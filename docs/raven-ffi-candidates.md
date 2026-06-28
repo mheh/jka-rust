@@ -1,0 +1,2328 @@
+# Raven FFI Candidate Inventory
+
+Generated from `oracle/oracle`, not from the incomplete Rust oracle port. The Raven tree is treated as the source of truth for module boundaries.
+
+## Scope
+
+Included: every Raven surface I found that crosses a module/engine boundary: VM/DLL entry points, engine-to-module command declarations, module-to-engine syscall/trap declarations, SP function-table imports/exports, and platform loader touchpoints. Excluded: ordinary internal C/C++ functions and unrelated third-party/dynamic APIs such as OpenGL/OpenAL/EAX unless they are exposed through a game/cgame/ui module boundary.
+
+## Summary
+
+| Surface | Numeric imports | Numeric exports / vmMain cases | Function-table imports | Function-table exports | Wrapper/entry functions | Primary files |
+|---|---:|---:|---:|---:|---:|---|
+| MP server game | 329 | 40 | 0 | 0 | 315 | `codemp/game/g_public.h`, `codemp/game/g_syscalls.c`, `codemp/game/g_main.c` |
+| MP cgame | 217 | 32 | 0 | 0 | 217 | `codemp/cgame/cg_public.h`, `codemp/cgame/cg_syscalls.c`, `codemp/cgame/cg_main.c` |
+| MP ui | 150 | 12 | 0 | 0 | 136 | `codemp/ui/ui_public.h`, `codemp/ui/ui_syscalls.c`, `codemp/ui/ui_main.c` |
+| SP cgame | 129 | 17 | 0 | 0 | 131 | `code/cgame/cg_public.h`, `code/cgame/cg_syscalls.cpp`, `code/cgame/cg_main.cpp` |
+| SP ui | 95 | 14 | 69 | 0 | 25 | `code/ui/ui_public.h`, `code/ui/ui_syscalls.cpp`, `code/ui/ui_main.cpp` |
+| SP game function table | 0 | 0 | 130 | 17 | 1 | `code/game/g_public.h`, `code/game/g_main.cpp` |
+
+## MP server game
+
+Sources: `codemp/game/g_public.h`, `codemp/game/g_syscalls.c`, `codemp/game/g_main.c`.
+
+### `gameImport_t` (329)
+
+- `G_PRINT`
+- `G_ERROR`
+- `G_MILLISECONDS`
+- `G_PRECISIONTIMER_START`
+- `G_PRECISIONTIMER_END`
+- `G_CVAR_REGISTER`
+- `G_CVAR_UPDATE`
+- `G_CVAR_SET`
+- `G_CVAR_VARIABLE_INTEGER_VALUE`
+- `G_CVAR_VARIABLE_STRING_BUFFER`
+- `G_ARGC`
+- `G_ARGV`
+- `G_FS_FOPEN_FILE`
+- `G_FS_READ`
+- `G_FS_WRITE`
+- `G_FS_FCLOSE_FILE`
+- `G_SEND_CONSOLE_COMMAND`
+- `G_LOCATE_GAME_DATA`
+- `G_DROP_CLIENT`
+- `G_SEND_SERVER_COMMAND`
+- `G_SET_CONFIGSTRING`
+- `G_GET_CONFIGSTRING`
+- `G_GET_USERINFO`
+- `G_SET_USERINFO`
+- `G_GET_SERVERINFO`
+- `G_SET_SERVER_CULL`
+- `G_SET_BRUSH_MODEL`
+- `G_TRACE`
+- `G_G2TRACE`
+- `G_POINT_CONTENTS`
+- `G_IN_PVS`
+- `G_IN_PVS_IGNORE_PORTALS`
+- `G_ADJUST_AREA_PORTAL_STATE`
+- `G_AREAS_CONNECTED`
+- `G_LINKENTITY`
+- `G_UNLINKENTITY`
+- `G_ENTITIES_IN_BOX`
+- `G_ENTITY_CONTACT`
+- `G_BOT_ALLOCATE_CLIENT`
+- `G_BOT_FREE_CLIENT`
+- `G_GET_USERCMD`
+- `G_GET_ENTITY_TOKEN`
+- `G_SIEGEPERSSET`
+- `G_SIEGEPERSGET`
+- `G_FS_GETFILELIST`
+- `G_DEBUG_POLYGON_CREATE`
+- `G_DEBUG_POLYGON_DELETE`
+- `G_REAL_TIME`
+- `G_SNAPVECTOR`
+- `G_TRACECAPSULE`
+- `G_ENTITY_CONTACTCAPSULE`
+- `SP_GETSTRINGTEXTSTRING`
+- `G_ROFF_CLEAN`
+- `G_ROFF_UPDATE_ENTITIES`
+- `G_ROFF_CACHE`
+- `G_ROFF_PLAY`
+- `G_ROFF_PURGE_ENT`
+- `G_TRUEMALLOC`
+- `G_TRUEFREE`
+- `G_ICARUS_RUNSCRIPT`
+- `G_ICARUS_REGISTERSCRIPT`
+- `G_ICARUS_INIT`
+- `G_ICARUS_VALIDENT`
+- `G_ICARUS_ISINITIALIZED`
+- `G_ICARUS_MAINTAINTASKMANAGER`
+- `G_ICARUS_ISRUNNING`
+- `G_ICARUS_TASKIDPENDING`
+- `G_ICARUS_INITENT`
+- `G_ICARUS_FREEENT`
+- `G_ICARUS_ASSOCIATEENT`
+- `G_ICARUS_SHUTDOWN`
+- `G_ICARUS_TASKIDSET`
+- `G_ICARUS_TASKIDCOMPLETE`
+- `G_ICARUS_SETVAR`
+- `G_ICARUS_VARIABLEDECLARED`
+- `G_ICARUS_GETFLOATVARIABLE`
+- `G_ICARUS_GETSTRINGVARIABLE`
+- `G_ICARUS_GETVECTORVARIABLE`
+- `G_SET_SHARED_BUFFER`
+- `G_MEMSET`
+- `G_MEMCPY`
+- `G_STRNCPY`
+- `G_SIN`
+- `G_COS`
+- `G_ATAN2`
+- `G_SQRT`
+- `G_MATRIXMULTIPLY`
+- `G_ANGLEVECTORS`
+- `G_PERPENDICULARVECTOR`
+- `G_FLOOR`
+- `G_CEIL`
+- `G_TESTPRINTINT`
+- `G_TESTPRINTFLOAT`
+- `G_ACOS`
+- `G_ASIN`
+- `G_NAV_INIT`
+- `G_NAV_FREE`
+- `G_NAV_LOAD`
+- `G_NAV_SAVE`
+- `G_NAV_ADDRAWPOINT`
+- `G_NAV_CALCULATEPATHS`
+- `G_NAV_HARDCONNECT`
+- `G_NAV_SHOWNODES`
+- `G_NAV_SHOWEDGES`
+- `G_NAV_SHOWPATH`
+- `G_NAV_GETNEARESTNODE`
+- `G_NAV_GETBESTNODE`
+- `G_NAV_GETNODEPOSITION`
+- `G_NAV_GETNODENUMEDGES`
+- `G_NAV_GETNODEEDGE`
+- `G_NAV_GETNUMNODES`
+- `G_NAV_CONNECTED`
+- `G_NAV_GETPATHCOST`
+- `G_NAV_GETEDGECOST`
+- `G_NAV_GETPROJECTEDNODE`
+- `G_NAV_CHECKFAILEDNODES`
+- `G_NAV_ADDFAILEDNODE`
+- `G_NAV_NODEFAILED`
+- `G_NAV_NODESARENEIGHBORS`
+- `G_NAV_CLEARFAILEDEDGE`
+- `G_NAV_CLEARALLFAILEDEDGES`
+- `G_NAV_EDGEFAILED`
+- `G_NAV_ADDFAILEDEDGE`
+- `G_NAV_CHECKFAILEDEDGE`
+- `G_NAV_CHECKALLFAILEDEDGES`
+- `G_NAV_ROUTEBLOCKED`
+- `G_NAV_GETBESTNODEALTROUTE`
+- `G_NAV_GETBESTNODEALT2`
+- `G_NAV_GETBESTPATHBETWEENENTS`
+- `G_NAV_GETNODERADIUS`
+- `G_NAV_CHECKBLOCKEDEDGES`
+- `G_NAV_CLEARCHECKEDNODES`
+- `G_NAV_CHECKEDNODE`
+- `G_NAV_SETCHECKEDNODE`
+- `G_NAV_FLAGALLNODES`
+- `G_NAV_GETPATHSCALCULATED`
+- `G_NAV_SETPATHSCALCULATED`
+- `BOTLIB_SETUP`
+- `BOTLIB_SHUTDOWN`
+- `BOTLIB_LIBVAR_SET`
+- `BOTLIB_LIBVAR_GET`
+- `BOTLIB_PC_ADD_GLOBAL_DEFINE`
+- `BOTLIB_START_FRAME`
+- `BOTLIB_LOAD_MAP`
+- `BOTLIB_UPDATENTITY`
+- `BOTLIB_TEST`
+- `BOTLIB_GET_SNAPSHOT_ENTITY`
+- `BOTLIB_GET_CONSOLE_MESSAGE`
+- `BOTLIB_USER_COMMAND`
+- `BOTLIB_AAS_ENABLE_ROUTING_AREA`
+- `BOTLIB_AAS_BBOX_AREAS`
+- `BOTLIB_AAS_AREA_INFO`
+- `BOTLIB_AAS_ENTITY_INFO`
+- `BOTLIB_AAS_INITIALIZED`
+- `BOTLIB_AAS_PRESENCE_TYPE_BOUNDING_BOX`
+- `BOTLIB_AAS_TIME`
+- `BOTLIB_AAS_POINT_AREA_NUM`
+- `BOTLIB_AAS_TRACE_AREAS`
+- `BOTLIB_AAS_POINT_CONTENTS`
+- `BOTLIB_AAS_NEXT_BSP_ENTITY`
+- `BOTLIB_AAS_VALUE_FOR_BSP_EPAIR_KEY`
+- `BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY`
+- `BOTLIB_AAS_FLOAT_FOR_BSP_EPAIR_KEY`
+- `BOTLIB_AAS_INT_FOR_BSP_EPAIR_KEY`
+- `BOTLIB_AAS_AREA_REACHABILITY`
+- `BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA`
+- `BOTLIB_AAS_SWIMMING`
+- `BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT`
+- `BOTLIB_EA_SAY`
+- `BOTLIB_EA_SAY_TEAM`
+- `BOTLIB_EA_COMMAND`
+- `BOTLIB_EA_ACTION`
+- `BOTLIB_EA_GESTURE`
+- `BOTLIB_EA_TALK`
+- `BOTLIB_EA_ATTACK`
+- `BOTLIB_EA_ALT_ATTACK`
+- `BOTLIB_EA_FORCEPOWER`
+- `BOTLIB_EA_USE`
+- `BOTLIB_EA_RESPAWN`
+- `BOTLIB_EA_CROUCH`
+- `BOTLIB_EA_MOVE_UP`
+- `BOTLIB_EA_MOVE_DOWN`
+- `BOTLIB_EA_MOVE_FORWARD`
+- `BOTLIB_EA_MOVE_BACK`
+- `BOTLIB_EA_MOVE_LEFT`
+- `BOTLIB_EA_MOVE_RIGHT`
+- `BOTLIB_EA_SELECT_WEAPON`
+- `BOTLIB_EA_JUMP`
+- `BOTLIB_EA_DELAYED_JUMP`
+- `BOTLIB_EA_MOVE`
+- `BOTLIB_EA_VIEW`
+- `BOTLIB_EA_END_REGULAR`
+- `BOTLIB_EA_GET_INPUT`
+- `BOTLIB_EA_RESET_INPUT`
+- `BOTLIB_AI_LOAD_CHARACTER`
+- `BOTLIB_AI_FREE_CHARACTER`
+- `BOTLIB_AI_CHARACTERISTIC_FLOAT`
+- `BOTLIB_AI_CHARACTERISTIC_BFLOAT`
+- `BOTLIB_AI_CHARACTERISTIC_INTEGER`
+- `BOTLIB_AI_CHARACTERISTIC_BINTEGER`
+- `BOTLIB_AI_CHARACTERISTIC_STRING`
+- `BOTLIB_AI_ALLOC_CHAT_STATE`
+- `BOTLIB_AI_FREE_CHAT_STATE`
+- `BOTLIB_AI_QUEUE_CONSOLE_MESSAGE`
+- `BOTLIB_AI_REMOVE_CONSOLE_MESSAGE`
+- `BOTLIB_AI_NEXT_CONSOLE_MESSAGE`
+- `BOTLIB_AI_NUM_CONSOLE_MESSAGE`
+- `BOTLIB_AI_INITIAL_CHAT`
+- `BOTLIB_AI_REPLY_CHAT`
+- `BOTLIB_AI_CHAT_LENGTH`
+- `BOTLIB_AI_ENTER_CHAT`
+- `BOTLIB_AI_STRING_CONTAINS`
+- `BOTLIB_AI_FIND_MATCH`
+- `BOTLIB_AI_MATCH_VARIABLE`
+- `BOTLIB_AI_UNIFY_WHITE_SPACES`
+- `BOTLIB_AI_REPLACE_SYNONYMS`
+- `BOTLIB_AI_LOAD_CHAT_FILE`
+- `BOTLIB_AI_SET_CHAT_GENDER`
+- `BOTLIB_AI_SET_CHAT_NAME`
+- `BOTLIB_AI_RESET_GOAL_STATE`
+- `BOTLIB_AI_RESET_AVOID_GOALS`
+- `BOTLIB_AI_PUSH_GOAL`
+- `BOTLIB_AI_POP_GOAL`
+- `BOTLIB_AI_EMPTY_GOAL_STACK`
+- `BOTLIB_AI_DUMP_AVOID_GOALS`
+- `BOTLIB_AI_DUMP_GOAL_STACK`
+- `BOTLIB_AI_GOAL_NAME`
+- `BOTLIB_AI_GET_TOP_GOAL`
+- `BOTLIB_AI_GET_SECOND_GOAL`
+- `BOTLIB_AI_CHOOSE_LTG_ITEM`
+- `BOTLIB_AI_CHOOSE_NBG_ITEM`
+- `BOTLIB_AI_TOUCHING_GOAL`
+- `BOTLIB_AI_ITEM_GOAL_IN_VIS_BUT_NOT_VISIBLE`
+- `BOTLIB_AI_GET_LEVEL_ITEM_GOAL`
+- `BOTLIB_AI_AVOID_GOAL_TIME`
+- `BOTLIB_AI_INIT_LEVEL_ITEMS`
+- `BOTLIB_AI_UPDATE_ENTITY_ITEMS`
+- `BOTLIB_AI_LOAD_ITEM_WEIGHTS`
+- `BOTLIB_AI_FREE_ITEM_WEIGHTS`
+- `BOTLIB_AI_SAVE_GOAL_FUZZY_LOGIC`
+- `BOTLIB_AI_ALLOC_GOAL_STATE`
+- `BOTLIB_AI_FREE_GOAL_STATE`
+- `BOTLIB_AI_RESET_MOVE_STATE`
+- `BOTLIB_AI_MOVE_TO_GOAL`
+- `BOTLIB_AI_MOVE_IN_DIRECTION`
+- `BOTLIB_AI_RESET_AVOID_REACH`
+- `BOTLIB_AI_RESET_LAST_AVOID_REACH`
+- `BOTLIB_AI_REACHABILITY_AREA`
+- `BOTLIB_AI_MOVEMENT_VIEW_TARGET`
+- `BOTLIB_AI_ALLOC_MOVE_STATE`
+- `BOTLIB_AI_FREE_MOVE_STATE`
+- `BOTLIB_AI_INIT_MOVE_STATE`
+- `BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON`
+- `BOTLIB_AI_GET_WEAPON_INFO`
+- `BOTLIB_AI_LOAD_WEAPON_WEIGHTS`
+- `BOTLIB_AI_ALLOC_WEAPON_STATE`
+- `BOTLIB_AI_FREE_WEAPON_STATE`
+- `BOTLIB_AI_RESET_WEAPON_STATE`
+- `BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION`
+- `BOTLIB_AI_INTERBREED_GOAL_FUZZY_LOGIC`
+- `BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC`
+- `BOTLIB_AI_GET_NEXT_CAMP_SPOT_GOAL`
+- `BOTLIB_AI_GET_MAP_LOCATION_GOAL`
+- `BOTLIB_AI_NUM_INITIAL_CHATS`
+- `BOTLIB_AI_GET_CHAT_MESSAGE`
+- `BOTLIB_AI_REMOVE_FROM_AVOID_GOALS`
+- `BOTLIB_AI_PREDICT_VISIBLE_POSITION`
+- `BOTLIB_AI_SET_AVOID_GOAL_TIME`
+- `BOTLIB_AI_ADD_AVOID_SPOT`
+- `BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL`
+- `BOTLIB_AAS_PREDICT_ROUTE`
+- `BOTLIB_AAS_POINT_REACHABILITY_AREA_INDEX`
+- `BOTLIB_PC_LOAD_SOURCE`
+- `BOTLIB_PC_FREE_SOURCE`
+- `BOTLIB_PC_READ_TOKEN`
+- `BOTLIB_PC_SOURCE_FILE_AND_LINE`
+- `G_R_REGISTERSKIN`
+- `G_G2_LISTBONES`
+- `G_G2_LISTSURFACES`
+- `G_G2_HAVEWEGHOULMODELS`
+- `G_G2_SETMODELS`
+- `G_G2_GETBOLT`
+- `G_G2_GETBOLT_NOREC`
+- `G_G2_GETBOLT_NOREC_NOROT`
+- `G_G2_INITGHOUL2MODEL`
+- `G_G2_SETSKIN`
+- `G_G2_SIZE`
+- `G_G2_ADDBOLT`
+- `G_G2_SETBOLTINFO`
+- `G_G2_ANGLEOVERRIDE`
+- `G_G2_PLAYANIM`
+- `G_G2_GETBONEANIM`
+- `G_G2_GETGLANAME`
+- `G_G2_COPYGHOUL2INSTANCE`
+- `G_G2_COPYSPECIFICGHOUL2MODEL`
+- `G_G2_DUPLICATEGHOUL2INSTANCE`
+- `G_G2_HASGHOUL2MODELONINDEX`
+- `G_G2_REMOVEGHOUL2MODEL`
+- `G_G2_REMOVEGHOUL2MODELS`
+- `G_G2_CLEANMODELS`
+- `G_G2_COLLISIONDETECT`
+- `G_G2_COLLISIONDETECTCACHE`
+- `G_G2_SETROOTSURFACE`
+- `G_G2_SETSURFACEONOFF`
+- `G_G2_SETNEWORIGIN`
+- `G_G2_DOESBONEEXIST`
+- `G_G2_GETSURFACERENDERSTATUS`
+- `G_G2_ABSURDSMOOTHING`
+- `G_G2_SETRAGDOLL`
+- `G_G2_ANIMATEG2MODELS`
+- `G_G2_RAGPCJCONSTRAINT`
+- `G_G2_RAGPCJGRADIENTSPEED`
+- `G_G2_RAGEFFECTORGOAL`
+- `G_G2_GETRAGBONEPOS`
+- `G_G2_RAGEFFECTORKICK`
+- `G_G2_RAGFORCESOLVE`
+- `G_G2_SETBONEIKSTATE`
+- `G_G2_IKMOVE`
+- `G_G2_REMOVEBONE`
+- `G_G2_ATTACHINSTANCETOENTNUM`
+- `G_G2_CLEARATTACHEDINSTANCE`
+- `G_G2_CLEANENTATTACHMENTS`
+- `G_G2_OVERRIDESERVER`
+- `G_G2_GETSURFACENAME`
+- `G_SET_ACTIVE_SUBBSP`
+- `G_CM_REGISTER_TERRAIN`
+- `G_RMG_INIT`
+- `G_BOT_UPDATEWAYPOINTS`
+- `G_BOT_CALCULATEPATHS`
+
+### `gameExport_t` (40)
+
+- `GAME_INIT`
+- `GAME_SHUTDOWN`
+- `GAME_CLIENT_CONNECT`
+- `GAME_CLIENT_BEGIN`
+- `GAME_CLIENT_USERINFO_CHANGED`
+- `GAME_CLIENT_DISCONNECT`
+- `GAME_CLIENT_COMMAND`
+- `GAME_CLIENT_THINK`
+- `GAME_RUN_FRAME`
+- `GAME_CONSOLE_COMMAND`
+- `BOTAI_START_FRAME`
+- `GAME_ROFF_NOTETRACK_CALLBACK`
+- `GAME_SPAWN_RMG_ENTITY`
+- `GAME_ICARUS_PLAYSOUND`
+- `GAME_ICARUS_SET`
+- `GAME_ICARUS_LERP2POS`
+- `GAME_ICARUS_LERP2ORIGIN`
+- `GAME_ICARUS_LERP2ANGLES`
+- `GAME_ICARUS_GETTAG`
+- `GAME_ICARUS_LERP2START`
+- `GAME_ICARUS_LERP2END`
+- `GAME_ICARUS_USE`
+- `GAME_ICARUS_KILL`
+- `GAME_ICARUS_REMOVE`
+- `GAME_ICARUS_PLAY`
+- `GAME_ICARUS_GETFLOAT`
+- `GAME_ICARUS_GETVECTOR`
+- `GAME_ICARUS_GETSTRING`
+- `GAME_ICARUS_SOUNDINDEX`
+- `GAME_ICARUS_GETSETIDFORSTRING`
+- `GAME_NAV_CLEARPATHTOPOINT`
+- `GAME_NAV_CLEARLOS`
+- `GAME_NAV_CLEARPATHBETWEENPOINTS`
+- `GAME_NAV_CHECKNODEFAILEDFORENT`
+- `GAME_NAV_ENTISUNLOCKEDDOOR`
+- `GAME_NAV_ENTISDOOR`
+- `GAME_NAV_ENTISBREAKABLE`
+- `GAME_NAV_ENTISREMOVABLEUSABLE`
+- `GAME_NAV_FINDCOMBATPOINTWAYPOINTS`
+- `GAME_GETITEMINDEXBYTAG`
+
+### Syscall wrappers and entry functions (314)
+
+- `void dllEntry( int (QDECL *syscallptr)( int arg,... ) )` (`codemp/game/g_syscalls.c:14`)
+- `void trap_Printf( const char *fmt )` (`codemp/game/g_syscalls.c:27`)
+- `void trap_Error( const char *fmt )` (`codemp/game/g_syscalls.c:31`)
+- `int trap_Milliseconds( void )` (`codemp/game/g_syscalls.c:35`)
+- `void trap_PrecisionTimer_Start(void **theNewTimer)` (`codemp/game/g_syscalls.c:46`)
+- `int trap_PrecisionTimer_End(void *theTimer)` (`codemp/game/g_syscalls.c:52`)
+- `void trap_Cvar_Register( vmCvar_t *cvar, const char *var_name, const char *value, int flags )` (`codemp/game/g_syscalls.c:57`)
+- `void trap_Cvar_Update( vmCvar_t *cvar )` (`codemp/game/g_syscalls.c:61`)
+- `void trap_Cvar_Set( const char *var_name, const char *value )` (`codemp/game/g_syscalls.c:65`)
+- `int trap_Cvar_VariableIntegerValue( const char *var_name )` (`codemp/game/g_syscalls.c:69`)
+- `void trap_Cvar_VariableStringBuffer( const char *var_name, char *buffer, int bufsize )` (`codemp/game/g_syscalls.c:73`)
+- `int trap_Argc( void )` (`codemp/game/g_syscalls.c:77`)
+- `void trap_Argv( int n, char *buffer, int bufferLength )` (`codemp/game/g_syscalls.c:81`)
+- `int trap_FS_FOpenFile( const char *qpath, fileHandle_t *f, fsMode_t mode )` (`codemp/game/g_syscalls.c:85`)
+- `void trap_FS_Read( void *buffer, int len, fileHandle_t f )` (`codemp/game/g_syscalls.c:89`)
+- `void trap_FS_Write( const void *buffer, int len, fileHandle_t f )` (`codemp/game/g_syscalls.c:93`)
+- `void trap_FS_FCloseFile( fileHandle_t f )` (`codemp/game/g_syscalls.c:97`)
+- `void trap_SendConsoleCommand( int exec_when, const char *text )` (`codemp/game/g_syscalls.c:101`)
+- `void trap_LocateGameData( gentity_t *gEnts, int numGEntities, int sizeofGEntity_t, playerState_t *clients, int sizeofGClient )` (`codemp/game/g_syscalls.c:105`)
+- `void trap_DropClient( int clientNum, const char *reason )` (`codemp/game/g_syscalls.c:110`)
+- `void trap_SendServerCommand( int clientNum, const char *text )` (`codemp/game/g_syscalls.c:114`)
+- `void trap_SetConfigstring( int num, const char *string )` (`codemp/game/g_syscalls.c:118`)
+- `void trap_GetConfigstring( int num, char *buffer, int bufferSize )` (`codemp/game/g_syscalls.c:122`)
+- `void trap_GetUserinfo( int num, char *buffer, int bufferSize )` (`codemp/game/g_syscalls.c:126`)
+- `void trap_SetUserinfo( int num, const char *buffer )` (`codemp/game/g_syscalls.c:130`)
+- `void trap_GetServerinfo( char *buffer, int bufferSize )` (`codemp/game/g_syscalls.c:134`)
+- `void trap_SetServerCull(float cullDistance)` (`codemp/game/g_syscalls.c:139`)
+- `void trap_SetBrushModel( gentity_t *ent, const char *name )` (`codemp/game/g_syscalls.c:144`)
+- `void trap_Trace( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask )` (`codemp/game/g_syscalls.c:148`)
+- `void trap_G2Trace( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask, int g2TraceType, int traceLod )` (`codemp/game/g_syscalls.c:153`)
+- `int trap_PointContents( const vec3_t point, int passEntityNum )` (`codemp/game/g_syscalls.c:157`)
+- `qboolean trap_InPVS( const vec3_t p1, const vec3_t p2 )` (`codemp/game/g_syscalls.c:162`)
+- `qboolean trap_InPVSIgnorePortals( const vec3_t p1, const vec3_t p2 )` (`codemp/game/g_syscalls.c:166`)
+- `void trap_AdjustAreaPortalState( gentity_t *ent, qboolean open )` (`codemp/game/g_syscalls.c:170`)
+- `qboolean trap_AreasConnected( int area1, int area2 )` (`codemp/game/g_syscalls.c:174`)
+- `void trap_LinkEntity( gentity_t *ent )` (`codemp/game/g_syscalls.c:178`)
+- `void trap_UnlinkEntity( gentity_t *ent )` (`codemp/game/g_syscalls.c:182`)
+- `int trap_EntitiesInBox( const vec3_t mins, const vec3_t maxs, int *list, int maxcount )` (`codemp/game/g_syscalls.c:186`)
+- `qboolean trap_EntityContact( const vec3_t mins, const vec3_t maxs, const gentity_t *ent )` (`codemp/game/g_syscalls.c:190`)
+- `int trap_BotAllocateClient( void )` (`codemp/game/g_syscalls.c:194`)
+- `void trap_BotFreeClient( int clientNum )` (`codemp/game/g_syscalls.c:198`)
+- `void trap_GetUsercmd( int clientNum, usercmd_t *cmd )` (`codemp/game/g_syscalls.c:202`)
+- `qboolean trap_GetEntityToken( char *buffer, int bufferSize )` (`codemp/game/g_syscalls.c:206`)
+- `void trap_SiegePersSet(siegePers_t *pers)` (`codemp/game/g_syscalls.c:210`)
+- `void trap_SiegePersGet(siegePers_t *pers)` (`codemp/game/g_syscalls.c:214`)
+- `int trap_FS_GetFileList( const char *path, const char *extension, char *listbuf, int bufsize )` (`codemp/game/g_syscalls.c:219`)
+- `int trap_DebugPolygonCreate(int color, int numPoints, vec3_t *points)` (`codemp/game/g_syscalls.c:223`)
+- `void trap_DebugPolygonDelete(int id)` (`codemp/game/g_syscalls.c:227`)
+- `int trap_RealTime( qtime_t *qtime )` (`codemp/game/g_syscalls.c:231`)
+- `void trap_SnapVector( float *v )` (`codemp/game/g_syscalls.c:235`)
+- `void trap_TraceCapsule( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask )` (`codemp/game/g_syscalls.c:239`)
+- `qboolean trap_EntityContactCapsule( const vec3_t mins, const vec3_t maxs, const gentity_t *ent )` (`codemp/game/g_syscalls.c:243`)
+- `int trap_SP_GetStringTextString(const char *text, char *buffer, int bufferLength)` (`codemp/game/g_syscalls.c:252`)
+- `qboolean trap_ROFF_Clean( void )` (`codemp/game/g_syscalls.c:257`)
+- `void trap_ROFF_UpdateEntities( void )` (`codemp/game/g_syscalls.c:262`)
+- `int trap_ROFF_Cache( char *file )` (`codemp/game/g_syscalls.c:267`)
+- `qboolean trap_ROFF_Play( int entID, int roffID, qboolean doTranslation )` (`codemp/game/g_syscalls.c:272`)
+- `qboolean trap_ROFF_Purge_Ent( int entID )` (`codemp/game/g_syscalls.c:277`)
+- `void trap_TrueMalloc(void **ptr, int size)` (`codemp/game/g_syscalls.c:283`)
+- `void trap_TrueFree(void **ptr)` (`codemp/game/g_syscalls.c:288`)
+- `int trap_ICARUS_RunScript( gentity_t *ent, const char *name )` (`codemp/game/g_syscalls.c:294`)
+- `qboolean trap_ICARUS_RegisterScript( const char *name, qboolean bCalledDuringInterrogate)` (`codemp/game/g_syscalls.c:299`)
+- `void trap_ICARUS_Init( void )` (`codemp/game/g_syscalls.c:304`)
+- `qboolean trap_ICARUS_ValidEnt( gentity_t *ent )` (`codemp/game/g_syscalls.c:309`)
+- `qboolean trap_ICARUS_IsInitialized( int entID )` (`codemp/game/g_syscalls.c:314`)
+- `qboolean trap_ICARUS_MaintainTaskManager( int entID )` (`codemp/game/g_syscalls.c:319`)
+- `qboolean trap_ICARUS_IsRunning( int entID )` (`codemp/game/g_syscalls.c:324`)
+- `qboolean trap_ICARUS_TaskIDPending(gentity_t *ent, int taskID)` (`codemp/game/g_syscalls.c:329`)
+- `void trap_ICARUS_InitEnt( gentity_t *ent )` (`codemp/game/g_syscalls.c:334`)
+- `void trap_ICARUS_FreeEnt( gentity_t *ent )` (`codemp/game/g_syscalls.c:339`)
+- `void trap_ICARUS_AssociateEnt( gentity_t *ent )` (`codemp/game/g_syscalls.c:344`)
+- `void trap_ICARUS_Shutdown( void )` (`codemp/game/g_syscalls.c:349`)
+- `void trap_ICARUS_TaskIDSet(gentity_t *ent, int taskType, int taskID)` (`codemp/game/g_syscalls.c:354`)
+- `void trap_ICARUS_TaskIDComplete(gentity_t *ent, int taskType)` (`codemp/game/g_syscalls.c:359`)
+- `void trap_ICARUS_SetVar(int taskID, int entID, const char *type_name, const char *data)` (`codemp/game/g_syscalls.c:364`)
+- `int trap_ICARUS_VariableDeclared(const char *type_name)` (`codemp/game/g_syscalls.c:369`)
+- `int trap_ICARUS_GetFloatVariable( const char *name, float *value )` (`codemp/game/g_syscalls.c:374`)
+- `int trap_ICARUS_GetStringVariable( const char *name, const char *value )` (`codemp/game/g_syscalls.c:379`)
+- `int trap_ICARUS_GetVectorVariable( const char *name, const vec3_t value )` (`codemp/game/g_syscalls.c:384`)
+- `void trap_Nav_Init( void )` (`codemp/game/g_syscalls.c:390`)
+- `void trap_Nav_Free( void )` (`codemp/game/g_syscalls.c:395`)
+- `qboolean trap_Nav_Load( const char *filename, int checksum )` (`codemp/game/g_syscalls.c:400`)
+- `qboolean trap_Nav_Save( const char *filename, int checksum )` (`codemp/game/g_syscalls.c:405`)
+- `int trap_Nav_AddRawPoint( vec3_t point, int flags, int radius )` (`codemp/game/g_syscalls.c:410`)
+- `void trap_Nav_CalculatePaths( qboolean recalc ) //recalc = qfalse` (`codemp/game/g_syscalls.c:415`)
+- `void trap_Nav_HardConnect( int first, int second )` (`codemp/game/g_syscalls.c:420`)
+- `void trap_Nav_ShowNodes( void )` (`codemp/game/g_syscalls.c:425`)
+- `void trap_Nav_ShowEdges( void )` (`codemp/game/g_syscalls.c:430`)
+- `void trap_Nav_ShowPath( int start, int end )` (`codemp/game/g_syscalls.c:435`)
+- `int trap_Nav_GetNearestNode( gentity_t *ent, int lastID, int flags, int targetID )` (`codemp/game/g_syscalls.c:440`)
+- `int trap_Nav_GetBestNode( int startID, int endID, int rejectID ) //rejectID = NODE_NONE` (`codemp/game/g_syscalls.c:445`)
+- `int trap_Nav_GetNodePosition( int nodeID, vec3_t out )` (`codemp/game/g_syscalls.c:450`)
+- `int trap_Nav_GetNodeNumEdges( int nodeID )` (`codemp/game/g_syscalls.c:455`)
+- `int trap_Nav_GetNodeEdge( int nodeID, int edge )` (`codemp/game/g_syscalls.c:460`)
+- `int trap_Nav_GetNumNodes( void )` (`codemp/game/g_syscalls.c:465`)
+- `qboolean trap_Nav_Connected( int startID, int endID )` (`codemp/game/g_syscalls.c:470`)
+- `int trap_Nav_GetPathCost( int startID, int endID )` (`codemp/game/g_syscalls.c:475`)
+- `int trap_Nav_GetEdgeCost( int startID, int endID )` (`codemp/game/g_syscalls.c:480`)
+- `int trap_Nav_GetProjectedNode( vec3_t origin, int nodeID )` (`codemp/game/g_syscalls.c:485`)
+- `void trap_Nav_CheckFailedNodes( gentity_t *ent )` (`codemp/game/g_syscalls.c:490`)
+- `void trap_Nav_AddFailedNode( gentity_t *ent, int nodeID )` (`codemp/game/g_syscalls.c:495`)
+- `qboolean trap_Nav_NodeFailed( gentity_t *ent, int nodeID )` (`codemp/game/g_syscalls.c:500`)
+- `qboolean trap_Nav_NodesAreNeighbors( int startID, int endID )` (`codemp/game/g_syscalls.c:505`)
+- `void trap_Nav_ClearFailedEdge( failedEdge_t *failedEdge )` (`codemp/game/g_syscalls.c:510`)
+- `void trap_Nav_ClearAllFailedEdges( void )` (`codemp/game/g_syscalls.c:515`)
+- `int trap_Nav_EdgeFailed( int startID, int endID )` (`codemp/game/g_syscalls.c:520`)
+- `void trap_Nav_AddFailedEdge( int entID, int startID, int endID )` (`codemp/game/g_syscalls.c:525`)
+- `qboolean trap_Nav_CheckFailedEdge( failedEdge_t *failedEdge )` (`codemp/game/g_syscalls.c:530`)
+- `void trap_Nav_CheckAllFailedEdges( void )` (`codemp/game/g_syscalls.c:535`)
+- `qboolean trap_Nav_RouteBlocked( int startID, int testEdgeID, int endID, int rejectRank )` (`codemp/game/g_syscalls.c:540`)
+- `int trap_Nav_GetBestNodeAltRoute( int startID, int endID, int *pathCost, int rejectID ) //rejectID = NODE_NONE` (`codemp/game/g_syscalls.c:545`)
+- `int trap_Nav_GetBestNodeAltRoute2( int startID, int endID, int rejectID ) //rejectID = NODE_NONE` (`codemp/game/g_syscalls.c:550`)
+- `int trap_Nav_GetBestPathBetweenEnts( gentity_t *ent, gentity_t *goal, int flags )` (`codemp/game/g_syscalls.c:555`)
+- `int trap_Nav_GetNodeRadius( int nodeID )` (`codemp/game/g_syscalls.c:560`)
+- `void trap_Nav_CheckBlockedEdges( void )` (`codemp/game/g_syscalls.c:565`)
+- `void trap_Nav_ClearCheckedNodes( void )` (`codemp/game/g_syscalls.c:570`)
+- `int trap_Nav_CheckedNode(int wayPoint, int ent) //return int was byte` (`codemp/game/g_syscalls.c:575`)
+- `void trap_Nav_SetCheckedNode(int wayPoint, int ent, int value) //int value was byte value` (`codemp/game/g_syscalls.c:580`)
+- `void trap_Nav_FlagAllNodes( int newFlag )` (`codemp/game/g_syscalls.c:585`)
+- `qboolean trap_Nav_GetPathsCalculated(void)` (`codemp/game/g_syscalls.c:590`)
+- `void trap_Nav_SetPathsCalculated(qboolean newVal)` (`codemp/game/g_syscalls.c:595`)
+- `void trap_SV_RegisterSharedMemory(char *memory)` (`codemp/game/g_syscalls.c:601`)
+- `int trap_BotLibSetup( void )` (`codemp/game/g_syscalls.c:607`)
+- `int trap_BotLibShutdown( void )` (`codemp/game/g_syscalls.c:611`)
+- `int trap_BotLibVarSet(char *var_name, char *value)` (`codemp/game/g_syscalls.c:615`)
+- `int trap_BotLibVarGet(char *var_name, char *value, int size)` (`codemp/game/g_syscalls.c:619`)
+- `int trap_BotLibDefine(char *string)` (`codemp/game/g_syscalls.c:623`)
+- `int trap_BotLibStartFrame(float time)` (`codemp/game/g_syscalls.c:627`)
+- `int trap_BotLibLoadMap(const char *mapname)` (`codemp/game/g_syscalls.c:631`)
+- `int trap_BotLibUpdateEntity(int ent, void /* struct bot_updateentity_s */ *bue)` (`codemp/game/g_syscalls.c:635`)
+- `int trap_BotLibTest(int parm0, char *parm1, vec3_t parm2, vec3_t parm3)` (`codemp/game/g_syscalls.c:639`)
+- `int trap_BotGetSnapshotEntity( int clientNum, int sequence )` (`codemp/game/g_syscalls.c:643`)
+- `int trap_BotGetServerCommand(int clientNum, char *message, int size)` (`codemp/game/g_syscalls.c:647`)
+- `void trap_BotUserCommand(int clientNum, usercmd_t *ucmd)` (`codemp/game/g_syscalls.c:651`)
+- `void trap_AAS_EntityInfo(int entnum, void /* struct aas_entityinfo_s */ *info)` (`codemp/game/g_syscalls.c:655`)
+- `int trap_AAS_Initialized(void)` (`codemp/game/g_syscalls.c:659`)
+- `void trap_AAS_PresenceTypeBoundingBox(int presencetype, vec3_t mins, vec3_t maxs)` (`codemp/game/g_syscalls.c:663`)
+- `float trap_AAS_Time(void)` (`codemp/game/g_syscalls.c:667`)
+- `int trap_AAS_PointAreaNum(vec3_t point)` (`codemp/game/g_syscalls.c:673`)
+- `int trap_AAS_PointReachabilityAreaIndex(vec3_t point)` (`codemp/game/g_syscalls.c:677`)
+- `int trap_AAS_TraceAreas(vec3_t start, vec3_t end, int *areas, vec3_t *points, int maxareas)` (`codemp/game/g_syscalls.c:681`)
+- `int trap_AAS_BBoxAreas(vec3_t absmins, vec3_t absmaxs, int *areas, int maxareas)` (`codemp/game/g_syscalls.c:685`)
+- `int trap_AAS_AreaInfo( int areanum, void /* struct aas_areainfo_s */ *info )` (`codemp/game/g_syscalls.c:689`)
+- `int trap_AAS_PointContents(vec3_t point)` (`codemp/game/g_syscalls.c:693`)
+- `int trap_AAS_NextBSPEntity(int ent)` (`codemp/game/g_syscalls.c:697`)
+- `int trap_AAS_ValueForBSPEpairKey(int ent, char *key, char *value, int size)` (`codemp/game/g_syscalls.c:701`)
+- `int trap_AAS_VectorForBSPEpairKey(int ent, char *key, vec3_t v)` (`codemp/game/g_syscalls.c:705`)
+- `int trap_AAS_FloatForBSPEpairKey(int ent, char *key, float *value)` (`codemp/game/g_syscalls.c:709`)
+- `int trap_AAS_IntForBSPEpairKey(int ent, char *key, int *value)` (`codemp/game/g_syscalls.c:713`)
+- `int trap_AAS_AreaReachability(int areanum)` (`codemp/game/g_syscalls.c:717`)
+- `int trap_AAS_AreaTravelTimeToGoalArea(int areanum, vec3_t origin, int goalareanum, int travelflags)` (`codemp/game/g_syscalls.c:721`)
+- `int trap_AAS_EnableRoutingArea( int areanum, int enable )` (`codemp/game/g_syscalls.c:725`)
+- `int trap_AAS_PredictRoute(void /*struct aas_predictroute_s*/ *route, int areanum, vec3_t origin, int goalareanum, int travelflags, int maxareas, int maxtime, int stopevent, int stopcontents, int stoptfl, int stopareanum)` (`codemp/game/g_syscalls.c:729`)
+- `int trap_AAS_AlternativeRouteGoals(vec3_t start, int startareanum, vec3_t goal, int goalareanum, int travelflags, void /*struct aas_altroutegoal_s*/ *altroutegoals, int maxaltroutegoals, int type)` (`codemp/game/g_syscalls.c:735`)
+- `int trap_AAS_Swimming(vec3_t origin)` (`codemp/game/g_syscalls.c:741`)
+- `int trap_AAS_PredictClientMovement(void /* struct aas_clientmove_s */ *move, int entnum, vec3_t origin, int presencetype, int onground, vec3_t velocity, vec3_t cmdmove, int cmdframes, int maxframes, float frametime, int stopevent, int stopareanum, int visualize)` (`codemp/game/g_syscalls.c:745`)
+- `void trap_EA_Say(int client, char *str)` (`codemp/game/g_syscalls.c:749`)
+- `void trap_EA_SayTeam(int client, char *str)` (`codemp/game/g_syscalls.c:753`)
+- `void trap_EA_Command(int client, char *command)` (`codemp/game/g_syscalls.c:757`)
+- `void trap_EA_Action(int client, int action)` (`codemp/game/g_syscalls.c:761`)
+- `void trap_EA_Gesture(int client)` (`codemp/game/g_syscalls.c:765`)
+- `void trap_EA_Talk(int client)` (`codemp/game/g_syscalls.c:769`)
+- `void trap_EA_Attack(int client)` (`codemp/game/g_syscalls.c:773`)
+- `void trap_EA_Alt_Attack(int client)` (`codemp/game/g_syscalls.c:777`)
+- `void trap_EA_ForcePower(int client)` (`codemp/game/g_syscalls.c:781`)
+- `void trap_EA_Use(int client)` (`codemp/game/g_syscalls.c:785`)
+- `void trap_EA_Respawn(int client)` (`codemp/game/g_syscalls.c:789`)
+- `void trap_EA_Crouch(int client)` (`codemp/game/g_syscalls.c:793`)
+- `void trap_EA_MoveUp(int client)` (`codemp/game/g_syscalls.c:797`)
+- `void trap_EA_MoveDown(int client)` (`codemp/game/g_syscalls.c:801`)
+- `void trap_EA_MoveForward(int client)` (`codemp/game/g_syscalls.c:805`)
+- `void trap_EA_MoveBack(int client)` (`codemp/game/g_syscalls.c:809`)
+- `void trap_EA_MoveLeft(int client)` (`codemp/game/g_syscalls.c:813`)
+- `void trap_EA_MoveRight(int client)` (`codemp/game/g_syscalls.c:817`)
+- `void trap_EA_SelectWeapon(int client, int weapon)` (`codemp/game/g_syscalls.c:821`)
+- `void trap_EA_Jump(int client)` (`codemp/game/g_syscalls.c:825`)
+- `void trap_EA_DelayedJump(int client)` (`codemp/game/g_syscalls.c:829`)
+- `void trap_EA_Move(int client, vec3_t dir, float speed)` (`codemp/game/g_syscalls.c:833`)
+- `void trap_EA_View(int client, vec3_t viewangles)` (`codemp/game/g_syscalls.c:837`)
+- `void trap_EA_EndRegular(int client, float thinktime)` (`codemp/game/g_syscalls.c:841`)
+- `void trap_EA_GetInput(int client, float thinktime, void /* struct bot_input_s */ *input)` (`codemp/game/g_syscalls.c:845`)
+- `void trap_EA_ResetInput(int client)` (`codemp/game/g_syscalls.c:849`)
+- `int trap_BotLoadCharacter(char *charfile, float skill)` (`codemp/game/g_syscalls.c:853`)
+- `void trap_BotFreeCharacter(int character)` (`codemp/game/g_syscalls.c:857`)
+- `float trap_Characteristic_Float(int character, int index)` (`codemp/game/g_syscalls.c:861`)
+- `float trap_Characteristic_BFloat(int character, int index, float min, float max)` (`codemp/game/g_syscalls.c:867`)
+- `int trap_Characteristic_Integer(int character, int index)` (`codemp/game/g_syscalls.c:873`)
+- `int trap_Characteristic_BInteger(int character, int index, int min, int max)` (`codemp/game/g_syscalls.c:877`)
+- `void trap_Characteristic_String(int character, int index, char *buf, int size)` (`codemp/game/g_syscalls.c:881`)
+- `int trap_BotAllocChatState(void)` (`codemp/game/g_syscalls.c:885`)
+- `void trap_BotFreeChatState(int handle)` (`codemp/game/g_syscalls.c:889`)
+- `void trap_BotQueueConsoleMessage(int chatstate, int type, char *message)` (`codemp/game/g_syscalls.c:893`)
+- `void trap_BotRemoveConsoleMessage(int chatstate, int handle)` (`codemp/game/g_syscalls.c:897`)
+- `int trap_BotNextConsoleMessage(int chatstate, void /* struct bot_consolemessage_s */ *cm)` (`codemp/game/g_syscalls.c:901`)
+- `int trap_BotNumConsoleMessages(int chatstate)` (`codemp/game/g_syscalls.c:905`)
+- `void trap_BotInitialChat(int chatstate, char *type, int mcontext, char *var0, char *var1, char *var2, char *var3, char *var4, char *var5, char *var6, char *var7 )` (`codemp/game/g_syscalls.c:909`)
+- `int trap_BotNumInitialChats(int chatstate, char *type)` (`codemp/game/g_syscalls.c:913`)
+- `int trap_BotReplyChat(int chatstate, char *message, int mcontext, int vcontext, char *var0, char *var1, char *var2, char *var3, char *var4, char *var5, char *var6, char *var7 )` (`codemp/game/g_syscalls.c:917`)
+- `int trap_BotChatLength(int chatstate)` (`codemp/game/g_syscalls.c:921`)
+- `void trap_BotEnterChat(int chatstate, int client, int sendto)` (`codemp/game/g_syscalls.c:925`)
+- `void trap_BotGetChatMessage(int chatstate, char *buf, int size)` (`codemp/game/g_syscalls.c:929`)
+- `int trap_StringContains(char *str1, char *str2, int casesensitive)` (`codemp/game/g_syscalls.c:933`)
+- `int trap_BotFindMatch(char *str, void /* struct bot_match_s */ *match, unsigned long int context)` (`codemp/game/g_syscalls.c:937`)
+- `void trap_BotMatchVariable(void /* struct bot_match_s */ *match, int variable, char *buf, int size)` (`codemp/game/g_syscalls.c:941`)
+- `void trap_UnifyWhiteSpaces(char *string)` (`codemp/game/g_syscalls.c:945`)
+- `void trap_BotReplaceSynonyms(char *string, unsigned long int context)` (`codemp/game/g_syscalls.c:949`)
+- `int trap_BotLoadChatFile(int chatstate, char *chatfile, char *chatname)` (`codemp/game/g_syscalls.c:953`)
+- `void trap_BotSetChatGender(int chatstate, int gender)` (`codemp/game/g_syscalls.c:957`)
+- `void trap_BotSetChatName(int chatstate, char *name, int client)` (`codemp/game/g_syscalls.c:961`)
+- `void trap_BotResetGoalState(int goalstate)` (`codemp/game/g_syscalls.c:965`)
+- `void trap_BotResetAvoidGoals(int goalstate)` (`codemp/game/g_syscalls.c:969`)
+- `void trap_BotRemoveFromAvoidGoals(int goalstate, int number)` (`codemp/game/g_syscalls.c:973`)
+- `void trap_BotPushGoal(int goalstate, void /* struct bot_goal_s */ *goal)` (`codemp/game/g_syscalls.c:977`)
+- `void trap_BotPopGoal(int goalstate)` (`codemp/game/g_syscalls.c:981`)
+- `void trap_BotEmptyGoalStack(int goalstate)` (`codemp/game/g_syscalls.c:985`)
+- `void trap_BotDumpAvoidGoals(int goalstate)` (`codemp/game/g_syscalls.c:989`)
+- `void trap_BotDumpGoalStack(int goalstate)` (`codemp/game/g_syscalls.c:993`)
+- `void trap_BotGoalName(int number, char *name, int size)` (`codemp/game/g_syscalls.c:997`)
+- `int trap_BotGetTopGoal(int goalstate, void /* struct bot_goal_s */ *goal)` (`codemp/game/g_syscalls.c:1001`)
+- `int trap_BotGetSecondGoal(int goalstate, void /* struct bot_goal_s */ *goal)` (`codemp/game/g_syscalls.c:1005`)
+- `int trap_BotChooseLTGItem(int goalstate, vec3_t origin, int *inventory, int travelflags)` (`codemp/game/g_syscalls.c:1009`)
+- `int trap_BotChooseNBGItem(int goalstate, vec3_t origin, int *inventory, int travelflags, void /* struct bot_goal_s */ *ltg, float maxtime)` (`codemp/game/g_syscalls.c:1013`)
+- `int trap_BotTouchingGoal(vec3_t origin, void /* struct bot_goal_s */ *goal)` (`codemp/game/g_syscalls.c:1017`)
+- `int trap_BotItemGoalInVisButNotVisible(int viewer, vec3_t eye, vec3_t viewangles, void /* struct bot_goal_s */ *goal)` (`codemp/game/g_syscalls.c:1021`)
+- `int trap_BotGetLevelItemGoal(int index, char *classname, void /* struct bot_goal_s */ *goal)` (`codemp/game/g_syscalls.c:1025`)
+- `int trap_BotGetNextCampSpotGoal(int num, void /* struct bot_goal_s */ *goal)` (`codemp/game/g_syscalls.c:1029`)
+- `int trap_BotGetMapLocationGoal(char *name, void /* struct bot_goal_s */ *goal)` (`codemp/game/g_syscalls.c:1033`)
+- `float trap_BotAvoidGoalTime(int goalstate, int number)` (`codemp/game/g_syscalls.c:1037`)
+- `void trap_BotSetAvoidGoalTime(int goalstate, int number, float avoidtime)` (`codemp/game/g_syscalls.c:1043`)
+- `void trap_BotInitLevelItems(void)` (`codemp/game/g_syscalls.c:1047`)
+- `void trap_BotUpdateEntityItems(void)` (`codemp/game/g_syscalls.c:1051`)
+- `int trap_BotLoadItemWeights(int goalstate, char *filename)` (`codemp/game/g_syscalls.c:1055`)
+- `void trap_BotFreeItemWeights(int goalstate)` (`codemp/game/g_syscalls.c:1059`)
+- `void trap_BotInterbreedGoalFuzzyLogic(int parent1, int parent2, int child)` (`codemp/game/g_syscalls.c:1063`)
+- `void trap_BotSaveGoalFuzzyLogic(int goalstate, char *filename)` (`codemp/game/g_syscalls.c:1067`)
+- `void trap_BotMutateGoalFuzzyLogic(int goalstate, float range)` (`codemp/game/g_syscalls.c:1071`)
+- `int trap_BotAllocGoalState(int state)` (`codemp/game/g_syscalls.c:1075`)
+- `void trap_BotFreeGoalState(int handle)` (`codemp/game/g_syscalls.c:1079`)
+- `void trap_BotResetMoveState(int movestate)` (`codemp/game/g_syscalls.c:1083`)
+- `void trap_BotAddAvoidSpot(int movestate, vec3_t origin, float radius, int type)` (`codemp/game/g_syscalls.c:1087`)
+- `void trap_BotMoveToGoal(void /* struct bot_moveresult_s */ *result, int movestate, void /* struct bot_goal_s */ *goal, int travelflags)` (`codemp/game/g_syscalls.c:1091`)
+- `int trap_BotMoveInDirection(int movestate, vec3_t dir, float speed, int type)` (`codemp/game/g_syscalls.c:1095`)
+- `void trap_BotResetAvoidReach(int movestate)` (`codemp/game/g_syscalls.c:1099`)
+- `void trap_BotResetLastAvoidReach(int movestate)` (`codemp/game/g_syscalls.c:1103`)
+- `int trap_BotReachabilityArea(vec3_t origin, int testground)` (`codemp/game/g_syscalls.c:1107`)
+- `int trap_BotMovementViewTarget(int movestate, void /* struct bot_goal_s */ *goal, int travelflags, float lookahead, vec3_t target)` (`codemp/game/g_syscalls.c:1111`)
+- `int trap_BotPredictVisiblePosition(vec3_t origin, int areanum, void /* struct bot_goal_s */ *goal, int travelflags, vec3_t target)` (`codemp/game/g_syscalls.c:1115`)
+- `int trap_BotAllocMoveState(void)` (`codemp/game/g_syscalls.c:1119`)
+- `void trap_BotFreeMoveState(int handle)` (`codemp/game/g_syscalls.c:1123`)
+- `void trap_BotInitMoveState(int handle, void /* struct bot_initmove_s */ *initmove)` (`codemp/game/g_syscalls.c:1127`)
+- `int trap_BotChooseBestFightWeapon(int weaponstate, int *inventory)` (`codemp/game/g_syscalls.c:1131`)
+- `void trap_BotGetWeaponInfo(int weaponstate, int weapon, void /* struct weaponinfo_s */ *weaponinfo)` (`codemp/game/g_syscalls.c:1135`)
+- `int trap_BotLoadWeaponWeights(int weaponstate, char *filename)` (`codemp/game/g_syscalls.c:1139`)
+- `int trap_BotAllocWeaponState(void)` (`codemp/game/g_syscalls.c:1143`)
+- `void trap_BotFreeWeaponState(int weaponstate)` (`codemp/game/g_syscalls.c:1147`)
+- `void trap_BotResetWeaponState(int weaponstate)` (`codemp/game/g_syscalls.c:1151`)
+- `int trap_GeneticParentsAndChildSelection(int numranks, float *ranks, int *parent1, int *parent2, int *child)` (`codemp/game/g_syscalls.c:1155`)
+- `int trap_PC_LoadSource( const char *filename )` (`codemp/game/g_syscalls.c:1159`)
+- `int trap_PC_FreeSource( int handle )` (`codemp/game/g_syscalls.c:1163`)
+- `int trap_PC_ReadToken( int handle, pc_token_t *pc_token )` (`codemp/game/g_syscalls.c:1167`)
+- `int trap_PC_SourceFileAndLine( int handle, char *filename, int *line )` (`codemp/game/g_syscalls.c:1171`)
+- `qhandle_t trap_R_RegisterSkin( const char *name )` (`codemp/game/g_syscalls.c:1179`)
+- `void trap_G2_ListModelBones(void *ghlInfo, int frame)` (`codemp/game/g_syscalls.c:1185`)
+- `void trap_G2_ListModelSurfaces(void *ghlInfo)` (`codemp/game/g_syscalls.c:1190`)
+- `qboolean trap_G2_HaveWeGhoul2Models( void *ghoul2)` (`codemp/game/g_syscalls.c:1195`)
+- `void trap_G2_SetGhoul2ModelIndexes(void *ghoul2, qhandle_t *modelList, qhandle_t *skinList)` (`codemp/game/g_syscalls.c:1200`)
+- `qboolean trap_G2API_GetBoltMatrix(void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale)` (`codemp/game/g_syscalls.c:1205`)
+- `qboolean trap_G2API_GetBoltMatrix_NoReconstruct(void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale)` (`codemp/game/g_syscalls.c:1211`)
+- `qboolean trap_G2API_GetBoltMatrix_NoRecNoRot(void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale)` (`codemp/game/g_syscalls.c:1217`)
+- `int trap_G2API_InitGhoul2Model(void **ghoul2Ptr, const char *fileName, int modelIndex, qhandle_t customSkin, qhandle_t customShader, int modelFlags, int lodBias)` (`codemp/game/g_syscalls.c:1223`)
+- `qboolean trap_G2API_SetSkin(void *ghoul2, int modelIndex, qhandle_t customSkin, qhandle_t renderSkin)` (`codemp/game/g_syscalls.c:1229`)
+- `int trap_G2API_Ghoul2Size ( void* ghlInfo )` (`codemp/game/g_syscalls.c:1234`)
+- `int trap_G2API_AddBolt(void *ghoul2, int modelIndex, const char *boneName)` (`codemp/game/g_syscalls.c:1239`)
+- `void trap_G2API_SetBoltInfo(void *ghoul2, int modelIndex, int boltInfo)` (`codemp/game/g_syscalls.c:1244`)
+- `qboolean trap_G2API_SetBoneAngles(void *ghoul2, int modelIndex, const char *boneName, const vec3_t angles, const int flags, const int up, const int right, const int forward, qhandle_t *modelList, int blendTime , int currentTime )` (`codemp/game/g_syscalls.c:1249`)
+- `qboolean trap_G2API_SetBoneAnim(void *ghoul2, const int modelIndex, const char *boneName, const int startFrame, const int endFrame, const int flags, const float animSpeed, const int currentTime, const float setFrame , const int blendTime )` (`codemp/game/g_syscalls.c:1256`)
+- `qboolean trap_G2API_GetBoneAnim(void *ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *startFrame, int *endFrame, int *flags, float *animSpeed, int *modelList, const int modelIndex)` (`codemp/game/g_syscalls.c:1262`)
+- `void trap_G2API_GetGLAName(void *ghoul2, int modelIndex, char *fillBuf)` (`codemp/game/g_syscalls.c:1268`)
+- `int trap_G2API_CopyGhoul2Instance(void *g2From, void *g2To, int modelIndex)` (`codemp/game/g_syscalls.c:1273`)
+- `void trap_G2API_CopySpecificGhoul2Model(void *g2From, int modelFrom, void *g2To, int modelTo)` (`codemp/game/g_syscalls.c:1278`)
+- `void trap_G2API_DuplicateGhoul2Instance(void *g2From, void **g2To)` (`codemp/game/g_syscalls.c:1283`)
+- `qboolean trap_G2API_HasGhoul2ModelOnIndex(void *ghlInfo, int modelIndex)` (`codemp/game/g_syscalls.c:1288`)
+- `qboolean trap_G2API_RemoveGhoul2Model(void *ghlInfo, int modelIndex)` (`codemp/game/g_syscalls.c:1293`)
+- `qboolean trap_G2API_RemoveGhoul2Models(void *ghlInfo)` (`codemp/game/g_syscalls.c:1298`)
+- `void trap_G2API_CleanGhoul2Models(void **ghoul2Ptr)` (`codemp/game/g_syscalls.c:1303`)
+- `void trap_G2API_CollisionDetect ( CollisionRecord_t *collRecMap, void* ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, vec3_t rayStart, vec3_t rayEnd, vec3_t scale, int traceFlags, int useLod, float fRadius )` (`codemp/game/g_syscalls.c:1308`)
+- `void trap_G2API_CollisionDetectCache ( CollisionRecord_t *collRecMap, void* ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, vec3_t rayStart, vec3_t rayEnd, vec3_t scale, int traceFlags, int useLod, float fRadius )` (`codemp/game/g_syscalls.c:1326`)
+- `void trap_G2API_GetSurfaceName(void *ghoul2, int surfNumber, int modelIndex, char *fillBuf)` (`codemp/game/g_syscalls.c:1344`)
+- `qboolean trap_G2API_SetRootSurface(void *ghoul2, const int modelIndex, const char *surfaceName)` (`codemp/game/g_syscalls.c:1349`)
+- `qboolean trap_G2API_SetSurfaceOnOff(void *ghoul2, const char *surfaceName, const int flags)` (`codemp/game/g_syscalls.c:1354`)
+- `qboolean trap_G2API_SetNewOrigin(void *ghoul2, const int boltIndex)` (`codemp/game/g_syscalls.c:1359`)
+- `qboolean trap_G2API_DoesBoneExist(void *ghoul2, int modelIndex, const char *boneName)` (`codemp/game/g_syscalls.c:1365`)
+- `int trap_G2API_GetSurfaceRenderStatus(void *ghoul2, const int modelIndex, const char *surfaceName)` (`codemp/game/g_syscalls.c:1370`)
+- `void trap_G2API_AbsurdSmoothing(void *ghoul2, qboolean status)` (`codemp/game/g_syscalls.c:1376`)
+- `void trap_G2API_SetRagDoll(void *ghoul2, sharedRagDollParams_t *params)` (`codemp/game/g_syscalls.c:1382`)
+- `void trap_G2API_AnimateG2Models(void *ghoul2, int time, sharedRagDollUpdateParams_t *params)` (`codemp/game/g_syscalls.c:1387`)
+- `qboolean trap_G2API_RagPCJConstraint(void *ghoul2, const char *boneName, vec3_t min, vec3_t max) //override default pcj bonee constraints` (`codemp/game/g_syscalls.c:1394`)
+- `qboolean trap_G2API_RagPCJGradientSpeed(void *ghoul2, const char *boneName, const float speed) //override the default gradient movespeed for a pcj bone` (`codemp/game/g_syscalls.c:1399`)
+- `qboolean trap_G2API_RagEffectorGoal(void *ghoul2, const char *boneName, vec3_t pos) //override an effector bone's goal position (world coordinates)` (`codemp/game/g_syscalls.c:1404`)
+- `qboolean trap_G2API_GetRagBonePos(void *ghoul2, const char *boneName, vec3_t pos, vec3_t entAngles, vec3_t entPos, vec3_t entScale) //current position of said bone is put into pos (world coordinates)` (`codemp/game/g_syscalls.c:1409`)
+- `qboolean trap_G2API_RagEffectorKick(void *ghoul2, const char *boneName, vec3_t velocity) //add velocity to a rag bone` (`codemp/game/g_syscalls.c:1414`)
+- `qboolean trap_G2API_RagForceSolve(void *ghoul2, qboolean force) //make sure we are actively performing solve/settle routines, if desired` (`codemp/game/g_syscalls.c:1419`)
+- `qboolean trap_G2API_SetBoneIKState(void *ghoul2, int time, const char *boneName, int ikState, sharedSetBoneIKStateParams_t *params)` (`codemp/game/g_syscalls.c:1424`)
+- `qboolean trap_G2API_IKMove(void *ghoul2, int time, sharedIKMoveParams_t *params)` (`codemp/game/g_syscalls.c:1429`)
+- `qboolean trap_G2API_RemoveBone(void *ghoul2, const char *boneName, int modelIndex)` (`codemp/game/g_syscalls.c:1434`)
+- `void trap_G2API_AttachInstanceToEntNum(void *ghoul2, int entityNum, qboolean server)` (`codemp/game/g_syscalls.c:1444`)
+- `void trap_G2API_ClearAttachedInstance(int entityNum)` (`codemp/game/g_syscalls.c:1449`)
+- `void trap_G2API_CleanEntAttachments(void)` (`codemp/game/g_syscalls.c:1454`)
+- `qboolean trap_G2API_OverrideServer(void *serverInstance)` (`codemp/game/g_syscalls.c:1459`)
+- `void trap_SetActiveSubBSP(int index)` (`codemp/game/g_syscalls.c:1468`)
+- `int trap_CM_RegisterTerrain(const char *config)` (`codemp/game/g_syscalls.c:1473`)
+- `void trap_RMG_Init(int terrainID)` (`codemp/game/g_syscalls.c:1478`)
+- `void trap_Bot_UpdateWaypoints(int wpnum, wpobject_t **wps)` (`codemp/game/g_syscalls.c:1483`)
+- `void trap_Bot_CalculatePaths(int rmg)` (`codemp/game/g_syscalls.c:1488`)
+
+### VM entry functions (1)
+
+- `int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11 )` (`codemp/game/g_main.c:515`)
+
+## MP cgame
+
+Sources: `codemp/cgame/cg_public.h`, `codemp/cgame/cg_syscalls.c`, `codemp/cgame/cg_main.c`.
+
+### `cgameImport_t` (217)
+
+- `CG_PRINT`
+- `CG_ERROR`
+- `CG_MILLISECONDS`
+- `CG_PRECISIONTIMER_START`
+- `CG_PRECISIONTIMER_END`
+- `CG_CVAR_REGISTER`
+- `CG_CVAR_UPDATE`
+- `CG_CVAR_SET`
+- `CG_CVAR_VARIABLESTRINGBUFFER`
+- `CG_CVAR_GETHIDDENVALUE`
+- `CG_ARGC`
+- `CG_ARGV`
+- `CG_ARGS`
+- `CG_FS_FOPENFILE`
+- `CG_FS_READ`
+- `CG_FS_WRITE`
+- `CG_FS_FCLOSEFILE`
+- `CG_FS_GETFILELIST`
+- `CG_SENDCONSOLECOMMAND`
+- `CG_ADDCOMMAND`
+- `CG_REMOVECOMMAND`
+- `CG_SENDCLIENTCOMMAND`
+- `CG_UPDATESCREEN`
+- `CG_CM_LOADMAP`
+- `CG_CM_NUMINLINEMODELS`
+- `CG_CM_INLINEMODEL`
+- `CG_CM_TEMPBOXMODEL`
+- `CG_CM_TEMPCAPSULEMODEL`
+- `CG_CM_POINTCONTENTS`
+- `CG_CM_TRANSFORMEDPOINTCONTENTS`
+- `CG_CM_BOXTRACE`
+- `CG_CM_CAPSULETRACE`
+- `CG_CM_TRANSFORMEDBOXTRACE`
+- `CG_CM_TRANSFORMEDCAPSULETRACE`
+- `CG_CM_MARKFRAGMENTS`
+- `CG_S_GETVOICEVOLUME`
+- `CG_S_MUTESOUND`
+- `CG_S_STARTSOUND`
+- `CG_S_STARTLOCALSOUND`
+- `CG_S_CLEARLOOPINGSOUNDS`
+- `CG_S_ADDLOOPINGSOUND`
+- `CG_S_UPDATEENTITYPOSITION`
+- `CG_S_ADDREALLOOPINGSOUND`
+- `CG_S_STOPLOOPINGSOUND`
+- `CG_S_RESPATIALIZE`
+- `CG_S_SHUTUP`
+- `CG_S_REGISTERSOUND`
+- `CG_S_STARTBACKGROUNDTRACK`
+- `CG_S_UPDATEAMBIENTSET`
+- `CG_AS_PARSESETS`
+- `CG_AS_ADDPRECACHEENTRY`
+- `CG_S_ADDLOCALSET`
+- `CG_AS_GETBMODELSOUND`
+- `CG_R_LOADWORLDMAP`
+- `CG_R_REGISTERMODEL`
+- `CG_R_REGISTERSKIN`
+- `CG_R_REGISTERSHADER`
+- `CG_R_REGISTERSHADERNOMIP`
+- `CG_R_REGISTERFONT`
+- `CG_R_FONT_STRLENPIXELS`
+- `CG_R_FONT_STRLENCHARS`
+- `CG_R_FONT_STRHEIGHTPIXELS`
+- `CG_R_FONT_DRAWSTRING`
+- `CG_LANGUAGE_ISASIAN`
+- `CG_LANGUAGE_USESSPACES`
+- `CG_ANYLANGUAGE_READCHARFROMSTRING`
+- `CG_R_CLEARSCENE`
+- `CG_R_CLEARDECALS`
+- `CG_R_ADDREFENTITYTOSCENE`
+- `CG_R_ADDPOLYTOSCENE`
+- `CG_R_ADDPOLYSTOSCENE`
+- `CG_R_ADDDECALTOSCENE`
+- `CG_R_LIGHTFORPOINT`
+- `CG_R_ADDLIGHTTOSCENE`
+- `CG_R_ADDADDITIVELIGHTTOSCENE`
+- `CG_R_RENDERSCENE`
+- `CG_R_SETCOLOR`
+- `CG_R_DRAWSTRETCHPIC`
+- `CG_R_MODELBOUNDS`
+- `CG_R_LERPTAG`
+- `CG_R_DRAWROTATEPIC`
+- `CG_R_DRAWROTATEPIC2`
+- `CG_R_SETRANGEFOG`
+- `CG_R_SETREFRACTIONPROP`
+- `CG_R_REMAP_SHADER`
+- `CG_R_GET_LIGHT_STYLE`
+- `CG_R_SET_LIGHT_STYLE`
+- `CG_R_GET_BMODEL_VERTS`
+- `CG_R_GETDISTANCECULL`
+- `CG_R_GETREALRES`
+- `CG_R_AUTOMAPELEVADJ`
+- `CG_R_INITWIREFRAMEAUTO`
+- `CG_FX_ADDLINE`
+- `CG_GETGLCONFIG`
+- `CG_GETGAMESTATE`
+- `CG_GETCURRENTSNAPSHOTNUMBER`
+- `CG_GETSNAPSHOT`
+- `CG_GETDEFAULTSTATE`
+- `CG_GETSERVERCOMMAND`
+- `CG_GETCURRENTCMDNUMBER`
+- `CG_GETUSERCMD`
+- `CG_SETUSERCMDVALUE`
+- `CG_SETCLIENTFORCEANGLE`
+- `CG_SETCLIENTTURNEXTENT`
+- `CG_OPENUIMENU`
+- `CG_TESTPRINTINT`
+- `CG_TESTPRINTFLOAT`
+- `CG_MEMORY_REMAINING`
+- `CG_KEY_ISDOWN`
+- `CG_KEY_GETCATCHER`
+- `CG_KEY_SETCATCHER`
+- `CG_KEY_GETKEY`
+- `CG_PC_ADD_GLOBAL_DEFINE`
+- `CG_PC_LOAD_SOURCE`
+- `CG_PC_FREE_SOURCE`
+- `CG_PC_READ_TOKEN`
+- `CG_PC_SOURCE_FILE_AND_LINE`
+- `CG_PC_LOAD_GLOBAL_DEFINES`
+- `CG_PC_REMOVE_ALL_GLOBAL_DEFINES`
+- `CG_S_STOPBACKGROUNDTRACK`
+- `CG_REAL_TIME`
+- `CG_SNAPVECTOR`
+- `CG_CIN_PLAYCINEMATIC`
+- `CG_CIN_STOPCINEMATIC`
+- `CG_CIN_RUNCINEMATIC`
+- `CG_CIN_DRAWCINEMATIC`
+- `CG_CIN_SETEXTENTS`
+- `CG_GET_ENTITY_TOKEN`
+- `CG_R_INPVS`
+- `CG_FX_REGISTER_EFFECT`
+- `CG_FX_PLAY_EFFECT`
+- `CG_FX_PLAY_ENTITY_EFFECT`
+- `CG_FX_PLAY_EFFECT_ID`
+- `CG_FX_PLAY_PORTAL_EFFECT_ID`
+- `CG_FX_PLAY_ENTITY_EFFECT_ID`
+- `CG_FX_PLAY_BOLTED_EFFECT_ID`
+- `CG_FX_ADD_SCHEDULED_EFFECTS`
+- `CG_FX_INIT_SYSTEM`
+- `CG_FX_SET_REFDEF`
+- `CG_FX_FREE_SYSTEM`
+- `CG_FX_ADJUST_TIME`
+- `CG_FX_DRAW_2D_EFFECTS`
+- `CG_FX_RESET`
+- `CG_FX_ADDPOLY`
+- `CG_FX_ADDBEZIER`
+- `CG_FX_ADDPRIMITIVE`
+- `CG_FX_ADDSPRITE`
+- `CG_FX_ADDELECTRICITY`
+- `CG_SP_GETSTRINGTEXTSTRING`
+- `CG_ROFF_CLEAN`
+- `CG_ROFF_UPDATE_ENTITIES`
+- `CG_ROFF_CACHE`
+- `CG_ROFF_PLAY`
+- `CG_ROFF_PURGE_ENT`
+- `CG_TRUEMALLOC`
+- `CG_TRUEFREE`
+- `CG_G2_LISTSURFACES`
+- `CG_G2_LISTBONES`
+- `CG_G2_SETMODELS`
+- `CG_G2_HAVEWEGHOULMODELS`
+- `CG_G2_GETBOLT`
+- `CG_G2_GETBOLT_NOREC`
+- `CG_G2_GETBOLT_NOREC_NOROT`
+- `CG_G2_INITGHOUL2MODEL`
+- `CG_G2_SETSKIN`
+- `CG_G2_COLLISIONDETECT`
+- `CG_G2_COLLISIONDETECTCACHE`
+- `CG_G2_CLEANMODELS`
+- `CG_G2_ANGLEOVERRIDE`
+- `CG_G2_PLAYANIM`
+- `CG_G2_GETBONEANIM`
+- `CG_G2_GETBONEFRAME`
+- `CG_G2_GETGLANAME`
+- `CG_G2_COPYGHOUL2INSTANCE`
+- `CG_G2_COPYSPECIFICGHOUL2MODEL`
+- `CG_G2_DUPLICATEGHOUL2INSTANCE`
+- `CG_G2_HASGHOUL2MODELONINDEX`
+- `CG_G2_REMOVEGHOUL2MODEL`
+- `CG_G2_SKINLESSMODEL`
+- `CG_G2_GETNUMGOREMARKS`
+- `CG_G2_ADDSKINGORE`
+- `CG_G2_CLEARSKINGORE`
+- `CG_G2_SIZE`
+- `CG_G2_ADDBOLT`
+- `CG_G2_ATTACHENT`
+- `CG_G2_SETBOLTON`
+- `CG_G2_SETROOTSURFACE`
+- `CG_G2_SETSURFACEONOFF`
+- `CG_G2_SETNEWORIGIN`
+- `CG_G2_DOESBONEEXIST`
+- `CG_G2_GETSURFACERENDERSTATUS`
+- `CG_G2_GETTIME`
+- `CG_G2_SETTIME`
+- `CG_G2_ABSURDSMOOTHING`
+- `CG_G2_SETRAGDOLL`
+- `CG_G2_ANIMATEG2MODELS`
+- `CG_G2_RAGPCJCONSTRAINT`
+- `CG_G2_RAGPCJGRADIENTSPEED`
+- `CG_G2_RAGEFFECTORGOAL`
+- `CG_G2_GETRAGBONEPOS`
+- `CG_G2_RAGEFFECTORKICK`
+- `CG_G2_RAGFORCESOLVE`
+- `CG_G2_SETBONEIKSTATE`
+- `CG_G2_IKMOVE`
+- `CG_G2_REMOVEBONE`
+- `CG_G2_ATTACHINSTANCETOENTNUM`
+- `CG_G2_CLEARATTACHEDINSTANCE`
+- `CG_G2_CLEANENTATTACHMENTS`
+- `CG_G2_OVERRIDESERVER`
+- `CG_G2_GETSURFACENAME`
+- `CG_SET_SHARED_BUFFER`
+- `CG_CM_REGISTER_TERRAIN`
+- `CG_RMG_INIT`
+- `CG_RE_INIT_RENDERER_TERRAIN`
+- `CG_R_WEATHER_CONTENTS_OVERRIDE`
+- `CG_R_WORLDEFFECTCOMMAND`
+- `CG_WE_ADDWEATHERZONE`
+
+### `cgameExport_t` (32)
+
+- `CG_INIT`
+- `CG_SHUTDOWN`
+- `CG_CONSOLE_COMMAND`
+- `CG_DRAW_ACTIVE_FRAME`
+- `CG_CROSSHAIR_PLAYER`
+- `CG_LAST_ATTACKER`
+- `CG_KEY_EVENT`
+- `CG_MOUSE_EVENT`
+- `CG_EVENT_HANDLING`
+- `CG_POINT_CONTENTS`
+- `CG_GET_LERP_ORIGIN`
+- `CG_GET_LERP_DATA`
+- `CG_GET_GHOUL2`
+- `CG_GET_MODEL_LIST`
+- `CG_CALC_LERP_POSITIONS`
+- `CG_TRACE`
+- `CG_G2TRACE`
+- `CG_G2MARK`
+- `CG_RAG_CALLBACK`
+- `CG_INCOMING_CONSOLE_COMMAND`
+- `CG_GET_USEABLE_FORCE`
+- `CG_GET_ORIGIN`
+- `CG_GET_ANGLES`
+- `CG_GET_ORIGIN_TRAJECTORY`
+- `CG_GET_ANGLE_TRAJECTORY`
+- `CG_ROFF_NOTETRACK_CALLBACK`
+- `CG_IMPACT_MARK`
+- `CG_MAP_CHANGE`
+- `CG_AUTOMAP_INPUT`
+- `CG_MISC_ENT`
+- `CG_GET_SORTED_FORCE_POWER`
+- `CG_FX_CAMERASHAKE`
+
+### Syscall wrappers and entry functions (216)
+
+- `void dllEntry( int (QDECL *syscallptr)( int arg,... ) )` (`codemp/cgame/cg_syscalls.c:10`)
+- `void trap_Print( const char *fmt )` (`codemp/cgame/cg_syscalls.c:21`)
+- `void trap_Error( const char *fmt )` (`codemp/cgame/cg_syscalls.c:25`)
+- `int trap_Milliseconds( void )` (`codemp/cgame/cg_syscalls.c:29`)
+- `void trap_PrecisionTimer_Start(void **theNewTimer)` (`codemp/cgame/cg_syscalls.c:39`)
+- `int trap_PrecisionTimer_End(void *theTimer)` (`codemp/cgame/cg_syscalls.c:45`)
+- `void trap_Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, int flags )` (`codemp/cgame/cg_syscalls.c:50`)
+- `void trap_Cvar_Update( vmCvar_t *vmCvar )` (`codemp/cgame/cg_syscalls.c:54`)
+- `void trap_Cvar_Set( const char *var_name, const char *value )` (`codemp/cgame/cg_syscalls.c:58`)
+- `void trap_Cvar_VariableStringBuffer( const char *var_name, char *buffer, int bufsize )` (`codemp/cgame/cg_syscalls.c:62`)
+- `int trap_Cvar_GetHiddenVarValue(const char *name)` (`codemp/cgame/cg_syscalls.c:66`)
+- `int trap_Argc( void )` (`codemp/cgame/cg_syscalls.c:71`)
+- `void trap_Argv( int n, char *buffer, int bufferLength )` (`codemp/cgame/cg_syscalls.c:75`)
+- `void trap_Args( char *buffer, int bufferLength )` (`codemp/cgame/cg_syscalls.c:79`)
+- `int trap_FS_FOpenFile( const char *qpath, fileHandle_t *f, fsMode_t mode )` (`codemp/cgame/cg_syscalls.c:83`)
+- `void trap_FS_Read( void *buffer, int len, fileHandle_t f )` (`codemp/cgame/cg_syscalls.c:87`)
+- `void trap_FS_Write( const void *buffer, int len, fileHandle_t f )` (`codemp/cgame/cg_syscalls.c:91`)
+- `void trap_FS_FCloseFile( fileHandle_t f )` (`codemp/cgame/cg_syscalls.c:95`)
+- `int trap_FS_GetFileList( const char *path, const char *extension, char *listbuf, int bufsize )` (`codemp/cgame/cg_syscalls.c:99`)
+- `void trap_SendConsoleCommand( const char *text )` (`codemp/cgame/cg_syscalls.c:103`)
+- `void trap_AddCommand( const char *cmdName )` (`codemp/cgame/cg_syscalls.c:107`)
+- `void trap_RemoveCommand( const char *cmdName )` (`codemp/cgame/cg_syscalls.c:111`)
+- `void trap_SendClientCommand( const char *s )` (`codemp/cgame/cg_syscalls.c:115`)
+- `void trap_UpdateScreen( void )` (`codemp/cgame/cg_syscalls.c:119`)
+- `void trap_CM_LoadMap( const char *mapname, qboolean SubBSP )` (`codemp/cgame/cg_syscalls.c:123`)
+- `int trap_CM_NumInlineModels( void )` (`codemp/cgame/cg_syscalls.c:127`)
+- `clipHandle_t trap_CM_InlineModel( int index )` (`codemp/cgame/cg_syscalls.c:131`)
+- `clipHandle_t trap_CM_TempBoxModel( const vec3_t mins, const vec3_t maxs )` (`codemp/cgame/cg_syscalls.c:135`)
+- `clipHandle_t trap_CM_TempCapsuleModel( const vec3_t mins, const vec3_t maxs )` (`codemp/cgame/cg_syscalls.c:139`)
+- `int trap_CM_PointContents( const vec3_t p, clipHandle_t model )` (`codemp/cgame/cg_syscalls.c:143`)
+- `int trap_CM_TransformedPointContents( const vec3_t p, clipHandle_t model, const vec3_t origin, const vec3_t angles )` (`codemp/cgame/cg_syscalls.c:147`)
+- `void trap_CM_BoxTrace( trace_t *results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask )` (`codemp/cgame/cg_syscalls.c:151`)
+- `void trap_CM_CapsuleTrace( trace_t *results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask )` (`codemp/cgame/cg_syscalls.c:157`)
+- `void trap_CM_TransformedBoxTrace( trace_t *results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask, const vec3_t origin, const vec3_t angles )` (`codemp/cgame/cg_syscalls.c:163`)
+- `void trap_CM_TransformedCapsuleTrace( trace_t *results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask, const vec3_t origin, const vec3_t angles )` (`codemp/cgame/cg_syscalls.c:170`)
+- `int trap_CM_MarkFragments( int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer )` (`codemp/cgame/cg_syscalls.c:177`)
+- `int trap_S_GetVoiceVolume( int entityNum )` (`codemp/cgame/cg_syscalls.c:184`)
+- `void trap_S_MuteSound( int entityNum, int entchannel )` (`codemp/cgame/cg_syscalls.c:188`)
+- `void trap_S_StartSound( vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfx )` (`codemp/cgame/cg_syscalls.c:192`)
+- `void trap_S_StartLocalSound( sfxHandle_t sfx, int channelNum )` (`codemp/cgame/cg_syscalls.c:196`)
+- `void trap_S_ClearLoopingSounds(void)` (`codemp/cgame/cg_syscalls.c:200`)
+- `void trap_S_AddLoopingSound( int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfx )` (`codemp/cgame/cg_syscalls.c:204`)
+- `void trap_S_UpdateEntityPosition( int entityNum, const vec3_t origin )` (`codemp/cgame/cg_syscalls.c:208`)
+- `void trap_S_AddRealLoopingSound( int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfx )` (`codemp/cgame/cg_syscalls.c:212`)
+- `void trap_S_StopLoopingSound( int entityNum )` (`codemp/cgame/cg_syscalls.c:216`)
+- `void trap_S_Respatialize( int entityNum, const vec3_t origin, vec3_t axis[3], int inwater )` (`codemp/cgame/cg_syscalls.c:220`)
+- `void trap_S_ShutUp(qboolean shutUpFactor)` (`codemp/cgame/cg_syscalls.c:224`)
+- `sfxHandle_t trap_S_RegisterSound( const char *sample )` (`codemp/cgame/cg_syscalls.c:229`)
+- `void trap_S_StartBackgroundTrack( const char *intro, const char *loop, qboolean bReturnWithoutStarting )` (`codemp/cgame/cg_syscalls.c:233`)
+- `void trap_S_UpdateAmbientSet( const char *name, vec3_t origin )` (`codemp/cgame/cg_syscalls.c:237`)
+- `void trap_AS_ParseSets( void )` (`codemp/cgame/cg_syscalls.c:242`)
+- `void trap_AS_AddPrecacheEntry( const char *name )` (`codemp/cgame/cg_syscalls.c:247`)
+- `int trap_S_AddLocalSet( const char *name, vec3_t listener_origin, vec3_t origin, int entID, int time )` (`codemp/cgame/cg_syscalls.c:252`)
+- `sfxHandle_t trap_AS_GetBModelSound( const char *name, int stage )` (`codemp/cgame/cg_syscalls.c:257`)
+- `void trap_R_LoadWorldMap( const char *mapname )` (`codemp/cgame/cg_syscalls.c:262`)
+- `qhandle_t trap_R_RegisterModel( const char *name )` (`codemp/cgame/cg_syscalls.c:266`)
+- `qhandle_t trap_R_RegisterSkin( const char *name )` (`codemp/cgame/cg_syscalls.c:270`)
+- `qhandle_t trap_R_RegisterShader( const char *name )` (`codemp/cgame/cg_syscalls.c:274`)
+- `qhandle_t trap_R_RegisterShaderNoMip( const char *name )` (`codemp/cgame/cg_syscalls.c:278`)
+- `qhandle_t trap_R_RegisterFont( const char *fontName )` (`codemp/cgame/cg_syscalls.c:282`)
+- `int trap_R_Font_StrLenPixels(const char *text, const int iFontIndex, const float scale)` (`codemp/cgame/cg_syscalls.c:287`)
+- `int trap_R_Font_StrLenChars(const char *text)` (`codemp/cgame/cg_syscalls.c:292`)
+- `int trap_R_Font_HeightPixels(const int iFontIndex, const float scale)` (`codemp/cgame/cg_syscalls.c:297`)
+- `void trap_R_Font_DrawString(int ox, int oy, const char *text, const float *rgba, const int setIndex, int iCharLimit, const float scale)` (`codemp/cgame/cg_syscalls.c:302`)
+- `qboolean trap_Language_IsAsian(void)` (`codemp/cgame/cg_syscalls.c:307`)
+- `qboolean trap_Language_UsesSpaces(void)` (`codemp/cgame/cg_syscalls.c:312`)
+- `unsigned int trap_AnyLanguage_ReadCharFromString( const char *psText, int *piAdvanceCount, qboolean *pbIsTrailingPunctuation/* = NULL*/ )` (`codemp/cgame/cg_syscalls.c:317`)
+- `void trap_R_ClearScene( void )` (`codemp/cgame/cg_syscalls.c:322`)
+- `void trap_R_ClearDecals ( void )` (`codemp/cgame/cg_syscalls.c:326`)
+- `void trap_R_AddRefEntityToScene( const refEntity_t *re )` (`codemp/cgame/cg_syscalls.c:331`)
+- `void trap_R_AddPolyToScene( qhandle_t hShader , int numVerts, const polyVert_t *verts )` (`codemp/cgame/cg_syscalls.c:335`)
+- `void trap_R_AddPolysToScene( qhandle_t hShader , int numVerts, const polyVert_t *verts, int num )` (`codemp/cgame/cg_syscalls.c:339`)
+- `void trap_R_AddDecalToScene ( qhandle_t shader, const vec3_t origin, const vec3_t dir, float orientation, float r, float g, float b, float a, qboolean alphaFade, float radius, qboolean temporary )` (`codemp/cgame/cg_syscalls.c:343`)
+- `int trap_R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir )` (`codemp/cgame/cg_syscalls.c:348`)
+- `void trap_R_AddLightToScene( const vec3_t org, float intensity, float r, float g, float b )` (`codemp/cgame/cg_syscalls.c:352`)
+- `void trap_R_AddAdditiveLightToScene( const vec3_t org, float intensity, float r, float g, float b )` (`codemp/cgame/cg_syscalls.c:356`)
+- `void trap_R_RenderScene( const refdef_t *fd )` (`codemp/cgame/cg_syscalls.c:360`)
+- `void trap_R_SetColor( const float *rgba )` (`codemp/cgame/cg_syscalls.c:364`)
+- `void trap_R_DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader )` (`codemp/cgame/cg_syscalls.c:368`)
+- `void trap_R_ModelBounds( clipHandle_t model, vec3_t mins, vec3_t maxs )` (`codemp/cgame/cg_syscalls.c:373`)
+- `int trap_R_LerpTag( orientation_t *tag, clipHandle_t mod, int startFrame, int endFrame, float frac, const char *tagName )` (`codemp/cgame/cg_syscalls.c:377`)
+- `void trap_R_DrawRotatePic( float x, float y, float w, float h, float s1, float t1, float s2, float t2,float a, qhandle_t hShader )` (`codemp/cgame/cg_syscalls.c:382`)
+- `void trap_R_DrawRotatePic2( float x, float y, float w, float h, float s1, float t1, float s2, float t2,float a, qhandle_t hShader )` (`codemp/cgame/cg_syscalls.c:388`)
+- `void trap_R_SetRangeFog(float range)` (`codemp/cgame/cg_syscalls.c:395`)
+- `void trap_R_SetRefractProp(float alpha, float stretch, qboolean prepost, qboolean negate)` (`codemp/cgame/cg_syscalls.c:401`)
+- `void trap_R_RemapShader( const char *oldShader, const char *newShader, const char *timeOffset )` (`codemp/cgame/cg_syscalls.c:406`)
+- `void trap_R_GetLightStyle(int style, color4ub_t color)` (`codemp/cgame/cg_syscalls.c:411`)
+- `void trap_R_SetLightStyle(int style, int color)` (`codemp/cgame/cg_syscalls.c:416`)
+- `void trap_R_GetBModelVerts(int bmodelIndex, vec3_t *verts, vec3_t normal )` (`codemp/cgame/cg_syscalls.c:421`)
+- `void trap_R_GetDistanceCull(float *f)` (`codemp/cgame/cg_syscalls.c:426`)
+- `void trap_R_GetRealRes(int *w, int *h)` (`codemp/cgame/cg_syscalls.c:432`)
+- `void trap_R_AutomapElevAdj(float newHeight)` (`codemp/cgame/cg_syscalls.c:439`)
+- `qboolean trap_R_InitWireframeAutomap(void)` (`codemp/cgame/cg_syscalls.c:445`)
+- `void trap_FX_AddLine( const vec3_t start, const vec3_t end, float size1, float size2, float sizeParm, float alpha1, float alpha2, float alphaParm, const vec3_t sRGB, const vec3_t eRGB, float rgbParm, int killTime, qhandle_t shader, int flags)` (`codemp/cgame/cg_syscalls.c:450`)
+- `void trap_GetGlconfig( glconfig_t *glconfig )` (`codemp/cgame/cg_syscalls.c:461`)
+- `void trap_GetGameState( gameState_t *gamestate )` (`codemp/cgame/cg_syscalls.c:465`)
+- `void trap_GetCurrentSnapshotNumber( int *snapshotNumber, int *serverTime )` (`codemp/cgame/cg_syscalls.c:469`)
+- `qboolean trap_GetSnapshot( int snapshotNumber, snapshot_t *snapshot )` (`codemp/cgame/cg_syscalls.c:473`)
+- `qboolean trap_GetDefaultState(int entityIndex, entityState_t *state )` (`codemp/cgame/cg_syscalls.c:477`)
+- `qboolean trap_GetServerCommand( int serverCommandNumber )` (`codemp/cgame/cg_syscalls.c:482`)
+- `int trap_GetCurrentCmdNumber( void )` (`codemp/cgame/cg_syscalls.c:486`)
+- `qboolean trap_GetUserCmd( int cmdNumber, usercmd_t *ucmd )` (`codemp/cgame/cg_syscalls.c:490`)
+- `void trap_SetUserCmdValue( int stateValue, float sensitivityScale, float mPitchOverride, float mYawOverride, float mSensitivityOverride, int fpSel, int invenSel, qboolean fighterControls )` (`codemp/cgame/cg_syscalls.c:494`)
+- `void trap_SetClientForceAngle(int time, vec3_t angle)` (`codemp/cgame/cg_syscalls.c:498`)
+- `void trap_SetClientTurnExtent(float turnAdd, float turnSub, int turnTime)` (`codemp/cgame/cg_syscalls.c:503`)
+- `void trap_OpenUIMenu(int menuID)` (`codemp/cgame/cg_syscalls.c:508`)
+- `int trap_MemoryRemaining( void )` (`codemp/cgame/cg_syscalls.c:521`)
+- `qboolean trap_Key_IsDown( int keynum )` (`codemp/cgame/cg_syscalls.c:525`)
+- `int trap_Key_GetCatcher( void )` (`codemp/cgame/cg_syscalls.c:529`)
+- `void trap_Key_SetCatcher( int catcher )` (`codemp/cgame/cg_syscalls.c:533`)
+- `int trap_Key_GetKey( const char *binding )` (`codemp/cgame/cg_syscalls.c:537`)
+- `int trap_PC_AddGlobalDefine( char *define )` (`codemp/cgame/cg_syscalls.c:541`)
+- `int trap_PC_LoadSource( const char *filename )` (`codemp/cgame/cg_syscalls.c:545`)
+- `int trap_PC_FreeSource( int handle )` (`codemp/cgame/cg_syscalls.c:549`)
+- `int trap_PC_ReadToken( int handle, pc_token_t *pc_token )` (`codemp/cgame/cg_syscalls.c:553`)
+- `int trap_PC_SourceFileAndLine( int handle, char *filename, int *line )` (`codemp/cgame/cg_syscalls.c:557`)
+- `int trap_PC_LoadGlobalDefines ( const char* filename )` (`codemp/cgame/cg_syscalls.c:561`)
+- `void trap_PC_RemoveAllGlobalDefines ( void )` (`codemp/cgame/cg_syscalls.c:566`)
+- `void trap_S_StopBackgroundTrack( void )` (`codemp/cgame/cg_syscalls.c:571`)
+- `int trap_RealTime(qtime_t *qtime)` (`codemp/cgame/cg_syscalls.c:575`)
+- `void trap_SnapVector( float *v )` (`codemp/cgame/cg_syscalls.c:579`)
+- `int trap_CIN_PlayCinematic( const char *arg0, int xpos, int ypos, int width, int height, int bits)` (`codemp/cgame/cg_syscalls.c:584`)
+- `e_status trap_CIN_StopCinematic(int handle)` (`codemp/cgame/cg_syscalls.c:590`)
+- `e_status trap_CIN_RunCinematic (int handle)` (`codemp/cgame/cg_syscalls.c:596`)
+- `void trap_CIN_DrawCinematic (int handle)` (`codemp/cgame/cg_syscalls.c:602`)
+- `void trap_CIN_SetExtents (int handle, int x, int y, int w, int h)` (`codemp/cgame/cg_syscalls.c:608`)
+- `qboolean trap_GetEntityToken( char *buffer, int bufferSize )` (`codemp/cgame/cg_syscalls.c:612`)
+- `qboolean trap_R_inPVS( const vec3_t p1, const vec3_t p2, byte *mask )` (`codemp/cgame/cg_syscalls.c:616`)
+- `int trap_FX_RegisterEffect(const char *file)` (`codemp/cgame/cg_syscalls.c:621`)
+- `void trap_FX_PlayEffect( const char *file, vec3_t org, vec3_t fwd, int vol, int rad )` (`codemp/cgame/cg_syscalls.c:626`)
+- `void trap_FX_PlayEntityEffect( const char *file, vec3_t org, vec3_t axis[3], const int boltInfo, const int entNum, int vol, int rad )` (`codemp/cgame/cg_syscalls.c:631`)
+- `void trap_FX_PlayEffectID( int id, vec3_t org, vec3_t fwd, int vol, int rad )` (`codemp/cgame/cg_syscalls.c:637`)
+- `void trap_FX_PlayPortalEffectID( int id, vec3_t org, vec3_t fwd, int vol, int rad )` (`codemp/cgame/cg_syscalls.c:642`)
+- `void trap_FX_PlayEntityEffectID( int id, vec3_t org, vec3_t axis[3], const int boltInfo, const int entNum, int vol, int rad )` (`codemp/cgame/cg_syscalls.c:647`)
+- `void trap_FX_PlayBoltedEffectID( int id, vec3_t org, void *ghoul2, const int boltNum, const int entNum, const int modelNum, int iLooptime, qboolean isRelative )` (`codemp/cgame/cg_syscalls.c:653`)
+- `void trap_FX_AddScheduledEffects( qboolean skyPortal )` (`codemp/cgame/cg_syscalls.c:659`)
+- `void trap_FX_Draw2DEffects ( float screenXScale, float screenYScale )` (`codemp/cgame/cg_syscalls.c:664`)
+- `int trap_FX_InitSystem( refdef_t* refdef )` (`codemp/cgame/cg_syscalls.c:669`)
+- `void trap_FX_SetRefDef( refdef_t* refdef )` (`codemp/cgame/cg_syscalls.c:674`)
+- `qboolean trap_FX_FreeSystem( void )` (`codemp/cgame/cg_syscalls.c:679`)
+- `void trap_FX_Reset ( void )` (`codemp/cgame/cg_syscalls.c:684`)
+- `void trap_FX_AdjustTime( int time )` (`codemp/cgame/cg_syscalls.c:689`)
+- `void trap_FX_AddPoly( addpolyArgStruct_t *p )` (`codemp/cgame/cg_syscalls.c:695`)
+- `void trap_FX_AddBezier( addbezierArgStruct_t *p )` (`codemp/cgame/cg_syscalls.c:700`)
+- `void trap_FX_AddPrimitive( effectTrailArgStruct_t *p )` (`codemp/cgame/cg_syscalls.c:705`)
+- `void trap_FX_AddSprite( addspriteArgStruct_t *p )` (`codemp/cgame/cg_syscalls.c:710`)
+- `void trap_FX_AddElectricity( addElectricityArgStruct_t *p )` (`codemp/cgame/cg_syscalls.c:715`)
+- `int trap_SP_GetStringTextString(const char *text, char *buffer, int bufferLength)` (`codemp/cgame/cg_syscalls.c:725`)
+- `qboolean trap_ROFF_Clean( void )` (`codemp/cgame/cg_syscalls.c:730`)
+- `void trap_ROFF_UpdateEntities( void )` (`codemp/cgame/cg_syscalls.c:735`)
+- `int trap_ROFF_Cache( char *file )` (`codemp/cgame/cg_syscalls.c:740`)
+- `qboolean trap_ROFF_Play( int entID, int roffID, qboolean doTranslation )` (`codemp/cgame/cg_syscalls.c:745`)
+- `qboolean trap_ROFF_Purge_Ent( int entID )` (`codemp/cgame/cg_syscalls.c:750`)
+- `void trap_TrueMalloc(void **ptr, int size)` (`codemp/cgame/cg_syscalls.c:757`)
+- `void trap_TrueFree(void **ptr)` (`codemp/cgame/cg_syscalls.c:762`)
+- `void trap_G2_ListModelSurfaces(void *ghlInfo)` (`codemp/cgame/cg_syscalls.c:771`)
+- `void trap_G2_ListModelBones(void *ghlInfo, int frame)` (`codemp/cgame/cg_syscalls.c:776`)
+- `void trap_G2_SetGhoul2ModelIndexes(void *ghoul2, qhandle_t *modelList, qhandle_t *skinList)` (`codemp/cgame/cg_syscalls.c:781`)
+- `qboolean trap_G2_HaveWeGhoul2Models(void *ghoul2)` (`codemp/cgame/cg_syscalls.c:786`)
+- `qboolean trap_G2API_GetBoltMatrix(void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale)` (`codemp/cgame/cg_syscalls.c:791`)
+- `qboolean trap_G2API_GetBoltMatrix_NoReconstruct(void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale)` (`codemp/cgame/cg_syscalls.c:797`)
+- `qboolean trap_G2API_GetBoltMatrix_NoRecNoRot(void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale)` (`codemp/cgame/cg_syscalls.c:803`)
+- `int trap_G2API_InitGhoul2Model(void **ghoul2Ptr, const char *fileName, int modelIndex, qhandle_t customSkin, qhandle_t customShader, int modelFlags, int lodBias)` (`codemp/cgame/cg_syscalls.c:809`)
+- `qboolean trap_G2API_SetSkin(void *ghoul2, int modelIndex, qhandle_t customSkin, qhandle_t renderSkin)` (`codemp/cgame/cg_syscalls.c:815`)
+- `void trap_G2API_CollisionDetect ( CollisionRecord_t *collRecMap, void* ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, const vec3_t rayStart, const vec3_t rayEnd, const vec3_t scale, int traceFlags, int useLod, float fRadius )` (`codemp/cgame/cg_syscalls.c:820`)
+- `void trap_G2API_CollisionDetectCache ( CollisionRecord_t *collRecMap, void* ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, const vec3_t rayStart, const vec3_t rayEnd, const vec3_t scale, int traceFlags, int useLod, float fRadius )` (`codemp/cgame/cg_syscalls.c:838`)
+- `void trap_G2API_CleanGhoul2Models(void **ghoul2Ptr)` (`codemp/cgame/cg_syscalls.c:856`)
+- `qboolean trap_G2API_SetBoneAngles(void *ghoul2, int modelIndex, const char *boneName, const vec3_t angles, const int flags, const int up, const int right, const int forward, qhandle_t *modelList, int blendTime , int currentTime )` (`codemp/cgame/cg_syscalls.c:861`)
+- `qboolean trap_G2API_SetBoneAnim(void *ghoul2, const int modelIndex, const char *boneName, const int startFrame, const int endFrame, const int flags, const float animSpeed, const int currentTime, const float setFrame , const int blendTime )` (`codemp/cgame/cg_syscalls.c:868`)
+- `qboolean trap_G2API_GetBoneAnim(void *ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *startFrame, int *endFrame, int *flags, float *animSpeed, int *modelList, const int modelIndex)` (`codemp/cgame/cg_syscalls.c:874`)
+- `qboolean trap_G2API_GetBoneFrame(void *ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *modelList, const int modelIndex)` (`codemp/cgame/cg_syscalls.c:880`)
+- `void trap_G2API_GetGLAName(void *ghoul2, int modelIndex, char *fillBuf)` (`codemp/cgame/cg_syscalls.c:885`)
+- `int trap_G2API_CopyGhoul2Instance(void *g2From, void *g2To, int modelIndex)` (`codemp/cgame/cg_syscalls.c:890`)
+- `void trap_G2API_CopySpecificGhoul2Model(void *g2From, int modelFrom, void *g2To, int modelTo)` (`codemp/cgame/cg_syscalls.c:895`)
+- `void trap_G2API_DuplicateGhoul2Instance(void *g2From, void **g2To)` (`codemp/cgame/cg_syscalls.c:900`)
+- `qboolean trap_G2API_HasGhoul2ModelOnIndex(void *ghlInfo, int modelIndex)` (`codemp/cgame/cg_syscalls.c:905`)
+- `qboolean trap_G2API_RemoveGhoul2Model(void *ghlInfo, int modelIndex)` (`codemp/cgame/cg_syscalls.c:910`)
+- `qboolean trap_G2API_SkinlessModel(void *ghlInfo, int modelIndex)` (`codemp/cgame/cg_syscalls.c:915`)
+- `int trap_G2API_GetNumGoreMarks(void *ghlInfo, int modelIndex)` (`codemp/cgame/cg_syscalls.c:920`)
+- `void trap_G2API_AddSkinGore(void *ghlInfo,SSkinGoreData *gore)` (`codemp/cgame/cg_syscalls.c:925`)
+- `void trap_G2API_ClearSkinGore ( void* ghlInfo )` (`codemp/cgame/cg_syscalls.c:930`)
+- `int trap_G2API_Ghoul2Size ( void* ghlInfo )` (`codemp/cgame/cg_syscalls.c:935`)
+- `int trap_G2API_AddBolt(void *ghoul2, int modelIndex, const char *boneName)` (`codemp/cgame/cg_syscalls.c:940`)
+- `qboolean trap_G2API_AttachEnt(int *boltInfo, void *ghlInfoTo, int toBoltIndex, int entNum, int toModelNum)` (`codemp/cgame/cg_syscalls.c:945`)
+- `void trap_G2API_SetBoltInfo(void *ghoul2, int modelIndex, int boltInfo)` (`codemp/cgame/cg_syscalls.c:950`)
+- `qboolean trap_G2API_SetRootSurface(void *ghoul2, const int modelIndex, const char *surfaceName)` (`codemp/cgame/cg_syscalls.c:955`)
+- `qboolean trap_G2API_SetSurfaceOnOff(void *ghoul2, const char *surfaceName, const int flags)` (`codemp/cgame/cg_syscalls.c:960`)
+- `qboolean trap_G2API_SetNewOrigin(void *ghoul2, const int boltIndex)` (`codemp/cgame/cg_syscalls.c:965`)
+- `qboolean trap_G2API_DoesBoneExist(void *ghoul2, int modelIndex, const char *boneName)` (`codemp/cgame/cg_syscalls.c:971`)
+- `int trap_G2API_GetSurfaceRenderStatus(void *ghoul2, const int modelIndex, const char *surfaceName)` (`codemp/cgame/cg_syscalls.c:976`)
+- `int trap_G2API_GetTime(void)` (`codemp/cgame/cg_syscalls.c:981`)
+- `void trap_G2API_SetTime(int time, int clock)` (`codemp/cgame/cg_syscalls.c:986`)
+- `void trap_G2API_AbsurdSmoothing(void *ghoul2, qboolean status)` (`codemp/cgame/cg_syscalls.c:992`)
+- `void trap_G2API_SetRagDoll(void *ghoul2, sharedRagDollParams_t *params)` (`codemp/cgame/cg_syscalls.c:998`)
+- `void trap_G2API_AnimateG2Models(void *ghoul2, int time, sharedRagDollUpdateParams_t *params)` (`codemp/cgame/cg_syscalls.c:1003`)
+- `qboolean trap_G2API_RagPCJConstraint(void *ghoul2, const char *boneName, vec3_t min, vec3_t max) //override default pcj bonee constraints` (`codemp/cgame/cg_syscalls.c:1010`)
+- `qboolean trap_G2API_RagPCJGradientSpeed(void *ghoul2, const char *boneName, const float speed) //override the default gradient movespeed for a pcj bone` (`codemp/cgame/cg_syscalls.c:1015`)
+- `qboolean trap_G2API_RagEffectorGoal(void *ghoul2, const char *boneName, vec3_t pos) //override an effector bone's goal position (world coordinates)` (`codemp/cgame/cg_syscalls.c:1020`)
+- `qboolean trap_G2API_GetRagBonePos(void *ghoul2, const char *boneName, vec3_t pos, vec3_t entAngles, vec3_t entPos, vec3_t entScale) //current position of said bone is put into pos (world coordinates)` (`codemp/cgame/cg_syscalls.c:1025`)
+- `qboolean trap_G2API_RagEffectorKick(void *ghoul2, const char *boneName, vec3_t velocity) //add velocity to a rag bone` (`codemp/cgame/cg_syscalls.c:1030`)
+- `qboolean trap_G2API_RagForceSolve(void *ghoul2, qboolean force) //make sure we are actively performing solve/settle routines, if desired` (`codemp/cgame/cg_syscalls.c:1035`)
+- `qboolean trap_G2API_SetBoneIKState(void *ghoul2, int time, const char *boneName, int ikState, sharedSetBoneIKStateParams_t *params)` (`codemp/cgame/cg_syscalls.c:1040`)
+- `qboolean trap_G2API_IKMove(void *ghoul2, int time, sharedIKMoveParams_t *params)` (`codemp/cgame/cg_syscalls.c:1045`)
+- `qboolean trap_G2API_RemoveBone(void *ghoul2, const char *boneName, int modelIndex)` (`codemp/cgame/cg_syscalls.c:1050`)
+- `void trap_G2API_AttachInstanceToEntNum(void *ghoul2, int entityNum, qboolean server)` (`codemp/cgame/cg_syscalls.c:1060`)
+- `void trap_G2API_ClearAttachedInstance(int entityNum)` (`codemp/cgame/cg_syscalls.c:1065`)
+- `void trap_G2API_CleanEntAttachments(void)` (`codemp/cgame/cg_syscalls.c:1070`)
+- `qboolean trap_G2API_OverrideServer(void *serverInstance)` (`codemp/cgame/cg_syscalls.c:1075`)
+- `void trap_G2API_GetSurfaceName(void *ghoul2, int surfNumber, int modelIndex, char *fillBuf)` (`codemp/cgame/cg_syscalls.c:1080`)
+- `void trap_CG_RegisterSharedMemory(char *memory)` (`codemp/cgame/cg_syscalls.c:1085`)
+- `int trap_CM_RegisterTerrain(const char *config)` (`codemp/cgame/cg_syscalls.c:1090`)
+- `void trap_RMG_Init(int terrainID, const char *terrainInfo)` (`codemp/cgame/cg_syscalls.c:1095`)
+- `void trap_RE_InitRendererTerrain( const char *info )` (`codemp/cgame/cg_syscalls.c:1100`)
+- `void trap_R_WeatherContentsOverride( int contents )` (`codemp/cgame/cg_syscalls.c:1105`)
+- `void trap_R_WorldEffectCommand(const char *cmd)` (`codemp/cgame/cg_syscalls.c:1110`)
+- `void trap_WE_AddWeatherZone( const vec3_t mins, const vec3_t maxs )` (`codemp/cgame/cg_syscalls.c:1115`)
+
+### VM entry functions (1)
+
+- `int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11 )` (`codemp/cgame/cg_main.c:190`)
+
+## MP ui
+
+Sources: `codemp/ui/ui_public.h`, `codemp/ui/ui_syscalls.c`, `codemp/ui/ui_main.c`.
+
+### `uiImport_t` (150)
+
+- `UI_ERROR`
+- `UI_PRINT`
+- `UI_MILLISECONDS`
+- `UI_CVAR_SET`
+- `UI_CVAR_VARIABLEVALUE`
+- `UI_CVAR_VARIABLESTRINGBUFFER`
+- `UI_CVAR_SETVALUE`
+- `UI_CVAR_RESET`
+- `UI_CVAR_CREATE`
+- `UI_CVAR_INFOSTRINGBUFFER`
+- `UI_ARGC`
+- `UI_ARGV`
+- `UI_CMD_EXECUTETEXT`
+- `UI_FS_FOPENFILE`
+- `UI_FS_READ`
+- `UI_FS_WRITE`
+- `UI_FS_FCLOSEFILE`
+- `UI_FS_GETFILELIST`
+- `UI_R_REGISTERMODEL`
+- `UI_R_REGISTERSKIN`
+- `UI_R_REGISTERSHADERNOMIP`
+- `UI_R_SHADERNAMEFROMINDEX`
+- `UI_R_CLEARSCENE`
+- `UI_R_ADDREFENTITYTOSCENE`
+- `UI_R_ADDPOLYTOSCENE`
+- `UI_R_ADDLIGHTTOSCENE`
+- `UI_R_RENDERSCENE`
+- `UI_R_SETCOLOR`
+- `UI_R_DRAWSTRETCHPIC`
+- `UI_UPDATESCREEN`
+- `UI_CM_LERPTAG`
+- `UI_CM_LOADMODEL`
+- `UI_S_REGISTERSOUND`
+- `UI_S_STARTLOCALSOUND`
+- `UI_KEY_KEYNUMTOSTRINGBUF`
+- `UI_KEY_GETBINDINGBUF`
+- `UI_KEY_SETBINDING`
+- `UI_KEY_ISDOWN`
+- `UI_KEY_GETOVERSTRIKEMODE`
+- `UI_KEY_SETOVERSTRIKEMODE`
+- `UI_KEY_CLEARSTATES`
+- `UI_KEY_GETCATCHER`
+- `UI_KEY_SETCATCHER`
+- `UI_GETCLIPBOARDDATA`
+- `UI_GETGLCONFIG`
+- `UI_GETCLIENTSTATE`
+- `UI_GETCONFIGSTRING`
+- `UI_LAN_GETPINGQUEUECOUNT`
+- `UI_LAN_CLEARPING`
+- `UI_LAN_GETPING`
+- `UI_LAN_GETPINGINFO`
+- `UI_CVAR_REGISTER`
+- `UI_CVAR_UPDATE`
+- `UI_MEMORY_REMAINING`
+- `UI_GET_CDKEY`
+- `UI_SET_CDKEY`
+- `UI_VERIFY_CDKEY`
+- `UI_R_REGISTERFONT`
+- `UI_R_FONT_STRLENPIXELS`
+- `UI_R_FONT_STRLENCHARS`
+- `UI_R_FONT_STRHEIGHTPIXELS`
+- `UI_R_FONT_DRAWSTRING`
+- `UI_LANGUAGE_ISASIAN`
+- `UI_LANGUAGE_USESSPACES`
+- `UI_ANYLANGUAGE_READCHARFROMSTRING`
+- `UI_R_MODELBOUNDS`
+- `UI_PC_ADD_GLOBAL_DEFINE`
+- `UI_PC_LOAD_SOURCE`
+- `UI_PC_FREE_SOURCE`
+- `UI_PC_READ_TOKEN`
+- `UI_PC_SOURCE_FILE_AND_LINE`
+- `UI_PC_LOAD_GLOBAL_DEFINES`
+- `UI_PC_REMOVE_ALL_GLOBAL_DEFINES`
+- `UI_S_STOPBACKGROUNDTRACK`
+- `UI_S_STARTBACKGROUNDTRACK`
+- `UI_REAL_TIME`
+- `UI_LAN_GETSERVERCOUNT`
+- `UI_LAN_GETSERVERADDRESSSTRING`
+- `UI_LAN_GETSERVERINFO`
+- `UI_LAN_MARKSERVERVISIBLE`
+- `UI_LAN_UPDATEVISIBLEPINGS`
+- `UI_LAN_RESETPINGS`
+- `UI_LAN_LOADCACHEDSERVERS`
+- `UI_LAN_SAVECACHEDSERVERS`
+- `UI_LAN_ADDSERVER`
+- `UI_LAN_REMOVESERVER`
+- `UI_CIN_PLAYCINEMATIC`
+- `UI_CIN_STOPCINEMATIC`
+- `UI_CIN_RUNCINEMATIC`
+- `UI_CIN_DRAWCINEMATIC`
+- `UI_CIN_SETEXTENTS`
+- `UI_R_REMAP_SHADER`
+- `UI_LAN_SERVERSTATUS`
+- `UI_LAN_GETSERVERPING`
+- `UI_LAN_SERVERISVISIBLE`
+- `UI_LAN_COMPARESERVERS`
+- `UI_MEMSET`
+- `UI_MEMCPY`
+- `UI_STRNCPY`
+- `UI_SIN`
+- `UI_COS`
+- `UI_ATAN2`
+- `UI_SQRT`
+- `UI_MATRIXMULTIPLY`
+- `UI_ANGLEVECTORS`
+- `UI_PERPENDICULARVECTOR`
+- `UI_FLOOR`
+- `UI_CEIL`
+- `UI_TESTPRINTINT`
+- `UI_TESTPRINTFLOAT`
+- `UI_ACOS`
+- `UI_ASIN`
+- `UI_SP_GETNUMLANGUAGES`
+- `UI_SP_GETLANGUAGENAME`
+- `UI_SP_GETSTRINGTEXTSTRING`
+- `UI_G2_LISTSURFACES`
+- `UI_G2_LISTBONES`
+- `UI_G2_SETMODELS`
+- `UI_G2_HAVEWEGHOULMODELS`
+- `UI_G2_GETBOLT`
+- `UI_G2_GETBOLT_NOREC`
+- `UI_G2_GETBOLT_NOREC_NOROT`
+- `UI_G2_INITGHOUL2MODEL`
+- `UI_G2_COLLISIONDETECT`
+- `UI_G2_COLLISIONDETECTCACHE`
+- `UI_G2_CLEANMODELS`
+- `UI_G2_ANGLEOVERRIDE`
+- `UI_G2_PLAYANIM`
+- `UI_G2_GETBONEANIM`
+- `UI_G2_GETBONEFRAME`
+- `UI_G2_GETGLANAME`
+- `UI_G2_COPYGHOUL2INSTANCE`
+- `UI_G2_COPYSPECIFICGHOUL2MODEL`
+- `UI_G2_DUPLICATEGHOUL2INSTANCE`
+- `UI_G2_HASGHOUL2MODELONINDEX`
+- `UI_G2_REMOVEGHOUL2MODEL`
+- `UI_G2_ADDBOLT`
+- `UI_G2_SETBOLTON`
+- `UI_G2_SETROOTSURFACE`
+- `UI_G2_SETSURFACEONOFF`
+- `UI_G2_SETNEWORIGIN`
+- `UI_G2_GETTIME`
+- `UI_G2_SETTIME`
+- `UI_G2_SETRAGDOLL`
+- `UI_G2_ANIMATEG2MODELS`
+- `UI_G2_SETBONEIKSTATE`
+- `UI_G2_IKMOVE`
+- `UI_G2_GETSURFACENAME`
+- `UI_G2_SETSKIN`
+- `UI_G2_ATTACHG2MODEL`
+
+### `uiExport_t` (12)
+
+- `UI_GETAPIVERSION`
+- `UI_INIT`
+- `UI_SHUTDOWN`
+- `UI_KEY_EVENT`
+- `UI_MOUSE_EVENT`
+- `UI_REFRESH`
+- `UI_IS_FULLSCREEN`
+- `UI_SET_ACTIVE_MENU`
+- `UI_CONSOLE_COMMAND`
+- `UI_DRAW_CONNECT_SCREEN`
+- `UI_HASUNIQUECDKEY`
+- `UI_MENU_RESET`
+
+### Syscall wrappers and entry functions (135)
+
+- `void dllEntry( int (QDECL *syscallptr)( int arg,... ) )` (`codemp/ui/ui_syscalls.c:11`)
+- `void trap_Print( const char *string )` (`codemp/ui/ui_syscalls.c:21`)
+- `void trap_Error( const char *string )` (`codemp/ui/ui_syscalls.c:25`)
+- `int trap_Milliseconds( void )` (`codemp/ui/ui_syscalls.c:29`)
+- `void trap_Cvar_Register( vmCvar_t *cvar, const char *var_name, const char *value, int flags )` (`codemp/ui/ui_syscalls.c:33`)
+- `void trap_Cvar_Update( vmCvar_t *cvar )` (`codemp/ui/ui_syscalls.c:37`)
+- `void trap_Cvar_Set( const char *var_name, const char *value )` (`codemp/ui/ui_syscalls.c:41`)
+- `float trap_Cvar_VariableValue( const char *var_name )` (`codemp/ui/ui_syscalls.c:45`)
+- `void trap_Cvar_VariableStringBuffer( const char *var_name, char *buffer, int bufsize )` (`codemp/ui/ui_syscalls.c:51`)
+- `void trap_Cvar_SetValue( const char *var_name, float value )` (`codemp/ui/ui_syscalls.c:55`)
+- `void trap_Cvar_Reset( const char *name )` (`codemp/ui/ui_syscalls.c:59`)
+- `void trap_Cvar_Create( const char *var_name, const char *var_value, int flags )` (`codemp/ui/ui_syscalls.c:63`)
+- `void trap_Cvar_InfoStringBuffer( int bit, char *buffer, int bufsize )` (`codemp/ui/ui_syscalls.c:67`)
+- `int trap_Argc( void )` (`codemp/ui/ui_syscalls.c:71`)
+- `void trap_Argv( int n, char *buffer, int bufferLength )` (`codemp/ui/ui_syscalls.c:75`)
+- `void trap_Cmd_ExecuteText( int exec_when, const char *text )` (`codemp/ui/ui_syscalls.c:79`)
+- `int trap_FS_FOpenFile( const char *qpath, fileHandle_t *f, fsMode_t mode )` (`codemp/ui/ui_syscalls.c:83`)
+- `void trap_FS_Read( void *buffer, int len, fileHandle_t f )` (`codemp/ui/ui_syscalls.c:87`)
+- `void trap_FS_Write( const void *buffer, int len, fileHandle_t f )` (`codemp/ui/ui_syscalls.c:91`)
+- `void trap_FS_FCloseFile( fileHandle_t f )` (`codemp/ui/ui_syscalls.c:95`)
+- `int trap_FS_GetFileList( const char *path, const char *extension, char *listbuf, int bufsize )` (`codemp/ui/ui_syscalls.c:99`)
+- `qhandle_t trap_R_RegisterModel( const char *name )` (`codemp/ui/ui_syscalls.c:103`)
+- `qhandle_t trap_R_RegisterSkin( const char *name )` (`codemp/ui/ui_syscalls.c:107`)
+- `qhandle_t trap_R_RegisterFont( const char *fontName )` (`codemp/ui/ui_syscalls.c:111`)
+- `int trap_R_Font_StrLenPixels(const char *text, const int iFontIndex, const float scale)` (`codemp/ui/ui_syscalls.c:116`)
+- `int trap_R_Font_StrLenChars(const char *text)` (`codemp/ui/ui_syscalls.c:121`)
+- `int trap_R_Font_HeightPixels(const int iFontIndex, const float scale)` (`codemp/ui/ui_syscalls.c:126`)
+- `void trap_R_Font_DrawString(int ox, int oy, const char *text, const float *rgba, const int setIndex, int iCharLimit, const float scale)` (`codemp/ui/ui_syscalls.c:131`)
+- `qboolean trap_Language_IsAsian(void)` (`codemp/ui/ui_syscalls.c:136`)
+- `qboolean trap_Language_UsesSpaces(void)` (`codemp/ui/ui_syscalls.c:141`)
+- `unsigned int trap_AnyLanguage_ReadCharFromString( const char *psText, int *piAdvanceCount, qboolean *pbIsTrailingPunctuation )` (`codemp/ui/ui_syscalls.c:146`)
+- `qhandle_t trap_R_RegisterShaderNoMip( const char *name )` (`codemp/ui/ui_syscalls.c:151`)
+- `trap_Cvar_VariableStringBuffer(name+1, buf, sizeof(buf))` (`codemp/ui/ui_syscalls.c:155`)
+- `void trap_R_ShaderNameFromIndex(char *name, int index)` (`codemp/ui/ui_syscalls.c:165`)
+- `void trap_R_ClearScene( void )` (`codemp/ui/ui_syscalls.c:170`)
+- `void trap_R_AddRefEntityToScene( const refEntity_t *re )` (`codemp/ui/ui_syscalls.c:174`)
+- `void trap_R_AddPolyToScene( qhandle_t hShader , int numVerts, const polyVert_t *verts )` (`codemp/ui/ui_syscalls.c:178`)
+- `void trap_R_AddLightToScene( const vec3_t org, float intensity, float r, float g, float b )` (`codemp/ui/ui_syscalls.c:182`)
+- `void trap_R_RenderScene( const refdef_t *fd )` (`codemp/ui/ui_syscalls.c:186`)
+- `void trap_R_SetColor( const float *rgba )` (`codemp/ui/ui_syscalls.c:190`)
+- `void trap_R_DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader )` (`codemp/ui/ui_syscalls.c:194`)
+- `void trap_R_ModelBounds( clipHandle_t model, vec3_t mins, vec3_t maxs )` (`codemp/ui/ui_syscalls.c:198`)
+- `void trap_UpdateScreen( void )` (`codemp/ui/ui_syscalls.c:202`)
+- `int trap_CM_LerpTag( orientation_t *tag, clipHandle_t mod, int startFrame, int endFrame, float frac, const char *tagName )` (`codemp/ui/ui_syscalls.c:206`)
+- `void trap_S_StartLocalSound( sfxHandle_t sfx, int channelNum )` (`codemp/ui/ui_syscalls.c:210`)
+- `sfxHandle_t trap_S_RegisterSound( const char *sample )` (`codemp/ui/ui_syscalls.c:214`)
+- `void trap_Key_KeynumToStringBuf( int keynum, char *buf, int buflen )` (`codemp/ui/ui_syscalls.c:218`)
+- `void trap_Key_GetBindingBuf( int keynum, char *buf, int buflen )` (`codemp/ui/ui_syscalls.c:222`)
+- `void trap_Key_SetBinding( int keynum, const char *binding )` (`codemp/ui/ui_syscalls.c:226`)
+- `qboolean trap_Key_IsDown( int keynum )` (`codemp/ui/ui_syscalls.c:230`)
+- `qboolean trap_Key_GetOverstrikeMode( void )` (`codemp/ui/ui_syscalls.c:234`)
+- `void trap_Key_SetOverstrikeMode( qboolean state )` (`codemp/ui/ui_syscalls.c:238`)
+- `void trap_Key_ClearStates( void )` (`codemp/ui/ui_syscalls.c:242`)
+- `int trap_Key_GetCatcher( void )` (`codemp/ui/ui_syscalls.c:246`)
+- `void trap_Key_SetCatcher( int catcher )` (`codemp/ui/ui_syscalls.c:250`)
+- `void trap_GetClipboardData( char *buf, int bufsize )` (`codemp/ui/ui_syscalls.c:254`)
+- `void trap_GetClientState( uiClientState_t *state )` (`codemp/ui/ui_syscalls.c:258`)
+- `void trap_GetGlconfig( glconfig_t *glconfig )` (`codemp/ui/ui_syscalls.c:262`)
+- `int trap_GetConfigString( int index, char* buff, int buffsize )` (`codemp/ui/ui_syscalls.c:266`)
+- `int trap_LAN_GetServerCount( int source )` (`codemp/ui/ui_syscalls.c:270`)
+- `void trap_LAN_GetServerAddressString( int source, int n, char *buf, int buflen )` (`codemp/ui/ui_syscalls.c:274`)
+- `void trap_LAN_GetServerInfo( int source, int n, char *buf, int buflen )` (`codemp/ui/ui_syscalls.c:278`)
+- `int trap_LAN_GetServerPing( int source, int n )` (`codemp/ui/ui_syscalls.c:282`)
+- `int trap_LAN_GetPingQueueCount( void )` (`codemp/ui/ui_syscalls.c:286`)
+- `int trap_LAN_ServerStatus( const char *serverAddress, char *serverStatus, int maxLen )` (`codemp/ui/ui_syscalls.c:290`)
+- `void trap_LAN_SaveCachedServers()` (`codemp/ui/ui_syscalls.c:294`)
+- `void trap_LAN_LoadCachedServers()` (`codemp/ui/ui_syscalls.c:298`)
+- `void trap_LAN_ResetPings(int n)` (`codemp/ui/ui_syscalls.c:302`)
+- `void trap_LAN_ClearPing( int n )` (`codemp/ui/ui_syscalls.c:306`)
+- `void trap_LAN_GetPing( int n, char *buf, int buflen, int *pingtime )` (`codemp/ui/ui_syscalls.c:310`)
+- `void trap_LAN_GetPingInfo( int n, char *buf, int buflen )` (`codemp/ui/ui_syscalls.c:314`)
+- `void trap_LAN_MarkServerVisible( int source, int n, qboolean visible )` (`codemp/ui/ui_syscalls.c:318`)
+- `int trap_LAN_ServerIsVisible( int source, int n)` (`codemp/ui/ui_syscalls.c:322`)
+- `qboolean trap_LAN_UpdateVisiblePings( int source )` (`codemp/ui/ui_syscalls.c:326`)
+- `int trap_LAN_AddServer(int source, const char *name, const char *addr)` (`codemp/ui/ui_syscalls.c:330`)
+- `void trap_LAN_RemoveServer(int source, const char *addr)` (`codemp/ui/ui_syscalls.c:334`)
+- `int trap_LAN_CompareServers( int source, int sortKey, int sortDir, int s1, int s2 )` (`codemp/ui/ui_syscalls.c:338`)
+- `int trap_MemoryRemaining( void )` (`codemp/ui/ui_syscalls.c:342`)
+- `void trap_GetCDKey( char *buf, int buflen )` (`codemp/ui/ui_syscalls.c:348`)
+- `void trap_SetCDKey( char *buf )` (`codemp/ui/ui_syscalls.c:352`)
+- `qboolean trap_VerifyCDKey( const char *key, const char *chksum)` (`codemp/ui/ui_syscalls.c:356`)
+- `int trap_PC_AddGlobalDefine( char *define )` (`codemp/ui/ui_syscalls.c:362`)
+- `int trap_PC_LoadSource( const char *filename )` (`codemp/ui/ui_syscalls.c:366`)
+- `int trap_PC_FreeSource( int handle )` (`codemp/ui/ui_syscalls.c:370`)
+- `int trap_PC_ReadToken( int handle, pc_token_t *pc_token )` (`codemp/ui/ui_syscalls.c:374`)
+- `int trap_PC_SourceFileAndLine( int handle, char *filename, int *line )` (`codemp/ui/ui_syscalls.c:378`)
+- `int trap_PC_LoadGlobalDefines ( const char* filename )` (`codemp/ui/ui_syscalls.c:382`)
+- `void trap_PC_RemoveAllGlobalDefines ( void )` (`codemp/ui/ui_syscalls.c:387`)
+- `void trap_S_StopBackgroundTrack( void )` (`codemp/ui/ui_syscalls.c:392`)
+- `void trap_S_StartBackgroundTrack( const char *intro, const char *loop, qboolean bReturnWithoutStarting)` (`codemp/ui/ui_syscalls.c:396`)
+- `int trap_RealTime(qtime_t *qtime)` (`codemp/ui/ui_syscalls.c:400`)
+- `int trap_CIN_PlayCinematic( const char *arg0, int xpos, int ypos, int width, int height, int bits)` (`codemp/ui/ui_syscalls.c:405`)
+- `e_status trap_CIN_StopCinematic(int handle)` (`codemp/ui/ui_syscalls.c:411`)
+- `e_status trap_CIN_RunCinematic (int handle)` (`codemp/ui/ui_syscalls.c:417`)
+- `void trap_CIN_DrawCinematic (int handle)` (`codemp/ui/ui_syscalls.c:423`)
+- `void trap_CIN_SetExtents (int handle, int x, int y, int w, int h)` (`codemp/ui/ui_syscalls.c:429`)
+- `void trap_R_RemapShader( const char *oldShader, const char *newShader, const char *timeOffset )` (`codemp/ui/ui_syscalls.c:434`)
+- `int trap_SP_GetNumLanguages( void )` (`codemp/ui/ui_syscalls.c:438`)
+- `void trap_GetLanguageName( const int languageIndex, char *buffer )` (`codemp/ui/ui_syscalls.c:443`)
+- `int trap_SP_GetStringTextString(const char *text, char *buffer, int bufferLength)` (`codemp/ui/ui_syscalls.c:448`)
+- `void trap_G2_ListModelSurfaces(void *ghlInfo)` (`codemp/ui/ui_syscalls.c:455`)
+- `void trap_G2_ListModelBones(void *ghlInfo, int frame)` (`codemp/ui/ui_syscalls.c:460`)
+- `void trap_G2_SetGhoul2ModelIndexes(void *ghoul2, qhandle_t *modelList, qhandle_t *skinList)` (`codemp/ui/ui_syscalls.c:465`)
+- `qboolean trap_G2_HaveWeGhoul2Models(void *ghoul2)` (`codemp/ui/ui_syscalls.c:470`)
+- `qboolean trap_G2API_GetBoltMatrix(void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale)` (`codemp/ui/ui_syscalls.c:475`)
+- `qboolean trap_G2API_GetBoltMatrix_NoReconstruct(void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale)` (`codemp/ui/ui_syscalls.c:481`)
+- `qboolean trap_G2API_GetBoltMatrix_NoRecNoRot(void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale)` (`codemp/ui/ui_syscalls.c:487`)
+- `int trap_G2API_InitGhoul2Model(void **ghoul2Ptr, const char *fileName, int modelIndex, qhandle_t customSkin, qhandle_t customShader, int modelFlags, int lodBias)` (`codemp/ui/ui_syscalls.c:493`)
+- `qboolean trap_G2API_SetSkin(void *ghoul2, int modelIndex, qhandle_t customSkin, qhandle_t renderSkin)` (`codemp/ui/ui_syscalls.c:499`)
+- `void trap_G2API_CollisionDetect ( CollisionRecord_t *collRecMap, void* ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, const vec3_t rayStart, const vec3_t rayEnd, const vec3_t scale, int traceFlags, int useLod, float fRadius )` (`codemp/ui/ui_syscalls.c:504`)
+- `void trap_G2API_CollisionDetectCache ( CollisionRecord_t *collRecMap, void* ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, const vec3_t rayStart, const vec3_t rayEnd, const vec3_t scale, int traceFlags, int useLod, float fRadius )` (`codemp/ui/ui_syscalls.c:522`)
+- `void trap_G2API_CleanGhoul2Models(void **ghoul2Ptr)` (`codemp/ui/ui_syscalls.c:540`)
+- `qboolean trap_G2API_SetBoneAngles(void *ghoul2, int modelIndex, const char *boneName, const vec3_t angles, const int flags, const int up, const int right, const int forward, qhandle_t *modelList, int blendTime , int currentTime )` (`codemp/ui/ui_syscalls.c:545`)
+- `qboolean trap_G2API_SetBoneAnim(void *ghoul2, const int modelIndex, const char *boneName, const int startFrame, const int endFrame, const int flags, const float animSpeed, const int currentTime, const float setFrame , const int blendTime )` (`codemp/ui/ui_syscalls.c:552`)
+- `qboolean trap_G2API_GetBoneAnim(void *ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *startFrame, int *endFrame, int *flags, float *animSpeed, int *modelList, const int modelIndex)` (`codemp/ui/ui_syscalls.c:558`)
+- `qboolean trap_G2API_GetBoneFrame(void *ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *modelList, const int modelIndex)` (`codemp/ui/ui_syscalls.c:564`)
+- `void trap_G2API_GetGLAName(void *ghoul2, int modelIndex, char *fillBuf)` (`codemp/ui/ui_syscalls.c:569`)
+- `int trap_G2API_CopyGhoul2Instance(void *g2From, void *g2To, int modelIndex)` (`codemp/ui/ui_syscalls.c:574`)
+- `void trap_G2API_CopySpecificGhoul2Model(void *g2From, int modelFrom, void *g2To, int modelTo)` (`codemp/ui/ui_syscalls.c:579`)
+- `void trap_G2API_DuplicateGhoul2Instance(void *g2From, void **g2To)` (`codemp/ui/ui_syscalls.c:584`)
+- `qboolean trap_G2API_HasGhoul2ModelOnIndex(void *ghlInfo, int modelIndex)` (`codemp/ui/ui_syscalls.c:589`)
+- `qboolean trap_G2API_RemoveGhoul2Model(void *ghlInfo, int modelIndex)` (`codemp/ui/ui_syscalls.c:594`)
+- `int trap_G2API_AddBolt(void *ghoul2, int modelIndex, const char *boneName)` (`codemp/ui/ui_syscalls.c:599`)
+- `void trap_G2API_SetBoltInfo(void *ghoul2, int modelIndex, int boltInfo)` (`codemp/ui/ui_syscalls.c:604`)
+- `qboolean trap_G2API_SetRootSurface(void *ghoul2, const int modelIndex, const char *surfaceName)` (`codemp/ui/ui_syscalls.c:609`)
+- `qboolean trap_G2API_SetSurfaceOnOff(void *ghoul2, const char *surfaceName, const int flags)` (`codemp/ui/ui_syscalls.c:614`)
+- `qboolean trap_G2API_SetNewOrigin(void *ghoul2, const int boltIndex)` (`codemp/ui/ui_syscalls.c:619`)
+- `int trap_G2API_GetTime(void)` (`codemp/ui/ui_syscalls.c:624`)
+- `void trap_G2API_SetTime(int time, int clock)` (`codemp/ui/ui_syscalls.c:629`)
+- `void trap_G2API_SetRagDoll(void *ghoul2, sharedRagDollParams_t *params)` (`codemp/ui/ui_syscalls.c:635`)
+- `void trap_G2API_AnimateG2Models(void *ghoul2, int time, sharedRagDollUpdateParams_t *params)` (`codemp/ui/ui_syscalls.c:640`)
+- `qboolean trap_G2API_SetBoneIKState(void *ghoul2, int time, const char *boneName, int ikState, sharedSetBoneIKStateParams_t *params)` (`codemp/ui/ui_syscalls.c:646`)
+- `qboolean trap_G2API_IKMove(void *ghoul2, int time, sharedIKMoveParams_t *params)` (`codemp/ui/ui_syscalls.c:651`)
+- `void trap_G2API_GetSurfaceName(void *ghoul2, int surfNumber, int modelIndex, char *fillBuf)` (`codemp/ui/ui_syscalls.c:656`)
+- `qboolean trap_G2API_AttachG2Model(void *ghoul2From, int modelIndexFrom, void *ghoul2To, int toBoltIndex, int toModel)` (`codemp/ui/ui_syscalls.c:661`)
+
+### VM entry functions (1)
+
+- `int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11 )` (`codemp/ui/ui_main.c:579`)
+
+## SP cgame
+
+Sources: `code/cgame/cg_public.h`, `code/cgame/cg_syscalls.cpp`, `code/cgame/cg_main.cpp`.
+
+### `cgameImport_t` (129)
+
+- `CG_PRINT`
+- `CG_ERROR`
+- `CG_MILLISECONDS`
+- `CG_CVAR_REGISTER`
+- `CG_CVAR_UPDATE`
+- `CG_CVAR_SET`
+- `CG_ARGC`
+- `CG_ARGV`
+- `CG_ARGS`
+- `CG_FS_FOPENFILE`
+- `CG_FS_READ`
+- `CG_FS_WRITE`
+- `CG_FS_FCLOSEFILE`
+- `CG_SENDCONSOLECOMMAND`
+- `CG_ADDCOMMAND`
+- `CG_SENDCLIENTCOMMAND`
+- `CG_UPDATESCREEN`
+- `CG_RMG_INIT`
+- `CG_CM_REGISTER_TERRAIN`
+- `CG_RE_INIT_RENDERER_TERRAIN`
+- `CG_CM_LOADMAP`
+- `CG_CM_NUMINLINEMODELS`
+- `CG_CM_INLINEMODEL`
+- `CG_CM_TEMPBOXMODEL`
+- `CG_CM_POINTCONTENTS`
+- `CG_CM_TRANSFORMEDPOINTCONTENTS`
+- `CG_CM_BOXTRACE`
+- `CG_CM_TRANSFORMEDBOXTRACE`
+- `CG_CM_MARKFRAGMENTS`
+- `CG_CM_SNAPPVS`
+- `CG_S_STARTSOUND`
+- `CG_S_STARTLOCALSOUND`
+- `CG_S_CLEARLOOPINGSOUNDS`
+- `CG_S_ADDLOOPINGSOUND`
+- `CG_S_STOPSOUNDS`
+- `CG_S_UPDATEENTITYPOSITION`
+- `CG_S_RESPATIALIZE`
+- `CG_S_REGISTERSOUND`
+- `CG_S_STARTBACKGROUNDTRACK`
+- `CG_FF_START`
+- `CG_FF_STOP`
+- `CG_FF_STOPALL`
+- `CG_FF_SHAKE`
+- `CG_FF_REGISTER`
+- `CG_FF_ADDLOOPINGFORCE`
+- `CG_FF_STARTFX`
+- `CG_FF_ENSUREFX`
+- `CG_FF_STOPFX`
+- `CG_FF_STOPALLFX`
+- `CG_FF_XBOX_SHAKE`
+- `CG_FF_XBOX_DAMAGE`
+- `CG_R_LOADWORLDMAP`
+- `CG_R_REGISTERMODEL`
+- `CG_R_REGISTERSKIN`
+- `CG_R_REGISTERSHADER`
+- `CG_R_REGISTERSHADERNOMIP`
+- `CG_R_REGISTERFONT`
+- `CG_R_FONTSTRLENPIXELS`
+- `CG_R_FONTSTRLENCHARS`
+- `CG_R_FONTHEIGHTPIXELS`
+- `CG_R_FONTDRAWSTRING`
+- `CG_LANGUAGE_ISASIAN`
+- `CG_LANGUAGE_USESSPACES`
+- `CG_ANYLANGUAGE_READFROMSTRING`
+- `CG_R_SETREFRACTIONPROP`
+- `CG_R_CLEARSCENE`
+- `CG_R_ADDREFENTITYTOSCENE`
+- `CG_R_INPVS`
+- `CG_R_GETLIGHTING`
+- `CG_R_ADDPOLYTOSCENE`
+- `CG_R_ADDLIGHTTOSCENE`
+- `CG_R_RENDERSCENE`
+- `CG_R_SETCOLOR`
+- `CG_R_DRAWSTRETCHPIC`
+- `CG_R_MODELBOUNDS`
+- `CG_R_LERPTAG`
+- `CG_R_DRAWROTATEPIC`
+- `CG_R_DRAWROTATEPIC2`
+- `CG_R_SETRANGEFOG`
+- `CG_R_LA_GOGGLES`
+- `CG_R_SCISSOR`
+- `CG_GETGLCONFIG`
+- `CG_GETGAMESTATE`
+- `CG_GETCURRENTSNAPSHOTNUMBER`
+- `CG_GETSNAPSHOT`
+- `CG_GETDEFAULTSTATE`
+- `CG_GETSERVERCOMMAND`
+- `CG_GETCURRENTCMDNUMBER`
+- `CG_GETUSERCMD`
+- `CG_SETUSERCMDVALUE`
+- `CG_SETUSERCMDANGLES`
+- `CG_S_UPDATEAMBIENTSET`
+- `CG_S_ADDLOCALSET`
+- `CG_AS_PARSESETS`
+- `CG_AS_ADDENTRY`
+- `CG_AS_GETBMODELSOUND`
+- `CG_S_GETSAMPLELENGTH`
+- `CG_G2_LISTBONES`
+- `CG_G2_LISTSURFACES`
+- `CG_G2_HAVEWEGHOULMODELS`
+- `CG_G2_SETMODELS`
+- `CG_R_GET_LIGHT_STYLE`
+- `CG_R_SET_LIGHT_STYLE`
+- `CG_R_GET_BMODEL_VERTS`
+- `CG_R_WORLD_EFFECT_COMMAND`
+- `CG_CIN_PLAYCINEMATIC`
+- `CG_CIN_STOPCINEMATIC`
+- `CG_CIN_RUNCINEMATIC`
+- `CG_CIN_DRAWCINEMATIC`
+- `CG_CIN_SETEXTENTS`
+- `CG_Z_MALLOC`
+- `CG_Z_FREE`
+- `CG_UI_MENU_RESET`
+- `CG_UI_MENU_NEW`
+- `CG_UI_SETACTIVE_MENU`
+- `CG_UI_MENU_OPENBYNAME`
+- `CG_UI_PARSE_INT`
+- `CG_UI_PARSE_STRING`
+- `CG_UI_PARSE_FLOAT`
+- `CG_UI_STARTPARSESESSION`
+- `CG_UI_ENDPARSESESSION`
+- `CG_UI_PARSEEXT`
+- `CG_UI_MENUPAINT_ALL`
+- `CG_UI_MENUCLOSE_ALL`
+- `CG_UI_STRING_INIT`
+- `CG_UI_GETMENUINFO`
+- `CG_SP_GETSTRINGTEXTSTRING`
+- `CG_UI_GETITEMTEXT`
+- `CG_UI_GETITEMINFO`
+
+### `vmMain` command cases (17)
+
+- `CG_INIT` (`code/cgame/cg_main.cpp:98`)
+- `CG_SHUTDOWN` (`code/cgame/cg_main.cpp:101`)
+- `CG_CONSOLE_COMMAND` (`code/cgame/cg_main.cpp:104`)
+- `CG_DRAW_ACTIVE_FRAME` (`code/cgame/cg_main.cpp:106`)
+- `CG_CROSSHAIR_PLAYER` (`code/cgame/cg_main.cpp:109`)
+- `CG_CAMERA_POS` (`code/cgame/cg_main.cpp:111`)
+- `CG_CAMERA_ANG` (`code/cgame/cg_main.cpp:113`)
+- `CG_RESIZE_G2` (`code/cgame/cg_main.cpp:118`)
+- `CG_RESIZE_G2_BOLT` (`code/cgame/cg_main.cpp:121`)
+- `CG_RESIZE_G2_BONE` (`code/cgame/cg_main.cpp:124`)
+- `CG_RESIZE_G2_SURFACE` (`code/cgame/cg_main.cpp:127`)
+- `CG_RESIZE_G2_TEMPBONE` (`code/cgame/cg_main.cpp:130`)
+- `CG_DRAW_DATAPAD_HUD` (`code/cgame/cg_main.cpp:137`)
+- `CG_DRAW_DATAPAD_OBJECTIVES` (`code/cgame/cg_main.cpp:145`)
+- `CG_DRAW_DATAPAD_WEAPONS` (`code/cgame/cg_main.cpp:153`)
+- `CG_DRAW_DATAPAD_INVENTORY` (`code/cgame/cg_main.cpp:160`)
+- `CG_DRAW_DATAPAD_FORCEPOWERS` (`code/cgame/cg_main.cpp:167`)
+
+### Syscall wrappers and entry functions (130)
+
+- `void cg_dllEntry( int (*syscallptr)( int arg,... ) )` (`code/cgame/cg_syscalls.cpp:31`)
+- `void dllEntry( int (*syscallptr)( int arg,... ) )` (`code/cgame/cg_syscalls.cpp:33`)
+- `void cgi_Printf( const char *fmt )` (`code/cgame/cg_syscalls.cpp:46`)
+- `void cgi_Error( const char *fmt )` (`code/cgame/cg_syscalls.cpp:50`)
+- `int cgi_Milliseconds( void )` (`code/cgame/cg_syscalls.cpp:54`)
+- `void cgi_Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, int flags )` (`code/cgame/cg_syscalls.cpp:58`)
+- `void cgi_Cvar_Update( vmCvar_t *vmCvar )` (`code/cgame/cg_syscalls.cpp:62`)
+- `void cgi_Cvar_Set( const char *var_name, const char *value )` (`code/cgame/cg_syscalls.cpp:66`)
+- `int cgi_Argc( void )` (`code/cgame/cg_syscalls.cpp:70`)
+- `void cgi_Argv( int n, char *buffer, int bufferLength )` (`code/cgame/cg_syscalls.cpp:74`)
+- `void cgi_Args( char *buffer, int bufferLength )` (`code/cgame/cg_syscalls.cpp:78`)
+- `int cgi_FS_FOpenFile( const char *qpath, fileHandle_t *f, fsMode_t mode )` (`code/cgame/cg_syscalls.cpp:82`)
+- `int cgi_FS_Read( void *buffer, int len, fileHandle_t f )` (`code/cgame/cg_syscalls.cpp:86`)
+- `int cgi_FS_Write( const void *buffer, int len, fileHandle_t f )` (`code/cgame/cg_syscalls.cpp:90`)
+- `void cgi_FS_FCloseFile( fileHandle_t f )` (`code/cgame/cg_syscalls.cpp:94`)
+- `void cgi_SendConsoleCommand( const char *text )` (`code/cgame/cg_syscalls.cpp:98`)
+- `void cgi_AddCommand( const char *cmdName )` (`code/cgame/cg_syscalls.cpp:102`)
+- `void cgi_SendClientCommand( const char *s )` (`code/cgame/cg_syscalls.cpp:106`)
+- `void cgi_UpdateScreen( void )` (`code/cgame/cg_syscalls.cpp:110`)
+- `void cgi_RMG_Init(int terrainID, const char *terrainInfo)` (`code/cgame/cg_syscalls.cpp:115`)
+- `int cgi_CM_RegisterTerrain(const char *terrainInfo)` (`code/cgame/cg_syscalls.cpp:120`)
+- `void cgi_RE_InitRendererTerrain( const char *terrainInfo )` (`code/cgame/cg_syscalls.cpp:125`)
+- `void cgi_CM_LoadMap( const char *mapname, qboolean subBSP )` (`code/cgame/cg_syscalls.cpp:131`)
+- `int cgi_CM_NumInlineModels( void )` (`code/cgame/cg_syscalls.cpp:135`)
+- `clipHandle_t cgi_CM_InlineModel( int index )` (`code/cgame/cg_syscalls.cpp:139`)
+- `clipHandle_t cgi_CM_TempBoxModel( const vec3_t mins, const vec3_t maxs )` (`code/cgame/cg_syscalls.cpp:143`)
+- `int cgi_CM_PointContents( const vec3_t p, clipHandle_t model )` (`code/cgame/cg_syscalls.cpp:147`)
+- `int cgi_CM_TransformedPointContents( const vec3_t p, clipHandle_t model, const vec3_t origin, const vec3_t angles )` (`code/cgame/cg_syscalls.cpp:151`)
+- `void cgi_CM_BoxTrace( trace_t *results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask )` (`code/cgame/cg_syscalls.cpp:155`)
+- `void cgi_CM_TransformedBoxTrace( trace_t *results, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, clipHandle_t model, int brushmask, const vec3_t origin, const vec3_t angles )` (`code/cgame/cg_syscalls.cpp:161`)
+- `int cgi_CM_MarkFragments( int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer )` (`code/cgame/cg_syscalls.cpp:168`)
+- `void cgi_CM_SnapPVS(vec3_t origin,byte *buffer)` (`code/cgame/cg_syscalls.cpp:175`)
+- `void cgi_S_StopSounds( void )` (`code/cgame/cg_syscalls.cpp:180`)
+- `void cgi_S_StartSound( const vec3_t origin, int entityNum, int entchannel, sfxHandle_t sfx )` (`code/cgame/cg_syscalls.cpp:185`)
+- `void cgi_AS_ParseSets( void )` (`code/cgame/cg_syscalls.cpp:189`)
+- `void cgi_AS_AddPrecacheEntry( const char *name )` (`code/cgame/cg_syscalls.cpp:193`)
+- `void cgi_S_UpdateAmbientSet( const char *name, vec3_t origin )` (`code/cgame/cg_syscalls.cpp:197`)
+- `int cgi_S_AddLocalSet( const char *name, vec3_t listener_origin, vec3_t origin, int entID, int time )` (`code/cgame/cg_syscalls.cpp:201`)
+- `sfxHandle_t cgi_AS_GetBModelSound( const char *name, int stage )` (`code/cgame/cg_syscalls.cpp:205`)
+- `void cgi_S_StartLocalSound( sfxHandle_t sfx, int channelNum )` (`code/cgame/cg_syscalls.cpp:209`)
+- `void cgi_S_ClearLoopingSounds( void )` (`code/cgame/cg_syscalls.cpp:213`)
+- `void cgi_S_AddLoopingSound( int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfx, soundChannel_t chan )` (`code/cgame/cg_syscalls.cpp:217`)
+- `void cgi_S_UpdateEntityPosition( int entityNum, const vec3_t origin )` (`code/cgame/cg_syscalls.cpp:221`)
+- `void cgi_S_Respatialize( int entityNum, const vec3_t origin, vec3_t axis[3], qboolean inwater )` (`code/cgame/cg_syscalls.cpp:225`)
+- `sfxHandle_t cgi_S_RegisterSound( const char *sample )` (`code/cgame/cg_syscalls.cpp:229`)
+- `void cgi_S_StartBackgroundTrack( const char *intro, const char *loop, qboolean bForceStart )` (`code/cgame/cg_syscalls.cpp:233`)
+- `float cgi_S_GetSampleLength( sfxHandle_t sfx )` (`code/cgame/cg_syscalls.cpp:237`)
+- `void cgi_FF_Start( ffHandle_t ff, int clientNum )` (`code/cgame/cg_syscalls.cpp:243`)
+- `void cgi_FF_Stop( ffHandle_t ff, int clientNum )` (`code/cgame/cg_syscalls.cpp:247`)
+- `void cgi_FF_StopAll( void )` (`code/cgame/cg_syscalls.cpp:251`)
+- `void cgi_FF_Shake( int intensity, int duration )` (`code/cgame/cg_syscalls.cpp:255`)
+- `ffHandle_t cgi_FF_Register( const char *name, int channel )` (`code/cgame/cg_syscalls.cpp:259`)
+- `void cgi_FF_AddLoopingForce( ffHandle_t handle, int entNum )` (`code/cgame/cg_syscalls.cpp:263`)
+- `void cgi_FF_StartFX( int iFX )` (`code/cgame/cg_syscalls.cpp:269`)
+- `void cgi_FF_EnsureFX( int iFX )` (`code/cgame/cg_syscalls.cpp:273`)
+- `void cgi_FF_StopFX( int iFX )` (`code/cgame/cg_syscalls.cpp:277`)
+- `void cgi_FF_StopAllFX( void )` (`code/cgame/cg_syscalls.cpp:281`)
+- `void cgi_FF_Xbox_Shake( float intensity, int duration )` (`code/cgame/cg_syscalls.cpp:289`)
+- `void cgi_FF_Xbox_Damage( int damage, float xpos )` (`code/cgame/cg_syscalls.cpp:293`)
+- `void cgi_R_LoadWorldMap( const char *mapname )` (`code/cgame/cg_syscalls.cpp:299`)
+- `qhandle_t cgi_R_RegisterModel( const char *name )` (`code/cgame/cg_syscalls.cpp:303`)
+- `qhandle_t cgi_R_RegisterSkin( const char *name )` (`code/cgame/cg_syscalls.cpp:307`)
+- `qhandle_t cgi_R_RegisterShader( const char *name )` (`code/cgame/cg_syscalls.cpp:311`)
+- `qhandle_t cgi_R_RegisterShaderNoMip( const char *name )` (`code/cgame/cg_syscalls.cpp:317`)
+- `qhandle_t cgi_R_RegisterFont( const char *name )` (`code/cgame/cg_syscalls.cpp:321`)
+- `int cgi_R_Font_StrLenPixels(const char *text, const int iFontIndex, const float scale /*= 1.0f*/)` (`code/cgame/cg_syscalls.cpp:325`)
+- `int cgi_R_Font_StrLenChars(const char *text)` (`code/cgame/cg_syscalls.cpp:329`)
+- `int cgi_R_Font_HeightPixels(const int iFontIndex, const float scale /*= 1.0f*/)` (`code/cgame/cg_syscalls.cpp:333`)
+- `qboolean cgi_Language_IsAsian( void )` (`code/cgame/cg_syscalls.cpp:337`)
+- `qboolean cgi_Language_UsesSpaces(void)` (`code/cgame/cg_syscalls.cpp:342`)
+- `unsigned int cgi_AnyLanguage_ReadCharFromString( const char *psText, int *piAdvanceCount, qboolean *pbIsTrailingPunctuation /* = NULL */ )` (`code/cgame/cg_syscalls.cpp:347`)
+- `void cgi_R_Font_DrawString(int ox, int oy, const char *text, const float *rgba, const int setIndex, int iMaxPixelWidth, const float scale /*= 1.0f*/)` (`code/cgame/cg_syscalls.cpp:352`)
+- `void cgi_R_SetRefractProp(float alpha, float stretch, qboolean prepost, qboolean negate)` (`code/cgame/cg_syscalls.cpp:357`)
+- `void cgi_R_ClearScene( void )` (`code/cgame/cg_syscalls.cpp:362`)
+- `void cgi_R_AddRefEntityToScene( const refEntity_t *re )` (`code/cgame/cg_syscalls.cpp:366`)
+- `qboolean cgi_R_inPVS( vec3_t p1, vec3_t p2 )` (`code/cgame/cg_syscalls.cpp:370`)
+- `void cgi_R_GetLighting( const vec3_t origin, vec3_t ambientLight, vec3_t directedLight, vec3_t ligthDir )` (`code/cgame/cg_syscalls.cpp:376`)
+- `void cgi_R_AddPolyToScene( qhandle_t hShader , int numVerts, const polyVert_t *verts )` (`code/cgame/cg_syscalls.cpp:380`)
+- `void cgi_R_AddLightToScene( const vec3_t org, float intensity, float r, float g, float b )` (`code/cgame/cg_syscalls.cpp:384`)
+- `void cgi_R_RenderScene( const refdef_t *fd )` (`code/cgame/cg_syscalls.cpp:388`)
+- `void cgi_R_SetColor( const float *rgba )` (`code/cgame/cg_syscalls.cpp:392`)
+- `void cgi_R_DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader )` (`code/cgame/cg_syscalls.cpp:396`)
+- `void cgi_R_ModelBounds( qhandle_t model, vec3_t mins, vec3_t maxs )` (`code/cgame/cg_syscalls.cpp:405`)
+- `void cgi_R_LerpTag( orientation_t *tag, qhandle_t mod, int startFrame, int endFrame, float frac, const char *tagName )` (`code/cgame/cg_syscalls.cpp:409`)
+- `void cgi_R_DrawRotatePic( float x, float y, float w, float h, float s1, float t1, float s2, float t2,float a, qhandle_t hShader )` (`code/cgame/cg_syscalls.cpp:414`)
+- `void cgi_R_DrawRotatePic2( float x, float y, float w, float h, float s1, float t1, float s2, float t2,float a, qhandle_t hShader )` (`code/cgame/cg_syscalls.cpp:420`)
+- `void cgi_R_SetRangeFog(float range)` (`code/cgame/cg_syscalls.cpp:427`)
+- `void cgi_R_LAGoggles( void )` (`code/cgame/cg_syscalls.cpp:432`)
+- `void cgi_R_Scissor( float x, float y, float w, float h)` (`code/cgame/cg_syscalls.cpp:437`)
+- `void cgi_GetGlconfig( glconfig_t *glconfig )` (`code/cgame/cg_syscalls.cpp:442`)
+- `void cgi_GetGameState( gameState_t *gamestate )` (`code/cgame/cg_syscalls.cpp:446`)
+- `void cgi_GetCurrentSnapshotNumber( int *snapshotNumber, int *serverTime )` (`code/cgame/cg_syscalls.cpp:450`)
+- `qboolean cgi_GetSnapshot( int snapshotNumber, snapshot_t *snapshot )` (`code/cgame/cg_syscalls.cpp:454`)
+- `qboolean cgi_GetDefaultState(int entityIndex, entityState_t *state )` (`code/cgame/cg_syscalls.cpp:458`)
+- `qboolean cgi_GetServerCommand( int serverCommandNumber )` (`code/cgame/cg_syscalls.cpp:463`)
+- `int cgi_GetCurrentCmdNumber( void )` (`code/cgame/cg_syscalls.cpp:467`)
+- `qboolean cgi_GetUserCmd( int cmdNumber, usercmd_t *ucmd )` (`code/cgame/cg_syscalls.cpp:471`)
+- `void cgi_SetUserCmdValue( int stateValue, float sensitivityScale, float mPitchOverride, float mYawOverride )` (`code/cgame/cg_syscalls.cpp:475`)
+- `void cgi_SetUserCmdAngles( float pitchOverride, float yawOverride, float rollOverride )` (`code/cgame/cg_syscalls.cpp:479`)
+- `void trap_G2_SetGhoul2ModelIndexes(CGhoul2Info_v &ghoul2, qhandle_t *modelList, qhandle_t *skinList)` (`code/cgame/cg_syscalls.cpp:486`)
+- `void trap_Com_SetOrgAngles(vec3_t org,vec3_t angles)` (`code/cgame/cg_syscalls.cpp:494`)
+- `void trap_R_GetLightStyle(int style, color4ub_t color)` (`code/cgame/cg_syscalls.cpp:499`)
+- `void trap_R_SetLightStyle(int style, int color)` (`code/cgame/cg_syscalls.cpp:504`)
+- `void cgi_R_GetBModelVerts(int bmodelIndex, vec3_t *verts, vec3_t normal )` (`code/cgame/cg_syscalls.cpp:509`)
+- `void cgi_R_WorldEffectCommand( const char *command )` (`code/cgame/cg_syscalls.cpp:514`)
+- `int trap_CIN_PlayCinematic( const char *arg0, int xpos, int ypos, int width, int height, int bits, const char *psAudioFile /* = NULL */)` (`code/cgame/cg_syscalls.cpp:520`)
+- `e_status trap_CIN_StopCinematic(int handle)` (`code/cgame/cg_syscalls.cpp:526`)
+- `e_status trap_CIN_RunCinematic (int handle)` (`code/cgame/cg_syscalls.cpp:532`)
+- `void trap_CIN_DrawCinematic (int handle)` (`code/cgame/cg_syscalls.cpp:538`)
+- `void trap_CIN_SetExtents (int handle, int x, int y, int w, int h)` (`code/cgame/cg_syscalls.cpp:544`)
+- `void *cgi_Z_Malloc( int size, int tag )` (`code/cgame/cg_syscalls.cpp:548`)
+- `void cgi_Z_Free( void *ptr )` (`code/cgame/cg_syscalls.cpp:553`)
+- `void cgi_UI_SetActive_Menu(char *name)` (`code/cgame/cg_syscalls.cpp:558`)
+- `void cgi_UI_Menu_OpenByName(char *buf)` (`code/cgame/cg_syscalls.cpp:563`)
+- `void cgi_UI_Menu_Reset(void)` (`code/cgame/cg_syscalls.cpp:568`)
+- `void cgi_UI_Menu_New(char *buf)` (`code/cgame/cg_syscalls.cpp:573`)
+- `void cgi_UI_Parse_Int(int *value)` (`code/cgame/cg_syscalls.cpp:578`)
+- `void cgi_UI_Parse_String(char *buf)` (`code/cgame/cg_syscalls.cpp:583`)
+- `void cgi_UI_Parse_Float(float *value)` (`code/cgame/cg_syscalls.cpp:588`)
+- `int cgi_UI_StartParseSession(char *menuFile,char **buf)` (`code/cgame/cg_syscalls.cpp:593`)
+- `void cgi_UI_EndParseSession(char *buf)` (`code/cgame/cg_syscalls.cpp:598`)
+- `void cgi_UI_ParseExt(char **token)` (`code/cgame/cg_syscalls.cpp:603`)
+- `void cgi_UI_MenuCloseAll(void)` (`code/cgame/cg_syscalls.cpp:608`)
+- `void cgi_UI_MenuPaintAll(void)` (`code/cgame/cg_syscalls.cpp:613`)
+- `void cgi_UI_String_Init(void)` (`code/cgame/cg_syscalls.cpp:618`)
+- `int cgi_UI_GetMenuInfo(char *menuFile,int *x,int *y,int *w,int *h)` (`code/cgame/cg_syscalls.cpp:623`)
+- `int cgi_UI_GetMenuItemInfo(const char *menuFile,const char *itemName, int *x,int *y,int *w,int *h,vec4_t color,qhandle_t *background)` (`code/cgame/cg_syscalls.cpp:628`)
+- `int cgi_UI_GetItemText(char *menuFile,char *itemName, char* text)` (`code/cgame/cg_syscalls.cpp:633`)
+- `int cgi_SP_GetStringTextString(const char *text, char *buffer, int bufferLength)` (`code/cgame/cg_syscalls.cpp:638`)
+- `int cgi_EndGame(void)` (`code/cgame/cg_syscalls.cpp:643`)
+
+### VM entry functions (1)
+
+- `int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7 )` (`code/cgame/cg_main.cpp:94`)
+
+## SP ui
+
+Sources: `code/ui/ui_public.h`, `code/ui/ui_syscalls.cpp`, `code/ui/ui_main.cpp`.
+
+### `uiImport_t` (95)
+
+- `UI_ERROR`
+- `UI_PRINT`
+- `UI_MILLISECONDS`
+- `UI_CVAR_SET`
+- `UI_CVAR_VARIABLEVALUE`
+- `UI_CVAR_VARIABLESTRINGBUFFER`
+- `UI_CVAR_SETVALUE`
+- `UI_CVAR_RESET`
+- `UI_CVAR_CREATE`
+- `UI_CVAR_INFOSTRINGBUFFER`
+- `UI_ARGC`
+- `UI_ARGV`
+- `UI_CMD_EXECUTETEXT`
+- `UI_FS_FOPENFILE`
+- `UI_FS_READ`
+- `UI_FS_WRITE`
+- `UI_FS_FCLOSEFILE`
+- `UI_FS_GETFILELIST`
+- `UI_R_REGISTERMODEL`
+- `UI_R_REGISTERSKIN`
+- `UI_R_REGISTERSHADERNOMIP`
+- `UI_R_CLEARSCENE`
+- `UI_R_ADDREFENTITYTOSCENE`
+- `UI_R_ADDPOLYTOSCENE`
+- `UI_R_ADDLIGHTTOSCENE`
+- `UI_R_RENDERSCENE`
+- `UI_R_SETCOLOR`
+- `UI_R_DRAWSTRETCHPIC`
+- `UI_UPDATESCREEN`
+- `UI_CM_LERPTAG`
+- `UI_CM_LOADMODEL`
+- `UI_S_REGISTERSOUND`
+- `UI_S_STARTLOCALSOUND`
+- `UI_KEY_KEYNUMTOSTRINGBUF`
+- `UI_KEY_GETBINDINGBUF`
+- `UI_KEY_SETBINDING`
+- `UI_KEY_ISDOWN`
+- `UI_KEY_GETOVERSTRIKEMODE`
+- `UI_KEY_SETOVERSTRIKEMODE`
+- `UI_KEY_CLEARSTATES`
+- `UI_KEY_GETCATCHER`
+- `UI_KEY_SETCATCHER`
+- `UI_GETCLIPBOARDDATA`
+- `UI_GETGLCONFIG`
+- `UI_GETCLIENTSTATE`
+- `UI_GETCONFIGSTRING`
+- `UI_LAN_GETPINGQUEUECOUNT`
+- `UI_LAN_CLEARPING`
+- `UI_LAN_GETPING`
+- `UI_LAN_GETPINGINFO`
+- `UI_CVAR_REGISTER`
+- `UI_CVAR_UPDATE`
+- `UI_MEMORY_REMAINING`
+- `UI_GET_CDKEY`
+- `UI_SET_CDKEY`
+- `UI_R_REGISTERFONT`
+- `UI_R_MODELBOUNDS`
+- `UI_PC_ADD_GLOBAL_DEFINE`
+- `UI_PC_LOAD_SOURCE`
+- `UI_PC_FREE_SOURCE`
+- `UI_PC_READ_TOKEN`
+- `UI_PC_SOURCE_FILE_AND_LINE`
+- `UI_S_STOPBACKGROUNDTRACK`
+- `UI_S_STARTBACKGROUNDTRACK`
+- `UI_REAL_TIME`
+- `UI_LAN_GETSERVERCOUNT`
+- `UI_LAN_GETSERVERADDRESSSTRING`
+- `UI_LAN_GETSERVERINFO`
+- `UI_LAN_MARKSERVERVISIBLE`
+- `UI_LAN_UPDATEVISIBLEPINGS`
+- `UI_LAN_RESETPINGS`
+- `UI_LAN_LOADCACHEDSERVERS`
+- `UI_LAN_SAVECACHEDSERVERS`
+- `UI_LAN_ADDSERVER`
+- `UI_LAN_REMOVESERVER`
+- `UI_CIN_PLAYCINEMATIC`
+- `UI_CIN_STOPCINEMATIC`
+- `UI_CIN_RUNCINEMATIC`
+- `UI_CIN_DRAWCINEMATIC`
+- `UI_CIN_SETEXTENTS`
+- `UI_R_REMAP_SHADER`
+- `UI_VERIFY_CDKEY`
+- `UI_LAN_SERVERSTATUS`
+- `UI_LAN_GETSERVERPING`
+- `UI_LAN_SERVERISVISIBLE`
+- `UI_LAN_COMPARESERVERS`
+- `UI_MEMSET`
+- `UI_MEMCPY`
+- `UI_STRNCPY`
+- `UI_SIN`
+- `UI_COS`
+- `UI_ATAN2`
+- `UI_SQRT`
+- `UI_FLOOR`
+- `UI_CEIL`
+
+### `uiimport_t` function pointers (69)
+
+- `Printf`: `void (*Printf)( const char *fmt, ... );`
+- `Error`: `void (*Error)( int level, const char *fmt, ... );`
+- `Cvar_Set`: `void (*Cvar_Set)( const char *name, const char *value );`
+- `Cvar_VariableValue`: `float (*Cvar_VariableValue)( const char *var_name );`
+- `Cvar_VariableStringBuffer`: `void (*Cvar_VariableStringBuffer)( const char *var_name, char *buffer, int bufsize );`
+- `Cvar_SetValue`: `void (*Cvar_SetValue)( const char *var_name, float value );`
+- `Cvar_Reset`: `void (*Cvar_Reset)( const char *name );`
+- `Cvar_Create`: `void (*Cvar_Create)( const char *var_name, const char *var_value, int flags );`
+- `Cvar_InfoStringBuffer`: `void (*Cvar_InfoStringBuffer)( int bit, char *buffer, int bufsize );`
+- `Argc`: `int (*Argc)( void );`
+- `Argv`: `void (*Argv)( int n, char *buffer, int bufferLength );`
+- `Cmd_ExecuteText`: `void (*Cmd_ExecuteText)( int exec_when, const char *text );`
+- `Cmd_TokenizeString`: `void (*Cmd_TokenizeString)( const char *text );`
+- `FS_FOpenFile`: `int (*FS_FOpenFile)( const char *qpath, fileHandle_t *file, fsMode_t mode );`
+- `FS_Read`: `int (*FS_Read)( void *buffer, int len, fileHandle_t f );`
+- `FS_Write`: `int (*FS_Write)( const void *buffer, int len, fileHandle_t f );`
+- `FS_FCloseFile`: `void (*FS_FCloseFile)( fileHandle_t f );`
+- `FS_GetFileList`: `int (*FS_GetFileList)( const char *path, const char *extension, char *listbuf, int bufsize );`
+- `FS_ReadFile`: `int (*FS_ReadFile)( const char *name, void **buf );`
+- `FS_FreeFile`: `void (*FS_FreeFile)( void *buf );`
+- `R_RegisterModel`: `qhandle_t (*R_RegisterModel)( const char *name ); // returns rgb axis if not found`
+- `R_RegisterSkin`: `qhandle_t (*R_RegisterSkin)( const char *name ); // returns all white if not found`
+- `R_RegisterShader`: `qhandle_t (*R_RegisterShader)( const char *name ); // returns white if not found`
+- `R_RegisterShaderNoMip`: `qhandle_t (*R_RegisterShaderNoMip)( const char *name ); // returns white if not found`
+- `R_RegisterFont`: `qhandle_t (*R_RegisterFont)( const char *name ); // returns 0 for bad font`
+- `R_Font_StrLenPixels`: `int (*R_Font_StrLenPixels)(const char *text, const int setIndex, const float scale = 1.0f);`
+- `R_Font_HeightPixels`: `int (*R_Font_HeightPixels)(const int setIndex, const float scale = 1.0f);`
+- `R_Font_DrawString`: `void (*R_Font_DrawString)(int ox, int oy, const char *text, const float *rgba, const int setIndex, int iMaxPixelWidth, const float scale = 1.0f);`
+- `R_Font_StrLenChars`: `int (*R_Font_StrLenChars)(const char *text);`
+- `Language_IsAsian`: `qboolean (*Language_IsAsian) (void);`
+- `Language_UsesSpaces`: `qboolean (*Language_UsesSpaces) (void);`
+- `AnyLanguage_ReadCharFromString`: `unsigned int (*AnyLanguage_ReadCharFromString)( const char *psText, int *piAdvanceCount, qboolean *pbIsTrailingPunctuation /* = NULL */);`
+- `R_ClearScene`: `void (*R_ClearScene)( void );`
+- `R_AddRefEntityToScene`: `void (*R_AddRefEntityToScene)( const refEntity_t *re );`
+- `R_AddPolyToScene`: `void (*R_AddPolyToScene)( qhandle_t hShader , int numVerts, const polyVert_t *verts );`
+- `R_AddLightToScene`: `void (*R_AddLightToScene)( const vec3_t org, float intensity, float r, float g, float b );`
+- `R_RenderScene`: `void (*R_RenderScene)( const refdef_t *fd );`
+- `R_ModelBounds`: `void (*R_ModelBounds)( qhandle_t handle, vec3_t mins, vec3_t maxs );`
+- `R_SetColor`: `void (*R_SetColor)( const float *rgba ); // NULL = 1,1,1,1`
+- `R_DrawStretchPic`: `void (*R_DrawStretchPic) ( float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader ); // 0 = white`
+- `R_ScissorPic`: `void (*R_ScissorPic) ( float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader ); // 0 = white`
+- `UpdateScreen`: `void (*UpdateScreen)( void );`
+- `PrecacheScreenshot`: `void (*PrecacheScreenshot)( void );`
+- `R_LerpTag`: `void (*R_LerpTag)( orientation_t *tag, clipHandle_t mod, int startFrame, int endFrame, float frac, const char *tagName );`
+- `S_StartLocalSound`: `void (*S_StartLocalSound)( sfxHandle_t sfxHandle, int channelNum );`
+- `S_RegisterSound`: `sfxHandle_t (*S_RegisterSound)( const char* name);`
+- `S_StartLocalLoopingSound`: `void (*S_StartLocalLoopingSound)( sfxHandle_t sfxHandle);`
+- `S_StopSounds`: `void (*S_StopSounds)( void );`
+- `DrawStretchRaw`: `void (*DrawStretchRaw) (int x, int y, int w, int h, int cols, int rows, const byte *data, int client, qboolean dirty);`
+- `SG_GetSaveImage`: `//qboolean(*SG_GetSaveImage)( const char *psPathlessBaseName, void *pvAddress );`
+- `SG_GetSaveGameComment`: `int (*SG_GetSaveGameComment)(const char *psPathlessBaseName, char *sComment, char *sMapName);`
+- `SG_GameAllowedToSaveHere`: `qboolean (*SG_GameAllowedToSaveHere)(qboolean inCamera);`
+- `SG_StoreSaveGameComment`: `void (*SG_StoreSaveGameComment)(const char *sComment);`
+- `SCR_GetScreenshot`: `//byte *(*SCR_GetScreenshot)(qboolean *);`
+- `Key_KeynumToStringBuf`: `void (*Key_KeynumToStringBuf)( int keynum, char *buf, int buflen );`
+- `Key_GetBindingBuf`: `void (*Key_GetBindingBuf)( int keynum, char *buf, int buflen );`
+- `Key_SetBinding`: `void (*Key_SetBinding)( int keynum, const char *binding );`
+- `Key_IsDown`: `qboolean (*Key_IsDown)( int keynum );`
+- `Key_GetOverstrikeMode`: `qboolean (*Key_GetOverstrikeMode)( void );`
+- `Key_SetOverstrikeMode`: `void (*Key_SetOverstrikeMode)( qboolean state );`
+- `Key_ClearStates`: `void (*Key_ClearStates)( void );`
+- `Key_GetCatcher`: `int (*Key_GetCatcher)( void );`
+- `Key_SetCatcher`: `void (*Key_SetCatcher)( int catcher );`
+- `GetClipboardData`: `void (*GetClipboardData)( char *buf, int bufsize );`
+- `GetGlconfig`: `void (*GetGlconfig)( glconfig_t *config );`
+- `GetClientState`: `connstate_t (*GetClientState)( void );`
+- `GetConfigString`: `void (*GetConfigString)( int index, char* buff, int buffsize );`
+- `Milliseconds`: `int (*Milliseconds)( void );`
+- `Draw_DataPad`: `void (*Draw_DataPad)(int HUDType);`
+
+### `vmMain` command cases (14)
+
+- `UI_CROSSHAIR` (`code/ui/ui_main.cpp:2024`)
+- `UI_EFFECTS` (`code/ui/ui_main.cpp:3751`)
+- `UI_VERSION` (`code/ui/ui_main.cpp:3754`)
+- `UI_DATAPAD_MISSION` (`code/ui/ui_main.cpp:3758`)
+- `UI_DATAPAD_WEAPONS` (`code/ui/ui_main.cpp:3763`)
+- `UI_DATAPAD_INVENTORY` (`code/ui/ui_main.cpp:3768`)
+- `UI_DATAPAD_FORCEPOWERS` (`code/ui/ui_main.cpp:3773`)
+- `UI_ALLMAPS_SELECTION` (`code/ui/ui_main.cpp:3778`)
+- `UI_PREVIEWCINEMATIC` (`code/ui/ui_main.cpp:3806`)
+- `UI_CROSSHAIR` (`code/ui/ui_main.cpp:3810`)
+- `UI_GLINFO` (`code/ui/ui_main.cpp:3813`)
+- `UI_KEYBINDSTATUS` (`code/ui/ui_main.cpp:3816`)
+- `UI_KEYBINDSTATUS` (`code/ui/ui_main.cpp:3882`)
+- `UI_SERVERREFRESHDATE` (`code/ui/ui_main.cpp:3894`)
+
+### Syscall wrappers and entry functions (24)
+
+- `void dllEntry( int (*syscallptr)( int arg,... ) )` (`code/ui/ui_syscalls.cpp:18`)
+- `float trap_Cvar_VariableValue( const char *var_name )` (`code/ui/ui_syscalls.cpp:35`)
+- `void trap_R_ClearScene( void )` (`code/ui/ui_syscalls.cpp:44`)
+- `void trap_R_AddRefEntityToScene( const refEntity_t *re )` (`code/ui/ui_syscalls.cpp:49`)
+- `void trap_R_RenderScene( const refdef_t *fd )` (`code/ui/ui_syscalls.cpp:54`)
+- `void trap_R_SetColor( const float *rgba )` (`code/ui/ui_syscalls.cpp:60`)
+- `void trap_R_DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader )` (`code/ui/ui_syscalls.cpp:67`)
+- `void trap_R_ModelBounds( clipHandle_t model, vec3_t mins, vec3_t maxs )` (`code/ui/ui_syscalls.cpp:76`)
+- `void trap_S_StartLocalSound( sfxHandle_t sfx, int channelNum )` (`code/ui/ui_syscalls.cpp:82`)
+- `void trap_S_StopSounds( void )` (`code/ui/ui_syscalls.cpp:89`)
+- `sfxHandle_t trap_S_RegisterSound( const char *sample, qboolean compressed )` (`code/ui/ui_syscalls.cpp:94`)
+- `void trap_FF_Start( ffHandle_t ff )` (`code/ui/ui_syscalls.cpp:101`)
+- `ffHandle_t trap_FF_Register( const char *name, int channel )` (`code/ui/ui_syscalls.cpp:106`)
+- `void trap_Key_SetBinding( int keynum, const char *binding )` (`code/ui/ui_syscalls.cpp:113`)
+- `qboolean trap_Key_GetOverstrikeMode( void )` (`code/ui/ui_syscalls.cpp:118`)
+- `void trap_Key_SetOverstrikeMode( qboolean state )` (`code/ui/ui_syscalls.cpp:123`)
+- `void trap_Key_ClearStates( void )` (`code/ui/ui_syscalls.cpp:128`)
+- `int trap_Key_GetCatcher( void )` (`code/ui/ui_syscalls.cpp:135`)
+- `void trap_Key_SetCatcher( int catcher )` (`code/ui/ui_syscalls.cpp:142`)
+- `void trap_GetClipboardData( char *buf, int bufsize )` (`code/ui/ui_syscalls.cpp:147`)
+- `void trap_GetClientState( uiClientState_t *state )` (`code/ui/ui_syscalls.cpp:151`)
+- `void trap_GetGlconfig( glconfig_t *glconfig )` (`code/ui/ui_syscalls.cpp:158`)
+- `int trap_CIN_PlayCinematic( const char *arg0, int xpos, int ypos, int width, int height, int bits, const char *psAudioFile)` (`code/ui/ui_syscalls.cpp:166`)
+- `int trap_CIN_StopCinematic(int handle)` (`code/ui/ui_syscalls.cpp:173`)
+
+### VM entry functions (1)
+
+- `int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11 )` (`code/ui/ui_main.cpp:512`)
+
+## SP game function-table ABI
+
+Sources: `code/game/g_public.h`, `code/game/g_main.cpp`. This surface uses import/export structs instead of the MP numeric syscall enum model.
+
+### `game_import_t` function pointers (130)
+
+- `Printf`: `void (*Printf)( const char *fmt, ... );`
+- `WriteCam`: `void (*WriteCam)( const char *text );`
+- `FlushCamFile`: `void (*FlushCamFile)();`
+- `Error`: `void (*Error)( int, const char *fmt, ... );`
+- `Milliseconds`: `int (*Milliseconds)( void );`
+- `cvar`: `cvar_t *(*cvar)( const char *var_name, const char *value, int flags );`
+- `cvar_set`: `void (*cvar_set)( const char *var_name, const char *value );`
+- `Cvar_VariableIntegerValue`: `int (*Cvar_VariableIntegerValue)( const char *var_name );`
+- `Cvar_VariableStringBuffer`: `void (*Cvar_VariableStringBuffer)( const char *var_name, char *buffer, int bufsize );`
+- `argc`: `int (*argc)( void );`
+- `argv`: `char *(*argv)( int n );`
+- `FS_FOpenFile`: `int (*FS_FOpenFile)( const char *qpath, fileHandle_t *file, fsMode_t mode );`
+- `FS_Read`: `int (*FS_Read)( void *buffer, int len, fileHandle_t f );`
+- `FS_Write`: `int (*FS_Write)( const void *buffer, int len, fileHandle_t f );`
+- `FS_FCloseFile`: `void (*FS_FCloseFile)( fileHandle_t f );`
+- `FS_ReadFile`: `int (*FS_ReadFile)( const char *name, void **buf );`
+- `FS_FreeFile`: `void (*FS_FreeFile)( void *buf );`
+- `FS_GetFileList`: `int (*FS_GetFileList)( const char *path, const char *extension, char *listbuf, int bufsize );`
+- `AppendToSaveGame`: `qboolean (*AppendToSaveGame)(unsigned long chid, const void *data, int length);`
+- `ReadFromSaveGame`: `int (*ReadFromSaveGame)(unsigned long chid, void *pvAddress, int iLength, void **ppvAddressPtr = NULL);`
+- `ReadFromSaveGameOptional`: `int (*ReadFromSaveGameOptional)(unsigned long chid, void *pvAddress, int iLength, void **ppvAddressPtr = NULL);`
+- `SendConsoleCommand`: `void (*SendConsoleCommand)( const char *text );`
+- `DropClient`: `void (*DropClient)( int clientNum, const char *reason );`
+- `SendServerCommand`: `void (*SendServerCommand)( int clientNum, const char *fmt, ... );`
+- `SetConfigstring`: `void (*SetConfigstring)( int num, const char *string );`
+- `GetConfigstring`: `void (*GetConfigstring)( int num, char *buffer, int bufferSize );`
+- `GetUserinfo`: `void (*GetUserinfo)( int num, char *buffer, int bufferSize );`
+- `SetUserinfo`: `void (*SetUserinfo)( int num, const char *buffer );`
+- `GetServerinfo`: `void (*GetServerinfo)( char *buffer, int bufferSize );`
+- `SetBrushModel`: `void (*SetBrushModel)( gentity_t *ent, const char *name );`
+- `trace`: `void (*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, const int passEntityNum, const int contentmask , const EG2_Collision eG2TraceType = (EG2_Collision)0, const int useLod = 0);`
+- `pointcontents`: `int (*pointcontents)( const vec3_t point, int passEntityNum );`
+- `totalMapContents`: `int (*totalMapContents)();`
+- `inPVS`: `qboolean (*inPVS)( const vec3_t p1, const vec3_t p2 );`
+- `inPVSIgnorePortals`: `qboolean (*inPVSIgnorePortals)( const vec3_t p1, const vec3_t p2 );`
+- `AdjustAreaPortalState`: `void (*AdjustAreaPortalState)( gentity_t *ent, qboolean open );`
+- `AreasConnected`: `qboolean (*AreasConnected)( int area1, int area2 );`
+- `linkentity`: `void (*linkentity)( gentity_t *ent );`
+- `unlinkentity`: `void (*unlinkentity)( gentity_t *ent ); // call before removing an interactive entity`
+- `EntitiesInBox`: `int (*EntitiesInBox)( const vec3_t mins, const vec3_t maxs, gentity_t **list, int maxcount );`
+- `EntityContact`: `qboolean (*EntityContact)( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );`
+- `Malloc`: `void *(*Malloc)( int iSize, memtag_t eTag, qboolean bZeroIt); // see qcommon/tags.h for choices`
+- `Free`: `int (*Free)( void *buf );`
+- `bIsFromZone`: `qboolean (*bIsFromZone)( void *buf, memtag_t eTag); // see qcommon/tags.h for choices`
+- `G2API_PrecacheGhoul2Model`: `qhandle_t (*G2API_PrecacheGhoul2Model)(const char *fileName);`
+- `G2API_InitGhoul2Model`: `int (*G2API_InitGhoul2Model)(CGhoul2Info_v &ghoul2, const char *fileName, int modelIndex, qhandle_t customSkin = NULL, qhandle_t customShader = NULL, int modelFlags = 0, int lodBias = 0);`
+- `G2API_SetSkin`: `qboolean (*G2API_SetSkin)(CGhoul2Info *ghlInfo, qhandle_t customSkin, qhandle_t renderSkin = 0 );`
+- `G2API_SetBoneAnim`: `qboolean (*G2API_SetBoneAnim)(CGhoul2Info *ghlInfo, const char *boneName, const int startFrame, const int endFrame, const int flags, const float animSpeed, const int currentTime, const float setFrame = -1, const int blendTime = -1);`
+- `G2API_SetBoneAngles`: `qboolean (*G2API_SetBoneAngles)(CGhoul2Info *ghlInfo, const char *boneName, const vec3_t angles, const int flags, const Eorientations up, const Eorientations right, const Eorientations forward, qhandle_t *modelList, int blendTime = 0, int blendStart = 0);`
+- `G2API_SetBoneAnglesIndex`: `qboolean (*G2API_SetBoneAnglesIndex)(CGhoul2Info *ghlInfo, const int index, const vec3_t angles, const int flags, const Eorientations yaw, const Eorientations pitch, const Eorientations roll, qhandle_t *modelList, int blendTime = 0, int currentTime = 0);`
+- `G2API_SetBoneAnglesMatrix`: `qboolean (*G2API_SetBoneAnglesMatrix)(CGhoul2Info *ghlInfo, const char *boneName, const mdxaBone_t &matrix, const int flags, qhandle_t *modelList, int blendTime = 0, int currentTime = 0);`
+- `G2API_CopyGhoul2Instance`: `void (*G2API_CopyGhoul2Instance)(CGhoul2Info_v &ghoul2From, CGhoul2Info_v &ghoul2To, int modelIndex = -1);`
+- `G2API_SetBoneAnimIndex`: `qboolean (*G2API_SetBoneAnimIndex)(CGhoul2Info *ghlInfo, const int index, const int startFrame, const int endFrame, const int flags, const float animSpeed, const int currentTime, const float setFrame = -1, const int blendTime = -1);`
+- `G2API_SetLodBias`: `qboolean (*G2API_SetLodBias)(CGhoul2Info *ghlInfo, int lodBias);`
+- `G2API_SetShader`: `qboolean (*G2API_SetShader)(CGhoul2Info *ghlInfo, qhandle_t customShader);`
+- `G2API_RemoveGhoul2Model`: `qboolean (*G2API_RemoveGhoul2Model)(CGhoul2Info_v &ghlInfo, const int modelIndex);`
+- `G2API_SetSurfaceOnOff`: `qboolean (*G2API_SetSurfaceOnOff)(CGhoul2Info *ghlInfo, const char *surfaceName, const int flags);`
+- `G2API_SetRootSurface`: `qboolean (*G2API_SetRootSurface)(CGhoul2Info_v &ghlInfo, const int modelIndex, const char *surfaceName);`
+- `G2API_RemoveSurface`: `qboolean (*G2API_RemoveSurface)(CGhoul2Info *ghlInfo, const int index);`
+- `G2API_AddSurface`: `int (*G2API_AddSurface)(CGhoul2Info *ghlInfo, int surfaceNumber, int polyNumber, float BarycentricI, float BarycentricJ, int lod );`
+- `G2API_GetBoneAnim`: `qboolean (*G2API_GetBoneAnim)(CGhoul2Info *ghlInfo, const char *boneName, const int currentTime, float *currentFrame, int *startFrame, int *endFrame, int *flags, float *animSpeed, int *modelList);`
+- `G2API_GetBoneAnimIndex`: `qboolean (*G2API_GetBoneAnimIndex)(CGhoul2Info *ghlInfo, const int iBoneIndex, const int currentTime, float *currentFrame, int *startFrame, int *endFrame, int *flags, float *animSpeed, int *modelList);`
+- `G2API_GetAnimRange`: `qboolean (*G2API_GetAnimRange)(CGhoul2Info *ghlInfo, const char *boneName, int *startFrame, int *endFrame);`
+- `G2API_GetAnimRangeIndex`: `qboolean (*G2API_GetAnimRangeIndex)(CGhoul2Info *ghlInfo, const int boneIndex, int *startFrame, int *endFrame);`
+- `G2API_PauseBoneAnim`: `qboolean (*G2API_PauseBoneAnim)(CGhoul2Info *ghlInfo, const char *boneName, const int currentTime);`
+- `G2API_PauseBoneAnimIndex`: `qboolean (*G2API_PauseBoneAnimIndex)(CGhoul2Info *ghlInfo, const int boneIndex, const int currentTime);`
+- `G2API_IsPaused`: `qboolean (*G2API_IsPaused)(CGhoul2Info *ghlInfo, const char *boneName);`
+- `G2API_StopBoneAnim`: `qboolean (*G2API_StopBoneAnim)(CGhoul2Info *ghlInfo, const char *boneName);`
+- `G2API_StopBoneAngles`: `qboolean (*G2API_StopBoneAngles)(CGhoul2Info *ghlInfo, const char *boneName);`
+- `G2API_RemoveBone`: `qboolean (*G2API_RemoveBone)(CGhoul2Info *ghlInfo, const char *boneName);`
+- `G2API_RemoveBolt`: `qboolean (*G2API_RemoveBolt)(CGhoul2Info *ghlInfo, const int index);`
+- `G2API_AddBolt`: `int (*G2API_AddBolt)(CGhoul2Info *ghlInfo, const char *boneName);`
+- `G2API_AddBoltSurfNum`: `int (*G2API_AddBoltSurfNum)(CGhoul2Info *ghlInfo, const int surfIndex);`
+- `G2API_AttachG2Model`: `qboolean (*G2API_AttachG2Model)(CGhoul2Info *ghlInfo, CGhoul2Info *ghlInfoTo, int toBoltIndex, int toModel);`
+- `G2API_DetachG2Model`: `qboolean (*G2API_DetachG2Model)(CGhoul2Info *ghlInfo);`
+- `G2API_AttachEnt`: `qboolean (*G2API_AttachEnt)(int *boltInfo, CGhoul2Info *ghlInfoTo, int toBoltIndex, int entNum, int toModelNum);`
+- `G2API_DetachEnt`: `void (*G2API_DetachEnt)(int *boltInfo);`
+- `G2API_GetBoltMatrix`: `qboolean (*G2API_GetBoltMatrix)(CGhoul2Info_v &ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, const vec3_t scale);`
+- `G2API_ListSurfaces`: `void (*G2API_ListSurfaces)(CGhoul2Info *ghlInfo);`
+- `G2API_ListBones`: `void (*G2API_ListBones)(CGhoul2Info *ghlInfo, int frame);`
+- `G2API_HaveWeGhoul2Models`: `qboolean (*G2API_HaveWeGhoul2Models)(CGhoul2Info_v &ghoul2);`
+- `G2API_SetGhoul2ModelFlags`: `qboolean (*G2API_SetGhoul2ModelFlags)(CGhoul2Info *ghlInfo, const int flags);`
+- `G2API_GetGhoul2ModelFlags`: `int (*G2API_GetGhoul2ModelFlags)(CGhoul2Info *ghlInfo);`
+- `G2API_GetAnimFileName`: `qboolean (*G2API_GetAnimFileName)(CGhoul2Info *ghlInfo, char **filename);`
+- `G2API_CollisionDetect`: `void (*G2API_CollisionDetect)(CCollisionRecord *collRecMap, CGhoul2Info_v &ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, vec3_t rayStart, vec3_t rayEnd, vec3_t scale, CMiniHeap *G2VertSpace, EG2_Collision eG2TraceType, int useLod, float fRadius);`
+- `G2API_GiveMeVectorFromMatrix`: `void (*G2API_GiveMeVectorFromMatrix)(mdxaBone_t &boltMatrix, Eorientations flags, vec3_t &vec);`
+- `G2API_CleanGhoul2Models`: `void (*G2API_CleanGhoul2Models)(CGhoul2Info_v &ghoul2);`
+- `TheGhoul2InfoArray`: `IGhoul2InfoArray & (*TheGhoul2InfoArray)();`
+- `G2API_GetParentSurface`: `int (*G2API_GetParentSurface)(CGhoul2Info *ghlInfo, const int index);`
+- `G2API_GetSurfaceIndex`: `int (*G2API_GetSurfaceIndex)(CGhoul2Info *ghlInfo, const char *surfaceName);`
+- `G2API_GetSurfaceName`: `char *(*G2API_GetSurfaceName)(CGhoul2Info *ghlInfo, int surfNumber);`
+- `G2API_GetGLAName`: `char *(*G2API_GetGLAName)(CGhoul2Info *ghlInfo);`
+- `G2API_SetNewOrigin`: `qboolean (*G2API_SetNewOrigin)(CGhoul2Info *ghlInfo, const int boltIndex);`
+- `G2API_GetBoneIndex`: `int (*G2API_GetBoneIndex)(CGhoul2Info *ghlInfo, const char *boneName, qboolean bAddIfNotFound);`
+- `G2API_StopBoneAnglesIndex`: `qboolean (*G2API_StopBoneAnglesIndex)(CGhoul2Info *ghlInfo, const int index);`
+- `G2API_StopBoneAnimIndex`: `qboolean (*G2API_StopBoneAnimIndex)(CGhoul2Info *ghlInfo, const int index);`
+- `G2API_SetBoneAnglesMatrixIndex`: `qboolean (*G2API_SetBoneAnglesMatrixIndex)(CGhoul2Info *ghlInfo, const int index, const mdxaBone_t &matrix, const int flags, qhandle_t *modelList, int blendTime, int currentTime);`
+- `G2API_SetAnimIndex`: `qboolean (*G2API_SetAnimIndex)(CGhoul2Info *ghlInfo, const int index);`
+- `G2API_GetAnimIndex`: `int (*G2API_GetAnimIndex)(CGhoul2Info *ghlInfo);`
+- `G2API_SaveGhoul2Models`: `void (*G2API_SaveGhoul2Models)(CGhoul2Info_v &ghoul2);`
+- `G2API_LoadGhoul2Models`: `void (*G2API_LoadGhoul2Models)(CGhoul2Info_v &ghoul2, char *buffer);`
+- `G2API_LoadSaveCodeDestructGhoul2Info`: `void (*G2API_LoadSaveCodeDestructGhoul2Info)(CGhoul2Info_v &ghoul2);`
+- `G2API_GetAnimFileNameIndex`: `char *(*G2API_GetAnimFileNameIndex)(qhandle_t modelIndex);`
+- `G2API_GetAnimFileInternalNameIndex`: `char *(*G2API_GetAnimFileInternalNameIndex)(qhandle_t modelIndex);`
+- `G2API_GetSurfaceRenderStatus`: `int (*G2API_GetSurfaceRenderStatus)(CGhoul2Info *ghlInfo, const char *surfaceName);`
+- `G2API_SetRagDoll`: `void (*G2API_SetRagDoll)(CGhoul2Info_v &ghoul2,CRagDollParams *parms);`
+- `G2API_AnimateG2Models`: `void (*G2API_AnimateG2Models)(CGhoul2Info_v &ghoul2, int AcurrentTime,CRagDollUpdateParams *params);`
+- `G2API_RagPCJConstraint`: `qboolean (*G2API_RagPCJConstraint)(CGhoul2Info_v &ghoul2, const char *boneName, vec3_t min, vec3_t max);`
+- `G2API_RagPCJGradientSpeed`: `qboolean (*G2API_RagPCJGradientSpeed)(CGhoul2Info_v &ghoul2, const char *boneName, const float speed);`
+- `G2API_RagEffectorGoal`: `qboolean (*G2API_RagEffectorGoal)(CGhoul2Info_v &ghoul2, const char *boneName, vec3_t pos);`
+- `G2API_GetRagBonePos`: `qboolean (*G2API_GetRagBonePos)(CGhoul2Info_v &ghoul2, const char *boneName, vec3_t pos, vec3_t entAngles, vec3_t entPos, vec3_t entScale);`
+- `G2API_RagEffectorKick`: `qboolean (*G2API_RagEffectorKick)(CGhoul2Info_v &ghoul2, const char *boneName, vec3_t velocity);`
+- `G2API_RagForceSolve`: `qboolean (*G2API_RagForceSolve)(CGhoul2Info_v &ghoul2, qboolean force);`
+- `G2API_SetBoneIKState`: `qboolean (*G2API_SetBoneIKState)(CGhoul2Info_v &ghoul2, int time, const char *boneName, int ikState, sharedSetBoneIKStateParams_t *params);`
+- `G2API_IKMove`: `qboolean (*G2API_IKMove) (CGhoul2Info_v &ghoul2, int time, sharedIKMoveParams_t *params);`
+- `G2API_AddSkinGore`: `void (*G2API_AddSkinGore)(CGhoul2Info_v &ghoul2,SSkinGoreData &gore);`
+- `G2API_ClearSkinGore`: `void (*G2API_ClearSkinGore)( CGhoul2Info_v &ghoul2 );`
+- `RMG_Init`: `void (*RMG_Init)(int terrainID);`
+- `CM_RegisterTerrain`: `int (*CM_RegisterTerrain)(const char *info);`
+- `SetActiveSubBSP`: `const char *(*SetActiveSubBSP)(int index);`
+- `RE_RegisterSkin`: `int (*RE_RegisterSkin)(const char *name);`
+- `RE_GetAnimationCFG`: `int (*RE_GetAnimationCFG)(const char *psCFGFilename, char *psDest, int iDestSize);`
+- `WE_GetWindVector`: `bool (*WE_GetWindVector)(vec3_t windVector, vec3_t atpoint);`
+- `WE_GetWindGusting`: `bool (*WE_GetWindGusting)(vec3_t atpoint);`
+- `WE_IsOutside`: `bool (*WE_IsOutside)(vec3_t pos);`
+- `WE_IsOutsideCausingPain`: `float (*WE_IsOutsideCausingPain)(vec3_t pos);`
+- `WE_GetChanceOfSaberFizz`: `float (*WE_GetChanceOfSaberFizz)(void);`
+- `WE_IsShaking`: `bool (*WE_IsShaking)(vec3_t pos);`
+- `WE_AddWeatherZone`: `void (*WE_AddWeatherZone)(vec3_t mins, vec3_t maxs);`
+- `WE_SetTempGlobalFogColor`: `bool (*WE_SetTempGlobalFogColor)(vec3_t color);`
+
+### `game_export_t` function pointers (17)
+
+- `Init`: `void (*Init)( const char *mapname, const char *spawntarget, int checkSum, const char *entstring, int levelTime, int randomSeed, int globalTime, SavedGameJustLoaded_e eSavedGameJustLoaded, qboolean qbLoadTransition );`
+- `Shutdown`: `void (*Shutdown) (void);`
+- `WriteLevel`: `void (*WriteLevel) (qboolean qbAutosave);`
+- `ReadLevel`: `void (*ReadLevel) (qboolean qbAutosave, qboolean qbLoadTransition);`
+- `GameAllowedToSaveHere`: `qboolean (*GameAllowedToSaveHere)(void);`
+- `ClientConnect`: `char *(*ClientConnect)( int clientNum, qboolean firstTime, SavedGameJustLoaded_e eSavedGameJustLoaded );`
+- `ClientBegin`: `void (*ClientBegin)( int clientNum, usercmd_t *cmd, SavedGameJustLoaded_e eSavedGameJustLoaded);`
+- `ClientUserinfoChanged`: `void (*ClientUserinfoChanged)( int clientNum );`
+- `ClientDisconnect`: `void (*ClientDisconnect)( int clientNum );`
+- `ClientCommand`: `void (*ClientCommand)( int clientNum );`
+- `ClientThink`: `void (*ClientThink)( int clientNum, usercmd_t *cmd );`
+- `RunFrame`: `void (*RunFrame)( int levelTime );`
+- `ConnectNavs`: `void (*ConnectNavs)( const char *mapname, int checkSum );`
+- `ConsoleCommand`: `qboolean (*ConsoleCommand)( void );`
+- `PrintEntClassname`: `//void (*PrintEntClassname)( int clientNum );`
+- `ValidateAnimRange`: `//int (*ValidateAnimRange)( int startFrame, int endFrame, float animSpeed );`
+- `GameSpawnRMGEntity`: `void (*GameSpawnRMGEntity)(char *s);`
+
+### Exported acquisition functions (1)
+
+- `game_export_t *GetGameAPI( game_import_t *import )` (`code/game/g_main.cpp:875`)
+
+## Loader/linker touchpoints
+
+Engine/platform-side places that locate or call module ABI symbols. These confirm symbol names and loading shape; they are not additional game APIs.
+
+- `Sys_LoadDll` (`codemp/win32/win_main.cpp:804`)
+- `void * QDECL Sys_LoadDll( const char *name, int (QDECL **entryPoint)(int, ...),` (`codemp/win32/win_main.cpp:811`)
+- `void (QDECL *dllEntry)( int (QDECL *syscallptr)(int, ...) );` (`codemp/win32/win_main.cpp:815`)
+- `dllEntry = ( void (QDECL *)( int (QDECL *)( int, ... ) ) )GetProcAddress( libHandle, "dllEntry" );` (`codemp/win32/win_main.cpp:879`)
+- `*entryPoint = (int (QDECL *)(int,...))GetProcAddress( libHandle, "vmMain" );` (`codemp/win32/win_main.cpp:880`)
+- `if ( !*entryPoint || !dllEntry ) {` (`codemp/win32/win_main.cpp:881`)
+- `dllEntry( systemcalls );` (`codemp/win32/win_main.cpp:885`)
+- `Sys_LoadDll` (`codemp/unix/unix_main.c:316`)
+- `void *Sys_LoadDll( const char *name,` (`codemp/unix/unix_main.c:323`)
+- `int (**entryPoint)(int, ...),` (`codemp/unix/unix_main.c:324`)
+- `void (*dllEntry)( int (*syscallptr)(int, ...) );` (`codemp/unix/unix_main.c:328`)
+- `Com_Printf( "Sys_LoadDll(%s)... \n", loadname );` (`codemp/unix/unix_main.c:368`)
+- `Com_Printf( "Sys_LoadDll(%s)... \n", fn );` (`codemp/unix/unix_main.c:381`)
+- `Com_Printf( "Sys_LoadDll(%s) failed: \"%s\"\n", fn, dlerror() );` (`codemp/unix/unix_main.c:393`)
+- `Com_Printf( "Sys_LoadDll(%s) failed: \"%s\"\n", fn, dlerror() );` (`codemp/unix/unix_main.c:399`)
+- `Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );` (`codemp/unix/unix_main.c:402`)
+- `Com_Printf ( "Sys_LoadDll(%s): succeeded ...\n", fn );` (`codemp/unix/unix_main.c:405`)
+- `Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed dlopen() completely!\n", name );` (`codemp/unix/unix_main.c:409`)
+- `Com_Printf ( "Sys_LoadDll(%s) failed dlopen() completely!\n", name );` (`codemp/unix/unix_main.c:411`)
+- `dllEntry = (void (*)(int (*)(int,...))) dlsym( libHandle, "dllEntry" );` (`codemp/unix/unix_main.c:421`)
+- `if (!dllEntry)` (`codemp/unix/unix_main.c:422`)
+- `Com_Printf("Sys_LoadDLL(%s) failed dlsym(dllEntry): \"%s\" ! \n",name,err);` (`codemp/unix/unix_main.c:425`)
+- `*entryPoint = (int(*)(int,...))dlsym( libHandle, "vmMain" );` (`codemp/unix/unix_main.c:428`)
+- `if (!*entryPoint)` (`codemp/unix/unix_main.c:429`)
+- `if ( !*entryPoint || !dllEntry ) {` (`codemp/unix/unix_main.c:431`)
+- `Com_Error ( ERR_FATAL, "Sys_LoadDll(%s) failed dlsym(vmMain): \"%s\" !\n", name, err );` (`codemp/unix/unix_main.c:433`)
+- `Com_Printf ( "Sys_LoadDll(%s) failed dlsym(vmMain): \"%s\" !\n", name, err );` (`codemp/unix/unix_main.c:435`)
+- `Com_Printf ( "Sys_LoadDll(%s) failed dlcose: \"%s\"\n", name, err );` (`codemp/unix/unix_main.c:440`)
+- `Com_Printf ( "Sys_LoadDll(%s) found **vmMain** at %p \n", name, *entryPoint ); // bk001212` (`codemp/unix/unix_main.c:443`)
+- `dllEntry( systemcalls );` (`codemp/unix/unix_main.c:444`)
+- `Com_Printf ( "Sys_LoadDll(%s) succeeded!\n", name );` (`codemp/unix/unix_main.c:445`)
+- `Sys_GetGameAPI` (`codemp/unix/unix_main.c:483`)
+- `void *Sys_GetGameAPI (void *parms)` (`codemp/unix/unix_main.c:488`)
+- `void *(*GetGameAPI) (void *);` (`codemp/unix/unix_main.c:490`)
+- `Com_Error (ERR_FATAL, "Sys_GetGameAPI without Sys_UnloadingGame");` (`codemp/unix/unix_main.c:500`)
+- `GetGameAPI = (void *)dlsym (game_library, "GetGameAPI");` (`codemp/unix/unix_main.c:517`)
+- `if (!GetGameAPI)` (`codemp/unix/unix_main.c:518`)
+- `return GetGameAPI (parms);` (`codemp/unix/unix_main.c:524`)
+- `Sys_GetGameAPI` (`codemp/unix/unix_main.c:547`)
+- `void *Sys_GetCGameAPI (void)` (`codemp/unix/unix_main.c:552`)
+- `api = (void *)dlsym (cgame_library, "GetCGameAPI");` (`codemp/unix/unix_main.c:585`)
+- `Com_Error( ERR_FATAL, "dlsym() failed on GetCGameAPI" );` (`codemp/unix/unix_main.c:588`)
+- `Sys_GetUIAPI` (`codemp/unix/unix_main.c:614`)
+- `void *Sys_GetUIAPI (void)` (`codemp/unix/unix_main.c:619`)
+- `api = (void *(*)(void))dlsym (ui_library, "GetUIAPI");` (`codemp/unix/unix_main.c:651`)
+- `Com_Error( ERR_FATAL, "dlsym() failed on GetUIAPI" );` (`codemp/unix/unix_main.c:654`)
+- `Sys_GetGameAPI` (`codemp/unix/unix_main.c:680`)
+- `GetBotLibAPI = (void *)dlsym (botlib_library, "GetBotLibAPI");` (`codemp/unix/unix_main.c:717`)
+- `Com_Error( ERR_FATAL, "dlsym() failed on GetBotLibAPI" );` (`codemp/unix/unix_main.c:721`)
+- `VM_DllSyscall` (`codemp/qcommon/vm.cpp:327`)
+- `int QDECL VM_DllSyscall( int arg, ... ) {` (`codemp/qcommon/vm.cpp:363`)
+- `vm->dllHandle = Sys_LoadDll( module, &vm->entryPoint, VM_DllSyscall );` (`codemp/qcommon/vm.cpp:518`)
+- `if ( currentVM->entryPoint ) {` (`codemp/qcommon/vm.cpp:648`)
+- `if ( gvm->entryPoint )` (`codemp/qcommon/vm.cpp:669`)
+- `if ( vm->entryPoint ) {` (`codemp/qcommon/vm.cpp:752`)
+- `VM_Call` (`codemp/qcommon/vm.cpp:763`)
+- `int QDECL VM_Call( vm_t *vm, int callnum, ... ) {` (`codemp/qcommon/vm.cpp:787`)
+- `Com_Error( ERR_FATAL, "VM_Call with NULL vm" );` (`codemp/qcommon/vm.cpp:796`)
+- `Com_Printf( "VM_Call( %i )\n", callnum );` (`codemp/qcommon/vm.cpp:804`)
+- `if ( vm->entryPoint ) {` (`codemp/qcommon/vm.cpp:808`)
+- `r = vm->entryPoint( callnum, args[0], args[1], args[2], args[3],` (`codemp/qcommon/vm.cpp:816`)
+- `r = VM_CallCompiled( vm, &callnum );` (`codemp/qcommon/vm.cpp:821`)
+- `r = VM_CallInterpreted( vm, &callnum );` (`codemp/qcommon/vm.cpp:823`)
+- `int VM_CallCompiled( vm_t *vm, int *args ) {` (`codemp/qcommon/vm.cpp:949`)
+- `VM_DllSyscall` (`codemp/qcommon/vm_console.cpp:14`)
+- `int QDECL VM_DllSyscall( int arg, ... )` (`codemp/qcommon/vm_console.cpp:50`)
+- `extern int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11 );` (`codemp/qcommon/vm_console.cpp:72`)
+- `void dllEntry( int (QDECL *syscallptr)( int arg,... ) );` (`codemp/qcommon/vm_console.cpp:73`)
+- `extern int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11 );` (`codemp/qcommon/vm_console.cpp:78`)
+- `void dllEntry( int (QDECL *syscallptr)( int arg,... ) );` (`codemp/qcommon/vm_console.cpp:79`)
+- `extern int vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11 );` (`codemp/qcommon/vm_console.cpp:84`)
+- `void dllEntry( int (QDECL *syscallptr)( int arg,... ) );` (`codemp/qcommon/vm_console.cpp:85`)
+- `vmTable[UI_VM_INDEX].entryPoint = (int (*)(int,...)) ui::vmMain;` (`codemp/qcommon/vm_console.cpp:93`)
+- `ui::dllEntry(VM_DllSyscall);` (`codemp/qcommon/vm_console.cpp:95`)
+- `vmTable[CG_VM_INDEX].entryPoint = (int (*)(int,...)) cgame::vmMain;` (`codemp/qcommon/vm_console.cpp:101`)
+- `cgame::dllEntry(VM_DllSyscall);` (`codemp/qcommon/vm_console.cpp:103`)
+- `vmTable[G_VM_INDEX].entryPoint = (int (*)(int,...)) game::vmMain;` (`codemp/qcommon/vm_console.cpp:109`)
+- `game::dllEntry(VM_DllSyscall);` (`codemp/qcommon/vm_console.cpp:111`)
+- `VM_Call` (`codemp/qcommon/vm_console.cpp:121`)
+- `int QDECL VM_Call( vm_t *vm, int callnum, ... )` (`codemp/qcommon/vm_console.cpp:145`)
+- `int r = vm->entryPoint( callnum, args[0], args[1], args[2], args[3],` (`codemp/qcommon/vm_console.cpp:163`)
+- `int r = vm->entryPoint( (&callnum)[0], (&callnum)[1], (&callnum)[2], (&callnum)[3],` (`codemp/qcommon/vm_console.cpp:168`)
+- `Sys_GetGameAPI` (`code/win32/win_main.cpp:478`)
+- `void *Sys_GetGameAPI (void *parms)` (`code/win32/win_main.cpp:483`)
+- `void *(*GetGameAPI) (void *);` (`code/win32/win_main.cpp:485`)
+- `Com_Error (ERR_FATAL, "Sys_GetGameAPI without Sys_UnloadingGame");` (`code/win32/win_main.cpp:511`)
+- `GetGameAPI = (void *(*)(void *))GetProcAddress (game_library, "GetGameAPI");` (`code/win32/win_main.cpp:540`)
+- `if (!GetGameAPI)` (`code/win32/win_main.cpp:541`)
+- `return GetGameAPI (parms);` (`code/win32/win_main.cpp:546`)
+- `Sys_LoadCgame` (`code/win32/win_main.cpp:552`)
+- `void * Sys_LoadCgame( int (**entryPoint)(int, ...), int (*systemcalls)(int, ...) )` (`code/win32/win_main.cpp:557`)
+- `void (*dllEntry)( int (*syscallptr)(int, ...) );` (`code/win32/win_main.cpp:559`)
+- `dllEntry = ( void (*)( int (*)( int, ... ) ) )GetProcAddress( game_library, "dllEntry" );` (`code/win32/win_main.cpp:561`)
+- `*entryPoint = (int (*)(int,...))GetProcAddress( game_library, "vmMain" );` (`code/win32/win_main.cpp:562`)
+- `if ( !*entryPoint || !dllEntry ) {` (`code/win32/win_main.cpp:563`)
+- `dllEntry( systemcalls );` (`code/win32/win_main.cpp:568`)
+- `Sys_GetGameAPI` (`code/unix/unix_main.c:252`)
+- `void *Sys_GetGameAPI (void *parms)` (`code/unix/unix_main.c:257`)
+- `void *(*GetGameAPI) (void *);` (`code/unix/unix_main.c:259`)
+- `Com_Error (ERR_FATAL, "Sys_GetGameAPI without Sys_UnloadingGame");` (`code/unix/unix_main.c:265`)
+- `GetGameAPI = (void *)dlsym (game_library, "GetGameAPI");` (`code/unix/unix_main.c:282`)
+- `if (!GetGameAPI)` (`code/unix/unix_main.c:283`)
+- `return GetGameAPI (parms);` (`code/unix/unix_main.c:289`)
+- `Sys_GetGameAPI` (`code/unix/unix_main.c:310`)
+- `void *Sys_GetCGameAPI (void)` (`code/unix/unix_main.c:315`)
+- `api = (void *)dlsym (cgame_library, "GetCGameAPI");` (`code/unix/unix_main.c:345`)
+- `Com_Error( ERR_FATAL, "dlsym() failed on GetCGameAPI" );` (`code/unix/unix_main.c:348`)
+- `Sys_GetUIAPI` (`code/unix/unix_main.c:372`)
+- `void *Sys_GetUIAPI (void)` (`code/unix/unix_main.c:377`)
+- `api = (void *)dlsym (ui_library, "GetUIAPI");` (`code/unix/unix_main.c:407`)
+- `Com_Error( ERR_FATAL, "dlsym() failed on GetUIAPI" );` (`code/unix/unix_main.c:410`)
+- `void *Sys_GetGameAPI (void *parms) {` (`code/mac/mac_main.c:37`)
+- `void *GetGameAPI (void *import);` (`code/mac/mac_main.c:38`)
+- `return GetGameAPI (parms);` (`code/mac/mac_main.c:40`)
+- `void *Sys_GetUIAPI (void) {` (`code/mac/mac_main.c:45`)
+- `void *GetUIAPI (void);` (`code/mac/mac_main.c:46`)
+- `return GetUIAPI ();` (`code/mac/mac_main.c:48`)
+- `void dllEntry( int (*syscallptr)( int arg,... ) );` (`code/mac/mac_main.c:62`)
+- `int vmMain( int command, ... );` (`code/mac/mac_main.c:63`)
+- `void *Sys_LoadDll( const char *name, int (**entryPoint)(int, ...),` (`code/mac/mac_main.c:65`)
+- `dllEntry( systemCalls );` (`code/mac/mac_main.c:68`)
+- `*entryPoint = vmMain;` (`code/mac/mac_main.c:70`)
+- `int VM_Call( int callnum, ... )` (`code/client/vmachine.cpp:12`)
+- `if (cgvm.entryPoint)` (`code/client/vmachine.cpp:16`)
+- `return cgvm.entryPoint( (&callnum)[0], (&callnum)[1], (&callnum)[2], (&callnum)[3],` (`code/client/vmachine.cpp:18`)
+- `VM_DllSyscall` (`code/client/vmachine.cpp:28`)
+- `int VM_DllSyscall( int arg, ... ) {` (`code/client/vmachine.cpp:36`)
+- `int (*entryPoint)( int callNum, ... );` (`code/client/vmachine.h:49`)
+- `extern int VM_Call( int callnum, ... );` (`code/client/vmachine.h:57`)
+- `extern int VM_DllSyscall( int arg, ... );` (`code/client/vmachine.h:58`)
+- `extern void *Sys_LoadCgame( int (**entryPoint)(int, ...), int (*systemcalls)(int, ...) );` (`code/client/vmachine.h:70`)
+- `res = Sys_LoadCgame( &cgvm.entryPoint, VM_DllSyscall );` (`code/client/vmachine.h:78`)
+
