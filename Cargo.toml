@@ -1,0 +1,13 @@
+[package]
+name = "jka-rust"
+version = "0.1.0"
+edition = "2021"
+description = "Idiomatic, opinionated Rust reimplementation of Jedi Academy MP; verified against the faithful jedi-academy-rust port (the oracle/ submodule)."
+
+[lib]
+name = "jka"
+
+[features]
+# Differential parity tests run this crate against the faithful port's behavior.
+# Off by default.
+oracle = []
