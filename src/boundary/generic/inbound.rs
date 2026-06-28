@@ -1,13 +1,12 @@
-use crate::ffi::GameExport;
-
 /// A typed executable-to-game call.
 ///
 /// These are the commands the executable sends through `vmMain`.
 pub trait InboundVmCall {
+    type Command;
     type Args;
     type Output;
 
-    const COMMAND: GameExport;
+    const COMMAND: Self::Command;
 }
 
 /// Route an inbound executable-to-game `vmMain` command.

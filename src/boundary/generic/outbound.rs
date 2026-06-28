@@ -1,14 +1,13 @@
-use crate::ffi::GameImport;
-
 /// A typed game-to-engine syscall.
 ///
 /// These are the callbacks jampgame makes through the syscall pointer the
 /// executable provided via `dllEntry`.
 pub trait OutboundSysCall {
+    type Import;
     type Args;
     type Output;
 
-    const IMPORT: GameImport;
+    const IMPORT: Self::Import;
 }
 
 /// Route an outbound game-to-engine syscall.

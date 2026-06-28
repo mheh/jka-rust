@@ -1,0 +1,36 @@
+use core::ffi::c_int;
+
+use crate::ffi::GameImport;
+use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+
+/// `BOTLIB_SHUTDOWN` outbound game-to-engine syscall.
+#[derive(Debug)]
+pub struct BotlibShutdownArgs;
+
+impl BotlibShutdownArgs {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+pub struct BotlibShutdown;
+
+impl OutboundSysCall for BotlibShutdown {
+    type Import = GameImport;
+    type Args = BotlibShutdownArgs;
+    type Output = c_int;
+
+    const IMPORT: GameImport = GameImport::BOTLIB_SHUTDOWN;
+}
+
+impl EncodeSysCall for BotlibShutdown {
+    fn encode_syscall(_a: &Self::Args) -> SysCallTransport {
+        SysCallTransport::empty()
+    }
+}
+
+impl DecodeSysCallReturn for BotlibShutdown {
+    fn decode_return(word: isize) -> Self::Output {
+        word as c_int
+    }
+}
