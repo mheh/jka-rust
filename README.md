@@ -21,8 +21,8 @@ opinionated structure per module.
 Scaffold. The boundary definitions prototyped in the port (typed
 `OutboundSysCall` / `EncodeSysCall` / `DecodeSysCallReturn` defs for all ~329
 game→engine syscalls, plus the transport traits) are imported under
-[`src/state/`](src/state) as starting material. They currently reference the
+[`src/boundary/`](src/boundary) as starting material. They currently reference the
 port's types (`crate::codemp::game::*`) and so do **not** compile here yet — the
 next step is to source those types under this crate's own layout (re-port
 opinionatedly, or via a thin shared ABI-types crate) and wire the modules into
-`src/lib.rs`. The ABI catalog is in `src/state/boundary/TRAPS.md`.
+`src/lib.rs`. The ABI catalog is in `src/boundary/TRAPS.md`.
