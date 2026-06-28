@@ -1,0 +1,53 @@
+use core::ffi::c_int;
+
+use crate::codemp::game::g_local::gentity_t;
+use crate::ffi::types::qboolean;
+use crate::ffi::GameImport;
+
+use super::super::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+
+/// `G_ICARUS_TASKIDPENDING` outbound game-to-engine syscall.
+///
+/// Queries whether task `task_id` is still pending on entity `ent`.
+#[derive(Debug)]
+pub struct GIcarusTaskidpendingArgs {
+    ent: *mut gentity_t,
+    task_id: c_int,
+}
+
+impl GIcarusTaskidpendingArgs {
+    pub fn new(ent: *mut gentity_t, task_id: c_int) -> Self {
+        Self { ent, task_id }
+    }
+
+    pub fn ent(&self) -> *mut gentity_t {
+        self.ent
+    }
+
+    pub fn task_id(&self) -> c_int {
+        self.task_id
+    }
+}
+
+pub struct GIcarusTaskidpending;
+
+impl OutboundSysCall for GIcarusTaskidpending {
+    type Args = GIcarusTaskidpendingArgs;
+    type Output = qboolean;
+
+    const IMPORT: GameImport = GameImport::G_ICARUS_TASKIDPENDING;
+}
+
+impl EncodeSysCall for GIcarusTaskidpending {
+    fn encode_syscall(a: &Self::Args) -> SysCallTransport {
+        SysCallTransport::new([ptr_to_word(a.ent), a.task_id as isize])
+    }
+}
+
+impl DecodeSysCallReturn for GIcarusTaskidpending {
+    fn decode_return(word: isize) -> Self::Output {
+        word as qboolean
+    }
+}
