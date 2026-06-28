@@ -1,1 +1,12 @@
-//! Engine to multiplayer UI `vmMain` calls.
+pub mod UI_GETAPIVERSION;
+pub mod UI_INIT;
+pub mod UI_SHUTDOWN;
+pub mod UI_KEY_EVENT;
+pub mod UI_MOUSE_EVENT;
+pub mod UI_REFRESH;
+pub mod UI_IS_FULLSCREEN;
+pub mod UI_SET_ACTIVE_MENU;
+pub mod UI_CONSOLE_COMMAND;
+pub mod UI_DRAW_CONNECT_SCREEN;
+pub mod UI_HASUNIQUECDKEY;
+pub mod UI_MENU_RESET;
