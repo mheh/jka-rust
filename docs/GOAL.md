@@ -9,18 +9,41 @@ syscall numbers, and `MpGameExport` models engine-to-module `vmMain` command
 numbers. Those integer values must match the original Raven values exactly.
 
 Matching those enum values is necessary, but it is not the whole drop-in DLL ABI.
-A Rust replacement must also match:
+A Rust replacement must work through this checklist before it can hot-swap for
+Raven's `jampgamex86.dll`:
 
-- exported C symbols: `dllEntry` and `vmMain`
-- calling convention and `vmMain` argument/return word behavior
-- syscall callback storage handed in through `dllEntry`
-- argument packing for ints, pointers, and floats via the original `PASSFLOAT`
-  convention
-- struct layout for every crossed type, including entities, player state, traces,
-  cvars, commands, botlib data, ICARUS data, nav data, and Ghoul2 data
-- shared memory/global expectations visible to the engine
-- all engine-observable side effects for init, frames, shutdown, clients, botlib,
-  ICARUS, nav, Ghoul2, and related systems
+- [x] Scope the MP game ABI separately from MP cgame, MP UI, and SP surfaces.
+- [x] Preserve the original MP game import/export integer vocabulary:
+  `MpGameImport` for module-to-engine syscalls and `MpGameExport` for
+  engine-to-module `vmMain` commands.
+- [ ] Generate or verify every MP game import/export value directly against
+  Raven `codemp/game/g_public.h`, including explicit reset points like `100`,
+  `200`, `250`, `300`, `400`, and `500`.
+- [ ] Expose exported C symbols with the original names: `dllEntry` and
+  `vmMain`.
+- [ ] Match Raven's calling convention and `vmMain` argument/return word
+  behavior.
+- [ ] Store and call the engine syscall callback handed in through `dllEntry`.
+- [ ] Match argument packing for ints, pointers, and floats, including the
+  original `PASSFLOAT` convention.
+- [ ] Source or define ABI-correct layouts for every crossed type, including
+  entities, player state, traces, cvars, commands, botlib data, ICARUS data, nav
+  data, and Ghoul2 data.
+- [ ] Verify struct sizes, alignments, and field offsets against Raven headers
+  for all boundary-visible types.
+- [ ] Model shared memory and global expectations visible to the engine.
+- [ ] Implement engine-observable side effects for `GAME_INIT`,
+  `GAME_RUN_FRAME`, `GAME_SHUTDOWN`, client lifecycle calls, botlib, ICARUS, nav,
+  Ghoul2, and related systems.
+- [ ] Build the Rust game module as a native dynamic library with the filename
+  and platform conventions expected by the engine.
+- [ ] Add an ABI smoke test that loads the Rust module through the same
+  `dllEntry`/`vmMain` contract as the engine.
+- [ ] Add differential tests against Raven/oracle behavior for representative
+  imports, exports, and frame/client flows.
+- [ ] Prove hot-swap behavior by replacing `jampgamex86.dll`/the platform
+  equivalent with the Rust build and running the MP engine through init, map
+  load, frame loop, client connect, and shutdown.
 
 So the boundary target is:
 
