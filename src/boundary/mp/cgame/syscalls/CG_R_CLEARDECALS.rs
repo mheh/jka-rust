@@ -1,5 +1,7 @@
 use super::super::MpCgameImport;
-use crate::boundary::generic::OutboundSysCall;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `CG_R_CLEARDECALS` MP cgame imports syscall boundary token.
 ///
@@ -8,8 +10,18 @@ pub struct CgRCleardecals;
 
 impl OutboundSysCall for CgRCleardecals {
     type Import = MpCgameImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    type Args = ();
+    type Output = ();
 
     const IMPORT: MpCgameImport = MpCgameImport::CG_R_CLEARDECALS;
+}
+
+impl EncodeSysCall for CgRCleardecals {
+    fn encode_syscall(_args: &Self::Args) -> SysCallTransport {
+        SysCallTransport::empty()
+    }
+}
+
+impl DecodeSysCallReturn for CgRCleardecals {
+    fn decode_return(_word: isize) -> Self::Output {}
 }
