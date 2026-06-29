@@ -1,15 +1,59 @@
+use core::ffi::c_int;
+
 use super::super::MpUiImport;
-use crate::boundary::generic::OutboundSysCall;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+use crate::ffi::types::qboolean;
+
+/// Arguments for `UI_LAN_UPDATEVISIBLEPINGS`.
+///
+/// Raven wrapper: `return syscall( UI_LAN_UPDATEVISIBLEPINGS, source );`
+/// Raven transport: `return LAN_UpdateVisiblePings( args[1] );`
+///
+/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:326-327`
+#[derive(Debug)]
+pub struct UiLanUpdatevisiblepingsArgs {
+    source: c_int,
+}
+
+impl UiLanUpdatevisiblepingsArgs {
+    pub fn new(source: c_int) -> Self {
+        Self { source }
+    }
+
+    pub fn source(&self) -> c_int {
+        self.source
+    }
+}
 
 /// `UI_LAN_UPDATEVISIBLEPINGS` MP UI imports syscall boundary token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:99`
+/// Raven wrapper: `return syscall( UI_LAN_UPDATEVISIBLEPINGS, source );`
+/// Raven transport: `return LAN_UpdateVisiblePings( args[1] );`
+///
+/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:99`
+/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:326-327`
+/// Output source: `oracle/oracle/codemp/ui/ui_local.h:976`
+/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1106-1107`
 pub struct UiLanUpdatevisiblepings;
 
 impl OutboundSysCall for UiLanUpdatevisiblepings {
     type Import = MpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    type Args = UiLanUpdatevisiblepingsArgs;
+    type Output = qboolean;
 
     const IMPORT: MpUiImport = MpUiImport::UI_LAN_UPDATEVISIBLEPINGS;
+}
+
+impl EncodeSysCall for UiLanUpdatevisiblepings {
+    fn encode_syscall(args: &Self::Args) -> SysCallTransport {
+        SysCallTransport::new([args.source() as isize])
+    }
+}
+
+impl DecodeSysCallReturn for UiLanUpdatevisiblepings {
+    fn decode_return(word: isize) -> Self::Output {
+        word as qboolean
+    }
 }
