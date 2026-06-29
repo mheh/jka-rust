@@ -1,3 +1,5 @@
+use core::ffi::c_int;
+
 use super::super::SpUiImport;
 use crate::boundary::generic::OutboundSysCall;
 
@@ -8,8 +10,13 @@ pub struct UiMilliseconds;
 
 impl OutboundSysCall for UiMilliseconds {
     type Import = SpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// `case UI_MILLISECONDS: return Sys_Milliseconds();`
+    /// (`oracle/oracle/code/client/cl_ui.cpp:452`).
+    ///
+    /// Args source: none (token-only call).
+    type Args = ();
+    /// Returns the same `int`/`Sys_Milliseconds` payload as in SP UI switch.
+    type Output = c_int;
 
     const IMPORT: SpUiImport = SpUiImport::UI_MILLISECONDS;
 }

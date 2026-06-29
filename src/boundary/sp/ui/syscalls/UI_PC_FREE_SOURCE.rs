@@ -1,3 +1,5 @@
+use core::ffi::c_int;
+
 use super::super::SpUiImport;
 use crate::boundary::generic::OutboundSysCall;
 
@@ -8,8 +10,16 @@ pub struct UiPcFreeSource;
 
 impl OutboundSysCall for UiPcFreeSource {
     type Import = SpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// SP `client/cl_ui.cpp` has no active `UI_PC_FREE_SOURCE` dispatch case.
+    /// Fallback transport shape from MP parity:
+    /// `oracle/oracle/codemp/ui/ui_syscalls.c:370-371` and
+    /// `oracle/oracle/codemp/client/cl_ui.cpp:1162`.
+    ///
+    /// Args source: single integer handle (`args[1]`).
+    type Args = c_int;
+    /// Returns `int` from botlib handle free call; fallback source:
+    /// `oracle/oracle/codemp/ui/ui_syscalls.c:370-371`.
+    type Output = c_int;
 
     const IMPORT: SpUiImport = SpUiImport::UI_PC_FREE_SOURCE;
 }
