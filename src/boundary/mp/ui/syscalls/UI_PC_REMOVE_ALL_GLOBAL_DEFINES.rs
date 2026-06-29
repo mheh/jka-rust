@@ -1,15 +1,50 @@
 use super::super::MpUiImport;
-use crate::boundary::generic::OutboundSysCall;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+
+/// Arguments for `UI_PC_REMOVE_ALL_GLOBAL_DEFINES`.
+///
+/// Raven wrapper: `syscall ( UI_PC_REMOVE_ALL_GLOBAL_DEFINES );`
+/// Raven transport: `botlib_export->PC_RemoveAllGlobalDefines ( ); return 0;`
+///
+/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:387-389`
+/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1169-1171`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UiPcRemoveAllGlobalDefinesArgs;
+
+impl UiPcRemoveAllGlobalDefinesArgs {
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 /// `UI_PC_REMOVE_ALL_GLOBAL_DEFINES` MP UI imports syscall boundary token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:90`
+/// Raven wrapper: `void trap_PC_RemoveAllGlobalDefines ( void ) { syscall ( UI_PC_REMOVE_ALL_GLOBAL_DEFINES ); }`
+/// Raven transport: `botlib_export->PC_RemoveAllGlobalDefines ( ); return 0;`
+///
+/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:90`
+/// Enum comment source: `oracle/oracle/codemp/ui/ui_public.h:82-90`
+/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:387-389`
+/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1169-1171`
+/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1169-1171`
 pub struct UiPcRemoveAllGlobalDefines;
 
 impl OutboundSysCall for UiPcRemoveAllGlobalDefines {
     type Import = MpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    type Args = UiPcRemoveAllGlobalDefinesArgs;
+    type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_PC_REMOVE_ALL_GLOBAL_DEFINES;
+}
+
+impl EncodeSysCall for UiPcRemoveAllGlobalDefines {
+    fn encode_syscall(_args: &Self::Args) -> SysCallTransport {
+        SysCallTransport::new([])
+    }
+}
+
+impl DecodeSysCallReturn for UiPcRemoveAllGlobalDefines {
+    fn decode_return(_word: isize) -> Self::Output {}
 }
