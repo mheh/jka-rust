@@ -68,9 +68,10 @@ For `vmMain` calls, prefer sources in this order:
 ## Worker Prompt
 
 Use this prompt when delegating a manifest row or a small non-overlapping group
-of rows. Do not summarize a row down to only the Rust file name. Paste the full
-generated assignment/evidence lines for the worker's scope exactly as generated,
-including:
+of rows. The prompt must be built from the generated assignment/evidence output,
+not from a hand-written list of scoped files. Do not summarize a row down to only
+the Rust file name. Paste every full generated line for the worker's scope
+exactly as generated, including:
 
 - Rust target file and line number
 - call name
@@ -80,8 +81,10 @@ including:
 - transport/switch source file and line number
 - any notes already present in the generated output
 
-If a generated line has no proven args or output source yet, include that
-absence in the pasted scope so the worker can either prove it or keep the TODO.
+If the generated output includes separate file, enum, args, output, transport,
+and notes columns, keep the whole line intact. If a generated line has no proven
+args or output source yet, include that absence in the pasted scope so the
+worker can either prove it or keep the TODO.
 
 ```text
 You own only the ABI boundary rows pasted below:
