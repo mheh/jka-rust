@@ -4,13 +4,16 @@ use crate::boundary::generic::InboundVmCall;
 
 /// `GAME_ICARUS_PLAY` MP game exports vmMain boundary token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:782`
+/// Source (enum): `oracle/oracle/codemp/game/g_public.h:782`
+/// Source (args): `oracle/oracle/codemp/game/g_main.c:628`
+/// Source (output): `oracle/oracle/codemp/game/g_main.c:631`
+/// Source (call site): `oracle/oracle/codemp/icarus/Q3_Interface.cpp:899`
 pub struct GameIcarusPlay;
 
 impl InboundVmCall for GameIcarusPlay {
     type Command = GameExport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    type Args = ();
+    type Output = ();
 
     const COMMAND: GameExport = GameExport::GAME_ICARUS_PLAY;
 }

@@ -1,16 +1,21 @@
+use core::ffi::c_int;
+
 use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
 /// `GAME_ICARUS_GETVECTOR` MP game exports vmMain boundary token.
 ///
-/// Source: `oracle/oracle/codemp/game/g_public.h:784`
+/// Source (enum): `oracle/oracle/codemp/game/g_public.h:784`
+/// Source (args): `oracle/oracle/codemp/game/g_main.c:639`
+/// Source (output): `oracle/oracle/codemp/game/g_main.c:642`
+/// Source (call site): `oracle/oracle/codemp/icarus/Q3_Interface.cpp:927`
 pub struct GameIcarusGetvector;
 
 impl InboundVmCall for GameIcarusGetvector {
     type Command = GameExport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    type Args = ();
+    type Output = c_int;
 
     const COMMAND: GameExport = GameExport::GAME_ICARUS_GETVECTOR;
 }
