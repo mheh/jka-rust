@@ -4,16 +4,20 @@ use crate::boundary::generic::{EncodeVmMainReturn, InboundVmCall};
 /// `CG_MISC_ENT` MP cgame exports vmMain boundary token.
 ///
 /// Raven: rwwRMG - added
-/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:435`
-/// Args source: `oracle/oracle/codemp/cgame/cg_public.h:521-526`
-/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:342-344`
-/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:342-344`
-/// Transport/call-site source: no engine call-site found in initial search; module vmMain switch proves return.
+/// Enum source: `oracle/oracle/codemp/cgame/cg_public.h:435`
+/// Shared-buffer source: `oracle/oracle/codemp/cgame/cg_public.h:521-526`
+/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:342-344`, `oracle/oracle/codemp/cgame/cg_main.c:582-587`
+/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:342-344`, `oracle/oracle/codemp/cgame/cg_main.c:599-621`
+/// Transport/switch source: `oracle/oracle/codemp/cgame/cg_main.c:342-344`
+/// Transport/call-site source: `oracle/oracle/codemp/RMG/RM_Terrain.cpp:447-451`
+/// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:521-526`
+/// FIXME: create type `TCGMiscEnt` in Rust from
+/// `oracle/oracle/codemp/cgame/cg_public.h:521-526`.
 pub struct CgMiscEnt;
 
 impl InboundVmCall for CgMiscEnt {
     type Command = MpCgameExport;
-    type Args = (); //TODO: Port args; payload is TCGMiscEnt in cg.sharedBuffer/cl.mSharedMemory.
+    type Args = (); //FIXME: create type `TCGMiscEnt` in Rust when this payload is modeled.
     type Output = ();
 
     const COMMAND: MpCgameExport = MpCgameExport::CG_MISC_ENT;
