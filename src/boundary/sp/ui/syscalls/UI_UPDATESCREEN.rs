@@ -8,8 +8,11 @@ pub struct UiUpdatescreen;
 
 impl OutboundSysCall for UiUpdatescreen {
     type Import = SpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// Args source: `oracle/oracle/code/client/cl_ui.cpp:992-994`
+    /// Output source: `oracle/oracle/code/client/cl_ui.cpp:992-994`
+    /// (token-only RPC; wrapper calls `SCR_UpdateScreen()` and returns 0)
+    type Args = ();
+    type Output = ();
 
     const IMPORT: SpUiImport = SpUiImport::UI_UPDATESCREEN;
 }
