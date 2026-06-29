@@ -1,9 +1,8 @@
-use core::ffi::c_void;
-
 use super::super::SpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
+use crate::abi::sp::cgame::types::CGhoul2Info_v;
 use crate::codemp::game::q_shared_h::qhandle_t;
 
 /// Arguments for `CG_G2_SETMODELS`.
@@ -14,17 +13,18 @@ use crate::codemp::game::q_shared_h::qhandle_t;
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:486`
 /// Args source: `oracle/oracle/code/cgame/cg_local.h:1186`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:794-796`
+/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:311`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgG2SetmodelsArgs {
-    /// FIXME: create type CGhoul2Info_v. Raven source: `oracle/oracle/code/cgame/cg_local.h:1186`.
-    ghoul2: *mut c_void,
+    /// Opaque Raven `CGhoul2Info_v *`, dereferenced by the engine switch.
+    ghoul2: *mut CGhoul2Info_v,
     model_list: *mut qhandle_t,
     skin_list: *mut qhandle_t,
 }
 
 impl CgG2SetmodelsArgs {
     pub const fn new(
-        ghoul2: *mut c_void,
+        ghoul2: *mut CGhoul2Info_v,
         model_list: *mut qhandle_t,
         skin_list: *mut qhandle_t,
     ) -> Self {
@@ -35,7 +35,7 @@ impl CgG2SetmodelsArgs {
         }
     }
 
-    pub const fn ghoul2(&self) -> *mut c_void {
+    pub const fn ghoul2(&self) -> *mut CGhoul2Info_v {
         self.ghoul2
     }
 
@@ -54,6 +54,7 @@ impl CgG2SetmodelsArgs {
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:486`
 /// Output source: `oracle/oracle/code/client/cl_cgame.cpp:794-796`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:794-796`
+/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:311`
 pub struct CgG2Setmodels;
 
 impl OutboundSysCall for CgG2Setmodels {

@@ -1,8 +1,9 @@
 use super::super::SpCgameImport;
+use super::super::types::clipHandle_t;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::{clipHandle_t, vec3_t};
+use crate::codemp::game::q_shared_h::vec3_t;
 
 /// Arguments for `CG_CM_TEMPBOXMODEL`.
 ///
@@ -29,6 +30,7 @@ impl CgCmTempboxmodelArgs {
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:143-145`
 /// Output source: `oracle/oracle/code/client/cl_cgame.cpp:533-534`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:533-534`
+/// Type definition source: `oracle/oracle/code/game/q_shared.h:188`
 pub struct CgCmTempboxmodel;
 
 impl OutboundSysCall for CgCmTempboxmodel {

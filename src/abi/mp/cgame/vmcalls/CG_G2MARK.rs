@@ -1,3 +1,4 @@
+use super::super::shared_buffer::{SharedBufferPayload, TCGG2Mark};
 use super::super::MpCgameExport;
 use crate::abi::generic::InboundVmCall;
 
@@ -11,13 +12,11 @@ use crate::abi::generic::InboundVmCall;
 /// Transport/switch source: `oracle/oracle/codemp/cgame/cg_main.c:252-254`
 /// Transport/call-site source: `oracle/oracle/codemp/client/FxSystem.h:163-171`
 /// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:498-504`
-/// FIXME: create type `TCGG2Mark` in Rust from
-/// `oracle/oracle/codemp/cgame/cg_public.h:498-504`.
 pub struct CgG2mark;
 
 impl InboundVmCall for CgG2mark {
     type Command = MpCgameExport;
-    type Args = (); //FIXME: create type `TCGG2Mark` in Rust when payload modeling is added.
+    type Args = SharedBufferPayload<TCGG2Mark>;
     type Output = ();
 
     const COMMAND: MpCgameExport = MpCgameExport::CG_G2MARK;

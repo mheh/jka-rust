@@ -1,5 +1,6 @@
 use core::ffi::c_int;
 
+use super::super::shared_buffer::{SharedBufferPayload, TCGPointContents};
 use super::super::MpCgameExport;
 use crate::abi::generic::InboundVmCall;
 
@@ -13,13 +14,11 @@ use crate::abi::generic::InboundVmCall;
 /// Transport/switch source: `oracle/oracle/codemp/cgame/cg_main.c:220-222`
 /// Transport/call-site source: `oracle/oracle/codemp/client/FxPrimitives.cpp:234-240`
 /// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:451-456`
-/// FIXME: create type `TCGPointContents` in Rust from
-/// `oracle/oracle/codemp/cgame/cg_public.h:451-456`.
 pub struct CgPointContents;
 
 impl InboundVmCall for CgPointContents {
     type Command = MpCgameExport;
-    type Args = (); //FIXME: create type `TCGPointContents` in Rust when this payload is modeled.
+    type Args = SharedBufferPayload<TCGPointContents>;
     type Output = c_int;
 
     const COMMAND: MpCgameExport = MpCgameExport::CG_POINT_CONTENTS;

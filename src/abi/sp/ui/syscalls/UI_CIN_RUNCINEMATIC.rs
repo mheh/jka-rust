@@ -1,16 +1,17 @@
-use core::ffi::c_int;
-
 use super::super::SpUiImport;
+use super::super::types::e_status;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_int;
 
 /// `UI_CIN_RUNCINEMATIC` SP UI imports syscall ABI token.
 ///
 /// Raven: will run a frame of the cinematic but will not draw it. Returns `e_status`.
-/// FIXME: create type `e_status` in Rust (Raven source: `oracle/oracle/code/game/q_shared.h:2670-2679`).
 ///
 /// Enum value source: `oracle/oracle/code/ui/ui_public.h:229`
+/// Type definition source: `oracle/oracle/code/game/q_shared.h:2670-2679`
 /// Args source: `oracle/oracle/code/client/cl_ui.cpp:473-474`
 /// Output source: `oracle/oracle/code/client/client.h:432`
+/// Output source: `oracle/oracle/code/client/cl_ui.cpp:473-474`
 /// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:473-474`
 pub struct UiCinRuncinematic;
 
@@ -32,8 +33,7 @@ impl UiCinRuncinematicArgs {
 impl OutboundSysCall for UiCinRuncinematic {
     type Import = SpUiImport;
     type Args = UiCinRuncinematicArgs;
-    /// Representing `e_status` as `c_int` for ABI compatibility.
-    type Output = c_int;
+    type Output = e_status;
 
     const IMPORT: SpUiImport = SpUiImport::UI_CIN_RUNCINEMATIC;
 }
@@ -46,6 +46,6 @@ impl EncodeSysCall for UiCinRuncinematic {
 
 impl DecodeSysCallReturn for UiCinRuncinematic {
     fn decode_return(word: isize) -> Self::Output {
-        word as c_int
+        e_status::from_wire(word as c_int)
     }
 }

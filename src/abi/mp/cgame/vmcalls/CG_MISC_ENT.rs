@@ -1,3 +1,4 @@
+use super::super::shared_buffer::{SharedBufferPayload, TCGMiscEnt};
 use super::super::MpCgameExport;
 use crate::abi::generic::{EncodeVmMainReturn, InboundVmCall};
 
@@ -11,13 +12,11 @@ use crate::abi::generic::{EncodeVmMainReturn, InboundVmCall};
 /// Transport/switch source: `oracle/oracle/codemp/cgame/cg_main.c:342-344`
 /// Transport/call-site source: `oracle/oracle/codemp/RMG/RM_Terrain.cpp:447-451`
 /// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:521-526`
-/// FIXME: create type `TCGMiscEnt` in Rust from
-/// `oracle/oracle/codemp/cgame/cg_public.h:521-526`.
 pub struct CgMiscEnt;
 
 impl InboundVmCall for CgMiscEnt {
     type Command = MpCgameExport;
-    type Args = (); //FIXME: create type `TCGMiscEnt` in Rust when this payload is modeled.
+    type Args = SharedBufferPayload<TCGMiscEnt>;
     type Output = ();
 
     const COMMAND: MpCgameExport = MpCgameExport::CG_MISC_ENT;

@@ -1,3 +1,4 @@
+use super::super::shared_buffer::{SharedBufferPayload, TCGCameraShake};
 use super::super::MpCgameExport;
 use crate::abi::generic::{EncodeVmMainReturn, InboundVmCall};
 
@@ -10,14 +11,12 @@ use crate::abi::generic::{EncodeVmMainReturn, InboundVmCall};
 /// Output source: `oracle/oracle/codemp/cgame/cg_main.c:346-351`
 /// Transport/switch source: `oracle/oracle/codemp/cgame/cg_main.c:346-352`
 /// Transport/call-site source: `oracle/oracle/codemp/client/FxSystem.cpp:85-93`
-/// Shared-buffer payload type is not represented in Rust yet.
-/// FIXME: create type `TCGCameraShake` from
-/// `oracle/oracle/codemp/cgame/cg_public.h:512-519`.
+/// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:512-519`
 pub struct CgFxCamerashake;
 
 impl InboundVmCall for CgFxCamerashake {
     type Command = MpCgameExport;
-    type Args = (); //FIXME: create type `TCGCameraShake` in Rust when this payload moves to first-class ABI args.
+    type Args = SharedBufferPayload<TCGCameraShake>;
     type Output = ();
 
     const COMMAND: MpCgameExport = MpCgameExport::CG_FX_CAMERASHAKE;

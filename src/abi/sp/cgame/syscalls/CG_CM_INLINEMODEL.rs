@@ -1,8 +1,6 @@
 use super::super::SpCgameImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
-use crate::codemp::game::q_shared_h::clipHandle_t;
+use super::super::types::clipHandle_t;
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// Arguments for `CG_CM_INLINEMODEL`.
 ///
@@ -28,6 +26,7 @@ impl CgCmInlinemodelArgs {
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:139-141`
 /// Output source: `oracle/oracle/code/client/cl_cgame.cpp:531-532`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:531-532`
+/// Type definition source: `oracle/oracle/code/game/q_shared.h:188`
 pub struct CgCmInlinemodel;
 
 impl OutboundSysCall for CgCmInlinemodel {

@@ -1,9 +1,8 @@
 use core::ffi::{c_int, c_void};
 
 use super::super::SpCgameImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::abi::sp::cgame::types::memtag_t;
 
 /// Arguments for `CG_Z_MALLOC`.
 ///
@@ -13,15 +12,15 @@ use crate::abi::generic::{
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:548-550`
 /// Output source: `oracle/oracle/code/client/cl_cgame.cpp:834-835`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:834-835`
+/// Type definition source: `oracle/oracle/code/game/q_shared.h:2688`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CgZMallocArgs {
     size: c_int,
-    // FIXME: create type `memtag_t` (Raven typedef: `oracle/oracle/code/game/q_shared.h:2688`).
-    tag: c_int,
+    tag: memtag_t,
 }
 
 impl CgZMallocArgs {
-    pub const fn new(size: c_int, tag: c_int) -> Self {
+    pub const fn new(size: c_int, tag: memtag_t) -> Self {
         Self { size, tag }
     }
 
@@ -29,20 +28,18 @@ impl CgZMallocArgs {
         self.size
     }
 
-    pub const fn tag(&self) -> c_int {
+    pub const fn tag(&self) -> memtag_t {
         self.tag
     }
 }
 
 /// `CG_Z_MALLOC` SP cgame imports syscall ABI token.
 ///
-/// FIXME: create type `memtag_t` for the second argument; using `c_int` preserves
-/// the existing syscall word transport until the shared Raven type exists.
-///
 /// Enum value source: `oracle/oracle/code/cgame/cg_public.h:190`
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:548-550`
 /// Output source: `oracle/oracle/code/client/cl_cgame.cpp:834-835`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:834-835`
+/// Type definition source: `oracle/oracle/code/game/q_shared.h:2688`
 pub struct CgZMalloc;
 
 impl OutboundSysCall for CgZMalloc {
@@ -55,7 +52,7 @@ impl OutboundSysCall for CgZMalloc {
 
 impl EncodeSysCall for CgZMalloc {
     fn encode_syscall(args: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([args.size() as isize, args.tag() as isize])
+        SysCallTransport::new([args.size() as isize, args.tag().as_wire() as isize])
     }
 }
 

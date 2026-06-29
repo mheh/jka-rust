@@ -1,9 +1,8 @@
 use core::ffi::c_int;
 
+use super::super::shared_buffer::{autoMapInput_t, SharedBufferPayload};
 use super::super::MpCgameExport;
-use crate::abi::generic::{
-    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
-};
+use crate::abi::generic::{EncodeVmMainReturn, InboundVmCall};
 
 /// `CG_AUTOMAP_INPUT` MP cgame exports vmMain ABI token.
 ///
@@ -18,24 +17,29 @@ use crate::abi::generic::{
 /// Output source: `oracle/oracle/codemp/cgame/cg_main.c:340`
 pub struct CgAutomapInput;
 
-/// `CG_AUTOMAP_INPUT` transport arg.
+/// `CG_AUTOMAP_INPUT` transport arg plus shared-buffer payload.
 ///
 /// Engine sends this call with `arg0=0` for map/keyboard style updates and
 /// `arg0!=0` for mouse motion events.
-/// FIXME: create type `autoMapInput_t` in Rust.
-/// - `oracle/oracle/codemp/cgame/cg_public.h:442-449`
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+///
+/// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:442-449`
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CgAutomapInputArgs {
     mode: c_int,
+    payload: SharedBufferPayload<autoMapInput_t>,
 }
 
 impl CgAutomapInputArgs {
-    pub const fn new(mode: c_int) -> Self {
-        Self { mode }
+    pub const fn new(mode: c_int, payload: SharedBufferPayload<autoMapInput_t>) -> Self {
+        Self { mode, payload }
     }
 
     pub const fn mode(self) -> c_int {
         self.mode
+    }
+
+    pub const fn payload(self) -> SharedBufferPayload<autoMapInput_t> {
+        self.payload
     }
 }
 
@@ -45,12 +49,6 @@ impl InboundVmCall for CgAutomapInput {
     type Output = ();
 
     const COMMAND: MpCgameExport = MpCgameExport::CG_AUTOMAP_INPUT;
-}
-
-impl DecodeVmMain for CgAutomapInput {
-    fn decode_vm_main(transport: VmMainTransport) -> Self::Args {
-        CgAutomapInputArgs::new(word_to_c_int(transport.arg(0)))
-    }
 }
 
 impl EncodeVmMainReturn for CgAutomapInput {

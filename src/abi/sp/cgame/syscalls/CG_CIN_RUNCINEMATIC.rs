@@ -1,9 +1,8 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::abi::sp::cgame::types::e_status;
 
 /// Arguments for `CG_CIN_RUNCINEMATIC`.
 ///
@@ -33,19 +32,19 @@ impl CgCinRuncinematicArgs {
 /// `CG_CIN_RUNCINEMATIC` SP cgame imports syscall ABI token.
 ///
 /// Raven `e_status` is an integer transport value.
-/// FIXME: create type e_status. Raven source: `oracle/oracle/code/cgame/cg_syscalls.cpp:531-533`.
 /// Enum value source: `oracle/oracle/code/cgame/cg_public.h:187`
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:531-533`
 /// Output source: `oracle/oracle/code/cgame/cg_syscalls.cpp:531-533`
 /// Output source: `oracle/oracle/code/cgame/cg_local.h:1200`
 /// Output source: `oracle/oracle/code/client/cl_cgame.cpp:823-824`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:823-824`
+/// Type definition source: `oracle/oracle/code/game/q_shared.h:2670-2679`
 pub struct CgCinRuncinematic;
 
 impl OutboundSysCall for CgCinRuncinematic {
     type Import = SpCgameImport;
     type Args = CgCinRuncinematicArgs;
-    type Output = c_int;
+    type Output = e_status;
 
     const IMPORT: SpCgameImport = SpCgameImport::CG_CIN_RUNCINEMATIC;
 }
@@ -58,6 +57,6 @@ impl EncodeSysCall for CgCinRuncinematic {
 
 impl DecodeSysCallReturn for CgCinRuncinematic {
     fn decode_return(word: isize) -> Self::Output {
-        word as c_int
+        e_status::from_wire(word as c_int)
     }
 }

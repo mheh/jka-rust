@@ -1,6 +1,5 @@
-use core::ffi::c_void;
-
 use super::super::SpUiImport;
+use super::super::types::uiClientState_t;
 use crate::abi::generic::{
     DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport, ptr_to_word,
 };
@@ -8,22 +7,25 @@ use crate::abi::generic::{
 /// `UI_GETCLIENTSTATE` SP UI imports syscall ABI token.
 ///
 /// Enum source: `oracle/oracle/code/ui/ui_public.h:196`
+/// Type definition source: `oracle/oracle/codemp/ui/ui_public.h:7-15`
 /// Args source: `oracle/oracle/code/ui/ui_syscalls.cpp:151-153`
+/// Args source: `oracle/oracle/codemp/ui/ui_local.h:961`
 /// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1044-1046`
 /// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:1044-1046`
-/// SP caveat: `UI_GETCLIENTSTATE` is not active in the current `oracle/oracle/code/client/cl_ui.cpp` branch.
+/// SP caveat: `UI_GETCLIENTSTATE` is commented out in
+/// `oracle/oracle/code/ui/ui_syscalls.cpp:148-153` and not active in the current
+/// `oracle/oracle/code/client/cl_ui.cpp` branch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiGetclientstateArgs {
-    // FIXME: create type `uiClientState_t` in Rust when UI client state payload is modeled.
-    state: *mut c_void,
+    state: *mut uiClientState_t,
 }
 
 impl UiGetclientstateArgs {
-    pub const fn new(state: *mut c_void) -> Self {
+    pub const fn new(state: *mut uiClientState_t) -> Self {
         Self { state }
     }
 
-    pub const fn state(&self) -> *mut c_void {
+    pub const fn state(&self) -> *mut uiClientState_t {
         self.state
     }
 }

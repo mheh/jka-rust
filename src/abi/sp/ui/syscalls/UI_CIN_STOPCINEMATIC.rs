@@ -1,9 +1,9 @@
-use core::ffi::c_int;
-
 use super::super::SpUiImport;
+use super::super::types::e_status;
 use crate::abi::generic::{
     DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
+use core::ffi::c_int;
 
 /// `UI_CIN_STOPCINEMATIC` SP UI imports syscall ABI token.
 ///
@@ -12,12 +12,12 @@ use crate::abi::generic::{
 /// Raven transport: `return CIN_StopCinematic(args[1]);`
 ///
 /// Enum value source: `oracle/oracle/code/ui/ui_public.h:228`
+/// Type definition source: `oracle/oracle/code/game/q_shared.h:2670-2679`
 /// Args source: `oracle/oracle/code/ui/ui_syscalls.cpp:173-176`
 /// Args source: `oracle/oracle/code/ui/ui_local.h:190`
 /// Output source: `oracle/oracle/code/client/client.h:431`
 /// Output source: `oracle/oracle/code/client/cl_ui.cpp:470`
 /// Transport/switch source: `oracle/oracle/code/client/cl_ui.cpp:470`
-/// FIXME: create type `e_status` in Rust. Raven source: `oracle/oracle/code/game/q_shared.h:2670-2679`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UiCinStopcinematicArgs {
     handle: c_int,
@@ -38,8 +38,7 @@ pub struct UiCinStopcinematic;
 impl OutboundSysCall for UiCinStopcinematic {
     type Import = SpUiImport;
     type Args = UiCinStopcinematicArgs;
-    /// Representing `e_status` as `c_int` for ABI compatibility.
-    type Output = c_int;
+    type Output = e_status;
 
     const IMPORT: SpUiImport = SpUiImport::UI_CIN_STOPCINEMATIC;
 }
@@ -52,6 +51,6 @@ impl EncodeSysCall for UiCinStopcinematic {
 
 impl DecodeSysCallReturn for UiCinStopcinematic {
     fn decode_return(word: isize) -> Self::Output {
-        word as c_int
+        e_status::from_wire(word as c_int)
     }
 }

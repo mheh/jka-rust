@@ -1,7 +1,10 @@
-use core::ffi::{c_float, c_int};
+use core::ffi::c_int;
 
 use super::super::SpCgameExport;
-use crate::abi::generic::InboundVmCall;
+use crate::abi::generic::{
+    word_to_mut_ptr, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
+use crate::codemp::game::q_shared_h::vec3_t;
 
 /// `CG_CAMERA_POS` SP cgame exports vmMain ABI token.
 ///
@@ -16,10 +19,20 @@ pub struct CgCameraPos;
 
 impl InboundVmCall for CgCameraPos {
     type Command = SpCgameExport;
-    /// FIXME: create type `vec3_t` in Rust (Raven source: `oracle/oracle/code/game/q_shared.h:316`).
-    /// Using `*mut c_float` keeps transport compatibility for this pointer payload.
-    type Args = *mut c_float;
+    type Args = *mut vec3_t;
     type Output = c_int;
 
     const COMMAND: SpCgameExport = SpCgameExport::CG_CAMERA_POS;
+}
+
+impl DecodeVmMain for CgCameraPos {
+    fn decode_vm_main(transport: VmMainTransport) -> Self::Args {
+        word_to_mut_ptr(transport.arg(0))
+    }
+}
+
+impl EncodeVmMainReturn for CgCameraPos {
+    fn encode_return(output: Self::Output) -> isize {
+        output as isize
+    }
 }

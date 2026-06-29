@@ -1,3 +1,4 @@
+use super::super::shared_buffer::{SharedBufferPayload, TCGImpactMark};
 use super::super::MpCgameExport;
 use crate::abi::generic::InboundVmCall;
 
@@ -14,13 +15,11 @@ use crate::abi::generic::InboundVmCall;
 /// Transport/switch source: `oracle/oracle/codemp/cgame/cg_main.c:303-305`
 /// Transport/call-site source: no `VM_Call( cgvm, CG_IMPACT_MARK )` site found in tracked Oracle sources; dispatch and payload usage is established in `oracle/oracle/codemp/cgame/cg_main.c`.
 /// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:467-479`
-/// FIXME: create type `TCGImpactMark` in Rust from
-/// `oracle/oracle/codemp/cgame/cg_public.h:467-479`.
 pub struct CgImpactMark;
 
 impl InboundVmCall for CgImpactMark {
     type Command = MpCgameExport;
-    type Args = (); //FIXME: create type `TCGImpactMark` in Rust when this payload is modeled.
+    type Args = SharedBufferPayload<TCGImpactMark>;
     type Output = ();
 
     const COMMAND: MpCgameExport = MpCgameExport::CG_IMPACT_MARK;

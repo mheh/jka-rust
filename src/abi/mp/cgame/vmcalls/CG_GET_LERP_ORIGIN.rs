@@ -1,4 +1,5 @@
 // Shared-buffer payload lives in cg.sharedBuffer / cl.mSharedMemory, not vmMain arg slots.
+use super::super::shared_buffer::{SharedBufferPayload, TCGVectorData};
 use super::super::MpCgameExport;
 use crate::abi::generic::InboundVmCall;
 
@@ -13,13 +14,12 @@ use crate::abi::generic::InboundVmCall;
 /// Transport/call-site source: `oracle/oracle/codemp/client/FxScheduler.cpp:130-133`
 /// Transport/call-site source: `oracle/oracle/codemp/client/FxScheduler.cpp:929-933`
 /// Transport/call-site source: `oracle/oracle/codemp/client/FxScheduler.cpp:1104-1105`
-/// FIXME: create type `TCGVectorData` in Rust from
-/// `oracle/oracle/codemp/cgame/cg_public.h:484-489`.
+/// Shared-buffer payload type source: `oracle/oracle/codemp/cgame/cg_public.h:484-489`
 pub struct CgGetLerpOrigin;
 
 impl InboundVmCall for CgGetLerpOrigin {
     type Command = MpCgameExport;
-    type Args = (); //FIXME: create type `TCGVectorData` in Rust when payload modeling is added.
+    type Args = SharedBufferPayload<TCGVectorData>;
     type Output = ();
 
     const COMMAND: MpCgameExport = MpCgameExport::CG_GET_LERP_ORIGIN;

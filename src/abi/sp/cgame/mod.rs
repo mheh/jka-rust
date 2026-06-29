@@ -3,6 +3,7 @@
 pub mod exports;
 pub mod imports;
 pub mod syscalls;
+pub mod types;
 pub mod vmcalls;
 
 pub use exports::SpCgameExport;
