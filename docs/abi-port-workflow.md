@@ -81,6 +81,15 @@ exactly as generated, including:
 - transport/switch source file and line number
 - any notes already present in the generated output
 
+Regenerate the current remaining worklist with:
+
+```sh
+python3 docs/regenerate-abi-port-list.py
+```
+
+Use `--surface 'SP cgame'` or `--limit 8` when preparing a smaller worker
+scope.
+
 If the generated output includes separate file, enum, args, output, transport,
 and notes columns, keep the whole line intact. If a generated line has no proven
 args or output source yet, include that absence in the pasted scope so the

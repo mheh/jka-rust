@@ -1,15 +1,41 @@
 use super::super::SpCgameImport;
-use crate::boundary::generic::OutboundSysCall;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+
+/// Arguments for `CG_UI_MENUCLOSE_ALL`.
+///
+/// Raven wrapper: `syscall(CG_UI_MENUCLOSE_ALL);`
+/// Raven transport: `Menus_CloseAll(); return 0;`
+///
+/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:608-610`
+/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:883-885`
+/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:883-885`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CgUiMenucloseAllArgs;
 
 /// `CG_UI_MENUCLOSE_ALL` SP cgame imports syscall boundary token.
 ///
-/// Source: `oracle/oracle/code/cgame/cg_public.h:203`
+/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:203`
+/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:608-610`
+/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:883-885`
+/// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:883-885`
 pub struct CgUiMenucloseAll;
 
 impl OutboundSysCall for CgUiMenucloseAll {
     type Import = SpCgameImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    type Args = CgUiMenucloseAllArgs;
+    type Output = ();
 
     const IMPORT: SpCgameImport = SpCgameImport::CG_UI_MENUCLOSE_ALL;
+}
+
+impl EncodeSysCall for CgUiMenucloseAll {
+    fn encode_syscall(_args: &Self::Args) -> SysCallTransport {
+        SysCallTransport::empty()
+    }
+}
+
+impl DecodeSysCallReturn for CgUiMenucloseAll {
+    fn decode_return(_word: isize) -> Self::Output {}
 }
