@@ -16,9 +16,15 @@ Raven's `jampgamex86.dll`:
 - [x] Preserve the original MP game import/export integer vocabulary:
   `MpGameImport` for module-to-engine syscalls and `MpGameExport` for
   engine-to-module `vmMain` commands.
-- [ ] Generate or verify every MP game import/export value directly against
+- [x] Generate or verify every MP game import/export value directly against
   Raven `codemp/game/g_public.h`, including explicit reset points like `100`,
   `200`, `250`, `300`, `400`, and `500`.
+- [x] Port or explicitly classify every generated ABI arg/output TODO for the
+  current MP/SP game, cgame, and UI surfaces.
+- [x] Clear the ABI type inventory audit so there are no active
+  `FIXME: create type` markers or unresolved referenced Rust type names.
+- [x] Document enum-only/unused ABI tokens instead of leaving them as port TODOs
+  when Raven exposes no wrapper, callsite, or transport behavior.
 - [ ] Expose exported C symbols with the original names: `dllEntry` and
   `vmMain`.
 - [ ] Match Raven's calling convention and `vmMain` argument/return word

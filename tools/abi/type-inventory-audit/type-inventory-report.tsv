@@ -1,3 +1,1 @@
 type_name	status	reference_count	fixme_count	rust_definition_count	references	fixmes	rust_definitions	oracle_candidates
-UI_CM_LOADMODEL	explicit_fixme_missing_rust_type	0	1	0		src/abi/sp/ui/syscalls/UI_CM_LOADMODEL.rs:18: /// FIXME: create type for `UI_CM_LOADMODEL` args/output if a Raven wrapper or transport case is located.		"oracle/oracle/code/ui/ui_public.h:182: UI_CM_LOADMODEL, // 30
-oracle/oracle/codemp/ui/ui_public.h:49: UI_CM_LOADMODEL,"
