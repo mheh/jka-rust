@@ -1,3 +1,5 @@
+use core::ffi::c_void;
+
 use super::super::SpUiImport;
 use crate::boundary::generic::OutboundSysCall;
 
@@ -8,8 +10,13 @@ pub struct UiRAddrefentitytoscene;
 
 impl OutboundSysCall for UiRAddrefentitytoscene {
     type Import = SpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// Args source: `oracle/oracle/code/ui/ui_public.h:174`,
+    /// `oracle/oracle/codemp/ui/ui_syscalls.c:174-175`
+    /// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:960-961`
+    type Args = *const c_void;
+    /// Output source: `oracle/oracle/code/client/cl_ui.cpp` has no SP case for
+    /// `UI_R_ADDREFENTITYTOSCENE`; fallback transport evidence: `oracle/oracle/codemp/client/cl_ui.cpp:960-961`
+    type Output = ();
 
     const IMPORT: SpUiImport = SpUiImport::UI_R_ADDREFENTITYTOSCENE;
 }

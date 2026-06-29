@@ -1,3 +1,5 @@
+use core::ffi::c_char;
+
 use super::super::SpUiImport;
 use crate::boundary::generic::OutboundSysCall;
 
@@ -8,8 +10,11 @@ pub struct UiPrint;
 
 impl OutboundSysCall for UiPrint {
     type Import = SpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:22`
+    /// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:862`
+    type Args = *const c_char;
+    /// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:863`
+    type Output = ();
 
     const IMPORT: SpUiImport = SpUiImport::UI_PRINT;
 }
