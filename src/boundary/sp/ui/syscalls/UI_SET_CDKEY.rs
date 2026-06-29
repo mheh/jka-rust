@@ -1,3 +1,5 @@
+use core::ffi::c_char;
+
 use super::super::SpUiImport;
 use crate::boundary::generic::OutboundSysCall;
 
@@ -8,8 +10,10 @@ pub struct UiSetCdkey;
 
 impl OutboundSysCall for UiSetCdkey {
     type Import = SpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:1127-1129`.
+    type Args = *mut c_char;
+    /// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1127-1129`.
+    type Output = ();
 
     const IMPORT: SpUiImport = SpUiImport::UI_SET_CDKEY;
 }

@@ -1,3 +1,5 @@
+use core::ffi::{c_char, c_int};
+
 use super::super::SpUiImport;
 use crate::boundary::generic::OutboundSysCall;
 
@@ -8,12 +10,10 @@ pub struct UiGetCdkey;
 
 impl OutboundSysCall for UiGetCdkey {
     type Import = SpUiImport;
-    /// TODO: Port args/output.
-    /// SP Oracle sources in this assignment only expose enum (`ui_public.h:205`) and do not include
-    /// a UI->engine signature for `UI_GET_CDKEY` (no matching `UI_GET_CDKEY` case/wrapper found in
-    /// `oracle/oracle/code/ui/ui_syscalls.cpp` or `oracle/oracle/code/client/cl_ui.cpp`).
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:1123-1125`.
+    type Args = (*mut c_char, c_int);
+    /// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1123-1125`.
+    type Output = ();
 
     const IMPORT: SpUiImport = SpUiImport::UI_GET_CDKEY;
 }

@@ -1,3 +1,5 @@
+use core::ffi::c_char;
+
 use super::super::SpUiImport;
 use crate::boundary::generic::OutboundSysCall;
 
@@ -9,8 +11,10 @@ pub struct UiRRemapShader;
 
 impl OutboundSysCall for UiRRemapShader {
     type Import = SpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:1201-1203`.
+    type Args = (*const c_char, *const c_char, *const c_char);
+    /// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1201-1203`.
+    type Output = ();
 
     const IMPORT: SpUiImport = SpUiImport::UI_R_REMAP_SHADER;
 }
