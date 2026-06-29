@@ -1,18 +1,31 @@
+use core::ffi::c_int;
+
 use super::super::MpCgameExport;
-use crate::boundary::generic::InboundVmCall;
+use crate::boundary::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport};
 
 /// `CG_CROSSHAIR_PLAYER` MP cgame exports vmMain boundary token.
 ///
-/// Raven: void (*CG_DrawActiveFrame)( int serverTime, stereoFrame_t stereoView, qboolean demoPlayback );
-/// Raven: Generates and draws a game scene and status information at the given time.
-/// Raven: If demoPlayback is set, local movement prediction will not be enabled
-/// Source: `oracle/oracle/codemp/cgame/cg_public.h:378`
+/// Raven: int (*CG_CrosshairPlayer)( void );
+/// Enum value source: `oracle/oracle/codemp/cgame/cg_public.h:378-379`
+/// Args source: `oracle/oracle/codemp/cgame/cg_main.c:204-205`
+/// Output source: `oracle/oracle/codemp/cgame/cg_main.c:204-205`
+/// Transport/call-site source: `oracle/oracle/codemp/client/cl_console.cpp:76-85`
 pub struct CgCrosshairPlayer;
 
 impl InboundVmCall for CgCrosshairPlayer {
     type Command = MpCgameExport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    type Args = ();
+    type Output = c_int;
 
     const COMMAND: MpCgameExport = MpCgameExport::CG_CROSSHAIR_PLAYER;
+}
+
+impl DecodeVmMain for CgCrosshairPlayer {
+    fn decode_vm_main(_transport: VmMainTransport) -> Self::Args {}
+}
+
+impl EncodeVmMainReturn for CgCrosshairPlayer {
+    fn encode_return(output: Self::Output) -> isize {
+        output as isize
+    }
 }
