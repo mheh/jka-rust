@@ -3,6 +3,9 @@
 //! Game-internal (the engine never sees these). `level_locals_t` embeds the ai.h
 //! `AIGroupInfo_t groups[MAX_FRAME_GROUPS]` and the alert/interest/combat arrays by
 //! value, and is pointer-bearing => arch-dependent (64-bit layout asserted).
+//!
+//! Migration target: `crate::modules::mp::game::level`.
+//! Source: `oracle/oracle/codemp/game/g_local.h:750`
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -23,8 +26,11 @@ pub const BODY_QUEUE_SIZE: usize = 8;
 //Interest points
 pub const MAX_INTEREST_POINTS: usize = 64;
 
-/// `interestPoint_t` (g_local.h) — squadmates look at these when idle and close.
-/// Carries a `char *target` => arch-dependent.
+/// `interestPoint_t`.
+///
+/// Raven: Interest points.
+/// Raven: squadmates automatically look at these if standing around and close to them.
+/// Source: `oracle/oracle/codemp/game/g_local.h:750`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct interestPoint_t {
@@ -37,9 +43,11 @@ const _: () = assert!(core::mem::size_of::<interestPoint_t>() == 24);
 //Combat points
 pub const MAX_COMBAT_POINTS: usize = 512;
 
-/// `combatPoint_t` (g_local.h) — NPCs in bState BS_COMBAT_POINT find their closest
-/// empty combat_point. Pointer-free (the `NPC_targetname`/`team` members are
-/// commented out in the original).
+/// `combatPoint_t`.
+///
+/// Raven: Combat points.
+/// Raven: NPCs in bState BS_COMBAT_POINT will find their closest empty combat_point.
+/// Source: `oracle/oracle/codemp/game/g_local.h:760`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct combatPoint_t {
@@ -56,12 +64,17 @@ const _: () = assert!(core::mem::size_of::<combatPoint_t>() == 28);
 // Alert events
 pub const MAX_ALERT_EVENTS: usize = 32;
 
-/// `alertEventType_e` (g_local.h).
+/// `alertEventType_e`.
+///
+/// Raven: Alert events.
+/// Source: `oracle/oracle/codemp/game/g_local.h:775`
 pub type alertEventType_e = c_int;
 pub const AET_SIGHT: alertEventType_e = 0;
 pub const AET_SOUND: alertEventType_e = 1;
 
-/// `alertEventLevel_e` (g_local.h).
+/// `alertEventLevel_e`.
+///
+/// Source: `oracle/oracle/codemp/game/g_local.h:785`
 pub type alertEventLevel_e = c_int;
 pub const AEL_MINOR: alertEventLevel_e = 0; //Enemy responds to the sound, but only by looking
 pub const AEL_SUSPICIOUS: alertEventLevel_e = 1; //Enemy looks at the sound, and will also investigate it
@@ -69,8 +82,11 @@ pub const AEL_DISCOVERED: alertEventLevel_e = 2; //Enemy knows the player is aro
 pub const AEL_DANGER: alertEventLevel_e = 3; //Enemy should try to find cover
 pub const AEL_DANGER_GREAT: alertEventLevel_e = 4; //Enemy should run like hell!
 
-/// `alertEvent_t` (g_local.h). Carries a `gentity_t *owner` => arch-dependent.
-/// `type` is a Rust keyword, hence `r#type` (the C field is `type`).
+/// `alertEvent_t`.
+///
+/// Raven: Alert events.
+/// Raven: `owner` is who made the sound.
+/// Source: `oracle/oracle/codemp/game/g_local.h:794`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct alertEvent_t {
@@ -89,8 +105,10 @@ const _: () = assert!(core::mem::size_of::<alertEvent_t>() == 48);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(alertEvent_t, owner) == 24);
 
-/// `waypointData_t` (g_local.h) — "this structure is cleared as each map is
-/// entered". Pointer-free.
+/// `waypointData_t`.
+///
+/// Raven: this structure is cleared as each map is entered.
+/// Source: `oracle/oracle/codemp/game/g_local.h:807`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct waypointData_t {
@@ -103,10 +121,12 @@ pub struct waypointData_t {
 }
 const _: () = assert!(core::mem::size_of::<waypointData_t>() == 324);
 
-/// `level_locals_t` (g_local.h) — "this structure is cleared as each map is
-/// entered". Game-internal (not engine-visible). Pointer-bearing => arch-dependent;
-/// embeds `AIGroupInfo_t groups[MAX_FRAME_GROUPS]` and the alert/interest/combat
-/// arrays by value.
+/// `level_locals_t`.
+///
+/// Raven: game-internal world container for clients, gentities, cvars, votes,
+/// Raven: spawn variables, intermission state, alert events, AI groups, interest
+/// Raven: points, combat points, and RMG adjustment data.
+/// Source: `oracle/oracle/codemp/game/g_local.h:820`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct level_locals_t {
@@ -230,8 +250,10 @@ const _: () = assert!(core::mem::offset_of!(level_locals_t, combatPoints) == 327
 const _: () = assert!(core::mem::offset_of!(level_locals_t, mTeamFilter) == 47112);
 
 // ===========================================================================
-// Remaining g_local.h data: damage flags, mover spawnflags, and the two later
-// pointer-free structs (reference_tag_t in g_misc.c, bot_settings_t in ai_util.c).
+// Remaining game-private `g_local.h` data.
+//
+// Raven: damage flags, mover spawnflags, and later helper structs.
+// Source: `oracle/oracle/codemp/game/g_local.h:1169`
 // ===========================================================================
 
 // damage flags (used by G_Damage's `dflags`)
@@ -266,7 +288,11 @@ pub const MAX_REFNAME: usize = 32;
 pub const RTF_NONE: c_int = 0;
 pub const RTF_NAVGOAL: c_int = 0x00000001;
 
-/// `reference_tag_t` (g_local.h, g_misc.c). Pointer-free.
+/// `reference_tag_t`.
+///
+/// Raven: g_misc.c reference tags.
+/// Raven: flags are "Just in case"; radius is "For nav goals".
+/// Source: `oracle/oracle/codemp/game/g_local.h:1240`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct reference_tag_t {
@@ -279,10 +305,16 @@ pub struct reference_tag_t {
 }
 const _: () = assert!(core::mem::size_of::<reference_tag_t>() == 68);
 
-/// `MAX_FILEPATH` (g_local.h, ai_main.c).
+/// `MAX_FILEPATH`.
+///
+/// Raven: ai_main.c.
+/// Source: `oracle/oracle/codemp/game/g_local.h:1479`
 pub const MAX_FILEPATH: usize = 144;
 
-/// `bot_settings_t` (g_local.h, ai_util.c). Pointer-free.
+/// `bot_settings_t`.
+///
+/// Raven: bot settings.
+/// Source: `oracle/oracle/codemp/game/g_local.h:1490`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct bot_settings_t {

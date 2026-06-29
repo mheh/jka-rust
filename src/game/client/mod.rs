@@ -3,6 +3,9 @@
 //! `gclient_s` (`gclient_t`) is engine-visible via its leading `playerState_t ps`;
 //! the rest is private to the game. Pointer-bearing => arch-dependent layout (the
 //! `#[cfg(target_pointer_width = "64")]` asserts pin the host-64-bit offsets).
+//!
+//! Migration target: `crate::modules::mp::game::client`.
+//! Source: `oracle/oracle/codemp/game/g_local.h:366`
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -17,25 +20,35 @@ use core::ffi::{c_char, c_int, c_uint, c_void};
 
 use super::entity::gentity_s;
 
-/// `clientConnected_t` (g_local.h) — anonymous enum + `typedef int`.
+/// `clientConnected_t`.
+///
+/// Raven: anonymous enum + `typedef int`.
+/// Source: `oracle/oracle/codemp/game/g_local.h:366`
 pub type clientConnected_t = c_int;
 pub const CON_DISCONNECTED: clientConnected_t = 0;
 pub const CON_CONNECTING: clientConnected_t = 1;
 pub const CON_CONNECTED: clientConnected_t = 2;
 
-/// `spectatorState_t` (g_local.h).
+/// `spectatorState_t`.
+///
+/// Source: `oracle/oracle/codemp/game/g_local.h:373`
 pub type spectatorState_t = c_int;
 pub const SPECTATOR_NOT: spectatorState_t = 0;
 pub const SPECTATOR_FREE: spectatorState_t = 1;
 pub const SPECTATOR_FOLLOW: spectatorState_t = 2;
 pub const SPECTATOR_SCOREBOARD: spectatorState_t = 3;
 
-/// `playerTeamStateState_t` (g_local.h).
+/// `playerTeamStateState_t`.
+///
+/// Source: `oracle/oracle/codemp/game/g_local.h:380`
 pub type playerTeamStateState_t = c_int;
 pub const TEAM_BEGIN: playerTeamStateState_t = 0; // Beginning a team game, spawn at base
 pub const TEAM_ACTIVE: playerTeamStateState_t = 1; // Now actively playing
 
-/// `playerTeamState_t` (g_local.h) — status in teamplay games. Pointer-free.
+/// `playerTeamState_t`.
+///
+/// Raven: status in teamplay games.
+/// Source: `oracle/oracle/codemp/game/g_local.h:385`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct playerTeamState_t {
@@ -62,10 +75,13 @@ const _: () = assert!(core::mem::size_of::<playerTeamState_t>() == 48);
 pub const FOLLOW_ACTIVE1: c_int = -1;
 pub const FOLLOW_ACTIVE2: c_int = -2;
 
-/// `clientSession_t` (g_local.h) — client data that stays across multiple levels
-/// or tournament restarts (written to cvar strings at game shutdown, read back at
-/// connection time). "Anything added here MUST be dealt with in G_InitSessionData()
-/// / G_ReadSessionData() / G_WriteSessionData()." Pointer-free.
+/// `clientSession_t`.
+///
+/// Raven: client data that stays across multiple levels or tournament restarts.
+/// Raven: this is achieved by writing all the data to cvar strings at game shutdown
+/// Raven: time and reading them back at connection time. Anything added here
+/// Raven: MUST be dealt with in G_InitSessionData() / G_ReadSessionData() / G_WriteSessionData().
+/// Source: `oracle/oracle/codemp/game/g_local.h:408`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct clientSession_t {
@@ -98,9 +114,11 @@ pub const PSG_TEAMVOTED: c_int = 1 << 1; // already cast a team vote
 pub const MAX_NETNAME: usize = 36;
 pub const MAX_VOTE_COUNT: c_int = 3;
 
-/// `clientPersistant_t` (g_local.h) — client data that stays across multiple
-/// respawns, but is cleared on each level change or team change at ClientBegin().
-/// Pointer-free.
+/// `clientPersistant_t`.
+///
+/// Raven: client data that stays across multiple respawns, but is cleared on
+/// Raven: each level change or team change at ClientBegin().
+/// Source: `oracle/oracle/codemp/game/g_local.h:441`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct clientPersistant_t {
@@ -123,9 +141,11 @@ const _: () = assert!(core::mem::size_of::<clientPersistant_t>() == 156);
 const _: () = assert!(core::mem::offset_of!(clientPersistant_t, netname) == 48);
 const _: () = assert!(core::mem::offset_of!(clientPersistant_t, teamState) == 96);
 
-/// `renderInfo_t` (g_local.h) — per-client model-rendering state (head/torso look
-/// ranges, muzzle points, bolt indices, …). Carries a `void *lastG2`, so it is
-/// arch-dependent (64-bit layout asserted).
+/// `renderInfo_t`.
+///
+/// Raven: per-client model-rendering state: model-part yaw/pitch ranges, muzzle
+/// Raven: points, tag points, look target, bolt indices, and `lastG2`.
+/// Source: `oracle/oracle/codemp/game/g_local.h:460`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct renderInfo_t {
@@ -207,10 +227,13 @@ const _: () = assert!(core::mem::offset_of!(renderInfo_t, lookMode) == 260);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(renderInfo_t, lastG2) == 320);
 
-/// `gclient_s` / `gclient_t` (g_local.h) — the game-side client. `ps` MUST be the
-/// first element (the server expects it); the rest is private to the game.
-/// "Cleared on each ClientSpawn(), except for `client->pers` and `client->sess`."
-/// Pointer-bearing => arch-dependent layout.
+/// `gclient_s` / `gclient_t`.
+///
+/// Raven: this structure is cleared on each ClientSpawn(), except for
+/// Raven: `client->pers` and `client->sess`.
+/// Raven: `ps` MUST be the first element, because the server expects it.
+/// Raven: the rest of the structure is private to game.
+/// Source: `oracle/oracle/codemp/game/g_local.h:534`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct gclient_s {
@@ -427,7 +450,10 @@ pub struct gclient_s {
     pub otherKillerWeaponType: c_int,
 }
 
-/// `gclient_t` (g_local.h `typedef struct gclient_s gclient_t`).
+/// `gclient_t`.
+///
+/// Raven: `typedef struct gclient_s gclient_t`.
+/// Source: `oracle/oracle/codemp/game/g_local.h:17`
 pub type gclient_t = gclient_s;
 
 #[cfg(target_pointer_width = "64")]

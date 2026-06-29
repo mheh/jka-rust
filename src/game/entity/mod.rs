@@ -7,6 +7,9 @@
 //! offset by the pointer-width delta on 64- vs 32-bit. The literal `size_of`/
 //! `offset_of` asserts are therefore gated `#[cfg(target_pointer_width = "64")]`;
 //! only `offset_of(s) == 0` is arch-independent. Mirrors upstream `codemp/game/g_local.h`.
+//!
+//! Migration target: `crate::modules::mp::game::entity`.
+//! Source: `oracle/oracle/codemp/game/g_local.h:52`
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -23,7 +26,10 @@ use core::ffi::{c_char, c_int, c_void};
 
 use super::client::gclient_s;
 
-// gentity->flags
+/// `FL_*` game entity flags.
+///
+/// Raven: gentity->flags.
+/// Source: `oracle/oracle/codemp/game/g_local.h:52`
 pub const FL_GODMODE: c_int = 0x00000010;
 pub const FL_NOTARGET: c_int = 0x00000020;
 pub const FL_TEAMSLAVE: c_int = 0x00000400; // not the first on the team
@@ -52,16 +58,20 @@ pub const FL_DMG_BY_HEAVY_WEAP_ONLY: c_int = 0x02000000; //only take dmg from ex
 
 pub const FL_BBRUSH: c_int = 0x04000000; //I am a breakable brush
 
-/// `moverState_t` (g_local.h) — movers are things like doors, plats, buttons, etc.
+/// `moverState_t`.
+///
+/// Raven: movers are things like doors, plats, buttons, etc.
+/// Source: `oracle/oracle/codemp/game/g_local.h:88`
 pub type moverState_t = c_int;
 pub const MOVER_POS1: moverState_t = 0;
 pub const MOVER_POS2: moverState_t = 1;
 pub const MOVER_1TO2: moverState_t = 2;
 pub const MOVER_2TO1: moverState_t = 3;
 
-// Hit-location enum (anonymous in g_local.h, so plain `c_int` consts). `HL_MAX`
-// sizes `gentity_t::locationDamage`. PC activates HL_GENERIC1..6 (the Xbox tree
-// commented them out), so HL_MAX = 23 (Xbox: 17).
+/// Hit-location enum.
+///
+/// Raven: anonymous enum ending in `HL_MAX`; sizes `gentity_t::locationDamage`.
+/// Source: `oracle/oracle/codemp/game/g_local.h:98`
 pub const HL_NONE: c_int = 0;
 pub const HL_FOOT_RT: c_int = 1;
 pub const HL_FOOT_LT: c_int = 2;
@@ -87,10 +97,12 @@ pub const HL_GENERIC5: c_int = 21;
 pub const HL_GENERIC6: c_int = 22;
 pub const HL_MAX: c_int = 23;
 
-/// `gentity_s` / `gentity_t` (g_local.h) — the server-side game entity. The first
-/// members up to `next_roff_time` are the engine-visible prefix shared with
-/// `centity_t`/`bgEntity_t` ("DO NOT MODIFY ANYTHING ABOVE THIS, THE SERVER EXPECTS
-/// THE FIELDS IN THAT ORDER!"). Pointer-bearing => arch-dependent layout.
+/// `gentity_s` / `gentity_t`.
+///
+/// Raven: rww - entstate must be first, to correspond with the bg shared entity structure.
+/// Raven: From here up must be the same as centity_t/bgEntity_t.
+/// Raven: DO NOT MODIFY ANYTHING ABOVE THIS, THE SERVER EXPECTS THE FIELDS IN THAT ORDER!
+/// Source: `oracle/oracle/codemp/game/g_local.h:133`
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct gentity_s {
@@ -321,7 +333,10 @@ pub struct gentity_s {
     pub item: *mut gitem_t, // for bonus items
 }
 
-/// `gentity_t` (g_local.h `typedef struct gentity_s gentity_t`).
+/// `gentity_t`.
+///
+/// Raven: `typedef struct gentity_s gentity_t`.
+/// Source: `oracle/oracle/codemp/game/g_local.h:16`
 pub type gentity_t = gentity_s;
 
 #[cfg(target_pointer_width = "64")]
