@@ -3,6 +3,7 @@ use crate::boundary::generic::OutboundSysCall;
 
 /// `UI_CM_LOADMODEL` MP UI imports syscall boundary token.
 ///
+/// Raven: no callable payload was located in the tracked MP UI sources.
 /// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:49`
 /// Args source: no parser/trap wrapper location for `UI_CM_LOADMODEL` in
 /// `oracle/oracle/codemp/ui/ui_syscalls.c`, `oracle/oracle/codemp/ui/ui_local.h`, or `oracle/oracle/codemp/ui/ui_shared.h`.
@@ -13,8 +14,8 @@ pub struct UiCmLoadmodel;
 
 impl OutboundSysCall for UiCmLoadmodel {
     type Import = MpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    type Args = ();
+    type Output = ();
 
     const IMPORT: MpUiImport = MpUiImport::UI_CM_LOADMODEL;
 }

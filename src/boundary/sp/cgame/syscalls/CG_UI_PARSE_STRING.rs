@@ -24,7 +24,7 @@ pub struct CgUiParseString;
 
 impl OutboundSysCall for CgUiParseString {
     type Import = SpCgameImport;
-    type Args = (); //TODO: Port args
+    type Args = (); //TODO: Port args - wrapper `char *buf` vs transport `const char **VMA(1)` stays ambiguous.
     type Output = ();
 
     const IMPORT: SpCgameImport = SpCgameImport::CG_UI_PARSE_STRING;
