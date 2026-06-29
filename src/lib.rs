@@ -8,7 +8,9 @@
 //! Modules are filed by true sharing scope (`shared` < `bg` < {`game`, `engine`}), bridged by the `boundary` seam; see README.md.
 
 pub mod bg;
+pub mod common;
 pub mod game;
+pub mod modules;
 pub mod shared;
 
 // `boundary/` (the typed seam) and `engine/` (its backend) not declared yet — pending type-sourcing.
