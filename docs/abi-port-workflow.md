@@ -67,28 +67,43 @@ For `vmMain` calls, prefer sources in this order:
 
 ## Worker Prompt
 
-Use this prompt when delegating a manifest row:
+Use this prompt when delegating a manifest row or a small non-overlapping group
+of rows. Do not summarize a row down to only the Rust file name. Paste the full
+generated assignment/evidence lines for the worker's scope exactly as generated,
+including:
+
+- Rust target file and line number
+- call name
+- enum/comment source file and line number
+- args source file and line number
+- output source file and line number
+- transport/switch source file and line number
+- any notes already present in the generated output
+
+If a generated line has no proven args or output source yet, include that
+absence in the pasted scope so the worker can either prove it or keep the TODO.
 
 ```text
-You own exactly one ABI boundary file:
-<boundary_file>
+You own only the ABI boundary rows pasted below:
+<full generated manifest/evidence lines for this worker scope>
 
 Task:
-Validate or create the Args and Output types for this call. Preserve the ABI
-integer enum. Keep or add Raven comments where useful. Add source references for:
+Validate or create the Args and Output types for each pasted call. Preserve the
+ABI integer enum. Keep or add Raven comments where useful. Add source references
+for:
 - enum value source
 - args source
 - output source
 - transport/switch source
 
-Use the source hints from docs/abi-port-manifest.tsv and the hierarchy in
-docs/abi-port-workflow.md. If the source evidence is ambiguous, leave the Rust
-payload as `()` with `//TODO: Port args` or `//TODO: Port output`, and add a
-comment naming the ambiguous Raven locations.
+Use the pasted lines as the initial scope of truth, then verify them against the
+Raven source hierarchy in docs/abi-port-workflow.md. If the source evidence is
+ambiguous, leave the Rust payload as `()` with `//TODO: Port args` or
+`//TODO: Port output`, and add a comment naming the ambiguous Raven locations.
 
-Do not edit any other file. Do not revert unrelated changes. Run formatting on
-the assigned file if needed. Report:
-- file changed
+Do not edit files outside the pasted scope. Do not revert unrelated changes. Run
+formatting on assigned files if needed. Report:
+- files changed
 - args evidence
 - output evidence
 - remaining TODOs
