@@ -1,6 +1,8 @@
-use core::ffi::{c_int, c_void, c_char};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::{c_char, c_int, c_void};
 
 /// `BOTLIB_AI_GET_LEVEL_ITEM_GOAL` outbound game-to-engine syscall.
 ///
@@ -15,14 +17,27 @@ pub struct BotlibAiGetLevelItemGoalArgs {
 
 impl BotlibAiGetLevelItemGoalArgs {
     pub fn new(index: c_int, classname: *const c_char, goal: *mut c_void) -> Self {
-        Self { index, classname, goal }
+        Self {
+            index,
+            classname,
+            goal,
+        }
     }
 
-    pub fn index(&self) -> c_int { self.index }
-    pub fn classname(&self) -> *const c_char { self.classname }
-    pub fn goal(&self) -> *mut c_void { self.goal }
+    pub fn index(&self) -> c_int {
+        self.index
+    }
+    pub fn classname(&self) -> *const c_char {
+        self.classname
+    }
+    pub fn goal(&self) -> *mut c_void {
+        self.goal
+    }
 }
 
+/// `BOTLIB_AI_GET_LEVEL_ITEM_GOAL` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:454`
 pub struct BotlibAiGetLevelItemGoal;
 
 impl OutboundSysCall for BotlibAiGetLevelItemGoal {

@@ -1,9 +1,11 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Args for the `BOTLIB_EA_GET_INPUT` outbound game-to-engine syscall.
 ///
@@ -19,15 +21,27 @@ pub struct BotlibEaGetInputArgs {
 
 impl BotlibEaGetInputArgs {
     pub fn new(client: c_int, thinktime: f32, input: *mut c_void) -> Self {
-        Self { client, thinktime, input }
+        Self {
+            client,
+            thinktime,
+            input,
+        }
     }
 
-    pub fn client(&self) -> c_int { self.client }
-    pub fn thinktime(&self) -> f32 { self.thinktime }
-    pub fn input(&self) -> *mut c_void { self.input }
+    pub fn client(&self) -> c_int {
+        self.client
+    }
+    pub fn thinktime(&self) -> f32 {
+        self.thinktime
+    }
+    pub fn input(&self) -> *mut c_void {
+        self.input
+    }
 }
 
-/// `BOTLIB_EA_GET_INPUT` outbound game-to-engine syscall.
+/// `BOTLIB_EA_GET_INPUT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:409`
 pub struct BotlibEaGetInput;
 
 impl OutboundSysCall for BotlibEaGetInput {
@@ -49,5 +63,7 @@ impl EncodeSysCall for BotlibEaGetInput {
 }
 
 impl DecodeSysCallReturn for BotlibEaGetInput {
-    fn decode_return(_word: isize) -> Self::Output { () }
+    fn decode_return(_word: isize) -> Self::Output {
+        ()
+    }
 }

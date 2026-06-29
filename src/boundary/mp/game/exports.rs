@@ -1,130 +1,153 @@
-//! `mp game export surface` — the commands the engine sends to the module via `vmMain`.
+//! MP game exports enum vocabulary.
 //!
-//! Transcribed verbatim (order = value) from the **original Raven JKA**
-//! `refs/raven-jediacademy/codemp/game/g_public.h`. The numbering is sequential from 0. The
-//! per-variant comments are carried over from g_public.h.
+//! Transcribed from Raven `oracle/oracle/codemp/game/g_public.h`.
+//! These discriminants are ABI wire values; do not renumber them.
 
 #![allow(non_camel_case_types)] // C enumerator names kept for 1:1 traceability
-
-use core::ffi::c_int;
 
 #[repr(i32)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MpGameExport {
-    /// `( int levelTime, int randomSeed, int restart )`
-    ///
-    /// init and shutdown will be called every single level.
+    /// ( int levelTime, int randomSeed, int restart );
+    /// init and shutdown will be called every single level
     /// The game should call G_GET_ENTITY_TOKEN to parse through all the
     /// entity configuration text and spawn gentities.
+    /// Source: `oracle/oracle/codemp/game/g_public.h:735`
     GAME_INIT,
 
-    /// `(void)`
+    /// (void);
+    /// Source: `oracle/oracle/codemp/game/g_public.h:740`
     GAME_SHUTDOWN,
 
-    /// `( int clientNum, qboolean firstTime, qboolean isBot )`
-    ///
+    /// ( int clientNum, qboolean firstTime, qboolean isBot );
     /// return NULL if the client is allowed to connect, otherwise return
-    /// a text string with the reason for denial.
+    /// a text string with the reason for denial
+    /// Source: `oracle/oracle/codemp/game/g_public.h:742`
     GAME_CLIENT_CONNECT,
 
-    /// `( int clientNum )`
+    /// ( int clientNum );
+    /// Source: `oracle/oracle/codemp/game/g_public.h:746`
     GAME_CLIENT_BEGIN,
 
-    /// `( int clientNum )`
+    /// ( int clientNum );
+    /// Source: `oracle/oracle/codemp/game/g_public.h:748`
     GAME_CLIENT_USERINFO_CHANGED,
 
-    /// `( int clientNum )`
+    /// ( int clientNum );
+    /// Source: `oracle/oracle/codemp/game/g_public.h:750`
     GAME_CLIENT_DISCONNECT,
 
-    /// `( int clientNum )`
+    /// ( int clientNum );
+    /// Source: `oracle/oracle/codemp/game/g_public.h:752`
     GAME_CLIENT_COMMAND,
 
-    /// `( int clientNum )`
+    /// ( int clientNum );
+    /// Source: `oracle/oracle/codemp/game/g_public.h:754`
     GAME_CLIENT_THINK,
 
-    /// `( int levelTime )`
+    /// ( int levelTime );
+    /// Source: `oracle/oracle/codemp/game/g_public.h:756`
     GAME_RUN_FRAME,
 
-    /// `( void )`
-    ///
+    /// ( void );
     /// ConsoleCommand will be called when a command has been issued
     /// that is not recognized as a builtin function.
     /// The game can issue trap_argc() / trap_argv() commands to get the command
     /// and parameters.  Return qfalse if the game doesn't recognize it as a command.
+    /// Source: `oracle/oracle/codemp/game/g_public.h:758`
     GAME_CONSOLE_COMMAND,
 
-    /// `( int time )`
+    /// ( int time );
+    /// Source: `oracle/oracle/codemp/game/g_public.h:764`
     BOTAI_START_FRAME,
 
-    /// `( int entnum, char *notetrack )`
+    /// int entnum, char *notetrack
+    /// Source: `oracle/oracle/codemp/game/g_public.h:766`
     GAME_ROFF_NOTETRACK_CALLBACK,
 
-    GAME_SPAWN_RMG_ENTITY, // rwwRMG - added
+    /// rwwRMG - added
+    /// rww - icarus callbacks
+    /// Source: `oracle/oracle/codemp/game/g_public.h:768`
+    GAME_SPAWN_RMG_ENTITY,
 
-    // rww - icarus callbacks
+    /// Source: `oracle/oracle/codemp/game/g_public.h:771`
     GAME_ICARUS_PLAYSOUND,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:772`
     GAME_ICARUS_SET,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:773`
     GAME_ICARUS_LERP2POS,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:774`
     GAME_ICARUS_LERP2ORIGIN,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:775`
     GAME_ICARUS_LERP2ANGLES,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:776`
     GAME_ICARUS_GETTAG,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:777`
     GAME_ICARUS_LERP2START,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:778`
     GAME_ICARUS_LERP2END,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:779`
     GAME_ICARUS_USE,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:780`
     GAME_ICARUS_KILL,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:781`
     GAME_ICARUS_REMOVE,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:782`
     GAME_ICARUS_PLAY,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:783`
     GAME_ICARUS_GETFLOAT,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:784`
     GAME_ICARUS_GETVECTOR,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:785`
     GAME_ICARUS_GETSTRING,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:786`
     GAME_ICARUS_SOUNDINDEX,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:787`
     GAME_ICARUS_GETSETIDFORSTRING,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:788`
     GAME_NAV_CLEARPATHTOPOINT,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:789`
     GAME_NAV_CLEARLOS,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:790`
     GAME_NAV_CLEARPATHBETWEENPOINTS,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:791`
     GAME_NAV_CHECKNODEFAILEDFORENT,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:792`
     GAME_NAV_ENTISUNLOCKEDDOOR,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:793`
     GAME_NAV_ENTISDOOR,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:794`
     GAME_NAV_ENTISBREAKABLE,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:795`
     GAME_NAV_ENTISREMOVABLEUSABLE,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:796`
     GAME_NAV_FINDCOMBATPOINTWAYPOINTS,
+
+    /// Source: `oracle/oracle/codemp/game/g_public.h:798`
     GAME_GETITEMINDEXBYTAG,
-}
-
-impl MpGameExport {
-    /// Convert a raw `vmMain` command integer into a known export, or `None` if
-    /// the engine sent a value outside the original-JKA range.
-    pub fn from_raw(v: c_int) -> Option<MpGameExport> {
-        if (MpGameExport::GAME_INIT as c_int..=MpGameExport::GAME_GETITEMINDEXBYTAG as c_int)
-            .contains(&v)
-        {
-            // SAFETY: `MpGameExport` is `repr(i32)` and contiguous from 0, and `v`
-            // was just bounds-checked against its first and last discriminants.
-            Some(unsafe { core::mem::transmute::<i32, MpGameExport>(v) })
-        } else {
-            None
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::MpGameExport::*;
-    use core::ffi::c_int;
-
-    #[test]
-    fn discriminants_match_original_jka() {
-        assert_eq!(GAME_INIT as c_int, 0);
-        assert_eq!(GAME_RUN_FRAME as c_int, 8);
-        assert_eq!(GAME_CONSOLE_COMMAND as c_int, 9);
-        assert_eq!(GAME_ICARUS_PLAYSOUND as c_int, 13);
-        assert_eq!(GAME_GETITEMINDEXBYTAG as c_int, 39);
-    }
-
-    #[test]
-    fn from_raw_roundtrips_and_rejects_out_of_range() {
-        assert_eq!(super::MpGameExport::from_raw(8), Some(GAME_RUN_FRAME));
-        assert_eq!(super::MpGameExport::from_raw(-1), None);
-        assert_eq!(super::MpGameExport::from_raw(40), None);
-    }
 }

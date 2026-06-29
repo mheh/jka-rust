@@ -3,7 +3,9 @@ use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ENTITY_CONTACTCAPSULE` outbound game-to-engine syscall.
 ///
@@ -33,6 +35,11 @@ impl GEntityContactcapsuleArgs {
     }
 }
 
+/// `G_ENTITY_CONTACTCAPSULE` MP game imports syscall boundary token.
+///
+/// Raven: ( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );
+/// Raven: SP_REGISTER_SERVER_CMD,
+/// Source: `oracle/oracle/codemp/game/g_public.h:236`
 pub struct GEntityContactcapsule;
 
 impl OutboundSysCall for GEntityContactcapsule {
@@ -45,11 +52,7 @@ impl OutboundSysCall for GEntityContactcapsule {
 
 impl EncodeSysCall for GEntityContactcapsule {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.mins),
-            ptr_to_word(a.maxs),
-            ptr_to_word(a.ent),
-        ])
+        SysCallTransport::new([ptr_to_word(a.mins), ptr_to_word(a.maxs), ptr_to_word(a.ent)])
     }
 }
 

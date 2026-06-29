@@ -12,7 +12,14 @@ use crate::boundary::generic::InboundVmCall;
 // `GAME_CONSOLE_COMMAND` is an inbound executable-to-game call raised when the
 // engine has a console command that was not handled as a builtin command.
 
-/// `GAME_CONSOLE_COMMAND` asks game code to handle the current console command.
+/// `GAME_CONSOLE_COMMAND` MP game exports vmMain boundary token.
+///
+/// Raven: ( void );
+/// Raven: ConsoleCommand will be called when a command has been issued
+/// Raven: that is not recognized as a builtin function.
+/// Raven: The game can issue trap_argc() / trap_argv() commands to get the command
+/// Raven: and parameters.  Return qfalse if the game doesn't recognize it as a command.
+/// Source: `oracle/oracle/codemp/game/g_public.h:758`
 pub struct GameConsoleCommand;
 
 impl InboundVmCall for GameConsoleCommand {

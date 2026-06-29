@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ROFF_CACHE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,6 +23,10 @@ impl GRoffCacheArgs {
     }
 }
 
+/// `G_ROFF_CACHE` MP game imports syscall boundary token.
+///
+/// Raven: int		ROFF_Cache(char *file);
+/// Source: `oracle/oracle/codemp/game/g_public.h:243`
 pub struct GRoffCache;
 
 impl OutboundSysCall for GRoffCache {

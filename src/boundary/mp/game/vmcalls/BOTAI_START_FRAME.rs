@@ -29,7 +29,10 @@ impl BotAiStartFrameArgs {
     }
 }
 
-/// `BOTAI_START_FRAME` advances bot AI state.
+/// `BOTAI_START_FRAME` MP game exports vmMain boundary token.
+///
+/// Raven: ( int time );
+/// Source: `oracle/oracle/codemp/game/g_public.h:764`
 pub struct BotAiStartFrame;
 
 impl InboundVmCall for BotAiStartFrame {

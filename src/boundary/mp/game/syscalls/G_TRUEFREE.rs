@@ -1,7 +1,9 @@
 use core::ffi::c_void;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// Arguments for the `G_TRUEFREE` game→engine syscall.
 ///
@@ -23,6 +25,10 @@ impl GTruefreeArgs {
     }
 }
 
+/// `G_TRUEFREE` MP game imports syscall boundary token.
+///
+/// Raven: rww - icarus traps
+/// Source: `oracle/oracle/codemp/game/g_public.h:249`
 pub struct GTruefree;
 
 impl OutboundSysCall for GTruefree {

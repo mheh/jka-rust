@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_SAVE_GOAL_FUZZY_LOGIC` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,7 +16,10 @@ pub struct BotlibAiSaveGoalFuzzyLogicArgs {
 
 impl BotlibAiSaveGoalFuzzyLogicArgs {
     pub fn new(goalstate: c_int, filename: CString) -> Self {
-        Self { goalstate, filename }
+        Self {
+            goalstate,
+            filename,
+        }
     }
 
     pub fn goalstate(&self) -> c_int {
@@ -26,6 +31,9 @@ impl BotlibAiSaveGoalFuzzyLogicArgs {
     }
 }
 
+/// `BOTLIB_AI_SAVE_GOAL_FUZZY_LOGIC` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:460`
 pub struct BotlibAiSaveGoalFuzzyLogic;
 
 impl OutboundSysCall for BotlibAiSaveGoalFuzzyLogic {
@@ -38,10 +46,7 @@ impl OutboundSysCall for BotlibAiSaveGoalFuzzyLogic {
 
 impl EncodeSysCall for BotlibAiSaveGoalFuzzyLogic {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.goalstate as isize,
-            ptr_to_word(a.filename.as_ptr()),
-        ])
+        SysCallTransport::new([a.goalstate as isize, ptr_to_word(a.filename.as_ptr())])
     }
 }
 

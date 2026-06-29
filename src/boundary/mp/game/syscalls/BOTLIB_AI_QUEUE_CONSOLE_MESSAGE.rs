@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_QUEUE_CONSOLE_MESSAGE` outbound game-to-engine syscall.
 ///
@@ -16,14 +18,27 @@ pub struct BotlibAiQueueConsoleMessageArgs {
 
 impl BotlibAiQueueConsoleMessageArgs {
     pub fn new(chatstate: c_int, r#type: c_int, message: CString) -> Self {
-        Self { chatstate, r#type, message }
+        Self {
+            chatstate,
+            r#type,
+            message,
+        }
     }
 
-    pub fn chatstate(&self) -> c_int { self.chatstate }
-    pub fn r#type(&self) -> c_int { self.r#type }
-    pub fn message(&self) -> &CString { &self.message }
+    pub fn chatstate(&self) -> c_int {
+        self.chatstate
+    }
+    pub fn r#type(&self) -> c_int {
+        self.r#type
+    }
+    pub fn message(&self) -> &CString {
+        &self.message
+    }
 }
 
+/// `BOTLIB_AI_QUEUE_CONSOLE_MESSAGE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:423`
 pub struct BotlibAiQueueConsoleMessage;
 
 impl OutboundSysCall for BotlibAiQueueConsoleMessage {

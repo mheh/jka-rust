@@ -1,8 +1,10 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -40,16 +42,35 @@ impl BotlibAasAlternativeRouteGoalArgs {
         }
     }
 
-    pub fn start(&self) -> *const vec3_t { self.start }
-    pub fn startareanum(&self) -> c_int { self.startareanum }
-    pub fn goal(&self) -> *const vec3_t { self.goal }
-    pub fn goalareanum(&self) -> c_int { self.goalareanum }
-    pub fn travelflags(&self) -> c_int { self.travelflags }
-    pub fn altroutegoals(&self) -> *mut c_void { self.altroutegoals }
-    pub fn maxaltroutegoals(&self) -> c_int { self.maxaltroutegoals }
-    pub fn route_type(&self) -> c_int { self.route_type }
+    pub fn start(&self) -> *const vec3_t {
+        self.start
+    }
+    pub fn startareanum(&self) -> c_int {
+        self.startareanum
+    }
+    pub fn goal(&self) -> *const vec3_t {
+        self.goal
+    }
+    pub fn goalareanum(&self) -> c_int {
+        self.goalareanum
+    }
+    pub fn travelflags(&self) -> c_int {
+        self.travelflags
+    }
+    pub fn altroutegoals(&self) -> *mut c_void {
+        self.altroutegoals
+    }
+    pub fn maxaltroutegoals(&self) -> c_int {
+        self.maxaltroutegoals
+    }
+    pub fn route_type(&self) -> c_int {
+        self.route_type
+    }
 }
 
+/// `BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:494`
 pub struct BotlibAasAlternativeRouteGoal;
 
 impl OutboundSysCall for BotlibAasAlternativeRouteGoal {

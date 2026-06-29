@@ -2,7 +2,9 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_NAV_FINDCOMBATPOINTWAYPOINTS` inbound executable-to-game `vmMain` call.
+/// `GAME_NAV_FINDCOMBATPOINTWAYPOINTS` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:796`
 pub struct GameNavFindcombatpointwaypoints;
 
 impl InboundVmCall for GameNavFindcombatpointwaypoints {

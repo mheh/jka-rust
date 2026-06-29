@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION` outbound game-to-engine syscall.
 ///
@@ -24,16 +26,35 @@ impl BotlibAiGeneticParentsAndChildSelectionArgs {
         parent2: *mut c_int,
         child: *mut c_int,
     ) -> Self {
-        Self { numranks, ranks, parent1, parent2, child }
+        Self {
+            numranks,
+            ranks,
+            parent1,
+            parent2,
+            child,
+        }
     }
 
-    pub fn numranks(&self) -> c_int { self.numranks }
-    pub fn ranks(&self) -> *mut f32 { self.ranks }
-    pub fn parent1(&self) -> *mut c_int { self.parent1 }
-    pub fn parent2(&self) -> *mut c_int { self.parent2 }
-    pub fn child(&self) -> *mut c_int { self.child }
+    pub fn numranks(&self) -> c_int {
+        self.numranks
+    }
+    pub fn ranks(&self) -> *mut f32 {
+        self.ranks
+    }
+    pub fn parent1(&self) -> *mut c_int {
+        self.parent1
+    }
+    pub fn parent2(&self) -> *mut c_int {
+        self.parent2
+    }
+    pub fn child(&self) -> *mut c_int {
+        self.child
+    }
 }
 
+/// `BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:482`
 pub struct BotlibAiGeneticParentsAndChildSelection;
 
 impl OutboundSysCall for BotlibAiGeneticParentsAndChildSelection {

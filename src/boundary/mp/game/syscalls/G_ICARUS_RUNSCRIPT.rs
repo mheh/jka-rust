@@ -3,7 +3,9 @@ use core::ffi::{c_char, c_int};
 use crate::codemp::game::g_local::gentity_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_RUNSCRIPT` outbound game-to-engine syscall.
 ///
@@ -30,6 +32,9 @@ impl GIcarusRunscriptArgs {
     }
 }
 
+/// `G_ICARUS_RUNSCRIPT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:252`
 pub struct GIcarusRunscript;
 
 impl OutboundSysCall for GIcarusRunscript {
@@ -42,7 +47,10 @@ impl OutboundSysCall for GIcarusRunscript {
 
 impl EncodeSysCall for GIcarusRunscript {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([ptr_to_word(a.ent as *const _), ptr_to_word(a.name as *const _)])
+        SysCallTransport::new([
+            ptr_to_word(a.ent as *const _),
+            ptr_to_word(a.name as *const _),
+        ])
     }
 }
 

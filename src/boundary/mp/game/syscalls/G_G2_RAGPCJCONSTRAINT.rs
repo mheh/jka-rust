@@ -4,7 +4,9 @@ use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_RAGPCJCONSTRAINT` outbound game-to-engine syscall.
 ///
@@ -24,7 +26,12 @@ impl GG2RagpcjconstraintArgs {
         min: *mut vec3_t,
         max: *mut vec3_t,
     ) -> Self {
-        Self { ghoul2, bone_name, min, max }
+        Self {
+            ghoul2,
+            bone_name,
+            min,
+            max,
+        }
     }
 
     pub fn ghoul2(&self) -> *mut c_void {
@@ -44,6 +51,9 @@ impl GG2RagpcjconstraintArgs {
     }
 }
 
+/// `G_G2_RAGPCJCONSTRAINT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:550`
 pub struct GG2Ragpcjconstraint;
 
 impl OutboundSysCall for GG2Ragpcjconstraint {

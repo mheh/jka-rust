@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_PC_ADD_GLOBAL_DEFINE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,6 +23,9 @@ impl BotlibPcAddGlobalDefineArgs {
     }
 }
 
+/// `BOTLIB_PC_ADD_GLOBAL_DEFINE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:346`
 pub struct BotlibPcAddGlobalDefine;
 
 impl OutboundSysCall for BotlibPcAddGlobalDefine {

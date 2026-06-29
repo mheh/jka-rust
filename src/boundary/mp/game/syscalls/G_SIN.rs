@@ -1,7 +1,9 @@
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_SIN` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -19,6 +21,9 @@ impl GSinArgs {
     }
 }
 
+/// `G_SIN` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:279`
 pub struct GSin;
 
 impl OutboundSysCall for GSin {

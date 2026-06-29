@@ -45,6 +45,9 @@ impl GFsGetfilelistArgs {
     }
 }
 
+/// `G_FS_GETFILELIST` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:229`
 pub struct GFsGetfilelist;
 
 impl OutboundSysCall for GFsGetfilelist {

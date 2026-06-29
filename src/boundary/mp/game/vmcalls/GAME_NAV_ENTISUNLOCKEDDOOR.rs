@@ -30,7 +30,9 @@ impl GameNavEntIsUnlockedDoorArgs {
     }
 }
 
-/// `GAME_NAV_ENTISUNLOCKEDDOOR` checks whether an entity is an unlocked door.
+/// `GAME_NAV_ENTISUNLOCKEDDOOR` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:792`
 pub struct GameNavEntIsUnlockedDoor;
 
 impl InboundVmCall for GameNavEntIsUnlockedDoor {

@@ -2,7 +2,9 @@ use core::ffi::c_void;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_CLEANMODELS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,6 +23,9 @@ impl GG2CleanmodelsArgs {
     }
 }
 
+/// `G_G2_CLEANMODELS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:529`
 pub struct GG2Cleanmodels;
 
 impl OutboundSysCall for GG2Cleanmodels {

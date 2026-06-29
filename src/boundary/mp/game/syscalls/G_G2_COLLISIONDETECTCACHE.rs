@@ -1,9 +1,11 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::CollisionRecord_t;
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
 
 /// `G_G2_COLLISIONDETECTCACHE` outbound game-to-engine syscall.
 ///
@@ -86,20 +88,47 @@ impl GG2CollisiondetectcacheArgs {
         }
     }
 
-    pub fn collision_records(&self) -> *mut CollisionRecord_t { self.collision_records }
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn angles(&self) -> *const f32 { self.angles }
-    pub fn origin(&self) -> *const f32 { self.origin }
-    pub fn time(&self) -> c_int { self.time }
-    pub fn ent_num(&self) -> c_int { self.ent_num }
-    pub fn scale(&self) -> *mut f32 { self.scale }
-    pub fn out_vec8(&self) -> *mut f32 { self.out_vec8 }
-    pub fn out_vec9(&self) -> *mut f32 { self.out_vec9 }
-    pub fn param10(&self) -> c_int { self.param10 }
-    pub fn param11(&self) -> c_int { self.param11 }
-    pub fn float_param(&self) -> f32 { self.float_param }
+    pub fn collision_records(&self) -> *mut CollisionRecord_t {
+        self.collision_records
+    }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn angles(&self) -> *const f32 {
+        self.angles
+    }
+    pub fn origin(&self) -> *const f32 {
+        self.origin
+    }
+    pub fn time(&self) -> c_int {
+        self.time
+    }
+    pub fn ent_num(&self) -> c_int {
+        self.ent_num
+    }
+    pub fn scale(&self) -> *mut f32 {
+        self.scale
+    }
+    pub fn out_vec8(&self) -> *mut f32 {
+        self.out_vec8
+    }
+    pub fn out_vec9(&self) -> *mut f32 {
+        self.out_vec9
+    }
+    pub fn param10(&self) -> c_int {
+        self.param10
+    }
+    pub fn param11(&self) -> c_int {
+        self.param11
+    }
+    pub fn float_param(&self) -> f32 {
+        self.float_param
+    }
 }
 
+/// `G_G2_COLLISIONDETECTCACHE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:531`
 pub struct GG2Collisiondetectcache;
 
 impl OutboundSysCall for GG2Collisiondetectcache {
@@ -113,18 +142,18 @@ impl OutboundSysCall for GG2Collisiondetectcache {
 impl EncodeSysCall for GG2Collisiondetectcache {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
-            ptr_to_word(a.collision_records),  // args[1]
-            ptr_to_word(a.ghoul2),             // args[2]
-            ptr_to_word(a.angles),             // args[3]
-            ptr_to_word(a.origin),             // args[4]
-            a.time as isize,                   // args[5]
-            a.ent_num as isize,                // args[6]
-            ptr_to_word(a.scale),              // args[7]
-            ptr_to_word(a.out_vec8),           // args[8]
-            ptr_to_word(a.out_vec9),           // args[9]
-            a.param10 as isize,                // args[10]
-            a.param11 as isize,                // args[11]
-            pass_float(a.float_param),         // args[12]
+            ptr_to_word(a.collision_records), // args[1]
+            ptr_to_word(a.ghoul2),            // args[2]
+            ptr_to_word(a.angles),            // args[3]
+            ptr_to_word(a.origin),            // args[4]
+            a.time as isize,                  // args[5]
+            a.ent_num as isize,               // args[6]
+            ptr_to_word(a.scale),             // args[7]
+            ptr_to_word(a.out_vec8),          // args[8]
+            ptr_to_word(a.out_vec9),          // args[9]
+            a.param10 as isize,               // args[10]
+            a.param11 as isize,               // args[11]
+            pass_float(a.float_param),        // args[12]
         ])
     }
 }

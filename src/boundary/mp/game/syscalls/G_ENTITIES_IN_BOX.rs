@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ENTITIES_IN_BOX` outbound game-to-engine syscall.
 ///
@@ -17,16 +19,40 @@ pub struct GEntitiesInBoxArgs {
 }
 
 impl GEntitiesInBoxArgs {
-    pub fn new(mins: *const vec3_t, maxs: *const vec3_t, list: *mut c_int, maxcount: c_int) -> Self {
-        Self { mins, maxs, list, maxcount }
+    pub fn new(
+        mins: *const vec3_t,
+        maxs: *const vec3_t,
+        list: *mut c_int,
+        maxcount: c_int,
+    ) -> Self {
+        Self {
+            mins,
+            maxs,
+            list,
+            maxcount,
+        }
     }
 
-    pub fn mins(&self) -> *const vec3_t { self.mins }
-    pub fn maxs(&self) -> *const vec3_t { self.maxs }
-    pub fn list(&self) -> *mut c_int { self.list }
-    pub fn maxcount(&self) -> c_int { self.maxcount }
+    pub fn mins(&self) -> *const vec3_t {
+        self.mins
+    }
+    pub fn maxs(&self) -> *const vec3_t {
+        self.maxs
+    }
+    pub fn list(&self) -> *mut c_int {
+        self.list
+    }
+    pub fn maxcount(&self) -> c_int {
+        self.maxcount
+    }
 }
 
+/// `G_ENTITIES_IN_BOX` MP game imports syscall boundary token.
+///
+/// Raven: ( const vec3_t mins, const vec3_t maxs, gentity_t **list, int maxcount );
+/// Raven: EntitiesInBox will return brush models based on their bounding box,
+/// Raven: so exact determination must still be done with EntityContact
+/// Source: `oracle/oracle/codemp/game/g_public.h:207`
 pub struct GEntitiesInBox;
 
 impl OutboundSysCall for GEntitiesInBox {

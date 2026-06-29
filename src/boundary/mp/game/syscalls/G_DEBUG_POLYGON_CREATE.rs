@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_DEBUG_POLYGON_CREATE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,14 +16,27 @@ pub struct GDebugPolygonCreateArgs {
 
 impl GDebugPolygonCreateArgs {
     pub fn new(color: c_int, num_points: c_int, points: *mut vec3_t) -> Self {
-        Self { color, num_points, points }
+        Self {
+            color,
+            num_points,
+            points,
+        }
     }
 
-    pub fn color(&self) -> c_int { self.color }
-    pub fn num_points(&self) -> c_int { self.num_points }
-    pub fn points(&self) -> *mut vec3_t { self.points }
+    pub fn color(&self) -> c_int {
+        self.color
+    }
+    pub fn num_points(&self) -> c_int {
+        self.num_points
+    }
+    pub fn points(&self) -> *mut vec3_t {
+        self.points
+    }
 }
 
+/// `G_DEBUG_POLYGON_CREATE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:230`
 pub struct GDebugPolygonCreate;
 
 impl OutboundSysCall for GDebugPolygonCreate {

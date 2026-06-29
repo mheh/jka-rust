@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_SET_ACTIVE_SUBBSP` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,6 +23,9 @@ impl GSetActiveSubbspArgs {
     }
 }
 
+/// `G_SET_ACTIVE_SUBBSP` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:571`
 pub struct GSetActiveSubbsp;
 
 impl OutboundSysCall for GSetActiveSubbsp {

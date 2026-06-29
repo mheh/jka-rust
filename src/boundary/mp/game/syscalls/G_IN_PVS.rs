@@ -30,7 +30,10 @@ impl GInPvsArgs {
     }
 }
 
-/// `G_IN_PVS` outbound game-to-engine syscall.
+/// `G_IN_PVS` MP game imports syscall boundary token.
+///
+/// Raven: ( const vec3_t p1, const vec3_t p2 );
+/// Source: `oracle/oracle/codemp/game/g_public.h:191`
 pub struct GInPvs;
 
 impl OutboundSysCall for GInPvs {

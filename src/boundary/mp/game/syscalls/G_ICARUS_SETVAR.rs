@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_SETVAR` outbound game-to-engine syscall.
 ///
@@ -16,16 +18,37 @@ pub struct GIcarusSetvarArgs {
 }
 
 impl GIcarusSetvarArgs {
-    pub fn new(task_id: c_int, ent_id: c_int, type_name: *const c_char, data: *const c_char) -> Self {
-        Self { task_id, ent_id, type_name, data }
+    pub fn new(
+        task_id: c_int,
+        ent_id: c_int,
+        type_name: *const c_char,
+        data: *const c_char,
+    ) -> Self {
+        Self {
+            task_id,
+            ent_id,
+            type_name,
+            data,
+        }
     }
 
-    pub fn task_id(&self) -> c_int { self.task_id }
-    pub fn ent_id(&self) -> c_int { self.ent_id }
-    pub fn type_name(&self) -> *const c_char { self.type_name }
-    pub fn data(&self) -> *const c_char { self.data }
+    pub fn task_id(&self) -> c_int {
+        self.task_id
+    }
+    pub fn ent_id(&self) -> c_int {
+        self.ent_id
+    }
+    pub fn type_name(&self) -> *const c_char {
+        self.type_name
+    }
+    pub fn data(&self) -> *const c_char {
+        self.data
+    }
 }
 
+/// `G_ICARUS_SETVAR` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:267`
 pub struct GIcarusSetvar;
 
 impl OutboundSysCall for GIcarusSetvar {

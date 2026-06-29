@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_STRING_CONTAINS` outbound game-to-engine syscall.
 ///
@@ -16,14 +18,27 @@ pub struct BotlibAiStringContainsArgs {
 
 impl BotlibAiStringContainsArgs {
     pub fn new(str1: CString, str2: CString, casesensitive: c_int) -> Self {
-        Self { str1, str2, casesensitive }
+        Self {
+            str1,
+            str2,
+            casesensitive,
+        }
     }
 
-    pub fn str1(&self) -> &CString { &self.str1 }
-    pub fn str2(&self) -> &CString { &self.str2 }
-    pub fn casesensitive(&self) -> c_int { self.casesensitive }
+    pub fn str1(&self) -> &CString {
+        &self.str1
+    }
+    pub fn str2(&self) -> &CString {
+        &self.str2
+    }
+    pub fn casesensitive(&self) -> c_int {
+        self.casesensitive
+    }
 }
 
+/// `BOTLIB_AI_STRING_CONTAINS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:431`
 pub struct BotlibAiStringContains;
 
 impl OutboundSysCall for BotlibAiStringContains {

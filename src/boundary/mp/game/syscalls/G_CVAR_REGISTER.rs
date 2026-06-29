@@ -52,7 +52,10 @@ impl GCvarRegisterArgs {
     }
 }
 
-/// `G_CVAR_REGISTER` outbound game-to-engine syscall.
+/// `G_CVAR_REGISTER` MP game imports syscall boundary token.
+///
+/// Raven: ( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, int flags );
+/// Source: `oracle/oracle/codemp/game/g_public.h:121`
 pub struct GCvarRegister;
 
 impl OutboundSysCall for GCvarRegister {

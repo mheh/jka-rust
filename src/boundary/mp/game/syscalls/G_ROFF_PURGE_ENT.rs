@@ -1,7 +1,9 @@
-use core::ffi::c_int;
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::types::qboolean;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
+use core::ffi::c_int;
 
 /// `G_ROFF_PURGE_ENT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -19,6 +21,11 @@ impl GRoffPurgeEntArgs {
     }
 }
 
+/// `G_ROFF_PURGE_ENT` MP game imports syscall boundary token.
+///
+/// Raven: qboolean ROFF_PurgeEnt( int entID )
+/// Raven: rww - dynamic vm memory allocation!
+/// Source: `oracle/oracle/codemp/game/g_public.h:245`
 pub struct GRoffPurgeEnt;
 
 impl OutboundSysCall for GRoffPurgeEnt {

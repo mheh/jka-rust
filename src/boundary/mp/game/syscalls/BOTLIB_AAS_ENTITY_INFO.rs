@@ -1,7 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AAS_ENTITY_INFO` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -24,6 +26,9 @@ impl BotlibAasEntityInfoArgs {
     }
 }
 
+/// `BOTLIB_AAS_ENTITY_INFO` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:359`
 pub struct BotlibAasEntityInfo;
 
 impl OutboundSysCall for BotlibAasEntityInfo {
@@ -36,10 +41,7 @@ impl OutboundSysCall for BotlibAasEntityInfo {
 
 impl EncodeSysCall for BotlibAasEntityInfo {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.entnum as isize,
-            ptr_to_word(a.info),
-        ])
+        SysCallTransport::new([a.entnum as isize, ptr_to_word(a.info)])
     }
 }
 

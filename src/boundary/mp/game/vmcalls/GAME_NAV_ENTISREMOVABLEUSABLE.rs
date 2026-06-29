@@ -30,7 +30,9 @@ impl GameNavEntIsRemovableUsableArgs {
     }
 }
 
-/// `GAME_NAV_ENTISREMOVABLEUSABLE` checks whether an entity is removable usable.
+/// `GAME_NAV_ENTISREMOVABLEUSABLE` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:795`
 pub struct GameNavEntIsRemovableUsable;
 
 impl InboundVmCall for GameNavEntIsRemovableUsable {

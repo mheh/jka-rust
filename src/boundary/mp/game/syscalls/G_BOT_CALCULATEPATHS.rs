@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_BOT_CALCULATEPATHS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,6 +23,10 @@ impl GBotCalculatepathsArgs {
     }
 }
 
+/// `G_BOT_CALCULATEPATHS` MP game imports syscall boundary token.
+///
+/// Raven: Ghoul2 Insert End
+/// Source: `oracle/oracle/codemp/game/g_public.h:576`
 pub struct GBotCalculatepaths;
 
 impl OutboundSysCall for GBotCalculatepaths {

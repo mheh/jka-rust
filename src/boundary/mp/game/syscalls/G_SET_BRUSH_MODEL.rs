@@ -35,7 +35,11 @@ impl GSetBrushModelArgs {
     }
 }
 
-/// `G_SET_BRUSH_MODEL` outbound game-to-engine syscall.
+/// `G_SET_BRUSH_MODEL` MP game imports syscall boundary token.
+///
+/// Raven: ( gentity_t *ent, const char *name );
+/// Raven: sets mins and maxs based on the brushmodel name
+/// Source: `oracle/oracle/codemp/game/g_public.h:179`
 pub struct GSetBrushModel;
 
 impl OutboundSysCall for GSetBrushModel {

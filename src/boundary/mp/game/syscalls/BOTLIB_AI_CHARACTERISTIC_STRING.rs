@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_CHARACTERISTIC_STRING` outbound game-to-engine syscall.
 ///
@@ -17,15 +19,31 @@ pub struct BotlibAiCharacteristicStringArgs {
 
 impl BotlibAiCharacteristicStringArgs {
     pub fn new(character: c_int, index: c_int, buf: *mut u8, size: c_int) -> Self {
-        Self { character, index, buf, size }
+        Self {
+            character,
+            index,
+            buf,
+            size,
+        }
     }
 
-    pub fn character(&self) -> c_int { self.character }
-    pub fn index(&self) -> c_int { self.index }
-    pub fn buf(&self) -> *mut u8 { self.buf }
-    pub fn size(&self) -> c_int { self.size }
+    pub fn character(&self) -> c_int {
+        self.character
+    }
+    pub fn index(&self) -> c_int {
+        self.index
+    }
+    pub fn buf(&self) -> *mut u8 {
+        self.buf
+    }
+    pub fn size(&self) -> c_int {
+        self.size
+    }
 }
 
+/// `BOTLIB_AI_CHARACTERISTIC_STRING` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:419`
 pub struct BotlibAiCharacteristicString;
 
 impl OutboundSysCall for BotlibAiCharacteristicString {

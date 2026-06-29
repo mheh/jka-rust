@@ -32,11 +32,9 @@ impl GTruemallocArgs {
     }
 }
 
-/// `G_TRUEMALLOC` outbound game-to-engine syscall.
+/// `G_TRUEMALLOC` MP game imports syscall boundary token.
 ///
-/// Asks the engine to allocate `size` bytes of dynamic VM memory, writing the
-/// resulting pointer through the caller-supplied `void **` out-parameter.
-/// Returns `void`; the allocation result arrives via `ptr`.
+/// Source: `oracle/oracle/codemp/game/g_public.h:248`
 pub struct GTruemalloc;
 
 impl OutboundSysCall for GTruemalloc {

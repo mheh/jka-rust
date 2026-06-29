@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_CVAR_VARIABLE_STRING_BUFFER` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -15,7 +17,11 @@ pub struct GCvarVariableStringBufferArgs {
 
 impl GCvarVariableStringBufferArgs {
     pub fn new(var_name: CString, buffer: *mut c_char, bufsize: c_int) -> Self {
-        Self { var_name, buffer, bufsize }
+        Self {
+            var_name,
+            buffer,
+            bufsize,
+        }
     }
 
     pub fn var_name(&self) -> &CString {
@@ -31,6 +37,10 @@ impl GCvarVariableStringBufferArgs {
     }
 }
 
+/// `G_CVAR_VARIABLE_STRING_BUFFER` MP game imports syscall boundary token.
+///
+/// Raven: ( const char *var_name, char *buffer, int bufsize );
+/// Source: `oracle/oracle/codemp/game/g_public.h:126`
 pub struct GCvarVariableStringBuffer;
 
 impl OutboundSysCall for GCvarVariableStringBuffer {

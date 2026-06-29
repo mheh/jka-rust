@@ -1,9 +1,11 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
 use crate::ffi::types::qboolean;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Args for the `G_G2_SETSKIN` outbound game-to-engine syscall.
 ///
@@ -27,16 +29,31 @@ impl GG2SetskinArgs {
         custom_skin: c_int,
         render_skin: c_int,
     ) -> Self {
-        Self { ghoul2, model_index, custom_skin, render_skin }
+        Self {
+            ghoul2,
+            model_index,
+            custom_skin,
+            render_skin,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn model_index(&self) -> c_int { self.model_index }
-    pub fn custom_skin(&self) -> c_int { self.custom_skin }
-    pub fn render_skin(&self) -> c_int { self.render_skin }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
+    pub fn custom_skin(&self) -> c_int {
+        self.custom_skin
+    }
+    pub fn render_skin(&self) -> c_int {
+        self.render_skin
+    }
 }
 
-/// `G_G2_SETSKIN` outbound game-to-engine syscall.
+/// `G_G2_SETSKIN` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:515`
 pub struct GG2Setskin;
 
 impl OutboundSysCall for GG2Setskin {

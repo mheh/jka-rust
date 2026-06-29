@@ -30,7 +30,9 @@ impl GameNavEntIsBreakableArgs {
     }
 }
 
-/// `GAME_NAV_ENTISBREAKABLE` checks whether an entity is breakable.
+/// `GAME_NAV_ENTISBREAKABLE` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:794`
 pub struct GameNavEntIsBreakable;
 
 impl InboundVmCall for GameNavEntIsBreakable {

@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_EA_SELECT_WEAPON` outbound game-to-engine syscall.
 ///
@@ -30,6 +32,9 @@ impl BotlibEaSelectWeaponArgs {
     }
 }
 
+/// `BOTLIB_EA_SELECT_WEAPON` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:402`
 pub struct BotlibEaSelectWeapon;
 
 impl OutboundSysCall for BotlibEaSelectWeapon {

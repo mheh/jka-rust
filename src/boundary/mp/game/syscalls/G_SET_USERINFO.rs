@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_SET_USERINFO` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -28,6 +30,10 @@ impl GSetUserinfoArgs {
     }
 }
 
+/// `G_SET_USERINFO` MP game imports syscall boundary token.
+///
+/// Raven: ( int num, const char *buffer );
+/// Source: `oracle/oracle/codemp/game/g_public.h:171`
 pub struct GSetUserinfo;
 
 impl OutboundSysCall for GSetUserinfo {
@@ -40,10 +46,7 @@ impl OutboundSysCall for GSetUserinfo {
 
 impl EncodeSysCall for GSetUserinfo {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.num() as isize,
-            ptr_to_word(a.info()),
-        ])
+        SysCallTransport::new([a.num() as isize, ptr_to_word(a.info())])
     }
 }
 

@@ -3,7 +3,9 @@ use core::ffi::c_void;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_OVERRIDESERVER` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -22,6 +24,9 @@ impl GG2OverrideserverArgs {
     }
 }
 
+/// `G_G2_OVERRIDESERVER` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:567`
 pub struct GG2Overrideserver;
 
 impl OutboundSysCall for GG2Overrideserver {

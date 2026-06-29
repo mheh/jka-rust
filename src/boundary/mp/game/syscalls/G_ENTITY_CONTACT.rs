@@ -3,7 +3,9 @@ use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ENTITY_CONTACT` outbound game-to-engine syscall.
 ///
@@ -23,11 +25,23 @@ impl GEntityContactArgs {
         Self { mins, maxs, ent }
     }
 
-    pub fn mins(&self) -> *const vec3_t { self.mins }
-    pub fn maxs(&self) -> *const vec3_t { self.maxs }
-    pub fn ent(&self) -> *const gentity_t { self.ent }
+    pub fn mins(&self) -> *const vec3_t {
+        self.mins
+    }
+    pub fn maxs(&self) -> *const vec3_t {
+        self.maxs
+    }
+    pub fn ent(&self) -> *const gentity_t {
+        self.ent
+    }
 }
 
+/// `G_ENTITY_CONTACT` MP game imports syscall boundary token.
+///
+/// Raven: ( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );
+/// Raven: perform an exact check against inline brush models of non-square shape
+/// Raven: access for bots to get and free a server client (FIXME?)
+/// Source: `oracle/oracle/codemp/game/g_public.h:211`
 pub struct GEntityContact;
 
 impl OutboundSysCall for GEntityContact {

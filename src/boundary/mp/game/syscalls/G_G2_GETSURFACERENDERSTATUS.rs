@@ -42,6 +42,9 @@ impl GG2GetsurfacerenderstatusArgs {
     }
 }
 
+/// `G_G2_GETSURFACERENDERSTATUS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:537`
 pub struct GG2Getsurfacerenderstatus;
 
 impl OutboundSysCall for GG2Getsurfacerenderstatus {

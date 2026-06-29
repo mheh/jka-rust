@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_DEBUG_POLYGON_DELETE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -19,6 +21,9 @@ impl GDebugPolygonDeleteArgs {
     }
 }
 
+/// `G_DEBUG_POLYGON_DELETE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:231`
 pub struct GDebugPolygonDelete;
 
 impl OutboundSysCall for GDebugPolygonDelete {

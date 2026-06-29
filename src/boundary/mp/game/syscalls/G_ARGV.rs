@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ARGV` outbound game-to-engine syscall.
 ///
@@ -20,14 +22,28 @@ pub struct GArgvArgs {
 
 impl GArgvArgs {
     pub fn new(n: c_int, buffer: *mut c_char, buffer_len: c_int) -> Self {
-        Self { n, buffer, buffer_len }
+        Self {
+            n,
+            buffer,
+            buffer_len,
+        }
     }
 
-    pub fn n(&self) -> c_int { self.n }
-    pub fn buffer(&self) -> *mut c_char { self.buffer }
-    pub fn buffer_len(&self) -> c_int { self.buffer_len }
+    pub fn n(&self) -> c_int {
+        self.n
+    }
+    pub fn buffer(&self) -> *mut c_char {
+        self.buffer
+    }
+    pub fn buffer_len(&self) -> c_int {
+        self.buffer_len
+    }
 }
 
+/// `G_ARGV` MP game imports syscall boundary token.
+///
+/// Raven: ( int n, char *buffer, int bufferLength );
+/// Source: `oracle/oracle/codemp/game/g_public.h:131`
 pub struct GArgv;
 
 impl OutboundSysCall for GArgv {
@@ -40,11 +56,7 @@ impl OutboundSysCall for GArgv {
 
 impl EncodeSysCall for GArgv {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.n as isize,
-            ptr_to_word(a.buffer),
-            a.buffer_len as isize,
-        ])
+        SysCallTransport::new([a.n as isize, ptr_to_word(a.buffer), a.buffer_len as isize])
     }
 }
 

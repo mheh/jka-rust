@@ -1,7 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_PRECISIONTIMER_END` outbound game-to-engine syscall.
 ///
@@ -24,6 +26,10 @@ impl GPrecisiontimerEndArgs {
     }
 }
 
+/// `G_PRECISIONTIMER_END` MP game imports syscall boundary token.
+///
+/// Raven: console variable interaction
+/// Source: `oracle/oracle/codemp/game/g_public.h:118`
 pub struct GPrecisiontimerEnd;
 
 impl OutboundSysCall for GPrecisiontimerEnd {

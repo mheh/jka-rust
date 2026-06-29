@@ -1,6 +1,8 @@
-use crate::codemp::game::q_shared_h::{vec3_t};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_PERPENDICULARVECTOR` outbound game-to-engine syscall.
 ///
@@ -27,6 +29,9 @@ impl GPerpendicularvectorArgs {
     }
 }
 
+/// `G_PERPENDICULARVECTOR` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:285`
 pub struct GPerpendicularvector;
 
 impl OutboundSysCall for GPerpendicularvector {
@@ -39,7 +44,10 @@ impl OutboundSysCall for GPerpendicularvector {
 
 impl EncodeSysCall for GPerpendicularvector {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([ptr_to_word(a.dst as *const _), ptr_to_word(a.src as *const _)])
+        SysCallTransport::new([
+            ptr_to_word(a.dst as *const _),
+            ptr_to_word(a.src as *const _),
+        ])
     }
 }
 

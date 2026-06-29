@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_RESET_AVOID_GOALS` outbound game-to-engine syscall.
 ///
@@ -23,6 +25,9 @@ impl BotlibAiResetAvoidGoalsArgs {
     }
 }
 
+/// `BOTLIB_AI_RESET_AVOID_GOALS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:441`
 pub struct BotlibAiResetAvoidGoals;
 
 impl OutboundSysCall for BotlibAiResetAvoidGoals {

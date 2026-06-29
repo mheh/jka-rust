@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_LOAD_CHAT_FILE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -15,14 +17,27 @@ pub struct BotlibAiLoadChatFileArgs {
 
 impl BotlibAiLoadChatFileArgs {
     pub fn new(chatstate: c_int, chatfile: CString, chatname: CString) -> Self {
-        Self { chatstate, chatfile, chatname }
+        Self {
+            chatstate,
+            chatfile,
+            chatname,
+        }
     }
 
-    pub fn chatstate(&self) -> c_int { self.chatstate }
-    pub fn chatfile(&self) -> &CString { &self.chatfile }
-    pub fn chatname(&self) -> &CString { &self.chatname }
+    pub fn chatstate(&self) -> c_int {
+        self.chatstate
+    }
+    pub fn chatfile(&self) -> &CString {
+        &self.chatfile
+    }
+    pub fn chatname(&self) -> &CString {
+        &self.chatname
+    }
 }
 
+/// `BOTLIB_AI_LOAD_CHAT_FILE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:436`
 pub struct BotlibAiLoadChatFile;
 
 impl OutboundSysCall for BotlibAiLoadChatFile {

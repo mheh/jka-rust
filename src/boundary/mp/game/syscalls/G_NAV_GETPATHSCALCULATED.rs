@@ -1,6 +1,8 @@
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::types::qboolean;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
 
 /// `G_NAV_GETPATHSCALCULATED` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -12,6 +14,9 @@ impl GNavGetpathscalculatedArgs {
     }
 }
 
+/// `G_NAV_GETPATHSCALCULATED` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:338`
 pub struct GNavGetpathscalculated;
 
 impl OutboundSysCall for GNavGetpathscalculated {

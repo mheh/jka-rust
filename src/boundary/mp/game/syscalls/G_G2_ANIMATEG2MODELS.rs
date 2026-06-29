@@ -3,7 +3,9 @@ use core::ffi::{c_int, c_void};
 use crate::codemp::game::q_shared_h::sharedRagDollUpdateParams_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_ANIMATEG2MODELS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -17,12 +19,12 @@ pub struct GG2Animateg2ModelsArgs {
 }
 
 impl GG2Animateg2ModelsArgs {
-    pub fn new(
-        ghoul2: *mut c_void,
-        time: c_int,
-        params: *mut sharedRagDollUpdateParams_t,
-    ) -> Self {
-        Self { ghoul2, time, params }
+    pub fn new(ghoul2: *mut c_void, time: c_int, params: *mut sharedRagDollUpdateParams_t) -> Self {
+        Self {
+            ghoul2,
+            time,
+            params,
+        }
     }
 
     pub fn ghoul2(&self) -> *mut c_void {
@@ -38,6 +40,11 @@ impl GG2Animateg2ModelsArgs {
     }
 }
 
+/// `G_G2_ANIMATEG2MODELS` MP game imports syscall boundary token.
+///
+/// Raven: rww - RAGDOLL_END
+/// Raven: additional ragdoll options -rww
+/// Source: `oracle/oracle/codemp/game/g_public.h:545`
 pub struct GG2Animateg2Models;
 
 impl OutboundSysCall for GG2Animateg2Models {

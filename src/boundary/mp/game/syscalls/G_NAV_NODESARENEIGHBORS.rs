@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::{types::qboolean, GameImport};
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_NODESARENEIGHBORS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -25,6 +27,9 @@ impl GNavNodesareneighborsArgs {
     }
 }
 
+/// `G_NAV_NODESARENEIGHBORS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:321`
 pub struct GNavNodesareneighbors;
 
 impl OutboundSysCall for GNavNodesareneighbors {

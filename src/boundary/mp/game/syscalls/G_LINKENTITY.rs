@@ -25,7 +25,13 @@ impl GLinkentityArgs {
     }
 }
 
-/// `G_LINKENTITY` outbound game-to-engine syscall.
+/// `G_LINKENTITY` MP game imports syscall boundary token.
+///
+/// Raven: ( gentity_t *ent );
+/// Raven: an entity will never be sent to a client or used for collision
+/// Raven: if it is not passed to linkentity.  If the size, position, or
+/// Raven: solidity changes, it must be relinked.
+/// Source: `oracle/oracle/codemp/game/g_public.h:199`
 pub struct GLinkentity;
 
 impl OutboundSysCall for GLinkentity {

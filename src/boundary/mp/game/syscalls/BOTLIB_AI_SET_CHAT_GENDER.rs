@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_SET_CHAT_GENDER` outbound game-to-engine syscall.
 ///
@@ -27,6 +29,9 @@ impl BotlibAiSetChatGenderArgs {
     }
 }
 
+/// `BOTLIB_AI_SET_CHAT_GENDER` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:437`
 pub struct BotlibAiSetChatGender;
 
 impl OutboundSysCall for BotlibAiSetChatGender {

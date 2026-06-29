@@ -1,7 +1,9 @@
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ROFF_PLAY` outbound game-to-engine syscall.
 ///
@@ -18,7 +20,11 @@ pub struct GRoffPlayArgs {
 
 impl GRoffPlayArgs {
     pub fn new(ent_id: i32, roff_id: i32, do_translation: qboolean) -> Self {
-        Self { ent_id, roff_id, do_translation }
+        Self {
+            ent_id,
+            roff_id,
+            do_translation,
+        }
     }
 
     pub fn ent_id(&self) -> i32 {
@@ -34,6 +40,10 @@ impl GRoffPlayArgs {
     }
 }
 
+/// `G_ROFF_PLAY` MP game imports syscall boundary token.
+///
+/// Raven: qboolean	ROFF_Play(int entID, int roffID, qboolean doTranslation);
+/// Source: `oracle/oracle/codemp/game/g_public.h:244`
 pub struct GRoffPlay;
 
 impl OutboundSysCall for GRoffPlay {

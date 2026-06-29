@@ -3,7 +3,9 @@ use core::ffi::{c_char, c_int};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_TEST` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -16,15 +18,31 @@ pub struct BotlibTestArgs {
 
 impl BotlibTestArgs {
     pub fn new(parm0: c_int, parm1: *mut c_char, parm2: *mut vec3_t, parm3: *mut vec3_t) -> Self {
-        Self { parm0, parm1, parm2, parm3 }
+        Self {
+            parm0,
+            parm1,
+            parm2,
+            parm3,
+        }
     }
 
-    pub fn parm0(&self) -> c_int { self.parm0 }
-    pub fn parm1(&self) -> *mut c_char { self.parm1 }
-    pub fn parm2(&self) -> *mut vec3_t { self.parm2 }
-    pub fn parm3(&self) -> *mut vec3_t { self.parm3 }
+    pub fn parm0(&self) -> c_int {
+        self.parm0
+    }
+    pub fn parm1(&self) -> *mut c_char {
+        self.parm1
+    }
+    pub fn parm2(&self) -> *mut vec3_t {
+        self.parm2
+    }
+    pub fn parm3(&self) -> *mut vec3_t {
+        self.parm3
+    }
 }
 
+/// `BOTLIB_TEST` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:350`
 pub struct BotlibTest;
 
 impl OutboundSysCall for BotlibTest {

@@ -2,7 +2,11 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_SPAWN_RMG_ENTITY` inbound executable-to-game `vmMain` call.
+/// `GAME_SPAWN_RMG_ENTITY` MP game exports vmMain boundary token.
+///
+/// Raven: rwwRMG - added
+/// Raven: rww - icarus callbacks
+/// Source: `oracle/oracle/codemp/game/g_public.h:768`
 pub struct GameSpawnRmgEntity;
 
 impl InboundVmCall for GameSpawnRmgEntity {

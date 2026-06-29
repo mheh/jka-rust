@@ -1,7 +1,9 @@
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 // Flow:
 //
@@ -34,7 +36,12 @@ impl GPrintArgs {
     }
 }
 
-/// `G_PRINT` writes text to the server console.
+/// `G_PRINT` MP game imports syscall boundary token.
+///
+/// Raven: ============== general Quake services ==================
+/// Raven: ( const char *string );
+/// Raven: print message on the local console
+/// Source: `oracle/oracle/codemp/game/g_public.h:105`
 pub struct GPrint;
 
 impl OutboundSysCall for GPrint {

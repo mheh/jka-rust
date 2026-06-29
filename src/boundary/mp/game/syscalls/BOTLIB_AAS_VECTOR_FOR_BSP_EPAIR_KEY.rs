@@ -1,9 +1,11 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -31,6 +33,9 @@ impl BotlibAasVectorForBspEpairKeyArgs {
     }
 }
 
+/// `BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:371`
 pub struct BotlibAasVectorForBspEpairKey;
 
 impl OutboundSysCall for BotlibAasVectorForBspEpairKey {

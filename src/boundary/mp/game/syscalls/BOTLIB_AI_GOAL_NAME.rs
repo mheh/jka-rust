@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_GOAL_NAME` outbound game-to-engine syscall.
 ///
@@ -33,6 +35,9 @@ impl BotlibAiGoalNameArgs {
     }
 }
 
+/// `BOTLIB_AI_GOAL_NAME` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:447`
 pub struct BotlibAiGoalName;
 
 impl OutboundSysCall for BotlibAiGoalName {
@@ -45,11 +50,7 @@ impl OutboundSysCall for BotlibAiGoalName {
 
 impl EncodeSysCall for BotlibAiGoalName {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.number as isize,
-            ptr_to_word(a.name),
-            a.size as isize,
-        ])
+        SysCallTransport::new([a.number as isize, ptr_to_word(a.name), a.size as isize])
     }
 }
 

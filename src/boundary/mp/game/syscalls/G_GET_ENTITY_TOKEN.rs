@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::{types::qboolean, GameImport};
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_GET_ENTITY_TOKEN` outbound game-to-engine syscall.
 ///
@@ -20,7 +22,10 @@ pub struct GGetEntityTokenArgs {
 
 impl GGetEntityTokenArgs {
     pub fn new(buffer: *mut c_char, buffer_size: c_int) -> Self {
-        Self { buffer, buffer_size }
+        Self {
+            buffer,
+            buffer_size,
+        }
     }
 
     pub fn buffer(&self) -> *mut c_char {
@@ -32,6 +37,13 @@ impl GGetEntityTokenArgs {
     }
 }
 
+/// `G_GET_ENTITY_TOKEN` MP game imports syscall boundary token.
+///
+/// Raven: qboolean ( char *buffer, int bufferSize )
+/// Raven: Retrieves the next string token from the entity spawn text, returning
+/// Raven: false when all tokens have been parsed.
+/// Raven: This should only be done at GAME_INIT time.
+/// Source: `oracle/oracle/codemp/game/g_public.h:221`
 pub struct GGetEntityToken;
 
 impl OutboundSysCall for GGetEntityToken {
@@ -44,10 +56,7 @@ impl OutboundSysCall for GGetEntityToken {
 
 impl EncodeSysCall for GGetEntityToken {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.buffer),
-            a.buffer_size as isize,
-        ])
+        SysCallTransport::new([ptr_to_word(a.buffer), a.buffer_size as isize])
     }
 }
 

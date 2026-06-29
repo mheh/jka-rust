@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_BOT_ALLOCATE_CLIENT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,6 +16,10 @@ impl GBotAllocateClientArgs {
     }
 }
 
+/// `G_BOT_ALLOCATE_CLIENT` MP game imports syscall boundary token.
+///
+/// Raven: ( void );
+/// Source: `oracle/oracle/codemp/game/g_public.h:215`
 pub struct GBotAllocateClient;
 
 impl OutboundSysCall for GBotAllocateClient {

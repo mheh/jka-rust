@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_EA_SAY_TEAM` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -26,6 +28,9 @@ impl BotlibEaSayTeamArgs {
     }
 }
 
+/// `BOTLIB_EA_SAY_TEAM` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:383`
 pub struct BotlibEaSayTeam;
 
 impl OutboundSysCall for BotlibEaSayTeam {
@@ -38,10 +43,7 @@ impl OutboundSysCall for BotlibEaSayTeam {
 
 impl EncodeSysCall for BotlibEaSayTeam {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.client as isize,
-            ptr_to_word(a.str.as_ptr()),
-        ])
+        SysCallTransport::new([a.client as isize, ptr_to_word(a.str.as_ptr())])
     }
 }
 

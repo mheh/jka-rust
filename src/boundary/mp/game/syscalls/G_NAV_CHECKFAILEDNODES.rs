@@ -1,7 +1,9 @@
 use crate::codemp::game::g_local::gentity_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_CHECKFAILEDNODES` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -19,6 +21,9 @@ impl GNavCheckfailednodesArgs {
     }
 }
 
+/// `G_NAV_CHECKFAILEDNODES` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:318`
 pub struct GNavCheckfailednodes;
 
 impl OutboundSysCall for GNavCheckfailednodes {

@@ -41,6 +41,9 @@ impl BotlibAasPresenceTypeBoundingBoxArgs {
     }
 }
 
+/// `BOTLIB_AAS_PRESENCE_TYPE_BOUNDING_BOX` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:362`
 pub struct BotlibAasPresenceTypeBoundingBox;
 
 impl OutboundSysCall for BotlibAasPresenceTypeBoundingBox {

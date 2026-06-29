@@ -38,6 +38,9 @@ impl BotlibAiGetChatMessageArgs {
     }
 }
 
+/// `BOTLIB_AI_GET_CHAT_MESSAGE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:488`
 pub struct BotlibAiGetChatMessage;
 
 impl OutboundSysCall for BotlibAiGetChatMessage {
@@ -50,11 +53,7 @@ impl OutboundSysCall for BotlibAiGetChatMessage {
 
 impl EncodeSysCall for BotlibAiGetChatMessage {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.chatstate as isize,
-            ptr_to_word(a.buf),
-            a.size as isize,
-        ])
+        SysCallTransport::new([a.chatstate as isize, ptr_to_word(a.buf), a.size as isize])
     }
 }
 

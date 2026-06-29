@@ -1,7 +1,9 @@
-use core::ffi::c_int;
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::usercmd_t;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
+use core::ffi::c_int;
 
 /// `BOTLIB_USER_COMMAND` outbound game-to-engine syscall.
 ///
@@ -27,6 +29,10 @@ impl BotlibUserCommandArgs {
     }
 }
 
+/// `BOTLIB_USER_COMMAND` MP game imports syscall boundary token.
+///
+/// Raven: ( int client, usercmd_t *ucmd );
+/// Source: `oracle/oracle/codemp/game/g_public.h:354`
 pub struct BotlibUserCommand;
 
 impl OutboundSysCall for BotlibUserCommand {
@@ -39,10 +45,7 @@ impl OutboundSysCall for BotlibUserCommand {
 
 impl EncodeSysCall for BotlibUserCommand {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.client_num as isize,
-            ptr_to_word(a.ucmd),
-        ])
+        SysCallTransport::new([a.client_num as isize, ptr_to_word(a.ucmd)])
     }
 }
 

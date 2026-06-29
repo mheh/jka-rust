@@ -1,9 +1,11 @@
 use core::ffi::{c_void, CStr};
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::types::qboolean;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
 
 /// `G_G2_RAGPCJGRADIENTSPEED` outbound game-to-engine syscall.
 /// C: `qboolean trap_G2API_RagPCJGradientSpeed(void *ghoul2, const char *boneName, const float speed)`
@@ -16,7 +18,11 @@ pub struct GG2RagpcjgradientspeedArgs {
 
 impl GG2RagpcjgradientspeedArgs {
     pub fn new(ghoul2: *mut c_void, bone_name: CString, speed: f32) -> Self {
-        Self { ghoul2, bone_name, speed }
+        Self {
+            ghoul2,
+            bone_name,
+            speed,
+        }
     }
 
     pub fn ghoul2(&self) -> *mut c_void {
@@ -32,6 +38,9 @@ impl GG2RagpcjgradientspeedArgs {
     }
 }
 
+/// `G_G2_RAGPCJGRADIENTSPEED` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:551`
 pub struct GG2Ragpcjgradientspeed;
 
 impl OutboundSysCall for GG2Ragpcjgradientspeed {

@@ -1,10 +1,12 @@
 use core::ffi::c_void;
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_RAGEFFECTORGOAL` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -16,7 +18,11 @@ pub struct GG2RageffectorgoalArgs {
 
 impl GG2RageffectorgoalArgs {
     pub fn new(ghoul2: *mut c_void, bone_name: CString, pos: *const vec3_t) -> Self {
-        Self { ghoul2, bone_name, pos }
+        Self {
+            ghoul2,
+            bone_name,
+            pos,
+        }
     }
 
     pub fn ghoul2(&self) -> *mut c_void {
@@ -32,6 +38,9 @@ impl GG2RageffectorgoalArgs {
     }
 }
 
+/// `G_G2_RAGEFFECTORGOAL` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:552`
 pub struct GG2Rageffectorgoal;
 
 impl OutboundSysCall for GG2Rageffectorgoal {

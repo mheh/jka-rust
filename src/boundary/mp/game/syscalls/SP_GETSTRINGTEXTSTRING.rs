@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `SP_GETSTRINGTEXTSTRING` outbound game-to-engine syscall.
 ///
@@ -16,7 +18,11 @@ pub struct SpGetstringtextstringArgs {
 
 impl SpGetstringtextstringArgs {
     pub fn new(text: *const c_char, buffer: *mut c_char, buffer_length: c_int) -> Self {
-        Self { text, buffer, buffer_length }
+        Self {
+            text,
+            buffer,
+            buffer_length,
+        }
     }
 
     pub fn text(&self) -> *const c_char {
@@ -32,6 +38,9 @@ impl SpGetstringtextstringArgs {
     }
 }
 
+/// `SP_GETSTRINGTEXTSTRING` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:239`
 pub struct SpGetstringtextstring;
 
 impl OutboundSysCall for SpGetstringtextstring {

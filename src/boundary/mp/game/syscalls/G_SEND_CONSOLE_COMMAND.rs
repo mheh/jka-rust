@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_SEND_CONSOLE_COMMAND` outbound game-to-engine syscall.
 ///
@@ -29,6 +31,13 @@ impl GSendConsoleCommandArgs {
     }
 }
 
+/// `G_SEND_CONSOLE_COMMAND` MP game imports syscall boundary token.
+///
+/// Raven: ( const char *text );
+/// Raven: add commands to the console as if they were typed in
+/// Raven: for map changing, etc
+/// Raven: =========== server specific functionality =============
+/// Source: `oracle/oracle/codemp/game/g_public.h:138`
 pub struct GSendConsoleCommand;
 
 impl OutboundSysCall for GSendConsoleCommand {
@@ -41,10 +50,7 @@ impl OutboundSysCall for GSendConsoleCommand {
 
 impl EncodeSysCall for GSendConsoleCommand {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.exec_when as isize,
-            ptr_to_word(a.text()),
-        ])
+        SysCallTransport::new([a.exec_when as isize, ptr_to_word(a.text())])
     }
 }
 

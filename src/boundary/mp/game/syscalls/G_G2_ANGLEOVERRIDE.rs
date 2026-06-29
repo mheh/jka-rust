@@ -98,6 +98,9 @@ impl GG2AngleoverrideArgs {
     }
 }
 
+/// `G_G2_ANGLEOVERRIDE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:519`
 pub struct GG2Angleoverride;
 
 impl OutboundSysCall for GG2Angleoverride {

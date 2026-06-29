@@ -1,10 +1,12 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_TESTPRINTFLOAT` outbound game-to-engine syscall.
 ///
@@ -31,6 +33,9 @@ impl GTestprintfloatArgs {
     }
 }
 
+/// `G_TESTPRINTFLOAT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:290`
 pub struct GTestprintfloat;
 
 impl OutboundSysCall for GTestprintfloat {
@@ -43,10 +48,7 @@ impl OutboundSysCall for GTestprintfloat {
 
 impl EncodeSysCall for GTestprintfloat {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.string()),
-            pass_float(a.f()),
-        ])
+        SysCallTransport::new([ptr_to_word(a.string()), pass_float(a.f())])
     }
 }
 

@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AAS_NEXT_BSP_ENTITY` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -20,6 +22,9 @@ impl BotlibAasNextBspEntityArgs {
     }
 }
 
+/// `BOTLIB_AAS_NEXT_BSP_ENTITY` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:369`
 pub struct BotlibAasNextBspEntity;
 
 impl OutboundSysCall for BotlibAasNextBspEntity {

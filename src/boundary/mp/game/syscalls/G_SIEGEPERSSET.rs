@@ -1,7 +1,9 @@
 use crate::codemp::game::q_shared_h::siegePers_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_SIEGEPERSSET` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -19,6 +21,9 @@ impl GSiegeperssetArgs {
     }
 }
 
+/// `G_SIEGEPERSSET` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:226`
 pub struct GSiegepersset;
 
 impl OutboundSysCall for GSiegepersset {

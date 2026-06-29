@@ -2,7 +2,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 // Flow:
 //
@@ -33,7 +35,11 @@ impl GErrorArgs {
     }
 }
 
-/// `G_ERROR` aborts the game through the engine and is not expected to return.
+/// `G_ERROR` MP game imports syscall boundary token.
+///
+/// Raven: ( const char *string );
+/// Raven: abort the game
+/// Source: `oracle/oracle/codemp/game/g_public.h:108`
 pub struct GError;
 
 impl OutboundSysCall for GError {

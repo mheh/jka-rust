@@ -1,8 +1,10 @@
 use core::ffi::c_void;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::qhandle_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_SETMODELS` outbound game-to-engine syscall.
 ///
@@ -19,19 +21,28 @@ pub struct GG2SetmodelsArgs {
 }
 
 impl GG2SetmodelsArgs {
-    pub fn new(
-        ghoul2: *mut c_void,
-        model_list: *mut qhandle_t,
-        skin_list: *mut qhandle_t,
-    ) -> Self {
-        Self { ghoul2, model_list, skin_list }
+    pub fn new(ghoul2: *mut c_void, model_list: *mut qhandle_t, skin_list: *mut qhandle_t) -> Self {
+        Self {
+            ghoul2,
+            model_list,
+            skin_list,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn model_list(&self) -> *mut qhandle_t { self.model_list }
-    pub fn skin_list(&self) -> *mut qhandle_t { self.skin_list }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn model_list(&self) -> *mut qhandle_t {
+        self.model_list
+    }
+    pub fn skin_list(&self) -> *mut qhandle_t {
+        self.skin_list
+    }
 }
 
+/// `G_G2_SETMODELS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:510`
 pub struct GG2Setmodels;
 
 impl OutboundSysCall for GG2Setmodels {

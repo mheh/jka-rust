@@ -2,7 +2,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_CVAR_SET` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -25,6 +27,10 @@ impl GCvarSetArgs {
     }
 }
 
+/// `G_CVAR_SET` MP game imports syscall boundary token.
+///
+/// Raven: ( const char *var_name, const char *value );
+/// Source: `oracle/oracle/codemp/game/g_public.h:123`
 pub struct GCvarSet;
 
 impl OutboundSysCall for GCvarSet {

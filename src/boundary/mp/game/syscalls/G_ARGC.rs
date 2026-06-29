@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_ARGC` outbound game-to-engine syscall.
 ///
@@ -16,6 +18,11 @@ impl GArgcArgs {
     }
 }
 
+/// `G_ARGC` MP game imports syscall boundary token.
+///
+/// Raven: ( void );
+/// Raven: ClientCommand and ServerCommand parameter access
+/// Source: `oracle/oracle/codemp/game/g_public.h:128`
 pub struct GArgc;
 
 impl OutboundSysCall for GArgc {

@@ -1,6 +1,8 @@
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::syscalls::pass_float;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
 
 /// `G_FLOOR` outbound game-to-engine syscall.
 ///
@@ -20,6 +22,9 @@ impl GFloorArgs {
     }
 }
 
+/// `G_FLOOR` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:286`
 pub struct GFloor;
 
 impl OutboundSysCall for GFloor {

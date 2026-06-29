@@ -35,7 +35,13 @@ impl GG2SetboneikstateArgs {
         ik_state: c_int,
         params: *mut sharedSetBoneIKStateParams_t,
     ) -> Self {
-        Self { ghoul2, time, bone_name, ik_state, params }
+        Self {
+            ghoul2,
+            time,
+            bone_name,
+            ik_state,
+            params,
+        }
     }
 
     pub fn ghoul2(&self) -> *mut core::ffi::c_void {
@@ -55,6 +61,9 @@ impl GG2SetboneikstateArgs {
     }
 }
 
+/// `G_G2_SETBONEIKSTATE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:559`
 pub struct GG2Setboneikstate;
 
 impl OutboundSysCall for GG2Setboneikstate {

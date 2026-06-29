@@ -2,7 +2,9 @@ use core::ffi::{c_int, c_void};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_MEMSET` outbound game-to-engine syscall.
 ///
@@ -36,6 +38,9 @@ impl GMemsetArgs {
     }
 }
 
+/// `G_MEMSET` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:276`
 pub struct GMemset;
 
 impl OutboundSysCall for GMemset {

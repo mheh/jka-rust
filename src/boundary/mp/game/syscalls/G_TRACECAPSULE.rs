@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::{trace_t, vec3_t};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_TRACECAPSULE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -26,18 +28,44 @@ impl GTracecapsuleArgs {
         pass_entity_num: c_int,
         contentmask: c_int,
     ) -> Self {
-        Self { results, start, mins, maxs, end, pass_entity_num, contentmask }
+        Self {
+            results,
+            start,
+            mins,
+            maxs,
+            end,
+            pass_entity_num,
+            contentmask,
+        }
     }
 
-    pub fn results(&self) -> *mut trace_t { self.results }
-    pub fn start(&self) -> *const vec3_t { self.start }
-    pub fn mins(&self) -> *const vec3_t { self.mins }
-    pub fn maxs(&self) -> *const vec3_t { self.maxs }
-    pub fn end(&self) -> *const vec3_t { self.end }
-    pub fn pass_entity_num(&self) -> c_int { self.pass_entity_num }
-    pub fn contentmask(&self) -> c_int { self.contentmask }
+    pub fn results(&self) -> *mut trace_t {
+        self.results
+    }
+    pub fn start(&self) -> *const vec3_t {
+        self.start
+    }
+    pub fn mins(&self) -> *const vec3_t {
+        self.mins
+    }
+    pub fn maxs(&self) -> *const vec3_t {
+        self.maxs
+    }
+    pub fn end(&self) -> *const vec3_t {
+        self.end
+    }
+    pub fn pass_entity_num(&self) -> c_int {
+        self.pass_entity_num
+    }
+    pub fn contentmask(&self) -> c_int {
+        self.contentmask
+    }
 }
 
+/// `G_TRACECAPSULE` MP game imports syscall boundary token.
+///
+/// Raven: ( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask );
+/// Source: `oracle/oracle/codemp/game/g_public.h:235`
 pub struct GTracecapsule;
 
 impl OutboundSysCall for GTracecapsule {

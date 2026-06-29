@@ -1,6 +1,8 @@
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_INIT_LEVEL_ITEMS` outbound game-to-engine syscall.
 ///
@@ -14,6 +16,9 @@ impl BotlibAiInitLevelItemsArgs {
     }
 }
 
+/// `BOTLIB_AI_INIT_LEVEL_ITEMS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:456`
 pub struct BotlibAiInitLevelItems;
 
 impl OutboundSysCall for BotlibAiInitLevelItems {

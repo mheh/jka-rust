@@ -2,7 +2,9 @@ use core::ffi::c_void;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_PRECISIONTIMER_START` outbound game-to-engine syscall.
 ///
@@ -24,6 +26,9 @@ impl GPrecisiontimerStartArgs {
     }
 }
 
+/// `G_PRECISIONTIMER_START` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:117`
 pub struct GPrecisiontimerStart;
 
 impl OutboundSysCall for GPrecisiontimerStart {

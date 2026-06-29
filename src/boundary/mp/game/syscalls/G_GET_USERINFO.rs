@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_GET_USERINFO` outbound game-to-engine syscall.
 ///
@@ -21,14 +23,31 @@ pub struct GGetUserinfoArgs {
 
 impl GGetUserinfoArgs {
     pub fn new(client_num: c_int, buf: *mut c_char, buf_size: c_int) -> Self {
-        Self { client_num, buf, buf_size }
+        Self {
+            client_num,
+            buf,
+            buf_size,
+        }
     }
 
-    pub fn client_num(&self) -> c_int { self.client_num }
-    pub fn buf(&self) -> *mut c_char { self.buf }
-    pub fn buf_size(&self) -> c_int { self.buf_size }
+    pub fn client_num(&self) -> c_int {
+        self.client_num
+    }
+    pub fn buf(&self) -> *mut c_char {
+        self.buf
+    }
+    pub fn buf_size(&self) -> c_int {
+        self.buf_size
+    }
 }
 
+/// `G_GET_USERINFO` MP game imports syscall boundary token.
+///
+/// Raven: ( int num, char *buffer, int bufferSize );
+/// Raven: userinfo strings are maintained by the server system, so they
+/// Raven: are persistant across level loads, while all other game visible
+/// Raven: data is completely reset
+/// Source: `oracle/oracle/codemp/game/g_public.h:166`
 pub struct GGetUserinfo;
 
 impl OutboundSysCall for GGetUserinfo {

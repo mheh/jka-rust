@@ -1,7 +1,9 @@
 use core::ffi::{c_char, c_int};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_STRNCPY` outbound game-to-engine syscall.
 ///
@@ -31,6 +33,9 @@ impl GStrncpyArgs {
     }
 }
 
+/// `G_STRNCPY` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:278`
 pub struct GStrncpy;
 
 impl OutboundSysCall for GStrncpy {
@@ -43,11 +48,7 @@ impl OutboundSysCall for GStrncpy {
 
 impl EncodeSysCall for GStrncpy {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.dest),
-            ptr_to_word(a.src),
-            a.n as isize,
-        ])
+        SysCallTransport::new([ptr_to_word(a.dest), ptr_to_word(a.src), a.n as isize])
     }
 }
 

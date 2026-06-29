@@ -1,7 +1,9 @@
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ROFF_CLEAN` outbound game-to-engine syscall.
 ///
@@ -16,6 +18,10 @@ impl GRoffCleanArgs {
     }
 }
 
+/// `G_ROFF_CLEAN` MP game imports syscall boundary token.
+///
+/// Raven: qboolean	ROFF_Clean(void);
+/// Source: `oracle/oracle/codemp/game/g_public.h:241`
 pub struct GRoffClean;
 
 impl OutboundSysCall for GRoffClean {

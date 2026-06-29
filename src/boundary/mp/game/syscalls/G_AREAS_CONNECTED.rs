@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::{types::qboolean, GameImport};
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_AREAS_CONNECTED` outbound game-to-engine syscall.
 ///
@@ -28,6 +30,10 @@ impl GAreasConnectedArgs {
     }
 }
 
+/// `G_AREAS_CONNECTED` MP game imports syscall boundary token.
+///
+/// Raven: ( int area1, int area2 );
+/// Source: `oracle/oracle/codemp/game/g_public.h:197`
 pub struct GAreasConnected;
 
 impl OutboundSysCall for GAreasConnected {

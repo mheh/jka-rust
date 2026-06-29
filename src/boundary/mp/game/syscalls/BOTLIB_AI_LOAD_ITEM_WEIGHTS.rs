@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_LOAD_ITEM_WEIGHTS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,7 +16,10 @@ pub struct BotlibAiLoadItemWeightsArgs {
 
 impl BotlibAiLoadItemWeightsArgs {
     pub fn new(goalstate: c_int, filename: CString) -> Self {
-        Self { goalstate, filename }
+        Self {
+            goalstate,
+            filename,
+        }
     }
 
     pub fn goalstate(&self) -> c_int {
@@ -26,6 +31,9 @@ impl BotlibAiLoadItemWeightsArgs {
     }
 }
 
+/// `BOTLIB_AI_LOAD_ITEM_WEIGHTS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:458`
 pub struct BotlibAiLoadItemWeights;
 
 impl OutboundSysCall for BotlibAiLoadItemWeights {
@@ -38,10 +46,7 @@ impl OutboundSysCall for BotlibAiLoadItemWeights {
 
 impl EncodeSysCall for BotlibAiLoadItemWeights {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.goalstate as isize,
-            ptr_to_word(a.filename.as_ptr()),
-        ])
+        SysCallTransport::new([a.goalstate as isize, ptr_to_word(a.filename.as_ptr())])
     }
 }
 

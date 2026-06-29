@@ -4,7 +4,9 @@ use crate::codemp::game::g_local::gentity_t;
 use crate::codemp::game::q_shared_h::playerState_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_LOCATE_GAME_DATA` outbound game-to-engine syscall.
 ///
@@ -56,6 +58,13 @@ impl GLocateGameDataArgs {
     }
 }
 
+/// `G_LOCATE_GAME_DATA` MP game imports syscall boundary token.
+///
+/// Raven: ( gentity_t *gEnts, int numGEntities, int sizeofGEntity_t,
+/// Raven: playerState_t *clients, int sizeofGameClient );
+/// Raven: the game needs to let the server system know where and how big the gentities
+/// Raven: are, so it can look at them directly without going through an interface
+/// Source: `oracle/oracle/codemp/game/g_public.h:145`
 pub struct GLocateGameData;
 
 impl OutboundSysCall for GLocateGameData {

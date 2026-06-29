@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_GET_SERVERINFO` outbound game-to-engine syscall.
 ///
@@ -30,6 +32,11 @@ impl GGetServerinfoArgs {
     }
 }
 
+/// `G_GET_SERVERINFO` MP game imports syscall boundary token.
+///
+/// Raven: ( char *buffer, int bufferSize );
+/// Raven: the serverinfo info string has all the cvars visible to server browsers
+/// Source: `oracle/oracle/codemp/game/g_public.h:173`
 pub struct GGetServerinfo;
 
 impl OutboundSysCall for GGetServerinfo {

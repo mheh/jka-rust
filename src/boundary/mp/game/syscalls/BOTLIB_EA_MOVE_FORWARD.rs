@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for the `BOTLIB_EA_MOVE_FORWARD` game→engine syscall.
 ///
@@ -23,7 +25,9 @@ impl BotlibEaMoveForwardArgs {
     }
 }
 
-/// `BOTLIB_EA_MOVE_FORWARD` outbound game-to-engine syscall.
+/// `BOTLIB_EA_MOVE_FORWARD` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:397`
 pub struct BotlibEaMoveForward;
 
 impl OutboundSysCall for BotlibEaMoveForward {

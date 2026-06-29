@@ -4,7 +4,9 @@ use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_RAGEFFECTORKICK` outbound game-to-engine syscall.
 /// C: `qboolean trap_G2API_RagEffectorKick(void *ghoul2, const char *boneName, vec3_t velocity)`
@@ -19,12 +21,12 @@ pub struct GG2RageffectorkickArgs {
 }
 
 impl GG2RageffectorkickArgs {
-    pub fn new(
-        ghoul2: *mut c_void,
-        bone_name: *const c_char,
-        velocity: *mut vec3_t,
-    ) -> Self {
-        Self { ghoul2, bone_name, velocity }
+    pub fn new(ghoul2: *mut c_void, bone_name: *const c_char, velocity: *mut vec3_t) -> Self {
+        Self {
+            ghoul2,
+            bone_name,
+            velocity,
+        }
     }
 
     pub fn ghoul2(&self) -> *mut c_void {
@@ -40,6 +42,9 @@ impl GG2RageffectorkickArgs {
     }
 }
 
+/// `G_G2_RAGEFFECTORKICK` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:554`
 pub struct GG2Rageffectorkick;
 
 impl OutboundSysCall for GG2Rageffectorkick {

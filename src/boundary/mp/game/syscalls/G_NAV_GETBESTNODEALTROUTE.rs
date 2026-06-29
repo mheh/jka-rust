@@ -2,12 +2,17 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_GETBESTNODEALTROUTE` outbound game-to-engine syscall.
 ///
 /// C signature: `int trap_Nav_GetBestNodeAltRoute(int startID, int endID, int *pathCost, int rejectID)`
 #[derive(Debug)]
+/// `G_NAV_GETBESTNODEALTROUTE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:329`
 pub struct GNavGetbestnodealtroute;
 
 #[derive(Debug)]
@@ -20,13 +25,26 @@ pub struct GNavGetbestnodealtRouteArgs {
 
 impl GNavGetbestnodealtRouteArgs {
     pub fn new(start_id: c_int, end_id: c_int, path_cost: *mut c_int, reject_id: c_int) -> Self {
-        Self { start_id, end_id, path_cost, reject_id }
+        Self {
+            start_id,
+            end_id,
+            path_cost,
+            reject_id,
+        }
     }
 
-    pub fn start_id(&self) -> c_int { self.start_id }
-    pub fn end_id(&self) -> c_int { self.end_id }
-    pub fn path_cost(&self) -> *mut c_int { self.path_cost }
-    pub fn reject_id(&self) -> c_int { self.reject_id }
+    pub fn start_id(&self) -> c_int {
+        self.start_id
+    }
+    pub fn end_id(&self) -> c_int {
+        self.end_id
+    }
+    pub fn path_cost(&self) -> *mut c_int {
+        self.path_cost
+    }
+    pub fn reject_id(&self) -> c_int {
+        self.reject_id
+    }
 }
 
 impl OutboundSysCall for GNavGetbestnodealtroute {

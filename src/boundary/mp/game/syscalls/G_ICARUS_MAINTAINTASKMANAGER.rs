@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::{types::qboolean, GameImport};
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_MAINTAINTASKMANAGER` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -20,6 +22,9 @@ impl GIcarusMaintaintaskmanagerArgs {
     }
 }
 
+/// `G_ICARUS_MAINTAINTASKMANAGER` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:258`
 pub struct GIcarusMaintaintaskmanager;
 
 impl OutboundSysCall for GIcarusMaintaintaskmanager {

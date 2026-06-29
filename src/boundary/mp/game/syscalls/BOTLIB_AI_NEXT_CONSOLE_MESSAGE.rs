@@ -2,7 +2,9 @@ use core::ffi::{c_int, c_void};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_NEXT_CONSOLE_MESSAGE` outbound game-to-engine syscall.
 ///
@@ -31,6 +33,9 @@ impl BotlibAiNextConsoleMessageArgs {
     }
 }
 
+/// `BOTLIB_AI_NEXT_CONSOLE_MESSAGE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:425`
 pub struct BotlibAiNextConsoleMessage;
 
 impl OutboundSysCall for BotlibAiNextConsoleMessage {
@@ -43,10 +48,7 @@ impl OutboundSysCall for BotlibAiNextConsoleMessage {
 
 impl EncodeSysCall for BotlibAiNextConsoleMessage {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.chatstate as isize,
-            ptr_to_word(a.cm),
-        ])
+        SysCallTransport::new([a.chatstate as isize, ptr_to_word(a.cm)])
     }
 }
 

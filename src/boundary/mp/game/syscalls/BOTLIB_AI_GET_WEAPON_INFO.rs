@@ -1,6 +1,8 @@
-use core::ffi::c_int;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_int;
 
 /// `BOTLIB_AI_GET_WEAPON_INFO` outbound game-to-engine syscall.
 ///
@@ -15,14 +17,27 @@ pub struct BotlibAiGetWeaponInfoArgs {
 
 impl BotlibAiGetWeaponInfoArgs {
     pub fn new(weaponstate: c_int, weapon: c_int, weaponinfo: *mut core::ffi::c_void) -> Self {
-        Self { weaponstate, weapon, weaponinfo }
+        Self {
+            weaponstate,
+            weapon,
+            weaponinfo,
+        }
     }
 
-    pub fn weaponstate(&self) -> c_int { self.weaponstate }
-    pub fn weapon(&self) -> c_int { self.weapon }
-    pub fn weaponinfo(&self) -> *mut core::ffi::c_void { self.weaponinfo }
+    pub fn weaponstate(&self) -> c_int {
+        self.weaponstate
+    }
+    pub fn weapon(&self) -> c_int {
+        self.weapon
+    }
+    pub fn weaponinfo(&self) -> *mut core::ffi::c_void {
+        self.weaponinfo
+    }
 }
 
+/// `BOTLIB_AI_GET_WEAPON_INFO` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:476`
 pub struct BotlibAiGetWeaponInfo;
 
 impl OutboundSysCall for BotlibAiGetWeaponInfo {

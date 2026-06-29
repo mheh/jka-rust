@@ -1,7 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::{types::qboolean, GameImport};
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_ATTACHINSTANCETOENTNUM` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -13,14 +15,27 @@ pub struct GG2AttachinstancetoentnumArgs {
 
 impl GG2AttachinstancetoentnumArgs {
     pub fn new(ghoul2: *mut c_void, entity_num: c_int, server: qboolean) -> Self {
-        Self { ghoul2, entity_num, server }
+        Self {
+            ghoul2,
+            entity_num,
+            server,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn entity_num(&self) -> c_int { self.entity_num }
-    pub fn server(&self) -> qboolean { self.server }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn entity_num(&self) -> c_int {
+        self.entity_num
+    }
+    pub fn server(&self) -> qboolean {
+        self.server
+    }
 }
 
+/// `G_G2_ATTACHINSTANCETOENTNUM` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:564`
 pub struct GG2Attachinstancetoentnum;
 
 impl OutboundSysCall for GG2Attachinstancetoentnum {

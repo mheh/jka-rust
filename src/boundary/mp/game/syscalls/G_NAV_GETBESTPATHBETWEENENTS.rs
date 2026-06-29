@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::g_local::gentity_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_NAV_GETBESTPATHBETWEENENTS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -30,6 +32,9 @@ impl GNavGetbestpathbetweenentsArgs {
     }
 }
 
+/// `G_NAV_GETBESTPATHBETWEENENTS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:331`
 pub struct GNavGetbestpathbetweenents;
 
 impl OutboundSysCall for GNavGetbestpathbetweenents {
@@ -42,11 +47,7 @@ impl OutboundSysCall for GNavGetbestpathbetweenents {
 
 impl EncodeSysCall for GNavGetbestpathbetweenents {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.ent),
-            ptr_to_word(a.goal),
-            a.flags as isize,
-        ])
+        SysCallTransport::new([ptr_to_word(a.ent), ptr_to_word(a.goal), a.flags as isize])
     }
 }
 

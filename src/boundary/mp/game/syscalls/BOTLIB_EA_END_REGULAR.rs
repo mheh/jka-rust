@@ -1,9 +1,11 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_EA_END_REGULAR` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -26,6 +28,9 @@ impl BotlibEaEndRegularArgs {
     }
 }
 
+/// `BOTLIB_EA_END_REGULAR` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:408`
 pub struct BotlibEaEndRegular;
 
 impl OutboundSysCall for BotlibEaEndRegular {
@@ -38,10 +43,7 @@ impl OutboundSysCall for BotlibEaEndRegular {
 
 impl EncodeSysCall for BotlibEaEndRegular {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.client as isize,
-            pass_float(a.thinktime),
-        ])
+        SysCallTransport::new([a.client as isize, pass_float(a.thinktime)])
     }
 }
 

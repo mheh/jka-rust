@@ -1,7 +1,8 @@
-
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC` outbound game-to-engine syscall.
 ///
@@ -28,6 +29,9 @@ impl BotlibAiMutateGoalFuzzyLogicArgs {
     }
 }
 
+/// `BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:484`
 pub struct BotlibAiMutateGoalFuzzyLogic;
 
 impl OutboundSysCall for BotlibAiMutateGoalFuzzyLogic {

@@ -1,8 +1,10 @@
 use core::ffi::{c_int, c_void};
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_FIND_MATCH` outbound game-to-engine syscall.
 ///
@@ -19,14 +21,27 @@ pub struct BotlibAiFindMatchArgs {
 
 impl BotlibAiFindMatchArgs {
     pub fn new(str: CString, match_ptr: *mut c_void, context: u64) -> Self {
-        Self { str, match_ptr, context }
+        Self {
+            str,
+            match_ptr,
+            context,
+        }
     }
 
-    pub fn str(&self) -> &CString { &self.str }
-    pub fn match_ptr(&self) -> *mut c_void { self.match_ptr }
-    pub fn context(&self) -> u64 { self.context }
+    pub fn str(&self) -> &CString {
+        &self.str
+    }
+    pub fn match_ptr(&self) -> *mut c_void {
+        self.match_ptr
+    }
+    pub fn context(&self) -> u64 {
+        self.context
+    }
 }
 
+/// `BOTLIB_AI_FIND_MATCH` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:432`
 pub struct BotlibAiFindMatch;
 
 impl OutboundSysCall for BotlibAiFindMatch {

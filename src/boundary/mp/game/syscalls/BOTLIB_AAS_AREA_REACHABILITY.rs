@@ -1,6 +1,8 @@
-use core::ffi::c_int;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_int;
 
 /// `BOTLIB_AAS_AREA_REACHABILITY` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -18,6 +20,9 @@ impl BotlibAasAreaReachabilityArgs {
     }
 }
 
+/// `BOTLIB_AAS_AREA_REACHABILITY` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:375`
 pub struct BotlibAasAreaReachability;
 
 impl OutboundSysCall for BotlibAasAreaReachability {

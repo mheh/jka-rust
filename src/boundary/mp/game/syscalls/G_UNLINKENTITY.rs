@@ -1,6 +1,8 @@
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::g_local::gentity_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_UNLINKENTITY` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -18,6 +20,11 @@ impl GUnlinkentityArgs {
     }
 }
 
+/// `G_UNLINKENTITY` MP game imports syscall boundary token.
+///
+/// Raven: ( gentity_t *ent );
+/// Raven: call before removing an interactive entity
+/// Source: `oracle/oracle/codemp/game/g_public.h:204`
 pub struct GUnlinkentity;
 
 impl OutboundSysCall for GUnlinkentity {

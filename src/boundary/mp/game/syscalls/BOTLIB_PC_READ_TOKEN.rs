@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::pc_token_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_PC_READ_TOKEN` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -25,6 +27,9 @@ impl BotlibPcReadTokenArgs {
     }
 }
 
+/// `BOTLIB_PC_READ_TOKEN` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:500`
 pub struct BotlibPcReadToken;
 
 impl OutboundSysCall for BotlibPcReadToken {
@@ -37,10 +42,7 @@ impl OutboundSysCall for BotlibPcReadToken {
 
 impl EncodeSysCall for BotlibPcReadToken {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.handle as isize,
-            ptr_to_word(a.pc_token),
-        ])
+        SysCallTransport::new([a.handle as isize, ptr_to_word(a.pc_token)])
     }
 }
 

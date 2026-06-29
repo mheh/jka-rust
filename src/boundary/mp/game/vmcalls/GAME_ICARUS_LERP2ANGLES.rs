@@ -2,7 +2,9 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_ICARUS_LERP2ANGLES` inbound executable-to-game `vmMain` call.
+/// `GAME_ICARUS_LERP2ANGLES` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:775`
 pub struct GameIcarusLerp2Angles;
 
 impl InboundVmCall for GameIcarusLerp2Angles {

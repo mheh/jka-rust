@@ -1,6 +1,8 @@
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::syscalls::pass_float;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
 
 /// `G_CEIL` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -18,6 +20,9 @@ impl GCeilArgs {
     }
 }
 
+/// `G_CEIL` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:287`
 pub struct GCeil;
 
 impl OutboundSysCall for GCeil {

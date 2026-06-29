@@ -1,5 +1,7 @@
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_CLEANENTATTACHMENTS` outbound game-to-engine syscall.
 ///
@@ -14,6 +16,9 @@ impl GG2CleanentattachmentsArgs {
     }
 }
 
+/// `G_G2_CLEANENTATTACHMENTS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:566`
 pub struct GG2Cleanentattachments;
 
 impl OutboundSysCall for GG2Cleanentattachments {

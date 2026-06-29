@@ -32,7 +32,10 @@ impl GameShutdownArgs {
     }
 }
 
-/// `GAME_SHUTDOWN` releases per-level module state.
+/// `GAME_SHUTDOWN` MP game exports vmMain boundary token.
+///
+/// Raven: (void);
+/// Source: `oracle/oracle/codemp/game/g_public.h:740`
 pub struct GameShutdown;
 
 impl InboundVmCall for GameShutdown {

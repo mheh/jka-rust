@@ -3,7 +3,9 @@ use core::ffi::c_void;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_ABSURDSMOOTHING` outbound game-to-engine syscall.
 ///
@@ -29,6 +31,10 @@ impl GG2AbsurdsmoothingArgs {
     }
 }
 
+/// `G_G2_ABSURDSMOOTHING` MP game imports syscall boundary token.
+///
+/// Raven: rww - RAGDOLL_BEGIN
+/// Source: `oracle/oracle/codemp/game/g_public.h:539`
 pub struct GG2Absurdsmoothing;
 
 impl OutboundSysCall for GG2Absurdsmoothing {

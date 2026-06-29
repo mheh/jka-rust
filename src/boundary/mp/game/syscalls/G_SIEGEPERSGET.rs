@@ -24,7 +24,9 @@ impl GSiegepersgetArgs {
     }
 }
 
-/// `G_SIEGEPERSGET` outbound game-to-engine syscall.
+/// `G_SIEGEPERSGET` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:227`
 pub struct GSiegepersget;
 
 impl OutboundSysCall for GSiegepersget {

@@ -58,21 +58,47 @@ impl BotlibAiReplyChatArgs {
         }
     }
 
-    pub fn chatstate(&self) -> c_int { self.chatstate }
-    pub fn message(&self) -> *const c_char { self.message }
-    pub fn mcontext(&self) -> c_int { self.mcontext }
-    pub fn vcontext(&self) -> c_int { self.vcontext }
-    pub fn var0(&self) -> *const c_char { self.var0 }
-    pub fn var1(&self) -> *const c_char { self.var1 }
-    pub fn var2(&self) -> *const c_char { self.var2 }
-    pub fn var3(&self) -> *const c_char { self.var3 }
-    pub fn var4(&self) -> *const c_char { self.var4 }
-    pub fn var5(&self) -> *const c_char { self.var5 }
-    pub fn var6(&self) -> *const c_char { self.var6 }
-    pub fn var7(&self) -> *const c_char { self.var7 }
+    pub fn chatstate(&self) -> c_int {
+        self.chatstate
+    }
+    pub fn message(&self) -> *const c_char {
+        self.message
+    }
+    pub fn mcontext(&self) -> c_int {
+        self.mcontext
+    }
+    pub fn vcontext(&self) -> c_int {
+        self.vcontext
+    }
+    pub fn var0(&self) -> *const c_char {
+        self.var0
+    }
+    pub fn var1(&self) -> *const c_char {
+        self.var1
+    }
+    pub fn var2(&self) -> *const c_char {
+        self.var2
+    }
+    pub fn var3(&self) -> *const c_char {
+        self.var3
+    }
+    pub fn var4(&self) -> *const c_char {
+        self.var4
+    }
+    pub fn var5(&self) -> *const c_char {
+        self.var5
+    }
+    pub fn var6(&self) -> *const c_char {
+        self.var6
+    }
+    pub fn var7(&self) -> *const c_char {
+        self.var7
+    }
 }
 
-/// `BOTLIB_AI_REPLY_CHAT` outbound game-to-engine syscall.
+/// `BOTLIB_AI_REPLY_CHAT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:428`
 pub struct BotlibAiReplyChat;
 
 impl OutboundSysCall for BotlibAiReplyChat {

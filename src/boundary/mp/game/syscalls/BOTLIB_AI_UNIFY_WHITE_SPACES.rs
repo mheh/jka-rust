@@ -1,6 +1,8 @@
-use core::ffi::c_char;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_char;
 
 /// `BOTLIB_AI_UNIFY_WHITE_SPACES` outbound game-to-engine syscall.
 ///
@@ -20,6 +22,9 @@ impl BotlibAiUnifyWhiteSpacesArgs {
     }
 }
 
+/// `BOTLIB_AI_UNIFY_WHITE_SPACES` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:434`
 pub struct BotlibAiUnifyWhiteSpaces;
 
 impl OutboundSysCall for BotlibAiUnifyWhiteSpaces {

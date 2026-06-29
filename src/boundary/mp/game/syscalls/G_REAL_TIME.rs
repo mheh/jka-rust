@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::qtime_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_REAL_TIME` outbound game-to-engine syscall.
 ///
@@ -23,6 +25,9 @@ impl GRealTimeArgs {
     }
 }
 
+/// `G_REAL_TIME` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:232`
 pub struct GRealTime;
 
 impl OutboundSysCall for GRealTime {

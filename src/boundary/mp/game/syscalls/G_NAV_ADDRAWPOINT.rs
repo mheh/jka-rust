@@ -1,7 +1,9 @@
-use core::ffi::c_int;
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
+use core::ffi::c_int;
 
 /// `G_NAV_ADDRAWPOINT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -13,14 +15,27 @@ pub struct GNavAddrawpointArgs {
 
 impl GNavAddrawpointArgs {
     pub fn new(point: *const vec3_t, flags: c_int, radius: c_int) -> Self {
-        Self { point, flags, radius }
+        Self {
+            point,
+            flags,
+            radius,
+        }
     }
 
-    pub fn point(&self) -> *const vec3_t { self.point }
-    pub fn flags(&self) -> c_int { self.flags }
-    pub fn radius(&self) -> c_int { self.radius }
+    pub fn point(&self) -> *const vec3_t {
+        self.point
+    }
+    pub fn flags(&self) -> c_int {
+        self.flags
+    }
+    pub fn radius(&self) -> c_int {
+        self.radius
+    }
 }
 
+/// `G_NAV_ADDRAWPOINT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:302`
 pub struct GNavAddrawpoint;
 
 impl OutboundSysCall for GNavAddrawpoint {
@@ -33,11 +48,7 @@ impl OutboundSysCall for GNavAddrawpoint {
 
 impl EncodeSysCall for GNavAddrawpoint {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.point),
-            a.flags as isize,
-            a.radius as isize,
-        ])
+        SysCallTransport::new([ptr_to_word(a.point), a.flags as isize, a.radius as isize])
     }
 }
 

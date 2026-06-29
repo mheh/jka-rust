@@ -1,6 +1,8 @@
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::syscalls::pass_float;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
 
 /// `G_COS` outbound game-to-engine syscall.
 /// C ABI: `FloatAsInt cos(VMF(1))` — one float arg, returns float bits.
@@ -19,6 +21,9 @@ impl GCosArgs {
     }
 }
 
+/// `G_COS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:280`
 pub struct GCos;
 
 impl OutboundSysCall for GCos {

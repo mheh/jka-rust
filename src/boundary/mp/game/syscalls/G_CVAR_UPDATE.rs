@@ -1,7 +1,9 @@
 use crate::ffi::types::vmCvar_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_CVAR_UPDATE` outbound game-to-engine syscall.
 ///
@@ -23,6 +25,10 @@ impl GCvarUpdateArgs {
     }
 }
 
+/// `G_CVAR_UPDATE` MP game imports syscall boundary token.
+///
+/// Raven: ( vmCvar_t *vmCvar );
+/// Source: `oracle/oracle/codemp/game/g_public.h:122`
 pub struct GCvarUpdate;
 
 impl OutboundSysCall for GCvarUpdate {

@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AAS_ENABLE_ROUTING_AREA` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -25,6 +27,9 @@ impl BotlibAasEnableRoutingAreaArgs {
     }
 }
 
+/// `BOTLIB_AAS_ENABLE_ROUTING_AREA` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:356`
 pub struct BotlibAasEnableRoutingArea;
 
 impl OutboundSysCall for BotlibAasEnableRoutingArea {

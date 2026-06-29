@@ -1,6 +1,8 @@
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_MATRIXMULTIPLY` outbound game-to-engine syscall.
 ///
@@ -15,19 +17,24 @@ pub struct GMatrixmultiplyArgs {
 }
 
 impl GMatrixmultiplyArgs {
-    pub fn new(
-        in1: *const vec3_t,
-        in2: *const vec3_t,
-        out: *mut vec3_t,
-    ) -> Self {
+    pub fn new(in1: *const vec3_t, in2: *const vec3_t, out: *mut vec3_t) -> Self {
         Self { in1, in2, out }
     }
 
-    pub fn in1(&self) -> *const vec3_t { self.in1 }
-    pub fn in2(&self) -> *const vec3_t { self.in2 }
-    pub fn out(&self) -> *mut vec3_t { self.out }
+    pub fn in1(&self) -> *const vec3_t {
+        self.in1
+    }
+    pub fn in2(&self) -> *const vec3_t {
+        self.in2
+    }
+    pub fn out(&self) -> *mut vec3_t {
+        self.out
+    }
 }
 
+/// `G_MATRIXMULTIPLY` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:283`
 pub struct GMatrixmultiply;
 
 impl OutboundSysCall for GMatrixmultiply {

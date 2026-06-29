@@ -1,6 +1,8 @@
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_SHOWNODES` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -12,6 +14,9 @@ impl GNavShownodesArgs {
     }
 }
 
+/// `G_NAV_SHOWNODES` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:305`
 pub struct GNavShownodes;
 
 impl OutboundSysCall for GNavShownodes {

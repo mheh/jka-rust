@@ -1,10 +1,12 @@
 use core::ffi::{c_int, c_void};
 
 use crate::codemp::game::q_shared_h::CollisionRecord_t;
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_COLLISIONDETECT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -115,6 +117,9 @@ impl GG2CollisiondetectArgs {
     }
 }
 
+/// `G_G2_COLLISIONDETECT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:530`
 pub struct GG2Collisiondetect;
 
 impl OutboundSysCall for GG2Collisiondetect {

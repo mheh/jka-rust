@@ -1,7 +1,9 @@
 use core::ffi::{c_char, c_int};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_GET_CONSOLE_MESSAGE` outbound game-to-engine syscall.
 ///
@@ -16,14 +18,28 @@ pub struct BotlibGetConsoleMessageArgs {
 
 impl BotlibGetConsoleMessageArgs {
     pub fn new(client_num: c_int, message: *mut c_char, size: c_int) -> Self {
-        Self { client_num, message, size }
+        Self {
+            client_num,
+            message,
+            size,
+        }
     }
 
-    pub fn client_num(&self) -> c_int { self.client_num }
-    pub fn message(&self) -> *mut c_char { self.message }
-    pub fn size(&self) -> c_int { self.size }
+    pub fn client_num(&self) -> c_int {
+        self.client_num
+    }
+    pub fn message(&self) -> *mut c_char {
+        self.message
+    }
+    pub fn size(&self) -> c_int {
+        self.size
+    }
 }
 
+/// `BOTLIB_GET_CONSOLE_MESSAGE` MP game imports syscall boundary token.
+///
+/// Raven: ( int client, char *message, int size );
+/// Source: `oracle/oracle/codemp/game/g_public.h:353`
 pub struct BotlibGetConsoleMessage;
 
 impl OutboundSysCall for BotlibGetConsoleMessage {

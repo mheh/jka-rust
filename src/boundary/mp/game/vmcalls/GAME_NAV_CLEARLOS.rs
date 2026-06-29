@@ -2,7 +2,9 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_NAV_CLEARLOS` inbound executable-to-game `vmMain` call.
+/// `GAME_NAV_CLEARLOS` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:789`
 pub struct GameNavClearlos;
 
 impl InboundVmCall for GameNavClearlos {

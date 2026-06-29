@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AAS_TRACE_AREAS` outbound game-to-engine syscall.
 ///
@@ -29,16 +31,35 @@ impl BotlibAasTraceAreasArgs {
         points: *mut vec3_t,
         maxareas: c_int,
     ) -> Self {
-        Self { start, end, areas, points, maxareas }
+        Self {
+            start,
+            end,
+            areas,
+            points,
+            maxareas,
+        }
     }
 
-    pub fn start(&self) -> *const vec3_t { self.start }
-    pub fn end(&self) -> *const vec3_t { self.end }
-    pub fn areas(&self) -> *mut c_int { self.areas }
-    pub fn points(&self) -> *mut vec3_t { self.points }
-    pub fn maxareas(&self) -> c_int { self.maxareas }
+    pub fn start(&self) -> *const vec3_t {
+        self.start
+    }
+    pub fn end(&self) -> *const vec3_t {
+        self.end
+    }
+    pub fn areas(&self) -> *mut c_int {
+        self.areas
+    }
+    pub fn points(&self) -> *mut vec3_t {
+        self.points
+    }
+    pub fn maxareas(&self) -> c_int {
+        self.maxareas
+    }
 }
 
+/// `BOTLIB_AAS_TRACE_AREAS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:366`
 pub struct BotlibAasTraceAreas;
 
 impl OutboundSysCall for BotlibAasTraceAreas {

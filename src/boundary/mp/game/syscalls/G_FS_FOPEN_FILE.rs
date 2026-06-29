@@ -1,11 +1,11 @@
 use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 
-use crate::ffi::{types::fileHandle_t, GameImport};
-use crate::codemp::game::q_shared_h::fsMode_t;
 use crate::boundary::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
+use crate::codemp::game::q_shared_h::fsMode_t;
+use crate::ffi::{types::fileHandle_t, GameImport};
 
 /// `G_FS_FOPEN_FILE` outbound game-to-engine syscall.
 ///
@@ -48,6 +48,10 @@ impl GFsFopenFileArgs {
     }
 }
 
+/// `G_FS_FOPEN_FILE` MP game imports syscall boundary token.
+///
+/// Raven: ( const char *qpath, fileHandle_t *file, fsMode_t mode );
+/// Source: `oracle/oracle/codemp/game/g_public.h:133`
 pub struct GFsFopenFile;
 
 impl OutboundSysCall for GFsFopenFile {

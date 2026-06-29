@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// Arguments for the `G_NAV_CONNECTED` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -26,7 +28,9 @@ impl GNavConnectedArgs {
     }
 }
 
-/// `G_NAV_CONNECTED` outbound game-to-engine syscall.
+/// `G_NAV_CONNECTED` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:314`
 pub struct GNavConnected;
 
 impl OutboundSysCall for GNavConnected {
@@ -39,10 +43,7 @@ impl OutboundSysCall for GNavConnected {
 
 impl EncodeSysCall for GNavConnected {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.start_id as isize,
-            a.end_id as isize,
-        ])
+        SysCallTransport::new([a.start_id as isize, a.end_id as isize])
     }
 }
 

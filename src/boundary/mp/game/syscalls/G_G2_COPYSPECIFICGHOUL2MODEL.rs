@@ -1,7 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_COPYSPECIFICGHOUL2MODEL` outbound game-to-engine syscall.
 ///
@@ -15,16 +17,37 @@ pub struct GG2Copyspecificghoul2ModelArgs {
 }
 
 impl GG2Copyspecificghoul2ModelArgs {
-    pub fn new(g2_from: *mut c_void, model_from: c_int, g2_to: *mut c_void, model_to: c_int) -> Self {
-        Self { g2_from, model_from, g2_to, model_to }
+    pub fn new(
+        g2_from: *mut c_void,
+        model_from: c_int,
+        g2_to: *mut c_void,
+        model_to: c_int,
+    ) -> Self {
+        Self {
+            g2_from,
+            model_from,
+            g2_to,
+            model_to,
+        }
     }
 
-    pub fn g2_from(&self) -> *mut c_void { self.g2_from }
-    pub fn model_from(&self) -> c_int { self.model_from }
-    pub fn g2_to(&self) -> *mut c_void { self.g2_to }
-    pub fn model_to(&self) -> c_int { self.model_to }
+    pub fn g2_from(&self) -> *mut c_void {
+        self.g2_from
+    }
+    pub fn model_from(&self) -> c_int {
+        self.model_from
+    }
+    pub fn g2_to(&self) -> *mut c_void {
+        self.g2_to
+    }
+    pub fn model_to(&self) -> c_int {
+        self.model_to
+    }
 }
 
+/// `G_G2_COPYSPECIFICGHOUL2MODEL` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:524`
 pub struct GG2Copyspecificghoul2Model;
 
 impl OutboundSysCall for GG2Copyspecificghoul2Model {

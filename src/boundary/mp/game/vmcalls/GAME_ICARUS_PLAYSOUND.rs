@@ -2,7 +2,9 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_ICARUS_PLAYSOUND` inbound executable-to-game `vmMain` call.
+/// `GAME_ICARUS_PLAYSOUND` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:771`
 pub struct GameIcarusPlaysound;
 
 impl InboundVmCall for GameIcarusPlaysound {

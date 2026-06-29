@@ -1,7 +1,9 @@
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_SET_SERVER_CULL` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -19,6 +21,10 @@ impl GSetServerCullArgs {
     }
 }
 
+/// `G_SET_SERVER_CULL` MP game imports syscall boundary token.
+///
+/// Raven: server culling to reduce traffic on open maps -rww
+/// Source: `oracle/oracle/codemp/game/g_public.h:176`
 pub struct GSetServerCull;
 
 impl OutboundSysCall for GSetServerCull {

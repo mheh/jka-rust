@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_RESET_LAST_AVOID_REACH` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -19,6 +21,9 @@ impl BotlibAiResetLastAvoidReachArgs {
     }
 }
 
+/// `BOTLIB_AI_RESET_LAST_AVOID_REACH` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:468`
 pub struct BotlibAiResetLastAvoidReach;
 
 impl OutboundSysCall for BotlibAiResetLastAvoidReach {

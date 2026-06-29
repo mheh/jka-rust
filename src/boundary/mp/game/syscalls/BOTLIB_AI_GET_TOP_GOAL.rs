@@ -31,7 +31,9 @@ impl BotlibAiGetTopGoalArgs {
     }
 }
 
-/// `BOTLIB_AI_GET_TOP_GOAL` outbound game-to-engine syscall.
+/// `BOTLIB_AI_GET_TOP_GOAL` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:448`
 pub struct BotlibAiGetTopGoal;
 
 impl OutboundSysCall for BotlibAiGetTopGoal {

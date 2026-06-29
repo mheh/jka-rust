@@ -5,7 +5,9 @@ use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_GETRAGBONEPOS` outbound game-to-engine syscall.
 ///
@@ -35,18 +37,39 @@ impl GG2GetragboneposArgs {
         ent_pos: *mut vec3_t,
         ent_scale: *mut vec3_t,
     ) -> Self {
-        Self { ghoul2, bone_name, pos, ent_angles, ent_pos, ent_scale }
+        Self {
+            ghoul2,
+            bone_name,
+            pos,
+            ent_angles,
+            ent_pos,
+            ent_scale,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn bone_name(&self) -> &CString { &self.bone_name }
-    pub fn pos(&self) -> *mut vec3_t { self.pos }
-    pub fn ent_angles(&self) -> *mut vec3_t { self.ent_angles }
-    pub fn ent_pos(&self) -> *mut vec3_t { self.ent_pos }
-    pub fn ent_scale(&self) -> *mut vec3_t { self.ent_scale }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn bone_name(&self) -> &CString {
+        &self.bone_name
+    }
+    pub fn pos(&self) -> *mut vec3_t {
+        self.pos
+    }
+    pub fn ent_angles(&self) -> *mut vec3_t {
+        self.ent_angles
+    }
+    pub fn ent_pos(&self) -> *mut vec3_t {
+        self.ent_pos
+    }
+    pub fn ent_scale(&self) -> *mut vec3_t {
+        self.ent_scale
+    }
 }
 
-/// `G_G2_GETRAGBONEPOS` outbound game-to-engine syscall.
+/// `G_G2_GETRAGBONEPOS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:553`
 pub struct GG2Getragbonepos;
 
 impl OutboundSysCall for GG2Getragbonepos {

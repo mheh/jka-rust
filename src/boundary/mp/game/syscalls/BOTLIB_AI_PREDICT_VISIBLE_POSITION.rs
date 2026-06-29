@@ -2,7 +2,9 @@ use core::ffi::{c_int, c_void};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_PREDICT_VISIBLE_POSITION` outbound game-to-engine syscall.
 ///
@@ -35,16 +37,35 @@ impl BotlibAiPredictVisiblePositionArgs {
         travelflags: c_int,
         target: *mut [f32; 3],
     ) -> Self {
-        Self { origin, areanum, goal, travelflags, target }
+        Self {
+            origin,
+            areanum,
+            goal,
+            travelflags,
+            target,
+        }
     }
 
-    pub fn origin(&self) -> *const [f32; 3] { self.origin }
-    pub fn areanum(&self) -> c_int { self.areanum }
-    pub fn goal(&self) -> *mut c_void { self.goal }
-    pub fn travelflags(&self) -> c_int { self.travelflags }
-    pub fn target(&self) -> *mut [f32; 3] { self.target }
+    pub fn origin(&self) -> *const [f32; 3] {
+        self.origin
+    }
+    pub fn areanum(&self) -> c_int {
+        self.areanum
+    }
+    pub fn goal(&self) -> *mut c_void {
+        self.goal
+    }
+    pub fn travelflags(&self) -> c_int {
+        self.travelflags
+    }
+    pub fn target(&self) -> *mut [f32; 3] {
+        self.target
+    }
 }
 
+/// `BOTLIB_AI_PREDICT_VISIBLE_POSITION` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:490`
 pub struct BotlibAiPredictVisiblePosition;
 
 impl OutboundSysCall for BotlibAiPredictVisiblePosition {

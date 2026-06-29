@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_ISINITIALIZED` outbound game-to-engine syscall.
 ///
@@ -23,6 +25,9 @@ impl GIcarusIsinitializedArgs {
     }
 }
 
+/// `G_ICARUS_ISINITIALIZED` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:257`
 pub struct GIcarusIsinitialized;
 
 impl OutboundSysCall for GIcarusIsinitialized {

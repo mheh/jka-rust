@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_SET_CONFIGSTRING` outbound game-to-engine syscall.
 ///
@@ -29,6 +31,15 @@ impl GSetConfigstringArgs {
     }
 }
 
+/// `G_SET_CONFIGSTRING` MP game imports syscall boundary token.
+///
+/// Raven: ( int num, const char *string );
+/// Raven: config strings hold all the index strings, and various other information
+/// Raven: that is reliably communicated to all clients
+/// Raven: All of the current configstrings are sent to clients when
+/// Raven: they connect, and changes are sent to all connected clients.
+/// Raven: All confgstrings are cleared at each level start.
+/// Source: `oracle/oracle/codemp/game/g_public.h:157`
 pub struct GSetConfigstring;
 
 impl OutboundSysCall for GSetConfigstring {
@@ -41,10 +52,7 @@ impl OutboundSysCall for GSetConfigstring {
 
 impl EncodeSysCall for GSetConfigstring {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.num as isize,
-            ptr_to_word(a.string.as_ptr()),
-        ])
+        SysCallTransport::new([a.num as isize, ptr_to_word(a.string.as_ptr())])
     }
 }
 

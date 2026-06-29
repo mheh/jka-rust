@@ -1,5 +1,7 @@
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_ASIN` outbound game-to-engine syscall.
 ///
@@ -19,6 +21,11 @@ impl GAsinArgs {
     }
 }
 
+/// `G_ASIN` MP game imports syscall boundary token.
+///
+/// Raven: END VM STUFF
+/// Raven: rww - BEGIN NPC NAV TRAPS
+/// Source: `oracle/oracle/codemp/game/g_public.h:293`
 pub struct GAsin;
 
 impl OutboundSysCall for GAsin {

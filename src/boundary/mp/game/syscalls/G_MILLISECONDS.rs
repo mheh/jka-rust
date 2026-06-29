@@ -19,7 +19,14 @@ impl GMillisecondsArgs {
     }
 }
 
-/// `G_MILLISECONDS` outbound game-to-engine syscall.
+/// `G_MILLISECONDS` MP game imports syscall boundary token.
+///
+/// Raven: ( void );
+/// Raven: get current time for profiling reasons
+/// Raven: this should NOT be used for any game related tasks,
+/// Raven: because it is not journaled
+/// Raven: Also for profiling.. do not use for game related tasks.
+/// Source: `oracle/oracle/codemp/game/g_public.h:111`
 pub struct GMilliseconds;
 
 impl OutboundSysCall for GMilliseconds {

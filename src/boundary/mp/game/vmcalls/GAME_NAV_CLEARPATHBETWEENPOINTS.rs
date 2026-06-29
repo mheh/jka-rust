@@ -2,7 +2,9 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_NAV_CLEARPATHBETWEENPOINTS` inbound executable-to-game `vmMain` call.
+/// `GAME_NAV_CLEARPATHBETWEENPOINTS` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:790`
 pub struct GameNavClearpathbetweenpoints;
 
 impl InboundVmCall for GameNavClearpathbetweenpoints {

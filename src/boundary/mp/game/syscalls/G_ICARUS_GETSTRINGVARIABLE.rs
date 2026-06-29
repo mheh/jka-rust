@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_GETSTRINGVARIABLE` outbound game-to-engine syscall.
 ///
@@ -30,6 +32,9 @@ impl GIcarusGetstringvariableArgs {
     }
 }
 
+/// `G_ICARUS_GETSTRINGVARIABLE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:270`
 pub struct GIcarusGetstringvariable;
 
 impl OutboundSysCall for GIcarusGetstringvariable {

@@ -2,7 +2,9 @@ use core::ffi::c_void;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_LISTBONES` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -25,6 +27,9 @@ impl GG2ListbonesArgs {
     }
 }
 
+/// `G_G2_LISTBONES` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:507`
 pub struct GG2Listbones;
 
 impl OutboundSysCall for GG2Listbones {

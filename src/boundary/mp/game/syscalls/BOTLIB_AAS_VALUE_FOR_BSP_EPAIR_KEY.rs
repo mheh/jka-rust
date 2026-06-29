@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AAS_VALUE_FOR_BSP_EPAIR_KEY` outbound game-to-engine syscall.
 ///
@@ -17,15 +19,31 @@ pub struct BotlibAasValueForBspEpairKeyArgs {
 
 impl BotlibAasValueForBspEpairKeyArgs {
     pub fn new(ent: c_int, key: *const c_char, value: *mut c_char, size: c_int) -> Self {
-        Self { ent, key, value, size }
+        Self {
+            ent,
+            key,
+            value,
+            size,
+        }
     }
 
-    pub fn ent(&self) -> c_int { self.ent }
-    pub fn key(&self) -> *const c_char { self.key }
-    pub fn value(&self) -> *mut c_char { self.value }
-    pub fn size(&self) -> c_int { self.size }
+    pub fn ent(&self) -> c_int {
+        self.ent
+    }
+    pub fn key(&self) -> *const c_char {
+        self.key
+    }
+    pub fn value(&self) -> *mut c_char {
+        self.value
+    }
+    pub fn size(&self) -> c_int {
+        self.size
+    }
 }
 
+/// `BOTLIB_AAS_VALUE_FOR_BSP_EPAIR_KEY` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:370`
 pub struct BotlibAasValueForBspEpairKey;
 
 impl OutboundSysCall for BotlibAasValueForBspEpairKey {

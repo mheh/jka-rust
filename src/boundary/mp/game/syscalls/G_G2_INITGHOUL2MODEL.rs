@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_INITGHOUL2MODEL` outbound game-to-engine syscall.
 ///
@@ -33,18 +35,43 @@ impl GG2Initghoul2ModelArgs {
         model_flags: c_int,
         lod_bias: c_int,
     ) -> Self {
-        Self { ghoul2_ptr, file_name, model_index, custom_skin, custom_shader, model_flags, lod_bias }
+        Self {
+            ghoul2_ptr,
+            file_name,
+            model_index,
+            custom_skin,
+            custom_shader,
+            model_flags,
+            lod_bias,
+        }
     }
 
-    pub fn ghoul2_ptr(&self) -> *mut *mut core::ffi::c_void { self.ghoul2_ptr }
-    pub fn file_name(&self) -> &CString { &self.file_name }
-    pub fn model_index(&self) -> c_int { self.model_index }
-    pub fn custom_skin(&self) -> c_int { self.custom_skin }
-    pub fn custom_shader(&self) -> c_int { self.custom_shader }
-    pub fn model_flags(&self) -> c_int { self.model_flags }
-    pub fn lod_bias(&self) -> c_int { self.lod_bias }
+    pub fn ghoul2_ptr(&self) -> *mut *mut core::ffi::c_void {
+        self.ghoul2_ptr
+    }
+    pub fn file_name(&self) -> &CString {
+        &self.file_name
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
+    pub fn custom_skin(&self) -> c_int {
+        self.custom_skin
+    }
+    pub fn custom_shader(&self) -> c_int {
+        self.custom_shader
+    }
+    pub fn model_flags(&self) -> c_int {
+        self.model_flags
+    }
+    pub fn lod_bias(&self) -> c_int {
+        self.lod_bias
+    }
 }
 
+/// `G_G2_INITGHOUL2MODEL` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:514`
 pub struct GG2Initghoul2Model;
 
 impl OutboundSysCall for GG2Initghoul2Model {

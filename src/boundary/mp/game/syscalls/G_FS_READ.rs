@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::{types::fileHandle_t, GameImport};
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_FS_READ` outbound game-to-engine syscall.
 ///
@@ -32,6 +34,10 @@ impl GFsReadArgs {
     }
 }
 
+/// `G_FS_READ` MP game imports syscall boundary token.
+///
+/// Raven: ( void *buffer, int len, fileHandle_t f );
+/// Source: `oracle/oracle/codemp/game/g_public.h:134`
 pub struct GFsRead;
 
 impl OutboundSysCall for GFsRead {
@@ -44,11 +50,7 @@ impl OutboundSysCall for GFsRead {
 
 impl EncodeSysCall for GFsRead {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.buffer),
-            a.len as isize,
-            a.f as isize,
-        ])
+        SysCallTransport::new([ptr_to_word(a.buffer), a.len as isize, a.f as isize])
     }
 }
 

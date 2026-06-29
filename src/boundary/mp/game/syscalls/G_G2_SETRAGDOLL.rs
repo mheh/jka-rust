@@ -1,7 +1,9 @@
-use core::ffi::c_void;
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::sharedRagDollParams_t;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
+use core::ffi::c_void;
 
 /// `G_G2_SETRAGDOLL` outbound game-to-engine syscall.
 ///
@@ -26,6 +28,9 @@ impl GG2SetragdollArgs {
     }
 }
 
+/// `G_G2_SETRAGDOLL` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:544`
 pub struct GG2Setragdoll;
 
 impl OutboundSysCall for GG2Setragdoll {

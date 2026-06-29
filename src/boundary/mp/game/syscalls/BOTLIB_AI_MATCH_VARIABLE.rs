@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_MATCH_VARIABLE` outbound game-to-engine syscall.
 ///
@@ -21,16 +23,37 @@ pub struct BotlibAiMatchVariableArgs {
 }
 
 impl BotlibAiMatchVariableArgs {
-    pub fn new(match_ptr: *mut core::ffi::c_void, variable: c_int, buf: *mut u8, size: c_int) -> Self {
-        Self { match_ptr, variable, buf, size }
+    pub fn new(
+        match_ptr: *mut core::ffi::c_void,
+        variable: c_int,
+        buf: *mut u8,
+        size: c_int,
+    ) -> Self {
+        Self {
+            match_ptr,
+            variable,
+            buf,
+            size,
+        }
     }
 
-    pub fn match_ptr(&self) -> *mut core::ffi::c_void { self.match_ptr }
-    pub fn variable(&self) -> c_int { self.variable }
-    pub fn buf(&self) -> *mut u8 { self.buf }
-    pub fn size(&self) -> c_int { self.size }
+    pub fn match_ptr(&self) -> *mut core::ffi::c_void {
+        self.match_ptr
+    }
+    pub fn variable(&self) -> c_int {
+        self.variable
+    }
+    pub fn buf(&self) -> *mut u8 {
+        self.buf
+    }
+    pub fn size(&self) -> c_int {
+        self.size
+    }
 }
 
+/// `BOTLIB_AI_MATCH_VARIABLE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:433`
 pub struct BotlibAiMatchVariable;
 
 impl OutboundSysCall for BotlibAiMatchVariable {

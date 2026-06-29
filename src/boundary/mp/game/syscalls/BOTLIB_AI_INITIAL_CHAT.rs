@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_INITIAL_CHAT` outbound game-to-engine syscall.
 ///
@@ -42,22 +44,59 @@ impl BotlibAiInitialChatArgs {
         var6: *const c_char,
         var7: *const c_char,
     ) -> Self {
-        Self { chatstate, r#type, mcontext, var0, var1, var2, var3, var4, var5, var6, var7 }
+        Self {
+            chatstate,
+            r#type,
+            mcontext,
+            var0,
+            var1,
+            var2,
+            var3,
+            var4,
+            var5,
+            var6,
+            var7,
+        }
     }
 
-    pub fn chatstate(&self) -> c_int { self.chatstate }
-    pub fn r#type(&self) -> *const c_char { self.r#type }
-    pub fn mcontext(&self) -> c_int { self.mcontext }
-    pub fn var0(&self) -> *const c_char { self.var0 }
-    pub fn var1(&self) -> *const c_char { self.var1 }
-    pub fn var2(&self) -> *const c_char { self.var2 }
-    pub fn var3(&self) -> *const c_char { self.var3 }
-    pub fn var4(&self) -> *const c_char { self.var4 }
-    pub fn var5(&self) -> *const c_char { self.var5 }
-    pub fn var6(&self) -> *const c_char { self.var6 }
-    pub fn var7(&self) -> *const c_char { self.var7 }
+    pub fn chatstate(&self) -> c_int {
+        self.chatstate
+    }
+    pub fn r#type(&self) -> *const c_char {
+        self.r#type
+    }
+    pub fn mcontext(&self) -> c_int {
+        self.mcontext
+    }
+    pub fn var0(&self) -> *const c_char {
+        self.var0
+    }
+    pub fn var1(&self) -> *const c_char {
+        self.var1
+    }
+    pub fn var2(&self) -> *const c_char {
+        self.var2
+    }
+    pub fn var3(&self) -> *const c_char {
+        self.var3
+    }
+    pub fn var4(&self) -> *const c_char {
+        self.var4
+    }
+    pub fn var5(&self) -> *const c_char {
+        self.var5
+    }
+    pub fn var6(&self) -> *const c_char {
+        self.var6
+    }
+    pub fn var7(&self) -> *const c_char {
+        self.var7
+    }
 }
 
+/// `BOTLIB_AI_INITIAL_CHAT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:427`
 pub struct BotlibAiInitialChat;
 
 impl OutboundSysCall for BotlibAiInitialChat {

@@ -1,6 +1,8 @@
-use core::ffi::c_int;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_int;
 
 /// `BOTLIB_EA_ALT_ATTACK` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -18,6 +20,9 @@ impl BotlibEaAltAttackArgs {
     }
 }
 
+/// `BOTLIB_EA_ALT_ATTACK` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:390`
 pub struct BotlibEaAltAttack;
 
 impl OutboundSysCall for BotlibEaAltAttack {

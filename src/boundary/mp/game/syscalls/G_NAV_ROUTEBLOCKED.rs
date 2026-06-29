@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::{types::qboolean, GameImport};
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_ROUTEBLOCKED` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -15,15 +17,31 @@ pub struct GNavRouteblockedArgs {
 
 impl GNavRouteblockedArgs {
     pub fn new(start_id: c_int, test_edge_id: c_int, end_id: c_int, reject_rank: c_int) -> Self {
-        Self { start_id, test_edge_id, end_id, reject_rank }
+        Self {
+            start_id,
+            test_edge_id,
+            end_id,
+            reject_rank,
+        }
     }
 
-    pub fn start_id(&self) -> c_int { self.start_id }
-    pub fn test_edge_id(&self) -> c_int { self.test_edge_id }
-    pub fn end_id(&self) -> c_int { self.end_id }
-    pub fn reject_rank(&self) -> c_int { self.reject_rank }
+    pub fn start_id(&self) -> c_int {
+        self.start_id
+    }
+    pub fn test_edge_id(&self) -> c_int {
+        self.test_edge_id
+    }
+    pub fn end_id(&self) -> c_int {
+        self.end_id
+    }
+    pub fn reject_rank(&self) -> c_int {
+        self.reject_rank
+    }
 }
 
+/// `G_NAV_ROUTEBLOCKED` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:328`
 pub struct GNavRouteblocked;
 
 impl OutboundSysCall for GNavRouteblocked {

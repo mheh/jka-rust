@@ -1,9 +1,11 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_CHARACTERISTIC_BFLOAT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -16,15 +18,31 @@ pub struct BotlibAiCharacteristicBfloatArgs {
 
 impl BotlibAiCharacteristicBfloatArgs {
     pub fn new(character: c_int, index: c_int, min: f32, max: f32) -> Self {
-        Self { character, index, min, max }
+        Self {
+            character,
+            index,
+            min,
+            max,
+        }
     }
 
-    pub fn character(&self) -> c_int { self.character }
-    pub fn index(&self) -> c_int { self.index }
-    pub fn min(&self) -> f32 { self.min }
-    pub fn max(&self) -> f32 { self.max }
+    pub fn character(&self) -> c_int {
+        self.character
+    }
+    pub fn index(&self) -> c_int {
+        self.index
+    }
+    pub fn min(&self) -> f32 {
+        self.min
+    }
+    pub fn max(&self) -> f32 {
+        self.max
+    }
 }
 
+/// `BOTLIB_AI_CHARACTERISTIC_BFLOAT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:416`
 pub struct BotlibAiCharacteristicBfloat;
 
 impl OutboundSysCall for BotlibAiCharacteristicBfloat {

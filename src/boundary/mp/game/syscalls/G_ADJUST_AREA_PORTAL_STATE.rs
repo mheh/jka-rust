@@ -2,7 +2,9 @@ use crate::codemp::game::g_local::gentity_t;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ADJUST_AREA_PORTAL_STATE` outbound game-to-engine syscall.
 ///
@@ -28,6 +30,10 @@ impl GAdjustAreaPortalStateArgs {
     }
 }
 
+/// `G_ADJUST_AREA_PORTAL_STATE` MP game imports syscall boundary token.
+///
+/// Raven: ( gentity_t *ent, qboolean open );
+/// Source: `oracle/oracle/codemp/game/g_public.h:195`
 pub struct GAdjustAreaPortalState;
 
 impl OutboundSysCall for GAdjustAreaPortalState {

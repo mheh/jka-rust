@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_FREE_CHARACTER` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -20,6 +22,9 @@ impl BotlibAiFreeCharacterArgs {
     }
 }
 
+/// `BOTLIB_AI_FREE_CHARACTER` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:414`
 pub struct BotlibAiFreeCharacter;
 
 impl OutboundSysCall for BotlibAiFreeCharacter {

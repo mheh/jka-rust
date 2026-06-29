@@ -2,7 +2,9 @@ use core::ffi::c_void;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_DUPLICATEGHOUL2INSTANCE` outbound game-to-engine syscall.
 ///
@@ -30,6 +32,9 @@ impl GG2Duplicateghoul2InstanceArgs {
     }
 }
 
+/// `G_G2_DUPLICATEGHOUL2INSTANCE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:525`
 pub struct GG2Duplicateghoul2Instance;
 
 impl OutboundSysCall for GG2Duplicateghoul2Instance {
@@ -42,10 +47,7 @@ impl OutboundSysCall for GG2Duplicateghoul2Instance {
 
 impl EncodeSysCall for GG2Duplicateghoul2Instance {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.g2_from()),
-            ptr_to_word(a.g2_to()),
-        ])
+        SysCallTransport::new([ptr_to_word(a.g2_from()), ptr_to_word(a.g2_to())])
     }
 }
 

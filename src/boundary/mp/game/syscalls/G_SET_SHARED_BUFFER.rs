@@ -1,6 +1,8 @@
-use core::ffi::c_char;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_char;
 
 /// `G_SET_SHARED_BUFFER` outbound game-to-engine syscall.
 ///
@@ -24,6 +26,10 @@ impl GSetSharedBufferArgs {
     }
 }
 
+/// `G_SET_SHARED_BUFFER` MP game imports syscall boundary token.
+///
+/// Raven: BEGIN VM STUFF
+/// Source: `oracle/oracle/codemp/game/g_public.h:273`
 pub struct GSetSharedBuffer;
 
 impl OutboundSysCall for GSetSharedBuffer {

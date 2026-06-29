@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_CHAT_LENGTH` outbound game-to-engine syscall.
 ///
@@ -22,6 +24,9 @@ impl BotlibAiChatLengthArgs {
     }
 }
 
+/// `BOTLIB_AI_CHAT_LENGTH` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:429`
 pub struct BotlibAiChatLength;
 
 impl OutboundSysCall for BotlibAiChatLength {

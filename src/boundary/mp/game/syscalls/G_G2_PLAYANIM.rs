@@ -1,9 +1,11 @@
-use core::ffi::{c_int, c_void, c_char};
+use core::ffi::{c_char, c_int, c_void};
 
-use crate::ffi::GameImport;
-use crate::ffi::types::qboolean;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::syscalls::pass_float;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::types::qboolean;
+use crate::ffi::GameImport;
 
 /// `G_G2_PLAYANIM` outbound game-to-engine syscall.
 ///
@@ -40,21 +42,55 @@ impl GG2PlayanimArgs {
         set_frame: f32,
         blend_time: c_int,
     ) -> Self {
-        Self { ghoul2, model_index, bone_name, start_frame, end_frame, flags, anim_speed, current_time, set_frame, blend_time }
+        Self {
+            ghoul2,
+            model_index,
+            bone_name,
+            start_frame,
+            end_frame,
+            flags,
+            anim_speed,
+            current_time,
+            set_frame,
+            blend_time,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn model_index(&self) -> c_int { self.model_index }
-    pub fn bone_name(&self) -> *const c_char { self.bone_name }
-    pub fn start_frame(&self) -> c_int { self.start_frame }
-    pub fn end_frame(&self) -> c_int { self.end_frame }
-    pub fn flags(&self) -> c_int { self.flags }
-    pub fn anim_speed(&self) -> f32 { self.anim_speed }
-    pub fn current_time(&self) -> c_int { self.current_time }
-    pub fn set_frame(&self) -> f32 { self.set_frame }
-    pub fn blend_time(&self) -> c_int { self.blend_time }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
+    pub fn bone_name(&self) -> *const c_char {
+        self.bone_name
+    }
+    pub fn start_frame(&self) -> c_int {
+        self.start_frame
+    }
+    pub fn end_frame(&self) -> c_int {
+        self.end_frame
+    }
+    pub fn flags(&self) -> c_int {
+        self.flags
+    }
+    pub fn anim_speed(&self) -> f32 {
+        self.anim_speed
+    }
+    pub fn current_time(&self) -> c_int {
+        self.current_time
+    }
+    pub fn set_frame(&self) -> f32 {
+        self.set_frame
+    }
+    pub fn blend_time(&self) -> c_int {
+        self.blend_time
+    }
 }
 
+/// `G_G2_PLAYANIM` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:520`
 pub struct GG2Playanim;
 
 impl OutboundSysCall for GG2Playanim {

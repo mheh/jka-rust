@@ -2,7 +2,9 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_NAV_CHECKNODEFAILEDFORENT` inbound executable-to-game `vmMain` call.
+/// `GAME_NAV_CHECKNODEFAILEDFORENT` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:791`
 pub struct GameNavChecknodefailedforent;
 
 impl InboundVmCall for GameNavChecknodefailedforent {

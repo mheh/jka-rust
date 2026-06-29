@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_PC_LOAD_SOURCE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -20,6 +22,9 @@ impl BotlibPcLoadSourceArgs {
     }
 }
 
+/// `BOTLIB_PC_LOAD_SOURCE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:498`
 pub struct BotlibPcLoadSource;
 
 impl OutboundSysCall for BotlibPcLoadSource {

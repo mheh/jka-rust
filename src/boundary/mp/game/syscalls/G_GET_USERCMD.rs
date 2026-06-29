@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::usercmd_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_GET_USERCMD` outbound game-to-engine syscall.
 ///
@@ -30,6 +32,10 @@ impl GGetUsercmdArgs {
     }
 }
 
+/// `G_GET_USERCMD` MP game imports syscall boundary token.
+///
+/// Raven: ( int clientNum, usercmd_t *cmd )
+/// Source: `oracle/oracle/codemp/game/g_public.h:219`
 pub struct GGetUsercmd;
 
 impl OutboundSysCall for GGetUsercmd {
@@ -42,10 +48,7 @@ impl OutboundSysCall for GGetUsercmd {
 
 impl EncodeSysCall for GGetUsercmd {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.client_num as isize,
-            ptr_to_word(a.cmd),
-        ])
+        SysCallTransport::new([a.client_num as isize, ptr_to_word(a.cmd)])
     }
 }
 

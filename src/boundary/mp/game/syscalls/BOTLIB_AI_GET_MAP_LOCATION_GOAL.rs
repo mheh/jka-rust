@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_GET_MAP_LOCATION_GOAL` outbound game-to-engine syscall.
 ///
@@ -31,6 +33,9 @@ impl BotlibAiGetMapLocationGoalArgs {
     }
 }
 
+/// `BOTLIB_AI_GET_MAP_LOCATION_GOAL` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:486`
 pub struct BotlibAiGetMapLocationGoal;
 
 impl OutboundSysCall for BotlibAiGetMapLocationGoal {
@@ -43,10 +48,7 @@ impl OutboundSysCall for BotlibAiGetMapLocationGoal {
 
 impl EncodeSysCall for BotlibAiGetMapLocationGoal {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.name.as_ptr()),
-            ptr_to_word(a.goal),
-        ])
+        SysCallTransport::new([ptr_to_word(a.name.as_ptr()), ptr_to_word(a.goal)])
     }
 }
 

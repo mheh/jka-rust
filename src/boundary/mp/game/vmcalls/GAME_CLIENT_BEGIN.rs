@@ -29,7 +29,10 @@ impl GameClientBeginArgs {
     }
 }
 
-/// `GAME_CLIENT_BEGIN` begins a client session in game code.
+/// `GAME_CLIENT_BEGIN` MP game exports vmMain boundary token.
+///
+/// Raven: ( int clientNum );
+/// Source: `oracle/oracle/codemp/game/g_public.h:746`
 pub struct GameClientBegin;
 
 impl InboundVmCall for GameClientBegin {

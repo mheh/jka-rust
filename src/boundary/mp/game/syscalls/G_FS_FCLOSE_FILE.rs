@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_FS_FCLOSE_FILE` outbound game-to-engine syscall.
 ///
@@ -24,6 +26,10 @@ impl GFsFcloseFileArgs {
     }
 }
 
+/// `G_FS_FCLOSE_FILE` MP game imports syscall boundary token.
+///
+/// Raven: ( fileHandle_t f );
+/// Source: `oracle/oracle/codemp/game/g_public.h:136`
 pub struct GFsFcloseFile;
 
 impl OutboundSysCall for GFsFcloseFile {

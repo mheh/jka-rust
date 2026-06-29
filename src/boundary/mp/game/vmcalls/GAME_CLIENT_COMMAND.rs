@@ -29,7 +29,10 @@ impl GameClientCommandArgs {
     }
 }
 
-/// `GAME_CLIENT_COMMAND` processes a client-issued command.
+/// `GAME_CLIENT_COMMAND` MP game exports vmMain boundary token.
+///
+/// Raven: ( int clientNum );
+/// Source: `oracle/oracle/codemp/game/g_public.h:752`
 pub struct GameClientCommand;
 
 impl InboundVmCall for GameClientCommand {

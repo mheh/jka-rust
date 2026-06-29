@@ -1,8 +1,10 @@
 use core::ffi::{c_char, c_int};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_ICARUS_GETVECTORVARIABLE` outbound game-to-engine syscall.
 ///
@@ -20,10 +22,17 @@ impl GIcarusGetvectorvariableArgs {
         Self { name, value }
     }
 
-    pub fn name(&self) -> *const c_char { self.name }
-    pub fn value(&self) -> *mut vec3_t { self.value }
+    pub fn name(&self) -> *const c_char {
+        self.name
+    }
+    pub fn value(&self) -> *mut vec3_t {
+        self.value
+    }
 }
 
+/// `G_ICARUS_GETVECTORVARIABLE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:271`
 pub struct GIcarusGetvectorvariable;
 
 impl OutboundSysCall for GIcarusGetvectorvariable {
@@ -36,10 +45,7 @@ impl OutboundSysCall for GIcarusGetvectorvariable {
 
 impl EncodeSysCall for GIcarusGetvectorvariable {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.name()),
-            ptr_to_word(a.value()),
-        ])
+        SysCallTransport::new([ptr_to_word(a.name()), ptr_to_word(a.value())])
     }
 }
 

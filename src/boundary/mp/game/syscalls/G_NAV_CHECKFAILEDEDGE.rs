@@ -1,9 +1,10 @@
-
 use crate::codemp::game::g_public_h::failedEdge_t;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_CHECKFAILEDEDGE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,6 +22,9 @@ impl GNavCheckfailededgeArgs {
     }
 }
 
+/// `G_NAV_CHECKFAILEDEDGE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:326`
 pub struct GNavCheckfailededge;
 
 impl OutboundSysCall for GNavCheckfailededge {

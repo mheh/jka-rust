@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_EA_VIEW` outbound game-to-engine syscall.
 ///
@@ -28,6 +30,9 @@ impl BotlibEaViewArgs {
     }
 }
 
+/// `BOTLIB_EA_VIEW` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:406`
 pub struct BotlibEaView;
 
 impl OutboundSysCall for BotlibEaView {
@@ -40,10 +45,7 @@ impl OutboundSysCall for BotlibEaView {
 
 impl EncodeSysCall for BotlibEaView {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.client as isize,
-            ptr_to_word(a.viewangles),
-        ])
+        SysCallTransport::new([a.client as isize, ptr_to_word(a.viewangles)])
     }
 }
 

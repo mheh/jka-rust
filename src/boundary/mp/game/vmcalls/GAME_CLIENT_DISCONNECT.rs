@@ -29,7 +29,10 @@ impl GameClientDisconnectArgs {
     }
 }
 
-/// `GAME_CLIENT_DISCONNECT` releases a client's game-side state.
+/// `GAME_CLIENT_DISCONNECT` MP game exports vmMain boundary token.
+///
+/// Raven: ( int clientNum );
+/// Source: `oracle/oracle/codemp/game/g_public.h:750`
 pub struct GameClientDisconnect;
 
 impl InboundVmCall for GameClientDisconnect {

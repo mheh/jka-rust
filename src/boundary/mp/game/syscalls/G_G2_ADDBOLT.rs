@@ -1,8 +1,10 @@
 use core::ffi::{c_int, c_void};
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_ADDBOLT` outbound game-to-engine syscall.
 ///
@@ -17,14 +19,27 @@ pub struct GG2AddboltArgs {
 
 impl GG2AddboltArgs {
     pub fn new(ghoul2: *mut c_void, model_index: c_int, bone_name: CString) -> Self {
-        Self { ghoul2, model_index, bone_name }
+        Self {
+            ghoul2,
+            model_index,
+            bone_name,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn model_index(&self) -> c_int { self.model_index }
-    pub fn bone_name(&self) -> &CString { &self.bone_name }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
+    pub fn bone_name(&self) -> &CString {
+        &self.bone_name
+    }
 }
 
+/// `G_G2_ADDBOLT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:517`
 pub struct GG2Addbolt;
 
 impl OutboundSysCall for GG2Addbolt {

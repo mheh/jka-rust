@@ -1,9 +1,11 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::{mdxaBone_t, qhandle_t, vec3_t};
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_GETBOLT_NOREC` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -44,17 +46,38 @@ impl GG2GetboltNorecArgs {
         }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn model_index(&self) -> c_int { self.model_index }
-    pub fn bolt_index(&self) -> c_int { self.bolt_index }
-    pub fn matrix(&self) -> *mut mdxaBone_t { self.matrix }
-    pub fn angles(&self) -> *const vec3_t { self.angles }
-    pub fn position(&self) -> *const vec3_t { self.position }
-    pub fn frame_num(&self) -> c_int { self.frame_num }
-    pub fn model_list(&self) -> *mut qhandle_t { self.model_list }
-    pub fn scale(&self) -> *mut vec3_t { self.scale }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
+    pub fn bolt_index(&self) -> c_int {
+        self.bolt_index
+    }
+    pub fn matrix(&self) -> *mut mdxaBone_t {
+        self.matrix
+    }
+    pub fn angles(&self) -> *const vec3_t {
+        self.angles
+    }
+    pub fn position(&self) -> *const vec3_t {
+        self.position
+    }
+    pub fn frame_num(&self) -> c_int {
+        self.frame_num
+    }
+    pub fn model_list(&self) -> *mut qhandle_t {
+        self.model_list
+    }
+    pub fn scale(&self) -> *mut vec3_t {
+        self.scale
+    }
 }
 
+/// `G_G2_GETBOLT_NOREC` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:512`
 pub struct GG2GetboltNorec;
 
 impl OutboundSysCall for GG2GetboltNorec {

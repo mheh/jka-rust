@@ -1,10 +1,12 @@
 use core::ffi::c_int;
 
 use crate::codemp::game::q_shared_h::vec3_t;
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_ADD_AVOID_SPOT` outbound game-to-engine syscall.
 ///
@@ -19,15 +21,31 @@ pub struct BotlibAiAddAvoidSpotArgs {
 
 impl BotlibAiAddAvoidSpotArgs {
     pub fn new(movestate: c_int, origin: *const vec3_t, radius: f32, spot_type: c_int) -> Self {
-        Self { movestate, origin, radius, spot_type }
+        Self {
+            movestate,
+            origin,
+            radius,
+            spot_type,
+        }
     }
 
-    pub fn movestate(&self) -> c_int { self.movestate }
-    pub fn origin(&self) -> *const vec3_t { self.origin }
-    pub fn radius(&self) -> f32 { self.radius }
-    pub fn spot_type(&self) -> c_int { self.spot_type }
+    pub fn movestate(&self) -> c_int {
+        self.movestate
+    }
+    pub fn origin(&self) -> *const vec3_t {
+        self.origin
+    }
+    pub fn radius(&self) -> f32 {
+        self.radius
+    }
+    pub fn spot_type(&self) -> c_int {
+        self.spot_type
+    }
 }
 
+/// `BOTLIB_AI_ADD_AVOID_SPOT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:493`
 pub struct BotlibAiAddAvoidSpot;
 
 impl OutboundSysCall for BotlibAiAddAvoidSpot {

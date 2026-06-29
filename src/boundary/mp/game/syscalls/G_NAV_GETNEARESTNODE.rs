@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use crate::codemp::game::g_local::gentity_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_GETNEARESTNODE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -16,15 +18,31 @@ pub struct GNavGetnearestnodeArgs {
 
 impl GNavGetnearestnodeArgs {
     pub fn new(ent: *mut gentity_t, last_id: c_int, flags: c_int, target_id: c_int) -> Self {
-        Self { ent, last_id, flags, target_id }
+        Self {
+            ent,
+            last_id,
+            flags,
+            target_id,
+        }
     }
 
-    pub fn ent(&self) -> *mut gentity_t { self.ent }
-    pub fn last_id(&self) -> c_int { self.last_id }
-    pub fn flags(&self) -> c_int { self.flags }
-    pub fn target_id(&self) -> c_int { self.target_id }
+    pub fn ent(&self) -> *mut gentity_t {
+        self.ent
+    }
+    pub fn last_id(&self) -> c_int {
+        self.last_id
+    }
+    pub fn flags(&self) -> c_int {
+        self.flags
+    }
+    pub fn target_id(&self) -> c_int {
+        self.target_id
+    }
 }
 
+/// `G_NAV_GETNEARESTNODE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:308`
 pub struct GNavGetnearestnode;
 
 impl OutboundSysCall for GNavGetnearestnode {

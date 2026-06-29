@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_POINT_CONTENTS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -13,7 +15,10 @@ pub struct GPointContentsArgs {
 
 impl GPointContentsArgs {
     pub fn new(point: *const vec3_t, pass_entity_num: c_int) -> Self {
-        Self { point, pass_entity_num }
+        Self {
+            point,
+            pass_entity_num,
+        }
     }
 
     pub fn point(&self) -> *const vec3_t {
@@ -25,6 +30,11 @@ impl GPointContentsArgs {
     }
 }
 
+/// `G_POINT_CONTENTS` MP game imports syscall boundary token.
+///
+/// Raven: ( const vec3_t point, int passEntityNum );
+/// Raven: point contents against all linked entities
+/// Source: `oracle/oracle/codemp/game/g_public.h:188`
 pub struct GPointContents;
 
 impl OutboundSysCall for GPointContents {
@@ -37,10 +47,7 @@ impl OutboundSysCall for GPointContents {
 
 impl EncodeSysCall for GPointContents {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.point),
-            a.pass_entity_num as isize,
-        ])
+        SysCallTransport::new([ptr_to_word(a.point), a.pass_entity_num as isize])
     }
 }
 

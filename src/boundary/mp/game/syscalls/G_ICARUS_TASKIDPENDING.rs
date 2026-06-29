@@ -31,6 +31,9 @@ impl GIcarusTaskidpendingArgs {
     }
 }
 
+/// `G_ICARUS_TASKIDPENDING` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:260`
 pub struct GIcarusTaskidpending;
 
 impl OutboundSysCall for GIcarusTaskidpending {

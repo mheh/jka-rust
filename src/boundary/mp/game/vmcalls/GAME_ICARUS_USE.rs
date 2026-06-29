@@ -2,7 +2,9 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_ICARUS_USE` inbound executable-to-game `vmMain` call.
+/// `GAME_ICARUS_USE` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:779`
 pub struct GameIcarusUse;
 
 impl InboundVmCall for GameIcarusUse {

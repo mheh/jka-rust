@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
 
 /// `BOTLIB_AI_CHOOSE_LTG_ITEM` outbound game-to-engine syscall.
 ///
@@ -16,16 +18,37 @@ pub struct BotlibAiChooseLtgItemArgs {
 }
 
 impl BotlibAiChooseLtgItemArgs {
-    pub fn new(goalstate: c_int, origin: *const vec3_t, inventory: *mut c_int, travelflags: c_int) -> Self {
-        Self { goalstate, origin, inventory, travelflags }
+    pub fn new(
+        goalstate: c_int,
+        origin: *const vec3_t,
+        inventory: *mut c_int,
+        travelflags: c_int,
+    ) -> Self {
+        Self {
+            goalstate,
+            origin,
+            inventory,
+            travelflags,
+        }
     }
 
-    pub fn goalstate(&self) -> c_int { self.goalstate }
-    pub fn origin(&self) -> *const vec3_t { self.origin }
-    pub fn inventory(&self) -> *mut c_int { self.inventory }
-    pub fn travelflags(&self) -> c_int { self.travelflags }
+    pub fn goalstate(&self) -> c_int {
+        self.goalstate
+    }
+    pub fn origin(&self) -> *const vec3_t {
+        self.origin
+    }
+    pub fn inventory(&self) -> *mut c_int {
+        self.inventory
+    }
+    pub fn travelflags(&self) -> c_int {
+        self.travelflags
+    }
 }
 
+/// `BOTLIB_AI_CHOOSE_LTG_ITEM` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:450`
 pub struct BotlibAiChooseLtgItem;
 
 impl OutboundSysCall for BotlibAiChooseLtgItem {

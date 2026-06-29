@@ -1,8 +1,10 @@
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+use crate::ffi::types::qboolean;
+use crate::ffi::GameImport;
 use core::ffi::c_int;
 use std::ffi::CString;
-use crate::ffi::GameImport;
-use crate::ffi::types::qboolean;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_SETROOTSURFACE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,14 +16,27 @@ pub struct GG2SetrootsurfaceArgs {
 
 impl GG2SetrootsurfaceArgs {
     pub fn new(ghoul2: *mut core::ffi::c_void, model_index: c_int, surface_name: CString) -> Self {
-        Self { ghoul2, model_index, surface_name }
+        Self {
+            ghoul2,
+            model_index,
+            surface_name,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut core::ffi::c_void { self.ghoul2 }
-    pub fn model_index(&self) -> c_int { self.model_index }
-    pub fn surface_name(&self) -> &CString { &self.surface_name }
+    pub fn ghoul2(&self) -> *mut core::ffi::c_void {
+        self.ghoul2
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
+    pub fn surface_name(&self) -> &CString {
+        &self.surface_name
+    }
 }
 
+/// `G_G2_SETROOTSURFACE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:533`
 pub struct GG2Setrootsurface;
 
 impl OutboundSysCall for GG2Setrootsurface {

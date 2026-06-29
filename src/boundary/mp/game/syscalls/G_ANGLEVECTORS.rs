@@ -1,6 +1,8 @@
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_ANGLEVECTORS` outbound game-to-engine syscall.
 ///
@@ -22,15 +24,31 @@ impl GAnglevectorsArgs {
         right: *mut vec3_t,
         up: *mut vec3_t,
     ) -> Self {
-        Self { angles, forward, right, up }
+        Self {
+            angles,
+            forward,
+            right,
+            up,
+        }
     }
 
-    pub fn angles(&self) -> *const vec3_t { self.angles }
-    pub fn forward(&self) -> *mut vec3_t { self.forward }
-    pub fn right(&self) -> *mut vec3_t { self.right }
-    pub fn up(&self) -> *mut vec3_t { self.up }
+    pub fn angles(&self) -> *const vec3_t {
+        self.angles
+    }
+    pub fn forward(&self) -> *mut vec3_t {
+        self.forward
+    }
+    pub fn right(&self) -> *mut vec3_t {
+        self.right
+    }
+    pub fn up(&self) -> *mut vec3_t {
+        self.up
+    }
 }
 
+/// `G_ANGLEVECTORS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:284`
 pub struct GAnglevectors;
 
 impl OutboundSysCall for GAnglevectors {

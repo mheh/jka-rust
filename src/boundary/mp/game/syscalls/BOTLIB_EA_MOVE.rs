@@ -4,7 +4,9 @@ use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::syscalls::pass_float;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_EA_MOVE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -32,6 +34,9 @@ impl BotlibEaMoveArgs {
     }
 }
 
+/// `BOTLIB_EA_MOVE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:405`
 pub struct BotlibEaMove;
 
 impl OutboundSysCall for BotlibEaMove {
@@ -44,11 +49,7 @@ impl OutboundSysCall for BotlibEaMove {
 
 impl EncodeSysCall for BotlibEaMove {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.client as isize,
-            ptr_to_word(a.dir),
-            pass_float(a.speed),
-        ])
+        SysCallTransport::new([a.client as isize, ptr_to_word(a.dir), pass_float(a.speed)])
     }
 }
 

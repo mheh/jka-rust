@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::{types::qboolean, GameImport};
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_GETBONEANIM` outbound game-to-engine syscall.
 ///
@@ -59,18 +61,41 @@ impl GG2GetboneanimArgs {
         }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn bone_name(&self) -> &CString { &self.bone_name }
-    pub fn current_time(&self) -> c_int { self.current_time }
-    pub fn current_frame(&self) -> *mut f32 { self.current_frame }
-    pub fn start_frame(&self) -> *mut c_int { self.start_frame }
-    pub fn end_frame(&self) -> *mut c_int { self.end_frame }
-    pub fn flags(&self) -> *mut c_int { self.flags }
-    pub fn anim_speed(&self) -> *mut f32 { self.anim_speed }
-    pub fn model_list(&self) -> *mut c_int { self.model_list }
-    pub fn model_index(&self) -> c_int { self.model_index }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn bone_name(&self) -> &CString {
+        &self.bone_name
+    }
+    pub fn current_time(&self) -> c_int {
+        self.current_time
+    }
+    pub fn current_frame(&self) -> *mut f32 {
+        self.current_frame
+    }
+    pub fn start_frame(&self) -> *mut c_int {
+        self.start_frame
+    }
+    pub fn end_frame(&self) -> *mut c_int {
+        self.end_frame
+    }
+    pub fn flags(&self) -> *mut c_int {
+        self.flags
+    }
+    pub fn anim_speed(&self) -> *mut f32 {
+        self.anim_speed
+    }
+    pub fn model_list(&self) -> *mut c_int {
+        self.model_list
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
 }
 
+/// `G_G2_GETBONEANIM` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:521`
 pub struct GG2Getboneanim;
 
 impl OutboundSysCall for GG2Getboneanim {

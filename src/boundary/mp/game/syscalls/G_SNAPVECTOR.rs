@@ -1,7 +1,9 @@
-use crate::ffi::GameImport;
 use crate::codemp::game::q_shared_h::vec3_t;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_SNAPVECTOR` outbound game-to-engine syscall.
 ///
@@ -23,6 +25,9 @@ impl GSnapvectorArgs {
     }
 }
 
+/// `G_SNAPVECTOR` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:233`
 pub struct GSnapvector;
 
 impl OutboundSysCall for GSnapvector {

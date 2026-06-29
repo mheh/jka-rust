@@ -21,6 +21,9 @@ impl GNavClearfailededgeArgs {
     }
 }
 
+/// `G_NAV_CLEARFAILEDEDGE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:322`
 pub struct GNavClearfailededge;
 
 impl OutboundSysCall for GNavClearfailededge {

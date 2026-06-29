@@ -1,6 +1,8 @@
-use core::ffi::c_int;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_int;
 
 /// `BOTLIB_AI_NUM_CONSOLE_MESSAGE` outbound game-to-engine syscall.
 ///
@@ -21,6 +23,9 @@ impl BotlibAiNumConsoleMessageArgs {
     }
 }
 
+/// `BOTLIB_AI_NUM_CONSOLE_MESSAGE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:426`
 pub struct BotlibAiNumConsoleMessage;
 
 impl OutboundSysCall for BotlibAiNumConsoleMessage {

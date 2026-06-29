@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_GETPROJECTEDNODE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -26,6 +28,9 @@ impl GNavGetprojectednodeArgs {
     }
 }
 
+/// `G_NAV_GETPROJECTEDNODE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:317`
 pub struct GNavGetprojectednode;
 
 impl OutboundSysCall for GNavGetprojectednode {
@@ -38,10 +43,7 @@ impl OutboundSysCall for GNavGetprojectednode {
 
 impl EncodeSysCall for GNavGetprojectednode {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.origin()),
-            a.node_id() as isize,
-        ])
+        SysCallTransport::new([ptr_to_word(a.origin()), a.node_id() as isize])
     }
 }
 

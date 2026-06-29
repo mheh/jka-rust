@@ -1,7 +1,9 @@
 use crate::codemp::game::g_local::gentity_t;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_ICARUS_ASSOCIATEENT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -19,6 +21,9 @@ impl GIcarusAssociateentArgs {
     }
 }
 
+/// `G_ICARUS_ASSOCIATEENT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:263`
 pub struct GIcarusAssociateent;
 
 impl OutboundSysCall for GIcarusAssociateent {

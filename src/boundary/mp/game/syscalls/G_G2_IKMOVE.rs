@@ -1,9 +1,11 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::sharedIKMoveParams_t;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_IKMOVE` outbound game-to-engine syscall.
 ///
@@ -17,7 +19,11 @@ pub struct GG2IkmoveArgs {
 
 impl GG2IkmoveArgs {
     pub fn new(ghoul2: *mut c_void, time: c_int, params: *mut sharedIKMoveParams_t) -> Self {
-        Self { ghoul2, time, params }
+        Self {
+            ghoul2,
+            time,
+            params,
+        }
     }
 
     pub fn ghoul2(&self) -> *mut c_void {
@@ -33,6 +39,9 @@ impl GG2IkmoveArgs {
     }
 }
 
+/// `G_G2_IKMOVE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:560`
 pub struct GG2Ikmove;
 
 impl OutboundSysCall for GG2Ikmove {

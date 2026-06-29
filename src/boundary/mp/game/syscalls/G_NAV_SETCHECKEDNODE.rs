@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_NAV_SETCHECKEDNODE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -14,14 +16,27 @@ pub struct GNavSetcheckednodeArgs {
 
 impl GNavSetcheckednodeArgs {
     pub fn new(way_point: c_int, ent: c_int, value: c_int) -> Self {
-        Self { way_point, ent, value }
+        Self {
+            way_point,
+            ent,
+            value,
+        }
     }
 
-    pub fn way_point(&self) -> c_int { self.way_point }
-    pub fn ent(&self) -> c_int { self.ent }
-    pub fn value(&self) -> c_int { self.value }
+    pub fn way_point(&self) -> c_int {
+        self.way_point
+    }
+    pub fn ent(&self) -> c_int {
+        self.ent
+    }
+    pub fn value(&self) -> c_int {
+        self.value
+    }
 }
 
+/// `G_NAV_SETCHECKEDNODE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:336`
 pub struct GNavSetcheckednode;
 
 impl OutboundSysCall for GNavSetcheckednode {
@@ -34,11 +49,7 @@ impl OutboundSysCall for GNavSetcheckednode {
 
 impl EncodeSysCall for GNavSetcheckednode {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.way_point as isize,
-            a.ent as isize,
-            a.value as isize,
-        ])
+        SysCallTransport::new([a.way_point as isize, a.ent as isize, a.value as isize])
     }
 }
 

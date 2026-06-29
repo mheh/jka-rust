@@ -1,6 +1,8 @@
-use core::ffi::c_int;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_int;
 
 /// `BOTLIB_GET_SNAPSHOT_ENTITY` outbound game-to-engine syscall.
 ///
@@ -13,7 +15,10 @@ pub struct BotlibGetSnapshotEntityArgs {
 
 impl BotlibGetSnapshotEntityArgs {
     pub fn new(client_num: c_int, sequence: c_int) -> Self {
-        Self { client_num, sequence }
+        Self {
+            client_num,
+            sequence,
+        }
     }
 
     pub fn client_num(&self) -> c_int {
@@ -25,6 +30,10 @@ impl BotlibGetSnapshotEntityArgs {
     }
 }
 
+/// `BOTLIB_GET_SNAPSHOT_ENTITY` MP game imports syscall boundary token.
+///
+/// Raven: ( int client, int ent );
+/// Source: `oracle/oracle/codemp/game/g_public.h:352`
 pub struct BotlibGetSnapshotEntity;
 
 impl OutboundSysCall for BotlibGetSnapshotEntity {
@@ -37,10 +46,7 @@ impl OutboundSysCall for BotlibGetSnapshotEntity {
 
 impl EncodeSysCall for BotlibGetSnapshotEntity {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.client_num as isize,
-            a.sequence as isize,
-        ])
+        SysCallTransport::new([a.client_num as isize, a.sequence as isize])
     }
 }
 

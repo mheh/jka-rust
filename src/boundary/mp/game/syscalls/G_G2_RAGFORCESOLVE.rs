@@ -2,7 +2,9 @@ use core::ffi::c_void;
 
 use crate::ffi::{types::qboolean, GameImport};
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_RAGFORCESOLVE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -25,6 +27,11 @@ impl GG2RagforcesolvArgs {
     }
 }
 
+/// `G_G2_RAGFORCESOLVE` MP game imports syscall boundary token.
+///
+/// Raven: rww - ik move method, allows you to specify a bone and move it to a world point (within joint constraints)
+/// Raven: by using the majority of gil's existing bone angling stuff from the ragdoll code.
+/// Source: `oracle/oracle/codemp/game/g_public.h:555`
 pub struct GG2Ragforcesolve;
 
 impl OutboundSysCall for GG2Ragforcesolve {

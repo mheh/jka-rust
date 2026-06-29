@@ -1,9 +1,11 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::types::qboolean;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::ffi::GameImport;
 
 /// `G_NAV_SAVE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -26,6 +28,9 @@ impl GNavSaveArgs {
     }
 }
 
+/// `G_NAV_SAVE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:301`
 pub struct GNavSave;
 
 impl OutboundSysCall for GNavSave {
@@ -38,10 +43,7 @@ impl OutboundSysCall for GNavSave {
 
 impl EncodeSysCall for GNavSave {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.filename.as_ptr()),
-            a.checksum as isize,
-        ])
+        SysCallTransport::new([ptr_to_word(a.filename.as_ptr()), a.checksum as isize])
     }
 }
 

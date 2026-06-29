@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_NUM_INITIAL_CHATS` outbound game-to-engine syscall.
 ///
@@ -16,7 +18,10 @@ pub struct BotlibAiNumInitialChatsArgs {
 
 impl BotlibAiNumInitialChatsArgs {
     pub fn new(chatstate: c_int, chat_type: CString) -> Self {
-        Self { chatstate, chat_type }
+        Self {
+            chatstate,
+            chat_type,
+        }
     }
 
     pub fn chatstate(&self) -> c_int {
@@ -28,6 +33,9 @@ impl BotlibAiNumInitialChatsArgs {
     }
 }
 
+/// `BOTLIB_AI_NUM_INITIAL_CHATS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:487`
 pub struct BotlibAiNumInitialChats;
 
 impl OutboundSysCall for BotlibAiNumInitialChats {
@@ -40,10 +48,7 @@ impl OutboundSysCall for BotlibAiNumInitialChats {
 
 impl EncodeSysCall for BotlibAiNumInitialChats {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.chatstate as isize,
-            ptr_to_word(a.chat_type.as_ptr()),
-        ])
+        SysCallTransport::new([a.chatstate as isize, ptr_to_word(a.chat_type.as_ptr())])
     }
 }
 

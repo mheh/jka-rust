@@ -1,7 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_BOT_UPDATEWAYPOINTS` outbound game-to-engine syscall.
 ///
@@ -27,6 +29,9 @@ impl GBotUpdatewaypointsArgs {
     }
 }
 
+/// `G_BOT_UPDATEWAYPOINTS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:575`
 pub struct GBotUpdatewaypoints;
 
 impl OutboundSysCall for GBotUpdatewaypoints {
@@ -39,10 +44,7 @@ impl OutboundSysCall for GBotUpdatewaypoints {
 
 impl EncodeSysCall for GBotUpdatewaypoints {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.wpnum as isize,
-            ptr_to_word(a.wps as *const _),
-        ])
+        SysCallTransport::new([a.wpnum as isize, ptr_to_word(a.wps as *const _)])
     }
 }
 

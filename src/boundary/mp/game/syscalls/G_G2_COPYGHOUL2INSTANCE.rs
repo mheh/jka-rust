@@ -3,7 +3,9 @@ use core::ffi::c_void;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_COPYGHOUL2INSTANCE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -18,14 +20,27 @@ pub struct GG2Copyghoul2InstanceArgs {
 
 impl GG2Copyghoul2InstanceArgs {
     pub fn new(g2_from: *mut c_void, g2_to: *mut c_void, model_index: c_int) -> Self {
-        Self { g2_from, g2_to, model_index }
+        Self {
+            g2_from,
+            g2_to,
+            model_index,
+        }
     }
 
-    pub fn g2_from(&self) -> *mut c_void { self.g2_from }
-    pub fn g2_to(&self) -> *mut c_void { self.g2_to }
-    pub fn model_index(&self) -> c_int { self.model_index }
+    pub fn g2_from(&self) -> *mut c_void {
+        self.g2_from
+    }
+    pub fn g2_to(&self) -> *mut c_void {
+        self.g2_to
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
 }
 
+/// `G_G2_COPYGHOUL2INSTANCE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:523`
 pub struct GG2Copyghoul2Instance;
 
 impl OutboundSysCall for GG2Copyghoul2Instance {

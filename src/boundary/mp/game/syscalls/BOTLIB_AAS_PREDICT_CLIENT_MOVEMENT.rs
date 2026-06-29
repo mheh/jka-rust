@@ -1,7 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT` outbound game-to-engine syscall.
 ///
@@ -67,21 +69,50 @@ impl BotlibAasPredictClientMovementArgs {
         }
     }
 
-    pub fn move_result(&self) -> *mut c_void { self.move_result }
-    pub fn entnum(&self) -> c_int { self.entnum }
-    pub fn origin(&self) -> *const f32 { self.origin }
-    pub fn presencetype(&self) -> c_int { self.presencetype }
-    pub fn onground(&self) -> c_int { self.onground }
-    pub fn velocity(&self) -> *const f32 { self.velocity }
-    pub fn cmdmove(&self) -> *const f32 { self.cmdmove }
-    pub fn cmdframes(&self) -> c_int { self.cmdframes }
-    pub fn maxframes(&self) -> c_int { self.maxframes }
-    pub fn frametime(&self) -> f32 { self.frametime }
-    pub fn stopevent(&self) -> c_int { self.stopevent }
-    pub fn stopareanum(&self) -> c_int { self.stopareanum }
-    pub fn visualize(&self) -> c_int { self.visualize }
+    pub fn move_result(&self) -> *mut c_void {
+        self.move_result
+    }
+    pub fn entnum(&self) -> c_int {
+        self.entnum
+    }
+    pub fn origin(&self) -> *const f32 {
+        self.origin
+    }
+    pub fn presencetype(&self) -> c_int {
+        self.presencetype
+    }
+    pub fn onground(&self) -> c_int {
+        self.onground
+    }
+    pub fn velocity(&self) -> *const f32 {
+        self.velocity
+    }
+    pub fn cmdmove(&self) -> *const f32 {
+        self.cmdmove
+    }
+    pub fn cmdframes(&self) -> c_int {
+        self.cmdframes
+    }
+    pub fn maxframes(&self) -> c_int {
+        self.maxframes
+    }
+    pub fn frametime(&self) -> f32 {
+        self.frametime
+    }
+    pub fn stopevent(&self) -> c_int {
+        self.stopevent
+    }
+    pub fn stopareanum(&self) -> c_int {
+        self.stopareanum
+    }
+    pub fn visualize(&self) -> c_int {
+        self.visualize
+    }
 }
 
+/// `BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:380`
 pub struct BotlibAasPredictClientMovement;
 
 impl OutboundSysCall for BotlibAasPredictClientMovement {

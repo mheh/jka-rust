@@ -1,9 +1,11 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
 use crate::codemp::game::q_shared_h::vec3_t;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -15,16 +17,37 @@ pub struct BotlibAasAreaTravelTimeToGoalAreaArgs {
 }
 
 impl BotlibAasAreaTravelTimeToGoalAreaArgs {
-    pub fn new(areanum: c_int, origin: *const vec3_t, goalareanum: c_int, travelflags: c_int) -> Self {
-        Self { areanum, origin, goalareanum, travelflags }
+    pub fn new(
+        areanum: c_int,
+        origin: *const vec3_t,
+        goalareanum: c_int,
+        travelflags: c_int,
+    ) -> Self {
+        Self {
+            areanum,
+            origin,
+            goalareanum,
+            travelflags,
+        }
     }
 
-    pub fn areanum(&self) -> c_int { self.areanum }
-    pub fn origin(&self) -> *const vec3_t { self.origin }
-    pub fn goalareanum(&self) -> c_int { self.goalareanum }
-    pub fn travelflags(&self) -> c_int { self.travelflags }
+    pub fn areanum(&self) -> c_int {
+        self.areanum
+    }
+    pub fn origin(&self) -> *const vec3_t {
+        self.origin
+    }
+    pub fn goalareanum(&self) -> c_int {
+        self.goalareanum
+    }
+    pub fn travelflags(&self) -> c_int {
+        self.travelflags
+    }
 }
 
+/// `BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:377`
 pub struct BotlibAasAreaTravelTimeToGoalArea;
 
 impl OutboundSysCall for BotlibAasAreaTravelTimeToGoalArea {

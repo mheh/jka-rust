@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_int};
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_GET_CONFIGSTRING` outbound game-to-engine syscall.
 ///
@@ -36,6 +38,10 @@ impl GGetConfigstringArgs {
     }
 }
 
+/// `G_GET_CONFIGSTRING` MP game imports syscall boundary token.
+///
+/// Raven: ( int num, char *buffer, int bufferSize );
+/// Source: `oracle/oracle/codemp/game/g_public.h:164`
 pub struct GGetConfigstring;
 
 impl OutboundSysCall for GGetConfigstring {
@@ -48,11 +54,7 @@ impl OutboundSysCall for GGetConfigstring {
 
 impl EncodeSysCall for GGetConfigstring {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.num as isize,
-            ptr_to_word(a.buf),
-            a.buf_len as isize,
-        ])
+        SysCallTransport::new([a.num as isize, ptr_to_word(a.buf), a.buf_len as isize])
     }
 }
 

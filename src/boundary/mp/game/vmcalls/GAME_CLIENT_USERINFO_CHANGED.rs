@@ -29,7 +29,10 @@ impl GameClientUserinfoChangedArgs {
     }
 }
 
-/// `GAME_CLIENT_USERINFO_CHANGED` refreshes game-side client info.
+/// `GAME_CLIENT_USERINFO_CHANGED` MP game exports vmMain boundary token.
+///
+/// Raven: ( int clientNum );
+/// Source: `oracle/oracle/codemp/game/g_public.h:748`
 pub struct GameClientUserinfoChanged;
 
 impl InboundVmCall for GameClientUserinfoChanged {

@@ -20,7 +20,12 @@ pub struct BotlibAiItemGoalInVisButNotVisibleArgs {
 
 impl BotlibAiItemGoalInVisButNotVisibleArgs {
     pub fn new(viewer: c_int, eye: *const f32, viewangles: *const f32, goal: *mut c_void) -> Self {
-        Self { viewer, eye, viewangles, goal }
+        Self {
+            viewer,
+            eye,
+            viewangles,
+            goal,
+        }
     }
 
     pub fn viewer(&self) -> c_int {
@@ -40,6 +45,9 @@ impl BotlibAiItemGoalInVisButNotVisibleArgs {
     }
 }
 
+/// `BOTLIB_AI_ITEM_GOAL_IN_VIS_BUT_NOT_VISIBLE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:453`
 pub struct BotlibAiItemGoalInVisButNotVisible;
 
 impl OutboundSysCall for BotlibAiItemGoalInVisButNotVisible {

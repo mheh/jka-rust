@@ -2,7 +2,9 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_GETITEMINDEXBYTAG` inbound executable-to-game `vmMain` call.
+/// `GAME_GETITEMINDEXBYTAG` MP game exports vmMain boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:798`
 pub struct GameGetitemindexbytag;
 
 impl InboundVmCall for GameGetitemindexbytag {

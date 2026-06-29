@@ -1,9 +1,11 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
 use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_AI_MOVEMENT_VIEW_TARGET` outbound game-to-engine syscall.
 ///
@@ -36,16 +38,35 @@ impl BotlibAiMovementViewTargetArgs {
         lookahead: f32,
         target: *mut [f32; 3],
     ) -> Self {
-        Self { movestate, goal, travelflags, lookahead, target }
+        Self {
+            movestate,
+            goal,
+            travelflags,
+            lookahead,
+            target,
+        }
     }
 
-    pub fn movestate(&self) -> c_int { self.movestate }
-    pub fn goal(&self) -> *mut c_void { self.goal }
-    pub fn travelflags(&self) -> c_int { self.travelflags }
-    pub fn lookahead(&self) -> f32 { self.lookahead }
-    pub fn target(&self) -> *mut [f32; 3] { self.target }
+    pub fn movestate(&self) -> c_int {
+        self.movestate
+    }
+    pub fn goal(&self) -> *mut c_void {
+        self.goal
+    }
+    pub fn travelflags(&self) -> c_int {
+        self.travelflags
+    }
+    pub fn lookahead(&self) -> f32 {
+        self.lookahead
+    }
+    pub fn target(&self) -> *mut [f32; 3] {
+        self.target
+    }
 }
 
+/// `BOTLIB_AI_MOVEMENT_VIEW_TARGET` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:470`
 pub struct BotlibAiMovementViewTarget;
 
 impl OutboundSysCall for BotlibAiMovementViewTarget {

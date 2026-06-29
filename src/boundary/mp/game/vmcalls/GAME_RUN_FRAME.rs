@@ -31,7 +31,10 @@ impl GameRunFrameArgs {
     }
 }
 
-/// `GAME_RUN_FRAME` advances the level simulation.
+/// `GAME_RUN_FRAME` MP game exports vmMain boundary token.
+///
+/// Raven: ( int levelTime );
+/// Source: `oracle/oracle/codemp/game/g_public.h:756`
 pub struct GameRunFrame;
 
 impl InboundVmCall for GameRunFrame {

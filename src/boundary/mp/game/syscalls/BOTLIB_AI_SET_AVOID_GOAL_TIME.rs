@@ -1,6 +1,8 @@
-use core::ffi::c_int;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_int;
 
 /// `BOTLIB_AI_SET_AVOID_GOAL_TIME` outbound game-to-engine syscall.
 ///
@@ -15,14 +17,27 @@ pub struct BotlibAiSetAvoidGoalTimeArgs {
 
 impl BotlibAiSetAvoidGoalTimeArgs {
     pub fn new(goalstate: c_int, number: c_int, avoidtime: f32) -> Self {
-        Self { goalstate, number, avoidtime }
+        Self {
+            goalstate,
+            number,
+            avoidtime,
+        }
     }
 
-    pub fn goalstate(&self) -> c_int { self.goalstate }
-    pub fn number(&self) -> c_int { self.number }
-    pub fn avoidtime(&self) -> f32 { self.avoidtime }
+    pub fn goalstate(&self) -> c_int {
+        self.goalstate
+    }
+    pub fn number(&self) -> c_int {
+        self.number
+    }
+    pub fn avoidtime(&self) -> f32 {
+        self.avoidtime
+    }
 }
 
+/// `BOTLIB_AI_SET_AVOID_GOAL_TIME` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:492`
 pub struct BotlibAiSetAvoidGoalTime;
 
 impl OutboundSysCall for BotlibAiSetAvoidGoalTime {
@@ -44,5 +59,7 @@ impl EncodeSysCall for BotlibAiSetAvoidGoalTime {
 }
 
 impl DecodeSysCallReturn for BotlibAiSetAvoidGoalTime {
-    fn decode_return(_word: isize) -> Self::Output { () }
+    fn decode_return(_word: isize) -> Self::Output {
+        ()
+    }
 }

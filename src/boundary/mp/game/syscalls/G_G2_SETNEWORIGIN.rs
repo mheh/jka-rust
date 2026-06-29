@@ -3,7 +3,9 @@ use core::ffi::c_void;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_SETNEWORIGIN` outbound game-to-engine syscall.
 ///
@@ -31,6 +33,9 @@ impl GG2SetneworiginArgs {
     }
 }
 
+/// `G_G2_SETNEWORIGIN` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:535`
 pub struct GG2Setneworigin;
 
 impl OutboundSysCall for GG2Setneworigin {
@@ -43,10 +48,7 @@ impl OutboundSysCall for GG2Setneworigin {
 
 impl EncodeSysCall for GG2Setneworigin {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.ghoul2),
-            a.bolt_index as isize,
-        ])
+        SysCallTransport::new([ptr_to_word(a.ghoul2), a.bolt_index as isize])
     }
 }
 

@@ -1,9 +1,11 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::syscalls::pass_float;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_LOAD_CHARACTER` outbound game-to-engine syscall.
 ///
@@ -30,6 +32,9 @@ impl BotlibAiLoadCharacterArgs {
     }
 }
 
+/// `BOTLIB_AI_LOAD_CHARACTER` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:413`
 pub struct BotlibAiLoadCharacter;
 
 impl OutboundSysCall for BotlibAiLoadCharacter {
@@ -42,10 +47,7 @@ impl OutboundSysCall for BotlibAiLoadCharacter {
 
 impl EncodeSysCall for BotlibAiLoadCharacter {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            ptr_to_word(a.charfile()),
-            pass_float(a.skill()),
-        ])
+        SysCallTransport::new([ptr_to_word(a.charfile()), pass_float(a.skill())])
     }
 }
 

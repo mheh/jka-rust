@@ -1,11 +1,13 @@
-use core::ffi::c_void;
 use core::ffi::c_int;
+use core::ffi::c_void;
 
-use crate::codemp::game::q_shared_h::{vec3_t, mdxaBone_t, qhandle_t};
-use crate::ffi::GameImport;
+use crate::codemp::game::q_shared_h::{mdxaBone_t, qhandle_t, vec3_t};
 use crate::ffi::types::qboolean;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_GETBOLT` outbound game-to-engine syscall.
 ///
@@ -37,20 +39,51 @@ impl GG2GetboltArgs {
         model_list: *mut qhandle_t,
         scale: *const vec3_t,
     ) -> Self {
-        Self { ghoul2, model_index, bolt_index, matrix, angles, position, frame_num, model_list, scale }
+        Self {
+            ghoul2,
+            model_index,
+            bolt_index,
+            matrix,
+            angles,
+            position,
+            frame_num,
+            model_list,
+            scale,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn model_index(&self) -> c_int { self.model_index }
-    pub fn bolt_index(&self) -> c_int { self.bolt_index }
-    pub fn matrix(&self) -> *mut mdxaBone_t { self.matrix }
-    pub fn angles(&self) -> *const vec3_t { self.angles }
-    pub fn position(&self) -> *const vec3_t { self.position }
-    pub fn frame_num(&self) -> c_int { self.frame_num }
-    pub fn model_list(&self) -> *mut qhandle_t { self.model_list }
-    pub fn scale(&self) -> *const vec3_t { self.scale }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
+    pub fn bolt_index(&self) -> c_int {
+        self.bolt_index
+    }
+    pub fn matrix(&self) -> *mut mdxaBone_t {
+        self.matrix
+    }
+    pub fn angles(&self) -> *const vec3_t {
+        self.angles
+    }
+    pub fn position(&self) -> *const vec3_t {
+        self.position
+    }
+    pub fn frame_num(&self) -> c_int {
+        self.frame_num
+    }
+    pub fn model_list(&self) -> *mut qhandle_t {
+        self.model_list
+    }
+    pub fn scale(&self) -> *const vec3_t {
+        self.scale
+    }
 }
 
+/// `G_G2_GETBOLT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:511`
 pub struct GG2Getbolt;
 
 impl OutboundSysCall for GG2Getbolt {

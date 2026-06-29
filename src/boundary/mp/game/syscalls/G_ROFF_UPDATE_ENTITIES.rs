@@ -1,5 +1,7 @@
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_ROFF_UPDATE_ENTITIES` outbound game-to-engine syscall.
 ///
@@ -14,6 +16,10 @@ impl GRoffUpdateEntitiesArgs {
     }
 }
 
+/// `G_ROFF_UPDATE_ENTITIES` MP game imports syscall boundary token.
+///
+/// Raven: void		ROFF_UpdateEntities(void);
+/// Source: `oracle/oracle/codemp/game/g_public.h:242`
 pub struct GRoffUpdateEntities;
 
 impl OutboundSysCall for GRoffUpdateEntities {

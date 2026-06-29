@@ -1,6 +1,8 @@
-use core::ffi::c_int;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_int;
 
 /// `BOTLIB_SETUP` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -12,6 +14,10 @@ impl BotlibSetupArgs {
     }
 }
 
+/// `BOTLIB_SETUP` MP game imports syscall boundary token.
+///
+/// Raven: ( void );
+/// Source: `oracle/oracle/codemp/game/g_public.h:342`
 pub struct BotlibSetup;
 
 impl OutboundSysCall for BotlibSetup {

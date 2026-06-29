@@ -4,7 +4,9 @@ use std::ffi::CString;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_REMOVEBONE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -16,14 +18,27 @@ pub struct GG2RemoveboneArgs {
 
 impl GG2RemoveboneArgs {
     pub fn new(ghoul2: *mut core::ffi::c_void, bone_name: CString, model_index: c_int) -> Self {
-        Self { ghoul2, bone_name, model_index }
+        Self {
+            ghoul2,
+            bone_name,
+            model_index,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut core::ffi::c_void { self.ghoul2 }
-    pub fn bone_name(&self) -> &CString { &self.bone_name }
-    pub fn model_index(&self) -> c_int { self.model_index }
+    pub fn ghoul2(&self) -> *mut core::ffi::c_void {
+        self.ghoul2
+    }
+    pub fn bone_name(&self) -> &CString {
+        &self.bone_name
+    }
+    pub fn model_index(&self) -> c_int {
+        self.model_index
+    }
 }
 
+/// `G_G2_REMOVEBONE` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:562`
 pub struct GG2Removebone;
 
 impl OutboundSysCall for GG2Removebone {

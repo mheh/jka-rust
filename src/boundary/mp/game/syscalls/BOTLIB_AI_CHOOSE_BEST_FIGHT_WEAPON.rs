@@ -1,7 +1,9 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON` outbound game-to-engine syscall.
 ///
@@ -14,7 +16,10 @@ pub struct BotlibAiChooseBestFightWeaponArgs {
 
 impl BotlibAiChooseBestFightWeaponArgs {
     pub fn new(weaponstate: c_int, inventory: *mut c_int) -> Self {
-        Self { weaponstate, inventory }
+        Self {
+            weaponstate,
+            inventory,
+        }
     }
 
     pub fn weaponstate(&self) -> c_int {
@@ -26,6 +31,9 @@ impl BotlibAiChooseBestFightWeaponArgs {
     }
 }
 
+/// `BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:475`
 pub struct BotlibAiChooseBestFightWeapon;
 
 impl OutboundSysCall for BotlibAiChooseBestFightWeapon {
@@ -38,10 +46,7 @@ impl OutboundSysCall for BotlibAiChooseBestFightWeapon {
 
 impl EncodeSysCall for BotlibAiChooseBestFightWeapon {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.weaponstate as isize,
-            ptr_to_word(a.inventory),
-        ])
+        SysCallTransport::new([a.weaponstate as isize, ptr_to_word(a.inventory)])
     }
 }
 

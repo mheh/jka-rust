@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_LOAD_MAP` outbound game-to-engine syscall.
 ///
@@ -23,6 +25,9 @@ impl BotlibLoadMapArgs {
     }
 }
 
+/// `BOTLIB_LOAD_MAP` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:348`
 pub struct BotlibLoadMap;
 
 impl OutboundSysCall for BotlibLoadMap {

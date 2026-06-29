@@ -3,7 +3,9 @@ use std::ffi::CString;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_CM_REGISTER_TERRAIN` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,6 +23,9 @@ impl GCmRegisterTerrainArgs {
     }
 }
 
+/// `G_CM_REGISTER_TERRAIN` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:572`
 pub struct GCmRegisterTerrain;
 
 impl OutboundSysCall for GCmRegisterTerrain {

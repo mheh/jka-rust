@@ -2,7 +2,9 @@ use core::ffi::{c_char, c_void};
 
 use crate::ffi::{types::qboolean, GameImport};
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_G2_SETSURFACEONOFF` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -17,14 +19,27 @@ pub struct GG2SetsurfaceonoffArgs {
 
 impl GG2SetsurfaceonoffArgs {
     pub fn new(ghoul2: *mut c_void, surface_name: *const c_char, flags: i32) -> Self {
-        Self { ghoul2, surface_name, flags }
+        Self {
+            ghoul2,
+            surface_name,
+            flags,
+        }
     }
 
-    pub fn ghoul2(&self) -> *mut c_void { self.ghoul2 }
-    pub fn surface_name(&self) -> *const c_char { self.surface_name }
-    pub fn flags(&self) -> i32 { self.flags }
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+    pub fn surface_name(&self) -> *const c_char {
+        self.surface_name
+    }
+    pub fn flags(&self) -> i32 {
+        self.flags
+    }
 }
 
+/// `G_G2_SETSURFACEONOFF` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:534`
 pub struct GG2Setsurfaceonoff;
 
 impl OutboundSysCall for GG2Setsurfaceonoff {

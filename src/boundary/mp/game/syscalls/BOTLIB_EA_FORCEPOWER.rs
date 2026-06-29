@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use crate::ffi::GameImport;
 
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `BOTLIB_EA_FORCEPOWER` outbound game-to-engine syscall.
 ///
@@ -24,6 +26,9 @@ impl BotlibEaForcepowerArgs {
     }
 }
 
+/// `BOTLIB_EA_FORCEPOWER` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:391`
 pub struct BotlibEaForcepower;
 
 impl OutboundSysCall for BotlibEaForcepower {

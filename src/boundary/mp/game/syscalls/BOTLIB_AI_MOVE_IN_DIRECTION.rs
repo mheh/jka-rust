@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_MOVE_IN_DIRECTION` outbound game-to-engine syscall.
 ///
@@ -18,15 +20,31 @@ pub struct BotlibAiMoveInDirectionArgs {
 
 impl BotlibAiMoveInDirectionArgs {
     pub fn new(movestate: c_int, dir: *const vec3_t, speed: f32, type_: c_int) -> Self {
-        Self { movestate, dir, speed, type_ }
+        Self {
+            movestate,
+            dir,
+            speed,
+            type_,
+        }
     }
 
-    pub fn movestate(&self) -> c_int { self.movestate }
-    pub fn dir(&self) -> *const vec3_t { self.dir }
-    pub fn speed(&self) -> f32 { self.speed }
-    pub fn type_(&self) -> c_int { self.type_ }
+    pub fn movestate(&self) -> c_int {
+        self.movestate
+    }
+    pub fn dir(&self) -> *const vec3_t {
+        self.dir
+    }
+    pub fn speed(&self) -> f32 {
+        self.speed
+    }
+    pub fn type_(&self) -> c_int {
+        self.type_
+    }
 }
 
+/// `BOTLIB_AI_MOVE_IN_DIRECTION` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:466`
 pub struct BotlibAiMoveInDirection;
 
 impl OutboundSysCall for BotlibAiMoveInDirection {

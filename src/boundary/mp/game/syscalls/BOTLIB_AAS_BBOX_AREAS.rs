@@ -52,7 +52,9 @@ impl BotlibAasBboxAreasArgs {
     }
 }
 
-/// `BOTLIB_AAS_BBOX_AREAS` outbound game-to-engine syscall.
+/// `BOTLIB_AAS_BBOX_AREAS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:357`
 pub struct BotlibAasBboxAreas;
 
 impl OutboundSysCall for BotlibAasBboxAreas {

@@ -24,7 +24,9 @@ impl GSqrtArgs {
     }
 }
 
-/// `G_SQRT` outbound game-to-engine syscall.
+/// `G_SQRT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:282`
 pub struct GSqrt;
 
 impl OutboundSysCall for GSqrt {

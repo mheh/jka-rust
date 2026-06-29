@@ -1,9 +1,11 @@
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
 use crate::codemp::game::q_shared_h::qhandle_t;
+use crate::ffi::GameImport;
 
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 
 /// `G_R_REGISTERSKIN` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,6 +23,9 @@ impl GRRegisterskinArgs {
     }
 }
 
+/// `G_R_REGISTERSKIN` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:506`
 pub struct GRRegisterskin;
 
 impl OutboundSysCall for GRRegisterskin {

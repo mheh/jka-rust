@@ -1,6 +1,8 @@
-use core::ffi::c_int;
+use crate::boundary::generic::{
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use core::ffi::c_int;
 
 /// `BOTLIB_AI_FREE_ITEM_WEIGHTS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -18,6 +20,9 @@ impl BotlibAiFreeItemWeightsArgs {
     }
 }
 
+/// `BOTLIB_AI_FREE_ITEM_WEIGHTS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:459`
 pub struct BotlibAiFreeItemWeights;
 
 impl OutboundSysCall for BotlibAiFreeItemWeights {

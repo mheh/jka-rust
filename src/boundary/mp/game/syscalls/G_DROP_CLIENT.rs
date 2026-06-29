@@ -1,8 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_DROP_CLIENT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -25,6 +27,11 @@ impl GDropClientArgs {
     }
 }
 
+/// `G_DROP_CLIENT` MP game imports syscall boundary token.
+///
+/// Raven: ( int clientNum, const char *reason );
+/// Raven: kick a client off the server with a message
+/// Source: `oracle/oracle/codemp/game/g_public.h:150`
 pub struct GDropClient;
 
 impl OutboundSysCall for GDropClient {
@@ -37,10 +44,7 @@ impl OutboundSysCall for GDropClient {
 
 impl EncodeSysCall for GDropClient {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            a.client_num as isize,
-            ptr_to_word(a.reason.as_ptr()),
-        ])
+        SysCallTransport::new([a.client_num as isize, ptr_to_word(a.reason.as_ptr())])
     }
 }
 

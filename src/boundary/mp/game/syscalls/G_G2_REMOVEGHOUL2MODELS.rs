@@ -1,8 +1,10 @@
 use core::ffi::c_void;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_G2_REMOVEGHOUL2MODELS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -21,6 +23,9 @@ impl GG2Removeghoul2ModelsArgs {
     }
 }
 
+/// `G_G2_REMOVEGHOUL2MODELS` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:528`
 pub struct GG2Removeghoul2Models;
 
 impl OutboundSysCall for GG2Removeghoul2Models {

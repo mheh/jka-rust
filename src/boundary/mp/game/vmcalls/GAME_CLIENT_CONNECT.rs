@@ -2,7 +2,12 @@ use crate::ffi::GameExport;
 
 use crate::boundary::generic::InboundVmCall;
 
-/// `GAME_CLIENT_CONNECT` inbound executable-to-game `vmMain` call.
+/// `GAME_CLIENT_CONNECT` MP game exports vmMain boundary token.
+///
+/// Raven: ( int clientNum, qboolean firstTime, qboolean isBot );
+/// Raven: return NULL if the client is allowed to connect, otherwise return
+/// Raven: a text string with the reason for denial
+/// Source: `oracle/oracle/codemp/game/g_public.h:742`
 pub struct GameClientConnect;
 
 impl InboundVmCall for GameClientConnect {

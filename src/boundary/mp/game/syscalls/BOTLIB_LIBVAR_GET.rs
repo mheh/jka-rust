@@ -1,8 +1,10 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
 use crate::ffi::GameImport;
-use crate::boundary::generic::{ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_LIBVAR_GET` outbound game-to-engine syscall.
 ///
@@ -20,7 +22,11 @@ pub struct BotlibLibvarGetArgs {
 
 impl BotlibLibvarGetArgs {
     pub fn new(var_name: CString, value: *mut c_char, size: c_int) -> Self {
-        Self { var_name, value, size }
+        Self {
+            var_name,
+            value,
+            size,
+        }
     }
 
     pub fn var_name(&self) -> &CString {
@@ -36,6 +42,9 @@ impl BotlibLibvarGetArgs {
     }
 }
 
+/// `BOTLIB_LIBVAR_GET` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:345`
 pub struct BotlibLibvarGet;
 
 impl OutboundSysCall for BotlibLibvarGet {
