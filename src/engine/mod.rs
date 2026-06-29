@@ -1,1 +1,1 @@
-//! The JKA engine reimagined in idiomatic Rust — the backend servicing [`crate::boundary`]'s typed calls.
+//! The JKA engine reimagined in idiomatic Rust — the backend servicing [`crate::abi`]'s typed calls.

@@ -2,7 +2,7 @@
 """Regenerate the ABI port worklist from the manifest and current Rust TODOs.
 
 This script intentionally does not rewrite docs/abi-port-manifest.tsv. It reads
-the manifest as the stable assignment inventory, scans src/boundary for
+the manifest as the stable assignment inventory, scans src/abi for
 `TODO: Port args` and `TODO: Port output`, then prints the remaining rows with
 the Rust line numbers needed for worker prompts.
 """
@@ -24,7 +24,7 @@ def repo_root() -> Path:
 
 def todo_lines(root: Path) -> dict[str, list[tuple[int, str]]]:
     todos: dict[str, list[tuple[int, str]]] = defaultdict(list)
-    for path in sorted((root / "src" / "boundary").rglob("*.rs")):
+    for path in sorted((root / "src" / "abi").rglob("*.rs")):
         rel = path.relative_to(root).as_posix()
         try:
             lines = path.read_text(encoding="utf-8").splitlines()

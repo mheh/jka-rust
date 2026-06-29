@@ -17,7 +17,7 @@
 // TODO: NOT-PORTED
 use crate::bg::gitem_t;
 // TODO: NOT-PORTED
-use crate::boundary::{entityShared_t, parms_t, Vehicle_t, MAX_FAILED_NODES, NUM_BSETS, NUM_TIDS};
+use crate::abi::{entityShared_t, parms_t, Vehicle_t, MAX_FAILED_NODES, NUM_BSETS, NUM_TIDS};
 // TODO: NOT-PORTED
 use crate::game::npc::gNPC_t;
 // TODO: NOT-PORTED

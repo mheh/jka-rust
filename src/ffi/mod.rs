@@ -1,9 +1,9 @@
-//! Compatibility names for generated MP game boundary calls.
+//! Compatibility names for generated MP game ABI calls.
 //!
-//! New boundary code should prefer `crate::boundary::mp::game::*`; this module
+//! New ABI code should prefer `crate::abi::mp::game::*`; this module
 //! keeps the generated call files compiling while they are migrated.
 
-pub use crate::boundary::mp::game::{MpGameExport as GameExport, MpGameImport as GameImport};
+pub use crate::abi::mp::game::{MpGameExport as GameExport, MpGameImport as GameImport};
 
 pub mod syscalls {
     /// Reinterpret an `f32` as an integer-width syscall argument, mirroring the C

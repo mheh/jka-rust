@@ -24,12 +24,11 @@ This is the intended folder hierarchy to be Rust module based. This is based on 
 | `src/modules/sp/game/` | SP game module implementation matching Raven `code/game`. |
 | `src/modules/sp/cgame/` | SP cgame module implementation matching Raven `code/cgame`. |
 | `src/modules/sp/ui/` | SP ui module implementation matching Raven `code/ui`. |
-| `src/boundary/` | Typed ABI boundary between engine and runtime modules. |
-| `src/boundary/generic/` | Shared transport/message shapes for syscall and `vmMain`. |
-| `src/boundary/mp/` | MP ABI surfaces for `game`, `cgame`, and `ui`. |
-| `src/boundary/sp/` | SP ABI surfaces for `game`, `cgame`, and `ui`. |
+| `src/abi/` | Typed ABI surface between engine and runtime modules. |
+| `src/abi/generic/` | Shared transport/message shapes for syscall and `vmMain`. |
+| `src/abi/mp/` | MP ABI surfaces for `game`, `cgame`, and `ui`. |
+| `src/abi/sp/` | SP ABI surfaces for `game`, `cgame`, and `ui`. |
 | `src/engine/` | Rust engine-side backend code. |
-| `src/ffi/` | Low-level FFI definitions that are not owned by a narrower boundary module. |
+| `src/ffi/` | Low-level FFI definitions that are not owned by a narrower ABI module. |
 | `src/bg/` | Legacy/current Rust `bg` location; intended to be reconciled with `src/common/{mp,sp}/bg`. |
 | `src/game/` | Legacy/current Rust game location; intended to be reconciled with `src/modules/{mp,sp}/game`. |
-

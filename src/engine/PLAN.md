@@ -1,7 +1,7 @@
 # Typed Boundary Over Swappable Engine Backends
 
 ## Summary
-`src/engine` is the JKA engine reimagined in idiomatic Rust. `src/boundary/` (a crate-root
+`src/engine` is the JKA engine reimagined in idiomatic Rust. `src/abi/` (a crate-root
 seam, depended on by both `src/game` and `src/engine`) is the typed boundary between the game
 module and the engine: every engine↔game call is a typed `OutboundSysCall` (game→engine) or `InboundVmCall`
 (engine→game). Execution is supplied by a **backend** that implements those calls. Two backends

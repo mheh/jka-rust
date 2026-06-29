@@ -3,7 +3,7 @@
 Build a Rust implementation of the Jedi Academy MP game module that can speak
 the same engine/module ABI as Raven's original `jampgamex86.dll`.
 
-The current MP boundary work gives the Rust code the same import/export
+The current MP ABI work gives the Rust code the same import/export
 vocabulary as the Raven MP game module: `MpGameImport` models module-to-engine
 syscall numbers, and `MpGameExport` models engine-to-module `vmMain` command
 numbers. Those integer values must match the original Raven values exactly.
@@ -30,7 +30,7 @@ Raven's `jampgamex86.dll`:
   entities, player state, traces, cvars, commands, botlib data, ICARUS data, nav
   data, and Ghoul2 data.
 - [ ] Verify struct sizes, alignments, and field offsets against Raven headers
-  for all boundary-visible types.
+  for all ABI-visible types.
 - [ ] Model shared memory and global expectations visible to the engine.
 - [ ] Implement engine-observable side effects for `GAME_INIT`,
   `GAME_RUN_FRAME`, `GAME_SHUTDOWN`, client lifecycle calls, botlib, ICARUS, nav,
@@ -45,7 +45,7 @@ Raven's `jampgamex86.dll`:
   equivalent with the Rust build and running the MP engine through init, map
   load, frame loop, client connect, and shutdown.
 
-So the boundary target is:
+So the ABI target is:
 
 > The MP Rust game module should become ABI-compatible with Raven's MP game
 > module, such that the engine can load it through the same `dllEntry`/`vmMain`

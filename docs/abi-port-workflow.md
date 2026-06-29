@@ -1,12 +1,12 @@
 # ABI Port Workflow
 
-This workflow ports one boundary file at a time. Each worker owns exactly one
+This workflow ports one ABI file at a time. Each worker owns exactly one
 Rust file and must either validate the existing args/output types or replace the
 stubbed `()` payloads with ABI-shaped types.
 
 ## Goal
 
-For every enum-backed syscall or `vmMain` call under `src/boundary`, record the
+For every enum-backed syscall or `vmMain` call under `src/abi`, record the
 real transport contract:
 
 - the Rust `Args` type
@@ -96,7 +96,7 @@ args or output source yet, include that absence in the pasted scope so the
 worker can either prove it or keep the TODO.
 
 ```text
-You own only the ABI boundary rows pasted below:
+You own only the ABI rows pasted below:
 <full generated manifest/evidence lines for this worker scope>
 
 Task:

@@ -1,0 +1,31 @@
+use super::super::SpCgameImport;
+use crate::abi::generic::OutboundSysCall;
+
+/// `CG_UI_PARSE_STRING` SP cgame imports syscall ABI token.
+///
+/// Enum value source: `oracle/oracle/code/cgame/cg_public.h:197`
+/// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:583-585`
+/// Output source: `oracle/oracle/code/client/cl_cgame.cpp:861-863`
+/// Transport/switch source: `oracle/oracle/code/cgame/cg_syscalls.cpp:583-585`, `oracle/oracle/code/client/cl_cgame.cpp:861-863`
+///
+/// TODO: Port args — ambiguous ABI shape between
+/// `cgi_UI_Parse_String(char *buf)` (`cg_syscalls.cpp:583-585`) and
+/// `(const char **) VMA(1)` (`cl_cgame.cpp:861-863`).
+///
+/// This should be resolved as either `*mut c_char` (wrapper shape) or
+/// `*mut *const c_char` (transport shape) depending on intended ownership.
+///
+/// TODO: Keep this unresolved until upstream confirms the intended C++ wrapper prototype;
+/// the current parse callsite is effectively dormant, so either form may remain
+/// ABI-incompatible with the other in the present codebase.
+///
+/// Raven note: `const char **` is likely required by `PC_ParseString(const char **string)`.
+pub struct CgUiParseString;
+
+impl OutboundSysCall for CgUiParseString {
+    type Import = SpCgameImport;
+    type Args = (); //TODO: Port args - wrapper `char *buf` vs transport `const char **VMA(1)` stays ambiguous.
+    type Output = ();
+
+    const IMPORT: SpCgameImport = SpCgameImport::CG_UI_PARSE_STRING;
+}

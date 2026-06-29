@@ -98,7 +98,7 @@ pub const SP_PODIUM_MODEL: &str = "models/mapobjects/podium/podium4.md3";
 
 // Type modules — copied from the oracle as faithful starting material (Raven comments
 // retained). Not yet wired into the build: they reference dependency types
-// (entityState_t, gitem_t, AIGroupInfo_t, …) pending port into shared/, bg/, boundary/.
+// (entityState_t, gitem_t, AIGroupInfo_t, …) pending port into shared/, bg/, abi/.
 // Migration target: src/modules/mp/game/{client,entity,level}.
 // pub mod client;
 // pub mod entity;

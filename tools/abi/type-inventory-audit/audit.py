@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit ABI boundary type references against Rust and Raven source definitions."""
+"""Audit ABI type references against Rust and Raven source definitions."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from typing import Iterable
 TOOL_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TOOL_DIR.parents[2]
 
-DEFAULT_BOUNDARY_ROOT = REPO_ROOT / "src" / "boundary"
+DEFAULT_ABI_ROOT = REPO_ROOT / "src" / "abi"
 DEFAULT_RUST_DEF_ROOTS = [
     REPO_ROOT / "src",
     REPO_ROOT / "oracle" / "src",
@@ -173,11 +173,11 @@ def interesting_type_identifiers(type_expression: str, local_defs: set[str]) -> 
     return identifiers
 
 
-def collect_boundary_references(boundary_root: Path) -> tuple[dict[str, TypeRecord], Counter[str]]:
+def collect_abi_references(abi_root: Path) -> tuple[dict[str, TypeRecord], Counter[str]]:
     records: dict[str, TypeRecord] = defaultdict(lambda: TypeRecord(""))
     marker_counts: Counter[str] = Counter()
 
-    for path in iter_files([boundary_root], RUST_SOURCE_EXTENSIONS):
+    for path in iter_files([abi_root], RUST_SOURCE_EXTENSIONS):
         text = read_text(path)
         local_defs = local_type_definitions(text)
 
@@ -247,7 +247,7 @@ def find_oracle_candidates(names: Iterable[str], roots: list[Path], limit_per_na
 
 
 def build_records(args: argparse.Namespace) -> tuple[list[TypeRecord], Counter[str]]:
-    records, marker_counts = collect_boundary_references(args.boundary_root)
+    records, marker_counts = collect_abi_references(args.abi_root)
     definitions = collect_rust_definitions(args.rust_def_roots)
 
     for name, locations in definitions.items():
@@ -350,9 +350,9 @@ def write_summary(records: list[TypeRecord], marker_counts: Counter[str], output
             "",
             "## Notes",
             "",
-            "- The audit is static because `src/boundary` is not currently declared from `src/lib.rs`.",
+            "- The audit is static because `src/abi` is not currently declared from `src/lib.rs`.",
             "- Oracle candidates are text matches in Raven source, not proof of an ABI-safe Rust port.",
-            "- Keep Raven comments and source locations in boundary files when resolving each type.",
+            "- Keep Raven comments and source locations in ABI files when resolving each type.",
             "",
         ]
     )
@@ -362,7 +362,7 @@ def write_summary(records: list[TypeRecord], marker_counts: Counter[str], output
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--boundary-root", type=Path, default=DEFAULT_BOUNDARY_ROOT)
+    parser.add_argument("--abi-root", type=Path, default=DEFAULT_ABI_ROOT)
     parser.add_argument("--rust-def-root", dest="rust_def_roots", type=Path, action="append")
     parser.add_argument("--oracle-root", dest="oracle_roots", type=Path, action="append")
     parser.add_argument("--oracle-limit", type=int, default=5)
