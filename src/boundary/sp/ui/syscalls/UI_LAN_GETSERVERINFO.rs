@@ -1,3 +1,5 @@
+use core::ffi::{c_char, c_int};
+
 use super::super::SpUiImport;
 use crate::boundary::generic::OutboundSysCall;
 
@@ -8,8 +10,16 @@ pub struct UiLanGetserverinfo;
 
 impl OutboundSysCall for UiLanGetserverinfo {
     type Import = SpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// Raven wrapper: `syscall( UI_LAN_GETSERVERINFO, source, n, buf, buflen );`
+    /// Transport source: `oracle/oracle/codemp/client/cl_ui.cpp:1092-1094`
+    /// SP transport path in `oracle/oracle/code/client/cl_ui.cpp` has no `UI_LAN_GETSERVERINFO` case.
+    ///
+    /// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:1092-1094`
+    /// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1094`
+    type Args = (c_int, c_int, *mut c_char, c_int);
+    /// Void return (implemented as `return 0;` in the transport path)
+    /// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1094`
+    type Output = ();
 
     const IMPORT: SpUiImport = SpUiImport::UI_LAN_GETSERVERINFO;
 }

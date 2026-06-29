@@ -1,3 +1,5 @@
+use core::ffi::c_int;
+
 use super::super::SpUiImport;
 use crate::boundary::generic::OutboundSysCall;
 
@@ -8,8 +10,13 @@ pub struct UiLanGetpingqueuecount;
 
 impl OutboundSysCall for UiLanGetpingqueuecount {
     type Import = SpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+    /// Args source: `oracle/oracle/codemp/client/cl_ui.cpp:1070` (SP transport path in
+    /// `oracle/oracle/code/client/cl_ui.cpp` does not define this case)
+    /// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1071`
+    type Args = ();
+    /// Output is an integer count.
+    /// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:1071`
+    type Output = c_int;
 
     const IMPORT: SpUiImport = SpUiImport::UI_LAN_GETPINGQUEUECOUNT;
 }
