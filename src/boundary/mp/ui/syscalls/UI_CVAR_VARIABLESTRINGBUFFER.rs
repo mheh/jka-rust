@@ -7,12 +7,13 @@ use crate::boundary::generic::{
 
 /// Arguments for `UI_CVAR_VARIABLESTRINGBUFFER`.
 ///
-/// Raven cgame calls `syscall( UI_CVAR_VARIABLESTRINGBUFFER, var_name, buffer, bufsize )`.
+/// Raven UI calls `syscall( UI_CVAR_VARIABLESTRINGBUFFER, var_name, buffer, bufsize )`.
 /// The client switch decodes `var_name` and `buffer` with `VMA`, reads `bufsize`
 /// directly from `args[3]`, and writes the cvar string into the provided buffer.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:62-63`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:723-724`
+/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:51-52`
+/// Args source: `oracle/oracle/codemp/ui/ui_local.h:922`
+/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:883-885`
 #[derive(Debug)]
 pub struct CgCvarVariablestringbufferArgs {
     var_name: *const c_char,
@@ -48,13 +49,13 @@ impl CgCvarVariablestringbufferArgs {
     }
 }
 
-/// `UI_CVAR_VARIABLESTRINGBUFFER` MP cgame imports syscall boundary token.
+/// `UI_CVAR_VARIABLESTRINGBUFFER` MP UI imports syscall boundary token.
 ///
 /// Raven: `( const char *var_name, char *buffer, int bufsize )`.
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:68`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:62-63`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:725`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:723-724`
+/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:23`
+/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:51-52`
+/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:883-885`
+/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:883-885`
 pub struct CgCvarVariablestringbuffer;
 
 impl OutboundSysCall for CgCvarVariablestringbuffer {

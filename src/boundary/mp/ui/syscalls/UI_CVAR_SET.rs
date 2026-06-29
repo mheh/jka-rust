@@ -10,8 +10,9 @@ use crate::boundary::generic::{
 /// Raven wrapper: `void trap_Cvar_Set( const char *var_name, const char *value )`.
 /// The MP client switch forwards both strings through `VMA` into `Cvar_Set`.
 ///
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:58-59`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:720-722`
+/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:41-42`
+/// Args source: `oracle/oracle/codemp/ui/ui_local.h:920`
+/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:876-878`
 #[derive(Debug)]
 pub struct CgCvarSetArgs {
     var_name: *const c_char,
@@ -37,15 +38,15 @@ impl CgCvarSetArgs {
     }
 }
 
-/// `UI_CVAR_SET` MP cgame imports syscall boundary token.
+/// `UI_CVAR_SET` MP UI imports syscall boundary token.
 ///
 /// Raven wrapper: `syscall( UI_CVAR_SET, var_name, value );`
 /// Raven transport: `Cvar_Set( (const char *)VMA(1), (const char *)VMA(2) );`
 ///
-/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:67`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:58-59`
-/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:722`
-/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:720-722`
+/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:21`
+/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:41-42`
+/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:876-878`
+/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:876-878`
 pub struct CgCvarSet;
 
 impl OutboundSysCall for CgCvarSet {

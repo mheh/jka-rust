@@ -4,7 +4,7 @@ use crate::boundary::generic::{
 };
 use crate::ffi::types::vmCvar_t;
 
-/// `UI_CVAR_UPDATE` outbound cgame-to-engine syscall.
+/// `UI_CVAR_UPDATE` outbound UI-to-engine syscall.
 ///
 /// Refreshes a previously registered cvar mirror (`vmCvar_t`) from the engine's
 /// current cvar state. Mirrors the C ABI: `void trap_Cvar_Update(vmCvar_t *vmCvar)`.
@@ -24,13 +24,14 @@ impl CgCvarUpdateArgs {
     }
 }
 
-/// `UI_CVAR_UPDATE` MP cgame imports syscall boundary token.
+/// `UI_CVAR_UPDATE` MP UI imports syscall boundary token.
 ///
 /// Raven: ( vmCvar_t *vmCvar );
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:66`
-/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:54-55`
-/// Output source: `oracle/oracle/codemp/ui/ui_syscalls.c:54`
-/// Transport source: `oracle/oracle/codemp/client/cl_ui.cpp:717-719`
+/// Enum value source: `oracle/oracle/codemp/ui/ui_public.h:70`
+/// Args source: `oracle/oracle/codemp/ui/ui_syscalls.c:37-38`
+/// Args source: `oracle/oracle/codemp/ui/ui_local.h:919`
+/// Output source: `oracle/oracle/codemp/client/cl_ui.cpp:872-874`
+/// Transport/switch source: `oracle/oracle/codemp/client/cl_ui.cpp:872-874`
 pub struct CgCvarUpdate;
 
 impl OutboundSysCall for CgCvarUpdate {
