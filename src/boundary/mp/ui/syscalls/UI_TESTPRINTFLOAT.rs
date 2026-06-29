@@ -1,15 +1,59 @@
-use super::super::MpUiImport;
-use crate::boundary::generic::OutboundSysCall;
+use core::ffi::{c_char, c_int};
+use std::ffi::CString;
 
-/// `UI_TESTPRINTFLOAT` MP UI imports syscall boundary token.
+use crate::ffi::syscalls::pass_float;
+use crate::ffi::GameImport;
+
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+
+/// `UiTESTPRINTFLOAT` outbound game-to-engine syscall.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:130`
-pub struct UiTestprintfloat;
+/// Mirrors `syscall!(UiTESTPRINTFLOAT, string, PASSFLOAT(f))`.
+/// The engine ignores both arguments and returns 0; this syscall exists for
+/// debug/test instrumentation only.
+#[derive(Debug)]
+pub struct GTestprintfloatArgs {
+    string: CString,
+    f: f32,
+}
 
-impl OutboundSysCall for UiTestprintfloat {
-    type Import = MpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+impl GTestprintfloatArgs {
+    pub fn new(string: CString, f: f32) -> Self {
+        Self { string, f }
+    }
 
-    const IMPORT: MpUiImport = MpUiImport::UI_TESTPRINTFLOAT;
+    pub fn string(&self) -> *const c_char {
+        self.string.as_ptr()
+    }
+
+    pub fn f(&self) -> f32 {
+        self.f
+    }
+}
+
+/// `UiTESTPRINTFLOAT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/ui/ui_public.h:290`
+pub struct GTestprintfloat;
+
+impl OutboundSysCall for GTestprintfloat {
+    type Import = GameImport;
+    type Args = GTestprintfloatArgs;
+    type Output = c_int;
+
+    const IMPORT: GameImport = GameImport::UiTESTPRINTFLOAT;
+}
+
+impl EncodeSysCall for GTestprintfloat {
+    fn encode_syscall(a: &Self::Args) -> SysCallTransport {
+        SysCallTransport::new([ptr_to_word(a.string()), pass_float(a.f())])
+    }
+}
+
+impl DecodeSysCallReturn for GTestprintfloat {
+    fn decode_return(word: isize) -> Self::Output {
+        word as c_int
+    }
 }

@@ -1,15 +1,72 @@
-use super::super::MpUiImport;
-use crate::boundary::generic::OutboundSysCall;
+use core::ffi::{c_int, c_void};
 
-/// `UI_G2_ANIMATEG2MODELS` MP UI imports syscall boundary token.
+use crate::codemp::game::q_shared_h::sharedRagDollUpdateParams_t;
+use crate::ffi::GameImport;
+
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+
+/// `UiG2_ANIMATEG2MODELS` outbound game-to-engine syscall.
+#[derive(Debug)]
+pub struct GG2Animateg2ModelsArgs {
+    /// Ghoul2 model instance handle (opaque void*).
+    ghoul2: *mut c_void,
+    /// Current time in milliseconds.
+    time: c_int,
+    /// Ragdoll update parameters written by caller.
+    params: *mut sharedRagDollUpdateParams_t,
+}
+
+impl GG2Animateg2ModelsArgs {
+    pub fn new(ghoul2: *mut c_void, time: c_int, params: *mut sharedRagDollUpdateParams_t) -> Self {
+        Self {
+            ghoul2,
+            time,
+            params,
+        }
+    }
+
+    pub fn ghoul2(&self) -> *mut c_void {
+        self.ghoul2
+    }
+
+    pub fn time(&self) -> c_int {
+        self.time
+    }
+
+    pub fn params(&self) -> *mut sharedRagDollUpdateParams_t {
+        self.params
+    }
+}
+
+/// `UiG2_ANIMATEG2MODELS` MP game imports syscall boundary token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:176`
-pub struct UiG2Animateg2models;
+/// Raven: rww - RAGDOLL_END
+/// Raven: additional ragdoll options -rww
+/// Source: `oracle/oracle/codemp/ui/ui_public.h:545`
+pub struct GG2Animateg2Models;
 
-impl OutboundSysCall for UiG2Animateg2models {
-    type Import = MpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+impl OutboundSysCall for GG2Animateg2Models {
+    type Import = GameImport;
+    type Args = GG2Animateg2ModelsArgs;
+    type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UI_G2_ANIMATEG2MODELS;
+    const IMPORT: GameImport = GameImport::UiG2_ANIMATEG2MODELS;
+}
+
+impl EncodeSysCall for GG2Animateg2Models {
+    fn encode_syscall(a: &Self::Args) -> SysCallTransport {
+        SysCallTransport::new([
+            ptr_to_word(a.ghoul2),
+            a.time as isize,
+            ptr_to_word(a.params),
+        ])
+    }
+}
+
+impl DecodeSysCallReturn for GG2Animateg2Models {
+    fn decode_return(_word: isize) -> Self::Output {
+        ()
+    }
 }

@@ -1,16 +1,48 @@
-use super::super::MpUiImport;
-use crate::boundary::generic::OutboundSysCall;
+use core::ffi::c_void;
 
-/// `UI_G2_LISTSURFACES` MP UI imports syscall boundary token.
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+use crate::ffi::GameImport;
+
+/// `UiG2_LISTSURFACES` outbound game-to-engine syscall.
+#[derive(Debug)]
+pub struct GG2ListsurfacesArgs {
+    /// Ghoul2 instance pointer whose surface list is dumped to the console.
+    ghl_info: *mut c_void,
+}
+
+impl GG2ListsurfacesArgs {
+    pub fn new(ghl_info: *mut c_void) -> Self {
+        Self { ghl_info }
+    }
+
+    pub fn ghl_info(&self) -> *mut c_void {
+        self.ghl_info
+    }
+}
+
+/// `UiG2_LISTSURFACES` MP game imports syscall boundary token.
 ///
-/// Raven: Ghoul2 Insert Start
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:142`
-pub struct UiG2Listsurfaces;
+/// Source: `oracle/oracle/codemp/ui/ui_public.h:508`
+pub struct GG2Listsurfaces;
 
-impl OutboundSysCall for UiG2Listsurfaces {
-    type Import = MpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+impl OutboundSysCall for GG2Listsurfaces {
+    type Import = GameImport;
+    type Args = GG2ListsurfacesArgs;
+    type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UI_G2_LISTSURFACES;
+    const IMPORT: GameImport = GameImport::UiG2_LISTSURFACES;
+}
+
+impl EncodeSysCall for GG2Listsurfaces {
+    fn encode_syscall(a: &Self::Args) -> SysCallTransport {
+        SysCallTransport::new([ptr_to_word(a.ghl_info)])
+    }
+}
+
+impl DecodeSysCallReturn for GG2Listsurfaces {
+    fn decode_return(_word: isize) -> Self::Output {
+        ()
+    }
 }

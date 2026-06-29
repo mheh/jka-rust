@@ -1,15 +1,56 @@
-use super::super::MpUiImport;
-use crate::boundary::generic::OutboundSysCall;
+use core::ffi::c_int;
+use std::ffi::CString;
 
-/// `UI_TESTPRINTINT` MP UI imports syscall boundary token.
+use crate::ffi::GameImport;
+
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+
+/// `UiTESTPRINTINT` outbound game-to-engine syscall.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:129`
-pub struct UiTestprintint;
+/// C signature: `void testPrintInt( char *string, int i )`
+#[derive(Debug)]
+pub struct GTestprintintArgs {
+    string: CString,
+    i: c_int,
+}
 
-impl OutboundSysCall for UiTestprintint {
-    type Import = MpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+impl GTestprintintArgs {
+    pub fn new(string: CString, i: c_int) -> Self {
+        Self { string, i }
+    }
 
-    const IMPORT: MpUiImport = MpUiImport::UI_TESTPRINTINT;
+    pub fn string(&self) -> &CString {
+        &self.string
+    }
+
+    pub fn i(&self) -> c_int {
+        self.i
+    }
+}
+
+/// `UiTESTPRINTINT` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/ui/ui_public.h:289`
+pub struct GTestprintint;
+
+impl OutboundSysCall for GTestprintint {
+    type Import = GameImport;
+    type Args = GTestprintintArgs;
+    type Output = ();
+
+    const IMPORT: GameImport = GameImport::UiTESTPRINTINT;
+}
+
+impl EncodeSysCall for GTestprintint {
+    fn encode_syscall(a: &Self::Args) -> SysCallTransport {
+        SysCallTransport::new([ptr_to_word(a.string.as_ptr()), a.i as isize])
+    }
+}
+
+impl DecodeSysCallReturn for GTestprintint {
+    fn decode_return(_word: isize) -> Self::Output {
+        ()
+    }
 }

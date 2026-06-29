@@ -1,15 +1,49 @@
-use super::super::MpUiImport;
-use crate::boundary::generic::OutboundSysCall;
+use std::ffi::CString;
 
-/// `UI_R_REGISTERSKIN` MP UI imports syscall boundary token.
+use crate::codemp::game::q_shared_h::qhandle_t;
+use crate::ffi::GameImport;
+
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+
+/// `UiR_REGISTERSKIN` outbound game-to-engine syscall.
+#[derive(Debug)]
+pub struct GRRegisterskinArgs {
+    name: CString,
+}
+
+impl GRRegisterskinArgs {
+    pub fn new(name: CString) -> Self {
+        Self { name }
+    }
+
+    pub fn name(&self) -> &CString {
+        &self.name
+    }
+}
+
+/// `UiR_REGISTERSKIN` MP game imports syscall boundary token.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:37`
-pub struct UiRRegisterskin;
+/// Source: `oracle/oracle/codemp/ui/ui_public.h:506`
+pub struct GRRegisterskin;
 
-impl OutboundSysCall for UiRRegisterskin {
-    type Import = MpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+impl OutboundSysCall for GRRegisterskin {
+    type Import = GameImport;
+    type Args = GRRegisterskinArgs;
+    type Output = qhandle_t;
 
-    const IMPORT: MpUiImport = MpUiImport::UI_R_REGISTERSKIN;
+    const IMPORT: GameImport = GameImport::UiR_REGISTERSKIN;
+}
+
+impl EncodeSysCall for GRRegisterskin {
+    fn encode_syscall(a: &Self::Args) -> SysCallTransport {
+        SysCallTransport::new([ptr_to_word(a.name.as_ptr())])
+    }
+}
+
+impl DecodeSysCallReturn for GRRegisterskin {
+    fn decode_return(word: isize) -> Self::Output {
+        word as qhandle_t
+    }
 }

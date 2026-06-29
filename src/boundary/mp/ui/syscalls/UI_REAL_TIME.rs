@@ -1,15 +1,51 @@
-use super::super::MpUiImport;
-use crate::boundary::generic::OutboundSysCall;
+use core::ffi::c_int;
 
-/// `UI_REAL_TIME` MP UI imports syscall boundary token.
+use crate::boundary::generic::{
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+};
+use crate::codemp::game::q_shared_h::qtime_t;
+use crate::ffi::GameImport;
+
+/// `UiREAL_TIME` outbound game-to-engine syscall.
 ///
-/// Source: `oracle/oracle/codemp/ui/ui_public.h:94`
-pub struct UiRealTime;
+/// Reads the engine's wall-clock time into `qtime`, returning the raw
+/// seconds-since-epoch value.  Mirrors `syscall!(UiREAL_TIME, qtime as *mut qtime_t)`.
+#[derive(Debug)]
+pub struct GRealTimeArgs {
+    qtime: *mut qtime_t,
+}
 
-impl OutboundSysCall for UiRealTime {
-    type Import = MpUiImport;
-    type Args = (); //TODO: Port args
-    type Output = (); //TODO: Port output
+impl GRealTimeArgs {
+    pub fn new(qtime: *mut qtime_t) -> Self {
+        Self { qtime }
+    }
 
-    const IMPORT: MpUiImport = MpUiImport::UI_REAL_TIME;
+    pub fn qtime(&self) -> *mut qtime_t {
+        self.qtime
+    }
+}
+
+/// `UiREAL_TIME` MP game imports syscall boundary token.
+///
+/// Source: `oracle/oracle/codemp/ui/ui_public.h:232`
+pub struct GRealTime;
+
+impl OutboundSysCall for GRealTime {
+    type Import = GameImport;
+    type Args = GRealTimeArgs;
+    type Output = c_int;
+
+    const IMPORT: GameImport = GameImport::UiREAL_TIME;
+}
+
+impl EncodeSysCall for GRealTime {
+    fn encode_syscall(a: &Self::Args) -> SysCallTransport {
+        SysCallTransport::new([ptr_to_word(a.qtime)])
+    }
+}
+
+impl DecodeSysCallReturn for GRealTime {
+    fn decode_return(word: isize) -> Self::Output {
+        word as c_int
+    }
 }
