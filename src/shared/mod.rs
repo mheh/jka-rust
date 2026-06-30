@@ -4,9 +4,11 @@
 
 use core::ffi::c_int;
 
+pub mod collision;
 pub mod platform;
 pub mod vector;
 
+pub use collision::cplane_t;
 pub use vector::{vec2_t, vec3_t, vec3pair_t, vec4_t, vec5_t, vec_t};
 
 /// Raven `qboolean`.

@@ -7,7 +7,7 @@
 
 use core::ffi::{c_float, c_int};
 
-use crate::shared::{qboolean, vec3_t};
+use crate::shared::{cplane_t, qboolean, vec3_t};
 
 pub const MAX_G2_COLLISIONS: usize = 16;
 
@@ -19,16 +19,15 @@ pub struct trace_t {
     pub startsolid: qboolean, // if true, the initial point was in a solid area
     pub fraction: c_float,    // time completed, 1.0 = didn't hit anything
     pub endpos: vec3_t,       // final position
-    // FIXME: create type cplane_t
-    // pub plane: cplane_t, // surface normal at impact, transformed to world space
-    pub surfaceFlags: c_int, // surface hit
-    pub contents: c_int,     // contents on other side of surface hit
-    pub entityNum: c_int,    // entity the contacted sirface is a part of
+    pub plane: cplane_t,      // surface normal at impact, transformed to world space
+    pub surfaceFlags: c_int,  // surface hit
+    pub contents: c_int,      // contents on other side of surface hit
+    pub entityNum: c_int,     // entity the contacted sirface is a part of
 
-                             // Ghoul2 Insert Start
-                             // FIXME: create type CCollisionRecord
-                             // pub G2CollisionMap: [CCollisionRecord; MAX_G2_COLLISIONS], // map that describes all of the parts of ghoul2 models that got hit
-                             // Ghoul2 Insert End
+    // Ghoul2 Insert Start
+    // FIXME: create type CCollisionRecord
+    // pub G2CollisionMap: [CCollisionRecord; MAX_G2_COLLISIONS], // map that describes all of the parts of ghoul2 models that got hit
+    // Ghoul2 Insert End
 }
 
 // trace->entityNum can also be 0 to (MAX_GENTITIES-1)
