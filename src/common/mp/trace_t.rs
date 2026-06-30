@@ -23,7 +23,6 @@ pub struct trace_t {
     pub surfaceFlags: c_int, // surface hit
     // contents on other side of surface hit
     pub contents: c_int,
-
     // Ghoul2 Insert Start
     //rww - removed this for now, it's just wasting space in the trace structure.
     // pub G2CollisionMap: [CollisionRecord_t; MAX_G2_COLLISIONS], // map that describes all of the parts of ghoul2 models that got hit

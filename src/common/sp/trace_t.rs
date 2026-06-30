@@ -25,6 +25,8 @@ pub struct trace_t {
 
     // Ghoul2 Insert Start
     // map that describes all of the parts of ghoul2 models that got hit
+    // SP initialization should populate records through
+    // `crate::common::sp::qcommon::collision_record::new_ccollision_record`.
     pub G2CollisionMap: [CCollisionRecord; MAX_G2_COLLISIONS],
     // Ghoul2 Insert End
 }
