@@ -7,6 +7,8 @@
 
 use core::ffi::{c_float, c_int, c_short};
 
+use crate::shared::vec3_t;
+
 // a trace is returned when a box is swept through the world
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -16,8 +18,7 @@ pub struct trace_t {
     pub entityNum: c_short, // entity the contacted sirface is a part of
 
     pub fraction: c_float, // time completed, 1.0 = didn't hit anything
-    // FIXME: create type vec3_t
-    // pub endpos: vec3_t, // final position
+    pub endpos: vec3_t,    // final position
     // FIXME: create type cplane_t
     // pub plane: cplane_t, // surface normal at impact, transformed to world space
     pub surfaceFlags: c_int, // surface hit

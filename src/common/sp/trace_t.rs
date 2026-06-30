@@ -7,7 +7,7 @@
 
 use core::ffi::{c_float, c_int};
 
-use crate::shared::qboolean;
+use crate::shared::{qboolean, vec3_t};
 
 pub const MAX_G2_COLLISIONS: usize = 16;
 
@@ -18,8 +18,7 @@ pub struct trace_t {
     pub allsolid: qboolean,   // if true, plane is not valid
     pub startsolid: qboolean, // if true, the initial point was in a solid area
     pub fraction: c_float,    // time completed, 1.0 = didn't hit anything
-    // FIXME: create type vec3_t
-    // pub endpos: vec3_t, // final position
+    pub endpos: vec3_t,       // final position
     // FIXME: create type cplane_t
     // pub plane: cplane_t, // surface normal at impact, transformed to world space
     pub surfaceFlags: c_int, // surface hit

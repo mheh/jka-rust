@@ -5,6 +5,9 @@
 use core::ffi::c_int;
 
 pub mod platform;
+pub mod vector;
+
+pub use vector::{vec2_t, vec3_t, vec3pair_t, vec4_t, vec5_t, vec_t};
 
 /// Raven `qboolean`.
 ///
