@@ -4,6 +4,16 @@ version = "0.1.0"
 edition = "2021"
 description = "Idiomatic, opinionated Rust reimplementation of Jedi Academy MP; verified against the faithful jedi-academy-rust port (the oracle/ submodule)."
 
+[workspace]
+resolver = "2"
+members = [
+    ".",
+    "crates/jampgame",
+    "crates/cgame",
+    "crates/ui",
+    "crates/jagame",
+]
+
 [lib]
 name = "jka"
 

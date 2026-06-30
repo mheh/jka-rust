@@ -1,0 +1,12 @@
+[package]
+name = "jampgame"
+version = "0.1.0"
+edition = "2021"
+description = "MP game module cdylib target, mirroring OpenJK's jampgame shared library."
+
+[lib]
+name = "jampgame"
+crate-type = ["cdylib"]
+
+[dependencies]
+jka = { package = "jka-rust", path = "../.." }

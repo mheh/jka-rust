@@ -3,5 +3,33 @@
 version = 4
 
 [[package]]
+name = "cgame"
+version = "0.1.0"
+dependencies = [
+ "jka-rust",
+]
+
+[[package]]
+name = "jagame"
+version = "0.1.0"
+dependencies = [
+ "jka-rust",
+]
+
+[[package]]
+name = "jampgame"
+version = "0.1.0"
+dependencies = [
+ "jka-rust",
+]
+
+[[package]]
 name = "jka-rust"
 version = "0.1.0"
+
+[[package]]
+name = "ui"
+version = "0.1.0"
+dependencies = [
+ "jka-rust",
+]

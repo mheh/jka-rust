@@ -1,0 +1,12 @@
+[package]
+name = "jagame"
+version = "0.1.0"
+edition = "2021"
+description = "SP game module cdylib target, mirroring OpenJK's jagame shared library."
+
+[lib]
+name = "jagame"
+crate-type = ["cdylib"]
+
+[dependencies]
+jka = { package = "jka-rust", path = "../.." }

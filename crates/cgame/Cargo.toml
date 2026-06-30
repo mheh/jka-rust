@@ -1,0 +1,12 @@
+[package]
+name = "cgame"
+version = "0.1.0"
+edition = "2021"
+description = "MP cgame module cdylib target, mirroring OpenJK's cgame shared library."
+
+[lib]
+name = "cgame"
+crate-type = ["cdylib"]
+
+[dependencies]
+jka = { package = "jka-rust", path = "../.." }

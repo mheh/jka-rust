@@ -13,4 +13,5 @@ pub mod game;
 pub mod modules;
 pub mod shared;
 
-// `abi/` (the typed seam) and `engine/` (its backend) not declared yet — pending type-sourcing.
+// Module ABI surfaces are built as separate workspace packages, mirroring
+// OpenJK's per-module shared-library targets.

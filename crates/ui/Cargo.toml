@@ -1,0 +1,12 @@
+[package]
+name = "ui"
+version = "0.1.0"
+edition = "2021"
+description = "MP UI module cdylib target, mirroring OpenJK's UI shared library."
+
+[lib]
+name = "ui"
+crate-type = ["cdylib"]
+
+[dependencies]
+jka = { package = "jka-rust", path = "../.." }
