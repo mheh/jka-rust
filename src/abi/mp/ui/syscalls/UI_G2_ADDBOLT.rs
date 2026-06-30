@@ -1,10 +1,10 @@
 use core::ffi::{c_int, c_void};
 use std::ffi::CString;
 
+use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `UiG2_ADDBOLT` outbound game-to-engine syscall.
 ///
@@ -43,11 +43,11 @@ impl GG2AddboltArgs {
 pub struct GG2Addbolt;
 
 impl OutboundSysCall for GG2Addbolt {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2AddboltArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::UiG2_ADDBOLT;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_ADDBOLT;
 }
 
 impl EncodeSysCall for GG2Addbolt {

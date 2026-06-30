@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpUiImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -36,11 +36,11 @@ impl GTestprintintArgs {
 pub struct GTestprintint;
 
 impl OutboundSysCall for GTestprintint {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GTestprintintArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::UiTESTPRINTINT;
+    const IMPORT: MpUiImport = MpUiImport::UiTESTPRINTINT;
 }
 
 impl EncodeSysCall for GTestprintint {

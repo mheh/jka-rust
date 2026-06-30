@@ -1,6 +1,6 @@
 use core::ffi::c_void;
 
-use crate::ffi::GameImport;
+use super::super::MpUiImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -33,11 +33,11 @@ impl GG2ListbonesArgs {
 pub struct GG2Listbones;
 
 impl OutboundSysCall for GG2Listbones {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2ListbonesArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::UiG2_LISTBONES;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_LISTBONES;
 }
 
 impl EncodeSysCall for GG2Listbones {

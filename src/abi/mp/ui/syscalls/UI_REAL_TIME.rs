@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
+use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::common::mp::qcommon::qtime_t;
-use crate::ffi::GameImport;
 
 /// `UiREAL_TIME` outbound game-to-engine syscall.
 ///
@@ -31,11 +31,11 @@ impl GRealTimeArgs {
 pub struct GRealTime;
 
 impl OutboundSysCall for GRealTime {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GRealTimeArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::UiREAL_TIME;
+    const IMPORT: MpUiImport = MpUiImport::UiREAL_TIME;
 }
 
 impl EncodeSysCall for GRealTime {

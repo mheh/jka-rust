@@ -1,6 +1,6 @@
 use core::ffi::c_void;
 
-use crate::ffi::GameImport;
+use super::super::MpUiImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -33,11 +33,11 @@ impl GG2HaveweghoulmodelsArgs {
 pub struct GG2Haveweghoulmodels;
 
 impl OutboundSysCall for GG2Haveweghoulmodels {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2HaveweghoulmodelsArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::UiG2_HAVEWEGHOULMODELS;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_HAVEWEGHOULMODELS;
 }
 
 impl EncodeSysCall for GG2Haveweghoulmodels {

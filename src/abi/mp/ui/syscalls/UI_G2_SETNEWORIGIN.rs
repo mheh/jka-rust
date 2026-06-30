@@ -1,6 +1,6 @@
 use core::ffi::c_void;
 
-use crate::ffi::GameImport;
+use super::super::MpUiImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -39,11 +39,11 @@ impl GG2SetneworiginArgs {
 pub struct GG2Setneworigin;
 
 impl OutboundSysCall for GG2Setneworigin {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2SetneworiginArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::UiG2_SETNEWORIGIN;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_SETNEWORIGIN;
 }
 
 impl EncodeSysCall for GG2Setneworigin {

@@ -1,9 +1,9 @@
 use core::ffi::c_void;
 
+use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::qhandle_t;
 
 /// `UiG2_SETMODELS` outbound game-to-engine syscall.
@@ -46,11 +46,11 @@ impl GG2SetmodelsArgs {
 pub struct GG2Setmodels;
 
 impl OutboundSysCall for GG2Setmodels {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2SetmodelsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::UiG2_SETMODELS;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_SETMODELS;
 }
 
 impl EncodeSysCall for GG2Setmodels {

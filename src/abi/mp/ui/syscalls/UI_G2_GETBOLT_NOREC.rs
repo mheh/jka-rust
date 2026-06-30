@@ -1,9 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::mdxaBone_t;
 use crate::shared::qboolean;
 use crate::shared::qhandle_t;
@@ -83,11 +83,11 @@ impl GG2GetboltNorecArgs {
 pub struct GG2GetboltNorec;
 
 impl OutboundSysCall for GG2GetboltNorec {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2GetboltNorecArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::UiG2_GETBOLT_NOREC;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_GETBOLT_NOREC;
 }
 
 impl EncodeSysCall for GG2GetboltNorec {

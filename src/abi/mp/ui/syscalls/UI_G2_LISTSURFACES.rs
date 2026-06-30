@@ -1,9 +1,9 @@
 use core::ffi::c_void;
 
+use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `UiG2_LISTSURFACES` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -28,11 +28,11 @@ impl GG2ListsurfacesArgs {
 pub struct GG2Listsurfaces;
 
 impl OutboundSysCall for GG2Listsurfaces {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2ListsurfacesArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::UiG2_LISTSURFACES;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_LISTSURFACES;
 }
 
 impl EncodeSysCall for GG2Listsurfaces {

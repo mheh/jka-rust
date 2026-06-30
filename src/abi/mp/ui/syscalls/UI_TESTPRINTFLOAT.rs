@@ -1,8 +1,8 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
+use super::super::MpUiImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -39,11 +39,11 @@ impl GTestprintfloatArgs {
 pub struct GTestprintfloat;
 
 impl OutboundSysCall for GTestprintfloat {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GTestprintfloatArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::UiTESTPRINTFLOAT;
+    const IMPORT: MpUiImport = MpUiImport::UiTESTPRINTFLOAT;
 }
 
 impl EncodeSysCall for GTestprintfloat {

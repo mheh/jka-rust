@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpUiImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 use crate::shared::CollisionRecord_t;
 
 use crate::abi::generic::{
@@ -123,11 +123,11 @@ impl GG2CollisiondetectArgs {
 pub struct GG2Collisiondetect;
 
 impl OutboundSysCall for GG2Collisiondetect {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2CollisiondetectArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::UiG2_COLLISIONDETECT;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_COLLISIONDETECT;
 }
 
 impl EncodeSysCall for GG2Collisiondetect {

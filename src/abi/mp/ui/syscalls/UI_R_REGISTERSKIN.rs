@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpUiImport;
 use crate::shared::qhandle_t;
 
 use crate::abi::generic::{
@@ -29,11 +29,11 @@ impl GRRegisterskinArgs {
 pub struct GRRegisterskin;
 
 impl OutboundSysCall for GRRegisterskin {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GRRegisterskinArgs;
     type Output = qhandle_t;
 
-    const IMPORT: GameImport = GameImport::UiR_REGISTERSKIN;
+    const IMPORT: MpUiImport = MpUiImport::UiR_REGISTERSKIN;
 }
 
 impl EncodeSysCall for GRRegisterskin {

@@ -1,7 +1,8 @@
 use core::ffi::{c_int, c_void};
 use std::ffi::CString;
 
-use crate::{ffi::GameImport, shared::qboolean};
+use super::super::MpUiImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -99,11 +100,11 @@ impl GG2GetboneanimArgs {
 pub struct GG2Getboneanim;
 
 impl OutboundSysCall for GG2Getboneanim {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2GetboneanimArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::UiG2_GETBONEANIM;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_GETBONEANIM;
 }
 
 impl EncodeSysCall for GG2Getboneanim {

@@ -1,8 +1,8 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use super::super::MpUiImport;
 use crate::common::mp::qcommon::sharedSetBoneIKStateParams_t;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -67,11 +67,11 @@ impl GG2SetboneikstateArgs {
 pub struct GG2Setboneikstate;
 
 impl OutboundSysCall for GG2Setboneikstate {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2SetboneikstateArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::UiG2_SETBONEIKSTATE;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_SETBONEIKSTATE;
 }
 
 impl EncodeSysCall for GG2Setboneikstate {

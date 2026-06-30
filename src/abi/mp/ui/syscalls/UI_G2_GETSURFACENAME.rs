@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpUiImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -53,11 +53,11 @@ impl GG2GetsurfacenameArgs {
 pub struct GG2Getsurfacename;
 
 impl OutboundSysCall for GG2Getsurfacename {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2GetsurfacenameArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::UiG2_GETSURFACENAME;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_GETSURFACENAME;
 }
 
 impl EncodeSysCall for GG2Getsurfacename {

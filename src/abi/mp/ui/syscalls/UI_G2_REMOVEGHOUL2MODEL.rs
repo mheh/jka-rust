@@ -1,7 +1,7 @@
+use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 use core::ffi::c_int;
 use core::ffi::c_void;
@@ -38,11 +38,11 @@ impl GG2Removeghoul2ModelArgs {
 pub struct GG2Removeghoul2Model;
 
 impl OutboundSysCall for GG2Removeghoul2Model {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2Removeghoul2ModelArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::UiG2_REMOVEGHOUL2MODEL;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_REMOVEGHOUL2MODEL;
 }
 
 impl EncodeSysCall for GG2Removeghoul2Model {

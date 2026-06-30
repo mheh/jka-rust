@@ -1,7 +1,7 @@
+use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 use core::ffi::c_int;
 use std::ffi::CString;
@@ -40,11 +40,11 @@ impl GG2SetrootsurfaceArgs {
 pub struct GG2Setrootsurface;
 
 impl OutboundSysCall for GG2Setrootsurface {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2SetrootsurfaceArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::UiG2_SETROOTSURFACE;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_SETROOTSURFACE;
 }
 
 impl EncodeSysCall for GG2Setrootsurface {

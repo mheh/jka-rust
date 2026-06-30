@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use core::ffi::c_void;
 
-use crate::ffi::GameImport;
+use super::super::MpUiImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -44,11 +44,11 @@ impl GG2Copyghoul2InstanceArgs {
 pub struct GG2Copyghoul2Instance;
 
 impl OutboundSysCall for GG2Copyghoul2Instance {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2Copyghoul2InstanceArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::UiG2_COPYGHOUL2INSTANCE;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_COPYGHOUL2INSTANCE;
 }
 
 impl EncodeSysCall for GG2Copyghoul2Instance {

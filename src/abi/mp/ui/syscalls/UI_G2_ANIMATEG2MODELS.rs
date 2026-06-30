@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpUiImport;
 use crate::common::mp::qcommon::sharedRagDollUpdateParams_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -48,11 +48,11 @@ impl GG2Animateg2ModelsArgs {
 pub struct GG2Animateg2Models;
 
 impl OutboundSysCall for GG2Animateg2Models {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2Animateg2ModelsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::UiG2_ANIMATEG2MODELS;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_ANIMATEG2MODELS;
 }
 
 impl EncodeSysCall for GG2Animateg2Models {

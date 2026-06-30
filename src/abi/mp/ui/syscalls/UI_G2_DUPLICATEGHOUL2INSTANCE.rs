@@ -1,6 +1,6 @@
 use core::ffi::c_void;
 
-use crate::ffi::GameImport;
+use super::super::MpUiImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -38,11 +38,11 @@ impl GG2Duplicateghoul2InstanceArgs {
 pub struct GG2Duplicateghoul2Instance;
 
 impl OutboundSysCall for GG2Duplicateghoul2Instance {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2Duplicateghoul2InstanceArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::UiG2_DUPLICATEGHOUL2INSTANCE;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_DUPLICATEGHOUL2INSTANCE;
 }
 
 impl EncodeSysCall for GG2Duplicateghoul2Instance {

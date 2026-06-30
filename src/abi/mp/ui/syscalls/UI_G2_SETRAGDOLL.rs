@@ -1,8 +1,8 @@
+use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::common::mp::qcommon::sharedRagDollParams_t;
-use crate::ffi::GameImport;
 use core::ffi::c_void;
 
 /// `UiG2_SETRAGDOLL` outbound game-to-engine syscall.
@@ -34,11 +34,11 @@ impl GG2SetragdollArgs {
 pub struct GG2Setragdoll;
 
 impl OutboundSysCall for GG2Setragdoll {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2SetragdollArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::UiG2_SETRAGDOLL;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_SETRAGDOLL;
 }
 
 impl EncodeSysCall for GG2Setragdoll {

@@ -1,6 +1,7 @@
 use core::ffi::{c_char, c_void};
 
-use crate::{ffi::GameImport, shared::qboolean};
+use super::super::MpUiImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -43,11 +44,11 @@ impl GG2SetsurfaceonoffArgs {
 pub struct GG2Setsurfaceonoff;
 
 impl OutboundSysCall for GG2Setsurfaceonoff {
-    type Import = GameImport;
+    type Import = MpUiImport;
     type Args = GG2SetsurfaceonoffArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::UiG2_SETSURFACEONOFF;
+    const IMPORT: MpUiImport = MpUiImport::UiG2_SETSURFACEONOFF;
 }
 
 impl EncodeSysCall for GG2Setsurfaceonoff {
