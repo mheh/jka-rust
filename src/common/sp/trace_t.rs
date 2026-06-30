@@ -24,7 +24,8 @@ pub struct trace_t {
     pub entityNum: c_int,     // entity the contacted sirface is a part of
 
     // Ghoul2 Insert Start
-    pub G2CollisionMap: [CCollisionRecord; MAX_G2_COLLISIONS], // map that describes all of the parts of ghoul2 models that got hit
+    // map that describes all of the parts of ghoul2 models that got hit
+    pub G2CollisionMap: [CCollisionRecord; MAX_G2_COLLISIONS],
     // Ghoul2 Insert End
 }
 

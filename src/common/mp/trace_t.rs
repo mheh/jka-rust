@@ -21,7 +21,8 @@ pub struct trace_t {
     pub endpos: vec3_t,      // final position
     pub plane: cplane_t,     // surface normal at impact, transformed to world space
     pub surfaceFlags: c_int, // surface hit
-    pub contents: c_int,     // contents on other side of surface hit
+    // contents on other side of surface hit
+    pub contents: c_int,
 
     // Ghoul2 Insert Start
     //rww - removed this for now, it's just wasting space in the trace structure.
