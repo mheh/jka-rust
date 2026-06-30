@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_void};
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -39,11 +39,11 @@ impl BotlibAiGetMapLocationGoalArgs {
 pub struct BotlibAiGetMapLocationGoal;
 
 impl OutboundSysCall for BotlibAiGetMapLocationGoal {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiGetMapLocationGoalArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_GET_MAP_LOCATION_GOAL;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_GET_MAP_LOCATION_GOAL;
 }
 
 impl EncodeSysCall for BotlibAiGetMapLocationGoal {

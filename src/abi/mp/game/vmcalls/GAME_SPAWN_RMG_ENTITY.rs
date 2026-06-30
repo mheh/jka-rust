@@ -1,4 +1,4 @@
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -13,9 +13,9 @@ use crate::abi::generic::InboundVmCall;
 pub struct GameSpawnRmgEntity;
 
 impl InboundVmCall for GameSpawnRmgEntity {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = ();
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_SPAWN_RMG_ENTITY;
+    const COMMAND: MpGameExport = MpGameExport::GAME_SPAWN_RMG_ENTITY;
 }

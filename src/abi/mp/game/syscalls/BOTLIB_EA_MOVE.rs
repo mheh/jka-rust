@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -40,11 +40,11 @@ impl BotlibEaMoveArgs {
 pub struct BotlibEaMove;
 
 impl OutboundSysCall for BotlibEaMove {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibEaMoveArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_EA_MOVE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_EA_MOVE;
 }
 
 impl EncodeSysCall for BotlibEaMove {

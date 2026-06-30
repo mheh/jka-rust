@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY` outbound game-to-engine syscall.
@@ -39,11 +39,11 @@ impl BotlibAasVectorForBspEpairKeyArgs {
 pub struct BotlibAasVectorForBspEpairKey;
 
 impl OutboundSysCall for BotlibAasVectorForBspEpairKey {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasVectorForBspEpairKeyArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY;
 }
 
 impl EncodeSysCall for BotlibAasVectorForBspEpairKey {

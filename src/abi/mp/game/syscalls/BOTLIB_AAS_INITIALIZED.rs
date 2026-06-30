@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 
 /// `BOTLIB_AAS_INITIALIZED` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -19,11 +19,11 @@ impl BotlibAasInitializedArgs {
 pub struct BotlibAasInitialized;
 
 impl OutboundSysCall for BotlibAasInitialized {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasInitializedArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_INITIALIZED;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_INITIALIZED;
 }
 
 impl EncodeSysCall for BotlibAasInitialized {

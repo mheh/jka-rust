@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -26,11 +26,11 @@ impl GSetServerCullArgs {
 pub struct GSetServerCull;
 
 impl OutboundSysCall for GSetServerCull {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GSetServerCullArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_SET_SERVER_CULL;
+    const IMPORT: MpGameImport = MpGameImport::G_SET_SERVER_CULL;
 }
 
 impl EncodeSysCall for GSetServerCull {

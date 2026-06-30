@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -44,11 +44,11 @@ impl GMemsetArgs {
 pub struct GMemset;
 
 impl OutboundSysCall for GMemset {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GMemsetArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_MEMSET;
+    const IMPORT: MpGameImport = MpGameImport::G_MEMSET;
 }
 
 impl EncodeSysCall for GMemset {

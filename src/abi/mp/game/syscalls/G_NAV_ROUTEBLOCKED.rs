@@ -1,6 +1,7 @@
 use core::ffi::c_int;
 
-use crate::{ffi::GameImport, shared::qboolean};
+use super::super::MpGameImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -43,11 +44,11 @@ impl GNavRouteblockedArgs {
 pub struct GNavRouteblocked;
 
 impl OutboundSysCall for GNavRouteblocked {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavRouteblockedArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_NAV_ROUTEBLOCKED;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_ROUTEBLOCKED;
 }
 
 impl EncodeSysCall for GNavRouteblocked {

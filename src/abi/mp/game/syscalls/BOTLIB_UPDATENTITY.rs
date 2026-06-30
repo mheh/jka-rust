@@ -1,9 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `BOTLIB_UPDATENTITY` outbound game-to-engine syscall.
 ///
@@ -37,11 +37,11 @@ impl BotlibUpdatentityArgs {
 pub struct BotlibUpdatentity;
 
 impl OutboundSysCall for BotlibUpdatentity {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibUpdatentityArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_UPDATENTITY;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_UPDATENTITY;
 }
 
 impl EncodeSysCall for BotlibUpdatentity {

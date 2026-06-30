@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -47,11 +47,11 @@ impl BotlibAiCharacteristicStringArgs {
 pub struct BotlibAiCharacteristicString;
 
 impl OutboundSysCall for BotlibAiCharacteristicString {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiCharacteristicStringArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_CHARACTERISTIC_STRING;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_CHARACTERISTIC_STRING;
 }
 
 impl EncodeSysCall for BotlibAiCharacteristicString {

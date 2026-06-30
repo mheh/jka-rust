@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 use crate::shared::vec3_t;
 
@@ -37,11 +37,11 @@ impl GInPvsArgs {
 pub struct GInPvs;
 
 impl OutboundSysCall for GInPvs {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GInPvsArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_IN_PVS;
+    const IMPORT: MpGameImport = MpGameImport::G_IN_PVS;
 }
 
 impl EncodeSysCall for GInPvs {

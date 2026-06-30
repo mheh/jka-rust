@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `BOTLIB_AI_EMPTY_GOAL_STACK` outbound game-to-engine syscall.
@@ -24,11 +24,11 @@ impl BotlibAiEmptyGoalStackArgs {
 pub struct BotlibAiEmptyGoalStack;
 
 impl OutboundSysCall for BotlibAiEmptyGoalStack {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiEmptyGoalStackArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_EMPTY_GOAL_STACK;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_EMPTY_GOAL_STACK;
 }
 
 impl EncodeSysCall for BotlibAiEmptyGoalStack {

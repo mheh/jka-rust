@@ -1,4 +1,4 @@
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -11,9 +11,9 @@ use crate::abi::generic::InboundVmCall;
 pub struct GameIcarusLerp2Angles;
 
 impl InboundVmCall for GameIcarusLerp2Angles {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = ();
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_ICARUS_LERP2ANGLES;
+    const COMMAND: MpGameExport = MpGameExport::GAME_ICARUS_LERP2ANGLES;
 }

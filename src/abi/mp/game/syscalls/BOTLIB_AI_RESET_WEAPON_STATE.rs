@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `BOTLIB_AI_RESET_WEAPON_STATE` outbound game-to-engine syscall.
@@ -24,11 +24,11 @@ impl BotlibAiResetWeaponStateArgs {
 pub struct BotlibAiResetWeaponState;
 
 impl OutboundSysCall for BotlibAiResetWeaponState {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiResetWeaponStateArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_RESET_WEAPON_STATE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_RESET_WEAPON_STATE;
 }
 
 impl EncodeSysCall for BotlibAiResetWeaponState {

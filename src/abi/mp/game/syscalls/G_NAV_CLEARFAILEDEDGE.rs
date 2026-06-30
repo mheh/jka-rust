@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::codemp::game::g_public_h::failedEdge_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -27,11 +27,11 @@ impl GNavClearfailededgeArgs {
 pub struct GNavClearfailededge;
 
 impl OutboundSysCall for GNavClearfailededge {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavClearfailededgeArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_CLEARFAILEDEDGE;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_CLEARFAILEDEDGE;
 }
 
 impl EncodeSysCall for GNavClearfailededge {

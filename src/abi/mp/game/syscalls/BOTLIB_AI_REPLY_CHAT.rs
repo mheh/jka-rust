@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -102,11 +102,11 @@ impl BotlibAiReplyChatArgs {
 pub struct BotlibAiReplyChat;
 
 impl OutboundSysCall for BotlibAiReplyChat {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiReplyChatArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_REPLY_CHAT;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_REPLY_CHAT;
 }
 
 impl EncodeSysCall for BotlibAiReplyChat {

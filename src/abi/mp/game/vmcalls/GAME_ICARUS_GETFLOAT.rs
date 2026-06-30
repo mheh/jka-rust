@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -13,9 +13,9 @@ use crate::abi::generic::InboundVmCall;
 pub struct GameIcarusGetfloat;
 
 impl InboundVmCall for GameIcarusGetfloat {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = ();
     type Output = c_int;
 
-    const COMMAND: GameExport = GameExport::GAME_ICARUS_GETFLOAT;
+    const COMMAND: MpGameExport = MpGameExport::GAME_ICARUS_GETFLOAT;
 }

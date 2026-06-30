@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `BOTLIB_GET_SNAPSHOT_ENTITY` outbound game-to-engine syscall.
@@ -35,11 +35,11 @@ impl BotlibGetSnapshotEntityArgs {
 pub struct BotlibGetSnapshotEntity;
 
 impl OutboundSysCall for BotlibGetSnapshotEntity {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibGetSnapshotEntityArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_GET_SNAPSHOT_ENTITY;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_GET_SNAPSHOT_ENTITY;
 }
 
 impl EncodeSysCall for BotlibGetSnapshotEntity {

@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -36,9 +36,9 @@ impl GameClientUserinfoChangedArgs {
 pub struct GameClientUserinfoChanged;
 
 impl InboundVmCall for GameClientUserinfoChanged {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameClientUserinfoChangedArgs;
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_CLIENT_USERINFO_CHANGED;
+    const COMMAND: MpGameExport = MpGameExport::GAME_CLIENT_USERINFO_CHANGED;
 }

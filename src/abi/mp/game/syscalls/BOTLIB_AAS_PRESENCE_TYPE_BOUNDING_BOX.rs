@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -47,11 +47,11 @@ impl BotlibAasPresenceTypeBoundingBoxArgs {
 pub struct BotlibAasPresenceTypeBoundingBox;
 
 impl OutboundSysCall for BotlibAasPresenceTypeBoundingBox {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasPresenceTypeBoundingBoxArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_PRESENCE_TYPE_BOUNDING_BOX;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_PRESENCE_TYPE_BOUNDING_BOX;
 }
 
 impl EncodeSysCall for BotlibAasPresenceTypeBoundingBox {

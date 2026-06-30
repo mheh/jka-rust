@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -36,9 +36,9 @@ impl GameClientBeginArgs {
 pub struct GameClientBegin;
 
 impl InboundVmCall for GameClientBegin {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameClientBeginArgs;
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_CLIENT_BEGIN;
+    const COMMAND: MpGameExport = MpGameExport::GAME_CLIENT_BEGIN;
 }

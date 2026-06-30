@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 /// `G_NAV_LOAD` outbound game-to-engine syscall.
@@ -34,11 +34,11 @@ impl GNavLoadArgs {
 pub struct GNavLoad;
 
 impl OutboundSysCall for GNavLoad {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavLoadArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_NAV_LOAD;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_LOAD;
 }
 
 impl EncodeSysCall for GNavLoad {

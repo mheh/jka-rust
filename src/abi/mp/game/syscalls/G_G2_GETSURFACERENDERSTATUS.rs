@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_void};
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -48,11 +48,11 @@ impl GG2GetsurfacerenderstatusArgs {
 pub struct GG2Getsurfacerenderstatus;
 
 impl OutboundSysCall for GG2Getsurfacerenderstatus {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2GetsurfacerenderstatusArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_G2_GETSURFACERENDERSTATUS;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_GETSURFACERENDERSTATUS;
 }
 
 impl EncodeSysCall for GG2Getsurfacerenderstatus {

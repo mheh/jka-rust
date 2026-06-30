@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -43,11 +43,11 @@ impl GErrorArgs {
 pub struct GError;
 
 impl OutboundSysCall for GError {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GErrorArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ERROR;
+    const IMPORT: MpGameImport = MpGameImport::G_ERROR;
 }
 
 impl EncodeSysCall for GError {

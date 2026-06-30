@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_int};
 
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -38,11 +38,11 @@ impl GIcarusRunscriptArgs {
 pub struct GIcarusRunscript;
 
 impl OutboundSysCall for GIcarusRunscript {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusRunscriptArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_RUNSCRIPT;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_RUNSCRIPT;
 }
 
 impl EncodeSysCall for GIcarusRunscript {

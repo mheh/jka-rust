@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -28,11 +28,11 @@ impl GBotCalculatepathsArgs {
 pub struct GBotCalculatepaths;
 
 impl OutboundSysCall for GBotCalculatepaths {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GBotCalculatepathsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_BOT_CALCULATEPATHS;
+    const IMPORT: MpGameImport = MpGameImport::G_BOT_CALCULATEPATHS;
 }
 
 impl EncodeSysCall for GBotCalculatepaths {

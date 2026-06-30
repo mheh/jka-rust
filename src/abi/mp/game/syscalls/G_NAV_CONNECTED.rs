@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
@@ -32,11 +32,11 @@ impl GNavConnectedArgs {
 pub struct GNavConnected;
 
 impl OutboundSysCall for GNavConnected {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavConnectedArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_NAV_CONNECTED;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_CONNECTED;
 }
 
 impl EncodeSysCall for GNavConnected {

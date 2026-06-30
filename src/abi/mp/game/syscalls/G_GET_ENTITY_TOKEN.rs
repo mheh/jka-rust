@@ -1,6 +1,7 @@
 use core::ffi::{c_char, c_int};
 
-use crate::{ffi::GameImport, shared::qboolean};
+use super::super::MpGameImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -47,11 +48,11 @@ impl GGetEntityTokenArgs {
 pub struct GGetEntityToken;
 
 impl OutboundSysCall for GGetEntityToken {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GGetEntityTokenArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_GET_ENTITY_TOKEN;
+    const IMPORT: MpGameImport = MpGameImport::G_GET_ENTITY_TOKEN;
 }
 
 impl EncodeSysCall for GGetEntityToken {

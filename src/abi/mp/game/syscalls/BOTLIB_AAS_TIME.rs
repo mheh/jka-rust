@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -18,11 +18,11 @@ impl BotlibAasTimeArgs {
 pub struct BotlibAasTime;
 
 impl OutboundSysCall for BotlibAasTime {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasTimeArgs;
     type Output = f32;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_TIME;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_TIME;
 }
 
 impl EncodeSysCall for BotlibAasTime {

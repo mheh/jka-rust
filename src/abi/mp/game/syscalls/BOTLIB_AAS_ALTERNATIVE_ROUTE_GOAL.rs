@@ -1,9 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL` outbound game-to-engine syscall.
@@ -74,11 +74,11 @@ impl BotlibAasAlternativeRouteGoalArgs {
 pub struct BotlibAasAlternativeRouteGoal;
 
 impl OutboundSysCall for BotlibAasAlternativeRouteGoal {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasAlternativeRouteGoalArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL;
 }
 
 impl EncodeSysCall for BotlibAasAlternativeRouteGoal {

@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::InboundVmCall;
@@ -50,9 +50,9 @@ impl GameClientConnectArgs {
 pub struct GameClientConnect;
 
 impl InboundVmCall for GameClientConnect {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameClientConnectArgs;
     type Output = *const c_char;
 
-    const COMMAND: GameExport = GameExport::GAME_CLIENT_CONNECT;
+    const COMMAND: MpGameExport = MpGameExport::GAME_CLIENT_CONNECT;
 }

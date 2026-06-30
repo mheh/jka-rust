@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `BOTLIB_AI_FREE_MOVE_STATE` outbound game-to-engine syscall.
@@ -24,11 +24,11 @@ impl BotlibAiFreeMoveStateArgs {
 pub struct BotlibAiFreeMoveState;
 
 impl OutboundSysCall for BotlibAiFreeMoveState {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiFreeMoveStateArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_FREE_MOVE_STATE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_FREE_MOVE_STATE;
 }
 
 impl EncodeSysCall for BotlibAiFreeMoveState {

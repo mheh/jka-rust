@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::{
     word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
@@ -38,11 +38,11 @@ impl GameRunFrameArgs {
 pub struct GameRunFrame;
 
 impl InboundVmCall for GameRunFrame {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameRunFrameArgs;
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_RUN_FRAME;
+    const COMMAND: MpGameExport = MpGameExport::GAME_RUN_FRAME;
 }
 
 impl DecodeVmMain for GameRunFrame {

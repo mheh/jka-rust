@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -56,11 +56,11 @@ impl GEntitiesInBoxArgs {
 pub struct GEntitiesInBox;
 
 impl OutboundSysCall for GEntitiesInBox {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GEntitiesInBoxArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_ENTITIES_IN_BOX;
+    const IMPORT: MpGameImport = MpGameImport::G_ENTITIES_IN_BOX;
 }
 
 impl EncodeSysCall for GEntitiesInBox {

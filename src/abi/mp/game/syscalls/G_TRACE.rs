@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::common::mp::trace_t::trace_t;
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -86,11 +86,11 @@ impl GTraceArgs {
 pub struct GTrace;
 
 impl OutboundSysCall for GTrace {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GTraceArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_TRACE;
+    const IMPORT: MpGameImport = MpGameImport::G_TRACE;
 }
 
 impl EncodeSysCall for GTrace {

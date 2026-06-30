@@ -1,4 +1,4 @@
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -11,9 +11,9 @@ use crate::abi::generic::InboundVmCall;
 pub struct GameIcarusRemove;
 
 impl InboundVmCall for GameIcarusRemove {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = ();
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_ICARUS_REMOVE;
+    const COMMAND: MpGameExport = MpGameExport::GAME_ICARUS_REMOVE;
 }

@@ -1,7 +1,7 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use core::ffi::c_char;
 
 /// `G_SET_SHARED_BUFFER` outbound game-to-engine syscall.
@@ -33,11 +33,11 @@ impl GSetSharedBufferArgs {
 pub struct GSetSharedBuffer;
 
 impl OutboundSysCall for GSetSharedBuffer {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GSetSharedBufferArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_SET_SHARED_BUFFER;
+    const IMPORT: MpGameImport = MpGameImport::G_SET_SHARED_BUFFER;
 }
 
 impl EncodeSysCall for GSetSharedBuffer {

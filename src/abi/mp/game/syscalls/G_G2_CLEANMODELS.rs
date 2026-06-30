@@ -1,6 +1,6 @@
 use core::ffi::c_void;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -29,11 +29,11 @@ impl GG2CleanmodelsArgs {
 pub struct GG2Cleanmodels;
 
 impl OutboundSysCall for GG2Cleanmodels {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2CleanmodelsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_G2_CLEANMODELS;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_CLEANMODELS;
 }
 
 impl EncodeSysCall for GG2Cleanmodels {

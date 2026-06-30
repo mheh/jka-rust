@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -42,11 +42,11 @@ impl GG2RemoveboneArgs {
 pub struct GG2Removebone;
 
 impl OutboundSysCall for GG2Removebone {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2RemoveboneArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_REMOVEBONE;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_REMOVEBONE;
 }
 
 impl EncodeSysCall for GG2Removebone {

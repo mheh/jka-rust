@@ -1,11 +1,11 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::abi::pass_float;
 use crate::codemp::game::q_shared_h::CollisionRecord_t;
-use crate::ffi::GameImport;
 
 /// `G_G2_COLLISIONDETECTCACHE` outbound game-to-engine syscall.
 ///
@@ -132,11 +132,11 @@ impl GG2CollisiondetectcacheArgs {
 pub struct GG2Collisiondetectcache;
 
 impl OutboundSysCall for GG2Collisiondetectcache {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2CollisiondetectcacheArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_G2_COLLISIONDETECTCACHE;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_COLLISIONDETECTCACHE;
 }
 
 impl EncodeSysCall for GG2Collisiondetectcache {

@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -37,11 +37,11 @@ impl BotlibAiSaveGoalFuzzyLogicArgs {
 pub struct BotlibAiSaveGoalFuzzyLogic;
 
 impl OutboundSysCall for BotlibAiSaveGoalFuzzyLogic {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiSaveGoalFuzzyLogicArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_SAVE_GOAL_FUZZY_LOGIC;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_SAVE_GOAL_FUZZY_LOGIC;
 }
 
 impl EncodeSysCall for BotlibAiSaveGoalFuzzyLogic {

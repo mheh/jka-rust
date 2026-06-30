@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 
 /// `G_NAV_GETBESTPATHBETWEENENTS` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -38,11 +38,11 @@ impl GNavGetbestpathbetweenentsArgs {
 pub struct GNavGetbestpathbetweenents;
 
 impl OutboundSysCall for GNavGetbestpathbetweenents {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavGetbestpathbetweenentsArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_NAV_GETBESTPATHBETWEENENTS;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_GETBESTPATHBETWEENENTS;
 }
 
 impl EncodeSysCall for GNavGetbestpathbetweenents {

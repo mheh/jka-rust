@@ -1,7 +1,7 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use core::ffi::c_char;
 
 /// `BOTLIB_AI_UNIFY_WHITE_SPACES` outbound game-to-engine syscall.
@@ -28,11 +28,11 @@ impl BotlibAiUnifyWhiteSpacesArgs {
 pub struct BotlibAiUnifyWhiteSpaces;
 
 impl OutboundSysCall for BotlibAiUnifyWhiteSpaces {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiUnifyWhiteSpacesArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_UNIFY_WHITE_SPACES;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_UNIFY_WHITE_SPACES;
 }
 
 impl EncodeSysCall for BotlibAiUnifyWhiteSpaces {

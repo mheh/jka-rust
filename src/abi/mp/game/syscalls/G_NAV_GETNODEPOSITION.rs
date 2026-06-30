@@ -1,9 +1,9 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `G_NAV_GETNODEPOSITION` outbound game-to-engine syscall.
@@ -38,11 +38,11 @@ impl GNavGetnodepositionArgs {
 pub struct GNavGetnodeposition;
 
 impl OutboundSysCall for GNavGetnodeposition {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavGetnodepositionArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_NAV_GETNODEPOSITION;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_GETNODEPOSITION;
 }
 
 impl EncodeSysCall for GNavGetnodeposition {

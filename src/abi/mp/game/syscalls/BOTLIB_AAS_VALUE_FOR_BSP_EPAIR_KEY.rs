@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -47,11 +47,11 @@ impl BotlibAasValueForBspEpairKeyArgs {
 pub struct BotlibAasValueForBspEpairKey;
 
 impl OutboundSysCall for BotlibAasValueForBspEpairKey {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasValueForBspEpairKeyArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_VALUE_FOR_BSP_EPAIR_KEY;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_VALUE_FOR_BSP_EPAIR_KEY;
 }
 
 impl EncodeSysCall for BotlibAasValueForBspEpairKey {

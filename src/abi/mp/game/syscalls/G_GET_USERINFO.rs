@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -51,11 +51,11 @@ impl GGetUserinfoArgs {
 pub struct GGetUserinfo;
 
 impl OutboundSysCall for GGetUserinfo {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GGetUserinfoArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_GET_USERINFO;
+    const IMPORT: MpGameImport = MpGameImport::G_GET_USERINFO;
 }
 
 impl EncodeSysCall for GGetUserinfo {

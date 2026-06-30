@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -27,11 +27,11 @@ impl GIcarusFreeentArgs {
 pub struct GIcarusFreeent;
 
 impl OutboundSysCall for GIcarusFreeent {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusFreeentArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_FREEENT;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_FREEENT;
 }
 
 impl EncodeSysCall for GIcarusFreeent {

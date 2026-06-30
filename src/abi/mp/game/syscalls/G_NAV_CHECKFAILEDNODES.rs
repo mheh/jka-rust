@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -27,11 +27,11 @@ impl GNavCheckfailednodesArgs {
 pub struct GNavCheckfailednodes;
 
 impl OutboundSysCall for GNavCheckfailednodes {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavCheckfailednodesArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_CHECKFAILEDNODES;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_CHECKFAILEDNODES;
 }
 
 impl EncodeSysCall for GNavCheckfailednodes {

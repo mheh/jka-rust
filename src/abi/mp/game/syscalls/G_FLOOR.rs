@@ -1,6 +1,6 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 /// `G_FLOOR` outbound game-to-engine syscall.
 ///
@@ -26,11 +26,11 @@ impl GFloorArgs {
 pub struct GFloor;
 
 impl OutboundSysCall for GFloor {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GFloorArgs;
     type Output = f32;
 
-    const IMPORT: GameImport = GameImport::G_FLOOR;
+    const IMPORT: MpGameImport = MpGameImport::G_FLOOR;
 }
 
 impl EncodeSysCall for GFloor {

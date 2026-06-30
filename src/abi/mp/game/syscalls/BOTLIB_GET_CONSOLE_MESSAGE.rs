@@ -1,9 +1,9 @@
 use core::ffi::{c_char, c_int};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `BOTLIB_GET_CONSOLE_MESSAGE` outbound game-to-engine syscall.
 ///
@@ -43,11 +43,11 @@ impl BotlibGetConsoleMessageArgs {
 pub struct BotlibGetConsoleMessage;
 
 impl OutboundSysCall for BotlibGetConsoleMessage {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibGetConsoleMessageArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_GET_CONSOLE_MESSAGE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_GET_CONSOLE_MESSAGE;
 }
 
 impl EncodeSysCall for BotlibGetConsoleMessage {

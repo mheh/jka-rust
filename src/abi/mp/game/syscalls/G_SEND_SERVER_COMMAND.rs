@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -42,11 +42,11 @@ impl GSendServerCommandArgs {
 pub struct GSendServerCommand;
 
 impl OutboundSysCall for GSendServerCommand {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GSendServerCommandArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_SEND_SERVER_COMMAND;
+    const IMPORT: MpGameImport = MpGameImport::G_SEND_SERVER_COMMAND;
 }
 
 impl EncodeSysCall for GSendServerCommand {

@@ -1,9 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `G_BOT_UPDATEWAYPOINTS` outbound game-to-engine syscall.
 ///
@@ -35,11 +35,11 @@ impl GBotUpdatewaypointsArgs {
 pub struct GBotUpdatewaypoints;
 
 impl OutboundSysCall for GBotUpdatewaypoints {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GBotUpdatewaypointsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_BOT_UPDATEWAYPOINTS;
+    const IMPORT: MpGameImport = MpGameImport::G_BOT_UPDATEWAYPOINTS;
 }
 
 impl EncodeSysCall for GBotUpdatewaypoints {

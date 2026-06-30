@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -26,11 +26,11 @@ impl BotlibAasNextBspEntityArgs {
 pub struct BotlibAasNextBspEntity;
 
 impl OutboundSysCall for BotlibAasNextBspEntity {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasNextBspEntityArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_NEXT_BSP_ENTITY;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_NEXT_BSP_ENTITY;
 }
 
 impl EncodeSysCall for BotlibAasNextBspEntity {

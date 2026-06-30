@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -18,11 +18,11 @@ impl GIcarusShutdownArgs {
 pub struct GIcarusShutdown;
 
 impl OutboundSysCall for GIcarusShutdown {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusShutdownArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_SHUTDOWN;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_SHUTDOWN;
 }
 
 impl EncodeSysCall for GIcarusShutdown {

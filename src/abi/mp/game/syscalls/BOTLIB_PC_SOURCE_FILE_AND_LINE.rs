@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -41,11 +41,11 @@ impl BotlibPcSourceFileAndLineArgs {
 pub struct BotlibPcSourceFileAndLine;
 
 impl OutboundSysCall for BotlibPcSourceFileAndLine {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibPcSourceFileAndLineArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_PC_SOURCE_FILE_AND_LINE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_PC_SOURCE_FILE_AND_LINE;
 }
 
 impl EncodeSysCall for BotlibPcSourceFileAndLine {

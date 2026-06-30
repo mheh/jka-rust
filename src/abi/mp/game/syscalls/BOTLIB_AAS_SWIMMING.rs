@@ -1,9 +1,9 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `BOTLIB_AAS_SWIMMING` outbound game-to-engine syscall.
@@ -28,11 +28,11 @@ impl BotlibAasSwimmingArgs {
 pub struct BotlibAasSwimming;
 
 impl OutboundSysCall for BotlibAasSwimming {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasSwimmingArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_SWIMMING;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_SWIMMING;
 }
 
 impl EncodeSysCall for BotlibAasSwimming {

@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -21,11 +21,11 @@ impl GBotAllocateClientArgs {
 pub struct GBotAllocateClient;
 
 impl OutboundSysCall for GBotAllocateClient {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GBotAllocateClientArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_BOT_ALLOCATE_CLIENT;
+    const IMPORT: MpGameImport = MpGameImport::G_BOT_ALLOCATE_CLIENT;
 }
 
 impl EncodeSysCall for GBotAllocateClient {

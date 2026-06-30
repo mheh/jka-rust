@@ -1,9 +1,9 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `BOTLIB_AAS_TRACE_AREAS` outbound game-to-engine syscall.
@@ -63,11 +63,11 @@ impl BotlibAasTraceAreasArgs {
 pub struct BotlibAasTraceAreas;
 
 impl OutboundSysCall for BotlibAasTraceAreas {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasTraceAreasArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_TRACE_AREAS;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_TRACE_AREAS;
 }
 
 impl EncodeSysCall for BotlibAasTraceAreas {

@@ -1,11 +1,11 @@
 use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::q_shared_h::fsMode_t;
-use crate::ffi::GameImport;
 use crate::shared::fileHandle_t;
 
 /// `G_FS_FOPEN_FILE` outbound game-to-engine syscall.
@@ -56,11 +56,11 @@ impl GFsFopenFileArgs {
 pub struct GFsFopenFile;
 
 impl OutboundSysCall for GFsFopenFile {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GFsFopenFileArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_FS_FOPEN_FILE;
+    const IMPORT: MpGameImport = MpGameImport::G_FS_FOPEN_FILE;
 }
 
 impl EncodeSysCall for GFsFopenFile {

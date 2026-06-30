@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vmCvar_t;
 
 use crate::abi::generic::{
@@ -59,11 +59,11 @@ impl GCvarRegisterArgs {
 pub struct GCvarRegister;
 
 impl OutboundSysCall for GCvarRegister {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GCvarRegisterArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_CVAR_REGISTER;
+    const IMPORT: MpGameImport = MpGameImport::G_CVAR_REGISTER;
 }
 
 impl EncodeSysCall for GCvarRegister {

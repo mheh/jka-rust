@@ -1,8 +1,8 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
 use crate::codemp::game::q_shared_h::playerState_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -68,11 +68,11 @@ impl GLocateGameDataArgs {
 pub struct GLocateGameData;
 
 impl OutboundSysCall for GLocateGameData {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GLocateGameDataArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_LOCATE_GAME_DATA;
+    const IMPORT: MpGameImport = MpGameImport::G_LOCATE_GAME_DATA;
 }
 
 impl EncodeSysCall for GLocateGameData {

@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -52,11 +52,11 @@ impl GIcarusSetvarArgs {
 pub struct GIcarusSetvar;
 
 impl OutboundSysCall for GIcarusSetvar {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusSetvarArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_SETVAR;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_SETVAR;
 }
 
 impl EncodeSysCall for GIcarusSetvar {

@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -75,11 +75,11 @@ impl GG2Initghoul2ModelArgs {
 pub struct GG2Initghoul2Model;
 
 impl OutboundSysCall for GG2Initghoul2Model {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2Initghoul2ModelArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_G2_INITGHOUL2MODEL;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_INITGHOUL2MODEL;
 }
 
 impl EncodeSysCall for GG2Initghoul2Model {

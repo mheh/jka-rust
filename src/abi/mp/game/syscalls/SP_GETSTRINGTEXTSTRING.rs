@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -44,11 +44,11 @@ impl SpGetstringtextstringArgs {
 pub struct SpGetstringtextstring;
 
 impl OutboundSysCall for SpGetstringtextstring {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = SpGetstringtextstringArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::SP_GETSTRINGTEXTSTRING;
+    const IMPORT: MpGameImport = MpGameImport::SP_GETSTRINGTEXTSTRING;
 }
 
 impl EncodeSysCall for SpGetstringtextstring {

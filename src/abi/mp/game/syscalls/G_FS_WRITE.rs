@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::fileHandle_t;
 
 use crate::abi::generic::{
@@ -45,11 +45,11 @@ impl GFsWriteArgs {
 pub struct GFsWrite;
 
 impl OutboundSysCall for GFsWrite {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GFsWriteArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_FS_WRITE;
+    const IMPORT: MpGameImport = MpGameImport::G_FS_WRITE;
 }
 
 impl EncodeSysCall for GFsWrite {

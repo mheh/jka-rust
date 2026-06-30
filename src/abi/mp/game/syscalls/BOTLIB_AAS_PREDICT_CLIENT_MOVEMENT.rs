@@ -1,9 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT` outbound game-to-engine syscall.
 ///
@@ -116,11 +116,11 @@ impl BotlibAasPredictClientMovementArgs {
 pub struct BotlibAasPredictClientMovement;
 
 impl OutboundSysCall for BotlibAasPredictClientMovement {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasPredictClientMovementArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_PREDICT_CLIENT_MOVEMENT;
 }
 
 impl EncodeSysCall for BotlibAasPredictClientMovement {

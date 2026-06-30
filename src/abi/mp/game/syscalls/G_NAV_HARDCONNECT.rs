@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `G_NAV_HARDCONNECT` outbound game-to-engine syscall.
@@ -29,11 +29,11 @@ impl GNavHardconnectArgs {
 pub struct GNavHardconnect;
 
 impl OutboundSysCall for GNavHardconnect {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavHardconnectArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_HARDCONNECT;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_HARDCONNECT;
 }
 
 impl EncodeSysCall for GNavHardconnect {

@@ -1,10 +1,10 @@
 use core::ffi::{c_char, c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 /// `G_G2_PLAYANIM` outbound game-to-engine syscall.
@@ -94,11 +94,11 @@ impl GG2PlayanimArgs {
 pub struct GG2Playanim;
 
 impl OutboundSysCall for GG2Playanim {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2PlayanimArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_PLAYANIM;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_PLAYANIM;
 }
 
 impl EncodeSysCall for GG2Playanim {

@@ -1,7 +1,7 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 use core::ffi::c_int;
 
@@ -39,11 +39,11 @@ impl GNavAddrawpointArgs {
 pub struct GNavAddrawpoint;
 
 impl OutboundSysCall for GNavAddrawpoint {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavAddrawpointArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_NAV_ADDRAWPOINT;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_ADDRAWPOINT;
 }
 
 impl EncodeSysCall for GNavAddrawpoint {

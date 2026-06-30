@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -40,11 +40,11 @@ impl BotlibAiInterbreedGoalFuzzyLogicArgs {
 pub struct BotlibAiInterbreedGoalFuzzyLogic;
 
 impl OutboundSysCall for BotlibAiInterbreedGoalFuzzyLogic {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiInterbreedGoalFuzzyLogicArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_INTERBREED_GOAL_FUZZY_LOGIC;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_INTERBREED_GOAL_FUZZY_LOGIC;
 }
 
 impl EncodeSysCall for BotlibAiInterbreedGoalFuzzyLogic {

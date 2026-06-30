@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 use crate::shared::vec3_t;
 
@@ -48,11 +48,11 @@ impl GG2RageffectorkickArgs {
 pub struct GG2Rageffectorkick;
 
 impl OutboundSysCall for GG2Rageffectorkick {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2RageffectorkickArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_RAGEFFECTORKICK;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_RAGEFFECTORKICK;
 }
 
 impl EncodeSysCall for GG2Rageffectorkick {

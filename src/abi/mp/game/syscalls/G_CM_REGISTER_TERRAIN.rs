@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -29,11 +29,11 @@ impl GCmRegisterTerrainArgs {
 pub struct GCmRegisterTerrain;
 
 impl OutboundSysCall for GCmRegisterTerrain {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GCmRegisterTerrainArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_CM_REGISTER_TERRAIN;
+    const IMPORT: MpGameImport = MpGameImport::G_CM_REGISTER_TERRAIN;
 }
 
 impl EncodeSysCall for GCmRegisterTerrain {

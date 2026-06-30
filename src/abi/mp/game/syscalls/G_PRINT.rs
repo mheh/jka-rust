@@ -1,9 +1,9 @@
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 // Flow:
 //
@@ -45,11 +45,11 @@ impl GPrintArgs {
 pub struct GPrint;
 
 impl OutboundSysCall for GPrint {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GPrintArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_PRINT;
+    const IMPORT: MpGameImport = MpGameImport::G_PRINT;
 }
 
 impl EncodeSysCall for GPrint {

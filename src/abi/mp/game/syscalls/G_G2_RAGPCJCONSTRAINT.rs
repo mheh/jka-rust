@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 use crate::shared::vec3_t;
 
@@ -57,11 +57,11 @@ impl GG2RagpcjconstraintArgs {
 pub struct GG2Ragpcjconstraint;
 
 impl OutboundSysCall for GG2Ragpcjconstraint {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2RagpcjconstraintArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_RAGPCJCONSTRAINT;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_RAGPCJCONSTRAINT;
 }
 
 impl EncodeSysCall for GG2Ragpcjconstraint {

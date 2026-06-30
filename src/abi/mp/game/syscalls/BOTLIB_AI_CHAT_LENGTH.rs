@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -28,11 +28,11 @@ impl BotlibAiChatLengthArgs {
 pub struct BotlibAiChatLength;
 
 impl OutboundSysCall for BotlibAiChatLength {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiChatLengthArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_CHAT_LENGTH;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_CHAT_LENGTH;
 }
 
 impl EncodeSysCall for BotlibAiChatLength {

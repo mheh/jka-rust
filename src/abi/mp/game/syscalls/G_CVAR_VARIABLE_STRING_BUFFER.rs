@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -44,11 +44,11 @@ impl GCvarVariableStringBufferArgs {
 pub struct GCvarVariableStringBuffer;
 
 impl OutboundSysCall for GCvarVariableStringBuffer {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GCvarVariableStringBufferArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_CVAR_VARIABLE_STRING_BUFFER;
+    const IMPORT: MpGameImport = MpGameImport::G_CVAR_VARIABLE_STRING_BUFFER;
 }
 
 impl EncodeSysCall for GCvarVariableStringBuffer {

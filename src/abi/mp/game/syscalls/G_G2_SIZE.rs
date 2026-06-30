@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -30,11 +30,11 @@ impl GG2SizeArgs {
 pub struct GG2Size;
 
 impl OutboundSysCall for GG2Size {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2SizeArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_G2_SIZE;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_SIZE;
 }
 
 impl EncodeSysCall for GG2Size {

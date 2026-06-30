@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
@@ -23,11 +23,11 @@ impl GRoffCleanArgs {
 pub struct GRoffClean;
 
 impl OutboundSysCall for GRoffClean {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GRoffCleanArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_ROFF_CLEAN;
+    const IMPORT: MpGameImport = MpGameImport::G_ROFF_CLEAN;
 }
 
 impl EncodeSysCall for GRoffClean {

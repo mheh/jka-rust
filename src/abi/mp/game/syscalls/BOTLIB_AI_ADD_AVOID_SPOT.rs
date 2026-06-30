@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -49,11 +49,11 @@ impl BotlibAiAddAvoidSpotArgs {
 pub struct BotlibAiAddAvoidSpot;
 
 impl OutboundSysCall for BotlibAiAddAvoidSpot {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiAddAvoidSpotArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_ADD_AVOID_SPOT;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_ADD_AVOID_SPOT;
 }
 
 impl EncodeSysCall for BotlibAiAddAvoidSpot {

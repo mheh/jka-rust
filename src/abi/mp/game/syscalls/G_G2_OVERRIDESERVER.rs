@@ -1,6 +1,6 @@
 use core::ffi::c_void;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -30,11 +30,11 @@ impl GG2OverrideserverArgs {
 pub struct GG2Overrideserver;
 
 impl OutboundSysCall for GG2Overrideserver {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2OverrideserverArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_OVERRIDESERVER;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_OVERRIDESERVER;
 }
 
 impl EncodeSysCall for GG2Overrideserver {

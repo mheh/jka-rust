@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -28,11 +28,11 @@ impl GIcarusVariabledeclaredArgs {
 pub struct GIcarusVariabledeclared;
 
 impl OutboundSysCall for GIcarusVariabledeclared {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusVariabledeclaredArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_VARIABLEDECLARED;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_VARIABLEDECLARED;
 }
 
 impl EncodeSysCall for GIcarusVariabledeclared {

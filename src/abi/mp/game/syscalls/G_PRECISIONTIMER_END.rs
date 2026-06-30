@@ -1,9 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `G_PRECISIONTIMER_END` outbound game-to-engine syscall.
 ///
@@ -33,11 +33,11 @@ impl GPrecisiontimerEndArgs {
 pub struct GPrecisiontimerEnd;
 
 impl OutboundSysCall for GPrecisiontimerEnd {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GPrecisiontimerEndArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_PRECISIONTIMER_END;
+    const IMPORT: MpGameImport = MpGameImport::G_PRECISIONTIMER_END;
 }
 
 impl EncodeSysCall for GPrecisiontimerEnd {

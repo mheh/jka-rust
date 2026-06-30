@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -21,11 +21,11 @@ impl GIcarusInitArgs {
 pub struct GIcarusInit;
 
 impl OutboundSysCall for GIcarusInit {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusInitArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_INIT;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_INIT;
 }
 
 impl EncodeSysCall for GIcarusInit {

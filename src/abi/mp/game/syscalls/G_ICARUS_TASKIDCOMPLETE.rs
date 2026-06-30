@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 
 /// `G_ICARUS_TASKIDCOMPLETE` outbound game-to-engine syscall.
 ///
@@ -36,11 +36,11 @@ impl GIcarusTaskidcompleteArgs {
 pub struct GIcarusTaskidcomplete;
 
 impl OutboundSysCall for GIcarusTaskidcomplete {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusTaskidcompleteArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_TASKIDCOMPLETE;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_TASKIDCOMPLETE;
 }
 
 impl EncodeSysCall for GIcarusTaskidcomplete {

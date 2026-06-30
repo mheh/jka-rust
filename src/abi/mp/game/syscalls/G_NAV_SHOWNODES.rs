@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -18,11 +18,11 @@ impl GNavShownodesArgs {
 pub struct GNavShownodes;
 
 impl OutboundSysCall for GNavShownodes {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavShownodesArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_SHOWNODES;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_SHOWNODES;
 }
 
 impl EncodeSysCall for GNavShownodes {

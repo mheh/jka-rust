@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -29,11 +29,11 @@ impl BotlibPcAddGlobalDefineArgs {
 pub struct BotlibPcAddGlobalDefine;
 
 impl OutboundSysCall for BotlibPcAddGlobalDefine {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibPcAddGlobalDefineArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_PC_ADD_GLOBAL_DEFINE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_PC_ADD_GLOBAL_DEFINE;
 }
 
 impl EncodeSysCall for BotlibPcAddGlobalDefine {

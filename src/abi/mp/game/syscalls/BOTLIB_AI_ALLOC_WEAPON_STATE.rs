@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -23,11 +23,11 @@ impl BotlibAiAllocWeaponStateArgs {
 pub struct BotlibAiAllocWeaponState;
 
 impl OutboundSysCall for BotlibAiAllocWeaponState {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiAllocWeaponStateArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_ALLOC_WEAPON_STATE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_ALLOC_WEAPON_STATE;
 }
 
 impl EncodeSysCall for BotlibAiAllocWeaponState {

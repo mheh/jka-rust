@@ -1,9 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `BOTLIB_AAS_ENTITY_INFO` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -32,11 +32,11 @@ impl BotlibAasEntityInfoArgs {
 pub struct BotlibAasEntityInfo;
 
 impl OutboundSysCall for BotlibAasEntityInfo {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasEntityInfoArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_ENTITY_INFO;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_ENTITY_INFO;
 }
 
 impl EncodeSysCall for BotlibAasEntityInfo {

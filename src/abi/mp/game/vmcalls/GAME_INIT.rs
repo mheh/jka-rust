@@ -10,7 +10,7 @@
 /// Source (call site): `oracle/oracle/codemp/server/sv_game.cpp:1690`
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -46,9 +46,9 @@ impl GameInitArgs {
 pub struct GameInit;
 
 impl InboundVmCall for GameInit {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameInitArgs;
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_INIT;
+    const COMMAND: MpGameExport = MpGameExport::GAME_INIT;
 }

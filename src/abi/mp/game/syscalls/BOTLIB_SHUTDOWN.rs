@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 
 /// `BOTLIB_SHUTDOWN` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -20,11 +20,11 @@ impl BotlibShutdownArgs {
 pub struct BotlibShutdown;
 
 impl OutboundSysCall for BotlibShutdown {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibShutdownArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_SHUTDOWN;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_SHUTDOWN;
 }
 
 impl EncodeSysCall for BotlibShutdown {

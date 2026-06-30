@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -49,11 +49,11 @@ impl GG2GetglanameArgs {
 pub struct GG2Getglaname;
 
 impl OutboundSysCall for GG2Getglaname {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2GetglanameArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_G2_GETGLANAME;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_GETGLANAME;
 }
 
 impl EncodeSysCall for GG2Getglaname {

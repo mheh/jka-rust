@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::codemp::game::be_ai_goal_h::bot_goal_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -37,11 +37,11 @@ impl BotlibAiGetTopGoalArgs {
 pub struct BotlibAiGetTopGoal;
 
 impl OutboundSysCall for BotlibAiGetTopGoal {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiGetTopGoalArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_GET_TOP_GOAL;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_GET_TOP_GOAL;
 }
 
 impl EncodeSysCall for BotlibAiGetTopGoal {

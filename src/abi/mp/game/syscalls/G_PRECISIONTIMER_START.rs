@@ -1,6 +1,6 @@
 use core::ffi::c_void;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -32,11 +32,11 @@ impl GPrecisiontimerStartArgs {
 pub struct GPrecisiontimerStart;
 
 impl OutboundSysCall for GPrecisiontimerStart {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GPrecisiontimerStartArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_PRECISIONTIMER_START;
+    const IMPORT: MpGameImport = MpGameImport::G_PRECISIONTIMER_START;
 }
 
 impl EncodeSysCall for GPrecisiontimerStart {

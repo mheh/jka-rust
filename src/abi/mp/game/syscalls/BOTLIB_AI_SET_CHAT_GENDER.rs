@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -33,11 +33,11 @@ impl BotlibAiSetChatGenderArgs {
 pub struct BotlibAiSetChatGender;
 
 impl OutboundSysCall for BotlibAiSetChatGender {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiSetChatGenderArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_SET_CHAT_GENDER;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_SET_CHAT_GENDER;
 }
 
 impl EncodeSysCall for BotlibAiSetChatGender {

@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `BOTLIB_EA_USE` outbound game-to-engine syscall.
@@ -26,11 +26,11 @@ impl BotlibEaUseArgs {
 pub struct BotlibEaUse;
 
 impl OutboundSysCall for BotlibEaUse {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibEaUseArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_EA_USE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_EA_USE;
 }
 
 impl EncodeSysCall for BotlibEaUse {

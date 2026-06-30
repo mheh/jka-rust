@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -46,11 +46,11 @@ impl GNavGetnearestnodeArgs {
 pub struct GNavGetnearestnode;
 
 impl OutboundSysCall for GNavGetnearestnode {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavGetnearestnodeArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_NAV_GETNEARESTNODE;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_GETNEARESTNODE;
 }
 
 impl EncodeSysCall for GNavGetnearestnode {

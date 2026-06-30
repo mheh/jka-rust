@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -38,11 +38,11 @@ impl GTruemallocArgs {
 pub struct GTruemalloc;
 
 impl OutboundSysCall for GTruemalloc {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GTruemallocArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_TRUEMALLOC;
+    const IMPORT: MpGameImport = MpGameImport::G_TRUEMALLOC;
 }
 
 impl EncodeSysCall for GTruemalloc {

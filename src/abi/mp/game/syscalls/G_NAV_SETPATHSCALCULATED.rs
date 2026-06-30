@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 /// `G_NAV_SETPATHSCALCULATED` outbound game-to-engine syscall.
@@ -25,11 +25,11 @@ impl GNavSetpathscalculatedArgs {
 pub struct GNavSetpathscalculated;
 
 impl OutboundSysCall for GNavSetpathscalculated {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavSetpathscalculatedArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_SETPATHSCALCULATED;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_SETPATHSCALCULATED;
 }
 
 impl EncodeSysCall for GNavSetpathscalculated {

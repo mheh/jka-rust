@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -48,11 +48,11 @@ impl GNavGetbestnodealtRouteArgs {
 }
 
 impl OutboundSysCall for GNavGetbestnodealtroute {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavGetbestnodealtRouteArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_NAV_GETBESTNODEALTROUTE;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_GETBESTNODEALTROUTE;
 }
 
 impl EncodeSysCall for GNavGetbestnodealtroute {

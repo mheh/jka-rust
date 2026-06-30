@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 
 /// `G_DEBUG_POLYGON_DELETE` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -25,11 +25,11 @@ impl GDebugPolygonDeleteArgs {
 pub struct GDebugPolygonDelete;
 
 impl OutboundSysCall for GDebugPolygonDelete {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GDebugPolygonDeleteArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_DEBUG_POLYGON_DELETE;
+    const IMPORT: MpGameImport = MpGameImport::G_DEBUG_POLYGON_DELETE;
 }
 
 impl EncodeSysCall for GDebugPolygonDelete {

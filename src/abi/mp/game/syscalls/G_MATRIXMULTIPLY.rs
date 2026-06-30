@@ -1,7 +1,7 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `G_MATRIXMULTIPLY` outbound game-to-engine syscall.
@@ -38,11 +38,11 @@ impl GMatrixmultiplyArgs {
 pub struct GMatrixmultiply;
 
 impl OutboundSysCall for GMatrixmultiply {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GMatrixmultiplyArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_MATRIXMULTIPLY;
+    const IMPORT: MpGameImport = MpGameImport::G_MATRIXMULTIPLY;
 }
 
 impl EncodeSysCall for GMatrixmultiply {

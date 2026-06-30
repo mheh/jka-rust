@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -29,11 +29,11 @@ impl BotlibAasPointReachabilityAreaIndexArgs {
 pub struct BotlibAasPointReachabilityAreaIndex;
 
 impl OutboundSysCall for BotlibAasPointReachabilityAreaIndex {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasPointReachabilityAreaIndexArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_POINT_REACHABILITY_AREA_INDEX;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_POINT_REACHABILITY_AREA_INDEX;
 }
 
 impl EncodeSysCall for BotlibAasPointReachabilityAreaIndex {

@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::codemp::game::q_shared_h::siegePers_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -27,11 +27,11 @@ impl GSiegeperssetArgs {
 pub struct GSiegepersset;
 
 impl OutboundSysCall for GSiegepersset {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GSiegeperssetArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_SIEGEPERSSET;
+    const IMPORT: MpGameImport = MpGameImport::G_SIEGEPERSSET;
 }
 
 impl EncodeSysCall for GSiegepersset {

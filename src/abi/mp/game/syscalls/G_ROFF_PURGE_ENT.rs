@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 use core::ffi::c_int;
 
@@ -27,11 +27,11 @@ impl GRoffPurgeEntArgs {
 pub struct GRoffPurgeEnt;
 
 impl OutboundSysCall for GRoffPurgeEnt {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GRoffPurgeEntArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_ROFF_PURGE_ENT;
+    const IMPORT: MpGameImport = MpGameImport::G_ROFF_PURGE_ENT;
 }
 
 impl EncodeSysCall for GRoffPurgeEnt {

@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -36,11 +36,11 @@ impl BotlibEaViewArgs {
 pub struct BotlibEaView;
 
 impl OutboundSysCall for BotlibEaView {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibEaViewArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_EA_VIEW;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_EA_VIEW;
 }
 
 impl EncodeSysCall for BotlibEaView {

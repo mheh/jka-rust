@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// Args for the `BOTLIB_PC_FREE_SOURCE` syscall.
@@ -26,11 +26,11 @@ impl BotlibPcFreeSourceArgs {
 pub struct BotlibPcFreeSource;
 
 impl OutboundSysCall for BotlibPcFreeSource {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibPcFreeSourceArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_PC_FREE_SOURCE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_PC_FREE_SOURCE;
 }
 
 impl EncodeSysCall for BotlibPcFreeSource {

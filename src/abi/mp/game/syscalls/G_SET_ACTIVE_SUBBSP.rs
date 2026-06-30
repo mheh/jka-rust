@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -27,11 +27,11 @@ impl GSetActiveSubbspArgs {
 pub struct GSetActiveSubbsp;
 
 impl OutboundSysCall for GSetActiveSubbsp {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GSetActiveSubbspArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_SET_ACTIVE_SUBBSP;
+    const IMPORT: MpGameImport = MpGameImport::G_SET_ACTIVE_SUBBSP;
 }
 
 impl EncodeSysCall for GSetActiveSubbsp {

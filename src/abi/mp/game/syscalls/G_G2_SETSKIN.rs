@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -57,11 +57,11 @@ impl GG2SetskinArgs {
 pub struct GG2Setskin;
 
 impl OutboundSysCall for GG2Setskin {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2SetskinArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_SETSKIN;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_SETSKIN;
 }
 
 impl EncodeSysCall for GG2Setskin {

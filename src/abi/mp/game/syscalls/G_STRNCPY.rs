@@ -1,9 +1,9 @@
 use core::ffi::{c_char, c_int};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `G_STRNCPY` outbound game-to-engine syscall.
 ///
@@ -39,11 +39,11 @@ impl GStrncpyArgs {
 pub struct GStrncpy;
 
 impl OutboundSysCall for GStrncpy {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GStrncpyArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_STRNCPY;
+    const IMPORT: MpGameImport = MpGameImport::G_STRNCPY;
 }
 
 impl EncodeSysCall for GStrncpy {

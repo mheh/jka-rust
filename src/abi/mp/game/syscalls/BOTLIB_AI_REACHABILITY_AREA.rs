@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -34,11 +34,11 @@ impl BotlibAiReachabilityAreaArgs {
 pub struct BotlibAiReachabilityArea;
 
 impl OutboundSysCall for BotlibAiReachabilityArea {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiReachabilityAreaArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_REACHABILITY_AREA;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_REACHABILITY_AREA;
 }
 
 impl EncodeSysCall for BotlibAiReachabilityArea {

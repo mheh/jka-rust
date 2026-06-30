@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -31,11 +31,11 @@ impl GFsFcloseFileArgs {
 pub struct GFsFcloseFile;
 
 impl OutboundSysCall for GFsFcloseFile {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GFsFcloseFileArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_FS_FCLOSE_FILE;
+    const IMPORT: MpGameImport = MpGameImport::G_FS_FCLOSE_FILE;
 }
 
 impl EncodeSysCall for GFsFcloseFile {

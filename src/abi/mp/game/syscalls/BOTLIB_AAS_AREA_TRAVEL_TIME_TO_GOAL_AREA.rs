@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -51,11 +51,11 @@ impl BotlibAasAreaTravelTimeToGoalAreaArgs {
 pub struct BotlibAasAreaTravelTimeToGoalArea;
 
 impl OutboundSysCall for BotlibAasAreaTravelTimeToGoalArea {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasAreaTravelTimeToGoalAreaArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_AREA_TRAVEL_TIME_TO_GOAL_AREA;
 }
 
 impl EncodeSysCall for BotlibAasAreaTravelTimeToGoalArea {

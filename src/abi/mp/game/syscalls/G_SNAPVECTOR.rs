@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -31,11 +31,11 @@ impl GSnapvectorArgs {
 pub struct GSnapvector;
 
 impl OutboundSysCall for GSnapvector {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GSnapvectorArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_SNAPVECTOR;
+    const IMPORT: MpGameImport = MpGameImport::G_SNAPVECTOR;
 }
 
 impl EncodeSysCall for GSnapvector {

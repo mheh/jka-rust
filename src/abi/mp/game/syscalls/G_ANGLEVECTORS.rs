@@ -1,7 +1,7 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `G_ANGLEVECTORS` outbound game-to-engine syscall.
@@ -52,11 +52,11 @@ impl GAnglevectorsArgs {
 pub struct GAnglevectors;
 
 impl OutboundSysCall for GAnglevectors {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GAnglevectorsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ANGLEVECTORS;
+    const IMPORT: MpGameImport = MpGameImport::G_ANGLEVECTORS;
 }
 
 impl EncodeSysCall for GAnglevectors {

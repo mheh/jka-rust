@@ -1,6 +1,7 @@
 use core::ffi::c_void;
 
-use crate::{ffi::GameImport, shared::qboolean};
+use super::super::MpGameImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -35,11 +36,11 @@ impl GG2RagforcesolvArgs {
 pub struct GG2Ragforcesolve;
 
 impl OutboundSysCall for GG2Ragforcesolve {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2RagforcesolvArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_RAGFORCESOLVE;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_RAGFORCESOLVE;
 }
 
 impl EncodeSysCall for GG2Ragforcesolve {

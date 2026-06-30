@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -58,11 +58,11 @@ impl BotlibAiGeneticParentsAndChildSelectionArgs {
 pub struct BotlibAiGeneticParentsAndChildSelection;
 
 impl OutboundSysCall for BotlibAiGeneticParentsAndChildSelection {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiGeneticParentsAndChildSelectionArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_GENETIC_PARENTS_AND_CHILD_SELECTION;
 }
 
 impl EncodeSysCall for BotlibAiGeneticParentsAndChildSelection {

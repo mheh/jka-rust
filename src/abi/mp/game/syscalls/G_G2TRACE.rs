@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::common::mp::trace_t::trace_t;
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `G_G2TRACE` outbound game-to-engine syscall.
@@ -91,11 +91,11 @@ impl GG2TraceArgs {
 pub struct GG2Trace;
 
 impl OutboundSysCall for GG2Trace {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2TraceArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_G2TRACE;
+    const IMPORT: MpGameImport = MpGameImport::G_G2TRACE;
 }
 
 impl EncodeSysCall for GG2Trace {

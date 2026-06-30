@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 
 /// `BOTLIB_AI_RESET_LAST_AVOID_REACH` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -25,11 +25,11 @@ impl BotlibAiResetLastAvoidReachArgs {
 pub struct BotlibAiResetLastAvoidReach;
 
 impl OutboundSysCall for BotlibAiResetLastAvoidReach {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiResetLastAvoidReachArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_RESET_LAST_AVOID_REACH;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_RESET_LAST_AVOID_REACH;
 }
 
 impl EncodeSysCall for BotlibAiResetLastAvoidReach {

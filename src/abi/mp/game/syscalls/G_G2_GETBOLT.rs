@@ -1,8 +1,8 @@
 use core::ffi::c_int;
 use core::ffi::c_void;
 
+use super::super::MpGameImport;
 use crate::codemp::game::q_shared_h::mdxaBone_t;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 use crate::shared::qhandle_t;
 use crate::shared::vec3_t;
@@ -89,11 +89,11 @@ impl GG2GetboltArgs {
 pub struct GG2Getbolt;
 
 impl OutboundSysCall for GG2Getbolt {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2GetboltArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_GETBOLT;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_GETBOLT;
 }
 
 impl EncodeSysCall for GG2Getbolt {

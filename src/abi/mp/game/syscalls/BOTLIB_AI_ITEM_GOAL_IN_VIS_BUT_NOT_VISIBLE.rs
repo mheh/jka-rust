@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -51,11 +51,11 @@ impl BotlibAiItemGoalInVisButNotVisibleArgs {
 pub struct BotlibAiItemGoalInVisButNotVisible;
 
 impl OutboundSysCall for BotlibAiItemGoalInVisButNotVisible {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiItemGoalInVisButNotVisibleArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_ITEM_GOAL_IN_VIS_BUT_NOT_VISIBLE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_ITEM_GOAL_IN_VIS_BUT_NOT_VISIBLE;
 }
 
 impl EncodeSysCall for BotlibAiItemGoalInVisButNotVisible {

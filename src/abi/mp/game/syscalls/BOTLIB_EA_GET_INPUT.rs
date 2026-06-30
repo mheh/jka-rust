@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -45,11 +45,11 @@ impl BotlibEaGetInputArgs {
 pub struct BotlibEaGetInput;
 
 impl OutboundSysCall for BotlibEaGetInput {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibEaGetInputArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_EA_GET_INPUT;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_EA_GET_INPUT;
 }
 
 impl EncodeSysCall for BotlibEaGetInput {

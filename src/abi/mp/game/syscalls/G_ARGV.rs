@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -47,11 +47,11 @@ impl GArgvArgs {
 pub struct GArgv;
 
 impl OutboundSysCall for GArgv {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GArgvArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ARGV;
+    const IMPORT: MpGameImport = MpGameImport::G_ARGV;
 }
 
 impl EncodeSysCall for GArgv {

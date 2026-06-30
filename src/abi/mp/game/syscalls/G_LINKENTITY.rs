@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -35,11 +35,11 @@ impl GLinkentityArgs {
 pub struct GLinkentity;
 
 impl OutboundSysCall for GLinkentity {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GLinkentityArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_LINKENTITY;
+    const IMPORT: MpGameImport = MpGameImport::G_LINKENTITY;
 }
 
 impl EncodeSysCall for GLinkentity {

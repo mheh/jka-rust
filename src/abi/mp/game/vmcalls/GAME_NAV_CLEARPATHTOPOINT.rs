@@ -1,6 +1,6 @@
 use core::ffi::{c_float, c_int};
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::InboundVmCall;
@@ -68,9 +68,9 @@ impl GameNavClearpathtopointArgs {
 pub struct GameNavClearpathtopoint;
 
 impl InboundVmCall for GameNavClearpathtopoint {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameNavClearpathtopointArgs;
     type Output = qboolean;
 
-    const COMMAND: GameExport = GameExport::GAME_NAV_CLEARPATHTOPOINT;
+    const COMMAND: MpGameExport = MpGameExport::GAME_NAV_CLEARPATHTOPOINT;
 }

@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::InboundVmCall;
@@ -37,9 +37,9 @@ impl GameNavChecknodefailedforentArgs {
 pub struct GameNavChecknodefailedforent;
 
 impl InboundVmCall for GameNavChecknodefailedforent {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameNavChecknodefailedforentArgs;
     type Output = qboolean;
 
-    const COMMAND: GameExport = GameExport::GAME_NAV_CHECKNODEFAILEDFORENT;
+    const COMMAND: MpGameExport = MpGameExport::GAME_NAV_CHECKNODEFAILEDFORENT;
 }

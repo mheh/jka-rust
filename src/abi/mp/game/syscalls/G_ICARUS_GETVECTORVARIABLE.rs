@@ -1,9 +1,9 @@
 use core::ffi::{c_char, c_int};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `G_ICARUS_GETVECTORVARIABLE` outbound game-to-engine syscall.
@@ -36,11 +36,11 @@ impl GIcarusGetvectorvariableArgs {
 pub struct GIcarusGetvectorvariable;
 
 impl OutboundSysCall for GIcarusGetvectorvariable {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusGetvectorvariableArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_GETVECTORVARIABLE;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_GETVECTORVARIABLE;
 }
 
 impl EncodeSysCall for GIcarusGetvectorvariable {

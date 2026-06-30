@@ -1,10 +1,10 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::q_shared_h::sharedIKMoveParams_t;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 /// `G_G2_IKMOVE` outbound game-to-engine syscall.
@@ -45,11 +45,11 @@ impl GG2IkmoveArgs {
 pub struct GG2Ikmove;
 
 impl OutboundSysCall for GG2Ikmove {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2IkmoveArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_IKMOVE;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_IKMOVE;
 }
 
 impl EncodeSysCall for GG2Ikmove {

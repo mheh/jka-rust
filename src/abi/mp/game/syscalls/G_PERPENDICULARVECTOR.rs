@@ -1,7 +1,7 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `G_PERPENDICULARVECTOR` outbound game-to-engine syscall.
@@ -35,11 +35,11 @@ impl GPerpendicularvectorArgs {
 pub struct GPerpendicularvector;
 
 impl OutboundSysCall for GPerpendicularvector {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GPerpendicularvectorArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_PERPENDICULARVECTOR;
+    const IMPORT: MpGameImport = MpGameImport::G_PERPENDICULARVECTOR;
 }
 
 impl EncodeSysCall for GPerpendicularvector {

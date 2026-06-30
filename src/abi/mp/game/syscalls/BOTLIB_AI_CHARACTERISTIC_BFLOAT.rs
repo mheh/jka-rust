@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -44,11 +44,11 @@ impl BotlibAiCharacteristicBfloatArgs {
 pub struct BotlibAiCharacteristicBfloat;
 
 impl OutboundSysCall for BotlibAiCharacteristicBfloat {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiCharacteristicBfloatArgs;
     type Output = f32;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_CHARACTERISTIC_BFLOAT;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_CHARACTERISTIC_BFLOAT;
 }
 
 impl EncodeSysCall for BotlibAiCharacteristicBfloat {

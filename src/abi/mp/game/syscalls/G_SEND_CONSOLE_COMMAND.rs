@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -41,11 +41,11 @@ impl GSendConsoleCommandArgs {
 pub struct GSendConsoleCommand;
 
 impl OutboundSysCall for GSendConsoleCommand {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GSendConsoleCommandArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_SEND_CONSOLE_COMMAND;
+    const IMPORT: MpGameImport = MpGameImport::G_SEND_CONSOLE_COMMAND;
 }
 
 impl EncodeSysCall for GSendConsoleCommand {

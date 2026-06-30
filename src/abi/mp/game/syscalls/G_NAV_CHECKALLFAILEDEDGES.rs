@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -18,11 +18,11 @@ impl GNavCheckallfailededgesArgs {
 pub struct GNavCheckallfailededges;
 
 impl OutboundSysCall for GNavCheckallfailededges {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavCheckallfailededgesArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_CHECKALLFAILEDEDGES;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_CHECKALLFAILEDEDGES;
 }
 
 impl EncodeSysCall for GNavCheckallfailededges {

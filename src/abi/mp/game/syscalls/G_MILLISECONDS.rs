@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -28,11 +28,11 @@ impl GMillisecondsArgs {
 pub struct GMilliseconds;
 
 impl OutboundSysCall for GMilliseconds {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GMillisecondsArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_MILLISECONDS;
+    const IMPORT: MpGameImport = MpGameImport::G_MILLISECONDS;
 }
 
 impl EncodeSysCall for GMilliseconds {

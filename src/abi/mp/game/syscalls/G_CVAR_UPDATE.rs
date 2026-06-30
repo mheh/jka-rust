@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vmCvar_t;
 
 use crate::abi::generic::{
@@ -32,11 +32,11 @@ impl GCvarUpdateArgs {
 pub struct GCvarUpdate;
 
 impl OutboundSysCall for GCvarUpdate {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GCvarUpdateArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_CVAR_UPDATE;
+    const IMPORT: MpGameImport = MpGameImport::G_CVAR_UPDATE;
 }
 
 impl EncodeSysCall for GCvarUpdate {

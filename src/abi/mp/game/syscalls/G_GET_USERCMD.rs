@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::q_shared_h::usercmd_t;
-use crate::ffi::GameImport;
 
 /// `G_GET_USERCMD` outbound game-to-engine syscall.
 ///
@@ -39,11 +39,11 @@ impl GGetUsercmdArgs {
 pub struct GGetUsercmd;
 
 impl OutboundSysCall for GGetUsercmd {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GGetUsercmdArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_GET_USERCMD;
+    const IMPORT: MpGameImport = MpGameImport::G_GET_USERCMD;
 }
 
 impl EncodeSysCall for GGetUsercmd {

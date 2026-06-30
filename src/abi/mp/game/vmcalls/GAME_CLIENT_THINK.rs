@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -36,9 +36,9 @@ impl GameClientThinkArgs {
 pub struct GameClientThink;
 
 impl InboundVmCall for GameClientThink {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameClientThinkArgs;
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_CLIENT_THINK;
+    const COMMAND: MpGameExport = MpGameExport::GAME_CLIENT_THINK;
 }

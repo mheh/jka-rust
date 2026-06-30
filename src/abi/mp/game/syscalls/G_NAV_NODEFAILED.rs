@@ -1,8 +1,8 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 use core::ffi::c_int;
 
@@ -35,11 +35,11 @@ impl GNavNodefailedArgs {
 pub struct GNavNodefailed;
 
 impl OutboundSysCall for GNavNodefailed {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavNodefailedArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_NAV_NODEFAILED;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_NODEFAILED;
 }
 
 impl EncodeSysCall for GNavNodefailed {

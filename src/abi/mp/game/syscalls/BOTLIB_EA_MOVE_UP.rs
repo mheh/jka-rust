@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -26,11 +26,11 @@ impl BotlibEaMoveUpArgs {
 pub struct BotlibEaMoveUp;
 
 impl OutboundSysCall for BotlibEaMoveUp {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibEaMoveUpArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_EA_MOVE_UP;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_EA_MOVE_UP;
 }
 
 impl EncodeSysCall for BotlibEaMoveUp {

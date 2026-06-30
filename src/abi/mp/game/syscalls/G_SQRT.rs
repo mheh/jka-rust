@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -28,11 +28,11 @@ impl GSqrtArgs {
 pub struct GSqrt;
 
 impl OutboundSysCall for GSqrt {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GSqrtArgs;
     type Output = f32;
 
-    const IMPORT: GameImport = GameImport::G_SQRT;
+    const IMPORT: MpGameImport = MpGameImport::G_SQRT;
 }
 
 impl EncodeSysCall for GSqrt {

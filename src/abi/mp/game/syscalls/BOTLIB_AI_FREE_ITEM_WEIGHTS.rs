@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `BOTLIB_AI_FREE_ITEM_WEIGHTS` outbound game-to-engine syscall.
@@ -24,11 +24,11 @@ impl BotlibAiFreeItemWeightsArgs {
 pub struct BotlibAiFreeItemWeights;
 
 impl OutboundSysCall for BotlibAiFreeItemWeights {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiFreeItemWeightsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_FREE_ITEM_WEIGHTS;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_FREE_ITEM_WEIGHTS;
 }
 
 impl EncodeSysCall for BotlibAiFreeItemWeights {

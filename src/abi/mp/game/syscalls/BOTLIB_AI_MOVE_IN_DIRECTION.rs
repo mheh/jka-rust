@@ -1,9 +1,9 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `BOTLIB_AI_MOVE_IN_DIRECTION` outbound game-to-engine syscall.
@@ -48,11 +48,11 @@ impl BotlibAiMoveInDirectionArgs {
 pub struct BotlibAiMoveInDirection;
 
 impl OutboundSysCall for BotlibAiMoveInDirection {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiMoveInDirectionArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_MOVE_IN_DIRECTION;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_MOVE_IN_DIRECTION;
 }
 
 impl EncodeSysCall for BotlibAiMoveInDirection {

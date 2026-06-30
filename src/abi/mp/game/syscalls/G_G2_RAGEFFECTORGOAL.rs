@@ -1,10 +1,10 @@
 use core::ffi::c_void;
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 use crate::shared::vec3_t;
 
@@ -44,11 +44,11 @@ impl GG2RageffectorgoalArgs {
 pub struct GG2Rageffectorgoal;
 
 impl OutboundSysCall for GG2Rageffectorgoal {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2RageffectorgoalArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_RAGEFFECTORGOAL;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_RAGEFFECTORGOAL;
 }
 
 impl EncodeSysCall for GG2Rageffectorgoal {

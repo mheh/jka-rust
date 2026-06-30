@@ -1,8 +1,8 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 
 /// `G_UNLINKENTITY` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -28,11 +28,11 @@ impl GUnlinkentityArgs {
 pub struct GUnlinkentity;
 
 impl OutboundSysCall for GUnlinkentity {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GUnlinkentityArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_UNLINKENTITY;
+    const IMPORT: MpGameImport = MpGameImport::G_UNLINKENTITY;
 }
 
 impl EncodeSysCall for GUnlinkentity {

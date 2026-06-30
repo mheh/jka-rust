@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -45,11 +45,11 @@ impl GGetConfigstringArgs {
 pub struct GGetConfigstring;
 
 impl OutboundSysCall for GGetConfigstring {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GGetConfigstringArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_GET_CONFIGSTRING;
+    const IMPORT: MpGameImport = MpGameImport::G_GET_CONFIGSTRING;
 }
 
 impl EncodeSysCall for GGetConfigstring {

@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -27,11 +27,11 @@ impl BotlibAiAllocGoalStateArgs {
 pub struct BotlibAiAllocGoalState;
 
 impl OutboundSysCall for BotlibAiAllocGoalState {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiAllocGoalStateArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_ALLOC_GOAL_STATE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_ALLOC_GOAL_STATE;
 }
 
 impl EncodeSysCall for BotlibAiAllocGoalState {

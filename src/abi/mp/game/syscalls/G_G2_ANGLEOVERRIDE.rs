@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_void};
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 use crate::shared::qhandle_t;
 use crate::shared::vec3_t;
@@ -105,11 +105,11 @@ impl GG2AngleoverrideArgs {
 pub struct GG2Angleoverride;
 
 impl OutboundSysCall for GG2Angleoverride {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2AngleoverrideArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_ANGLEOVERRIDE;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_ANGLEOVERRIDE;
 }
 
 impl EncodeSysCall for GG2Angleoverride {

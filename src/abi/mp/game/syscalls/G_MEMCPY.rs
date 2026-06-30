@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -44,11 +44,11 @@ impl GMemcpyArgs {
 pub struct GMemcpy;
 
 impl OutboundSysCall for GMemcpy {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GMemcpyArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_MEMCPY;
+    const IMPORT: MpGameImport = MpGameImport::G_MEMCPY;
 }
 
 impl EncodeSysCall for GMemcpy {

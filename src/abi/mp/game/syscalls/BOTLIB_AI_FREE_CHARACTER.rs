@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -26,11 +26,11 @@ impl BotlibAiFreeCharacterArgs {
 pub struct BotlibAiFreeCharacter;
 
 impl OutboundSysCall for BotlibAiFreeCharacter {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiFreeCharacterArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_FREE_CHARACTER;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_FREE_CHARACTER;
 }
 
 impl EncodeSysCall for BotlibAiFreeCharacter {

@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 
 /// `G_ATAN2` outbound game-to-engine syscall.
 /// C ABI: float atan2(float y, float x) — TRAP_ATAN2, args at VMF(1)/VMF(2), return FloatAsInt.
@@ -29,11 +29,11 @@ impl GAtan2Args {
 pub struct GAtan2;
 
 impl OutboundSysCall for GAtan2 {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GAtan2Args;
     type Output = f32;
 
-    const IMPORT: GameImport = GameImport::G_ATAN2;
+    const IMPORT: MpGameImport = MpGameImport::G_ATAN2;
 }
 
 impl EncodeSysCall for GAtan2 {

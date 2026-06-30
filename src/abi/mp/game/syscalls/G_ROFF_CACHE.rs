@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -30,11 +30,11 @@ impl GRoffCacheArgs {
 pub struct GRoffCache;
 
 impl OutboundSysCall for GRoffCache {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GRoffCacheArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_ROFF_CACHE;
+    const IMPORT: MpGameImport = MpGameImport::G_ROFF_CACHE;
 }
 
 impl EncodeSysCall for GRoffCache {

@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -26,11 +26,11 @@ impl GNavGetnoderadiusArgs {
 pub struct GNavGetnoderadius;
 
 impl OutboundSysCall for GNavGetnoderadius {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavGetnoderadiusArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_NAV_GETNODERADIUS;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_GETNODERADIUS;
 }
 
 impl EncodeSysCall for GNavGetnoderadius {

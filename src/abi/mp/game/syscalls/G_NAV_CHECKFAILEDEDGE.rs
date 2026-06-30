@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::codemp::game::g_public_h::failedEdge_t;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -28,11 +28,11 @@ impl GNavCheckfailededgeArgs {
 pub struct GNavCheckfailededge;
 
 impl OutboundSysCall for GNavCheckfailededge {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavCheckfailededgeArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_NAV_CHECKFAILEDEDGE;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_CHECKFAILEDEDGE;
 }
 
 impl EncodeSysCall for GNavCheckfailededge {

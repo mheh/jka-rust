@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `G_DROP_CLIENT` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -35,11 +35,11 @@ impl GDropClientArgs {
 pub struct GDropClient;
 
 impl OutboundSysCall for GDropClient {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GDropClientArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_DROP_CLIENT;
+    const IMPORT: MpGameImport = MpGameImport::G_DROP_CLIENT;
 }
 
 impl EncodeSysCall for GDropClient {

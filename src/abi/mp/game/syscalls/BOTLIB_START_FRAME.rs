@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -31,11 +31,11 @@ impl BotlibStartFrameArgs {
 pub struct BotlibStartFrame;
 
 impl OutboundSysCall for BotlibStartFrame {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibStartFrameArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_START_FRAME;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_START_FRAME;
 }
 
 impl EncodeSysCall for BotlibStartFrame {

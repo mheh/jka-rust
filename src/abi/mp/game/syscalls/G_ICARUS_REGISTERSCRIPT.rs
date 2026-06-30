@@ -1,9 +1,9 @@
 use core::ffi::c_char;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 /// `G_ICARUS_REGISTERSCRIPT` outbound game-to-engine syscall.
@@ -39,11 +39,11 @@ impl GIcarusRegisterscriptArgs {
 pub struct GIcarusRegisterscript;
 
 impl OutboundSysCall for GIcarusRegisterscript {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusRegisterscriptArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_REGISTERSCRIPT;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_REGISTERSCRIPT;
 }
 
 impl EncodeSysCall for GIcarusRegisterscript {

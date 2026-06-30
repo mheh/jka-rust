@@ -1,9 +1,9 @@
 use core::ffi::c_void;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// Arguments for the `G_TRUEFREE` game→engine syscall.
 ///
@@ -32,11 +32,11 @@ impl GTruefreeArgs {
 pub struct GTruefree;
 
 impl OutboundSysCall for GTruefree {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GTruefreeArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_TRUEFREE;
+    const IMPORT: MpGameImport = MpGameImport::G_TRUEFREE;
 }
 
 impl EncodeSysCall for GTruefree {

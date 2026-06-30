@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -101,11 +101,11 @@ impl BotlibAasPredictRouteArgs {
 pub struct BotlibAasPredictRoute;
 
 impl OutboundSysCall for BotlibAasPredictRoute {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasPredictRouteArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_PREDICT_ROUTE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_PREDICT_ROUTE;
 }
 
 impl EncodeSysCall for BotlibAasPredictRoute {

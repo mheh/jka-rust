@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::InboundVmCall;
@@ -36,9 +36,9 @@ impl GameNavEntIsUnlockedDoorArgs {
 pub struct GameNavEntIsUnlockedDoor;
 
 impl InboundVmCall for GameNavEntIsUnlockedDoor {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameNavEntIsUnlockedDoorArgs;
     type Output = qboolean;
 
-    const COMMAND: GameExport = GameExport::GAME_NAV_ENTISUNLOCKEDDOOR;
+    const COMMAND: MpGameExport = MpGameExport::GAME_NAV_ENTISUNLOCKEDDOOR;
 }

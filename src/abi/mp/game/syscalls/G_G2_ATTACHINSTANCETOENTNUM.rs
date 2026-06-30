@@ -1,9 +1,10 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::{ffi::GameImport, shared::qboolean};
+use crate::shared::qboolean;
 
 /// `G_G2_ATTACHINSTANCETOENTNUM` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -39,11 +40,11 @@ impl GG2AttachinstancetoentnumArgs {
 pub struct GG2Attachinstancetoentnum;
 
 impl OutboundSysCall for GG2Attachinstancetoentnum {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2AttachinstancetoentnumArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_G2_ATTACHINSTANCETOENTNUM;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_ATTACHINSTANCETOENTNUM;
 }
 
 impl EncodeSysCall for GG2Attachinstancetoentnum {

@@ -1,6 +1,6 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 /// `G_CEIL` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -24,11 +24,11 @@ impl GCeilArgs {
 pub struct GCeil;
 
 impl OutboundSysCall for GCeil {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GCeilArgs;
     type Output = f32;
 
-    const IMPORT: GameImport = GameImport::G_CEIL;
+    const IMPORT: MpGameImport = MpGameImport::G_CEIL;
 }
 
 impl EncodeSysCall for GCeil {

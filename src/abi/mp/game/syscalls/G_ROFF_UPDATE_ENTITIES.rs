@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 
 /// `G_ROFF_UPDATE_ENTITIES` outbound game-to-engine syscall.
 ///
@@ -21,11 +21,11 @@ impl GRoffUpdateEntitiesArgs {
 pub struct GRoffUpdateEntities;
 
 impl OutboundSysCall for GRoffUpdateEntities {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GRoffUpdateEntitiesArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ROFF_UPDATE_ENTITIES;
+    const IMPORT: MpGameImport = MpGameImport::G_ROFF_UPDATE_ENTITIES;
 }
 
 impl EncodeSysCall for GRoffUpdateEntities {

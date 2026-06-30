@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `BOTLIB_AI_QUEUE_CONSOLE_MESSAGE` outbound game-to-engine syscall.
 ///
@@ -42,11 +42,11 @@ impl BotlibAiQueueConsoleMessageArgs {
 pub struct BotlibAiQueueConsoleMessage;
 
 impl OutboundSysCall for BotlibAiQueueConsoleMessage {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiQueueConsoleMessageArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_QUEUE_CONSOLE_MESSAGE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_QUEUE_CONSOLE_MESSAGE;
 }
 
 impl EncodeSysCall for BotlibAiQueueConsoleMessage {

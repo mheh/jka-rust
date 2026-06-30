@@ -1,10 +1,10 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `BOTLIB_LIBVAR_GET` outbound game-to-engine syscall.
 ///
@@ -48,11 +48,11 @@ impl BotlibLibvarGetArgs {
 pub struct BotlibLibvarGet;
 
 impl OutboundSysCall for BotlibLibvarGet {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibLibvarGetArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_LIBVAR_GET;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_LIBVAR_GET;
 }
 
 impl EncodeSysCall for BotlibLibvarGet {

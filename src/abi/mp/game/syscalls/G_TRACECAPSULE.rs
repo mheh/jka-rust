@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::common::mp::trace_t::trace_t;
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `G_TRACECAPSULE` outbound game-to-engine syscall.
@@ -70,11 +70,11 @@ impl GTracecapsuleArgs {
 pub struct GTracecapsule;
 
 impl OutboundSysCall for GTracecapsule {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GTracecapsuleArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_TRACECAPSULE;
+    const IMPORT: MpGameImport = MpGameImport::G_TRACECAPSULE;
 }
 
 impl EncodeSysCall for GTracecapsule {

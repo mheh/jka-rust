@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -29,11 +29,11 @@ impl BotlibAiResetAvoidGoalsArgs {
 pub struct BotlibAiResetAvoidGoals;
 
 impl OutboundSysCall for BotlibAiResetAvoidGoals {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiResetAvoidGoalsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_RESET_AVOID_GOALS;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_RESET_AVOID_GOALS;
 }
 
 impl EncodeSysCall for BotlibAiResetAvoidGoals {

@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -31,11 +31,11 @@ impl GNavGetedgecostArgs {
 pub struct GNavGetedgecost;
 
 impl OutboundSysCall for GNavGetedgecost {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavGetedgecostArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_NAV_GETEDGECOST;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_GETEDGECOST;
 }
 
 impl EncodeSysCall for GNavGetedgecost {

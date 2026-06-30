@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -37,11 +37,11 @@ impl GIcarusTaskidpendingArgs {
 pub struct GIcarusTaskidpending;
 
 impl OutboundSysCall for GIcarusTaskidpending {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusTaskidpendingArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_TASKIDPENDING;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_TASKIDPENDING;
 }
 
 impl EncodeSysCall for GIcarusTaskidpending {

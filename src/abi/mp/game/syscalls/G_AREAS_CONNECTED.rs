@@ -1,6 +1,7 @@
 use core::ffi::c_int;
 
-use crate::{ffi::GameImport, shared::qboolean};
+use super::super::MpGameImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -35,11 +36,11 @@ impl GAreasConnectedArgs {
 pub struct GAreasConnected;
 
 impl OutboundSysCall for GAreasConnected {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GAreasConnectedArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_AREAS_CONNECTED;
+    const IMPORT: MpGameImport = MpGameImport::G_AREAS_CONNECTED;
 }
 
 impl EncodeSysCall for GAreasConnected {

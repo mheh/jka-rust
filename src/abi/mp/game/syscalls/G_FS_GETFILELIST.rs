@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -51,11 +51,11 @@ impl GFsGetfilelistArgs {
 pub struct GFsGetfilelist;
 
 impl OutboundSysCall for GFsGetfilelist {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GFsGetfilelistArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_FS_GETFILELIST;
+    const IMPORT: MpGameImport = MpGameImport::G_FS_GETFILELIST;
 }
 
 impl EncodeSysCall for GFsGetfilelist {

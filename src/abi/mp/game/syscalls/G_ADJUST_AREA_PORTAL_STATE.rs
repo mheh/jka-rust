@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -37,11 +37,11 @@ impl GAdjustAreaPortalStateArgs {
 pub struct GAdjustAreaPortalState;
 
 impl OutboundSysCall for GAdjustAreaPortalState {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GAdjustAreaPortalStateArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_ADJUST_AREA_PORTAL_STATE;
+    const IMPORT: MpGameImport = MpGameImport::G_ADJUST_AREA_PORTAL_STATE;
 }
 
 impl EncodeSysCall for GAdjustAreaPortalState {

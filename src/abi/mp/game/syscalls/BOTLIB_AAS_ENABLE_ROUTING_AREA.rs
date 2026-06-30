@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -31,11 +31,11 @@ impl BotlibAasEnableRoutingAreaArgs {
 pub struct BotlibAasEnableRoutingArea;
 
 impl OutboundSysCall for BotlibAasEnableRoutingArea {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasEnableRoutingAreaArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_ENABLE_ROUTING_AREA;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_ENABLE_ROUTING_AREA;
 }
 
 impl EncodeSysCall for BotlibAasEnableRoutingArea {

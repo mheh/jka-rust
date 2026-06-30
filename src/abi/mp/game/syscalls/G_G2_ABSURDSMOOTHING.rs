@@ -1,6 +1,6 @@
 use core::ffi::c_void;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -38,11 +38,11 @@ impl GG2AbsurdsmoothingArgs {
 pub struct GG2Absurdsmoothing;
 
 impl OutboundSysCall for GG2Absurdsmoothing {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2AbsurdsmoothingArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_G2_ABSURDSMOOTHING;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_ABSURDSMOOTHING;
 }
 
 impl EncodeSysCall for GG2Absurdsmoothing {

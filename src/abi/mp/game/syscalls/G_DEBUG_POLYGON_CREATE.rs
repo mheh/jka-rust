@@ -1,9 +1,9 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `G_DEBUG_POLYGON_CREATE` outbound game-to-engine syscall.
@@ -40,11 +40,11 @@ impl GDebugPolygonCreateArgs {
 pub struct GDebugPolygonCreate;
 
 impl OutboundSysCall for GDebugPolygonCreate {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GDebugPolygonCreateArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_DEBUG_POLYGON_CREATE;
+    const IMPORT: MpGameImport = MpGameImport::G_DEBUG_POLYGON_CREATE;
 }
 
 impl EncodeSysCall for GDebugPolygonCreate {

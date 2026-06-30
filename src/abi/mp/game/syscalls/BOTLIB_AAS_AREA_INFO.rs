@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::be_aas_h::aas_areainfo_t;
-use crate::ffi::GameImport;
 
 /// `BOTLIB_AAS_AREA_INFO` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -33,11 +33,11 @@ impl BotlibAasAreaInfoArgs {
 pub struct BotlibAasAreaInfo;
 
 impl OutboundSysCall for BotlibAasAreaInfo {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasAreaInfoArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_AREA_INFO;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_AREA_INFO;
 }
 
 impl EncodeSysCall for BotlibAasAreaInfo {

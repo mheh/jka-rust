@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -34,11 +34,11 @@ impl GCvarSetArgs {
 pub struct GCvarSet;
 
 impl OutboundSysCall for GCvarSet {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GCvarSetArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_CVAR_SET;
+    const IMPORT: MpGameImport = MpGameImport::G_CVAR_SET;
 }
 
 impl EncodeSysCall for GCvarSet {

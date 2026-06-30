@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -33,9 +33,9 @@ impl GameGetitemindexbytagArgs {
 pub struct GameGetitemindexbytag;
 
 impl InboundVmCall for GameGetitemindexbytag {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameGetitemindexbytagArgs;
     type Output = c_int;
 
-    const COMMAND: GameExport = GameExport::GAME_GETITEMINDEXBYTAG;
+    const COMMAND: MpGameExport = MpGameExport::GAME_GETITEMINDEXBYTAG;
 }

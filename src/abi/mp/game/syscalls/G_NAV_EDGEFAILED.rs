@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -31,11 +31,11 @@ impl GNavEdgefailedArgs {
 pub struct GNavEdgefailed;
 
 impl OutboundSysCall for GNavEdgefailed {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavEdgefailedArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_NAV_EDGEFAILED;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_EDGEFAILED;
 }
 
 impl EncodeSysCall for GNavEdgefailed {

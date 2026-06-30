@@ -1,6 +1,7 @@
 use core::ffi::c_int;
 
-use crate::{ffi::GameImport, shared::qboolean};
+use super::super::MpGameImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -31,11 +32,11 @@ impl GNavNodesareneighborsArgs {
 pub struct GNavNodesareneighbors;
 
 impl OutboundSysCall for GNavNodesareneighbors {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavNodesareneighborsArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_NAV_NODESARENEIGHBORS;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_NODESARENEIGHBORS;
 }
 
 impl EncodeSysCall for GNavNodesareneighbors {

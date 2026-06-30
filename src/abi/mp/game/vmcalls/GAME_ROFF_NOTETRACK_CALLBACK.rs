@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -34,9 +34,9 @@ impl GameRoffNotetrackCallbackArgs {
 pub struct GameRoffNotetrackCallback;
 
 impl InboundVmCall for GameRoffNotetrackCallback {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameRoffNotetrackCallbackArgs;
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_ROFF_NOTETRACK_CALLBACK;
+    const COMMAND: MpGameExport = MpGameExport::GAME_ROFF_NOTETRACK_CALLBACK;
 }

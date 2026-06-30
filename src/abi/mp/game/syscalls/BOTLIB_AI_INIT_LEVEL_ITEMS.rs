@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -20,11 +20,11 @@ impl BotlibAiInitLevelItemsArgs {
 pub struct BotlibAiInitLevelItems;
 
 impl OutboundSysCall for BotlibAiInitLevelItems {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiInitLevelItemsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_INIT_LEVEL_ITEMS;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_INIT_LEVEL_ITEMS;
 }
 
 impl EncodeSysCall for BotlibAiInitLevelItems {

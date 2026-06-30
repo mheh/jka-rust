@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_ulong};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -37,11 +37,11 @@ impl BotlibAiReplaceSynonymsArgs {
 pub struct BotlibAiReplaceSynonyms;
 
 impl OutboundSysCall for BotlibAiReplaceSynonyms {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiReplaceSynonymsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_REPLACE_SYNONYMS;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_REPLACE_SYNONYMS;
 }
 
 impl EncodeSysCall for BotlibAiReplaceSynonyms {

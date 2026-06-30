@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 
 /// `G_ASIN` outbound game-to-engine syscall.
 ///
@@ -27,11 +27,11 @@ impl GAsinArgs {
 pub struct GAsin;
 
 impl OutboundSysCall for GAsin {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GAsinArgs;
     type Output = f32;
 
-    const IMPORT: GameImport = GameImport::G_ASIN;
+    const IMPORT: MpGameImport = MpGameImport::G_ASIN;
 }
 
 impl EncodeSysCall for GAsin {

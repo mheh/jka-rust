@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 use crate::shared::vec3_t;
 
@@ -45,11 +45,11 @@ impl GEntityContactArgs {
 pub struct GEntityContact;
 
 impl OutboundSysCall for GEntityContact {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GEntityContactArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_ENTITY_CONTACT;
+    const IMPORT: MpGameImport = MpGameImport::G_ENTITY_CONTACT;
 }
 
 impl EncodeSysCall for GEntityContact {

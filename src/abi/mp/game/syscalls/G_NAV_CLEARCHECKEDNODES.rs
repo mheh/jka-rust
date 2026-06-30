@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -18,11 +18,11 @@ impl GNavClearcheckednodesArgs {
 pub struct GNavClearcheckednodes;
 
 impl OutboundSysCall for GNavClearcheckednodes {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavClearcheckednodesArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_CLEARCHECKEDNODES;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_CLEARCHECKEDNODES;
 }
 
 impl EncodeSysCall for GNavClearcheckednodes {

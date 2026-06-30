@@ -1,4 +1,4 @@
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::InboundVmCall;
@@ -23,9 +23,9 @@ use crate::abi::generic::InboundVmCall;
 pub struct GameConsoleCommand;
 
 impl InboundVmCall for GameConsoleCommand {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = ();
     type Output = qboolean;
 
-    const COMMAND: GameExport = GameExport::GAME_CONSOLE_COMMAND;
+    const COMMAND: MpGameExport = MpGameExport::GAME_CONSOLE_COMMAND;
 }

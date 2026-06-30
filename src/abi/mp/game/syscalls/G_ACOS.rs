@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -28,11 +28,11 @@ impl GAcosArgs {
 pub struct GAcos;
 
 impl OutboundSysCall for GAcos {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GAcosArgs;
     type Output = f32;
 
-    const IMPORT: GameImport = GameImport::G_ACOS;
+    const IMPORT: MpGameImport = MpGameImport::G_ACOS;
 }
 
 impl EncodeSysCall for GAcos {

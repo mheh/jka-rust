@@ -1,6 +1,6 @@
 use core::ffi::{c_float, c_int};
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -67,9 +67,9 @@ impl GameNavClearpathbetweenpointsArgs {
 pub struct GameNavClearpathbetweenpoints;
 
 impl InboundVmCall for GameNavClearpathbetweenpoints {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameNavClearpathbetweenpointsArgs;
     type Output = c_int;
 
-    const COMMAND: GameExport = GameExport::GAME_NAV_CLEARPATHBETWEENPOINTS;
+    const COMMAND: MpGameExport = MpGameExport::GAME_NAV_CLEARPATHBETWEENPOINTS;
 }

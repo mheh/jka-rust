@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -36,9 +36,9 @@ impl BotAiStartFrameArgs {
 pub struct BotAiStartFrame;
 
 impl InboundVmCall for BotAiStartFrame {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = BotAiStartFrameArgs;
     type Output = c_int;
 
-    const COMMAND: GameExport = GameExport::BOTAI_START_FRAME;
+    const COMMAND: MpGameExport = MpGameExport::BOTAI_START_FRAME;
 }

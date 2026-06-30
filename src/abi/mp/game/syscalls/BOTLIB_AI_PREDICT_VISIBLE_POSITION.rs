@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -69,11 +69,11 @@ impl BotlibAiPredictVisiblePositionArgs {
 pub struct BotlibAiPredictVisiblePosition;
 
 impl OutboundSysCall for BotlibAiPredictVisiblePosition {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiPredictVisiblePositionArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_PREDICT_VISIBLE_POSITION;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_PREDICT_VISIBLE_POSITION;
 }
 
 impl EncodeSysCall for BotlibAiPredictVisiblePosition {

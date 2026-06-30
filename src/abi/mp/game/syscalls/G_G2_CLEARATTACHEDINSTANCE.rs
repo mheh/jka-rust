@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -26,11 +26,11 @@ impl GG2ClearattachedinstanceArgs {
 pub struct GG2Clearattachedinstance;
 
 impl OutboundSysCall for GG2Clearattachedinstance {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2ClearattachedinstanceArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_G2_CLEARATTACHEDINSTANCE;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_CLEARATTACHEDINSTANCE;
 }
 
 impl EncodeSysCall for GG2Clearattachedinstance {

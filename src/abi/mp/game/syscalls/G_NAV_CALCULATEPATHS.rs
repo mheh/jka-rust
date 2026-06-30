@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
@@ -25,11 +25,11 @@ impl GNavCalculatepathsArgs {
 pub struct GNavCalculatepaths;
 
 impl OutboundSysCall for GNavCalculatepaths {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavCalculatepathsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_CALCULATEPATHS;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_CALCULATEPATHS;
 }
 
 impl EncodeSysCall for GNavCalculatepaths {

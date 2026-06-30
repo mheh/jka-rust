@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -34,11 +34,11 @@ impl BotlibLibvarSetArgs {
 pub struct BotlibLibvarSet;
 
 impl OutboundSysCall for BotlibLibvarSet {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibLibvarSetArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_LIBVAR_SET;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_LIBVAR_SET;
 }
 
 impl EncodeSysCall for BotlibLibvarSet {

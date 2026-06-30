@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -46,11 +46,11 @@ impl BotlibTestArgs {
 pub struct BotlibTest;
 
 impl OutboundSysCall for BotlibTest {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibTestArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_TEST;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_TEST;
 }
 
 impl EncodeSysCall for BotlibTest {

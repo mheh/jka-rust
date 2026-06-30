@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -18,11 +18,11 @@ impl GNavFreeArgs {
 pub struct GNavFree;
 
 impl OutboundSysCall for GNavFree {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavFreeArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_FREE;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_FREE;
 }
 
 impl EncodeSysCall for GNavFree {

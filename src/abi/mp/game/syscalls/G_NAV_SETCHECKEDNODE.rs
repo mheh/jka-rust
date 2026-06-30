@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -38,11 +38,11 @@ impl GNavSetcheckednodeArgs {
 pub struct GNavSetcheckednode;
 
 impl OutboundSysCall for GNavSetcheckednode {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavSetcheckednodeArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_NAV_SETCHECKEDNODE;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_SETCHECKEDNODE;
 }
 
 impl EncodeSysCall for GNavSetcheckednode {

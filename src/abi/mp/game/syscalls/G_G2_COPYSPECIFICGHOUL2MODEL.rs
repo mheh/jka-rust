@@ -1,9 +1,9 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `G_G2_COPYSPECIFICGHOUL2MODEL` outbound game-to-engine syscall.
 ///
@@ -51,11 +51,11 @@ impl GG2Copyspecificghoul2ModelArgs {
 pub struct GG2Copyspecificghoul2Model;
 
 impl OutboundSysCall for GG2Copyspecificghoul2Model {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2Copyspecificghoul2ModelArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_G2_COPYSPECIFICGHOUL2MODEL;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_COPYSPECIFICGHOUL2MODEL;
 }
 
 impl EncodeSysCall for GG2Copyspecificghoul2Model {

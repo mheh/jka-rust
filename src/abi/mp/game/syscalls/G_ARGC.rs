@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 
 /// `G_ARGC` outbound game-to-engine syscall.
 ///
@@ -24,11 +24,11 @@ impl GArgcArgs {
 pub struct GArgc;
 
 impl OutboundSysCall for GArgc {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GArgcArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_ARGC;
+    const IMPORT: MpGameImport = MpGameImport::G_ARGC;
 }
 
 impl EncodeSysCall for GArgc {

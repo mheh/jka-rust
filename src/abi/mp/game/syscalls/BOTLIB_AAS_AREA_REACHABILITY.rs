@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `BOTLIB_AAS_AREA_REACHABILITY` outbound game-to-engine syscall.
@@ -24,11 +24,11 @@ impl BotlibAasAreaReachabilityArgs {
 pub struct BotlibAasAreaReachability;
 
 impl OutboundSysCall for BotlibAasAreaReachability {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasAreaReachabilityArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_AREA_REACHABILITY;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_AREA_REACHABILITY;
 }
 
 impl EncodeSysCall for BotlibAasAreaReachability {

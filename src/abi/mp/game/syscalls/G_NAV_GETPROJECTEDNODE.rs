@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -34,11 +34,11 @@ impl GNavGetprojectednodeArgs {
 pub struct GNavGetprojectednode;
 
 impl OutboundSysCall for GNavGetprojectednode {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GNavGetprojectednodeArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_NAV_GETPROJECTEDNODE;
+    const IMPORT: MpGameImport = MpGameImport::G_NAV_GETPROJECTEDNODE;
 }
 
 impl EncodeSysCall for GNavGetprojectednode {

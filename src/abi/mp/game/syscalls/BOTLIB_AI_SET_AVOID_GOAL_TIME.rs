@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `BOTLIB_AI_SET_AVOID_GOAL_TIME` outbound game-to-engine syscall.
@@ -39,11 +39,11 @@ impl BotlibAiSetAvoidGoalTimeArgs {
 pub struct BotlibAiSetAvoidGoalTime;
 
 impl OutboundSysCall for BotlibAiSetAvoidGoalTime {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiSetAvoidGoalTimeArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_SET_AVOID_GOAL_TIME;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_SET_AVOID_GOAL_TIME;
 }
 
 impl EncodeSysCall for BotlibAiSetAvoidGoalTime {

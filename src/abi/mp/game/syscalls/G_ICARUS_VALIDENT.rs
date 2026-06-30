@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::codemp::game::g_local::gentity_t;
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{
@@ -32,11 +32,11 @@ impl GIcarusValidentArgs {
 pub struct GIcarusValident;
 
 impl OutboundSysCall for GIcarusValident {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusValidentArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_VALIDENT;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_VALIDENT;
 }
 
 impl EncodeSysCall for GIcarusValident {

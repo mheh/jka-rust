@@ -1,9 +1,9 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 /// `G_POINT_CONTENTS` outbound game-to-engine syscall.
@@ -38,11 +38,11 @@ impl GPointContentsArgs {
 pub struct GPointContents;
 
 impl OutboundSysCall for GPointContents {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GPointContentsArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_POINT_CONTENTS;
+    const IMPORT: MpGameImport = MpGameImport::G_POINT_CONTENTS;
 }
 
 impl EncodeSysCall for GPointContents {

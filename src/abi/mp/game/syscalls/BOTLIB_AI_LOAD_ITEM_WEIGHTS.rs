@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -37,11 +37,11 @@ impl BotlibAiLoadItemWeightsArgs {
 pub struct BotlibAiLoadItemWeights;
 
 impl OutboundSysCall for BotlibAiLoadItemWeights {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiLoadItemWeightsArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_LOAD_ITEM_WEIGHTS;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_LOAD_ITEM_WEIGHTS;
 }
 
 impl EncodeSysCall for BotlibAiLoadItemWeights {

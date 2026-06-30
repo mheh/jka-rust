@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -28,11 +28,11 @@ impl BotlibEaRespawnArgs {
 pub struct BotlibEaRespawn;
 
 impl OutboundSysCall for BotlibEaRespawn {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibEaRespawnArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_EA_RESPAWN;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_EA_RESPAWN;
 }
 
 impl EncodeSysCall for BotlibEaRespawn {

@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -36,9 +36,9 @@ impl GameClientDisconnectArgs {
 pub struct GameClientDisconnect;
 
 impl InboundVmCall for GameClientDisconnect {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameClientDisconnectArgs;
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_CLIENT_DISCONNECT;
+    const COMMAND: MpGameExport = MpGameExport::GAME_CLIENT_DISCONNECT;
 }

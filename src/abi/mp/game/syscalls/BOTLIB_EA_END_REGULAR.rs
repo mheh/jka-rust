@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -32,11 +32,11 @@ impl BotlibEaEndRegularArgs {
 pub struct BotlibEaEndRegular;
 
 impl OutboundSysCall for BotlibEaEndRegular {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibEaEndRegularArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_EA_END_REGULAR;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_EA_END_REGULAR;
 }
 
 impl EncodeSysCall for BotlibEaEndRegular {

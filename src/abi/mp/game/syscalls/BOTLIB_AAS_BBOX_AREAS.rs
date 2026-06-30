@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -58,11 +58,11 @@ impl BotlibAasBboxAreasArgs {
 pub struct BotlibAasBboxAreas;
 
 impl OutboundSysCall for BotlibAasBboxAreas {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAasBboxAreasArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AAS_BBOX_AREAS;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AAS_BBOX_AREAS;
 }
 
 impl EncodeSysCall for BotlibAasBboxAreas {

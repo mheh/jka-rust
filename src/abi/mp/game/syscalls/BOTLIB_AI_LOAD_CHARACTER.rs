@@ -1,11 +1,11 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 /// `BOTLIB_AI_LOAD_CHARACTER` outbound game-to-engine syscall.
 ///
@@ -38,11 +38,11 @@ impl BotlibAiLoadCharacterArgs {
 pub struct BotlibAiLoadCharacter;
 
 impl OutboundSysCall for BotlibAiLoadCharacter {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiLoadCharacterArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_LOAD_CHARACTER;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_LOAD_CHARACTER;
 }
 
 impl EncodeSysCall for BotlibAiLoadCharacter {

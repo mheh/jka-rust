@@ -1,7 +1,7 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 use core::ffi::c_int;
 use std::ffi::CString;
@@ -40,11 +40,11 @@ impl GG2DoesboneexistArgs {
 pub struct GG2Doesboneexist;
 
 impl OutboundSysCall for GG2Doesboneexist {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2DoesboneexistArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_DOESBONEEXIST;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_DOESBONEEXIST;
 }
 
 impl EncodeSysCall for GG2Doesboneexist {

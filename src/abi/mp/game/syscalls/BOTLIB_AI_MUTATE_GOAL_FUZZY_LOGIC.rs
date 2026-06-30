@@ -1,4 +1,4 @@
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -33,11 +33,11 @@ impl BotlibAiMutateGoalFuzzyLogicArgs {
 pub struct BotlibAiMutateGoalFuzzyLogic;
 
 impl OutboundSysCall for BotlibAiMutateGoalFuzzyLogic {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiMutateGoalFuzzyLogicArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC;
 }
 
 impl EncodeSysCall for BotlibAiMutateGoalFuzzyLogic {

@@ -1,6 +1,7 @@
 use core::ffi::c_int;
 
-use crate::{ffi::GameImport, shared::qboolean};
+use super::super::MpGameImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -26,11 +27,11 @@ impl GIcarusIsrunningArgs {
 pub struct GIcarusIsrunning;
 
 impl OutboundSysCall for GIcarusIsrunning {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusIsrunningArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_ISRUNNING;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_ISRUNNING;
 }
 
 impl EncodeSysCall for GIcarusIsrunning {

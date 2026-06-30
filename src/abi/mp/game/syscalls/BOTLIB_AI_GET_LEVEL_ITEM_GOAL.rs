@@ -1,7 +1,7 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use core::ffi::{c_char, c_int, c_void};
 
 /// `BOTLIB_AI_GET_LEVEL_ITEM_GOAL` outbound game-to-engine syscall.
@@ -41,11 +41,11 @@ impl BotlibAiGetLevelItemGoalArgs {
 pub struct BotlibAiGetLevelItemGoal;
 
 impl OutboundSysCall for BotlibAiGetLevelItemGoal {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiGetLevelItemGoalArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_GET_LEVEL_ITEM_GOAL;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_GET_LEVEL_ITEM_GOAL;
 }
 
 impl EncodeSysCall for BotlibAiGetLevelItemGoal {

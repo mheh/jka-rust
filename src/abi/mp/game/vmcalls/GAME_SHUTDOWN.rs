@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameExport;
+use super::super::MpGameExport;
 
 use crate::abi::generic::InboundVmCall;
 
@@ -39,9 +39,9 @@ impl GameShutdownArgs {
 pub struct GameShutdown;
 
 impl InboundVmCall for GameShutdown {
-    type Command = GameExport;
+    type Command = MpGameExport;
     type Args = GameShutdownArgs;
     type Output = ();
 
-    const COMMAND: GameExport = GameExport::GAME_SHUTDOWN;
+    const COMMAND: MpGameExport = MpGameExport::GAME_SHUTDOWN;
 }

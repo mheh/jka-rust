@@ -1,5 +1,5 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::GameImport;
 
 /// `G_G2_CLEANENTATTACHMENTS` outbound game-to-engine syscall.
 ///
@@ -20,11 +20,11 @@ impl GG2CleanentattachmentsArgs {
 pub struct GG2Cleanentattachments;
 
 impl OutboundSysCall for GG2Cleanentattachments {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2CleanentattachmentsArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_G2_CLEANENTATTACHMENTS;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_CLEANENTATTACHMENTS;
 }
 
 impl EncodeSysCall for GG2Cleanentattachments {

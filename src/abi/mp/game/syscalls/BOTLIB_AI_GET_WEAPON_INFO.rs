@@ -1,7 +1,7 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use core::ffi::c_int;
 
 /// `BOTLIB_AI_GET_WEAPON_INFO` outbound game-to-engine syscall.
@@ -41,11 +41,11 @@ impl BotlibAiGetWeaponInfoArgs {
 pub struct BotlibAiGetWeaponInfo;
 
 impl OutboundSysCall for BotlibAiGetWeaponInfo {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiGetWeaponInfoArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_GET_WEAPON_INFO;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_GET_WEAPON_INFO;
 }
 
 impl EncodeSysCall for BotlibAiGetWeaponInfo {

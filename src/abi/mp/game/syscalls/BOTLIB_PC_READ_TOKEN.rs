@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::q_shared_h::pc_token_t;
-use crate::ffi::GameImport;
 
 /// `BOTLIB_PC_READ_TOKEN` outbound game-to-engine syscall.
 #[derive(Debug)]
@@ -33,11 +33,11 @@ impl BotlibPcReadTokenArgs {
 pub struct BotlibPcReadToken;
 
 impl OutboundSysCall for BotlibPcReadToken {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibPcReadTokenArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_PC_READ_TOKEN;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_PC_READ_TOKEN;
 }
 
 impl EncodeSysCall for BotlibPcReadToken {

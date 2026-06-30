@@ -1,10 +1,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `BOTLIB_LOAD_MAP` outbound game-to-engine syscall.
 ///
@@ -31,11 +31,11 @@ impl BotlibLoadMapArgs {
 pub struct BotlibLoadMap;
 
 impl OutboundSysCall for BotlibLoadMap {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibLoadMapArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_LOAD_MAP;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_LOAD_MAP;
 }
 
 impl EncodeSysCall for BotlibLoadMap {

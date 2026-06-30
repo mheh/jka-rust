@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_void};
 
+use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{
@@ -66,11 +66,11 @@ impl BotlibAiChooseNbgItemArgs {
 pub struct BotlibAiChooseNbgItem;
 
 impl OutboundSysCall for BotlibAiChooseNbgItem {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiChooseNbgItemArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_CHOOSE_NBG_ITEM;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_CHOOSE_NBG_ITEM;
 }
 
 impl EncodeSysCall for BotlibAiChooseNbgItem {

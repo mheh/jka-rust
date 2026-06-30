@@ -1,9 +1,9 @@
 use core::ffi::c_int;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 
 /// `BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON` outbound game-to-engine syscall.
 ///
@@ -37,11 +37,11 @@ impl BotlibAiChooseBestFightWeaponArgs {
 pub struct BotlibAiChooseBestFightWeapon;
 
 impl OutboundSysCall for BotlibAiChooseBestFightWeapon {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiChooseBestFightWeaponArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_CHOOSE_BEST_FIGHT_WEAPON;
 }
 
 impl EncodeSysCall for BotlibAiChooseBestFightWeapon {

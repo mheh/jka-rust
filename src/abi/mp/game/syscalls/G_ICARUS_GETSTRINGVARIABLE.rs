@@ -1,6 +1,6 @@
 use core::ffi::{c_char, c_int};
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
@@ -38,11 +38,11 @@ impl GIcarusGetstringvariableArgs {
 pub struct GIcarusGetstringvariable;
 
 impl OutboundSysCall for GIcarusGetstringvariable {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GIcarusGetstringvariableArgs;
     type Output = c_int;
 
-    const IMPORT: GameImport = GameImport::G_ICARUS_GETSTRINGVARIABLE;
+    const IMPORT: MpGameImport = MpGameImport::G_ICARUS_GETSTRINGVARIABLE;
 }
 
 impl EncodeSysCall for GIcarusGetstringvariable {

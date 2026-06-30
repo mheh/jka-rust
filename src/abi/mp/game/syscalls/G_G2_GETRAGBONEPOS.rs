@@ -1,7 +1,7 @@
 use core::ffi::c_void;
 use std::ffi::CString;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 use crate::shared::qboolean;
 use crate::shared::vec3_t;
 
@@ -73,11 +73,11 @@ impl GG2GetragboneposArgs {
 pub struct GG2Getragbonepos;
 
 impl OutboundSysCall for GG2Getragbonepos {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2GetragboneposArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_GETRAGBONEPOS;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_GETRAGBONEPOS;
 }
 
 impl EncodeSysCall for GG2Getragbonepos {

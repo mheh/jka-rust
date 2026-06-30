@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -33,11 +33,11 @@ impl BotlibAiRemoveConsoleMessageArgs {
 pub struct BotlibAiRemoveConsoleMessage;
 
 impl OutboundSysCall for BotlibAiRemoveConsoleMessage {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = BotlibAiRemoveConsoleMessageArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::BOTLIB_AI_REMOVE_CONSOLE_MESSAGE;
+    const IMPORT: MpGameImport = MpGameImport::BOTLIB_AI_REMOVE_CONSOLE_MESSAGE;
 }
 
 impl EncodeSysCall for BotlibAiRemoveConsoleMessage {

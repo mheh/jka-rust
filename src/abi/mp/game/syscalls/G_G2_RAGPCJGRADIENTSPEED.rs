@@ -1,10 +1,10 @@
 use core::ffi::{c_void, CStr};
 use std::ffi::CString;
 
+use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::GameImport;
 use crate::shared::qboolean;
 
 /// `G_G2_RAGPCJGRADIENTSPEED` outbound game-to-engine syscall.
@@ -44,11 +44,11 @@ impl GG2RagpcjgradientspeedArgs {
 pub struct GG2Ragpcjgradientspeed;
 
 impl OutboundSysCall for GG2Ragpcjgradientspeed {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GG2RagpcjgradientspeedArgs;
     type Output = qboolean;
 
-    const IMPORT: GameImport = GameImport::G_G2_RAGPCJGRADIENTSPEED;
+    const IMPORT: MpGameImport = MpGameImport::G_G2_RAGPCJGRADIENTSPEED;
 }
 
 impl EncodeSysCall for GG2Ragpcjgradientspeed {

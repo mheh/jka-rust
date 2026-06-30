@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::GameImport;
+use super::super::MpGameImport;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
@@ -29,11 +29,11 @@ impl GRmgInitArgs {
 pub struct GRmgInit;
 
 impl OutboundSysCall for GRmgInit {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GRmgInitArgs;
     type Output = ();
 
-    const IMPORT: GameImport = GameImport::G_RMG_INIT;
+    const IMPORT: MpGameImport = MpGameImport::G_RMG_INIT;
 }
 
 impl EncodeSysCall for GRmgInit {

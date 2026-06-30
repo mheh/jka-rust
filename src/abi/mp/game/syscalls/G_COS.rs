@@ -1,6 +1,6 @@
+use super::super::MpGameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::abi::pass_float;
-use crate::ffi::GameImport;
 
 /// `G_COS` outbound game-to-engine syscall.
 /// C ABI: `FloatAsInt cos(VMF(1))` — one float arg, returns float bits.
@@ -25,11 +25,11 @@ impl GCosArgs {
 pub struct GCos;
 
 impl OutboundSysCall for GCos {
-    type Import = GameImport;
+    type Import = MpGameImport;
     type Args = GCosArgs;
     type Output = f32;
 
-    const IMPORT: GameImport = GameImport::G_COS;
+    const IMPORT: MpGameImport = MpGameImport::G_COS;
 }
 
 impl EncodeSysCall for GCos {
