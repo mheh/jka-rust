@@ -7,7 +7,7 @@ use crate::abi::generic::{
 use crate::abi::pass_float;
 use crate::shared::qboolean;
 
-/// `UiG2_PLAYANIM` outbound game-to-engine syscall.
+/// `UI_G2_PLAYANIM` outbound game-to-engine syscall.
 ///
 /// Mirrors `trap_G2API_SetBoneAnim`:
 /// ```c
@@ -16,7 +16,7 @@ use crate::shared::qboolean;
 ///     int currentTime, float setFrame, int blendTime);
 /// ```
 #[derive(Debug)]
-pub struct GG2PlayanimArgs {
+pub struct UiG2PlayanimArgs {
     ghoul2: *mut c_void,
     model_index: c_int,
     bone_name: *const c_char,
@@ -29,7 +29,7 @@ pub struct GG2PlayanimArgs {
     blend_time: c_int,
 }
 
-impl GG2PlayanimArgs {
+impl UiG2PlayanimArgs {
     pub fn new(
         ghoul2: *mut c_void,
         model_index: c_int,
@@ -88,20 +88,20 @@ impl GG2PlayanimArgs {
     }
 }
 
-/// `UiG2_PLAYANIM` MP game imports syscall ABI token.
+/// `UI_G2_PLAYANIM` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:520`
-pub struct GG2Playanim;
+pub struct UiG2Playanim;
 
-impl OutboundSysCall for GG2Playanim {
+impl OutboundSysCall for UiG2Playanim {
     type Import = MpUiImport;
-    type Args = GG2PlayanimArgs;
+    type Args = UiG2PlayanimArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_PLAYANIM;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_PLAYANIM;
 }
 
-impl EncodeSysCall for GG2Playanim {
+impl EncodeSysCall for UiG2Playanim {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2()),
@@ -118,7 +118,7 @@ impl EncodeSysCall for GG2Playanim {
     }
 }
 
-impl DecodeSysCallReturn for GG2Playanim {
+impl DecodeSysCallReturn for UiG2Playanim {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

@@ -7,9 +7,9 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_COPYGHOUL2INSTANCE` outbound game-to-engine syscall.
+/// `UI_G2_COPYGHOUL2INSTANCE` outbound game-to-engine syscall.
 #[derive(Debug)]
-pub struct GG2Copyghoul2InstanceArgs {
+pub struct UiG2Copyghoul2InstanceArgs {
     /// Source ghoul2 instance.
     pub g2_from: *mut c_void,
     /// Destination ghoul2 instance.
@@ -18,7 +18,7 @@ pub struct GG2Copyghoul2InstanceArgs {
     pub model_index: c_int,
 }
 
-impl GG2Copyghoul2InstanceArgs {
+impl UiG2Copyghoul2InstanceArgs {
     pub fn new(g2_from: *mut c_void, g2_to: *mut c_void, model_index: c_int) -> Self {
         Self {
             g2_from,
@@ -38,20 +38,20 @@ impl GG2Copyghoul2InstanceArgs {
     }
 }
 
-/// `UiG2_COPYGHOUL2INSTANCE` MP game imports syscall ABI token.
+/// `UI_G2_COPYGHOUL2INSTANCE` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:523`
-pub struct GG2Copyghoul2Instance;
+pub struct UiG2Copyghoul2Instance;
 
-impl OutboundSysCall for GG2Copyghoul2Instance {
+impl OutboundSysCall for UiG2Copyghoul2Instance {
     type Import = MpUiImport;
-    type Args = GG2Copyghoul2InstanceArgs;
+    type Args = UiG2Copyghoul2InstanceArgs;
     type Output = c_int;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_COPYGHOUL2INSTANCE;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_COPYGHOUL2INSTANCE;
 }
 
-impl EncodeSysCall for GG2Copyghoul2Instance {
+impl EncodeSysCall for UiG2Copyghoul2Instance {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.g2_from),
@@ -61,7 +61,7 @@ impl EncodeSysCall for GG2Copyghoul2Instance {
     }
 }
 
-impl DecodeSysCallReturn for GG2Copyghoul2Instance {
+impl DecodeSysCallReturn for UiG2Copyghoul2Instance {
     fn decode_return(word: isize) -> Self::Output {
         word as c_int
     }

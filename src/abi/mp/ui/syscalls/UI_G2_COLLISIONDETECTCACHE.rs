@@ -7,7 +7,7 @@ use crate::abi::generic::{
 use crate::abi::pass_float;
 use crate::shared::CollisionRecord_t;
 
-/// `UiG2_COLLISIONDETECTCACHE` outbound game-to-engine syscall.
+/// `UI_G2_COLLISIONDETECTCACHE` outbound game-to-engine syscall.
 ///
 /// Mirrors the C ABI:
 /// ```c
@@ -29,7 +29,7 @@ use crate::shared::CollisionRecord_t;
 /// return 0; // void
 /// ```
 #[derive(Debug)]
-pub struct GG2CollisiondetectcacheArgs {
+pub struct UiG2CollisiondetectcacheArgs {
     /// args[1]: out-param collision record array
     pub collision_records: *mut CollisionRecord_t,
     /// args[2]: CGhoul2Info_v* (opaque C++ class pointer)
@@ -56,7 +56,7 @@ pub struct GG2CollisiondetectcacheArgs {
     pub float_param: f32,
 }
 
-impl GG2CollisiondetectcacheArgs {
+impl UiG2CollisiondetectcacheArgs {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         collision_records: *mut CollisionRecord_t,
@@ -126,20 +126,20 @@ impl GG2CollisiondetectcacheArgs {
     }
 }
 
-/// `UiG2_COLLISIONDETECTCACHE` MP game imports syscall ABI token.
+/// `UI_G2_COLLISIONDETECTCACHE` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:531`
-pub struct GG2Collisiondetectcache;
+pub struct UiG2Collisiondetectcache;
 
-impl OutboundSysCall for GG2Collisiondetectcache {
+impl OutboundSysCall for UiG2Collisiondetectcache {
     type Import = MpUiImport;
-    type Args = GG2CollisiondetectcacheArgs;
+    type Args = UiG2CollisiondetectcacheArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_COLLISIONDETECTCACHE;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_COLLISIONDETECTCACHE;
 }
 
-impl EncodeSysCall for GG2Collisiondetectcache {
+impl EncodeSysCall for UiG2Collisiondetectcache {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.collision_records), // args[1]
@@ -158,7 +158,7 @@ impl EncodeSysCall for GG2Collisiondetectcache {
     }
 }
 
-impl DecodeSysCallReturn for GG2Collisiondetectcache {
+impl DecodeSysCallReturn for UiG2Collisiondetectcache {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

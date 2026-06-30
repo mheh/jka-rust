@@ -7,9 +7,9 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_SETSURFACEONOFF` outbound game-to-engine syscall.
+/// `UI_G2_SETSURFACEONOFF` outbound game-to-engine syscall.
 #[derive(Debug)]
-pub struct GG2SetsurfaceonoffArgs {
+pub struct UiG2SetsurfaceonoffArgs {
     /// Ghoul2 instance handle.
     ghoul2: *mut c_void,
     /// Surface name as a raw C string (caller owns the buffer).
@@ -18,7 +18,7 @@ pub struct GG2SetsurfaceonoffArgs {
     flags: i32,
 }
 
-impl GG2SetsurfaceonoffArgs {
+impl UiG2SetsurfaceonoffArgs {
     pub fn new(ghoul2: *mut c_void, surface_name: *const c_char, flags: i32) -> Self {
         Self {
             ghoul2,
@@ -38,20 +38,20 @@ impl GG2SetsurfaceonoffArgs {
     }
 }
 
-/// `UiG2_SETSURFACEONOFF` MP game imports syscall ABI token.
+/// `UI_G2_SETSURFACEONOFF` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:534`
-pub struct GG2Setsurfaceonoff;
+pub struct UiG2Setsurfaceonoff;
 
-impl OutboundSysCall for GG2Setsurfaceonoff {
+impl OutboundSysCall for UiG2Setsurfaceonoff {
     type Import = MpUiImport;
-    type Args = GG2SetsurfaceonoffArgs;
+    type Args = UiG2SetsurfaceonoffArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_SETSURFACEONOFF;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_SETSURFACEONOFF;
 }
 
-impl EncodeSysCall for GG2Setsurfaceonoff {
+impl EncodeSysCall for UiG2Setsurfaceonoff {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2 as *const _),
@@ -61,7 +61,7 @@ impl EncodeSysCall for GG2Setsurfaceonoff {
     }
 }
 
-impl DecodeSysCallReturn for GG2Setsurfaceonoff {
+impl DecodeSysCallReturn for UiG2Setsurfaceonoff {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

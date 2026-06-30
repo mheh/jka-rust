@@ -9,9 +9,9 @@ use crate::shared::qboolean;
 use crate::shared::qhandle_t;
 use crate::shared::vec3_t;
 
-/// `UiG2_GETBOLT_NOREC` outbound game-to-engine syscall.
+/// `UI_G2_GETBOLT_NOREC` outbound game-to-engine syscall.
 #[derive(Debug)]
-pub struct GG2GetboltNorecArgs {
+pub struct UiG2GetboltNorecArgs {
     pub ghoul2: *mut c_void,
     pub model_index: c_int,
     pub bolt_index: c_int,
@@ -23,7 +23,7 @@ pub struct GG2GetboltNorecArgs {
     pub scale: *mut vec3_t,
 }
 
-impl GG2GetboltNorecArgs {
+impl UiG2GetboltNorecArgs {
     pub fn new(
         ghoul2: *mut c_void,
         model_index: c_int,
@@ -77,20 +77,20 @@ impl GG2GetboltNorecArgs {
     }
 }
 
-/// `UiG2_GETBOLT_NOREC` MP game imports syscall ABI token.
+/// `UI_G2_GETBOLT_NOREC` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:512`
-pub struct GG2GetboltNorec;
+pub struct UiG2GetboltNorec;
 
-impl OutboundSysCall for GG2GetboltNorec {
+impl OutboundSysCall for UiG2GetboltNorec {
     type Import = MpUiImport;
-    type Args = GG2GetboltNorecArgs;
+    type Args = UiG2GetboltNorecArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_GETBOLT_NOREC;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_GETBOLT_NOREC;
 }
 
-impl EncodeSysCall for GG2GetboltNorec {
+impl EncodeSysCall for UiG2GetboltNorec {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2),
@@ -106,7 +106,7 @@ impl EncodeSysCall for GG2GetboltNorec {
     }
 }
 
-impl DecodeSysCallReturn for GG2GetboltNorec {
+impl DecodeSysCallReturn for UiG2GetboltNorec {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

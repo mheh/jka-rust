@@ -23,7 +23,7 @@ impl GRRegisterskinArgs {
     }
 }
 
-/// `UiR_REGISTERSKIN` MP game imports syscall ABI token.
+/// `UiR_REGISTERSKIN` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:506`
 pub struct GRRegisterskin;

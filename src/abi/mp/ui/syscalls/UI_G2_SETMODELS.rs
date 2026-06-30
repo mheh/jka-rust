@@ -6,12 +6,12 @@ use crate::abi::generic::{
 };
 use crate::shared::qhandle_t;
 
-/// `UiG2_SETMODELS` outbound game-to-engine syscall.
+/// `UI_G2_SETMODELS` outbound game-to-engine syscall.
 ///
 /// Sets the model and skin handle lists on a Ghoul2 instance.
-/// Mirrors `trap_G2_SetGhoul2ModelIndexes` / `syscall!(UiG2_SETMODELS, ghoul2, model_list, skin_list)`.
+/// Mirrors `trap_G2_SetGhoul2ModelIndexes` / `syscall!(UI_G2_SETMODELS, ghoul2, model_list, skin_list)`.
 #[derive(Debug)]
-pub struct GG2SetmodelsArgs {
+pub struct UiG2SetmodelsArgs {
     /// Ghoul2 instance handle (opaque pointer).
     ghoul2: *mut c_void,
     /// Pointer to the array of model handles.
@@ -20,7 +20,7 @@ pub struct GG2SetmodelsArgs {
     skin_list: *mut qhandle_t,
 }
 
-impl GG2SetmodelsArgs {
+impl UiG2SetmodelsArgs {
     pub fn new(ghoul2: *mut c_void, model_list: *mut qhandle_t, skin_list: *mut qhandle_t) -> Self {
         Self {
             ghoul2,
@@ -40,20 +40,20 @@ impl GG2SetmodelsArgs {
     }
 }
 
-/// `UiG2_SETMODELS` MP game imports syscall ABI token.
+/// `UI_G2_SETMODELS` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:510`
-pub struct GG2Setmodels;
+pub struct UiG2Setmodels;
 
-impl OutboundSysCall for GG2Setmodels {
+impl OutboundSysCall for UiG2Setmodels {
     type Import = MpUiImport;
-    type Args = GG2SetmodelsArgs;
+    type Args = UiG2SetmodelsArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_SETMODELS;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_SETMODELS;
 }
 
-impl EncodeSysCall for GG2Setmodels {
+impl EncodeSysCall for UiG2Setmodels {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2()),
@@ -63,7 +63,7 @@ impl EncodeSysCall for GG2Setmodels {
     }
 }
 
-impl DecodeSysCallReturn for GG2Setmodels {
+impl DecodeSysCallReturn for UiG2Setmodels {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

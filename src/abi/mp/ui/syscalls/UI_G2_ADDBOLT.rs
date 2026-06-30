@@ -6,18 +6,18 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_ADDBOLT` outbound game-to-engine syscall.
+/// `UI_G2_ADDBOLT` outbound game-to-engine syscall.
 ///
 /// Registers a bolt (attach point) on `model_index` of the ghoul2 instance, identified by
 /// `bone_name` (a bone or tag surface name). Returns the bolt index, or `-1` on failure.
 #[derive(Debug)]
-pub struct GG2AddboltArgs {
+pub struct UiG2AddboltArgs {
     ghoul2: *mut c_void,
     model_index: c_int,
     bone_name: CString,
 }
 
-impl GG2AddboltArgs {
+impl UiG2AddboltArgs {
     pub fn new(ghoul2: *mut c_void, model_index: c_int, bone_name: CString) -> Self {
         Self {
             ghoul2,
@@ -37,20 +37,20 @@ impl GG2AddboltArgs {
     }
 }
 
-/// `UiG2_ADDBOLT` MP game imports syscall ABI token.
+/// `UI_G2_ADDBOLT` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:517`
-pub struct GG2Addbolt;
+pub struct UiG2Addbolt;
 
-impl OutboundSysCall for GG2Addbolt {
+impl OutboundSysCall for UiG2Addbolt {
     type Import = MpUiImport;
-    type Args = GG2AddboltArgs;
+    type Args = UiG2AddboltArgs;
     type Output = c_int;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_ADDBOLT;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_ADDBOLT;
 }
 
-impl EncodeSysCall for GG2Addbolt {
+impl EncodeSysCall for UiG2Addbolt {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2),
@@ -60,7 +60,7 @@ impl EncodeSysCall for GG2Addbolt {
     }
 }
 
-impl DecodeSysCallReturn for GG2Addbolt {
+impl DecodeSysCallReturn for UiG2Addbolt {
     fn decode_return(word: isize) -> Self::Output {
         word as c_int
     }

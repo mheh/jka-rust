@@ -5,16 +5,16 @@ use crate::abi::generic::{
 use crate::common::mp::qcommon::sharedRagDollParams_t;
 use core::ffi::c_void;
 
-/// `UiG2_SETRAGDOLL` outbound game-to-engine syscall.
+/// `UI_G2_SETRAGDOLL` outbound game-to-engine syscall.
 ///
 /// Maps to `trap_G2API_SetRagDoll(void *ghoul2, sharedRagDollParams_t *params)` — void return.
 #[derive(Debug)]
-pub struct GG2SetragdollArgs {
+pub struct UiG2SetragdollArgs {
     ghoul2: *mut c_void,
     params: *mut sharedRagDollParams_t,
 }
 
-impl GG2SetragdollArgs {
+impl UiG2SetragdollArgs {
     pub fn new(ghoul2: *mut c_void, params: *mut sharedRagDollParams_t) -> Self {
         Self { ghoul2, params }
     }
@@ -28,20 +28,20 @@ impl GG2SetragdollArgs {
     }
 }
 
-/// `UiG2_SETRAGDOLL` MP game imports syscall ABI token.
+/// `UI_G2_SETRAGDOLL` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:544`
-pub struct GG2Setragdoll;
+pub struct UiG2Setragdoll;
 
-impl OutboundSysCall for GG2Setragdoll {
+impl OutboundSysCall for UiG2Setragdoll {
     type Import = MpUiImport;
-    type Args = GG2SetragdollArgs;
+    type Args = UiG2SetragdollArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_SETRAGDOLL;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_SETRAGDOLL;
 }
 
-impl EncodeSysCall for GG2Setragdoll {
+impl EncodeSysCall for UiG2Setragdoll {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2 as *const _),
@@ -50,7 +50,7 @@ impl EncodeSysCall for GG2Setragdoll {
     }
 }
 
-impl DecodeSysCallReturn for GG2Setragdoll {
+impl DecodeSysCallReturn for UiG2Setragdoll {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

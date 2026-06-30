@@ -6,7 +6,7 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_GETGLANAME` outbound game-to-engine syscall.
+/// `UI_G2_GETGLANAME` outbound game-to-engine syscall.
 ///
 /// Copies the GLA (animation file) name for the given model index into the
 /// caller-supplied buffer.  The engine writes through `fill_buf`; the call
@@ -14,7 +14,7 @@ use crate::abi::generic::{
 ///
 /// C ABI: `void trap_G2API_GetGLAName(void *ghoul2, int modelIndex, char *fillBuf)`
 #[derive(Debug)]
-pub struct GG2GetglanameArgs {
+pub struct UiG2GetglanameArgs {
     /// Ghoul2 instance handle (opaque engine pointer).
     pub ghoul2: *mut c_void,
     /// Index of the model within the ghoul2 instance.
@@ -23,7 +23,7 @@ pub struct GG2GetglanameArgs {
     pub fill_buf: *mut c_char,
 }
 
-impl GG2GetglanameArgs {
+impl UiG2GetglanameArgs {
     pub fn new(ghoul2: *mut c_void, model_index: c_int, fill_buf: *mut c_char) -> Self {
         Self {
             ghoul2,
@@ -43,20 +43,20 @@ impl GG2GetglanameArgs {
     }
 }
 
-/// `UiG2_GETGLANAME` MP game imports syscall ABI token.
+/// `UI_G2_GETGLANAME` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:522`
-pub struct GG2Getglaname;
+pub struct UiG2Getglaname;
 
-impl OutboundSysCall for GG2Getglaname {
+impl OutboundSysCall for UiG2Getglaname {
     type Import = MpUiImport;
-    type Args = GG2GetglanameArgs;
+    type Args = UiG2GetglanameArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_GETGLANAME;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_GETGLANAME;
 }
 
-impl EncodeSysCall for GG2Getglaname {
+impl EncodeSysCall for UiG2Getglaname {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2),
@@ -66,6 +66,6 @@ impl EncodeSysCall for GG2Getglaname {
     }
 }
 
-impl DecodeSysCallReturn for GG2Getglaname {
+impl DecodeSysCallReturn for UiG2Getglaname {
     fn decode_return(_word: isize) -> Self::Output {}
 }

@@ -7,13 +7,13 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_INITGHOUL2MODEL` outbound game-to-engine syscall.
+/// `UI_G2_INITGHOUL2MODEL` outbound game-to-engine syscall.
 ///
 /// C ABI: `int trap_G2API_InitGhoul2Model(void **ghoul2Ptr, const char *fileName,
 ///   int modelIndex, qhandle_t customSkin, qhandle_t customShader,
 ///   int modelFlags, int lodBias)`
 #[derive(Debug)]
-pub struct GG2Initghoul2ModelArgs {
+pub struct UiG2Initghoul2ModelArgs {
     /// Out-param: engine writes the ghoul2 handle through this pointer.
     pub ghoul2_ptr: *mut *mut core::ffi::c_void,
     /// File name of the model (owned so the pointer stays live during the call).
@@ -25,7 +25,7 @@ pub struct GG2Initghoul2ModelArgs {
     pub lod_bias: c_int,
 }
 
-impl GG2Initghoul2ModelArgs {
+impl UiG2Initghoul2ModelArgs {
     pub fn new(
         ghoul2_ptr: *mut *mut core::ffi::c_void,
         file_name: CString,
@@ -69,20 +69,20 @@ impl GG2Initghoul2ModelArgs {
     }
 }
 
-/// `UiG2_INITGHOUL2MODEL` MP game imports syscall ABI token.
+/// `UI_G2_INITGHOUL2MODEL` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:514`
-pub struct GG2Initghoul2Model;
+pub struct UiG2Initghoul2Model;
 
-impl OutboundSysCall for GG2Initghoul2Model {
+impl OutboundSysCall for UiG2Initghoul2Model {
     type Import = MpUiImport;
-    type Args = GG2Initghoul2ModelArgs;
+    type Args = UiG2Initghoul2ModelArgs;
     type Output = c_int;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_INITGHOUL2MODEL;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_INITGHOUL2MODEL;
 }
 
-impl EncodeSysCall for GG2Initghoul2Model {
+impl EncodeSysCall for UiG2Initghoul2Model {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2_ptr as *const _),
@@ -96,7 +96,7 @@ impl EncodeSysCall for GG2Initghoul2Model {
     }
 }
 
-impl DecodeSysCallReturn for GG2Initghoul2Model {
+impl DecodeSysCallReturn for UiG2Initghoul2Model {
     fn decode_return(word: isize) -> Self::Output {
         word as c_int
     }

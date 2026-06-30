@@ -6,19 +6,19 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_GETSURFACENAME` outbound game-to-engine syscall.
+/// `UI_G2_GETSURFACENAME` outbound game-to-engine syscall.
 ///
 /// Mirrors `trap_G2API_GetSurfaceName(void *ghoul2, int surfNumber, int modelIndex, char *fillBuf)`.
 /// `fillBuf` is an out-param written by the engine; it stays as a raw pointer in Args.
 #[derive(Debug)]
-pub struct GG2GetsurfacenameArgs {
+pub struct UiG2GetsurfacenameArgs {
     ghoul2: *mut c_void,
     surf_number: c_int,
     model_index: c_int,
     fill_buf: *mut c_char,
 }
 
-impl GG2GetsurfacenameArgs {
+impl UiG2GetsurfacenameArgs {
     pub fn new(
         ghoul2: *mut c_void,
         surf_number: c_int,
@@ -47,20 +47,20 @@ impl GG2GetsurfacenameArgs {
     }
 }
 
-/// `UiG2_GETSURFACENAME` MP game imports syscall ABI token.
+/// `UI_G2_GETSURFACENAME` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:569`
-pub struct GG2Getsurfacename;
+pub struct UiG2Getsurfacename;
 
-impl OutboundSysCall for GG2Getsurfacename {
+impl OutboundSysCall for UiG2Getsurfacename {
     type Import = MpUiImport;
-    type Args = GG2GetsurfacenameArgs;
+    type Args = UiG2GetsurfacenameArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_GETSURFACENAME;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_GETSURFACENAME;
 }
 
-impl EncodeSysCall for GG2Getsurfacename {
+impl EncodeSysCall for UiG2Getsurfacename {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2 as *const _),
@@ -71,7 +71,7 @@ impl EncodeSysCall for GG2Getsurfacename {
     }
 }
 
-impl DecodeSysCallReturn for GG2Getsurfacename {
+impl DecodeSysCallReturn for UiG2Getsurfacename {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

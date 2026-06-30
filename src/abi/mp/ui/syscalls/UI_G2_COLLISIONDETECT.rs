@@ -8,9 +8,9 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_COLLISIONDETECT` outbound game-to-engine syscall.
+/// `UI_G2_COLLISIONDETECT` outbound game-to-engine syscall.
 #[derive(Debug)]
-pub struct GG2CollisiondetectArgs {
+pub struct UiG2CollisiondetectArgs {
     /// Output collision record map (caller-allocated array).
     coll_rec_map: *mut CollisionRecord_t,
     /// Ghoul2 model instance handle (opaque void*).
@@ -37,7 +37,7 @@ pub struct GG2CollisiondetectArgs {
     f_radius: f32,
 }
 
-impl GG2CollisiondetectArgs {
+impl UiG2CollisiondetectArgs {
     pub fn new(
         coll_rec_map: *mut CollisionRecord_t,
         ghoul2: *mut c_void,
@@ -117,20 +117,20 @@ impl GG2CollisiondetectArgs {
     }
 }
 
-/// `UiG2_COLLISIONDETECT` MP game imports syscall ABI token.
+/// `UI_G2_COLLISIONDETECT` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:530`
-pub struct GG2Collisiondetect;
+pub struct UiG2Collisiondetect;
 
-impl OutboundSysCall for GG2Collisiondetect {
+impl OutboundSysCall for UiG2Collisiondetect {
     type Import = MpUiImport;
-    type Args = GG2CollisiondetectArgs;
+    type Args = UiG2CollisiondetectArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_COLLISIONDETECT;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_COLLISIONDETECT;
 }
 
-impl EncodeSysCall for GG2Collisiondetect {
+impl EncodeSysCall for UiG2Collisiondetect {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.coll_rec_map),
@@ -149,7 +149,7 @@ impl EncodeSysCall for GG2Collisiondetect {
     }
 }
 
-impl DecodeSysCallReturn for GG2Collisiondetect {
+impl DecodeSysCallReturn for UiG2Collisiondetect {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

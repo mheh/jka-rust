@@ -5,14 +5,14 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_LISTSURFACES` outbound game-to-engine syscall.
+/// `UI_G2_LISTSURFACES` outbound game-to-engine syscall.
 #[derive(Debug)]
-pub struct GG2ListsurfacesArgs {
+pub struct UiG2ListsurfacesArgs {
     /// Ghoul2 instance pointer whose surface list is dumped to the console.
     ghl_info: *mut c_void,
 }
 
-impl GG2ListsurfacesArgs {
+impl UiG2ListsurfacesArgs {
     pub fn new(ghl_info: *mut c_void) -> Self {
         Self { ghl_info }
     }
@@ -22,26 +22,26 @@ impl GG2ListsurfacesArgs {
     }
 }
 
-/// `UiG2_LISTSURFACES` MP game imports syscall ABI token.
+/// `UI_G2_LISTSURFACES` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:508`
-pub struct GG2Listsurfaces;
+pub struct UiG2Listsurfaces;
 
-impl OutboundSysCall for GG2Listsurfaces {
+impl OutboundSysCall for UiG2Listsurfaces {
     type Import = MpUiImport;
-    type Args = GG2ListsurfacesArgs;
+    type Args = UiG2ListsurfacesArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_LISTSURFACES;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_LISTSURFACES;
 }
 
-impl EncodeSysCall for GG2Listsurfaces {
+impl EncodeSysCall for UiG2Listsurfaces {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(a.ghl_info)])
     }
 }
 
-impl DecodeSysCallReturn for GG2Listsurfaces {
+impl DecodeSysCallReturn for UiG2Listsurfaces {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

@@ -7,11 +7,11 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// Args for the `UiG2_SETSKIN` outbound game-to-engine syscall.
+/// Args for the `UI_G2_SETSKIN` outbound game-to-engine syscall.
 ///
-/// Mirrors `syscall!(UiG2_SETSKIN, ghoul2, model_index, custom_skin, render_skin)`.
+/// Mirrors `syscall!(UI_G2_SETSKIN, ghoul2, model_index, custom_skin, render_skin)`.
 #[derive(Debug)]
-pub struct GG2SetskinArgs {
+pub struct UiG2SetskinArgs {
     /// Ghoul2 instance pointer.
     pub ghoul2: *mut c_void,
     /// Model index within the ghoul2 instance.
@@ -22,7 +22,7 @@ pub struct GG2SetskinArgs {
     pub render_skin: c_int,
 }
 
-impl GG2SetskinArgs {
+impl UiG2SetskinArgs {
     pub fn new(
         ghoul2: *mut c_void,
         model_index: c_int,
@@ -51,20 +51,20 @@ impl GG2SetskinArgs {
     }
 }
 
-/// `UiG2_SETSKIN` MP game imports syscall ABI token.
+/// `UI_G2_SETSKIN` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:515`
-pub struct GG2Setskin;
+pub struct UiG2Setskin;
 
-impl OutboundSysCall for GG2Setskin {
+impl OutboundSysCall for UiG2Setskin {
     type Import = MpUiImport;
-    type Args = GG2SetskinArgs;
+    type Args = UiG2SetskinArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_SETSKIN;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_SETSKIN;
 }
 
-impl EncodeSysCall for GG2Setskin {
+impl EncodeSysCall for UiG2Setskin {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2),
@@ -75,7 +75,7 @@ impl EncodeSysCall for GG2Setskin {
     }
 }
 
-impl DecodeSysCallReturn for GG2Setskin {
+impl DecodeSysCallReturn for UiG2Setskin {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

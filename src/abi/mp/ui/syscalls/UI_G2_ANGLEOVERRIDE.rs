@@ -10,7 +10,7 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_ANGLEOVERRIDE` outbound game-to-engine syscall.
+/// `UI_G2_ANGLEOVERRIDE` outbound game-to-engine syscall.
 ///
 /// Mirrors `trap_G2API_SetBoneAngles` from `g_syscalls.c`:
 /// ```c
@@ -21,7 +21,7 @@ use crate::abi::generic::{
 ///     qhandle_t *modelList, int blendTime, int currentTime)
 /// ```
 #[derive(Debug)]
-pub struct GG2AngleoverrideArgs {
+pub struct UiG2AngleoverrideArgs {
     ghoul2: *mut c_void,
     model_index: c_int,
     bone_name: CString,
@@ -35,7 +35,7 @@ pub struct GG2AngleoverrideArgs {
     current_time: c_int,
 }
 
-impl GG2AngleoverrideArgs {
+impl UiG2AngleoverrideArgs {
     pub fn new(
         ghoul2: *mut c_void,
         model_index: c_int,
@@ -99,20 +99,20 @@ impl GG2AngleoverrideArgs {
     }
 }
 
-/// `UiG2_ANGLEOVERRIDE` MP game imports syscall ABI token.
+/// `UI_G2_ANGLEOVERRIDE` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:519`
-pub struct GG2Angleoverride;
+pub struct UiG2Angleoverride;
 
-impl OutboundSysCall for GG2Angleoverride {
+impl OutboundSysCall for UiG2Angleoverride {
     type Import = MpUiImport;
-    type Args = GG2AngleoverrideArgs;
+    type Args = UiG2AngleoverrideArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_ANGLEOVERRIDE;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_ANGLEOVERRIDE;
 }
 
-impl EncodeSysCall for GG2Angleoverride {
+impl EncodeSysCall for UiG2Angleoverride {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2()),
@@ -130,7 +130,7 @@ impl EncodeSysCall for GG2Angleoverride {
     }
 }
 
-impl DecodeSysCallReturn for GG2Angleoverride {
+impl DecodeSysCallReturn for UiG2Angleoverride {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

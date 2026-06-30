@@ -6,15 +6,15 @@ use crate::shared::qboolean;
 use core::ffi::c_int;
 use std::ffi::CString;
 
-/// `UiG2_SETROOTSURFACE` outbound game-to-engine syscall.
+/// `UI_G2_SETROOTSURFACE` outbound game-to-engine syscall.
 #[derive(Debug)]
-pub struct GG2SetrootsurfaceArgs {
+pub struct UiG2SetrootsurfaceArgs {
     pub ghoul2: *mut core::ffi::c_void,
     pub model_index: c_int,
     pub surface_name: CString,
 }
 
-impl GG2SetrootsurfaceArgs {
+impl UiG2SetrootsurfaceArgs {
     pub fn new(ghoul2: *mut core::ffi::c_void, model_index: c_int, surface_name: CString) -> Self {
         Self {
             ghoul2,
@@ -34,20 +34,20 @@ impl GG2SetrootsurfaceArgs {
     }
 }
 
-/// `UiG2_SETROOTSURFACE` MP game imports syscall ABI token.
+/// `UI_G2_SETROOTSURFACE` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:533`
-pub struct GG2Setrootsurface;
+pub struct UiG2Setrootsurface;
 
-impl OutboundSysCall for GG2Setrootsurface {
+impl OutboundSysCall for UiG2Setrootsurface {
     type Import = MpUiImport;
-    type Args = GG2SetrootsurfaceArgs;
+    type Args = UiG2SetrootsurfaceArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_SETROOTSURFACE;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_SETROOTSURFACE;
 }
 
-impl EncodeSysCall for GG2Setrootsurface {
+impl EncodeSysCall for UiG2Setrootsurface {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2),
@@ -57,7 +57,7 @@ impl EncodeSysCall for GG2Setrootsurface {
     }
 }
 
-impl DecodeSysCallReturn for GG2Setrootsurface {
+impl DecodeSysCallReturn for UiG2Setrootsurface {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

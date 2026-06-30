@@ -11,13 +11,13 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_GETBOLT` outbound game-to-engine syscall.
+/// `UI_G2_GETBOLT` outbound game-to-engine syscall.
 ///
 /// C ABI: `qboolean trap_G2API_GetBoltMatrix(void *ghoul2, const int modelIndex, const int boltIndex,
 ///     mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum,
 ///     qhandle_t *modelList, vec3_t scale)`
 #[derive(Debug)]
-pub struct GG2GetboltArgs {
+pub struct UiG2GetboltArgs {
     ghoul2: *mut c_void,
     model_index: c_int,
     bolt_index: c_int,
@@ -29,7 +29,7 @@ pub struct GG2GetboltArgs {
     scale: *const vec3_t,
 }
 
-impl GG2GetboltArgs {
+impl UiG2GetboltArgs {
     pub fn new(
         ghoul2: *mut c_void,
         model_index: c_int,
@@ -83,20 +83,20 @@ impl GG2GetboltArgs {
     }
 }
 
-/// `UiG2_GETBOLT` MP game imports syscall ABI token.
+/// `UI_G2_GETBOLT` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:511`
-pub struct GG2Getbolt;
+pub struct UiG2Getbolt;
 
-impl OutboundSysCall for GG2Getbolt {
+impl OutboundSysCall for UiG2Getbolt {
     type Import = MpUiImport;
-    type Args = GG2GetboltArgs;
+    type Args = UiG2GetboltArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_GETBOLT;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_GETBOLT;
 }
 
-impl EncodeSysCall for GG2Getbolt {
+impl EncodeSysCall for UiG2Getbolt {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2 as *const u8),
@@ -112,7 +112,7 @@ impl EncodeSysCall for GG2Getbolt {
     }
 }
 
-impl DecodeSysCallReturn for GG2Getbolt {
+impl DecodeSysCallReturn for UiG2Getbolt {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

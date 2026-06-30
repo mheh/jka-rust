@@ -33,7 +33,7 @@ impl GTestprintfloatArgs {
     }
 }
 
-/// `UiTESTPRINTFLOAT` MP game imports syscall ABI token.
+/// `UiTESTPRINTFLOAT` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:290`
 pub struct GTestprintfloat;

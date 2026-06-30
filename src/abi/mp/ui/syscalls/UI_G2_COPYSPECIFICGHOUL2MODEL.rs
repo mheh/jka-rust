@@ -5,18 +5,18 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_COPYSPECIFICGHOUL2MODEL` outbound game-to-engine syscall.
+/// `UI_G2_COPYSPECIFICGHOUL2MODEL` outbound game-to-engine syscall.
 ///
 /// C ABI: `void trap_G2API_CopySpecificGhoul2Model(void *g2From, int modelFrom, void *g2To, int modelTo)`
 #[derive(Debug)]
-pub struct GG2Copyspecificghoul2ModelArgs {
+pub struct UiG2Copyspecificghoul2ModelArgs {
     g2_from: *mut c_void,
     model_from: c_int,
     g2_to: *mut c_void,
     model_to: c_int,
 }
 
-impl GG2Copyspecificghoul2ModelArgs {
+impl UiG2Copyspecificghoul2ModelArgs {
     pub fn new(
         g2_from: *mut c_void,
         model_from: c_int,
@@ -45,20 +45,20 @@ impl GG2Copyspecificghoul2ModelArgs {
     }
 }
 
-/// `UiG2_COPYSPECIFICGHOUL2MODEL` MP game imports syscall ABI token.
+/// `UI_G2_COPYSPECIFICGHOUL2MODEL` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:524`
-pub struct GG2Copyspecificghoul2Model;
+pub struct UiG2Copyspecificghoul2Model;
 
-impl OutboundSysCall for GG2Copyspecificghoul2Model {
+impl OutboundSysCall for UiG2Copyspecificghoul2Model {
     type Import = MpUiImport;
-    type Args = GG2Copyspecificghoul2ModelArgs;
+    type Args = UiG2Copyspecificghoul2ModelArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_COPYSPECIFICGHOUL2MODEL;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_COPYSPECIFICGHOUL2MODEL;
 }
 
-impl EncodeSysCall for GG2Copyspecificghoul2Model {
+impl EncodeSysCall for UiG2Copyspecificghoul2Model {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.g2_from),
@@ -69,6 +69,6 @@ impl EncodeSysCall for GG2Copyspecificghoul2Model {
     }
 }
 
-impl DecodeSysCallReturn for GG2Copyspecificghoul2Model {
+impl DecodeSysCallReturn for UiG2Copyspecificghoul2Model {
     fn decode_return(_word: isize) -> Self::Output {}
 }

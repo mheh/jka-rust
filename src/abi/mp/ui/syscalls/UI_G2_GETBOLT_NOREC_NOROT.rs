@@ -9,12 +9,12 @@ use crate::shared::qboolean;
 use crate::shared::qhandle_t;
 use crate::shared::vec3_t;
 
-/// `UiG2_GETBOLT_NOREC_NOROT` outbound game-to-engine syscall.
+/// `UI_G2_GETBOLT_NOREC_NOROT` outbound game-to-engine syscall.
 ///
 /// ABI mirror of `trap_G2API_GetBoltMatrix_NoRecNoRot` in `g_syscalls.c`.
 /// No skeleton reconstruction; no rotation applied before bolt sampling.
 #[derive(Debug)]
-pub struct GG2GetboltNorecNorotArgs {
+pub struct UiG2GetboltNorecNorotArgs {
     /// Opaque Ghoul2 instance handle.
     pub ghoul2: *mut c_void,
     /// Model index within the Ghoul2 instance.
@@ -35,7 +35,7 @@ pub struct GG2GetboltNorecNorotArgs {
     pub scale: *const vec3_t,
 }
 
-impl GG2GetboltNorecNorotArgs {
+impl UiG2GetboltNorecNorotArgs {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         ghoul2: *mut c_void,
@@ -90,20 +90,20 @@ impl GG2GetboltNorecNorotArgs {
     }
 }
 
-/// `UiG2_GETBOLT_NOREC_NOROT` MP game imports syscall ABI token.
+/// `UI_G2_GETBOLT_NOREC_NOROT` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:513`
-pub struct GG2GetboltNorecNorot;
+pub struct UiG2GetboltNorecNorot;
 
-impl OutboundSysCall for GG2GetboltNorecNorot {
+impl OutboundSysCall for UiG2GetboltNorecNorot {
     type Import = MpUiImport;
-    type Args = GG2GetboltNorecNorotArgs;
+    type Args = UiG2GetboltNorecNorotArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_GETBOLT_NOREC_NOROT;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_GETBOLT_NOREC_NOROT;
 }
 
-impl EncodeSysCall for GG2GetboltNorecNorot {
+impl EncodeSysCall for UiG2GetboltNorecNorot {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2),
@@ -119,7 +119,7 @@ impl EncodeSysCall for GG2GetboltNorecNorot {
     }
 }
 
-impl DecodeSysCallReturn for GG2GetboltNorecNorot {
+impl DecodeSysCallReturn for UiG2GetboltNorecNorot {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

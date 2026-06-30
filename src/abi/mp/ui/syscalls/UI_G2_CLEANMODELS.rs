@@ -6,14 +6,14 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_CLEANMODELS` outbound game-to-engine syscall.
+/// `UI_G2_CLEANMODELS` outbound game-to-engine syscall.
 #[derive(Debug)]
-pub struct GG2CleanmodelsArgs {
+pub struct UiG2CleanmodelsArgs {
     /// Pointer to the ghoul2 instance pointer; the engine frees the instance and NULLs the slot.
     ghoul2_ptr: *mut *mut c_void,
 }
 
-impl GG2CleanmodelsArgs {
+impl UiG2CleanmodelsArgs {
     pub fn new(ghoul2_ptr: *mut *mut c_void) -> Self {
         Self { ghoul2_ptr }
     }
@@ -23,26 +23,26 @@ impl GG2CleanmodelsArgs {
     }
 }
 
-/// `UiG2_CLEANMODELS` MP game imports syscall ABI token.
+/// `UI_G2_CLEANMODELS` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:529`
-pub struct GG2Cleanmodels;
+pub struct UiG2Cleanmodels;
 
-impl OutboundSysCall for GG2Cleanmodels {
+impl OutboundSysCall for UiG2Cleanmodels {
     type Import = MpUiImport;
-    type Args = GG2CleanmodelsArgs;
+    type Args = UiG2CleanmodelsArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_CLEANMODELS;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_CLEANMODELS;
 }
 
-impl EncodeSysCall for GG2Cleanmodels {
+impl EncodeSysCall for UiG2Cleanmodels {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(a.ghoul2_ptr as *const _)])
     }
 }
 
-impl DecodeSysCallReturn for GG2Cleanmodels {
+impl DecodeSysCallReturn for UiG2Cleanmodels {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

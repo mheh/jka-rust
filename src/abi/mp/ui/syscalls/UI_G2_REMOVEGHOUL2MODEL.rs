@@ -6,16 +6,16 @@ use crate::shared::qboolean;
 use core::ffi::c_int;
 use core::ffi::c_void;
 
-/// `UiG2_REMOVEGHOUL2MODEL` outbound game-to-engine syscall.
+/// `UI_G2_REMOVEGHOUL2MODEL` outbound game-to-engine syscall.
 ///
 /// Remove the model at `model_index` from the ghoul2 instance pointed to by `ghl_info`.
 #[derive(Debug)]
-pub struct GG2Removeghoul2ModelArgs {
+pub struct UiG2Removeghoul2ModelArgs {
     ghl_info: *mut c_void,
     model_index: c_int,
 }
 
-impl GG2Removeghoul2ModelArgs {
+impl UiG2Removeghoul2ModelArgs {
     pub fn new(ghl_info: *mut c_void, model_index: c_int) -> Self {
         Self {
             ghl_info,
@@ -32,26 +32,26 @@ impl GG2Removeghoul2ModelArgs {
     }
 }
 
-/// `UiG2_REMOVEGHOUL2MODEL` MP game imports syscall ABI token.
+/// `UI_G2_REMOVEGHOUL2MODEL` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:527`
-pub struct GG2Removeghoul2Model;
+pub struct UiG2Removeghoul2Model;
 
-impl OutboundSysCall for GG2Removeghoul2Model {
+impl OutboundSysCall for UiG2Removeghoul2Model {
     type Import = MpUiImport;
-    type Args = GG2Removeghoul2ModelArgs;
+    type Args = UiG2Removeghoul2ModelArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_REMOVEGHOUL2MODEL;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_REMOVEGHOUL2MODEL;
 }
 
-impl EncodeSysCall for GG2Removeghoul2Model {
+impl EncodeSysCall for UiG2Removeghoul2Model {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(a.ghl_info), a.model_index as isize])
     }
 }
 
-impl DecodeSysCallReturn for GG2Removeghoul2Model {
+impl DecodeSysCallReturn for UiG2Removeghoul2Model {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

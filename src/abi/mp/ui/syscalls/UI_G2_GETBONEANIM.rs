@@ -8,11 +8,11 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_GETBONEANIM` outbound game-to-engine syscall.
+/// `UI_G2_GETBONEANIM` outbound game-to-engine syscall.
 ///
 /// Mirrors `trap_G2API_GetBoneAnim` in `oracle/codemp/game/g_syscalls.c`.
 #[derive(Debug)]
-pub struct GG2GetboneanimArgs {
+pub struct UiG2GetboneanimArgs {
     /// Ghoul2 instance handle (opaque void*).
     pub ghoul2: *mut c_void,
     /// Name of the bone (null-terminated).
@@ -35,7 +35,7 @@ pub struct GG2GetboneanimArgs {
     pub model_index: c_int,
 }
 
-impl GG2GetboneanimArgs {
+impl UiG2GetboneanimArgs {
     pub fn new(
         ghoul2: *mut c_void,
         bone_name: CString,
@@ -94,20 +94,20 @@ impl GG2GetboneanimArgs {
     }
 }
 
-/// `UiG2_GETBONEANIM` MP game imports syscall ABI token.
+/// `UI_G2_GETBONEANIM` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:521`
-pub struct GG2Getboneanim;
+pub struct UiG2Getboneanim;
 
-impl OutboundSysCall for GG2Getboneanim {
+impl OutboundSysCall for UiG2Getboneanim {
     type Import = MpUiImport;
-    type Args = GG2GetboneanimArgs;
+    type Args = UiG2GetboneanimArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_GETBONEANIM;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_GETBONEANIM;
 }
 
-impl EncodeSysCall for GG2Getboneanim {
+impl EncodeSysCall for UiG2Getboneanim {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2 as *const _),
@@ -124,7 +124,7 @@ impl EncodeSysCall for GG2Getboneanim {
     }
 }
 
-impl DecodeSysCallReturn for GG2Getboneanim {
+impl DecodeSysCallReturn for UiG2Getboneanim {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

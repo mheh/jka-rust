@@ -9,12 +9,12 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_SETBONEIKSTATE` outbound game-to-engine syscall.
+/// `UI_G2_SETBONEIKSTATE` outbound game-to-engine syscall.
 ///
 /// Mirrors `trap_G2API_SetBoneIKState(void *ghoul2, int time, const char *boneName,
 /// int ikState, sharedSetBoneIKStateParams_t *params) -> qboolean`.
 #[derive(Debug)]
-pub struct GG2SetboneikstateArgs {
+pub struct UiG2SetboneikstateArgs {
     /// Opaque Ghoul2 instance handle (void *).
     pub ghoul2: *mut core::ffi::c_void,
     /// Current server time.
@@ -27,7 +27,7 @@ pub struct GG2SetboneikstateArgs {
     pub params: *mut sharedSetBoneIKStateParams_t,
 }
 
-impl GG2SetboneikstateArgs {
+impl UiG2SetboneikstateArgs {
     pub fn new(
         ghoul2: *mut core::ffi::c_void,
         time: c_int,
@@ -61,20 +61,20 @@ impl GG2SetboneikstateArgs {
     }
 }
 
-/// `UiG2_SETBONEIKSTATE` MP game imports syscall ABI token.
+/// `UI_G2_SETBONEIKSTATE` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:559`
-pub struct GG2Setboneikstate;
+pub struct UiG2Setboneikstate;
 
-impl OutboundSysCall for GG2Setboneikstate {
+impl OutboundSysCall for UiG2Setboneikstate {
     type Import = MpUiImport;
-    type Args = GG2SetboneikstateArgs;
+    type Args = UiG2SetboneikstateArgs;
     type Output = qboolean;
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_SETBONEIKSTATE;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_SETBONEIKSTATE;
 }
 
-impl EncodeSysCall for GG2Setboneikstate {
+impl EncodeSysCall for UiG2Setboneikstate {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2 as *const _),
@@ -86,7 +86,7 @@ impl EncodeSysCall for GG2Setboneikstate {
     }
 }
 
-impl DecodeSysCallReturn for GG2Setboneikstate {
+impl DecodeSysCallReturn for UiG2Setboneikstate {
     fn decode_return(word: isize) -> Self::Output {
         word as qboolean
     }

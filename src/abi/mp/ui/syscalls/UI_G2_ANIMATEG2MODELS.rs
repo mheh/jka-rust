@@ -7,9 +7,9 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_ANIMATEG2MODELS` outbound game-to-engine syscall.
+/// `UI_G2_ANIMATEG2MODELS` outbound game-to-engine syscall.
 #[derive(Debug)]
-pub struct GG2Animateg2ModelsArgs {
+pub struct UiG2Animateg2ModelsArgs {
     /// Ghoul2 model instance handle (opaque void*).
     ghoul2: *mut c_void,
     /// Current time in milliseconds.
@@ -18,7 +18,7 @@ pub struct GG2Animateg2ModelsArgs {
     params: *mut sharedRagDollUpdateParams_t,
 }
 
-impl GG2Animateg2ModelsArgs {
+impl UiG2Animateg2ModelsArgs {
     pub fn new(ghoul2: *mut c_void, time: c_int, params: *mut sharedRagDollUpdateParams_t) -> Self {
         Self {
             ghoul2,
@@ -40,22 +40,22 @@ impl GG2Animateg2ModelsArgs {
     }
 }
 
-/// `UiG2_ANIMATEG2MODELS` MP game imports syscall ABI token.
+/// `UI_G2_ANIMATEG2MODELS` MP UI imports syscall ABI token.
 ///
 /// Raven: rww - RAGDOLL_END
 /// Raven: additional ragdoll options -rww
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:545`
-pub struct GG2Animateg2Models;
+pub struct UiG2Animateg2Models;
 
-impl OutboundSysCall for GG2Animateg2Models {
+impl OutboundSysCall for UiG2Animateg2Models {
     type Import = MpUiImport;
-    type Args = GG2Animateg2ModelsArgs;
+    type Args = UiG2Animateg2ModelsArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_ANIMATEG2MODELS;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_ANIMATEG2MODELS;
 }
 
-impl EncodeSysCall for GG2Animateg2Models {
+impl EncodeSysCall for UiG2Animateg2Models {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2),
@@ -65,7 +65,7 @@ impl EncodeSysCall for GG2Animateg2Models {
     }
 }
 
-impl DecodeSysCallReturn for GG2Animateg2Models {
+impl DecodeSysCallReturn for UiG2Animateg2Models {
     fn decode_return(_word: isize) -> Self::Output {
         ()
     }

@@ -6,19 +6,19 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiG2_DUPLICATEGHOUL2INSTANCE` outbound game-to-engine syscall.
+/// `UI_G2_DUPLICATEGHOUL2INSTANCE` outbound game-to-engine syscall.
 ///
 /// Deep-copies a ghoul2 instance (`g2_from`) into the location pointed to by `g2_to`.
 /// The engine allocates the new instance and writes the pointer through `g2_to`.
 #[derive(Debug)]
-pub struct GG2Duplicateghoul2InstanceArgs {
+pub struct UiG2Duplicateghoul2InstanceArgs {
     /// Source ghoul2 instance handle.
     g2_from: *mut c_void,
     /// Pointer to the destination handle slot; engine writes the new instance pointer here.
     g2_to: *mut *mut c_void,
 }
 
-impl GG2Duplicateghoul2InstanceArgs {
+impl UiG2Duplicateghoul2InstanceArgs {
     pub fn new(g2_from: *mut c_void, g2_to: *mut *mut c_void) -> Self {
         Self { g2_from, g2_to }
     }
@@ -32,25 +32,25 @@ impl GG2Duplicateghoul2InstanceArgs {
     }
 }
 
-/// `UiG2_DUPLICATEGHOUL2INSTANCE` MP game imports syscall ABI token.
+/// `UI_G2_DUPLICATEGHOUL2INSTANCE` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:525`
-pub struct GG2Duplicateghoul2Instance;
+pub struct UiG2Duplicateghoul2Instance;
 
-impl OutboundSysCall for GG2Duplicateghoul2Instance {
+impl OutboundSysCall for UiG2Duplicateghoul2Instance {
     type Import = MpUiImport;
-    type Args = GG2Duplicateghoul2InstanceArgs;
+    type Args = UiG2Duplicateghoul2InstanceArgs;
     type Output = ();
 
-    const IMPORT: MpUiImport = MpUiImport::UiG2_DUPLICATEGHOUL2INSTANCE;
+    const IMPORT: MpUiImport = MpUiImport::UI_G2_DUPLICATEGHOUL2INSTANCE;
 }
 
-impl EncodeSysCall for GG2Duplicateghoul2Instance {
+impl EncodeSysCall for UiG2Duplicateghoul2Instance {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
         SysCallTransport::new([ptr_to_word(a.g2_from()), ptr_to_word(a.g2_to())])
     }
 }
 
-impl DecodeSysCallReturn for GG2Duplicateghoul2Instance {
+impl DecodeSysCallReturn for UiG2Duplicateghoul2Instance {
     fn decode_return(_word: isize) -> Self::Output {}
 }
