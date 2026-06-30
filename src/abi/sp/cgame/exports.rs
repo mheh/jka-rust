@@ -60,5 +60,4 @@ pub enum SpCgameExport {
 
     /// Source: `oracle/oracle/code/client/vmachine.h:37`
     CG_DRAW_DATAPAD_FORCEPOWERS,
-
 }

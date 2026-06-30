@@ -376,5 +376,4 @@ pub enum SpCgameImport {
 
     /// Source: `oracle/oracle/code/cgame/cg_public.h:208`
     CG_UI_GETITEMINFO,
-
 }

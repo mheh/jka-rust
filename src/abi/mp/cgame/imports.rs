@@ -720,5 +720,4 @@ pub enum MpCgameImport {
     /// Adding trap to get weather working
     /// Source: `oracle/oracle/codemp/cgame/cg_public.h:336`
     CG_WE_ADDWEATHERZONE,
-
 }

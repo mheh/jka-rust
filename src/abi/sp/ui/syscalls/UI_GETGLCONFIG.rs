@@ -1,8 +1,8 @@
 use super::super::SpUiImport;
-use core::ffi::c_void;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
+use core::ffi::c_void;
 
 /// `UI_GETGLCONFIG` SP UI imports syscall ABI token.
 ///

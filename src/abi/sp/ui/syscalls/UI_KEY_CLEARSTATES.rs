@@ -1,7 +1,5 @@
 use super::super::SpUiImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `UI_KEY_CLEARSTATES` SP UI imports syscall ABI token.
 ///

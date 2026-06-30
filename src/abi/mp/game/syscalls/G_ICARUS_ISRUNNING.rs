@@ -2,9 +2,7 @@ use core::ffi::c_int;
 
 use crate::ffi::{types::qboolean, GameImport};
 
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_ICARUS_ISRUNNING` outbound game-to-engine syscall.
 #[derive(Debug)]

@@ -3,9 +3,7 @@ use core::ffi::c_int;
 use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
 
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_ICARUS_ISINITIALIZED` outbound game-to-engine syscall.
 ///

@@ -1,7 +1,5 @@
 use super::super::MpCgameImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `CG_R_CLEARDECALS` MP cgame imports syscall ABI token.
 ///

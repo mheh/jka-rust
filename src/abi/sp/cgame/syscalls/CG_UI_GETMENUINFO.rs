@@ -26,7 +26,13 @@ pub struct CgUiGetmenuinfoArgs {
 impl CgUiGetmenuinfoArgs {
     /// # Safety
     /// `x`, `y`, `w`, and `h` must point to writable `int` outputs.
-    pub const unsafe fn new(menu_file: *const c_char, x: *mut c_int, y: *mut c_int, w: *mut c_int, h: *mut c_int) -> Self {
+    pub const unsafe fn new(
+        menu_file: *const c_char,
+        x: *mut c_int,
+        y: *mut c_int,
+        w: *mut c_int,
+        h: *mut c_int,
+    ) -> Self {
         Self {
             menu_file,
             x,

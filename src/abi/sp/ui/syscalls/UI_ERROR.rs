@@ -2,7 +2,7 @@ use core::ffi::c_char;
 
 use super::super::SpUiImport;
 use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport, ptr_to_word,
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
 /// `UI_ERROR` SP UI imports syscall ABI token.

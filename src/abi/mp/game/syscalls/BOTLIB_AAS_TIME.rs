@@ -1,8 +1,6 @@
 use crate::ffi::GameImport;
 
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AAS_TIME` outbound game-to-engine syscall.
 #[derive(Debug)]

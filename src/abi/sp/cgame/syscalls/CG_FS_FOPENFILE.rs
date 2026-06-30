@@ -24,11 +24,7 @@ pub struct CgFsFopenfileArgs {
 impl CgFsFopenfileArgs {
     /// # Safety
     /// `file` must point to a valid writable `fileHandle_t`.
-    pub const unsafe fn new(
-        qpath: *const c_char,
-        file: *mut fileHandle_t,
-        mode: fsMode_t,
-    ) -> Self {
+    pub const unsafe fn new(qpath: *const c_char, file: *mut fileHandle_t, mode: fsMode_t) -> Self {
         Self { qpath, file, mode }
     }
 }

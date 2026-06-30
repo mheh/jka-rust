@@ -300,5 +300,4 @@ pub enum SpUiImport {
 
     /// Source: `oracle/oracle/code/ui/ui_public.h:247`
     UI_CEIL,
-
 }

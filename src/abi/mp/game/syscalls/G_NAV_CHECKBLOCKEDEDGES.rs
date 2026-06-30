@@ -1,8 +1,6 @@
 use crate::ffi::GameImport;
 
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `G_NAV_CHECKBLOCKEDEDGES` outbound game-to-engine syscall.
 #[derive(Debug)]

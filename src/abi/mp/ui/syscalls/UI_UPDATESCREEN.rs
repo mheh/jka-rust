@@ -1,7 +1,5 @@
 use super::super::MpUiImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// Arguments for `UI_UPDATESCREEN`.
 ///

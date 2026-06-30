@@ -1,7 +1,5 @@
 use super::super::SpCgameImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `CG_UPDATESCREEN` SP cgame imports syscall ABI token.
 ///

@@ -1,7 +1,5 @@
 use super::super::SpUiImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::ffi::types::qboolean;
 
 /// Arguments for `UI_KEY_SETOVERSTRIKEMODE`.

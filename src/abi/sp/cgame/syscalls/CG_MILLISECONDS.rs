@@ -1,9 +1,7 @@
 use core::ffi::c_int;
 
 use super::super::SpCgameImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `CG_MILLISECONDS` SP cgame imports syscall ABI token.
 ///

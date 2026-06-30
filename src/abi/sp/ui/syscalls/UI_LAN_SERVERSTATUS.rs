@@ -1,10 +1,8 @@
 use core::ffi::{c_char, c_int};
 
 use super::super::SpUiImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
 use crate::abi::generic::ptr_to_word;
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// Arguments for `UI_LAN_SERVERSTATUS`.
 ///
@@ -24,7 +22,11 @@ pub struct UiLanServerstatusArgs {
 }
 
 impl UiLanServerstatusArgs {
-    pub const fn new(server_address: *const c_char, server_status: *mut c_char, max_len: c_int) -> Self {
+    pub const fn new(
+        server_address: *const c_char,
+        server_status: *mut c_char,
+        max_len: c_int,
+    ) -> Self {
         Self {
             server_address,
             server_status,

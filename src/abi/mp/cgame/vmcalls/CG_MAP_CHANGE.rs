@@ -1,7 +1,5 @@
 use super::super::MpCgameExport;
-use crate::abi::generic::{
-    DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
-};
+use crate::abi::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport};
 
 /// `CG_MAP_CHANGE` MP cgame exports vmMain ABI token.
 ///

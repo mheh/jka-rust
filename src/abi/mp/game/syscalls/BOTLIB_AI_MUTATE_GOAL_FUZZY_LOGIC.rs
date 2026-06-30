@@ -1,8 +1,6 @@
 use crate::ffi::GameImport;
 
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_MUTATE_GOAL_FUZZY_LOGIC` outbound game-to-engine syscall.
 ///

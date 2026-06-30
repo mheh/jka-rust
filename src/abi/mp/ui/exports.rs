@@ -56,5 +56,4 @@ pub enum MpUiExport {
     /// a GetClientState syscall will be made to get the current strings
     /// Source: `oracle/oracle/codemp/ui/ui_public.h:250`
     UI_MENU_RESET,
-
 }

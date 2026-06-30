@@ -1,7 +1,5 @@
 use super::super::SpUiImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::ffi::types::fileHandle_t;
 
 /// `UI_FS_FCLOSEFILE` SP UI imports syscall ABI token.

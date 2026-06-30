@@ -463,5 +463,4 @@ pub enum MpUiImport {
 
     /// Source: `oracle/oracle/codemp/ui/ui_public.h:188`
     UI_G2_ATTACHG2MODEL,
-
 }

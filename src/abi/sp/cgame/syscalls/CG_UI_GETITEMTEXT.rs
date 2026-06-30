@@ -23,7 +23,11 @@ pub struct CgUiGetitemtextArgs {
 impl CgUiGetitemtextArgs {
     /// # Safety
     /// `text` must point to a writable `char` buffer at least 256 bytes long.
-    pub const unsafe fn new(menu_file: *const c_char, item_name: *const c_char, text: *mut c_char) -> Self {
+    pub const unsafe fn new(
+        menu_file: *const c_char,
+        item_name: *const c_char,
+        text: *mut c_char,
+    ) -> Self {
         Self {
             menu_file,
             item_name,

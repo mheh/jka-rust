@@ -25,11 +25,7 @@ pub struct UiLanMarkservervisibleArgs {
 
 impl UiLanMarkservervisibleArgs {
     pub const fn new(source: c_int, n: c_int, visible: qboolean) -> Self {
-        Self {
-            source,
-            n,
-            visible,
-        }
+        Self { source, n, visible }
     }
 
     pub const fn source(&self) -> c_int {

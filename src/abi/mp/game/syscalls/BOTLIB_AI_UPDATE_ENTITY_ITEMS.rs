@@ -1,8 +1,6 @@
 use crate::ffi::GameImport;
 
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_UPDATE_ENTITY_ITEMS` outbound game-to-engine syscall.
 #[derive(Debug)]

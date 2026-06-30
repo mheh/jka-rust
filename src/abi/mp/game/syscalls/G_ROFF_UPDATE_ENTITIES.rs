@@ -1,6 +1,4 @@
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::ffi::GameImport;
 
 /// `G_ROFF_UPDATE_ENTITIES` outbound game-to-engine syscall.

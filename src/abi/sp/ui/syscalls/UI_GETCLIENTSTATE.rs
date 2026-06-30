@@ -1,7 +1,7 @@
-use super::super::SpUiImport;
 use super::super::types::uiClientState_t;
+use super::super::SpUiImport;
 use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport, ptr_to_word,
+    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
 /// `UI_GETCLIENTSTATE` SP UI imports syscall ABI token.

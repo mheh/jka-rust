@@ -1,5 +1,5 @@
-use super::super::SpCgameImport;
 use super::super::types::clipHandle_t;
+use super::super::SpCgameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// Arguments for `CG_CM_INLINEMODEL`.

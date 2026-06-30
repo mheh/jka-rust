@@ -1,7 +1,5 @@
 use super::super::SpCgameImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::ffi::types::qboolean;
 
 /// `CG_LANGUAGE_USESSPACES` SP cgame imports syscall ABI token.

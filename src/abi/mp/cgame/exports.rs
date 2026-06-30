@@ -140,5 +140,4 @@ pub enum MpCgameExport {
     /// mcg post-gold added
     /// Source: `oracle/oracle/codemp/cgame/cg_public.h:439`
     CG_FX_CAMERASHAKE,
-
 }

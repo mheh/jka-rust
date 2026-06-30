@@ -1,6 +1,6 @@
-use crate::ffi::types::qboolean;
-use crate::abi::generic::InboundVmCall;
 use super::super::MpUiExport;
+use crate::abi::generic::InboundVmCall;
+use crate::ffi::types::qboolean;
 
 /// `UI_INIT` MP UI exports vmMain ABI token.
 ///

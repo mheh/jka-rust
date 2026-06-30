@@ -1,8 +1,8 @@
 use core::ffi::c_int;
 
-use crate::ffi::types::qboolean;
 use super::super::MpUiExport;
 use crate::abi::generic::InboundVmCall;
+use crate::ffi::types::qboolean;
 
 /// `UI_KEY_EVENT` MP UI exports vmMain ABI token.
 ///

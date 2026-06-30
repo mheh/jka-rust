@@ -1,8 +1,6 @@
 use core::ffi::c_int;
 
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::ffi::GameImport;
 
 /// `BOTLIB_AI_RESET_LAST_AVOID_REACH` outbound game-to-engine syscall.

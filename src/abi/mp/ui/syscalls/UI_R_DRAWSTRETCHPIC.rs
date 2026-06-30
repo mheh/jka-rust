@@ -1,9 +1,7 @@
 use core::ffi::c_int;
 
 use super::super::MpUiImport;
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 use crate::ffi::syscalls::pass_float;
 
 /// Arguments for `UI_R_DRAWSTRETCHPIC`.

@@ -1,8 +1,8 @@
+use super::super::SpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::q_shared_h::vec3_t;
-use super::super::SpCgameImport;
 
 /// Arguments for `COM_SETORGANGLES`.
 ///

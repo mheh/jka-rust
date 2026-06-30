@@ -3,9 +3,7 @@ use core::ffi::c_int;
 use crate::ffi::syscalls::pass_float;
 use crate::ffi::GameImport;
 
-use crate::abi::generic::{
-    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
-};
+use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 
 /// `BOTLIB_AI_CHARACTERISTIC_BFLOAT` outbound game-to-engine syscall.
 #[derive(Debug)]
