@@ -4,7 +4,7 @@ use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::qtime_t;
+use crate::common::mp::qcommon::qtime_t;
 
 /// `G_REAL_TIME` outbound game-to-engine syscall.
 ///

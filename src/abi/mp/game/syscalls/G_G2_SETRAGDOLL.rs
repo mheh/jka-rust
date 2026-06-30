@@ -2,7 +2,7 @@ use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::sharedRagDollParams_t;
+use crate::common::mp::qcommon::sharedRagDollParams_t;
 use core::ffi::c_void;
 
 /// `G_G2_SETRAGDOLL` outbound game-to-engine syscall.

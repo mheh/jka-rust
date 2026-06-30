@@ -4,7 +4,7 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::sharedRagDollParams_t;
+use crate::common::mp::qcommon::sharedRagDollParams_t;
 
 /// Arguments for `CG_G2_SETRAGDOLL`.
 ///

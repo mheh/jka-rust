@@ -2,7 +2,11 @@
 
 pub mod collision_record;
 pub mod platform;
+pub mod qtime;
+pub mod shared_ragdoll_params;
 pub mod shared_set_bone_ik_state_params;
 pub mod tags;
 
+pub use qtime::qtime_t;
+pub use shared_ragdoll_params::sharedRagDollParams_t;
 pub use shared_set_bone_ik_state_params::sharedSetBoneIKStateParams_t;

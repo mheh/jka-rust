@@ -4,7 +4,7 @@ use super::super::MpCgameExport;
 use crate::abi::generic::{
     word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
 };
-use crate::codemp::game::q_shared_h::trajectory_t;
+use crate::shared::trajectory_t;
 
 /// Arguments for `CG_GET_ORIGIN_TRAJECTORY`.
 ///

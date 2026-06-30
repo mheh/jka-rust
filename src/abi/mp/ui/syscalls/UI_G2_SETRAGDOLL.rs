@@ -1,7 +1,7 @@
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::sharedRagDollParams_t;
+use crate::common::mp::qcommon::sharedRagDollParams_t;
 use crate::ffi::GameImport;
 use core::ffi::c_void;
 
