@@ -4,7 +4,7 @@ use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// Arguments for `UI_G2_GETBONEFRAME`.
 ///

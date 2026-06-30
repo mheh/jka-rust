@@ -3,8 +3,8 @@ use core::ffi::{c_int, c_void};
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
+use crate::shared::vec3_t;
 
 /// `BOTLIB_AAS_ALTERNATIVE_ROUTE_GOAL` outbound game-to-engine syscall.
 #[derive(Debug)]

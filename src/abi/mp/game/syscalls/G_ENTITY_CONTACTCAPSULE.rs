@@ -1,7 +1,7 @@
 use crate::codemp::game::g_local::gentity_t;
-use crate::codemp::game::q_shared_h::vec3_t;
-use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
+use crate::shared::qboolean;
+use crate::shared::vec3_t;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,

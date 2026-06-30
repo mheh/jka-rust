@@ -5,7 +5,7 @@ use crate::abi::generic::{
     word_to_c_int, word_to_mut_ptr, DecodeVmMain, EncodeVmMainReturn, InboundVmCall,
     VmMainTransport,
 };
-use crate::codemp::game::q_shared_h::vec3_t;
+use crate::shared::vec3_t;
 
 /// Arguments for `CG_GET_ANGLES`.
 ///

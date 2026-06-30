@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_void};
 use std::ffi::CString;
 
-use crate::ffi::{types::qboolean, GameImport};
+use crate::{ffi::GameImport, shared::qboolean};
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,

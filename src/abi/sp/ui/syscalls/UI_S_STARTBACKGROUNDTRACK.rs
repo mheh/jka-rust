@@ -2,7 +2,7 @@ use core::ffi::c_char;
 
 use super::super::SpUiImport;
 use crate::abi::generic::OutboundSysCall;
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// `UI_S_STARTBACKGROUNDTRACK` SP UI imports syscall ABI token.
 ///

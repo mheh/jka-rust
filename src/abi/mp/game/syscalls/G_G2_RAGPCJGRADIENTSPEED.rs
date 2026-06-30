@@ -4,8 +4,8 @@ use std::ffi::CString;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
+use crate::shared::qboolean;
 
 /// `G_G2_RAGPCJGRADIENTSPEED` outbound game-to-engine syscall.
 /// C: `qboolean trap_G2API_RagPCJGradientSpeed(void *ghoul2, const char *boneName, const float speed)`

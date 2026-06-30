@@ -1,6 +1,6 @@
 use super::super::MpUiExport;
 use crate::abi::generic::InboundVmCall;
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// `UI_HASUNIQUECDKEY` MP UI exports vmMain ABI token.
 ///

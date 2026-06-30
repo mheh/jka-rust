@@ -1,6 +1,6 @@
 use super::super::MpCgameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// Arguments for `CG_FX_ADD_SCHEDULED_EFFECTS`.
 ///

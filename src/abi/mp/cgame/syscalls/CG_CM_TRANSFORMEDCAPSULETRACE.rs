@@ -4,7 +4,8 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::{trace_t, vec3_t};
+use crate::common::mp::trace_t::trace_t;
+use crate::shared::vec3_t;
 
 /// Arguments for `CG_CM_TRANSFORMEDCAPSULETRACE`.
 ///

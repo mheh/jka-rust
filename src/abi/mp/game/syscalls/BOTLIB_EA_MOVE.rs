@@ -1,8 +1,8 @@
 use core::ffi::c_int;
 
-use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::syscalls::pass_float;
 use crate::ffi::GameImport;
+use crate::shared::vec3_t;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,

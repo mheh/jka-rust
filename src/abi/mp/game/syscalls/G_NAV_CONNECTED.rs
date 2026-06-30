@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
-use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
 

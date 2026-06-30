@@ -1,8 +1,8 @@
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
+use crate::shared::vec3_t;
 use core::ffi::c_int;
 
 /// `G_NAV_ADDRAWPOINT` outbound game-to-engine syscall.

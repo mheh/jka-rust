@@ -4,9 +4,9 @@ use std::ffi::CString;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::vec3_t;
-use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
+use crate::shared::qboolean;
+use crate::shared::vec3_t;
 
 /// `G_G2_RAGEFFECTORGOAL` outbound game-to-engine syscall.
 #[derive(Debug)]

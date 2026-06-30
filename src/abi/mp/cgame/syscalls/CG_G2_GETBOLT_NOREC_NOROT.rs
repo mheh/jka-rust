@@ -4,8 +4,9 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::{mdxaBone_t, qhandle_t, vec3_t};
-use crate::ffi::types::qboolean;
+use crate::codemp::game::q_shared_h::{mdxaBone_t, qhandle_t};
+use crate::shared::qboolean;
+use crate::shared::vec3_t;
 
 /// Arguments for `CG_G2_GETBOLT_NOREC_NOROT`.
 ///

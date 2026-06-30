@@ -2,8 +2,8 @@ use core::ffi::c_int;
 use std::ffi::CString;
 
 use crate::codemp::game::q_shared_h::sharedSetBoneIKStateParams_t;
-use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
+use crate::shared::qboolean;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,

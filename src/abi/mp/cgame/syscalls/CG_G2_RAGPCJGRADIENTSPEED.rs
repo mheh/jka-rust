@@ -5,7 +5,7 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::ffi::syscalls::pass_float;
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// Arguments for `CG_G2_RAGPCJGRADIENTSPEED`.
 ///

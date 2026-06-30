@@ -1,6 +1,6 @@
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
+use crate::shared::qboolean;
 
 /// `G_NAV_SETPATHSCALCULATED` outbound game-to-engine syscall.
 #[derive(Debug)]

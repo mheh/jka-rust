@@ -4,8 +4,8 @@ use std::ffi::CString;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::vec3_t;
 use crate::ffi::GameImport;
+use crate::shared::vec3_t;
 
 /// `BOTLIB_AAS_VECTOR_FOR_BSP_EPAIR_KEY` outbound game-to-engine syscall.
 #[derive(Debug)]

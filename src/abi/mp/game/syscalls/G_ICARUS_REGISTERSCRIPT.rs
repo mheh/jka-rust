@@ -3,8 +3,8 @@ use core::ffi::c_char;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
+use crate::shared::qboolean;
 
 /// `G_ICARUS_REGISTERSCRIPT` outbound game-to-engine syscall.
 ///

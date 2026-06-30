@@ -4,7 +4,7 @@ use super::super::MpCgameExport;
 use crate::abi::generic::{
     word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
 };
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// Arguments for `CG_DRAW_ACTIVE_FRAME`.
 ///

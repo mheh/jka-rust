@@ -1,6 +1,6 @@
 use super::super::SpCgameExport;
 use crate::abi::generic::InboundVmCall;
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// `CG_CONSOLE_COMMAND` SP cgame exports vmMain ABI token.
 ///

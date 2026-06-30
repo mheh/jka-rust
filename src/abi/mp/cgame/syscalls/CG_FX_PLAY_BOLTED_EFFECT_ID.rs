@@ -4,7 +4,7 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::{codemp::game::q_shared_h::vec3_t, ffi::types::qboolean};
+use crate::shared::{qboolean, vec3_t};
 
 /// Arguments for `CG_FX_PLAY_BOLTED_EFFECT_ID`.
 ///

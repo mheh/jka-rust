@@ -4,8 +4,8 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::ffi::syscalls::pass_float;
-use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
+use crate::shared::qboolean;
 
 /// `G_G2_PLAYANIM` outbound game-to-engine syscall.
 ///

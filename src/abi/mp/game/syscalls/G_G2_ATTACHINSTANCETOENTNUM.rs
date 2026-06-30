@@ -3,7 +3,7 @@ use core::ffi::{c_int, c_void};
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::{types::qboolean, GameImport};
+use crate::{ffi::GameImport, shared::qboolean};
 
 /// `G_G2_ATTACHINSTANCETOENTNUM` outbound game-to-engine syscall.
 #[derive(Debug)]

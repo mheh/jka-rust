@@ -2,7 +2,7 @@ use core::ffi::c_int;
 
 use super::super::SpUiImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// Arguments for `UI_LAN_UPDATEVISIBLEPINGS`.
 ///

@@ -11,8 +11,10 @@
 
 use core::ffi::{c_char, c_float, c_int};
 
-use crate::codemp::game::q_shared_h::{qhandle_t, trace_t, vec3_t};
-use crate::ffi::types::qboolean;
+use crate::codemp::game::q_shared_h::qhandle_t;
+use crate::common::mp::trace_t::trace_t;
+use crate::shared::qboolean;
+use crate::shared::vec3_t;
 
 /// Typed view of Raven's MP cgame `cg.sharedBuffer` payload.
 ///

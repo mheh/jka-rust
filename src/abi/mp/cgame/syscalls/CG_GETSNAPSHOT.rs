@@ -4,7 +4,7 @@ use core::ffi::{c_int, c_void};
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// Arguments for `CG_GETSNAPSHOT`.
 ///

@@ -5,7 +5,7 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::q_shared_h::{qhandle_t, vec4_t};
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 /// Arguments for `CG_UI_GETITEMINFO`.
 ///

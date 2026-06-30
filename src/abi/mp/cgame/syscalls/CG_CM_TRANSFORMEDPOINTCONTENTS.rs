@@ -5,7 +5,7 @@ use crate::abi::generic::{
     c_int_to_word, ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall,
     SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::vec3_t;
+use crate::shared::vec3_t;
 
 /// Arguments for `CG_CM_TRANSFORMEDPOINTCONTENTS`.
 ///

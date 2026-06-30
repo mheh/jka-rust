@@ -4,8 +4,8 @@ use std::ffi::CString;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::qboolean;
 use crate::ffi::GameImport;
+use crate::shared::qboolean;
 
 /// `G_NAV_LOAD` outbound game-to-engine syscall.
 #[derive(Debug)]

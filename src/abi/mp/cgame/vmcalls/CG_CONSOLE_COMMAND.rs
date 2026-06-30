@@ -1,4 +1,4 @@
-use crate::ffi::types::qboolean;
+use crate::shared::qboolean;
 
 use super::super::MpCgameExport;
 use crate::abi::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport};
