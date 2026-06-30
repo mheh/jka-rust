@@ -11,12 +11,12 @@
 
 // #if defined(_XBOX)
 // #include <xtl.h>
-// TODO: Port xtl.h platform API surface.
+// NOTE: Raven included <xtl.h> here for Xbox platform APIs.
 // #endif
 
 // #if defined(_WINDOWS)
 // #include <windows.h>
-// TODO: Port windows.h platform API surface.
+// NOTE: Raven included <windows.h> here for Windows platform APIs.
 // #endif
 
 // #if defined (__linux__)
