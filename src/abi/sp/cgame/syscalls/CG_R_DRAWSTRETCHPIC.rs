@@ -10,7 +10,7 @@ use crate::shared::qhandle_t;
 ///
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:398`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:714-716`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRDrawstretchpicArgs {
     x: f32,
     y: f32,

@@ -18,7 +18,7 @@ use crate::codemp::game::q_shared_h::CollisionRecord_t;
 /// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2509`
 /// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1354-1367`
 /// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1354-1367`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgG2CollisiondetectcacheArgs {
     /// `CollisionRecord_t *collRecMap`, decoded by Raven from `VMA(1)`.
     coll_rec_map: *mut CollisionRecord_t,

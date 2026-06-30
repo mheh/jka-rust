@@ -14,7 +14,7 @@ use crate::{abi::pass_float, shared::vec3_t};
 /// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:450-459`
 /// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2308-2311`
 /// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1099-1104`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgFxAddlineArgs {
     start: *const vec3_t,
     end: *const vec3_t,

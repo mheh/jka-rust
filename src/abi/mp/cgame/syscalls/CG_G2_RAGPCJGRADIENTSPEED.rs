@@ -15,7 +15,7 @@ use crate::shared::qboolean;
 /// Args source: `oracle/oracle/codemp/cgame/cg_syscalls.c:1015-1017`
 /// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2575`
 /// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1597-1598`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgG2RagpcjgradientspeedArgs {
     ghoul2: *mut c_void,
     bone_name: *const c_char,

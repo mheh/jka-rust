@@ -17,7 +17,7 @@ use crate::shared::qhandle_t;
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:409-411`
 /// Output source: `oracle/oracle/code/client/cl_cgame.cpp:723-725`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:723-725`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRLerptagArgs {
     tag: *mut c_void,
     mod_: qhandle_t,

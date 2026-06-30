@@ -14,7 +14,7 @@ use crate::shared::qhandle_t;
 /// Args source: `oracle/oracle/code/cgame/cg_syscalls.cpp:414-417`
 /// Output source: `oracle/oracle/code/client/cl_cgame.cpp:726-728`
 /// Transport/switch source: `oracle/oracle/code/client/cl_cgame.cpp:726-728`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CgRDrawrotatepicArgs {
     x: f32,
     y: f32,

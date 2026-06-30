@@ -19,7 +19,7 @@ use crate::shared::qboolean;
 /// Args source: `oracle/oracle/codemp/cgame/cg_local.h:2553-2554`
 /// Output source: `oracle/oracle/codemp/client/cl_cgame.cpp:1382-1384`
 /// Transport/switch source: `oracle/oracle/codemp/client/cl_cgame.cpp:1382-1384`
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CgG2PlayanimArgs {
     /// Ghoul2 handle, decoded by Raven as `*((CGhoul2Info_v *)args[1])`.
     ghoul2: *mut c_void,

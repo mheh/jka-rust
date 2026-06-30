@@ -1,8 +1,8 @@
 use core::ffi::c_int;
 use core::ffi::c_void;
 
-use crate::codemp::game::q_shared_h::mdxaBone_t;
 use crate::ffi::GameImport;
+use crate::shared::mdxaBone_t;
 use crate::shared::qboolean;
 use crate::shared::qhandle_t;
 use crate::shared::vec3_t;

@@ -13,7 +13,7 @@ use super::super::SpUiImport;
 /// TODO: SP `oracle/oracle/code/client/cl_ui.cpp` does not include a `UI_FLOOR` case in its visible switch
 /// (function-table ABI for this token is intentionally out-of-scope). The transport shape is inferred from
 /// MP-side `oracle/oracle/codemp/client/cl_ui.cpp` behavior.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UiFloorArgs {
     value: f32,
 }
