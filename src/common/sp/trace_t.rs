@@ -7,9 +7,8 @@
 
 use core::ffi::{c_float, c_int};
 
+use crate::common::sp::qcommon::collision_record::{CCollisionRecord, MAX_G2_COLLISIONS};
 use crate::shared::{cplane_t, qboolean, vec3_t};
-
-pub const MAX_G2_COLLISIONS: usize = 16;
 
 // a trace is returned when a box is swept through the world
 #[repr(C)]
@@ -25,8 +24,7 @@ pub struct trace_t {
     pub entityNum: c_int,     // entity the contacted sirface is a part of
 
     // Ghoul2 Insert Start
-    // FIXME: create type CCollisionRecord
-    // pub G2CollisionMap: [CCollisionRecord; MAX_G2_COLLISIONS], // map that describes all of the parts of ghoul2 models that got hit
+    pub G2CollisionMap: [CCollisionRecord; MAX_G2_COLLISIONS], // map that describes all of the parts of ghoul2 models that got hit
     // Ghoul2 Insert End
 }
 

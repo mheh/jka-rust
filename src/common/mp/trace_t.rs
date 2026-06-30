@@ -25,7 +25,6 @@ pub struct trace_t {
 
     // Ghoul2 Insert Start
     //rww - removed this for now, it's just wasting space in the trace structure.
-    // FIXME: create type CollisionRecord_t
     // pub G2CollisionMap: [CollisionRecord_t; MAX_G2_COLLISIONS], // map that describes all of the parts of ghoul2 models that got hit
     // Ghoul2 Insert End
 }
