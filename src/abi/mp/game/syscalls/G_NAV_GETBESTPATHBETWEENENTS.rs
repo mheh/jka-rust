@@ -4,7 +4,7 @@ use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::g_local::gentity_t;
+use crate::common::mp::gentity_t;
 
 /// `G_NAV_GETBESTPATHBETWEENENTS` outbound game-to-engine syscall.
 #[derive(Debug)]

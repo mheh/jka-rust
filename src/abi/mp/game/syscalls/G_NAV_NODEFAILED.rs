@@ -2,7 +2,7 @@ use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::g_local::gentity_t;
+use crate::common::mp::gentity_t;
 use crate::shared::qboolean;
 use core::ffi::c_int;
 

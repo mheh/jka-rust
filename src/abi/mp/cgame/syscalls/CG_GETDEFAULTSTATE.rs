@@ -4,7 +4,7 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::entityState_t;
+use crate::common::mp::qcommon::entityState_t;
 use crate::shared::qboolean;
 
 /// Arguments for `CG_GETDEFAULTSTATE`.

@@ -6,6 +6,7 @@ use core::ffi::c_int;
 
 pub mod collision;
 pub mod cvar;
+pub mod entity_shared;
 #[path = "fsMode_t.rs"]
 pub mod file_mode;
 #[path = "pc_token_t.rs"]
@@ -18,6 +19,7 @@ pub mod vector;
 
 pub use collision::{cplane_t, CollisionRecord_t};
 pub use cvar::{cvarHandle_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
+pub use entity_shared::entityShared_t;
 pub use file_mode::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};
 pub use shared_ik_move_params::sharedIKMoveParams_t;
@@ -61,3 +63,9 @@ pub struct mdxaBone_t {
 
 pub const QFALSE: qboolean = 0;
 pub const QTRUE: qboolean = 1;
+
+/// Raven `MAX_QPATH`.
+///
+/// Definition source: `oracle/oracle/code/game/q_shared.h:215`
+/// Definition source: `oracle/oracle/codemp/game/q_shared.h:393`
+pub const MAX_QPATH: usize = 64;
