@@ -8,7 +8,7 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiTESTPRINTFLOAT` outbound game-to-engine syscall.
+/// `UI_TESTPRINTFLOAT` outbound game-to-engine syscall.
 ///
 /// Mirrors `syscall!(UiTESTPRINTFLOAT, string, PASSFLOAT(f))`.
 /// The engine ignores both arguments and returns 0; this syscall exists for
@@ -33,7 +33,7 @@ impl GTestprintfloatArgs {
     }
 }
 
-/// `UiTESTPRINTFLOAT` MP UI imports syscall ABI token.
+/// `UI_TESTPRINTFLOAT` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:290`
 pub struct GTestprintfloat;
@@ -43,7 +43,7 @@ impl OutboundSysCall for GTestprintfloat {
     type Args = GTestprintfloatArgs;
     type Output = c_int;
 
-    const IMPORT: MpUiImport = MpUiImport::UiTESTPRINTFLOAT;
+    const IMPORT: MpUiImport = MpUiImport::UI_TESTPRINTFLOAT;
 }
 
 impl EncodeSysCall for GTestprintfloat {

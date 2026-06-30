@@ -8,6 +8,8 @@ pub mod collision;
 pub mod cvar;
 #[path = "fsMode_t.rs"]
 pub mod file_mode;
+#[path = "pc_token_t.rs"]
+pub mod pc_token;
 pub mod platform;
 #[path = "sharedIKMoveParams_t.rs"]
 pub mod shared_ik_move_params;
@@ -17,6 +19,7 @@ pub mod vector;
 pub use collision::{cplane_t, CollisionRecord_t};
 pub use cvar::{cvarHandle_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
 pub use file_mode::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
+pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};
 pub use shared_ik_move_params::sharedIKMoveParams_t;
 pub use trajectory::{trType_t, trajectory_t};
 pub use vector::{vec2_t, vec3_t, vec3pair_t, vec4_t, vec5_t, vec_t};
@@ -32,6 +35,12 @@ pub type qboolean = c_int;
 /// Type definition source: `oracle/oracle/code/game/q_shared.h:187`
 /// Type definition source: `oracle/oracle/codemp/game/q_shared.h:362`
 pub type fileHandle_t = c_int;
+
+/// Raven `clipHandle_t` collision model handle.
+///
+/// Type definition source: `oracle/oracle/code/game/q_shared.h:188`
+/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:363`
+pub type clipHandle_t = c_int;
 
 /// Raven `qhandle_t`.
 ///

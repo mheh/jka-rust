@@ -4,7 +4,7 @@ use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::pc_token_t;
+use crate::shared::pc_token_t;
 
 /// Arguments for `UI_PC_READ_TOKEN`.
 ///

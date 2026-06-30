@@ -2,7 +2,7 @@ use core::ffi::c_int;
 
 use super::super::SpUiImport;
 use crate::abi::generic::OutboundSysCall;
-use crate::codemp::game::q_shared_h::pc_token_t;
+use crate::shared::pc_token_t;
 
 /// `UI_PC_READ_TOKEN` SP UI imports syscall ABI token.
 ///

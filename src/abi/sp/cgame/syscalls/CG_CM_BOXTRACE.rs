@@ -4,8 +4,8 @@ use super::super::SpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::clipHandle_t;
 use crate::common::sp::trace_t::trace_t;
+use crate::shared::clipHandle_t;
 use crate::shared::vec3_t;
 
 /// Arguments for `CG_CM_BOXTRACE`.

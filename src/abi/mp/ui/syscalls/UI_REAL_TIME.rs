@@ -6,7 +6,7 @@ use crate::abi::generic::{
 };
 use crate::common::mp::qcommon::qtime_t;
 
-/// `UiREAL_TIME` outbound game-to-engine syscall.
+/// `UI_REAL_TIME` outbound game-to-engine syscall.
 ///
 /// Reads the engine's wall-clock time into `qtime`, returning the raw
 /// seconds-since-epoch value.  Mirrors `syscall!(UiREAL_TIME, qtime as *mut qtime_t)`.
@@ -25,7 +25,7 @@ impl GRealTimeArgs {
     }
 }
 
-/// `UiREAL_TIME` MP UI imports syscall ABI token.
+/// `UI_REAL_TIME` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:232`
 pub struct GRealTime;
@@ -35,7 +35,7 @@ impl OutboundSysCall for GRealTime {
     type Args = GRealTimeArgs;
     type Output = c_int;
 
-    const IMPORT: MpUiImport = MpUiImport::UiREAL_TIME;
+    const IMPORT: MpUiImport = MpUiImport::UI_REAL_TIME;
 }
 
 impl EncodeSysCall for GRealTime {

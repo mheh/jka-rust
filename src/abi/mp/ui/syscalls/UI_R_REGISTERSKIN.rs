@@ -7,7 +7,7 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 
-/// `UiR_REGISTERSKIN` outbound game-to-engine syscall.
+/// `UI_R_REGISTERSKIN` outbound game-to-engine syscall.
 #[derive(Debug)]
 pub struct GRRegisterskinArgs {
     name: CString,
@@ -23,7 +23,7 @@ impl GRRegisterskinArgs {
     }
 }
 
-/// `UiR_REGISTERSKIN` MP UI imports syscall ABI token.
+/// `UI_R_REGISTERSKIN` MP UI imports syscall ABI token.
 ///
 /// Source: `oracle/oracle/codemp/ui/ui_public.h:506`
 pub struct GRRegisterskin;
@@ -33,7 +33,7 @@ impl OutboundSysCall for GRRegisterskin {
     type Args = GRRegisterskinArgs;
     type Output = qhandle_t;
 
-    const IMPORT: MpUiImport = MpUiImport::UiR_REGISTERSKIN;
+    const IMPORT: MpUiImport = MpUiImport::UI_R_REGISTERSKIN;
 }
 
 impl EncodeSysCall for GRRegisterskin {
