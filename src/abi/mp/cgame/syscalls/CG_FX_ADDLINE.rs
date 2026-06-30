@@ -4,7 +4,7 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::{ffi::syscalls::pass_float, shared::vec3_t};
+use crate::{abi::pass_float, shared::vec3_t};
 
 /// Arguments for `CG_FX_ADDLINE`.
 ///

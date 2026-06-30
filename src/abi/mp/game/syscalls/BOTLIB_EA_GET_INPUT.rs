@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 
-use crate::ffi::syscalls::pass_float;
+use crate::abi::pass_float;
 use crate::ffi::GameImport;
 
 use crate::abi::generic::{

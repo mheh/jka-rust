@@ -4,8 +4,8 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
+use crate::abi::pass_float;
 use crate::codemp::game::q_shared_h::CollisionRecord_t;
-use crate::ffi::syscalls::pass_float;
 
 /// Arguments for `CG_G2_COLLISIONDETECTCACHE`.
 ///

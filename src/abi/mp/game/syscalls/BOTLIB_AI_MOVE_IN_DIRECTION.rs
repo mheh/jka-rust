@@ -60,7 +60,7 @@ impl EncodeSysCall for BotlibAiMoveInDirection {
         SysCallTransport::new([
             a.movestate as isize,
             ptr_to_word(a.dir as *const u8),
-            crate::ffi::syscalls::pass_float(a.speed),
+            crate::abi::pass_float(a.speed),
             a.type_ as isize,
         ])
     }

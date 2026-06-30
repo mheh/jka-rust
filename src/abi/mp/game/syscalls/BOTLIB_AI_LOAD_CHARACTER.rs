@@ -4,7 +4,7 @@ use std::ffi::CString;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::syscalls::pass_float;
+use crate::abi::pass_float;
 use crate::ffi::GameImport;
 
 /// `BOTLIB_AI_LOAD_CHARACTER` outbound game-to-engine syscall.

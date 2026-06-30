@@ -2,7 +2,7 @@ use core::ffi::c_int;
 
 use super::super::MpCgameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::ffi::syscalls::pass_float;
+use crate::abi::pass_float;
 use crate::shared::qboolean;
 
 /// Arguments for `CG_SETUSERCMDVALUE`.

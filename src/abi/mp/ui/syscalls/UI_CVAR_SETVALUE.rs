@@ -4,7 +4,7 @@ use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::syscalls::pass_float;
+use crate::abi::pass_float;
 
 /// Arguments for `UI_CVAR_SETVALUE`.
 ///

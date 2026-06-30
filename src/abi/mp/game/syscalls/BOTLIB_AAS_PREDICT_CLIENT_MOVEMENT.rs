@@ -135,7 +135,7 @@ impl EncodeSysCall for BotlibAasPredictClientMovement {
             ptr_to_word(a.cmdmove as *const _),
             a.cmdframes as isize,
             a.maxframes as isize,
-            crate::ffi::syscalls::pass_float(a.frametime),
+            crate::abi::pass_float(a.frametime),
             a.stopevent as isize,
             a.stopareanum as isize,
             a.visualize as isize,

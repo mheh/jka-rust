@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_int};
 use std::ffi::CString;
 
-use crate::ffi::syscalls::pass_float;
+use crate::abi::pass_float;
 use crate::ffi::GameImport;
 
 use crate::abi::generic::{

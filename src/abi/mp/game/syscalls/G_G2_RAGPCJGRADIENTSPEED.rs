@@ -56,7 +56,7 @@ impl EncodeSysCall for GG2Ragpcjgradientspeed {
         SysCallTransport::new([
             ptr_to_word(a.ghoul2 as *const _),
             ptr_to_word(a.bone_name.as_ptr()),
-            crate::ffi::syscalls::pass_float(a.speed),
+            crate::abi::pass_float(a.speed),
         ])
     }
 }

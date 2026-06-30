@@ -1,6 +1,6 @@
 use super::super::MpCgameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
-use crate::{ffi::syscalls::pass_float, shared::qboolean};
+use crate::{abi::pass_float, shared::qboolean};
 
 /// Arguments for `CG_R_SETREFRACTIONPROP`.
 ///

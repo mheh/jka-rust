@@ -1,7 +1,7 @@
 use super::super::SpCgameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};
+use crate::abi::pass_float;
 use crate::codemp::game::q_shared_h::qhandle_t;
-use crate::ffi::syscalls::pass_float;
 
 /// Arguments for `CG_R_DRAWROTATEPIC2`.
 ///

@@ -4,7 +4,7 @@ use super::super::SpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::syscalls::pass_float;
+use crate::abi::pass_float;
 
 /// `UI_CM_LERPTAG` SP UI imports syscall ABI token.
 ///

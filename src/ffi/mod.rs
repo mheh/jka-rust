@@ -5,15 +5,6 @@
 
 pub use crate::abi::mp::game::{MpGameExport as GameExport, MpGameImport as GameImport};
 
-pub mod syscalls {
-    /// Reinterpret an `f32` as an integer-width syscall argument, mirroring the C
-    /// `PASSFLOAT` helper.
-    #[inline]
-    pub fn pass_float(f: f32) -> isize {
-        f.to_bits() as i32 as isize
-    }
-}
-
 pub mod types {
     #![allow(non_camel_case_types)]
 

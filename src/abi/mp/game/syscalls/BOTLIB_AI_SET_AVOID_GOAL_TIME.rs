@@ -51,7 +51,7 @@ impl EncodeSysCall for BotlibAiSetAvoidGoalTime {
         SysCallTransport::new([
             a.goalstate as isize,
             a.number as isize,
-            crate::ffi::syscalls::pass_float(a.avoidtime),
+            crate::abi::pass_float(a.avoidtime),
         ])
     }
 }

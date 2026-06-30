@@ -38,10 +38,7 @@ impl OutboundSysCall for GAtan2 {
 
 impl EncodeSysCall for GAtan2 {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([
-            crate::ffi::syscalls::pass_float(a.y),
-            crate::ffi::syscalls::pass_float(a.x),
-        ])
+        SysCallTransport::new([crate::abi::pass_float(a.y), crate::abi::pass_float(a.x)])
     }
 }
 

@@ -36,7 +36,7 @@ impl OutboundSysCall for GAsin {
 
 impl EncodeSysCall for GAsin {
     fn encode_syscall(a: &Self::Args) -> SysCallTransport {
-        SysCallTransport::new([crate::ffi::syscalls::pass_float(a.value())])
+        SysCallTransport::new([crate::abi::pass_float(a.value())])
     }
 }
 

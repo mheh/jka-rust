@@ -1,6 +1,6 @@
 use core::ffi::c_int;
 
-use crate::ffi::syscalls::pass_float;
+use crate::abi::pass_float;
 use crate::ffi::GameImport;
 use crate::shared::vec3_t;
 

@@ -3,7 +3,7 @@ use core::ffi::{c_char, c_int, c_void};
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::syscalls::pass_float;
+use crate::abi::pass_float;
 use crate::ffi::GameImport;
 use crate::shared::qboolean;
 

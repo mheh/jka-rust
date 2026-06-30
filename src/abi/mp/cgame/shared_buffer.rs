@@ -8,6 +8,7 @@
 //! Transport source: `oracle/oracle/codemp/client/cl_cgame.cpp:1179-1184`
 
 #![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_float, c_int};
 
