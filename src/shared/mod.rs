@@ -6,11 +6,14 @@ use core::ffi::c_int;
 
 pub mod collision;
 pub mod cvar;
+#[allow(non_snake_case)]
+pub mod fsMode_t;
 pub mod platform;
 pub mod vector;
 
 pub use collision::{cplane_t, CollisionRecord_t};
 pub use cvar::{cvarHandle_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
+pub use fsMode_t::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
 pub use vector::{vec2_t, vec3_t, vec3pair_t, vec4_t, vec5_t, vec_t};
 
 /// Raven `qboolean`.

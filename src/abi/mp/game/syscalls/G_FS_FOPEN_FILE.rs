@@ -5,8 +5,8 @@ use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::fsMode_t;
 use crate::shared::fileHandle_t;
+use crate::shared::fsMode_t;
 
 /// `G_FS_FOPEN_FILE` outbound game-to-engine syscall.
 ///

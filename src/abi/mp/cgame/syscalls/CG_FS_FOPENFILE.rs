@@ -4,8 +4,8 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::fsMode_t;
 use crate::shared::fileHandle_t;
+use crate::shared::fsMode_t;
 
 /// Arguments for `CG_FS_FOPENFILE`.
 ///

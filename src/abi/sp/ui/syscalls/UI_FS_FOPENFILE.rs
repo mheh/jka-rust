@@ -4,8 +4,8 @@ use super::super::SpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::fsMode_t;
 use crate::shared::fileHandle_t;
+use crate::shared::fsMode_t;
 
 /// `UI_FS_FOPENFILE` SP UI imports syscall ABI token.
 ///
