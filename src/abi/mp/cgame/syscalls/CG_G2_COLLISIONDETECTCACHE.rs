@@ -5,7 +5,7 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::abi::pass_float;
-use crate::codemp::game::q_shared_h::CollisionRecord_t;
+use crate::shared::CollisionRecord_t;
 
 /// Arguments for `CG_G2_COLLISIONDETECTCACHE`.
 ///

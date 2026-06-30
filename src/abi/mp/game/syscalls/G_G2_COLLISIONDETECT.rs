@@ -2,7 +2,7 @@ use core::ffi::{c_int, c_void};
 
 use super::super::MpGameImport;
 use crate::abi::pass_float;
-use crate::codemp::game::q_shared_h::CollisionRecord_t;
+use crate::shared::CollisionRecord_t;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,

@@ -2,7 +2,7 @@ use core::ffi::c_int;
 use std::ffi::CString;
 
 use super::super::MpGameImport;
-use crate::codemp::game::q_shared_h::sharedSetBoneIKStateParams_t;
+use crate::common::mp::qcommon::sharedSetBoneIKStateParams_t;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{

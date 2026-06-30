@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::codemp::game::q_shared_h::sharedSetBoneIKStateParams_t;
+use crate::common::mp::qcommon::sharedSetBoneIKStateParams_t;
 use crate::ffi::GameImport;
 use crate::shared::qboolean;
 

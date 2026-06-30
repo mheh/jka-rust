@@ -3,9 +3,9 @@ use core::ffi::{c_int, c_void};
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::sharedIKMoveParams_t;
 use crate::ffi::GameImport;
 use crate::shared::qboolean;
+use crate::shared::sharedIKMoveParams_t;
 
 /// `UiG2_IKMOVE` outbound game-to-engine syscall.
 ///
