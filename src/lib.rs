@@ -7,6 +7,7 @@
 //!
 //! Modules are filed by true sharing scope (`shared` < `bg` < {`game`, `engine`}), bridged by the ABI seam; see README.md.
 
+pub mod abi;
 pub mod bg;
 pub mod common;
 pub mod game;
