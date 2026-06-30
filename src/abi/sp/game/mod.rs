@@ -2,3 +2,9 @@
 //!
 //! Raven SP game uses the `GetGameAPI` function-table ABI, not the `vmMain` /
 //! syscall shape. Keep that surface deferred until the table ABI is modeled.
+
+pub mod exports;
+pub mod imports;
+
+pub use exports::{SpGameExport, SpGameExportTable};
+pub use imports::{SpGameImport, SpGameImportTable};

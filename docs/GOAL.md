@@ -60,3 +60,66 @@ So the ABI target is:
 The present state is not yet a drop-in `jampgamex86.dll` replacement. It is the
 scaffold for making that replacement possible without losing the original ABI
 numbers or mixing MP game, MP cgame, MP UI, and SP surfaces into one global enum.
+
+## Related ABI Track: SP `GetGameAPI`
+
+Before continuing deeper into the MP `dllEntry` / `vmMain` work, model Raven's
+other game-module boundary: the SP `GetGameAPI` function-table ABI.
+
+This is related to the syscall/vmMain work because it is another engine/module
+ABI surface, but it is not the same transport:
+
+- MP game, MP cgame, MP UI, SP cgame, and SP UI use the QVM-style shape:
+  `dllEntry(syscall_callback)`, `vmMain(command, arg0..arg11)`, and typed
+  syscall/vmMain wrappers over raw integer words.
+- SP game uses `GetGameAPI(game_import_t *import) -> game_export_t *`, where
+  the engine passes a `game_import_t` function-pointer table into the module and
+  the module returns a `game_export_t` function-pointer table back to the engine.
+
+The SP table ABI should be modeled beside the MP `vmMain` ABI, not forced into
+the same enum transport.
+
+- [x] Create a generic function-table ABI vocabulary alongside the existing
+  syscall/vmMain vocabulary.
+- [ ] Port Raven SP `game_import_t` as a `#[repr(C)]` Rust import table with
+  Raven comments and source line references.
+  - [ ] Create the SP game ABI type foundation for table fields:
+    `qboolean`, `fileHandle_t`, `fsMode_t`, `cvar_t`, `gentity_t`,
+    `usercmd_t`, `trace_t`, `vec3_t`, `qhandle_t`, `memtag_t`,
+    `SavedGameJustLoaded_e`, and related crossed types.
+  - [ ] Define the opaque-type policy for Raven C++ classes, pointers, and
+    references used by `game_import_t`, including Ghoul2, ragdoll, gore,
+    collision, and weather types.
+  - [ ] Define the function-pointer convention for table fields, including how
+    nullable callbacks and variadic callbacks like `Printf`, `Error`, and
+    `SendServerCommand` are represented.
+  - [ ] Preserve Raven field names and order for ABI traceability, even when
+    names do not match Rust style.
+  - [ ] Create a field manifest for every `game_import_t` entry with field name,
+    C signature, Raven source line, Rust type translation, and notes.
+  - [ ] Record the default-argument rule: C++ default arguments are not ABI
+    fields, so Rust signatures model the full parameter list only.
+  - [ ] Add a layout verification plan for `game_import_t`, including size and
+    representative field offsets against Raven headers.
+- [ ] Port Raven SP `game_export_t` as a `#[repr(C)]` Rust export table with
+  Raven comments and source line references.
+  - [ ] Reuse the SP game ABI type foundation for export callbacks and shared
+    variables such as `gentity_t`, `usercmd_t`, `qboolean`, and
+    `SavedGameJustLoaded_e`.
+  - [ ] Define the function-pointer convention for exported game callbacks and
+    decide where unported callback behavior is stubbed.
+  - [ ] Preserve Raven field names and order for ABI traceability, including
+    global shared fields such as `gentities`, `gentitySize`, and
+    `num_entities`.
+  - [ ] Create a field manifest for every `game_export_t` entry with field name,
+    C signature, Raven source line, Rust type translation, and notes.
+  - [ ] Add a layout verification plan for `game_export_t`, including size and
+    representative field offsets against Raven headers.
+- [ ] Add the SP `GetGameAPI` exported symbol only after the import/export
+  tables exist.
+- [ ] Store or expose the imported SP engine table in a way that SP game code
+  can call without every callsite handling raw unsafe pointers directly.
+- [ ] Stub exported SP game table functions where behavior is not ported yet,
+  while keeping ABI signatures and source references exact.
+- [ ] Keep SP `GetGameAPI` separate from the MP `dllEntry` / `vmMain` hot-swap
+  path, but reuse shared ABI primitives where the representation truly overlaps.
