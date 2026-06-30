@@ -1,3 +1,6 @@
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+
 use core::ffi::c_int;
 
 use super::super::MpCgameImport;
