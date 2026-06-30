@@ -19,9 +19,7 @@ pub mod types {
 
     use core::ffi::{c_char, c_float, c_int};
 
-    pub type qboolean = c_int;
-    pub const QFALSE: c_int = 0;
-    pub const QTRUE: c_int = 1;
+    pub use crate::shared::{qboolean, QFALSE, QTRUE};
 
     pub type fileHandle_t = c_int;
     pub type cvarHandle_t = c_int;
