@@ -2,7 +2,7 @@ use core::ffi::c_int;
 
 use super::super::SpUiImport;
 use crate::abi::generic::OutboundSysCall;
-use crate::codemp::game::q_shared_h::qtime_t;
+use crate::common::mp::qcommon::qtime_t;
 
 /// `UI_REAL_TIME` SP UI imports syscall ABI token.
 ///

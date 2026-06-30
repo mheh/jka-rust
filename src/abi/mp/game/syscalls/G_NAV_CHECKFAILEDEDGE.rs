@@ -1,5 +1,5 @@
 use super::super::MpGameImport;
-use crate::codemp::game::g_public_h::failedEdge_t;
+use crate::common::mp::qcommon::failedEdge_t;
 use crate::shared::qboolean;
 
 use crate::abi::generic::{

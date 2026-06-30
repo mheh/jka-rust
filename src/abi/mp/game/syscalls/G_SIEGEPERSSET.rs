@@ -1,5 +1,5 @@
 use super::super::MpGameImport;
-use crate::codemp::game::q_shared_h::siegePers_t;
+use crate::common::mp::qcommon::siegePers_t;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
