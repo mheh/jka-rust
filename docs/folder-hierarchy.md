@@ -6,7 +6,8 @@ This is the intended folder hierarchy to be Rust module based. This is based on 
 | --- | --- |
 | `src/shared/` | Rust-native shared primitives that are not tied to a Raven source subsystem. |
 | `src/common/` | Raven-derived common strata, split by proven sharing scope. |
-| `src/common/qcommon/` | Intentionally unified Rust home for Raven `code/qcommon` and `codemp/qcommon` concepts. |
+| `src/common/sp/qcommon/` | SP executable common substrate corresponding to Raven `code/qcommon`. |
+| `src/common/mp/qcommon/` | MP executable common substrate corresponding to Raven `codemp/qcommon`. |
 | `src/common/mp/` | Common support shared within MP modules, not yet proven shared with SP. |
 | `src/common/mp/bg/` | MP `bg_*` gameplay support. |
 | `src/common/mp/game/` | MP game-module common support. |

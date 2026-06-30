@@ -12,7 +12,7 @@
 
 ## Migration Rule
 
-Keep structures sourced from `codemp/game/g_local.h` under `src/modules/mp/game`. Promote only narrower pieces into `src/common/mp/game` or `src/common/qcommon` when the Raven source proves they are shared support code instead of runtime module state.
+Keep structures sourced from `codemp/game/g_local.h` under `src/modules/mp/game`. Promote only narrower pieces into `src/common/mp/game` or `src/common/mp/qcommon` when the Raven source proves they are shared support code instead of runtime module state.
 
 ## Comment Rule
 
