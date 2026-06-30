@@ -4,7 +4,7 @@ use core::ffi::c_int;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::fileHandle_t;
+use crate::shared::fileHandle_t;
 
 /// Arguments for `UI_FS_READ`.
 ///

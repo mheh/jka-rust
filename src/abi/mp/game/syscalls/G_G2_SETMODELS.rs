@@ -3,8 +3,8 @@ use core::ffi::c_void;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::qhandle_t;
 use crate::ffi::GameImport;
+use crate::shared::qhandle_t;
 
 /// `G_G2_SETMODELS` outbound game-to-engine syscall.
 ///

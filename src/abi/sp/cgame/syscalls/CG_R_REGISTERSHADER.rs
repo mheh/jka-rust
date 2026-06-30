@@ -4,7 +4,7 @@ use super::super::SpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::qhandle_t;
+use crate::shared::qhandle_t;
 
 /// `CG_R_REGISTERSHADER` SP cgame imports syscall ABI token.
 ///

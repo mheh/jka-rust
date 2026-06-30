@@ -1,9 +1,9 @@
 use core::ffi::{c_int, c_void};
 use std::ffi::CString;
 
-use crate::codemp::game::q_shared_h::qhandle_t;
 use crate::ffi::GameImport;
 use crate::shared::qboolean;
+use crate::shared::qhandle_t;
 use crate::shared::vec3_t;
 
 use crate::abi::generic::{

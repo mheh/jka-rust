@@ -4,7 +4,7 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::qhandle_t;
+use crate::shared::qhandle_t;
 
 /// Arguments for `CG_G2_SETMODELS`.
 ///

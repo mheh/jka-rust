@@ -2,7 +2,7 @@ use super::super::MpUiImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::vmCvar_t;
+use crate::shared::vmCvar_t;
 
 /// `UI_CVAR_UPDATE` outbound UI-to-engine syscall.
 ///

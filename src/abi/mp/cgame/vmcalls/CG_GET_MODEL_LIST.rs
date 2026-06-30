@@ -1,6 +1,6 @@
 use super::super::MpCgameExport;
 use crate::abi::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport};
-use crate::codemp::game::q_shared_h::qhandle_t;
+use crate::shared::qhandle_t;
 
 /// `CG_GET_MODEL_LIST` MP cgame exports vmMain ABI token.
 ///

@@ -1,4 +1,4 @@
-use crate::ffi::types::vmCvar_t;
+use crate::shared::vmCvar_t;
 
 use super::super::SpCgameImport;
 use crate::abi::generic::{

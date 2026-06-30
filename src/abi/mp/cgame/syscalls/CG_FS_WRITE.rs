@@ -4,7 +4,7 @@ use super::super::MpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::fileHandle_t;
+use crate::shared::fileHandle_t;
 
 /// Arguments for the `CG_FS_WRITE` outbound cgame-to-engine syscall.
 ///

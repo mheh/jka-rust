@@ -2,7 +2,7 @@ use core::ffi::c_char;
 
 use super::super::SpUiImport;
 use crate::abi::generic::OutboundSysCall;
-use crate::codemp::game::q_shared_h::qhandle_t;
+use crate::shared::qhandle_t;
 
 /// `UI_R_REGISTERFONT` SP UI imports syscall ABI token.
 ///

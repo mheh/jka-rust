@@ -1,5 +1,5 @@
-use crate::ffi::types::vmCvar_t;
 use crate::ffi::GameImport;
+use crate::shared::vmCvar_t;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,

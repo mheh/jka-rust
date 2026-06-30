@@ -1,4 +1,4 @@
-use crate::codemp::game::q_shared_h::qhandle_t;
+use crate::shared::qhandle_t;
 
 use super::super::MpCgameImport;
 use crate::abi::generic::{DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport};

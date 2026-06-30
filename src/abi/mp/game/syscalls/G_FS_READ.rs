@@ -1,6 +1,7 @@
 use core::ffi::c_int;
 
-use crate::ffi::{types::fileHandle_t, GameImport};
+use crate::ffi::GameImport;
+use crate::shared::fileHandle_t;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,

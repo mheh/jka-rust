@@ -4,7 +4,7 @@ use core::ffi::{c_char, c_int};
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::vmCvar_t;
+use crate::shared::vmCvar_t;
 
 /// Arguments for `CG_CVAR_REGISTER`.
 ///

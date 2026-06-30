@@ -3,7 +3,7 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::abi::sp::cgame::types::CGhoul2Info_v;
-use crate::codemp::game::q_shared_h::qhandle_t;
+use crate::shared::qhandle_t;
 
 /// Arguments for `CG_G2_SETMODELS`.
 ///

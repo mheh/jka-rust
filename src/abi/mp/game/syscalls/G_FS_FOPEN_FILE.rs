@@ -5,7 +5,8 @@ use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use crate::codemp::game::q_shared_h::fsMode_t;
-use crate::ffi::{types::fileHandle_t, GameImport};
+use crate::ffi::GameImport;
+use crate::shared::fileHandle_t;
 
 /// `G_FS_FOPEN_FILE` outbound game-to-engine syscall.
 ///

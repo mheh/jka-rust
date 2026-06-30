@@ -4,7 +4,7 @@ use super::super::SpCgameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::ffi::types::fileHandle_t;
+use crate::shared::fileHandle_t;
 
 /// Arguments for `CG_FS_READ`.
 ///
