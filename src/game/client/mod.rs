@@ -14,8 +14,9 @@
 use crate::game::npc::lookMode_t;
 // TODO: NOT-PORTED
 use crate::game::teams::{class_t, npcteam_t};
+use crate::common::mp::qcommon::usercmd_t;
 // TODO: NOT-PORTED
-use crate::shared::{playerState_t, qboolean, saberInfo_t, usercmd_t, vec3_t, MAX_QPATH, MAX_SABERS};
+use crate::shared::{playerState_t, qboolean, saberInfo_t, vec3_t, MAX_QPATH, MAX_SABERS};
 use core::ffi::{c_char, c_int, c_uint, c_void};
 
 use super::entity::gentity_s;

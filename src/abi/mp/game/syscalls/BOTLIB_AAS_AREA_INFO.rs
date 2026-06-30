@@ -4,7 +4,7 @@ use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::be_aas_h::aas_areainfo_t;
+use crate::common::mp::qcommon::aas_areainfo_t;
 
 /// `BOTLIB_AAS_AREA_INFO` outbound game-to-engine syscall.
 #[derive(Debug)]

@@ -2,7 +2,7 @@ use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::q_shared_h::usercmd_t;
+use crate::common::mp::qcommon::usercmd_t;
 use core::ffi::c_int;
 
 /// `BOTLIB_USER_COMMAND` outbound game-to-engine syscall.
