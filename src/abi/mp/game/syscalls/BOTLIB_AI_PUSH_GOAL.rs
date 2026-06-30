@@ -4,7 +4,7 @@ use super::super::MpGameImport;
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
-use crate::codemp::game::be_ai_goal_h::bot_goal_t;
+use crate::common::mp::qcommon::bot_goal_t;
 
 /// Args for the `BOTLIB_AI_PUSH_GOAL` game→engine syscall.
 ///

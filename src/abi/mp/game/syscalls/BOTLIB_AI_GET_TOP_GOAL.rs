@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
 use super::super::MpGameImport;
-use crate::codemp::game::be_ai_goal_h::bot_goal_t;
+use crate::common::mp::qcommon::bot_goal_t;
 
 use crate::abi::generic::{
     ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,

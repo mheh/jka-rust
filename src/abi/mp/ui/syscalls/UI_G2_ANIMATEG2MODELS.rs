@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 
-use crate::codemp::game::q_shared_h::sharedRagDollUpdateParams_t;
+use crate::common::mp::qcommon::sharedRagDollUpdateParams_t;
 use crate::ffi::GameImport;
 
 use crate::abi::generic::{
