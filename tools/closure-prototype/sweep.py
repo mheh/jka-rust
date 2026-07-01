@@ -127,6 +127,9 @@ def main():
             continue
         ext = target.extent
         entry = None
+        if cur.kind == CursorKind.ENUM_DECL and (not cur.spelling or cur.is_anonymous()
+                                                 or "unnamed" in cur.spelling):
+            continue  # anon const-block enums ride along with their typedef row
         if cur.kind in STRUCTY or cur.kind == CursorKind.ENUM_DECL:
             kind = ("enum" if cur.kind == CursorKind.ENUM_DECL
                     else cur.kind.name.split("_")[0].lower())
@@ -139,9 +142,8 @@ def main():
         elif cur.kind == CursorKind.TYPEDEF_DECL:
             under, _ = C.peel(cur.underlying_typedef_type)
             udecl = under.get_declaration()
-            if udecl.kind in C.RECORD_KINDS and udecl.spelling \
-                    and decl_in_header(udecl.get_definition() or udecl, header):
-                continue  # named record covered by its own row (alias map links them)
+            if udecl.kind in C.RECORD_KINDS and udecl.spelling and not udecl.is_anonymous():
+                continue  # named record covered by its own row wherever it lives
             canon = cur.underlying_typedef_type.get_canonical()
             if canon.kind == TypeKind.POINTER and canon.get_pointee().kind == TypeKind.FUNCTIONPROTO:
                 kind = "fnptr"
