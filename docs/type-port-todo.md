@@ -21,6 +21,33 @@ See also: [[porting-rules]], [[workspace-architecture]], `GENTITY_TYPE_FOLLOWUPS
 - **Fwd** = forward-declared opaque (`*mut`-only at all current use sites); full port deferred.
 - Status: ☐ todo · ◐ in progress · ☑ done (cargo-verified)
 
+## native (Tier -1, cross-mode — identical MP/SP)
+
+Wave 0 foundation. Only genuinely Raven-free types that are byte-identical in both
+trees live here; anything that diverges MP/SP stays per-mode in `qshared`.
+
+### `native_math` (q_math section of q_shared.h)
+| Type | Oracle (MP / SP) | Kind | native |
+|---|---|---|---|
+| `vec_t`,`vec2_t`..`vec5_t`,`vec3pair_t` | `q_shared.h:530-537` / `:314-320` | alias | ☑ `math/vector.rs` |
+| `ivec3_t`,`ivec4_t`,`ivec5_t` | `q_shared.h:539-541` / `:323-325` | alias | ☑ `math/vector.rs` |
+| `fixed4_t`,`fixed8_t`,`fixed16_t` | `q_shared.h:543-545` / `:327-329` | alias | ☑ `math/vector.rs` |
+| `orientation_t` | `q_shared.h:1926` / `:1409` | struct (48 B) | ☑ `math/orientation.rs` |
+| `Eorientations` | `q_shared.h:3086` / `:2641` | enum (order X,Z,Y) | ☑ `math/eorientations.rs` |
+
+### `native_types` (scalar/handle primitives)
+| Type | Oracle (MP / SP) | Kind | native |
+|---|---|---|---|
+| `byte`,`word`,`ulong` | `q_shared.h:349-351` / `:173-176` | alias | ☑ `types/lib.rs` |
+| `qboolean` (+`QFALSE`/`QTRUE`) | `q_shared.h:353` / `:180` | alias `c_int` | ☑ `types/lib.rs` |
+| `qhandle_t`,`thandle_t`,`fxHandle_t`,`sfxHandle_t`,`fileHandle_t`,`clipHandle_t` | `q_shared.h:358-363` / `:183-188` | alias | ☑ `types/lib.rs` |
+| `mdxaBone_t` | `q_shared.h:3078` / `mdx_format.h:137` | struct | ☑ `types/lib.rs` |
+| `MAX_QPATH` | `q_shared.h:393` / `:215` | const `64` | ☑ `types/lib.rs` |
+
+Divergent — deliberately **not** native (kept per-mode): `ivec2_t` (SP-only),
+`qint64` (MP-only), `LPCSTR` (SP win32-ism). `native_containers` = C++ track
+(idiomatic reimpl); `native_platform` = replacement, not ported.
+
 ## MP
 
 ### `mp_qshared` (q_shared.h)
