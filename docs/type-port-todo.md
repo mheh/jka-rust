@@ -85,7 +85,7 @@ Divergent — deliberately **not** native (kept per-mode): `ivec2_t` (SP-only),
 MP `q_shared.h` now **complete**. Deferred to their tiers: `cvar_t` (engine),
 `SSkinGoreData`/`mdxaBone_t` (ghoul2; `mdxaBone_t` already in `native_types`).
 
-### `mp_bg` (bg_public.h / bg_vehicles.h)
+### `mp_bg` (bg_public.h / bg_vehicles.h / bg_weapons.h)
 | Type / const | Oracle (codemp) | Kind | Value/size | MP |
 |---|---|---|---|---|
 | `MAX_SPAWN_VARS` | `game/bg_public.h:16` | const | `64` | ☑ `public/spawn.rs` |
@@ -93,7 +93,32 @@ MP `q_shared.h` now **complete**. Deferred to their tiers: `cvar_t` (engine),
 | `team_t` (+`TEAM_NUM_TEAMS`) | `game/bg_public.h:1008-1017` | `typedef int` + enum | ☑ `public/team.rs` |
 | `gametype_t` | `game/bg_public.h:183-199` | `typedef int` + anon enum (`GT_FFA`..`GT_MAX_GAME_TYPE`) | ☑ `public/gametype/mod.rs` |
 | `powerup_t` | `game/bg_public.h:652-684` | `typedef int` + anon enum (`PW_NONE`..`PW_NUM_POWERUPS`, "may not have more than 16") | ☑ `public/powerup/mod.rs` |
-| `Vehicle_t` | `game/bg_vehicles.h:477-623` (~146 ln) | struct (`*mut` only via `gentity_s`) | **Fwd — deferred** (not needed by client/level; `gentity_s.m_pVehicle` stays `*mut c_void` in qshared) |
+| `Vehicle_t` | `game/bg_vehicles.h:477-623` | struct (976 B, ptr+fn-ptr fields) | ☑ `vehicles/vehicle_s.rs` (Wave 2; was **Fwd-deferred**, now full-ported — `gentity_s.m_pVehicle` still stays `*mut c_void` in `mp_qshared`, which sits below `mp_bg` and can't name `Vehicle_t` directly) |
+
+#### Wave 2 batch — `bg_public.h` (ported into `public/`, cargo-green)
+- **Enums** (`#[repr(i32)]`): `animEventType_t`, `brokenLimb_t`, `ctfMsg_t`,
+  `duelTeam_t`, `effectTypes_t`, `entityType_t`, `entity_event_t`, `fieldtype_t`,
+  `footstepType_t`, `forceHandAnims_t`, `g2ModelParts_t`, `gender_t`,
+  `global_team_sound_t`, `meansOfDeath_t`, `pdSounds_t`, `persEnum_t`,
+  `pmtype_t`, `saberQuadrant_t`, `statIndex_t`, `teamtask_t`, `weaponstate_t`
+- **`typedef int` + consts**: `holdable_t`, `saberMoveName_t`
+- **Structs** (`#[repr(C)]`+size assert): `animation_s`(7 B, `repr(C,packed)`
+  per Raven's `#pragma pack(push,1)`), `animevent_s`(32 B), `BG_field_t`(24 B),
+  `bgLoadedAnim_t`(72 B), `bgLoadedEvents_t`(19272 B), `saberMoveData_t`(48 B),
+  `bgEntity_s`(576 B — shared head-of-`gentity_t`/`centity_t` view),
+  `pmove_t`(336 B — ghoul2 bolt/gametype/duel-loss fields vs SP's simpler
+  block)
+
+#### Wave 2 batch — `bg_weapons.h` (ported into `weapons/`, cargo-green)
+- `ammo_t` (enum), `weapon_t` (`typedef int` + consts), `ammoData_s`(4 B),
+  `weaponData_s`(56 B)
+
+#### Wave 2 batch — `bg_vehicles.h` (ported into `vehicles/`, cargo-green)
+- **Enums**: `EWeaponPose`, `vehFlags_t`, `vehicleType_t`
+- **Structs**: `vehTurretStatus_t`(20 B), `vehWeaponStats_t`(28 B),
+  `vehWeaponStatus_t`(16 B), `turretStats_t`(96 B), `vehWeaponInfo_t`(104 B,
+  ptr-bearing), `vehicleInfo_t`(952 B, ptr+fn-ptr "virtual interface" table),
+  `Vehicle_t`(976 B, see Wave-2 note in the table above)
 
 ### `mp_game` (ai.h / teams.h / b_public.h)
 | Type / const | Oracle (codemp) | Kind | Value/size | MP |
@@ -163,6 +188,21 @@ heavy + 3 deferred = 65). Ported from `code/`, not copied from MP:
 | Type / const | SP oracle (`code/…`) | Divergence vs MP | SP |
 |---|---|---|---|
 | `powerup_t` | `game/bg_public.h:248-267` | **named enum**, member set diverges heavily from MP (`PW_HASTE`, `PW_UNCLOAKING`, `PW_DISRUPTION`, `PW_GALAK_SHIELD`, `PW_SEEKER`, `PW_SHOCKED`, `PW_DRAINED`, `PW_INVINCIBLE`, `PW_FORCE_PUSH*` replace MP's flag/force-power powerups; MP is `typedef int` + anon enum) | ☑ `public/powerup/mod.rs` |
+
+#### Wave 2 SP `bg_public.h` batch (ported into `public/`, cargo-green)
+| Type | SP oracle (`code/…`) | Divergence vs MP | SP |
+|---|---|---|---|
+| `animEventType_t` | `game/bg_public.h:520-532` | identical member set (incl. `AEV_SABER_SWING`/`AEV_SABER_SPIN`) | ☑ |
+| `animation_s` | `game/bg_public.h:468-475` | **8 B, not packed** — adds a `glaIndex` byte (MP: 7 B `repr(C,packed)`, no `glaIndex`) | ☑ |
+| `animevent_s` | `game/bg_public.h:537-545` | **40 B** — adds `modelOnly`/`glaIndex` fields, `MAX_RANDOM_ANIM_SOUNDS=8` (MP: 32 B, `=4`) | ☑ |
+| `entityType_t` | `game/bg_public.h:713-732` | **15 variants**, no `ET_HOLOCRON`/`ET_NPC`/`ET_TEAM`/`ET_BODY`/`ET_FX` (MP 19) | ☑ |
+| `entity_event_t` | `game/bg_public.h:283-465` | **142 variants** — SP story/NPC/AI sound events replace MP's CTF/vehicle events (MP 192) | ☑ |
+| `footstepType_t` | `game/bg_public.h:550-557` | identical (4 + terminator) | ☑ |
+| `meansOfDeath_t` | `game/bg_public.h:560-617` | same count (46) but reordered/renamed members (e.g. `MOD_BRYAR` vs MP `MOD_BRYAR_PISTOL`) | ☑ |
+| `persEnum_t` | `game/bg_public.h:195-208` | **10 variants**, no rank/impressive/excellent/defend/assist/gauntlet/capture stats (MP 15) | ☑ |
+| `pmtype_t` | `game/bg_public.h:63-70` | **6 variants**, no `PM_JETPACK`/`PM_FLOAT`/`PM_SPINTERMISSION` (MP 9) | ☑ |
+| `weaponstate_t` | `game/bg_public.h:72-80` | identical (7 variants incl. `WEAPON_IDLE`) | ☑ |
+| `pmove_t` | `game/bg_public.h:130-163` | **248 B** — `gent: *mut gentity_t` (SP's concrete entity type) instead of MP's `bgEntity_t*`/ghoul2-bolt/gametype/duel-loss fields; `trace` callback carries an extra `eG2TraceType` param (MP 336 B) | ☑ `public/pmove_t.rs` |
 
 ### `sp_game`
 | Type / const | SP oracle (`code/…`) | Divergence vs MP | SP |

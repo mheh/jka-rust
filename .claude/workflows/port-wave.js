@@ -46,7 +46,14 @@ const RULES = `HOUSE RULES (binding — docs/porting-rules.md):
 - Unported deps: //TODO: Port <RavenIdent> + // Source: <oracle path:line>;
   pointer-only deps may stay opaque.
 - Preserve Raven's comments from the packet source; state conclusions, don't
-  re-derive C mechanics. Trust ONLY cargo check (rust-analyzer is stale).`
+  re-derive C mechanics. Trust ONLY cargo check (rust-analyzer is stale).
+- Every new file starts with #![allow(non_camel_case_types, non_snake_case)]
+  (file-level, like the existing ports) — the build must stay at ZERO new
+  warnings, not just zero errors.
+- Tools are BLACK BOXES: never read or inspect sweep.py / closure.py / any
+  tool source. Run the exact command given, read its stdout, move on. A badge
+  line looks like:  \`  gitem_t   ☑ crates/.../game_item.rs\`  (☑ = verified,
+  anything else = fix your port).`
 
 const PORT_SCHEMA = {
   type: 'object',
