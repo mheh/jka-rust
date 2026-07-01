@@ -78,6 +78,29 @@ width or a wire-safe newtype).
   header or type-group, each handed this skill's checklist + the porting rules.
   Bottleneck is verification, so have each agent end on a green `cargo check`.
 - **Heavy layout-critical structs:** do these yourself, one per commit, with full
-  `offset_of!` asserts. Do not parallelize them.
+  `offset_of!` asserts. Do not parallelize them — or run them through the
+  `port-wave` workflow's serial Heavy phase (below), which enforces the same
+  discipline with machine verification.
 
 See `docs/type-port-plan.md` for the wave breakdown and delegation notes.
+
+## Tools & workflows (preferred for batch waves)
+
+Ground-truth layout tooling lives in `tools/closure-prototype/` (see its
+NOTES.md): `closure.py` (dependency closures, call trees, `--asserts`
+generation, verified ☑/✗/◐ ported badges from clang record layouts) and
+`portpacket.py` (self-contained function port packets, `--json`).
+
+Two Workflow scripts in `.claude/workflows/` orchestrate batch porting with
+Sonnet agents + machine verify; output is left **uncommitted for review**:
+
+- `port-assert-backfill` — args: `[{file, module, crate}]` (the assert-less
+  `#[repr(C)]` files; compute via
+  `for f in $(grep -rl "#\[repr(C)\]" crates --include="*.rs"); do grep -q size_of $f || echo $f; done`).
+  One agent per file pastes clang-generated asserts; compile-failing asserts
+  are reported as latent layout bugs, never silently "fixed".
+- `port-wave` — args: `{mpModule, spModule, mpCrate, spCrate, headers[],
+  onlyTypes?}`. Scout → skeleton (pre-wires lib.rs so porters never collide)
+  → parallel MP port → SP-as-diff → serial heavy phase (high effort) →
+  badge-sweep verify with fixer rounds → todo-doc update. Smoke-test new
+  targets with `onlyTypes` first.
