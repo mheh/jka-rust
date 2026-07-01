@@ -80,7 +80,9 @@ into crates/${A.mpModule.replace('-', '/')}/src/.
    layout-critical struct that crosses the ABI or is >200B or pointer-bearing
    with many fields; medium = everything else.
 4. Pick the target folder inside crates/${A.mpModule.replace('-', '/')}/src/
-   consistent with the existing layout there (look at it first).
+   consistent with the existing layout there (look at it first). A folder is a
+   SUBSYSTEM directory shared by many types (e.g. "public" holding team.rs,
+   spawn.rs, ...) — NEVER one folder per type. Reuse existing folders.
 5. Check SP divergence: does oracle/oracle/code/game/<equiv header> define it,
    and does the definition differ (fields/values/size)? Set spDiverges and
    spCite (SP file:line) accordingly. Absent in SP -> spDiverges true,
@@ -127,7 +129,8 @@ In crates/${A.mpModule.replace('-', '/')}/src/ AND crates/${A.spModule.replace('
 for each of these folders: ${JSON.stringify(allFolders)}
 - ensure the folder exists with a mod.rs (create empty mod.rs if new),
 - ensure it is registered up the module tree to lib.rs (pub mod ...),
-- do NOT create any type files.
+- do NOT create any type files, and do NOT create stub modules for types —
+  folders are subsystem dirs; porters add flat <type>.rs files inside later.
 Finish with cargo check -p ${A.mpCrate} and cargo check -p ${A.spCrate} GREEN.
 If a folder already exists and is wired, leave it alone.`,
   { label: 'skeleton', phase: 'Skeleton', model: 'sonnet' }
@@ -162,8 +165,10 @@ ${list.map(t => `- ${t.name} | ${t.tier} | ${t.cite}${mode === 'SP' ? ` | ${t.sp
 Per type:
 1. Read the oracle definition at the cite. For structs, get ground truth:
      ${TOOL} ${module} <Type> --layout   and   --asserts
-2. One file per type in the target folder, house doc comment + source ref,
-   asserts pasted for #[repr(C)] structs. Register in the folder's mod.rs.
+2. One FLAT file per type in the target folder — <type_name>.rs (snake_case,
+   like the existing team.rs / spawn.rs), never a per-type subfolder or
+   mod.rs. House doc comment + source ref, asserts pasted for #[repr(C)]
+   structs. Register in the folder's mod.rs.
    Touch ONLY files inside your target folder (mod.rs included) — lib.rs and
    parent modules are already wired.
 3. Unported by-value deps: if trivial, port them too (same rules, same folder
