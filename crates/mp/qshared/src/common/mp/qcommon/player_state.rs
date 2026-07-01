@@ -246,3 +246,19 @@ pub struct playerState_t {
     pub userVec1: vec3_t,
     pub userVec2: vec3_t,
 }
+
+const _: () = assert!(core::mem::size_of::<forcedata_t>() == 464);
+const _: () = assert!(core::mem::offset_of!(forcedata_t, forcePowerDebounce) == 0);
+const _: () = assert!(core::mem::offset_of!(forcedata_t, forcePowersKnown) == 72);
+const _: () = assert!(core::mem::offset_of!(forcedata_t, forcePowerDuration) == 88);
+const _: () = assert!(core::mem::offset_of!(forcedata_t, forcePowerLevel) == 172);
+const _: () = assert!(core::mem::offset_of!(forcedata_t, killSoundEntIndex) == 416);
+const _: () = assert!(core::mem::offset_of!(forcedata_t, privateDuelTime) == 460);
+
+const _: () = assert!(core::mem::size_of::<playerState_t>() == 1552);
+const _: () = assert!(core::mem::offset_of!(playerState_t, commandTime) == 0);
+const _: () = assert!(core::mem::offset_of!(playerState_t, velocity) == 32);
+const _: () = assert!(core::mem::offset_of!(playerState_t, fd) == 804);
+const _: () = assert!(core::mem::offset_of!(playerState_t, forceJumpFlip) == 1268);
+const _: () = assert!(core::mem::offset_of!(playerState_t, lastHitLoc) == 1376);
+const _: () = assert!(core::mem::offset_of!(playerState_t, userVec2) == 1540);

@@ -31,3 +31,13 @@ pub struct trace_t {
 
 // trace->entityNum can also be 0 to (MAX_GENTITIES-1)
 // or ENTITYNUM_NONE, ENTITYNUM_WORLD
+
+const _: () = assert!(core::mem::size_of::<trace_t>() == 48);
+const _: () = assert!(core::mem::offset_of!(trace_t, allsolid) == 0);
+const _: () = assert!(core::mem::offset_of!(trace_t, startsolid) == 1);
+const _: () = assert!(core::mem::offset_of!(trace_t, entityNum) == 2);
+const _: () = assert!(core::mem::offset_of!(trace_t, fraction) == 4);
+const _: () = assert!(core::mem::offset_of!(trace_t, endpos) == 8);
+const _: () = assert!(core::mem::offset_of!(trace_t, plane) == 20);
+const _: () = assert!(core::mem::offset_of!(trace_t, surfaceFlags) == 40);
+const _: () = assert!(core::mem::offset_of!(trace_t, contents) == 44);

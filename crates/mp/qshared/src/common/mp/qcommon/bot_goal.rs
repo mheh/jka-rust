@@ -29,3 +29,13 @@ pub struct bot_goal_t {
     /// Raven `iteminfo`: item information
     pub iteminfo: c_int,
 }
+
+const _: () = assert!(core::mem::size_of::<bot_goal_t>() == 56);
+const _: () = assert!(core::mem::offset_of!(bot_goal_t, origin) == 0);
+const _: () = assert!(core::mem::offset_of!(bot_goal_t, areanum) == 12);
+const _: () = assert!(core::mem::offset_of!(bot_goal_t, mins) == 16);
+const _: () = assert!(core::mem::offset_of!(bot_goal_t, maxs) == 28);
+const _: () = assert!(core::mem::offset_of!(bot_goal_t, entitynum) == 40);
+const _: () = assert!(core::mem::offset_of!(bot_goal_t, number) == 44);
+const _: () = assert!(core::mem::offset_of!(bot_goal_t, flags) == 48);
+const _: () = assert!(core::mem::offset_of!(bot_goal_t, iteminfo) == 52);

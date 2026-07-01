@@ -35,3 +35,10 @@ pub struct trajectory_t {
     /// Raven `trDelta`: velocity, etc
     pub tr_delta: vec3_t,
 }
+
+const _: () = assert!(core::mem::size_of::<trajectory_t>() == 36);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_type) == 0);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_time) == 4);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_duration) == 8);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_base) == 12);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_delta) == 24);

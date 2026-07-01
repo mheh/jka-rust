@@ -180,3 +180,62 @@ pub struct TCGMiscEnt {
     pub mAngles: vec3_t,
     pub mScale: vec3_t,
 }
+
+const _: () = assert!(core::mem::size_of::<autoMapInput_t>() == 20);
+const _: () = assert!(core::mem::offset_of!(autoMapInput_t, up) == 0);
+const _: () = assert!(core::mem::offset_of!(autoMapInput_t, down) == 4);
+const _: () = assert!(core::mem::offset_of!(autoMapInput_t, yaw) == 8);
+const _: () = assert!(core::mem::offset_of!(autoMapInput_t, pitch) == 12);
+const _: () = assert!(core::mem::offset_of!(autoMapInput_t, goToDefaults) == 16);
+
+const _: () = assert!(core::mem::size_of::<TCGPointContents>() == 16);
+const _: () = assert!(core::mem::offset_of!(TCGPointContents, mPoint) == 0);
+const _: () = assert!(core::mem::offset_of!(TCGPointContents, mPassEntityNum) == 12);
+
+const _: () = assert!(core::mem::size_of::<TCGGetBoltData>() == 40);
+const _: () = assert!(core::mem::offset_of!(TCGGetBoltData, mOrigin) == 0);
+const _: () = assert!(core::mem::offset_of!(TCGGetBoltData, mAngles) == 12);
+const _: () = assert!(core::mem::offset_of!(TCGGetBoltData, mScale) == 24);
+const _: () = assert!(core::mem::offset_of!(TCGGetBoltData, mEntityNum) == 36);
+
+const _: () = assert!(core::mem::size_of::<TCGImpactMark>() == 52);
+const _: () = assert!(core::mem::offset_of!(TCGImpactMark, mHandle) == 0);
+const _: () = assert!(core::mem::offset_of!(TCGImpactMark, mPoint) == 4);
+const _: () = assert!(core::mem::offset_of!(TCGImpactMark, mAngle) == 16);
+const _: () = assert!(core::mem::offset_of!(TCGImpactMark, mRotation) == 28);
+const _: () = assert!(core::mem::offset_of!(TCGImpactMark, mRed) == 32);
+const _: () = assert!(core::mem::offset_of!(TCGImpactMark, mGreen) == 36);
+const _: () = assert!(core::mem::offset_of!(TCGImpactMark, mBlue) == 40);
+const _: () = assert!(core::mem::offset_of!(TCGImpactMark, mAlphaStart) == 44);
+const _: () = assert!(core::mem::offset_of!(TCGImpactMark, mSizeStart) == 48);
+
+const _: () = assert!(core::mem::size_of::<TCGVectorData>() == 16);
+const _: () = assert!(core::mem::offset_of!(TCGVectorData, mEntityNum) == 0);
+const _: () = assert!(core::mem::offset_of!(TCGVectorData, mPoint) == 4);
+
+const _: () = assert!(core::mem::size_of::<TCGTrace>() == 104);
+const _: () = assert!(core::mem::offset_of!(TCGTrace, mResult) == 0);
+const _: () = assert!(core::mem::offset_of!(TCGTrace, mStart) == 48);
+const _: () = assert!(core::mem::offset_of!(TCGTrace, mMins) == 60);
+const _: () = assert!(core::mem::offset_of!(TCGTrace, mMaxs) == 72);
+const _: () = assert!(core::mem::offset_of!(TCGTrace, mEnd) == 84);
+const _: () = assert!(core::mem::offset_of!(TCGTrace, mSkipNumber) == 96);
+const _: () = assert!(core::mem::offset_of!(TCGTrace, mMask) == 100);
+
+const _: () = assert!(core::mem::size_of::<TCGG2Mark>() == 32);
+const _: () = assert!(core::mem::offset_of!(TCGG2Mark, shader) == 0);
+const _: () = assert!(core::mem::offset_of!(TCGG2Mark, size) == 4);
+const _: () = assert!(core::mem::offset_of!(TCGG2Mark, start) == 8);
+const _: () = assert!(core::mem::offset_of!(TCGG2Mark, dir) == 20);
+
+const _: () = assert!(core::mem::size_of::<TCGCameraShake>() == 24);
+const _: () = assert!(core::mem::offset_of!(TCGCameraShake, mOrigin) == 0);
+const _: () = assert!(core::mem::offset_of!(TCGCameraShake, mIntensity) == 12);
+const _: () = assert!(core::mem::offset_of!(TCGCameraShake, mRadius) == 16);
+const _: () = assert!(core::mem::offset_of!(TCGCameraShake, mTime) == 20);
+
+const _: () = assert!(core::mem::size_of::<TCGMiscEnt>() == 100);
+const _: () = assert!(core::mem::offset_of!(TCGMiscEnt, mModel) == 0);
+const _: () = assert!(core::mem::offset_of!(TCGMiscEnt, mOrigin) == 64);
+const _: () = assert!(core::mem::offset_of!(TCGMiscEnt, mAngles) == 76);
+const _: () = assert!(core::mem::offset_of!(TCGMiscEnt, mScale) == 88);

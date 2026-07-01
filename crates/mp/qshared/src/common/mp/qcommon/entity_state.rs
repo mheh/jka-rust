@@ -134,3 +134,11 @@ pub struct entityState_t {
     pub userVec1: vec3_t,
     pub userVec2: vec3_t,
 }
+
+const _: () = assert!(core::mem::size_of::<entityState_t>() == 532);
+const _: () = assert!(core::mem::offset_of!(entityState_t, number) == 0);
+const _: () = assert!(core::mem::offset_of!(entityState_t, pos) == 16);
+const _: () = assert!(core::mem::offset_of!(entityState_t, origin) == 96);
+const _: () = assert!(core::mem::offset_of!(entityState_t, customRGBA) == 352);
+const _: () = assert!(core::mem::offset_of!(entityState_t, boneAngles1) == 428);
+const _: () = assert!(core::mem::offset_of!(entityState_t, userVec1) == 508);

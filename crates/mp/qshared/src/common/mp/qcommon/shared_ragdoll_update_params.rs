@@ -21,3 +21,11 @@ pub struct sharedRagDollUpdateParams_t {
     pub me: c_int,
     pub settle_frame: c_int,
 }
+
+const _: () = assert!(core::mem::size_of::<sharedRagDollUpdateParams_t>() == 56);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollUpdateParams_t, angles) == 0);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollUpdateParams_t, position) == 12);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollUpdateParams_t, scale) == 24);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollUpdateParams_t, velocity) == 36);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollUpdateParams_t, me) == 48);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollUpdateParams_t, settle_frame) == 52);

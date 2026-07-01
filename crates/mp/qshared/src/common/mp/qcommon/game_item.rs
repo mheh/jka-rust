@@ -36,3 +36,17 @@ pub struct gitem_t {
     pub sounds: *mut c_char,
     pub description: *mut c_char,
 }
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::size_of::<gitem_t>() == 104);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gitem_t, classname) == 0);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gitem_t, world_model) == 16);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gitem_t, view_model) == 48);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gitem_t, quantity) == 64);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gitem_t, precaches) == 80);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gitem_t, description) == 96);

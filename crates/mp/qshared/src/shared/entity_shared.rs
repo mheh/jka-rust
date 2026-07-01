@@ -32,3 +32,11 @@ pub struct entityShared_t {
     /// First 32 clients are index 0, latter 32 clients are index 1.
     pub broadcastClients: [c_int; 2],
 }
+
+const _: () = assert!(core::mem::size_of::<entityShared_t>() == 112);
+const _: () = assert!(core::mem::offset_of!(entityShared_t, linked) == 0);
+const _: () = assert!(core::mem::offset_of!(entityShared_t, bmodel) == 16);
+const _: () = assert!(core::mem::offset_of!(entityShared_t, mins) == 20);
+const _: () = assert!(core::mem::offset_of!(entityShared_t, absmin) == 48);
+const _: () = assert!(core::mem::offset_of!(entityShared_t, mIsRoffing) == 96);
+const _: () = assert!(core::mem::offset_of!(entityShared_t, broadcastClients) == 104);

@@ -19,6 +19,10 @@ pub struct markFragment_t {
     pub numPoints: c_int,
 }
 
+const _: () = assert!(core::mem::size_of::<markFragment_t>() == 8);
+const _: () = assert!(core::mem::offset_of!(markFragment_t, firstPoint) == 0);
+const _: () = assert!(core::mem::offset_of!(markFragment_t, numPoints) == 4);
+
 /// Arguments for `CG_CM_MARKFRAGMENTS`.
 ///
 /// Raven wrapper: `int trap_CM_MarkFragments(int numPoints,

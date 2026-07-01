@@ -22,3 +22,12 @@ pub struct aas_areainfo_t {
     pub maxs: vec3_t,
     pub center: vec3_t,
 }
+
+const _: () = assert!(core::mem::size_of::<aas_areainfo_t>() == 52);
+const _: () = assert!(core::mem::offset_of!(aas_areainfo_t, contents) == 0);
+const _: () = assert!(core::mem::offset_of!(aas_areainfo_t, flags) == 4);
+const _: () = assert!(core::mem::offset_of!(aas_areainfo_t, presencetype) == 8);
+const _: () = assert!(core::mem::offset_of!(aas_areainfo_t, cluster) == 12);
+const _: () = assert!(core::mem::offset_of!(aas_areainfo_t, mins) == 16);
+const _: () = assert!(core::mem::offset_of!(aas_areainfo_t, maxs) == 28);
+const _: () = assert!(core::mem::offset_of!(aas_areainfo_t, center) == 40);

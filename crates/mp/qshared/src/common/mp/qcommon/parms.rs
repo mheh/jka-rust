@@ -17,3 +17,6 @@ pub const MAX_PARM_STRING_LENGTH: usize = crate::shared::MAX_QPATH;
 pub struct parms_t {
     pub parm: [[c_char; MAX_PARM_STRING_LENGTH]; MAX_PARMS],
 }
+
+const _: () = assert!(core::mem::size_of::<parms_t>() == 1024);
+const _: () = assert!(core::mem::offset_of!(parms_t, parm) == 0);

@@ -17,3 +17,9 @@ pub struct failedEdge_t {
     pub checkTime: c_int,
     pub entID: c_int,
 }
+
+const _: () = assert!(core::mem::size_of::<failedEdge_t>() == 16);
+const _: () = assert!(core::mem::offset_of!(failedEdge_t, startID) == 0);
+const _: () = assert!(core::mem::offset_of!(failedEdge_t, endID) == 4);
+const _: () = assert!(core::mem::offset_of!(failedEdge_t, checkTime) == 8);
+const _: () = assert!(core::mem::offset_of!(failedEdge_t, entID) == 12);

@@ -26,3 +26,15 @@ pub struct usercmd_t {
     pub rightmove: c_schar,
     pub upmove: c_schar,
 }
+
+const _: () = assert!(core::mem::size_of::<usercmd_t>() == 28);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, server_time) == 0);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, angles) == 4);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, buttons) == 16);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, weapon) == 20);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, forcesel) == 21);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, invensel) == 22);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, generic_cmd) == 23);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, forwardmove) == 24);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, rightmove) == 25);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, upmove) == 26);

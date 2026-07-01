@@ -77,6 +77,9 @@ pub struct mdxaBone_t {
     pub matrix: [[f32; 4]; 3],
 }
 
+const _: () = assert!(core::mem::size_of::<mdxaBone_t>() == 48);
+const _: () = assert!(core::mem::offset_of!(mdxaBone_t, matrix) == 0);
+
 pub const QFALSE: qboolean = 0;
 pub const QTRUE: qboolean = 1;
 

@@ -42,3 +42,16 @@ pub struct sharedRagDollParams_t {
     /// Raven comment: `effector control, used for RP_DISABLE_EFFECTORS call`
     pub effectors_to_turn_off: c_int,
 }
+
+const _: () = assert!(core::mem::size_of::<sharedRagDollParams_t>() == 96);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, angles) == 0);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, position) == 12);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, scale) == 24);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, pelvis_angles_offset) == 36);
+const _: () =
+    assert!(core::mem::offset_of!(sharedRagDollParams_t, pelvis_position_offset) == 48);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, f_impact_strength) == 60);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, me) == 68);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, start_frame) == 72);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, collision_type) == 80);
+const _: () = assert!(core::mem::offset_of!(sharedRagDollParams_t, effectors_to_turn_off) == 92);

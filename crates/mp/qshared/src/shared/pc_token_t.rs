@@ -24,3 +24,10 @@ pub struct pc_token_t {
     pub floatvalue: f32,
     pub string: [c_char; MAX_TOKENLENGTH],
 }
+
+const _: () = assert!(core::mem::size_of::<pc_token_t>() == 1040);
+const _: () = assert!(core::mem::offset_of!(pc_token_t, type_) == 0);
+const _: () = assert!(core::mem::offset_of!(pc_token_t, subtype) == 4);
+const _: () = assert!(core::mem::offset_of!(pc_token_t, intvalue) == 8);
+const _: () = assert!(core::mem::offset_of!(pc_token_t, floatvalue) == 12);
+const _: () = assert!(core::mem::offset_of!(pc_token_t, string) == 16);
