@@ -1,8 +1,14 @@
 # Type-port TODO — game-code dependency types (MP + SP)
 
-Tracks the types the dormant `src/game/{client,entity,level}` scaffolding depends on
-that were **not yet ported**, discovered while migrating that code into `crates/mp/game`.
-Each must be ported for MP, then investigated + ported for SP (SP structures differ).
+Tracks the types the MP `g_local.h` data model depends on, ported into `crates/mp/game`.
+Each was ported for MP, then investigated + ported for SP (SP structures differ).
+
+**Status:** MP `g_local.h` data model **complete** — `mp_game::{client, entity, level}`
+(`gclient_s`=7344, `level_locals_t`=47176, `renderInfo_t`=368, all friend types) ported
+fresh from oracle and cargo-validated with size/offset asserts. The `spectatorState_t`,
+`playerTeamStateState_t`, and `alertEvent*` enums were corrected to real `typedef enum`s
+(the retired `src/` scaffolding had wrongly flattened them to `int`). Remaining `mp_game`
+work is the gameplay *logic* (`g_*.c`), not types.
 
 Placement principle: put each type in the **lowest tier that needs it** (native < qshared
 < bg < game), mirroring which Raven header owns it. `*mut`-only types are forward-declared

@@ -1,11 +1,14 @@
 //! `mp_game` — MP server-game module (`g_*`), the game-side of the QVM boundary.
 //!
-//! //TODO: Port module mp_game (dependency types for the dormant `gclient_s` /
-//! `level_locals_t` scaffolding are ported first; the structs themselves follow).
+//! The core `g_local.h` data model is ported (client/entity/level + AI/teams/npc
+//! types), verified against oracle with size/offset asserts. //TODO: Port the
+//! gameplay logic (g_*.c functions).
 
 #![allow(non_camel_case_types, non_snake_case)]
 
 pub mod ai;
 pub mod client;
+pub mod entity;
+pub mod level;
 pub mod npc;
 pub mod teams;
