@@ -2,8 +2,15 @@
 
 #![allow(non_camel_case_types)]
 
+pub mod add_electricity_arg;
+pub mod addbezier_arg;
+pub mod addpoly_arg;
+pub mod addsprite_arg;
 pub mod cbuf_exec;
 pub mod collision;
+pub mod effect_trail_arg;
+pub mod effect_trail_vert;
+pub mod game_state;
 pub mod connstate;
 pub mod ct_table;
 pub mod cvar;
@@ -35,6 +42,7 @@ pub mod trackchan;
 pub mod vec3struct;
 pub mod wl_e;
 pub mod wpneighbor;
+pub mod wpobject;
 #[path = "fsMode_t.rs"]
 pub mod file_mode;
 #[path = "pc_token_t.rs"]
@@ -48,8 +56,15 @@ pub mod trajectory;
 pub use native_math::vector;
 pub use native_platform::platform;
 
+pub use add_electricity_arg::addElectricityArgStruct_t;
+pub use addbezier_arg::addbezierArgStruct_t;
+pub use addpoly_arg::addpolyArgStruct_t;
+pub use addsprite_arg::addspriteArgStruct_t;
 pub use cbuf_exec::cbufExec_t;
 pub use collision::{cplane_t, CollisionRecord_t};
+pub use effect_trail_arg::effectTrailArgStruct_t;
+pub use effect_trail_vert::effectTrailVertStruct_t;
+pub use game_state::{gameState_t, MAX_CONFIGSTRINGS, MAX_GAMESTATE_CHARS};
 pub use connstate::connstate_t;
 pub use ct_table::ct_table_t;
 pub use cvar::{cvarHandle_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
@@ -94,6 +109,7 @@ pub use trajectory::{trType_t, trajectory_t};
 pub use vec3struct::vec3struct_t;
 pub use wl_e::WL_e;
 pub use wpneighbor::wpneighbor_t;
+pub use wpobject::{wpobject_t, MAX_NEIGHBOR_SIZE};
 pub use vector::{vec2_t, vec3_t, vec3pair_t, vec4_t, vec5_t, vec_t};
 
 // Migration bridge: cross-mode scalar/handle primitives now live in `native_types`.

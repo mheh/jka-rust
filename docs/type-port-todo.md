@@ -75,10 +75,14 @@ Divergent — deliberately **not** native (kept per-mode): `ivec2_t` (SP-only),
   `qint64`(8, MP-only), `markFragment_t`(8), `stringID_table_t`(16),
   `wpneighbor_t`(8)
 
-Remaining MP `q_shared.h` **heavy** (offset-asserted, one/commit): VM-arg structs
-(`addpolyArgStruct_t`, `addbezierArgStruct_t`, `addspriteArgStruct_t`,
-`effectTrailVertStruct_t`, `effectTrailArgStruct_t`, `addElectricityArgStruct_t`),
-`gameState_t`, `wpobject_t`. Deferred to their tiers: `cvar_t` (engine),
+#### Wave 1 heavy batch — `q_shared.h` (offset-asserted, cargo-green)
+- VM-arg effect structs: `addpolyArgStruct_t`(180), `addbezierArgStruct_t`(136),
+  `addspriteArgStruct_t`(72), `effectTrailVertStruct_t`(84),
+  `effectTrailArgStruct_t`(348), `addElectricityArgStruct_t`(92)
+- `gameState_t`(22804) + `MAX_CONFIGSTRINGS`(1700)/`MAX_GAMESTATE_CHARS`(16000)
+- `wpobject_t`(300) + `MAX_NEIGHBOR_SIZE`(32)
+
+MP `q_shared.h` now **complete**. Deferred to their tiers: `cvar_t` (engine),
 `SSkinGoreData`/`mdxaBone_t` (ghoul2; `mdxaBone_t` already in `native_types`).
 
 ### `mp_bg` (bg_public.h / bg_vehicles.h)
