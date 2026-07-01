@@ -54,8 +54,8 @@ pub struct gentity_t {
     /// Ptr to playerstate if applicable (for bg ents).
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:136`
     pub playerState: *mut playerState_t,
-    // FIXME: create type `Vehicle_t`.
-    // Raven field source: `oracle/oracle/codemp/game/g_local.h:137`
+    //TODO: Port Vehicle_t
+    // Source: oracle/oracle/codemp/game/bg_vehicles.h:477 (used *mut only via g_local.h:137)
     // pub m_pVehicle: *mut Vehicle_t,
     /// Placeholder for `Vehicle_t *m_pVehicle` until `Vehicle_t` is ported.
     pub m_pVehicle: *mut c_void,
@@ -119,8 +119,8 @@ pub struct gentity_t {
     // pub client: *mut gclient_s,
     /// Placeholder for `struct gclient_s *client` until `gclient_s` is ported.
     pub client: *mut c_void,
-    // FIXME: create type `gNPC_t`.
-    // Raven field source: `oracle/oracle/codemp/game/g_local.h:175`
+    //TODO: Port gNPC_t
+    // Source: oracle/oracle/codemp/game/b_public.h (used *mut only via g_local.h:175)
     // pub NPC: *mut gNPC_t,
     /// Placeholder for `gNPC_t *NPC` until `gNPC_t` is ported.
     pub NPC: *mut c_void,

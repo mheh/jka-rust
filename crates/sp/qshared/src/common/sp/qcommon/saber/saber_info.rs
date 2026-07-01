@@ -12,6 +12,11 @@ use super::blade_info::{bladeInfo_t, MAX_BLADES};
 use super::saber_styles::saber_styles_t;
 use super::saber_type::saberType_t;
 
+//TODO: Port saberInfoRetail_t
+// Source: oracle/oracle/code/game/q_shared.h:1947
+// SP-only retail-savegame-compat saber struct (C++ inline methods); deferred to
+// the SP savegame system.
+
 /// Raven SP `saberInfo_t` (as loaded from `sabers.cfg`).
 ///
 /// Raven: `!!!! loadsave affecting struct !!!!` — SP serializes this into

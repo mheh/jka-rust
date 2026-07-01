@@ -13,6 +13,11 @@ pub type cvarHandle_t = c_int;
 
 pub const MAX_CVAR_VALUE_STRING: usize = 256;
 
+//TODO: Port cvar_t
+// Source: oracle/oracle/codemp/game/q_shared.h:1804
+// The engine-side `cvar_s` registry node (linked-list `next`/`hashNext` ptrs) is
+// deferred to the engine/qcommon tier; only the VM-facing `vmCvar_t` lives here.
+
 /// Raven `vmCvar_t`.
 ///
 /// Raven comment: "the modules that run in the virtual machine can't access
