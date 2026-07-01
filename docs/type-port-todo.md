@@ -134,6 +134,18 @@ heavy + 3 deferred = 65). Ported from `code/`, not copied from MP:
 - **Pre-existing provenance leaks to reconcile** (cite `codemp/`, not SP
   q_shared.h types): `entity_shared.rs`, `qtime.rs`, `pc_token_t.rs`
 
+#### Wave 1 reconcile decisions (stale markers resolved)
+- **MP `gentity_t.client`** stays `*mut c_void` **by design**, not a missing type.
+  `gclient_s` is ported (mp_game, 7344 B) but `gentity_t` must live in `mp_qshared`
+  because the sub-game abi seam (`mp_abi`, below the game tier) names `*mut
+  gentity_t` in ~18 syscalls; `mp_qshared` can't depend on `mp_game`. `*mut c_void`
+  is ABI-identical to `*mut gclient_s`. **Future refactor** (tracked): move
+  `gentity_t` to `mp_game` and switch the 18 abi syscall structs to an opaque
+  entity pointer, restoring the real `*mut gclient_s`.
+- **SP `playerState_t`** remains a stub — **deferred full heavy-struct port**
+  (~284 lines). No longer blocked: SP `saberInfo_t` is ported in-crate and is
+  embedded by value as `saber[MAX_SABERS]`. Marked `//TODO: Port playerState_t`.
+
 ### `sp_qshared`
 | Type / const | SP oracle (`code/…`) | Divergence vs MP | SP |
 |---|---|---|---|

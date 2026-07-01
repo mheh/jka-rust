@@ -4,15 +4,15 @@
 
 #![allow(non_camel_case_types)]
 
-/// Raven SP `playerState_t`.
+/// Raven SP `playerState_t` — placeholder stub (full layout not yet ported).
 ///
 /// Type definition source: `oracle/oracle/code/game/q_shared.h:2077-2361`
-///
-/// FIXME: create type `saberInfo_t` before porting the full SP `playerState_t`
-/// layout. Raven's SP struct embeds `saberInfo_t saber[MAX_SABERS]` and C++
-/// helper methods in the middle of the field list; the methods do not affect
-/// layout, but the embedded saber type must be ported before this can be ABI
-/// complete.
+//TODO: Port playerState_t
+// Source: oracle/oracle/code/game/q_shared.h:2077-2361
+// Deferred full heavy-struct port. No longer blocked: SP `saberInfo_t` is ported
+// in-crate and is embedded by value as `saber[MAX_SABERS]` (oracle:2168). The C++
+// helper methods interspersed in the field list do not affect layout. Remaining
+// work is transcribing the full ~284-line SP field layout + offset/size asserts.
 #[repr(C)]
 #[derive(Debug)]
 pub struct playerState_t {

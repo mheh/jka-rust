@@ -114,10 +114,14 @@ pub struct gentity_t {
     pub next_roff_time: c_int,
     /// DO NOT MODIFY ANYTHING ABOVE THIS, THE SERVER EXPECTS THE FIELDS IN THAT ORDER.
     ///
-    // FIXME: create type `gclient_s`.
-    // Raven field source: `oracle/oracle/codemp/game/g_local.h:173`
-    // pub client: *mut gclient_s,
-    /// Placeholder for `struct gclient_s *client` until `gclient_s` is ported.
+    // Raven: `struct gclient_s *client` (g_local.h:173). `gclient_s` IS ported
+    // (mp_game, 7344 B) — this is not a missing type. It stays `*mut c_void` by
+    // tiering: `gentity_t` lives in mp_qshared because the sub-game abi seam
+    // (mp_abi) names `*mut gentity_t` in ~18 syscalls, and mp_qshared cannot
+    // depend on the game tier where `gclient_s` lives. `*mut c_void` is
+    // ABI-identical to `*mut gclient_s` (both pointer-sized). A future abi-seam
+    // refactor could move `gentity_t` to mp_game and restore the real type.
+    // Source: oracle/oracle/codemp/game/g_local.h:173
     pub client: *mut c_void,
     //TODO: Port gNPC_t
     // Source: oracle/oracle/codemp/game/b_public.h (used *mut only via g_local.h:175)
