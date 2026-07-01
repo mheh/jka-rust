@@ -2,7 +2,7 @@ use core::ffi::c_int;
 
 use super::super::SpUiImport;
 use abi_transport::generic::{
-    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use sp_qshared::shared::qboolean;
 

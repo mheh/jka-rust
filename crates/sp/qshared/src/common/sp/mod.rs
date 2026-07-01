@@ -5,6 +5,7 @@ pub mod cgame;
 pub mod game;
 pub mod gentity;
 pub mod qcommon;
+pub mod renderer;
 pub mod trace_t;
 pub mod ui;
 

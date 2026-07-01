@@ -51,14 +51,9 @@ pub struct uiClientState_t {
     _private: [u8; 0],
 }
 
-/// Opaque Raven `refdef_t` renderer scene description.
+/// Raven `refdef_t` renderer scene description — the full layout now lives in
+/// `sp_qshared` (`common/sp/renderer/refdef_t.rs`); re-exported here for the
+/// syscall wrappers that transport it by pointer.
 ///
-/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:103-176`
-///
-/// SP UI receives this through its imported function table
-/// (`oracle/oracle/code/ui/ui_public.h:80`) rather than the active SP UI
-/// syscall switch; only pointer transport is modeled here.
-#[repr(C)]
-pub struct refdef_t {
-    _private: [u8; 0],
-}
+/// Type definition source: `oracle/oracle/code/renderer/tr_types.h:159-176`
+pub use sp_qshared::common::sp::renderer::refdef_t::refdef_t;

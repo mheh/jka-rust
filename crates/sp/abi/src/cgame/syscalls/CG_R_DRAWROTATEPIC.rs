@@ -1,6 +1,6 @@
 use super::super::SpCgameImport;
 use abi_transport::generic::{
-    ptr_to_word, DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
+    DecodeSysCallReturn, EncodeSysCall, OutboundSysCall, SysCallTransport,
 };
 use abi_transport::pass_float;
 use sp_qshared::shared::qhandle_t;

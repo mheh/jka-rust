@@ -1,5 +1,3 @@
-use core::ffi::c_int;
-
 use super::super::SpUiImport;
 use abi_transport::generic::OutboundSysCall;
 
