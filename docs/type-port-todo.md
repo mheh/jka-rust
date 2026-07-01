@@ -118,6 +118,22 @@ SP structures diverge from MP. Investigated via oracle scouts; ported to how **S
 defines it (SP tiering follows SP's headers: `team_t`/`class_t` in `teams.h` → `sp_game`;
 spawn-vars in `g_local.h` → `sp_game`; saber in `q_shared.h` → `sp_qshared`).
 
+#### Wave 1 SP `q_shared.h` batch (ported from SP oracle, cargo-green)
+SP `q_shared.h` now **complete** (19 pre-existing + 24 native + 16 trivial + 3
+heavy + 3 deferred = 65). Ported from `code/`, not copied from MP:
+- **Trivial** (`shared/`): `LPCSTR`(SP-only), `ivec2_t`(SP-only), `cbufExec_t`,
+  `printParm_t`, `errorParm_t`, `ct_table_t`(+`CT_TITLE`), `fsOrigin_t`,
+  `waterHeightLevel_t`(SP-only), `genCmds_t`(FORCE_* only), `connstate_t`,
+  `sharedEIKMoveState`, `ForceReload_e`, `e_status`(named enum), `forcePowers_t`
+  (int+consts; no team powers, NUM=16 vs MP 18), `markFragment_t`(8),
+  `stringID_table_t`(16)
+- **Heavy** (offset-asserted): `gameState_t`(21204; SP `MAX_CONFIGSTRINGS`=1300),
+  `sharedRagDollUpdateParams_t`(52), `parseData_t`(88, SP-only, +`MAX_PARSEFILES`)
+- **Deferred** to their tiers: `cvar_t`→engine, `SSkinGoreData`→ghoul2,
+  `saberInfoRetail_t`→SP savegame system (C++ retail-compat struct)
+- **Pre-existing provenance leaks to reconcile** (cite `codemp/`, not SP
+  q_shared.h types): `entity_shared.rs`, `qtime.rs`, `pc_token_t.rs`
+
 ### `sp_qshared`
 | Type / const | SP oracle (`code/…`) | Divergence vs MP | SP |
 |---|---|---|---|

@@ -14,7 +14,10 @@ pub mod error_parm;
 pub mod force_powers;
 pub mod force_reload;
 pub mod fs_origin;
+pub mod game_state;
 pub mod gen_cmds;
+pub mod parse_data;
+pub mod shared_ragdoll_update_params;
 #[path = "ivec2_t.rs"]
 pub mod ivec2;
 pub mod limits;
@@ -53,7 +56,10 @@ pub use force_powers::{
 };
 pub use force_reload::ForceReload_e;
 pub use fs_origin::fsOrigin_t;
+pub use game_state::{gameState_t, MAX_CONFIGSTRINGS, MAX_GAMESTATE_CHARS};
 pub use gen_cmds::genCmds_t;
+pub use parse_data::{parseData_t, MAX_PARSEFILES};
+pub use shared_ragdoll_update_params::sharedRagDollUpdateParams_t;
 pub use ivec2::ivec2_t;
 pub use limits::{MAX_CLIENTS, MAX_STRING_CHARS};
 pub use lpcstr::LPCSTR;
