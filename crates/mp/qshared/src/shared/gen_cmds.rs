@@ -1,0 +1,40 @@
+#![allow(non_camel_case_types)]
+
+/// Raven `genCmds_t` generic (button-driven) client commands.
+///
+/// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2488-2521`
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum genCmds_t {
+    GENCMD_SABERSWITCH = 1,
+    GENCMD_ENGAGE_DUEL,
+    GENCMD_FORCE_HEAL,
+    GENCMD_FORCE_SPEED,
+    GENCMD_FORCE_THROW,
+    GENCMD_FORCE_PULL,
+    GENCMD_FORCE_DISTRACT,
+    GENCMD_FORCE_RAGE,
+    GENCMD_FORCE_PROTECT,
+    GENCMD_FORCE_ABSORB,
+    GENCMD_FORCE_HEALOTHER,
+    GENCMD_FORCE_FORCEPOWEROTHER,
+    GENCMD_FORCE_SEEING,
+    GENCMD_USE_SEEKER,
+    GENCMD_USE_FIELD,
+    GENCMD_USE_BACTA,
+    GENCMD_USE_ELECTROBINOCULARS,
+    GENCMD_ZOOM,
+    GENCMD_USE_SENTRY,
+    GENCMD_USE_JETPACK,
+    GENCMD_USE_BACTABIG,
+    GENCMD_USE_HEALTHDISP,
+    GENCMD_USE_AMMODISP,
+    GENCMD_USE_EWEB,
+    GENCMD_USE_CLOAK,
+    GENCMD_SABERATTACKCYCLE,
+    GENCMD_TAUNT,
+    GENCMD_BOW,
+    GENCMD_MEDITATE,
+    GENCMD_FLOURISH,
+    GENCMD_GLOAT,
+}

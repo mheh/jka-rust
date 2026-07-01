@@ -63,6 +63,24 @@ Divergent — deliberately **not** native (kept per-mode): `ivec2_t` (SP-only),
 | `bladeInfo_t` (+`MAX_BLADES=8`) | `game/q_shared.h:652-670` | struct (204 B) | ☑ | ☑ |
 | `saberInfo_t` | `game/q_shared.h:735-840` | struct (2156 B, by-value in `gclient_s.saber[]`) | ☑ full port | ☑ |
 
+#### Wave 1 trivial batch — `q_shared.h` (ported into `shared/`, cargo-green)
+25 batchable types, enum-vs-alias verified against oracle:
+- **Enums** (`#[repr(i32)]`): `cbufExec_t`, `WL_e`, `printParm_t`, `errorParm_t`,
+  `ha_pref`, `saberBlockType_t`, `saberBlockedType_t`, `sharedERagPhase`,
+  `sharedERagEffector`, `sharedEIKMoveState`, `ct_table_t`, `fsOrigin_t`,
+  `trackchan_t`, `itemUseFail_t`, `genCmds_t`, `connstate_t`, `ForceReload_e`
+- **`typedef int` + consts**: `forcePowers_t`, `soundChannel_t`, `e_status`,
+  `flagStatus_t`
+- **Structs** (`#[repr(C)]`+size assert): `vec3struct_t`(12, MP `__LCC__`),
+  `qint64`(8, MP-only), `markFragment_t`(8), `stringID_table_t`(16),
+  `wpneighbor_t`(8)
+
+Remaining MP `q_shared.h` **heavy** (offset-asserted, one/commit): VM-arg structs
+(`addpolyArgStruct_t`, `addbezierArgStruct_t`, `addspriteArgStruct_t`,
+`effectTrailVertStruct_t`, `effectTrailArgStruct_t`, `addElectricityArgStruct_t`),
+`gameState_t`, `wpobject_t`. Deferred to their tiers: `cvar_t` (engine),
+`SSkinGoreData`/`mdxaBone_t` (ghoul2; `mdxaBone_t` already in `native_types`).
+
 ### `mp_bg` (bg_public.h / bg_vehicles.h)
 | Type / const | Oracle (codemp) | Kind | Value/size | MP |
 |---|---|---|---|---|
