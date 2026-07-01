@@ -165,6 +165,29 @@ min, ~1.1M subagent tokens). Results:
   defensively); the named-workflow registry can serve a stale cached script —
   invoke by `scriptPath` when iterating.
 
+## v8 — Wave 2 via port-wave v2 (packet-fed, pipelined)
+
+Full bg wave: **45 MP + 11 SP types** (incl. 8 heavies: `vehicleInfo_t` 952B
+w/ 137 anchors, `Vehicle_t` 976B, `bgLoadedEvents_t` 19272B, both `pmove_t`s)
+in **37 min, 22 agents, ~990k tokens** — vs v1's 13 min / 8 agents / 293k for
+just 3 types. Verify: cargo green, every struct badge ☑ (independently
+re-swept). Raven comments preserved (e.g. vehicleInfo_t's vehFields warning).
+
+Speedups that did it: sweep.py replaced scout agents (45 types in 0.8s);
+packet-fed porters transcribe instead of exploring (manifest file pattern —
+args carry ~9KB metadata, packets stay on disk); per-folder MP→SP pipelines
+(no global barrier); haiku on trivial batches.
+
+Cheap-model lessons (both bit this run, fixed in prompts):
+- Packet-fed porters never see neighboring files, so the prompt must carry
+  EVERY convention — missing file-level `#![allow(...)]` produced ~29
+  warnings (Sonnet mediums too, not just haiku). Now explicit + zero-warning
+  rule; post-run cleanup normalized 24 files.
+- Agents read tool source (sweep.py) before running it — tools must be
+  declared black boxes with sample output shown.
+- Ops: zsh doesn't word-split unquoted vars — a batch commit script silently
+  mispackaged 4 commits (caught, reset --soft, redone).
+
 ## If absorbed into the real workflow
 
 - Generate assert blocks (`--asserts`) during ports instead of hand-deriving —
