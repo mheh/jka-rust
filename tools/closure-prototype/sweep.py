@@ -26,7 +26,10 @@ STRUCTY = {CursorKind.STRUCT_DECL, CursorKind.UNION_DECL, CursorKind.CLASS_DECL}
 
 def decl_in_header(cur, header):
     f = cur.location.file
-    return f is not None and f.name.replace("\\", "/").endswith(header)
+    # Case-insensitive: the oracle includes some headers with divergent case
+    # (`G_Vehicles.h` vs on-disk `g_vehicles.h`), which macOS resolves but
+    # libclang records as spelled.
+    return f is not None and f.name.replace("\\", "/").lower().endswith(header.lower())
 
 
 def source_slice(path, start, end):

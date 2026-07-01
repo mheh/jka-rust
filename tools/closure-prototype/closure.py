@@ -34,19 +34,21 @@ SRC_ROOT = ORACLE  # reassigned by --root for non-oracle trees (e.g. OpenJK)
 RAVEN_MODULES = {
     # MP tree (codemp/) — plain C modules
     "mp-game": dict(
-        lang="c", entry="codemp/game/g_local.h",
+        lang="c", entry=["codemp/game/b_local.h", "codemp/game/ai_main.h",
+                         "codemp/game/w_saber.h", "codemp/game/bg_local.h"],
         includes=["codemp/game"],
         defines=["NDEBUG", "MISSIONPACK", "QAGAME", "_JK2"],
         srcglob=["codemp/game/*.c"]),
     # bg_* compiles into game/cgame/ui; parse it through the game TU. Alias
     # so tier-named callers (crate mp_bg) resolve without knowing that.
     "mp-bg": dict(
-        lang="c", entry="codemp/game/g_local.h",
+        lang="c", entry=["codemp/game/g_local.h", "codemp/game/bg_local.h",
+                         "codemp/game/bg_saga.h"],
         includes=["codemp/game"],
         defines=["NDEBUG", "MISSIONPACK", "QAGAME", "_JK2"],
         srcglob=["codemp/game/bg_*.c"]),
     "mp-cgame": dict(
-        lang="c", entry="codemp/cgame/cg_local.h",
+        lang="c", entry=["codemp/cgame/cg_local.h", "codemp/cgame/cg_lights.h"],
         includes=["codemp/cgame", "codemp/game", "codemp/ui"],
         defines=["NDEBUG", "MISSIONPACK", "CGAME", "_JK2"],
         srcglob=["codemp/cgame/*.c", "codemp/game/bg_*.c", "codemp/ui/ui_shared.c"]),
@@ -69,21 +71,27 @@ RAVEN_MODULES = {
         defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
     # SP tree (code/) — C++ throughout
     "sp-game": dict(
-        lang="c++", entry="code/game/g_local.h",
+        lang="c++", entry=["code/game/b_local.h", "code/game/wp_saber.h",
+                           "code/game/g_functions.h", "code/game/g_vehicles.h",
+                           "code/game/g_roff.h", "code/game/objectives.h",
+                           "code/game/g_items.h", "code/game/fields.h",
+                           "code/game/characters.h", "code/game/hitlocs.h",
+                           "code/game/events.h", "code/game/bg_local.h"],
         includes=["code/game", "code"],
         defines=["NDEBUG", "_IMMERSION"],
         srcglob=["code/game/*.cpp"]),
     "sp-bg": dict(
-        lang="c++", entry="code/game/g_local.h",
+        lang="c++", entry=["code/game/g_local.h", "code/game/bg_local.h"],
         includes=["code/game", "code"],
         defines=["NDEBUG", "_IMMERSION"],
         srcglob=["code/game/bg_*.cpp"]),
     "sp-cgame": dict(
-        lang="c++", entry="code/cgame/cg_local.h",
+        lang="c++", entry=["code/cgame/cg_local.h", "code/cgame/cg_media.h",
+                           "code/cgame/cg_lights.h"],
         includes=["code/cgame", "code/game", "code"],
         defines=["NDEBUG", "_IMMERSION"]),
     "sp-ui": dict(
-        lang="c++", entry="code/ui/ui_local.h",
+        lang="c++", entry=["code/ui/ui_local.h", "code/ui/gameinfo.h"],
         includes=["code/ui", "code/game", "code"],
         defines=["NDEBUG", "_IMMERSION"]),
     "sp-engine": dict(
@@ -173,9 +181,17 @@ def parse_tu(module: str, extra_file: str | None, unity: bool = False):
                              text=True).stdout.strip()
         if res:
             args.append(f"-resource-dir={res}")
-    entry = SRC_ROOT / (extra_file or cfg["entry"])
-    if not entry.exists():
-        sys.exit(f"entry file not found: {entry}")
+    # A profile entry may be a list of headers: one TU that includes each in
+    # order, so types in headers unreachable from the primary entry (ai_main.h,
+    # wp_saber.h, bg_local.h, ...) are still parsed/badged/packeted. The first
+    # header must pull the core includes (g_local.h etc.) the rest rely on.
+    cfg_entry = [extra_file] if extra_file else (
+        cfg["entry"] if isinstance(cfg["entry"], list) else [cfg["entry"]])
+    entries = [SRC_ROOT / e for e in cfg_entry]
+    for e in entries:
+        if not e.exists():
+            sys.exit(f"entry file not found: {e}")
+    entry = entries[0]
     src = str(entry)
     unsaved = []
     if unity:  # one TU including every module source file, so callee bodies exist
@@ -184,9 +200,9 @@ def parse_tu(module: str, extra_file: str | None, unity: bool = False):
         files = sorted(p for g in cfg["srcglob"] for p in SRC_ROOT.glob(g))
         src = str(entry.parent / "__closure_unity__.c")
         unsaved.append((src, "".join(f'#include "{p}"\n' for p in files)))
-    elif entry.suffix == ".h":  # synthesize a TU around the header
+    elif len(entries) > 1 or entry.suffix == ".h":  # synthesize a TU around the header(s)
         src = str(entry.parent / "__closure_tu__.c")
-        unsaved.append((src, f'#include "{entry.name}"\n'))
+        unsaved.append((src, "".join(f'#include "{e}"\n' for e in entries)))
     unsaved += backslash_include_shims()
     idx = ci.Index.create()
     tu = idx.parse(src, args=args, unsaved_files=unsaved,
@@ -214,7 +230,7 @@ def scan_ported(mode: str):
     # same file as the declaration (house style: one type per file, colocated
     # asserts). Prevents MP asserts vouching for SP stubs and vice versa.
     size_asserts: dict[str, dict[str, set[int]]] = {}
-    def rank(rel):  # own-mode > native > other-mode
+    def rank(rel):  # own-mode > native; other-mode is excluded entirely
         if rel.startswith(f"crates/{mode}/"):
             return 0
         if rel.startswith("crates/native/"):
@@ -223,8 +239,13 @@ def scan_ported(mode: str):
     for rs in CRATES.rglob("*.rs"):
         if "target" in rs.parts:
             continue
-        text = rs.read_text(errors="replace")
         rel = str(rs.relative_to(REPO))
+        # Tree-scoped: a declaration in the OTHER mode's tree must never badge
+        # this mode's type (same-named MP/SP types diverge — cross-tree name
+        # matches produced false ☑s, e.g. SP gclient_s "ported" at an MP path).
+        if rank(rel) > 1:
+            continue
+        text = rs.read_text(errors="replace")
         for m in decl_re.finditer(text):
             name = m.group(1) or m.group(2)
             prev = status.get(name)

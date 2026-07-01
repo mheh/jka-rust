@@ -1,7 +1,7 @@
 export const meta = {
   name: 'port-wave',
   description: 'Port one wave of Raven C types from pre-generated packets (pre-wired skeleton, fully parallel porters, machine-verified)',
-  whenToUse: 'Batch type-porting. args = {mpModule, spModule, mpCrate, spCrate, manifestPath, mp: [entry...], sp: [entry...]} — generate packets with tools/closure-prototype/sweep.py <module> --header <h> --packets --json (filter to unported), adding {folder, level?} per entry. level = heavy dependency level (1 = no unported by-value deps among heavies, 2 = depends on level-1 heavies, ...).',
+  whenToUse: 'Batch type-porting. args = {mpModule, spModule, mpCrate, spCrate, manifestPath, skipDocs?, mp: [entry...], sp: [entry...]} — generate packets with tools/closure-prototype/sweep.py <module> --header <h> --packets --json (filter to unported), adding {folder, level?, crate?, srcDir?, file?} per entry. level = heavy dependency level (1 = no unported by-value deps among heavies, 2 = depends on level-1 heavies, ...). crate/srcDir override the run defaults for seam types targeting abi/qshared; file overrides the snake_case default.',
   phases: [
     { title: 'Skeleton', detail: 'pre-create every type file + fully wire mod.rs — porters never touch shared files' },
     { title: 'Port', detail: 'per-folder, MP chunks parallel then SP chunks parallel; haiku trivials, sonnet mediums' },
@@ -21,18 +21,21 @@ for (const k of ['mpModule', 'spModule', 'mpCrate', 'spCrate', 'manifestPath']) 
   if (!A[k]) throw new Error(`args.${k} required`)
 }
 const snake = n => n.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/__+/g, '_').toLowerCase()
-const prep = list => (list || []).filter(t => t.folder).map(t => ({ ...t, file: t.file || `${snake(t.name)}.rs` }))
-const MP = prep(A.mp)
-const SP = prep(A.sp)
+// Per-entry {crate, srcDir} may override the run defaults, so one run can mix
+// module-private targets with abi/qshared seam targets (parsed via the same
+// module TU). Defaults: run-level args.mpCrate/spCrate + module-derived src.
+const prep = (list, defCrate, defSrcDir) => (list || []).filter(t => t.folder).map(t => ({
+  ...t,
+  file: t.file || `${snake(t.name)}.rs`,
+  crate: t.crate || defCrate,
+  srcDir: t.srcDir || defSrcDir,
+}))
+const modSrc = (m, ov) => ov || `crates/${m.replace('-', '/')}/src`
+const MP = prep(A.mp, A.mpCrate, modSrc(A.mpModule, A.mpSrcDir))
+const SP = prep(A.sp, A.spCrate, modSrc(A.spModule, A.spSrcDir))
 if (!MP.length && !SP.length) throw new Error('args.mp / args.sp packet lists are empty')
 
 const SWEEP = 'tools/closure-prototype/.venv/bin/python tools/closure-prototype/sweep.py'
-// Optional args.mpSrcDir / args.spSrcDir override the crate src root when the
-// target crate differs from the parse module (e.g. tr_types.h parsed via
-// mp-cgame but ported into crates/mp/qshared/src/common/mp).
-const srcDir = m =>
-  (m === A.mpModule && A.mpSrcDir) || (m === A.spModule && A.spSrcDir) ||
-  `crates/${m.replace('-', '/')}/src`
 
 const RULES = `HOUSE RULES (binding — docs/porting-rules.md):
 - NEVER edit anything under oracle/oracle/.
@@ -64,9 +67,17 @@ const RULES = `HOUSE RULES (binding — docs/porting-rules.md):
   vec4_t}; SP: sp_qshared::shared::{...}).
   Tree-specific types sit under <tree>_qshared::common::<mp|sp>::<subsystem>
   (e.g. mp_qshared::common::mp::cgame::glconfig_t::glconfig_t).
-  Wave-2 bg types: <tree>_bg::<folder>::<file>::<Type>. If a needed item truly
-  isn't there, ONE grep for "pub struct <Name>\\|pub type <Name>" across
-  crates/ settles it — then move on.
+  Wave-2 bg types: <tree>_bg::<folder>::<file>::<Type>.
+  Wave-3 renderer types (refEntity_t, refdef_t, glconfig_t, polyVert_t, ...):
+  MP mp_qshared::common::mp::cgame::<file>::<Type>; SP
+  sp_qshared::common::sp::renderer::<file>::<Type>.
+  Wave-3 ui_shared types (displayContextDef_t, menuDef_t, itemDef_s, ...):
+  <tree>_uishared::shared::<file>::<Type>.
+  Cross-crate wave siblings (e.g. snapshot_t in <tree>_abi): use the crate
+  path <crate>::<folder-path>::<file>::<Type> exactly as listed in the
+  sibling's target file. If a needed item truly isn't there, ONE grep for
+  "pub struct <Name>\\|pub type <Name>" across crates/ settles it — then move
+  on.
 - STYLE PRECEDENT: crates/mp/bg/src/weapons/weapon_data_t.rs is a known-good
   medium port; copy its shape (doc header, repr, assert block placement)
   instead of exploring other files for precedent. Structs: no derives unless
@@ -95,13 +106,14 @@ const PORT_SCHEMA = {
   required: ['ported', 'deferred', 'problems'],
 }
 
-function portPrompt(mode, module, crate, folder, list, mpFiles) {
+function portPrompt(mode, module, list, mpFiles) {
+  const { crate, srcDir, folder } = list[0]
   const spNote = mode === 'SP' ? `
 SP pass: the packets are from the SP oracle (code/), which DIVERGES from MP.
 Use the MP baseline file listed per type as a style/diff reference only —
 port what the SP packet source says. No MP baseline -> port fresh.` : ''
   const names = list.map(t => t.name)
-  return `Port these Raven types into ${srcDir(module)}/${folder}/ (crate ${crate}).
+  return `Port these Raven types into ${srcDir}/${folder}/ (crate ${crate}).
 Your packets are pre-generated. Extract ONLY your entries (the manifest is too
 large to cat) with exactly:
   python3 -c "import json; d=json.load(open('${A.manifestPath}')); ns={${names.map(n => `'${n}'`).join(',')}}; print(json.dumps([e for e in d['${mode.toLowerCase()}'] if e['name'] in ns], indent=1))"
@@ -111,7 +123,7 @@ transcribe faithfully into the pre-created placeholder file listed per type,
 verify.
 ${RULES}
 ${spNote}
-Types (type -> your file, in ${srcDir(module)}/${folder}/):
+Types (type -> your file, in ${srcDir}/${folder}/):
 ${list.map(t => `- ${t.name} (${t.kind}, ${t.tier}, ${t.sizeB}B) -> ${t.file}${mode === 'SP' && mpFiles && mpFiles[t.name] ? ` [MP baseline: ${mpFiles[t.name]}]` : ''}`).join('\n')}
 
 End state:
@@ -127,14 +139,15 @@ Return ONLY the structured result; final message is data, not prose.`
 // mod.rs line up front. After this, no two agents ever write the same file,
 // so Port and Heavy phases parallelize freely.
 phase('Skeleton')
+const allCrates = [...new Set([...MP, ...SP].map(t => t.crate))]
 const skeletonSpec = [
-  { module: A.mpModule, crate: A.mpCrate, types: MP },
-  { module: A.spModule, crate: A.spCrate, types: SP },
+  { module: A.mpModule, types: MP },
+  { module: A.spModule, types: SP },
 ].filter(s => s.types.length).map(s => ({
-  module: s.module, crate: s.crate,
+  module: s.module,
   files: s.types.map(t => ({
-    path: `${srcDir(s.module)}/${t.folder}/${t.file}`,
-    name: t.name, cite: t.cite,
+    path: `${t.srcDir}/${t.folder}/${t.file}`,
+    crate: t.crate, name: t.name, cite: t.cite,
   })),
 }))
 await agent(
@@ -151,7 +164,7 @@ oracle/oracle/. For each entry below:
 3. Register every file in its folder's mod.rs (pub mod <file-stem>;).
 Use ONE python3 heredoc to create everything, then verify.
 Spec (JSON): ${JSON.stringify(skeletonSpec)}
-Finish with cargo check ${skeletonSpec.map(s => `-p ${s.crate}`).join(' ')} GREEN, zero new warnings.`,
+Finish with cargo check ${allCrates.map(c => `-p ${c}`).join(' ')} GREEN, zero new warnings.`,
   { label: 'skeleton', phase: 'Skeleton', model: 'sonnet' }
 )
 
@@ -171,20 +184,22 @@ function chunks(list) {
     out.push({ tier: 'medium', types: med.slice(i, i + CHUNK.medium) })
   return out
 }
-const folders = [...new Set([...MP.map(t => t.folder), ...SP.map(t => t.folder)])]
+const groupKey = t => `${t.srcDir}/${t.folder}`
+const folders = [...new Set([...MP.map(groupKey), ...SP.map(groupKey)])]
 const mpFiles = {}
-const lightResults = await parallel(folders.map(folder => async () => {
+const lightResults = await parallel(folders.map(key => async () => {
   const out = []
-  const mpChunks = chunks(MP.filter(t => t.folder === folder && t.tier !== 'heavy'))
+  const label = key.split('/').slice(-1)[0]
+  const mpChunks = chunks(MP.filter(t => groupKey(t) === key && t.tier !== 'heavy'))
   const mpRs = await parallel(mpChunks.map(c => () => agent(
-    portPrompt('MP', A.mpModule, A.mpCrate, folder, c.types, null),
-    { label: `mp:${folder}:${c.tier}`, phase: 'Port',
+    portPrompt('MP', A.mpModule, c.types, null),
+    { label: `mp:${label}:${c.tier}`, phase: 'Port',
       model: c.tier === 'trivial' ? 'haiku' : 'sonnet', schema: PORT_SCHEMA })))
   for (const r of mpRs.filter(Boolean)) { out.push(r); r.ported.forEach(p => { mpFiles[p.name] = p.file }) }
-  const spChunks = chunks(SP.filter(t => t.folder === folder && t.tier !== 'heavy'))
+  const spChunks = chunks(SP.filter(t => groupKey(t) === key && t.tier !== 'heavy'))
   const spRs = await parallel(spChunks.map(c => () => agent(
-    portPrompt('SP', A.spModule, A.spCrate, folder, c.types, mpFiles),
-    { label: `sp:${folder}:${c.tier}`, phase: 'Port',
+    portPrompt('SP', A.spModule, c.types, mpFiles),
+    { label: `sp:${label}:${c.tier}`, phase: 'Port',
       model: c.tier === 'trivial' ? 'haiku' : 'sonnet', schema: PORT_SCHEMA })))
   out.push(...spRs.filter(Boolean))
   return out
@@ -203,9 +218,9 @@ HEAVY layout-critical struct: paste the FULL provided assert block (all
 offsets). If a by-value dep is unported and non-trivial, STOP: add the
 //TODO: Port marker, record it under deferred, keep the field ABI-compatible.`
 const heavyAgent = async (key, t) => {
-  const [module, crate] = key === 'mp' ? [A.mpModule, A.mpCrate] : [A.spModule, A.spCrate]
+  const module = key === 'mp' ? A.mpModule : A.spModule
   const r = await agent(
-    portPrompt(key.toUpperCase(), module, crate, t.folder, [t], key === 'sp' ? mpFiles : null) + HEAVY_NOTE,
+    portPrompt(key.toUpperCase(), module, [t], key === 'sp' ? mpFiles : null) + HEAVY_NOTE,
     { label: `heavy-${key}:${t.name}`, phase: 'Heavy',
       model: 'sonnet', effort: 'high', schema: PORT_SCHEMA })
   if (r) {
@@ -276,6 +291,11 @@ assert, add //TODO: Port marker, note it. End with cargo check --workspace GREEN
 }
 
 // ------------------------------------------------------------------- Docs
+// A.skipDocs: when several port-wave runs execute concurrently they must not
+// race on the todo doc — the orchestrator updates it once at the end instead.
+if (A.skipDocs) {
+  return { mpPorted: claimed[A.mpModule], spPorted: claimed[A.spModule], verify: verdict }
+}
 phase('Docs')
 const docs = await agent(
 `Update ${A.todoDoc || 'docs/type-port-todo.md'} for the wave that just landed
