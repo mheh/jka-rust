@@ -38,6 +38,13 @@ RAVEN_MODULES = {
         includes=["codemp/game"],
         defines=["NDEBUG", "MISSIONPACK", "QAGAME", "_JK2"],
         srcglob=["codemp/game/*.c"]),
+    # bg_* compiles into game/cgame/ui; parse it through the game TU. Alias
+    # so tier-named callers (crate mp_bg) resolve without knowing that.
+    "mp-bg": dict(
+        lang="c", entry="codemp/game/g_local.h",
+        includes=["codemp/game"],
+        defines=["NDEBUG", "MISSIONPACK", "QAGAME", "_JK2"],
+        srcglob=["codemp/game/bg_*.c"]),
     "mp-cgame": dict(
         lang="c", entry="codemp/cgame/cg_local.h",
         includes=["codemp/cgame", "codemp/game", "codemp/ui"],
@@ -66,6 +73,11 @@ RAVEN_MODULES = {
         includes=["code/game", "code"],
         defines=["NDEBUG", "_IMMERSION"],
         srcglob=["code/game/*.cpp"]),
+    "sp-bg": dict(
+        lang="c++", entry="code/game/g_local.h",
+        includes=["code/game", "code"],
+        defines=["NDEBUG", "_IMMERSION"],
+        srcglob=["code/game/bg_*.cpp"]),
     "sp-cgame": dict(
         lang="c++", entry="code/cgame/cg_local.h",
         includes=["code/cgame", "code/game", "code"],
