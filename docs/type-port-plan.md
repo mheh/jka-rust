@@ -43,7 +43,7 @@ Counts are faithful-C types by owning header; C++/vendored excluded per above.
 | 0 | `native/platform` | 25 (replace) | 38 (replace) | started | n/a — replaced |
 | 1 | `mp/qshared` · `sp/qshared` | 88 | 65 | 42 / 36 files | **HIGH — ABI long pole** |
 | 2 | `mp/bg` · `sp/bg` | 60 | 17 | 4 / 1 | medium |
-| 3 | `mp/uishared` · `sp/uishared` | 17 | 17 | stub | low |
+| 3 | `mp/uishared` · `sp/uishared` | 17 | 17 | **done** (+ tr_types.h into qshared) | low |
 | 4 | `*/game` | 71 (+27\*) | 78 (+55\*) | 33 / 12 | high (gentity/gclient — done for MP) |
 | 4 | `*/cgame` | 58 | 47 | stub | medium |
 | 4 | `*/ui` | 35 | 9 | stub | low |

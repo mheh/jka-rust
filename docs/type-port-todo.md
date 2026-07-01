@@ -85,6 +85,13 @@ Divergent — deliberately **not** native (kept per-mode): `ivec2_t` (SP-only),
 MP `q_shared.h` now **complete**. Deferred to their tiers: `cvar_t` (engine),
 `SSkinGoreData`/`mdxaBone_t` (ghoul2; `mdxaBone_t` already in `native_types`).
 
+#### Wave 3 batch — `cgame/tr_types.h` (ported into `common/mp/cgame/`, cargo-green)
+All 9 qshared-tier types (`stereoFrame_t` pre-existed in `sp_abi`):
+- **Trivial**: `color4ub_t` (alias), `refEntityType_t`, `textureCompression_t`
+- **Medium**: `polyVert_t`(24), `poly_s`(16), `miniRefEntity_s`(108)
+- **Heavy** (offset-asserted): `glconfig_t`(96), `refEntity_t`(216),
+  `refdef_t`(384)
+
 ### `mp_bg` (bg_public.h / bg_vehicles.h / bg_weapons.h)
 | Type / const | Oracle (codemp) | Kind | Value/size | MP |
 |---|---|---|---|---|
@@ -112,6 +119,15 @@ MP `q_shared.h` now **complete**. Deferred to their tiers: `cvar_t` (engine),
 #### Wave 2 batch — `bg_weapons.h` (ported into `weapons/`, cargo-green)
 - `ammo_t` (enum), `weapon_t` (`typedef int` + consts), `ammoData_s`(4 B),
   `weaponData_s`(56 B)
+
+### `mp_uishared` (ui/ui_shared.h) — Wave 3, **complete**
+All 15 types, cargo-green, offset-asserted:
+- **Medium**: `rectDef_t`(16), `scriptDef_t`(104), `colorRangeDef_t`(24),
+  `columnInfo_s`(12), `commandDef_t`(16), `editFieldDef_s`(28),
+  `modelDef_s`(136)
+- **Heavy**: `windowDef_t`(192), `listBoxDef_s`(240), `multiDef_s`(648),
+  `itemDef_s`(704), `menuDef_t`(2400), `cachedAssets_t`(272),
+  `textScrollDef_s`(2072), `displayContextDef_t`(872)
 
 #### Wave 2 batch — `bg_vehicles.h` (ported into `vehicles/`, cargo-green)
 - **Enums**: `EWeaponPose`, `vehFlags_t`, `vehicleType_t`
@@ -169,9 +185,9 @@ heavy + 3 deferred = 65). Ported from `code/`, not copied from MP:
   is ABI-identical to `*mut gclient_s`. **Future refactor** (tracked): move
   `gentity_t` to `mp_game` and switch the 18 abi syscall structs to an opaque
   entity pointer, restoring the real `*mut gclient_s`.
-- **SP `playerState_t`** remains a stub — **deferred full heavy-struct port**
-  (~284 lines). No longer blocked: SP `saberInfo_t` is ported in-crate and is
-  embedded by value as `saber[MAX_SABERS]`. Marked `//TODO: Port playerState_t`.
+- **SP `playerState_t`** ~~remains a stub~~ — **full-ported in Wave 3**
+  (offset-asserted, 4992 B, matches the v7 clang ground truth), incl.
+  `saber[MAX_SABERS]` by value.
 
 ### `sp_qshared`
 | Type / const | SP oracle (`code/…`) | Divergence vs MP | SP |
@@ -183,6 +199,20 @@ heavy + 3 deferred = 65). Ported from `code/`, not copied from MP:
 | `saberTrail_t` | `game/q_shared.h:1616-1630` | **92 B** — no `dualbase`/`dualtip` (MP 116) | ☑ |
 | `bladeInfo_t` (+`MAX_BLADES=8`) | `game/q_shared.h:1634-1658` | **164 B** — no `desiredLength`/3 debounce ints (MP 204) | ☑ |
 | `saberInfo_t` (+`MAX_SABERS=2`) | `game/q_shared.h:1724-1944` | **1952 B, pointer-bearing** — `char*` name/model/skin/broken1/2, `char[]` shaders, SP-only `fallSound[3]` (MP 2156, buffers/handles) | ☑ |
+| `playerState_t` | `game/q_shared.h:2066-2361` | **4992 B** — SP-only forceData/vehicle-less block; embeds `saberInfo_t[2]` by value (MP layout differs heavily) | ☑ `qcommon/player_state.rs` (Wave 3) |
+
+#### Wave 3 batch — `renderer/tr_types.h` (ported into `common/sp/renderer/`, cargo-green)
+8 types, SP-as-diff vs MP `cgame/tr_types.h` (no `miniRefEntity_s` in SP):
+- **Trivial**: `color4ub_t`, `refEntityType_t`, `textureCompression_t`
+- **Medium**: `polyVert_t`(24), `poly_s`(16), `refdef_t`(116 — vs MP 384)
+- **Heavy** (offset-asserted): `glconfig_t`(96), `refEntity_t`(176 — vs MP 216)
+- `sp_abi`'s opaque `refdef_t` stub replaced by a re-export of the real layout.
+
+### `sp_uishared` (ui/ui_shared.h) — Wave 3, **complete**
+All 15 crate-owned types (`pc_token_s` lives in `sp_qshared`), cargo-green,
+offset-asserted. Divergences vs MP: `displayContextDef_t`(792 vs 872),
+`menuDef_t`(1568 vs 2400), `multiDef_s`(1288 vs 648), `cachedAssets_t`(212 vs
+272), `itemDef_s`(712 vs 704), `windowDef_t`(208 vs 192); no `scriptDef_t`.
 
 ### `sp_bg` (bg_public.h)
 | Type / const | SP oracle (`code/…`) | Divergence vs MP | SP |
@@ -216,6 +246,7 @@ heavy + 3 deferred = 65). Ported from `code/`, not copied from MP:
 | ai consts | `game/ai.h:18,94,104` | identical (32/32/7) | ☑ `ai/consts.rs` |
 | `MAX_SPAWN_VARS` | `game/g_local.h:143` | same value (64), **game-tier** in SP | ☑ `local/spawn.rs` |
 | `MAX_SPAWN_VARS_CHARS` | `game/g_local.h:144` | **2048** (MP 4096) | ☑ `local/spawn.rs` |
+| `animFileSet_t` (+`MAX_ANIM_EVENTS=300`) | `game/g_local.h:68-76` | **absent in MP** — SP-only per-model anim config, embeds `animation_t[MAX_ANIMATIONS]`/`animevent_t[MAX_ANIM_EVENTS]` (36416 B) | ☑ `local/anim_file_set_t.rs` |
 
 ### SP deferred
 | Type | Note | SP |
@@ -223,7 +254,9 @@ heavy + 3 deferred = 65). Ported from `code/`, not copied from MP:
 | `Vehicle_t` | Not needed yet (SP `gentity` is an opaque stub); SP vehicle system TBD | ◐ deferred |
 | `gNPC_t` | SP NPC struct is large; SP `gentity` opaque; no consumer yet | ◐ deferred |
 | `saberInfoRetail_t` | SP-only savegame-compat struct; port with SP savegame system | ◐ deferred |
+| `animNumber_t` | `anims.h:1789`; ~1500-entry enum. `animFileSet_t.animations[MAX_ANIMATIONS]` sized from the verified packet offset (12344 B / 8) instead, pending this enum's port | ◐ deferred |
 
 ## Related pre-existing gaps (out of scope, tracked)
-- SP `gentity_t`, `playerState_t` are opaque stubs; SP `entity_shared.rs` / `collision.rs`
-  are mis-provenanced MP copies. See scout findings / `GENTITY_TYPE_FOLLOWUPS.md`.
+- SP `gentity_t` is an opaque stub (`playerState_t` full-ported in Wave 3); SP
+  `entity_shared.rs` / `collision.rs` are mis-provenanced MP copies. See scout
+  findings / `GENTITY_TYPE_FOLLOWUPS.md`.
