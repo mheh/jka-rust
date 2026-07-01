@@ -1,1 +1,0 @@
-//! MP game module implementation.

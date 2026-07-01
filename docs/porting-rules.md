@@ -73,6 +73,20 @@ Every ported item keeps the current codebase style:
 
 - When a type/const differs SP vs MP, keep **both** source refs (existing style).
 
+- **State the conclusion, not the derivation.** The oracle source holds the full
+  definition, so the comment cites it rather than re-deriving it. Shape:
+  `/// Raven \`X\` <one-line desc>.` + a `Source:` / `Type definition source:` cite.
+  Add rationale only when a Rust choice diverges from the obvious (e.g. a `#[repr]`
+  width or a wire-safe newtype), and cap it at ~2 lines. If you find yourself
+  re-explaining C mechanics the cited lines already show, cut it.
+
+  ```rust
+  // Raven's `typedef char memtag_t` is 1 byte, not int-wide; `#[repr(i8)]` matches
+  // that width.
+  // Source: `oracle/oracle/codemp/game/q_shared.h:3101-3107`
+  #[repr(i8)]
+  ```
+
 ## Unported-work markers
 
 Every not-yet-ported placeholder uses one consistent, greppable pattern so the

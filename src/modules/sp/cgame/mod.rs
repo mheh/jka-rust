@@ -1,1 +1,0 @@
-//! SP cgame module implementation.

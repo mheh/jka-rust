@@ -1,13 +1,8 @@
-[package]
-name = "jka-rust"
-version = "0.1.0"
-edition = "2021"
-description = "Idiomatic, opinionated Rust reimplementation of Jedi Academy MP; verified against the faithful jedi-academy-rust port (the oracle/ submodule)."
-
+# Virtual workspace — the `jka` monolith (`src/`) has been dissolved into the
+# tier crates below. Each Raven module/engine subsystem is its own crate.
 [workspace]
 resolver = "2"
 members = [
-    ".",
     "crates/native/math",
     "crates/native/platform",
     "crates/native/containers",
@@ -49,21 +44,3 @@ members = [
     "crates/ui",
     "crates/jagame",
 ]
-
-[lib]
-name = "jka"
-
-# Migration bridges: `jka` re-exports the extracted tier crates so its remaining
-# modules stay green until the monolith is dissolved.
-[dependencies]
-native_math = { path = "crates/native/math" }
-native_platform = { path = "crates/native/platform" }
-native_types = { path = "crates/native/types" }
-abi_transport = { path = "crates/abi-transport" }
-mp_qshared = { path = "crates/mp/qshared" }
-sp_qshared = { path = "crates/sp/qshared" }
-
-[features]
-# Differential parity tests run this crate against the faithful port's behavior.
-# Off by default.
-oracle = []

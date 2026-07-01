@@ -5,6 +5,7 @@
 pub mod collision;
 pub mod cvar;
 pub mod entity_shared;
+pub mod limits;
 #[path = "fsMode_t.rs"]
 pub mod file_mode;
 #[path = "pc_token_t.rs"]
@@ -22,6 +23,7 @@ pub use collision::{cplane_t, CollisionRecord_t};
 pub use cvar::{cvarHandle_t, vmCvar_t, MAX_CVAR_VALUE_STRING};
 pub use entity_shared::entityShared_t;
 pub use file_mode::{fsMode_t, FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};
+pub use limits::{MAX_CLIENTS, MAX_STRING_CHARS};
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};
 pub use shared_ik_move_params::sharedIKMoveParams_t;
 pub use trajectory::{trType_t, trajectory_t};

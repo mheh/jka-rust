@@ -9,4 +9,4 @@ name = "jagame"
 crate-type = ["cdylib"]
 
 [dependencies]
-jka = { package = "jka-rust", path = "../.." }
+abi_transport = { path = "../abi-transport" }

@@ -1,1 +1,1 @@
-pub use jka::abi::entrypoints::sp_game::GetGameAPI;
+pub use abi_transport::entrypoints::sp_game::GetGameAPI;

@@ -10,33 +10,21 @@ version = "0.1.0"
 name = "cgame"
 version = "0.1.0"
 dependencies = [
- "jka-rust",
+ "abi_transport",
 ]
 
 [[package]]
 name = "jagame"
 version = "0.1.0"
 dependencies = [
- "jka-rust",
+ "abi_transport",
 ]
 
 [[package]]
 name = "jampgame"
 version = "0.1.0"
 dependencies = [
- "jka-rust",
-]
-
-[[package]]
-name = "jka-rust"
-version = "0.1.0"
-dependencies = [
  "abi_transport",
- "mp_qshared",
- "native_math",
- "native_platform",
- "native_types",
- "sp_qshared",
 ]
 
 [[package]]
@@ -322,5 +310,5 @@ dependencies = [
 name = "ui"
 version = "0.1.0"
 dependencies = [
- "jka-rust",
+ "abi_transport",
 ]

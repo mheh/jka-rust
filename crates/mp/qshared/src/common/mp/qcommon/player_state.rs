@@ -10,7 +10,9 @@ use core::ffi::c_int;
 use crate::shared::{qboolean, vec3_t};
 
 pub const NUM_FORCE_POWERS: usize = 18;
-pub const TRACK_CHANNEL_MAX: usize = 5;
+/// Raven `TRACK_CHANNEL_MAX` = NUM_TRACK_CHANNELS(56) - 50.
+/// Source: `oracle/oracle/codemp/game/q_shared.h:2066`
+pub const TRACK_CHANNEL_MAX: usize = 6;
 pub const MAX_STATS: usize = 16;
 pub const MAX_PERSISTANT: usize = 16;
 pub const MAX_POWERUPS: usize = 16;

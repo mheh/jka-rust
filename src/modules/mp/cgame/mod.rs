@@ -1,1 +1,0 @@
-//! MP cgame module implementation.

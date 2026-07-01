@@ -1,1 +1,0 @@
-//! MP ui module implementation.

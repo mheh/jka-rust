@@ -1,1 +1,1 @@
-pub use jka::abi::entrypoints::qvm::{dllEntry, vmMain, GetModuleAPI};
+pub use abi_transport::entrypoints::qvm::{dllEntry, vmMain, GetModuleAPI};

@@ -441,3 +441,29 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:358`
     pub item: *mut gitem_t,
 }
+
+// Layout parity contract. `gentity_t` carries pointers, so its layout is
+// arch-dependent; the literal offsets are pinned to the host-64-bit build (only
+// `offset_of(s) == 0` is arch-independent). The `*mut c_void` placeholders for
+// `m_pVehicle`/`client`/`NPC` occupy the same 8 bytes as their real pointee
+// pointers, so these offsets hold regardless of those types being ported.
+// Source: `oracle/oracle/codemp/game/g_local.h:133-359`
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::size_of::<gentity_t>() == 1832);
+const _: () = assert!(core::mem::offset_of!(gentity_t, s) == 0); // arch-independent anchor
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gentity_t, r) == 576);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gentity_t, taskID) == 688);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gentity_t, client) == 976);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gentity_t, moverState) == 1176);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gentity_t, think) == 1440);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gentity_t, material) == 1516);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gentity_t, locationDamage) == 1544);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(gentity_t, item) == 1824);
