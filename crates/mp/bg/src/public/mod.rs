@@ -1,5 +1,7 @@
 //! MP `bg_public.h` shared game definitions.
 
+pub mod gametype;
+pub mod powerup;
 pub mod spawn;
 pub mod team;
 

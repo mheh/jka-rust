@@ -91,6 +91,8 @@ MP `q_shared.h` now **complete**. Deferred to their tiers: `cvar_t` (engine),
 | `MAX_SPAWN_VARS` | `game/bg_public.h:16` | const | `64` | ☑ `public/spawn.rs` |
 | `MAX_SPAWN_VARS_CHARS` | `game/bg_public.h:17` | const | `4096` | ☑ `public/spawn.rs` |
 | `team_t` (+`TEAM_NUM_TEAMS`) | `game/bg_public.h:1008-1017` | `typedef int` + enum | ☑ `public/team.rs` |
+| `gametype_t` | `game/bg_public.h:183-199` | `typedef int` + anon enum (`GT_FFA`..`GT_MAX_GAME_TYPE`) | ☑ `public/gametype/mod.rs` |
+| `powerup_t` | `game/bg_public.h:652-684` | `typedef int` + anon enum (`PW_NONE`..`PW_NUM_POWERUPS`, "may not have more than 16") | ☑ `public/powerup/mod.rs` |
 | `Vehicle_t` | `game/bg_vehicles.h:477-623` (~146 ln) | struct (`*mut` only via `gentity_s`) | **Fwd — deferred** (not needed by client/level; `gentity_s.m_pVehicle` stays `*mut c_void` in qshared) |
 
 ### `mp_game` (ai.h / teams.h / b_public.h)
@@ -156,6 +158,11 @@ heavy + 3 deferred = 65). Ported from `code/`, not copied from MP:
 | `saberTrail_t` | `game/q_shared.h:1616-1630` | **92 B** — no `dualbase`/`dualtip` (MP 116) | ☑ |
 | `bladeInfo_t` (+`MAX_BLADES=8`) | `game/q_shared.h:1634-1658` | **164 B** — no `desiredLength`/3 debounce ints (MP 204) | ☑ |
 | `saberInfo_t` (+`MAX_SABERS=2`) | `game/q_shared.h:1724-1944` | **1952 B, pointer-bearing** — `char*` name/model/skin/broken1/2, `char[]` shaders, SP-only `fallSound[3]` (MP 2156, buffers/handles) | ☑ |
+
+### `sp_bg` (bg_public.h)
+| Type / const | SP oracle (`code/…`) | Divergence vs MP | SP |
+|---|---|---|---|
+| `powerup_t` | `game/bg_public.h:248-267` | **named enum**, member set diverges heavily from MP (`PW_HASTE`, `PW_UNCLOAKING`, `PW_DISRUPTION`, `PW_GALAK_SHIELD`, `PW_SEEKER`, `PW_SHOCKED`, `PW_DRAINED`, `PW_INVINCIBLE`, `PW_FORCE_PUSH*` replace MP's flag/force-power powerups; MP is `typedef int` + anon enum) | ☑ `public/powerup/mod.rs` |
 
 ### `sp_game`
 | Type / const | SP oracle (`code/…`) | Divergence vs MP | SP |
