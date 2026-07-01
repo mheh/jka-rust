@@ -1,0 +1,14 @@
+[package]
+name = "sp_ui"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sp_ui"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sp_qshared = { path = "../qshared" }
+sp_bg = { path = "../bg" }
+sp_uishared = { path = "../uishared" }
+sp_abi = { path = "../abi" }

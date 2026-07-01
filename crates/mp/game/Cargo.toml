@@ -1,0 +1,13 @@
+[package]
+name = "mp_game"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_game"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+mp_qshared = { path = "../qshared" }
+mp_bg = { path = "../bg" }
+mp_abi = { path = "../abi" }

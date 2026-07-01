@@ -1,0 +1,11 @@
+[package]
+name = "mp_abi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_abi"
+
+[dependencies]
+abi_transport = { path = "../../abi-transport" }
+mp_qshared = { path = "../qshared" }

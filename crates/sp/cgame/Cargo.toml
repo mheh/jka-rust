@@ -1,0 +1,14 @@
+[package]
+name = "sp_cgame"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sp_cgame"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sp_qshared = { path = "../qshared" }
+sp_bg = { path = "../bg" }
+sp_uishared = { path = "../uishared" }
+sp_abi = { path = "../abi" }

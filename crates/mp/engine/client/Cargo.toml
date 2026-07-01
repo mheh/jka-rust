@@ -1,0 +1,12 @@
+[package]
+name = "mp_engine_client"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_engine_client"
+
+[dependencies]
+mp_qshared = { path = "../../qshared" }
+mp_engine_qcommon = { path = "../qcommon" }
+mp_abi = { path = "../../abi" }

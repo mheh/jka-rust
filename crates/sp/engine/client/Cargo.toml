@@ -1,0 +1,12 @@
+[package]
+name = "sp_engine_client"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sp_engine_client"
+
+[dependencies]
+sp_qshared = { path = "../../qshared" }
+sp_engine_qcommon = { path = "../qcommon" }
+sp_abi = { path = "../../abi" }

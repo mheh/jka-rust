@@ -1,0 +1,11 @@
+[package]
+name = "mp_uishared"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_uishared"
+
+[dependencies]
+mp_qshared = { path = "../qshared" }
+mp_bg = { path = "../bg" }

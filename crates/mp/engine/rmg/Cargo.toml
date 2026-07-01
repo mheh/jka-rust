@@ -1,0 +1,10 @@
+[package]
+name = "mp_engine_rmg"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_engine_rmg"
+
+[dependencies]
+mp_qshared = { path = "../../qshared" }

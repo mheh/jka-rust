@@ -1,0 +1,44 @@
+use core::ffi::c_int;
+
+use super::super::MpGameExport;
+use mp_qshared::shared::qboolean;
+
+use abi_transport::generic::InboundVmCall;
+
+// Flow:
+//
+//   executable --vmMain(GAME_NAV_ENTISBREAKABLE, entityNum, ...)--> jampgame
+//   jampgame   --G_EntIsBreakable(entityNum)--------------------> query entity navigation state
+//   jampgame   --return qboolean-------------------------------> executable
+//
+// `GAME_NAV_ENTISBREAKABLE` is an inbound executable-to-game call raised when
+// the engine asks whether an entity is a breakable navigation obstacle.
+
+/// Arguments for `GAME_NAV_ENTISBREAKABLE`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GameNavEntIsBreakableArgs {
+    entity_num: c_int,
+}
+
+impl GameNavEntIsBreakableArgs {
+    pub const fn new(entity_num: c_int) -> Self {
+        Self { entity_num }
+    }
+
+    pub const fn entity_num(self) -> c_int {
+        self.entity_num
+    }
+}
+
+/// `GAME_NAV_ENTISBREAKABLE` MP game exports vmMain ABI token.
+///
+/// Source: `oracle/oracle/codemp/game/g_public.h:794`
+pub struct GameNavEntIsBreakable;
+
+impl InboundVmCall for GameNavEntIsBreakable {
+    type Command = MpGameExport;
+    type Args = GameNavEntIsBreakableArgs;
+    type Output = qboolean;
+
+    const COMMAND: MpGameExport = MpGameExport::GAME_NAV_ENTISBREAKABLE;
+}

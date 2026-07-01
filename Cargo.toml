@@ -8,6 +8,42 @@ description = "Idiomatic, opinionated Rust reimplementation of Jedi Academy MP; 
 resolver = "2"
 members = [
     ".",
+    "crates/native/math",
+    "crates/native/platform",
+    "crates/native/containers",
+    "crates/native/types",
+    "crates/abi-transport",
+    "crates/mp/qshared",
+    "crates/mp/bg",
+    "crates/mp/uishared",
+    "crates/mp/abi",
+    "crates/mp/game",
+    "crates/mp/cgame",
+    "crates/mp/ui",
+    "crates/mp/engine/qcommon",
+    "crates/mp/engine/server",
+    "crates/mp/engine/client",
+    "crates/mp/engine/botlib",
+    "crates/mp/engine/ghoul2",
+    "crates/mp/engine/icarus",
+    "crates/mp/engine/rmg",
+    "crates/mp/renderer",
+    "crates/mp/app",
+    "crates/sp/qshared",
+    "crates/sp/bg",
+    "crates/sp/uishared",
+    "crates/sp/abi",
+    "crates/sp/game",
+    "crates/sp/cgame",
+    "crates/sp/ui",
+    "crates/sp/engine/qcommon",
+    "crates/sp/engine/server",
+    "crates/sp/engine/client",
+    "crates/sp/engine/ghoul2",
+    "crates/sp/engine/icarus",
+    "crates/sp/engine/rmg",
+    "crates/sp/renderer",
+    "crates/sp/app",
     "crates/jampgame",
     "crates/cgame",
     "crates/ui",
@@ -16,6 +52,16 @@ members = [
 
 [lib]
 name = "jka"
+
+# Migration bridges: `jka` re-exports the extracted tier crates so its remaining
+# modules stay green until the monolith is dissolved.
+[dependencies]
+native_math = { path = "crates/native/math" }
+native_platform = { path = "crates/native/platform" }
+native_types = { path = "crates/native/types" }
+abi_transport = { path = "crates/abi-transport" }
+mp_qshared = { path = "crates/mp/qshared" }
+sp_qshared = { path = "crates/sp/qshared" }
 
 [features]
 # Differential parity tests run this crate against the faithful port's behavior.

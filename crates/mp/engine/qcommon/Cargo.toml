@@ -1,0 +1,12 @@
+[package]
+name = "mp_engine_qcommon"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_engine_qcommon"
+
+[dependencies]
+mp_qshared = { path = "../../qshared" }
+abi_transport = { path = "../../../abi-transport" }
+native_platform = { path = "../../../native/platform" }

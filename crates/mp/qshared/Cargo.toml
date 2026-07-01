@@ -1,0 +1,12 @@
+[package]
+name = "mp_qshared"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_qshared"
+
+[dependencies]
+native_math = { path = "../../native/math" }
+native_platform = { path = "../../native/platform" }
+native_types = { path = "../../native/types" }

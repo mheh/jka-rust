@@ -3,6 +3,10 @@
 version = 4
 
 [[package]]
+name = "abi_transport"
+version = "0.1.0"
+
+[[package]]
 name = "cgame"
 version = "0.1.0"
 dependencies = [
@@ -26,6 +30,293 @@ dependencies = [
 [[package]]
 name = "jka-rust"
 version = "0.1.0"
+dependencies = [
+ "abi_transport",
+ "mp_qshared",
+ "native_math",
+ "native_platform",
+ "native_types",
+ "sp_qshared",
+]
+
+[[package]]
+name = "mp_abi"
+version = "0.1.0"
+dependencies = [
+ "abi_transport",
+ "mp_qshared",
+]
+
+[[package]]
+name = "mp_app"
+version = "0.1.0"
+dependencies = [
+ "mp_abi",
+ "mp_engine_client",
+ "mp_engine_qcommon",
+ "mp_engine_server",
+ "mp_renderer",
+]
+
+[[package]]
+name = "mp_bg"
+version = "0.1.0"
+dependencies = [
+ "mp_qshared",
+]
+
+[[package]]
+name = "mp_cgame"
+version = "0.1.0"
+dependencies = [
+ "mp_abi",
+ "mp_bg",
+ "mp_qshared",
+ "mp_uishared",
+]
+
+[[package]]
+name = "mp_engine_botlib"
+version = "0.1.0"
+dependencies = [
+ "mp_qshared",
+]
+
+[[package]]
+name = "mp_engine_client"
+version = "0.1.0"
+dependencies = [
+ "mp_abi",
+ "mp_engine_qcommon",
+ "mp_qshared",
+]
+
+[[package]]
+name = "mp_engine_ghoul2"
+version = "0.1.0"
+dependencies = [
+ "mp_qshared",
+]
+
+[[package]]
+name = "mp_engine_icarus"
+version = "0.1.0"
+dependencies = [
+ "mp_qshared",
+]
+
+[[package]]
+name = "mp_engine_qcommon"
+version = "0.1.0"
+dependencies = [
+ "abi_transport",
+ "mp_qshared",
+ "native_platform",
+]
+
+[[package]]
+name = "mp_engine_rmg"
+version = "0.1.0"
+dependencies = [
+ "mp_qshared",
+]
+
+[[package]]
+name = "mp_engine_server"
+version = "0.1.0"
+dependencies = [
+ "mp_abi",
+ "mp_engine_qcommon",
+ "mp_qshared",
+]
+
+[[package]]
+name = "mp_game"
+version = "0.1.0"
+dependencies = [
+ "mp_abi",
+ "mp_bg",
+ "mp_qshared",
+]
+
+[[package]]
+name = "mp_qshared"
+version = "0.1.0"
+dependencies = [
+ "native_math",
+ "native_platform",
+ "native_types",
+]
+
+[[package]]
+name = "mp_renderer"
+version = "0.1.0"
+dependencies = [
+ "mp_qshared",
+ "native_platform",
+]
+
+[[package]]
+name = "mp_ui"
+version = "0.1.0"
+dependencies = [
+ "mp_abi",
+ "mp_bg",
+ "mp_qshared",
+ "mp_uishared",
+]
+
+[[package]]
+name = "mp_uishared"
+version = "0.1.0"
+dependencies = [
+ "mp_bg",
+ "mp_qshared",
+]
+
+[[package]]
+name = "native_containers"
+version = "0.1.0"
+
+[[package]]
+name = "native_math"
+version = "0.1.0"
+
+[[package]]
+name = "native_platform"
+version = "0.1.0"
+
+[[package]]
+name = "native_types"
+version = "0.1.0"
+
+[[package]]
+name = "sp_abi"
+version = "0.1.0"
+dependencies = [
+ "abi_transport",
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_app"
+version = "0.1.0"
+dependencies = [
+ "sp_abi",
+ "sp_engine_client",
+ "sp_engine_qcommon",
+ "sp_engine_server",
+ "sp_renderer",
+]
+
+[[package]]
+name = "sp_bg"
+version = "0.1.0"
+dependencies = [
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_cgame"
+version = "0.1.0"
+dependencies = [
+ "sp_abi",
+ "sp_bg",
+ "sp_qshared",
+ "sp_uishared",
+]
+
+[[package]]
+name = "sp_engine_client"
+version = "0.1.0"
+dependencies = [
+ "sp_abi",
+ "sp_engine_qcommon",
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_engine_ghoul2"
+version = "0.1.0"
+dependencies = [
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_engine_icarus"
+version = "0.1.0"
+dependencies = [
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_engine_qcommon"
+version = "0.1.0"
+dependencies = [
+ "abi_transport",
+ "native_platform",
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_engine_rmg"
+version = "0.1.0"
+dependencies = [
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_engine_server"
+version = "0.1.0"
+dependencies = [
+ "sp_abi",
+ "sp_engine_qcommon",
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_game"
+version = "0.1.0"
+dependencies = [
+ "sp_abi",
+ "sp_bg",
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_qshared"
+version = "0.1.0"
+dependencies = [
+ "native_math",
+ "native_platform",
+ "native_types",
+]
+
+[[package]]
+name = "sp_renderer"
+version = "0.1.0"
+dependencies = [
+ "native_platform",
+ "sp_qshared",
+]
+
+[[package]]
+name = "sp_ui"
+version = "0.1.0"
+dependencies = [
+ "sp_abi",
+ "sp_bg",
+ "sp_qshared",
+ "sp_uishared",
+]
+
+[[package]]
+name = "sp_uishared"
+version = "0.1.0"
+dependencies = [
+ "sp_bg",
+ "sp_qshared",
+]
 
 [[package]]
 name = "ui"

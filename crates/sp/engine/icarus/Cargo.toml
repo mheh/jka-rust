@@ -1,0 +1,10 @@
+[package]
+name = "sp_engine_icarus"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sp_engine_icarus"
+
+[dependencies]
+sp_qshared = { path = "../../qshared" }

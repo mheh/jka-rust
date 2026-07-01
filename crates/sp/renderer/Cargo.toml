@@ -1,0 +1,11 @@
+[package]
+name = "sp_renderer"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sp_renderer"
+
+[dependencies]
+sp_qshared = { path = "../qshared" }
+native_platform = { path = "../../native/platform" }

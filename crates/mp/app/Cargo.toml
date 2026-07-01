@@ -1,0 +1,11 @@
+[package]
+name = "mp_app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mp_engine_qcommon = { path = "../engine/qcommon" }
+mp_engine_server = { path = "../engine/server" }
+mp_engine_client = { path = "../engine/client" }
+mp_renderer = { path = "../renderer" }
+mp_abi = { path = "../abi" }

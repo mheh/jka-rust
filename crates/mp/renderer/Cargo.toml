@@ -1,0 +1,11 @@
+[package]
+name = "mp_renderer"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_renderer"
+
+[dependencies]
+mp_qshared = { path = "../qshared" }
+native_platform = { path = "../../native/platform" }

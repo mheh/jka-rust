@@ -1,0 +1,11 @@
+[package]
+name = "sp_app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sp_engine_qcommon = { path = "../engine/qcommon" }
+sp_engine_server = { path = "../engine/server" }
+sp_engine_client = { path = "../engine/client" }
+sp_renderer = { path = "../renderer" }
+sp_abi = { path = "../abi" }

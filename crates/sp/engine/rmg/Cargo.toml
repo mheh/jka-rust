@@ -1,0 +1,10 @@
+[package]
+name = "sp_engine_rmg"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sp_engine_rmg"
+
+[dependencies]
+sp_qshared = { path = "../../qshared" }
