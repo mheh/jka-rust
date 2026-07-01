@@ -74,6 +74,10 @@ pub struct markFragment_t {
     pub numPoints: c_int,
 }
 
+const _: () = assert!(core::mem::size_of::<markFragment_t>() == 8);
+const _: () = assert!(core::mem::offset_of!(markFragment_t, firstPoint) == 0);
+const _: () = assert!(core::mem::offset_of!(markFragment_t, numPoints) == 4);
+
 /// Raven `stereoFrame_t` wire value.
 ///
 /// Type definition source: `oracle/oracle/code/renderer/tr_types.h:183-187`

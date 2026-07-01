@@ -71,3 +71,11 @@ pub struct entityState_t {
     pub boltInfo: c_int,
     pub isPortalEnt: qboolean,
 }
+
+const _: () = assert!(core::mem::size_of::<entityState_t>() == 272);
+const _: () = assert!(core::mem::offset_of!(entityState_t, number) == 0);
+const _: () = assert!(core::mem::offset_of!(entityState_t, pos) == 12);
+const _: () = assert!(core::mem::offset_of!(entityState_t, origin) == 92);
+const _: () = assert!(core::mem::offset_of!(entityState_t, saberInFlight) == 220);
+const _: () = assert!(core::mem::offset_of!(entityState_t, modelScale) == 248);
+const _: () = assert!(core::mem::offset_of!(entityState_t, isPortalEnt) == 268);

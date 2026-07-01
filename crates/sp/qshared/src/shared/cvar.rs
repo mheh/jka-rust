@@ -52,3 +52,10 @@ impl Default for vmCvar_t {
         Self::zeroed()
     }
 }
+
+const _: () = assert!(core::mem::size_of::<vmCvar_t>() == 272);
+const _: () = assert!(core::mem::offset_of!(vmCvar_t, handle) == 0);
+const _: () = assert!(core::mem::offset_of!(vmCvar_t, modificationCount) == 4);
+const _: () = assert!(core::mem::offset_of!(vmCvar_t, value) == 8);
+const _: () = assert!(core::mem::offset_of!(vmCvar_t, integer) == 12);
+const _: () = assert!(core::mem::offset_of!(vmCvar_t, string) == 16);

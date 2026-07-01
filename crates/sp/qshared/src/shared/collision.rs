@@ -49,3 +49,18 @@ pub struct CollisionRecord_t {
     pub mBarycentricI: c_float, // two barycentic coodinates for the hit point
     pub mBarycentricJ: c_float, // K = 1-I-J
 }
+
+const _: () = assert!(core::mem::size_of::<cplane_t>() == 20);
+const _: () = assert!(core::mem::offset_of!(cplane_t, normal) == 0);
+const _: () = assert!(core::mem::offset_of!(cplane_t, dist) == 12);
+const _: () = assert!(core::mem::offset_of!(cplane_t, r#type) == 16);
+const _: () = assert!(core::mem::offset_of!(cplane_t, signbits) == 17);
+const _: () = assert!(core::mem::offset_of!(cplane_t, pad) == 18);
+
+const _: () = assert!(core::mem::size_of::<CollisionRecord_t>() == 64);
+const _: () = assert!(core::mem::offset_of!(CollisionRecord_t, mDistance) == 0);
+const _: () = assert!(core::mem::offset_of!(CollisionRecord_t, mCollisionPosition) == 20);
+const _: () = assert!(core::mem::offset_of!(CollisionRecord_t, mCollisionNormal) == 32);
+const _: () = assert!(core::mem::offset_of!(CollisionRecord_t, mFlags) == 44);
+const _: () = assert!(core::mem::offset_of!(CollisionRecord_t, mBarycentricI) == 56);
+const _: () = assert!(core::mem::offset_of!(CollisionRecord_t, mBarycentricJ) == 60);

@@ -33,3 +33,14 @@ pub struct trace_t {
 
 // trace->entityNum can also be 0 to (MAX_GENTITIES-1)
 // or ENTITYNUM_NONE, ENTITYNUM_WORLD
+
+const _: () = assert!(core::mem::size_of::<trace_t>() == 1080);
+const _: () = assert!(core::mem::offset_of!(trace_t, allsolid) == 0);
+const _: () = assert!(core::mem::offset_of!(trace_t, startsolid) == 4);
+const _: () = assert!(core::mem::offset_of!(trace_t, fraction) == 8);
+const _: () = assert!(core::mem::offset_of!(trace_t, endpos) == 12);
+const _: () = assert!(core::mem::offset_of!(trace_t, plane) == 24);
+const _: () = assert!(core::mem::offset_of!(trace_t, surfaceFlags) == 44);
+const _: () = assert!(core::mem::offset_of!(trace_t, contents) == 48);
+const _: () = assert!(core::mem::offset_of!(trace_t, entityNum) == 52);
+const _: () = assert!(core::mem::offset_of!(trace_t, G2CollisionMap) == 56);

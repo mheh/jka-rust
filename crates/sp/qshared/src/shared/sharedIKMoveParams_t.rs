@@ -20,3 +20,9 @@ pub struct sharedIKMoveParams_t {
     /// Raven `movementSpeed`: how fast the bone should move toward the destination
     pub movement_speed: f32,
 }
+
+const _: () = assert!(core::mem::size_of::<sharedIKMoveParams_t>() == 540);
+const _: () = assert!(core::mem::offset_of!(sharedIKMoveParams_t, bone_name) == 0);
+const _: () = assert!(core::mem::offset_of!(sharedIKMoveParams_t, desired_origin) == 512);
+const _: () = assert!(core::mem::offset_of!(sharedIKMoveParams_t, origin) == 524);
+const _: () = assert!(core::mem::offset_of!(sharedIKMoveParams_t, movement_speed) == 536);

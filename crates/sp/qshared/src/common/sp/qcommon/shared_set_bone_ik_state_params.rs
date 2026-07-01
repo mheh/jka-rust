@@ -33,3 +33,15 @@ pub struct sharedSetBoneIKStateParams_t {
     /// Raven `endFrame`: base pose end
     pub end_frame: c_int,
 }
+
+const _: () = assert!(core::mem::size_of::<sharedSetBoneIKStateParams_t>() == 80);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, pcj_mins) == 0);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, pcj_maxs) == 12);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, origin) == 24);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, angles) == 36);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, scale) == 48);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, radius) == 60);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, blend_time) == 64);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, pcj_overrides) == 68);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, start_frame) == 72);
+const _: () = assert!(core::mem::offset_of!(sharedSetBoneIKStateParams_t, end_frame) == 76);

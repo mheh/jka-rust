@@ -29,3 +29,14 @@ pub struct qtime_t {
     /// Raven `tm_isdst`: daylight savings time flag
     pub tm_isdst: c_int,
 }
+
+const _: () = assert!(core::mem::size_of::<qtime_t>() == 36);
+const _: () = assert!(core::mem::offset_of!(qtime_t, tm_sec) == 0);
+const _: () = assert!(core::mem::offset_of!(qtime_t, tm_min) == 4);
+const _: () = assert!(core::mem::offset_of!(qtime_t, tm_hour) == 8);
+const _: () = assert!(core::mem::offset_of!(qtime_t, tm_mday) == 12);
+const _: () = assert!(core::mem::offset_of!(qtime_t, tm_mon) == 16);
+const _: () = assert!(core::mem::offset_of!(qtime_t, tm_year) == 20);
+const _: () = assert!(core::mem::offset_of!(qtime_t, tm_wday) == 24);
+const _: () = assert!(core::mem::offset_of!(qtime_t, tm_yday) == 28);
+const _: () = assert!(core::mem::offset_of!(qtime_t, tm_isdst) == 32);
