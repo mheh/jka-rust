@@ -8,4 +8,5 @@ name = "sp_renderer"
 
 [dependencies]
 sp_qshared = { path = "../qshared" }
+sp_engine_qcommon = { path = "../engine/qcommon" }
 native_platform = { path = "../../native/platform" }

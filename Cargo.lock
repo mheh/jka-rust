@@ -140,6 +140,7 @@ dependencies = [
 name = "mp_renderer"
 version = "0.1.0"
 dependencies = [
+ "mp_engine_qcommon",
  "mp_qshared",
  "native_platform",
 ]
@@ -285,6 +286,7 @@ name = "sp_renderer"
 version = "0.1.0"
 dependencies = [
  "native_platform",
+ "sp_engine_qcommon",
  "sp_qshared",
 ]
 

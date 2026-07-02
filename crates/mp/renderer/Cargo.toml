@@ -8,4 +8,5 @@ name = "mp_renderer"
 
 [dependencies]
 mp_qshared = { path = "../qshared" }
+mp_engine_qcommon = { path = "../engine/qcommon" }
 native_platform = { path = "../../native/platform" }
