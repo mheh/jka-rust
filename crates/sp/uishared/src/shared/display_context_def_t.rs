@@ -2,10 +2,13 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use sp_qshared::common::sp::ghoul2::cghoul2_info_v::CGhoul2Info_v;
 use sp_qshared::common::sp::renderer::glconfig_t::glconfig_t;
 use sp_qshared::common::sp::renderer::ref_entity_t::refEntity_t;
 use sp_qshared::common::sp::renderer::refdef_t::refdef_t;
-use sp_qshared::shared::{mdxaBone_t, qboolean, qhandle_t, sfxHandle_t, vec3_t, vec4_t};
+use sp_qshared::shared::{
+    mdxaBone_t, qboolean, qhandle_t, sfxHandle_t, vec3_t, vec4_t, Eorientations,
+};
 
 use super::cached_assets_t::cachedAssets_t;
 use super::item_def_s::itemDef_s;
@@ -155,15 +158,12 @@ pub struct displayContextDef_t {
             blendTime: c_int,
         ) -> qboolean,
     >,
-    //TODO: Port CGhoul2Info_v
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:326-329
+    // Raven passes `CGhoul2Info_v &` — reference ABI is a pointer.
     pub g2_RemoveGhoul2Model:
-        Option<unsafe extern "C" fn(ghlInfo: *mut c_void, modelIndex: c_int) -> qboolean>,
-    //TODO: Port CGhoul2Info_v
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:326-329
+        Option<unsafe extern "C" fn(ghlInfo: *mut CGhoul2Info_v, modelIndex: c_int) -> qboolean>,
     pub g2_InitGhoul2Model: Option<
         unsafe extern "C" fn(
-            ghoul2: *mut c_void,
+            ghoul2: *mut CGhoul2Info_v,
             fileName: *const c_char,
             unused: c_int,
             customSkin: qhandle_t,
@@ -172,18 +172,14 @@ pub struct displayContextDef_t {
             lodBias: c_int,
         ) -> c_int,
     >,
-    //TODO: Port CGhoul2Info_v
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:326-329
-    pub g2_CleanGhoul2Models: Option<unsafe extern "C" fn(ghoul2: *mut c_void)>,
+    pub g2_CleanGhoul2Models: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v)>,
     //TODO: Port CGhoul2Info
     // Source: oracle/oracle/code/game/ghoul2_shared.h:240
     pub g2_AddBolt:
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, boneName: *const c_char) -> c_int>,
-    //TODO: Port CGhoul2Info_v
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:326-329
     pub g2_GetBoltMatrix: Option<
         unsafe extern "C" fn(
-            ghoul2: *mut c_void,
+            ghoul2: *mut CGhoul2Info_v,
             modelIndex: c_int,
             boltIndex: c_int,
             matrix: *mut mdxaBone_t,
@@ -194,10 +190,8 @@ pub struct displayContextDef_t {
             scale: *const vec3_t,
         ) -> qboolean,
     >,
-    //TODO: Port Eorientations
-    // Source: oracle/oracle/code/game/q_shared.h:2641
     pub g2_GiveMeVectorFromMatrix: Option<
-        unsafe extern "C" fn(boltMatrix: *mut mdxaBone_t, flags: c_int, vec: *mut vec3_t),
+        unsafe extern "C" fn(boltMatrix: *mut mdxaBone_t, flags: Eorientations, vec: *mut vec3_t),
     >,
 
     // Raven: Utility functions that don't immediately redirect to ghoul2 functions

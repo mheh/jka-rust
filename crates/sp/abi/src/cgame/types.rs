@@ -105,13 +105,9 @@ impl stereoFrame_t {
     }
 }
 
-/// Opaque Raven `CGhoul2Info_v` C++ class.
-///
-/// Type definition source: `oracle/oracle/code/game/ghoul2_shared.h:311`
-#[repr(C)]
-pub struct CGhoul2Info_v {
-    _private: [u8; 0],
-}
+/// Raven `CGhoul2Info_v` — canonical port lives in `sp_qshared`'s ghoul2
+/// module (Wave 5); re-exported here for the existing abi syscall signatures.
+pub use sp_qshared::common::sp::ghoul2::cghoul2_info_v::CGhoul2Info_v;
 
 /// Opaque Raven `surfaceInfo_v` C++ vector alias.
 ///

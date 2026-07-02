@@ -7,6 +7,7 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use crate::common::sp::ghoul2::cghoul2_info_v::CGhoul2Info_v;
 use crate::common::sp::qcommon::{entityState_t, gitem_t, parms_t};
 use crate::shared::{qboolean, qhandle_t, vec3_t, vec4_t};
 
@@ -156,11 +157,7 @@ pub struct gentity_t {
     /// prevent player missiles from immediately
     /// colliding with their owner
     pub owner: *mut gentity_t,
-    //TODO: Port CGhoul2Info_v
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:326-329
-    // Raven's `CGhoul2Info_v` wraps a single `int mItem` handle into the shared
-    // ghoul2 instance array; ABI width is 4 bytes.
-    pub ghoul2: c_int,
+    pub ghoul2: CGhoul2Info_v,
     /// needed for g2 collision
     pub modelScale: vec3_t,
     /// set in QuakeEd

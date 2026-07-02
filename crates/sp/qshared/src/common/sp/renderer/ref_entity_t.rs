@@ -2,10 +2,11 @@
 
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_int, c_void};
+use core::ffi::c_int;
 
 use native_types::byte;
 
+use crate::common::sp::ghoul2::cghoul2_info_v::CGhoul2Info_v;
 use crate::shared::{qboolean, qhandle_t, vec2_t, vec3_t};
 
 use super::ref_entity_type_t::refEntityType_t;
@@ -88,10 +89,8 @@ pub struct refEntity_t {
 
     /// axis scale for models
     pub modelScale: vec3_t,
-    //TODO: Port CGhoul2Info_v
-    // Source: oracle/oracle/code/ghoul2/G2.h
     /// has to be at the end of the ref-ent in order for it to be created properly
-    pub ghoul2: *mut c_void,
+    pub ghoul2: *mut CGhoul2Info_v,
     // Ghoul2 Insert End
 }
 

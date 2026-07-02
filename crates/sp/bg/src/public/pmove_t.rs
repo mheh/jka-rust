@@ -7,6 +7,7 @@
 use core::ffi::c_int;
 
 use sp_qshared::common::sp::gentity::gentity_t;
+use sp_qshared::common::sp::ghoul2::eg2_collision::EG2_Collision;
 use sp_qshared::common::sp::qcommon::{playerState_t, usercmd_t};
 use sp_qshared::common::sp::trace_t::trace_t;
 use sp_qshared::shared::{qboolean, vec3_t};
@@ -68,10 +69,6 @@ pub struct pmove_t {
     /// Raven: callbacks to test the world; these will be different functions
     /// during game and cgame.
     /// Raven field source: `oracle/oracle/code/game/bg_public.h:159-160`
-    //TODO: Port EG2_Collision
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:484-489
-    // `eG2TraceType` is a 3-variant unscoped C++ enum (int-sized); kept as
-    // `c_int` here to preserve the fn-pointer ABI until EG2_Collision is ported.
     pub trace: Option<
         unsafe extern "C" fn(
             results: *mut trace_t,
@@ -81,7 +78,7 @@ pub struct pmove_t {
             end: *const vec3_t,
             passEntityNum: c_int,
             contentMask: c_int,
-            eG2TraceType: c_int,
+            eG2TraceType: EG2_Collision,
             useLod: c_int,
         ),
     >,

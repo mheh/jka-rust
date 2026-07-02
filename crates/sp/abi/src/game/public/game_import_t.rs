@@ -3,6 +3,8 @@
 use core::ffi::{c_char, c_int, c_ulong, c_void};
 
 use sp_qshared::common::sp::gentity::gentity_t;
+use sp_qshared::common::sp::ghoul2::crag_doll_params::CRagDollParams;
+use sp_qshared::common::sp::ghoul2::eg2_collision::EG2_Collision;
 use sp_qshared::common::sp::qcommon::collision_record::CCollisionRecord;
 use sp_qshared::common::sp::qcommon::shared_set_bone_ik_state_params::sharedSetBoneIKStateParams_t;
 use sp_qshared::common::sp::qcommon::tags::memtag_t;
@@ -146,10 +148,6 @@ pub struct game_import_t {
     pub SetBrushModel: Option<unsafe extern "C" fn(ent: *mut gentity_t, name: *const c_char)>,
 
     // collision detection against all linked entities
-    //TODO: Port EG2_Collision
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:484
-    // `eG2TraceType` is a 3-variant unscoped C++ enum (int-sized); kept as `c_int`
-    // here to preserve the fn-pointer ABI until EG2_Collision is ported.
     pub trace: Option<
         unsafe extern "C" fn(
             results: *mut trace_t,
@@ -159,7 +157,7 @@ pub struct game_import_t {
             end: *const vec3_t,
             passEntityNum: c_int,
             contentmask: c_int,
-            eG2TraceType: c_int,
+            eG2TraceType: EG2_Collision,
             useLod: c_int,
         ),
     >,
@@ -498,10 +496,8 @@ pub struct game_import_t {
         Option<unsafe extern "C" fn(ghlInfo: *mut c_void, surfaceName: *const c_char) -> c_int>,
 
     //rww - RAGDOLL_BEGIN
-    //TODO: Port CRagDollParams
-    // Source: oracle/oracle/code/game/g_public.h:48
     pub G2API_SetRagDoll:
-        Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, parms: *mut c_void)>,
+        Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, parms: *mut CRagDollParams)>,
     //TODO: Port CRagDollUpdateParams
     // Source: oracle/oracle/code/game/g_public.h:47
     pub G2API_AnimateG2Models: Option<

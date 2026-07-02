@@ -2,6 +2,7 @@
 
 use core::ffi::{c_char, c_float, c_int, c_void};
 
+use sp_qshared::common::sp::ghoul2::cghoul2_info_v::CGhoul2Info_v;
 use sp_qshared::shared::{qhandle_t, sfxHandle_t};
 
 use super::color_range_def_t::colorRangeDef_t;
@@ -50,12 +51,8 @@ pub struct itemDef_s {
     pub parent: *mut c_void,
     /// handle to asset
     pub asset: qhandle_t,
-    //TODO: Port CGhoul2Info_v
-    // Source: oracle/oracle/code/game/ghoul2_shared.h:326-329
-    // Raven's `CGhoul2Info_v` wraps a single `int mItem` handle into the shared
-    // ghoul2 instance array; ABI width is 4 bytes.
     /// ghoul2 instance if available instead of a model.
-    pub ghoul2: c_int,
+    pub ghoul2: CGhoul2Info_v,
     /// flags like g2valid, character, saber, saber2, etc.
     pub flags: c_int,
     /// mouse enter script
