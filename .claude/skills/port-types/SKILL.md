@@ -91,8 +91,8 @@ NOTES.md): `closure.py` (dependency closures, call trees, `--asserts`
 generation, verified ☑/✗/◐ ported badges from clang record layouts) and
 `portpacket.py` (self-contained function port packets, `--json`).
 
-Two Workflow scripts in `.claude/workflows/` orchestrate batch porting with
-Sonnet agents + machine verify; output is left **uncommitted for review**:
+Three Workflow scripts in `.claude/workflows/` orchestrate batch porting with
+subagents + machine verify; output is left **uncommitted for review**:
 
 - `port-assert-backfill` — args: `[{file, module, crate}]` (the assert-less
   `#[repr(C)]` files; compute via
@@ -104,3 +104,17 @@ Sonnet agents + machine verify; output is left **uncommitted for review**:
   → parallel MP port → SP-as-diff → serial heavy phase (high effort) →
   badge-sweep verify with fixer rounds → todo-doc update. Smoke-test new
   targets with `onlyTypes` first.
+- `port-cpp-subsystem` — the C++ track (porting-rules §F: idiomatic
+  reimplementation, differential verification; NOT byte-faithful). args:
+  `{subsystem, mpCrate, spCrate, mpDir, spDir, mpOracle[], spOracle[],
+  designPath?, hard?[], skipDocs?}`. Scout → high-effort Design doc +
+  adversarial review (pass `designPath` to use a hand-reviewed doc instead)
+  → differential harness (`tools/<subsystem>-oracle`, compiles the
+  unmodified oracle TUs, committed goldens, Rust parity tests) → frozen
+  skeleton (designed signatures, `todo!()` bodies) → parallel per-class
+  porters (MP, then SP twin as diff) → parity+cargo verify with fixer
+  rounds → todo-doc C++-track table. Exemplar: GP2
+  (`crates/mp/engine/qcommon/src/gp2`, `tools/gp2-oracle`). For subsystems
+  with heavy engine coupling (ghoul2), expect the Harness phase to shrink
+  scope — it must record uncovered areas under `gaps`, never claim silent
+  coverage.
