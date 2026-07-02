@@ -1,0 +1,25 @@
+//! MP botlib ABI seam types (`botlib.h`/`be_aas.h`/`be_ai_*.h`) shared with game/cgame.
+
+pub mod aas_altroutegoal_s;
+pub mod aas_clientmove_s;
+pub mod aas_entityinfo_s;
+pub mod aas_export_s;
+pub mod aas_predictroute_s;
+pub mod aas_trace_s;
+pub mod ai_export_s;
+pub mod bot_avoidspot_s;
+pub mod bot_consolemessage_s;
+pub mod bot_entitystate_s;
+pub mod bot_initmove_s;
+pub mod bot_input_s;
+pub mod bot_match_s;
+pub mod bot_matchvariable_s;
+pub mod bot_moveresult_s;
+pub mod botlib_export_s;
+pub mod botlib_import_s;
+pub mod bsp_surface_s;
+pub mod bsp_trace_s;
+pub mod ea_export_s;
+pub mod projectileinfo_s;
+pub mod solid_t;
+pub mod weaponinfo_s;
