@@ -7,8 +7,11 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 pub mod ai;
+pub mod botai;
 pub mod client;
 pub mod entity;
 pub mod level;
 pub mod npc;
+pub mod saber;
+pub mod say;
 pub mod teams;
