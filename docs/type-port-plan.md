@@ -53,8 +53,8 @@ Counts are faithful-C types by owning header; C++/vendored excluded per above.
 | 5 | `*/engine/icarus` | 11 | 3 | **done** (faithful subset; managers → C++ track) | medium |
 | 5 | `*/engine/rmg` | 2 | 3 | **done** (enums only; classes → C++ track) | mostly C++ track |
 | 5 | `*/engine/server` | 8 | 8 | **done** | medium |
-| 6 | `*/engine/client` | 85 | 67 | stub | medium (skip eax 77+77) |
-| 7 | `*/renderer` | 239 | 237 | stub | **HIGH** (`refEntity_t`, `refdef_t`, shaders, mdx) |
+| 6 | `*/engine/client` | 40 | 38 | **done** (FX/music/ambient classes → C++ track; eax/Bink/console skipped; mp3 layout structs ported)\*\*\* | medium |
+| 7 | `*/renderer` | 92 | 88 | **done** (qgl/glext GL bindings → replaced; WorldEffects/QuickSprite(MP) → C++ track; tr_types was Wave 3) | **HIGH** (`trGlobals_t`, `shaderCommands_s`, mdx — all offset-asserted) |
 
 \* `game/*` headers (`g_public.h`, `g_shared.h`, …) not yet split across
 `qshared`/`bg`/`game`; classified per-file when Wave 4 starts.
@@ -63,6 +63,13 @@ Counts are faithful-C types by owning header; C++/vendored excluded per above.
 (`game/botlib.h`, `game/be_*.h`) in `mp_qshared::common::mp::botlib`.
 Wave-5 counts are ground-truth sweep results; the original estimates
 included types that turned out C++-track or already ported.
+
+\*\*\* Wave 6/7 counts are likewise ground-truth: the original client estimate
+(85/67) included the FX/music/ambient C++ class families and Xbox/vendored
+headers; the renderer estimate (239/237) counted the qgl/glext GL-binding
+typedefs (replaced, not ported) and tr_types.h (done in Wave 3). `MP3STREAM`
++ `SAMPLE`/`IN_OUT` (vendored mp3code) are ported as layout structs because
+`channel_t` embeds `MP3STREAM` by value; the decoder itself stays replaced.
 
 ## Waves
 
@@ -90,11 +97,14 @@ model done; remaining is `g_public.h`/`g_shared.h` classification + cgame/ui.
 **Wave 5 — engine core.** `qcommon` first (underpins the rest), then
 botlib/ghoul2/icarus/rmg/server. rmg is mostly the C++ track.
 
-**Wave 6 — `client`.** Skip the 154 eax vendor types.
+**Wave 6 — `client`.** Done. eax/OpenAL/Bink vendored headers skipped or
+parse-shimmed; FX system / music / ambient-set classes deferred to the C++
+track; mp3struct.h layout structs ported (embedded by value in `channel_t`).
 
-**Wave 7 — `renderer`.** Largest bucket. `tr_local.h`, `mdx_format.h`,
-`refEntity_t`/`refdef_t`/shaders are layout-critical; glext/qgl are GL bindings
-(mechanical or replaceable).
+**Wave 7 — `renderer`.** Done. `tr_local.h`, `mdx_format.h`, `tr_public.h`
+ported offset-asserted into the top-level `mp_renderer`/`sp_renderer` crates;
+glext/qgl GL bindings are replaced (parse-only `glshim/`), WorldEffects and
+MP QuickSprite classes deferred to the C++ track.
 
 ## Per-crate batching workflow (every wave)
 

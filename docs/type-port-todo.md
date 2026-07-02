@@ -421,6 +421,76 @@ discriminant), SP `CRMAutomapSymbol`.
 | net profiling | `INetProfile`/`CNetProfile` | win32-only C++ |
 | misc | SP `CMapPoolLow`/`CMapBlock` (hstring pools), `unzip.h` (vendored minizip) | std:: members / vendored |
 
+## Client tier — Wave 6, **complete** (MP 40 / SP 38, all ☑)
+
+### `mp_engine_client` / `sp_engine_client`
+`client/`: `clientActive_t` (MP 1764304 B / SP 248800 B), `clientConnection_t`
+(MP 407048 — embeds `netchan_t` — / SP 18776), `clientStatic_t` (MP 414432 /
+SP 1456), `clSnapshot_t`, `console_t`(65612), `kbutton_t`, `ping_t`,
+`serverInfo_t`/`serverAddress_t`/`outPacket_t`/`rmAutomapSymbol_t` (MP),
+`exitTo_t`/`getserversResponse_t`/`serverInfoResponse_t` (SP). `keys/`:
+`keyGlobals_t`(13984), `field_t`, `qkey_t`, `keyname_t`; SP `keycodes/`
+`fakeAscii_t` (MP keycodes are ui-owned — `fakeAscii_t` was already ported in
+Wave 4). SP `vmachine/`: `vm_t`(8) + `cgameExport_t` (SP's tiny cgame
+dispatcher, unrelated to MP QVM `vm_t`). `snd/`: `channel_t`(76808, embeds
+`MP3STREAM` by value; SP `entchannel` is the real `soundChannel_t`), `sfx_t`,
+`dma_t`, `wavinfo_t`, `portable_samplepair_t`, `STREAMINGBUFFER`,
+`SoundCompressionMethod_t`, `MusicState_e`, `id3v1_1`. `snd_ambient/`:
+`ambientSet_t`, `parseFunc_t`, `set_e`/`setKeyword_e`. `mp3/`: `MP3STREAM`
+(26656) + `SAMPLE`/`IN_OUT` + decode fn-ptr typedefs — ported faithfully
+because `channel_t` embeds `MP3STREAM` **by value**; the mp3 *decode code*
+stays on the vendored-replacement track (`minimp3`). `fffx/` `ffFX_e`;
+`fx/` faithful subset: `SFxHelper`, `CFxRange`, `SEffectTemplate`,
+`EPrimType`, `EMatImpactEffect`; SP `input_hotswap/` `HotSwapManager`.
+
+Hand-ported alongside (Wave-1 gap found by the client sweep): SP
+`soundChannel_t` (`game/channels.h`, included by SP `q_shared.h`) →
+`sp_qshared::common::sp::game`; MP/SP `stereoFrame_t` (MP `typedef int` +
+anon enum → alias+consts; SP named enum → `#[repr(i32)]`) → qshared
+tr_types homes; MP `orientation_t` re-export added to `mp_qshared::shared`.
+
+### Wave 6 C++-track deferrals / skips
+| Group | Types | Why |
+|---|---|---|
+| FX system | `CEffect` + 12 primitive subclasses (`CParticle`, `CLine`, …), `CFxScheduler` (std::map/list), `CMediaHandles` (std::vector), `CPrimitiveTemplate` (embeds `CMediaHandles` by value — std cascade) | virtual/base/std:: |
+| Ambient sets | `CSetGroup` | std::vector/map members |
+| Vendored/Xbox | `BinkVideo.h` (Bink SDK), `snd_local_console.h`, MP `client/keycodes.h` (Xbox orphan; PC uses `ui/keycodes.h`), eax (COM headers patched out of the parse — no swept type embeds EAX), OpenAL headers (parse-only; `ALuint` fields are plain `u32`) | vendored / console-only |
+
+## Renderer tier — Wave 7, **complete** (MP 92 / SP 88, all ☑)
+
+### `mp_renderer` / `sp_renderer` (top-level crates, statically linked like Raven's)
+`tr_local/` (69/67 types): `trGlobals_t` (MP 316472 B / SP 175176),
+`backEndData_t` (MP 1983128 / SP 2032904), `shaderCommands_s`(128064, the
+tess buffer; `__declspec(align(16))` typedef noted), `renderCommandList_t`,
+`backEndState_t`, `trRefdef_t`, `viewParms_t` (SP `or` fields parse via
+`-fno-operator-names`), `trRefEntity_t`/`trMiniRefEntity_t`, `world_t`,
+`shader_s`(232/208) + `shaderStage_t`/`textureBundle_t`/`texModInfo_t`/
+`deformStage_t`/`waveForm_t`/`skyParms_t`/`fogParms_t`, `image_t`, `skin_s`,
+`model_s` (`md3Header_t*`/`mdxmHeader_t*` from Wave-5 `qfiles`), `bmodel_t`,
+`mnode_s`/`msurface_s`/`mgrid_t`/`fog_t`, all `srf*` surface variants +
+`surfaceType_t`, render commands (`drawSurfsCommand_t`, `stretchPic…`,
+`rotatePic…`, SP `scissor…`/`setMode…`), `glstate_t`, counters, `dlight_s`,
+`decalPoly_s`/`hitMatReg_t`/`eDLightTypes`/`CPBUFFER` (MP; win32
+HGLRC/HDC/HPBUFFERARB handles stay opaque pointers by design),
+`CRenderableSurface` (ghoul2 render surface; `CBoneCache*` marker), 12
+shader enums, `glIndex_t`. `tr_public/`: `refexport_t` (360/384; no
+`refimport_t` exists in JKA — renderer is statically linked, exports only).
+`mdx_format/` (14 each): full GLM (`mdxm*`) + GLA (`mdxa*`) disk formats
+incl. `mdxaCompQuatBone_t`(14). `tr_worldeffects/` MP `SParticle`.
+`tr_quicksprite/` SP `CQuickSpriteSystem`(44032; MP variant has virtuals →
+C++ track). `tr_landscape/` (5 each): `CTRLandScape`(1120, real
+`[CTRHeightDetails; 256]` array), `CTRPatch`/`CTerVert`/`SPatchInfo` with
+real `*mut shader_t` siblings (`CCMLandScape*`/`CCMPatch*` stay C++-track
+markers).
+
+### Wave 7 C++-track deferrals / skips
+| Group | Types | Why |
+|---|---|---|
+| World effects | MP `CWorldEffect`/`CWorldEffectsSystem` (SP header owns no types) | virtual |
+| Quick sprites | MP `CQuickSpriteSystem` (SP variant ported — no virtuals) | virtual |
+| GL bindings | `qgl.h`/`glext.h` PFN typedefs + `qgl_console`/`glext_console` | replaced by a Rust GL loader; parse-only via `glshim/` |
+| Misc | SP `tr_stl.h` (STL helpers), `tr_jpeg_interface.h` (vendored jpeg-6), `amd3d.h` (3DNow asm), `tr_font.h`/`matcomp.h` (own no types) | vendored / no types |
+
 ## Related pre-existing gaps (out of scope, tracked)
 - ~~SP `gentity_t` is an opaque stub~~ — full-ported in Wave 4 (1496 B,
   offset-asserted). Remaining: SP `entity_shared.rs` / `collision.rs` are
