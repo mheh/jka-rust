@@ -53,6 +53,7 @@ pub mod trajectory;
 
 // Migration bridge: these tiers now live in dedicated crates. `jka` re-exports
 // them so its remaining modules stay green until the monolith is dissolved.
+pub use native_math::orientation::orientation_t;
 pub use native_math::vector;
 pub use native_platform::platform;
 
