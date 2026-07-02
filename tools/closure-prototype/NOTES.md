@@ -277,3 +277,44 @@ Lessons → fixes:
   came back `*mut c_void` + TODO and needed a manual reconcile pass. Next
   wave: extend RULES — pointer fields whose target is IN THE MANIFEST must
   use the real sibling type (placeholders make it safe already).
+
+## v11 — Waves 6+7: client + renderer via two concurrent runs
+
+Numbers: 258 workflow types (client MP 40 / SP 38; renderer MP 92 / SP 88)
++ 3 hand-ported (`soundChannel_t` — a Wave-1 gap the client sweep exposed:
+`game/channels.h` is included by SP `q_shared.h` — and MP/SP `stereoFrame_t`),
+126 workflow agents, ~4.4 M subagent tokens, zero agent errors, both runs
+cargo-green on first verify. Wall: client ~21 min (54 agents), renderer
+~28 min (72 agents), run concurrently.
+
+New machinery this wave:
+- mp/sp-client TU profiles (client.h + snd chain + FX headers + mp3struct);
+  renderer profiles went multi-entry (tr_local + font/quicksprite/
+  WorldEffects/landscape + cm_landscape.h for HEIGHT_RESOLUTION).
+- glshim/: parse-only GL scalar-typedef headers (gl.h, GL/gl.h, MesaGL/gl.h,
+  empty qgl_linked.h for MP) — qgl.h/glext.h parse without any GL SDK.
+- Per-profile `flags`: `-fdeclspec` (shaderCommands_t's
+  `__declspec(align(16))` typedef), `-fno-operator-names` (SP tr_local names
+  fields `or` — clang was SILENTLY DROPPING them from viewParms_t/trGlobals_t;
+  MSVC treats `or` as an identifier). Windows-type defines (HDC/HGLRC/BOOL/
+  DECLARE_HANDLE(x)) fix qgl.h's unguarded WGL pbuffer section.
+- _SHIM_PATCHES in backslash_include_shims: snd_local.h's eax includes
+  (windows COM) drop out at parse time — verified no swept type embeds EAX.
+
+Lessons -> fixes:
+- The `or`-field drop is the nastiest silent-corruption class yet: no parse
+  error mentions the struct, the field just vanishes. Caught by walking the
+  FULL deduped diagnostic list per TU (not the first 3) and reading every
+  "expected member name" site. Rule: any error whose location is inside a
+  swept struct's line range is a stop signal.
+- Error-recovery is layout-safe for default-args on fn-ptr members (MSVC
+  extension, C++ forbids): probed refexport_t/uiimport_t offsets around the
+  errored members — clang keeps the field, drops the default. Benign class.
+- Vendored-by-value: channel_t embeds MP3STREAM (26656 B) by value, so
+  mp3struct.h/small_header.h structs are ported as layout types even though
+  mp3code stays replaced. "Vendored -> skip" applies to CODE, not to layout
+  the faithful port depends on.
+- v10's porter-rule gap recurred (skyParms.outerbox, landscape shader_t,
+  bmodel.firstSurface, srfTerrain.landscape came back `*mut c_void` + TODO):
+  RULES now says in-manifest/below-tier pointees must use the real type;
+  opaque + TODO is only for C++-track / platform / higher-tier targets.

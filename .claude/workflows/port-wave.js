@@ -51,6 +51,11 @@ const RULES = `HOUSE RULES (binding — docs/porting-rules.md):
   every wave file already has the correct size/alignment, so your offsets and
   asserts are right from the first cargo check. Do NOT hand-roll [u8; N]
   blob fields for wave siblings.
+- POINTER fields too: if the pointee type is in this wave's manifest (or
+  already ported anywhere below your crate), the field is \`*mut TheRealType\`
+  with a normal import — NOT \`*mut c_void\` + TODO marker. Opaque pointers +
+  \`//TODO: Port X\` are ONLY for types that are genuinely out of scope
+  (C++-track classes, platform handles, higher-tier types).
 - If house style renames your item (C tag -> typedef name), ALSO emit
   pub type <manifest name> = <new name>; when they differ, so siblings that
   imported the manifest name stay green.

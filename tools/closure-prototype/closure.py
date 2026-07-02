@@ -132,10 +132,45 @@ RAVEN_MODULES = {
                            "codemp/RMG/RM_Headers.h"],
         includes=["codemp/RMG", "codemp/game", "codemp/qcommon", "codemp"],
         defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
-    "mp-renderer": dict(
-        lang="c++", entry="codemp/renderer/tr_local.h",
-        includes=["codemp/renderer", "codemp/game", "codemp/qcommon"],
+    # client.h pulls tr_public/ui_public/keys/snd_public/cg_public/bg_public.
+    # keys.h -> ../ui/keycodes.h (MP keycodes are ui-owned). snd_local.h pulls
+    # vendored-but-parseable OpenAL headers + mp3struct.h (channel_t embeds
+    # MP3STREAM by value); its eax includes are patched out at parse time
+    # (windows COM; nothing swept embeds EAX types). Skipped: BinkVideo.h
+    # (vendored Bink SDK, Xbox), snd_local_console.h (Xbox),
+    # client/keycodes.h (Xbox orphan; PC uses ui/keycodes.h).
+    "mp-client": dict(
+        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
+                           "codemp/client/client.h", "codemp/client/snd_local.h",
+                           "codemp/client/snd_music.h", "codemp/client/snd_ambient.h",
+                           "codemp/client/fffx.h", "codemp/client/FxScheduler.h",
+                           "codemp/client/FXExport.h"],
+        includes=["codemp/client", "codemp/game", "codemp/qcommon", "codemp/renderer",
+                  "codemp/ui", "codemp/cgame", "codemp"],
         defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
+    # Multi-entry: tr_local.h pulls tr_public/qgl/ghoul2_shared/mdx_format.
+    # qgl.h/glext.h parse via the glshim include dir (GL scalar typedefs only);
+    # their own types are GL bindings — replaced, never swept. Skipped:
+    # qgl_console/glext_console (Xbox).
+    # cm_landscape.h precedes tr_landscape.h (HEIGHT_RESOLUTION array bound).
+    # The windows-type defines cover qgl.h's unguarded WGL pbuffer section and
+    # tr_local.h's HDC/HGLRC/USHORT fields (handles = pointer-size, layout-
+    # correct). -fdeclspec parses `__declspec(align(16))` on shaderCommands_t.
+    "mp-renderer": dict(
+        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
+                           "codemp/qcommon/cm_landscape.h",
+                           "codemp/renderer/tr_local.h", "codemp/renderer/tr_font.h",
+                           "codemp/renderer/tr_quicksprite.h",
+                           "codemp/renderer/tr_WorldEffects.h",
+                           "codemp/renderer/tr_landscape.h",
+                           "codemp/renderer/matcomp.h"],
+        includes=["codemp/renderer", "codemp/game", "codemp/qcommon", "codemp",
+                  "../../tools/closure-prototype/glshim"],
+        defines=["NDEBUG", "MISSIONPACK", "_JK2",
+                 "USHORT=unsigned short", "BOOL=int", "UINT=unsigned int",
+                 "FLOAT=float", "HDC=void *", "HGLRC=void *",
+                 "DECLARE_HANDLE(name)=typedef void *name"],
+        flags=["-fdeclspec"]),
     # SP tree (code/) — C++ throughout
     "sp-game": dict(
         lang="c++", entry=["code/game/b_local.h", "code/game/wp_saber.h",
@@ -198,10 +233,40 @@ RAVEN_MODULES = {
         lang="c++", entry="code/Rmg/RM_Headers.h",
         includes=["code/Rmg", "code/game", "code/qcommon", "code"],
         defines=["NDEBUG", "_IMMERSION"]),
-    "sp-renderer": dict(
-        lang="c++", entry="code/renderer/tr_local.h",
-        includes=["code/renderer", "code/game", "code/qcommon", "code"],
+    # Same shape as mp-client; SP additionally has client_ui.h, vmachine.h
+    # (SP's vm_t), cl_mp3.h, cl_input_hotswap.h, and its keycodes.h lives in
+    # client/ (not ui/). Same eax patch + skips as MP.
+    "sp-client": dict(
+        lang="c++", entry=["code/game/q_shared.h", "code/qcommon/qcommon.h",
+                           "code/client/client.h", "code/client/client_ui.h",
+                           "code/client/vmachine.h", "code/client/snd_local.h",
+                           "code/client/cl_mp3.h", "code/client/snd_music.h",
+                           "code/client/snd_ambient.h", "code/client/fffx.h",
+                           "code/client/cl_input_hotswap.h"],
+        includes=["code/client", "code/game", "code/qcommon", "code/renderer",
+                  "code/ui", "code/cgame", "code"],
         defines=["NDEBUG", "_IMMERSION"]),
+    # SP tr_local.h additionally includes glext.h directly. Skipped:
+    # tr_stl.h (C++ STL helpers), tr_jpeg_interface.h (vendored jpeg-6),
+    # amd3d.h (3DNow asm), qgl_linked.h (binding macros).
+    "sp-renderer": dict(
+        lang="c++", entry=["code/game/q_shared.h", "code/qcommon/qcommon.h",
+                           "code/qcommon/cm_landscape.h",
+                           "code/renderer/tr_local.h", "code/renderer/tr_font.h",
+                           "code/renderer/tr_quicksprite.h",
+                           "code/renderer/tr_WorldEffects.h",
+                           "code/renderer/tr_landscape.h",
+                           "code/renderer/matcomp.h"],
+        includes=["code/renderer", "code/game", "code/qcommon", "code",
+                  "../../tools/closure-prototype/glshim"],
+        defines=["NDEBUG", "_IMMERSION",
+                 "USHORT=unsigned short", "BOOL=int", "UINT=unsigned int",
+                 "FLOAT=float", "HDC=void *", "HGLRC=void *",
+                 "DECLARE_HANDLE(name)=typedef void *name"],
+        # SP tr_local.h names fields `or` (orientationr_t or;) — MSVC treats
+        # `or` as an identifier; -fno-operator-names matches that, else clang
+        # silently drops the field from viewParms_t/trGlobals_t.
+        flags=["-fdeclspec", "-fno-operator-names"]),
 }
 
 # JACoders/OpenJK profile — defines/includes mirror its CMakeLists:
@@ -240,6 +305,16 @@ RECORD_KINDS = {CursorKind.STRUCT_DECL, CursorKind.UNION_DECL,
 _SHIM_CACHE: list | None = None
 
 
+# Parse-only content patches applied on top of the slash fix (path suffix ->
+# [(old, new)]). snd_local.h's eax includes need windows COM (<objbase.h>);
+# no swept type embeds an EAX type (channel_t etc. use only OpenAL ALuint),
+# so they are dropped for layout parsing.
+_SHIM_PATCHES = {
+    "client/snd_local.h": [('#include "eax/eax.h"', ""),
+                           ('#include "eax/eaxman.h"', "")],
+}
+
+
 def backslash_include_shims():
     """Windows-style `#include "..\\game\\x.h"` fails on POSIX. Shadow the few
     offending files (9 in the oracle) via unsaved_files with slashes fixed —
@@ -251,10 +326,16 @@ def backslash_include_shims():
              "--include=*.h", "--include=*.c", "--include=*.cpp"],
             capture_output=True, text=True).stdout.split()
         inc_re = re.compile(r'(#include\s*"[^"]*")')
-        _SHIM_CACHE = [
-            (p, inc_re.sub(lambda m: m.group(1).replace("\\", "/"),
-                           Path(p).read_text(errors="replace")))
-            for p in hits]
+        shims = []
+        for p in hits:
+            text = inc_re.sub(lambda m: m.group(1).replace("\\", "/"),
+                              Path(p).read_text(errors="replace"))
+            for suffix, edits in _SHIM_PATCHES.items():
+                if p.endswith(suffix):
+                    for old, new in edits:
+                        text = text.replace(old, new)
+            shims.append((p, text))
+        _SHIM_CACHE = shims
     return _SHIM_CACHE
 
 
@@ -266,6 +347,7 @@ def parse_tu(module: str, extra_file: str | None, unity: bool = False):
         args.append("-std=c++03" if SRC_ROOT == ORACLE else "-std=c++11")
     args += [f"-I{SRC_ROOT / inc}" for inc in cfg["includes"]]
     args += [f"-D{d}" for d in cfg["defines"]]
+    args += cfg.get("flags", [])
     # No platform macro is defined (WIN32/MACOS_X gate macros+inline asm, not
     # layouts), so supply the two the headers expect from the platform section.
     args += ["-DID_INLINE=inline", "-DMAC_STATIC="]
