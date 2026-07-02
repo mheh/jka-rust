@@ -7,6 +7,7 @@
 
 pub mod local;
 pub mod public;
+pub mod saga;
 pub mod siege;
 pub mod vehicles;
 pub mod weapons;

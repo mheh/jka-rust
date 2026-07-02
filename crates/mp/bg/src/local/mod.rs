@@ -5,3 +5,4 @@
 //! Source: `oracle/oracle/codemp/game/bg_local.h`
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
+pub mod pml_t;
