@@ -2,6 +2,7 @@
 
 pub mod exports;
 pub mod imports;
+pub mod public;
 pub mod shared_buffer;
 pub mod syscalls;
 pub mod vmcalls;
