@@ -491,6 +491,24 @@ markers).
 | GL bindings | `qgl.h`/`glext.h` PFN typedefs + `qgl_console`/`glext_console` | replaced by a Rust GL loader; parse-only via `glshim/` |
 | Misc | SP `tr_stl.h` (STL helpers), `tr_jpeg_interface.h` (vendored jpeg-6), `amd3d.h` (3DNow asm), `tr_font.h`/`matcomp.h` (own no types) | vendored / no types |
 
+## C++ track — idiomatic reimplementations
+
+Separate workstream (see [[porting-rules]] §F): Raven C++ classes reimplemented
+idiomatically, never byte-faithfully, verified by differential dump harnesses
+against the compiled, unmodified oracle TUs. The per-wave deferral tables above
+remain the roster of what's left.
+
+| Subsystem | Raven classes | MP | SP | Verification |
+|---|---|---|---|---|
+| GP2 | `CGenericParser2`, `CGPGroup`, `CGPValue` (`CTextPool`/`CGPObject` dissolve; caller-less C shim unported) | ☑ `mp_engine_qcommon::gp2` | ☑ `sp_qshared::common::sp::game::gp2` | ☑ `tools/gp2-oracle` — 8 fixtures × both modes, byte-exact, incl. MP-error/SP-ok truncation divergence |
+
+GP2 design notes (the pilot; pattern for the rest): arena + `GpGroupId` +
+copyable `GpGroup<'_>` borrow wrapper (rules §B5) so `GetParent` walks work;
+insertion-ordered `Vec`s with the `InOrder` sorted view computed on demand;
+faithful signed-char tokenizer; divergences only where Raven is UB (buffer
+overruns on unterminated input, null-deref `GetNum*` on empty MP lists),
+each noted at the site.
+
 ## Related pre-existing gaps (out of scope, tracked)
 - ~~SP `gentity_t` is an opaque stub~~ — full-ported in Wave 4 (1496 B,
   offset-asserted). Remaining: SP `entity_shared.rs` / `collision.rs` are

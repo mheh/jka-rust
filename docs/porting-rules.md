@@ -56,6 +56,36 @@ decided in discussion when we port that code — not pre-baked here.**
 16. **Stopping point = a real engine call works end-to-end and matches oracle**,
     not "N files typed."
 
+## F. C++ track (idiomatic reimplementations)
+
+Raven C++ classes (virtuals, std:: members, templates) are reimplemented
+idiomatically, never byte-faithfully — they cross the ABI seam only behind
+pointers/handles, so layout is free. Established by the GP2 pilot
+(`crates/mp/engine/qcommon/src/gp2/`, `tools/gp2-oracle/`); applies to ghoul2,
+FX, icarus, ROFF, terrain/RMG, containers.
+
+17. **Design before transcription.** Decide the subsystem's Rust shape once —
+    closed virtual hierarchies → enums; interface classes → the arena/handle
+    they hide (§B5: arena + id + copyable borrow wrapper when consumers walk
+    parent/sibling pointers); intrusive lists/pools/std:: members → owned
+    `Vec`/`String`/std collections — then transcribe methods into that shape.
+18. **Parity is proven differentially.** Compile the *unmodified* oracle TU
+    standalone (stub headers under `tools/<subsystem>-oracle/`, oracle never
+    edited), dump canonical behavior over committed fixtures, and require the
+    Rust port to reproduce the goldens byte-for-byte. Goldens are committed so
+    `cargo test` needs no C++ toolchain.
+19. **Diverge only where Raven is UB** (buffer overruns, null derefs) — pick the
+    one defined behavior, note it in ≤2 lines at the site, keep it out of the
+    shared fixtures (or normalize it in the dumper with a comment).
+20. **Preserve emergent per-mode quirks; drop dead surface.** MP first, SP as
+    diff — duplicate, don't unify, even for accidental behavior (SP GP2's
+    never-set `mParent` makes truncated files parse). API with zero callers in
+    either tree (e.g. GP2's C handle shim) is dropped with a module-doc note,
+    not ported speculatively.
+21. **House comment style, one Raven class per file** (private helpers
+    colocate); cite both the class definition lines and the method source
+    lines.
+
 ## Comment & source-reference rules
 
 Every ported item keeps the current codebase style:
