@@ -35,7 +35,8 @@ RAVEN_MODULES = {
     # MP tree (codemp/) — plain C modules
     "mp-game": dict(
         lang="c", entry=["codemp/game/b_local.h", "codemp/game/ai_main.h",
-                         "codemp/game/w_saber.h", "codemp/game/bg_local.h"],
+                         "codemp/game/w_saber.h", "codemp/game/bg_local.h",
+                         "codemp/game/botlib.h"],
         includes=["codemp/game"],
         defines=["NDEBUG", "MISSIONPACK", "QAGAME", "_JK2"],
         srcglob=["codemp/game/*.c"]),
@@ -218,10 +219,13 @@ def parse_tu(module: str, extra_file: str | None, unity: bool = False):
 
 
 # ------------------------------------------------------------- ported scan
-def scan_ported(mode: str):
+def scan_ported(mode: str, crate_seg: str | None = None):
     """(status, size_asserts) from crates/**/*.rs — status: name -> ('ported',
-    path) | ('todo', path); size_asserts: name -> {asserted sizes}. Prefers
-    declarations in the matching mode's tree (mp/ vs sp/) over the other."""
+    path) | ('todo', path); size_asserts: name -> {asserted sizes}. Only the
+    matching mode's tree (mp/ vs sp/) + native/ is scanned; within it, the
+    module's own crate dir (crate_seg, e.g. 'ui' for mp-ui) is preferred —
+    same-named types in sibling crates (mp_ui vs mp_cgame lerpFrame_t) must
+    not badge each other."""
     decl_re = re.compile(r"^\s*pub\s+(?:struct|enum|union)\s+(\w+)|^\s*pub\s+type\s+(\w+)\s*=", re.M)
     todo_re = re.compile(r"//\s*TODO:\s*Port\s+(\w+)")
     size_re = re.compile(r"size_of::<\s*(\w+)\s*>\s*\(\)\s*==\s*(\d+)")
@@ -230,12 +234,14 @@ def scan_ported(mode: str):
     # same file as the declaration (house style: one type per file, colocated
     # asserts). Prevents MP asserts vouching for SP stubs and vice versa.
     size_asserts: dict[str, dict[str, set[int]]] = {}
-    def rank(rel):  # own-mode > native; other-mode is excluded entirely
-        if rel.startswith(f"crates/{mode}/"):
+    def rank(rel):  # own-crate > own-mode > native; other-mode excluded entirely
+        if crate_seg and rel.startswith(f"crates/{mode}/{crate_seg}/"):
             return 0
-        if rel.startswith("crates/native/"):
+        if rel.startswith(f"crates/{mode}/"):
             return 1
-        return 2
+        if rel.startswith("crates/native/"):
+            return 2
+        return 3
     for rs in CRATES.rglob("*.rs"):
         if "target" in rs.parts:
             continue
@@ -243,7 +249,7 @@ def scan_ported(mode: str):
         # Tree-scoped: a declaration in the OTHER mode's tree must never badge
         # this mode's type (same-named MP/SP types diverge — cross-tree name
         # matches produced false ☑s, e.g. SP gclient_s "ported" at an MP path).
-        if rank(rel) > 1:
+        if rank(rel) > 2:
             continue
         text = rs.read_text(errors="replace")
         for m in decl_re.finditer(text):
@@ -273,10 +279,13 @@ def build_alias_map(decls):
 def make_badger(ported, size_asserts, alias):
     """badge(name, decl=None) -> verified ported-status string."""
     def badge(name, decl=None):
-        rust_name = name if name in ported else alias.get(name, name)
-        st = ported.get(rust_name)
-        if st is None:
-            st = ported.get(name)
+        # A real declaration under EITHER the tag or the typedef name outranks
+        # a //TODO marker under the other (a kept cross-tier TODO for
+        # `gclient_s` must not shadow the port declared as `gclient_t`).
+        cands = [ported.get(name), ported.get(alias.get(name, name))]
+        cands = [c for c in cands if c]
+        st = next((c for c in cands if c[0] == "ported"), cands[0] if cands else None)
+        rust_name = name if ported.get(name) is st else alias.get(name, name)
         if st and st[0] == "todo":
             return f"◐ TODO marker in {st[1]}"
         if not st:
@@ -589,7 +598,7 @@ def main():
     unity = is_fn_target and args.tree and not args.file
     tu = parse_tu(args.module, args.file, unity=unity)
     decls = named_decls(tu)
-    ported, size_asserts = scan_ported(args.module.split("-")[0])
+    ported, size_asserts = scan_ported(*args.module.split("-", 1))
     alias = build_alias_map(decls)
 
     clo = Closure()

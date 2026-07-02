@@ -92,6 +92,13 @@ All 9 qshared-tier types (`stereoFrame_t` pre-existed in `sp_abi`):
 - **Heavy** (offset-asserted): `glconfig_t`(96), `refEntity_t`(216),
   `refdef_t`(384)
 
+#### Wave 4 batch — `game/g_public.h` (ported into `common/mp/qcommon/`, cargo-green)
+23 seam types beside the `parms_t`/`failedEdge_e` precedent: the 17
+`T_G_ICARUS_*` VM-transport structs (12–4104 B, offset-asserted),
+`sharedEntity_t`(976 — engine-side `gentity_t` view; `m_pVehicle` stays opaque
+below the bg tier), and the seam enums `gameImport_t`/`gameExport_t`/`bSet_t`/
+`bState_t`/`taskID_t`.
+
 ### `mp_bg` (bg_public.h / bg_vehicles.h / bg_weapons.h)
 | Type / const | Oracle (codemp) | Kind | Value/size | MP |
 |---|---|---|---|---|
@@ -136,6 +143,36 @@ All 15 types, cargo-green, offset-asserted:
   ptr-bearing), `vehicleInfo_t`(952 B, ptr+fn-ptr "virtual interface" table),
   `Vehicle_t`(976 B, see Wave-2 note in the table above)
 
+#### Wave 4 batch — `bg_saga.h` + `bg_local.h` (ported into `saga/`, `local/`, cargo-green)
+- **saga/**: `siegeClassDesc_t`(4096), `siegeClass_t`(1548), `siegeTeam_t`(648,
+  real `*mut siegeClass_t` roster), `siegeClassFlags_t`, `siegePlayerClassFlags_t`
+- **local/**: `pml_t`(132 — pmove-internal scratch state)
+
+### `mp_abi` seam batches — Wave 4, cargo-green
+- **cgame/public/** (cg_public.h remainder, beside the pre-existing
+  `shared_buffer.rs` TCG* set): `snapshot_t`(139352 — embeds
+  `entityState_t[256]` + `playerState_t`), `TCGIncomingConsoleCommand`(1024),
+  `TCGPositionOnBolt`(272), 6 `ragCallback*` structs, `cgameImport_t`/
+  `cgameExport_t`
+- **ui/public/** (ui_public.h): `uiClientState_t`(3084), `uiImport_t`,
+  `uiExport_t`, `uiMenuCommand_t`
+
+### `mp_cgame` (cg_local.h / cg_lights.h) — Wave 4, **complete**
+All 27 `cg_local.h` types in `local/` + `clightstyle_t`(264) in `lights/`,
+offset-asserted. Heavies: `cg_t`(295424), `cgs_t`(229576), `centity_t`(1984,
+real `*mut Vehicle_t`), `clientInfo_t`(5920), `cgMedia_t`(1716),
+`cgEffects_t`(356), `localEntity_s`(472), `weaponInfo_t`(232, typed
+`centity_t` trail callbacks), `lerpFrame_t`(80), `markPoly_s`(304),
+`playerEntity_t`(264).
+
+### `mp_ui` (ui_local.h / keycodes.h) — Wave 4, **complete**
+All 30 `ui_local.h` types in `local/` + `fakeAscii_t` in `keycodes/`,
+offset-asserted. Heavies: `uiInfo_t`(342384), `serverStatus_s`(11484),
+`playerInfo_t`(11056), `playerSpeciesInfo_t`(7760), `menuframework_s`(2096),
+`pendingServerStatus_t`(2244), `serverStatusInfo_t`(5288), the Q3 menu-widget
+family (`menucommon_s`(88) embedded by value in `menuaction/bitmap/list/
+radiobutton/slider/text/field`), `mfield_t`(272), `uiClientState_t` → abi.
+
 ### `mp_game` (ai.h / teams.h / b_public.h)
 | Type / const | Oracle (codemp) | Kind | Value/size | MP |
 |---|---|---|---|---|
@@ -147,7 +184,16 @@ All 15 types, cargo-green, offset-asserted:
 | `NUM_SQUAD_STATES` | `game/ai.h:19-29` (anon enum) | const `7` | ☑ `ai/consts.rs` |
 | `AIGroupMember_t` | `game/ai.h:87-93` | struct (16 B) | ☑ `ai/group_member.rs` |
 | `AIGroupInfo_t` | `game/ai.h:97-116` | struct (ptrs → align 8, 624 B) | ☑ `ai/group_info.rs` |
-| `gNPC_t` | `game/b_public.h:…-264` (large) | struct (`*mut` only via `gentity_s`) | **Fwd — deferred** (not needed by client/level; `gentity_s.NPC` stays `*mut c_void` in qshared) |
+| `gNPC_t` | `game/b_public.h:116-264` | struct (896 B) | ☑ `npc/g_npc_t.rs` (Wave 4 — full-ported; `gentity_s.NPC` still `*mut c_void` in qshared by tier) |
+
+#### Wave 4 batch — `ai_main.h` / `b_public.h` / `b_local.h` / `say.h` / `w_saber.h` (cargo-green)
+- **botai/**: `bot_state_t`(5096 — embeds the existing `level/bot_settings`
+  port), `bot_ctf_state_t`, `bot_siege_state_t`, `bot_teamplay_state_t`,
+  `botattachment_s`(68), `boteventtracker_s`(16), `botskills_s`(24),
+  `nodeobject_s`(28)
+- **npc/**: `gNPCstats_e`(68), `navInfo_s`(88), `jumpState_t`, `spot_t`,
+  `visibility_t`
+- **saber/**: `evasionType_t` · **say/**: `saying_t`
 
 ### `mp_qshared::gentity` (reconcile, not new)
 | Task | Detail | MP |
@@ -200,6 +246,7 @@ heavy + 3 deferred = 65). Ported from `code/`, not copied from MP:
 | `bladeInfo_t` (+`MAX_BLADES=8`) | `game/q_shared.h:1634-1658` | **164 B** — no `desiredLength`/3 debounce ints (MP 204) | ☑ |
 | `saberInfo_t` (+`MAX_SABERS=2`) | `game/q_shared.h:1724-1944` | **1952 B, pointer-bearing** — `char*` name/model/skin/broken1/2, `char[]` shaders, SP-only `fallSound[3]` (MP 2156, buffers/handles) | ☑ |
 | `playerState_t` | `game/q_shared.h:2066-2361` | **4992 B** — SP-only forceData/vehicle-less block; embeds `saberInfo_t[2]` by value (MP layout differs heavily) | ☑ `qcommon/player_state.rs` (Wave 3) |
+| `gentity_s` | `game/g_shared.h:514-825` | **1496 B** — SP concrete entity (MP's lives in q_shared tier as 976 B `sharedEntity_t` split). Game-tier by-value enums (`material_t`/`moverState_t`/`team_t`) stay documented `c_int` aliases; gclient/gNPC/Vehicle ptrs opaque per MP precedent | ☑ `common/sp/gentity.rs` (Wave 4 — stub replaced) |
 
 #### Wave 3 batch — `renderer/tr_types.h` (ported into `common/sp/renderer/`, cargo-green)
 8 types, SP-as-diff vs MP `cgame/tr_types.h` (no `miniRefEntity_s` in SP):
@@ -248,15 +295,69 @@ offset-asserted. Divergences vs MP: `displayContextDef_t`(792 vs 872),
 | `MAX_SPAWN_VARS_CHARS` | `game/g_local.h:144` | **2048** (MP 4096) | ☑ `local/spawn.rs` |
 | `animFileSet_t` (+`MAX_ANIM_EVENTS=300`) | `game/g_local.h:68-76` | **absent in MP** — SP-only per-model anim config, embeds `animation_t[MAX_ANIMATIONS]`/`animevent_t[MAX_ANIM_EVENTS]` (36416 B) | ☑ `local/anim_file_set_t.rs` |
 
+### `sp_game` — Wave 4, **complete** (80 types across 18 header folders)
+- **shared/** (g_shared.h): `gclient_t`(7384), `clientSession_t`(1036, embeds
+  `missionStats_s`(228) + `objectives_s`(8)), `clientPersistant_t`(128),
+  `clientInfo_t`(496), `renderInfo_t`(468), `weaponInfo_t`(160 — cgame-tier
+  `centity_t` callback param stays opaque), `playerTeamState_t`(44) + the
+  g_shared enums (`material_t`, `moverState_t`, `movetype_t`, `taskID_t`,
+  `targetModel_t`, `clientConnected_t`, `playerTeamStateState_t`,
+  `saberBlock*_t`)
+- **local/** (g_local.h): `level_locals_t`(620536, real `*mut gclient_t`),
+  `alertEvent_s`(56) + level enums, `combatPoint_t`(28), `interestPoint_t`(24),
+  `waypointData_t`(324), `reference_tag_s`(64)
+- **vehicles/** (G_Vehicles.h — SP vehicle system un-deferred): `Vehicle_t`
+  (1760 vs MP 976), `vehicleInfo_t`(904 vs MP 952), `Muzzle`(32),
+  `turretStats_t`(96), `vehWeapon*` set, `vehicleType_t`, `EWeaponPose`
+- **saber/** (wp_saber.h): `saberMoveName_t`(316-variant enum),
+  `saberMoveData_t`(48, typed chain fields), `saberQuadrant_t`,
+  `sabersLockMode_t`, `saberLockResult_t`, `evasionType_t`, `swingType_t`
+- **weapons/** (weapons.h): `weaponData_t`(1536 vs MP 56!), `ammoData_t`(36),
+  `weapon_t`, `ammo_t`
+- **npc/** (b_public.h/b_local.h): `gNPC_t`(984), `navInfo_s`(1120),
+  `gNPCstats_e`(72), `jumpState_t`, `sexType_t`, `spot_t`, `visibility_t`
+- **functions/** (g_functions.h): the 8 savegame fn-enums (`thinkFunc_t`,
+  `useFunc_t`, `painFunc_t`, `dieFunc_t`, `touchFunc_t`, `blockedFunc_t`,
+  `reachedFunc_t`, `clThinkFunc_t`)
+- **one-header folders**: `roff/`(5 structs), `objectives/`(3 enums),
+  `fields/`(`save_field_t`+`fieldtypeSAVE_t`), `characters/`, `hitlocs/`,
+  `events/`, `say/`, `bset/`, `bstate/`, `dmstates/`
+
+### `sp_abi` seam batches — Wave 4, cargo-green
+- **game/public/** (g_public.h): `game_import_t`(1048, ~150 fn ptrs — matches
+  v7 clang ground truth), `game_export_t`(144), `SavedGameJustLoaded_e`;
+  `CMiniHeap`/`CRagDoll*` params stay opaque (C++ track).
+  `G2API_SetBoneAngles` uses real `Eorientations` (new `sp_qshared::shared`
+  re-export from `native_math`)
+- **cgame/public/**: `snapshot_s`(144328), `cgameImport_t`
+- **ui/public/**: `uiimport_t`(528 fn table, `R_LerpTag` takes real
+  `*mut orientation_t`), `uiImport_t`, `dpTypes_t`
+
+### `sp_cgame` (cg_local.h / cg_media.h / cg_camera.h / cg_lights.h) — Wave 4, **complete**
+`local/`: 13 types (`cg_t` 321248, `centity_t` 488, `localEntity_s` 336,
+`markPoly_s` 304, `screengraphics_s` 72, `lerpFrame_t` 56 + enums).
+`media/`: `cgs_t`(35232 — `clientInfo_t` embed is an ABI-sized blob + TODO,
+game-tier type unreachable from cgame), `cgMedia_t`(1640), `cgEffects_t`(136),
+`HUDMenuItem_s`(56), `footstep_t`, `otherhudbits_t`. `camera/`:
+`camera_t`(500). `lights/`: `clightstyle_t`(264).
+
+### `sp_ui` (ui_local.h / gameinfo.h) — Wave 4, **complete**
+`local/`: `uiInfo_t`(251568), `playerSpeciesInfo_t`(7760), `uifield_t`(288),
+`uiStatic_t`(144), `modInfo_t`. `gameinfo/`: `gameinfo_import_t`(72).
+
 ### SP deferred
 | Type | Note | SP |
 |---|---|---|
-| `Vehicle_t` | Not needed yet (SP `gentity` is an opaque stub); SP vehicle system TBD | ◐ deferred |
-| `gNPC_t` | SP NPC struct is large; SP `gentity` opaque; no consumer yet | ◐ deferred |
+| `Vehicle_t` | ~~deferred~~ **ported in Wave 4** (`sp_game::vehicles`, 1760 B) | ☑ |
+| `gNPC_t` | ~~deferred~~ **ported in Wave 4** (`sp_game::npc`, 984 B) | ☑ |
 | `saberInfoRetail_t` | SP-only savegame-compat struct; port with SP savegame system | ◐ deferred |
 | `animNumber_t` | `anims.h:1789`; ~1500-entry enum. `animFileSet_t.animations[MAX_ANIMATIONS]` sized from the verified packet offset (12344 B / 8) instead, pending this enum's port | ◐ deferred |
 
 ## Related pre-existing gaps (out of scope, tracked)
-- SP `gentity_t` is an opaque stub (`playerState_t` full-ported in Wave 3); SP
-  `entity_shared.rs` / `collision.rs` are mis-provenanced MP copies. See scout
-  findings / `GENTITY_TYPE_FOLLOWUPS.md`.
+- ~~SP `gentity_t` is an opaque stub~~ — full-ported in Wave 4 (1496 B,
+  offset-asserted). Remaining: SP `entity_shared.rs` / `collision.rs` are
+  mis-provenanced MP copies. See scout findings / `GENTITY_TYPE_FOLLOWUPS.md`.
+- Cross-tier `c_int` aliases with `//TODO: Port` markers, kept deliberately
+  (ABI-identical; real type lives above the referencing crate): SP `gentity.rs`
+  (`material_t`/`moverState_t`/`team_t`), SP `cgs_t.clientinfo` blob, SP
+  `weaponInfo_t` cgame-callback params, MP `sharedEntity_t.m_pVehicle`.

@@ -77,7 +77,7 @@ def main():
 
     tu = C.parse_tu(args.module, None)
     decls = C.named_decls(tu)
-    ported, size_asserts = C.scan_ported(args.module.split("-")[0])
+    ported, size_asserts = C.scan_ported(*args.module.split("-", 1))
     alias = C.build_alias_map(decls)
     badge = C.make_badger(ported, size_asserts, alias)
 

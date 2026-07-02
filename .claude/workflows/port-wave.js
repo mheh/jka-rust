@@ -43,9 +43,17 @@ const RULES = `HOUSE RULES (binding — docs/porting-rules.md):
   "typedef int X" + separate anon enum -> pub type X = c_int + pub const items.
   NEVER flatten a named enum to an int alias. (The packet's "kind" field tells
   you which: kind=enum -> repr(i32) enum; kind=alias -> type alias + consts.)
-- Your target file(s) ALREADY EXIST as placeholder stubs and are ALREADY
-  registered in mod.rs. Overwrite each placeholder with the port. NEVER edit
-  mod.rs, lib.rs, or any file that is not one of your assigned type files.
+- Your target file(s) ALREADY EXIST as ABI-sized placeholder stubs and are
+  ALREADY registered in mod.rs. Overwrite each placeholder with the port.
+  NEVER edit mod.rs, lib.rs, or any file that is not one of your assigned
+  type files.
+- By-value deps that are still placeholders: import and embed them NORMALLY —
+  every wave file already has the correct size/alignment, so your offsets and
+  asserts are right from the first cargo check. Do NOT hand-roll [u8; N]
+  blob fields for wave siblings.
+- If house style renames your item (C tag -> typedef name), ALSO emit
+  pub type <manifest name> = <new name>; when they differ, so siblings that
+  imported the manifest name stay green.
 - Every item gets a doc comment + source ref, exactly this shape:
     /// Raven \`X\` — <one-line description>.
     ///
@@ -89,10 +97,11 @@ const RULES = `HOUSE RULES (binding — docs/porting-rules.md):
 - Every new file starts with #![allow(non_camel_case_types, non_snake_case)]
   (file-level, like the existing ports) — the build must stay at ZERO new
   warnings, not just zero errors.
-- Tools are BLACK BOXES: never read or inspect sweep.py / closure.py / any
-  tool source. Run the exact command given, read its stdout, move on. A badge
-  line looks like:  \`  gitem_t   ☑ crates/.../game_item.rs\`  (☑ = verified,
-  anything else = fix your port).`
+- Tools and orchestration are BLACK BOXES: never read or inspect sweep.py /
+  closure.py / anything under .claude/workflows/ / any tool source. Run the
+  exact command given, read its stdout, move on. A badge line looks like:
+  \`  gitem_t   ☑ crates/.../game_item.rs\`  (☑ = verified, anything else =
+  fix your port).`
 
 const PORT_SCHEMA = {
   type: 'object',
@@ -148,6 +157,7 @@ const skeletonSpec = [
   files: s.types.map(t => ({
     path: `${t.srcDir}/${t.folder}/${t.file}`,
     crate: t.crate, name: t.name, cite: t.cite,
+    kind: t.kind, sizeB: t.sizeB,
   })),
 }))
 await agent(
@@ -156,11 +166,22 @@ oracle/oracle/. For each entry below:
 1. Ensure the folder exists with a mod.rs registered up to the crate's lib.rs
    (folders are subsystem dirs; match the existing style of sibling mod.rs
    files — a //! doc line then pub mod lines, alphabetical).
-2. Create EVERY listed type file as a placeholder containing exactly:
+2. Create EVERY listed type file as an ABI-SIZED placeholder so siblings can
+   embed the type by value before its real port lands (port order then never
+   matters). Every placeholder starts with:
+     #![allow(non_camel_case_types, non_snake_case)]
      //TODO: Port <name>
      // Source: <cite>
-   (nothing else — an empty module compiles). If the file already exists with
-   real content, leave it alone but still ensure it is registered.
+   then, by kind:
+   - struct/union (sizeB = N > 0):
+       #[repr(C, align(A))]
+       pub struct <name>(pub [u8; N]);
+       const _: () = assert!(core::mem::size_of::<<name>>() == N);
+     where A = 8 if N%8==0 else 4 if N%4==0 else 2 if N%2==0 else 1.
+   - enum or alias: pub type <name> = ::core::ffi::c_int;
+     (ABI-identical 4-byte placeholder; the real port replaces it.)
+   If the file already exists with real content, leave it alone but still
+   ensure it is registered.
 3. Register every file in its folder's mod.rs (pub mod <file-stem>;).
 Use ONE python3 heredoc to create everything, then verify.
 Spec (JSON): ${JSON.stringify(skeletonSpec)}
@@ -215,8 +236,10 @@ phase('Heavy')
 const heavyPorted = { mp: [], sp: [] }
 const HEAVY_NOTE = `
 HEAVY layout-critical struct: paste the FULL provided assert block (all
-offsets). If a by-value dep is unported and non-trivial, STOP: add the
-//TODO: Port marker, record it under deferred, keep the field ABI-compatible.`
+offsets). Wave-sibling by-value deps: embed normally (placeholders are
+ABI-sized). A by-value dep that is OUTSIDE the wave and unported (e.g. a C++
+class): //TODO: Port marker + an ABI-compatible [u8; N] field sized/aligned
+from the assert block, recorded under deferred.`
 const heavyAgent = async (key, t) => {
   const module = key === 'mp' ? A.mpModule : A.spModule
   const r = await agent(

@@ -195,3 +195,47 @@ Cheap-model lessons (both bit this run, fixed in prompts):
 - Add `-target i686-pc-windows-msvc` variant if a 32-bit `jampgamex86.dll`
   target is ever decided.
 - Wire into the port-types skill as the scout step (closure before porting).
+
+## v9 — Wave 4: three concurrent port-wave runs (modules + seams)
+
+Full module wave: **236 types** (ui 44, cgame 62, game 130) in three
+CONCURRENT workflow runs — **150 agents, ~55 min wall, ~5.5M subagent
+tokens**, zero agent errors, every struct badge ☑ against clang, zero new
+warnings. Landed the SP entity data model (`gentity_s` 1496B un-stubbing the
+qshared opaque, `gclient_t` 7384B, `level_locals_t` 620536B), SP vehicles
+(previously deferred), MP bot AI, both cgame/ui module states (`uiInfo_t`
+342KB, `cg_t` 295/321KB), and the abi seam tables (`game_import_t`,
+`uiimport_t`, `snapshot_t/_s`).
+
+New machinery this wave (all committed):
+- **Per-entry `{crate, srcDir, file}` overrides** in port-wave.js — one run
+  mixes module-private targets with abi/qshared seam targets parsed from the
+  same TU. `skipDocs` lets concurrent runs skip the shared-doc phase.
+- **Multi-entry module TUs** (profile `entry` is now a list) — ai_main.h,
+  wp_saber.h, G_Vehicles.h, bg_local.h, cg_media.h etc. were invisible to the
+  single-entry parse; ~70 types would have been silently skipped.
+- **Tree- then crate-scoped badges** — SP types were falsely ☑ via same-named
+  MP files (`gclient_s`!), and mp_ui's `lerpFrame_t`(56) was mismatch-flagged
+  against mp_cgame's (80). Badges now scan only the module's mode tree and
+  prefer its own crate dir; a kept cross-tier `//TODO` under the tag name no
+  longer shadows the port declared under the typedef name.
+- **Case-insensitive owning-header match** — the oracle includes
+  `G_Vehicles.h` (on-disk `g_vehicles.h`); macOS resolves it, libclang records
+  it as spelled, and the SP vehicle types vanished from the sweep.
+
+Lessons → fixes:
+- **Mediums embedding sibling heavies fought red asserts** (Port phase runs
+  before Heavy): the menu-widget family blobbed `menucommon_s` as `[u64; 11]`
+  + TODO, roughly doubling those agents' tool calls, and a post-run reconcile
+  pass had to swap blobs back to real embeds. Fixed for next wave: skeleton
+  placeholders are now ABI-SIZED (`#[repr(C, align(A))] struct X([u8; N])` /
+  `type X = c_int`), so any port order compiles and asserts correctly.
+- Concurrent runs sharing crates (mp_abi cgame/ vs ui/) contended only on the
+  cargo target lock — no cross-run fixer confusion observed; per-subfolder
+  mod.rs ownership kept skeletons collision-free.
+- `bot_settings_s` is owned by g_local.h, NOT botlib.h (checked assumption
+  mid-run; the type was already ported in `level/` and the porter correctly
+  turned its placeholder into a re-export).
+- Cross-tier by-value deps surfaced a real pattern: SP `gentity_s` embeds
+  game-tier enums (`material_t` et al) — kept as documented ABI-identical
+  `c_int` aliases + TODO markers, mirroring MP's `gentity_t.client` decision.
