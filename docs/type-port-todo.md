@@ -14,7 +14,7 @@ Placement principle: put each type in the **lowest tier that needs it** (native 
 < bg < game), mirroring which Raven header owns it. `*mut`-only types are forward-declared
 now (a faithful C forward-decl) and fully ported later.
 
-See also: [[porting-rules]], [[workspace-architecture]], `GENTITY_TYPE_FOLLOWUPS.md`.
+See also: [[porting-rules]], [[workspace-architecture]].
 
 ## Legend
 - **Port** = full faithful `#[repr(C)]` port with `size_of`/`offset_of!` asserts.
@@ -512,7 +512,8 @@ each noted at the site.
 ## Related pre-existing gaps (out of scope, tracked)
 - ~~SP `gentity_t` is an opaque stub~~ — full-ported in Wave 4 (1496 B,
   offset-asserted). Remaining: SP `entity_shared.rs` / `collision.rs` are
-  mis-provenanced MP copies. See scout findings / `GENTITY_TYPE_FOLLOWUPS.md`.
+  mis-provenanced MP copies (retired GENTITY_TYPE_FOLLOWUPS.md; its three
+  deferred types — `Vehicle_t`, `gclient_s`, `gNPC_t` — are ported, see tables above).
 - Cross-tier `c_int` aliases with `//TODO: Port` markers, kept deliberately
   (ABI-identical; real type lives above the referencing crate): SP `gentity.rs`
   (`material_t`/`moverState_t`/`team_t`), SP `cgs_t.clientinfo` blob, SP

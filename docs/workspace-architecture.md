@@ -115,6 +115,9 @@ half of `abi-transport` instead of `dllEntry`/`vmMain`.
 
 ## Migration mapping (current `src/` -> target crate)
 
+> **Migration complete** — `src/` has been dissolved into `crates/`; this table
+> is kept as the historical record of where things went.
+
 | Current | Target | Notes |
 | --- | --- | --- |
 | `src/lib.rs` | dissolves | monolith split into the crates above |
@@ -157,5 +160,7 @@ graph enforces the tier boundaries underneath.
   OpenJK-style unified `rd-common` + backends only if a real need appears.
 - **`native/` may stay small:** most "shared" types trace to `q_shared.h` and are
   therefore per-mode. `native/math` is the main genuine cross-mode crate.
-- **SP `cgame`/`ui` transport:** confirm whether SP builds these as QVM modules
-  or links them differently before finalizing `sp/abi`.
+- **SP `cgame`/`ui` transport:** ~~confirm whether SP builds these as QVM modules
+  or links them differently~~ — resolved per `decisions.md` DEC-07: statically
+  linked into `sp/app` behind the vmachine shim, matching shipped `jasp`
+  (design in `docs/architecture/module-loading.md`).

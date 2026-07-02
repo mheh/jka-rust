@@ -33,12 +33,18 @@ rust-analyzer is stale in this workspace — **always confirm compilation with
 
 - `docs/workspace-architecture.md` — crate graph and dependency tiers
   (native < qshared < bg < game; qshared → abi → game).
-- `docs/type-port-todo.md` — live per-type port status (MP + SP).
-- `docs/type-port-scope.md` — total scope & effort estimate (~1,900 faithful C
-  types remaining).
-- `docs/oracle-types.md` — mechanical index of all 2,572 oracle type definitions.
-- `docs/GOAL.md`, `docs/folder-hierarchy.md` — project goal and layout.
-- `docs/abi-traps.md`, `docs/engine-plan.md` — ABI seam gotchas and engine plan.
+- `docs/decisions.md` — the DEC-xx ledger: user-settled architectural choices
+  (renderer deferral, WASM transport, wire compat, …). Cite, never re-litigate.
+- `docs/doc-standards.md` — template + gates for logic-port design docs
+  (`docs/architecture/`, `docs/modules/`, `docs/subsystems/`).
+- `docs/type-port-todo.md` — live per-type port status (MP + SP; type port is
+  complete — Waves 0–7).
+- `docs/type-port-scope.md`, `docs/oracle-types.md` — type-port scope and the
+  mechanical oracle type index (reference).
+- `docs/GOAL.md` — project goal (drop-in ABI compatibility checklists).
+- `docs/abi-traps.md` — generated trap_* signature reference.
+- `docs/engine-plan.md` — legacy engine sketch; being superseded by
+  `docs/architecture/engine-seam.md` (see decisions ledger).
 
 ## Module targets (Raven-faithful)
 
