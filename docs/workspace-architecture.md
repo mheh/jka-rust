@@ -55,30 +55,47 @@ crates/
 
   abi-transport/             # cross-mode ABI transport: OutboundSysCall,
                              #   InboundVmCall, Encode/Decode, vmMain word packing,
-                             #   function-table shapes. No Raven types.
+                             #   function-table shapes. Depends on native/platform
+                             #   for the raw ABI fn-pointer aliases (RawSyscall,
+                             #   RawVmMain), which it re-exports. No Raven types.
+
+  jampgame/                  # MP game cdylib shell: ENGINE OnceLock, live
+                             #   entrypoint exports, Dispatch match. Depends on
+                             #   abi-transport + mp/game (logic).
+  cgame/                     # MP cgame cdylib shell (same shape). SP cgame is
+                             #   statically linked (DEC-07); no separate shell.
+  ui/                        # MP ui cdylib shell (same shape). SP ui is
+                             #   statically linked (DEC-07); no separate shell.
+  jagame/                    # SP game cdylib shell (GetGameAPI table ABI).
+                             #   Depends on abi-transport + sp/game (logic).
 
   mp/
     qshared/                 # Tier 0: codemp/game/q_shared.{h,c}  (re-exports native/math)
     bg/                      # Tier 1: codemp/game/bg_*
     uishared/                # Tier 2: codemp/ui/ui_shared
     abi/                     # MP engine<->module seam (dllEntry/vmMain surfaces)
-    game/                    # jampgame   (cdylib)
-    cgame/                   # cgame      (cdylib)
-    ui/                      # ui         (cdylib)
+    game/                    # mp_game logic (transport-agnostic; jampgame shell wraps it)
+    cgame/                   # mp_cgame logic (transport-agnostic; cgame shell wraps it)
+    ui/                      # mp_ui logic (transport-agnostic; ui shell wraps it)
     engine/
+      core/                  # mp_engine_core facade: aggregate `Engine`,
+                             #   com_init/com_frame/com_shutdown/com_error
       qcommon/  server/  client/  botlib/  ghoul2/  icarus/  rmg/
     renderer/                # codemp/renderer (per-mode, split for authenticity)
-    app/                     # openjk (client) + openjkded (dedicated)
+    app/                     # openjk (client) + openjkded (dedicated); thin
+                             #   bin shell depending on mp_engine_core
 
   sp/
     qshared/  bg/  uishared/
     abi/                     # SP: GetGameAPI table (game) + dllEntry/vmMain (cgame/ui)
-    game/                    # jagame (cdylib, GetGameAPI table ABI)
-    cgame/  ui/
+    game/                    # sp_game logic (transport-agnostic; jagame shell wraps it)
+    cgame/  ui/               # statically linked into sp/app via vmachine shim (DEC-07)
     engine/
+      core/                  # sp_engine_core facade (mirrors mp_engine_core)
       qcommon/  server/  client/  ghoul2/  icarus/  rmg/
     renderer/                # code/renderer (per-mode)
-    app/                     # openjk_sp (client)
+    app/                     # openjk_sp (client); thin bin shell depending on
+                             #   sp_engine_core
 ```
 
 ## Tier definitions (mapped to Raven compile-lists)
@@ -90,12 +107,17 @@ crates/
 | 0 qshared | `mp/qshared`, `sp/qshared` | `q_shared.{h,c}` | engine + game + cgame + ui (per mode) |
 | 1 bg | `mp/bg`, `sp/bg` | `bg_*` (pmove, weapons, saber, panimate, saga, vehicles) | game + cgame + ui (per mode) |
 | 2 uishared | `mp/uishared`, `sp/uishared` | `ui_shared` | cgame + ui (per mode) |
-| 3 module | `*/game`, `*/cgame`, `*/ui` | `g_*` / `cg_*`+`fx_*` / `ui_*` | one module each |
-| engine | `*/engine/*`, `*/renderer` | `qcommon/server/client/botlib/ghoul2/icarus/RMG/renderer` | host binaries |
+| 3 module (logic) | `mp/game`, `mp/cgame`, `mp/ui`, `sp/game` (+ `sp/cgame`, `sp/ui`, statically linked) | `g_*` / `cg_*`+`fx_*` / `ui_*` | transport-agnostic; wrapped by the shell crates below (or statically linked into `sp/app`) |
+| shell | `jampgame`, `cgame`, `ui`, `jagame` | `dllEntry`/`vmMain`/`GetGameAPI` export shape | thin cdylib shells: `ENGINE` `OnceLock` + entrypoints + `Dispatch` match |
+| engine | `*/engine/*`, `*/renderer` | `qcommon/server/client/botlib/ghoul2/icarus/RMG/renderer` | host binaries; `*/engine/core` is the aggregate facade (`Engine` + `com_init`/`com_frame`/`com_shutdown`/`com_error`) depended on by `*/app` |
+
+> `MAX_GENTITIES` currently sits in `mp_engine_server` from the mechanical
+> type-port but belongs in `mp_qshared` (oracle home
+> `codemp/game/q_shared.h:1996,2004`); relocation is a slice-0 wiring task.
 
 ## Dependency edges
 
-Module cdylibs (per mode):
+Module logic crates (per mode; transport-agnostic — no ABI/cdylib concerns):
 
 | Crate | Depends on |
 | --- | --- |
@@ -106,12 +128,30 @@ Module cdylibs (per mode):
 | `mp/uishared` | `mp/qshared`, `mp/bg` |
 | `mp/abi` | `abi-transport`, `mp/qshared` |
 | `mp/qshared` | `native/math`, `native/platform` |
+| `abi-transport` | `native/platform` (re-exports its `RawSyscall`/`RawVmMain` fn-pointer aliases) |
+
+Module cdylib shells (per mode) — thin, hosting only the `ENGINE` `OnceLock`,
+live entrypoint exports, and the `Dispatch` match:
+
+| Crate | Depends on |
+| --- | --- |
+| `jampgame` | `abi-transport`, `mp/game` |
+| `cgame` | `abi-transport`, `mp/cgame` |
+| `ui` | `abi-transport`, `mp/ui` |
+| `jagame` | `abi-transport`, `sp/game` |
+
+SP `cgame`/`ui` have no separate shell — they are statically linked into
+`sp/app` behind the vmachine shim (DEC-07).
 
 Engine (per mode): `mp/engine/*` depend on `mp/qshared`, `abi-transport`, and
 `native/*`; `ghoul2` is depended on by both `engine/*` and `cgame` (Raven shares
-it that way). `mp/app` links the engine subsystems + `mp/abi` and hosts the
-module cdylibs. SP mirrors the same edges; SP `game` uses the `GetGameAPI` table
-half of `abi-transport` instead of `dllEntry`/`vmMain`.
+it that way). `mp/engine/core` (package `mp_engine_core`) is the aggregate
+facade: it depends on the other `mp/engine/*` subcrates, defines the aggregate
+`pub struct Engine`, and hosts `com_init`/`com_frame`/`com_shutdown`/`com_error`.
+`mp/app` is a thin bin shell depending only on `mp/engine/core` and hosts the
+module cdylib shells. SP mirrors the same edges via `sp/engine/core` (package
+`sp_engine_core`); SP `game` uses the `GetGameAPI` table half of
+`abi-transport` instead of `dllEntry`/`vmMain`.
 
 ## Migration mapping (current `src/` -> target crate)
 

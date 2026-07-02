@@ -35,6 +35,14 @@ executables.
 The platform doc defines the adapter between winit's event-loop model and
 Raven's poll-style `Sys_*`/input pump.
 
+> **Amendment 2026-07-02:** accepted divergence — under winit's `Poll` mode,
+> OS input arriving during the FPS-cap busy-spin is deferred one frame
+> (≤`1000/com_maxfps` ms; Raven pumps `PeekMessage` per spin iteration,
+> `oracle/oracle/codemp/qcommon/common.cpp:1647-1653` →
+> `oracle/oracle/codemp/win32/win_main.cpp:1211`). This sits below the
+> differential seam (journaling feeds the event ring directly). Recorded in
+> `lifecycle.md` LIFE-D1.
+
 ## DEC-03 — Audio: cpal + faithful mixer
 
 Raven's software mixer (`snd_dma`/`snd_mix`) is ported **faithfully** and outputs
@@ -88,6 +96,13 @@ what "drop-in `jampded`" means.
 preserving the `VM_Call` ABI shape — matching shipped `jasp`. The retail
 load-from-DLL variant is not ported. Resolves workspace-architecture's "SP
 transport" open item.
+
+> **Amendment 2026-07-02:** the vmachine shim is preserved as the **inbound**
+> `VM_Call`-shaped dispatch surface into cgame's `vmMain` only; outbound
+> cgame→engine calls are direct typed calls through the `Static` transport (no
+> word packing — `oracle/oracle/code/client/vmachine.cpp:36-39`'s
+> `VM_DllSyscall`→`CL_CgameSystemCalls` round-trip is internal plumbing with no
+> observable behavior). Recorded in `engine-seam.md` SEAM-D1.
 
 ## DEC-08 — Com_Error recovery: panic + catch_unwind
 
