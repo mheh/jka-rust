@@ -5,6 +5,7 @@
 
 pub mod exports;
 pub mod imports;
+pub mod public;
 
 pub use exports::{SpGameExport, SpGameExportTable};
 pub use imports::{SpGameImport, SpGameImportTable};

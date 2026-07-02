@@ -78,3 +78,6 @@ pub use native_types::{
     clipHandle_t, fileHandle_t, fxHandle_t, mdxaBone_t, qboolean, qhandle_t, sfxHandle_t,
     MAX_QPATH, QFALSE, QTRUE,
 };
+// Cross-mode math types from `native_math` needed by the SP abi fn tables.
+pub use native_math::eorientations::Eorientations;
+pub use native_math::orientation::orientation_t;
