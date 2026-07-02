@@ -1,21 +1,44 @@
 //! MP executable common substrate corresponding to Raven's `codemp/qcommon` tree.
 
 pub mod aas_areainfo;
+pub mod b_set_t;
+pub mod b_state_t;
 pub mod bot_goal;
 pub mod collision_record;
 pub mod entity_state;
 pub mod failed_edge;
+pub mod game_export_t;
+pub mod game_import_t;
 pub mod game_item;
 pub mod parms;
 pub mod platform;
 pub mod player_state;
 pub mod qtime;
 pub mod saber;
+pub mod shared_entity_t;
 pub mod shared_ragdoll_params;
 pub mod shared_ragdoll_update_params;
 pub mod shared_set_bone_ik_state_params;
 pub mod siege_pers;
+pub mod t_g_icarus_getfloat;
+pub mod t_g_icarus_getsetidforstring;
+pub mod t_g_icarus_getstring;
+pub mod t_g_icarus_gettag;
+pub mod t_g_icarus_getvector;
+pub mod t_g_icarus_kill;
+pub mod t_g_icarus_lerp2_angles;
+pub mod t_g_icarus_lerp2_end;
+pub mod t_g_icarus_lerp2_origin;
+pub mod t_g_icarus_lerp2_pos;
+pub mod t_g_icarus_lerp2_start;
+pub mod t_g_icarus_play;
+pub mod t_g_icarus_playsound;
+pub mod t_g_icarus_remove;
+pub mod t_g_icarus_set;
+pub mod t_g_icarus_soundindex;
+pub mod t_g_icarus_use;
 pub mod tags;
+pub mod task_id_t;
 pub mod usercmd;
 
 pub use aas_areainfo::aas_areainfo_t;
