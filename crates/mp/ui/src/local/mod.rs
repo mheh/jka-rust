@@ -1,0 +1,32 @@
+//! MP UI local definitions (`ui_local.h`).
+
+pub mod alias_info;
+pub mod award_type_t;
+pub mod character_info;
+pub mod game_type_info;
+pub mod lerp_frame_t;
+pub mod map_info;
+pub mod menuaction_s;
+pub mod menubitmap_s;
+pub mod menucommon_s;
+pub mod menufield_s;
+pub mod menuframework_s;
+pub mod menulist_s;
+pub mod menuradiobutton_s;
+pub mod menuslider_s;
+pub mod menutext_s;
+pub mod mfield_t;
+pub mod mod_info_t;
+pub mod pending_server_status_t;
+pub mod pending_server_t;
+pub mod pinglist_t;
+pub mod player_info_t;
+pub mod player_species_info_t;
+pub mod post_game_info_s;
+pub mod server_filter_s;
+pub mod server_status_info_t;
+pub mod server_status_s;
+pub mod team_info;
+pub mod tier_info;
+pub mod ui_info_t;
+pub mod ui_static_t;
