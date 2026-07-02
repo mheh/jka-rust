@@ -1,0 +1,29 @@
+//! MP cgame local state (`cg_local.h`).
+
+pub mod centity_s;
+pub mod cg_effects_t;
+pub mod cg_loop_sound_s;
+pub mod cg_media_t;
+pub mod cg_t;
+pub mod cgs_t;
+pub mod cgscreffects_s;
+pub mod chat_box_item_s;
+pub mod client_info_t;
+pub mod footstep_t;
+pub mod force_tic_pos_s;
+pub mod impact_sound_t;
+pub mod item_info_t;
+pub mod le_bounce_sound_type_t;
+pub mod le_flag_t;
+pub mod le_mark_type_t;
+pub mod le_type_t;
+pub mod lerp_frame_t;
+pub mod local_entity_s;
+pub mod mark_poly_s;
+pub mod player_entity_t;
+pub mod powerup_info_t;
+pub mod q3print_t;
+pub mod score_t;
+pub mod siege_extended_s;
+pub mod skulltrail_t;
+pub mod weapon_info_s;
