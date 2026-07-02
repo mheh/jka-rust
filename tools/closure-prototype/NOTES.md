@@ -239,3 +239,41 @@ Lessons → fixes:
 - Cross-tier by-value deps surfaced a real pattern: SP `gentity_s` embeds
   game-tier enums (`material_t` et al) — kept as documented ABI-identical
   `c_int` aliases + TODO markers, mirroring MP's `gentity_t.client` decision.
+
+## v10 — Wave 5: engine core via four concurrent runs
+
+Numbers: 263 types (160 engine, 65 botlib, 19 ghoul2, 14 icarus, 5 rmg
+hand-ported), 139 workflow agents, ~4.75 M subagent tokens, zero agent
+errors, all four runs cargo-green on first verify. Wall: icarus ~7 min,
+botlib ~14 min, ghoul2 ~11 min, engine ~24 min (the long pole, 75 agents).
+v4's ABI-sized skeleton placeholders held up: no medium-embeds-heavy churn.
+
+New machinery this wave:
+- Multi-entry engine TU profiles (qcommon+cm+files+vm+server in one parse);
+  new ghoul2/icarus/rmg profiles; botlib TU reproduces Q3's include order.
+- sweep.py: comma-separated --header lists (one parse, N inventories);
+  `cxx` flag on method/ctor/base-bearing records — drove the faithful-vs-
+  C++-track split (124 of 377 swept types deferred); parse errors surfaced
+  loudly on stderr.
+- scan_ported: engine subcrates rank as own-crate; `pub use ... as Y`
+  renames count as declarations (CCollisionRecord alias pattern).
+
+Lessons → fixes:
+- Include-order layout corruption is silent and real: `aas_entity_s` swept
+  1 B (its `aas_entityinfo_t` field dropped — definition header parsed
+  later), `interface_export_s` swept 1 B (missing `g_public.h`). Both
+  caught pre-launch by the new stderr error surfacing + tiny-struct scan
+  of manifests. Rule: every profile's entry list mirrors a real Raven
+  compile-unit include order; sizes ≤4 B in a manifest are a stop signal.
+- Cross-compiler layout caveat, now explicit: clang-mac IS the ground
+  truth convention (all asserts ever written here). Win32-only fields
+  (`timing_c`'s rdtsc stamps) compile out; std:: members mean C++ track.
+- OpenJK's CMakeLists source_groups are a free placement oracle: their
+  engine common/botlib/ghoul2/icarus/server groups map 1:1 to our crates,
+  their botlib file list flagged the game-side `be_*.h` definition headers,
+  and their dropped-RMG decision backed our rmg deferral.
+- Porter rule gap: rules allow pointer-only deps to stay opaque, so in-wave
+  siblings behind pointers (`indent_t.script`, `bstream_t.stream`, ...)
+  came back `*mut c_void` + TODO and needed a manual reconcile pass. Next
+  wave: extend RULES — pointer fields whose target is IN THE MANIFEST must
+  use the real sibling type (placeholders make it safe already).

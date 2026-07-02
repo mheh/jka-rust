@@ -47,17 +47,22 @@ Counts are faithful-C types by owning header; C++/vendored excluded per above.
 | 4 | `*/game` | 71 (+27\*) | 78 (+55\*) | **done** (module types; logic TBD) | high (gentity/gclient — done both trees) |
 | 4 | `*/cgame` | 58 | 47 | **done** | medium |
 | 4 | `*/ui` | 35 | 9 | **done** | low |
-| 5 | `*/engine/qcommon` | 134 | 105 | stub | high (`qfiles.h`, netchan) |
-| 5 | `*/engine/botlib` | 43 | ~ | stub | medium |
-| 5 | `*/engine/ghoul2` | 20 | 6 | stub | medium |
-| 5 | `*/engine/icarus` | 58 | 14 | stub | medium |
-| 5 | `*/engine/rmg` | 30 | 31 | stub | mostly C++ track |
-| 5 | `*/engine/server` | 14 | 8 | stub | medium |
+| 5 | `*/engine/qcommon` | 77 | 67 | **done** (terrain/GP2/ROFF → C++ track) | high (`qfiles.h`, netchan) |
+| 5 | `*/engine/botlib` | 42+23\*\* | — | **done** (MP-only) | medium |
+| 5 | `*/engine/ghoul2` | 9 | 10 | **done** (faithful subset; classes → C++ track) | medium |
+| 5 | `*/engine/icarus` | 11 | 3 | **done** (faithful subset; managers → C++ track) | medium |
+| 5 | `*/engine/rmg` | 2 | 3 | **done** (enums only; classes → C++ track) | mostly C++ track |
+| 5 | `*/engine/server` | 8 | 8 | **done** | medium |
 | 6 | `*/engine/client` | 85 | 67 | stub | medium (skip eax 77+77) |
 | 7 | `*/renderer` | 239 | 237 | stub | **HIGH** (`refEntity_t`, `refdef_t`, shaders, mdx) |
 
 \* `game/*` headers (`g_public.h`, `g_shared.h`, …) not yet split across
 `qshared`/`bg`/`game`; classified per-file when Wave 4 starts.
+
+\*\* 42 botlib internals in `mp/engine/botlib` + 23 game↔engine seam types
+(`game/botlib.h`, `game/be_*.h`) in `mp_qshared::common::mp::botlib`.
+Wave-5 counts are ground-truth sweep results; the original estimates
+included types that turned out C++-track or already ported.
 
 ## Waves
 

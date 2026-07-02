@@ -353,6 +353,74 @@ game-tier type unreachable from cgame), `cgMedia_t`(1640), `cgEffects_t`(136),
 | `saberInfoRetail_t` | SP-only savegame-compat struct; port with SP savegame system | ◐ deferred |
 | `animNumber_t` | `anims.h:1789`; ~1500-entry enum. `animFileSet_t.animations[MAX_ANIMATIONS]` sized from the verified packet offset (12344 B / 8) instead, pending this enum's port | ◐ deferred |
 
+## Engine tier — Wave 5, **complete** (263 types, all ☑)
+
+### `mp_engine_qcommon` / `sp_engine_qcommon` (MP 77 / SP 67)
+`qcommon/`: `msg_t`, `netadr_t`, `netchan_t` (MP 98364 B / SP 17448 B),
+MP `huff_t`/`huffman_t`/`nodetype`, `sysEvent_t`, wire enums
+(`netsrc_t`/`netadrtype_t`/`svc_ops_e`/`clc_ops_e`, MP `sharedTraps_t`/
+`vmInterpret_t`), `xcommand_t`. `qfiles/`: full disk formats — BSP lumps
+(`dheader_t`…`dsurface_t`), MD3 (`md3Header_t`…), `dfontdat_t`(7180),
+`pcx_t`/`_TargaHeader`, `vmHeader_t`, SP `hunkAllocType_t`. `cm/`:
+`clipMap_t`, `cGrid_t`(199708), `facet_t`, `patchCollide_t`, `winding_t`,
+`traceWork_t` (MP 296 / SP 1376), `CCMShader`, `leafList_t` (fn-ptr field
+typed). `files/`: `pack_t`, `searchpath_t`, `fileHandleData_t`, `qfile_us/gus`.
+MP `vm/`: `vm_t`, `opcode_t`, `vmSymbol_t`, `vmptr_t`. `miniheap/`
+`CMiniHeap`(24), SP `hstring/` `hstring`(4), `timing/` `timing_c` (win32
+`rdtsc` fields compiled out in clang ground truth — documented), MP `gp2/`
+`TGPGroup`/`TGPValue`/`TGenericParser2` void* handles.
+
+### `mp_engine_server` / `sp_engine_server` (8 each)
+`server/`: `server_t` (MP 664960 B / SP 397528 B), `client_t` (MP 332960 /
+SP 100048, embeds `netchan_t`), `serverStatic_t`, `clientSnapshot_t`,
+`svEntity_t`, `challenge_t`, `serverState_t`/`clientState_t`.
+
+### `mp_engine_botlib` (42 internals; MP-only — SP ships no botlib)
+`aasfile/` 16 on-disk AAS types; `be_aas_def/` runtime state (`aas_t` 14272,
+`aas_entity_t`, routing cache/links); `be_ai_weight/` fuzzy weights
+(`weightconfig_t` 2120); `l_script//l_precomp//l_struct/` lexer (`script_t`,
+`token_t`, `source_t` 3184, `define_t`, `indent_t`, field/struct defs);
+`l_libvar//l_crc/`; `be_interface/` `botlib_globals_t`.
+
+### `mp_qshared::common::mp::botlib` — game↔engine seam (23)
+From `game/botlib.h` + `game/be_*.h` (joins `bot_goal_t`/`aas_areainfo_t`):
+fn tables `botlib_export_t`(1104)/`botlib_import_t`/`aas_export_t`/
+`ai_export_t`(600)/`ea_export_t`, `bot_input_t`, `bot_entitystate_t`,
+`bsp_trace_t`/`bsp_surface_t`, `aas_clientmove_t`, `aas_entityinfo_t`,
+`aas_trace_t`, `aas_altroutegoal_t`, `aas_predictroute_t`, `solid_t`,
+chat/move/weapon info (`bot_consolemessage_t`, `bot_match_t`,
+`weaponinfo_t` 552, `projectileinfo_t`, …).
+
+### ghoul2 — `mp/sp_engine_ghoul2` + `sp_qshared::common::sp::ghoul2`
+Faithful subset: `boneInfo_t` (768/760, embeds `mdxaBone_t`), `boltInfo_t`
+(MP 64 / SP 16), `surfaceInfo_t`, gore PODs (`SGoreSurface`,
+`GoreTextureCoordinates`, `SRagDollEffectorCollision`). SP module-visible
+types live at qshared tier (embedded by value in `gentity_t`/`itemDef_s`,
+passed in G2API tables): `CGhoul2Info_v` (4 B handle), `EG2_Collision`,
+`CRagDollParams`, `CCollisionRecord` (shared-layout alias). Reconciled into
+`gentity_t.ghoul2`, `refEntity_t.ghoul2`, `pmove_t.trace`,
+`game_import_t`, `displayContextDef_t`, `itemDef_s`.
+
+### icarus — `mp/sp_engine_icarus` (MP 11 / SP 3)
+`CBlockMember`/`CBlockStream`(1056) POD-layout classes,
+`interface_export_t`(320 fn table), `variable_t`, `keywordArray_t`,
+`bstream_t` (→ real `*mut CBlockStream`), `pscript_t`,
+`playType_t`/`setType_t`, `vector_t`, `LPTokenizerErrorProc`.
+
+### rmg — `mp/sp_engine_rmg` (2 MP / 3 SP)
+`symmetry_t`, `ERMDir` (`DIR_FIRST` as const alias — duplicate
+discriminant), SP `CRMAutomapSymbol`.
+
+### Wave 5 C++-track deferrals (idiomatic reimpl, not byte-faithful)
+| Group | Types | Why |
+|---|---|---|
+| Terrain/RMG | `CCMLandScape`, `CCMPatch`, `CArea`, `CPathInfo`, `CRandomTerrain`, `CTerrainMap`(2 MB), `CRM*` classes, `CCGPatch`, `CRandomModel`, `areaType_t` | RMG subsystem; std:: members; OpenJK dropped it entirely |
+| GP2 / ROFF / stringed | `CGenericParser2` family, `CROFFSystem`, stringed classes | bases / std:: members; module access is via handles |
+| ghoul2 classes | `CGhoul2Info` (std::vector members), `IGhoul2InfoArray` (virtual), `CGoreSet` (multimap), `CRagDollUpdateParams` (virtual), `CBoneCache` (renderer, Wave 7) | not standard-layout |
+| icarus managers | `CIcarus`, `CSequencer`, `CTaskManager`, `CBlock`, `CInterpreter`, tokenizer class family | virtual / std:: members |
+| net profiling | `INetProfile`/`CNetProfile` | win32-only C++ |
+| misc | SP `CMapPoolLow`/`CMapBlock` (hstring pools), `unzip.h` (vendored minizip) | std:: members / vendored |
+
 ## Related pre-existing gaps (out of scope, tracked)
 - ~~SP `gentity_t` is an opaque stub~~ — full-ported in Wave 4 (1496 B,
   offset-asserted). Remaining: SP `entity_shared.rs` / `collision.rs` are
@@ -361,3 +429,7 @@ game-tier type unreachable from cgame), `cgMedia_t`(1640), `cgEffects_t`(136),
   (ABI-identical; real type lives above the referencing crate): SP `gentity.rs`
   (`material_t`/`moverState_t`/`team_t`), SP `cgs_t.clientinfo` blob, SP
   `weaponInfo_t` cgame-callback params, MP `sharedEntity_t.m_pVehicle`.
+  Wave 5 resolved the ghoul2 ones (`gentity_t.ghoul2` et al. are real types
+  now); still opaque by tier: sp_abi `G2API_CollisionDetect` `*mut CMiniHeap`
+  (engine-tier type) and `CGhoul2Info`/`CRagDollUpdateParams` pointers
+  (C++ track).
