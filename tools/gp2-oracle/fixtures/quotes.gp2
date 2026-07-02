@@ -1,0 +1,8 @@
+"key with spaces"	quotedkeyvalue
+plain	"value with spaces"
+emptyval	""
+trailing	"quoted part" rest ignored
+grp
+{
+	"another key"	"another value"
+}

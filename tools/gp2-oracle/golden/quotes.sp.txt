@@ -1,0 +1,43 @@
+== parse ok ==
+G 0 |Top Level|
+P 0 |key with spaces|quotedkeyvalue|
+P 0 |plain|value with spaces|
+P 0 |emptyval||
+P 0 |trailing|quoted part|
+P 0 |rest|ignored|
+F 0 |key with spaces|quotedkeyvalue|
+F 0 |plain|value with spaces|
+F 0 |emptyval||
+F 0 |trailing|quoted part|
+F 0 |rest|ignored|
+F 0 |zzz_missing|<DEF>|
+F 0 |name||count|<DEF>|
+F 0 |zzz_missing||name|<DEF>|
+F 0 |NAME|<DEF>|
+G 1 |grp|
+P 1 |another key|another value|
+F 1 |another key|another value|
+F 1 |zzz_missing|<DEF>|
+F 1 |name||count|<DEF>|
+F 1 |zzz_missing||name|<DEF>|
+F 1 |NAME|<DEF>|
+== inorder ==
+IG 0 |Top Level|
+IP 0 |emptyval|
+IP 0 |key with spaces|
+IP 0 |plain|
+IP 0 |rest|
+IP 0 |trailing|
+IG 1 |grp|
+IP 1 |another key|
+== write ==
+"key with spaces"		quotedkeyvalue
+plain		"value with spaces"
+emptyval		""
+trailing		"quoted part"
+rest		ignored
+grp
+{
+	"another key"		"another value"
+}
+== end ==

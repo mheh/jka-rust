@@ -1,0 +1,9 @@
+top
+{
+	key	value one
+	list
+	[
+		entry a
+		entry b
+	]
+}

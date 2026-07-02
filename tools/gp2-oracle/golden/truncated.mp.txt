@@ -1,0 +1,36 @@
+== parse error ==
+G 0 |Top Level|
+F 0 |zzz_missing|<DEF>|
+F 0 |name||count|<DEF>|
+F 0 |zzz_missing||name|<DEF>|
+F 0 |NAME|<DEF>|
+G 1 |outer|
+P 1 |key|value|
+F 1 |key|value|
+F 1 |zzz_missing|<DEF>|
+F 1 |name||count|<DEF>|
+F 1 |zzz_missing||name|<DEF>|
+F 1 |NAME|<DEF>|
+G 2 |inner|
+P 2 |deep|yes|
+F 2 |deep|yes|
+F 2 |zzz_missing|<DEF>|
+F 2 |name||count|<DEF>|
+F 2 |zzz_missing||name|<DEF>|
+F 2 |NAME|<DEF>|
+== inorder ==
+IG 0 |Top Level|
+IG 1 |outer|
+IP 1 |key|
+IG 2 |inner|
+IP 2 |deep|
+== write ==
+outer
+{
+	key		value
+	inner
+	{
+		deep		yes
+	}
+}
+== end ==

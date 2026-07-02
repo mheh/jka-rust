@@ -1,0 +1,26 @@
+== parse ok ==
+G 0 |Top Level|
+P 0 |colors|red|deep blue|light green|
+P 0 |empty|
+P 0 |after|ok|
+F 0 |colors|red|
+F 0 |empty|<DEF>|
+F 0 |after|ok|
+F 0 |zzz_missing|<DEF>|
+F 0 |name||count|<DEF>|
+F 0 |zzz_missing||name|<DEF>|
+F 0 |NAME|<DEF>|
+== inorder ==
+IG 0 |Top Level|
+IP 0 |after|
+IP 0 |colors|
+IP 0 |empty|
+== write ==
+colors
+[
+	red
+	"deep blue"
+	"light green"
+]
+after		ok
+== end ==

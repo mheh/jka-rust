@@ -1,0 +1,5 @@
+a	one two three
+b	value // trailing comment
+d	tabbed	
+e  spaced out  
+c	value /* unterminated comment

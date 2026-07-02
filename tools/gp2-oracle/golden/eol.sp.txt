@@ -1,0 +1,30 @@
+== parse ok ==
+G 0 |Top Level|
+P 0 |a|one two three|
+P 0 |b|value |
+P 0 |d|tabbed|
+P 0 |e|spaced out  |
+P 0 |c|value |
+F 0 |a|one two three|
+F 0 |b|value |
+F 0 |d|tabbed|
+F 0 |e|spaced out  |
+F 0 |c|value |
+F 0 |zzz_missing|<DEF>|
+F 0 |name||count|<DEF>|
+F 0 |zzz_missing||name|<DEF>|
+F 0 |NAME|<DEF>|
+== inorder ==
+IG 0 |Top Level|
+IP 0 |a|
+IP 0 |b|
+IP 0 |c|
+IP 0 |d|
+IP 0 |e|
+== write ==
+a		"one two three"
+b		"value "
+d		tabbed
+e		"spaced out  "
+c		"value "
+== end ==

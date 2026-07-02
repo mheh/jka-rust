@@ -1,0 +1,18 @@
+// basic structure
+topkey topvalue
+outer
+{
+	name	First Name
+	Count	3
+	/* block
+	   comment */
+	inner
+	{
+		deep	value
+	}
+	AfterGroup	yes
+}
+second
+{
+	name	other
+}

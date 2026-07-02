@@ -1,0 +1,31 @@
+== parse ok ==
+G 0 |Top Level|
+F 0 |zzz_missing|<DEF>|
+F 0 |name||count|<DEF>|
+F 0 |zzz_missing||name|<DEF>|
+F 0 |NAME|<DEF>|
+G 1 |top|
+P 1 |key|value one|
+P 1 |list|entry a|entry b|
+F 1 |key|value one|
+F 1 |list|entry a|
+F 1 |zzz_missing|<DEF>|
+F 1 |name||count|<DEF>|
+F 1 |zzz_missing||name|<DEF>|
+F 1 |NAME|<DEF>|
+== inorder ==
+IG 0 |Top Level|
+IG 1 |top|
+IP 1 |key|
+IP 1 |list|
+== write ==
+top
+{
+	key		"value one"
+	list
+	[
+		"entry a"
+		"entry b"
+	]
+}
+== end ==

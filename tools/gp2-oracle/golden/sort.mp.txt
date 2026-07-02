@@ -1,0 +1,61 @@
+== parse ok ==
+G 0 |Top Level|
+P 0 |delta|4|
+P 0 |Alpha|1|
+P 0 |alpha|2|
+P 0 |CHARLIE|3|
+P 0 |bravo|5|
+P 0 |alpha|6|
+F 0 |delta|4|
+F 0 |Alpha|1|
+F 0 |alpha|1|
+F 0 |CHARLIE|3|
+F 0 |bravo|5|
+F 0 |alpha|1|
+F 0 |zzz_missing|<DEF>|
+F 0 |name||count|<DEF>|
+F 0 |zzz_missing||name|<DEF>|
+F 0 |NAME|<DEF>|
+G 1 |Zeta|
+F 1 |zzz_missing|<DEF>|
+F 1 |name||count|<DEF>|
+F 1 |zzz_missing||name|<DEF>|
+F 1 |NAME|<DEF>|
+G 1 |echo|
+F 1 |zzz_missing|<DEF>|
+F 1 |name||count|<DEF>|
+F 1 |zzz_missing||name|<DEF>|
+F 1 |NAME|<DEF>|
+G 1 |Echo|
+F 1 |zzz_missing|<DEF>|
+F 1 |name||count|<DEF>|
+F 1 |zzz_missing||name|<DEF>|
+F 1 |NAME|<DEF>|
+== inorder ==
+IG 0 |Top Level|
+IP 0 |Alpha|
+IP 0 |alpha|
+IP 0 |alpha|
+IP 0 |bravo|
+IP 0 |CHARLIE|
+IP 0 |delta|
+IG 1 |echo|
+IG 1 |Echo|
+IG 1 |Zeta|
+== write ==
+delta		4
+Alpha		1
+alpha		2
+CHARLIE		3
+bravo		5
+alpha		6
+Zeta
+{
+}
+echo
+{
+}
+Echo
+{
+}
+== end ==

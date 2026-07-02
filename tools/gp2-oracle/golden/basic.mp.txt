@@ -1,0 +1,61 @@
+== parse ok ==
+G 0 |Top Level|
+P 0 |topkey|topvalue|
+F 0 |topkey|topvalue|
+F 0 |zzz_missing|<DEF>|
+F 0 |name||count|<DEF>|
+F 0 |zzz_missing||name|<DEF>|
+F 0 |NAME|<DEF>|
+G 1 |outer|
+P 1 |name|First Name|
+P 1 |Count|3|
+P 1 |AfterGroup|yes|
+F 1 |name|First Name|
+F 1 |Count|3|
+F 1 |AfterGroup|yes|
+F 1 |zzz_missing|<DEF>|
+F 1 |name||count|First Name|
+F 1 |zzz_missing||name|First Name|
+F 1 |NAME|First Name|
+G 2 |inner|
+P 2 |deep|value|
+F 2 |deep|value|
+F 2 |zzz_missing|<DEF>|
+F 2 |name||count|<DEF>|
+F 2 |zzz_missing||name|<DEF>|
+F 2 |NAME|<DEF>|
+G 1 |second|
+P 1 |name|other|
+F 1 |name|other|
+F 1 |zzz_missing|<DEF>|
+F 1 |name||count|other|
+F 1 |zzz_missing||name|other|
+F 1 |NAME|other|
+== inorder ==
+IG 0 |Top Level|
+IP 0 |topkey|
+IG 1 |outer|
+IP 1 |AfterGroup|
+IP 1 |Count|
+IP 1 |name|
+IG 2 |inner|
+IP 2 |deep|
+IG 1 |second|
+IP 1 |name|
+== write ==
+topkey		topvalue
+outer
+{
+	name		"First Name"
+	Count		3
+	AfterGroup		yes
+	inner
+	{
+		deep		value
+	}
+}
+second
+{
+	name		other
+}
+== end ==
