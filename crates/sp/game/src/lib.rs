@@ -7,6 +7,20 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
 pub mod ai;
+pub mod bset;
+pub mod bstate;
+pub mod characters;
+pub mod dmstates;
+pub mod events;
+pub mod fields;
+pub mod functions;
 pub mod local;
 pub mod npc;
+pub mod objectives;
+pub mod roff;
+pub mod saber;
+pub mod say;
+pub mod shared;
 pub mod teams;
+pub mod vehicles;
+pub mod weapons;

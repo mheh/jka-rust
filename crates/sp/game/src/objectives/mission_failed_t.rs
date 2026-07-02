@@ -1,0 +1,24 @@
+#![allow(non_camel_case_types, non_snake_case)]
+
+/// Raven `missionFailed_t` — mission failure reason codes.
+///
+/// Type definition source: `oracle/oracle/code/game/objectives.h:118-138`
+#[repr(i32)]
+pub enum missionFailed_t {
+	MISSIONFAILED_JAN = 0,
+	MISSIONFAILED_LUKE,
+	MISSIONFAILED_LANDO,
+	MISSIONFAILED_R5D2,
+	MISSIONFAILED_WARDEN,
+	MISSIONFAILED_PRISONERS,
+	MISSIONFAILED_EMPLACEDGUNS,
+	MISSIONFAILED_LADYLUCK,
+	MISSIONFAILED_KYLECAPTURE,
+	MISSIONFAILED_TOOMANYALLIESDIED,
+	MISSIONFAILED_CHEWIE,
+	MISSIONFAILED_KYLE,
+	MISSIONFAILED_ROSH,
+	MISSIONFAILED_WEDGE,
+	MISSIONFAILED_TURNED, // Turned on your friends.
+	MAX_MISSIONFAILED,
+}
