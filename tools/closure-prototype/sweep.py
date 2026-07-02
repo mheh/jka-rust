@@ -76,6 +76,12 @@ def main():
         sys.exit(f"module '{args.module}' not in profile (has {', '.join(sorted(C.MODULES))})")
 
     tu = C.parse_tu(args.module, None)
+    # -Wno-everything hides real errors; an unresolved include/type silently
+    # becomes int and corrupts layouts. Surface errors loudly on stderr.
+    errs = [d for d in tu.diagnostics if d.severity >= 3]
+    if errs:
+        print(f"[sweep] WARNING: {len(errs)} parse error(s) in {args.module} TU; "
+              f"first: {errs[0]}", file=sys.stderr)
     decls = C.named_decls(tu)
     ported, size_asserts = C.scan_ported(*args.module.split("-", 1))
     alias = C.build_alias_map(decls)
@@ -107,78 +113,93 @@ def main():
     # ----------------------------------------------------------- sweep mode
     if not args.header:
         sys.exit("need --header or --badges")
-    header = args.header
 
-    # anonymous enums in the header, for the `enum {...}; typedef int X;` pattern
-    anon_enums = []
-    def walk_anon(cur):
-        for c in cur.get_children():
-            if c.kind == CursorKind.ENUM_DECL and (not c.spelling or c.is_anonymous()) \
-                    and decl_in_header(c, header):
-                anon_enums.append(c)
-            if c.kind in (CursorKind.UNEXPOSED_DECL, CursorKind.LINKAGE_SPEC):
-                walk_anon(c)
-    walk_anon(tu.cursor)
+    def cxx_track(defn):
+        """Method/ctor/base-bearing record — the idiomatic C++ track, not the
+        byte-faithful port."""
+        for c in defn.get_children():
+            if c.kind in (CursorKind.CXX_METHOD, CursorKind.CONSTRUCTOR,
+                          CursorKind.DESTRUCTOR, CursorKind.CXX_BASE_SPECIFIER):
+                return True
+        return False
 
-    seen_records = set()
-    rows = []
-    for name, cur in sorted(decls.items()):
-        if name.startswith("fn:"):
-            continue
-        target = cur.get_definition() or cur
-        if not decl_in_header(target, header):
-            continue
-        ext = target.extent
-        entry = None
-        if cur.kind == CursorKind.ENUM_DECL and (not cur.spelling or cur.is_anonymous()
-                                                 or "unnamed" in cur.spelling):
-            continue  # anon const-block enums ride along with their typedef row
-        if cur.kind in STRUCTY or cur.kind == CursorKind.ENUM_DECL:
-            kind = ("enum" if cur.kind == CursorKind.ENUM_DECL
-                    else cur.kind.name.split("_")[0].lower())
-            sz = target.type.get_size()
-            ptr = cur.kind in STRUCTY and pointer_bearing(target)
-            nf = len(list(target.type.get_fields())) if cur.kind in STRUCTY else 0
-            entry = dict(name=name, kind=kind, sizeB=sz, pointerBearing=ptr,
-                         tier=classify(kind, sz or 0, ptr, nf))
-            seen_records.add(name)
-        elif cur.kind == CursorKind.TYPEDEF_DECL:
-            under, _ = C.peel(cur.underlying_typedef_type)
-            udecl = under.get_declaration()
-            if udecl.kind in C.RECORD_KINDS and udecl.spelling and not udecl.is_anonymous():
-                continue  # named record covered by its own row wherever it lives
-            canon = cur.underlying_typedef_type.get_canonical()
-            if canon.kind == TypeKind.POINTER and canon.get_pointee().kind == TypeKind.FUNCTIONPROTO:
-                kind = "fnptr"
-            elif udecl.kind == CursorKind.ENUM_DECL and (not udecl.spelling or udecl.is_anonymous()):
-                kind = "enum"  # typedef enum {...} X with anonymous tag
-            else:
-                kind = "alias"
-            entry = dict(name=name, kind=kind, sizeB=canon.get_size(),
-                         pointerBearing=False, tier="trivial")
-            # `enum {...}; typedef int X;` — pull the adjacent anon enum into the cite
-            if kind == "alias":
-                for ae in anon_enums:
-                    if 0 <= ext.start.line - ae.extent.end.line <= 5:
-                        ext = type("E", (), {"start": ae.extent.start, "end": ext.end})()
-                        break
-        if entry is None:
-            continue
-        rel = C.loc(target).rsplit(":", 1)[0]
-        entry["cite"] = f"{rel}:{ext.start.line}-{ext.end.line}"
-        entry["badge"] = badge(name, target if cur.kind in STRUCTY else None)
-        if args.packets:
-            entry["source"] = source_slice(ext.start.file.name, ext.start.line, ext.end.line)
-            if cur.kind in STRUCTY and (target.type.get_size() or 0) > 0:
-                entry["asserts"] = C.rust_asserts(alias.get(name, name), target)
-        rows.append(entry)
+    def sweep_header(header):
+        # anonymous enums in the header, for the `enum {...}; typedef int X;` pattern
+        anon_enums = []
+        def walk_anon(cur):
+            for c in cur.get_children():
+                if c.kind == CursorKind.ENUM_DECL and (not c.spelling or c.is_anonymous()) \
+                        and decl_in_header(c, header):
+                    anon_enums.append(c)
+                if c.kind in (CursorKind.UNEXPOSED_DECL, CursorKind.LINKAGE_SPEC):
+                    walk_anon(c)
+        walk_anon(tu.cursor)
 
+        rows = []
+        for name, cur in sorted(decls.items()):
+            if name.startswith("fn:"):
+                continue
+            target = cur.get_definition() or cur
+            if not decl_in_header(target, header):
+                continue
+            ext = target.extent
+            entry = None
+            if cur.kind == CursorKind.ENUM_DECL and (not cur.spelling or cur.is_anonymous()
+                                                     or "unnamed" in cur.spelling):
+                continue  # anon const-block enums ride along with their typedef row
+            if cur.kind in STRUCTY or cur.kind == CursorKind.ENUM_DECL:
+                kind = ("enum" if cur.kind == CursorKind.ENUM_DECL
+                        else cur.kind.name.split("_")[0].lower())
+                sz = target.type.get_size()
+                ptr = cur.kind in STRUCTY and pointer_bearing(target)
+                nf = len(list(target.type.get_fields())) if cur.kind in STRUCTY else 0
+                entry = dict(name=name, kind=kind, sizeB=sz, pointerBearing=ptr,
+                             tier=classify(kind, sz or 0, ptr, nf))
+                if cur.kind in STRUCTY and cxx_track(target):
+                    entry["cxx"] = True
+            elif cur.kind == CursorKind.TYPEDEF_DECL:
+                under, _ = C.peel(cur.underlying_typedef_type)
+                udecl = under.get_declaration()
+                if udecl.kind in C.RECORD_KINDS and udecl.spelling and not udecl.is_anonymous():
+                    continue  # named record covered by its own row wherever it lives
+                canon = cur.underlying_typedef_type.get_canonical()
+                if canon.kind == TypeKind.POINTER and canon.get_pointee().kind == TypeKind.FUNCTIONPROTO:
+                    kind = "fnptr"
+                elif udecl.kind == CursorKind.ENUM_DECL and (not udecl.spelling or udecl.is_anonymous()):
+                    kind = "enum"  # typedef enum {...} X with anonymous tag
+                else:
+                    kind = "alias"
+                entry = dict(name=name, kind=kind, sizeB=canon.get_size(),
+                             pointerBearing=False, tier="trivial")
+                # `enum {...}; typedef int X;` — pull the adjacent anon enum into the cite
+                if kind == "alias":
+                    for ae in anon_enums:
+                        if 0 <= ext.start.line - ae.extent.end.line <= 5:
+                            ext = type("E", (), {"start": ae.extent.start, "end": ext.end})()
+                            break
+            if entry is None:
+                continue
+            rel = C.loc(target).rsplit(":", 1)[0]
+            entry["cite"] = f"{rel}:{ext.start.line}-{ext.end.line}"
+            entry["badge"] = badge(name, target if cur.kind in STRUCTY else None)
+            if args.packets:
+                entry["source"] = source_slice(ext.start.file.name, ext.start.line, ext.end.line)
+                if cur.kind in STRUCTY and (target.type.get_size() or 0) > 0:
+                    entry["asserts"] = C.rust_asserts(alias.get(name, name), target)
+            rows.append(entry)
+        return rows
+
+    headers = [h.strip() for h in args.header.split(",") if h.strip()]
+    out = {h: sweep_header(h) for h in headers}
     if args.json:
-        print(json.dumps(rows, indent=1))
+        # single header keeps the historical plain-list JSON shape
+        print(json.dumps(out[headers[0]] if len(headers) == 1 else out, indent=1))
     else:
-        for r in rows:
-            print(f"  {r['name']:32} {r['kind']:6} {str(r['sizeB']):>6}B {r['tier']:7} {r['badge']:44} {r['cite']}")
-        print(f"\n{len(rows)} types owned by {header}")
+        for header, rows in out.items():
+            for r in rows:
+                print(f"  {r['name']:32} {r['kind']:6} {str(r['sizeB']):>6}B {r['tier']:7} "
+                      f"{'C++ ' if r.get('cxx') else '    '}{r['badge']:44} {r['cite']}")
+            print(f"\n{len(rows)} types owned by {header}\n")
 
 
 if __name__ == "__main__":

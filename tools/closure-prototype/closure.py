@@ -58,14 +58,80 @@ RAVEN_MODULES = {
         includes=["codemp/ui", "codemp/game"],
         defines=["NDEBUG", "MISSIONPACK", "UI_EXPORTS", "_JK2"],
         srcglob=["codemp/ui/*.c", "codemp/game/bg_*.c"]),
+    # Multi-entry: qcommon owns many headers unreachable from qcommon.h
+    # (qfiles/cm_*/files/vm_local/containers); server.h rides this TU too.
+    # Skipped on purpose: unzip.h (vendored minizip), platform.h/sparc.h
+    # (replaced), INetProfile.h/CNetProfile (win32 net profiling, C++ track).
     "mp-engine": dict(
-        lang="c++", entry="codemp/qcommon/qcommon.h",
-        includes=["codemp/qcommon", "codemp/game"],
+        lang="c++", entry=["codemp/qcommon/qcommon.h", "codemp/qcommon/qfiles.h",
+                           "codemp/qcommon/cm_local.h", "codemp/qcommon/cm_patch.h",
+                           "codemp/qcommon/cm_landscape.h",
+                           "codemp/qcommon/cm_randomterrain.h",
+                           "codemp/qcommon/cm_terrainmap.h", "codemp/qcommon/files.h",
+                           "codemp/qcommon/vm_local.h", "codemp/qcommon/chash.h",
+                           "codemp/qcommon/fixedmap.h", "codemp/qcommon/hstring.h",
+                           "codemp/qcommon/sstring.h", "codemp/qcommon/MiniHeap.h",
+                           "codemp/qcommon/GenericParser2.h",
+                           "codemp/qcommon/RoffSystem.h",
+                           "codemp/qcommon/stringed_ingame.h",
+                           "codemp/qcommon/stringed_interface.h",
+                           "codemp/qcommon/timing.h", "codemp/server/server.h"],
+        includes=["codemp/qcommon", "codemp/game", "codemp/server", "codemp"],
         defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
+    # botlib headers assume the classic Q3 include order (q_shared -> l_* ->
+    # aasfile -> botlib -> be_*); the entry list reproduces it.
+    # NB: the botlib interface header is codemp/game/botlib.h (there is no
+    # codemp/botlib/botlib.h) — Raven's be_* files include it cross-dir.
     "mp-botlib": dict(
-        lang="c", entry="codemp/botlib/botlib.h",
-        includes=["codemp/botlib", "codemp/game"],
+        lang="c", entry=["codemp/game/q_shared.h", "codemp/botlib/l_crc.h",
+                         "codemp/botlib/l_libvar.h", "codemp/botlib/l_log.h",
+                         "codemp/botlib/l_memory.h", "codemp/botlib/l_script.h",
+                         "codemp/botlib/l_precomp.h", "codemp/botlib/l_struct.h",
+                         "codemp/botlib/l_utils.h", "codemp/botlib/aasfile.h",
+                         "codemp/game/botlib.h",
+                         # game-side interface headers must precede be_aas_def.h
+                         # (aas_entity_s embeds aas_entityinfo_t from be_aas.h)
+                         "codemp/game/be_aas.h", "codemp/game/be_ai_char.h",
+                         "codemp/game/be_ai_chat.h", "codemp/game/be_ai_gen.h",
+                         "codemp/game/be_ai_goal.h", "codemp/game/be_ai_move.h",
+                         "codemp/game/be_ai_weap.h", "codemp/game/be_ea.h",
+                         "codemp/botlib/be_aas_def.h",
+                         "codemp/botlib/be_aas_funcs.h", "codemp/botlib/be_aas_bsp.h",
+                         "codemp/botlib/be_aas_cluster.h", "codemp/botlib/be_aas_debug.h",
+                         "codemp/botlib/be_aas_entity.h", "codemp/botlib/be_aas_file.h",
+                         "codemp/botlib/be_aas_main.h", "codemp/botlib/be_aas_move.h",
+                         "codemp/botlib/be_aas_optimize.h", "codemp/botlib/be_aas_reach.h",
+                         "codemp/botlib/be_aas_route.h", "codemp/botlib/be_aas_routealt.h",
+                         "codemp/botlib/be_aas_sample.h", "codemp/botlib/be_ai_weight.h",
+                         "codemp/botlib/be_interface.h"],
+        includes=["codemp/botlib", "codemp/game", "codemp"],
         defines=["NDEBUG", "MISSIONPACK", "BOTLIB", "_JK2"]),
+    "mp-ghoul2": dict(
+        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
+                           "codemp/ghoul2/ghoul2_shared.h", "codemp/ghoul2/G2_local.h",
+                           "codemp/ghoul2/G2_gore.h", "codemp/ghoul2/G2.h"],
+        includes=["codemp/ghoul2", "codemp/game", "codemp/qcommon", "codemp"],
+        defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
+    "mp-icarus": dict(
+        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
+                           # interface.h fn tables reference sharedEntity_t
+                           "codemp/game/g_public.h",
+                           "codemp/icarus/tokenizer.h", "codemp/icarus/blockstream.h",
+                           "codemp/icarus/interpreter.h", "codemp/icarus/interface.h",
+                           "codemp/icarus/sequence.h", "codemp/icarus/taskmanager.h",
+                           "codemp/icarus/sequencer.h", "codemp/icarus/module.h",
+                           "codemp/icarus/instance.h",
+                           "codemp/icarus/icarus.h", "codemp/icarus/Q3_Interface.h",
+                           "codemp/icarus/Q3_Registers.h", "codemp/icarus/GameInterface.h"],
+        includes=["codemp/icarus", "codemp/game", "codemp/qcommon", "codemp"],
+        # tokenizer.h uses the win32 LPCTSTR spelling; platform.h only defines
+        # it under _WIN32, so supply it directly for layout purposes.
+        defines=["NDEBUG", "MISSIONPACK", "_JK2", "LPCTSTR=const char *"]),
+    "mp-rmg": dict(
+        lang="c++", entry=["codemp/game/q_shared.h", "codemp/qcommon/qcommon.h",
+                           "codemp/RMG/RM_Headers.h"],
+        includes=["codemp/RMG", "codemp/game", "codemp/qcommon", "codemp"],
+        defines=["NDEBUG", "MISSIONPACK", "_JK2"]),
     "mp-renderer": dict(
         lang="c++", entry="codemp/renderer/tr_local.h",
         includes=["codemp/renderer", "codemp/game", "codemp/qcommon"],
@@ -95,9 +161,42 @@ RAVEN_MODULES = {
         lang="c++", entry=["code/ui/ui_local.h", "code/ui/gameinfo.h"],
         includes=["code/ui", "code/game", "code"],
         defines=["NDEBUG", "_IMMERSION"]),
+    # Same skip list as mp-engine; SP additionally has no vm_local (no QVM)
+    # and no GenericParser2/RoffSystem in qcommon (SP GP2 lives in game/).
     "sp-engine": dict(
-        lang="c++", entry="code/qcommon/qcommon.h",
-        includes=["code/qcommon", "code/game", "code"],
+        lang="c++", entry=["code/game/q_shared.h",
+                           "code/qcommon/qcommon.h", "code/qcommon/qfiles.h",
+                           "code/qcommon/cm_local.h", "code/qcommon/cm_patch.h",
+                           "code/qcommon/cm_landscape.h",
+                           "code/qcommon/cm_randomterrain.h",
+                           "code/qcommon/cm_terrainmap.h", "code/qcommon/files.h",
+                           "code/qcommon/chash.h", "code/qcommon/fixedmap.h",
+                           "code/qcommon/hstring.h", "code/qcommon/sstring.h",
+                           "code/qcommon/MiniHeap.h",
+                           "code/qcommon/stringed_ingame.h",
+                           "code/qcommon/stringed_interface.h",
+                           "code/qcommon/timing.h", "code/server/server.h"],
+        includes=["code/qcommon", "code/game", "code/server", "code"],
+        defines=["NDEBUG", "_IMMERSION"]),
+    # SP ghoul2_shared.h lives in code/game/ (engine-linked), not code/ghoul2/.
+    "sp-ghoul2": dict(
+        lang="c++", entry=["code/game/q_shared.h",
+                           "code/game/ghoul2_shared.h", "code/ghoul2/ghoul2_gore.h",
+                           "code/ghoul2/G2.h"],
+        includes=["code/ghoul2", "code/game", "code/qcommon", "code"],
+        defines=["NDEBUG", "_IMMERSION"]),
+    # Order mirrors Raven's Sequencer.cpp: StdAfx -> IcarusImplementation ->
+    # BlockStream -> Sequence -> TaskManager -> Sequencer.
+    "sp-icarus": dict(
+        lang="c++", entry=["code/icarus/StdAfx.h", "code/icarus/IcarusInterface.h",
+                           "code/icarus/IcarusImplementation.h",
+                           "code/icarus/blockstream.h", "code/icarus/sequence.h",
+                           "code/icarus/taskmanager.h", "code/icarus/sequencer.h"],
+        includes=["code/icarus", "code/game", "code/qcommon", "code"],
+        defines=["NDEBUG", "_IMMERSION"]),
+    "sp-rmg": dict(
+        lang="c++", entry="code/Rmg/RM_Headers.h",
+        includes=["code/Rmg", "code/game", "code/qcommon", "code"],
         defines=["NDEBUG", "_IMMERSION"]),
     "sp-renderer": dict(
         lang="c++", entry="code/renderer/tr_local.h",
@@ -226,7 +325,12 @@ def scan_ported(mode: str, crate_seg: str | None = None):
     module's own crate dir (crate_seg, e.g. 'ui' for mp-ui) is preferred —
     same-named types in sibling crates (mp_ui vs mp_cgame lerpFrame_t) must
     not badge each other."""
-    decl_re = re.compile(r"^\s*pub\s+(?:struct|enum|union)\s+(\w+)|^\s*pub\s+type\s+(\w+)\s*=", re.M)
+    decl_re = re.compile(
+        r"^\s*pub\s+(?:struct|enum|union)\s+(\w+)"
+        r"|^\s*pub\s+type\s+(\w+)\s*="
+        # `pub use path::X as Y;` renames count as declaring Y (house pattern
+        # for mode-facing names over a shared layout, e.g. SP CCollisionRecord)
+        r"|^\s*pub\s+use\s+[\w:{}, ]*\bas\s+(\w+)\s*;", re.M)
     todo_re = re.compile(r"//\s*TODO:\s*Port\s+(\w+)")
     size_re = re.compile(r"size_of::<\s*(\w+)\s*>\s*\(\)\s*==\s*(\d+)")
     status: dict[str, tuple[str, str]] = {}
@@ -235,7 +339,10 @@ def scan_ported(mode: str, crate_seg: str | None = None):
     # asserts). Prevents MP asserts vouching for SP stubs and vice versa.
     size_asserts: dict[str, dict[str, set[int]]] = {}
     def rank(rel):  # own-crate > own-mode > native; other-mode excluded entirely
-        if crate_seg and rel.startswith(f"crates/{mode}/{crate_seg}/"):
+        # Engine subsystems (ghoul2/icarus/botlib/...) live one level down:
+        # crates/{mode}/engine/{seg}. Prefer that dir too.
+        if crate_seg and (rel.startswith(f"crates/{mode}/{crate_seg}/")
+                          or rel.startswith(f"crates/{mode}/engine/{crate_seg}/")):
             return 0
         if rel.startswith(f"crates/{mode}/"):
             return 1
@@ -253,7 +360,7 @@ def scan_ported(mode: str, crate_seg: str | None = None):
             continue
         text = rs.read_text(errors="replace")
         for m in decl_re.finditer(text):
-            name = m.group(1) or m.group(2)
+            name = m.group(1) or m.group(2) or m.group(3)
             prev = status.get(name)
             if prev is None or prev[0] != "ported" or rank(rel) < rank(prev[1]):
                 status[name] = ("ported", rel)
