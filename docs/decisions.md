@@ -21,8 +21,13 @@ re-confirm specifics at that time.
 
 Implications: `docs/subsystems/renderer.md` covers the seam + null-renderer
 deferral strategy only; lifecycle docs must define headless boot for all three
-executables (note SP boots the renderer early inside `Com_Init`,
-`oracle/oracle/code/qcommon/common.cpp:969-977` — the stub must satisfy that).
+executables.
+
+> **Amendment 2026-07-02:** the earlier note that SP boots the renderer early
+> inside `Com_Init` was wrong — that block
+> (`oracle/oracle/code/qcommon/common.cpp:965-981`) is `#ifdef _XBOX` dead
+> code. On PC, SP initializes the renderer inside `CL_Init` like MP (A3
+> survey). Headless design needs no special SP early-boot handling.
 
 ## DEC-02 — Windowing/input: winit
 
@@ -86,11 +91,20 @@ transport" open item.
 
 ## DEC-08 — Com_Error recovery: panic + catch_unwind
 
-`Com_Error(ERR_DROP, …)`'s longjmp-to-`Com_Frame` becomes a **typed panic
-payload** caught by `catch_unwind` at the frame boundary, running the same
-recovery Raven does. Requires `panic = "unwind"` and a per-subsystem audit that
-unwound state resets match Raven's error paths. Result-threading was rejected:
-it reshapes thousands of faithful signatures away from oracle control flow.
+`Com_Error(ERR_DROP, …)`'s dynamic escape to `Com_Frame` becomes a **typed
+panic payload** caught by `catch_unwind` at the frame boundary, running the
+same recovery Raven does. Requires `panic = "unwind"` and a per-subsystem audit
+that unwound state resets match Raven's error paths. Result-threading was
+rejected: it reshapes thousands of faithful signatures away from oracle
+control flow.
+
+> **Amendment 2026-07-02:** Raven's mechanism is C++ `throw`/`catch` (string
+> exceptions like `"DROPPED\n"` caught in `Com_Frame` —
+> `oracle/oracle/codemp/qcommon/common.cpp:1762`,
+> `oracle/oracle/code/qcommon/common.cpp:1450`), not setjmp/longjmp as first
+> recorded. Recovery runs *before* the throw; the catch prints and returns.
+> This maps onto panic+catch_unwind even more directly — the decision stands
+> unchanged. (A3 survey.)
 
 ## DEC-09 — Engine verification: TU harnesses + live peers
 
