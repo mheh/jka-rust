@@ -16,6 +16,8 @@ use core::ffi::c_int;
 /// material, location, and barycentric hit coordinates.
 pub use crate::shared::CollisionRecord_t as CCollisionRecord;
 
+const _: () = assert!(core::mem::size_of::<CCollisionRecord>() == 64);
+
 // collision detection stuff
 pub const G2_FRONTFACE: c_int = 1;
 pub const G2_BACKFACE: c_int = 0;
