@@ -67,7 +67,8 @@ crates/
   ui/                        # MP ui cdylib shell (same shape). SP ui is
                              #   statically linked (DEC-07); no separate shell.
   jagame/                    # SP game cdylib shell (GetGameAPI table ABI).
-                             #   Depends on abi-transport + sp/game (logic).
+                             #   Depends on abi-transport + sp/game (logic)
+                             #   + sp/abi + sp/qshared (table + member types).
 
   mp/
     qshared/                 # Tier 0: codemp/game/q_shared.{h,c}  (re-exports native/math)
@@ -120,7 +121,7 @@ crates/
 | 1 bg | `mp/bg`, `sp/bg` | `bg_*` (pmove, weapons, saber, panimate, saga, vehicles) | game + cgame + ui (per mode) |
 | 2 uishared | `mp/uishared`, `sp/uishared` | `ui_shared` | cgame + ui (per mode) |
 | 3 module (logic) | `mp/game`, `mp/cgame`, `mp/ui`, `sp/game` (+ `sp/cgame`, `sp/ui`, statically linked) | `g_*` / `cg_*`+`fx_*` / `ui_*` | transport-agnostic; wrapped by the shell crates below (or statically linked into `sp/app`) |
-| shell | `jampgame`, `cgame`, `ui`, `jagame` | `dllEntry`/`vmMain`/`GetGameAPI` export shape | thin cdylib shells: `ENGINE` `OnceLock` + entrypoints + `Dispatch` match |
+| shell | `jampgame`, `cgame`, `ui`, `jagame` | `dllEntry`/`vmMain`/`GetGameAPI` export shape | thin cdylib shells: `ENGINE` `OnceLock` + entrypoints + `Dispatch` match (MP shells only — `jagame` fills the `game_export_t` table directly, no command dispatch; settled SP mapping 2026-07-03, state-ownership.md) |
 | engine | `*/engine/*`, `*/renderer` | `qcommon/server/client/botlib/ghoul2/icarus/RMG/renderer` | host binaries; `*/engine/core` is the aggregate facade (`Engine` + `com_init`/`com_frame`/`com_shutdown`, plus `com_error`'s *recovery* — `com_error` itself is defined one tier lower in `*/engine/qcommon`, state-ownership.md STATE-D7) depended on by `*/app` |
 
 > `MAX_GENTITIES` currently sits in `mp_engine_server` from the mechanical
@@ -133,7 +134,8 @@ Module logic crates (per mode; transport-agnostic — no ABI/cdylib concerns):
 
 | Crate | Depends on |
 | --- | --- |
-| `mp/game` | `mp/qshared`, `mp/bg`, `mp/abi`, `mp/engine-select` |
+| `mp/game` | `mp/qshared`, `mp/bg`, `mp/abi`, `mp/engine-select`, `native/platform` (`zeroed_box`/`ZeroValid` impls — STATE-D9; skeleton-verified 2026-07-03) |
+| `sp/game` | `sp/qshared`, `sp/bg`, `sp/abi`, `native/platform` (SP dual of the row above; `mod gi` binds `game_import_t` directly, no select crate — settled SP mapping 2026-07-03) |
 | `mp/cgame` | `mp/qshared`, `mp/bg`, `mp/uishared`, `mp/abi`, `mp/engine-select` |
 | `mp/ui` | `mp/qshared`, `mp/bg`, `mp/uishared`, `mp/abi`, `mp/engine-select` |
 | `mp/engine-select` | `abi-transport` (concrete `CEngine`/`Static` backends) |
@@ -143,15 +145,21 @@ Module logic crates (per mode; transport-agnostic — no ABI/cdylib concerns):
 | `mp/qshared` | `native/math`, `native/platform` |
 | `abi-transport` | `native/platform` (re-exports its `RawSyscall`/`RawVmMain` fn-pointer aliases) |
 
+`mp/abi` **re-exports the four `abi-transport` seam traits**
+(`Dispatch`/`InboundVmCall`/`Execute`/`OutboundSysCall`): it already depends on
+`abi-transport` and is the seam crate by definition, so module logic crates name them
+as `use mp_abi::…` through their existing `mp/abi` edge — **no logic crate gains an
+`abi-transport` edge** (state-ownership STATE-Q12 resolution, 2026-07-03).
+
 Module cdylib shells (per mode) — thin, hosting only the `ENGINE` `OnceLock`,
 live entrypoint exports, and the `Dispatch` match:
 
 | Crate | Depends on |
 | --- | --- |
-| `jampgame` | `abi-transport`, `mp/game` |
+| `jampgame` | `abi-transport`, `mp/game` (`mp/game` re-exports `MpGameExport` at its crate root — `pub use mp_abi::game::exports::MpGameExport;` — so the shell's frozen two-edge set reaches the seam enum through the logic crate; state-ownership STATE-Q13 resolution, 2026-07-03) |
 | `cgame` | `abi-transport`, `mp/cgame` |
 | `ui` | `abi-transport`, `mp/ui` |
-| `jagame` | `abi-transport`, `sp/game` |
+| `jagame` | `abi-transport`, `sp/game`, `sp/abi`, `sp/qshared` (table + member-signature types — skeleton-verified 2026-07-03) |
 
 SP `cgame`/`ui` have no separate shell — they are statically linked into
 `sp/app` behind the vmachine shim (DEC-07).

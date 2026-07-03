@@ -135,3 +135,45 @@ Two layers, used by every subsystem doc's `## Verification strategy`:
 
 Building the full Raven engine from oracle source was rejected as a project in
 itself; OpenJK serves as the buildable near-oracle where a live peer is needed.
+
+## DEC-10 — Incremental builds with checkpoint/reset semantics
+
+Validation builds for the logic port are **cumulative, not scratch**
+(2026-07-03 session):
+
+- A persistent **skeleton branch** is seeded from the settled design surface —
+  crates, frozen signatures, `todo!()` bodies. `cargo check` green on the seed
+  is the base build; rustc replaces prose probes as the dry-run referee
+  (SEAM-Q12-class contradictions become compile errors).
+- Every phase/agent builds on top; **each green state is a checkpoint commit**
+  (tag per phase boundary).
+- **Reset semantics:** minor issue observed while building → adjust (doc
+  amendment and/or skeleton fix) and continue; foundational issue → `git reset`
+  to an earlier checkpoint and fix the foundation; unrecoverable → re-branch
+  from the seed commit. Nothing is re-derived from scratch.
+- The validated skeleton **is** slice 0's starting point, not throwaway gate
+  output; the `port-slice` workflow builds on it.
+
+> **Amendment 2026-07-03 (same session):** applied **immediately**, not after
+> FROZEN ×4 — the baseline is seeded in parallel with the round-4 doc pass from
+> the user-settled resolutions (all 29 forks closed). Round-4 doc deltas
+> reconcile into the skeleton as minor fixes per the semantics above.
+
+## DEC-11 — Post-parity seam inversion (end-state, not pursued yet)
+
+Once oracle parity is proven per subsystem, the generic transport layer
+(`Execute<C>`/`Dispatch<C>`, typed calls) becomes the **true call path**
+wherever both endpoints are ours; the Raven ABI shapes solidify into a frozen,
+layout-asserted **compatibility shell** engaged only at foreign-endpoint edges
+(original DLLs, real engines, wire peers). The shell gets first-class dual-path
+CI (our engine + retail DLLs, our DLLs + OpenJK, live-peer wire sessions per
+DEC-09) so it never rots.
+
+Standing priority during the port (user, 2026-07-03): **possibility over
+pursuit** — keep the inversion possible, change nothing toward it now; syntax
+and semantics of Raven behavior are what matter most during this process.
+Sequenced strictly after per-subsystem parity (porting-rules §A2's
+faithful-first rule); fits DEC-04's arc (unify only after porting). Precedents
+already inside the settled decisions: DEC-07's dropped word-packing round-trip
+(internal plumbing, no observable behavior) and DEC-05's wasm transport (the
+generic layer is already the true call in one mode).

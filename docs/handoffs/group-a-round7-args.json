@@ -1,0 +1,45 @@
+{
+  "docs": [
+    {
+      "path": "docs/architecture/engine-seam.md",
+      "title": "Engine Seam",
+      "prefix": "SEAM",
+      "scope": "GATE-ONLY (round 7, stamping round): a single-agent reconciliation pass (2026-07-03) converged all four architecture docs; the GameContext pub-fields ruling, vmMain tie-break, GAME_INIT variant spelling, ZeroValid/MaybeUninit mechanics, and all round-5/6 resolutions are applied (record: docs/handoffs/2026-07-03-skeleton-findings.md). Do NOT revise content — verify the doc under the gates and re-stamp REVIEWED. Fix-in-place is allowed ONLY for pointer precision (doc + section/ID) and typos. GATE POLICY: user-sanctioned-open questions with named owners are NOT stamping blockers and must NOT be reported as needsSession; the sibling docs' sanctioned-open set is STATE-Q2, STATE-Q9, LOAD-Q1, LOAD-Q9, LOAD-Q13, LIFE-Q1, plus the tracked client-slice presence-idiom and SP engine-side-signature notes. Cross-doc FROZEN-ness formally lands at user sign-off (FROZEN x4) — the freeze-ordering meta-note is process-sanctioned, not a hole. Gate-3 reading set = this doc + standing docs (ALL sibling docs/architecture/*.md) + docs/abi-traps.md + oracle.",
+      "decisions": ["NO NEW DECISIONS — gate-only. A genuinely new contested point (not in the sanctioned-open set, not answerable from cited ground truth) is reported as needsSession, never invented."],
+      "outline": "Verify + re-stamp REVIEWED. Content changes only for pointer precision/typos.",
+      "dossierPath": "docs/dossiers/A1-engine-seam.md",
+      "model": "opus"
+    },
+    {
+      "path": "docs/architecture/state-ownership.md",
+      "title": "State Ownership",
+      "prefix": "STATE",
+      "scope": "GATE-ONLY (round 7, stamping round): the reconciliation pass (2026-07-03) applied the GameContext pub-fields ruling (STATE-D8 final), the vmMain AbiWord tie-break, sv: Server + Box<Engine>/MaybeUninit mechanics (STATE-D13 superseded), ZeroValid array rule + soundness-gate line, STATE-Q8/Q10/Q11 closures, and the STATE-Q7 reconciliation ledger (record: docs/handoffs/2026-07-03-skeleton-findings.md). Do NOT revise content — verify and re-stamp REVIEWED. Fix-in-place ONLY for pointer precision and typos. GATE POLICY: STATE-Q2 and STATE-Q9 are user-sanctioned-open with named owners; the client-slice presence-idiom note and the SP engine-side-signatures tracked note are likewise sanctioned; cross-doc FROZEN-ness lands at user sign-off — none of these are needsSession blockers. Gate-3 reading set = this doc + standing docs (ALL sibling docs/architecture/*.md) + docs/abi-traps.md + oracle.",
+      "decisions": ["NO NEW DECISIONS — gate-only. A genuinely new contested point (not in the sanctioned-open set, not answerable from cited ground truth) is reported as needsSession, never invented."],
+      "outline": "Verify + re-stamp REVIEWED. Content changes only for pointer precision/typos.",
+      "dossierPath": "docs/dossiers/A2-state-ownership.md",
+      "model": "opus"
+    },
+    {
+      "path": "docs/architecture/module-loading.md",
+      "title": "Module Loading",
+      "prefix": "LOAD",
+      "scope": "GATE-ONLY (round 7, stamping round): the reconciliation pass (2026-07-03) applied the Unix NDEBUG in-loader fatal amendment (contract settled, unix_main.c:431-436) with LOAD-Q13 as the tracked-open mechanism sub-question, plus the round-5/6 resolutions (EngineSlot injection, load_module widening, guard = name.is_empty() only) (record: docs/handoffs/2026-07-03-skeleton-findings.md). Do NOT revise content — verify and re-stamp REVIEWED. Fix-in-place ONLY for pointer precision and typos. GATE POLICY: LOAD-Q1, LOAD-Q9, and LOAD-Q13 are user/owner-sanctioned-open — NOT needsSession blockers; cross-doc FROZEN-ness lands at user sign-off. Gate-3 reading set = this doc + standing docs (ALL sibling docs/architecture/*.md) + docs/abi-traps.md + oracle.",
+      "decisions": ["NO NEW DECISIONS — gate-only. A genuinely new contested point (not in the sanctioned-open set, not answerable from cited ground truth) is reported as needsSession, never invented."],
+      "outline": "Verify + re-stamp REVIEWED. Content changes only for pointer precision/typos.",
+      "dossierPath": "docs/dossiers/A4-module-loading.md",
+      "model": "opus"
+    },
+    {
+      "path": "docs/architecture/lifecycle.md",
+      "title": "Lifecycle",
+      "prefix": "LIFE",
+      "scope": "GATE-ONLY (round 7, stamping round): the reconciliation pass (2026-07-03) applied the ComError pub-fields reconciliation, LIFE-Q7 closure (Engine::new() -> Box<Engine>, whole-aggregate zeroed with MaybeUninit in-place init of non-zero-valid fields, sv: Server, LIFE-D5 amended), and the com_printf &mut Common re-render (record: docs/handoffs/2026-07-03-skeleton-findings.md). Do NOT revise content — verify and re-stamp REVIEWED. Fix-in-place ONLY for pointer precision and typos. GATE POLICY: LIFE-Q1 is user-sanctioned-open (owner: the pending platform/input subsystem doc) — NOT a needsSession blocker; cross-doc FROZEN-ness lands at user sign-off. Gate-3 reading set = this doc + standing docs (ALL sibling docs/architecture/*.md) + docs/abi-traps.md + oracle.",
+      "decisions": ["NO NEW DECISIONS — gate-only. A genuinely new contested point (not in the sanctioned-open set, not answerable from cited ground truth) is reported as needsSession, never invented."],
+      "outline": "Verify + re-stamp REVIEWED. Content changes only for pointer precision/typos.",
+      "dossierPath": "docs/dossiers/A3-lifecycle.md",
+      "model": "opus"
+    }
+  ],
+  "standingDocs": ["docs/doc-standards.md", "docs/porting-rules.md", "docs/workspace-architecture.md", "docs/architecture/two-island-model.md", "docs/abi-traps.md", "docs/architecture/engine-seam.md", "docs/architecture/state-ownership.md", "docs/architecture/lifecycle.md", "docs/architecture/module-loading.md", "docs/handoffs/2026-07-03-skeleton-findings.md"]
+}
