@@ -17,14 +17,24 @@ Links only — never restated here:
   Wasm`; retail-DLL hosting `i686-pc-windows`-only; WASM first-class, wasmtime
   after native parity), DEC-07 (SP cgame/ui via the vmachine shim), DEC-08
   (`Com_Error` recovery = typed panic + `catch_unwind`, scoped to the
-  `ERR_DROP`/`ERR_DISCONNECT` caught escape — see LOAD-Q7), DEC-09
+  `ERR_DROP`/`ERR_DISCONNECT` caught escape — see LOAD-D11), DEC-09
   (verification layers).
 - `docs/architecture/engine-seam.md` — the **typed call/dispatch** side (SEAM-D1
   compile-time-per-artifact vs runtime-per-module transport, SEAM-D4 pointer-word
   interpretation, `ModuleTransport` enum, `Execute`/`Dispatch`, `CEngine`,
-  `SharedGameData`). This doc supplies the loader that produces the handles that
-  doc dispatches through; the two are duals.
+  `SharedGameData`; SEAM-D12 seam entrypoints/dispatchers are `extern "C-unwind"`,
+  with the follow-up sweep of the `entrypoints.rs:9-27` raw aliases this doc
+  relocates). This doc supplies the loader that produces the handles that doc
+  dispatches through; the two are duals.
 - `docs/architecture/two-island-model.md` — STATE-D3 (`extern "C-unwind"`).
+- `docs/architecture/state-ownership.md` — STATE-D7 (resolving STATE-Q4): the
+  receiverless leaf throw `pub fn com_error(level: ErrorLevel, msg: String) -> !`
+  in `mp_engine_qcommon` (FROZEN in state-ownership § `com_init`/`com_frame`/
+  `com_shutdown`/`com_error` entry points, cite `state-ownership.md:566`) that
+  LOAD-D11 calls directly, and the `ErrorLevel` taxonomy (its `ERR_FATAL`
+  variant). This is the settled shape; lifecycle.md's earlier receiver-ful
+  `com_error(engine, …)` is superseded by STATE-D7 and is **not** the one LOAD-D11
+  uses.
 
 ## Scope & non-goals
 
@@ -63,11 +73,18 @@ Non-goals (punted, each with its owning doc):
 ### MP native-DLL load chain
 
 `vm_t *VM_Create( const char *module, systemCalls, vmInterpret_t interpret )`
-(`oracle/oracle/codemp/qcommon/vm.cpp:471-472`) is the entry. It reuses a live
-slot by name (`vm.cpp:485-489`), else allocates the first free slot of
-`vmTable[MAX_VM]` (`#define MAX_VM 3`, `vm.cpp:28-29`; fatal if full,
-`vm.cpp:499-500`), stores `systemCall` (`vm.cpp:505-506`), then attempts a
-native load: `Sys_LoadDll(module, &vm->entryPoint, VM_DllSyscall)`
+(`oracle/oracle/codemp/qcommon/vm.cpp:471-472`) is the entry. It first guards
+its parameters — `if ( !module || !module[0] || !systemCalls ) Com_Error(
+ERR_FATAL, "VM_Create: bad parms" )` (`vm.cpp:480-482`), the earliest of the
+function's two `ERR_FATAL`s. It then reuses a live slot whose stored `name`
+matches (`if (!Q_stricmp(vmTable[i].name, module))`, `vm.cpp:485-489`), else
+allocates the first free slot of `vmTable[MAX_VM]` — the free-slot test is
+`!vmTable[i].name[0]` (`vm.cpp:493-494`), i.e. a slot's occupancy and identity
+**are** its `name` field (`vm_local.h:119`, sitting in the same `vm_s` struct as
+`dllHandle`/`entryPoint`, `:122-123`) — (`#define MAX_VM 3`, `vm.cpp:28-29`;
+fatal if full, `vm.cpp:499-500`), stores the name and syscall (`Q_strncpyz(
+vm->name, module, …)` `vm.cpp:505`, `vm->systemCall = systemCalls` `vm.cpp:506`),
+then attempts a native load: `Sys_LoadDll(module, &vm->entryPoint, VM_DllSyscall)`
 (`vm.cpp:515-518`). Success returns immediately; failure falls through to the
 QVM path — **out of scope (DEC-05.4)** (`vm.cpp:519-524`, non-fatal).
 
@@ -196,10 +213,11 @@ porting-rules §4 / doc-standards §4).
 | `vmTable[MAX_VM]` (`MAX_VM = 3`) | `qcommon/vm.cpp:28-29` | `mp_engine_qcommon::ModuleRegistry.slots: [Option<LoadedModule>; MAX_VM]` — **per-slot only, no current-module global** (LOAD-D5); home crate `mp_engine_qcommon` mirrors `vm.cpp`'s subsystem (LOAD-D8; engine-seam.md state table — `ModuleRegistry` mirrors oracle `qcommon/vm.cpp`) | `ModuleRegistry::load_module` (FROZEN — LOAD-D8: slot reuse-by-name `vm.cpp:485-489`, first free slot `vm.cpp:494`, `Com_Error(ERR_FATAL)` when all `MAX_VM` full `vm.cpp:499-500`) | dispatcher `engine` arg (engine-seam) |
 | `vm->dllHandle` | `qcommon/vm_local.h:111-146` | `LoadedModule.lib: libloading::Library` in the slot | `sys_load_dll` | held in slot; dropped on unload |
 | `vm->entryPoint` | `qcommon/vm_local.h:123` | `LoadedModule.entry: RawVmMain` in the slot | handshake in `sys_load_dll` | passed to `Dispatch` (engine-seam) |
+| `vm->name` (slot identity for reuse/free) | `qcommon/vm_local.h:119`; set `vm.cpp:505`, read `vm.cpp:486,494` | `LoadedModule.name: String` in the slot (LOAD-D8 amendment — faithful `vm_s` mirror: `name` sits beside `dllHandle`/`entryPoint`) | stamped by `sys_load_dll` from its `name: &str` arg | held in slot; `load_module`'s reuse scan compares it (`vm.cpp:485-489`) |
 | `currentVM`, `lastVM` | `qcommon/vm.cpp:24-25` | **eliminated** (LOAD-D5; owned/justified in engine-seam state table) — the `VM_Free` clobber (`vm.cpp:624-625`) is structurally unreproducible | — | — |
 | `gvm` (jampgame slot) | `server/sv_game.cpp:1750` | `ModuleRegistry` slot; server state holds the `SlotId` | `SV_InitGameProgs`-equiv | server state |
 | `cgvm`, `uivm` (MP slots) | `client/cl_cgame.cpp:1771`, `client/cl_ui.cpp:1478` | `ModuleRegistry` slots; client state holds their `SlotId`s | `CL_InitCGame` / `CL_InitUI`-equiv | client state |
-| SP `game_library` `HINSTANCE` | `code/win32/win_main.cpp:459` | only present in the **i686-windows drop-in hosting** scenario (matrix row 3) as a `LoadedModule`; our own SP is fully static (DEC-07) → no handle | `Sys_GetGameAPI`-equiv | — |
+| SP `game_library` `HINSTANCE` | `code/win32/win_main.cpp:459` | **no jka-rust owner** — our SP is fully static (DEC-07) → no handle; a retail SP `game_library` only exists when hosting a real SP game DLL, which is outside DEC-05.3 (MP `jampgamex86.dll` replacements only) and has no parity-matrix row | `Sys_GetGameAPI`-equiv | — |
 | SP `cgvm`/`uivm` (vmachine shim) | `code/client/vmachine.h:54-55` | static dispatch handles, **no load** (DEC-07); owned as `cgvm.entryPoint` in engine-seam state table | static link | dispatcher arg (engine-seam) |
 
 ## Seam definition
@@ -231,6 +249,24 @@ crates/native/platform/src/module_loader/
   loader.rs         // sys_load_dll + unload_module
 ```
 
+`LoadedModule`'s fields (`name`/`lib`/`entry`) are set by `sys_load_dll` in the
+sibling `loader.rs`, so they take the minimal cross-module visibility
+`pub(in crate::module_loader)` — ordinary Rust idiom for a one-type-per-file split,
+**not** a design point (porting-rules §D12: internal-only types get idiomatic
+shape). Pinned only so porters spell it uniformly.
+
+The raw ABI aliases relocated by LOAD-D6 are **not** loader types, so they do not
+sit under `module_loader/`; they land in a sibling file that mirrors the
+`abi-transport` source they move from (LOAD-D12e — mechanical, same one-type-block
+/ mirror-the-source rationale, pinned only so a porter and the dry-run agree):
+
+```
+crates/native/platform/src/
+  entrypoints.rs    // AbiCommand, AbiWord, RawSyscall, RawDllEntry, RawVmMain
+                    //   (LOAD-D6); mirrors abi-transport src/entrypoints.rs;
+                    //   abi-transport re-exports all five from its own entrypoints.rs
+```
+
 ### The loader mechanism — `crates/native/platform`
 
 One `libloading`-based loader executes a mode-supplied policy value (LOAD-D1).
@@ -249,7 +285,9 @@ pub struct ModuleNaming {
     pub suffix: &'static str,
 }
 
-/// A mode's search policy — a value, constructed by each mode's app (LOAD-D1).
+/// A mode's search policy — a value, built **per load by the caller in
+/// `mp_engine_qcommon`** (LOAD-D9), never by `native/platform` (which stays
+/// cvar-free, porting-rules §B3). All paths are already resolved when built.
 pub struct ModuleSearchPolicy {
     pub naming: ModuleNaming,
     /// Bare `LoadLibrary(filename)` / CWD-default probe tried first (MP Win32
@@ -261,39 +299,50 @@ pub struct ModuleSearchPolicy {
 }
 
 pub enum SearchStep {
-    /// `FS_BuildOSPath(<base_cvar>, <gamedir_cvar>, filename)` (files.cpp:479-498).
+    /// `FS_BuildOSPath(base, gamedir, filename)` (files.cpp:479-498). Carries
+    /// **resolved** values (LOAD-D9), NOT cvar names: the caller in
+    /// `mp_engine_qcommon` reads `Cvar_VariableString("fs_basepath")` /
+    /// `("fs_cdpath")` / `("fs_game")` (win_main.cpp:858-860) once B1 lands and
+    /// plants the results here, so `native/platform` never touches a cvar table.
     /// MP order = basepath/fs_game then cdpath/fs_game; NO homepath (win_main.cpp:858-869).
-    FsPath { base_cvar: &'static str, gamedir_cvar: &'static str },
+    FsPath { base: PathBuf, gamedir: String },
     /// SP: `<cwd>/<subdir?>/filename` (win_main.cpp:515,524). No fs_* cvars.
     CwdRelative { subdir: Option<&'static str> },
 }
 ```
 
-Each mode's app owns a **named** policy constructor `module_search_policy()`
-(LOAD-D6): `crates/mp/app::module_search_policy()` (in `openjk` / `openjkded`)
-and `crates/sp/app::module_search_policy()` (in `openjk_sp`), per
-`docs/workspace-architecture.md` (`mp/app` links the engine subsystems + `mp/abi`
-and hosts the module cdylibs). This doc freezes the per-mode policy **value** each
-returns — its `naming` / `direct_first` / `steps` — which is what Slice 0 needs;
-*when* that fn is called during boot is `lifecycle.md`'s (pending). The MP
-`direct_first` split is per-platform (LOAD-D1, amended 2026-07-02):
+The per-load `ModuleSearchPolicy` **value** is built by the **caller in
+`mp_engine_qcommon`** (LOAD-D9), at the `ModuleRegistry::load_module` call site —
+not by `native/platform`, which stays cvar-free (porting-rules §B3/§B4). Once the
+cvar port (B1) lands the caller resolves `Cvar_VariableString("fs_basepath")` /
+`("fs_cdpath")` / `("fs_game")` (`win_main.cpp:858-860`) and plants the
+**resolved** `FsPath { base, gamedir }` values; Slice 0 (pre-B1) builds the same
+value from hardcoded / CLI paths. This doc freezes the per-mode policy **value** —
+its `naming` / `direct_first` / `steps` — which is what Slice 0 needs; *when* that
+construction runs during boot is `lifecycle.md`'s (pending). The MP `direct_first`
+split is per-platform (LOAD-D1, amended 2026-07-02):
 
 ```rust
-// crates/mp/app::module_search_policy()
+// mp_engine_qcommon caller, per load (LOAD-D9): resolve the cvars, then build the value.
 // Win32 (win_main.cpp:855-869): LoadLibrary-direct, then basepath/fs_game, then cdpath/fs_game.
 // Unix  (unix_main.c:361-396):  basepath/fs_game then cdpath/fs_game; the cwd/installdir
 //   dlopen is #if 0'd ("bk010205 - do not load from installdir", unix_main.c:373) → NO direct probe.
+let gamedir = cvar_string("fs_game");            // win_main.cpp:860 (Slice 0: CLI/hardcoded)
 ModuleSearchPolicy {
     naming: ModuleNaming { suffix: /* platform: "x86.dll" | "i386.so" | ".dylib" */ },
     // Win32: true (win_main.cpp:855); Unix: false (unix_main.c:361-373 is #if 0'd).
     direct_first: cfg!(windows),
+    // Both steps are pushed UNCONDITIONALLY; sys_load_dll skips an FsPath whose
+    // base is empty, reproducing the `if (cdpath[0])` guard that lives inside
+    // Sys_LoadDll (win_main.cpp:866 / unix_main.c:391) — LOAD-D9 amendment.
     steps: vec![
-        SearchStep::FsPath { base_cvar: "fs_basepath", gamedir_cvar: "fs_game" },
-        SearchStep::FsPath { base_cvar: "fs_cdpath",   gamedir_cvar: "fs_game" }, // skipped if empty
+        SearchStep::FsPath { base: cvar_string("fs_basepath").into(), gamedir: gamedir.clone() }, // :858 (basepath is the resolved install path, never empty)
+        SearchStep::FsPath { base: cvar_string("fs_cdpath").into(),   gamedir: gamedir.clone() }, // :859 (empty fs_cdpath → sys_load_dll skips this step)
     ],
 }
-// crates/sp/app::module_search_policy()
-// SP (win_main.cpp:515,524): cwd/<debugdir> then cwd, no fs_* cvars, no direct probe.
+// SP policy (crates/sp/app caller) — CwdRelative only, cvar-free, so LOAD-D9's
+// resolve-at-construction leaves it unchanged (win_main.cpp:515,524):
+// cwd/<debugdir> then cwd, no fs_* cvars, no direct probe.
 ModuleSearchPolicy {
     naming: ModuleNaming { suffix: /* "x86.dll" */ },
     direct_first: false,
@@ -307,10 +356,16 @@ ModuleSearchPolicy {
 ### Load / unload / restart
 
 ```rust
-/// A live native module: the library handle plus its resolved entrypoints,
-/// held in a ModuleRegistry slot (State ownership). Faithful to vm->dllHandle +
-/// vm->entryPoint (vm_local.h:123).
+/// A live native module: the library handle, its resolved entrypoints, and the
+/// bare module name it was loaded under, held in a ModuleRegistry slot (State
+/// ownership). Faithful `vm_s` mirror: name + dllHandle + entryPoint sit in the
+/// same slot struct (vm_local.h:119,122-123).
 pub struct LoadedModule {
+    /// vm->name (vm_local.h:119): the bare module name ("jampgame"/"cgame"/"ui"),
+    /// stamped from sys_load_dll's `name` arg. Carries the slot's identity so
+    /// load_module's reuse scan can match it (vm.cpp:485-489); placement decided
+    /// by LOAD-D8's amendment (faithful vm_s mirror, NOT a parallel registry array).
+    name: String,
     lib: libloading::Library,   // vm->dllHandle (win_main.cpp:855-863)
     entry: RawVmMain,           // "vmMain" (win_main.cpp:880); RawVmMain defined here in
                                 // native/platform (LOAD-D6), re-exported by abi-transport
@@ -324,8 +379,13 @@ pub struct LoadedModule {
 /// `//TODO: Port Sys_UnpackDLL` + `// Source:` marker (porting-rules §14 —
 /// unported deps are explicit, never a silent no-op), NOT a silently-swallowed
 /// step. Namely: apply naming, walk the policy, `GetProcAddress`/`dlsym`
-/// "dllEntry"+"vmMain" (both required), call `dllEntry(syscall)`. `None` = not
-/// found (Raven's QVM fallback is out of scope, DEC-05.4; the caller decides
+/// "dllEntry"+"vmMain" (both required), call `dllEntry(syscall)`, and stamp
+/// `name` into the returned `LoadedModule` (LOAD-D8 amendment — the slot's
+/// reuse identity). Walking the policy **skips any `FsPath` step whose `base` is
+/// empty**, reproducing Raven's `if (cdpath[0])` guard, which lives inside
+/// `Sys_LoadDll` itself (win_main.cpp:866 / unix_main.c:391 — LOAD-D9 amendment);
+/// the caller plants both `FsPath` steps unconditionally. `None` = not found
+/// (Raven's QVM fallback is out of scope, DEC-05.4; the caller decides
 /// fatal-vs-skip per mode).
 pub fn sys_load_dll(policy: &ModuleSearchPolicy, name: &str, syscall: RawSyscall)
     -> Option<LoadedModule>;   // RawSyscall/RawVmMain defined in this crate (LOAD-D6)
@@ -351,36 +411,46 @@ pub enum RestartKind {
 **Alias home (LOAD-D6).** The raw ABI aliases named above — `RawVmMain`
 (`LoadedModule.entry`), `RawSyscall` (`sys_load_dll`'s `syscall`), and
 `RawDllEntry` (the handshake call target `dllEntry(syscall)`,
-`win_main.cpp:879-887`) — **live in `crates/native/platform`** (base tier: they
+`win_main.cpp:879-887`) — **live in `crates/native/platform`**, specifically in
+`crates/native/platform/src/entrypoints.rs` (LOAD-D12e), a base tier: they
 are Raven-free platform-ABI vocabulary; `RawDllEntry` travels with its two
 siblings under LOAD-D6's same rationale — all three already co-reside in the
-`crates/abi-transport/src/entrypoints.rs` block LOAD-D6 relocates).
+`crates/abi-transport/src/entrypoints.rs` block LOAD-D6 relocates. The two
+supporting aliases `AbiCommand` and `AbiWord` (`entrypoints.rs:3-4`) — which
+`RawVmMain`'s signature is written in terms of (its body at `entrypoints.rs:10-24`
+names both) — **relocate with them**: leaving them in `abi-transport` would force
+the forbidden `native/platform → abi-transport` uphill edge just to typecheck
+`RawVmMain`, so all **five** aliases move as one block (LOAD-D6, amended below).
 `abi-transport` takes a downhill dep on `native/platform` and **re-exports** them
 from `entrypoints.rs`, so existing `abi-transport` consumers are unaffected and no
 tier inversion occurs. The frozen loader signatures therefore compile in
 `native/platform` with no new outward edge. `workspace-architecture.md` gains the
 `abi-transport → native/platform` edge (updated there separately).
 
-**Cargo wiring (mechanical — realizes LOAD-D1 + LOAD-D6, not a new decision).**
-Both crates are currently `[dependencies]`-less; a porter adds exactly two edges
-and no others: `crates/native/platform/Cargo.toml` gains a `libloading`
-dependency (the LOAD-D1 loader mechanism, confined to this crate per LOAD-D4), and
+**Cargo wiring (mechanical — realizes LOAD-D1 + LOAD-D6, restated by LOAD-D12d,
+not a new decision).** Both crates are currently `[dependencies]`-less; a porter
+adds exactly two edges and no others: `crates/native/platform/Cargo.toml` gains a
+`libloading` dependency — used only by `module_loader/loader.rs`'s `sys_load_dll`
+(the LOAD-D1 loader mechanism, confined to this crate per LOAD-D4) — and
 `crates/abi-transport/Cargo.toml` gains a `native_platform` path dependency (the
 LOAD-D6 downhill re-export edge, already documented in
 `workspace-architecture.md`). Crate names per their `Cargo.toml`: `native_platform`,
-`abi_transport`.
+`abi_transport`. (The wasm-host crate's own Cargo wiring — the `wasmtime` dep and
+`mp_engine_qcommon`'s feature-gate onto it — is LOAD-D10 / `workspace-architecture.md`.)
 
-The three aliases are **not new shapes** — they are the existing frozen
+The three aliases are **not new shapes** — they are the existing
 `entrypoints.rs` definitions verbatim in **arg list, types, and arity**;
-`verbatim` is scoped to those, **not** to the calling convention. The live
-`crates/abi-transport/src/entrypoints.rs:9-10` currently declares
-`RawDllEntry`/`RawVmMain` as `extern "C"` (pre-STATE-D3); relocating them under
-LOAD-D6 carries STATE-D3's `extern "C-unwind"` convention (two-island-model) —
-already settled context this doc depends on (Standing context) and the same
-annotation LOAD-D4 puts on the entrypoint scaffolding — so the relocation
-**updates** that stale `extern "C"` to `extern "C-unwind"`, it does not preserve
-it. The change is unwind-behavior only (same C ABI / symbol shape), not a
-layout/arity change:
+`verbatim` is scoped to those, **not** to the calling convention. Their calling
+convention is `extern "C-unwind"` per **engine-seam SEAM-D12** (which adopts
+STATE-D3: a `Com_Error` panic, DEC-08, must traverse a real host's live C frames
+mid-trap — plain `extern "C"` aborts on unwind). The live
+`crates/abi-transport/src/entrypoints.rs:9-27` aliases are **still plain
+`extern "C"`** (pre-STATE-D3, unused); SEAM-D12 records flipping them to
+`extern "C-unwind"` as an **explicit follow-up slice task** — this doc therefore
+**cross-refs that sweep rather than asserting current-repo agreement** (LOAD-D12a).
+The relocation under LOAD-D6 lands the aliases already spelled `extern "C-unwind"`;
+the difference vs the stale repo spelling is unwind-behavior only (same C ABI /
+symbol shape), not a layout/arity change:
 
 ```rust
 // Source: crates/abi-transport/src/entrypoints.rs:3-24 (relocated under LOAD-D6).
@@ -420,10 +490,23 @@ pub struct ModuleRegistry {
 }
 
 impl ModuleRegistry {
-    /// VM_Create slot semantics (vm.cpp:471 region): reuse a live slot whose
-    /// module name matches (vm.cpp:485-489, returned as-is, NO reload), else the
-    /// first free slot (vm.cpp:494), else Com_Error(ERR_FATAL) when all MAX_VM
-    /// slots are full (vm.cpp:499-500). A fresh slot runs sys_load_dll.
+    /// VM_Create slot semantics (vm.cpp:471 region). First the bad-parms guard
+    /// (vm.cpp:480-482): `if name.is_empty() || syscall.is_null()` →
+    /// `com_error(ERR_FATAL, "VM_Create: bad parms")` (LOAD-D11 amendment — the
+    /// reachable disjuncts of Raven's `!module || !module[0] || !systemCalls`;
+    /// `!module` (a null pointer) is vacuous for `&str`). Then reuse a live slot
+    /// whose stored name matches — scan `slots[i].as_ref().map(|m| m.name == name)`
+    /// against each occupied slot's `LoadedModule.name` (vm.cpp:485-489, returned
+    /// as-is, NO reload), else the first free slot (`slots[i].is_none()`,
+    /// vm.cpp:494), else `Com_Error(ERR_FATAL)` when all MAX_VM slots are full
+    /// (vm.cpp:499-500). A fresh slot runs sys_load_dll.
+    ///
+    /// Infallible `-> SlotId` (LOAD-D11): neither ERR_FATAL branch (bad-parms,
+    /// slot-full) surfaces an error — each reproduces Raven's `Com_Error(ERR_FATAL)`
+    /// by calling the receiverless `mp_engine_qcommon::com_error(ERR_FATAL, …)`
+    /// directly (same crate, exactly Raven-shaped call geometry), a diverging
+    /// `-> !` panic that unwinds to the `mp_engine_core` catch (DEC-08 model).
+    /// Reachable the moment a porter fills the body, not just at FROZEN time.
     pub fn load_module(&mut self, policy: &ModuleSearchPolicy, name: &str,
                        syscall: RawSyscall) -> SlotId;
 
@@ -432,12 +515,28 @@ impl ModuleRegistry {
     pub fn unload(&mut self, slot: SlotId);
 
     /// Native VM_Restart = drop+recreate in place (vm.cpp:398-409): unload then
-    /// reload the same slot (RestartKind::DropRecreate). Wasm may substitute the
-    /// in-place reset (LOAD-D2) behind the same call.
-    pub fn restart(&mut self, slot: SlotId, policy: &ModuleSearchPolicy,
-                   name: &str, syscall: RawSyscall);
+    /// reload the same slot. `kind` is **caller-supplied** (LOAD-D12b — threading
+    /// RestartKind through the frozen signature): `DropRecreate` for NativeDll /
+    /// Static, `WasmInPlaceReset` for the wasm fast path (LOAD-D2), so the registry
+    /// needs no internal transport tag to choose between them (closes LOAD-Q8).
+    /// `policy`/`name`/`syscall` are still needed for `DropRecreate`'s reload.
+    pub fn restart(&mut self, slot: SlotId, kind: RestartKind,
+                   policy: &ModuleSearchPolicy, name: &str, syscall: RawSyscall);
 }
 ```
+
+**Transport scope of the frozen slot (LOAD-Q9, open).** `slots` holds
+`LoadedModule`, whose shape is **NativeDll-only** (`libloading::Library` +
+`RawVmMain`) — all Slice 0 exercises (`NativeDll`, LOAD-D2 / SEAM-D7). engine-seam
+(state table, line 192) makes `ModuleTransport { NativeDll | Static | Wasm }` a
+**field of** `ModuleRegistry`, and DEC-05 / LOAD-D2 require the registry to also
+track `Static` (no library handle) and `Wasm` (a wasmtime `Instance`, not a
+`libloading::Library`) modules. **How a non-`NativeDll` module occupies a slot** —
+and where the `ModuleTransport` field sits relative to `slots` — is **not**
+settled here (LOAD-D8 froze only `VM_Create`'s slot *reuse / allocate / overflow*
+semantics over the NativeDll `LoadedModule`) and is **not** derivable from oracle
+(`Static`/`Wasm` are a jka-rust transport layer with no `vm.cpp` precedent). It is
+**LOAD-Q9** — non-blocking for the NativeDll-only Slice 0.
 
 Per-file placement (**mechanical, not architectural** — one-type-per-file /
 folder-mirrors-subsystem, porting-rules; pinned only so a porter and the dry-run
@@ -457,6 +556,11 @@ crates/mp/engine/qcommon/src/vm/   // mirrors oracle qcommon/vm.cpp
 `vmTable[MAX_VM]`/`VM_Create` in `vm.cpp` — mechanical placement, same rationale
 as the file mapping above, not a design choice.
 
+`SlotId`'s wrapped `u32` is constructed by `ModuleRegistry` in the sibling
+`module_registry.rs`, so it takes the minimal cross-module visibility
+`pub(in crate::vm)` — ordinary Rust idiom for the one-type-per-file split, not a
+design point (porting-rules §D12), pinned only so porters spell it uniformly.
+
 ### Host-side wasm pointer shape (LOAD-D3)
 
 A guest linear-memory offset is a `u32`, **never** a host address. Accessors are
@@ -467,6 +571,9 @@ by a range check; the `dataBase + offset` translation, `vm.cpp:649`, is the
 precedent).
 
 ```rust
+// crates/mp/engine/wasm-host (package mp_engine_wasm_host) — host-side wasm types
+// + the wasmtime dep, isolated here (LOAD-D10; workspace-architecture.md).
+
 /// A guest linear-memory offset interpreted against a module Memory (LOAD-D3).
 #[repr(transparent)]
 pub struct WasmPtr<T>(pub u32, core::marker::PhantomData<T>);
@@ -482,17 +589,18 @@ pub trait ModuleMemory {
 }
 ```
 
-**Not frozen here — the crate home of `WasmPtr<T>` / `ModuleMemory`.** LOAD-D3
-fixes their *shape* but not their *location*: they are host-side (bound to a
-wasmtime `Memory`, so native — not a `wasm32` guest type, so they cannot live in
-the `#[cfg(target_arch = "wasm32")]` arm of `abi-transport::entrypoints`,
-LOAD-D4), yet `docs/workspace-architecture.md` declares **no** wasmtime-host tier
-or crate, and — unlike every other Seam subsection — this code block carries no
-crate-path comment. Which crate hosts them is an open fork, **LOAD-Q5** — the
-analogous native-alias fork LOAD-Q4 was resolved by relocating those aliases into
-`crates/native/platform` (LOAD-D6), but no equivalent host tier exists for these
-wasm types, so this one stands. First exercised by the wasm host slice (post
-native parity, DEC-05.5); it does not block any native slice.
+**Crate home (LOAD-D10, resolves LOAD-Q5).** `WasmPtr<T>` and `ModuleMemory` live
+in the new crate `crates/mp/engine/wasm-host` (package `mp_engine_wasm_host`),
+which isolates the host-side wasm types **and** the `wasmtime` dependency;
+`mp_engine_qcommon`'s `ModuleTransport::Wasm` arm is feature-gated onto it, so
+native-only builds carry no wasm toolchain. `docs/workspace-architecture.md`
+already carries this crate (tree entry + engine paragraph, tagged "LOAD-Q5
+resolution, 2026-07-02") — cited, not restated. They are host-side (bound to a
+wasmtime `Memory`, so native), so they cannot live in the
+`#[cfg(target_arch = "wasm32")]` guest arm of `abi-transport::entrypoints`
+(LOAD-D4). Only the **topology** is settled here; the crate's internals are
+designed later, before the first wasm slice (post native parity, DEC-05.5) — this
+fork blocks no native slice.
 
 Trap signatures and wire words stay **identical** across all three transports
 (SEAM-D4); only the `Wasm` dispatcher arm interprets a pointer word as a
@@ -634,18 +742,28 @@ fn-pointer aliases `RawSyscall`, `RawVmMain`, and `RawDllEntry` (the
 `entrypoints.rs` block) **move** from
 `crates/abi-transport/src/entrypoints.rs` into `crates/native/platform` — they
 are Raven-free platform-ABI vocabulary, so they belong at the base tier
-(`workspace-architecture.md`'s tier −1). `abi-transport` takes a **downhill** dep
+(`workspace-architecture.md`'s tier −1). The two supporting aliases `AbiCommand`
+and `AbiWord` (`entrypoints.rs:3-4`) **move with them**: `RawVmMain`'s signature is
+written in terms of both (`entrypoints.rs:10-24`), so leaving them behind would
+force the very `native/platform → abi-transport` uphill edge this decision forbids
+to typecheck `RawVmMain`. The relocation is therefore all **five** aliases as one
+block — reconciling this record with the five-alias code block in Seam definition;
+this is **forced by the no-uphill-edge constraint, not a fresh choice**, and
+`abi-transport` re-exports all five (amended 2026-07-02). `abi-transport` takes a **downhill** dep
 on `native/platform` and **re-exports** them from `entrypoints.rs`, so existing
 `abi-transport` consumers are unaffected and no tier inversion occurs — the feared
 `native/platform → abi-transport` uphill edge never forms. The FROZEN loader
 signatures (`sys_load_dll`, `LoadedModule.entry`) therefore compile inside
 `native/platform` naming these aliases locally, with **no new outward edge** from
 the loader; `workspace-architecture.md` gains the `abi-transport →
-native/platform` edge (updated there separately). The relocation also carries the
-STATE-D3 `extern "C-unwind"` convention onto these aliases (the live
-`entrypoints.rs:9-10` are still the pre-STATE-D3 `extern "C"`; "verbatim" above is
-arg-list/types/arity only — see the Alias-home note in Seam definition); this
-applies already-settled STATE-D3 context, not a new choice. *Rejected:* importing
+native/platform` edge (updated there separately). The relocation carries the
+`extern "C-unwind"` convention onto these aliases per **engine-seam SEAM-D12**
+(adopting STATE-D3); the live `entrypoints.rs:9-27` are still the pre-STATE-D3
+plain `extern "C"`, which SEAM-D12 sweeps to `-unwind` in an explicit follow-up
+slice task — this doc cross-refs that sweep, it does not assert current-repo
+agreement (LOAD-D12a). "Verbatim" above is arg-list/types/arity only (see the
+Alias-home note in Seam definition); this applies already-settled context, not a
+new choice. *Rejected:* importing
 `abi-transport` into `native/platform` (inverts the tier model); redefining the
 aliases locally while leaving the originals in `abi-transport` (duplicates an ABI
 type).
@@ -678,9 +796,141 @@ full (`vm.cpp:499-500`). `unload(slot)` follows `VM_Free` (`vm.cpp:605-610`) wit
 no `currentVM`/`lastVM` clobber (LOAD-D5); `restart(slot, …)` is native
 drop+recreate in place (`vm.cpp:398-409`), Wasm substituting the in-place reset
 (LOAD-D2) behind the same call. Host-side bookkeeping, not an ABI-crossing struct,
-so porting-rules §A2 permits this shape. *Rejected:* modeling name-reuse or
+so porting-rules §A2 permits this shape. **Freeze scope:** this covers
+`VM_Create`'s slot *reuse / allocate / overflow* semantics over a NativeDll-shaped
+`LoadedModule` slot (all Slice 0 needs); the transport-polymorphic slot **content**
+for `Static`/`Wasm` and the `ModuleTransport` field engine-seam places on
+`ModuleRegistry` (state table, line 192) are **LOAD-Q9** (open, non-blocking for
+the NativeDll-only Slice 0), not frozen here. *Rejected:* modeling name-reuse or
 fatal-overflow differently (they are cited `VM_Create` behavior on the hosting
 path); a current-module global (LOAD-D5).
+
+*Amended 2026-07-02 (dry-run hole-close, no new fork).* The reuse-by-name scan
+(`vm.cpp:485-489`) requires the loaded name to be stored somewhere; the frozen
+`LoadedModule`/`ModuleRegistry` code blocks originally named no field for it. It
+lives on **`LoadedModule.name: String`**, stamped by `sys_load_dll` from the
+`name: &str` it already receives — the **faithful `vm_s` mirror**: oracle's
+`vm->name` sits in the *same* slot struct as `dllHandle`/`entryPoint`
+(`vm_local.h:119,122-123`), and `LoadedModule` is that slot record. The reuse
+scan reads each occupied slot's `.name`; the free-slot test is `slots[i].is_none()`
+(oracle's `!vmTable[i].name[0]`, `vm.cpp:494`). This is oracle-derived, **not** a
+fresh choice — a parallel `names: [Option<String>; MAX_VM]` on `ModuleRegistry`
+would split identity from payload and diverge from the single `vm_s` struct
+(porting-rules §A2). `LoadedModule`/`ModuleRegistry` gain no other field.
+
+**LOAD-D9 — `SearchStep::FsPath` carries resolved paths; the policy is built at
+the `mp_engine_qcommon` call site (resolve-at-construction).** (Resolves LOAD-Q6;
+session 2026-07-02.) `SearchStep::FsPath` carries **resolved** values —
+`{ base: PathBuf, gamedir: String }` — **not** cvar names. The
+`ModuleSearchPolicy` value is built **per load by the caller in
+`mp_engine_qcommon`** (at the `ModuleRegistry::load_module` call site): once the
+cvar port (B1) lands the caller reads `Cvar_VariableString("fs_basepath")` /
+`("fs_cdpath")` / `("fs_game")` (`win_main.cpp:858-860`) and plants the results;
+Slice 0 (pre-B1) builds the same value from hardcoded / CLI paths.
+`native/platform` therefore **never reaches a cvar table** (porting-rules
+§B3/§B4 — no hidden globals, state threaded not reached), and `sys_load_dll`'s
+FROZEN signature `(policy, name, syscall)` stands **unchanged** — no cvar-resolver
+param is threaded through it. The only frozen-type change is `FsPath`'s fields
+(names → resolved values), authorized by this resolution. Search-order goldens
+(Verification 1) are described over the **resolved per-platform path sequences**.
+*Because* resolving at the qcommon construction site keeps the tier −1 loader
+cvar-free while still honoring `win_main.cpp`'s `Cvar_VariableString` reads.
+*Rejected:* threading a cvar-resolver closure into `sys_load_dll` (extends the
+frozen seam; leaks cvar reach into `native/platform`); keeping cvar *names* in
+`FsPath` (forces `native/platform` to reach a cvar table it must not know about).
+
+*Amended 2026-07-02 (dry-run hole-close, no new fork).* Raven only probes the
+cdpath location `if (cdpath[0])` (`win_main.cpp:866`, `unix_main.c:391`); an empty
+`fs_cdpath` skips that probe. That guard is owned by **`sys_load_dll`**, which
+**skips any `FsPath` step whose `base` is empty** — because the `if (cdpath[0])`
+guard textually lives *inside* `Sys_LoadDll`, and `sys_load_dll` is its faithful
+port (porting-rules §10: keep the control-flow guard where the ported function
+has it). The `mp_engine_qcommon` caller therefore plants **both** `FsPath` steps
+unconditionally (the code sample above), matching oracle passing the cvar through
+unguarded. Relocating the guard into the caller (omit the cdpath step when the
+cvar is empty) is **rejected** — it would move a control-flow guard out of the
+ported function into a different crate. On every reachable input this reproduces
+oracle exactly: `fs_basepath` is the resolved install path (never empty, attempted
+unconditionally per `win_main.cpp:862-863`), only `fs_cdpath` is empty-able. The
+never-reached empty-`basepath` case is the sole divergence (oracle would attempt
+`FS_BuildOSPath("", gamedir, …)`); it is out of Slice 0's fixtures.
+
+**LOAD-D10 — Host-side wasm types live in `crates/mp/engine/wasm-host`.**
+(Resolves LOAD-Q5; session 2026-07-02.) `WasmPtr<T>` and `ModuleMemory` (LOAD-D3)
+live in a new crate `crates/mp/engine/wasm-host` (package `mp_engine_wasm_host`),
+which isolates both the host-side wasm types **and** the `wasmtime` dependency;
+`mp_engine_qcommon`'s `ModuleTransport::Wasm` arm is **feature-gated** onto it, so
+native-only builds carry no wasm toolchain. `docs/workspace-architecture.md` is
+**already updated** (crate tree entry + engine-paragraph note, tagged "LOAD-Q5
+resolution, 2026-07-02") — cited, no contradiction expected. Only the **topology**
+is settled; the crate's internals are designed later, before the first wasm slice
+(post native parity, DEC-05.5). *Because* the host-side wasm types are native (not
+`wasm32` guest types, LOAD-D4) yet must not drag `wasmtime` into every native
+build — a dedicated feature-gated crate isolates the dep. *Rejected:* putting them
+in `crates/native/platform` (would pull `wasmtime` into the base platform tier);
+the `#[cfg(target_arch = "wasm32")]` guest arm of `abi-transport::entrypoints`
+(they bind a host `Memory`, not a guest type).
+
+**LOAD-D11 — `load_module`'s `ERR_FATAL` is a direct `com_error` panic; the return
+stays infallible.** (Resolves LOAD-Q7; session 2026-07-02.) Following the STATE-D7
+split shape (resolving STATE-Q4) settled and **FROZEN** in `state-ownership.md`
+(now in this doc's Standing context; the earlier receiver-ful `lifecycle.md`
+shape is superseded), `ModuleRegistry::load_module` reproduces Raven's slot-full
+`Com_Error(ERR_FATAL)` (`vm.cpp:499-500`) by calling the **receiverless**
+`mp_engine_qcommon::com_error` **directly** — its exact frozen signature is
+`pub fn com_error(level: ErrorLevel, msg: String) -> !` (state-ownership STATE-D7,
+`state-ownership.md:566`), invoked with the `ERR_FATAL` variant of `ErrorLevel`
+(state-ownership STATE-D7 / lifecycle LIFE-D3 taxonomy) and a formatted `String`.
+`ModuleRegistry` lives in the same crate, so this is exactly Raven-shaped call
+geometry — a diverging `-> !` panic that unwinds to the `mp_engine_core` catch
+(DEC-08 model). The porter therefore fills the slot-full branch with a real
+`com_error(<ERR_FATAL>, format!(…))` call reachable from the standing set, **not**
+a `//TODO: Port` marker.
+`load_module` keeps its **infallible `-> SlotId`** return (no `Result` variant);
+the diverging-panic path is noted at the signature. *Because* the slot-full case
+is a real cited `VM_Create` fatal, and a direct same-crate `com_error` call
+reproduces Raven's geometry without widening the frozen return type. *Rejected:* a
+`Result` fatal variant on `load_module` (widens the frozen infallible return);
+routing the fatal through a threaded receiver (STATE-D7 settled `com_error`
+receiverless).
+
+*Amended 2026-07-02 (dry-run hole-close, no new fork).* `VM_Create` has a *second*
+earlier `ERR_FATAL` — the bad-parms guard `if ( !module || !module[0] ||
+!systemCalls ) Com_Error( ERR_FATAL, "VM_Create: bad parms" )` (`vm.cpp:480-482`)
+— reachable through `load_module`'s frozen surface (an empty `name: &str`, a null
+`RawSyscall`). It gets the **identical** disposition this decision already settled
+for the slot-full fatal: `load_module` reproduces it as a first-statement guard
+`if name.is_empty() || syscall.is_null() { com_error(<ERR_FATAL>, "VM_Create: bad
+parms".into()) }`. This is faithful-first (§A2) applied to the sibling fatal in
+the same function under LOAD-D11's already-chosen mechanism — **not** a new
+choice, so neither `//TODO: Port` nor a skip. Of Raven's three disjuncts, `!module`
+(a null `const char*`) is vacuous for a Rust `&str` and is dropped as
+structurally-unreachable (cf. LOAD-D5's dropped `currentVM` clobber); `!module[0]`
+(empty) and `!systemCalls` (null syscall) are the reachable, reproduced ones.
+`load_module` keeps its infallible `-> SlotId`.
+
+**LOAD-D12 — Mechanical closes (no forks).** (Session 2026-07-02.) Four mechanical
+hole-closes, none a new design choice: **(a)** the relocated `RawSyscall` /
+`RawVmMain` / `RawDllEntry` aliases (LOAD-D6) are `extern "C-unwind"` per
+**engine-seam SEAM-D12**; the repo's current plain-`extern "C"` aliases
+(`entrypoints.rs:9-27`) are swept to `-unwind` in the already-tracked SEAM-D12
+**follow-up slice task** — this doc cross-refs that sweep rather than asserting
+current-repo agreement. **(b)** `RestartKind` (LOAD-D2) is threaded through the
+frozen `ModuleRegistry::restart` as a **caller-supplied** `kind: RestartKind`
+parameter (`DropRecreate` for NativeDll/Static, `WasmInPlaceReset` for the wasm
+fast path), so the registry needs no internal transport tag to dispatch — this
+closes LOAD-Q8. **(c)** `const MAX_VM: usize = 3` (`vm.cpp:28-29`) lives in
+`module_registry.rs` alongside `ModuleRegistry`, mirroring oracle's `#define
+MAX_VM 3` beside `vmTable[MAX_VM]`. **(d)** Cargo wiring:
+`crates/native/platform/Cargo.toml` gains a `libloading` dependency used only by
+`module_loader/loader.rs`, and `crates/abi-transport/Cargo.toml` gains the
+`native_platform` path dependency (LOAD-D6's downhill re-export edge). **(e)** the
+five relocated aliases (LOAD-D6) — `AbiCommand`, `AbiWord`, `RawSyscall`,
+`RawDllEntry`, `RawVmMain` — land in `crates/native/platform/src/entrypoints.rs`, a
+sibling of `module_loader/` (they are ABI vocabulary, not loader types, so they sit
+outside that tree), mirroring the `abi-transport` `src/entrypoints.rs` they move
+from; `abi-transport` re-exports all five from its own `entrypoints.rs`. *Rejected:*
+n/a — mechanical, no alternatives.
 
 ### DEC-05 drop-in parity matrix (both directions)
 
@@ -705,9 +955,11 @@ file/function per commit):
    basepath → cdpath, no homepath), the MP **Unix** order (basepath → cdpath, **no
    direct probe**), and the SP order (`cwd/<debugdir>` → `cwd`) exactly,
    first-hit-wins, matching `win_main.cpp:855-869` / `unix_main.c:361-396` /
-   `:515,524`. Naming-table
-   goldens assert `"jampgame" → jampgamex86.dll` / `jampgamei386.so` /
-   `jampgame.dylib` per platform.
+   `:515,524`. Goldens are described over the **resolved per-platform path
+   sequences** (LOAD-D9) — `FsPath` steps carry already-resolved
+   `base`/`gamedir`, so the fixtures plant the artifact at the resolved paths and
+   `sys_load_dll` never reads a cvar. Naming-table goldens assert `"jampgame" →
+   jampgamex86.dll` / `jampgamei386.so` / `jampgame.dylib` per platform.
 2. **Live-peer** (DEC-09.2, DEC-05.2): our module cdylib (`…x86.dll`,
    i686-pc-windows) loaded by an **unmodified OpenJK/retail** engine — the
    `dllEntry`+`vmMain` handshake round-trip against a real host (matrix rows
@@ -740,18 +992,21 @@ file/function per commit):
   `ModuleRegistry::load_module -> SlotId` (LOAD-D8, resolving LOAD-Q3). The
   pure-server `Sys_UnpackDLL` pre-step is stubbed with a `//TODO: Port` marker
   (LOAD-D7) — Slice 0 is non-pure and does not exercise it. Two Slice-0 caveats
-  remain **owned outside this doc / open**: the `SV_InitGameProgs`-equiv **boot
-  call site** (crate/signature/trigger) is SEAM-D7 + `lifecycle.md`'s (pending) —
-  the loader surface builds standalone but end-to-end wiring waits on it
-  (Referenced-but-owned-elsewhere note); and the `FsPath` cvar-resolution path the
-  jampgame policy relies on is **unsettled (LOAD-Q6)**.
+  remain: the `SV_InitGameProgs`-equiv **boot call site**
+  (crate/signature/trigger) is SEAM-D7 + `lifecycle.md`'s (pending), **owned
+  outside this doc / open** — the loader surface builds standalone but end-to-end
+  wiring waits on it (Referenced-but-owned-elsewhere note). The `FsPath`
+  cvar-resolution path the jampgame policy relies on is now **settled (LOAD-D9)** —
+  the `mp_engine_qcommon` caller plants resolved values (Slice 0 uses
+  hardcoded/CLI paths pre-B1), so it no longer blocks Slice 0.
 - **Client slices** add cgame/ui loading (same MP policy, same drop+recreate
   cadence, dossier §1) and their registry slots.
 - **SP slice** wires the `GetGameAPI` table + vmachine shim dispatch — no loader
   path exercised (DEC-07, LOAD-D5).
 - **Wasm host slice** (post native-parity, DEC-05.5): the `wasm` entrypoint arm,
-  `ModuleMemory`/`WasmPtr` (crate home **LOAD-Q5**), and the restart-equivalence
-  parity test (needs `RestartKind` threading — **LOAD-Q8** — resolved first).
+  `ModuleMemory`/`WasmPtr` in `crates/mp/engine/wasm-host` (LOAD-D10), and the
+  restart-equivalence parity test driving the caller-supplied
+  `RestartKind::WasmInPlaceReset` vs `DropRecreate` (LOAD-D12b).
 
 ## Open questions
 
@@ -769,81 +1024,35 @@ file/function per commit):
   against the OpenJK-style host the module targets, when the macOS host is wired;
   not needed for Slice 0 (i686-windows / native-Linux only).
 
-- **LOAD-Q5 — Crate home of the host-side wasm types (`WasmPtr<T>` /
-  `ModuleMemory`).** LOAD-D3 freezes the *shape* of the host-side wasm pointer
-  types, but — unlike every other Seam subsection, which names its owning crate
-  (`crates/native/platform`, `crates/abi-transport/src/entrypoints.rs`) — the
-  "Host-side wasm pointer shape" code block names none, and
-  `docs/workspace-architecture.md`'s tier table declares **no** tier or crate for
-  a wasmtime host (the `Memory` handle these accessors bind to). They are
-  host-side (the engine running wasmtime is native), so they cannot live in the
-  `#[cfg(target_arch = "wasm32")]` guest arm of `abi-transport::entrypoints`
-  (LOAD-D4). Whether they belong in `crates/native/platform`, a new wasmtime-host
-  crate, or elsewhere — and the corresponding addition to the crate graph — is a
-  fork no LOAD decision or standing doc settles. LOAD-Q4 — the analogous
-  native-alias fork — was resolved by relocating those aliases **down** to
-  `crates/native/platform` (LOAD-D6), but no equivalent host tier exists for these
-  wasm types (`workspace-architecture.md` declares no wasmtime-host tier or
-  crate), so this fork stands. Escalated; not needed for Slice 0 or any
-  native-parity slice; first exercised by the wasm host slice (post native parity,
-  DEC-05.5).
-
-- **LOAD-Q6 — How a cvar name in `SearchStep::FsPath` reaches its runtime value.**
-  `SearchStep::FsPath { base_cvar, gamedir_cvar }` stores cvar *names* (faithful to
-  `Cvar_VariableString("fs_basepath")`, `win_main.cpp:858`), but the FROZEN
-  `sys_load_dll(policy, name, syscall)` signature carries **no** parameter for
-  resolving a cvar name to its current runtime value, and **no** State-ownership
-  row covers how `native/platform` (Raven-free, tier −1) reaches a mode's cvar
-  table without a hidden global (porting-rules §B3/§B4 — no hidden globals, state
-  threaded not reached). Oracle reaches the value through an ambient global, which
-  §B3 forbids; resolving it here means either **extending the frozen seam** (a
-  cvar-resolver closure/param threaded into `sys_load_dll`) or **changing
-  `FsPath`** to carry resolved paths instead of names — both alter a frozen
-  signature/type, and neither is derivable from oracle ground truth or a settled
-  decision. **Blocks Slice 0**, whose MP policy uses exactly this `FsPath` step
-  (`win_main.cpp:858-869`). Escalated.
-
-- **LOAD-Q7 — Rust representation of the `Com_Error(ERR_FATAL)` sites.** The
-  `Com_Error(ERR_FATAL, …)` sites this doc cites — slot table full in
-  `ModuleRegistry::load_module` (`vm.cpp:499-500`, LOAD-D8) and SP dll-not-found
-  (`code/win32/win_main.cpp:536`) — have **no** representation in the FROZEN
-  bare-return signatures (`load_module -> SlotId`; `sys_load_dll ->
-  Option<LoadedModule>`, where `None` = not-found and the caller decides
-  fatal-vs-skip). DEC-08 maps only the `Com_Error(ERR_DROP/ERR_DISCONNECT)`
-  **thrown, `Com_Frame`-caught** escape (`common.cpp:313`) onto a caught panic;
-  `ERR_FATAL` is the **other** path — it falls through to `Sys_Error`
-  (`common.cpp:344`), process-terminating and **not** caught — so DEC-08 does not
-  settle it. Whether these `ERR_FATAL` sites become an (uncaught) `panic!`, a
-  `Sys_Error`-equivalent process abort, or a `Result` fatal variant is unsettled
-  by any cited decision. Escalated. (Not blocking Slice 0's on-disk happy path,
-  but the slot-full branch of `load_module` is reachable.)
-
-- **LOAD-Q8 — How `RestartKind` (LOAD-D2) is threaded through the frozen
-  `ModuleRegistry::restart`.** LOAD-D2 defines `RestartKind { DropRecreate |
-  WasmInPlaceReset }` and calls the wasm in-place path **user-selected**, but the
-  FROZEN `restart(&mut self, slot, policy, name, syscall)` (Seam definition,
-  LOAD-D8) carries **no** `RestartKind` parameter, and neither `LoadedModule` nor
-  the `ModuleRegistry` slot carries a transport tag the method could dispatch on
-  internally. engine-seam.md's state table (`docs/architecture/engine-seam.md:192`)
-  fixes the per-loaded-module `ModuleTransport { NativeDll | Static | Wasm }` as
-  *a field of `mp_engine_qcommon::ModuleRegistry`* but **defers its construction to
-  this doc's loader** — yet this doc's frozen `ModuleRegistry`/`LoadedModule`
-  declare no such field, so where the tag physically sits (per-slot beside
-  `LoadedModule`, or on the registry) and how `restart` reads it is unsettled; and
-  even with the tag, LOAD-D2's *user-selected* choice between `WasmInPlaceReset`
-  and `DropRecreate` for a wasm module has no home in the parameterless `restart`.
-  Resolving either means adding a field to a frozen type or a parameter to a frozen
-  signature — a change no LOAD decision, engine-seam decision, or oracle ground
-  truth settles (wasm restart is our post-parity extension, no oracle precedent —
-  LOAD-D2). **Does not block Slice 0** (NativeDll only; Slice hooks pin
-  `RestartKind::DropRecreate`) or any native-parity slice; first exercised by the
-  wasm host slice (post native parity, DEC-05.5). Escalated.
+- **LOAD-Q9 — Transport-polymorphic slot content for `Static` / `Wasm` modules.**
+  The frozen `ModuleRegistry.slots: [Option<LoadedModule>; MAX_VM]` (LOAD-D8) holds
+  a `LoadedModule` whose shape is **NativeDll-only** (`libloading::Library` +
+  `RawVmMain`) — all Slice 0 exercises. engine-seam (state table, line 192) makes
+  `ModuleTransport { NativeDll | Static | Wasm }` a **field of** `ModuleRegistry`,
+  and DEC-05 / LOAD-D2 require the registry to also hold `Static` (no library
+  handle) and `Wasm` (a wasmtime `Instance`, not a `libloading::Library`) modules —
+  but neither this doc nor any cited sibling settles **how such a module occupies a
+  slot** (e.g. `LoadedModule` becoming a transport-tagged enum, or a slot pairing a
+  `ModuleTransport` tag with a transport-specific payload) or **where the
+  `ModuleTransport` field sits relative to `slots`**. Not derivable from oracle
+  (`Static`/`Wasm` transports have no `vm.cpp` precedent — they are a jka-rust
+  layer). **Non-blocking for Slice 0** (NativeDll only). **Owner:** design session,
+  before the first `Static` (client / SP slices) or `Wasm` (post-native-parity,
+  DEC-05.5) registry slot lands.
 
 **Resolved (2026-07-02 escalation session), now Decisions:** LOAD-Q2 → **LOAD-D7**
 (`Sys_UnpackDLL` in scope, deferred to a post-B2 MP-server slice, Slice 0 stubs
 it); LOAD-Q3 → **LOAD-D8** (`ModuleRegistry` slot API frozen against `VM_Create`);
 LOAD-Q4 → **LOAD-D6** (raw ABI aliases relocate to `crates/native/platform`,
 `abi-transport` re-exports them).
+
+**Resolved (2026-07-02 post-nap session), now Decisions:** LOAD-Q6 → **LOAD-D9**
+(`SearchStep::FsPath` carries resolved paths; policy built at the
+`mp_engine_qcommon` call site, `native/platform` stays cvar-free); LOAD-Q5 →
+**LOAD-D10** (host-side wasm types live in `crates/mp/engine/wasm-host`); LOAD-Q7
+→ **LOAD-D11** (`load_module`'s `ERR_FATAL` is a direct receiverless `com_error`
+panic, return stays infallible); LOAD-Q8 → **LOAD-D12b** (`RestartKind` threaded
+through `ModuleRegistry::restart` as a caller-supplied `kind` parameter).
 
 **Referenced but owned elsewhere (not re-opened here):** the `GetModuleAPI`
 OpenJK-native handshake contract (**SEAM-Q7**) remains open in `engine-seam.md`.
