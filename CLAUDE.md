@@ -46,7 +46,26 @@ rust-analyzer is stale in this workspace — **always confirm compilation with
 - `docs/engine-plan.md` — legacy engine sketch; being superseded by
   `docs/architecture/engine-seam.md` (see decisions ledger).
 
-## Module targets (Raven-faithful)
+## Port tooling & the future logic-port pipeline
+
+The type port ran on: `tools/closure-prototype/sweep.py` (one libclang parse →
+per-type packets: verbatim source slice + ready-to-paste layout asserts; badge
+modes verify Rust asserts against clang ground truth) consumed by
+`.claude/workflows/port-wave.js` (skeleton → parallel packet-porters who never
+explore → machine verify). Principle: **tooling turns the oracle into
+self-contained, machine-verifiable work orders; agents transcribe, a mechanical
+referee judges.**
+
+For the logic port, half exists: `closure.py fn:Name --tree` (function call-tree
+closure, stops at the trap_* seam) and `portpacket.py <module> <Fn>` (full
+single-function packet: body + cites, inlined helpers, type closure w/ badges,
+referenced globals, syscall surface). **To build after slice 0 proves the shape
+by hand:** a batch function sweep (manifest generator), a `port-logic` workflow
+consuming function packets, call-graph ordering (cyclic — needs SCC, not the
+type port's DAG levels), fn-pointer dispatch resolution (think/touch/die), and
+the referee swap: frozen design docs + oracle differential tests replace clang
+layout as ground truth. Goal: per-function cost drops to mechanical throughput;
+model-ladder porters (Haiku/Sonnet) with escalations batched, not interactive.
 
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
 - **SP** (`jasp` engine) ships **only** `jagame`; SP cgame/ui are statically
