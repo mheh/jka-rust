@@ -66,6 +66,30 @@ impl Engine {
     /// Source: `docs/architecture/state-ownership.md` § `com_init` / `Engine::new`.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Box<Engine> {
-        todo!("Port Engine::new — whole-aggregate zeroed alloc + Instant base (LIFE-D4b)")
+        use std::alloc::{alloc_zeroed, handle_alloc_error, Layout};
+        use std::ptr::addr_of_mut;
+
+        use mp_engine_qcommon::vm::ModuleRegistry;
+
+        let layout = Layout::new::<Engine>();
+        // SAFETY: the zeroed bytes cover only the ZeroValid-audited #[repr(C)]
+        // mass; EVERY non-ZeroValid field is written in place below before the
+        // Box is exposed (the MaybeUninit pattern, LIFE-Q9) — raw `.write()`s,
+        // no drops of uninit memory, single-threaded.
+        unsafe {
+            let p = alloc_zeroed(layout) as *mut Engine;
+            if p.is_null() {
+                handle_alloc_error(layout);
+            }
+            // The Instant timer base (LIFE-D4b) — captured here, first in main().
+            addr_of_mut!((*p).common.time_base).write(std::time::Instant::now());
+            // The empty ModuleRegistry (step-30 VM_Init's default-shaped build);
+            // a zeroed Option<ModuleSlot> is NOT guaranteed None.
+            addr_of_mut!((*p).common.modules).write(ModuleRegistry::default());
+            // Option<Client>/Option<SoundSystem>: same niche non-guarantee.
+            addr_of_mut!((*p).cl).write(None);
+            addr_of_mut!((*p).snd).write(None);
+            Box::from_raw(p)
+        }
     }
 }

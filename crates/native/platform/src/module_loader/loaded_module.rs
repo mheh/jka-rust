@@ -17,3 +17,12 @@ pub struct LoadedModule {
     /// (LOAD-D6), re-exported by `abi-transport`.
     pub(crate) entry: RawVmMain,
 }
+
+impl LoadedModule {
+    /// The resolved `vmMain` entrypoint (`vm->entryPoint`, `vm_local.h:123`).
+    /// Accessor over the `pub(crate)` field (LOAD-D12f) for the registry's
+    /// engine→module calls (`VM_Call`'s `vm->entryPoint` read, `vm.cpp:808`).
+    pub fn entry(&self) -> RawVmMain {
+        self.entry
+    }
+}

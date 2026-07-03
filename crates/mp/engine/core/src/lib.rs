@@ -7,6 +7,8 @@
 
 pub mod engine;
 pub mod lifecycle;
+pub mod sv_init_game_progs;
 
 pub use engine::Engine;
 pub use lifecycle::{com_frame, com_init, com_shutdown, sys_error, sys_milliseconds};
+pub use sv_init_game_progs::sv_init_game_progs;

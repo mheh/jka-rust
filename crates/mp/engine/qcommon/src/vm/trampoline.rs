@@ -30,6 +30,37 @@ extern "C-unwind" {
 /// is on the stack (porting-rules §D11 engine-side seam exemption).
 #[no_mangle]
 pub extern "C-unwind" fn game_syscall_trampoline_words(args: *const isize) -> isize {
-    let _ = args;
-    todo!("Port VM_DllSyscall dispatch — oracle/oracle/codemp/qcommon/vm.cpp:363-377")
+    // SAFETY: the shim always passes its full 16-word frame (vm.cpp:366).
+    let slot = unsafe {
+        (*GAME_SLOT.0.get())
+            .as_ref()
+            .expect("game slot armed before any module syscall")
+    };
+    (slot.syscall)(slot.ctx, args)
+}
+
+/// The game slot's copy of the injected `EngineSlot` pair, readable by the
+/// stateless trampoline above — the SEAM-D11 per-slot cell in its post-
+/// injection form ("one monomorphic trampoline per slot; e.g. the game slot"),
+/// the §D11 engine-side static exemption twin of the shell's `OnceLock`.
+///
+/// PROVISIONAL (checkpoint-7 finding): the injected-EngineSlot amendment
+/// leaves the trampoline→slot channel unspecified; this cell + `arm_game_slot`
+/// are the minimal faithful bridge, armed by the load call site alongside its
+/// `load_module` injection.
+static GAME_SLOT: GameSlotCell = GameSlotCell(std::cell::UnsafeCell::new(None));
+
+struct GameSlotCell(std::cell::UnsafeCell<Option<super::engine_slot::EngineSlot>>);
+
+// SAFETY (Sync only): armed once at module load, read single-threaded per
+// Raven's contract (the same argument as the module shell's cells).
+unsafe impl Sync for GameSlotCell {}
+
+/// Arm the game slot's trampoline cell with the same `(ctx, system_calls)`
+/// pair the load call site injects into `load_module` (LOAD-D8 injection).
+pub fn arm_game_slot(ctx: *mut core::ffi::c_void, syscall: super::engine_slot::SlotSyscall) {
+    // SAFETY: single-threaded module-load path; no syscall can race the arm.
+    unsafe {
+        *GAME_SLOT.0.get() = Some(super::engine_slot::EngineSlot { ctx, syscall });
+    }
 }
