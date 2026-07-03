@@ -10,6 +10,8 @@ pub mod ai;
 pub mod botai;
 pub mod client;
 pub mod entity;
+pub mod g_init_game;
+pub mod g_shutdown_game;
 pub mod level;
 pub mod npc;
 pub mod saber;
@@ -24,3 +26,11 @@ pub use world::{EntityId, GameContext, GameWorld};
 // its existing two edges (round-7 item 25; SEAM-D10's exactly-two-edges shell
 // property stays intact — the shell sees the seam through the logic crate).
 pub use mp_abi::game::exports::MpGameExport;
+
+// The per-command vmMain call types the shell's dispatch match names, seen
+// through the logic crate on the same item-25 principle (checkpoint-7 finding:
+// mechanical extension — the shell's arms need the C marker/Args types).
+pub mod vmcalls {
+    pub use mp_abi::game::vmcalls::GAME_INIT::GameInit;
+    pub use mp_abi::game::vmcalls::GAME_SHUTDOWN::GameShutdown;
+}

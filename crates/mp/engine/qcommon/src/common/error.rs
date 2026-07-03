@@ -43,6 +43,8 @@ pub struct ComError {
 ///
 /// Source: `oracle/oracle/codemp/qcommon/common.cpp:249`
 pub fn com_error(level: errorParm_t, msg: String) -> ! {
-    let _ = (level, msg);
-    todo!("Port Com_Error (receiverless panic_any) — oracle/oracle/codemp/qcommon/common.cpp:249")
+    // Pure format + diverge (STATE-D7): the varargs formatting is caller-side
+    // (msg arrives formatted, mirroring vsprintf into com_errorMessage,
+    // common.cpp:293-295); ALL recovery runs catch-side in mp_engine_core.
+    std::panic::panic_any(ComError { level, msg })
 }

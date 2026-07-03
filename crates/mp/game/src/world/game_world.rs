@@ -30,9 +30,17 @@ impl GameWorld {
     ///
     /// Source: `docs/architecture/state-ownership.md` § `GameWorld::zeroed` (STATE-D9).
     pub fn zeroed() -> Self {
-        //TODO: Port GameWorld::zeroed — native_platform::zeroed_box (ZeroValid-bounded)
-        // for entities/clients/level; impls beside each type's layout asserts.
-        // Source: oracle/oracle/codemp/game/g_main.c:978-988 (STATE-D9)
-        todo!("Port GameWorld::zeroed — oracle/oracle/codemp/game/g_main.c:978-988 (STATE-D9)")
+        // The frozen STATE-D9 sketch verbatim: zeroed heap boxes first; the
+        // level.gentities/clients + entities[i].client back-pointers alias them
+        // AFTER they exist, in G_InitGame's dispatched arm (g_main.c:978-988) —
+        // not here.
+        let entities = native_platform::zeroed_box::<[gentity_t; MAX_GENTITIES]>();
+        let clients = native_platform::zeroed_box::<[gclient_t; MAX_CLIENTS]>();
+        let level = *native_platform::zeroed_box::<level_locals_t>();
+        GameWorld {
+            level,
+            entities,
+            clients,
+        }
     }
 }

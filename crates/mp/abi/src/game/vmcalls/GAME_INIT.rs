@@ -12,7 +12,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GameInitArgs {
@@ -51,4 +53,22 @@ impl InboundVmCall for GameInit {
     type Output = ();
 
     const COMMAND: MpGameExport = MpGameExport::GAME_INIT;
+}
+
+impl DecodeVmMain for GameInit {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // ( int levelTime, int randomSeed, int restart ) — g_main.c:517.
+        GameInitArgs::new(
+            word_to_c_int(t.arg(0)),
+            word_to_c_int(t.arg(1)),
+            word_to_c_int(t.arg(2)),
+        )
+    }
+}
+
+impl EncodeVmMainReturn for GameInit {
+    fn encode_return(_output: Self::Output) -> isize {
+        // `G_InitGame(...); return 0;` — g_main.c:518-519.
+        0
+    }
 }

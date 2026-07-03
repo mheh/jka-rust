@@ -27,5 +27,19 @@ unsafe impl<T: ZeroValid, const N: usize> ZeroValid for [T; N] {}
 ///
 /// Source: `docs/architecture/state-ownership.md` § `zeroed_box` (STATE-D9).
 pub fn zeroed_box<T: ZeroValid>() -> Box<T> {
-    todo!("Port zeroed_box — alloc_zeroed + Box::from_raw (STATE-D9)")
+    use std::alloc::{alloc_zeroed, handle_alloc_error, Layout};
+    let layout = Layout::new::<T>();
+    if layout.size() == 0 {
+        // ZST: all-zero is trivially the (only) value; no allocation.
+        return unsafe { Box::from_raw(core::ptr::NonNull::<T>::dangling().as_ptr()) };
+    }
+    // SAFETY: the ZeroValid bound carries the all-zero-validity contract; the
+    // allocation is exactly Layout::new::<T>() and ownership passes to the Box.
+    unsafe {
+        let p = alloc_zeroed(layout) as *mut T;
+        if p.is_null() {
+            handle_alloc_error(layout);
+        }
+        Box::from_raw(p)
+    }
 }

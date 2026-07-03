@@ -17,8 +17,20 @@
 //! The per-call wrappers themselves are logic-port work (one per abi-traps row),
 //! not frozen skeleton surface — this module fixes only the import + the shape.
 
-#[allow(unused_imports)]
+use mp_abi::game::syscalls::G_PRINT::GPrint;
+use mp_abi::{Execute, OutboundSysCall};
 use mp_engine_select::Engine;
 
-//TODO: Port trap::* outbound-call wrappers (one per abi-traps.md row)
+/// Raven `trap_Printf` (`g_syscalls.c:27-29`): print message on the local
+/// console (`G_PRINT`, `g_public.h:105`). The frozen SEAM-D13 wrapper shape.
+pub fn Printf(
+    engine: &Engine,
+    args: <GPrint as OutboundSysCall>::Args,
+) -> <GPrint as OutboundSysCall>::Output {
+    // UFCS spelling of the frozen `engine.execute(args)` — the bare method
+    // call cannot infer `C` from `Args` alone (mechanical; checkpoint-7 finding).
+    <Engine as Execute<GPrint>>::execute(engine, args)
+}
+
+//TODO: Port trap::* outbound-call wrappers (the remaining abi-traps.md rows)
 // Source: docs/architecture/engine-seam.md § Call-site conventions (SEAM-D13)
