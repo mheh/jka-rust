@@ -8,27 +8,21 @@ use crate::game_world::GameWorld;
 /// The copyable `Dispatch<C>` receiver each `vmMain` command routes through
 /// (SEAM-Q12 resolved 2026-07-03). Defined in `mp_game`; `Engine` is the
 /// `mp_engine_select` module-side transport alias (NOT `mp_engine_core::Engine`).
-/// `vmMain` constructs one per call from the shell's `WORLD` + `ENGINE.get()`
-/// (SEAM-D1). Each `impl Dispatch<C> for GameContext` unpacks `world` via STATE-D6
-/// leaf reborrows and threads `engine` into the logic fns' `trap::X(engine, …)`
-/// call sites (oracle syscall order). The `&Engine` channel is the receiver's own
-/// field — no `dispatch` parameter is added, SEAM-D8 stays untouched; the orphan
-/// rule is satisfied because `GameContext` and its impls both live in `mp_game`.
+/// `vmMain` constructs one per call — a plain struct literal built by the shell
+/// from its `WORLD` + `ENGINE.get()` (SEAM-D1); fields are `pub` per the
+/// round-5 resolution (a `Copy` struct of raw pointers has no invariant to
+/// protect; the `WorldPtr` precedent, STATE-D8). Each `impl Dispatch<C> for
+/// GameContext` unpacks `world` via STATE-D6 leaf reborrows and threads
+/// `engine` into the logic fns' `trap::X(engine, …)` call sites (oracle syscall
+/// order). The `&Engine` channel is the receiver's own field — no `dispatch`
+/// parameter is added, SEAM-D8 stays untouched; the orphan rule is satisfied
+/// because `GameContext` and its impls both live in `mp_game`.
 ///
 /// Source: `docs/architecture/engine-seam.md` § inbound dual (SEAM-Q12 amendment 2026-07-03).
 #[derive(Clone, Copy)]
 pub struct GameContext<'e> {
-    world: *mut GameWorld,
-    engine: &'e Engine,
-}
-
-impl<'e> GameContext<'e> {
-    /// Constructed per `vmMain` call by the module cdylib shell from its `WORLD`
-    /// raw pointer + `ENGINE.get()` (SEAM-D1). Fields stay private (frozen
-    /// shape); this is the shell's sole constructor.
-    pub fn new(world: *mut GameWorld, engine: &'e Engine) -> Self {
-        Self { world, engine }
-    }
+    pub world: *mut GameWorld,
+    pub engine: &'e Engine,
 }
 
 // The per-command `impl Dispatch<C> for GameContext` blocks (one per

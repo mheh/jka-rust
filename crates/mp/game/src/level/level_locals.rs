@@ -141,3 +141,9 @@ const _: () = assert!(core::mem::offset_of!(level_locals_t, groups) == 11232);
 const _: () = assert!(core::mem::offset_of!(level_locals_t, combatPoints) == 32740);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(level_locals_t, mTeamFilter) == 47112);
+
+// The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
+// all-zero bytes are a valid level_locals_t — the same property the layout asserts above
+// pin and Raven's memset/static zero-init relies on.
+// Source: oracle/oracle/codemp/game/g_local.h (all-zero-valid #[repr(C)]; Raven zero-inits `level`, g_main.c:9)
+unsafe impl native_platform::ZeroValid for level_locals_t {}

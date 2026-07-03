@@ -6,4 +6,4 @@ pub mod mem;
 pub mod module_loader;
 pub mod platform;
 
-pub use mem::zeroed_box;
+pub use mem::{zeroed_box, ZeroValid};

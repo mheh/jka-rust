@@ -245,3 +245,9 @@ const _: () = assert!(core::mem::offset_of!(gclient_t, renderInfo) == 6776);
 const _: () = assert!(core::mem::offset_of!(gclient_t, NPC_class) == 7204);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gclient_t, lastGenCmdTime) == 7324);
+
+// The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
+// all-zero bytes are a valid gclient_t — the same property the layout asserts above
+// pin and Raven's memset/static zero-init relies on.
+// Source: oracle/oracle/codemp/game/g_local.h (all-zero-valid #[repr(C)]; Raven memsets g_clients, g_main.c:983)
+unsafe impl native_platform::ZeroValid for gclient_t {}

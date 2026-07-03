@@ -12,7 +12,11 @@ use sp_abi::game::public::game_import_t::game_import_t;
 use crate::game_world::GameWorld;
 
 /// The copyable per-export receiver, mirroring MP's `GameContext` (SEAM-Q12).
-/// The SP engine handle is the stored `game_import_t` the engine passed into
+/// Built as a plain struct literal in each `game_export_t` export fn's prologue
+/// by the jagame shell, from the SP `WORLD` cell + the stored import table;
+/// fields are `pub` per the round-5 resolution (a `Copy` struct of raw pointers
+/// has no invariant to protect; the `WorldPtr` precedent, STATE-D8). The SP
+/// engine handle is the stored `game_import_t` the engine passed into
 /// `GetGameAPI` (Raven `gi = *import`, `g_main.cpp:878`) — bound directly per
 /// SEAM-D2 (SP has no `mp_engine_select`-style alias crate; no alias name is
 /// minted here, see skeleton checkpoint-3 findings).
@@ -22,16 +26,8 @@ use crate::game_world::GameWorld;
 /// round-4 gate.
 #[derive(Clone, Copy)]
 pub struct GameContext<'e> {
-    world: *mut GameWorld,
-    engine: &'e game_import_t,
-}
-
-impl<'e> GameContext<'e> {
-    /// Constructed in each `game_export_t` export fn's prologue by the jagame
-    /// shell, from the SP `WORLD` cell + the stored import table.
-    pub fn new(world: *mut GameWorld, engine: &'e game_import_t) -> Self {
-        Self { world, engine }
-    }
+    pub world: *mut GameWorld,
+    pub engine: &'e game_import_t,
 }
 
 // The per-export logic entry points (InitGame, G_RunFrame, ClientThink, …) that

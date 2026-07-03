@@ -175,3 +175,9 @@ const _: () = assert!(core::mem::offset_of!(level_locals_t, mRotationAdjust) == 
 const _: () = assert!(core::mem::offset_of!(level_locals_t, mTargetAdjust) == 620520);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(level_locals_t, hasBspInstances) == 620528);
+
+// The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
+// all-zero bytes are a valid level_locals_t — the same property the layout asserts above
+// pin and Raven's memset/static zero-init relies on.
+// Source: oracle/oracle/code/game/g_local.h (all-zero-valid #[repr(C)]; SP zero-inits `level`, g_main.cpp:46)
+unsafe impl native_platform::ZeroValid for level_locals_t {}

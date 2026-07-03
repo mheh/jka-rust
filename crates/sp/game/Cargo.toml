@@ -11,3 +11,5 @@ crate-type = ["cdylib", "rlib"]
 sp_qshared = { path = "../qshared" }
 sp_bg = { path = "../bg" }
 sp_abi = { path = "../abi" }
+# STATE-D9 SP mirror: zeroed_box/ZeroValid for GameWorld construction (checkpoint-4 finding).
+native_platform = { path = "../../native/platform" }

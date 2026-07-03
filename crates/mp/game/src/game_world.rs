@@ -30,9 +30,9 @@ impl GameWorld {
     ///
     /// Source: `docs/architecture/state-ownership.md` § `GameWorld::zeroed` (STATE-D9).
     pub fn zeroed() -> Self {
-        //TODO: Port GameWorld::zeroed — native_platform::zeroed_box for entities/clients/level
+        //TODO: Port GameWorld::zeroed — native_platform::zeroed_box (ZeroValid-bounded)
+        // for entities/clients/level; impls beside each type's layout asserts.
         // Source: oracle/oracle/codemp/game/g_main.c:978-988 (STATE-D9)
-        // (mp_game -> native_platform Cargo edge is added when this body is filled.)
         todo!("Port GameWorld::zeroed — oracle/oracle/codemp/game/g_main.c:978-988 (STATE-D9)")
     }
 }

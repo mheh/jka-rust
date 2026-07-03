@@ -197,6 +197,7 @@ dependencies = [
  "mp_bg",
  "mp_engine_select",
  "mp_qshared",
+ "native_platform",
 ]
 
 [[package]]
@@ -348,6 +349,7 @@ dependencies = [
 name = "sp_game"
 version = "0.1.0"
 dependencies = [
+ "native_platform",
  "sp_abi",
  "sp_bg",
  "sp_qshared",

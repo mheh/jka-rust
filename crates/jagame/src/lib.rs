@@ -141,7 +141,10 @@ pub unsafe extern "C-unwind" fn GetGameAPI(import: *const game_import_t) -> *con
 //
 //     let world = unsafe { (*WORLD.0.get()).as_mut().expect("ge->Init built the world") }
 //         as *mut GameWorld;
-//     let ctx = sp_game::GameContext::new(world, ENGINE.get().expect("GetGameAPI set ENGINE"));
+//     let ctx = sp_game::GameContext {
+//         world,
+//         engine: ENGINE.0.get().expect("GetGameAPI set ENGINE"),
+//     }; // struct literal, pub fields (round-5 resolution; WorldPtr precedent)
 //
 // `init` WRITES the cell first (GameWorld::zeroed, STATE-D9) then delegates;
 // `shutdown` takes the world OUT after its delegation returns (drop = teardown).

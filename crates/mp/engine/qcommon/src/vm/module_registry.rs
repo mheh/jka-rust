@@ -23,7 +23,11 @@ pub struct ModuleRegistry {
 
 impl ModuleRegistry {
     /// `VM_Create` slot semantics (`vm.cpp:471` region): bad-parms guard
-    /// (`vm.cpp:480-482`) → `com_error(ERR_FATAL, "VM_Create: bad parms")`; reuse
+    /// (`vm.cpp:480-482`) → `com_error(ERR_FATAL, "VM_Create: bad parms")` —
+    /// the guard is `name.is_empty()` ONLY (round-5 resolution): Raven's
+    /// `!module` and `!systemCalls` disjuncts are structurally unreachable in
+    /// Rust (`&str` is non-null; `SlotSyscall` is a non-nullable fn pointer);
+    /// reuse
     /// a live slot whose stored name matches case-insensitively
     /// (`vm.cpp:485-489`); else first free slot (`vm.cpp:494`); else
     /// `com_error(ERR_FATAL, …)` when all `MAX_VM` full (`vm.cpp:499-500`). A

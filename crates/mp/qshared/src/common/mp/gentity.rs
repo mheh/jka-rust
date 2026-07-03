@@ -471,3 +471,9 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, material) == 1516);
 const _: () = assert!(core::mem::offset_of!(gentity_t, locationDamage) == 1544);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, item) == 1824);
+
+// The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
+// all-zero bytes are a valid gentity_t — the same property the layout asserts above
+// pin and Raven's memset/static zero-init relies on.
+// Source: oracle/oracle/codemp/game/g_shared.h (all-zero-valid #[repr(C)]; Raven memsets g_entities, g_main.c:978)
+unsafe impl native_platform::ZeroValid for gentity_t {}

@@ -39,6 +39,12 @@ impl Engine {
     /// first in `main()`, before the warm-up `sys_milliseconds` read and
     /// `com_init`. Takes no command line (LIFE-D4b).
     ///
+    /// `sv`/`cm` are constructed via the `ZeroValid`-bounded
+    /// `native_platform::zeroed_box` path (round-5 resolution, STATE-D9
+    /// analogy; stack `Default` rejected — `server_t` embeds 1024 `svEntity_t`
+    /// by value, `server.h:53-88`). Their `unsafe impl ZeroValid` lines land
+    /// with their real field sets, beside their layout asserts.
+    ///
     /// Source: `docs/architecture/state-ownership.md` § `com_init` / `Engine::new`.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Engine {

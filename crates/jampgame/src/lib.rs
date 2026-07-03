@@ -67,8 +67,13 @@ pub extern "C-unwind" fn vmMain(
     );
     let _ = (&ENGINE, WORLD.0.get());
     let _construct = |w: *mut GameWorld| {
-        // Per-call receiver from WORLD + ENGINE.get() (SEAM-Q12).
-        mp_game::GameContext::new(w, ENGINE.get().expect("dllEntry set ENGINE"))
+        // Per-call receiver from WORLD + ENGINE.get() (SEAM-Q12) — plain struct
+        // literal, pub fields (round-5 resolution: no invariant on a Copy
+        // struct of raw pointers; WorldPtr precedent, STATE-D8).
+        mp_game::GameContext {
+            world: w,
+            engine: ENGINE.get().expect("dllEntry set ENGINE"),
+        }
     };
     todo!("Port jampgame vmMain export-enum match — oracle/oracle/codemp/game/g_main.c:515")
 }

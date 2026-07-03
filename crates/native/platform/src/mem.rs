@@ -1,16 +1,31 @@
 //! Zeroed heap construction — the Rust mirror of C static zero-initialization
-//! for large all-zeroes-valid `#[repr(C)]` types (STATE-D9).
+//! for large all-zeroes-valid `#[repr(C)]` types (STATE-D9; form settled by the
+//! round-5 STATE-Q10 resolution: safe fn bounded by an unsafe marker trait).
+
+/// Marker trait: the all-zero bit pattern is a valid value of `Self`.
+///
+/// Hand-rolled `bytemuck::Zeroable` style (round-5 STATE-Q10 resolution — no
+/// new dependency): implementing it is the `unsafe` step, one line per type,
+/// colocated with that type's layout static-asserts; every `zeroed_box` call
+/// site stays safe (porting-rules §D11 confinement).
+///
+/// # Safety
+/// Implementors guarantee `Self` is `#[repr(C)]` and that all-zero bytes are a
+/// valid `Self` (no `NonNull`/enum-niche/reference fields).
+pub unsafe trait ZeroValid {}
+
+// Arrays of zero-valid elements are zero-valid (the bytemuck-Zeroable array
+// rule; the GameWorld `[gentity_t; MAX_GENTITIES]` boxes build through this).
+unsafe impl<T: ZeroValid, const N: usize> ZeroValid for [T; N] {}
 
 /// THE sanctioned construction idiom for large `#[repr(C)]` all-zeroes-valid
 /// types: `alloc_zeroed` the storage and `Box::from_raw` it, so a large array is
 /// built directly on the heap and never transits the stack (naive
-/// stack-build-then-box risks overflow on constrained-stack targets).
-///
-/// # Safety
-/// The caller guarantees `T` is `#[repr(C)]` and that the all-zero bit pattern is
-/// a valid value of `T` (no `NonNull`/enum-niche/reference fields).
+/// stack-build-then-box risks overflow on constrained-stack targets). Safe: the
+/// all-zero-valid precondition is carried by the `ZeroValid` bound (STATE-Q10,
+/// round-5 resolution).
 ///
 /// Source: `docs/architecture/state-ownership.md` § `zeroed_box` (STATE-D9).
-pub fn zeroed_box<T>() -> Box<T> {
+pub fn zeroed_box<T: ZeroValid>() -> Box<T> {
     todo!("Port zeroed_box — alloc_zeroed + Box::from_raw (STATE-D9)")
 }

@@ -13,3 +13,5 @@ mp_bg = { path = "../bg" }
 mp_abi = { path = "../abi" }
 # SEAM-D13: the module-side transport alias (`mod trap`, GameContext.engine).
 mp_engine_select = { path = "../engine-select" }
+# STATE-D9: zeroed_box/ZeroValid for GameWorld construction (doc-sanctioned edge).
+native_platform = { path = "../../native/platform" }
