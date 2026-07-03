@@ -16,6 +16,13 @@ use crate::entrypoints::RawSyscall;
 /// `LoadedModule { lib, entry }`. `None` = not found (Raven's QVM fallback is
 /// out of scope, DEC-05.4; the caller decides fatal-vs-skip per mode).
 ///
+/// **Missing-export handshake arm — two build-mode arms** (round-6 item-18
+/// resolution, reproducing Raven's Unix `#ifdef NDEBUG` split faithfully,
+/// porting-rules §20): debug builds print (`Com_Printf`) and return `None`;
+/// release builds (`cfg(not(debug_assertions))`) raise the in-loader
+/// receiverless `com_error(ERR_FATAL, "Sys_LoadDll(%s) failed dlsym(vmMain): …")`.
+/// Source: `oracle/oracle/codemp/unix/unix_main.c:431-436`.
+///
 /// Source: `oracle/oracle/codemp/win32/win_main.cpp:811-887`
 pub fn sys_load_dll(
     _policy: &ModuleSearchPolicy,

@@ -3,7 +3,7 @@
 
 use mp_engine_select::Engine;
 
-use crate::game_world::GameWorld;
+use super::game_world::GameWorld;
 
 /// The copyable `Dispatch<C>` receiver each `vmMain` command routes through
 /// (SEAM-Q12 resolved 2026-07-03). Defined in `mp_game`; `Engine` is the

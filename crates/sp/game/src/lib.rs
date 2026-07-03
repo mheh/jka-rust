@@ -14,8 +14,6 @@ pub mod dmstates;
 pub mod events;
 pub mod fields;
 pub mod functions;
-pub mod game_context;
-pub mod game_world;
 pub mod gi;
 pub mod local;
 pub mod npc;
@@ -27,6 +25,6 @@ pub mod shared;
 pub mod teams;
 pub mod vehicles;
 pub mod weapons;
+pub mod world;
 
-pub use game_context::GameContext;
-pub use game_world::GameWorld;
+pub use world::{EntityId, GameContext, GameWorld};

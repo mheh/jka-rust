@@ -1,15 +1,21 @@
 //! `Server` (the `Engine.sv` island host) + `ServerGame` (the game dispatcher's
 //! reborrowed host state) + `sv_game_system_calls` (the MP game dispatcher).
 
-/// The server-island state owned by `Engine.sv: Option<Server>` (state-ownership
-/// § Server). Reuses the existing ported `server_t`/`serverStatic_t` types as
-/// fields (`server/server_t.rs`, `server/server_static_t.rs`) plus bot/master/
-/// savegame state — placeheld here so the frozen `Engine` struct can name it.
+/// The server-island state owned by `Engine.sv: Server` — always present, NOT
+/// an `Option` (LIFE-Q7 resolution, round-6): liveness is `sv.state == SS_DEAD`
+/// (`serverState_t`, `SS_DEAD` = "no map loaded", `codemp/server/server.h:46-54`),
+/// the direct dual of Raven's loader-zero-filled `sv`/`svs` statics. Reuses the
+/// existing ported `server_t`/`serverStatic_t` types as fields
+/// (`server/server_t.rs`, `server/server_static_t.rs`) plus bot/master/savegame
+/// state — placeheld here so the frozen `Engine` struct can name it; the
+/// `sv.state` liveness field arrives with the `server_t` field set.
 ///
-/// Source: `oracle/oracle/codemp/server/sv_main.cpp:10-11`
+/// Source: `oracle/oracle/codemp/server/sv_main.cpp:10-11`;
+/// `oracle/oracle/codemp/server/server.h:46-54` (state/`SS_DEAD`).
 pub struct Server {
-    //TODO: Port Server fields (sv: server_t, svs: serverStatic_t, bot, …)
-    // Source: oracle/oracle/codemp/server/sv_main.cpp:10-11
+    //TODO: Port Server fields (sv: server_t incl. the SS_DEAD liveness state,
+    // svs: serverStatic_t, bot, …)
+    // Source: oracle/oracle/codemp/server/sv_main.cpp:10-11; server.h:53-88
     _private: (),
 }
 

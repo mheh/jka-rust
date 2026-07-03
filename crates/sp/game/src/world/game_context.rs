@@ -9,7 +9,7 @@
 
 use sp_abi::game::public::game_import_t::game_import_t;
 
-use crate::game_world::GameWorld;
+use super::game_world::GameWorld;
 
 /// The copyable per-export receiver, mirroring MP's `GameContext` (SEAM-Q12).
 /// Built as a plain struct literal in each `game_export_t` export fn's prologue
