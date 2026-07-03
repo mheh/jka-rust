@@ -5,3 +5,7 @@ edition = "2021"
 
 [lib]
 name = "abi_transport"
+
+[dependencies]
+# LOAD-D6/D12d: downhill re-export edge for the five relocated raw ABI aliases.
+native_platform = { path = "../native/platform" }

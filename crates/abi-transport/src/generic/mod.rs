@@ -1,12 +1,14 @@
+pub mod engine;
 pub mod inbound;
 pub mod message;
 pub mod outbound;
 pub mod table;
 pub mod transport;
 
-pub use inbound::{InboundVmCall, InboundVmCallExecutor};
+pub use engine::{CEngine, RunStatic, Static};
+pub use inbound::{Dispatch, InboundVmCall, InboundVmCallExecutor};
 pub use message::{MessageArgs, MessageOutboundSysCall, MessageOutboundSysCallExecutor};
-pub use outbound::{OutboundSysCall, OutboundSysCallExecutor};
+pub use outbound::{Execute, OutboundSysCall, OutboundSysCallExecutor};
 pub use table::{FunctionTableExport, FunctionTableImport};
 pub use transport::{
     c_int_to_word, ptr_to_word, word_to_c_int, word_to_const_ptr, word_to_mut_ptr,

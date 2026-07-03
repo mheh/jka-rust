@@ -88,7 +88,7 @@ pub use fs_origin::fsOrigin_t;
 pub use gen_cmds::genCmds_t;
 pub use hunk_pref::ha_pref;
 pub use item_use_fail::itemUseFail_t;
-pub use limits::{MAX_CLIENTS, MAX_STRING_CHARS};
+pub use limits::{MAX_CLIENTS, MAX_GENTITIES, MAX_STRING_CHARS};
 pub use mark_fragment::markFragment_t;
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};
 pub use print_parm::printParm_t;

@@ -1,0 +1,14 @@
+[package]
+name = "mp_engine_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_engine_core"
+
+[dependencies]
+mp_qshared = { path = "../../qshared" }
+mp_engine_qcommon = { path = "../qcommon" }
+mp_engine_server = { path = "../server" }
+mp_engine_client = { path = "../client" }
+native_platform = { path = "../../../native/platform" }

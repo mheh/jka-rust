@@ -9,4 +9,6 @@ name = "jampgame"
 crate-type = ["cdylib"]
 
 [dependencies]
+# SEAM-D10: the thin cdylib shell depends on abi_transport AND its logic crate.
 abi_transport = { path = "../abi-transport" }
+mp_game = { path = "../mp/game" }

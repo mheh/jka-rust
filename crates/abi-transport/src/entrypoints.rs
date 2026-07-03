@@ -1,27 +1,14 @@
-use core::ffi::{c_int, c_void};
+use core::ffi::c_void;
 
-pub type AbiCommand = c_int;
-pub type AbiWord = isize;
-pub type RawSyscall = *const c_void;
+// The five raw ABI aliases relocated to `native/platform` per module-loading.md
+// LOAD-D6 (base tier) and re-exported here so existing `abi_transport`
+// consumers (the module cdylib shells) are unaffected and no tier inversion
+// occurs. `abi-transport` takes a downhill dep on `native_platform`.
+pub use native_platform::entrypoints::{AbiCommand, AbiWord, RawDllEntry, RawSyscall, RawVmMain};
+
 pub type RawImportTable = *mut c_void;
 pub type RawExportTable = *mut c_void;
 
-pub type RawDllEntry = extern "C" fn(syscall: RawSyscall);
-pub type RawVmMain = extern "C" fn(
-    command: AbiCommand,
-    arg0: AbiWord,
-    arg1: AbiWord,
-    arg2: AbiWord,
-    arg3: AbiWord,
-    arg4: AbiWord,
-    arg5: AbiWord,
-    arg6: AbiWord,
-    arg7: AbiWord,
-    arg8: AbiWord,
-    arg9: AbiWord,
-    arg10: AbiWord,
-    arg11: AbiWord,
-) -> AbiWord;
 pub type RawGetModuleApi =
     extern "C" fn(api_version: AbiCommand, import: RawImportTable) -> RawExportTable;
 pub type RawGetGameApi = extern "C" fn(import: RawImportTable) -> RawExportTable;

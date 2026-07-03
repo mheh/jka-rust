@@ -11,3 +11,5 @@ crate-type = ["cdylib", "rlib"]
 mp_qshared = { path = "../qshared" }
 mp_bg = { path = "../bg" }
 mp_abi = { path = "../abi" }
+# SEAM-D13: the module-side transport alias (`mod trap`, GameContext.engine).
+mp_engine_select = { path = "../engine-select" }

@@ -5,6 +5,21 @@ version = 4
 [[package]]
 name = "abi_transport"
 version = "0.1.0"
+dependencies = [
+ "native_platform",
+]
+
+[[package]]
+name = "bytemuck"
+version = "1.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
+
+[[package]]
+name = "cfg-if"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "cgame"
@@ -25,6 +40,17 @@ name = "jampgame"
 version = "0.1.0"
 dependencies = [
  "abi_transport",
+ "mp_game",
+]
+
+[[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link",
 ]
 
 [[package]]
@@ -80,6 +106,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mp_engine_core"
+version = "0.1.0"
+dependencies = [
+ "mp_engine_client",
+ "mp_engine_qcommon",
+ "mp_engine_server",
+ "mp_qshared",
+ "native_platform",
+]
+
+[[package]]
 name = "mp_engine_ghoul2"
 version = "0.1.0"
 dependencies = [
@@ -110,6 +147,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mp_engine_select"
+version = "0.1.0"
+dependencies = [
+ "abi_transport",
+]
+
+[[package]]
 name = "mp_engine_server"
 version = "0.1.0"
 dependencies = [
@@ -119,11 +163,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mp_engine_wasm_host"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "mp_game"
 version = "0.1.0"
 dependencies = [
  "mp_abi",
  "mp_bg",
+ "mp_engine_select",
  "mp_qshared",
 ]
 
@@ -174,6 +226,9 @@ version = "0.1.0"
 [[package]]
 name = "native_platform"
 version = "0.1.0"
+dependencies = [
+ "libloading",
+]
 
 [[package]]
 name = "native_types"
@@ -314,3 +369,9 @@ version = "0.1.0"
 dependencies = [
  "abi_transport",
 ]
+
+[[package]]
+name = "windows-link"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"

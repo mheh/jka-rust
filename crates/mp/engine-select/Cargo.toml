@@ -1,0 +1,15 @@
+[package]
+name = "mp_engine_select"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_engine_select"
+
+[features]
+# SEAM-D13: Cargo feature `static` selects the `Static` backend; default is
+# `CEngine` (NativeDll); `cfg(target_arch = "wasm32")` picks the wasm backend.
+static = []
+
+[dependencies]
+abi_transport = { path = "../../abi-transport" }

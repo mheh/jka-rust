@@ -5,3 +5,8 @@ edition = "2021"
 
 [lib]
 name = "native_platform"
+
+[dependencies]
+# LOAD-D12d: used only by module_loader/loader.rs's sys_load_dll (LOAD-D1 loader
+# mechanism, confined to this crate per LOAD-D4).
+libloading = "0.8"

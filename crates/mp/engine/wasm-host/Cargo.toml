@@ -1,0 +1,15 @@
+[package]
+name = "mp_engine_wasm_host"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mp_engine_wasm_host"
+
+[dependencies]
+# LOAD-D3: the `bytemuck::Pod` bound on `ModuleMemory`'s typed accessors.
+bytemuck = "1"
+# LOAD-D10: the wasmtime dep is isolated to this crate. Not yet wired into the
+# frozen type shapes (the `Memory` handle is abstract behind `ModuleMemory`);
+# added when the Wasm transport is implemented post-parity (DEC-05.5).
+#TODO: Port wasmtime wiring — docs/architecture/module-loading.md LOAD-D10
