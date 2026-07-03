@@ -1,5 +1,5 @@
 # Engine Seam Design
-Status: DRAFT     Supersedes: docs/engine-plan.md
+Status: REVIEWED     Supersedes: docs/engine-plan.md
 Decision prefix: SEAM     Ledger deps: DEC-04, DEC-05, DEC-07, DEC-08, DEC-09
 
 ## Standing context

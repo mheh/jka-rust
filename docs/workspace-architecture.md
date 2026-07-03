@@ -85,6 +85,11 @@ crates/
     engine/
       core/                  # mp_engine_core facade: aggregate `Engine`,
                              #   com_init/com_frame/com_shutdown/com_error
+      wasm-host/             # mp_engine_wasm_host: host-side wasm module
+                             #   types (WasmPtr<T>, ModuleMemory) + the
+                             #   wasmtime dep, isolated here; qcommon's
+                             #   ModuleTransport::Wasm arm is feature-gated
+                             #   on it (LOAD-Q5 resolution, 2026-07-02)
       qcommon/  server/  client/  botlib/  ghoul2/  icarus/  rmg/
     renderer/                # codemp/renderer (per-mode, split for authenticity)
     app/                     # openjk (client) + openjkded (dedicated); thin
@@ -166,7 +171,10 @@ it that way). `mp/engine/core` (package `mp_engine_core`) is the aggregate
 facade: it depends on the other `mp/engine/*` subcrates, defines the aggregate
 `pub struct Engine`, and hosts `com_init`/`com_frame`/`com_shutdown`/`com_error`.
 `mp/app` is a thin bin shell depending only on `mp/engine/core` and hosts the
-module cdylib shells. SP mirrors the same edges via `sp/engine/core` (package
+module cdylib shells. `mp/engine/wasm-host` (package `mp_engine_wasm_host`)
+isolates the host-side wasm types (`WasmPtr<T>`, `ModuleMemory`) and the
+`wasmtime` dependency; `mp/engine/qcommon`'s `ModuleTransport::Wasm` arm is
+feature-gated on it, so native-only builds carry no wasm toolchain. SP mirrors the same edges via `sp/engine/core` (package
 `sp_engine_core`); SP `game` uses the `GetGameAPI` table half of
 `abi-transport` instead of `dllEntry`/`vmMain`.
 
