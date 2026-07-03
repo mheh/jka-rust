@@ -19,13 +19,3 @@ pub trait InboundVmCall {
 pub trait Dispatch<C: InboundVmCall> {
     fn dispatch(&self, args: C::Args) -> C::Output;
 }
-
-/// Route an inbound executable-to-game `vmMain` command.
-///
-/// Placeholder marker trait with zero impls — superseded by `Dispatch<C>`
-/// (SEAM-D8). Retained (not deleted) in this skeleton seed; see FINDINGS.
-pub trait InboundVmCallExecutor {
-    fn call_inbound<C>(&self, args: C::Args) -> C::Output
-    where
-        C: InboundVmCall;
-}
