@@ -32,6 +32,9 @@ Links only — never restated here:
   § Engine-side dispatchers), the `ServerGame` dispatcher arg (engine-seam
   § dispatchers — the reborrowed `Engine.sv` host state), and `SharedGameData`
   (whose *method set* this doc freezes below).
+- `docs/abi-traps.md` — the generated `trap_*` signature reference; the seam
+  below stores the payloads of rows 18 (`trap_LocateGameData`),
+  19 (`trap_DropClient`), and 121 (`trap_SV_RegisterSharedMemory`).
 - `docs/dossiers/A2-state-ownership.md` — the survey this doc renders.
 
 ## Scope & non-goals
@@ -100,7 +103,7 @@ Four clusters are reached from far outside their home subsystem and force the
 Cleanly encapsulated *already* (near-zero redesign): the VM table (qcommon-
 private, handle-based — engine-seam owns it), `cmd_functions`/`cvar_vars`
 (API-only access), the sound mixer (syscall-fed), and `kg` (`keyGlobals_t`,
-`cl_keys.cpp:22` — Raven already pre-bundled the key state into one struct: the
+`cl_keys.cpp:17` — Raven already pre-bundled the key state into one struct: the
 template for a Rust `KeyState`).
 
 ### SP deltas
@@ -208,12 +211,22 @@ reentrant call mutates do.
   is the high-arity `vmMain` escape (read by `C_Trace`/`GAME_ICARUS_*`) and is
   consumed by icarus/RMG — a *second* register-once/read-later registration in
   the same family as `LocateGameData`.
-- **No address translation on the MP game boundary.** `sv_game.cpp:401` defines
-  `#define VMA(x) ((void*)args[x])` — a direct cast, **never** `VM_ArgPtr` — for
-  every `G_*` syscall. The MP `game` boundary is hard-wired to a real native DLL
-  sharing the engine's address space (classic QVM bytecode is out of scope,
-  DEC-05.4, which sidesteps the latent `VM_ArgPtr` inconsistency). Model MP `game`
-  as always-native real shared memory.
+- **No address translation on the MP game boundary (on the real native-DLL
+  target).** `VMA(x)` — the macro every `G_*` syscall uses to read a pointer
+  argument — is conditional (`sv_game.cpp:401-404`): the direct-cast form
+  `((void*)args[x])` is gated `#if __linux__ && __powerpc__`, and the **default/PC
+  branch is `VM_ArgPtr(args[x])`**. But `VM_ArgPtr` **degenerates to an identity
+  cast for a native-DLL VM**: for an `entryPoint`-set VM it returns
+  `dataBase + intValue` (`vm.cpp:648-649`), and `dataBase` **stays 0 for native
+  DLLs** — it is assigned only in the QVM bytecode-load paths (`vm.cpp:444,560`),
+  whereas the DLL load path sets only `entryPoint` (`Sys_LoadDll`, `vm.cpp:518`)
+  and `vmTable` is a zero-initialized file-scope static (`vm.cpp:29`). So on the
+  real PC native-DLL target `VMA(x) == args[x]`, no translation. The masking
+  branch (`& dataMask`, `vm.cpp:652`) applies only to classic QVM bytecode, which
+  is out of scope (DEC-05.4). The MP `game` boundary is therefore hard-wired to a
+  real native DLL sharing the engine's address space; model MP `game` as
+  always-native real shared memory, and `SharedGameData`'s `NativeDll`/`Static`
+  impl does raw base+stride arithmetic with zero translation.
 - **SP `GetGameAPI` table handoff.** SP has **zero** `LocateGameData` call sites
   (grep-confirmed). `GetGameAPI` (`code/game/g_main.cpp:875`) returns a struct of
   real fn/data pointers; `InitGame` sets `globals.gentities = g_entities;
@@ -333,7 +346,7 @@ globals below plus the `cvars`/`cmd`/`cbuf`/`fs`/`net` sub-structs.
 | `fs_serverPaks*`/`fs_serverReferencedPaks*`/`lastValidBase/Game`/`fs_checksumFeed` | `files_common.cpp:206-218` | `Common.fs: FileSystem` (**MP only — SP has no pure-server globals**) | `FS_PureServerSetLoadedPaks` | `&mut Engine` |
 | `showpackets`/`showdrop`/`qport`/`net_killdroppedfragments` cvars | `net_chan.cpp:40-43` | `Cvar` handles (via `Common.cvars`) | `Netchan_Init` | handle |
 | `loopbacks[2]` | `net_chan.cpp:486` | `Common.net: mp/engine/qcommon::NetLoopbacks` (`net_chan.cpp` is a qcommon TU) | `Netchan_Init` | `&mut Engine` |
-| `cmg`/`SubBSP[32]`/`NumSubBSP`/trace counters/cm cvars | `cm_load.cpp:37,60-61` | `Engine.cm: mp/engine/qcommon::CollisionWorld` (`cm_load.cpp` is a qcommon TU; **instance-shaped value**, STATE-D2) | `CM_LoadMap` | `&mut Engine` |
+| `cmg`/`SubBSP[32]`/`NumSubBSP`/trace counters/cm cvars | `cm_load.cpp:37,60-61` | `Engine.cm: mp/engine/qcommon::CollisionWorld` (`cm_load.cpp` is a qcommon TU; **instance-shaped value**, STATE-D2) | `CM_LoadMap` **populates**; zero/Default from `Engine::new` (mirrors static zero-init of `cmg`, `cm_load.cpp:37`) | `&mut Engine` |
 | `gpvCachedMapDiskImage`/`gbUsingCachedMapDataRightNow` (CM↔renderer) | `cm_load.cpp:568,570` | `Engine.cm: mp/engine/qcommon::CollisionWorld` (renderer half → DEC-01) | `CM_LoadMap_Actual` | `&mut Engine` |
 | `sv_worldSectors[64]`/`sv_numworldSectors` | `sv_world.cpp:58-59` | `Server.world_sectors` (**instance-shaped value**, STATE-D2) | `SV_ClearWorld` | `&mut Engine.sv`; the Chain-A disjoint field |
 
@@ -359,7 +372,7 @@ globals below plus the `cvars`/`cmd`/`cbuf`/`fs`/`net` sub-structs.
 | `cl` (`clientActive_t`) | `cl_main.cpp:105` | `Client.cl: clientActive_t` — **reuse the existing mechanically-ported type** (`crates/mp/engine/client/src/client/client_active_t.rs:16`), not a new type; snapshots, baselines, parseEntities, cmds, gameState, `mSharedMemory` | `CL_ClearState` | `&mut Engine.cl` |
 | `clc` (`clientConnection_t`) | `cl_main.cpp:106` | `Client.clc: clientConnection_t` — **reuse the ported type** (`client_connection_t.rs:46`); netchan, reliable rings, download/demo, RMG heightmaps | `CL_Connect_f` | `&mut Engine.cl` |
 | `cls` (`clientStatic_t`) | `cl_main.cpp:107` | `Client.cls: clientStatic_t` — **reuse the ported type** (`client_static_t.rs:45`); connstate, keyCatchers, browser lists, glconfig copy | `CL_Init` | `&mut Engine.cl` |
-| `kg` (`keyGlobals_t`) | `cl_keys.cpp:22` | `Client.keys: KeyState` (Raven already pre-bundled — the model shape) | `CL_Init` | `&mut Engine.cl` |
+| `kg` (`keyGlobals_t`) | `cl_keys.cpp:17` | `Client.keys: KeyState` (Raven already pre-bundled — the model shape) | `CL_Init` | `&mut Engine.cl` |
 | `chatField`/`chat_team`/`chat_playerNum` | `cl_keys.cpp:12-15` | `Client.chat` | `CL_Init` | `&mut Engine.cl` |
 | `con` (`console_t`) / `scr_*` / debug graph | `cl_console.cpp:13`, `cl_scrn.cpp:9,318,510` | `Client.console` / `Client.screen` | `CL_Init`/`SCR_Init` | `&mut Engine.cl` |
 
@@ -397,7 +410,7 @@ These four engine subcrates exist in the crate graph (`mp/engine/{botlib,ghoul2,
 |---|---|---|---|---|
 | `level` (`level_locals_t`) | `g_main.c:9` | `GameWorld.level: mp_game::level::level_locals_t` | `G_InitGame` | `(world, id)` re-borrow |
 | `g_entities[MAX_GENTITIES]` | `g_main.c:27` | `GameWorld.entities: Box<[mp_qshared::common::mp::gentity_t; MAX_GENTITIES]>` (contiguous `#[repr(C)]`, size-asserted 1832B — reuse the existing type, §D12) | `G_InitGame` | `EntityId(u32)` index |
-| `MAX_GENTITIES` (sizes the array above) | `q_shared.h:1996,2004` | **`mp_qshared`** const per its oracle home + workspace-architecture tier table (Tier 0 qshared) — currently mis-placed in `mp_engine_server` (`crates/mp/engine/server/src/server/server_t.rs:21`) by the mechanical type-port; **relocated to `mp_qshared`** as a slice-0 wiring task (`mp_engine_server` re-imports it), no behavioral change | (compile-time const) | referenced, not threaded |
+| `MAX_GENTITIES` (sizes the array above) | `q_shared.h:1996` | **`mp_qshared`** const per its oracle home + workspace-architecture tier table (Tier 0 qshared) — currently mis-placed in `mp_engine_server` (`crates/mp/engine/server/src/server/server_t.rs:21`) by the mechanical type-port; **relocated to `mp_qshared`** as a slice-0 wiring task (`mp_engine_server` re-imports it), no behavioral change | (compile-time const) | referenced, not threaded |
 | `g_clients[MAX_CLIENTS]` (reached as `level.clients`) | `g_main.c:28` | `GameWorld.clients: Box<[mp_game::client::gclient_t; MAX_CLIENTS]>` (`gclient_t` = `gclient_s`, asserted 7344B; **MP only**) | `G_InitGame` | index |
 | `trap_LocateGameData` registration | `g_main.c:997` | registers `GameWorld` base+stride into the engine's `SharedGameData` (§Seam) | `G_InitGame` | raw seam (§D11) |
 
@@ -439,14 +452,21 @@ pub struct Engine {
     pub common: Common,          // type from mp_engine_qcommon (cvars, cmd, cbuf, fs, net)
     pub sv: Option<Server>,      // type from mp_engine_server — Some when a server is running
     pub cl: Option<Client>,      // type from mp_engine_client — Some on client builds; None on dedicated
-    pub cm: CollisionWorld,      // type from mp_engine_qcommon — cmg + SubBSP, instance-shaped value
+    pub cm: CollisionWorld,      // type from mp_engine_qcommon — cmg + SubBSP, instance-shaped value.
+                                 //   NOT an Option: `Engine::new` builds it zero/Default-initialized
+                                 //   (mirroring Raven's static zero-init of file-scope `clipMap_t cmg`,
+                                 //   `cm_load.cpp:37`; §A2 faithful), present-but-empty before any map;
+                                 //   CM_LoadMap then POPULATES it in place. The master table's
+                                 //   "constructed by CM_LoadMap" means populate-in-place, not first
+                                 //   existence — a zeroed CollisionWorld exists from `Engine::new`.
     pub snd: Option<SoundSystem>,// type from mp_engine_client — client only; None on dedicated,
                                  //   the same `Option`-for-client-presence shape as `cl`.
                                  //   S_Init is reached only through the client-init path, gated
                                  //   `!com_dedicated` (`common.cpp:1394,1680`; S_Init
                                  //   `cl_main.cpp:1380,2461`), so a dedicated server never
                                  //   constructs it — Slice 0 (dedicated) builds `snd: None`
-                                 //   (STATE-D1 amendment 2026-07-02).
+                                 //   (grounded in the cited gating + DEC-03; same Sound
+                                 //   master-table row).
     // botlib/ghoul2/icarus/rmg engine-side state is NOT yet a field here — those
     // four §F subcrates were outside the A2 survey; attachment point is STATE-Q2.
 }
@@ -457,6 +477,71 @@ The game dispatcher's `engine: &mut ServerGame` parameter (engine-seam,
 `Server`, carrying its `SharedGameData` registration. `ServerGame` is
 engine-seam's name for exactly that reborrowed host state; the two names denote
 the same value (kept consistent per that doc).
+
+### `com_init` / `com_frame` / `com_shutdown` / `com_error` — the `mp_engine_core` entry points (FROZEN HERE)
+
+The engine island's headline entry points are **defined in `mp_engine_core`** —
+the aggregate facade, the only engine crate that can reach both `Server` and
+`Client` (workspace-architecture § Dependency edges; STATE-D5). A leaf subcrate
+**cannot** host them: `mp_engine_server`'s deps are `mp_qshared`/
+`mp_engine_qcommon`/`mp_abi` only (no facade edge). `&mut Engine` threads **down**
+from here (STATE-D1); an orchestrator takes the whole `Engine` and hands each
+subsystem its narrower reborrow (`&mut Engine.sv` / `&mut Engine.cl`, master
+table) as it calls down.
+
+```rust
+// mp/engine/core (SP: sp/engine/core). Free functions on the facade.
+
+/// `void Com_Frame( void )` (`common.cpp:1593`). One host frame. Takes **no**
+/// frame-delta argument — `msec` is computed internally (`Com_ModifyMsec`,
+/// `common.cpp:1660`) before dispatching `sv_frame`/`cl_frame`
+/// (`common.cpp:1669,1711`). Hosts the DEC-08 `catch_unwind` that turns a
+/// `com_error` panic into print-and-continue (throw caught at `common.cpp:1762`).
+pub fn com_frame(engine: &mut Engine);
+
+/// `void Com_Shutdown( void )` (`common.cpp:1785`). Teardown of the owned
+/// subsystems is their `Drop` (§C9), not an explicit free.
+pub fn com_shutdown(engine: &mut Engine);
+```
+
+**`sv_frame`/`cl_frame` live in `mp_engine_core` too, not the leaf subcrates.**
+The two-island diagram's `sv_frame(&mut Engine)` takes the *whole* `Engine`
+because it both advances `Engine.sv` **and** issues `VM_Call(GAME_RUN_FRAME)`
+through the module-host dispatch (engine-seam) and, on non-dedicated builds, calls
+`cl_frame` — reaching server + client + seam, exactly the facade's remit. It is
+**not** definable in `mp_engine_server` (that needs `server → core`, the reverse
+of the real edge). `sv_frame` is the orchestrator; the narrower `&mut Engine.sv`
+the master table documents is what it hands to `Server`-internal functions as it
+calls down. (Mirrors oracle's `SV_Frame( int msec )`, `sv_main.cpp:826`, itself
+called only from `Com_Frame`.)
+
+**`com_init` and `Engine::new`.** `Engine` is instantiated by `Engine::new`
+(returns the one owned `Engine` value, STATE-D5); `com_init` runs Raven
+`Com_Init`'s boot body (the subsystem `*_Init` sequence, master table
+"constructed by"). Both live in `mp_engine_core`. Raven `Com_Init( char
+*commandLine )` (`common.cpp:1216`) parses that raw command line
+(`Com_ParseCommandLine`, `common.cpp:1230,397`) into `Common.cmdline`, so the raw
+command line enters this init pair. **Not fixed here — deferred to lifecycle.md
+(§ Non-goals, construction order):** the division of labor between `Engine::new`
+and `com_init`, and hence which of the two carries the command-line parameter.
+Slice 0 already depends on lifecycle.md for construction order (§ Slice hooks), so
+this rides along; STATE freezes only that `Engine::new -> Engine` yields the owned
+island and that all four `com_*` live in the facade.
+
+**`com_error`'s signature is partially frozen.** Its payload is fixed —
+`level: ErrorLevel` + a formatted `msg: String` (the `ComError` struct below;
+Raven `void QDECL Com_Error( int code, const char *fmt, ... )`, `common.cpp:249`,
+whose varargs are formatted caller-side into `msg`) — and it **diverges**, `-> !`
+via `panic_any(ComError)` after recovery (STATE-D3). Its **receiver is *not*
+frozen**: whether `com_error` takes `&mut Engine` — or reaches the cross-subsystem
+recovery some other way — is the unresolved **STATE-Q4** reachability question
+(§ Open questions), because the concrete deep throw sites are leaf-crate code that
+cannot reach the facade. Written against the settled parts only:
+
+```rust
+// mp/engine/core. Receiver PENDING STATE-Q4 (see Open questions).
+pub fn com_error(/* receiver: STATE-Q4 */ level: ErrorLevel, msg: String) -> !;
+```
 
 ### `GameWorld` — the one owned module-island instance (per mode)
 
@@ -498,14 +583,69 @@ pub struct GameWorld {
   cannot reach; the frozen struct references `mp_qshared::…::MAX_GENTITIES`, and
   relocating the const to its tier-correct home is a mechanical porting task for
   this slice (no behavioral change — the value is identical).
-- **`level`'s self-referencing pointers are construction-order detail
-  (non-goal → lifecycle.md).** `level_locals_t` carries the raw back-pointers
-  Raven wires with `level.gentities = g_entities` / `level.clients = g_clients`
-  (`g_main.c:979,984`); wiring them to alias the boxed `entities`/`clients`
-  arrays is boot sequencing, owned by lifecycle.md (§ Non-goals), not fixed here.
-  De-risking note: `level.gentities` is write-once/registration-only — never
-  indexed by game logic (0 hits for `level.gentities[` across `codemp/`), so it
-  is inert once wired (`level.clients`, by contrast, *is* the client access path).
+- **`level`'s self-referencing pointers — intra-`GameWorld` construction order.**
+  (Grounded in the oracle sequence cited below, `g_main.c:978-984`; not a separate
+  decision record.) `level_locals_t` carries the raw back-pointers Raven wires with
+  `level.gentities = g_entities` / `level.clients = g_clients` (`g_main.c:979,984`,
+  each immediately after its array is `memset`, `g_main.c:978,983`). The one
+  data-dependency this doc fixes: **heap-allocate the `entities`/`clients` boxes
+  first, then set `level.gentities`/`level.clients` to alias them** — the boxes
+  must exist before the pointers can name them (mirroring `g_main.c:978-984`). The
+  *broader* boot sequence (when `G_InitGame` runs relative to `SV_SpawnServer`,
+  the `ErrorLevel` teardown order) stays lifecycle.md's (§ Non-goals). De-risking
+  note: `level.gentities` is write-once/registration-only — never indexed by game
+  logic (0 hits for `level.gentities[` across `codemp/`), so it is inert once
+  wired (`level.clients`, by contrast, *is* the client access path).
+
+### `WorldCell` — where the one `GameWorld` lives across `vmMain` calls (STATE-D6, FROZEN HERE)
+
+The C module entrypoint `vmMain(command, args…)` takes **no context argument**,
+yet the single owned `GameWorld` must persist **and** be mutated across successive
+opaque calls (`GAME_INIT` builds it, `g_main.c:515,979`; `GAME_RUN_FRAME` mutates
+it, `g_main.c:3582`). It is reached through a `WorldCell` static in the module
+cdylib shell — the second sanctioned static exemption (STATE-D6), beside
+engine-seam's outbound `ENGINE: OnceLock<CEngine>` (SEAM-D1). Frozen shape:
+
+```rust
+// Module cdylib shell crate (crates/jampgame / crates/cgame / crates/ui; SP jagame).
+// Holds the module island's one owned GameWorld — a per-mode logical singleton,
+// exactly Raven's `level` (§B6). Identical shape in NativeDll, Static, and Wasm builds.
+// No logic crate names it; only the shell's vmMain reads/writes it (access confined below).
+static WORLD: WorldCell = WorldCell::new();
+
+struct WorldCell(UnsafeCell<Option<GameWorld>>);
+// SAFETY: the module runs single-threaded per Raven's contract; the ONLY reader/writer
+// is the vmMain dispatch below, so no cross-thread aliasing is possible.
+unsafe impl Sync for WorldCell {}
+```
+
+Access discipline — the only `unsafe` in the shell, confined per §D11:
+
+```rust
+// crates/jampgame shell. C entrypoint takes NO context arg, so the world is reached via
+// WORLD. GAME_INIT constructs it into the cell; every later command re-derives `&mut GameWorld`
+// from the cell and threads it inward — reborrow-threading (STATE-D1) from the seam down.
+#[no_mangle]
+pub extern "C-unwind" fn vmMain(command: c_int, /* args… */) -> c_int {
+    let world: &mut GameWorld = /* unsafe: &mut *WORLD.0.get(), the Option built at GAME_INIT */;
+    dispatch(command, world, /* args… */)
+}
+```
+
+- **Reentrancy is by design, not a hazard** (STATE-D6). The engine re-enters
+  `vmMain` from inside a syscall handler — `G_DROP_CLIENT` (`sv_game.cpp:570`) →
+  `SV_GameDropClient` (`sv_game.cpp:110-114`) → `SV_DropClient`
+  (`sv_client.cpp:580`) → `VM_Call(gvm, GAME_CLIENT_DISCONNECT)`
+  (`sv_client.cpp:640`), a fresh `vmMain` entry while the outer one is suspended
+  — so the re-derived `&mut GameWorld` aliases the world exactly as Raven's plain
+  `level`/`g_entities` globals did under the same chains. This is why the cell is a
+  raw `UnsafeCell` and **not** a `Mutex` (deadlocks on those chains) or `RefCell`
+  (panics on them): the safety argument is Raven's single-threaded sequencing, made
+  explicit at this one seam.
+- **`extern "C-unwind"`** (engine-seam SEAM-D10) so a `com_error` panic unwinds
+  through the live C frames of a re-entrant chain (STATE-D3).
+- The `EntityId` re-borrow discipline (below) applies to every access *inside*
+  `dispatch`, so no raw `gentity_t*` alias survives above the seam.
 
 ### `EntityId` — the entity handle (§B5)
 
@@ -528,6 +668,8 @@ pointer aliases survive in the safe tier above the seam.
 //   (1) the LocateGameData entity+client arrays, (2) the SET_SHARED_BUFFER command buffer.
 // Method set mirrors SV_GentityNum / SV_GameClientNum / SV_NumForGentity
 // (sv_game.cpp:46-65) and the sv.mSharedMemory registration (sv_game.cpp:940).
+// Stores the payloads of abi-traps.md row 18 (trap_LocateGameData) and
+// row 121 (trap_SV_RegisterSharedMemory); the trap *crossing* is engine-seam's.
 pub trait SharedGameData {
     // --- family 1: entity/client arrays (G_LOCATE_GAME_DATA) ---
     /// Register base+stride for the game's entity and client arrays. Called once
@@ -584,7 +726,10 @@ pub struct ComError {
 
 `ErrorLevel` is per-mode (MP `errorParm_t` vs SP's set) and is **frozen in
 `docs/architecture/lifecycle.md` (LIFE-D3, pending)**, not here; this doc only
-fixes the payload shape and the recovery-before-panic ordering (STATE-D3).
+fixes the payload shape and the recovery-before-panic ordering (STATE-D3). The
+`com_error` *function* signature (this payload as the panic value, `-> !`, and its
+still-open receiver) is in § `com_init`/`com_frame`/`com_shutdown`/`com_error`
+above — the receiver awaits STATE-Q4.
 
 ## Decisions
 
@@ -634,7 +779,12 @@ no current-module global at all (engine-seam SEAM-D1 eliminated `currentVM`).
 subsystem is already torn down when the throw starts; unwinding runs destructors
 and nothing else, so any across-call guard must clean up in `Drop`. *Rejected:*
 recovering *after* `catch_unwind` (would let the handler observe half-torn state);
-`Result`-threading (DEC-08 — reshapes thousands of faithful signatures).
+`Result`-threading (DEC-08 — reshapes thousands of faithful signatures). *Open:*
+the crate-graph mechanism by which a deep **leaf-crate** throw site (e.g.
+`SV_SvEntityForGentity`, `sv_game.cpp:70-75`, in `mp_engine_server`) reaches this
+facade-level recovery — `com_error` lives in `mp_engine_core`, which the leaf
+crate cannot depend on — is unresolved (**STATE-Q4**); it also fixes `com_error`'s
+receiver.
 
 **STATE-D4 — Globals collapse policy.** Cleanly-bounded subsystems become owned
 structs within the Engine island (`CvarSystem`, `CmdSystem`+`Cbuf` incl. owned
@@ -652,6 +802,42 @@ flagged `files_pc.cpp:2328` "static shadowing bug" is **dead comment text, not
 real code** — no shadowing behavior exists to model; the clause is dropped.
 *Rejected:* porting `TheZone` faithfully (§C9 — Rust ownership is the
 replacement); unifying MP/SP `cmd_functions` (DEC-04 — duplicate, don't unify).
+
+**STATE-D5 — `Engine`'s defining crate + instantiation (resolves STATE-Q1;
+session 2026-07-02).** `pub struct Engine` is **defined** in a new per-mode facade
+crate `crates/mp/engine/core` (package `mp_engine_core`; SP mirror
+`crates/sp/engine/core`, `sp_engine_core`) — the one crate depending on every
+engine subcrate, so it can name `Common`/`Server`/`Client`/… as fields
+(`mp_engine_qcommon` cannot reach the server+client crates). That facade crate
+also hosts `com_init`/`com_frame`/`com_shutdown`/`com_error` (they must reach
+server+client). `Engine` is **instantiated** by `Engine::new` from the thin
+`mp/app` (`sp/app`) bin shell; `&mut Engine` threads **down**, never a `static`.
+LIFE-D2 is amended accordingly in lifecycle.md; field sub-structs keep their own
+subcrate homes (§Seam Engine block). *Because* `mp/engine/` is seven independent
+subcrates with no aggregator, and a dedicated facade keeps `mp/app` a thin shell.
+*Rejected:* defining `Engine` in `mp/app` (the bin shell must stay thin, and
+`com_*` belong in a lib crate the modules can link, not the app binary).
+
+**STATE-D6 — `GameWorld` storage across `vmMain` calls (resolves STATE-Q3;
+session 2026-07-02).** The single owned `GameWorld` lives in a `WorldCell`
+**static** in the module cdylib shell crate (`crates/jampgame`/`crates/cgame`/
+`crates/ui`, SP `jagame`), beside engine-seam's outbound `ENGINE` cell — the
+**second** sanctioned static exemption to §D11/§B3, widening engine-seam SEAM-D1's
+"one static" to two module-shell cells. It is a per-mode logical singleton exactly
+like Raven's `level` (§B6). Unsafe access is confined to the shell's `vmMain`
+dispatch, which re-derives `&mut GameWorld` from the cell once per entry and
+threads it inward; same cell shape in all three transports (module-island state).
+**Reentrancy contract:** the engine genuinely re-enters `vmMain` from inside a
+syscall handler — `G_DROP_CLIENT` (`sv_game.cpp:570`) → `SV_GameDropClient`
+(`sv_game.cpp:110-114`) → `SV_DropClient` (`sv_client.cpp:580`) →
+`VM_Call(gvm, GAME_CLIENT_DISCONNECT)` (`sv_client.cpp:640`), a fresh `vmMain`
+entry while the outer one is live — so the re-derived `&mut GameWorld` aliases the
+world exactly as Raven's plain `level`/`g_entities` globals did under those same
+chains. *Because* the C `vmMain(command, args…)` entrypoint takes no context
+argument, so a mutable-across-calls owned value must be reachable without one, and
+those live re-entry chains alias it by design. *Rejected:* `Mutex` (deadlocks on
+those chains); `RefCell` (panics on them); a context-threaded entrypoint (the ABI
+is fixed — no context slot in `vmMain`).
 
 ## Verification strategy
 
@@ -680,20 +866,27 @@ slice-driven.
 
 ## Slice hooks
 
-- **Slice 0 (MP dedicated boot).** Constructs `Engine` with `common: Common` +
-  `sv: Some(Server)`, `cl: None`, `snd: None` (dedicated — no client, no sound)
-  in `main()`; `jampgame`'s `GAME_INIT`
-  builds `GameWorld` and issues **both** registrations —
-  `trap_LocateGameData` (`g_main.c:997`) and `trap_SV_RegisterSharedMemory`
-  (`g_main.c:920`) — dispatched into the `NativeDll` `SharedGameData` impl held in
-  `Server.sv` (native contract: cache base+stride / store buffer, return `0`).
-  **Where that `GameWorld` instance is stored so the subsequent `GAME_RUN_FRAME`
-  call reaches it is STATE-Q3 (open) — it must resolve before this slice runs past
-  `GAME_INIT`.**
-  Needs frozen here (and are): the `Engine`/`Server`/`GameWorld` shapes, `EntityId`,
-  the `SharedGameData` trait, and the `ComError` payload. Depends on
+- **Slice 0 (MP dedicated boot).** `Engine::new` (in `mp_engine_core`, called
+  from the thin `mp/app` bin shell, STATE-D5) builds `Engine` with all five
+  fields: `common: Common`, `cm: CollisionWorld` (zero/Default — no map loaded
+  yet in the dedicated-boot skeleton; the first `CM_LoadMap` populates it later,
+  mirroring `cmg`'s static zero-init, `cm_load.cpp:37`), `sv: Some(Server)`,
+  `cl: None`, `snd: None` (dedicated — no client, no sound); `&mut Engine` threads
+  down. `jampgame`'s `GAME_INIT` builds
+  the `GameWorld` **into the `WORLD` cell** (STATE-D6) and issues **both**
+  registrations — `trap_LocateGameData` (`g_main.c:997`) and
+  `trap_SV_RegisterSharedMemory` (`g_main.c:920`) — dispatched into the `NativeDll`
+  `SharedGameData` impl held in `Server.sv` (native contract: cache base+stride /
+  store buffer, return `0`). The subsequent `GAME_RUN_FRAME` re-derives
+  `&mut GameWorld` from that same cell (STATE-D6 access discipline).
+  Needs frozen here (and are): the `Engine`/`Server`/`GameWorld`/`WorldCell`
+  shapes, `EntityId`, the `SharedGameData` trait, the `ComError` payload, and the
+  `com_frame`/`com_shutdown` entry-point signatures (§ Seam). Depends on
   engine-seam.md for the dispatchers exercising these registrations (SEAM Slice 0)
-  and on lifecycle.md for construction *order* and `ErrorLevel` variants.
+  and on lifecycle.md for construction *order*, `ErrorLevel` variants, **and the
+  `Engine::new`/`com_init` command-line-parameter split** (§ Seam). `com_error`'s
+  receiver is not needed for the dedicated first-frame skeleton, which raises no
+  error — it is STATE-Q4.
 - **Later slices.** MP client adds `cl: Some(Client)` (+ `KeyState`, console) and
   `snd`; SP adds its `GameWorld` (no `clients`) and the `GetGameAPI` table
   register (SEAM-D2); the WASM `SharedGameData` re-resolving impl lands after
@@ -703,50 +896,46 @@ slice-driven.
 ## Open questions
 
 The survey's own forks (dossier § Design forks 1–7) are all settled by
-STATE-D1..D4 or the cited ledger entries (DEC-04/05/07/08). The two cross-doc
+STATE-D1..D6 or the cited ledger entries (DEC-04/05/07/08). The two former
+structural gaps — the defining crate for `Engine` (was STATE-Q1) and where the
+owned `GameWorld` lives across `vmMain` calls (was STATE-Q3) — are resolved by
+STATE-D5 and STATE-D6 (escalation session 2026-07-02). The two cross-doc
 dependencies — the seam dispatchers (engine-seam.md) and the `ErrorLevel` enum
 plus construction order (lifecycle.md, LIFE-D3) — are scoped non-goals owned
-elsewhere, not unresolved decisions. Three structural questions surfaced during
-dry-run remain genuinely undecided and go back to a design session:
+elsewhere, not unresolved decisions. Two structural questions remain genuinely
+undecided and go back to a design session:
 
-- **STATE-Q1 — the defining crate for the aggregate `Engine` type.** `Engine`
-  is *instantiated* in `main()` (`mp/app`), but where the `pub struct Engine`
-  type is *defined* is unfixed: `mp/engine/` is a directory of seven independent
-  subcrates (`qcommon`/`server`/`client`/`botlib`/`ghoul2`/`icarus`/`rmg`, each
-  its own `Cargo.toml`, none depending on all the others), so there is no
-  `mp/engine` crate to hold it. The aggregate needs a crate depending on every
-  engine subcrate; `mp/app` (already depends on qcommon+server+client) is the
-  one existing candidate, but a dedicated `mp/engine` facade crate is equally
-  admissible. Picking one is a workspace-shape decision, not derivable from
-  oracle (Raven is C, no crates). STATE-D1's reborrow-threading and the frozen
-  field list hold under either.
-- **STATE-Q2 — `Engine`-island attachment for the four §F subcrates.** botlib,
-  ghoul2, icarus, and rmg have real engine-side Raven globals but were outside
-  the A2 survey (dossier §1 censused only qcommon/server/client/sound/renderer;
-  these appear there as readers, not owners). Their internal ownership is
-  designed in their own §F subsystem docs (porting-rules §F, GP2 precedent), but
-  whether/how their engine-side state becomes fields of `Engine` — especially
-  ghoul2, shared engine↔cgame — is undecided. Placeholdered in the master table;
-  resolve alongside those §F docs.
-- **STATE-Q3 — where the one owned `GameWorld` instance is stored across
-  `vmMain` calls in a `NativeDll` module.** This doc freezes `GameWorld`'s
-  *shape* and that it is "one owned value, not a global" (STATE-D1/D2), but for a
-  real separately-loaded DLL image the C entrypoint `vmMain(command, args…)`
-  takes **no context argument**, while the single `GameWorld` must both persist
-  and be **mutated** across successive opaque calls (`GAME_INIT` builds it,
-  `g_main.c:515,979`; `GAME_RUN_FRAME` mutates it, `g_main.c:3582`). The obvious
-  homes are all closed off: porting-rules §B3 forbids `static mut`/hidden globals
-  in the module tree, STATE-D1 forbids `RefCell`, and the § Verification-strategy
-  gate sanctions exactly one static in these trees — engine-seam's
-  `OnceLock<CEngine>` (SEAM-D1), which holds the *outbound syscall pointer*, not
-  world state, and SEAM-D1 states "No other seam global". A mutable-across-calls
-  owned value reached from a context-free `vmMain` needs either a second
-  sanctioned module-shell cell (widening SEAM-D1's §B6 exception — Raven's `level`
-  is exactly such a per-mode logical singleton, §B6) or another mechanism; which,
-  and how it satisfies "mutated across calls" without `static mut`/`RefCell`, is
-  **not derivable from oracle** (Raven uses plain mutable module globals, which
-  §B3 rejects) **nor from any settled decision**. It is **needed by Slice 0**:
-  the `GAME_RUN_FRAME` call must reach the `GameWorld` that `GAME_INIT` built
-  (engine-seam SEAM-D7). Escalated to a design session; natural home is this doc
-  in concert with engine-seam SEAM-D1 (the module-shell state). The frozen
-  `GameWorld`/`EntityId` shapes hold under any storage answer.
+- **STATE-Q4 — `com_error`'s recovery reachability across the crate graph (and
+  hence its receiver).** *Owner: escalate to a design session (touches STATE-D3,
+  STATE-D5, DEC-08).* STATE-D3 requires `com_error` to run the full cross-subsystem
+  recovery (`SV_Shutdown` → `GAME_SHUTDOWN` dispatch + `VM_Free`,
+  `CL_Disconnect`/`CL_FlushMemory`, `common.cpp:313-326`) **synchronously before**
+  panicking, and rejects recovering after `catch_unwind`. `com_error` is hosted in
+  the `mp_engine_core` facade (STATE-D5), which can reach `Server` + `Client`. But
+  the cited concrete deep throw sites — e.g. `SV_SvEntityForGentity` firing
+  `ERR_DROP` several native frames deep inside a live `GAME_RUN_FRAME`
+  (`sv_game.cpp:70-75`) — are **leaf-crate** code in `mp_engine_server`, which does
+  **not** depend on the facade (its deps are `mp_qshared`/`mp_engine_qcommon`/
+  `mp_abi`; workspace-architecture § Dependency edges), so such a site **cannot
+  call the recovery-running `com_error`**, and threading a full `&mut Engine` down
+  to every potential error site contradicts the master table's `&mut Engine.sv`/
+  `&mut Engine.cl` per-subsystem scoping. The mechanism is undecided: (a) thread
+  the full `&mut Engine` to error-capable sites; (b) inject a recovery
+  callback/trait handle into `Server`/`Client`; (c) have leaf sites raise a
+  **narrow** panic that a facade-level guard converts into recovery-then-rethrow
+  (which pushes recovery *after* the first unwind — in tension with STATE-D3); or
+  (d) amend STATE-D3. Its resolution also fixes `com_error`'s receiver signature
+  (§ Seam, left `PENDING STATE-Q4`). This is **not** a subsystem-internals
+  non-goal — it is exactly the STATE-D1/D3 threading contract, surfaced by the
+  doc's own Chain-B worked example.
+
+- **STATE-Q2 — `Engine`-island attachment for the four §F subcrates.**
+  *Owner: the per-subsystem C++-track design docs
+  (`docs/subsystems/{botlib,ghoul2,icarus,rmg}.md`).* botlib, ghoul2, icarus, and
+  rmg have real engine-side Raven globals but were outside the A2 survey (dossier
+  §1 censused only qcommon/server/client/sound/renderer; these appear there as
+  readers, not owners). Their internal ownership is designed in their own §F
+  subsystem docs (porting-rules §F, GP2 precedent), but whether/how their
+  engine-side state becomes fields of `Engine` — especially ghoul2, shared
+  engine↔cgame — is undecided. Placeholdered in the master table; resolve
+  alongside those §F docs.

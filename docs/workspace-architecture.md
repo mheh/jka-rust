@@ -74,6 +74,11 @@ crates/
     bg/                      # Tier 1: codemp/game/bg_*
     uishared/                # Tier 2: codemp/ui/ui_shared
     abi/                     # MP engine<->module seam (dllEntry/vmMain surfaces)
+    engine-select/           # mp_engine_select binding leaf: the one cfg'd
+                             #   `pub type Engine` alias (wasm32 by target_arch;
+                             #   Static by feature "static"; default CEngine/
+                             #   NativeDll). Logic crates import it so `mod trap`
+                             #   stays non-generic and cfg-free (SEAM-D13).
     game/                    # mp_game logic (transport-agnostic; jampgame shell wraps it)
     cgame/                   # mp_cgame logic (transport-agnostic; cgame shell wraps it)
     ui/                      # mp_ui logic (transport-agnostic; ui shell wraps it)
@@ -121,9 +126,10 @@ Module logic crates (per mode; transport-agnostic — no ABI/cdylib concerns):
 
 | Crate | Depends on |
 | --- | --- |
-| `mp/game` | `mp/qshared`, `mp/bg`, `mp/abi` |
-| `mp/cgame` | `mp/qshared`, `mp/bg`, `mp/uishared`, `mp/abi` |
-| `mp/ui` | `mp/qshared`, `mp/bg`, `mp/uishared`, `mp/abi` |
+| `mp/game` | `mp/qshared`, `mp/bg`, `mp/abi`, `mp/engine-select` |
+| `mp/cgame` | `mp/qshared`, `mp/bg`, `mp/uishared`, `mp/abi`, `mp/engine-select` |
+| `mp/ui` | `mp/qshared`, `mp/bg`, `mp/uishared`, `mp/abi`, `mp/engine-select` |
+| `mp/engine-select` | `abi-transport` (concrete `CEngine`/`Static` backends) |
 | `mp/bg` | `mp/qshared` |
 | `mp/uishared` | `mp/qshared`, `mp/bg` |
 | `mp/abi` | `abi-transport`, `mp/qshared` |
@@ -142,6 +148,17 @@ live entrypoint exports, and the `Dispatch` match:
 
 SP `cgame`/`ui` have no separate shell — they are statically linked into
 `sp/app` behind the vmachine shim (DEC-07).
+
+Per-build transport selection (SEAM-D13): `mp/engine-select` owns the single
+cfg'd `pub type Engine` alias — `cfg(target_arch = "wasm32")` picks the wasm
+backend, Cargo feature `static` picks `Static`, default is `CEngine`
+(`NativeDll`); shells select it (`jampgame` et al. take the default, a
+static-linking engine build enables `static`). Known cost: NativeDll and Static
+shells on the same host triple cannot share one feature-unified
+`cargo build --workspace` graph — those builds go per-package. SP needs no
+select crate: `sp/game`'s `mod gi` binds the `game_import_t` table directly
+(SEAM-D2, always native) and SP `cgame`/`ui` are always `Static` — their
+aliases are fixed.
 
 Engine (per mode): `mp/engine/*` depend on `mp/qshared`, `abi-transport`, and
 `native/*`; `ghoul2` is depended on by both `engine/*` and `cgame` (Raven shares

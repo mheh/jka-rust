@@ -25,13 +25,19 @@ Links only — never restated here. MP tree = `oracle/oracle/codemp/`, SP tree =
   This doc supplies the boot order that reaches those dispatchers.
 - `docs/architecture/module-loading.md` — **LOAD-D5** (the per-slot
   `ModuleRegistry` the `Com_Init` step-30 `VM_Init` constructs — default-constructed
-  empty — and **LOAD-Q3**, its `load_module` fill-signature, open). This doc names
-  the empty-registry construct as a boot step; that doc owns its shape + crate home.
+  empty — and **LOAD-D8**, which froze its `load_module` fill-signature —
+  `ModuleRegistry::load_module(&mut self, policy, name, syscall) -> SlotId`,
+  resolving the former LOAD-Q3, 2026-07-02). This doc names
+  the empty-registry construct as a boot step; that doc owns its shape. Its **crate
+  home is `mp_engine_qcommon`** (fixed by the engine-seam session resolution, not
+  `Engine`'s crate — the two were decoupled 2026-07-02).
 - `docs/architecture/state-ownership.md` — STATE-D1/D2 (islands, `GameWorld`),
   **STATE-D3** (recovery runs synchronously *before* `panic_any`; the same
   contract this doc renders as flow — cross-ref, not restated), the `Common`
-  field shapes this doc times, the `ComError` payload, and **STATE-Q1** (the
-  aggregate `Engine` type's defining crate, still open).
+  field shapes this doc times, the `ComError` payload, and **STATE-D5** (the
+  aggregate `Engine` type — and the per-mode facade crate that defines it,
+  `crates/{mp,sp}/engine/core` = `mp_engine_core`/`sp_engine_core`; the former
+  STATE-Q1, resolved 2026-07-02).
 - `docs/dossiers/A3-lifecycle.md` — the survey this doc renders.
 
 ## Scope & non-goals
@@ -43,7 +49,8 @@ order, the error-recovery *flow* (per-level sequences and the panic boundary),
 the event pump and its winit/console adapters, timing (`Sys_Milliseconds`,
 FPS-cap spin, `Com_ModifyMsec` clamps), journaling, and binary packaging. It
 **freezes** the per-mode `ErrorLevel` (LIFE-D3, = the existing `errorParm_t`),
-the `com_*` seam signatures, and the `SysEventQueue` surface.
+the `com_*` seam signatures, the `sys_milliseconds` base-relative clock-read
+signature (LIFE-D4b), and the `SysEventQueue` surface.
 
 **Non-goals** (each punted to its owning doc):
 
@@ -106,6 +113,21 @@ Three headline corrections from the survey shape every contract below:
   then `while(1)`: `IN_Frame` + **`Com_Frame`** (`:1211`), `Sleep(5)`/`Sleep(50)`
   when minimized/inactive. **No `NET_Init` in SP's entry point.**
 
+**Rust construction ordering (all three mains).** Raven's `WinMain`/`main` reads
+`Sys_Milliseconds()` for a warm-up *before* `Com_Init`, relying on the C static
+`sys_timeBase` being captured lazily on that first call (`win_shared.cpp:22-34`).
+The Rust mains **construct `Engine` first** — `Engine::new()` captures the
+`std::time::Instant` base into `Engine.common` (LIFE-D4b) — **then** perform the
+warm-up `Sys_Milliseconds` read, **then** call `com_init(&mut engine, cmdline)`.
+This is behaviorally equivalent to Raven **for the base-relative reads**
+(`baseTime=false`): the warm-up read and every later frame-time read yield the same
+series regardless of *when* the base is captured, and this is the ordering the
+slice-0 `main()` skeleton renders (§ Slice hooks). The **raw variant**
+(`baseTime=true`, Raven's `Rand_Init` seed) is *not* base-relative — it returns an
+absolute clock value with no Instant-backed equivalent, an open gap tracked at
+**LIFE-Q3** (below). Construction before `com_init` is forced anyway: `com_init`
+threads `&mut Engine`.
+
 ### MP `Com_Init` — 42-step boot contract
 
 `common.cpp:1216-1442`, body wrapped `try { … } catch (const char* reason)
@@ -153,13 +175,22 @@ are marked **[ded]**.
     its `{ slots: [Option<LoadedModule>; MAX_VM] }` shape); the `vm_*` cvars become
     the module transport-select cvars (module-loading territory). "Registration
     only" for slice 0 = construct that empty registry + register those cvars — a
-    `ModuleRegistry::default()`-shaped empty build. Its **crate home is the engine
-    module-host state, a field of the engine island gated by SEAM-Q8/STATE-Q1
-    exactly like `Engine` itself**, so the `use` path (not the empty-construct
-    shape) rides that cross-doc blocker (§ Slice hooks), not a lifecycle-inventable
-    item. The `load_module` signature that later fills the registry is
-    module-loading **LOAD-Q3** (open) and is not exercised until `SV_SpawnServer`
-    loads the module (post-slice-0).
+    `ModuleRegistry::default()`-shaped empty build. Its **crate home is
+    `mp_engine_qcommon`** (fixed by the engine-seam session resolution; decoupled
+    from `Engine`'s crate — the registry lives a tier below the `mp_engine_core`
+    facade that owns `Engine`), so the empty-construct shape is a settled boot step.
+    **Where the registry hangs off `Engine`** (the accessor field/path the boot step
+    stores it into) is **not named here**: state-ownership.md's frozen `Engine`
+    struct (STATE-D5) is `{ common, sv, cl, cm, snd }` with no registry field, and
+    module-loading.md **LOAD-D5** owns `ModuleRegistry` (its owner table fixes
+    `ModuleRegistry.slots`, not an `Engine.<field>: ModuleRegistry` attachment). The
+    attachment slot is therefore an Engine-field / module-host detail owned by those
+    two docs — the same class of cross-doc dependency as `Engine::new`'s per-field
+    build (§ Slice hooks, Cross-doc blockers), not a lifecycle decision and not
+    invented here. The `load_module` signature that later fills the registry is
+    module-loading **LOAD-D8** (`ModuleRegistry::load_module -> SlotId`, frozen
+    2026-07-02, resolving the former LOAD-Q3) and is not exercised until
+    `SV_SpawnServer` loads the module (post-slice-0).
 31. `SV_Init()` — `:1385` (serverinfo/systeminfo cvars, operator commands).
 32. `com_dedicated->modified = qfalse` — `:1393`.
 33. **`if (!com_dedicated->integer) { CL_Init(); Sys_ShowConsole(…); }`** —
@@ -327,9 +358,12 @@ takes no arg:
 
 - **`Sys_Milliseconds`** — MP `win_shared.cpp:22-34`: `timeGetTime()` minus a
   static `sys_timeBase` (captured at first call); `baseTime=true` skips the
-  subtraction (used at `Rand_Init(Sys_Milliseconds(true))`, `common.cpp:1248`).
-  SP `code/win32/win_shared.cpp:17-25`: `int Sys_Milliseconds(void)`, no raw
-  variant.
+  subtraction, returning the raw **absolute** `timeGetTime()` value (its sole use is
+  `Rand_Init(Sys_Milliseconds(true))`, `common.cpp:1248`, seeding the RNG from that
+  large run-varying value). Reproducing that absolute value under the
+  Instant-backed clock (LIFE-D4b, which exposes no absolute epoch) is unspecified —
+  **LIFE-Q3**. SP `code/win32/win_shared.cpp:17-25`: `int Sys_Milliseconds(void)`,
+  no raw variant.
 - **`Com_ModifyMsec` clamps** — MP `common.cpp:1534-1578`: `com_fixedtime`
   overrides; else `msec *= com_timescale` (floor `1` when timescale nonzero);
   ceiling = dedicated **5000** (+"Hitch warning" if msec>500) / remote-server
@@ -389,14 +423,24 @@ no-ops; `null_client.cpp:9-66`). **SP has no such stubs** (`code/null/` lacks
 
 Per DEC-04 the tables are per-mode; MP shown, SP mirror under `sp/engine/*`
 (deltas: no journaling, no `dedicated`, no rapid-error escalation). The
-**lifecycle-owned** rows below extend `Common` (`mp/engine/qcommon`).
-`state-ownership.md`'s master table fixes only their **owner** (`Common.field`);
-the internal field *types* are qcommon subsystem detail (state-ownership treats
-each owned struct's field list as a non-goal), i.e. mechanical §C ports of the
-cited Raven globals — **not** independently "frozen" elsewhere, so they are stated
-inline here so a slice-0 skeleton can build:
+**lifecycle-owned** rows below extend `Common` (`mp/engine/core`'s `common`
+module, LIFE-D2 amendment). `state-ownership.md`'s master table fixes only their
+**owner** (`Common.field`); the internal field *types* are `common`-module
+subsystem detail (state-ownership treats each owned struct's field list as a
+non-goal), i.e. mechanical §C ports of the cited Raven globals — their file/struct
+layout is pinned mechanically in § Seam (the `common/` submodule tree), not
+independently "frozen" elsewhere, and stated inline here so a slice-0 skeleton can
+build:
 
 - `frame_{time,msec,number}: i32` — Raven `int` (`common.cpp:79-81`).
+- `frame_last_time: i32` — the `Com_Frame` `static int lastTime` (MP `common.cpp:1601`
+  / SP `:1274`), the previous-frame timestamp the FPS-cap spin subtracts (`msec =
+  com_frameTime - lastTime`, § `Com_Frame` step 5) and rewrites at step 6; a §B3 hoist
+  of a function static into `Common` (no statics).
+- `fully_initialized: bool` — Raven `qboolean com_fullyInitialized` (MP `common.cpp:84`
+  / SP `:69`), set true at `Com_Init` step 40 (MP `:1434` / SP `:1104`) and read by
+  `Com_WriteConfiguration` (§ `Com_Frame` step 1) to suppress config writes on a
+  partial-init quit (MP `:1479` / SP `:1162`).
 - `error` — `entered: bool` (`qboolean`) + `message: [u8; MAXPRINTMSG]`
   (`char[MAXPRINTMSG]`, `MAXPRINTMSG=4096`, `common.cpp:18,83,86`) + **MP-only**
   `last_error_time: i32`/`error_count: i32` (the rapid-error statics
@@ -413,11 +457,13 @@ and **mutation points** (the `Com_Frame`/`Com_Error` sites that write them). Own
 | Raven global | oracle cite | Rust owner | constructed by | mutated at |
 |---|---|---|---|---|
 | `com_frameTime`/`com_frameMsec`/`com_frameNumber` | MP `common.cpp:79-81` | `Common.frame_{time,msec,number}: i32` (types: preamble) | `Com_Init` step 34 (MP `:1402`) | `Com_Frame` 5/7/12 |
+| `Com_Frame` `static int lastTime` (FPS-spin delta base) | MP `common.cpp:1601` / SP `:1274` | `Common.frame_last_time: i32` (§B3 hoist of a fn static) | `Com_Init` (0) | `Com_Frame` 5 reads / 6 writes (MP `:1656`) |
+| `com_fullyInitialized` | MP `common.cpp:84` / SP `:69` | `Common.fully_initialized: bool` (`qboolean`) | `Com_Init` (false) | set true `Com_Init` step 40 (MP `:1434`); read `Com_WriteConfiguration` (`Com_Frame` 1, MP `:1479`) |
 | `com_errorEntered`/`com_errorMessage[4096]` | MP `common.cpp:83,86` | `Common.error` (`entered: bool`/`message: [u8;4096]`, preamble) | `Com_Init` | `Com_Error` entry/branch clears — STATE-D3 |
 | MP rapid-error `lastErrorTime`/`errorCount` (100ms/3 escalation) | MP `common.cpp:251-252` | `Common.error` **MP-only fields** (rule §B3 — no statics) | `Com_Init` | `Com_Error` `:277-286` |
 | `com_journalFile`/`com_journalDataFile` | MP `common.cpp:34-35` | `Common.journal` (**MP only**) | `Com_Init` step 13 `Com_InitJournaling` | `Com_GetRealEvent` tap |
 | `eventQue[256]`/`eventHead`/`eventTail` (`Sys_QueEvent` ring) | MP `win_main.cpp:1162-1166` | `Common.sys_events: SysEventQueue` (**new; distinct from the 1024 `com_pushedEvents`**) | `Com_Init` (empty ring) | winit/console adapters `queue()`; `Sys_GetEvent` drains |
-| `sys_timeBase` (Sys_Milliseconds base) | MP `win_shared.cpp:22-34` / SP `:17-25` | `native/platform` monotonic clock (Instant base) — **constructed at the warm-up point (MP `win_main.cpp:1545`), before `Com_Init` and before `Engine`, so it is NOT an `Engine` field and needs no pre-existing Engine** (Raven captures the static base lazily on first call, `win_shared.cpp:22-34`); "threaded via `Engine`" = Engine holds a handle to the already-constructed platform clock. Exact field placement is a platform-doc detail (LIFE-D4b); Engine's handle to it is part of the STATE-Q1 construction (§ Slice hooks). No ordering paradox. | entry-point warm-up (MP `win_main.cpp:1545`) | read-only after capture |
+| `sys_timeBase` (Sys_Milliseconds base) | MP `win_shared.cpp:22-34` / SP `:17-25` | `Common` field holding the `std::time::Instant` base — **captured inside `Engine::new()`** (LIFE-D4b), which runs first in `main()`, so the base exists before the warm-up read and before `com_init`. Behaviorally equivalent to Raven's lazy static capture on the first `Sys_Milliseconds` call (`win_shared.cpp:22-34`) **for the base-relative reads** (`baseTime=false`), which yield the same series regardless of capture time; the raw `baseTime=true` variant is *not* base-relative and has no Instant-backed equivalent (LIFE-Q3). Exact field placement/name is a `common`-module mechanical detail (LIFE-D4b). | `Engine::new()` (before warm-up read + `com_init`) | read-only after capture |
 
 Everything else the A3 survey touched (`sv`/`svs`, `cl`/`clc`/`cls`, cvar/cmd/fs
 tables, sound, module VM handles) is owned by **state-ownership.md** — see its
@@ -425,36 +471,42 @@ master table; not duplicated here.
 
 ## Seam definition
 
-FROZEN — porters fill bodies without changing these shapes. Per LIFE-D2 the three
-`com_*` functions are ported **per-mode** into `mp/engine/qcommon` /
-`sp/engine/qcommon`; there is **no shared `Lifecycle` trait**. `Engine` is the
-aggregate engine-island struct (state-ownership STATE-D1; its defining crate is
-STATE-Q1, open — these signatures hold under either home).
+FROZEN — porters fill bodies without changing these shapes. Per LIFE-D2 (amended
+2026-07-02) the four `com_*` functions are ported **per-mode** into
+`crates/{mp,sp}/engine/core` (`mp_engine_core` / `sp_engine_core`) — **not** the
+qcommon crates, because `com_frame` must call `SV_Frame`/`CL_Frame`, which qcommon
+cannot reach; there is **no shared `Lifecycle` trait**. `Engine` is the aggregate
+engine-island struct (state-ownership STATE-D1); its defining crate is
+**`mp_engine_core`** (STATE-D5, the former STATE-Q1 resolved 2026-07-02).
 
-**What STATE-Q1 blocks vs. what is pinned.** These signatures freeze regardless of
-STATE-Q1. What STATE-Q1 (cross-doc, open) still gates is the *concrete* `use
-Engine` import path, hence `mp/app`'s `[dependencies]`/`[features]` edges and the
-`dedicated`-feature client-tier exclusion (§ Binary packaging) — none derivable
-from oracle (Raven is C, no crates), all resolving when STATE-Q1 does. **Pinned
-now** (settled elsewhere, not blocked): the `com_*` free functions port from
-`common.cpp` into the **new `common` module** of `mp_engine_qcommon` that
-state-ownership.md adds (alongside `cm`/`files`/`gp2`/…); CLAUDE.md's
-one-type-per-file rule governs *types* — `Common`, `SysEventQueue`, `Journal` each
-get their own file — while the free `com_*`/`Com_*` lifecycle functions ported from
-one `.cpp` colocate in that module (a `common/lifecycle.rs` submodule is the
-mechanical layout, not an architectural choice). Only **these three** types get a
-file: the `error` and `frame_{time,msec,number}` field groups in the § State
-ownership table are **`Common`'s own fields, not separate types** — there is **no
-`ErrorState` type**; grouping `error`'s subfields into an inline sub-struct is
-itself a mechanical, not file-owning, choice (state-ownership.md fixes their owner
-as `Common.error` and treats the field list as subsystem detail). The **exact
-submodule filenames are the porter's mechanical choice, not frozen**: one-type-per-file
-yields a file each for `Common`/`SysEventQueue`/`Journal` and the free
-`com_*`/`Com_*` fns colocate in a `lifecycle.rs`-shaped submodule; a dry-run need
-not treat any specific filename set (e.g. an `error.rs`) as a doc-frozen list.
+**What STATE-D5 settles vs. what stays app-crate mechanical.** `Engine`'s crate is
+now fixed (`mp_engine_core`), so the `use Engine` import path is pinned; every
+`&mut Engine`-threading function above (the `com_*` surface, its private helpers,
+and `com_printf`) lives in `mp_engine_core` with it — nothing below `core` can name
+`Engine`. What is **not** oracle-derivable and stays an `mp/app`-crate mechanical
+detail (Raven is C, no crates) is the exact `[features] dedicated = […]` +
+dependency edges that compile-exclude the client tier from `jampded`
+(§ Binary packaging) — an app-crate wiring choice, not a lifecycle or STATE-D5
+blocker. **File tree — pinned mechanically (not architectural):** the
+`com_*` free functions and the lifecycle-owned state types port from `common.cpp`
+into a **`common/` module of `mp_engine_core`** with this submodule tree —
 
-`com_printf` is the qcommon `Com_Printf` port (`mp/engine/qcommon`,
-`common.cpp:128`); `sys_error` is `Sys_Error` (declared `qcommon.h:966`,
+- `common.rs` — the `Common` struct;
+- `sys_event_queue.rs` — `SysEventQueue` (below);
+- `journal.rs` — `Journal` (MP only);
+- `error.rs` — `struct ErrorState { entered, message, last_error_time, error_count }`
+  (the `Common.error` field group, § State ownership; `last_error_time`/`error_count`
+  are MP-only);
+- `lifecycle.rs` — the free `com_*`/`Com_*` functions ported from the one `.cpp`.
+
+This tree is a **mechanical** layout (CLAUDE.md one-type-per-file for the structs +
+one colocated fns file), **not** an architectural decision — a dry-run renders it
+verbatim rather than inventing filenames.
+
+`com_printf` is the `Com_Printf` port. It threads `&mut Engine`, so per STATE-D5 it
+lives in `mp_engine_core` (`lifecycle.rs`, `common.cpp:128`), **not** qcommon —
+Raven's most-called primitive rides up to the facade crate with `Engine`;
+`sys_error` is `Sys_Error` (declared `qcommon.h:966`,
 implemented in the platform entry shell — `win32/win_main.cpp:350`, dedicated
 `null/win_main.cpp:324` → `mp/app`'s `sys` layer). Both are **slice-0
 deliverables** (unported today), like `errorParm_t`/`sysEvent_t` are pre-existing
@@ -474,19 +526,29 @@ pub fn com_printf(engine: &mut Engine, msg: &str);
 pub fn sys_error(engine: &mut Engine, msg: &str) -> !;
 ```
 
-Like the four `com_*` above, these shapes hold under either STATE-Q1 resolution;
-what stays open is the concrete crate wiring — for `sys_error` specifically the
-qcommon→app-shell **reverse dependency** (it is *declared* in `qcommon.h` but
-*implemented* in `mp/app`'s platform shell, so `com_init` in `mp/engine/qcommon`
-reaching it is entangled with STATE-Q1's crate shape, § Slice hooks) — not the
-signatures.
+These signatures freeze as written. `com_printf` lives in `mp_engine_core` with the
+`com_*` surface (STATE-D5, above). `sys_error` is *declared* in `qcommon.h` but its
+Raven body is the platform entry shell (`win32/win_main.cpp:350`, dedicated
+`null/win_main.cpp:324`); because it now threads `&mut Engine` (crate `core`) yet
+does platform teardown owned by `mp/app`, `com_init` in `core` reaching it needs a
+seam — either `sys_error` lives in `core` delegating console-destroy/`exit` to lower
+platform primitives, or the app injects its body through `Engine`. That injection
+mechanism is an `mp/app`/platform-crate mechanical detail (same class as the
+`[features]` edges — not oracle-derivable, Raven is C), not a change to the frozen
+signature; it is surfaced as an open item (§ Open questions, LIFE-Q2).
 
 ### The `com_*` entry surface (per mode)
 
 ```rust
-// mp/engine/qcommon (SP mirror: sp/engine/qcommon). NOT a trait — per-mode fns.
+// mp/engine/core (mp_engine_core; SP mirror: sp/engine/core). NOT a trait — per-mode fns.
 // `errorParm_t` is the EXISTING ported enum (mp_qshared::errorParm_t, 5 variants;
 // sp_qshared::errorParm_t, 4 variants) — this is state-ownership's `ErrorLevel`.
+
+// state-ownership.md names the `ComError` level-field type `ErrorLevel` (its
+// `ComError { level: ErrorLevel, .. }`); lifecycle.md is where that name freezes
+// (LIFE-D3) as the per-mode `errorParm_t`. The alias makes the two spellings below
+// (`com_error(.., level: errorParm_t)` and `ComError.level: ErrorLevel`) one type:
+pub type ErrorLevel = errorParm_t;   // per-mode: MP 5-variant / SP 4-variant errorParm_t
 
 /// Raven `Com_Init` (MP `common.cpp:1216` / SP `:950`). Runs the boot contract;
 /// a ComError panic during init is caught here and escalated to fatal
@@ -528,8 +590,8 @@ pub fn com_frame(engine: &mut Engine) {
 `sys_error` (fatal), matching Raven's init catch. `ComError` and its recovery
 ordering are frozen in `state-ownership.md` (§ Seam, STATE-D3); this doc only
 names `errorParm_t` as its `level` type. Concretely, that frozen block is
-`pub struct ComError { level: ErrorLevel, msg: String }` in **`mp/engine/qcommon`**
-— the same crate as `com_frame`, so the `downcast::<ComError>()` above resolves the
+`pub struct ComError { level: ErrorLevel, msg: String }` in **`mp_engine_core`**
+— the same crate as `com_frame` (STATE-D5), so the `downcast::<ComError>()` above resolves the
 type locally with no cross-crate `use`. Those two fields are **exhaustive** (the
 `{level, msg}` the recovery snippet reads is the whole payload), and it needs **no
 derive**: a `panic_any`/`downcast` payload only requires `Any + Send + 'static`,
@@ -554,11 +616,40 @@ functions (all thread `&mut Engine` per STATE-D1):
   (`common.cpp:789-800`); that byte format is golden-diffed, not a typed API
   (§ Verification 1).
 
+### `sys_milliseconds` — the base-relative clock read (LIFE-D4b)
+
+FROZEN. Called by every `main()` warm-up read (§ Slice hooks) and internally
+wherever Raven reads `Sys_Milliseconds`/`Com_Milliseconds`. It threads `Engine`
+and reads the `std::time::Instant` base held in `Common` (§ State ownership,
+`sys_timeBase` row), returning `now − base` as the base-relative `i32` — pure
+`std` (no `timeGetTime`, no platform shell), so unlike `Sys_Init`/`Sys_Quit` it is
+**not** a LIFE-Q2 up-tier call and lives in `mp_engine_core`'s `common/` module
+with the `com_*` surface (STATE-D5). Receiver is `&Engine` (shared): the base is
+captured once in `Engine::new()` and never mutated afterward (§ State ownership).
+MP keeps Raven's `baseTime` bool, SP is `void` (LIFE-D4b, DEC-04). Because Rust has
+no default arguments, MP call sites pass the value explicitly — Raven's
+base-relative reads (the warm-up and every frame-time read) are `baseTime=false`
+(Raven's C++ default, `qcommon.h:978`); the `baseTime=true` raw-absolute path has
+no Instant-backed value (LIFE-Q3).
+
+```rust
+// mp_engine_core `common` module (SP mirror: sp_engine_core). Backs Sys_Milliseconds
+// with the Common-owned Instant base (LIFE-D4b); base-relative i32 API.
+// MP — Raven `int Sys_Milliseconds(bool baseTime = false)` (win_shared.cpp:22-34,
+// decl qcommon.h:978):
+pub fn sys_milliseconds(engine: &Engine, base_time: bool) -> i32;
+
+// SP mirror — Raven `int Sys_Milliseconds(void)` (win_shared.cpp:17-25,
+// decl qcommon.h:770); no raw variant (DEC-04):
+//   pub fn sys_milliseconds(engine: &Engine) -> i32;
+```
+
 ### `SysEventQueue` — the 256-entry `Sys_QueEvent` ring
 
 ```rust
-// mp/engine/qcommon (SP mirror). Faithful queue semantics of eventQue[256]
-// (win_main.cpp:1162-1203). NOT the 1024-entry com_pushedEvents ring.
+// mp/engine/core `common` module (SP mirror: sp/engine/core). Faithful queue
+// semantics of eventQue[256] (win_main.cpp:1162-1203). NOT the 1024-entry
+// com_pushedEvents ring.
 pub const MAX_QUED_EVENTS: usize = 256;
 
 pub struct SysEventQueue {
@@ -568,16 +659,34 @@ pub struct SysEventQueue {
 }
 
 impl SysEventQueue {
-    /// `Sys_QueEvent` (win_main.cpp:1178). `time==0` → stamp Sys_Milliseconds();
-    /// overflow drops the oldest (frees its evPtr). Called by the platform adapters.
-    pub fn queue(&mut self, time: i32, ty: sysEventType_t, value: i32, value2: i32,
-                 ptr: Option<Box<[u8]>>);
+    /// `Sys_QueEvent` (win_main.cpp:1178-1203). `time==0` → stamp the
+    /// caller-threaded `now_ms` (Raven's internal `Sys_Milliseconds()`); a nonzero
+    /// `time` is used as-is. Overflow drops the oldest (frees its evPtr — the
+    /// `Box`↔raw marshaling and its `unsafe` confinement is LIFE-Q4). Called by
+    /// the platform adapters.
+    ///
+    /// `now_ms` is threaded in — mirroring `get` — because the `Sys_Milliseconds`
+    /// Instant base lives in `Common`, not this queue (LIFE-D4b, § State ownership):
+    /// the queue is a pure ring that reaches no clock (§B3/§B4), so faithful
+    /// `time==0` stamping (Raven's `Sys_QueEvent` computes it internally) is fed the
+    /// value rather than reaching for it. Symmetric with `get`'s `now_ms`.
+    pub fn queue(&mut self, time: i32, now_ms: i32, ty: sysEventType_t, value: i32,
+                 value2: i32, ptr: Option<Box<[u8]>>);
     /// `Sys_GetEvent` reduced to a PURE ring-drain — NO OS pump inside (DEC-02
     /// inversion). Returns a synthesized `SE_NONE` stamped `Sys_Milliseconds()`
-    /// when empty (win_main.cpp:1270).
+    /// (the caller-threaded `now_ms`) when empty (win_main.cpp:1270).
     pub fn get(&mut self, now_ms: i32) -> sysEvent_t;
 }
 ```
+
+**Payload ownership / `evPtr` marshaling is unsettled — LIFE-Q4.** The frozen
+surface above (the `queue`/`get` signatures and the 256-entry ring) does **not**
+resolve how the owned `ptr: Option<Box<[u8]>>` payload is stored behind
+`sysEvent_t.evPtr` (`*mut c_void`), nor how the resulting `Box`↔raw round-trip
+(materialize on `queue`, free on overflow eviction / consumption) is confined
+against porting-rule §D11 — this queue lives in `mp_engine_core`, not literally
+the ABI seam. The public surface stays frozen; only the internal payload
+representation + its §D11 confinement is open. Escalated (§ Open questions).
 
 ### winit-adapter boundary (`jamp`/`jasp`, LIFE-D1)
 
@@ -599,12 +708,27 @@ The boundary contract (designed now, first exercised when the client slice lands
 - The FPS-cap busy-spin (`Com_Frame` step 5) stays a **spin** that re-drains the
   ring (LIFE-D1; `WaitUntil` rejected as timing-divergent).
 
+**Divergence note — one-frame input latency during the spin (inherent to DEC-02).**
+Raven's spin *pumps the OS* each iteration: `Com_EventLoop → … → Sys_GetEvent`
+runs `PeekMessage` inside the getter (`common.cpp:1647-1653` → `win_main.cpp:1211`),
+so OS input arriving mid-spin is picked up that same frame. Under DEC-02 winit owns
+the loop with `ControlFlow::Poll`: the spin can only **re-drain the ring**, and the
+ring is only refilled by winit callbacks that fire *between* `about_to_wait`
+invocations — so OS input physically arriving during the spin window (≤ `1000 /
+com_maxfps` ms, ~11 ms at the default 85) is deferred to the next frame rather than
+consumed in the current one. This is a documented divergence inherent to DEC-02,
+**below the differential seam**: DEC-09 verification is unaffected, because
+journaling replay (LIFE-D4a) feeds the ring directly from the recorded stream, not
+from live OS timing (§ Verification 1).
+
 ### `jampded` console adapter (LIFE-D4d)
 
 No winit. The OS loop is `loop { com_frame(&mut engine) }` with the `Sleep(5)`
 entry pacing (`null/win_main.cpp:1478`). A faithful minimal polled line editor
 over raw stdin (the `Sys_ConsoleInput` behavior, `null/win_main.cpp:200-302`)
-feeds completed lines as `SE_CONSOLE` events through `SysEventQueue::queue`; net
+feeds completed lines as `SE_CONSOLE` events through `SysEventQueue::queue`
+(faithful `Sys_QueEvent(0, SE_CONSOLE, …)` — `time==0`, `null/win_main.cpp:1195`;
+the adapter threads the current clock as `now_ms` and the queue stamps it); net
 poll feeds `SE_PACKET`. Same ring, same `Com_EventLoop` `SE_CONSOLE` handling.
 
 ### Binary packaging (LIFE-D2)
@@ -621,12 +745,13 @@ poll feeds `SE_PACKET`. Same ring, same `Com_EventLoop` `SE_CONSOLE` handling.
   no-ops" behavior. The `dedicated` cargo **feature** therefore serves the
   *build-level* purpose of Raven's `null_*` link swap — a **client-less binary**:
   it compile-excludes the client-tier crates (`mp/engine/client` + renderer +
-  sound) from `jampded`, not substitutes stub field types. **The exact feature
-  wiring** — how the client tier is `cfg`-excluded while the `Engine` type still
-  names `Option<Client>` — depends on where `Engine` is defined and is entangled
-  with **STATE-Q1** (cross-doc, open; § Slice hooks), so the concrete
-  `[features] dedicated = […]` + dependency edges are not pinned here. The
-  **runtime** `com_dedicated` hot-toggle (`common.cpp:1675-1687`) stays compiled
+  sound) from `jampded`, not substitutes stub field types. `Engine`'s defining
+  crate is now settled — `mp_engine_core` (STATE-D5) — so `mp/app`'s `use Engine`
+  path is fixed; **the exact feature wiring** (how the client tier is `cfg`-excluded
+  while the `Engine` type still names `Option<Client>`, i.e. the concrete
+  `[features] dedicated = […]` + dependency edges) is an `mp/app`-crate mechanical
+  detail, not oracle-derivable (Raven is C, no crates), and is not spelled out here.
+  The **runtime** `com_dedicated` hot-toggle (`common.cpp:1675-1687`) stays compiled
   **only in the `jamp` binary** (dead on Raven's ROM dedicated build).
 - **`crates/sp/app`** — one `[[bin]]`: `jasp` (`src/bin/jasp.rs`). No dedicated
   variant (SP has none).
@@ -637,18 +762,26 @@ poll feeds `SE_PACKET`. Same ring, same `Com_EventLoop` `SE_CONSOLE` handling.
 the loop** — an `ApplicationHandler` with `ControlFlow::Poll`, `com_frame()`
 called from `about_to_wait`, winit events translated into the ported 256-entry
 `sysEvent_t` ring (faithful queue semantics; `Sys_GetEvent` becomes a pure
-ring-drain). The FPS-cap busy-spin is preserved as a spin that pumps/re-drains
-events (parity-faithful timing). `jampded`: plain `loop { com_frame() }` with the
-`Sleep(5)` entry pacing and polled console input. Renderer deferral (DEC-01)
-means the windowed path is *designed now, first exercised later* — early client
-slices boot headless. *Because* Raven's architecture fixes the adapter direction
-(callbacks enqueue; frame work runs from `about_to_wait`). *Rejected:*
-`ControlFlow::WaitUntil` for the FPS cap (diverges in event-arrival timing);
-`pump_app_events` loop-shape preservation (platform-limited/second-class, dossier
-§7).
+ring-drain). The FPS-cap busy-spin is preserved as a spin that **re-drains the
+ring** (the accurate wording is § winit-adapter boundary). `jampded`: plain
+`loop { com_frame() }` with the `Sleep(5)` entry pacing and polled console input.
+Renderer deferral (DEC-01) means the windowed path is *designed now, first
+exercised later* — early client slices boot headless. *Because* Raven's
+architecture fixes the adapter direction (callbacks enqueue; frame work runs from
+`about_to_wait`). *Rejected:* `ControlFlow::WaitUntil` for the FPS cap (diverges in
+event-arrival timing); `pump_app_events` loop-shape preservation
+(platform-limited/second-class, dossier §7).
 
-**LIFE-D2 — Skeleton + packaging.** `com_init`/`com_frame`/`com_shutdown` are
-ported **per-mode** into the `{mp,sp}` engine `qcommon` crates — **no shared
+*Amended 2026-07-02:* softened the timing claim — the spin does **not** pump the OS
+(winit owns the loop under DEC-02); it only re-drains the ring. Dropped the
+"pumps"/"parity-faithful timing" wording. Consequence: OS input arriving during the
+spin window is deferred one frame — a documented DEC-02 divergence, below the
+differential seam (cites and rationale in § winit-adapter boundary, "Divergence
+note").
+
+**LIFE-D2 — Skeleton + packaging.** `com_init`/`com_frame`/`com_shutdown`/`com_error`
+(and `pub struct Engine`) are ported **per-mode** into the per-mode facade crates
+`crates/{mp,sp}/engine/core` (`mp_engine_core` / `sp_engine_core`) — **no shared
 `Lifecycle` trait** — because they are genuinely divergent (NET_Init location,
 CL_Init gating, `CL_StartHunkUsers` position, journaling, msec clamps). Binary
 shells are thin new-code mains: `mp/app` gets two `[[bin]]` targets (`jamp`,
@@ -659,6 +792,15 @@ stubs (mirrors `DEDICATED` + `null_*` substitution); the runtime dedicated-toggl
 are real. *Rejected:* a shared generic `Lifecycle`/host trait (would force the
 three shapes to converge against oracle); a single binary with runtime `+set
 dedicated` only (Raven's dedicated is compile-time ROM — parity).
+
+*Amended 2026-07-02 (per STATE-Q1 resolution = STATE-D5):* the `com_*` functions and
+`pub struct Engine` live in the per-mode facade crate `crates/{mp,sp}/engine/core`,
+**not** the `qcommon` crates — `com_frame` must call `SV_Frame`/`CL_Frame`, which
+`qcommon` (a tier below server/client) cannot reach, and `Engine` aggregates
+`sv`/`cl`/`snd`. Every `&mut Engine`-threading item (the `com_*` surface, its private
+helpers, `com_printf`, `ComError`, and the lifecycle-owned `common/` state module)
+moves to `core` with it (§ Seam). The rest of this record — thin app bins, two
+`[[bin]]` targets, the `dedicated` feature — stands unchanged.
 
 **LIFE-D3 — Error payload taxonomy.** `com_error(engine, level, msg)` runs the
 per-level recovery **synchronously**, then `panic_any(ComError{level, msg})` —
@@ -712,43 +854,102 @@ slice-driven. `SysEventQueue`/`ErrorLevel` layout parity rides the existing
 
 ## Slice hooks
 
-**Slice 0 — `jampded` bin.** `main` → construct the one `Engine` (dedicated: a
-value with `cl: None, snd: None`; its *constructor* is STATE-Q1-gated — see
-cross-doc blockers below) → `com_init(engine)` → `SV_Init` path → `loop { com_frame }`
-idle with polled console input. Depends on: engine-seam.md (dispatchers — none exercised at
-idle until a `map` command loads the module), state-ownership.md (`Engine`/`Common`
-shapes, `ComError`), and this doc's `com_*` seam + `SysEventQueue`.
+**Slice 0 — `jampded` bin.** The `jampded` `main()` skeleton is:
 
-**Cross-doc blockers (tracked elsewhere, not lifecycle decisions).** The settled
-signatures here still depend on external open items before slice 0 can write its
-final crate wiring — surfaced so the porter treats them as known dependencies, not
-doc defects: **STATE-Q1** (state-ownership.md — the crate that *defines* `pub struct
-Engine`) gates the `use Engine` path, `mp/app`'s dependency/`[features]` edges, and
-the `dedicated` client-tier exclusion (§ Binary packaging). **STATE-Q1 also gates
-`main()`'s Engine-construction call** — the `let mut engine = …;` a slice-0 skeleton
-needs *before* `com_init(engine, …)`: state-ownership.md freezes `pub struct
-Engine`'s field list but **no constructor** (`Default`/`new`, and the initial build
-of each field sub-struct — `Common`, `sv`/`cl`/`snd: None`, `cm`), so how the first
-Engine is built is a sub-item of STATE-Q1's home decision, **not lifecycle-inventable**
-(Raven is C, static zero-init — no oracle constructor exists); it resolves when
-STATE-Q1 picks Engine's defining crate. The empty step-30 `ModuleRegistry` (§
-`Com_Init` step 30) rides the same blocker. **LOAD-Q3**
-(module-loading.md — the `load_module` signature) gates the registry-fill path,
-which slice 0 does not exercise at idle. Both are owned and escalated in their home
-docs; the frozen `com_*`/`SysEventQueue`/`ComError` shapes hold under either
-resolution. Which of the 42 MP `Com_Init` steps slice 0 **implements** vs
-**stubs**:
+```rust
+fn main() {
+    // Engine::new() (mp_engine_core, STATE-D5) captures the std::time::Instant
+    // base into Engine.common (LIFE-D4b) and builds the dedicated Engine value
+    // (cl: None, snd: None). Runs FIRST — before the warm-up read and com_init.
+    let mut engine = Engine::new();
+    // Raven's warm-up read (base already captured). MP keeps the `baseTime` bool
+    // (LIFE-D4b); base-relative reads pass `false` (Raven's C++ default at the
+    // jampded `Sys_Milliseconds()` warm-up, null/win_main.cpp:1447 → qcommon.h:978).
+    // SP's mirror warm-up is the void `sys_milliseconds(&engine)`.
+    let _ = sys_milliseconds(&engine, false);
+    // `command_line()` is the app-bin helper that captures/joins process argv into
+    // the single command string `Com_ParseCommandLine` splits (step 4) — mirroring
+    // Raven's merge-argv step (jampded `null/win_main.cpp:1425`; § Entry points).
+    // New-code glue in `mp/app`, not a lifecycle seam; the join detail is app-crate
+    // mechanical (Raven is C, no argv helper to freeze).
+    com_init(&mut engine, &command_line());     // SV_Init path; no CL_Init (dedicated)
+    loop { com_frame(&mut engine); }            // idle, polled console input
+}
+```
 
-- **Implements:** 1-10 (banner, push-event, cvar/cmd/cbuf, cmdline, zone→arena,
-  rand, startup vars), 12 (`FS_InitFilesystem`), **13 `Com_InitJournaling`**
+Depends on: engine-seam.md (dispatchers — none exercised at idle until a `map`
+command loads the module), state-ownership.md (`Engine`/`Common` field shapes,
+`ComError`), and this doc's `com_*` seam + `SysEventQueue`.
+
+**Cross-doc blockers (tracked elsewhere, not lifecycle decisions).** With STATE-Q1
+resolved (= STATE-D5), the earlier crate-wiring unknowns are largely closed;
+what remains external is surfaced so the porter treats it as a known dependency,
+not a doc defect:
+
+- **STATE-D5 (resolved 2026-07-02)** fixes `pub struct Engine`'s defining crate as
+  `mp_engine_core`, so the `use Engine` path is pinned and `Engine::new()` (its
+  constructor, capturing the `Instant` base — LIFE-D4b) is named by the skeleton
+  above. The per-field initial build (`Common`, `sv` = the server island, `cl`/`snd:
+  None`, `cm` = the collision model — Raven's `CM_*`/`cmodel`, e.g. the `CM_ClearMap`
+  at § Shutdown paths) is a `core`/state-ownership mechanical detail of
+  `Engine::new()`; those field **types** are owned by state-ownership.md (STATE-D5),
+  not named or glossed further here, so `Engine::new()`'s body for the slice-0
+  skeleton is completed from state-ownership.md, not lifecycle.md alone — a cross-doc
+  dependency, no longer a lifecycle blocker.
+  The `engine.common.*` accessor this doc uses throughout (e.g. the `sys_timeBase`
+  Instant base, § State ownership) is STATE-D5's frozen field: state-ownership.md
+  fixes `pub struct Engine { pub common: Common, .. }` — the field name is a
+  cross-ref, not assumed here.
+- **`sys_error` up-tier seam (LIFE-Q2, open)** — `com_init`/`com_error` in `core`
+  call `sys_error`, whose Raven body is the platform shell (`mp/app`, above `core`);
+  the injection/relocation mechanism is not settled (§ Seam, § Open questions). This
+  is a **slice-0 compile gate, not only a runtime concern**: the same up-tier seam
+  governs step 28's `Sys_Init`, `com_printf`'s dedicated `Sys_Print` fall-through
+  (`common.cpp:167`), and `com_shutdown`'s `Sys_Quit` (`win_main.cpp:389`), so the
+  `com_*` bodies the slice-0 skeleton calls cannot fully compile until LIFE-Q2
+  resolves (Slice-0 step table, "Blocked", below).
+- **LOAD-D8 (resolved 2026-07-02)** — module-loading.md froze the `load_module`
+  signature (`ModuleRegistry::load_module -> SlotId`, resolving the former LOAD-Q3)
+  that gates the registry-fill path; slice 0 does not exercise it at idle (the empty
+  step-30 `ModuleRegistry` lives in `mp_engine_qcommon`, its home settled — §
+  `Com_Init` step 30). Owned in module-loading.md.
+- **`ModuleRegistry` → `Engine` attachment (external, LOAD-D5 / STATE-D5).** Slice 0
+  *constructs* the empty step-30 registry (shape settled, above), but the accessor
+  field it hangs from on `Engine` is not named by this doc — state-ownership's frozen
+  `Engine { common, sv, cl, cm, snd }` (STATE-D5) carries no registry field and
+  module-loading.md's owner table fixes `ModuleRegistry.slots`, not the `Engine`
+  attachment. The porter treats the attachment slot as a state-ownership /
+  module-loading detail (§ `Com_Init` step 30), like `Engine::new`'s per-field build
+  — not invented here.
+
+Which of the 42 MP `Com_Init` steps slice 0 **implements**, **stubs**, or leaves
+**blocked** on an already-open question / externally-owned slot:
+
+- **Implements:** 1-8, 10 (banner, push-event, cvar/cmd/cbuf, cmdline, zone→arena,
+  startup vars), **9 partially** (the `Rand_Init` call is wired, but its
+  `Sys_Milliseconds(true)` raw seed *value* is **blocked on LIFE-Q3** — Blocked
+  below), 12 (`FS_InitFilesystem`), **13 `Com_InitJournaling`**
   (LIFE-D4a), 14-18 (config execs incl. `jampserver.cfg`, `Cbuf_Execute`,
   re-override), **19 `com_dedicated="2"` ROM**, 20 (hunk→arena), 21-26 (cvar
-  block, viewlog force, quit/writeconfig, version), 28 (`Sys_Init` — CPU detect;
-  `IN_Init` = null stub), 29 (`Netchan_Init`), **30 `VM_Init`** (= empty
-  `ModuleRegistry` + transport-select cvars, step 30 above; module *load* is
-  post-slice-0, at `SV_SpawnServer`), 31 (`SV_Init`), 32,
+  block, viewlog force, quit/writeconfig, version), **28 partially** (`Sys_Init`
+  CPU-detect logic is oracle-derivable, `IN_Init` = null stub, but its up-tier call
+  from `core` to the platform shell is **blocked on LIFE-Q2** — Blocked below),
+  29 (`Netchan_Init`), **30 partially** (the empty `ModuleRegistry` + transport-select
+  cvars are settled — step 30 above, module *load* is post-slice-0 at
+  `SV_SpawnServer` — but **hanging the registry off `Engine` is a cross-doc blocker**,
+  STATE-D5/LOAD-D5, Cross-doc blockers above), 31 (`SV_Init`), 32,
   34 (`com_frameTime`), 35 (`Com_AddStartupCommands`; no cinematic), 40-41
   (`fullyInitialized`, banner).
+- **Blocked (in the Implements set above, but slice 0 cannot fully compile/run the
+  step until resolved — each is an already-open question or an externally-owned
+  slot, not a new lifecycle decision withheld here):** the whole `com_*` body
+  compilation depends on **LIFE-Q2** — `com_init`'s init-catch calls `sys_error`,
+  step 28 calls `Sys_Init`, `com_printf`'s dedicated `Sys_Print` fall-through
+  (`common.cpp:167`) and `com_shutdown`'s `Sys_Quit` (`win_main.cpp:389`) all cross
+  the same unsettled `core`→platform-shell up-tier seam. Step 9's raw RNG seed value
+  is **LIFE-Q3**. Step 30's `Engine` attachment slot is the cross-doc STATE-D5/LOAD-D5
+  dependency (Cross-doc blockers above). Listed so the Implements set is not read as
+  "fully compiles today."
 - **Stubs / no-op (dedicated null tier):** 11 `CL_InitKeyCommands`
   (`null_client.cpp:57`), **33 `CL_Init` skipped** (dedicated gate), **37
   `CL_StartHunkUsers`** (`null_client.cpp:66` no-op — no renderer/sound), 36/38
@@ -798,3 +999,57 @@ winit-keycode map (LIFE-Q1) is needed by the first `jamp` slice.
   first exercised by the `jamp` client slice, not slice 0; its natural home is
   the platform/input subsystem doc (pending) in concert with this boundary
   contract. Escalated — not decided here.
+- **LIFE-Q2 — how `core` reaches `sys_error` (platform-shell up-tier call).**
+  The LIFE-D2 amendment (2026-07-02) puts `com_init`/`com_error` in `mp_engine_core`;
+  both call `sys_error` to escalate to fatal. But `sys_error` = Raven `Sys_Error`,
+  whose body is the platform entry shell (`win32/win_main.cpp:350`, dedicated
+  `null/win_main.cpp:324`), owned by `mp/app` — a crate **above** `core`, so `core`
+  cannot call its implementation directly. Two shapes are consistent with the frozen
+  `sys_error(engine: &mut Engine, msg) -> !` signature: (a) `sys_error` lives in
+  `core`, delegating the actual console-destroy/`exit(1)` to lower `native/platform`
+  primitives; (b) the app injects its body through `Engine` (fn pointer / trait
+  object). The settled inputs do not pick one and oracle has no crate structure to
+  derive it from (Raven is C, single link). The **same up-tier seam governs every
+  other platform-shell `Sys_*` call `core` makes**, several exercised at slice 0:
+  `Sys_Init` (`Com_Init` step 28, `win_main.cpp:1336`, threads `&mut Engine` to set
+  CPU cvars), `Sys_ShowConsole`, the dedicated `Sys_Print` fall-through inside
+  `com_printf` (`common.cpp:167`), and `Sys_Quit` inside `com_shutdown`
+  (`win_main.cpp:389`) — all with Raven bodies in the entry shell (`mp/app`). They
+  co-resolve with `sys_error` under the same platform/sys-layer shape, not
+  independently; `sys_error` is the representative first hit. First hit at slice 0
+  (dedicated boot's init-catch escalation). Escalated — not decided here; natural
+  co-resolution with STATE-D5's `Engine` construction and the platform/sys layer's
+  shape.
+- **LIFE-Q3 — the `Sys_Milliseconds(true)` raw-variant return under the
+  Instant-backed clock.** LIFE-D4b backs `Sys_Milliseconds` with
+  `std::time::Instant` behind a base-relative `i32` API and keeps MP's `baseTime`
+  bool. Oracle's `baseTime=true` path (`win_shared.cpp:22-34`) *skips* the base
+  subtraction and returns the raw **absolute** `timeGetTime()` value; its sole
+  caller is `Rand_Init(Sys_Milliseconds(true))` (`common.cpp:1248`, MP `Com_Init`
+  step 9), which relies on that large, run-varying absolute value for RNG entropy.
+  `Instant` exposes **no absolute epoch**, so `sys_milliseconds(engine, true)`
+  cannot return Raven's value; returning the monotonic-since-base value (≈0 at
+  boot) would seed `Rand_Init` near-constant every run — a behavioral divergence
+  from Raven. Two things are unsettled, and each is a design call the settled
+  inputs do not cover and oracle cannot supply (Instant has no absolute epoch):
+  (a) what `sys_milliseconds(engine, true)` returns, and (b) whether the resulting
+  RNG-seed-entropy divergence is accepted (with a ≤2-line site note, porting-rules
+  §19 style) or sourced another way. It is plausibly **below the differential
+  seam** — the Verification strategy golden-diffs journaled event streams and
+  `Com_ModifyMsec` clamps, never RNG-from-clock — but slice 0 *implements* step 9
+  (§ Slice hooks), so the fork is hit at first boot. Escalated — not decided here;
+  a Timing / LIFE-D4b design session owns it.
+- **LIFE-Q4 — `SysEventQueue` payload ownership vs. porting-rule §D11.** The frozen
+  `SysEventQueue` surface takes an owned `ptr: Option<Box<[u8]>>` on `queue` yet
+  stores its entries as `[sysEvent_t; 256]`, whose `evPtr` is a raw `*mut c_void`
+  (`sysEvent_t` is the ABI-crossing `#[repr(C)]` type — layout asserted, § Verification
+  strategy). Faithfully reproducing Raven's ring (overflow "drops the oldest, freeing
+  its evPtr", `win_main.cpp:1178-1203`) therefore needs a `Box`↔raw round-trip — and
+  its `unsafe` — *inside* `mp_engine_core`, which is **not** literally the ABI seam
+  §D11 confines unsafe to. Two shapes fit the frozen signatures: (a) store the payload
+  as a parallel owned `[Option<Box<[u8]>>; 256]` and populate `evPtr` only transiently
+  at the adapter seam; (b) a justified, confined `unsafe` block in the queue with a
+  ≤2-line site note (porting-rules §19 style). The settled inputs pick neither and
+  oracle has no crate/ownership model to derive it from (Raven is C, manual free). The
+  public `queue`/`get` signatures stay frozen (LIFE-D4 / § Seam); only the internal
+  payload representation + its §D11 confinement is open. Escalated — not decided here.

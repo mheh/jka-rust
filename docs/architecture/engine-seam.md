@@ -322,8 +322,17 @@ Each module's outbound dispatcher (our `SV_GameSystemCalls` /
 compiler enforces every variant is handled (SEAM-D3):
 
 ```rust
-// `engine` = &mut the engine module-host state (forward-declared);
-// `args[0]` = syscall number; return is the C `intptr_t` word.
+// crate::Type home: `mp_engine_server` (`crates/mp/engine/server`), mirroring
+// oracle `server/sv_game.cpp:458` per the one-file-per-Raven-subsystem convention
+// (CLAUDE.md) and reinforced by the `&mut ServerGame` server-subsystem receiver —
+// distinct from the `mp_engine_qcommon::ModuleRegistry` transport/trampoline
+// machinery above, which mirrors a *different* oracle file (`qcommon/vm.cpp`), not
+// this dispatcher. The cgame/ui peers (`CL_CgameSystemCalls`/`CL_UISystemCalls`,
+// `client/cl_cgame.cpp:644`, `client/cl_ui.cpp:813`) mirror likewise into
+// `mp_engine_client` (`crates/mp/engine/client`); both peers land in a later slice
+// (§ Slice hooks). `engine` = &mut ServerGame, the server-subsystem module-host
+// state (forward-declared); `args[0]` = syscall number; return is the C `intptr_t`
+// word.
 pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize;
 // each arm: decode words → run against `engine` → encode return, one line;
 // unimplemented arms: todo!("Port <trap>")   (porting-rules marker).
@@ -377,7 +386,20 @@ module-side state-ownership spine, an explicit non-goal owned by
 value is constructed and held — and whether it augments the shell's SEAM-D10
 inventory or lives elsewhere — is state-ownership.md's to freeze, not this
 doc's; SEAM-D10 fixes only the shell's seam surface (`ENGINE`, the exports, the
-`Dispatch<C>` match), which is orthogonal to the world the match delegates into. The `command` word arrives
+`Dispatch<C>` match), which is orthogonal to the world the match delegates into.
+
+For the sole purpose of writing this doc's `vmMain` match and `Dispatch<C>`
+skeleton, that receiver is **forward-declared** as `GameWorld` — the module-side
+owned value already named by `two-island-model.md` (STATE-D1/STATE-D2; e.g.
+`g_run_frame(&mut GameWorld, …)`, and STATE-D2 "`GameWorld` is a value") —
+exactly as this doc forward-declares `Engine`, `Static`'s `RunStatic`,
+`ServerGame`, and `SharedGameData`. Naming it is **not** defining it (no new
+decision): the skeleton spells `impl Dispatch<C> for GameWorld` and a `vmMain`
+match that holds and dispatches on a `GameWorld`, while that type's fields, its
+`GAME_INIT` construction, and its persistent home across bare-`vmMain` calls (the
+module-side analog of the shell's `OnceLock<CEngine>` §B6 exception, since
+`vmMain` takes no context arg) stay a forward reference frozen in
+`state-ownership.md`, not here (§ Scope & non-goals). The `command` word arrives
 as a raw `c_int` (`AbiCommand`), so the `match` is preceded by a fallible
 `c_int → MpGameExport::try_from` conversion (the same `TryFrom<i32>` doctrine,
 SEAM-D6); an **unrecognized command** reproduces Raven faithfully (porting-
@@ -546,14 +568,20 @@ existing `RawGetModuleApi` alias (`entrypoints.rs:25`), not a frozen contract.
 
 Ported logic never spells the transport, and never reaches a seam global
 (SEAM-D1 "No other seam global"; porting-rules §B3/§B4): the backend is
-**threaded in** as `&Engine`, the per-module compile-time alias
-`type Engine = CEngine | Static | <wasm>` (SEAM-D1). The **physical home** of
-this alias and of `mod trap`, and the **mechanism** that resolves it per build
-while keeping the logic crate transport-agnostic and reused unchanged across all
-three transports (SEAM-D10), are **not settled here** — see **SEAM-Q10** (open).
-SEAM-D1 cited the `engine-plan.md` mechanism, but SEAM-D5 supersedes that doc and
-it specifies nothing reachable; the frozen contract below is only the call-site
-*surface* (`engine.execute(args)`), not where `Engine` is bound.
+**threaded in** as `&Engine`, where `Engine` is the single cfg'd alias owned by
+the binding-leaf crate `mp_engine_select` (`crates/mp/engine-select`, SEAM-D13) —
+`CEngine` (`NativeDll`) by default, `Static` under Cargo feature `static`, the
+wasm backend under `cfg(target_arch = "wasm32")` (that wasm backend's concrete
+type/file is **open** — SEAM-Q11). Each logic crate
+(`mp_game`/`mp_cgame`/`mp_ui`) depends on `mp_engine_select` and writes
+`use mp_engine_select::Engine;` in its `mod trap`, so the logic crate itself
+carries **no** cfg and **no** Cargo feature (SEAM-D10 held literally) and `mod
+trap` stays in the logic crate with the frozen non-generic wrappers below. SP
+needs no select crate: `mod gi` binds `game_import_t` directly (SEAM-D2, always
+native) and SP cgame/ui are always `Static`, so their aliases are fixed. The
+frozen contract below is the call-site *surface* (`engine.execute(args)`);
+`Engine` is bound by `mp_engine_select` per build (SEAM-D13,
+`docs/workspace-architecture.md` § Dependency edges).
 Each outbound call `C` has one thin module-side wrapper, this exact shape:
 
 ```rust
@@ -617,8 +645,9 @@ wrapping the raw syscall pointer; the same module crate linked into our Rust
 engine uses `Static` (direct engine-service calls); a wasm32 build uses wasm
 imports — selected by a `type Engine = ...` alias per module crate. (The
 concrete per-build selection mechanism and the physical home of that alias and
-`mod trap` are **SEAM-Q10**, open — SEAM-D5 supersedes the `engine-plan.md`
-mechanism this record originally deferred to, leaving nothing reachable.) The
+`mod trap` are settled by **SEAM-D13**: the `mp_engine_select` binding-leaf crate
+owns the one cfg'd `type Engine` alias, imported unchanged by each logic crate's
+`mod trap`.) The
 engine side is a runtime `ModuleTransport { NativeDll |
 Static | Wasm }` per loaded module so one session can mix transports (DEC-05).
 The raw syscall pointer lives in exactly one `OnceLock<CEngine>` at the module
@@ -753,6 +782,36 @@ exports and must not silently diverge from them. *Rejected:* plain
 `extern "C"` — unwinding through it is undefined and aborts, breaking DEC-08
 recovery when hosting a native DLL.
 
+**SEAM-D13 — The `type Engine` alias lives in a dedicated binding-leaf crate
+`mp_engine_select`; logic crates import it and carry no cfg/feature (resolves
+SEAM-Q10).** A new crate `crates/mp/engine-select` (package `mp_engine_select`,
+depends on `abi-transport` where the concrete `CEngine`/`Static` backends live,
+SEAM-D9) holds the single cfg'd `pub type Engine` alias: the wasm arm is selected
+by `cfg(target_arch = "wasm32")` (the concrete module-side wasm `Execute<C>`
+backend type/file this arm resolves to is **open** — SEAM-Q11), `Static` by a
+Cargo feature `static` (enabled
+only by static-transport builds), and the default (non-wasm, no feature) is
+`CEngine` (`NativeDll`). Each logic crate (`mp_game`/`mp_cgame`/`mp_ui`) depends
+on `mp_engine_select` and writes `use mp_engine_select::Engine;` in its `mod
+trap`, so the logic crate contains **zero** cfg and **zero** Cargo features
+(SEAM-D10 held literally) and `mod trap` stays in the logic crate with the frozen
+non-generic wrappers (§ Call-site conventions). Shells select: `jampgame`/`cgame`/
+`ui` take the default, a static-linking engine build enables feature `static`.
+Because the logic crate must stay transport-agnostic (SEAM-D10) yet its frozen
+non-generic wrapper needs a concrete `Engine` in scope, isolating the one
+cfg/feature in a binding leaf is the only reconciliation. **Known cost:**
+`NativeDll` and `Static` artifacts on the same host triple cannot share one
+feature-unified `cargo build --workspace` graph — those builds go per-package
+(wasm needs no feature: distinct target triple). SP needs **no** select crate: SP
+game's `mod gi` binds the `game_import_t` table directly (SEAM-D2, always native)
+and SP cgame/ui are always `Static` — their aliases are fixed. The crate, its
+edges, and the selection paragraph are already in `docs/workspace-architecture.md`
+(§ Dependency edges). *Rejected:* a Cargo feature on the logic crate itself (it
+recompiles per shell and makes the logic crate carry features, breaking SEAM-D10
+literally); a generic `Engine` type parameter (contradicts the frozen non-generic
+`&Engine` signature); hoisting `mod trap` into the shell crate (a forward
+dependency edge `mp_game`→`jampgame`).
+
 ## Verification strategy
 
 Per DEC-09, three oracle-parity layers plus a standing wasm32 compile-gate:
@@ -771,7 +830,10 @@ Per DEC-09, three oracle-parity layers plus a standing wasm32 compile-gate:
    totality the compiler proves.
 4. **`wasm32` compile-gate (SEAM-D4), standing CI from day one**: module crates
    (`qshared`, `bg`, `uishared`, `game`, `cgame`, `ui`, `abi` tiers) must
-   **compile** for `wasm32`; layout asserts are
+   **compile** for `wasm32`; because `game`/`cgame`/`ui` resolve `Engine` through
+   `mp_engine_select` (SEAM-D13), this presupposes a concrete module-side wasm
+   `Execute<C>` backend in scope under `wasm32` from day one, whose type and file
+   are **open** — SEAM-Q11. Layout asserts are
    `#[cfg(target_pointer_width = "64")]`-gated (e.g.
    `crates/sp/abi/src/game/public/game_import_t.rs`) so the compile-gate stays
    clean under wasm32's 32-bit pointers. Compile-gating is sufficient now because
@@ -789,7 +851,7 @@ function/struct/file per commit, slice-driven.
   the `crates/jampgame` thin cdylib shell (SEAM-D10 — deps `abi_transport` +
   `mp_game`) with live `dllEntry` + `OnceLock<CEngine>` and its `Dispatch<C>`
   match delegating into `mp_game`, loaded through the `native/platform` dylib
-  loader (LOAD-D1, module-loading.md, pending — one of three external
+  loader (LOAD-D1, module-loading.md, pending — one of two external
   dependencies this slice needs frozen elsewhere; see "Frozen elsewhere" below).
   The crate-topology question that once blocked this
   (SEAM-Q8) is resolved by SEAM-D10: the shell's `lib.rs` receives the live
@@ -808,12 +870,13 @@ function/struct/file per commit, slice-driven.
   `GAME_RUN_FRAME` can mutate state between frames — and its
   construction/ownership, which is state-ownership.md's spine (§ Scope &
   non-goals; § Seam definition, inbound dual), the same boundary that punts the
-  engine-side `SharedGameData` impl below; (b) the physical home of
-  `mod trap`/`type Engine` and the mechanism binding the alias to `CEngine` for
-  this `NativeDll` build while the logic crate stays reusable (**SEAM-Q10**,
-  open); (c) the `native/platform` dylib loader (LOAD-D1, above). Slice 0 cannot
-  be wired until (a)–(c) are frozen in their owning docs/sessions, exactly as it
-  already waits on LOAD-D1. Because Slice 0 hosts our module **inside a
+  engine-side `SharedGameData` impl below; and (c) the `native/platform` dylib
+  loader (LOAD-D1, above). Slice 0 cannot be wired until (a) and (c) are frozen
+  in their owning docs/sessions, exactly as it already waits on LOAD-D1. (The
+  physical home of `mod trap`/`type Engine` and the mechanism binding the alias to
+  `CEngine` for this `NativeDll` build, once tracked here as a blocker, is now
+  **frozen in this doc** by SEAM-D13 — the `mp_engine_select` binding leaf,
+  default `CEngine` — so it no longer gates the slice.) Because Slice 0 hosts our module **inside a
   real/OpenJK engine** (SEAM-D7), the *engine-side* receivers of those calls —
   `SV_LocateGameData` and the `G_SET_SHARED_BUFFER` handler that stores `VMA(1)`
   and returns `0` (`sv_game.cpp:327-335,940`), i.e. the native `SharedGameData`
@@ -823,8 +886,26 @@ function/struct/file per commit, slice-driven.
   it is the later our-engine-hosting slice's work, the same boundary as the
   SEAM-D11 engine-side trampoline, which is likewise **not** in this slice (a
   real/OpenJK host supplies the syscall pointer). Its shape stays informative
-  here, frozen in state-ownership.md (§ `SharedGameData`). Lifecycle/boot order →
-  lifecycle.md.
+  here, frozen in state-ownership.md (§ `SharedGameData`).
+  **Dry-run boundary (the Gate-3 deliverable reachable from this doc + standing
+  docs alone).** The skeleton this doc yields for Slice 0 is `crates/jampgame`'s
+  `lib.rs` with the live `dllEntry`/`vmMain` exports, the `ENGINE:
+  OnceLock<CEngine>` static, and the exhaustive export-enum `vmMain` match routing
+  `GAME_INIT`/`GAME_RUN_FRAME`/`GAME_SHUTDOWN` (`g_main.c:517,540,520`) to
+  `Dispatch<C> for GameWorld` impls (receiver forward-declared, § Seam
+  definition), plus the `trap_G_*` outbound wrapper *surface* (§ Call-site
+  conventions). Its terminal **in-scope** plan step is *"`jampgame` compiles and
+  its `Dispatch<C>` match + `trap_G_*` wrappers are unit-testable in isolation
+  against the forward-declared `GameWorld`."* End-to-end wiring past that step is
+  gated on exactly two **named, already-owned** external freezes — not on any hole
+  in this doc: (a) `GameWorld`'s definition, `GAME_INIT` construction, and
+  persistent home across bare-`vmMain` calls → state-ownership.md; and (c) the
+  live host-load of the cdylib and syscall-pointer hand-off that actually invokes
+  `dllEntry`/`vmMain` → LOAD-D1, module-loading.md. Both are § Scope & non-goals
+  deferrals (not `## Open questions` — each has a named owning doc, per the
+  taxonomy in that section), so a Gate-3 dry-run **stops** at the terminal step
+  above and cites (a)/(c) as external gates rather than reporting an unanswerable
+  question. Lifecycle/boot order → lifecycle.md.
 - **Later slices.** MP client adds the `CL_CgameSystemCalls` / `CL_UISystemCalls`
   dispatchers and their `vmMain` duals; our-engine hosting of a real DLL adds the
   SEAM-D11 per-slot trampoline **and** the native `SharedGameData` engine-side impl
@@ -856,30 +937,29 @@ function/struct/file per commit, slice-driven.
   the export body stays the `entrypoints.rs:59` null stub (§ Live entrypoint
   exports).
 
-- **SEAM-Q10 — Physical home of the `type Engine` alias / `mod trap`, and the
-  per-build selection mechanism.** § Call-site conventions freezes a **non-generic**
-  outbound wrapper `pub fn X(engine: &Engine, args) -> Output { engine.execute(args) }`,
-  so a concrete `Engine` type must be in scope wherever `mod trap` (SP: `mod gi`)
-  lives — yet SEAM-D10 requires the logic crate (`mp_game`/`mp_cgame`/`mp_ui`) to
-  stay transport-agnostic and be **reused unchanged** across the `CEngine`
-  (`NativeDll`), `Static`, and `wasm32` builds. Those two only reconcile through a
-  selection mechanism this doc never states, and the only mechanism SEAM-D1 cited
-  is `docs/engine-plan.md`, which SEAM-D5 supersedes and which is excluded from a
-  porter's doc set. It cannot be settled from oracle ground truth (it is a Rust
-  crate-topology / build-configuration choice with no Raven analog), and no
-  in-repo precedent exists to fall back on: `crates/abi-transport`, `crates/mp/abi`,
-  and `crates/mp/game` currently have **no** `mod trap`, **no** `type Engine`
-  alias, and **no** Cargo `[features]` anywhere (grep-verified). The candidate
-  shapes each carry an unresolved cost the doc must not pick blind — e.g. a Cargo
-  feature recompiling the logic crate per shell; a generic `Engine` type parameter
-  (which would contradict the frozen non-generic `&Engine` signature); or hoisting
-  `mod trap` above the transport split — and note `mp_game` **cannot** place
-  `mod trap` in its own dependent shell crate `jampgame` (a forward dependency
-  edge). Escalated to a design session; the natural home is the transport/build
-  wiring alongside SEAM-D10 (crate topology) once the shell exists. Blocks Slice 0
-  only insofar as the `NativeDll` alias binding must be chosen before the wrappers
-  compile (SEAM-D7 is `NativeDll`-only, so the runtime behavior is `CEngine`
-  either way); it does **not** block the frozen seam surface above it.
+- **SEAM-Q11 — Module-side `wasm32` `Execute<C>` backend has no named type or
+  file.** SEAM-D13 selects the `type Engine` wasm arm by `cfg(target_arch =
+  "wasm32")`, and the verification-strategy `wasm32` compile-gate (§ Verification
+  strategy #4, standing CI from day one) requires the logic crates
+  (`mp_game`/`mp_cgame`/`mp_ui`, each `use mp_engine_select::Engine;`) to compile
+  for `wasm32` — so a concrete module-side backend implementing `Execute<C>` must
+  be in scope under `wasm32` now. No decision names it: SEAM-D9 pins only
+  `CEngine`/`Static` to `crates/abi-transport/src/generic/engine.rs` (grep confirms
+  no `Wasm` backend struct exists in-tree), and SEAM-D4 / DEC-05.5 defer only the
+  **engine-side** wasmtime host marshaller to post-parity — a different question
+  from what module-side type satisfies `Execute<C>` today — while SEAM-D13 and
+  `docs/workspace-architecture.md` § Dependency edges name only "the wasm backend"
+  with no type, file, or crate. There is **no oracle ground truth** to derive it
+  from: the wasm transport is a jka-rust addition (DEC-05), absent from Raven. The
+  choice is genuinely open — the compile-gate could be satisfied by (a) a stub
+  backend type in `generic/engine.rs` with a deferred (`todo!()`) `Execute<C>`
+  body paralleling `CEngine`/`Static`, (b) a compile-only alias of the wasm arm to
+  an existing backend until the wasmtime host lands, or (c) a backend in a
+  wasm-specific crate — each a new design decision. Not exercised by Slice 0
+  (`NativeDll`, SEAM-D7), so it does not block the first slice. Escalated to a
+  design session; the natural home is the wasm-transport design SEAM-D4 / DEC-05.5
+  defer to post-parity, but the type/file that satisfies the standing compile-gate
+  must be settled before `mp_engine_select`'s wasm arm can be written.
 
 **Resolved (history).** All previously escalated items are resolved; their
 resolutions live in the records/sections above:
@@ -907,11 +987,17 @@ resolutions live in the records/sections above:
   SEAM-D11 (one `extern "C-unwind"` trampoline per module slot over a per-slot
   `*mut Engine` cell set by a `Drop` scope-guard; § Seam — inbound raw syscall
   trampoline; the specified replacement for the eliminated `currentVM`).
+- **SEAM-Q10** (physical home of the `type Engine` alias / `mod trap` + the
+  per-build selection mechanism) — SEAM-D13 (the `mp_engine_select` binding-leaf
+  crate owns the one cfg'd `type Engine` alias; logic crates import it and carry
+  no cfg/feature; § Call-site conventions, § Decisions, and
+  `docs/workspace-architecture.md` § Dependency edges).
 
 Remaining deferrals to sibling docs (the `SharedGameData` method set →
 state-ownership.md; the module-side `Dispatch<C>` `Self` receiver — the owned
 `GameWorld`-shaped value persisted across `vmMain` calls — and its
 construction/ownership → state-ownership.md; the `Static` bootstrap slice →
 module-loading.md) are scoped non-goals (§ Scope & non-goals), not open
-questions. SEAM-Q10 (alias home + selection mechanism) is the one genuinely open
-item alongside SEAM-Q7, because no sibling doc yet owns it.
+questions. SEAM-Q7 (`GetModuleAPI` OpenJK-load contract) and SEAM-Q11 (the
+module-side `wasm32` `Execute<C>` backend type/file) are the genuinely open
+items, because no sibling doc yet owns them.
