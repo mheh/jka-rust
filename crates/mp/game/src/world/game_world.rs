@@ -4,6 +4,7 @@ use mp_qshared::common::mp::gentity_t;
 use mp_qshared::shared::{MAX_CLIENTS, MAX_GENTITIES};
 
 use crate::client::gclient_t;
+use crate::game_cvars::GameCvars;
 use crate::level::level_locals::level_locals_t;
 
 /// A value type owned by the module crate. NOT a global. Field types are the
@@ -20,6 +21,11 @@ pub struct GameWorld {
     /// `g_clients[MAX_CLIENTS]` (reached as `level.clients`, `g_main.c:28`;
     /// asserted 7344 B). MP only.
     pub clients: Box<[gclient_t; MAX_CLIENTS]>,
+    /// Raven's ~136 file-scope `vmCvar_t` cvar handles, grouped as one
+    /// GameWorld sub-struct (fork ruling 1: file-scope globals become GameWorld
+    /// fields). Not part of the `LocateGameData` alias set.
+    /// Source: `oracle/oracle/codemp/game/g_main.c:230-475`
+    pub cvars: GameCvars,
 }
 
 impl GameWorld {
@@ -41,6 +47,7 @@ impl GameWorld {
             level,
             entities,
             clients,
+            cvars: GameCvars::default(),
         }
     }
 }
