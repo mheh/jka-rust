@@ -1,61 +1,41 @@
-//! `EngineSlot` — the per-module-slot inbound-syscall trampoline cell (SEAM-D11).
+//! `EngineSlot` — the per-module-slot injected engine syscall target (SEAM-D11,
+//! amended by skeleton-findings resolution 2, 2026-07-03).
 //!
-//! When our engine hosts a real mod DLL, the module's poisoned `syscall` slot
-//! must be handed a raw C variadic fn pointer (Raven's `VM_DllSyscall`,
-//! `vm.cpp:363-380`) — the inbound dual of `CEngine::raw_syscall_words`. That raw
-//! fn is stateless, so it reads a per-slot `*mut Engine` cell set for exactly the
-//! duration of each engine→module call. SEAM-D11 replaces Raven's `currentVM`
-//! global with one such cell per module slot (never one global — STATE-D2).
+//! SEAM-D11 specced the slot's cell as `Cell<*mut Engine>`, but `Engine` =
+//! `mp_engine_core::Engine` and the typed dispatcher lives in
+//! `mp_engine_server` — both uphill of this crate. Settled resolution: the slot
+//! stores **injected** state — an opaque ctx pointer plus the syscall fn
+//! pointer, both passed in at module-load time — mirroring Raven, where
+//! `VM_Create` *receives* `systemCalls` as an argument instead of naming the
+//! server. No crate-graph change; qcommon still never names `mp_engine_core` or
+//! `mp_engine_server`. The trampoline itself lives in `trampoline.rs` +
+//! `game_syscall_trampoline.c` (resolution 1).
 
-use std::cell::Cell;
-use std::ffi::c_void;
+use core::ffi::c_void;
 
-//TODO: Port EngineSlot engine-pointer type
-// Frozen shape (SEAM-D11) is `Cell<*mut Engine>` where `Engine` =
-// `mp_engine_core::Engine` (the engine-island aggregate). `mp_engine_qcommon`
-// sits a tier BELOW `mp_engine_core` and cannot name that type (uphill edge),
-// so the cell is spelled with an opaque `*mut c_void` placeholder here. This is
-// a real doc/layering tension surfaced by the seed — see skeleton FINDINGS.
-// Source: docs/architecture/engine-seam.md § Inbound raw syscall trampoline (SEAM-D11)
-type EnginePtr = *mut c_void;
-
-/// One per hosted module slot. The cell holds a live `*mut Engine` ONLY while an
-/// engine→module call into this slot is on the stack — the porting-rules §D11
-/// engine-side seam exemption, the twin of the module shell's
-/// `OnceLock<CEngine>` (SEAM-D1), one cell per slot (STATE-D2).
+/// The engine-side syscall dispatch fn injected at module load — Raven's
+/// `systemCalls` parameter (`int (*systemCalls)(int *)`, `vm.cpp:471-472`,
+/// stored `vm->systemCall = systemCalls`, `vm.cpp:506`), widened with the
+/// opaque `ctx` so the injecting caller (which owns the typed engine state) can
+/// recover it without this crate naming that state. `extern "C-unwind"` per
+/// SEAM-D12.
 ///
-/// Source: `docs/architecture/engine-seam.md` § Inbound raw syscall trampoline (SEAM-D11).
+/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:471-472,506`
+pub type SlotSyscall = extern "C-unwind" fn(ctx: *mut c_void, args: *const isize) -> isize;
+
+/// One per hosted module slot: the injected engine ctx + dispatch target the
+/// slot's raw trampoline (`trampoline.rs` / `game_syscall_trampoline.c`)
+/// forwards to. Both fields are injected at module-load time through
+/// `ModuleRegistry::load_module` (resolution 2, 2026-07-03 — supersedes the
+/// per-call `Cell<*mut Engine>` + `EngineSlotGuard` shape). The porting-rules
+/// §D11 engine-side seam exemption, the twin of the module shell's
+/// `OnceLock<CEngine>` (SEAM-D1), one per slot (STATE-D2).
+///
+/// Source: `oracle/oracle/codemp/qcommon/vm.cpp:471-472,506` (`VM_Create`
+/// receiving + storing `systemCalls`).
 pub struct EngineSlot {
-    engine: Cell<EnginePtr>,
+    /// Opaque engine ctx handed back to `syscall` on every trampoline forward.
+    pub(crate) ctx: *mut c_void,
+    /// The injected dispatch target — Raven `vm->systemCall` (`vm.cpp:506`).
+    pub(crate) syscall: SlotSyscall,
 }
-
-/// RAII: set the slot's cell on entry to an engine→module call, restore on Drop.
-pub struct EngineSlotGuard<'a> {
-    slot: &'a EngineSlot,
-    prev: EnginePtr,
-}
-
-impl EngineSlot {
-    /// cell = engine.
-    pub fn enter(&self, engine: EnginePtr) -> EngineSlotGuard<'_> {
-        let _ = (&self.engine, engine);
-        todo!("Port EngineSlot::enter — docs/architecture/engine-seam.md SEAM-D11")
-    }
-}
-
-impl Drop for EngineSlotGuard<'_> {
-    fn drop(&mut self) {
-        // cell = prev.
-        let _ = (self.slot, self.prev);
-        //TODO: Port EngineSlotGuard::drop restore — docs/architecture/engine-seam.md SEAM-D11
-    }
-}
-
-//TODO: Port game_syscall_trampoline
-// The raw fn assigned to the hosted module's `syscall` slot is frozen (SEAM-D11)
-// as `extern "C-unwind" fn game_syscall_trampoline(arg: isize, ...) -> isize` —
-// a C-variadic DEFINITION, which stable Rust cannot express (requires the
-// unstable `c_variadic` feature). Emitting it would not compile, so it is left
-// as this marker; Slice 0 does not exercise it (SEAM-D11 non-blocking note).
-// This is a doc/stable-Rust contradiction surfaced by the seed — see FINDINGS.
-// Source: docs/architecture/engine-seam.md § Inbound raw syscall trampoline (SEAM-D11)

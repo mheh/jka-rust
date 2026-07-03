@@ -10,3 +10,8 @@ name = "mp_engine_qcommon"
 mp_qshared = { path = "../../qshared" }
 abi_transport = { path = "../../../abi-transport" }
 native_platform = { path = "../../../native/platform" }
+
+[build-dependencies]
+# Builds the SEAM-D11 C-variadic trampoline shim (src/vm/game_syscall_trampoline.c);
+# stable Rust cannot define a C-variadic fn (skeleton-findings resolution 1).
+cc = "1"

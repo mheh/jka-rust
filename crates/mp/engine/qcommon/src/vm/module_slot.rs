@@ -16,7 +16,9 @@ pub struct ModuleSlot {
     /// The loaded native artifact (lib + `vmMain` entry). NativeDll-only today;
     /// transport-polymorphic content for Static/Wasm is LOAD-Q9 (open).
     pub(crate) module: LoadedModule,
-    /// SEAM-D11's per-slot `*mut Engine` stash + guard — the inbound trampoline's
-    /// engine cell, one per slot.
+    /// SEAM-D11's per-slot engine syscall target the inbound trampoline forwards
+    /// to — the injected ctx + `system_calls` pair (`vm->systemCall`,
+    /// `vm.cpp:506`), one per slot, stored at load (skeleton-findings
+    /// resolution 2, 2026-07-03).
     pub(crate) engine: EngineSlot,
 }
