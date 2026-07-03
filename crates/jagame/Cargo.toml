@@ -9,4 +9,11 @@ name = "jagame"
 crate-type = ["cdylib"]
 
 [dependencies]
+# SEAM-D10 SP mirror: thin cdylib shell over the logic crate. sp_abi/sp_qshared
+# edges carry the GetGameAPI table types (game_import_t/game_export_t + their
+# member-signature types) — an addition over workspace-architecture's two-edge
+# shell table (finding, checkpoint 3).
 abi_transport = { path = "../abi-transport" }
+sp_game = { path = "../sp/game" }
+sp_abi = { path = "../sp/abi" }
+sp_qshared = { path = "../sp/qshared" }

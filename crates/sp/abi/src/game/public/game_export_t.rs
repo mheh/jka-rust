@@ -16,6 +16,12 @@ use super::saved_game_just_loaded_e::SavedGameJustLoaded_e;
 /// arithmetic on gentities, because the server's sizeof(struct gentity_s) doesn't
 /// equal gentitySize.
 /// Type definition source: `oracle/oracle/code/game/g_public.h:476-527`
+///
+/// ABI-string note (SEAM-D12 sweep, applied here 2026-07-03): the fn-pointer
+/// fields carry `extern "C-unwind"`, not plain `extern "C"` — these are
+/// seam-crossing export pointers a `com_error` panic must unwind through; the
+/// jagame shell's `extern "C-unwind"` export fns could not otherwise populate
+/// this table. Same C ABI/layout; unwind behavior only.
 #[repr(C)]
 pub struct game_export_t {
     pub apiversion: c_int,
@@ -26,7 +32,7 @@ pub struct game_export_t {
     //TODO: Port Init variadic-free but multi-arg pointer signature
     // Source: oracle/oracle/code/game/g_public.h:482
     pub Init: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             mapname: *const c_char,
             spawntarget: *const c_char,
             checkSum: c_int,
@@ -38,18 +44,18 @@ pub struct game_export_t {
             qbLoadTransition: qboolean,
         ),
     >,
-    pub Shutdown: Option<unsafe extern "C" fn()>,
+    pub Shutdown: Option<unsafe extern "C-unwind" fn()>,
 
     // ReadLevel is called after the default map information has been
     // loaded with SpawnEntities
-    pub WriteLevel: Option<unsafe extern "C" fn(qbAutosave: qboolean)>,
-    pub ReadLevel: Option<unsafe extern "C" fn(qbAutosave: qboolean, qbLoadTransition: qboolean)>,
-    pub GameAllowedToSaveHere: Option<unsafe extern "C" fn() -> qboolean>,
+    pub WriteLevel: Option<unsafe extern "C-unwind" fn(qbAutosave: qboolean)>,
+    pub ReadLevel: Option<unsafe extern "C-unwind" fn(qbAutosave: qboolean, qbLoadTransition: qboolean)>,
+    pub GameAllowedToSaveHere: Option<unsafe extern "C-unwind" fn() -> qboolean>,
 
     // return NULL if the client is allowed to connect, otherwise return
     // a text string with the reason for denial
     pub ClientConnect: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             clientNum: c_int,
             firstTime: qboolean,
             eSavedGameJustLoaded: SavedGameJustLoaded_e,
@@ -57,30 +63,30 @@ pub struct game_export_t {
     >,
 
     pub ClientBegin: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             clientNum: c_int,
             cmd: *mut usercmd_t,
             eSavedGameJustLoaded: SavedGameJustLoaded_e,
         ),
     >,
-    pub ClientUserinfoChanged: Option<unsafe extern "C" fn(clientNum: c_int)>,
-    pub ClientDisconnect: Option<unsafe extern "C" fn(clientNum: c_int)>,
-    pub ClientCommand: Option<unsafe extern "C" fn(clientNum: c_int)>,
-    pub ClientThink: Option<unsafe extern "C" fn(clientNum: c_int, cmd: *mut usercmd_t)>,
+    pub ClientUserinfoChanged: Option<unsafe extern "C-unwind" fn(clientNum: c_int)>,
+    pub ClientDisconnect: Option<unsafe extern "C-unwind" fn(clientNum: c_int)>,
+    pub ClientCommand: Option<unsafe extern "C-unwind" fn(clientNum: c_int)>,
+    pub ClientThink: Option<unsafe extern "C-unwind" fn(clientNum: c_int, cmd: *mut usercmd_t)>,
 
-    pub RunFrame: Option<unsafe extern "C" fn(levelTime: c_int)>,
-    pub ConnectNavs: Option<unsafe extern "C" fn(mapname: *const c_char, checkSum: c_int)>,
+    pub RunFrame: Option<unsafe extern "C-unwind" fn(levelTime: c_int)>,
+    pub ConnectNavs: Option<unsafe extern "C-unwind" fn(mapname: *const c_char, checkSum: c_int)>,
 
     // ConsoleCommand will be called when a command has been issued
     // that is not recognized as a builtin function.
     // The game can issue gi.argc() / gi.argv() commands to get the command
     // and parameters.  Return qfalse if the game doesn't recognize it as a command.
-    pub ConsoleCommand: Option<unsafe extern "C" fn() -> qboolean>,
+    pub ConsoleCommand: Option<unsafe extern "C-unwind" fn() -> qboolean>,
 
     // Raven's commented-out `PrintEntClassname`/`ValidateAnimRange` members are dead
     // code (`//void (*PrintEntClassname)(...)`, `//int (*ValidateAnimRange)(...)`)
     // and contribute no layout; omitted here.
-    pub GameSpawnRMGEntity: Option<unsafe extern "C" fn(s: *mut c_char)>,
+    pub GameSpawnRMGEntity: Option<unsafe extern "C-unwind" fn(s: *mut c_char)>,
 
     //
     // global variables shared between game and server

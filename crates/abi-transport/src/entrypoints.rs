@@ -13,50 +13,9 @@ pub type RawGetModuleApi =
     extern "C" fn(api_version: AbiCommand, import: RawImportTable) -> RawExportTable;
 pub type RawGetGameApi = extern "C" fn(import: RawImportTable) -> RawExportTable;
 
-pub mod qvm {
-    use super::{AbiCommand, AbiWord, RawExportTable, RawImportTable, RawSyscall};
-
-    /// Raven/OpenJK QVM-style `dllEntry` export.
-    #[no_mangle]
-    pub extern "C" fn dllEntry(_syscall: RawSyscall) {}
-
-    /// Raven/OpenJK QVM-style `vmMain` export.
-    #[no_mangle]
-    #[allow(clippy::too_many_arguments)]
-    pub extern "C" fn vmMain(
-        _command: AbiCommand,
-        _arg0: AbiWord,
-        _arg1: AbiWord,
-        _arg2: AbiWord,
-        _arg3: AbiWord,
-        _arg4: AbiWord,
-        _arg5: AbiWord,
-        _arg6: AbiWord,
-        _arg7: AbiWord,
-        _arg8: AbiWord,
-        _arg9: AbiWord,
-        _arg10: AbiWord,
-        _arg11: AbiWord,
-    ) -> AbiWord {
-        0
-    }
-
-    /// Raven/OpenJK table-style `GetModuleAPI` export.
-    #[no_mangle]
-    pub extern "C" fn GetModuleAPI(
-        _api_version: AbiCommand,
-        _import: RawImportTable,
-    ) -> RawExportTable {
-        core::ptr::null_mut()
-    }
-}
-
-pub mod sp_game {
-    use super::{RawExportTable, RawImportTable};
-
-    /// Raven/OpenJK SP game `GetGameAPI` export.
-    #[no_mangle]
-    pub extern "C" fn GetGameAPI(_import: RawImportTable) -> RawExportTable {
-        core::ptr::null_mut()
-    }
-}
+// The former `qvm`/`sp_game` `#[no_mangle]` stub-export modules were the
+// pre-decision state superseded by LOAD-D4/SEAM-D10: live exports are declared
+// per module cdylib shell crate (`jampgame`/`jagame` hold theirs; `cgame`/`ui`
+// carry interim stubs pending their live match). One shared entrypoints.rs
+// cannot carry per-module exports, and the shared `#[no_mangle]` symbols
+// collide with the shells' live ones at cdylib link time.

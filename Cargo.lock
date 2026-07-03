@@ -49,6 +49,9 @@ name = "jagame"
 version = "0.1.0"
 dependencies = [
  "abi_transport",
+ "sp_abi",
+ "sp_game",
+ "sp_qshared",
 ]
 
 [[package]]

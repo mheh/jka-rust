@@ -61,7 +61,7 @@ pub use gen_cmds::genCmds_t;
 pub use parse_data::{parseData_t, MAX_PARSEFILES};
 pub use shared_ragdoll_update_params::sharedRagDollUpdateParams_t;
 pub use ivec2::ivec2_t;
-pub use limits::{MAX_CLIENTS, MAX_STRING_CHARS};
+pub use limits::{MAX_CLIENTS, MAX_GENTITIES, MAX_STRING_CHARS};
 pub use lpcstr::LPCSTR;
 pub use mark_fragment::markFragment_t;
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};
