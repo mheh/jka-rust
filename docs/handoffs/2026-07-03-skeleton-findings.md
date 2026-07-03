@@ -302,6 +302,38 @@ commit → compose B1-B5 batch → author the slice-0 port-slice workflow (build
 on the `skeleton` branch, 7 green checkpoints, seed 497fff4 → 4887d0c).
 On freeze, also record the parked post-parity seam-inversion DEC (below).
 
+## SLICE 0 LIVE (checkpoints 7a-7c: 18252cf, 297cd52, eac635d)
+
+Porting-rules E16 achieved: the mp_app dedicated bin boots headless, loads the
+jampgame cdylib, GAME_INIT round-trips through the full frozen seam (vmMain
+bootstrap → GameContext → Dispatch<GameInit> → trap::Printf ×3 → C shim →
+injected EngineSlot → sv_game_system_calls G_PRINT), banner order matches
+g_main.c:925-927, GAME_SHUTDOWN takes the world, clean exit. Observed stdout
+captured in the checkpoint-7c commit. needsSession items (batch with the
+jampgame fork-discovery grill session):
+
+27. **LOAD-Q12 provisional**: sv_init_game_progs placed in mp_engine_core
+    (needs Engine+registry+loader), driven directly from main() pending the
+    real map-spawn trigger — pin crate/signature + interim-driver legitimacy.
+28. **Trampoline→slot channel**: stateless trampoline finds its EngineSlot
+    pair via a minimal GAME_SLOT cell + arm_game_slot armed at load — the
+    injected-slot amendment never specified this; needs a doc line.
+29. **ServerGame concrete shape** still unpinned (engine-seam forward-decl);
+    shim carries a null ctx it never derefs (G_PRINT needs no host state);
+    real reborrow blocked on the pin.
+30. **macOS dev-glue vs LOAD-Q1**: acceptance ran with a clearly-marked
+    Some(".dylib") dev policy + staging rename; canonical macOS naming stays
+    open/unclaimed.
+31. Mechanical for the next doc touch: frozen execute/dispatch sketches need
+    UFCS turbofish (inference can't pick C from Args); mp_game gained a
+    vmcalls re-export module (item-25 principle extended); GAME_INIT args
+    zeroed pending svs.time plumbing.
+
+Remaining in-slice (marked in-source): com_frame body + OS loop, exhaustive
+sv_game_system_calls dispatch, G_InitGame real body (cvar registration +
+LocateGameData/RegisterSharedMemory host handlers), LOAD-Q13 release fatal,
+Sys_UnpackDLL (LOAD-D7).
+
 ## Parked until Group A settles (user, 2026-07-03)
 
 **Post-parity seam inversion — record as a new DEC after this round stamps,

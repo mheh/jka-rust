@@ -86,3 +86,20 @@ client-slice presence-idiom note, SP engine-side signatures (SP engine pass).
 - The seeder agent (skeleton) and reconciler agent (docs) both have deep
   context but are session-bound — a new session re-briefs from the findings
   ledger instead.
+
+## MEGA-PASS STAGED (2026-07-03, end of day — launch on a fresh usage window)
+
+Everything decision-shaped is done: slice 0 LIVE (E16 achieved, checkpoints
+7a-7c); fn manifest built (2,934 fns / 148k LOC / 88 files / only 4
+non-trivial SCCs — tools/closure-prototype/out/); 88 Rust signature skeletons
+staged (out/skel/); ALL 10 fork rulings settled
+(docs/handoffs/jampgame-fork-discovery.md). Launch vehicle:
+
+    Workflow({ scriptPath: ".claude/workflows/port-jampgame.js" })
+
+Phases: land skeletons -> 88 parallel file-porters (park-don't-block
+escalations) -> cargo fixer loop -> escalation aggregate. Est. burn: 30-45M
+subagent tokens (largest single spend of the project — do NOT launch on a
+nearly-spent window; there is a 400k budget guard per porter but give it a
+full window). After the run: one user session clears parked escalations ->
+fix-up pass -> B1-B5 unlock progressive oracle certification.
