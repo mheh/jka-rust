@@ -93,7 +93,11 @@ an interactive session (never self-resolved by an agent).
   violated, a fork a porter would hit that no decision covers, a seam signature
   that can't round-trip its trap. Revise until no confirmed findings; contested
   points escalate to the user, never self-resolve.
-- **Gate 3 — dry-run** (fresh context): given only this doc + standing docs +
-  oracle, produce a scratch skeleton (file layout, pub signatures, owned-state
-  struct) and a first-slice plan. Pass = zero unanswerable questions, seam
-  matches the doc verbatim, no invented decisions. Any hole → revise → re-run.
+- **Gate 3 — dry-run** (fresh context): given this doc + standing docs + the
+  sibling `docs/architecture/*.md` set + `docs/abi-traps.md` + oracle (what a
+  real porter reads — amended 2026-07-03; a single-doc reading set registered
+  legitimate cross-doc deferrals as holes), produce a scratch skeleton (file
+  layout, pub signatures, owned-state struct) and a first-slice plan. Pass =
+  zero unanswerable questions, seam matches the doc verbatim, no invented
+  decisions. A cross-ref to a sibling doc is a hole only if the pointer is
+  wrong or the target doesn't answer it. Any hole → revise → re-run.

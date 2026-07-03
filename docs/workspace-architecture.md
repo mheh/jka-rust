@@ -156,6 +156,14 @@ live entrypoint exports, and the `Dispatch` match:
 SP `cgame`/`ui` have no separate shell — they are statically linked into
 `sp/app` behind the vmachine shim (DEC-07).
 
+> **Two types named `Engine` exist, on opposite islands, never co-scoped**
+> (disambiguation, 2026-07-03): `mp_engine_select::Engine` is the module-side
+> cfg'd transport-backend alias (CEngine/Static/wasm) that `mod trap` wrappers
+> take as `engine: &Engine`; `mp_engine_core::Engine` is the engine-island
+> aggregate struct (`{common, sv, cl, cm, snd}`, state-ownership.md STATE-D5).
+> Module crates cannot reach core; engine crates do not import select. Doc text
+> must always crate-qualify the two.
+
 Per-build transport selection (SEAM-D13): `mp/engine-select` owns the single
 cfg'd `pub type Engine` alias — `cfg(target_arch = "wasm32")` picks the wasm
 backend, Cargo feature `static` picks `Static`, default is `CEngine`

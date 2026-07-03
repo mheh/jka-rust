@@ -1,0 +1,61 @@
+{
+  "docs": [
+    {
+      "path": "docs/architecture/engine-seam.md",
+      "title": "Engine Seam",
+      "prefix": "SEAM",
+      "scope": "MINIMAL AMENDMENT + RE-GATE PASS (round 4, expected stamping round): apply ONLY the items below (session 2026-07-03), touch nothing else, re-run gates to stamp REVIEWED. NOTE: doc-standards.md's Gate-3 reading set was amended 2026-07-03 to include the sibling docs/architecture/*.md + docs/abi-traps.md — cross-doc deferrals with correct pointers are no longer holes.",
+      "decisions": [
+        "SEAM-Q12 RESOLVED (session 2026-07-03): the module-side Dispatch receiver is the copyable pub struct GameContext<'e> { world: *mut GameWorld, engine: &'e Engine } in mp_game (Engine = the mp_engine_select transport alias) — it SUPERSEDES round-3's WorldPtr (state-ownership.md is being amended to match). vmMain constructs it per call from WORLD + ENGINE.get(); impls unpack world via STATE-D6 leaf reborrows and thread ctx.engine into logic fns, whose trap::X(engine, ...) call sites keep the frozen SEAM-D1/D13 shape and oracle syscall order. SEAM-D8's trait is UNTOUCHED. Close SEAM-Q12; update the round-3 WorldPtr cross-ref pointer to name GameContext.",
+        "ENGINE NAMING DISAMBIGUATION (session 2026-07-03, no renames): mp_engine_select::Engine (module-side transport alias) and mp_engine_core::Engine (engine-island aggregate) both stand — opposite islands, never co-scoped. Add a 1-2 line disambiguation note where this doc discusses the alias (SEAM-D13 record), cross-referencing state-ownership.md STATE-D5 and workspace-architecture.md (which now carries the canonical disambiguation block, updated 2026-07-03). Doc text must crate-qualify wherever both could be confused."
+      ],
+      "outline": "Apply exactly: (1) Record the SEAM-Q12 resolution (GameContext supersedes WorldPtr) as a dated amendment at the Dispatch-receiver pointer; close SEAM-Q12 in ## Open questions. (2) Add the naming-disambiguation note at SEAM-D13. (3) Nothing else. Gates re-stamp REVIEWED.",
+      "dossierPath": "docs/dossiers/A1-engine-seam.md",
+      "model": "opus"
+    },
+    {
+      "path": "docs/architecture/state-ownership.md",
+      "title": "State Ownership",
+      "prefix": "STATE",
+      "scope": "REVISION PASS (round 4, expected stamping round): revise IN PLACE with the 2026-07-03 session resolutions below; full round-3 findings in docs/handoffs/group-a-regate3-findings.json (READ IT). doc-standards.md's Gate-3 reading set now includes the sibling docs/architecture/*.md + docs/abi-traps.md, so correct cross-doc pointers are no longer holes — but verify each pointer actually answers what it defers.",
+      "decisions": [
+        "SEAM-Q12 RESOLVED / WorldPtr SUPERSEDED (session 2026-07-03): the frozen Dispatch receiver becomes copyable pub struct GameContext<'e> { world: *mut GameWorld, engine: &'e Engine } in mp_game (Engine = mp_engine_select alias; this is the '&Engine' the round-3 finding could not place — NOT mp_engine_core::Engine). vmMain constructs it per call from WORLD + ENGINE.get(); STATE-D6 leaf-reborrow discipline unchanged (world reborrows at leaves, dropped before reentrancy-capable traps); handlers thread ctx.engine into logic fns for trap::X(engine, ...) calls in oracle order. Replace WorldPtr in the frozen Seam definition with GameContext via dated amendment (record the supersession).",
+        "ENGINE NAMING DISAMBIGUATION (session 2026-07-03, no renames): add the 1-2 line note at the frozen Engine struct (STATE-D5): mp_engine_core::Engine (this aggregate) vs mp_engine_select::Engine (module-side transport alias in trap wrappers) — opposite islands, never co-scoped; workspace-architecture.md carries the canonical disambiguation block (2026-07-03). Crate-qualify ambiguous mentions.",
+        "MECHANICAL (no forks): (a) sweep stale '(pending)' annotations — lifecycle.md and module-loading.md exist (Status: DRAFT), engine-seam.md exists; annotate by actual status, not 'pending'. (b) STATE-Q2 stays open unchanged (owner: §F subsystem docs). (c) The round-3 reading-set-artifact holes (Dispatch trait definition, abi-traps rows, ErrorLevel variants, dossier census) need no doc changes beyond correct pointers — the Gate-3 amendment covers them; verify the pointers are precise (doc + section/ID)."
+      ],
+      "outline": "Apply exactly: (1) GameContext supersedes WorldPtr in ## Seam definition (dated amendment, supersession recorded; vmMain sketch updated to construct it). (2) Naming note at STATE-D5's frozen Engine block. (3) Mechanical sweep (a)-(c). (4) Keep Status: DRAFT (gates re-stamp).",
+      "dossierPath": "docs/dossiers/A2-state-ownership.md",
+      "model": "opus",
+      "depends": ["docs/architecture/engine-seam.md"]
+    },
+    {
+      "path": "docs/architecture/lifecycle.md",
+      "title": "Lifecycle",
+      "prefix": "LIFE",
+      "scope": "REVISION PASS (round 4, expected stamping round): revise IN PLACE with the 2026-07-03 session resolution below; full round-3 findings in docs/handoffs/group-a-regate3-findings.json (READ IT). Gate-3 reading set now includes sibling architecture docs + abi-traps.md.",
+      "decisions": [
+        "RECURSIVE-ERROR RESOLVED (session 2026-07-03, LIFE-D3 dated amendment): com_frame's catch arm wraps com_error_recover in its own catch_unwind(AssertUnwindSafe(...)); if recovery itself panics while the errorEntered guard is set, route to sys_error(\"recursive error after: {saved msg}\") — reproducing Raven's exact recursive-error banner and controlled exit path (MP common.cpp:288 Sys_Error(\"recursive error after: %s\", com_errorMessage)). Replace the imprecise 're-panics past the same catch = Raven's recursive Sys_Error fatal path' equivalence claim with this mechanism (frozen snippet updated). com_init's catch gets the same one-line treatment if its recovery can recurse (state it either way).",
+        "MECHANICAL: LIFE-Q1 stays open unchanged. If anything else needs a new decision, report needsSession rather than inventing."
+      ],
+      "outline": "Apply exactly: (1) LIFE-D3 dated amendment + the corrected frozen com_frame catch snippet (inner catch_unwind, guard-set branch to sys_error with the saved message, both cites). (2) State the com_init-catch recursion story explicitly. (3) Keep Status: DRAFT (gates re-stamp).",
+      "dossierPath": "docs/dossiers/A3-lifecycle.md",
+      "model": "opus",
+      "depends": ["docs/architecture/state-ownership.md"]
+    },
+    {
+      "path": "docs/architecture/module-loading.md",
+      "title": "Module Loading",
+      "prefix": "LOAD",
+      "scope": "REVISION PASS (round 4, expected stamping round): revise IN PLACE with the 2026-07-03 session resolutions below; full round-3 findings in docs/handoffs/group-a-regate3-findings.json (READ IT). Gate-3 reading set now includes sibling architecture docs + abi-traps.md.",
+      "decisions": [
+        "LOAD-Q10 RESOLVED (session 2026-07-03, LOAD-D11 dated amendment): load_module returns Option<SlotId> — None = artifact not found on any policy step, mirroring sys_load_dll's own contract. The CALLER owns the fatal disposition, exactly as the oracle: gvm = VM_Create(...); if (!gvm) Com_Error(ERR_FATAL, \"VM_Create on game failed\") (sv_game.cpp:1750-1752) — ADD this caller-side ground truth to ## Raven ground truth (the round-3 finding showed the section quotes vm.cpp:471-524 but omits the adjacent caller); the SV_InitGameVM-equivalent call site reproduces it via the receiverless com_error. Delete the incorrect 'not derivable from oracle ground truth' claim; close LOAD-Q10. Slot-full and bad-parms fatals inside load_module (LOAD-D8/D11) are unchanged — Raven puts THOSE inside VM_Create.",
+        "MECHANICAL (no forks, per the findings file): (a) EngineSlotCell/EngineSlot name drift — unify on EngineSlot (engine-seam.md froze `struct EngineSlot`); ModuleSlot.engine: EngineSlot everywhere in this doc. (b) LOAD-Q1's macOS ModuleNaming.suffix cannot be 'unset' as &'static str — widen to Option<&'static str> (None until the macOS host is wired; LOAD-Q1 itself stays open with owner noted); update the frozen ModuleNaming block + policy samples. (c) Verify remaining cross-doc pointers are precise under the amended Gate-3 set."
+      ],
+      "outline": "Apply exactly: (1) LOAD-D11 dated amendment (Option<SlotId>) + the caller-side ground-truth addition with the sv_game.cpp:1750-1752 cite + caller snippet; close LOAD-Q10. (2) Mechanical (a)-(c). (3) LOAD-Q1 stays open. Keep Status: DRAFT (gates re-stamp).",
+      "dossierPath": "docs/dossiers/A4-module-loading.md",
+      "model": "opus",
+      "depends": ["docs/architecture/engine-seam.md"]
+    }
+  ],
+  "standingDocs": ["docs/doc-standards.md", "docs/porting-rules.md", "docs/workspace-architecture.md", "docs/architecture/two-island-model.md", "docs/abi-traps.md"]
+}
