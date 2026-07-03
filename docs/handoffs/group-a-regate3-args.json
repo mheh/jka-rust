@@ -1,0 +1,68 @@
+{
+  "docs": [
+    {
+      "path": "docs/architecture/engine-seam.md",
+      "title": "Engine Seam",
+      "prefix": "SEAM",
+      "scope": "MINIMAL AMENDMENT + RE-GATE PASS: engine-seam.md is REVIEWED. Apply ONLY the two dated amendments below (session 2026-07-02, round 3), touch nothing else, re-run gates to re-stamp.",
+      "decisions": [
+        "SEAM-D11 AMENDED (session 2026-07-02): the per-slot *mut Engine trampoline cell's physical home is the `engine: EngineSlotCell` field of the composed per-slot struct mp_engine_qcommon::ModuleSlot { name: String, module: LoadedModule, engine: EngineSlotCell } — ModuleRegistry.slots: [Option<ModuleSlot>; MAX_VM]. Cell semantics/guard unchanged; module-loading.md owns the composed type (its LOAD decision this round). Update the state-table row's storage column to ModuleSlot.engine.",
+        "SEAM-D8 CROSS-REF (session 2026-07-02, no trait change): the module-side Self receiver each Dispatch<C> impl uses is the copyable WorldPtr(*mut GameWorld) wrapper settled in state-ownership.md (STATE-D6 leaf-reborrow discipline; porting-rules §17 copyable-borrow-wrapper idiom) — &self on the copyable wrapper, trait signature untouched. Add a 1-line pointer at the inbound-dual paragraph that punts the receiver to state-ownership.md, naming WorldPtr."
+      ],
+      "outline": "Apply exactly: (1) Dated amendment on SEAM-D11's record + the state-table row (ModuleSlot.engine home, cite module-loading.md). (2) The 1-line WorldPtr pointer at the Dispatch receiver punt. (3) Nothing else. Keep current Status (gates re-stamp REVIEWED).",
+      "dossierPath": "docs/dossiers/A1-engine-seam.md",
+      "model": "opus"
+    },
+    {
+      "path": "docs/architecture/state-ownership.md",
+      "title": "State Ownership",
+      "prefix": "STATE",
+      "scope": "REVISION PASS: revise docs/architecture/state-ownership.md IN PLACE with the round-3 session resolutions below (all 2026-07-02); full gate findings in docs/handoffs/group-a-regate2-findings.json (READ IT). Do not rewrite from scratch.",
+      "decisions": [
+        "WORLD BOOTSTRAP RESOLVED (session, record as a STATE-D6 dated amendment or new record per numbering): vmMain's GAME_INIT arm constructs the zeroed GameWorld and writes it into the WorldCell BEFORE falling into the generic dispatch path — storage creation mirrors C's static allocation at load time; the dispatched GAME_INIT handler then does G_InitGame's init logic against it. GAME_SHUTDOWN's arm takes the world OUT of the cell after its dispatch returns (module-unload lifetime; map_restart's fresh GAME_INIT builds a fresh world). Fix the frozen vmMain sketch accordingly (no unconditional expect on first call).",
+        "DISPATCH RECEIVER RESOLVED (session): Dispatch<C> is implemented on a copyable pub struct WorldPtr(pub *mut GameWorld) defined in mp_game — NOT on GameWorld. &self on the copyable wrapper matches SEAM-D8's frozen trait signature (engine-seam.md is being cross-ref-amended, no trait change); impl bodies do the STATE-D6 leaf &mut reborrows internally and drop any live &mut before trap:: calls that can re-enter. This is porting-rules §17's arena/copyable-borrow-wrapper idiom. Freeze WorldPtr's shape + the impl pattern in ## Seam definition.",
+        "ZEROED CONSTRUCTION RESOLVED (session): one helper pub fn zeroed_box<T>() -> Box<T> (alloc_zeroed + Box::from_raw) in crates/native/platform is THE sanctioned construction idiom for large #[repr(C)] all-zeroes-valid types — the Rust mirror of C static zero-initialization; heap-direct (no stack transit of the ~1.83MB gentity array). Safety contract stated once at the helper (T is #[repr(C)], all-zero bit pattern valid). GameWorld::zeroed() builds Box<[gentity_t; MAX_GENTITIES]>, Box<[gclient_t; MAX_CLIENTS]>, level_locals_t via it, then wires level.gentities/clients per the existing construction-order note. Cite the helper's home; note it is Raven-free native-tier vocabulary (no workspace-architecture change needed — no new crate/edge).",
+        "REGISTRY ATTACHMENT RESOLVED (session, shared with lifecycle.md LIFE-Q5): ModuleRegistry is a field of Common — Engine.common.modules — mirroring Raven's vmTable as a qcommon-subsystem static (vm.cpp). Engine's frozen five-field shape is unchanged. Add the master-table row (mp_engine_qcommon::Common.modules, constructed empty at Com_Init step 30).",
+        "COM_PRINTF STATE (session, shared with lifecycle.md — record the state-ownership side): com_printf(common: &mut Common, msg) lives in mp_engine_qcommon; Common owns the print-adjacent state (console buffer, logfile handle, rd_buffer redirect fields). Add/adjust master-table rows for those Common fields; the full decision record lives in lifecycle.md, cite it."
+      ],
+      "outline": "Apply exactly: (1) Fix the frozen vmMain/WorldCell sketch per the bootstrap resolution (GAME_INIT write-then-dispatch, GAME_SHUTDOWN take). (2) Freeze WorldPtr + the Dispatch impl pattern in ## Seam definition with the leaf-reborrow discipline. (3) Add the zeroed_box helper record + GameWorld::zeroed() construction story. (4) Add the Common.modules and com_printf-state master-table rows. (5) Close the corresponding items; keep genuinely-open ones. Keep Status: DRAFT (gates re-stamp).",
+      "dossierPath": "docs/dossiers/A2-state-ownership.md",
+      "model": "opus",
+      "depends": ["docs/architecture/engine-seam.md"]
+    },
+    {
+      "path": "docs/architecture/lifecycle.md",
+      "title": "Lifecycle",
+      "prefix": "LIFE",
+      "scope": "REVISION PASS: revise docs/architecture/lifecycle.md IN PLACE with the round-3 session resolutions below (all 2026-07-02); full gate findings in docs/handoffs/group-a-regate2-findings.json (READ IT). Do not rewrite from scratch.",
+      "decisions": [
+        "COM_PRINTF RESOLVED (session, fixes the C4 layering contradiction): com_printf(common: &mut Common, msg: &str) lives in mp_engine_qcommon — Common owns the print state (console buffer, logfile, rd_buffer redirect), and every engine crate reaches it (they all depend on qcommon). mp_engine_core keeps at most a convenience re-export. Dated amendment to the LIFE-D2 amendment + sweep the frozen signatures and call sites from &mut Engine/core to &mut Common/qcommon. Mirrors the STATE-Q4 reachability logic; state-ownership.md records the Common field rows.",
+        "LIFE-Q3 RESOLVED (session): sys_milliseconds' baseTime=true variant reads SystemTime::now() unix-epoch ms truncated to i32 (Raven: timeGetTime(), ms-since-OS-boot int) — same role, absolute seed source for Rand_Init at Com_Init step 9; the base-relative variant stays Instant-backed per LIFE-D4b. 1-line divergence note (different absolute origin; below the differential seam — RNG seeding was never cross-run deterministic). Close LIFE-Q3; step 9 fully Implements.",
+        "LIFE-Q4 RESOLVED (session): SysEventQueue's internal representation is the Box round-trip — the pinned sys_event_queue.rs owns the codebase's ONE Box::into_raw/from_raw pair: queue(ev, payload: Option<Box<[u8]>>) stores the raw ptr in the faithful sysEvent_t.evPtr, get() re-wraps to an owned Box, overflow eviction reconstitutes-and-drops. Invariant stated once: every non-null evPtr in the ring came from Box::into_raw. Documented as a §D11-style confinement note (sysEvent_t is the Raven ABI shape — the queue IS a seam surface). Public queue()/get() signatures unchanged. Close LIFE-Q4.",
+        "LIFE-Q5 RESOLVED (session, shared with state-ownership.md): the step-30 ModuleRegistry hangs off Engine.common.modules (field of Common in mp_engine_qcommon, mirroring vmTable as a qcommon-subsystem static). Engine's five-field frozen shape unchanged. Fix the step-30 line + slice hooks; close LIFE-Q5.",
+        "MECHANICAL: LIFE-Q1 stays open unchanged (owner already noted). If any remaining hole needs a genuinely new decision, report needsSession rather than inventing."
+      ],
+      "outline": "Apply exactly: (1) com_printf home sweep per the resolution (dated amendment; all frozen signatures + call-site text). (2) Record LIFE-Q3 resolution (SystemTime raw variant + divergence note) and mark step 9 Implements; close LIFE-Q3. (3) Record LIFE-Q4 internal-repr resolution at the SysEventQueue section; close LIFE-Q4. (4) Record LIFE-Q5 (Engine.common.modules) at step 30 + slice hooks; close LIFE-Q5. (5) Keep Status: DRAFT (gates re-stamp).",
+      "dossierPath": "docs/dossiers/A3-lifecycle.md",
+      "model": "opus",
+      "depends": ["docs/architecture/state-ownership.md"]
+    },
+    {
+      "path": "docs/architecture/module-loading.md",
+      "title": "Module Loading",
+      "prefix": "LOAD",
+      "scope": "REVISION PASS: revise docs/architecture/module-loading.md IN PLACE with the round-3 session resolutions below (all 2026-07-02); full gate findings in docs/handoffs/group-a-regate2-findings.json (READ IT). Do not rewrite from scratch.",
+      "decisions": [
+        "SLOT SHAPE RESOLVED (session, reconciles the SEAM-D11 conflict; engine-seam.md is being amended to match): one composed per-slot struct in mp_engine_qcommon's module_registry: pub struct ModuleSlot { name: String (the vm.cpp:485-489 reuse-by-name key), module: LoadedModule (lib + entry, shape unchanged), engine: EngineSlotCell (the SEAM-D11 *mut Engine stash + guard) }; ModuleRegistry.slots: [Option<ModuleSlot>; MAX_VM]. Amend the frozen ModuleRegistry/LoadedModule blocks accordingly (LoadedModule itself keeps {lib, entry}); load_module's reuse-by-name reads slot.name — closes the name-field hole with authorization.",
+        "SP POLICY REMOVED (session): delete the SP ModuleSearchPolicy block from the frozen Seam — per LOAD-D5 + DEC-07 our SP never exercises the loader (jagame via GetGameAPI table factory; retail SP-DLL hosting not ported), so the frozen value described a construction site that does not exist. Its search order stays documented under ## Raven ground truth only, with a 1-line why (porting-rules §20: zero-caller surface dropped with a note).",
+        "CDPATH SKIP RESOLVED (session): the mp_engine_qcommon policy-construction fn omits any FsPath step whose base is empty (the oracle's 'skipped if empty', win_main.cpp:859) — the policy handed to sys_load_dll contains only real steps and the loader executes blindly. Fix LOAD-D9's sample; the search-order goldens are over constructed policies so the skip is golden-tested at that layer. native/platform stays cvar-semantics-free.",
+        "MECHANICAL (no forks): (a) add VM_Create's earliest guard Com_Error(ERR_FATAL, \"VM_Create: bad parms\") (vm.cpp:481) to ## Raven ground truth and LOAD-D11's enumeration; load_module reproduces it via the receiverless com_error (LOAD-Q7 shape). (b) Pin field visibility: LoadedModule.lib/.entry and SlotId's tuple field are pub(crate) — constructed by loader.rs/module_registry.rs within their own crates under the one-type-per-file split; state it at the frozen blocks."
+      ],
+      "outline": "Apply exactly: (1) Amend the frozen registry blocks to the composed ModuleSlot; update load_module's reuse-by-name text. (2) Remove the SP policy from the frozen Seam (ground-truth section keeps the order + note). (3) Fix LOAD-D9's constructor sample per the cdpath skip. (4) Mechanical (a)-(b). (5) LOAD-Q1 stays open with owner noted. Keep Status: DRAFT (gates re-stamp).",
+      "dossierPath": "docs/dossiers/A4-module-loading.md",
+      "model": "opus",
+      "depends": ["docs/architecture/engine-seam.md"]
+    }
+  ],
+  "standingDocs": ["docs/doc-standards.md", "docs/porting-rules.md", "docs/workspace-architecture.md", "docs/architecture/two-island-model.md"]
+}
