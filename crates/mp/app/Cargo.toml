@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# The thin bin shell depends on the aggregate facade (workspace-architecture:
+# "mp/app is a thin bin shell depending only on mp_engine_core"); the legacy
+# leaf edges below predate mp_engine_core and are kept until their consumers
+# migrate.
+mp_engine_core = { path = "../engine/core" }
+native_platform = { path = "../../native/platform" }
 mp_engine_qcommon = { path = "../engine/qcommon" }
 mp_engine_server = { path = "../engine/server" }
 mp_engine_client = { path = "../engine/client" }
