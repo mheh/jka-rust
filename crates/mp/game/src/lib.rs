@@ -19,3 +19,8 @@ pub mod trap;
 pub mod world;
 
 pub use world::{EntityId, GameContext, GameWorld};
+
+// The export-command enum, re-exported so the jampgame shell names it through
+// its existing two edges (round-7 item 25; SEAM-D10's exactly-two-edges shell
+// property stays intact — the shell sees the seam through the logic crate).
+pub use mp_abi::game::exports::MpGameExport;

@@ -4,12 +4,15 @@
 //! that delegates into `mp_game` (`GameContext` receiver, SEAM-Q12). The logic
 //! crate `mp_game` has no entrypoint/`OnceLock`/`WorldCell` code of its own.
 
-use std::cell::UnsafeCell;
 use std::sync::OnceLock;
+
+mod world_cell;
 
 use abi_transport::entrypoints::{AbiCommand, AbiWord, RawExportTable, RawImportTable, RawSyscall};
 use abi_transport::generic::engine::CEngine;
 use mp_game::GameWorld;
+
+use crate::world_cell::WorldCell;
 
 /// The single outbound-syscall backend seam global (SEAM-D1, porting-rules §B6
 /// exception — `vmMain` takes no context argument). Set once at `dllEntry`.
@@ -18,21 +21,6 @@ static ENGINE: OnceLock<CEngine> = OnceLock::new();
 /// The module island's one owned `GameWorld` across `vmMain` calls (STATE-D6,
 /// the second sanctioned static exemption). `None` until `GAME_INIT` builds it.
 static WORLD: WorldCell = WorldCell::new();
-
-/// `UnsafeCell<Option<GameWorld>>` — reentrancy is handled by raw-pointer
-/// threading in `vmMain`, not by this wrapper (STATE-D6).
-struct WorldCell(UnsafeCell<Option<GameWorld>>);
-
-impl WorldCell {
-    const fn new() -> Self {
-        WorldCell(UnsafeCell::new(None))
-    }
-}
-
-// SAFETY (Sync only): the module runs single-threaded per Raven's contract, so
-// the static is never touched from a second thread. Single-threaded *reentrant*
-// aliasing is handled by the raw-pointer threading in `vmMain` (STATE-D6).
-unsafe impl Sync for WorldCell {}
 
 /// Raven `dllEntry` (`g_syscalls.c:14-16`). Stores the engine syscall trampoline
 /// into the one `OnceLock<CEngine>`. `extern "C-unwind"` (SEAM-D12).

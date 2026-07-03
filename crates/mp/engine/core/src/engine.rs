@@ -50,12 +50,18 @@ impl Engine {
     /// WHOLE aggregate is built through the `ZeroValid`-bounded zeroed path
     /// (LIFE-Q7 resolution, round-6 — the direct dual of Raven's
     /// loader-zero-filled statics; stack construction rejected: `server_t`
-    /// embeds 1024 `svEntity_t` by value, `server.h:53-88`). Non-zero init
-    /// happens in `com_init` exactly where Raven does it; `Engine::new` itself
-    /// only zero-allocates and captures the `std::time::Instant` timer base
-    /// into `Engine.common` (LIFE-D4b). Runs first in `main()`
-    /// (`let mut engine: Box<Engine> = Engine::new();`), before the warm-up
-    /// `sys_milliseconds` read and `com_init`. Takes no command line (LIFE-D4b).
+    /// embeds 1024 `svEntity_t` by value, `server.h:53-88`).
+    ///
+    /// Mechanics (LIFE-Q9 generalized, round-7): zeroed bytes only cover the
+    /// `ZeroValid` `#[repr(C)]` mass; EVERY non-`ZeroValid` field is written
+    /// in place through `MaybeUninit` BEFORE `assume_init` —
+    /// `common.time_base` (the `Instant` capture, LIFE-D4b),
+    /// `common.modules` (a zeroed `Option<ModuleSlot>` is NOT guaranteed
+    /// `None`), `cl = None`, `snd = None` (same non-guarantee). Non-zero
+    /// *subsystem* init happens in `com_init` exactly where Raven does it.
+    /// Runs first in `main()` (`let mut engine: Box<Engine> = Engine::new();`),
+    /// before the warm-up `sys_milliseconds` read and `com_init`. Takes no
+    /// command line (LIFE-D4b).
     ///
     /// Source: `docs/architecture/state-ownership.md` § `com_init` / `Engine::new`.
     #[allow(clippy::new_without_default)]
