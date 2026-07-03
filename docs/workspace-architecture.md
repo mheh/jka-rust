@@ -84,7 +84,9 @@ crates/
     ui/                      # mp_ui logic (transport-agnostic; ui shell wraps it)
     engine/
       core/                  # mp_engine_core facade: aggregate `Engine`,
-                             #   com_init/com_frame/com_shutdown/com_error
+                             #   com_init/com_frame/com_shutdown (+ com_error
+                             #   *recovery*; com_error itself is defined one tier
+                             #   lower in qcommon, state-ownership.md STATE-D7)
       wasm-host/             # mp_engine_wasm_host: host-side wasm module
                              #   types (WasmPtr<T>, ModuleMemory) + the
                              #   wasmtime dep, isolated here; qcommon's
@@ -119,7 +121,7 @@ crates/
 | 2 uishared | `mp/uishared`, `sp/uishared` | `ui_shared` | cgame + ui (per mode) |
 | 3 module (logic) | `mp/game`, `mp/cgame`, `mp/ui`, `sp/game` (+ `sp/cgame`, `sp/ui`, statically linked) | `g_*` / `cg_*`+`fx_*` / `ui_*` | transport-agnostic; wrapped by the shell crates below (or statically linked into `sp/app`) |
 | shell | `jampgame`, `cgame`, `ui`, `jagame` | `dllEntry`/`vmMain`/`GetGameAPI` export shape | thin cdylib shells: `ENGINE` `OnceLock` + entrypoints + `Dispatch` match |
-| engine | `*/engine/*`, `*/renderer` | `qcommon/server/client/botlib/ghoul2/icarus/RMG/renderer` | host binaries; `*/engine/core` is the aggregate facade (`Engine` + `com_init`/`com_frame`/`com_shutdown`/`com_error`) depended on by `*/app` |
+| engine | `*/engine/*`, `*/renderer` | `qcommon/server/client/botlib/ghoul2/icarus/RMG/renderer` | host binaries; `*/engine/core` is the aggregate facade (`Engine` + `com_init`/`com_frame`/`com_shutdown`, plus `com_error`'s *recovery* — `com_error` itself is defined one tier lower in `*/engine/qcommon`, state-ownership.md STATE-D7) depended on by `*/app` |
 
 > `MAX_GENTITIES` currently sits in `mp_engine_server` from the mechanical
 > type-port but belongs in `mp_qshared` (oracle home
@@ -169,7 +171,9 @@ Engine (per mode): `mp/engine/*` depend on `mp/qshared`, `abi-transport`, and
 `native/*`; `ghoul2` is depended on by both `engine/*` and `cgame` (Raven shares
 it that way). `mp/engine/core` (package `mp_engine_core`) is the aggregate
 facade: it depends on the other `mp/engine/*` subcrates, defines the aggregate
-`pub struct Engine`, and hosts `com_init`/`com_frame`/`com_shutdown`/`com_error`.
+`pub struct Engine`, and hosts `com_init`/`com_frame`/`com_shutdown` (plus
+`com_error`'s recovery; `com_error` itself is defined one tier lower in
+`mp/engine/qcommon` — state-ownership.md STATE-D7).
 `mp/app` is a thin bin shell depending only on `mp/engine/core` and hosts the
 module cdylib shells. `mp/engine/wasm-host` (package `mp_engine_wasm_host`)
 isolates the host-side wasm types (`WasmPtr<T>`, `ModuleMemory`) and the
