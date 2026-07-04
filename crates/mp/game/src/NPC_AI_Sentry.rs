@@ -278,9 +278,9 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
             }
         } else {
             let goal: *mut gentity_t = if let Some(goal_id) = (*NPCInfo).goalEntity {
-                unsafe { &*(*world).entities.as_ptr().add(goal_id.0 as usize) } as *const gentity_t as *mut gentity_t
+                (unsafe { &*(*world).entities.as_ptr().add(goal_id.0 as usize) }) as *const gentity_t as *mut gentity_t
             } else if let Some(last_goal_id) = (*NPCInfo).lastGoalEntity {
-                unsafe { &*(*world).entities.as_ptr().add(last_goal_id.0 as usize) } as *const gentity_t as *mut gentity_t
+                (unsafe { &*(*world).entities.as_ptr().add(last_goal_id.0 as usize) }) as *const gentity_t as *mut gentity_t
             } else {
                 core::ptr::null_mut()
             };

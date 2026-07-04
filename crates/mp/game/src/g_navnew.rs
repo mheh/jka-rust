@@ -1063,5 +1063,3 @@ pub fn NAVNEW_MoveToGoal(
         bestNode
     }
 }
-    }
-}

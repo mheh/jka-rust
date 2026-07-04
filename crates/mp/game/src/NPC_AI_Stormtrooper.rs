@@ -1949,7 +1949,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
             runner = QTRUE;
         }
 
-        if /*!runner &&*/ (*group).lastSeenEnemyTime > world.level.time - 32000
+        if /* !runner && */ (*group).lastSeenEnemyTime > world.level.time - 32000
             && (*group).lastSeenEnemyTime < world.level.time - 30000
         {
             // no-one has seen the enemy for 30 seconds// and no-one is running after him

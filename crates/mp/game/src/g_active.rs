@@ -321,7 +321,7 @@ pub fn DoImpact(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mut gentity
             } else if (*self_).mass <= 10.0 {
                 my_mass = 10.0;
             } else {
-                my_mass = (*self_).mass; ///10;
+                my_mass = (*self_).mass; // /10;
             }
         }
 
