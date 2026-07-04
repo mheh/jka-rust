@@ -95,6 +95,17 @@ crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut muzzle);
 ```
 (`vec3_t` is `[f32;3]` and `Copy` — read a struct field straight in by value, no `&`. bg-tier files reach these as `mp_qshared::shared::q_math::…`.)
 
+### float→double promotion — bare double literals promote, `f`-suffixed stay f32
+C arithmetic mixing a `float` with a bare double literal (`x *= 0.75;`) promotes to double, then narrows on store — port that promotion explicitly. Literals with an `f` suffix (`0.5f`) stay pure f32. Multi-term expressions keep C's promotion points: each subexpression widens only where C does. (Precedent: PM_Friction / BG_AdjustClientSpeed / BG_G2PlayerAngles, trial-8, `bg_pmove.rs`.)
+```rust
+// Raven: x *= 0.75;            — bare double literal: promote, then narrow
+x = (x as f64 * 0.75) as f32;
+// Raven: x *= 0.5f;            — f-suffixed literal: pure f32
+x *= 0.5f32;
+// Raven: (-360.0 + h) * 0.75;  — f32 addition, then f64 multiply, then narrow
+((-360.0f32 + h) as f64 * 0.75) as f32
+```
+
 ### RNG — Raven `rand`/`random`/`crandom`/`flrand`/`irand` → the one `BgState.rng`
 ```rust
 // Raven: respawn += crandom() * ent->random;
