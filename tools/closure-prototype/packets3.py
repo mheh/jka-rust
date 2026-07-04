@@ -371,6 +371,141 @@ def main():
         print(f"[packets3] trial-manifest.json: {[e['file'] for e in trial]}")
 
 
+def example_syntax(tier, rng_path):
+    """`## EXAMPLE SYNTAX` — worked, copy-me call shapes lifted verbatim from the
+    worktree (trap.rs / q_math.rs / rng.rs / cstr_util.rs / ent_fn_enums.rs /
+    entity_id.rs). Built to kill the recurring porter/fixer syntax failures:
+    Raven macro-style vec3 calls, hand-rolled CStrings, wrong trap arg shapes,
+    raw fn-ptr assignment, pointer compares of Option<EntityId> fields — and the
+    reflex to shim a "missing" helper inside a ported file."""
+    rng = rng_path[1:-1]  # strip the markdown backticks for inside a code fence
+    e = []
+    e.append("## EXAMPLE SYNTAX (copy these shapes)")
+    e.append("")
+    e.append("REAL, compiling call shapes lifted verbatim from the worktree — copy them. "
+             "Do NOT write Raven macro/libc spellings (`VectorCopy(a,b)`, `rand()`, "
+             "`atoi(s)`) and do NOT report the mapped canonical helpers below as "
+             "missing symbols.")
+    e.append("")
+    e.append("**NEVER define a local helper/shim fn in your file — if a helper seems "
+             "missing, use the mapped canonical form below or report it in "
+             "`missing_symbols`.**")
+    e.append("")
+    e.append("### traps — game tier: `crate::trap::Name(ctx.engine, <Name>Args::new(…))`")
+    e.append("One `ctx.engine` + one `…Args::new(…)` struct in oracle arg order; args are "
+             "raw pointers where Raven passed `T*` (`&mut x as *mut T` / `&x as *const T`).")
+    e.append("```rust")
+    e.append("// void — trap_LinkEntity(self):")
+    e.append("trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));")
+    e.append("")
+    e.append("// out-param + buffers — trap_Trace(&tr, start, mins, maxs, end, num, mask):")
+    e.append("trap::Trace(")
+    e.append("    ctx.engine,")
+    e.append("    GTraceArgs::new(")
+    e.append("        &mut tr as *mut trace_t,")
+    e.append("        &(*self_).r.currentOrigin as *const vec3_t,")
+    e.append("        &(*self_).r.mins as *const vec3_t,")
+    e.append("        &(*self_).r.maxs as *const vec3_t,")
+    e.append("        &(*self_).r.currentOrigin as *const vec3_t,")
+    e.append("        (*self_).s.number,")
+    e.append("        CONTENTS_BODY,")
+    e.append("    ),")
+    e.append(");")
+    e.append("")
+    e.append("// G2 strap (fully-qualified Args path when not in the prelude) —")
+    e.append("// trap_G2API_GetBoltMatrix(ghoul2, mdl, bolt, &matrix, angles, pos, frame, list, scale):")
+    e.append("trap::G2API_GetBoltMatrix(")
+    e.append("    ctx.engine,")
+    e.append("    mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(")
+    e.append("        (*eweb).ghoul2, 0, (*eweb).genericValue10,")
+    e.append("        &mut boltMatrix as *mut mdxaBone_t,")
+    e.append("        &(*eweb).s.apos.trBase as *const vec3_t,")
+    e.append("        &(*eweb).r.currentOrigin as *const vec3_t,")
+    e.append("        (*ctx.world).level.time,")
+    e.append("        core::ptr::null_mut(),")
+    e.append("        &(*eweb).modelScale as *const vec3_t,")
+    e.append("    ),")
+    e.append(");")
+    e.append("```")
+    e.append("")
+    e.append("### traps — bg tier: `self.traps.<method>(…)` (`&dyn BgTraps`, snake_case names)")
+    e.append("```rust")
+    e.append("self.traps.trace(")
+    e.append("    &mut trace,")
+    e.append("    core::ptr::addr_of!((*ps).origin) as *const vec3_t,")
+    e.append("    core::ptr::addr_of!((*self.pm).mins) as *const vec3_t,")
+    e.append("    core::ptr::addr_of!((*self.pm).maxs) as *const vec3_t,")
+    e.append("    core::ptr::addr_of!(end) as *const vec3_t,")
+    e.append("    (*ps).clientNum,")
+    e.append("    (*self.pm).tracemask,")
+    e.append(");")
+    e.append("```")
+    e.append("")
+    e.append("### vec3 / q_shared macros → reshaped `crate::q_math` fns (inputs BY VALUE, outputs `&mut`)")
+    e.append("Raven's `q_shared.h` `Vector*`/`DotProduct`/`CrossProduct` MACROS are reshaped "
+             "functions — NEVER macro call syntax, NEVER a local shim. Note the `_` prefix on "
+             "the assignment-style ones. Exact names/signatures:")
+    e.append("- `VectorCopy(a,b)`       → `_VectorCopy(in: vec3_t, out: &mut vec3_t)`")
+    e.append("- `VectorSubtract(a,b,c)` → `_VectorSubtract(a: vec3_t, b: vec3_t, out: &mut vec3_t)`")
+    e.append("- `VectorAdd(a,b,c)`      → `_VectorAdd(a: vec3_t, b: vec3_t, out: &mut vec3_t)`")
+    e.append("- `VectorScale(a,s,c)`    → `_VectorScale(in: vec3_t, scale: f32, out: &mut vec3_t)`")
+    e.append("- `VectorMA(a,s,b,c)`     → `_VectorMA(a: vec3_t, scale: f32, b: vec3_t, out: &mut vec3_t)`")
+    e.append("- `DotProduct(a,b)`       → `_DotProduct(a: vec3_t, b: vec3_t) -> f32`")
+    e.append("- `CrossProduct(a,b,c)`   → `CrossProduct(a: vec3_t, b: vec3_t, cross: &mut vec3_t)`")
+    e.append("- `VectorNormalize(v)`    → `VectorNormalize(v: &mut vec3_t) -> f32` (mutate-in-place + return length)")
+    e.append("- `VectorNormalize2(v,o)` → `VectorNormalize2(v: vec3_t, out: &mut vec3_t) -> f32`")
+    e.append("- `VectorLength(v)`       → `VectorLength(v: vec3_t) -> f32`  ·  `Distance(a,b)` → `Distance(a: vec3_t, b: vec3_t) -> f32`")
+    e.append("```rust")
+    e.append("// Raven: VectorSubtract( ent->r.currentOrigin, self->r.currentOrigin, dir );")
+    e.append("crate::q_math::_VectorSubtract((*ent).r.currentOrigin, (*self_).r.currentOrigin, &mut dir);")
+    e.append("// Raven: VectorCopy( ent->r.currentOrigin, muzzle );")
+    e.append("crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut muzzle);")
+    e.append("```")
+    e.append("(`vec3_t` is `[f32;3]` and `Copy` — read a struct field straight in by value, no "
+             "`&`. bg-tier files reach these as `mp_qshared::shared::q_math::…`.)")
+    e.append("")
+    e.append(f"### RNG — Raven `rand`/`random`/`crandom`/`flrand`/`irand` → the one `BgState.rng`")
+    e.append("```rust")
+    e.append("// Raven: respawn += crandom() * ent->random;")
+    e.append(f"respawn += ({rng}.crandom() * (*ent).random) as c_int;")
+    e.append("```")
+    e.append(f"(`{rng}` is the tier's generator path — see the RNG section above for the full "
+             "method table.)")
+    e.append("")
+    e.append("### cstr seam — build/decode a `char*` at a syscall boundary (never a hand-rolled CString)")
+    e.append("```rust")
+    e.append("// Raven: Com_Printf( \"%s\", s );  — own the bytes in a local, pass `.as_ptr()`")
+    e.append("crate::g_main::Com_Printf(cstr(&s).as_ptr());")
+    e.append("// Raven: const char *n = <engine char*>;  — decode an engine string")
+    e.append("let n: String = unsafe { cstr_to_str(name_ptr) };")
+    e.append("```")
+    e.append("")
+    e.append("### fn-ptr dispatch — store an `EntThink`/`EntUse`/… enum, call via `dispatch_*`")
+    e.append("```rust")
+    e.append("// Raven: self->think = ShieldGoSolid;")
+    e.append("(*self_).think = Some(EntThink::ShieldGoSolid);")
+    e.append("// Raven: if ( self->think == ShieldGoSolid ) …")
+    e.append("if (*self_).think == Some(EntThink::ShieldGoSolid) { /* … */ }")
+    e.append("// Raven: ent->think( ent );   (an indirect call)")
+    e.append("if let Some(think_fn) = (*ent).think {")
+    e.append("    crate::ent_fn_enums::dispatch_think(ctx, think_fn, ent);")
+    e.append("}")
+    e.append("```")
+    e.append("")
+    e.append("### `Option<EntityId>` stored fields — assign/compare ids, never pointers (ruling 22)")
+    e.append("```rust")
+    e.append("// Raven: missile->parent = owner;")
+    e.append("(*missile).parent = Some(ent_id((*ctx.world).entities.as_mut_ptr(), owner));")
+    e.append("// Raven: if ( client->hook == ent ) …")
+    e.append("if (*client_ptr).hook == Some(ent_id((*ctx.world).entities.as_mut_ptr(), ent)) { /* … */ }")
+    e.append("// Raven: if ( !ent->enemy ) …")
+    e.append("if (*ent).enemy.is_none() { /* … */ }")
+    e.append("// ent_id_opt(base, maybe_null_ptr) folds a nullable pointer straight to Option<EntityId>.")
+    e.append("```")
+    e.append("")
+    return "\n".join(e)
+
+
 def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
                   va_table, wt, wt_sig, method_sig, is_pmove_method, shape,
                   ctx_by, ctxfree,
@@ -495,6 +630,9 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
              "`[c_char; N]` struct field with truncation + NUL, replacing a Raven "
              "`Q_strncpyz`/`strcpy` into a char array.")
     o.append("")
+
+    # ---- worked example syntax (copy-me shapes; kills the recurring syntax classes)
+    o.append(example_syntax(tier, rng_path))
 
     # ---- threading digest per fn
     o.append("## THREADING DIGEST — per open fn")
