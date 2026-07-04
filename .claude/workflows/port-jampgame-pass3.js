@@ -49,15 +49,33 @@ log(`Pass 3: ${files.length} packets, zero-park blind transcription`)
 const OPUS_FILES = new Set(['ai_main.c', 'w_saber.c', 'NPC_AI_Jedi.c', 'bg_pmove.c', 'g_vehicles.c', 'g_combat.c'])
 const tierFor = p => OPUS_FILES.has(p.file) || (p.loc || 0) > 3500 ? 'opus' : (p.loc || 0) < 900 ? 'haiku' : 'sonnet'
 
-// ---- non-blocking, BATCHED symbol fixers (fixer = symbol resolver, never logic) ----
-// One agent per porter REPORT (not per symbol): symbols sharing a defining
-// file/enum family get one consistent resolution instead of N serialized
-// no-op confirmations (trial-3 finding: 12 agents for one enum glob).
-// SERIALIZED through one chain: fixers share prelude.rs/mod.rs files — parallel edits would race.
-// Cross-porter dedupe via symSeen (claimed at enqueue time, before the agent runs).
+// ---- non-blocking, TWO-PHASE symbol fixers (fixer = symbol resolver, never logic) ----
+// Phase A (RESOLVE, fully parallel): one READ-ONLY resolver per porter REPORT
+// (not per symbol — trial-3 finding: 12 agents for one enum glob) investigates
+// its fresh symbols and returns per-symbol edit plans; it writes nothing, so
+// nothing serializes. Cross-porter dedupe via symSeen (claimed at enqueue time,
+// before the agent runs).
+// Phase B (WRITE): plans grouped by defining-file family (target_files[0]); one
+// writer per family. Writers serialize ONLY on shared paths via pathChains, a
+// per-path promise map: a writer awaits the prior claim on ALL its target files
+// and claims them before it starts (claim-then-run), so two families touching
+// prelude.rs queue while disjoint families run concurrently. Replaces the
+// single serial symChain, which was the trial's wall-clock tail (~40 min after
+// porters finished).
 const symSeen = new Set()
 const symbolsFixed = []
-let symChain = Promise.resolve()
+const fixJobs = []
+const pathChains = new Map()
+const normPath = p => String(p).replace(`${WT}/`, '').replace(/^\.\//, '')
+function claimPaths(paths, run) {
+  const prior = Promise.all(paths.map(p => pathChains.get(p) || Promise.resolve()))
+  const job = prior.then(run)
+  const settled = job.catch(() => {})
+  for (const p of paths) pathChains.set(p, settled)
+  return job
+}
+const RESOLVE_SCHEMA = { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, action: { type: 'string' }, target_files: { type: 'array', items: { type: 'string' } }, plan: { type: 'string' } }, required: ['name', 'action', 'target_files'] } } }, required: ['results'] }
+const WRITE_SCHEMA = { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, action: { type: 'string' }, path: { type: 'string' } }, required: ['name', 'action'] } } }, required: ['results'] }
 function fixSymbols(syms) {
   const fresh = []
   for (const s of (syms || [])) {
@@ -71,21 +89,41 @@ function fixSymbols(syms) {
   if (!fresh.length) return Promise.resolve(null)
   const list = fresh.map(s => `- \`${s.name}\` (${s.kind || 'unknown kind'}${s.source ? ', oracle: ' + s.source : ''})`).join('\n')
   const label = fresh.length === 1 ? `sym:${fresh[0].name}` : `sym:${fresh[0].name}+${fresh.length - 1}`
-  const run = () => agent(
-    `SYMBOL FIXER (batched resolver contract — you resolve symbols, never logic). Worktree ${WT}, branch skeleton. These ${fresh.length} symbols are referenced by freshly-ported jampgame bodies but do not resolve:
+  const job = agent(
+    `SYMBOL RESOLVER (phase A of the two-phase fixer — READ-ONLY: you investigate and plan; a separate writer executes. Write NOTHING, edit NOTHING). Worktree ${WT}, branch skeleton. These ${fresh.length} symbols are referenced by freshly-ported jampgame bodies but do not resolve:
 ${list}
 For EACH symbol, in order:
-1. grep the worktree crates/mp/ first: if it EXISTS but is private/unimported -> make it pub and add the re-export where bare references resolve (prelude.rs pattern).
-2. If it does not exist -> port it faithfully from the oracle (find it; single const/enum/type/table/helper-fn; house style: doc-comment + Source cite, Raven name, enum-vs-alias fidelity, one type per file beside its subsystem siblings; wire mod decls).
-3. FAMILY RULE: symbols sharing one defining file or enum resolve TOGETHER with ONE strategy (one module/enum glob re-export, or one const block ported) — never mix per-name strategies for the same family, never re-add a name a glob already covers.
-3a. CANONICAL FAMILIES ALWAYS EXIST — the vec3/q_shared macro family (Vector*, DotProduct, CrossProduct, VectorNormalize, …, in q_math.rs — assignment forms are _-prefixed: _VectorCopy/_VectorSubtract/_VectorAdd/_VectorScale/_VectorMA/_DotProduct), libc names (atoi/atof/rand in bg_lib.rs), and cstr helpers (cstr/cstr_to_str/write_cstr_field in cstr_util.rs; RNG via BgState.rng) all already exist in canonical form. For these the ONLY valid action is to fix the CALL SITE imports (add/adjust the use path) or report "already-ok" — NEVER create a local shim, NEVER port a duplicate, NEVER re-derive them.
-4. NEVER modify a fn body or an existing signature. Call sites bend toward declarations, never the reverse — and you touch neither.
-${STYLE} Return JSON {results:[{name, action: "exported"|"ported"|"already-ok"|"is-state-not-const", path: "<rust file>"}]} — one entry per symbol above.`,
-    { label, phase: 'Port', model: fresh.length > 6 ? 'sonnet' : 'haiku', effort: 'low', schema: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, action: { type: 'string' }, path: { type: 'string' } }, required: ['name', 'action'] } } }, required: ['results'] } }
-  ).then(r => { if (r && r.results) symbolsFixed.push(...r.results); return r })
-  const p = symChain.then(run)
-  symChain = p.catch(() => {})
-  return p
+1. grep the worktree crates/mp/ first: if it EXISTS but is private/unimported -> action "export"; plan the pub + re-export where bare references resolve (prelude.rs pattern). If it already resolves as referenced -> action "already-ok", target_files: [].
+2. If it does not exist -> action "port"; find it in the oracle and plan the faithful port (single const/enum/type/table/helper-fn; house style: doc-comment + Source cite, Raven name, enum-vs-alias fidelity, one type per file beside its subsystem siblings; wire mod decls).
+3. FAMILY RULE: symbols sharing one defining file or enum resolve TOGETHER with ONE strategy (one module/enum glob re-export, or one const block ported) — never mix per-name strategies for the same family, never re-add a name a glob already covers. Family members share the SAME target_files[0].
+3a. CANONICAL FAMILIES ALWAYS EXIST — the vec3/q_shared macro family (Vector*, DotProduct, CrossProduct, VectorNormalize, …, in q_math.rs — assignment forms are _-prefixed: _VectorCopy/_VectorSubtract/_VectorAdd/_VectorScale/_VectorMA/_DotProduct), libc names (atoi/atof/rand in bg_lib.rs), and cstr helpers (cstr/cstr_to_str/write_cstr_field in cstr_util.rs; RNG via BgState.rng) all already exist in canonical form. For these the ONLY valid plan is an import/re-export fix ("export") or "already-ok" — NEVER plan a local shim, a duplicate port, or a re-derivation.
+4. Plans NEVER modify a fn body or an existing signature. Call sites bend toward declarations, never the reverse — and you plan for neither.
+Return JSON {results:[{name, action: "port"|"export"|"already-ok", target_files: ["<repo-relative .rs paths the writer would create/edit — the defining/new file FIRST, then any mod.rs, prelude.rs>"], plan: "<2-4 line edit plan>"}]} — one entry per symbol above.`,
+    { label, phase: 'Port', model: fresh.length > 6 ? 'sonnet' : 'haiku', effort: 'low', schema: RESOLVE_SCHEMA }
+  ).then(r => {
+    if (!r || !r.results) return null
+    // already-ok needs no writer; the rest group by defining-file family.
+    const families = new Map()
+    for (const res of r.results) {
+      if (res.action === 'already-ok' || !(res.target_files || []).length) { symbolsFixed.push({ name: res.name, action: 'already-ok' }); continue }
+      const key = normPath(res.target_files[0])
+      if (!families.has(key)) families.set(key, [])
+      families.get(key).push(res)
+    }
+    return Promise.all([...families].map(([famFile, members]) => {
+      const paths = [...new Set(members.flatMap(m => m.target_files.map(normPath)))]
+      const plans = members.map(m => `- \`${m.name}\` (${m.action}) -> ${m.target_files.map(normPath).join(', ')}\n  PLAN: ${m.plan || 'per action, house style'}`).join('\n')
+      const wlabel = members.length === 1 ? `symw:${members[0].name}` : `symw:${members[0].name}+${members.length - 1}`
+      return claimPaths(paths, () => agent(
+        `SYMBOL WRITER (phase B of the two-phase fixer — you EXECUTE the resolver's plans verbatim; never re-investigate, never redesign). Worktree ${WT}, branch skeleton. Family: ${famFile}. Execute these plans, touching ONLY these files: ${paths.join(', ')}.
+${plans}
+DISCIPLINE: NO SHIMS — never define a local helper or duplicate; every symbol goes to its canonical home exactly as planned. House style: doc-comment + Source cite, Raven name, enum-vs-alias fidelity, one type per file; unported deps get the house //TODO: Port <subject> + // Source: marker, never a silent fake. NEVER modify a fn body or an existing signature — call sites bend toward declarations, and you touch neither. ${STYLE} Return JSON {results:[{name, action: "exported"|"ported"|"already-ok"|"is-state-not-const", path: "<rust file>"}]} — one entry per symbol above.`,
+        { label: wlabel, phase: 'Port', model: 'sonnet', effort: 'low', schema: WRITE_SCHEMA }
+      ).then(w => { if (w && w.results) symbolsFixed.push(...w.results); return w }))
+    }))
+  })
+  fixJobs.push(job.catch(() => {}))
+  return job
 }
 
 // ---- serialized WIP committer (no parallel git races) ----
@@ -136,7 +174,7 @@ Return JSON: {file, fns_filled, fns_deferred_by_ruling, port_notes:[{fn,topic,no
   }
   return r
 }))
-await symChain
+await Promise.all(fixJobs) // barrier: every resolver AND all phase-B writes it spawned
 maybeCommit(true)
 await commitChain
 const done = results.filter(Boolean)
