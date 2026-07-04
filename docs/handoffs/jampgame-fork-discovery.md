@@ -154,7 +154,9 @@ parks trace to the generated signatures not carrying already-settled rulings.
     long only — document + assert at the boot target; pmove_t's trace/
     pointcontents fn-ptr fields stay for layout but bg logic uses BgTraps
     (two-channel situation is intended).
-22. **Fork-4 execution shape (stated 2026-07-04):** the 38 stored fields
+22. **Fork-4 execution shape (stated 2026-07-04; count corrected at flip
+    time: 37 fields — gNPC_t has 12 gentity_t* fields, not 13; gclient_t's
+    formationGoal stays a pointer):** the stored fields
     become `Option<EntityId>` (Raven NULL → None; entity 0 is valid so no
     sentinel niche); conversion is compiler-driven (change field types, fix
     every resulting type error before porters launch); gentity_t/gclient_t
