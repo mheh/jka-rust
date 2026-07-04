@@ -7,9 +7,11 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use crate::common::mp::ent_fn_ids::{
+    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse,
+};
 use crate::common::mp::entity_id::EntityId;
 use crate::common::mp::qcommon::{entityState_t, gitem_t, parms_t, playerState_t};
-use crate::common::mp::trace_t::trace_t;
 use crate::shared::{entityShared_t, qboolean, vec3_t};
 
 /// Raven MP `NUM_TIDS`.
@@ -341,38 +343,27 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:283`
     pub nextthink: c_int,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:284`
-    pub think: Option<unsafe extern "C" fn(self_: *mut gentity_t)>,
+    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntThink>` (Raven fn ptr).
+    pub think: Option<EntThink>,
     /// Movers call this when hitting endpoint.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:285`
-    pub reached: Option<unsafe extern "C" fn(self_: *mut gentity_t)>,
+    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntReached>` (Raven fn ptr).
+    pub reached: Option<EntReached>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:286`
-    pub blocked: Option<unsafe extern "C" fn(self_: *mut gentity_t, other: *mut gentity_t)>,
+    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntBlocked>` (Raven fn ptr).
+    pub blocked: Option<EntBlocked>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:287`
-    pub touch: Option<
-        unsafe extern "C" fn(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t),
-    >,
+    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntTouch>` (Raven fn ptr).
+    pub touch: Option<EntTouch>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:288`
-    pub use_: Option<
-        unsafe extern "C" fn(
-            self_: *mut gentity_t,
-            other: *mut gentity_t,
-            activator: *mut gentity_t,
-        ),
-    >,
+    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntUse>` (Raven fn ptr).
+    pub use_: Option<EntUse>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:289`
-    pub pain: Option<
-        unsafe extern "C" fn(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int),
-    >,
+    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntPain>` (Raven fn ptr).
+    pub pain: Option<EntPain>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:290`
-    pub die: Option<
-        unsafe extern "C" fn(
-            self_: *mut gentity_t,
-            inflictor: *mut gentity_t,
-            attacker: *mut gentity_t,
-            damage: c_int,
-            mod_: c_int,
-        ),
-    >,
+    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntDie>` (Raven fn ptr).
+    pub die: Option<EntDie>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:292`
     pub pain_debounce_time: c_int,
     /// Wind tunnel.

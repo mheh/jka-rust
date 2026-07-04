@@ -1822,8 +1822,8 @@ pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).genericValue4 = 0;
 
         (*ent).takedamage = qtrue;
-        (*ent).pain = Some(EntThink::emplaced_gun_pain);
-        (*ent).die = Some(EntThink::emplaced_gun_die);
+        (*ent).pain = Some(EntPain::emplaced_gun_pain);
+        (*ent).die = Some(EntDie::emplaced_gun_die);
 
         (*ent).splashDamage = 80;
         (*ent).splashRadius = 128;
@@ -1857,7 +1857,7 @@ pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).think = Some(EntThink::emplaced_gun_update);
         (*ent).nextthink = (*ctx.world).level.time + 50;
 
-        (*ent).use_ = Some(EntThink::emplaced_gun_realuse);
+        (*ent).use_ = Some(EntUse::emplaced_gun_realuse);
 
         (*ent).r.svFlags |= crate::shared::SVF_PLAYER_USABLE as u32;
 

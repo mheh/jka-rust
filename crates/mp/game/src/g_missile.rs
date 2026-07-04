@@ -610,7 +610,7 @@ pub fn G_MissileImpact(
                     if (*ent).s.weapon == WP_FLECHETTE && (((*ent).s.eFlags & EF_ALT_FIRING) != 0) {
                         if let Some(think_fn) = (*ent).think {
                             // Call the think function
-                            (think_fn)(ctx, ent);
+                            crate::ent_fn_enums::dispatch_think(ctx, think_fn, ent);
                         }
                     } else {
                         G_Damage(other, ent, &mut (*ctx.world).entities[(*ent).r.ownerNum as usize], velocity, (*ent).r.currentOrigin, (*ent).damage, DAMAGE_HALF_ABSORB as c_int, (*ent).methodOfDeath);

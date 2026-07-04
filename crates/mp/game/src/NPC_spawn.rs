@@ -1262,7 +1262,7 @@ pub fn NPC_SpawnType(
     }
 
     unsafe {
-        (*npc_spawner).think = Some(G_FreeEntity);
+        (*npc_spawner).think = Some(EntThink::G_FreeEntity);
         (*npc_spawner).nextthink = ctx.world.level.time + 50; // FRAMETIME
     }
 

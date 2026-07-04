@@ -3,6 +3,7 @@
 pub mod bg;
 pub mod botlib;
 pub mod cgame;
+pub mod ent_fn_ids;
 pub mod entity_id;
 pub mod game;
 pub mod gentity;

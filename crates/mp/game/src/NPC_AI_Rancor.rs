@@ -273,9 +273,9 @@ pub fn Rancor_Swing(
                     (*npc).count = 1;//in my hand
                     //wait to attack
                     crate::g_timer::TIMER_Set(ctx, npc, c"attacking".as_ptr(), (*(*npc).client).ps.legsTimer + crate::q_math::Q_irand(500, 2500));
-                    if (*radiusEnt).health > 0 && !(*radiusEnt).pain.is_null() {
+                    if (*radiusEnt).health > 0 && (*radiusEnt).pain.is_some() {
                         //do pain on enemy
-                        ((*radiusEnt).pain)(radiusEnt, npc, 100);
+                        crate::ent_fn_enums::dispatch_pain(ctx, (*radiusEnt).pain.unwrap(), radiusEnt, npc, 100);
                         //GEntity_PainFunc( radiusEnt, NPC, NPC, radiusEnt->r.currentOrigin, 0, MOD_CRUSH );
                     } else if !(*radiusEnt).client.is_null() {
                         (*(*radiusEnt).client).ps.forceHandExtend = HANDEXTEND_NONE;

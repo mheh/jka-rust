@@ -3200,7 +3200,7 @@ pub fn G_BounceItem(
         if (*ent).s.weapon == WP_DET_PACK as c_int && (*ent).s.eType == ET_GENERAL as c_int && (*ent).physicsObject != 0 {
             // detpacks only
             if let Some(touch) = (*ent).touch {
-                touch(ent, &mut (*ctx.world).entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
+                crate::ent_fn_enums::dispatch_touch(ctx, touch, ent, &mut (*ctx.world).entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
                 return;
             }
         }
@@ -3225,7 +3225,7 @@ pub fn G_BounceItem(
         if (*ent).s.eType == ET_HOLOCRON as c_int || ((*ent).s.shouldtarget != 0 && (*ent).s.eType == ET_GENERAL as c_int && (*ent).physicsObject != 0) {
             // holocrons and sentry guns
             if let Some(touch) = (*ent).touch {
-                touch(ent, &mut (*ctx.world).entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
+                crate::ent_fn_enums::dispatch_touch(ctx, touch, ent, &mut (*ctx.world).entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
             }
         }
     }

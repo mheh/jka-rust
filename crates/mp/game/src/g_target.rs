@@ -601,7 +601,7 @@ pub fn target_relay_use(
 
         if (*self_).spawnflags & 4 != 0 {
             let ent = G_PickTarget(ctx, (*self_).target);
-            if !ent.is_null() && !(*ent).use_.is_null() {
+            if !ent.is_null() && (*ent).use_.is_some() {
                 GlobalUse(ent, self_, activator);
             }
             return;
@@ -837,7 +837,7 @@ pub fn target_random_use(
             if t == self_ {
                 // WARNING: Entity used itself (shouldn't happen)
             } else if t_count == pick {
-                if !(*t).use_.is_null() {
+                if (*t).use_.is_some() {
                     // check can be omitted
                     GlobalUse(t, self_, activator);
                     return;

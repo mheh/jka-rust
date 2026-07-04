@@ -129,14 +129,14 @@ pub fn auto_turret_die(
         let owner_num = (*self_).r.ownerNum as usize;
         if owner_num < ctx.world.entities.len() {
             let owner = &mut ctx.world.entities[owner_num];
-            owner.think = EntThink::None;
-            owner.use_fn = EntUse::None;
+            owner.think = None;
+            owner.use_fn = None;
         }
 
         let mut forward = [0.0, 0.0, 1.0];
         let mut pos = [0.0, 0.0, 0.0];
 
-        (*self_).die = EntDie::None;
+        (*self_).die = None;
         (*self_).takedamage = qfalse;
         (*self_).s.health = 0;
         (*self_).health = 0;
@@ -251,7 +251,7 @@ pub fn turret_fire(
 
         (*bolt).classname = c"turret_proj".as_ptr();
         (*bolt).nextthink = ctx.world.level.time + 10000;
-        (*bolt).think = EntThink::G_FreeEntity;
+        (*bolt).think = Some(EntThink::G_FreeEntity);
         (*bolt).s.eType = ET_MISSILE;
         (*bolt).s.weapon = WP_EMPLACED_GUN;
         (*bolt).r.ownerNum = (*ent).s.number;
@@ -776,8 +776,8 @@ pub fn SP_misc_turret(
         (*base).r.mins[1] = -32.0;
         (*base).r.mins[2] = 0.0;
 
-        (*base).use_fn = EntUse::turret_base_use;
-        (*base).think = EntThink::turret_base_think;
+        (*base).use_fn = Some(EntUse::turret_base_use);
+        (*base).think = Some(EntThink::turret_base_think);
         (*base).nextthink = ctx.world.level.time + FRAMETIME * 5;
 
         trap::LinkEntity(ctx.engine, base);
@@ -853,8 +853,8 @@ pub fn turret_base_spawn_top(
         }
 
         (*base).takedamage = qtrue;
-        (*base).pain = EntPain::TurretBasePain;
-        (*base).die = EntDie::bottom_die;
+        (*base).pain = Some(EntPain::TurretBasePain);
+        (*base).die = Some(EntDie::bottom_die);
 
         // Shot speed
         G_SpawnFloat(ctx, c"shotspeed".as_ptr(), c"1100".as_ptr(), &mut (*base).mass);
@@ -927,8 +927,8 @@ pub fn turret_base_spawn_top(
         (*top).r.contents = CONTENTS_BODY;
 
         (*top).takedamage = qtrue;
-        (*top).pain = EntPain::TurretPain;
-        (*top).die = EntDie::auto_turret_die;
+        (*top).pain = Some(EntPain::TurretPain);
+        (*top).die = Some(EntDie::auto_turret_die);
 
         (*top).material = MAT_METAL;
 

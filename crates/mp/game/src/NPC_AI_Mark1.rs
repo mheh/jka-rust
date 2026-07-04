@@ -843,7 +843,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
                 (*npc).health = 0;
                 (*(*npc).client).ps.stats[STAT_HEALTH] = 0;
                 if let Some(die_fn) = (*npc).die {
-                    die_fn(npc, npc, npc, 100, MOD_UNKNOWN as c_int);
+                    crate::ent_fn_enums::dispatch_die(ctx, die_fn, npc, npc, npc, 100, MOD_UNKNOWN as c_int);
                 }
                 return;
             };
