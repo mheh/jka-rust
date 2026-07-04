@@ -280,7 +280,7 @@ pub use crate::w_saber::WP_SaberCanBlock;
 pub use crate::NPC_AI_Stormtrooper::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Stormtrooper.rs
 pub use crate::g_items::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_items.rs
 pub use crate::ai_wpnav::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai_wpnav.rs
-pub use crate::teams::class::{class_t, class_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/teams/class.rs
+pub use crate::teams::class::{ class_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/teams/class.rs
 pub use mp_qshared::common::mp::gentity::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/gentity.rs
 pub use crate::bg_saber::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saber.rs
 pub use crate::NPC_AI_Mark1::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Mark1.rs
@@ -296,7 +296,7 @@ pub use crate::g_client::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates
 pub use crate::NPC_AI_Mark2::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Mark2.rs
 pub use mp_bg::public::saber_quadrant::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_quadrant.rs
 pub use crate::NPC_senses::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_senses.rs
-pub use mp_bg::weapons::ammo_t::{ammo_t, ammo_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/weapons/ammo_t.rs
+pub use mp_bg::weapons::ammo_t::{ ammo_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/weapons/ammo_t.rs
 pub use crate::NPC_AI_ImperialProbe::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_ImperialProbe.rs
 pub use crate::NPC_AI_Atst::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Atst.rs
 pub use crate::bg_slidemove::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_slidemove.rs
@@ -309,9 +309,8 @@ pub use crate::NPC_AI_Droid::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/cr
 pub use mp_bg::public::saberlock::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saberlock.rs
 pub use mp_bg::public::saber_move_data_table::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_move_data_table.rs
 pub use crate::botai::bweaponrange::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/botai/bweaponrange.rs
-pub use mp_qshared::shared::fsMode_t::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/fsMode_t.rs
-pub use mp_bg::public::g2_model_parts::{G2_MODEL_PART};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/g2_model_parts.rs
-pub use mp_bg::public::g2_model_parts::{g2ModelParts_t, g2ModelParts_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/g2_model_parts.rs
+pub use mp_qshared::shared::file_mode::{FS_APPEND, FS_APPEND_SYNC, FS_READ, FS_WRITE};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/fsMode_t.rs
+pub use mp_bg::public::g2_model_parts::{ g2ModelParts_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/g2_model_parts.rs
 pub use crate::NPC_AI_GalakMech::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_GalakMech.rs
 pub use crate::g_timer::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_timer.rs
 pub use crate::client::client_persistant::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/client/client_persistant.rs
@@ -324,7 +323,7 @@ pub use mp_qshared::shared::flag_status::*;  // .claude/worktrees/agent-a43cc532
 pub use crate::ai::consts::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/consts.rs
 pub use mp_qshared::common::mp::qcommon::player_state::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/player_state.rs
 pub use mp_bg::vehicles::vehicle_s::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/vehicle_s.rs
-pub use mp_qshared::shared::trajectory::{trType_t, trType_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/trajectory.rs
+pub use mp_qshared::shared::trajectory::{ trType_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/trajectory.rs
 pub use crate::level::alert_event::{MAX_ALERT_EVENTS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/level/alert_event.rs
 pub use crate::NPC_behavior::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_behavior.rs
 pub use crate::tri_coll_test::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/tri_coll_test.rs
@@ -351,7 +350,6 @@ pub use crate::game_globals::{MAX_ITEMS};  // .claude/worktrees/agent-a43cc53200
 pub use mp_qshared::shared::wpobject::{MAX_NEIGHBOR_SIZE};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/wpobject.rs
 pub use mp_qshared::common::mp::qcommon::parms::{MAX_PARMS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/parms.rs
 pub use crate::NPC_AI_Utils::{MAX_RADIUS_ENTS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Utils.rs
-pub use mp_qshared::common::mp::qcommon::saber::saber_info::{MAX_SABERS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/saber/saber_info.rs
 pub use mp_bg::vehicles::turret_stats_t::{MAX_VEHICLE_TURRET_MUZZLES};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/turret_stats_t.rs
 pub use mp_qshared::shared::q_color::{Q_COLOR_ESCAPE};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/q_color.rs
 pub use crate::w_force::{SFL_TWO_HANDED};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/w_force.rs
@@ -359,8 +357,7 @@ pub use crate::bg_saga::{SIEGECHAR_TAB};  // .claude/worktrees/agent-a43cc53200d
 pub use mp_bg::weapons::ammo_data::{ammoData};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/weapons/ammo_data.rs
 pub use mp_bg::local::bg_toggleable_surfaces::{bgToggleableSurfaces};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/bg_toggleable_surfaces.rs
 pub use mp_bg::local::force_power_needed::{forcePowerNeeded};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_power_needed.rs
-pub use mp_bg::weapons::weapon_data::{weaponData};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/weapons/weapon_data.rs
-pub use crate::g_spawn::{MAX_AMBIENT_SETS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_spawn.rs
+pub use crate::g_spawn::MAX_AMBIENT_SETS;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_spawn.rs
 pub use crate::g_cmds::{MAX_TOKEN_CHARS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_cmds.rs
 pub use crate::bg_pmove::{MIN_WALK_NORMAL};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_pmove.rs
 pub use mp_qshared::common::mp::gentity::{NUM_BSETS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/gentity.rs
