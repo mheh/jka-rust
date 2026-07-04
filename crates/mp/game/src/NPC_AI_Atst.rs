@@ -47,14 +47,14 @@ const RIGHT_ARM_HEALTH: c_int = 40;
 ///
 /// Precache weapon and effect resources.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:20-34`
-pub fn NPC_ATST_Precache() {
+pub fn NPC_ATST_Precache(ctx: GameContext<'_>) {
     unsafe {
         // SAFETY: G_SoundIndex, G_EffectIndex, RegisterItem accessed through game context.
         G_SoundIndex(b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char);
         G_SoundIndex(b"sound/chars/atst/atst_damaged2\0".as_ptr() as *const c_char);
 
-        RegisterItem(BG_FindItemForWeapon(WP_BOWCASTER));
-        RegisterItem(BG_FindItemForWeapon(WP_ROCKET_LAUNCHER));
+        RegisterItem(ctx, BG_FindItemForWeapon(WP_BOWCASTER));
+        RegisterItem(ctx, BG_FindItemForWeapon(WP_ROCKET_LAUNCHER));
 
         G_EffectIndex(b"env/med_explode2\0".as_ptr() as *const c_char);
         G_EffectIndex(b"blaster/smoke_bolton\0".as_ptr() as *const c_char);
@@ -67,6 +67,7 @@ pub fn NPC_ATST_Precache() {
 /// Called by NPC's and player in an ATST. Plays a damage sound.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:66-113`
 pub fn G_ATSTCheckPain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     damage: c_int,
@@ -74,9 +75,9 @@ pub fn G_ATSTCheckPain(
     unsafe {
         // SAFETY: self_ accessed through game context, rand() via bg-shared.
         if rand() & 1 != 0 {
-            G_SoundOnEnt(self_, CHAN_LESS_ATTEN, b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char);
+            G_SoundOnEnt(ctx, self_, CHAN_LESS_ATTEN, b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char);
         } else {
-            G_SoundOnEnt(self_, CHAN_LESS_ATTEN, b"sound/chars/atst/atst_damaged2\0".as_ptr() as *const c_char);
+            G_SoundOnEnt(ctx, self_, CHAN_LESS_ATTEN, b"sound/chars/atst/atst_damaged2\0".as_ptr() as *const c_char);
         }
     }
 }
@@ -86,14 +87,15 @@ pub fn G_ATSTCheckPain(
 /// Called when ATST takes damage. Plays pain sound and calls NPC pain handler.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:119-123`
 pub fn NPC_ATST_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
 ) {
     unsafe {
         // SAFETY: self_, attacker accessed through game context.
-        G_ATSTCheckPain(self_, attacker, damage);
-        NPC_Pain(self_, attacker, damage);
+        G_ATSTCheckPain(ctx, self_, attacker, damage);
+        NPC_Pain(ctx, self_, attacker, damage);
     }
 }
 
@@ -107,6 +109,7 @@ pub fn NPC_ATST_Pain(
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
 pub fn ATST_Hunt(
+    ctx: GameContext<'_>,
     visible: qboolean,
     advance: qboolean,
 ) {
@@ -123,6 +126,7 @@ pub fn ATST_Hunt(
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
 pub fn ATST_Ranged(
+    ctx: GameContext<'_>,
     visible: qboolean,
     advance: qboolean,
     altAttack: qboolean,
@@ -140,7 +144,7 @@ pub fn ATST_Ranged(
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ATST_Attack() {
+pub fn ATST_Attack(ctx: GameContext<'_>) {
     todo!("Port ATST_Attack — parked: ai-context")
 }
 
@@ -154,7 +158,7 @@ pub fn ATST_Attack() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ATST_Patrol() {
+pub fn ATST_Patrol(ctx: GameContext<'_>) {
     todo!("Port ATST_Patrol — parked: ai-context")
 }
 
@@ -167,7 +171,7 @@ pub fn ATST_Patrol() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ATST_Idle() {
+pub fn ATST_Idle(ctx: GameContext<'_>) {
     todo!("Port ATST_Idle — parked: ai-context")
 }
 
@@ -181,6 +185,6 @@ pub fn ATST_Idle() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn NPC_BSATST_Default() {
+pub fn NPC_BSATST_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSATST_Default — parked: ai-context")
 }

@@ -44,6 +44,7 @@ const MAX_MEDPACK_BIG_HEAL_AMOUNT: c_int = 50;
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:47-88`
 pub fn adjustRespawnTime(
+    ctx: GameContext<'_>,
     preRespawnTime: f32,
     itemType: c_int,
     itemTag: c_int,
@@ -57,6 +58,7 @@ pub fn adjustRespawnTime(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:108-119`
 pub fn ShieldRemove(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port ShieldRemove — parked: raw-ptr-skeleton-no-world-handle")
@@ -68,6 +70,7 @@ pub fn ShieldRemove(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:123-141`
 pub fn ShieldThink(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port ShieldThink — parked: raw-ptr-skeleton-no-world-handle")
@@ -79,6 +82,7 @@ pub fn ShieldThink(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:145-151`
 pub fn ShieldDie(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -94,6 +98,7 @@ pub fn ShieldDie(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:155-167`
 pub fn ShieldPain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -108,6 +113,7 @@ pub fn ShieldPain(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:171-207`
 pub fn ShieldGoSolid(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port ShieldGoSolid — parked: raw-ptr-skeleton-no-world-handle")
@@ -119,6 +125,7 @@ pub fn ShieldGoSolid(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:211-226`
 pub fn ShieldGoNotSolid(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port ShieldGoNotSolid — parked: raw-ptr-skeleton-no-world-handle")
@@ -130,6 +137,7 @@ pub fn ShieldGoNotSolid(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:230-250`
 pub fn ShieldTouch(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -144,6 +152,7 @@ pub fn ShieldTouch(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:254-380`
 pub fn CreateShield(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port CreateShield — parked: raw-ptr-skeleton-no-world-handle")
@@ -157,6 +166,7 @@ pub fn CreateShield(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:382-470`
 pub fn PlaceShield(
+    ctx: GameContext<'_>,
     playerent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port PlaceShield — parked: vec3-outparam-seam")
@@ -168,6 +178,7 @@ pub fn PlaceShield(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:472-502`
 pub fn ItemUse_Binoculars(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port ItemUse_Binoculars — parked: raw-ptr-skeleton-no-world-handle")
@@ -177,9 +188,10 @@ pub fn ItemUse_Binoculars(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:504-507`
 pub fn ItemUse_Shield(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    PlaceShield(ent);
+    PlaceShield(ctx, ent);
 }
 
 /// Raven `SentryTouch`.
@@ -199,6 +211,7 @@ pub fn SentryTouch(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:521-542`
 pub fn pas_fire(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port pas_fire — parked: raw-ptr-skeleton-no-world-handle")
@@ -210,6 +223,7 @@ pub fn pas_fire(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:547-639`
 pub fn pas_find_enemies(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) -> qboolean {
     todo!("Port pas_find_enemies — parked: raw-ptr-skeleton-no-world-handle")
@@ -221,6 +235,7 @@ pub fn pas_find_enemies(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:642-695`
 pub fn pas_adjust_enemy(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port pas_adjust_enemy — parked: raw-ptr-skeleton-no-world-handle")
@@ -233,6 +248,7 @@ pub fn pas_adjust_enemy(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:702-705`
 pub fn sentryExpire(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port sentryExpire — parked: missing-const")
@@ -245,6 +261,7 @@ pub fn sentryExpire(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:708-937`
 pub fn pas_think(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port pas_think — parked: raw-ptr-skeleton-no-world-handle")
@@ -256,6 +273,7 @@ pub fn pas_think(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:940-973`
 pub fn turret_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -271,6 +289,7 @@ pub fn turret_die(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:978-1011`
 pub fn SP_PAS(
+    ctx: GameContext<'_>,
     base: *mut gentity_t,
 ) {
     todo!("Port SP_PAS — parked: raw-ptr-skeleton-no-world-handle")
@@ -282,6 +301,7 @@ pub fn SP_PAS(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1014-1093`
 pub fn ItemUse_Sentry(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port ItemUse_Sentry — parked: raw-ptr-skeleton-no-world-handle")
@@ -293,6 +313,7 @@ pub fn ItemUse_Sentry(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1096-1125`
 pub fn ItemUse_Seeker(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port ItemUse_Seeker — parked: raw-ptr-skeleton-no-world-handle")
@@ -372,6 +393,7 @@ pub fn Jetpack_Off(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1177-1199`
 pub fn Jetpack_On(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Jetpack_On — parked: raw-ptr-skeleton-no-world-handle")
@@ -383,6 +405,7 @@ pub fn Jetpack_On(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1201-1234`
 pub fn ItemUse_Jetpack(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port ItemUse_Jetpack — parked: raw-ptr-skeleton-no-world-handle")
@@ -394,6 +417,7 @@ pub fn ItemUse_Jetpack(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1239-1272`
 pub fn ItemUse_UseCloak(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port ItemUse_UseCloak — parked: raw-ptr-skeleton-no-world-handle")
@@ -405,6 +429,7 @@ pub fn ItemUse_UseCloak(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1277-1293`
 pub fn SpecialItemThink(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SpecialItemThink — parked: raw-ptr-skeleton-no-world-handle")
@@ -416,6 +441,7 @@ pub fn SpecialItemThink(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1295-1331`
 pub fn G_SpecialSpawnItem(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     item: *mut gitem_t,
 ) {
@@ -425,16 +451,16 @@ pub fn G_SpecialSpawnItem(
 /// Raven `G_PrecacheDispensers`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1336-1351`
-pub fn G_PrecacheDispensers() {
+pub fn G_PrecacheDispensers(ctx: GameContext<'_>) {
     unsafe {
         let mut item = BG_FindItem(c"item_medpak_instant".as_ptr());
         if !item.is_null() {
-            crate::g_items::RegisterItem(item);
+            crate::g_items::RegisterItem(ctx, item);
         }
 
         item = BG_FindItem(c"ammo_all".as_ptr());
         if !item.is_null() {
-            crate::g_items::RegisterItem(item);
+            crate::g_items::RegisterItem(ctx, item);
         }
     }
 }
@@ -446,6 +472,7 @@ pub fn G_PrecacheDispensers() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1353-1410`
 pub fn ItemUse_UseDisp(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     r#type: c_int,
 ) {
@@ -458,6 +485,7 @@ pub fn ItemUse_UseDisp(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1417-1431`
 pub fn EWebDisattach(
+    ctx: GameContext<'_>,
     owner: *mut gentity_t,
     eweb: *mut gentity_t,
 ) {
@@ -467,9 +495,9 @@ pub fn EWebDisattach(
 /// Raven `EWebPrecache`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1434-1439`
-pub fn EWebPrecache() {
+pub fn EWebPrecache(ctx: GameContext<'_>) {
     unsafe {
-        RegisterItem(BG_FindItemForWeapon(WP_TURRET));
+        RegisterItem(ctx, BG_FindItemForWeapon(WP_TURRET));
         G_EffectIndex(c"detpack/explosion.efx".as_ptr());
         G_EffectIndex(c"turret/muzzle_flash.efx".as_ptr());
     }
@@ -481,6 +509,7 @@ pub fn EWebPrecache() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1449-1481`
 pub fn EWebDie(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -496,6 +525,7 @@ pub fn EWebDie(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1484-1496`
 pub fn EWebPain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -510,6 +540,7 @@ pub fn EWebPain(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1499-1598`
 pub fn EWeb_SetBoneAngles(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     bone: *mut c_char,
     angles: vec3_t,
@@ -523,6 +554,7 @@ pub fn EWeb_SetBoneAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1601-1620`
 pub fn EWeb_SetBoneAnim(
+    ctx: GameContext<'_>,
     eweb: *mut gentity_t,
     startFrame: c_int,
     endFrame: c_int,
@@ -537,6 +569,7 @@ pub fn EWeb_SetBoneAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1624-1664`
 pub fn EWebFire(
+    ctx: GameContext<'_>,
     owner: *mut gentity_t,
     eweb: *mut gentity_t,
 ) {
@@ -551,6 +584,7 @@ pub fn EWebFire(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1667-1732`
 pub fn EWebPositionUser(
+    ctx: GameContext<'_>,
     owner: *mut gentity_t,
     eweb: *mut gentity_t,
 ) {
@@ -561,6 +595,7 @@ pub fn EWebPositionUser(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1735-1769`
 pub fn EWebUpdateBoneAngles(
+    ctx: GameContext<'_>,
     owner: *mut gentity_t,
     eweb: *mut gentity_t,
 ) {
@@ -583,9 +618,9 @@ pub fn EWebUpdateBoneAngles(
         (*eweb).angle += incr;
 
         yAng[0] = (*eweb).angle;
-        EWeb_SetBoneAngles(eweb, c"cannon_Yrot".as_ptr() as *mut c_char, yAng);
+        EWeb_SetBoneAngles(ctx, eweb, c"cannon_Yrot".as_ptr() as *mut c_char, yAng);
 
-        EWebPositionUser(owner, eweb);
+        EWebPositionUser(ctx, owner, eweb);
         if (*((*owner).client as *mut gclient_t)).ewebIndex == 0 {
             // was removed during position function
             return;
@@ -596,7 +631,7 @@ pub fn EWebUpdateBoneAngles(
             (*((*owner).client as *mut gclient_t)).ps.viewangles[PITCH],
             (*eweb).s.angles[PITCH],
         ) * 0.8;
-        EWeb_SetBoneAngles(eweb, c"cannon_Xrot".as_ptr() as *mut c_char, yAng2);
+        EWeb_SetBoneAngles(ctx, eweb, c"cannon_Xrot".as_ptr() as *mut c_char, yAng2);
     }
 }
 
@@ -607,6 +642,7 @@ pub fn EWebUpdateBoneAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1776-1854`
 pub fn EWebThink(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port EWebThink — parked: raw-ptr-skeleton-no-world-handle")
@@ -619,6 +655,7 @@ pub fn EWebThink(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1859-1980`
 pub fn EWeb_Create(
+    ctx: GameContext<'_>,
     spawner: *mut gentity_t,
 ) -> *mut gentity_t {
     todo!("Port EWeb_Create — parked: raw-ptr-skeleton-no-world-handle")
@@ -630,6 +667,7 @@ pub fn EWeb_Create(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1984-2018`
 pub fn ItemUse_UseEWeb(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port ItemUse_UseEWeb — parked: raw-ptr-skeleton-no-world-handle")
@@ -642,6 +680,7 @@ pub fn ItemUse_UseEWeb(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2024-2100`
 pub fn Pickup_Powerup(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) -> c_int {
@@ -654,6 +693,7 @@ pub fn Pickup_Powerup(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2104-2113`
 pub fn Pickup_Holdable(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) -> c_int {
@@ -666,6 +706,7 @@ pub fn Pickup_Holdable(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2118-2128`
 pub fn Add_Ammo(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     weapon: c_int,
     count: c_int,
@@ -679,6 +720,7 @@ pub fn Add_Ammo(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2130-2175`
 pub fn Pickup_Ammo(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) -> c_int {
@@ -691,6 +733,7 @@ pub fn Pickup_Ammo(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2180-2232`
 pub fn Pickup_Weapon(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) -> c_int {
@@ -701,6 +744,7 @@ pub fn Pickup_Weapon(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2237-2266`
 pub fn Pickup_Health(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) -> c_int {
@@ -736,7 +780,7 @@ pub fn Pickup_Health(
             return RESPAWN_MEGAHEALTH;
         }
 
-        adjustRespawnTime(RESPAWN_HEALTH, (*item).giType as c_int, (*item).giTag)
+        adjustRespawnTime(ctx, RESPAWN_HEALTH, (*item).giType as c_int, (*item).giTag)
     }
 }
 
@@ -744,6 +788,7 @@ pub fn Pickup_Health(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2270-2279`
 pub fn Pickup_Armor(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) -> c_int {
@@ -760,7 +805,7 @@ pub fn Pickup_Armor(
             (*cl).ps.stats[statIndex_t::STAT_ARMOR as usize] = cap;
         }
 
-        adjustRespawnTime(RESPAWN_ARMOR, (*item).giType as c_int, (*item).giTag)
+        adjustRespawnTime(ctx, RESPAWN_ARMOR, (*item).giType as c_int, (*item).giTag)
     }
 }
 
@@ -771,6 +816,7 @@ pub fn Pickup_Armor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2288-2334`
 pub fn RespawnItem(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port RespawnItem — parked: raw-ptr-skeleton-no-world-handle")
@@ -782,6 +828,7 @@ pub fn RespawnItem(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2336-2355`
 pub fn CheckItemCanBePickedUpByNPC(
+    ctx: GameContext<'_>,
     item: *mut gentity_t,
     pickerupper: *mut gentity_t,
 ) -> qboolean {
@@ -794,6 +841,7 @@ pub fn CheckItemCanBePickedUpByNPC(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2362-2646`
 pub fn Touch_Item(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -808,6 +856,7 @@ pub fn Touch_Item(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2658-2733`
 pub fn LaunchItem(
+    ctx: GameContext<'_>,
     item: *mut gitem_t,
     origin: vec3_t,
     velocity: vec3_t,
@@ -822,6 +871,7 @@ pub fn LaunchItem(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2742-2755`
 pub fn Drop_Item(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     item: *mut gitem_t,
     angle: f32,
@@ -833,11 +883,12 @@ pub fn Drop_Item(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2765-2767`
 pub fn Use_Item(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    RespawnItem(ent);
+    RespawnItem(ctx, ent);
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
@@ -847,6 +898,7 @@ pub fn Use_Item(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2779-2963`
 pub fn FinishSpawningItem(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port FinishSpawningItem — parked: raw-ptr-skeleton-no-world-handle")
@@ -857,7 +909,7 @@ pub fn FinishSpawningItem(
 /// Raven `G_CheckTeamItems`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2973-2991`
-pub fn G_CheckTeamItems() {
+pub fn G_CheckTeamItems(ctx: GameContext<'_>) {
     todo!("Port G_CheckTeamItems — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -867,7 +919,7 @@ pub fn G_CheckTeamItems() {
 /// Raven `ClearRegisteredItems`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2998-3011`
-pub fn ClearRegisteredItems() {
+pub fn ClearRegisteredItems(ctx: GameContext<'_>) {
     todo!("Port ClearRegisteredItems — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -878,6 +930,7 @@ pub fn ClearRegisteredItems() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3020-3025`
 pub fn RegisterItem(
+    ctx: GameContext<'_>,
     item: *mut gitem_t,
 ) {
     todo!("Port RegisterItem — parked: raw-ptr-skeleton-no-world-handle")
@@ -889,7 +942,7 @@ pub fn RegisterItem(
 /// Raven `SaveRegisteredItems`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3036-3054`
-pub fn SaveRegisteredItems() {
+pub fn SaveRegisteredItems(ctx: GameContext<'_>) {
     todo!("Port SaveRegisteredItems — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -899,6 +952,7 @@ pub fn SaveRegisteredItems() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3061-3067`
 pub fn G_ItemDisabled(
+    ctx: GameContext<'_>,
     item: *mut gitem_t,
 ) -> c_int {
     todo!("Port G_ItemDisabled — parked: raw-ptr-skeleton-no-world-handle")
@@ -911,6 +965,7 @@ pub fn G_ItemDisabled(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3079-3121`
 pub fn G_SpawnItem(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     item: *mut gitem_t,
 ) {
@@ -923,6 +978,7 @@ pub fn G_SpawnItem(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3130-3174`
 pub fn G_BounceItem(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     trace: *mut trace_t,
 ) {
@@ -936,6 +992,7 @@ pub fn G_BounceItem(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3183-3242`
 pub fn G_RunItem(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_RunItem — parked: raw-ptr-skeleton-no-world-handle")

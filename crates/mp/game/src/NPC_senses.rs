@@ -25,6 +25,7 @@ use crate::prelude::*;
 // (ruling 1: `GameWorld` owns `g_entities`) — this faithful signature
 // carries neither.
 pub fn G_ClearLineOfSight(
+    ctx: GameContext<'_>,
     point1: vec3_t,
     point2: vec3_t,
     ignore: c_int,
@@ -45,6 +46,7 @@ pub fn G_ClearLineOfSight(
 // (resolved wrapper needs `&Engine`, which this signature carries none of)
 // and depends on `CalcEntitySpot`'s own unresolved `vec3-outparam-seam`.
 pub fn CanSee(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CanSee — parked: ai-context")
@@ -98,6 +100,7 @@ pub fn InFOV3(
 // out-param by value and so cannot write it back before it's forwarded into
 // `InFOV3`.
 pub fn InFOV2(
+    ctx: GameContext<'_>,
     origin: vec3_t,
     from: *mut gentity_t,
     hFOV: c_int,
@@ -117,6 +120,7 @@ pub fn InFOV2(
 // `vec3_t` out-params by value and so cannot write `eyes`/`spot`/`angles`
 // back into this function's locals.
 pub fn InFOV(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     from: *mut gentity_t,
     hFOV: c_int,
@@ -135,6 +139,7 @@ pub fn InFOV(
 // globals (`b_local.h:63-64`) directly — `NPCInfo->stats.visrange` and
 // `CalcEntitySpot(NPC, ...)` — no threading mechanism resolved for them.
 pub fn InVisrange(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port InVisrange — parked: ai-context")
@@ -148,6 +153,7 @@ pub fn InVisrange(
 // `InFOV`/`CanShoot`); also calls `trap_InPVS` (resolved wrapper needs
 // `&Engine`, which this signature carries none of).
 pub fn NPC_CheckVisibility(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     flags: c_int,
 ) -> visibility_t {
@@ -162,6 +168,7 @@ pub fn NPC_CheckVisibility(
 // level.numAlertEvents]` directly (ruling 1: `GameWorld` owns `level`) — no
 // threading mechanism resolved for it.
 pub fn G_CheckSoundEvents(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     maxHearDist: f32,
     ignoreAlert: c_int,
@@ -195,6 +202,7 @@ pub fn G_GetLightLevel(
 // level.numAlertEvents]` directly (ruling 1: `GameWorld` owns `level`) — no
 // threading mechanism resolved for it.
 pub fn G_CheckSightEvents(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     hFOV: c_int,
     vFOV: c_int,
@@ -215,6 +223,7 @@ pub fn G_CheckSightEvents(
 // `level.alertEvents[...]` directly (ruling 1: `GameWorld` owns both) — no
 // threading mechanism resolved for them.
 pub fn G_CheckAlertEvents(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     checkSight: qboolean,
     checkSound: qboolean,
@@ -234,6 +243,7 @@ pub fn G_CheckAlertEvents(
 // globals directly (`NPCInfo->stats.visrange`/`earshot`) into
 // `G_CheckAlertEvents` — no threading mechanism resolved for them.
 pub fn NPC_CheckAlertEvents(
+    ctx: GameContext<'_>,
     checkSight: qboolean,
     checkSound: qboolean,
     ignoreAlert: c_int,
@@ -251,6 +261,7 @@ pub fn NPC_CheckAlertEvents(
 // directly (ruling 1: `GameWorld` owns `level`) — no threading mechanism
 // resolved for it.
 pub fn G_CheckForDanger(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     alertEvent: c_int,
 ) -> qboolean {
@@ -265,6 +276,7 @@ pub fn G_CheckForDanger(
 // directly into `G_CheckForDanger` — no threading mechanism resolved for
 // it.
 pub fn NPC_CheckForDanger(
+    ctx: GameContext<'_>,
     alertEvent: c_int,
 ) -> qboolean {
     todo!("Port NPC_CheckForDanger — parked: ai-context")
@@ -277,6 +289,7 @@ pub fn NPC_CheckForDanger(
 // and `level.numAlertEvents`/`curAlertID`/`time` directly (ruling 1:
 // `GameWorld` owns `level`) — no threading mechanism resolved for it.
 pub fn AddSoundEvent(
+    ctx: GameContext<'_>,
     owner: *mut gentity_t,
     position: vec3_t,
     radius: f32,
@@ -293,6 +306,7 @@ pub fn AddSoundEvent(
 // and `level.numAlertEvents`/`curAlertID`/`time` directly (ruling 1:
 // `GameWorld` owns `level`) — no threading mechanism resolved for it.
 pub fn AddSightEvent(
+    ctx: GameContext<'_>,
     owner: *mut gentity_t,
     position: vec3_t,
     radius: f32,
@@ -309,7 +323,7 @@ pub fn AddSightEvent(
 // `level.numAlertEvents`/`level.time` and the file-static `eventClearTime`
 // extern global (ruling 1: `GameWorld` owns both) — no threading mechanism
 // resolved for them.
-pub fn ClearPlayerAlertEvents() {
+pub fn ClearPlayerAlertEvents(ctx: GameContext<'_>) {
     todo!("Port ClearPlayerAlertEvents — parked: seam-threading (level, eventClearTime)")
 }
 
@@ -319,7 +333,7 @@ pub fn ClearPlayerAlertEvents() {
 // PORT-ESCALATION(seam-threading): reads/writes `level.alertEvents[...]`/
 // `level.numAlertEvents` directly (ruling 1: `GameWorld` owns `level`) — no
 // threading mechanism resolved for it.
-pub fn RemoveOldestAlert() -> qboolean {
+pub fn RemoveOldestAlert(ctx: GameContext<'_>) -> qboolean {
     todo!("Port RemoveOldestAlert — parked: seam-threading (level)")
 }
 
@@ -332,6 +346,7 @@ pub fn RemoveOldestAlert() -> qboolean {
 // `g_entities[tr.entityNum]` (ruling 1: `GameWorld` owns `g_entities`) —
 // this faithful signature carries neither.
 pub fn G_ClearLOS(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     start: vec3_t,
     end: vec3_t,
@@ -348,6 +363,7 @@ pub fn G_ClearLOS(
 // `vec3_t` out-param by value and so cannot write it back before it's
 // forwarded into `G_ClearLOS`.
 pub fn G_ClearLOS2(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     ent: *mut gentity_t,
     end: vec3_t,
@@ -364,6 +380,7 @@ pub fn G_ClearLOS2(
 // `spot` as a `vec3_t` out-param by value and so cannot write it back
 // before it's forwarded into `G_ClearLOS`.
 pub fn G_ClearLOS3(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     start: vec3_t,
     ent: *mut gentity_t,
@@ -380,6 +397,7 @@ pub fn G_ClearLOS3(
 // `vec3_t` out-param by value and so cannot write it back before it's
 // forwarded into `G_ClearLOS3`.
 pub fn G_ClearLOS4(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     ent: *mut gentity_t,
 ) -> qboolean {
@@ -395,6 +413,7 @@ pub fn G_ClearLOS4(
 // `vec3_t` out-param by value and so cannot write it back before it's
 // forwarded into `G_ClearLOS`.
 pub fn G_ClearLOS5(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     end: vec3_t,
 ) -> qboolean {
@@ -441,6 +460,7 @@ pub fn NPC_GetVFOVPercentage(
 // and calls `trap_InPVS` (resolved wrapper needs `&Engine`, which this
 // signature carries none of) — no threading mechanism resolved for either.
 pub fn G_FindLocalInterestPoint(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) -> c_int {
     todo!("Port G_FindLocalInterestPoint — parked: seam-threading (level, trap_InPVS)")
@@ -456,6 +476,7 @@ pub fn G_FindLocalInterestPoint(
 // `level.numInterestPoints`/`level.interestPoints[...]` directly (ruling 1:
 // `GameWorld` owns `level`) — no threading mechanism resolved for it.
 pub fn SP_target_interest(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port SP_target_interest — parked: seam-threading (level)")

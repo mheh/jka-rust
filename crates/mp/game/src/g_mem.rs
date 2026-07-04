@@ -37,7 +37,7 @@ pub fn G_Alloc(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mem.c:35-37`
 // PORT-ESCALATION(state-threading): resets allocPoint — needs GameWorld state, but signature has no world/engine channel.
-pub fn G_InitMemory() {
+pub fn G_InitMemory(ctx: GameContext<'_>) {
     todo!("Port G_InitMemory — parked: state-threading")
 }
 
@@ -45,6 +45,6 @@ pub fn G_InitMemory() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_mem.c:39-41`
 // PORT-ESCALATION(state-threading): reads allocPoint for console output via G_Printf — needs GameWorld state and engine trap channel, but signature has no world/engine channel.
-pub fn Svcmd_GameMem_f() {
+pub fn Svcmd_GameMem_f(ctx: GameContext<'_>) {
     todo!("Port Svcmd_GameMem_f — parked: state-threading")
 }

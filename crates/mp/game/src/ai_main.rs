@@ -37,6 +37,7 @@ pub fn BotStraightTPOrderCheck(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:157-165`
 pub fn BotSelectWeapon(
+    ctx: GameContext<'_>,
     client: c_int,
     weapon: c_int,
 ) {
@@ -48,6 +49,7 @@ pub fn BotSelectWeapon(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:167-181`
 pub fn BotReportStatus(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port BotReportStatus — parked: seam-threading")
@@ -58,6 +60,7 @@ pub fn BotReportStatus(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:184-276`
 pub fn BotOrder(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     clientnum: c_int,
     ordernum: c_int,
@@ -70,6 +73,7 @@ pub fn BotOrder(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:279-325`
 pub fn BotMindTricked(
+    ctx: GameContext<'_>,
     botClient: c_int,
     enemyClient: c_int,
 ) -> c_int {
@@ -92,7 +96,7 @@ pub fn BotAI_Print(
 /// Raven `IsTeamplay`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:336-344`
-pub fn IsTeamplay() -> c_int {
+pub fn IsTeamplay(ctx: GameContext<'_>) -> c_int {
     todo!("Port IsTeamplay — parked: seam-threading")
 }
 
@@ -101,6 +105,7 @@ pub fn IsTeamplay() -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:351-364`
 pub fn BotAI_GetClientState(
+    ctx: GameContext<'_>,
     clientNum: c_int,
     state: *mut playerState_t,
 ) -> c_int {
@@ -112,6 +117,7 @@ pub fn BotAI_GetClientState(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:371-381`
 pub fn BotAI_GetEntityState(
+    ctx: GameContext<'_>,
     entityNum: c_int,
     state: *mut entityState_t,
 ) -> c_int {
@@ -123,6 +129,7 @@ pub fn BotAI_GetEntityState(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:388-400`
 pub fn BotAI_GetSnapshotEntity(
+    ctx: GameContext<'_>,
     clientNum: c_int,
     sequence: c_int,
     state: *mut entityState_t,
@@ -135,6 +142,7 @@ pub fn BotAI_GetSnapshotEntity(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:407-409`
 pub fn BotEntityInfo(
+    ctx: GameContext<'_>,
     entnum: c_int,
     info: *mut aas_entityinfo_t,
 ) {
@@ -145,7 +153,7 @@ pub fn BotEntityInfo(
 /// Raven `NumBots`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:416-418`
-pub fn NumBots() -> c_int {
+pub fn NumBots(ctx: GameContext<'_>) -> c_int {
     todo!("Port NumBots — parked: seam-threading")
 }
 
@@ -204,6 +212,7 @@ pub fn BotChangeViewAngle(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:470-530`
 pub fn BotChangeViewAngles(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     thinktime: f32,
 ) {
@@ -215,6 +224,7 @@ pub fn BotChangeViewAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:537-626`
 pub fn BotInputToUserCommand(
+    ctx: GameContext<'_>,
     bi: *mut bot_input_t,
     ucmd: *mut usercmd_t,
     delta_angles: *mut c_int,
@@ -229,6 +239,7 @@ pub fn BotInputToUserCommand(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:633-655`
 pub fn BotUpdateInput(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     time: c_int,
     elapsed_time: c_int,
@@ -240,7 +251,7 @@ pub fn BotUpdateInput(
 /// Raven `BotAIRegularUpdate`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:662-667`
-pub fn BotAIRegularUpdate() {
+pub fn BotAIRegularUpdate(ctx: GameContext<'_>) {
     todo!("Port BotAIRegularUpdate — parked: seam-threading")
 }
 
@@ -259,6 +270,7 @@ pub fn RemoveColorEscapeSequences(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:696-771`
 pub fn BotAI(
+    ctx: GameContext<'_>,
     client: c_int,
     thinktime: f32,
 ) -> c_int {
@@ -269,7 +281,7 @@ pub fn BotAI(
 /// Raven `BotScheduleBotThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:778-791`
-pub fn BotScheduleBotThink() {
+pub fn BotScheduleBotThink(ctx: GameContext<'_>) {
     todo!("Port BotScheduleBotThink — parked: seam-threading")
 }
 
@@ -277,7 +289,7 @@ pub fn BotScheduleBotThink() {
 /// Raven `PlayersInGame`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:793-812`
-pub fn PlayersInGame() -> c_int {
+pub fn PlayersInGame(ctx: GameContext<'_>) -> c_int {
     todo!("Port PlayersInGame — parked: seam-threading")
 }
 
@@ -286,6 +298,7 @@ pub fn PlayersInGame() -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:819-884`
 pub fn BotAISetupClient(
+    ctx: GameContext<'_>,
     client: c_int,
     //TODO: Port bot_settings_s  (C: `struct bot_settings_s *`)
     settings: *mut c_void,
@@ -299,6 +312,7 @@ pub fn BotAISetupClient(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:891-914`
 pub fn BotAIShutdownClient(
+    ctx: GameContext<'_>,
     client: c_int,
     restart: qboolean,
 ) -> c_int {
@@ -310,6 +324,7 @@ pub fn BotAIShutdownClient(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:924-959`
 pub fn BotResetState(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port BotResetState — parked: seam-threading")
@@ -320,6 +335,7 @@ pub fn BotResetState(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:966-977`
 pub fn BotAILoadMap(
+    ctx: GameContext<'_>,
     restart: c_int,
 ) -> c_int {
     todo!("Port BotAILoadMap — parked: seam-threading")
@@ -330,6 +346,7 @@ pub fn BotAILoadMap(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:982-994`
 pub fn OrgVisible(
+    ctx: GameContext<'_>,
     org1: vec3_t,
     org2: vec3_t,
     ignore: c_int,
@@ -342,6 +359,7 @@ pub fn OrgVisible(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:997-1026`
 pub fn WPOrgVisible(
+    ctx: GameContext<'_>,
     bot: *mut gentity_t,
     org1: vec3_t,
     org2: vec3_t,
@@ -355,6 +373,7 @@ pub fn WPOrgVisible(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1029-1048`
 pub fn OrgVisibleBox(
+    ctx: GameContext<'_>,
     org1: vec3_t,
     mins: vec3_t,
     maxs: vec3_t,
@@ -369,6 +388,7 @@ pub fn OrgVisibleBox(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1053-1083`
 pub fn CheckForFunc(
+    ctx: GameContext<'_>,
     org: vec3_t,
     ignore: c_int,
 ) -> c_int {
@@ -380,6 +400,7 @@ pub fn CheckForFunc(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1086-1101`
 pub fn BotPVSCheck(
+    ctx: GameContext<'_>,
     p1: vec3_t,
     p2: vec3_t,
 ) -> qboolean {
@@ -391,6 +412,7 @@ pub fn BotPVSCheck(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1104-1149`
 pub fn GetNearestVisibleWP(
+    ctx: GameContext<'_>,
     org: vec3_t,
     ignore: c_int,
 ) -> c_int {
@@ -402,6 +424,7 @@ pub fn GetNearestVisibleWP(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1157-1190`
 pub fn PassWayCheck(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     windex: c_int,
 ) -> c_int {
@@ -413,6 +436,7 @@ pub fn PassWayCheck(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1193-1259`
 pub fn TotalTrailDistance(
+    ctx: GameContext<'_>,
     start: c_int,
     end: c_int,
     bs: *mut bot_state_t,
@@ -425,6 +449,7 @@ pub fn TotalTrailDistance(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1263-1349`
 pub fn CheckForShorterRoutes(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     newwpindex: c_int,
 ) {
@@ -436,6 +461,7 @@ pub fn CheckForShorterRoutes(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1353-1429`
 pub fn WPConstantRoutine(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port WPConstantRoutine — parked: seam-threading")
@@ -446,6 +472,7 @@ pub fn WPConstantRoutine(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1432-1446`
 pub fn BotCTFGuardDuty(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> qboolean {
     todo!("Port BotCTFGuardDuty — parked: seam-threading")
@@ -456,6 +483,7 @@ pub fn BotCTFGuardDuty(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1452-1539`
 pub fn WPTouchRoutine(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port WPTouchRoutine — parked: seam-threading")
@@ -478,6 +506,7 @@ pub fn MoveTowardIdealAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1556-1633`
 pub fn BotTrace_Strafe(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     traceto: vec3_t,
 ) -> c_int {
@@ -489,6 +518,7 @@ pub fn BotTrace_Strafe(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1638-1699`
 pub fn BotTrace_Jump(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     traceto: vec3_t,
 ) -> c_int {
@@ -500,6 +530,7 @@ pub fn BotTrace_Jump(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1702-1750`
 pub fn BotTrace_Duck(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     traceto: vec3_t,
 ) -> c_int {
@@ -511,6 +542,7 @@ pub fn BotTrace_Duck(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1753-1858`
 pub fn PassStandardEnemyChecks(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     en: *mut gentity_t,
 ) -> c_int {
@@ -522,6 +554,7 @@ pub fn PassStandardEnemyChecks(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1861-1941`
 pub fn BotDamageNotification(
+    ctx: GameContext<'_>,
     bot: *mut gclient_t,
     attacker: *mut gentity_t,
 ) {
@@ -533,6 +566,7 @@ pub fn BotDamageNotification(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1945-2010`
 pub fn BotCanHear(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     en: *mut gentity_t,
     endist: f32,
@@ -544,7 +578,7 @@ pub fn BotCanHear(
 /// Raven `UpdateEventTracker`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2013-2031`
-pub fn UpdateEventTracker() {
+pub fn UpdateEventTracker(ctx: GameContext<'_>) {
     todo!("Port UpdateEventTracker — parked: seam-threading")
 }
 
@@ -584,6 +618,7 @@ pub fn InFieldOfVision(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2078-2129`
 pub fn PassLovedOneCheck(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     ent: *mut gentity_t,
 ) -> c_int {
@@ -595,6 +630,7 @@ pub fn PassLovedOneCheck(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2134-2220`
 pub fn ScanForEnemies(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port ScanForEnemies — parked: seam-threading")
@@ -605,6 +641,7 @@ pub fn ScanForEnemies(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2222-2260`
 pub fn WaitingForNow(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     goalpos: vec3_t,
 ) -> c_int {
@@ -626,6 +663,7 @@ pub fn BotGetWeaponRange(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2301-2391`
 pub fn BotIsAChickenWuss(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotIsAChickenWuss — parked: seam-threading")
@@ -636,6 +674,7 @@ pub fn BotIsAChickenWuss(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2395-2504`
 pub fn GetNearestBadThing(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> *mut gentity_t {
     todo!("Port GetNearestBadThing — parked: seam-threading")
@@ -646,6 +685,7 @@ pub fn GetNearestBadThing(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2507-2538`
 pub fn BotDefendFlag(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotDefendFlag — parked: seam-threading")
@@ -656,6 +696,7 @@ pub fn BotDefendFlag(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2541-2572`
 pub fn BotGetEnemyFlag(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotGetEnemyFlag — parked: seam-threading")
@@ -666,6 +707,7 @@ pub fn BotGetEnemyFlag(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2575-2637`
 pub fn BotGetFlagBack(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotGetFlagBack — parked: seam-threading")
@@ -676,6 +718,7 @@ pub fn BotGetFlagBack(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2641-2703`
 pub fn BotGuardFlagCarrier(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotGuardFlagCarrier — parked: seam-threading")
@@ -686,6 +729,7 @@ pub fn BotGuardFlagCarrier(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2706-2737`
 pub fn BotGetFlagHome(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotGetFlagHome — parked: seam-threading")
@@ -696,6 +740,7 @@ pub fn BotGetFlagHome(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2739-2801`
 pub fn GetNewFlagPoint(
+    ctx: GameContext<'_>,
     wp: *mut wpobject_t,
     flagEnt: *mut gentity_t,
     team: c_int,
@@ -708,6 +753,7 @@ pub fn GetNewFlagPoint(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2804-3034`
 pub fn CTFTakesPriority(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port CTFTakesPriority — parked: seam-threading")
@@ -718,6 +764,7 @@ pub fn CTFTakesPriority(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3036-3052`
 pub fn EntityVisibleBox(
+    ctx: GameContext<'_>,
     org1: vec3_t,
     mins: vec3_t,
     maxs: vec3_t,
@@ -733,6 +780,7 @@ pub fn EntityVisibleBox(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3055-3152`
 pub fn Siege_TargetClosestObjective(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     flag: c_int,
 ) -> c_int {
@@ -744,6 +792,7 @@ pub fn Siege_TargetClosestObjective(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3154-3199`
 pub fn Siege_DefendFromAttackers(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port Siege_DefendFromAttackers — parked: seam-threading")
@@ -754,6 +803,7 @@ pub fn Siege_DefendFromAttackers(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3202-3227`
 pub fn Siege_CountDefenders(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port Siege_CountDefenders — parked: seam-threading")
@@ -764,6 +814,7 @@ pub fn Siege_CountDefenders(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3230-3252`
 pub fn Siege_CountTeammates(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port Siege_CountTeammates — parked: seam-threading")
@@ -774,6 +825,7 @@ pub fn Siege_CountTeammates(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3256-3420`
 pub fn SiegeTakesPriority(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port SiegeTakesPriority — parked: seam-threading")
@@ -784,6 +836,7 @@ pub fn SiegeTakesPriority(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3424-3496`
 pub fn JMTakesPriority(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port JMTakesPriority — parked: seam-threading")
@@ -794,6 +847,7 @@ pub fn JMTakesPriority(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3500-3554`
 pub fn BotHasAssociated(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     wp: *mut wpobject_t,
 ) -> c_int {
@@ -805,6 +859,7 @@ pub fn BotHasAssociated(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3559-3621`
 pub fn GetBestIdleGoal(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port GetBestIdleGoal — parked: seam-threading")
@@ -815,6 +870,7 @@ pub fn GetBestIdleGoal(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3625-3907`
 pub fn GetIdealDestination(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port GetIdealDestination — parked: seam-threading")
@@ -825,6 +881,7 @@ pub fn GetIdealDestination(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3911-4074`
 pub fn CommanderBotCTFAI(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port CommanderBotCTFAI — parked: seam-threading")
@@ -835,6 +892,7 @@ pub fn CommanderBotCTFAI(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4077-4140`
 pub fn CommanderBotSiegeAI(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port CommanderBotSiegeAI — parked: seam-threading")
@@ -855,6 +913,7 @@ pub fn BotDoTeamplayAI(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4158-4249`
 pub fn CommanderBotTeamplayAI(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port CommanderBotTeamplayAI — parked: seam-threading")
@@ -865,6 +924,7 @@ pub fn CommanderBotTeamplayAI(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4252-4266`
 pub fn CommanderBotAI(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port CommanderBotAI — parked: seam-threading")
@@ -875,6 +935,7 @@ pub fn CommanderBotAI(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4269-4351`
 pub fn MeleeCombatHandling(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port MeleeCombatHandling — parked: seam-threading")
@@ -885,6 +946,7 @@ pub fn MeleeCombatHandling(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4354-4566`
 pub fn SaberCombatHandling(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port SaberCombatHandling — parked: seam-threading")
@@ -938,6 +1000,7 @@ pub fn BotAimLeading(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4687-4801`
 pub fn BotAimOffsetGoalAngles(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port BotAimOffsetGoalAngles — parked: seam-threading")
@@ -948,6 +1011,7 @@ pub fn BotAimOffsetGoalAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4804-4882`
 pub fn ShouldSecondaryFire(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port ShouldSecondaryFire — parked: seam-threading")
@@ -958,6 +1022,7 @@ pub fn ShouldSecondaryFire(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4885-5023`
 pub fn CombatBotAI(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     thinktime: f32,
 ) -> c_int {
@@ -969,6 +1034,7 @@ pub fn CombatBotAI(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5029-5070`
 pub fn BotFallbackNavigation(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotFallbackNavigation — parked: seam-threading")
@@ -979,6 +1045,7 @@ pub fn BotFallbackNavigation(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5072-5103`
 pub fn BotTryAnotherWeapon(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotTryAnotherWeapon — parked: seam-threading")
@@ -989,6 +1056,7 @@ pub fn BotTryAnotherWeapon(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5106-5120`
 pub fn BotWeaponSelectable(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     weapon: c_int,
 ) -> qboolean {
@@ -1000,6 +1068,7 @@ pub fn BotWeaponSelectable(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5123-5213`
 pub fn BotSelectIdealWeapon(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotSelectIdealWeapon — parked: seam-threading")
@@ -1010,6 +1079,7 @@ pub fn BotSelectIdealWeapon(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5216-5251`
 pub fn BotSelectChoiceWeapon(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     weapon: c_int,
     doselection: c_int,
@@ -1022,6 +1092,7 @@ pub fn BotSelectChoiceWeapon(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5254-5266`
 pub fn BotSelectMelee(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotSelectMelee — parked: seam-threading")
@@ -1032,6 +1103,7 @@ pub fn BotSelectMelee(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5269-5312`
 pub fn GetLoveLevel(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     love: *mut bot_state_t,
 ) -> c_int {
@@ -1043,6 +1115,7 @@ pub fn GetLoveLevel(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5315-5388`
 pub fn BotLovedOneDied(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     loved: *mut bot_state_t,
     lovelevel: c_int,
@@ -1055,6 +1128,7 @@ pub fn BotLovedOneDied(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5390-5414`
 pub fn BotDeathNotify(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port BotDeathNotify — parked: seam-threading")
@@ -1065,6 +1139,7 @@ pub fn BotDeathNotify(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5417-5463`
 pub fn StrafeTracing(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port StrafeTracing — parked: seam-threading")
@@ -1115,6 +1190,7 @@ pub fn KeepAltFromFiring(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5538-5583`
 pub fn CheckForFriendInLOF(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> *mut gentity_t {
     todo!("Port CheckForFriendInLOF — parked: seam-threading")
@@ -1125,6 +1201,7 @@ pub fn CheckForFriendInLOF(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5585-5615`
 pub fn BotScanForLeader(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port BotScanForLeader — parked: seam-threading")
@@ -1135,6 +1212,7 @@ pub fn BotScanForLeader(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5618-5644`
 pub fn BotReplyGreetings(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port BotReplyGreetings — parked: seam-threading")
@@ -1145,6 +1223,7 @@ pub fn BotReplyGreetings(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5647-5723`
 pub fn CTFFlagMovement(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port CTFFlagMovement — parked: seam-threading")
@@ -1155,6 +1234,7 @@ pub fn CTFFlagMovement(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5726-5777`
 pub fn BotCheckDetPacks(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
     todo!("Port BotCheckDetPacks — parked: seam-threading")
@@ -1165,6 +1245,7 @@ pub fn BotCheckDetPacks(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5780-5830`
 pub fn BotUseInventoryItem(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotUseInventoryItem — parked: seam-threading")
@@ -1175,6 +1256,7 @@ pub fn BotUseInventoryItem(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5833-5852`
 pub fn BotSurfaceNear(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
     todo!("Port BotSurfaceNear — parked: seam-threading")
@@ -1203,6 +1285,7 @@ pub fn BotWeaponBlockable(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5883-5927`
 pub fn Bot_SetForcedMovement(
+    ctx: GameContext<'_>,
     bot: c_int,
     forward: c_int,
     right: c_int,
@@ -1216,6 +1299,7 @@ pub fn Bot_SetForcedMovement(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5931-7483`
 pub fn StandardBotAI(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     thinktime: f32,
 ) {
@@ -1227,6 +1311,7 @@ pub fn StandardBotAI(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:7492-7568`
 pub fn BotAIStartFrame(
+    ctx: GameContext<'_>,
     time: c_int,
 ) -> c_int {
     todo!("Port BotAIStartFrame — parked: seam-threading")
@@ -1237,6 +1322,7 @@ pub fn BotAIStartFrame(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:7575-7616`
 pub fn BotAISetup(
+    ctx: GameContext<'_>,
     restart: c_int,
 ) -> c_int {
     todo!("Port BotAISetup — parked: seam-threading")
@@ -1247,6 +1333,7 @@ pub fn BotAISetup(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:7623-7641`
 pub fn BotAIShutdown(
+    ctx: GameContext<'_>,
     restart: c_int,
 ) -> c_int {
     todo!("Port BotAIShutdown — parked: seam-threading")

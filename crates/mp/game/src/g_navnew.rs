@@ -97,7 +97,8 @@ pub fn NPC_ClearBlocked(self_: *mut gentity_t) {
 /// Raven `NPC_SetBlocked`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:43-51`
-pub fn NPC_SetBlocked(self_: *mut gentity_t, blocker: *mut gentity_t) {
+pub fn NPC_SetBlocked(
+    ctx: GameContext<'_>,self_: *mut gentity_t, blocker: *mut gentity_t) {
     todo!("Port NPC_SetBlocked — parked: const-value")
 }
 
@@ -157,6 +158,7 @@ pub fn NAVNEW_ClearPathBetweenPoints(
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:84-171`
 pub fn NAVNEW_PushBlocker(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     right: vec3_t,
@@ -176,6 +178,7 @@ pub fn NAVNEW_PushBlocker(
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:178-215`
 pub fn NAVNEW_DanceWithBlocker(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     movedir: &mut vec3_t,
@@ -232,6 +235,7 @@ pub fn NAVNEW_DanceWithBlocker(
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:222-340`
 pub fn NAVNEW_SidestepBlocker(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     blocked_dir: vec3_t,
@@ -252,6 +256,7 @@ pub fn NAVNEW_SidestepBlocker(
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:347-377`
 pub fn NAVNEW_Bypass(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     blocked_dir: vec3_t,
@@ -289,6 +294,7 @@ pub fn NAVNEW_CheckDoubleBlock(
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:399-435`
 pub fn NAVNEW_ResolveEntityCollision(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     movedir: vec3_t,
@@ -306,6 +312,7 @@ pub fn NAVNEW_ResolveEntityCollision(
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:442-518`
 pub fn NAVNEW_AvoidCollision(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     goal: *mut gentity_t,
     info: *mut navInfo_t,
@@ -328,6 +335,7 @@ pub fn NAVNEW_AvoidCollision(
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:520-572`
 pub fn NAVNEW_TestNodeConnectionBlocked(
+    ctx: GameContext<'_>,
     wp1: c_int,
     wp2: c_int,
     ignoreEnt: *mut gentity_t,
@@ -350,6 +358,7 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
 /// Raven `NAVNEW_MoveToGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:578-865`
-pub fn NAVNEW_MoveToGoal(self_: *mut gentity_t, info: *mut navInfo_t) -> c_int {
+pub fn NAVNEW_MoveToGoal(
+    ctx: GameContext<'_>,self_: *mut gentity_t, info: *mut navInfo_t) -> c_int {
     todo!("Port NAVNEW_MoveToGoal — parked: ai-context")
 }

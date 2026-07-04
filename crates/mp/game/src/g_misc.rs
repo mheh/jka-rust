@@ -57,8 +57,9 @@ pub fn SP_info_camp(self_: *mut gentity_t) {
 /// Used as a positional target for calculations in the utilities
 /// (spotlights, etc), but removed during gameplay.
 /// Source: `oracle/oracle/codemp/game/g_misc.c:33-35`
-pub fn SP_info_null(self_: *mut gentity_t) {
-    G_FreeEntity(self_);
+pub fn SP_info_null(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
+    G_FreeEntity(ctx, self_);
 }
 
 /// Raven `SP_info_notnull`.
@@ -77,18 +78,20 @@ pub fn SP_info_notnull(self_: *mut gentity_t) {
 /// Raven `misc_lightstyle_set`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:86-132`
-pub fn misc_lightstyle_set(ent: *mut gentity_t) {
+pub fn misc_lightstyle_set(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port misc_lightstyle_set — parked: raw-ptr-skeleton-no-world-handle")
 }
 
 /// Raven `misc_dlight_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:134-140`
-pub fn misc_dlight_use(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn misc_dlight_use(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     unsafe {
-        G_ActivateBehavior(ent, BSET_USE);
+        G_ActivateBehavior(ctx, ent, BSET_USE);
         (*ent).alt_fire = if (*ent).alt_fire != qfalse { qfalse } else { qtrue };
-        misc_lightstyle_set(ent);
+        misc_lightstyle_set(ctx, ent);
     }
 }
 
@@ -100,7 +103,8 @@ pub fn misc_dlight_use(ent: *mut gentity_t, other: *mut gentity_t, activator: *m
 /// Raven `SP_light`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:142-166`
-pub fn SP_light(self_: *mut gentity_t) {
+pub fn SP_light(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_light — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -109,7 +113,8 @@ pub fn SP_light(self_: *mut gentity_t) {
 /// Raven `TeleportPlayer`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:177-231`
-pub fn TeleportPlayer(player: *mut gentity_t, origin: vec3_t, angles: vec3_t) {
+pub fn TeleportPlayer(
+    ctx: GameContext<'_>,player: *mut gentity_t, origin: vec3_t, angles: vec3_t) {
     todo!("Port TeleportPlayer — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -125,23 +130,26 @@ pub fn SP_misc_teleporter_dest(ent: *mut gentity_t) {}
 /// The live (non-`#if 0`) path just frees the entity — map triangle
 /// generation was compiled out.
 /// Source: `oracle/oracle/codemp/game/g_misc.c:249-262`
-pub fn SP_misc_model(ent: *mut gentity_t) {
-    G_FreeEntity(ent);
+pub fn SP_misc_model(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
+    G_FreeEntity(ctx, ent);
 }
 
 /// Raven `SP_misc_model_static`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:277-280`
-pub fn SP_misc_model_static(ent: *mut gentity_t) {
-    G_FreeEntity(ent);
+pub fn SP_misc_model_static(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
+    G_FreeEntity(ctx, ent);
 }
 
 /// Raven `SP_misc_G2model`.
 ///
 /// The live (non-`#if 0`) path just frees the entity.
 /// Source: `oracle/oracle/codemp/game/g_misc.c:285-301`
-pub fn SP_misc_G2model(ent: *mut gentity_t) {
-    G_FreeEntity(ent);
+pub fn SP_misc_G2model(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
+    G_FreeEntity(ctx, ent);
 }
 
 // PORT-ESCALATION(vec3-outparam-seam): resolved `VectorNormalize(vec3_t) ->
@@ -152,7 +160,8 @@ pub fn SP_misc_G2model(ent: *mut gentity_t) {
 /// Raven `locateCamera`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:305-349`
-pub fn locateCamera(ent: *mut gentity_t) {
+pub fn locateCamera(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port locateCamera — parked: vec3-outparam-seam")
 }
 
@@ -161,7 +170,8 @@ pub fn locateCamera(ent: *mut gentity_t) {
 /// Raven `SP_misc_portal_surface`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:355-369`
-pub fn SP_misc_portal_surface(ent: *mut gentity_t) {
+pub fn SP_misc_portal_surface(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_portal_surface — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -169,7 +179,8 @@ pub fn SP_misc_portal_surface(ent: *mut gentity_t) {
 /// Raven `SP_misc_portal_camera`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:375-385`
-pub fn SP_misc_portal_camera(ent: *mut gentity_t) {
+pub fn SP_misc_portal_camera(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_portal_camera — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -179,7 +190,8 @@ pub fn SP_misc_portal_camera(ent: *mut gentity_t) {
 /// Raven `SP_misc_bsp`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:390-462`
-pub fn SP_misc_bsp(ent: *mut gentity_t) {
+pub fn SP_misc_bsp(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_bsp — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -189,7 +201,8 @@ pub fn SP_misc_bsp(ent: *mut gentity_t) {
 /// Raven `SP_terrain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:484-631`
-pub fn SP_terrain(ent: *mut gentity_t) {
+pub fn SP_terrain(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_terrain — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -199,15 +212,17 @@ pub fn SP_terrain(ent: *mut gentity_t) {
 /// Raven `G_PortalifyEntities`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:638-667`
-pub fn G_PortalifyEntities(ent: *mut gentity_t) {
+pub fn G_PortalifyEntities(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port G_PortalifyEntities — parked: raw-ptr-skeleton-no-world-handle")
 }
 
 /// Raven `SP_misc_skyportal_orient`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:675-678`
-pub fn SP_misc_skyportal_orient(ent: *mut gentity_t) {
-    G_FreeEntity(ent);
+pub fn SP_misc_skyportal_orient(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
+    G_FreeEntity(ctx, ent);
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
@@ -216,7 +231,8 @@ pub fn SP_misc_skyportal_orient(ent: *mut gentity_t) {
 /// Raven `SP_misc_skyportal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:694-715`
-pub fn SP_misc_skyportal(ent: *mut gentity_t) {
+pub fn SP_misc_skyportal(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_skyportal — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -232,7 +248,8 @@ pub fn HolocronRespawn(self_: *mut gentity_t) {
 /// Raven `HolocronPopOut`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:765-784`
-pub fn HolocronPopOut(self_: *mut gentity_t) {
+pub fn HolocronPopOut(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     unsafe {
         if Q_irand(1, 10) < 5 {
             (*self_).s.pos.trDelta[0] = 150.0 + Q_irand(1, 100) as f32;
@@ -253,7 +270,8 @@ pub fn HolocronPopOut(self_: *mut gentity_t) {
 /// Raven `HolocronTouch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:786-905`
-pub fn HolocronTouch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn HolocronTouch(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port HolocronTouch — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -262,7 +280,8 @@ pub fn HolocronTouch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut t
 /// Raven `HolocronThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:907-991`
-pub fn HolocronThink(ent: *mut gentity_t) {
+pub fn HolocronThink(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port HolocronThink — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -272,7 +291,8 @@ pub fn HolocronThink(ent: *mut gentity_t) {
 /// Raven `SP_misc_holocron`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:993-1097`
-pub fn SP_misc_holocron(ent: *mut gentity_t) {
+pub fn SP_misc_holocron(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_holocron — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -282,16 +302,18 @@ pub fn SP_misc_holocron(ent: *mut gentity_t) {
 /// Raven `Use_Shooter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1107-1139`
-pub fn Use_Shooter(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn Use_Shooter(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     todo!("Port Use_Shooter — parked: rng-threading")
 }
 
 /// Raven `InitShooter_Finish`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1142-1146`
-pub fn InitShooter_Finish(ent: *mut gentity_t) {
+pub fn InitShooter_Finish(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     unsafe {
-        (*ent).enemy = G_PickTarget((*ent).target);
+        (*ent).enemy = G_PickTarget(ctx, (*ent).target);
         (*ent).think = None;
         (*ent).nextthink = 0;
     }
@@ -303,22 +325,25 @@ pub fn InitShooter_Finish(ent: *mut gentity_t) {
 /// Raven `InitShooter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1148-1166`
-pub fn InitShooter(ent: *mut gentity_t, weapon: c_int) {
+pub fn InitShooter(
+    ctx: GameContext<'_>,ent: *mut gentity_t, weapon: c_int) {
     todo!("Port InitShooter — parked: raw-ptr-skeleton-no-world-handle")
 }
 
 /// Raven `SP_shooter_blaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1172-1174`
-pub fn SP_shooter_blaster(ent: *mut gentity_t) {
-    InitShooter(ent, mp_bg::weapons::weapon_t::WP_BLASTER);
+pub fn SP_shooter_blaster(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
+    InitShooter(ctx, ent, mp_bg::weapons::weapon_t::WP_BLASTER);
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `check_recharge`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1176-1206`
-pub fn check_recharge(ent: *mut gentity_t) {
+pub fn check_recharge(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port check_recharge — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -328,7 +353,8 @@ pub fn check_recharge(ent: *mut gentity_t) {
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
 // `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
 // how is state threaded in?
-pub fn EnergyShieldStationSettings(ent: *mut gentity_t) {
+pub fn EnergyShieldStationSettings(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port EnergyShieldStationSettings — parked: seam-threading")
 }
 
@@ -338,6 +364,7 @@ pub fn EnergyShieldStationSettings(ent: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1230-1328`
 pub fn shield_power_converter_use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -351,6 +378,7 @@ pub fn shield_power_converter_use(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1331-1505`
 pub fn ammo_generic_power_converter_use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -364,7 +392,8 @@ pub fn ammo_generic_power_converter_use(
 /// Raven `SP_misc_ammo_floor_unit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1515-1592`
-pub fn SP_misc_ammo_floor_unit(ent: *mut gentity_t) {
+pub fn SP_misc_ammo_floor_unit(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_ammo_floor_unit — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -374,7 +403,8 @@ pub fn SP_misc_ammo_floor_unit(ent: *mut gentity_t) {
 /// Raven `SP_misc_shield_floor_unit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1602-1687`
-pub fn SP_misc_shield_floor_unit(ent: *mut gentity_t) {
+pub fn SP_misc_shield_floor_unit(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_shield_floor_unit — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -384,7 +414,8 @@ pub fn SP_misc_shield_floor_unit(ent: *mut gentity_t) {
 /// Raven `SP_misc_model_shield_power_converter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1697-1735`
-pub fn SP_misc_model_shield_power_converter(ent: *mut gentity_t) {
+pub fn SP_misc_model_shield_power_converter(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_model_shield_power_converter — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -394,7 +425,8 @@ pub fn SP_misc_model_shield_power_converter(ent: *mut gentity_t) {
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
 // `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
 // how is state threaded in?
-pub fn EnergyAmmoStationSettings(ent: *mut gentity_t) {
+pub fn EnergyAmmoStationSettings(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port EnergyAmmoStationSettings — parked: seam-threading")
 }
 
@@ -403,6 +435,7 @@ pub fn EnergyAmmoStationSettings(ent: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1753-1853`
 pub fn ammo_power_converter_use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -416,7 +449,8 @@ pub fn ammo_power_converter_use(
 /// Raven `SP_misc_model_ammo_power_converter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1864-1904`
-pub fn SP_misc_model_ammo_power_converter(ent: *mut gentity_t) {
+pub fn SP_misc_model_ammo_power_converter(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_model_ammo_power_converter — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -426,7 +460,8 @@ pub fn SP_misc_model_ammo_power_converter(ent: *mut gentity_t) {
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
 // `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
 // how is state threaded in?
-pub fn EnergyHealthStationSettings(ent: *mut gentity_t) {
+pub fn EnergyHealthStationSettings(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port EnergyHealthStationSettings — parked: seam-threading")
 }
 
@@ -435,6 +470,7 @@ pub fn EnergyHealthStationSettings(ent: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1921-1972`
 pub fn health_power_converter_use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -448,7 +484,8 @@ pub fn health_power_converter_use(
 /// Raven `SP_misc_model_health_power_converter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1982-2027`
-pub fn SP_misc_model_health_power_converter(ent: *mut gentity_t) {
+pub fn SP_misc_model_health_power_converter(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_model_health_power_converter — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -456,7 +493,8 @@ pub fn SP_misc_model_health_power_converter(ent: *mut gentity_t) {
 /// Raven `fx_runner_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2266-2310`
-pub fn fx_runner_think(ent: *mut gentity_t) {
+pub fn fx_runner_think(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port fx_runner_think — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -465,7 +503,8 @@ pub fn fx_runner_think(ent: *mut gentity_t) {
 /// Raven `fx_runner_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2313-2384`
-pub fn fx_runner_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn fx_runner_use(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     todo!("Port fx_runner_use — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -474,7 +513,8 @@ pub fn fx_runner_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *m
 /// Raven `fx_runner_link`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2387-2453`
-pub fn fx_runner_link(ent: *mut gentity_t) {
+pub fn fx_runner_link(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port fx_runner_link — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -483,7 +523,8 @@ pub fn fx_runner_link(ent: *mut gentity_t) {
 /// Raven `SP_fx_runner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2456-2501`
-pub fn SP_fx_runner(ent: *mut gentity_t) {
+pub fn SP_fx_runner(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_fx_runner — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -493,14 +534,16 @@ pub fn SP_fx_runner(ent: *mut gentity_t) {
 /// Raven `SP_CreateSpaceDust`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2509-2513`
-pub fn SP_CreateSpaceDust(ent: *mut gentity_t) {
+pub fn SP_CreateSpaceDust(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_CreateSpaceDust — parked: variadic-seam")
 }
 
 /// Raven `SP_CreateSnow`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2522-2527`
-pub fn SP_CreateSnow(ent: *mut gentity_t) {
+pub fn SP_CreateSnow(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     G_EffectIndex(b"*snow\0".as_ptr() as *const c_char);
     G_EffectIndex(b"*fog\0".as_ptr() as *const c_char);
     G_EffectIndex(b"*constantwind (100 100 -100)\0".as_ptr() as *const c_char);
@@ -511,17 +554,19 @@ pub fn SP_CreateSnow(ent: *mut gentity_t) {
 /// Raven `SP_CreateRain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2535-2538`
-pub fn SP_CreateRain(ent: *mut gentity_t) {
+pub fn SP_CreateRain(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_CreateRain — parked: variadic-seam")
 }
 
 /// Raven `Use_Target_Screenshake`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2543-2553`
-pub fn Use_Target_Screenshake(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn Use_Target_Screenshake(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     unsafe {
         let bGlobal: qboolean = if (*ent).genericValue6 != 0 { qtrue } else { qfalse };
-        G_ScreenShake((*ent).s.origin, std::ptr::null_mut(), (*ent).speed, (*ent).genericValue5, bGlobal);
+        G_ScreenShake(ctx, (*ent).s.origin, std::ptr::null_mut(), (*ent).speed, (*ent).genericValue5, bGlobal);
     }
 }
 
@@ -532,7 +577,8 @@ pub fn Use_Target_Screenshake(ent: *mut gentity_t, other: *mut gentity_t, activa
 /// Raven `SP_target_screenshake`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2555-2565`
-pub fn SP_target_screenshake(ent: *mut gentity_t) {
+pub fn SP_target_screenshake(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_target_screenshake — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -541,7 +587,8 @@ pub fn SP_target_screenshake(ent: *mut gentity_t) {
 /// Raven `Use_Target_Escapetrig`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2569-2597`
-pub fn Use_Target_Escapetrig(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn Use_Target_Escapetrig(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     todo!("Port Use_Target_Escapetrig — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -550,7 +597,8 @@ pub fn Use_Target_Escapetrig(ent: *mut gentity_t, other: *mut gentity_t, activat
 /// Raven `SP_target_escapetrig`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2599-2613`
-pub fn SP_target_escapetrig(ent: *mut gentity_t) {
+pub fn SP_target_escapetrig(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_target_escapetrig — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -561,6 +609,7 @@ pub fn SP_target_escapetrig(ent: *mut gentity_t) {
 /// (`//rwwFIXMEFIXME - weap expl func`).
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2623-2640`
 pub fn maglock_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -576,7 +625,7 @@ pub fn maglock_die(
                 (*door).flags &= !FL_INACTIVE;
             }
         }
-        G_UseTargets(self_, attacker);
+        G_UseTargets(ctx, self_, attacker);
     }
 }
 
@@ -585,7 +634,8 @@ pub fn maglock_die(
 /// Raven `SP_misc_maglock`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2645-2658`
-pub fn SP_misc_maglock(self_: *mut gentity_t) {
+pub fn SP_misc_maglock(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_misc_maglock — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -595,7 +645,8 @@ pub fn SP_misc_maglock(self_: *mut gentity_t) {
 /// Raven `maglock_link`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2659-2728`
-pub fn maglock_link(self_: *mut gentity_t) {
+pub fn maglock_link(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port maglock_link — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -603,7 +654,8 @@ pub fn maglock_link(self_: *mut gentity_t) {
 /// Raven `faller_touch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2730-2756`
-pub fn faller_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn faller_touch(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port faller_touch — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -612,7 +664,8 @@ pub fn faller_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut tr
 /// Raven `faller_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2758-2787`
-pub fn faller_think(ent: *mut gentity_t) {
+pub fn faller_think(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port faller_think — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -622,7 +675,8 @@ pub fn faller_think(ent: *mut gentity_t) {
 /// Raven `misc_faller_create`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2789-2828`
-pub fn misc_faller_create(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn misc_faller_create(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     todo!("Port misc_faller_create — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -630,7 +684,8 @@ pub fn misc_faller_create(ent: *mut gentity_t, other: *mut gentity_t, activator:
 /// Raven `misc_faller_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2830-2834`
-pub fn misc_faller_think(ent: *mut gentity_t) {
+pub fn misc_faller_think(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port misc_faller_think — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -639,7 +694,8 @@ pub fn misc_faller_think(ent: *mut gentity_t) {
 /// Raven `SP_misc_faller`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2844-2865`
-pub fn SP_misc_faller(ent: *mut gentity_t) {
+pub fn SP_misc_faller(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_faller — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -648,7 +704,7 @@ pub fn SP_misc_faller(ent: *mut gentity_t) {
 /// Raven `FirstFreeTagOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2888-2903`
-pub fn FirstFreeTagOwner() -> *mut c_void {
+pub fn FirstFreeTagOwner(ctx: GameContext<'_>) -> *mut c_void {
     //TODO: Port tagOwner_t (unported return type; C: `tagOwner_t *`)
     todo!("Port FirstFreeTagOwner — parked: bg-dep")
 }
@@ -658,6 +714,7 @@ pub fn FirstFreeTagOwner() -> *mut c_void {
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2905-2922`
 pub fn FirstFreeRefTag(
+    ctx: GameContext<'_>,
     //TODO: Port tagOwner_t  (C: `tagOwner_t *`)
     tagOwner: *mut c_void,
 ) -> *mut reference_tag_t {
@@ -669,7 +726,7 @@ pub fn FirstFreeRefTag(
 /// Raven `TAG_Init`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2930-2945`
-pub fn TAG_Init() {
+pub fn TAG_Init(ctx: GameContext<'_>) {
     todo!("Port TAG_Init — parked: bg-dep")
 }
 
@@ -678,7 +735,8 @@ pub fn TAG_Init() {
 /// Raven `TAG_FindOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2953-2967`
-pub fn TAG_FindOwner(owner: *const c_char) -> *mut c_void {
+pub fn TAG_FindOwner(
+    ctx: GameContext<'_>,owner: *const c_char) -> *mut c_void {
     //TODO: Port tagOwner_t (unported return type; C: `tagOwner_t *`)
     todo!("Port TAG_FindOwner — parked: bg-dep")
 }
@@ -687,7 +745,8 @@ pub fn TAG_FindOwner(owner: *const c_char) -> *mut c_void {
 /// Raven `TAG_Find`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2975-3028`
-pub fn TAG_Find(owner: *const c_char, name: *const c_char) -> *mut reference_tag_t {
+pub fn TAG_Find(
+    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char) -> *mut reference_tag_t {
     todo!("Port TAG_Find — parked: bg-dep")
 }
 
@@ -697,6 +756,7 @@ pub fn TAG_Find(owner: *const c_char, name: *const c_char) -> *mut reference_tag
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3036-3104`
 pub fn TAG_Add(
+    ctx: GameContext<'_>,
     name: *const c_char,
     owner: *const c_char,
     origin: vec3_t,
@@ -711,7 +771,8 @@ pub fn TAG_Add(
 /// Raven `TAG_GetOrigin`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3112-3125`
-pub fn TAG_GetOrigin(owner: *const c_char, name: *const c_char, origin: vec3_t) -> c_int {
+pub fn TAG_GetOrigin(
+    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char, origin: vec3_t) -> c_int {
     todo!("Port TAG_GetOrigin — parked: bg-dep")
 }
 
@@ -719,7 +780,8 @@ pub fn TAG_GetOrigin(owner: *const c_char, name: *const c_char, origin: vec3_t) 
 /// Raven `TAG_GetOrigin2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3134-3146`
-pub fn TAG_GetOrigin2(owner: *const c_char, name: *const c_char, origin: vec3_t) -> c_int {
+pub fn TAG_GetOrigin2(
+    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char, origin: vec3_t) -> c_int {
     todo!("Port TAG_GetOrigin2 — parked: bg-dep")
 }
 
@@ -727,7 +789,8 @@ pub fn TAG_GetOrigin2(owner: *const c_char, name: *const c_char, origin: vec3_t)
 /// Raven `TAG_GetAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3153-3166`
-pub fn TAG_GetAngles(owner: *const c_char, name: *const c_char, angles: vec3_t) -> c_int {
+pub fn TAG_GetAngles(
+    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char, angles: vec3_t) -> c_int {
     todo!("Port TAG_GetAngles — parked: bg-dep")
 }
 
@@ -735,7 +798,8 @@ pub fn TAG_GetAngles(owner: *const c_char, name: *const c_char, angles: vec3_t) 
 /// Raven `TAG_GetRadius`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3174-3185`
-pub fn TAG_GetRadius(owner: *const c_char, name: *const c_char) -> c_int {
+pub fn TAG_GetRadius(
+    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char) -> c_int {
     todo!("Port TAG_GetRadius — parked: bg-dep")
 }
 
@@ -743,7 +807,8 @@ pub fn TAG_GetRadius(owner: *const c_char, name: *const c_char) -> c_int {
 /// Raven `TAG_GetFlags`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3193-3204`
-pub fn TAG_GetFlags(owner: *const c_char, name: *const c_char) -> c_int {
+pub fn TAG_GetFlags(
+    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char) -> c_int {
     todo!("Port TAG_GetFlags — parked: bg-dep")
 }
 
@@ -753,7 +818,8 @@ pub fn TAG_GetFlags(owner: *const c_char, name: *const c_char) -> c_int {
 /// Raven `ref_link`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3267-3298`
-pub fn ref_link(ent: *mut gentity_t) {
+pub fn ref_link(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port ref_link — parked: bg-dep")
 }
 
@@ -762,7 +828,8 @@ pub fn ref_link(ent: *mut gentity_t) {
 /// Raven `SP_reference_tag`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3300-3312`
-pub fn SP_reference_tag(ent: *mut gentity_t) {
+pub fn SP_reference_tag(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_reference_tag — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -772,7 +839,7 @@ pub fn SP_reference_tag(ent: *mut gentity_t) {
 /// Raven `G_ClientForShooter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3354-3375`
-pub fn G_ClientForShooter() -> *mut gclient_t {
+pub fn G_ClientForShooter(ctx: GameContext<'_>) -> *mut gclient_t {
     todo!("Port G_ClientForShooter — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -781,7 +848,8 @@ pub fn G_ClientForShooter() -> *mut gclient_t {
 /// Raven `G_FreeClientForShooter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3377-3389`
-pub fn G_FreeClientForShooter(cl: *mut gclient_t) {
+pub fn G_FreeClientForShooter(
+    ctx: GameContext<'_>,cl: *mut gclient_t) {
     todo!("Port G_FreeClientForShooter — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -790,7 +858,8 @@ pub fn G_FreeClientForShooter(cl: *mut gclient_t) {
 /// Raven `misc_weapon_shooter_fire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3391-3399`
-pub fn misc_weapon_shooter_fire(self_: *mut gentity_t) {
+pub fn misc_weapon_shooter_fire(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port misc_weapon_shooter_fire — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -803,6 +872,7 @@ pub fn misc_weapon_shooter_fire(self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3401-3415`
 pub fn misc_weapon_shooter_use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -814,7 +884,8 @@ pub fn misc_weapon_shooter_use(
 /// Raven `misc_weapon_shooter_aim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3417-3438`
-pub fn misc_weapon_shooter_aim(self_: *mut gentity_t) {
+pub fn misc_weapon_shooter_aim(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port misc_weapon_shooter_aim — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -824,7 +895,8 @@ pub fn misc_weapon_shooter_aim(self_: *mut gentity_t) {
 /// Raven `SP_misc_weapon_shooter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3444-3486`
-pub fn SP_misc_weapon_shooter(self_: *mut gentity_t) {
+pub fn SP_misc_weapon_shooter(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_misc_weapon_shooter — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -835,7 +907,8 @@ pub fn SP_misc_weapon_shooter(self_: *mut gentity_t) {
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn SP_misc_weather_zone(ent: *mut gentity_t) {
+pub fn SP_misc_weather_zone(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_misc_weather_zone — parked: seam-threading")
 }
 

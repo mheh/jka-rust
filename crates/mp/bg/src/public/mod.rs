@@ -3,6 +3,7 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
 pub mod anim_event_type;
+pub mod anim_number;
 pub mod animation;
 pub mod animevent;
 pub mod bg_entity;
@@ -25,6 +26,7 @@ pub mod gender;
 pub mod global_team_sound;
 pub mod holdable;
 pub mod item_type;
+pub mod jump_velocity;
 pub mod means_of_death;
 pub mod pd_sounds;
 pub mod pers_enum;
@@ -35,11 +37,13 @@ pub mod powerup;
 pub mod saber_move_data;
 pub mod saber_move_name;
 pub mod saber_quadrant;
+pub mod saberlock;
 pub mod spawn;
 pub mod stat_index;
 pub mod team;
 pub mod teamtask;
 pub mod weaponstate;
 
+pub use jump_velocity::JUMP_VELOCITY;
 pub use spawn::{MAX_SPAWN_VARS, MAX_SPAWN_VARS_CHARS};
 pub use team::{team_t, TEAM_BLUE, TEAM_FREE, TEAM_NUM_TEAMS, TEAM_RED, TEAM_SPECTATOR};

@@ -59,7 +59,7 @@ pub fn Howler_Idle() {
 /// Raven `Howler_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:38-71`
-pub fn Howler_Patrol() {
+pub fn Howler_Patrol(ctx: GameContext<'_>) {
     todo!("Port Howler_Patrol — parked: ambient-ai-state")
 }
 
@@ -69,6 +69,7 @@ pub fn Howler_Patrol() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:78-86`
 pub fn Howler_Move(
+    ctx: GameContext<'_>,
     visible: qboolean,
 ) {
     todo!("Port Howler_Move — parked: ambient-ai-state")
@@ -84,6 +85,7 @@ pub fn Howler_Move(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:89-109`
 pub fn Howler_TryDamage(
+    ctx: GameContext<'_>,
     enemy: *mut gentity_t,
     damage: c_int,
 ) {
@@ -95,7 +97,7 @@ pub fn Howler_TryDamage(
 /// Raven `Howler_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:112-131`
-pub fn Howler_Attack() {
+pub fn Howler_Attack(ctx: GameContext<'_>) {
     todo!("Port Howler_Attack — parked: ambient-ai-state")
 }
 
@@ -104,7 +106,7 @@ pub fn Howler_Attack() {
 /// Raven `Howler_Combat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:134-171`
-pub fn Howler_Combat() {
+pub fn Howler_Combat(ctx: GameContext<'_>) {
     todo!("Port Howler_Combat — parked: ambient-ai-state")
 }
 
@@ -120,6 +122,7 @@ pub fn Howler_Combat() {
 // type-check as irrefutable match-pattern bindings (always-true), which is
 // a behavioral bug, not just a compile gap — parked instead.
 pub fn NPC_Howler_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -134,6 +137,6 @@ pub fn NPC_Howler_Pain(
 /// Default behavior state for Howler NPC — dispatch based on whether the
 /// Howler has an enemy target or is in patrol/idle mode.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:202-218`
-pub fn NPC_BSHowler_Default() {
+pub fn NPC_BSHowler_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSHowler_Default — parked: ambient-ai-state")
 }

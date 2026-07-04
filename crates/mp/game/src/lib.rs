@@ -104,6 +104,7 @@ pub mod g_vehicleTurret;
 pub mod g_vehicles;
 pub mod g_weapon;
 pub mod game_cvars;
+pub mod game_globals;
 pub mod q_math;
 pub mod q_shared;
 pub mod tri_coll_test;

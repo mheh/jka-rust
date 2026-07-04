@@ -40,6 +40,7 @@ pub mod t_g_icarus_use;
 pub mod tags;
 pub mod task_id_t;
 pub mod usercmd;
+pub mod usercmd_button;
 
 pub use aas_areainfo::aas_areainfo_t;
 pub use bot_goal::bot_goal_t;

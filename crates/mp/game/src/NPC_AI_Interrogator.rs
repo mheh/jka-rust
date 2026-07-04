@@ -52,7 +52,8 @@ const MIN_DISTANCE: c_int = 64;
 ///
 /// Precache sounds and effects for the Interrogator NPC.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:20-28`
-pub fn NPC_Interrogator_Precache(self_: *mut gentity_t) {
+pub fn NPC_Interrogator_Precache(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr() as *const c_char);
     G_SoundIndex(c"sound/chars/mark1/misc/anger.wav".as_ptr() as *const c_char);
     G_SoundIndex(c"sound/chars/probe/misc/talk".as_ptr() as *const c_char);
@@ -68,6 +69,7 @@ pub fn NPC_Interrogator_Precache(self_: *mut gentity_t) {
 /// Death behavior for Interrogator NPC. Sets velocity and clears flying flag.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:34-57`
 pub fn Interrogator_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -102,7 +104,7 @@ pub fn Interrogator_die(
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Interrogator_PartsMove() {
+pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
     todo!("Port Interrogator_PartsMove — parked: ai-context")
 }
 
@@ -115,7 +117,7 @@ pub fn Interrogator_PartsMove() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Interrogator_MaintainHeight() {
+pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
     todo!("Port Interrogator_MaintainHeight — parked: ai-context")
 }
 
@@ -126,7 +128,7 @@ pub fn Interrogator_MaintainHeight() {
 ///
 /// Perform a strafe movement away from the target.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:238-279`
-pub fn Interrogator_Strafe() {
+pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
     todo!("Port Interrogator_Strafe — parked: trap-no-engine")
 }
 
@@ -139,7 +141,8 @@ pub fn Interrogator_Strafe() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Interrogator_Hunt(visible: qboolean, advance: qboolean) {
+pub fn Interrogator_Hunt(
+    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
     todo!("Port Interrogator_Hunt — parked: ai-context")
 }
 
@@ -152,7 +155,8 @@ pub fn Interrogator_Hunt(visible: qboolean, advance: qboolean) {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Interrogator_Melee(visible: qboolean, advance: qboolean) {
+pub fn Interrogator_Melee(
+    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
     todo!("Port Interrogator_Melee — parked: ai-context")
 }
 
@@ -165,7 +169,7 @@ pub fn Interrogator_Melee(visible: qboolean, advance: qboolean) {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Interrogator_Attack() {
+pub fn Interrogator_Attack(ctx: GameContext<'_>) {
     todo!("Port Interrogator_Attack — parked: ai-context")
 }
 
@@ -178,7 +182,7 @@ pub fn Interrogator_Attack() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Interrogator_Idle() {
+pub fn Interrogator_Idle(ctx: GameContext<'_>) {
     todo!("Port Interrogator_Idle — parked: ai-context")
 }
 
@@ -191,6 +195,6 @@ pub fn Interrogator_Idle() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn NPC_BSInterrogator_Default() {
+pub fn NPC_BSInterrogator_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSInterrogator_Default — parked: ai-context")
 }

@@ -37,7 +37,8 @@ pub fn WP_SpeedOfMissileForWeapon(wp: c_int, alt_fire: qboolean) -> f32 {
 /// Raven `W_TraceSetStart`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:182-218`
-pub fn W_TraceSetStart(ent: *mut gentity_t, start: vec3_t, mins: vec3_t, maxs: vec3_t) {
+pub fn W_TraceSetStart(
+    ctx: GameContext<'_>,ent: *mut gentity_t, start: vec3_t, mins: vec3_t, maxs: vec3_t) {
     todo!("Port W_TraceSetStart — parked: seam-threading")
 }
 
@@ -45,7 +46,8 @@ pub fn W_TraceSetStart(ent: *mut gentity_t, start: vec3_t, mins: vec3_t, maxs: v
 /// Raven `WP_FireBryarPistol`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:236-293`
-pub fn WP_FireBryarPistol(ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireBryarPistol(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     todo!("Port WP_FireBryarPistol — parked: seam-threading")
 }
 
@@ -54,6 +56,7 @@ pub fn WP_FireBryarPistol(ent: *mut gentity_t, altFire: qboolean) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:304-326`
 pub fn WP_FireTurretMissile(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     start: vec3_t,
     dir: vec3_t,
@@ -74,6 +77,7 @@ pub fn WP_FireTurretMissile(
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:331-348`
 pub fn WP_FireGenericBlasterMissile(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     start: vec3_t,
     dir: vec3_t,
@@ -89,7 +93,8 @@ pub fn WP_FireGenericBlasterMissile(
 /// Raven `WP_FireBlasterMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:359-383`
-pub fn WP_FireBlasterMissile(ent: *mut gentity_t, start: vec3_t, dir: vec3_t, altFire: qboolean) {
+pub fn WP_FireBlasterMissile(
+    ctx: GameContext<'_>,ent: *mut gentity_t, start: vec3_t, dir: vec3_t, altFire: qboolean) {
     todo!("Port WP_FireBlasterMissile — parked: bg-dep")
 }
 
@@ -97,7 +102,8 @@ pub fn WP_FireBlasterMissile(ent: *mut gentity_t, start: vec3_t, dir: vec3_t, al
 /// Raven `WP_FireTurboLaserMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:386-419`
-pub fn WP_FireTurboLaserMissile(ent: *mut gentity_t, start: vec3_t, dir: vec3_t) {
+pub fn WP_FireTurboLaserMissile(
+    ctx: GameContext<'_>,ent: *mut gentity_t, start: vec3_t, dir: vec3_t) {
     todo!("Port WP_FireTurboLaserMissile — parked: seam-threading")
 }
 
@@ -106,6 +112,7 @@ pub fn WP_FireTurboLaserMissile(ent: *mut gentity_t, start: vec3_t, dir: vec3_t)
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:422-448`
 pub fn WP_FireEmplacedMissile(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     start: vec3_t,
     dir: vec3_t,
@@ -119,7 +126,8 @@ pub fn WP_FireEmplacedMissile(
 /// Raven `WP_FireBlaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:451-469`
-pub fn WP_FireBlaster(ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireBlaster(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     todo!("Port WP_FireBlaster — parked: seam-threading")
 }
 
@@ -127,7 +135,8 @@ pub fn WP_FireBlaster(ent: *mut gentity_t, altFire: qboolean) {
 /// Raven `WP_DisruptorMainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:483-621`
-pub fn WP_DisruptorMainFire(ent: *mut gentity_t) {
+pub fn WP_DisruptorMainFire(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_DisruptorMainFire — parked: seam-threading")
 }
 
@@ -143,14 +152,16 @@ pub fn G_CanDisruptify(ent: *mut gentity_t) -> qboolean {
 /// Raven `WP_DisruptorAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:642-886`
-pub fn WP_DisruptorAltFire(ent: *mut gentity_t) {
+pub fn WP_DisruptorAltFire(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_DisruptorAltFire — parked: seam-threading")
 }
 
 /// Raven `WP_FireDisruptor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:890-912`
-pub fn WP_FireDisruptor(ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireDisruptor(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     unsafe {
         let mut altFire = altFire;
         let client = if ent.is_null() {
@@ -168,14 +179,14 @@ pub fn WP_FireDisruptor(ent: *mut gentity_t, altFire: qboolean) {
             && client.is_null()
         {
             // special case for animents
-            WP_DisruptorAltFire(ent);
+            WP_DisruptorAltFire(ctx, ent);
             return;
         }
 
         if altFire != qfalse {
-            WP_DisruptorAltFire(ent);
+            WP_DisruptorAltFire(ctx, ent);
         } else {
-            WP_DisruptorMainFire(ent);
+            WP_DisruptorMainFire(ctx, ent);
         }
     }
 }
@@ -184,7 +195,8 @@ pub fn WP_FireDisruptor(ent: *mut gentity_t, altFire: qboolean) {
 /// Raven `WP_BowcasterAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:923-942`
-pub fn WP_BowcasterAltFire(ent: *mut gentity_t) {
+pub fn WP_BowcasterAltFire(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_BowcasterAltFire — parked: seam-threading")
 }
 
@@ -192,18 +204,20 @@ pub fn WP_BowcasterAltFire(ent: *mut gentity_t) {
 /// Raven `WP_BowcasterMainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:945-1029`
-pub fn WP_BowcasterMainFire(ent: *mut gentity_t) {
+pub fn WP_BowcasterMainFire(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_BowcasterMainFire — parked: seam-threading")
 }
 
 /// Raven `WP_FireBowcaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1032-1043`
-pub fn WP_FireBowcaster(ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireBowcaster(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     if altFire != qfalse {
-        WP_BowcasterAltFire(ent);
+        WP_BowcasterAltFire(ctx, ent);
     } else {
-        WP_BowcasterMainFire(ent);
+        WP_BowcasterMainFire(ctx, ent);
     }
 }
 
@@ -211,7 +225,8 @@ pub fn WP_FireBowcaster(ent: *mut gentity_t, altFire: qboolean) {
 /// Raven `WP_RepeaterMainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1056-1073`
-pub fn WP_RepeaterMainFire(ent: *mut gentity_t, dir: vec3_t) {
+pub fn WP_RepeaterMainFire(
+    ctx: GameContext<'_>,ent: *mut gentity_t, dir: vec3_t) {
     todo!("Port WP_RepeaterMainFire — parked: seam-threading")
 }
 
@@ -219,7 +234,8 @@ pub fn WP_RepeaterMainFire(ent: *mut gentity_t, dir: vec3_t) {
 /// Raven `WP_RepeaterAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1076-1107`
-pub fn WP_RepeaterAltFire(ent: *mut gentity_t) {
+pub fn WP_RepeaterAltFire(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_RepeaterAltFire — parked: seam-threading")
 }
 
@@ -227,7 +243,8 @@ pub fn WP_RepeaterAltFire(ent: *mut gentity_t) {
 /// Raven `WP_FireRepeater`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1110-1131`
-pub fn WP_FireRepeater(ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireRepeater(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     todo!("Port WP_FireRepeater — parked: seam-threading")
 }
 
@@ -235,7 +252,8 @@ pub fn WP_FireRepeater(ent: *mut gentity_t, altFire: qboolean) {
 /// Raven `WP_DEMP2_MainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1142-1160`
-pub fn WP_DEMP2_MainFire(ent: *mut gentity_t) {
+pub fn WP_DEMP2_MainFire(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_DEMP2_MainFire — parked: seam-threading")
 }
 
@@ -243,7 +261,8 @@ pub fn WP_DEMP2_MainFire(ent: *mut gentity_t) {
 /// Raven `DEMP2_AltRadiusDamage`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1164-1307`
-pub fn DEMP2_AltRadiusDamage(ent: *mut gentity_t) {
+pub fn DEMP2_AltRadiusDamage(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port DEMP2_AltRadiusDamage — parked: seam-threading")
 }
 
@@ -251,7 +270,8 @@ pub fn DEMP2_AltRadiusDamage(ent: *mut gentity_t) {
 /// Raven `DEMP2_AltDetonate`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1310-1333`
-pub fn DEMP2_AltDetonate(ent: *mut gentity_t) {
+pub fn DEMP2_AltDetonate(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port DEMP2_AltDetonate — parked: seam-threading")
 }
 
@@ -259,18 +279,20 @@ pub fn DEMP2_AltDetonate(ent: *mut gentity_t) {
 /// Raven `WP_DEMP2_AltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1336-1403`
-pub fn WP_DEMP2_AltFire(ent: *mut gentity_t) {
+pub fn WP_DEMP2_AltFire(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_DEMP2_AltFire — parked: seam-threading")
 }
 
 /// Raven `WP_FireDEMP2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1406-1417`
-pub fn WP_FireDEMP2(ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireDEMP2(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     if altFire != qfalse {
-        WP_DEMP2_AltFire(ent);
+        WP_DEMP2_AltFire(ctx, ent);
     } else {
-        WP_DEMP2_MainFire(ent);
+        WP_DEMP2_MainFire(ctx, ent);
     }
 }
 
@@ -278,7 +300,8 @@ pub fn WP_FireDEMP2(ent: *mut gentity_t, altFire: qboolean) {
 /// Raven `WP_FlechetteMainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1430-1467`
-pub fn WP_FlechetteMainFire(ent: *mut gentity_t) {
+pub fn WP_FlechetteMainFire(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_FlechetteMainFire — parked: seam-threading")
 }
 
@@ -286,7 +309,8 @@ pub fn WP_FlechetteMainFire(ent: *mut gentity_t) {
 /// Raven `prox_mine_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1470-1506`
-pub fn prox_mine_think(ent: *mut gentity_t) {
+pub fn prox_mine_think(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port prox_mine_think — parked: seam-threading")
 }
 
@@ -294,7 +318,8 @@ pub fn prox_mine_think(ent: *mut gentity_t) {
 /// Raven `WP_TraceSetStart`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1509-1541`
-pub fn WP_TraceSetStart(ent: *mut gentity_t, start: vec3_t, mins: vec3_t, maxs: vec3_t) {
+pub fn WP_TraceSetStart(
+    ctx: GameContext<'_>,ent: *mut gentity_t, start: vec3_t, mins: vec3_t, maxs: vec3_t) {
     todo!("Port WP_TraceSetStart — parked: seam-threading")
 }
 
@@ -302,33 +327,36 @@ pub fn WP_TraceSetStart(ent: *mut gentity_t, start: vec3_t, mins: vec3_t, maxs: 
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1543-1546`
 pub fn WP_ExplosiveDie(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
     r#mod: c_int,
 ) {
-    laserTrapExplode(self_);
+    laserTrapExplode(ctx, self_);
 }
 
 /// Raven `WP_flechette_alt_blow`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1549-1557`
-pub fn WP_flechette_alt_blow(ent: *mut gentity_t) {
+pub fn WP_flechette_alt_blow(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     unsafe {
         (*ent).s.pos.trDelta[0] = 1.0;
         (*ent).s.pos.trDelta[1] = 0.0;
         (*ent).s.pos.trDelta[2] = 0.0;
     }
 
-    laserTrapExplode(ent);
+    laserTrapExplode(ctx, ent);
 }
 
 // PORT-ESCALATION(rng-threading): faithful skeleton signature carries no threaded Rng (ruling 3: `random()`/Q_flrand LCG is bg-shared and threaded), but `random()` is used for the missile speed/life here — how is the Rng reached from this context-free signature?
 /// Raven `WP_CreateFlechetteBouncyThing`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1560-1599`
-pub fn WP_CreateFlechetteBouncyThing(start: vec3_t, fwd: vec3_t, self_: *mut gentity_t) {
+pub fn WP_CreateFlechetteBouncyThing(
+    ctx: GameContext<'_>,start: vec3_t, fwd: vec3_t, self_: *mut gentity_t) {
     todo!("Port WP_CreateFlechetteBouncyThing — parked: rng-threading")
 }
 
@@ -336,19 +364,21 @@ pub fn WP_CreateFlechetteBouncyThing(start: vec3_t, fwd: vec3_t, self_: *mut gen
 /// Raven `WP_FlechetteAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1602-1623`
-pub fn WP_FlechetteAltFire(self_: *mut gentity_t) {
+pub fn WP_FlechetteAltFire(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port WP_FlechetteAltFire — parked: seam-threading")
 }
 
 /// Raven `WP_FireFlechette`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1626-1638`
-pub fn WP_FireFlechette(ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireFlechette(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     if altFire != qfalse {
         // WP_FlechetteProxMine( ent );
-        WP_FlechetteAltFire(ent);
+        WP_FlechetteAltFire(ctx, ent);
     } else {
-        WP_FlechetteMainFire(ent);
+        WP_FlechetteMainFire(ctx, ent);
     }
 }
 
@@ -356,7 +386,8 @@ pub fn WP_FireFlechette(ent: *mut gentity_t, altFire: qboolean) {
 /// Raven `rocketThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1651-1811`
-pub fn rocketThink(ent: *mut gentity_t) {
+pub fn rocketThink(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port rocketThink — parked: seam-threading")
 }
 
@@ -365,6 +396,7 @@ pub fn rocketThink(ent: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1814-1823`
 pub fn RocketDie(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -378,7 +410,8 @@ pub fn RocketDie(
 /// Raven `WP_FireRocket`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1826-1908`
-pub fn WP_FireRocket(ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireRocket(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     todo!("Port WP_FireRocket — parked: seam-threading")
 }
 
@@ -386,7 +419,8 @@ pub fn WP_FireRocket(ent: *mut gentity_t, altFire: qboolean) {
 /// Raven `thermalDetonatorExplode`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1936-1970`
-pub fn thermalDetonatorExplode(ent: *mut gentity_t) {
+pub fn thermalDetonatorExplode(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port thermalDetonatorExplode — parked: seam-threading")
 }
 
@@ -394,7 +428,8 @@ pub fn thermalDetonatorExplode(ent: *mut gentity_t) {
 /// Raven `thermalThinkStandard`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1972-1983`
-pub fn thermalThinkStandard(ent: *mut gentity_t) {
+pub fn thermalThinkStandard(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port thermalThinkStandard — parked: seam-threading")
 }
 
@@ -402,7 +437,8 @@ pub fn thermalThinkStandard(ent: *mut gentity_t) {
 /// Raven `WP_FireThermalDetonator`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1986-2072`
-pub fn WP_FireThermalDetonator(ent: *mut gentity_t, altFire: qboolean) -> *mut gentity_t {
+pub fn WP_FireThermalDetonator(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) -> *mut gentity_t {
     todo!("Port WP_FireThermalDetonator — parked: seam-threading")
 }
 
@@ -410,7 +446,8 @@ pub fn WP_FireThermalDetonator(ent: *mut gentity_t, altFire: qboolean) -> *mut g
 /// Raven `WP_DropThermal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2074-2078`
-pub fn WP_DropThermal(ent: *mut gentity_t) -> *mut gentity_t {
+pub fn WP_DropThermal(
+    ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut gentity_t {
     todo!("Port WP_DropThermal — parked: seam-threading")
 }
 
@@ -419,6 +456,7 @@ pub fn WP_DropThermal(ent: *mut gentity_t) -> *mut gentity_t {
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2082-2226`
 pub fn WP_LobFire(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     start: vec3_t,
     target: vec3_t,
@@ -441,7 +479,8 @@ pub fn WP_LobFire(
 /// Raven `laserTrapExplode`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2244-2280`
-pub fn laserTrapExplode(self_: *mut gentity_t) {
+pub fn laserTrapExplode(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port laserTrapExplode — parked: seam-threading")
 }
 
@@ -450,6 +489,7 @@ pub fn laserTrapExplode(self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2282-2294`
 pub fn laserTrapDelayedExplode(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -463,7 +503,8 @@ pub fn laserTrapDelayedExplode(
 /// Raven `touchLaserTrap`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2296-2318`
-pub fn touchLaserTrap(ent: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn touchLaserTrap(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port touchLaserTrap — parked: seam-threading")
 }
 
@@ -471,7 +512,8 @@ pub fn touchLaserTrap(ent: *mut gentity_t, other: *mut gentity_t, trace: *mut tr
 /// Raven `proxMineThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2320-2365`
-pub fn proxMineThink(ent: *mut gentity_t) {
+pub fn proxMineThink(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port proxMineThink — parked: seam-threading")
 }
 
@@ -479,7 +521,8 @@ pub fn proxMineThink(ent: *mut gentity_t) {
 /// Raven `laserTrapThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2367-2400`
-pub fn laserTrapThink(ent: *mut gentity_t) {
+pub fn laserTrapThink(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port laserTrapThink — parked: seam-threading")
 }
 
@@ -487,7 +530,8 @@ pub fn laserTrapThink(ent: *mut gentity_t) {
 /// Raven `laserTrapStick`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2402-2469`
-pub fn laserTrapStick(ent: *mut gentity_t, endpos: vec3_t, normal: vec3_t) {
+pub fn laserTrapStick(
+    ctx: GameContext<'_>,ent: *mut gentity_t, endpos: vec3_t, normal: vec3_t) {
     todo!("Port laserTrapStick — parked: seam-threading")
 }
 
@@ -495,7 +539,8 @@ pub fn laserTrapStick(ent: *mut gentity_t, endpos: vec3_t, normal: vec3_t) {
 /// Raven `TrapThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2471-2475`
-pub fn TrapThink(ent: *mut gentity_t) {
+pub fn TrapThink(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port TrapThink — parked: seam-threading")
 }
 
@@ -503,7 +548,8 @@ pub fn TrapThink(ent: *mut gentity_t) {
 /// Raven `CreateLaserTrap`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2477-2531`
-pub fn CreateLaserTrap(laserTrap: *mut gentity_t, start: vec3_t, owner: *mut gentity_t) {
+pub fn CreateLaserTrap(
+    ctx: GameContext<'_>,laserTrap: *mut gentity_t, start: vec3_t, owner: *mut gentity_t) {
     todo!("Port CreateLaserTrap — parked: seam-threading")
 }
 
@@ -511,7 +557,8 @@ pub fn CreateLaserTrap(laserTrap: *mut gentity_t, start: vec3_t, owner: *mut gen
 /// Raven `WP_PlaceLaserTrap`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2533-2626`
-pub fn WP_PlaceLaserTrap(ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn WP_PlaceLaserTrap(
+    ctx: GameContext<'_>,ent: *mut gentity_t, alt_fire: qboolean) {
     todo!("Port WP_PlaceLaserTrap — parked: seam-threading")
 }
 
@@ -530,7 +577,8 @@ pub fn VectorNPos(r#in: vec3_t, out: vec3_t) -> vec3_t {
 /// Raven `charge_stick`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2645-2738`
-pub fn charge_stick(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn charge_stick(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port charge_stick — parked: seam-threading")
 }
 
@@ -538,7 +586,8 @@ pub fn charge_stick(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut tr
 /// Raven `DetPackBlow`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2740-2766`
-pub fn DetPackBlow(self_: *mut gentity_t) {
+pub fn DetPackBlow(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port DetPackBlow — parked: seam-threading")
 }
 
@@ -546,7 +595,8 @@ pub fn DetPackBlow(self_: *mut gentity_t) {
 /// Raven `DetPackPain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2768-2773`
-pub fn DetPackPain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+pub fn DetPackPain(
+    ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     todo!("Port DetPackPain — parked: seam-threading")
 }
 
@@ -555,6 +605,7 @@ pub fn DetPackPain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_in
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2775-2780`
 pub fn DetPackDie(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -568,7 +619,8 @@ pub fn DetPackDie(
 /// Raven `drop_charge`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2782-2849`
-pub fn drop_charge(self_: *mut gentity_t, start: vec3_t, dir: vec3_t) {
+pub fn drop_charge(
+    ctx: GameContext<'_>,self_: *mut gentity_t, start: vec3_t, dir: vec3_t) {
     todo!("Port drop_charge — parked: seam-threading")
 }
 
@@ -576,7 +628,8 @@ pub fn drop_charge(self_: *mut gentity_t, start: vec3_t, dir: vec3_t) {
 /// Raven `BlowDetpacks`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2851-2869`
-pub fn BlowDetpacks(ent: *mut gentity_t) {
+pub fn BlowDetpacks(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port BlowDetpacks — parked: seam-threading")
 }
 
@@ -584,7 +637,7 @@ pub fn BlowDetpacks(ent: *mut gentity_t) {
 /// Raven `CheatsOn`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2871-2878`
-pub fn CheatsOn() -> qboolean {
+pub fn CheatsOn(ctx: GameContext<'_>) -> qboolean {
     todo!("Port CheatsOn — parked: seam-threading")
 }
 
@@ -592,7 +645,8 @@ pub fn CheatsOn() -> qboolean {
 /// Raven `WP_DropDetPack`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2880-2964`
-pub fn WP_DropDetPack(ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn WP_DropDetPack(
+    ctx: GameContext<'_>,ent: *mut gentity_t, alt_fire: qboolean) {
     todo!("Port WP_DropDetPack — parked: seam-threading")
 }
 
@@ -600,7 +654,8 @@ pub fn WP_DropDetPack(ent: *mut gentity_t, alt_fire: qboolean) {
 /// Raven `WP_FireConcussionAlt`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2967-3229`
-pub fn WP_FireConcussionAlt(ent: *mut gentity_t) {
+pub fn WP_FireConcussionAlt(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_FireConcussionAlt — parked: seam-threading")
 }
 
@@ -608,7 +663,8 @@ pub fn WP_FireConcussionAlt(ent: *mut gentity_t) {
 /// Raven `WP_FireConcussion`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3232-3276`
-pub fn WP_FireConcussion(ent: *mut gentity_t) {
+pub fn WP_FireConcussion(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port WP_FireConcussion — parked: seam-threading")
 }
 
@@ -616,7 +672,8 @@ pub fn WP_FireConcussion(ent: *mut gentity_t) {
 /// Raven `WP_FireStunBaton`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3282-3357`
-pub fn WP_FireStunBaton(ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn WP_FireStunBaton(
+    ctx: GameContext<'_>,ent: *mut gentity_t, alt_fire: qboolean) {
     todo!("Port WP_FireStunBaton — parked: seam-threading")
 }
 
@@ -624,7 +681,8 @@ pub fn WP_FireStunBaton(ent: *mut gentity_t, alt_fire: qboolean) {
 /// Raven `WP_FireMelee`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3363-3445`
-pub fn WP_FireMelee(ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn WP_FireMelee(
+    ctx: GameContext<'_>,ent: *mut gentity_t, alt_fire: qboolean) {
     todo!("Port WP_FireMelee — parked: seam-threading")
 }
 
@@ -646,7 +704,8 @@ pub fn SnapVectorTowards(v: vec3_t, to: vec3_t) -> vec3_t {
 /// Raven `LogAccuracyHit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3485-3516`
-pub fn LogAccuracyHit(target: *mut gentity_t, attacker: *mut gentity_t) -> qboolean {
+pub fn LogAccuracyHit(
+    ctx: GameContext<'_>,target: *mut gentity_t, attacker: *mut gentity_t) -> qboolean {
     unsafe {
         if (*target).takedamage == 0 {
             return qfalse;
@@ -673,7 +732,7 @@ pub fn LogAccuracyHit(target: *mut gentity_t, attacker: *mut gentity_t) -> qbool
             return qfalse;
         }
 
-        if crate::g_team::OnSameTeam(target, attacker) != qfalse {
+        if crate::g_team::OnSameTeam(ctx, target, attacker) != qfalse {
             return qfalse;
         }
 
@@ -686,6 +745,7 @@ pub fn LogAccuracyHit(target: *mut gentity_t, attacker: *mut gentity_t) -> qbool
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3530-3551`
 pub fn CalcMuzzlePoint(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     forward: vec3_t,
     right: vec3_t,
@@ -730,13 +790,14 @@ pub fn CalcMuzzlePointOrigin(
 /// Raven `WP_TouchVehMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3569-3578`
-pub fn WP_TouchVehMissile(ent: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn WP_TouchVehMissile(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     unsafe {
         let mut myTrace: trace_t = *trace;
         if !other.is_null() {
             myTrace.entityNum = (*other).s.number as i16;
         }
-        crate::g_missile::G_MissileImpact(ent, &mut myTrace);
+        crate::g_missile::G_MissileImpact(ctx, ent, &mut myTrace);
     }
 }
 
@@ -744,7 +805,8 @@ pub fn WP_TouchVehMissile(ent: *mut gentity_t, other: *mut gentity_t, trace: *mu
 /// Raven `WP_CalcVehMuzzle`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3580-3608`
-pub fn WP_CalcVehMuzzle(ent: *mut gentity_t, muzzleNum: c_int) {
+pub fn WP_CalcVehMuzzle(
+    ctx: GameContext<'_>,ent: *mut gentity_t, muzzleNum: c_int) {
     todo!("Port WP_CalcVehMuzzle — parked: seam-threading")
 }
 
@@ -752,7 +814,8 @@ pub fn WP_CalcVehMuzzle(ent: *mut gentity_t, muzzleNum: c_int) {
 /// Raven `WP_VehWeapSetSolidToOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3610-3625`
-pub fn WP_VehWeapSetSolidToOwner(self_: *mut gentity_t) {
+pub fn WP_VehWeapSetSolidToOwner(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port WP_VehWeapSetSolidToOwner — parked: seam-threading")
 }
 
@@ -761,6 +824,7 @@ pub fn WP_VehWeapSetSolidToOwner(self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3628-3848`
 pub fn WP_FireVehicleWeapon(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     start: vec3_t,
     dir: vec3_t,
@@ -775,7 +839,8 @@ pub fn WP_FireVehicleWeapon(
 /// Raven `G_VehMuzzleFireFX`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3851-3881`
-pub fn G_VehMuzzleFireFX(ent: *mut gentity_t, broadcaster: *mut gentity_t, muzzlesFired: c_int) {
+pub fn G_VehMuzzleFireFX(
+    ctx: GameContext<'_>,ent: *mut gentity_t, broadcaster: *mut gentity_t, muzzlesFired: c_int) {
     todo!("Port G_VehMuzzleFireFX — parked: bg-dep")
 }
 
@@ -784,6 +849,7 @@ pub fn G_VehMuzzleFireFX(ent: *mut gentity_t, broadcaster: *mut gentity_t, muzzl
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3883-3959`
 pub fn G_EstimateCamPos(
+    ctx: GameContext<'_>,
     viewAngles: vec3_t,
     cameraFocusLoc: vec3_t,
     viewheight: f32,
@@ -810,6 +876,7 @@ pub fn WP_GetVehicleCamPos(ent: *mut gentity_t, pilot: *mut gentity_t, camPos: v
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4022-4047`
 pub fn WP_VehLeadCrosshairVeh(
+    ctx: GameContext<'_>,
     camTraceEnt: *mut gentity_t,
     newEnd: vec3_t,
     dir: vec3_t,
@@ -823,7 +890,8 @@ pub fn WP_VehLeadCrosshairVeh(
 /// Raven `WP_VehCheckTraceFromCamPos`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4052-4113`
-pub fn WP_VehCheckTraceFromCamPos(ent: *mut gentity_t, shotStart: vec3_t, shotDir: vec3_t) -> qboolean {
+pub fn WP_VehCheckTraceFromCamPos(
+    ctx: GameContext<'_>,ent: *mut gentity_t, shotStart: vec3_t, shotDir: vec3_t) -> qboolean {
     todo!("Port WP_VehCheckTraceFromCamPos — parked: seam-threading")
 }
 
@@ -831,7 +899,8 @@ pub fn WP_VehCheckTraceFromCamPos(ent: *mut gentity_t, shotStart: vec3_t, shotDi
 /// Raven `FireVehicleWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4116-4413`
-pub fn FireVehicleWeapon(ent: *mut gentity_t, alt_fire: qboolean) {
+pub fn FireVehicleWeapon(
+    ctx: GameContext<'_>,ent: *mut gentity_t, alt_fire: qboolean) {
     todo!("Port FireVehicleWeapon — parked: seam-threading")
 }
 
@@ -839,7 +908,8 @@ pub fn FireVehicleWeapon(ent: *mut gentity_t, alt_fire: qboolean) {
 /// Raven `FireWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4424-4608`
-pub fn FireWeapon(ent: *mut gentity_t, altFire: qboolean) {
+pub fn FireWeapon(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     todo!("Port FireWeapon — parked: seam-threading")
 }
 
@@ -847,7 +917,8 @@ pub fn FireWeapon(ent: *mut gentity_t, altFire: qboolean) {
 /// Raven `WP_FireEmplaced`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4611-4660`
-pub fn WP_FireEmplaced(ent: *mut gentity_t, altFire: qboolean) {
+pub fn WP_FireEmplaced(
+    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
     todo!("Port WP_FireEmplaced — parked: seam-threading")
 }
 
@@ -855,21 +926,24 @@ pub fn WP_FireEmplaced(ent: *mut gentity_t, altFire: qboolean) {
 /// Raven `emplaced_gun_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4691-4802`
-pub fn emplaced_gun_use(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn emplaced_gun_use(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port emplaced_gun_use — parked: seam-threading")
 }
 
 /// Raven `emplaced_gun_realuse`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4804-4807`
-pub fn emplaced_gun_realuse(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
-    emplaced_gun_use(self_, other, std::ptr::null_mut());
+pub fn emplaced_gun_realuse(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    emplaced_gun_use(ctx, self_, other, std::ptr::null_mut());
 }
 
 /// Raven `emplaced_gun_pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4810-4823`
-pub fn emplaced_gun_pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+pub fn emplaced_gun_pain(
+    ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     unsafe {
         (*self_).s.health = (*self_).health;
 
@@ -877,7 +951,7 @@ pub fn emplaced_gun_pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage
             // death effect.. for now taken care of on cgame
         } else {
             // if we have a pain behavior set then use it I guess
-            crate::NPC_utils::G_ActivateBehavior(self_, bSet_t::BSET_PAIN as c_int);
+            crate::NPC_utils::G_ActivateBehavior(ctx, self_, bSet_t::BSET_PAIN as c_int);
         }
     }
 }
@@ -886,7 +960,8 @@ pub fn emplaced_gun_pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage
 /// Raven `emplaced_gun_update`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4828-4927`
-pub fn emplaced_gun_update(self_: *mut gentity_t) {
+pub fn emplaced_gun_update(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port emplaced_gun_update — parked: seam-threading")
 }
 
@@ -895,6 +970,7 @@ pub fn emplaced_gun_update(self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4930-4942`
 pub fn emplaced_gun_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -908,6 +984,7 @@ pub fn emplaced_gun_die(
 /// Raven `SP_emplaced_gun`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4944-5027`
-pub fn SP_emplaced_gun(ent: *mut gentity_t) {
+pub fn SP_emplaced_gun(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_emplaced_gun — parked: seam-threading")
 }

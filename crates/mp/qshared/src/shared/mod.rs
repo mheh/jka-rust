@@ -29,6 +29,8 @@ pub mod item_use_fail;
 pub mod limits;
 pub mod mark_fragment;
 pub mod print_parm;
+pub mod q_color;
+pub mod q_math_rand;
 #[path = "qint64.rs"]
 pub mod int64;
 pub mod saber_block_type;
@@ -93,6 +95,8 @@ pub use limits::{MAX_CLIENTS, MAX_GENTITIES, MAX_STRING_CHARS};
 pub use mark_fragment::markFragment_t;
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};
 pub use print_parm::printParm_t;
+pub use q_color::{Q_IsColorString, Q_COLOR_ESCAPE};
+pub use q_math_rand::RAND_MAX;
 pub use int64::qint64;
 pub use saber_block_type::saberBlockType_t;
 pub use saber_blocked_type::saberBlockedType_t;

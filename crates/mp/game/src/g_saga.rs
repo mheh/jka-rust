@@ -36,6 +36,7 @@ const qfalse: qboolean = 0;
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:51-87`
 pub fn G_SiegeRegisterWeaponsAndHoldables(
+    ctx: GameContext<'_>,
     team: c_int,
 ) {
     unsafe {
@@ -51,7 +52,7 @@ pub fn G_SiegeRegisterWeaponsAndHoldables(
                     while j < WP_NUM_WEAPONS {
                         if (*scl).weapons & (1 << j) != 0 {
                             // we use this weapon so register it.
-                            RegisterItem(BG_FindItemForWeapon(j));
+                            RegisterItem(ctx, BG_FindItemForWeapon(j));
                         }
                         j += 1;
                     }
@@ -59,7 +60,7 @@ pub fn G_SiegeRegisterWeaponsAndHoldables(
                     while j < HI_NUM_HOLDABLE {
                         if (*scl).invenItems & (1 << j) != 0 {
                             // we use this item so register it.
-                            RegisterItem(BG_FindItemForHoldable(j));
+                            RegisterItem(ctx, BG_FindItemForHoldable(j));
                         }
                         j += 1;
                     }
@@ -77,6 +78,7 @@ pub fn G_SiegeRegisterWeaponsAndHoldables(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:91-94`
 pub fn SiegeSetCompleteData(
+    ctx: GameContext<'_>,
     team: c_int,
 ) {
     todo!("Port SiegeSetCompleteData — parked: raw-ptr-skeleton-no-world-handle")
@@ -89,7 +91,7 @@ pub fn SiegeSetCompleteData(
 /// Raven `InitSiegeMode`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:96-373`
-pub fn InitSiegeMode() {
+pub fn InitSiegeMode(ctx: GameContext<'_>) {
     todo!("Port InitSiegeMode — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -100,6 +102,7 @@ pub fn InitSiegeMode() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:375-427`
 pub fn G_SiegeSetObjectiveComplete(
+    ctx: GameContext<'_>,
     team: c_int,
     objective: c_int,
     failIt: qboolean,
@@ -114,6 +117,7 @@ pub fn G_SiegeSetObjectiveComplete(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:430-480`
 pub fn G_SiegeGetCompletionStatus(
+    ctx: GameContext<'_>,
     team: c_int,
     objective: c_int,
 ) -> qboolean {
@@ -129,6 +133,7 @@ pub fn G_SiegeGetCompletionStatus(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:482-526`
 pub fn UseSiegeTarget(
+    ctx: GameContext<'_>,
     other: *mut gentity_t,
     en: *mut gentity_t,
     target: *mut c_char,
@@ -143,6 +148,7 @@ pub fn UseSiegeTarget(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:528-540`
 pub fn SiegeBroadcast_OBJECTIVECOMPLETE(
+    ctx: GameContext<'_>,
     team: c_int,
     client: c_int,
     objective: c_int,
@@ -157,6 +163,7 @@ pub fn SiegeBroadcast_OBJECTIVECOMPLETE(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:542-553`
 pub fn SiegeBroadcast_ROUNDOVER(
+    ctx: GameContext<'_>,
     winningteam: c_int,
     winningclient: c_int,
 ) {
@@ -169,6 +176,7 @@ pub fn SiegeBroadcast_ROUNDOVER(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:555-564`
 pub fn BroadcastObjectiveCompletion(
+    ctx: GameContext<'_>,
     team: c_int,
     objective: c_int,
     r#final: c_int,
@@ -183,6 +191,7 @@ pub fn BroadcastObjectiveCompletion(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:566-589`
 pub fn AddSiegeWinningTeamPoints(
+    ctx: GameContext<'_>,
     team: c_int,
     winner: c_int,
 ) {
@@ -195,7 +204,7 @@ pub fn AddSiegeWinningTeamPoints(
 /// Raven `SiegeClearSwitchData`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:591-595`
-pub fn SiegeClearSwitchData() {
+pub fn SiegeClearSwitchData(ctx: GameContext<'_>) {
     todo!("Port SiegeClearSwitchData — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -204,7 +213,7 @@ pub fn SiegeClearSwitchData() {
 /// Raven `SiegeDoTeamAssign`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:597-630`
-pub fn SiegeDoTeamAssign() {
+pub fn SiegeDoTeamAssign(ctx: GameContext<'_>) {
     todo!("Port SiegeDoTeamAssign — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -214,6 +223,7 @@ pub fn SiegeDoTeamAssign() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:632-652`
 pub fn SiegeTeamSwitch(
+    ctx: GameContext<'_>,
     winTeam: c_int,
     winTime: c_int,
 ) {
@@ -227,6 +237,7 @@ pub fn SiegeTeamSwitch(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:654-742`
 pub fn SiegeRoundComplete(
+    ctx: GameContext<'_>,
     winningteam: c_int,
     winningclient: c_int,
 ) {
@@ -240,6 +251,7 @@ pub fn SiegeRoundComplete(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:744-784`
 pub fn G_ValidateSiegeClassForTeam(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     team: c_int,
 ) {
@@ -252,6 +264,7 @@ pub fn G_ValidateSiegeClassForTeam(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:787-834`
 pub fn SetTeamQuick(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     team: c_int,
     doBegin: qboolean,
@@ -263,17 +276,18 @@ pub fn SetTeamQuick(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:836-851`
 pub fn SiegeRespawn(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
 
         if (*client).sess.sessionTeam != (*client).sess.siegeDesiredTeam {
-            SetTeamQuick(ent, (*client).sess.siegeDesiredTeam, qtrue);
+            SetTeamQuick(ctx, ent, (*client).sess.siegeDesiredTeam, qtrue);
         } else {
-            ClientSpawn(ent);
+            ClientSpawn(ctx, ent);
             // add a teleportation effect
-            let tent = G_TempEntity(
+            let tent = G_TempEntity(ctx, 
                 (*client).ps.origin,
                 entity_event_t::EV_PLAYER_TELEPORT_IN as c_int,
             );
@@ -289,6 +303,7 @@ pub fn SiegeRespawn(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:853-903`
 pub fn SiegeBeginRound(
+    ctx: GameContext<'_>,
     entNum: c_int,
 ) {
     todo!("Port SiegeBeginRound — parked: raw-ptr-skeleton-no-world-handle")
@@ -299,7 +314,7 @@ pub fn SiegeBeginRound(
 /// Raven `SiegeCheckTimers`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:905-1013`
-pub fn SiegeCheckTimers() {
+pub fn SiegeCheckTimers(ctx: GameContext<'_>) {
     todo!("Port SiegeCheckTimers — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -310,6 +325,7 @@ pub fn SiegeCheckTimers() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1015-1058`
 pub fn SiegeObjectiveCompleted(
+    ctx: GameContext<'_>,
     team: c_int,
     objective: c_int,
     r#final: c_int,
@@ -325,6 +341,7 @@ pub fn SiegeObjectiveCompleted(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1060-1128`
 pub fn siegeTriggerUse(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -339,6 +356,7 @@ pub fn siegeTriggerUse(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1137-1179`
 pub fn SP_info_siege_objective(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_info_siege_objective — parked: raw-ptr-skeleton-no-world-handle")
@@ -365,6 +383,7 @@ pub fn SiegeIconUse(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1203-1234`
 pub fn SP_info_siege_radaricon(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_info_siege_radaricon — parked: raw-ptr-skeleton-no-world-handle")
@@ -377,6 +396,7 @@ pub fn SP_info_siege_radaricon(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1236-1291`
 pub fn decompTriggerUse(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -391,6 +411,7 @@ pub fn decompTriggerUse(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1297-1315`
 pub fn SP_info_siege_decomplete(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_info_siege_decomplete — parked: raw-ptr-skeleton-no-world-handle")
@@ -400,11 +421,12 @@ pub fn SP_info_siege_decomplete(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1317-1320`
 pub fn siegeEndUse(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    LogExit(b"Round ended\0".as_ptr() as *const c_char);
+    LogExit(ctx, b"Round ended\0".as_ptr() as *const c_char);
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `siege_valid`/the
@@ -414,6 +436,7 @@ pub fn siegeEndUse(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1325-1334`
 pub fn SP_target_siege_end(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_target_siege_end — parked: raw-ptr-skeleton-no-world-handle")
@@ -437,12 +460,13 @@ pub fn SiegeItemRemoveOwner(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1351-1370`
 pub fn SiegeItemRespawnEffect(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     newOrg: vec3_t,
 ) {
     unsafe {
         if !(*ent).target5.is_null() && *(*ent).target5 != 0 {
-            G_UseTargets2(ent, ent, (*ent).target5 as *const c_char);
+            G_UseTargets2(ctx, ent, ent, (*ent).target5 as *const c_char);
         }
 
         if (*ent).genericValue10 == 0 {
@@ -463,11 +487,12 @@ pub fn SiegeItemRespawnEffect(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1372-1380`
 pub fn SiegeItemRespawnOnOriginalSpot(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     carrier: *mut gentity_t,
 ) {
     unsafe {
-        SiegeItemRespawnEffect(ent, (*ent).pos1);
+        SiegeItemRespawnEffect(ctx, ent, (*ent).pos1);
         G_SetOrigin(ent, (*ent).pos1);
         SiegeItemRemoveOwner(ent, carrier);
 
@@ -483,6 +508,7 @@ pub fn SiegeItemRespawnOnOriginalSpot(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1382-1475`
 pub fn SiegeItemThink(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SiegeItemThink — parked: raw-ptr-skeleton-no-world-handle")
@@ -495,6 +521,7 @@ pub fn SiegeItemThink(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1477-1545`
 pub fn SiegeItemTouch(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -508,6 +535,7 @@ pub fn SiegeItemTouch(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1547-1551`
 pub fn SiegeItemPain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -522,6 +550,7 @@ pub fn SiegeItemPain(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1553-1574`
 pub fn SiegeItemDie(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -538,6 +567,7 @@ pub fn SiegeItemDie(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1576-1623`
 pub fn SiegeItemUse(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -553,6 +583,7 @@ pub fn SiegeItemUse(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1676-1835`
 pub fn SP_misc_siege_item(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_misc_siege_item — parked: raw-ptr-skeleton-no-world-handle")
@@ -566,6 +597,7 @@ pub fn SP_misc_siege_item(
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1845-1886`
 pub fn G_SiegeClientExData(
+    ctx: GameContext<'_>,
     msgTarg: *mut gentity_t,
 ) {
     todo!("Port G_SiegeClientExData — parked: raw-ptr-skeleton-no-world-handle")

@@ -55,7 +55,7 @@ const LSTATE_FIRED4: c_int = 7;
 /// Raven `NPC_Mark1_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:50-74`
-pub fn NPC_Mark1_Precache() {
+pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/shutdown".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/walk".as_ptr());
@@ -74,12 +74,12 @@ pub fn NPC_Mark1_Precache() {
     crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr());
     crate::g_utils::G_EffectIndex(c"explosions/droidexplosion1".as_ptr());
 
-    crate::g_items::RegisterItem(crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_METAL_BOLTS));
-    crate::g_items::RegisterItem(crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_BLASTER));
-    crate::g_items::RegisterItem(crate::bg_misc::BG_FindItemForWeapon(
+    crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_METAL_BOLTS));
+    crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_BLASTER));
+    crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForWeapon(
         mp_bg::weapons::weapon_t::WP_BOWCASTER,
     ));
-    crate::g_items::RegisterItem(crate::bg_misc::BG_FindItemForWeapon(
+    crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForWeapon(
         mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL,
     ));
 }
@@ -90,7 +90,8 @@ pub fn NPC_Mark1_Precache() {
 /// Raven `NPC_Mark1_Part_Explode`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:81-102`
-pub fn NPC_Mark1_Part_Explode(self_: *mut gentity_t, bolt: c_int) {
+pub fn NPC_Mark1_Part_Explode(
+    ctx: GameContext<'_>,self_: *mut gentity_t, bolt: c_int) {
     todo!("Port NPC_Mark1_Part_Explode — parked: ambient-state")
 }
 
@@ -99,7 +100,7 @@ pub fn NPC_Mark1_Part_Explode(self_: *mut gentity_t, bolt: c_int) {
 /// Raven `Mark1_Idle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:109-115`
-pub fn Mark1_Idle() {
+pub fn Mark1_Idle(ctx: GameContext<'_>) {
     todo!("Port Mark1_Idle — parked: ambient-state")
 }
 
@@ -109,7 +110,7 @@ pub fn Mark1_Idle() {
 /// Raven `Mark1Dead_FireRocket`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:123-163`
-pub fn Mark1Dead_FireRocket() {
+pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
     todo!("Port Mark1Dead_FireRocket — parked: ambient-state")
 }
 
@@ -119,7 +120,7 @@ pub fn Mark1Dead_FireRocket() {
 /// Raven `Mark1Dead_FireBlaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:171-202`
-pub fn Mark1Dead_FireBlaster() {
+pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
     todo!("Port Mark1Dead_FireBlaster — parked: ambient-state")
 }
 
@@ -133,6 +134,7 @@ pub fn Mark1Dead_FireBlaster() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:209-243`
 pub fn Mark1_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -151,7 +153,8 @@ pub fn Mark1_die(
 /// Raven `Mark1_dying`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:250-312`
-pub fn Mark1_dying(self_: *mut gentity_t) {
+pub fn Mark1_dying(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port Mark1_dying — parked: client-cast")
 }
 
@@ -161,7 +164,8 @@ pub fn Mark1_dying(self_: *mut gentity_t) {
 /// Raven `NPC_Mark1_Pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:320-396`
-pub fn NPC_Mark1_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+pub fn NPC_Mark1_Pain(
+    ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     todo!("Port NPC_Mark1_Pain — parked: ambient-state")
 }
 
@@ -170,7 +174,7 @@ pub fn NPC_Mark1_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c
 /// Raven `Mark1_Hunt`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:404-416`
-pub fn Mark1_Hunt() {
+pub fn Mark1_Hunt(ctx: GameContext<'_>) {
     todo!("Port Mark1_Hunt — parked: ambient-state")
 }
 
@@ -182,7 +186,7 @@ pub fn Mark1_Hunt() {
 /// Raven `Mark1_FireBlaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:424-488`
-pub fn Mark1_FireBlaster() {
+pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
     todo!("Port Mark1_FireBlaster — parked: ambient-state")
 }
 
@@ -191,7 +195,8 @@ pub fn Mark1_FireBlaster() {
 /// Raven `Mark1_BlasterAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:495-548`
-pub fn Mark1_BlasterAttack(advance: qboolean) {
+pub fn Mark1_BlasterAttack(
+    ctx: GameContext<'_>,advance: qboolean) {
     todo!("Port Mark1_BlasterAttack — parked: ambient-state")
 }
 
@@ -201,7 +206,7 @@ pub fn Mark1_BlasterAttack(advance: qboolean) {
 /// Raven `Mark1_FireRocket`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:555-599`
-pub fn Mark1_FireRocket() {
+pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
     todo!("Port Mark1_FireRocket — parked: ambient-state")
 }
 
@@ -210,7 +215,8 @@ pub fn Mark1_FireRocket() {
 /// Raven `Mark1_RocketAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:606-618`
-pub fn Mark1_RocketAttack(advance: qboolean) {
+pub fn Mark1_RocketAttack(
+    ctx: GameContext<'_>,advance: qboolean) {
     todo!("Port Mark1_RocketAttack — parked: ambient-state")
 }
 
@@ -220,7 +226,7 @@ pub fn Mark1_RocketAttack(advance: qboolean) {
 /// Raven `Mark1_AttackDecision`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:625-704`
-pub fn Mark1_AttackDecision() {
+pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
     todo!("Port Mark1_AttackDecision — parked: ambient-state")
 }
 
@@ -229,7 +235,7 @@ pub fn Mark1_AttackDecision() {
 /// Raven `Mark1_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:711-739`
-pub fn Mark1_Patrol() {
+pub fn Mark1_Patrol(ctx: GameContext<'_>) {
     todo!("Port Mark1_Patrol — parked: ambient-state")
 }
 
@@ -238,6 +244,6 @@ pub fn Mark1_Patrol() {
 /// Raven `NPC_BSMark1_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:747-764`
-pub fn NPC_BSMark1_Default() {
+pub fn NPC_BSMark1_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSMark1_Default — parked: ambient-state")
 }

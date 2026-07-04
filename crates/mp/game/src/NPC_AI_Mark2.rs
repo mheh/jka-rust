@@ -105,7 +105,7 @@ fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, vec: &
 /// Raven `NPC_Mark2_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:27-43`
-pub fn NPC_Mark2_Precache() {
+pub fn NPC_Mark2_Precache(ctx: GameContext<'_>) {
     unsafe {
         // SAFETY: G_SoundIndex, G_EffectIndex, RegisterItem accessed through game context.
         G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
@@ -118,10 +118,10 @@ pub fn NPC_Mark2_Precache() {
         G_EffectIndex(b"blaster/smoke_bolton\0".as_ptr() as *const c_char);
         G_EffectIndex(b"bryar/muzzle_flash\0".as_ptr() as *const c_char);
 
-        RegisterItem(BG_FindItemForWeapon(WP_BRYAR_PISTOL));
-        RegisterItem(BG_FindItemForAmmo(AMMO_METAL_BOLTS));
-        RegisterItem(BG_FindItemForAmmo(AMMO_POWERCELL));
-        RegisterItem(BG_FindItemForAmmo(AMMO_BLASTER));
+        RegisterItem(ctx, BG_FindItemForWeapon(WP_BRYAR_PISTOL));
+        RegisterItem(ctx, BG_FindItemForAmmo(AMMO_METAL_BOLTS));
+        RegisterItem(ctx, BG_FindItemForAmmo(AMMO_POWERCELL));
+        RegisterItem(ctx, BG_FindItemForAmmo(AMMO_BLASTER));
     }
 }
 
@@ -133,6 +133,7 @@ pub fn NPC_Mark2_Precache() {
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_Mark2_Part_Explode(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     bolt: c_int,
 ) {
@@ -147,6 +148,7 @@ pub fn NPC_Mark2_Part_Explode(
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_Mark2_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -162,7 +164,7 @@ pub fn NPC_Mark2_Pain(
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Mark2_Hunt() {
+pub fn Mark2_Hunt(ctx: GameContext<'_>) {
     todo!("Port Mark2_Hunt — parked: ai-context")
 }
 
@@ -175,6 +177,7 @@ pub fn Mark2_Hunt() {
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
 pub fn Mark2_FireBlaster(
+    ctx: GameContext<'_>,
     advance: qboolean,
 ) {
     todo!("Port Mark2_FireBlaster — parked: ai-context")
@@ -189,6 +192,7 @@ pub fn Mark2_FireBlaster(
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
 pub fn Mark2_BlasterAttack(
+    ctx: GameContext<'_>,
     advance: qboolean,
 ) {
     todo!("Port Mark2_BlasterAttack — parked: ai-context")
@@ -202,7 +206,7 @@ pub fn Mark2_BlasterAttack(
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Mark2_AttackDecision() {
+pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
     todo!("Port Mark2_AttackDecision — parked: ai-context")
 }
 
@@ -214,7 +218,7 @@ pub fn Mark2_AttackDecision() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Mark2_Patrol() {
+pub fn Mark2_Patrol(ctx: GameContext<'_>) {
     todo!("Port Mark2_Patrol — parked: ai-context")
 }
 
@@ -226,7 +230,7 @@ pub fn Mark2_Patrol() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Mark2_Idle() {
+pub fn Mark2_Idle(ctx: GameContext<'_>) {
     todo!("Port Mark2_Idle — parked: ai-context")
 }
 
@@ -238,6 +242,6 @@ pub fn Mark2_Idle() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn NPC_BSMark2_Default() {
+pub fn NPC_BSMark2_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSMark2_Default — parked: ai-context")
 }

@@ -31,7 +31,7 @@ const GALAK_SHIELD_HEALTH: c_int = 500;
 /// Raven `NPC_GalakMech_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:42-57`
-pub fn NPC_GalakMech_Precache() {
+pub fn NPC_GalakMech_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/weapons/galak/skewerhit.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/weapons/galak/lasercharge.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/weapons/galak/lasercutting.wav".as_ptr());
@@ -54,7 +54,8 @@ pub fn NPC_GalakMech_Precache() {
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn NPC_GalakMech_Init(ent: *mut gentity_t) {
+pub fn NPC_GalakMech_Init(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port NPC_GalakMech_Init — parked: seam-threading")
 }
 
@@ -64,7 +65,8 @@ pub fn NPC_GalakMech_Init(ent: *mut gentity_t) {
 /// Raven `GM_CreateExplosion`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:101-125`
-pub fn GM_CreateExplosion(self_: *mut gentity_t, boltID: c_int, doSmall: qboolean) {
+pub fn GM_CreateExplosion(
+    ctx: GameContext<'_>,self_: *mut gentity_t, boltID: c_int, doSmall: qboolean) {
     todo!("Port GM_CreateExplosion — parked: ambient-state")
 }
 
@@ -74,7 +76,8 @@ pub fn GM_CreateExplosion(self_: *mut gentity_t, boltID: c_int, doSmall: qboolea
 /// Raven `GM_Dying`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:133-229`
-pub fn GM_Dying(self_: *mut gentity_t) {
+pub fn GM_Dying(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port GM_Dying — parked: ambient-state")
 }
 
@@ -86,7 +89,8 @@ pub fn GM_Dying(self_: *mut gentity_t) {
 /// Raven `NPC_GM_Pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:238-354`
-pub fn NPC_GM_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+pub fn NPC_GM_Pain(
+    ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     todo!("Port NPC_GM_Pain — parked: ambient-state")
 }
 
@@ -96,7 +100,7 @@ pub fn NPC_GM_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_in
 /// Raven `GM_HoldPosition`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:362-369`
-pub fn GM_HoldPosition() {
+pub fn GM_HoldPosition(ctx: GameContext<'_>) {
     todo!("Port GM_HoldPosition — parked: ambient-state")
 }
 
@@ -106,7 +110,7 @@ pub fn GM_HoldPosition() {
 /// Raven `GM_Move`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:376-408`
-pub fn GM_Move() -> qboolean {
+pub fn GM_Move(ctx: GameContext<'_>) -> qboolean {
     todo!("Port GM_Move — parked: ambient-state")
 }
 
@@ -115,7 +119,7 @@ pub fn GM_Move() -> qboolean {
 /// Raven `NPC_BSGM_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:416-432`
-pub fn NPC_BSGM_Patrol() {
+pub fn NPC_BSGM_Patrol(ctx: GameContext<'_>) {
     todo!("Port NPC_BSGM_Patrol — parked: ambient-state")
 }
 
@@ -126,7 +130,7 @@ pub fn NPC_BSGM_Patrol() {
 /// Raven `GM_CheckMoveState`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:440-460`
-pub fn GM_CheckMoveState() {
+pub fn GM_CheckMoveState(ctx: GameContext<'_>) {
     todo!("Port GM_CheckMoveState — parked: ambient-state")
 }
 
@@ -137,7 +141,7 @@ pub fn GM_CheckMoveState() {
 /// Raven `GM_CheckFireState`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:468-556`
-pub fn GM_CheckFireState() {
+pub fn GM_CheckFireState(ctx: GameContext<'_>) {
     todo!("Port GM_CheckFireState — parked: ambient-state")
 }
 
@@ -146,7 +150,7 @@ pub fn GM_CheckFireState() {
 /// Raven `NPC_GM_StartLaser`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:558-573`
-pub fn NPC_GM_StartLaser() {
+pub fn NPC_GM_StartLaser(ctx: GameContext<'_>) {
     todo!("Port NPC_GM_StartLaser — parked: ambient-state")
 }
 
@@ -155,7 +159,7 @@ pub fn NPC_GM_StartLaser() {
 /// Raven `GM_StartGloat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:575-587`
-pub fn GM_StartGloat() {
+pub fn GM_StartGloat(ctx: GameContext<'_>) {
     todo!("Port GM_StartGloat — parked: ambient-state")
 }
 
@@ -167,7 +171,7 @@ pub fn GM_StartGloat() {
 /// Raven `NPC_BSGM_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:594-1229`
-pub fn NPC_BSGM_Attack() {
+pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
     todo!("Port NPC_BSGM_Attack — parked: ambient-state")
 }
 
@@ -177,6 +181,6 @@ pub fn NPC_BSGM_Attack() {
 /// Raven `NPC_BSGM_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:1231-1297`
-pub fn NPC_BSGM_Default() {
+pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSGM_Default — parked: ambient-state")
 }

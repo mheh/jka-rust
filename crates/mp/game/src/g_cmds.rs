@@ -27,6 +27,7 @@ const qfalse: qboolean = 0;
 // `trap_SendServerCommand`; the staged raw-pointer signature carries no
 // GameWorld/engine handle to reach any of these.
 pub fn DeathmatchScoreboardMessage(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port DeathmatchScoreboardMessage — parked: raw-ptr-skeleton-no-world-handle")
@@ -36,9 +37,10 @@ pub fn DeathmatchScoreboardMessage(
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:98-100`
 pub fn Cmd_Score_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    DeathmatchScoreboardMessage(ent);
+    DeathmatchScoreboardMessage(ctx, ent);
 }
 
 /// Raven `CheatsOk`.
@@ -48,6 +50,7 @@ pub fn Cmd_Score_f(
 // calls `trap_SendServerCommand`/`G_GetStringEdString`+`ent-g_entities`; no
 // GameCvars/engine handle is reachable from this raw-pointer signature.
 pub fn CheatsOk(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CheatsOk — parked: raw-ptr-skeleton-no-world-handle")
@@ -63,6 +66,7 @@ pub fn CheatsOk(
 // return a raw pointer to it without leaking/aliasing. Also needs `trap_Argc`/
 // `trap_Argv`, unreachable without an engine handle.
 pub fn ConcatArgs(
+    ctx: GameContext<'_>,
     start: c_int,
 ) -> *mut c_char {
     todo!("Port ConcatArgs — parked: static-scratch-buffer-vs-raw-ptr-return")
@@ -111,6 +115,7 @@ pub fn SanitizeString(
 // `level.clients`, and calls `trap_SendServerCommand`; no GameWorld/engine handle
 // reachable from this raw-pointer signature.
 pub fn ClientNumberFromString(
+    ctx: GameContext<'_>,
     to: *mut gentity_t,
     s: *mut c_char,
 ) -> c_int {
@@ -126,6 +131,7 @@ pub fn ClientNumberFromString(
 // parked), reads `g_entities`, calls `trap_Argv`/`trap_Argc`/`Com_Printf`; no
 // GameWorld/engine handle reachable from this raw-pointer signature.
 pub fn Cmd_Give_f(
+    ctx: GameContext<'_>,
     cmdent: *mut gentity_t,
     baseArg: c_int,
 ) {
@@ -142,6 +148,7 @@ pub fn Cmd_Give_f(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
 pub fn Cmd_God_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_God_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -157,6 +164,7 @@ pub fn Cmd_God_f(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
 pub fn Cmd_Notarget_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_Notarget_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -170,6 +178,7 @@ pub fn Cmd_Notarget_f(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
 pub fn Cmd_Noclip_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_Noclip_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -186,6 +195,7 @@ pub fn Cmd_Noclip_f(
 // calls `CheatsOk`/`BeginIntermission`/`trap_SendServerCommand`; no GameWorld/
 // engine handle reachable here.
 pub fn Cmd_LevelShot_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_LevelShot_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -200,6 +210,7 @@ pub fn Cmd_LevelShot_f(
 // calls `trap_Argc`/`trap_Argv`/`trap_GetUserinfo`/`trap_SetUserinfo`; no
 // GameWorld/engine handle reachable here.
 pub fn Cmd_TeamTask_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_TeamTask_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -212,6 +223,7 @@ pub fn Cmd_TeamTask_f(
 // `g_autoBanTKSpammers` cvars and calls `AddIP`/`trap_SendServerCommand`/
 // `trap_SendConsoleCommand`; no GameWorld/engine handle reachable here.
 pub fn G_CheckTKAutoKickBan(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_CheckTKAutoKickBan — parked: raw-ptr-skeleton-no-world-handle")
@@ -225,6 +237,7 @@ pub fn G_CheckTKAutoKickBan(
 // `level.numPlayingClients`/`level.warmupTime`; no GameWorld/engine handle
 // reachable here.
 pub fn Cmd_Kill_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_Kill_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -236,6 +249,7 @@ pub fn Cmd_Kill_f(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.maxclients`,
 // `level.clients`, `g_entities`; no GameWorld/engine handle reachable here.
 pub fn G_GetDuelWinner(
+    ctx: GameContext<'_>,
     client: *mut gclient_t,
 ) -> *mut gentity_t {
     todo!("Port G_GetDuelWinner — parked: raw-ptr-skeleton-no-world-handle")
@@ -250,6 +264,7 @@ pub fn G_GetDuelWinner(
 // and calls `trap_SendServerCommand`/`G_LogPrintf`/`TeamName`; no GameWorld/
 // engine handle reachable here.
 pub fn BroadcastTeamChange(
+    ctx: GameContext<'_>,
     client: *mut gclient_t,
     oldTeam: c_int,
 ) {
@@ -260,6 +275,7 @@ pub fn BroadcastTeamChange(
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:720-743`
 pub fn G_PowerDuelCheckFail(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     // Raven `duelTeam_t` (`bg_public.h:1019-1025`); `gclient_t::sess.duelTeam` is
@@ -275,7 +291,7 @@ pub fn G_PowerDuelCheckFail(
 
         let mut loners: c_int = 0;
         let mut doubles: c_int = 0;
-        crate::g_main::G_PowerDuelCount(&mut loners, &mut doubles, qfalse);
+        crate::g_main::G_PowerDuelCount(ctx, &mut loners, &mut doubles, qfalse);
 
         if (*((*ent).client as *mut gclient_t)).sess.duelTeam == DUELTEAM_LONE && loners >= 1 {
             return qtrue;
@@ -299,6 +315,7 @@ pub fn G_PowerDuelCheckFail(
 // mutates the file-scope `g_dontPenalizeTeam qboolean` global (fork-1: becomes a
 // GameWorld field once threaded).
 pub fn SetTeam(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     s: *mut c_char,
 ) {
@@ -315,6 +332,7 @@ pub fn SetTeam(
 // (client slot index) to set `ps.clientNum`; no GameWorld/engine handle reachable
 // to locate the `g_entities` base here.
 pub fn StopFollowing(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port StopFollowing — parked: raw-ptr-skeleton-no-world-handle")
@@ -328,6 +346,7 @@ pub fn StopFollowing(
 // `trap_Argv`/`trap_SendServerCommand`/`SetTeam`; no GameWorld/engine handle
 // reachable here.
 pub fn Cmd_Team_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_Team_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -340,6 +359,7 @@ pub fn Cmd_Team_f(
 // `level.time`, calls `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`G_Damage`/
 // `ClientUserinfoChanged`; no GameWorld/engine handle reachable here.
 pub fn Cmd_DuelTeam_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_DuelTeam_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -356,6 +376,7 @@ pub fn Cmd_DuelTeam_f(
 // Which type/const carries the siege *team* id (as opposed to `team_t`
 // RED/BLUE), and what is `MAX_SIEGE_CLASSES` named once ported?
 pub fn G_TeamForSiegeClass(
+    ctx: GameContext<'_>,
     clName: *const c_char,
 ) -> c_int {
     todo!("Port G_TeamForSiegeClass — parked: unresolved-siege-team-consts")
@@ -370,6 +391,7 @@ pub fn G_TeamForSiegeClass(
 // no GameWorld/engine handle reachable here. Also mutates file-scope
 // `g_preventTeamBegin` (fork-1).
 pub fn Cmd_SiegeClass_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_SiegeClass_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -382,6 +404,7 @@ pub fn Cmd_SiegeClass_f(
 // calls `WP_InitForcePowers`/`G_GetStringEdString`/`trap_SendServerCommand`/
 // `trap_Argc`/`trap_Argv`/`Cmd_Team_f`; no GameWorld/engine handle reachable here.
 pub fn Cmd_ForceChanged_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_ForceChanged_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -394,6 +417,7 @@ pub fn Cmd_ForceChanged_f(
 // and the file-scope `bgSiegeClasses` table (fork-1: becomes a GameWorld/bg-shared
 // field once threaded); no GameWorld/engine handle reachable here.
 pub fn G_SetSaber(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     saberNum: c_int,
     saberName: *mut c_char,
@@ -409,6 +433,7 @@ pub fn G_SetSaber(
 // `g_gametype` cvar, calls `trap_Argc`/`trap_Argv`/`ClientNumberFromString`/
 // `StopFollowing`/`SetTeam`; no GameWorld/engine handle reachable here.
 pub fn Cmd_Follow_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_Follow_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -421,6 +446,7 @@ pub fn Cmd_Follow_f(
 // `level.maxclients` and `g_gametype` cvar, calls `SetTeam`/`G_Error`; no
 // GameWorld/engine handle reachable here.
 pub fn Cmd_FollowCycle_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     dir: c_int,
 ) {
@@ -434,6 +460,7 @@ pub fn Cmd_FollowCycle_f(
 // `level.time`, calls `trap_SendServerCommand`/`OnSameTeam`; no GameWorld/engine
 // handle reachable here.
 pub fn G_SayTo(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     mode: c_int,
@@ -453,6 +480,7 @@ pub fn G_SayTo(
 // `Team_GetLocationMsg`/`G_Printf`/`G_SayTo`; no GameWorld/engine handle
 // reachable here.
 pub fn G_Say(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     target: *mut gentity_t,
     mode: c_int,
@@ -468,6 +496,7 @@ pub fn G_Say(
 // `ConcatArgs` (itself parked) and `G_Say`; no GameWorld/engine handle reachable
 // here.
 pub fn Cmd_Say_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     mode: c_int,
     arg0: qboolean,
@@ -482,6 +511,7 @@ pub fn Cmd_Say_f(
 // `g_entities`, calls `trap_Argc`/`trap_Argv`/`ConcatArgs`/`G_LogPrintf`/`G_Say`;
 // no GameWorld/engine handle reachable here.
 pub fn Cmd_Tell_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_Tell_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -497,6 +527,7 @@ pub fn Cmd_Tell_f(
 // `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`G_TempEntity`/`G_SoundIndex`;
 // no GameWorld/engine handle reachable here.
 pub fn Cmd_VoiceCommand_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_VoiceCommand_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -508,6 +539,7 @@ pub fn Cmd_VoiceCommand_f(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`, calls
 // `trap_Argv`/`G_Say`; no GameWorld/engine handle reachable here.
 pub fn Cmd_GameCommand_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_GameCommand_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -520,6 +552,7 @@ pub fn Cmd_GameCommand_f(
 // and calls `trap_SendServerCommand`/`vtos`; no GameWorld/engine handle reachable
 // here.
 pub fn Cmd_Where_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_Where_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -533,6 +566,7 @@ pub fn Cmd_Where_f(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.numConnectedClients`
 // and `level.clients`; no GameWorld/engine handle reachable here.
 pub fn G_ClientNumberFromName(
+    ctx: GameContext<'_>,
     name: *const c_char,
 ) -> c_int {
     todo!("Port G_ClientNumberFromName — parked: raw-ptr-skeleton-no-world-handle")
@@ -598,6 +632,7 @@ pub fn SanitizeString2(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.numConnectedClients`
 // and `level.clients`; no GameWorld/engine handle reachable here.
 pub fn G_ClientNumberFromStrippedName(
+    ctx: GameContext<'_>,
     name: *const c_char,
 ) -> c_int {
     todo!("Port G_ClientNumberFromStrippedName — parked: raw-ptr-skeleton-no-world-handle")
@@ -610,6 +645,7 @@ pub fn G_ClientNumberFromStrippedName(
 // fields, `g_allowVote` cvar, calls a dozen trap_*/G_* helpers; no GameWorld/
 // engine handle reachable here.
 pub fn Cmd_CallVote_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_CallVote_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -622,6 +658,7 @@ pub fn Cmd_CallVote_f(
 // `voteYes`/`voteNo`, `g_gametype` cvar, calls `trap_Argv`/`trap_SendServerCommand`/
 // `trap_SetConfigstring`; no GameWorld/engine handle reachable here.
 pub fn Cmd_Vote_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_Vote_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -634,6 +671,7 @@ pub fn Cmd_Vote_f(
 // `level.teamVote*` fields, `g_gametype`/`g_allowTeamVote` cvars, `level.clients`;
 // no GameWorld/engine handle reachable here.
 pub fn Cmd_CallTeamVote_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_CallTeamVote_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -646,6 +684,7 @@ pub fn Cmd_CallTeamVote_f(
 // `level.teamVote*` fields, calls `trap_Argv`/`trap_SendServerCommand`/
 // `trap_SetConfigstring`; no GameWorld/engine handle reachable here.
 pub fn Cmd_TeamVote_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_TeamVote_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -658,6 +697,7 @@ pub fn Cmd_TeamVote_f(
 // `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`TeleportPlayer`; no
 // GameWorld/engine handle reachable here.
 pub fn Cmd_SetViewpos_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_SetViewpos_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -681,6 +721,7 @@ pub fn Cmd_Stats_f(
 // `G_AddEvent(&g_entities[ps->clientNum], ...)`) and calls `trap_Trace`; no
 // GameWorld/engine handle reachable here.
 pub fn G_ItemUsable(
+    ctx: GameContext<'_>,
     ps: *mut playerState_t,
     forcedUse: c_int,
 ) -> c_int {
@@ -694,6 +735,7 @@ pub fn G_ItemUsable(
 // `g_entities` (via `saberKnockDown(&g_entities[...], ...)`); no GameWorld/engine
 // handle reachable here.
 pub fn Cmd_ToggleSaber_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_ToggleSaber_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -706,6 +748,7 @@ pub fn Cmd_ToggleSaber_f(
 // `d_saberStanceDebug` cvars, the file-scope `bgSiegeClasses` table, calls
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
 pub fn Cmd_SaberAttackCycle_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_SaberAttackCycle_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -716,7 +759,7 @@ pub fn Cmd_SaberAttackCycle_f(
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:2875-2892`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`; no
 // GameWorld/engine handle reachable here.
-pub fn G_OtherPlayersDueling() -> qboolean {
+pub fn G_OtherPlayersDueling(ctx: GameContext<'_>) -> qboolean {
     todo!("Port G_OtherPlayersDueling — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -728,6 +771,7 @@ pub fn G_OtherPlayersDueling() -> qboolean {
 // `trap_Trace`/`G_OtherPlayersDueling`/`OnSameTeam`/`G_AddEvent`/`G_Sound`; no
 // GameWorld/engine handle reachable here.
 pub fn Cmd_EngageDuel_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Cmd_EngageDuel_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -742,6 +786,7 @@ pub fn Cmd_EngageDuel_f(
 // `trap_Argv`/`Com_Printf`, reads the file-scope `animTable`/`saberMoveData`
 // tables; no GameWorld/engine handle reachable here.
 pub fn Cmd_DebugSetSaberMove_f(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Cmd_DebugSetSaberMove_f — parked: raw-ptr-skeleton-no-world-handle")
@@ -756,6 +801,7 @@ pub fn Cmd_DebugSetSaberMove_f(
 // `trap_Argv`/`Com_Printf`, reads the file-scope `animTable`; no GameWorld/engine
 // handle reachable here.
 pub fn Cmd_DebugSetBodyAnim_f(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     flags: c_int,
 ) {
@@ -766,6 +812,7 @@ pub fn Cmd_DebugSetBodyAnim_f(
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:3114-3117`
 pub fn StandardSetBodyAnim(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     anim: c_int,
     flags: c_int,
@@ -781,6 +828,7 @@ pub fn StandardSetBodyAnim(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`; no
 // GameWorld/engine handle reachable here.
 pub fn G_ClientNumFromNetname(
+    ctx: GameContext<'_>,
     name: *mut c_char,
 ) -> c_int {
     todo!("Port G_ClientNumFromNetname — parked: raw-ptr-skeleton-no-world-handle")
@@ -810,6 +858,7 @@ pub fn TryGrapple(
 // in this file (nearly all themselves parked); no GameWorld/engine handle
 // reachable from this raw-pointer signature.
 pub fn ClientCommand(
+    ctx: GameContext<'_>,
     clientNum: c_int,
 ) {
     todo!("Port ClientCommand — parked: raw-ptr-skeleton-no-world-handle")

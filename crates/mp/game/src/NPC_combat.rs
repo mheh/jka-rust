@@ -31,7 +31,8 @@ const SCF_NO_GROUPS: i32 = 0x00020000;
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn G_ClearEnemy(self_: *mut gentity_t) {
+pub fn G_ClearEnemy(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port G_ClearEnemy — parked: seam-threading")
 }
 
@@ -39,7 +40,8 @@ pub fn G_ClearEnemy(self_: *mut gentity_t) {
 ///
 /// Raven: `ANGER_ALERT_RADIUS` (512), `ANGER_ALERT_SOUND_RADIUS` (256).
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:44-59`
-pub fn G_AngerAlert(self_: *mut gentity_t) {
+pub fn G_AngerAlert(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     const ANGER_ALERT_RADIUS: f32 = 512.0;
     const ANGER_ALERT_SOUND_RADIUS: f32 = 256.0;
     unsafe {
@@ -50,11 +52,11 @@ pub fn G_AngerAlert(self_: *mut gentity_t) {
                 return;
             }
         }
-        if TIMER_Done(self_, c"interrogating".as_ptr() as *const c_char) == 0 {
+        if TIMER_Done(ctx, self_, c"interrogating".as_ptr() as *const c_char) == 0 {
             //I'm interrogating, don't wake everyone else up yet...
             return;
         }
-        G_AlertTeam(
+        G_AlertTeam(ctx, 
             self_,
             (*self_).enemy,
             ANGER_ALERT_RADIUS,
@@ -69,7 +71,8 @@ pub fn G_AngerAlert(self_: *mut gentity_t) {
 /// Raven `G_TeamEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:67-115`
-pub fn G_TeamEnemy(self_: *mut gentity_t) -> qboolean {
+pub fn G_TeamEnemy(
+    ctx: GameContext<'_>,self_: *mut gentity_t) -> qboolean {
     todo!("Port G_TeamEnemy — parked: seam-threading")
 }
 
@@ -79,14 +82,16 @@ pub fn G_TeamEnemy(self_: *mut gentity_t) -> qboolean {
 /// Raven `G_AttackDelay`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:117-310`
-pub fn G_AttackDelay(self_: *mut gentity_t, enemy: *mut gentity_t) {
+pub fn G_AttackDelay(
+    ctx: GameContext<'_>,self_: *mut gentity_t, enemy: *mut gentity_t) {
     todo!("Port G_AttackDelay — parked: seam-threading")
 }
 
 /// Raven `G_ForceSaberOn`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:312-340`
-pub fn G_ForceSaberOn(ent: *mut gentity_t) {
+pub fn G_ForceSaberOn(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         if (*client).ps.saberInFlight != 0 {
@@ -106,10 +111,10 @@ pub fn G_ForceSaberOn(ent: *mut gentity_t) {
         (*client).ps.saberHolstered = 0;
 
         if (*client).saber[0].soundOn != 0 {
-            G_Sound(ent, mp_qshared::shared::sound_channel::CHAN_AUTO, (*client).saber[0].soundOn);
+            G_Sound(ctx, ent, mp_qshared::shared::sound_channel::CHAN_AUTO, (*client).saber[0].soundOn);
         }
         if (*client).saber[1].soundOn != 0 {
-            G_Sound(ent, mp_qshared::shared::sound_channel::CHAN_AUTO, (*client).saber[1].soundOn);
+            G_Sound(ctx, ent, mp_qshared::shared::sound_channel::CHAN_AUTO, (*client).saber[1].soundOn);
         }
     }
 }
@@ -120,7 +125,8 @@ pub fn G_ForceSaberOn(ent: *mut gentity_t) {
 /// Raven `G_SetEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:349-523`
-pub fn G_SetEnemy(self_: *mut gentity_t, enemy: *mut gentity_t) {
+pub fn G_SetEnemy(
+    ctx: GameContext<'_>,self_: *mut gentity_t, enemy: *mut gentity_t) {
     todo!("Port G_SetEnemy — parked: seam-threading")
 }
 
@@ -131,7 +137,8 @@ pub fn G_SetEnemy(self_: *mut gentity_t, enemy: *mut gentity_t) {
 /// Raven `ChangeWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:570-842`
-pub fn ChangeWeapon(ent: *mut gentity_t, newWeapon: c_int) {
+pub fn ChangeWeapon(
+    ctx: GameContext<'_>,ent: *mut gentity_t, newWeapon: c_int) {
     todo!("Port ChangeWeapon — parked: seam-threading")
 }
 
@@ -154,7 +161,7 @@ pub fn NPC_ChangeWeapon(newWeapon: c_int) {
 /// Raven `NPC_ApplyWeaponFireDelay`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:878-918`
-pub fn NPC_ApplyWeaponFireDelay() {
+pub fn NPC_ApplyWeaponFireDelay(ctx: GameContext<'_>) {
     todo!("Port NPC_ApplyWeaponFireDelay — parked: ai-context")
 }
 
@@ -163,7 +170,7 @@ pub fn NPC_ApplyWeaponFireDelay() {
 /// Raven `ShootThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:925-1028`
-pub fn ShootThink() {
+pub fn ShootThink(ctx: GameContext<'_>) {
     todo!("Port ShootThink — parked: ai-context")
 }
 
@@ -172,7 +179,8 @@ pub fn ShootThink() {
 /// Raven `WeaponThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1036-1103`
-pub fn WeaponThink(inCombat: qboolean) {
+pub fn WeaponThink(
+    ctx: GameContext<'_>,inCombat: qboolean) {
     todo!("Port WeaponThink — parked: ai-context")
 }
 
@@ -181,7 +189,8 @@ pub fn WeaponThink(inCombat: qboolean) {
 /// Raven `HaveWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1109-1112`
-pub fn HaveWeapon(weapon: c_int) -> qboolean {
+pub fn HaveWeapon(
+    ctx: GameContext<'_>,weapon: c_int) -> qboolean {
     todo!("Port HaveWeapon — parked: ai-context")
 }
 
@@ -208,6 +217,7 @@ pub fn EntIsGlass(check: *mut gentity_t) -> qboolean {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1126-1140`
 pub fn ShotThroughGlass(
+    ctx: GameContext<'_>,
     tr: *mut trace_t,
     target: *mut gentity_t,
     spot: vec3_t,
@@ -222,7 +232,8 @@ pub fn ShotThroughGlass(
 /// Raven `CanShoot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1150-1221`
-pub fn CanShoot(ent: *mut gentity_t, shooter: *mut gentity_t) -> qboolean {
+pub fn CanShoot(
+    ctx: GameContext<'_>,ent: *mut gentity_t, shooter: *mut gentity_t) -> qboolean {
     todo!("Port CanShoot — parked: seam-threading")
 }
 
@@ -233,7 +244,8 @@ pub fn CanShoot(ent: *mut gentity_t, shooter: *mut gentity_t) -> qboolean {
 /// Raven `NPC_CheckPossibleEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1229-1274`
-pub fn NPC_CheckPossibleEnemy(other: *mut gentity_t, vis: visibility_t) {
+pub fn NPC_CheckPossibleEnemy(
+    ctx: GameContext<'_>,other: *mut gentity_t, vis: visibility_t) {
     todo!("Port NPC_CheckPossibleEnemy — parked: ai-context")
 }
 
@@ -242,7 +254,7 @@ pub fn NPC_CheckPossibleEnemy(other: *mut gentity_t, vis: visibility_t) {
 /// Raven `NPC_AttackDebounceForWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1288-1331`
-pub fn NPC_AttackDebounceForWeapon() -> c_int {
+pub fn NPC_AttackDebounceForWeapon(ctx: GameContext<'_>) -> c_int {
     todo!("Port NPC_AttackDebounceForWeapon — parked: ai-context")
 }
 
@@ -251,7 +263,7 @@ pub fn NPC_AttackDebounceForWeapon() -> c_int {
 /// Raven `NPC_MaxDistSquaredForWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1334-1392`
-pub fn NPC_MaxDistSquaredForWeapon() -> f32 {
+pub fn NPC_MaxDistSquaredForWeapon(ctx: GameContext<'_>) -> f32 {
     todo!("Port NPC_MaxDistSquaredForWeapon — parked: ai-context")
 }
 
@@ -261,7 +273,8 @@ pub fn NPC_MaxDistSquaredForWeapon() -> f32 {
 /// Raven `ValidEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1400-1460`
-pub fn ValidEnemy(ent: *mut gentity_t) -> qboolean {
+pub fn ValidEnemy(
+    ctx: GameContext<'_>,ent: *mut gentity_t) -> qboolean {
     todo!("Port ValidEnemy — parked: ai-context")
 }
 
@@ -270,7 +283,8 @@ pub fn ValidEnemy(ent: *mut gentity_t) -> qboolean {
 /// Raven `NPC_EnemyTooFar`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1462-1486`
-pub fn NPC_EnemyTooFar(enemy: *mut gentity_t, dist: f32, toShoot: qboolean) -> qboolean {
+pub fn NPC_EnemyTooFar(
+    ctx: GameContext<'_>,enemy: *mut gentity_t, dist: f32, toShoot: qboolean) -> qboolean {
     todo!("Port NPC_EnemyTooFar — parked: ai-context")
 }
 
@@ -281,6 +295,7 @@ pub fn NPC_EnemyTooFar(enemy: *mut gentity_t, dist: f32, toShoot: qboolean) -> q
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1505-1796`
 pub fn NPC_PickEnemy(
+    ctx: GameContext<'_>,
     closestTo: *mut gentity_t,
     enemyTeam: c_int,
     checkVis: qboolean,
@@ -296,6 +311,7 @@ pub fn NPC_PickEnemy(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1804-1893`
 pub fn NPC_PickAlly(
+    ctx: GameContext<'_>,
     facingEachOther: qboolean,
     range: f32,
     ignoreGroup: qboolean,
@@ -310,7 +326,8 @@ pub fn NPC_PickAlly(
 /// Raven `NPC_CheckEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1895-2102`
-pub fn NPC_CheckEnemy(findNew: qboolean, tooFarOk: qboolean, setEnemy: qboolean) -> *mut gentity_t {
+pub fn NPC_CheckEnemy(
+    ctx: GameContext<'_>,findNew: qboolean, tooFarOk: qboolean, setEnemy: qboolean) -> *mut gentity_t {
     todo!("Port NPC_CheckEnemy — parked: ai-context")
 }
 
@@ -320,7 +337,8 @@ pub fn NPC_CheckEnemy(findNew: qboolean, tooFarOk: qboolean, setEnemy: qboolean)
 /// Raven `NPC_ClearShot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2110-2144`
-pub fn NPC_ClearShot(ent: *mut gentity_t) -> qboolean {
+pub fn NPC_ClearShot(
+    ctx: GameContext<'_>,ent: *mut gentity_t) -> qboolean {
     todo!("Port NPC_ClearShot — parked: ai-context")
 }
 
@@ -329,7 +347,8 @@ pub fn NPC_ClearShot(ent: *mut gentity_t) -> qboolean {
 /// Raven `NPC_ShotEntity`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2152-2206`
-pub fn NPC_ShotEntity(ent: *mut gentity_t, impactPos: vec3_t) -> c_int {
+pub fn NPC_ShotEntity(
+    ctx: GameContext<'_>,ent: *mut gentity_t, impactPos: vec3_t) -> c_int {
     todo!("Port NPC_ShotEntity — parked: ai-context")
 }
 
@@ -338,7 +357,8 @@ pub fn NPC_ShotEntity(ent: *mut gentity_t, impactPos: vec3_t) -> c_int {
 /// Raven `NPC_EvaluateShot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2208-2220`
-pub fn NPC_EvaluateShot(hit: c_int, glassOK: qboolean) -> qboolean {
+pub fn NPC_EvaluateShot(
+    ctx: GameContext<'_>,hit: c_int, glassOK: qboolean) -> qboolean {
     todo!("Port NPC_EvaluateShot — parked: ai-context")
 }
 
@@ -347,7 +367,8 @@ pub fn NPC_EvaluateShot(hit: c_int, glassOK: qboolean) -> qboolean {
 /// Raven `NPC_CheckAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2228-2242`
-pub fn NPC_CheckAttack(scale: f32) -> qboolean {
+pub fn NPC_CheckAttack(
+    ctx: GameContext<'_>,scale: f32) -> qboolean {
     todo!("Port NPC_CheckAttack — parked: ai-context")
 }
 
@@ -356,7 +377,8 @@ pub fn NPC_CheckAttack(scale: f32) -> qboolean {
 /// Raven `NPC_CheckDefend`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2250-2259`
-pub fn NPC_CheckDefend(scale: f32) -> qboolean {
+pub fn NPC_CheckDefend(
+    ctx: GameContext<'_>,scale: f32) -> qboolean {
     todo!("Port NPC_CheckDefend — parked: ai-context")
 }
 
@@ -365,7 +387,8 @@ pub fn NPC_CheckDefend(scale: f32) -> qboolean {
 /// Raven `NPC_CheckCanAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2263-2465`
-pub fn NPC_CheckCanAttack(attack_scale: f32, stationary: qboolean) -> qboolean {
+pub fn NPC_CheckCanAttack(
+    ctx: GameContext<'_>,attack_scale: f32, stationary: qboolean) -> qboolean {
     todo!("Port NPC_CheckCanAttack — parked: ai-context")
 }
 
@@ -375,7 +398,8 @@ pub fn NPC_CheckCanAttack(attack_scale: f32, stationary: qboolean) -> qboolean {
 /// Raven `IdealDistance`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2475-2503`
-pub fn IdealDistance(self_: *mut gentity_t) -> f32 {
+pub fn IdealDistance(
+    ctx: GameContext<'_>,self_: *mut gentity_t) -> f32 {
     todo!("Port IdealDistance — parked: ai-context")
 }
 
@@ -385,7 +409,8 @@ pub fn IdealDistance(self_: *mut gentity_t) -> f32 {
 /// Raven `SP_point_combat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2516-2546`
-pub fn SP_point_combat(self_: *mut gentity_t) {
+pub fn SP_point_combat(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_point_combat — parked: seam-threading")
 }
 
@@ -395,7 +420,7 @@ pub fn SP_point_combat(self_: *mut gentity_t) {
 /// Raven `CP_FindCombatPointWaypoints`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2548-2562`
-pub fn CP_FindCombatPointWaypoints() {
+pub fn CP_FindCombatPointWaypoints(ctx: GameContext<'_>) {
     todo!("Port CP_FindCombatPointWaypoints — parked: seam-threading")
 }
 
@@ -406,6 +431,7 @@ pub fn CP_FindCombatPointWaypoints() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2575-2644`
 pub fn NPC_CollectCombatPoints(
+    ctx: GameContext<'_>,
     origin: vec3_t,
     radius: f32,
     //TODO: Port combatPt_t  (C: `combatPt_t *`)
@@ -422,6 +448,7 @@ pub fn NPC_CollectCombatPoints(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2657-2874`
 pub fn NPC_FindCombatPoint(
+    ctx: GameContext<'_>,
     position: vec3_t,
     avoidPosition: vec3_t,
     enemyPosition: vec3_t,
@@ -438,7 +465,8 @@ pub fn NPC_FindCombatPoint(
 /// Raven `NPC_FindSquadPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2882-2915`
-pub fn NPC_FindSquadPoint(position: vec3_t) -> c_int {
+pub fn NPC_FindSquadPoint(
+    ctx: GameContext<'_>,position: vec3_t) -> c_int {
     todo!("Port NPC_FindSquadPoint — parked: seam-threading")
 }
 
@@ -448,7 +476,8 @@ pub fn NPC_FindSquadPoint(position: vec3_t) -> c_int {
 /// Raven `NPC_ReserveCombatPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2923-2937`
-pub fn NPC_ReserveCombatPoint(combatPointID: c_int) -> qboolean {
+pub fn NPC_ReserveCombatPoint(
+    ctx: GameContext<'_>,combatPointID: c_int) -> qboolean {
     todo!("Port NPC_ReserveCombatPoint — parked: seam-threading")
 }
 
@@ -458,7 +487,8 @@ pub fn NPC_ReserveCombatPoint(combatPointID: c_int) -> qboolean {
 /// Raven `NPC_FreeCombatPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2945-2963`
-pub fn NPC_FreeCombatPoint(combatPointID: c_int, failed: qboolean) -> qboolean {
+pub fn NPC_FreeCombatPoint(
+    ctx: GameContext<'_>,combatPointID: c_int, failed: qboolean) -> qboolean {
     todo!("Port NPC_FreeCombatPoint — parked: ai-context")
 }
 
@@ -467,7 +497,8 @@ pub fn NPC_FreeCombatPoint(combatPointID: c_int, failed: qboolean) -> qboolean {
 /// Raven `NPC_SetCombatPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2971-2985`
-pub fn NPC_SetCombatPoint(combatPointID: c_int) -> qboolean {
+pub fn NPC_SetCombatPoint(
+    ctx: GameContext<'_>,combatPointID: c_int) -> qboolean {
     todo!("Port NPC_SetCombatPoint — parked: ai-context")
 }
 
@@ -477,7 +508,7 @@ pub fn NPC_SetCombatPoint(combatPointID: c_int) -> qboolean {
 /// Raven `NPC_SearchForWeapons`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2988-3045`
-pub fn NPC_SearchForWeapons() -> *mut gentity_t {
+pub fn NPC_SearchForWeapons(ctx: GameContext<'_>) -> *mut gentity_t {
     todo!("Port NPC_SearchForWeapons — parked: ai-context")
 }
 
@@ -486,7 +517,8 @@ pub fn NPC_SearchForWeapons() -> *mut gentity_t {
 /// Raven `NPC_SetPickUpGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:3047-3058`
-pub fn NPC_SetPickUpGoal(foundWeap: *mut gentity_t) {
+pub fn NPC_SetPickUpGoal(
+    ctx: GameContext<'_>,foundWeap: *mut gentity_t) {
     todo!("Port NPC_SetPickUpGoal — parked: ai-context")
 }
 
@@ -495,7 +527,7 @@ pub fn NPC_SetPickUpGoal(foundWeap: *mut gentity_t) {
 /// Raven `NPC_CheckGetNewWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:3060-3096`
-pub fn NPC_CheckGetNewWeapon() {
+pub fn NPC_CheckGetNewWeapon(ctx: GameContext<'_>) {
     todo!("Port NPC_CheckGetNewWeapon — parked: ai-context")
 }
 
@@ -504,7 +536,8 @@ pub fn NPC_CheckGetNewWeapon() {
 /// Raven `NPC_AimAdjust`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:3098-3129`
-pub fn NPC_AimAdjust(change: c_int) {
+pub fn NPC_AimAdjust(
+    ctx: GameContext<'_>,change: c_int) {
     todo!("Port NPC_AimAdjust — parked: ai-context")
 }
 
@@ -514,6 +547,7 @@ pub fn NPC_AimAdjust(change: c_int) {
 /// Raven `G_AimSet`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:3131-3145`
-pub fn G_AimSet(self_: *mut gentity_t, aim: c_int) {
+pub fn G_AimSet(
+    ctx: GameContext<'_>,self_: *mut gentity_t, aim: c_int) {
     todo!("Port G_AimSet — parked: seam-threading")
 }

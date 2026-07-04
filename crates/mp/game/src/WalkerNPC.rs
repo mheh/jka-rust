@@ -26,7 +26,8 @@ fn vector_length(v: &[f32; 3]) -> f32 {
 // `g_vehicleInfo` table(s) — genuinely unported runtime data
 // (fork-discovery ruling 1: globals -> GameWorld fields), not just a
 // missing `use`.
-pub fn RegisterAssets(pVeh: *mut Vehicle_t) {
+pub fn RegisterAssets(
+    ctx: GameContext<'_>,pVeh: *mut Vehicle_t) {
     todo!("Port RegisterAssets — parked: unported-global (g_vehicleInfo)")
 }
 
@@ -199,7 +200,8 @@ pub fn G_SetWalkerVehicleFunctions(pVehInfo: *mut vehicleInfo_t) {
 ///
 /// Board the Walker vehicle (internal static, assigned to vehicleInfo_t.Board).
 /// Source: `oracle/oracle/codemp/game/WalkerNPC.c:106-115`
-fn Board(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
+fn Board(
+    ctx: GameContext<'_>,pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
     // PORT-ESCALATION(level-global): oracle line 188 accesses `level.time` global for boarding delay
     todo!("Port Board — parked: level.time not yet accessible in vehicle context")
 }
@@ -212,6 +214,7 @@ fn Board(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
 // `g_vehicleInfo` table(s) — genuinely unported runtime data
 // (fork-discovery ruling 1: globals -> GameWorld fields), not just a
 // missing `use`.
-pub fn G_CreateWalkerNPC(pVeh: *mut *mut Vehicle_t, strAnimalType: *const c_char) {
+pub fn G_CreateWalkerNPC(
+    ctx: GameContext<'_>,pVeh: *mut *mut Vehicle_t, strAnimalType: *const c_char) {
     todo!("Port G_CreateWalkerNPC — parked: unported-global (g_vehicleInfo)")
 }

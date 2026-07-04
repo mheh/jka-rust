@@ -28,6 +28,7 @@ use crate::prelude::*;
 /// Raven: special routine for tracking angles between client and server -rww.
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:24-123`
 pub fn G2Tur_SetBoneAngles(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     bone: *mut c_char,
     angles: vec3_t,
@@ -42,6 +43,7 @@ pub fn G2Tur_SetBoneAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:125-207`
 pub fn turretG2_set_models(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     dying: qboolean,
 ) {
@@ -54,6 +56,7 @@ pub fn turretG2_set_models(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:210-233`
 pub fn TurretG2Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -68,6 +71,7 @@ pub fn TurretG2Pain(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:236-316`
 pub fn turretG2_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -86,6 +90,7 @@ pub fn turretG2_die(
 /// Raven: start an animation on model_root both server side and client side.
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:321-340`
 pub fn TurboLaser_SetBoneAnim(
+    ctx: GameContext<'_>,
     eweb: *mut gentity_t,
     startFrame: c_int,
     endFrame: c_int,
@@ -102,6 +107,7 @@ pub fn TurboLaser_SetBoneAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:344-412`
 pub fn turretG2_fire(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     start: vec3_t,
     dir: vec3_t,
@@ -120,6 +126,7 @@ pub fn turretG2_fire(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:414-434`
 pub fn turretG2_respawn(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turretG2_respawn — parked: entfield-fnptr-abi-mismatch")
@@ -131,6 +138,7 @@ pub fn turretG2_respawn(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:437-482`
 pub fn turretG2_head_think(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turretG2_head_think — parked: raw-ptr-skeleton-no-world-handle")
@@ -142,6 +150,7 @@ pub fn turretG2_head_think(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:485-648`
 pub fn turretG2_aim(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turretG2_aim — parked: raw-ptr-skeleton-no-world-handle")
@@ -153,6 +162,7 @@ pub fn turretG2_aim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:651-674`
 pub fn turretG2_turnoff(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turretG2_turnoff — parked: raw-ptr-skeleton-no-world-handle")
@@ -164,6 +174,7 @@ pub fn turretG2_turnoff(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:677-826`
 pub fn turretG2_find_enemies(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) -> qboolean {
     todo!("Port turretG2_find_enemies — parked: raw-ptr-skeleton-no-world-handle")
@@ -177,6 +188,7 @@ pub fn turretG2_find_enemies(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:829-956`
 pub fn turretG2_base_think(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turretG2_base_think — parked: raw-ptr-skeleton-no-world-handle")
@@ -202,6 +214,7 @@ pub fn turretG2_base_use(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:1029-1081`
 pub fn SP_misc_turretG2(
+    ctx: GameContext<'_>,
     base: *mut gentity_t,
 ) {
     todo!("Port SP_misc_turretG2 — parked: unported-consts (EF_SHADER_ANIM, EF_RADAROBJECT)")
@@ -217,6 +230,7 @@ pub fn SP_misc_turretG2(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:1084-1297`
 pub fn finish_spawning_turretG2(
+    ctx: GameContext<'_>,
     base: *mut gentity_t,
 ) {
     todo!("Port finish_spawning_turretG2 — parked: raw-ptr-skeleton-no-world-handle")

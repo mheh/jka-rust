@@ -31,6 +31,7 @@ use crate::prelude::*;
 /// Source: `oracle/oracle/codemp/game/g_active.c:20-24`
 // PORT-ESCALATION(state-threading): raw-pointer skeleton fns have no GameContext/world/engine channel, but faithful bodies need GameWorld state (level/g_entities/cvars) and engine-bearing traps — how should the module island + trap engine handle be threaded into these verbatim signatures without a forbidden global?
 pub fn P_SetTwitchInfo(
+    ctx: GameContext<'_>,
     client: *mut gclient_t,
 ) {
     todo!("Port P_SetTwitchInfo — parked: state-threading")
@@ -41,6 +42,7 @@ pub fn P_SetTwitchInfo(
 /// Source: `oracle/oracle/codemp/game/g_active.c:36-118`
 // PORT-ESCALATION(state-threading): needs level.time + G_AddEvent seam; no world/engine channel in the raw-pointer signature.
 pub fn P_DamageFeedback(
+    ctx: GameContext<'_>,
     player: *mut gentity_t,
 ) {
     todo!("Port P_DamageFeedback — parked: state-threading")
@@ -51,6 +53,7 @@ pub fn P_DamageFeedback(
 /// Source: `oracle/oracle/codemp/game/g_active.c:129-205`
 // PORT-ESCALATION(state-threading): needs level.time + G_Sound/G_Damage/rand; no world/engine channel.
 pub fn P_WorldEffects(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port P_WorldEffects — parked: state-threading")
@@ -61,6 +64,7 @@ pub fn P_WorldEffects(
 /// Source: `oracle/oracle/codemp/game/g_active.c:213-405`
 // PORT-ESCALATION(state-threading): needs g_gravity cvar, level.time, trap_PointContents (engine); no world/engine channel.
 pub fn DoImpact(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     damageSelf: qboolean,
@@ -84,6 +88,7 @@ pub fn Client_CheckImpactBBrush(
 /// Source: `oracle/oracle/codemp/game/g_active.c:444-467`
 // PORT-ESCALATION(state-threading): needs level.snd_* + level.time; no world channel.
 pub fn G_SetClientSound(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_SetClientSound — parked: state-threading")
@@ -94,6 +99,7 @@ pub fn G_SetClientSound(
 /// Source: `oracle/oracle/codemp/game/g_active.c:478-506`
 // PORT-ESCALATION(state-threading): needs g_entities[] + entity fn-pointer touch dispatch; no world channel.
 pub fn ClientImpacts(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     pm: *mut pmove_t,
 ) {
@@ -105,6 +111,7 @@ pub fn ClientImpacts(
 /// Source: `oracle/oracle/codemp/game/g_active.c:516-590`
 // PORT-ESCALATION(state-threading): needs g_entities[], level.time, engine traps (EntitiesInBox/EntityContact); no world/engine channel.
 pub fn G_TouchTriggers(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_TouchTriggers — parked: state-threading")
@@ -115,6 +122,7 @@ pub fn G_TouchTriggers(
 /// Source: `oracle/oracle/codemp/game/g_active.c:601-671`
 // PORT-ESCALATION(state-threading): needs g_entities[] + engine traps; no world/engine channel.
 pub fn G_MoverTouchPushTriggers(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     oldOrg: vec3_t,
 ) {
@@ -126,6 +134,7 @@ pub fn G_MoverTouchPushTriggers(
 /// Source: `oracle/oracle/codemp/game/g_active.c:678-740`
 // PORT-ESCALATION(state-threading): needs level.time, engine traps, Pmove, g_noSpecMove cvar; no world/engine channel.
 pub fn SpectatorThink(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     ucmd: *mut usercmd_t,
 ) {
@@ -137,6 +146,7 @@ pub fn SpectatorThink(
 /// Source: `oracle/oracle/codemp/game/g_active.c:751-774`
 // PORT-ESCALATION(state-threading): needs g_inactivity cvar, level, trap_DropClient/SendServerCommand (engine); no world/engine channel.
 pub fn ClientInactivityTimer(
+    ctx: GameContext<'_>,
     client: *mut gclient_t,
 ) -> qboolean {
     todo!("Port ClientInactivityTimer — parked: state-threading")
@@ -168,6 +178,7 @@ pub fn ClientIntermissionThink(
 /// Source: `oracle/oracle/codemp/game/g_active.c:826-854`
 // PORT-ESCALATION(state-threading): needs level.time + engine G2API traps + NPC_SetAnim; no world/engine channel.
 pub fn G_VehicleAttachDroidUnit(
+    ctx: GameContext<'_>,
     vehEnt: *mut gentity_t,
 ) {
     todo!("Port G_VehicleAttachDroidUnit — parked: state-threading")
@@ -189,6 +200,7 @@ pub fn G_CheapWeaponFire(
 /// Source: `oracle/oracle/codemp/game/g_active.c:909-1052`
 // PORT-ESCALATION(state-threading): needs level, g_entities[], engine traps; no world/engine channel.
 pub fn ClientEvents(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     oldEventSequence: c_int,
 ) {
@@ -200,6 +212,7 @@ pub fn ClientEvents(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1059-1087`
 // PORT-ESCALATION(state-threading): needs g_entities[]/G_AddEvent seam; no world channel.
 pub fn SendPendingPredictableEvents(
+    ctx: GameContext<'_>,
     ps: *mut playerState_t,
 ) {
     todo!("Port SendPendingPredictableEvents — parked: state-threading")
@@ -210,6 +223,7 @@ pub fn SendPendingPredictableEvents(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1103-1147`
 // PORT-ESCALATION(state-threading): needs level.numConnectedClients/sortedClients + g_entities[]; no world channel.
 pub fn G_UpdateForceSightBroadcasts(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port G_UpdateForceSightBroadcasts — parked: state-threading")
@@ -220,6 +234,7 @@ pub fn G_UpdateForceSightBroadcasts(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1149-1197`
 // PORT-ESCALATION(state-threading): needs level.numConnectedClients/sortedClients + g_entities[]; no world channel.
 pub fn G_UpdateJediMasterBroadcasts(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port G_UpdateJediMasterBroadcasts — parked: state-threading")
@@ -230,6 +245,7 @@ pub fn G_UpdateJediMasterBroadcasts(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1199-1209`
 // PORT-ESCALATION(state-threading): entity-only wrapper but delegates to the two parked broadcast fns; parked with them for one atomic integrate.
 pub fn G_UpdateClientBroadcasts(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port G_UpdateClientBroadcasts — parked: state-threading")
@@ -240,6 +256,7 @@ pub fn G_UpdateClientBroadcasts(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1211-1244`
 // PORT-ESCALATION(state-threading): needs level.time; no world channel.
 pub fn G_AddPushVecToUcmd(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     ucmd: *mut usercmd_t,
 ) {
@@ -271,6 +288,7 @@ pub fn G_ActionButtonPressed(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1302-1430`
 // PORT-ESCALATION(state-threading): needs level.time + cvars; no world channel.
 pub fn G_CheckClientIdle(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     ucmd: *mut usercmd_t,
 ) {
@@ -314,6 +332,7 @@ pub fn NPC_GetRunSpeed(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1577-1614`
 // PORT-ESCALATION(state-threading): needs level + G_Sound seam; no world channel.
 pub fn G_CheckMovingLoopingSounds(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     ucmd: *mut usercmd_t,
 ) {
@@ -325,6 +344,7 @@ pub fn G_CheckMovingLoopingSounds(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1616-1651`
 // PORT-ESCALATION(state-threading): needs g_entities[] via stored pointer→EntityId; no world channel.
 pub fn G_HeldByMonster(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     ucmd: *mut *mut usercmd_t,
 ) {
@@ -336,6 +356,7 @@ pub fn G_HeldByMonster(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1662-1926`
 // PORT-ESCALATION(state-threading): needs level.time + engine traps + G_AddEvent; no world/engine channel.
 pub fn G_SetTauntAnim(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     taunt: c_int,
 ) {
@@ -347,6 +368,7 @@ pub fn G_SetTauntAnim(
 /// Source: `oracle/oracle/codemp/game/g_active.c:1939-3611`
 // PORT-ESCALATION(state-threading): the 1673-LOC core — pervasively reads/writes level, g_entities[], g_clients, ~dozens of cvars, and the whole engine trap seam, plus multi-entity simultaneous &mut (fork-ruling 4); wholly dependent on the unresolved world/engine channel.
 pub fn ClientThink_real(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port ClientThink_real — parked: state-threading")
@@ -357,6 +379,7 @@ pub fn ClientThink_real(
 /// Source: `oracle/oracle/codemp/game/g_active.c:3620-3640`
 // PORT-ESCALATION(state-threading): needs level.time + cvars; no world channel.
 pub fn G_CheckClientTimeouts(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_CheckClientTimeouts — parked: state-threading")
@@ -367,6 +390,7 @@ pub fn G_CheckClientTimeouts(
 /// Source: `oracle/oracle/codemp/game/g_active.c:3649-3720`
 // PORT-ESCALATION(state-threading): needs g_entities[], level, trap_GetUsercmd (engine); no world/engine channel.
 pub fn ClientThink(
+    ctx: GameContext<'_>,
     clientNum: c_int,
     ucmd: *mut usercmd_t,
 ) {
@@ -378,6 +402,7 @@ pub fn ClientThink(
 /// Source: `oracle/oracle/codemp/game/g_active.c:3723-3729`
 // PORT-ESCALATION(state-threading): needs level + delegates to ClientThink_real; no world channel.
 pub fn G_RunClient(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_RunClient — parked: state-threading")
@@ -388,6 +413,7 @@ pub fn G_RunClient(
 /// Source: `oracle/oracle/codemp/game/g_active.c:3738-3783`
 // PORT-ESCALATION(state-threading): needs level, g_entities[]; no world channel.
 pub fn SpectatorClientEndFrame(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SpectatorClientEndFrame — parked: state-threading")
@@ -398,6 +424,7 @@ pub fn SpectatorClientEndFrame(
 /// Source: `oracle/oracle/codemp/game/g_active.c:3794-3874`
 // PORT-ESCALATION(state-threading): needs level.time + engine traps (BG_PlayerStateToEntityState/LinkEntity); no world/engine channel.
 pub fn ClientEndFrame(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port ClientEndFrame — parked: state-threading")

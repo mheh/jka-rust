@@ -41,7 +41,8 @@ const BSET_USE: c_int = 1;
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:8-20`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_SetBrushModel`
 // — no engine handle on this raw-pointer signature.
-pub fn InitTrigger(self_: *mut gentity_t) {
+pub fn InitTrigger(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port InitTrigger — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -65,7 +66,8 @@ pub fn multi_wait(ent: *mut gentity_t) {
 // `trap_SetConfigstring`, and the threaded LCG (`crandom`, ruling 3); also a
 // fn-pointer write (`think = trigger_cleared_fire`, ruling 2) the `gentity_t`
 // field type cannot yet express against a plain-`fn` skeleton target.
-pub fn multi_trigger_run(ent: *mut gentity_t) {
+pub fn multi_trigger_run(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port multi_trigger_run — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -111,15 +113,17 @@ pub fn G_NameInTriggerClassList(list: *mut c_char, str: *mut c_char) -> qboolean
 // `g_gametype`/other cvars, `g_entities[]`, `gSiegeRoundBegun`, and
 // `trap_EntitiesInBox` — no GameWorld/engine handle on this raw-pointer
 // signature. Also a fn-pointer write (`think = multi_trigger_run`, ruling 2).
-pub fn multi_trigger(ent: *mut gentity_t, activator: *mut gentity_t) {
+pub fn multi_trigger(
+    ctx: GameContext<'_>,ent: *mut gentity_t, activator: *mut gentity_t) {
     todo!("Port multi_trigger — parked: raw-ptr-skeleton-no-world-handle")
 }
 
 /// Raven `Use_Multi`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:343-346`
-pub fn Use_Multi(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
-    multi_trigger(ent, activator);
+pub fn Use_Multi(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    multi_trigger(ctx, ent, activator);
 }
 
 /// Raven `Touch_Multi`.
@@ -129,7 +133,8 @@ pub fn Use_Multi(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gen
 // a fn-pointer *compare* (`self->think == trigger_cleared_fire`, ruling 2)
 // the `gentity_t` field type does not yet carry against a plain-`fn`
 // skeleton target.
-pub fn Touch_Multi(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn Touch_Multi(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port Touch_Multi — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -140,7 +145,8 @@ pub fn Touch_Multi(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut tra
 // the threaded LCG (`crandom`, ruling 3); also a fn-pointer write
 // (`think = 0`) that is fine, but the read side (compared in `Touch_Multi`)
 // needs the enum wiring — parked with the rest of the wait/think chain.
-pub fn trigger_cleared_fire(self_: *mut gentity_t) {
+pub fn trigger_cleared_fire(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port trigger_cleared_fire — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -150,7 +156,8 @@ pub fn trigger_cleared_fire(self_: *mut gentity_t) {
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`;
 // also fn-pointer writes (`touch = Touch_Multi`, `use = Use_Multi`, ruling 2)
 // — no engine/world handle nor enum wiring on this raw-pointer signature.
-pub fn SP_trigger_multiple(ent: *mut gentity_t) {
+pub fn SP_trigger_multiple(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_trigger_multiple — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -159,7 +166,8 @@ pub fn SP_trigger_multiple(ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:694-731`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`;
 // also fn-pointer writes (`touch = Touch_Multi`, `use = Use_Multi`).
-pub fn SP_trigger_once(ent: *mut gentity_t) {
+pub fn SP_trigger_once(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_trigger_once — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -169,7 +177,8 @@ pub fn SP_trigger_once(ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:739-786`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_Trace` and
 // reads `level.time`/`g_entities[]` — no engine/world handle.
-pub fn Do_Strike(ent: *mut gentity_t) {
+pub fn Do_Strike(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port Do_Strike — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -179,7 +188,8 @@ pub fn Do_Strike(ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:789-798`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time` and
 // the threaded LCG (`Q_irand`, ruling 3).
-pub fn Think_Strike(ent: *mut gentity_t) {
+pub fn Think_Strike(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port Think_Strike — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -188,7 +198,8 @@ pub fn Think_Strike(ent: *mut gentity_t) {
 /// lightning strike trigger use event function
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:801-809`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time`.
-pub fn Use_Strike(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn Use_Strike(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     todo!("Port Use_Strike — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -198,16 +209,18 @@ pub fn Use_Strike(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut ge
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time`,
 // `trap_LinkEntity`, and `Com_Error`; also fn-pointer writes
 // (`use = Use_Strike`, `think = Think_Strike`).
-pub fn SP_trigger_lightningstrike(ent: *mut gentity_t) {
+pub fn SP_trigger_lightningstrike(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_trigger_lightningstrike — parked: raw-ptr-skeleton-no-world-handle")
 }
 
 /// Raven `trigger_always_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:872-875`
-pub fn trigger_always_think(ent: *mut gentity_t) {
-    G_UseTargets(ent, ent);
-    G_FreeEntity(ent);
+pub fn trigger_always_think(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
+    G_UseTargets(ctx, ent, ent);
+    G_FreeEntity(ctx, ent);
 }
 
 /// Raven `SP_trigger_always`.
@@ -216,7 +229,8 @@ pub fn trigger_always_think(ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:880-884`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time`;
 // also a fn-pointer write (`think = trigger_always_think`).
-pub fn SP_trigger_always(ent: *mut gentity_t) {
+pub fn SP_trigger_always(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port SP_trigger_always — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -225,7 +239,8 @@ pub fn SP_trigger_always(ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:901-1029`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time` and
 // calls `BG_TouchJumpPad`; also a fn-pointer write (`touch = NULL`).
-pub fn trigger_push_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn trigger_push_touch(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port trigger_push_touch — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -235,7 +250,8 @@ pub fn trigger_push_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1039-1097`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the `g_gravity`
 // cvar (`GameCvars`, ruling 1) — no world/engine handle on this signature.
-pub fn AimAtTarget(self_: *mut gentity_t) {
+pub fn AimAtTarget(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port AimAtTarget — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -246,7 +262,8 @@ pub fn AimAtTarget(self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1112-1136`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time` and
 // `trap_LinkEntity`; also fn-pointer writes (`touch`/`think`).
-pub fn SP_trigger_push(self_: *mut gentity_t) {
+pub fn SP_trigger_push(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_trigger_push — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -254,7 +271,8 @@ pub fn SP_trigger_push(self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1138-1159`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time`.
-pub fn Use_target_push(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn Use_target_push(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     todo!("Port Use_target_push — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -264,14 +282,16 @@ pub fn Use_target_push(self_: *mut gentity_t, other: *mut gentity_t, activator: 
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1168-1187`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time`;
 // also fn-pointer writes (`think = AimAtTarget`, `use = Use_target_push`).
-pub fn SP_target_push(self_: *mut gentity_t) {
+pub fn SP_target_push(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_target_push — parked: raw-ptr-skeleton-no-world-handle")
 }
 
 /// Raven `trigger_teleporter_touch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1197-1225`
-pub fn trigger_teleporter_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn trigger_teleporter_touch(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     unsafe {
         if (*self_).flags & FL_INACTIVE != 0 {
             // set by target_deactivate
@@ -286,13 +306,13 @@ pub fn trigger_teleporter_touch(self_: *mut gentity_t, other: *mut gentity_t, tr
         // does not carry.
         // Source: oracle/oracle/codemp/game/g_trigger.c:1208-1215
 
-        let dest = G_PickTarget((*self_).target);
+        let dest = G_PickTarget(ctx, (*self_).target);
         if dest.is_null() {
-            G_Printf(b"Couldn't find teleporter destination\n\0".as_ptr() as *const c_char);
+            G_Printf(ctx, b"Couldn't find teleporter destination\n\0".as_ptr() as *const c_char);
             return;
         }
 
-        TeleportPlayer(other, (*dest).s.origin, (*dest).s.angles);
+        TeleportPlayer(ctx, other, (*dest).s.origin, (*dest).s.angles);
     }
 }
 
@@ -303,7 +323,8 @@ pub fn trigger_teleporter_touch(self_: *mut gentity_t, other: *mut gentity_t, tr
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `InitTrigger`
 // (parked) and `trap_LinkEntity`; also a fn-pointer write
 // (`touch = trigger_teleporter_touch`).
-pub fn SP_trigger_teleport(self_: *mut gentity_t) {
+pub fn SP_trigger_teleport(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_trigger_teleport — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -312,7 +333,8 @@ pub fn SP_trigger_teleport(self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1280-1297`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
 // `trap_UnlinkEntity`/`trap_LinkEntity` — no engine handle.
-pub fn hurt_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn hurt_use(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     todo!("Port hurt_use — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -322,7 +344,8 @@ pub fn hurt_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut ge
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1299-1411`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `g_gametype`
 // cvar and `level.time` — no world/engine handle.
-pub fn hurt_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn hurt_touch(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port hurt_touch — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -332,7 +355,8 @@ pub fn hurt_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trac
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`/
 // `trap_UnlinkEntity`; writes the file-scope `gTrigFallSound` global (fork
 // ruling 1) and fn-pointer fields (`touch`/`use`).
-pub fn SP_trigger_hurt(self_: *mut gentity_t) {
+pub fn SP_trigger_hurt(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_trigger_hurt — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -341,7 +365,8 @@ pub fn SP_trigger_hurt(self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1442-1478`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): indexes `g_entities[]`
 // and reads `level.time` — no world handle.
-pub fn space_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn space_touch(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port space_touch — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -351,7 +376,8 @@ pub fn space_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut tra
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1484-1492`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `InitTrigger`
 // (parked) and `trap_LinkEntity`; also a fn-pointer write (`touch`).
-pub fn SP_trigger_space(self_: *mut gentity_t) {
+pub fn SP_trigger_space(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_trigger_space — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -360,7 +386,8 @@ pub fn SP_trigger_space(self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1494-1531`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time`,
 // `G_Find`/`G_Error` (needs `level`/`g_entities`), and `trap_LinkEntity`.
-pub fn shipboundary_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn shipboundary_touch(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port shipboundary_touch — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -369,7 +396,8 @@ pub fn shipboundary_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1533-1565`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time`,
 // `trap_EntitiesInBox`, and `g_entities[]`.
-pub fn shipboundary_think(ent: *mut gentity_t) {
+pub fn shipboundary_think(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port shipboundary_think — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -381,7 +409,8 @@ pub fn shipboundary_think(ent: *mut gentity_t) {
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time`,
 // `G_Error`, and `trap_LinkEntity`; also fn-pointer writes
 // (`think`/`touch`).
-pub fn SP_trigger_shipboundary(self_: *mut gentity_t) {
+pub fn SP_trigger_shipboundary(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_trigger_shipboundary — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -390,7 +419,8 @@ pub fn SP_trigger_shipboundary(self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1597-1680`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time` and
 // `G_Find`/`G_Error` (need `level`/`g_entities`) throughout.
-pub fn hyperspace_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+pub fn hyperspace_touch(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port hyperspace_touch — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -403,7 +433,8 @@ pub fn hyperspace_touch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mu
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `G_Error`,
 // `InitTrigger` (parked), and `trap_LinkEntity`; also a fn-pointer write
 // (`touch = hyperspace_touch`).
-pub fn SP_trigger_hyperspace(self_: *mut gentity_t) {
+pub fn SP_trigger_hyperspace(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_trigger_hyperspace — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -412,18 +443,20 @@ pub fn SP_trigger_hyperspace(self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1757-1761`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time` and
 // the threaded LCG (`crandom`, ruling 3).
-pub fn func_timer_think(self_: *mut gentity_t) {
+pub fn func_timer_think(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port func_timer_think — parked: raw-ptr-skeleton-no-world-handle")
 }
 
 /// Raven `func_timer_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1763-1776`
-pub fn func_timer_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+pub fn func_timer_use(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     unsafe {
         (*self_).activator = activator;
 
-        G_ActivateBehavior(self_, BSET_USE);
+        G_ActivateBehavior(ctx, self_, BSET_USE);
 
         // if on, turn it off
         if (*self_).nextthink != 0 {
@@ -432,7 +465,7 @@ pub fn func_timer_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *
         }
 
         // turn it on
-        func_timer_think(self_);
+        func_timer_think(ctx, self_);
     }
 }
 
@@ -445,7 +478,8 @@ pub fn func_timer_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time` and
 // `G_Printf`/`vtos` (variadic-c-abi); also fn-pointer writes
 // (`use = func_timer_use`, `think = func_timer_think`).
-pub fn SP_func_timer(self_: *mut gentity_t) {
+pub fn SP_func_timer(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_func_timer — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -457,7 +491,8 @@ pub fn SP_func_timer(self_: *mut gentity_t) {
 // ruling 3 — no seed channel on this signature). The body's own control
 // flow is pure, but both callees require state this signature has no path
 // to reach, so the whole function is parked rather than half-transcribed.
-pub fn asteroid_pick_random_asteroid(self_: *mut gentity_t) -> *mut gentity_t {
+pub fn asteroid_pick_random_asteroid(
+    ctx: GameContext<'_>,self_: *mut gentity_t) -> *mut gentity_t {
     todo!("Port asteroid_pick_random_asteroid — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -466,7 +501,8 @@ pub fn asteroid_pick_random_asteroid(self_: *mut gentity_t) -> *mut gentity_t {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1843-1859`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): iterates `g_entities[]`
 // directly — no world handle on this signature.
-pub fn asteroid_count_num_asteroids(self_: *mut gentity_t) -> c_int {
+pub fn asteroid_count_num_asteroids(
+    ctx: GameContext<'_>,self_: *mut gentity_t) -> c_int {
     todo!("Port asteroid_count_num_asteroids — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -477,7 +513,8 @@ pub fn asteroid_count_num_asteroids(self_: *mut gentity_t) -> c_int {
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time`, the
 // threaded LCG (`flrand`/`Q_irand`, ruling 3), and `Q3_Lerp2Origin` (ICARUS,
 // fork ruling 6); also a fn-pointer write (`think`).
-pub fn asteroid_move_to_start2(self_: *mut gentity_t, ownerTrigger: *mut gentity_t) {
+pub fn asteroid_move_to_start2(
+    ctx: GameContext<'_>,self_: *mut gentity_t, ownerTrigger: *mut gentity_t) {
     todo!("Port asteroid_move_to_start2 — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -487,7 +524,8 @@ pub fn asteroid_move_to_start2(self_: *mut gentity_t, ownerTrigger: *mut gentity
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1922-1925`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): indexes `g_entities[]`
 // — no world handle on this signature.
-pub fn asteroid_move_to_start(self_: *mut gentity_t) {
+pub fn asteroid_move_to_start(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port asteroid_move_to_start — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -496,7 +534,8 @@ pub fn asteroid_move_to_start(self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1927-1979`
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs `level.time` and
 // `G_Spawn` (needs `g_entities`/`level`, itself parked).
-pub fn asteroid_field_think(self_: *mut gentity_t) {
+pub fn asteroid_field_think(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port asteroid_field_think — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -506,6 +545,7 @@ pub fn asteroid_field_think(self_: *mut gentity_t) {
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
 // `trap_SetBrushModel`/`trap_LinkEntity` and needs `level.time`; also a
 // fn-pointer write (`think = asteroid_field_think`).
-pub fn SP_trigger_asteroid_field(self_: *mut gentity_t) {
+pub fn SP_trigger_asteroid_field(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port SP_trigger_asteroid_field — parked: raw-ptr-skeleton-no-world-handle")
 }

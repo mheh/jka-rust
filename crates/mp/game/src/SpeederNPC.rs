@@ -122,6 +122,7 @@ pub fn G_SetSpeederVehicleFunctions(pVehInfo: *mut vehicleInfo_t) {
 // `*mut c_void` placeholder (`//TODO: Port vehicleInfo_t`,
 // `bg_vehicles.h:586`) pending that type's pointer-field port. Needs both
 // settled before transcription.
-pub fn G_CreateSpeederNPC(pVeh: *mut *mut Vehicle_t, strType: *const c_char) {
+pub fn G_CreateSpeederNPC(
+    ctx: GameContext<'_>,pVeh: *mut *mut Vehicle_t, strType: *const c_char) {
     todo!("Port G_CreateSpeederNPC — parked: ambient-global (g_vehicleInfo) + unported Vehicle_t::m_pVehicleInfo — oracle/oracle/codemp/game/SpeederNPC.c:1092")
 }

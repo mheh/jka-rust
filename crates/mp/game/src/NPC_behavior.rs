@@ -23,7 +23,7 @@ use crate::prelude::*;
 /// Raven `NPC_BSAdvanceFight`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:29-183`
-pub fn NPC_BSAdvanceFight() {
+pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
     todo!("Port NPC_BSAdvanceFight — parked: ai-context")
 }
 
@@ -45,6 +45,7 @@ pub fn Disappear(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:194-211`
 pub fn BeamOut(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port BeamOut — parked: ai-context")
@@ -55,7 +56,7 @@ pub fn BeamOut(
 /// Raven `NPC_BSCinematic`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:213-244`
-pub fn NPC_BSCinematic() {
+pub fn NPC_BSCinematic(ctx: GameContext<'_>) {
     todo!("Port NPC_BSCinematic — parked: ai-context")
 }
 
@@ -64,7 +65,7 @@ pub fn NPC_BSCinematic() {
 /// Raven `NPC_BSWait`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:246-249`
-pub fn NPC_BSWait() {
+pub fn NPC_BSWait(ctx: GameContext<'_>) {
     todo!("Port NPC_BSWait — parked: ai-context")
 }
 
@@ -84,6 +85,7 @@ pub fn NPC_BSInvestigate() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:409-494`
 pub fn NPC_CheckInvestigate(
+    ctx: GameContext<'_>,
     alertEventNum: c_int,
 ) -> qboolean {
     todo!("Port NPC_CheckInvestigate — parked: ai-context")
@@ -94,7 +96,7 @@ pub fn NPC_CheckInvestigate(
 /// Raven `NPC_BSSleep`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:500-521`
-pub fn NPC_BSSleep() {
+pub fn NPC_BSSleep(ctx: GameContext<'_>) {
     todo!("Port NPC_BSSleep — parked: ai-context")
 }
 
@@ -103,7 +105,7 @@ pub fn NPC_BSSleep() {
 /// Raven `NPC_BSFollowLeader`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:524-729`
-pub fn NPC_BSFollowLeader() {
+pub fn NPC_BSFollowLeader(ctx: GameContext<'_>) {
     todo!("Port NPC_BSFollowLeader — parked: ai-context")
 }
 
@@ -112,7 +114,7 @@ pub fn NPC_BSFollowLeader() {
 /// Raven `NPC_BSJump`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:733-919`
-pub fn NPC_BSJump() {
+pub fn NPC_BSJump(ctx: GameContext<'_>) {
     todo!("Port NPC_BSJump — parked: ai-context")
 }
 
@@ -121,7 +123,7 @@ pub fn NPC_BSJump() {
 /// Raven `NPC_BSRemove`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:921-937`
-pub fn NPC_BSRemove() {
+pub fn NPC_BSRemove(ctx: GameContext<'_>) {
     todo!("Port NPC_BSRemove — parked: ai-context")
 }
 
@@ -130,7 +132,7 @@ pub fn NPC_BSRemove() {
 /// Raven `NPC_BSSearch`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:939-1124`
-pub fn NPC_BSSearch() {
+pub fn NPC_BSSearch(ctx: GameContext<'_>) {
     todo!("Port NPC_BSSearch — parked: ai-context")
 }
 
@@ -140,6 +142,7 @@ pub fn NPC_BSSearch() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1132-1150`
 pub fn NPC_BSSearchStart(
+    ctx: GameContext<'_>,
     homeWp: c_int,
     bState: bState_t,
 ) {
@@ -151,7 +154,7 @@ pub fn NPC_BSSearchStart(
 /// Raven `NPC_BSNoClip`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1160-1191`
-pub fn NPC_BSNoClip() {
+pub fn NPC_BSNoClip(ctx: GameContext<'_>) {
     todo!("Port NPC_BSNoClip — parked: ai-context")
 }
 
@@ -160,7 +163,7 @@ pub fn NPC_BSNoClip() {
 /// Raven `NPC_BSWander`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1193-1286`
-pub fn NPC_BSWander() {
+pub fn NPC_BSWander(ctx: GameContext<'_>) {
     todo!("Port NPC_BSWander — parked: ai-context")
 }
 
@@ -169,7 +172,7 @@ pub fn NPC_BSWander() {
 /// Raven `NPC_Surrender`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1317-1339`
-pub fn NPC_Surrender() {
+pub fn NPC_Surrender(ctx: GameContext<'_>) {
     todo!("Port NPC_Surrender — parked: ai-context")
 }
 
@@ -178,7 +181,7 @@ pub fn NPC_Surrender() {
 /// Raven `NPC_CheckSurrender`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1341-1442`
-pub fn NPC_CheckSurrender() -> qboolean {
+pub fn NPC_CheckSurrender(ctx: GameContext<'_>) -> qboolean {
     todo!("Port NPC_CheckSurrender — parked: ai-context")
 }
 
@@ -187,7 +190,7 @@ pub fn NPC_CheckSurrender() -> qboolean {
 /// Raven `NPC_BSFlee`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1444-1558`
-pub fn NPC_BSFlee() {
+pub fn NPC_BSFlee(ctx: GameContext<'_>) {
     todo!("Port NPC_BSFlee — parked: ai-context")
 }
 
@@ -197,6 +200,7 @@ pub fn NPC_BSFlee() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1560-1634`
 pub fn NPC_StartFlee(
+    ctx: GameContext<'_>,
     enemy: *mut gentity_t,
     dangerPoint: vec3_t,
     dangerLevel: c_int,
@@ -213,6 +217,7 @@ pub fn NPC_StartFlee(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1636-1648`
 pub fn G_StartFlee(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     enemy: *mut gentity_t,
     dangerPoint: vec3_t,
@@ -228,6 +233,6 @@ pub fn G_StartFlee(
 /// Raven `NPC_BSEmplaced`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_behavior.c:1650-1748`
-pub fn NPC_BSEmplaced() {
+pub fn NPC_BSEmplaced(ctx: GameContext<'_>) {
     todo!("Port NPC_BSEmplaced — parked: ai-context")
 }

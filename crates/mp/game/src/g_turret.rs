@@ -19,6 +19,7 @@ use crate::g_utils::G_ScaleNetHealth;
 // faithful-LCG `Rng` (ruling 3) that `random()` needs. Needs a threaded
 // `&mut GameWorld`/`Rng` param before this body can be written.
 pub fn TurretPain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -30,6 +31,7 @@ pub fn TurretPain(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:35-48`
 pub fn TurretBasePain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -41,7 +43,7 @@ pub fn TurretBasePain(
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(target);
             }
-            TurretPain(target, attacker, damage);
+            TurretPain(ctx, target, attacker, damage);
         }
     }
 }
@@ -53,6 +55,7 @@ pub fn TurretBasePain(
 // (a global write) with no `&mut GameWorld`/entity-arena param reachable
 // from this signature.
 pub fn auto_turret_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -66,6 +69,7 @@ pub fn auto_turret_die(
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:112-124`
 pub fn bottom_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -79,7 +83,7 @@ pub fn bottom_die(
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(target);
             }
-            auto_turret_die(target, inflictor, attacker, damage, meansOfDeath);
+            auto_turret_die(ctx, target, inflictor, attacker, damage, meansOfDeath);
         }
     }
 }
@@ -91,6 +95,7 @@ pub fn bottom_die(
 // (requires `&Engine`), and `G_Spawn`/entity-arena access — none reachable
 // from `(ent, start, dir)` alone.
 pub fn turret_fire(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     start: vec3_t,
     dir: vec3_t,
@@ -104,6 +109,7 @@ pub fn turret_fire(
 // PORT-ESCALATION(world-threading): needs `g_entities[self->r.ownerNum]`
 // and `level.time`, neither reachable from `(self_,)` alone.
 pub fn turret_head_think(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turret_head_think — parked: world-threading (g_entities[], level.time)")
@@ -116,6 +122,7 @@ pub fn turret_head_think(
 // `level.time`, and the faithful-LCG `Rng` (`flrand`), none reachable from
 // `(self_,)` alone.
 pub fn turret_aim(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turret_aim — parked: world-threading (g_entities[], level.time, Rng)")
@@ -127,6 +134,7 @@ pub fn turret_aim(
 // PORT-ESCALATION(world-threading): needs `g_entities[self->r.ownerNum]`
 // and `level.time`, neither reachable from `(self_,)` alone.
 pub fn turret_turnoff(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turret_turnoff — parked: world-threading (g_entities[], level.time)")
@@ -138,6 +146,7 @@ pub fn turret_turnoff(
 // PORT-ESCALATION(world-threading): needs `level.time`, not reachable from
 // `(self_,)` alone.
 pub fn turret_sleep(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turret_sleep — parked: world-threading (level.time)")
@@ -150,6 +159,7 @@ pub fn turret_sleep(
 // `trap_InPVS`/`trap_Trace` (require `&Engine`), and `G_RadiusList`'s
 // entity-arena scan — none reachable from `(self_,)` alone.
 pub fn turret_find_enemies(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) -> qboolean {
     todo!("Port turret_find_enemies — parked: world-threading (g_entities[], level.time, &Engine)")
@@ -162,6 +172,7 @@ pub fn turret_find_enemies(
 // `trap_Trace` (require `&Engine`), and the faithful-LCG `Rng`, none
 // reachable from `(self_,)` alone.
 pub fn turret_base_think(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port turret_base_think — parked: world-threading (level.time, &Engine, Rng)")
@@ -189,6 +200,7 @@ pub fn turret_base_use(
 // PORT-ESCALATION(world-threading): needs `level.time` and `trap_LinkEntity`
 // (requires `&Engine`), neither reachable from `(base,)` alone.
 pub fn SP_misc_turret(
+    ctx: GameContext<'_>,
     base: *mut gentity_t,
 ) {
     todo!("Port SP_misc_turret — parked: world-threading (level.time, &Engine)")
@@ -201,6 +213,7 @@ pub fn SP_misc_turret(
 // `trap_LinkEntity` (requires `&Engine`), and the faithful-LCG `Rng`
 // (`random()`), none reachable from `(base,)` alone.
 pub fn turret_base_spawn_top(
+    ctx: GameContext<'_>,
     base: *mut gentity_t,
 ) -> qboolean {
     todo!("Port turret_base_spawn_top — parked: world-threading (&Engine, Rng, G_Spawn)")

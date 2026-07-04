@@ -25,14 +25,16 @@ use crate::prelude::*;
 /// Raven `B_TempAlloc`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_util.c:14-17`
-pub fn B_TempAlloc(size: c_int) -> *mut c_void {
+pub fn B_TempAlloc(
+    ctx: GameContext<'_>,size: c_int) -> *mut c_void {
     crate::bg_misc::BG_TempAlloc(size)
 }
 
 /// Raven `B_TempFree`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_util.c:19-22`
-pub fn B_TempFree(size: c_int) {
+pub fn B_TempFree(
+    ctx: GameContext<'_>,size: c_int) {
     crate::bg_misc::BG_TempFree(size)
 }
 
@@ -41,7 +43,8 @@ pub fn B_TempFree(size: c_int) {
 /// Raven: `BOT_ZMALLOC` is not defined in this build, so only the plain
 /// `return BG_Alloc(size);` branch (`ai_util.c:77`) is live.
 /// Source: `oracle/oracle/codemp/game/ai_util.c:25-80`
-pub fn B_Alloc(size: c_int) -> *mut c_void {
+pub fn B_Alloc(
+    ctx: GameContext<'_>,size: c_int) -> *mut c_void {
     crate::bg_misc::BG_Alloc(size)
 }
 
@@ -61,7 +64,7 @@ pub fn B_Free(ptr: *mut c_void) {}
 /// Raven `B_InitAlloc`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_util.c:133-140`
-pub fn B_InitAlloc() {
+pub fn B_InitAlloc(ctx: GameContext<'_>) {
     todo!("Port B_InitAlloc — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -253,7 +256,8 @@ pub fn GetPairedValue(buf: *mut c_char, key: *mut c_char, outbuf: *mut c_char) -
 /// Raven `BotDoChat`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_util.c:328-515`
-pub fn BotDoChat(bs: *mut bot_state_t, section: *mut c_char, always: c_int) -> c_int {
+pub fn BotDoChat(
+    ctx: GameContext<'_>,bs: *mut bot_state_t, section: *mut c_char, always: c_int) -> c_int {
     todo!("Port BotDoChat — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -340,7 +344,8 @@ pub fn ParseEmotionalAttachments(bs: *mut bot_state_t, buf: *mut c_char) {
 /// Raven `ReadChatGroups`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_util.c:574-612`
-pub fn ReadChatGroups(bs: *mut bot_state_t, buf: *mut c_char) -> c_int {
+pub fn ReadChatGroups(
+    ctx: GameContext<'_>,bs: *mut bot_state_t, buf: *mut c_char) -> c_int {
     todo!("Port ReadChatGroups — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -352,7 +357,8 @@ pub fn ReadChatGroups(bs: *mut bot_state_t, buf: *mut c_char) -> c_int {
 /// Raven `BotUtilizePersonality`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_util.c:614-867`
-pub fn BotUtilizePersonality(bs: *mut bot_state_t) {
+pub fn BotUtilizePersonality(
+    ctx: GameContext<'_>,bs: *mut bot_state_t) {
     todo!("Port BotUtilizePersonality — parked: raw-ptr-skeleton-no-world-handle")
 }
 

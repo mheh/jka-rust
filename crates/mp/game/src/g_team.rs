@@ -58,7 +58,7 @@ fn fofs_classname() -> c_int {
 // writes the file-scope `teamgame` global — no world/cvar handle in this
 // signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:22-35`
-pub fn Team_InitGame() {
+pub fn Team_InitGame(ctx: GameContext<'_>) {
     todo!("Port Team_InitGame — parked: raw-ptr-skeleton-no-world-handle (g_gametype, teamgame)")
 }
 
@@ -134,6 +134,7 @@ pub fn TeamColorString(
 /// team name.
 /// Source: `oracle/oracle/codemp/game/g_team.c:100-132`
 pub fn PrintCTFMessage(
+    ctx: GameContext<'_>,
     plIndex: c_int,
     teamIndex: c_int,
     ctfMessage: c_int,
@@ -144,7 +145,7 @@ pub fn PrintCTFMessage(
     let teamIndex = if teamIndex == -1 { 50 } else { teamIndex };
 
     unsafe {
-        let te = G_TempEntity([0.0, 0.0, 0.0], entity_event_t::EV_CTFMESSAGE as c_int);
+        let te = G_TempEntity(ctx, [0.0, 0.0, 0.0], entity_event_t::EV_CTFMESSAGE as c_int);
         (*te).r.svFlags |= SVF_BROADCAST;
         (*te).s.eventParm = ctfMessage;
         (*te).s.trickedentindex = plIndex;
@@ -162,6 +163,7 @@ pub fn PrintCTFMessage(
 // `level.teamScores` — no world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:142-179`
 pub fn AddTeamScore(
+    ctx: GameContext<'_>,
     origin: vec3_t,
     team: c_int,
     score: c_int,
@@ -175,6 +177,7 @@ pub fn AddTeamScore(
 // cvar/world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:187-276`
 pub fn OnSameTeam(
+    ctx: GameContext<'_>,
     ent1: *mut gentity_t,
     ent2: *mut gentity_t,
 ) -> qboolean {
@@ -188,6 +191,7 @@ pub fn OnSameTeam(
 // `trap_SetConfigstring` — no world/engine handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:281-318`
 pub fn Team_SetFlagStatus(
+    ctx: GameContext<'_>,
     team: c_int,
     status: flagStatus_t,
 ) {
@@ -198,16 +202,17 @@ pub fn Team_SetFlagStatus(
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:320-330`
 pub fn Team_CheckDroppedItem(
+    ctx: GameContext<'_>,
     dropped: *mut gentity_t,
 ) {
     unsafe {
         let giTag = (*(*dropped).item).giTag;
         if giTag == PW_REDFLAG {
-            Team_SetFlagStatus(TEAM_RED, FLAG_DROPPED);
+            Team_SetFlagStatus(ctx, TEAM_RED, FLAG_DROPPED);
         } else if giTag == PW_BLUEFLAG {
-            Team_SetFlagStatus(TEAM_BLUE, FLAG_DROPPED);
+            Team_SetFlagStatus(ctx, TEAM_BLUE, FLAG_DROPPED);
         } else if giTag == PW_NEUTRALFLAG {
-            Team_SetFlagStatus(TEAM_FREE, FLAG_DROPPED);
+            Team_SetFlagStatus(ctx, TEAM_FREE, FLAG_DROPPED);
         }
     }
 }
@@ -218,6 +223,7 @@ pub fn Team_CheckDroppedItem(
 // no world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:337-352`
 pub fn Team_ForceGesture(
+    ctx: GameContext<'_>,
     team: c_int,
 ) {
     todo!("Port Team_ForceGesture — parked: raw-ptr-skeleton-no-world-handle (g_entities)")
@@ -230,6 +236,7 @@ pub fn Team_ForceGesture(
 // this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:363-534`
 pub fn Team_FragBonuses(
+    ctx: GameContext<'_>,
     targ: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -243,6 +250,7 @@ pub fn Team_FragBonuses(
 // world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:544-565`
 pub fn Team_CheckHurtCarrier(
+    ctx: GameContext<'_>,
     targ: *mut gentity_t,
     attacker: *mut gentity_t,
 ) {
@@ -253,6 +261,7 @@ pub fn Team_CheckHurtCarrier(
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:568-599`
 pub fn Team_ResetFlag(
+    ctx: GameContext<'_>,
     team: c_int,
 ) -> *mut gentity_t {
     let classname: &CStr = if team == TEAM_RED {
@@ -269,19 +278,19 @@ pub fn Team_ResetFlag(
         let mut ent: *mut gentity_t = core::ptr::null_mut();
         let mut rent: *mut gentity_t = core::ptr::null_mut();
         loop {
-            ent = G_Find(ent, fofs_classname(), classname.as_ptr());
+            ent = G_Find(ctx, ent, fofs_classname(), classname.as_ptr());
             if ent.is_null() {
                 break;
             }
             if (*ent).flags & FL_DROPPED_ITEM != 0 {
-                G_FreeEntity(ent);
+                G_FreeEntity(ctx, ent);
             } else {
                 rent = ent;
-                RespawnItem(ent);
+                RespawnItem(ctx, ent);
             }
         }
 
-        Team_SetFlagStatus(team, FLAG_ATBASE);
+        Team_SetFlagStatus(ctx, team, FLAG_ATBASE);
 
         rent
     }
@@ -292,7 +301,7 @@ pub fn Team_ResetFlag(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
 // cvar handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:601-606`
-pub fn Team_ResetFlags() {
+pub fn Team_ResetFlags(ctx: GameContext<'_>) {
     todo!("Port Team_ResetFlags — parked: raw-ptr-skeleton-no-world-handle (g_gametype)")
 }
 
@@ -300,18 +309,19 @@ pub fn Team_ResetFlags() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:608-624`
 pub fn Team_ReturnFlagSound(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     team: c_int,
 ) {
     if ent.is_null() {
-        // G_Printf("Warning:  NULL passed to Team_ReturnFlagSound\n") —
+        // G_Printf(ctx, "Warning:  NULL passed to Team_ReturnFlagSound\n") —
         // logging trap not resolved in this packet's call surface; behavior
         // (early return) preserved, message dropped.
         return;
     }
 
     unsafe {
-        let te = G_TempEntity((*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+        let te = G_TempEntity(ctx, (*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
         (*te).s.eventParm = if team == TEAM_BLUE {
             global_team_sound_t::GTS_RED_RETURN as c_int
         } else {
@@ -327,6 +337,7 @@ pub fn Team_ReturnFlagSound(
 // and `level.time` — no world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:626-662`
 pub fn Team_TakeFlagSound(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     team: c_int,
 ) {
@@ -337,17 +348,18 @@ pub fn Team_TakeFlagSound(
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:664-680`
 pub fn Team_CaptureFlagSound(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     team: c_int,
 ) {
     if ent.is_null() {
-        // G_Printf("Warning:  NULL passed to Team_CaptureFlagSound\n") —
+        // G_Printf(ctx, "Warning:  NULL passed to Team_CaptureFlagSound\n") —
         // logging trap not resolved in this packet's call surface.
         return;
     }
 
     unsafe {
-        let te = G_TempEntity((*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+        let te = G_TempEntity(ctx, (*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
         (*te).s.eventParm = if team == TEAM_BLUE {
             global_team_sound_t::GTS_BLUE_CAPTURE as c_int
         } else {
@@ -361,16 +373,17 @@ pub fn Team_CaptureFlagSound(
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:682-691`
 pub fn Team_ReturnFlag(
+    ctx: GameContext<'_>,
     team: c_int,
 ) {
-    let flag = Team_ResetFlag(team);
-    Team_ReturnFlagSound(flag, team);
+    let flag = Team_ResetFlag(ctx, team);
+    Team_ReturnFlagSound(ctx, flag, team);
     if team == TEAM_FREE {
         // PrintMsg(NULL, "The flag has returned!\n") — dead (StringEd-only
         // client-side messaging, g_team.c:685).
     } else {
         // flag should always have team in normal CTF
-        PrintCTFMessage(-1, team, ctfMsg_t::CTFMESSAGE_FLAG_RETURNED as c_int);
+        PrintCTFMessage(ctx, -1, team, ctfMsg_t::CTFMESSAGE_FLAG_RETURNED as c_int);
     }
 }
 
@@ -378,16 +391,17 @@ pub fn Team_ReturnFlag(
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:693-703`
 pub fn Team_FreeEntity(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     unsafe {
         let giTag = (*(*ent).item).giTag;
         if giTag == PW_REDFLAG {
-            Team_ReturnFlag(TEAM_RED);
+            Team_ReturnFlag(ctx, TEAM_RED);
         } else if giTag == PW_BLUEFLAG {
-            Team_ReturnFlag(TEAM_BLUE);
+            Team_ReturnFlag(ctx, TEAM_BLUE);
         } else if giTag == PW_NEUTRALFLAG {
-            Team_ReturnFlag(TEAM_FREE);
+            Team_ReturnFlag(ctx, TEAM_FREE);
         }
     }
 }
@@ -400,6 +414,7 @@ pub fn Team_FreeEntity(
 /// wiring for the assignment site is separate from this body.
 /// Source: `oracle/oracle/codemp/game/g_team.c:714-729`
 pub fn Team_DroppedFlagThink(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     unsafe {
@@ -413,8 +428,8 @@ pub fn Team_DroppedFlagThink(
         };
 
         // Team_ResetFlag will delete this entity.
-        let flag = Team_ResetFlag(team);
-        Team_ReturnFlagSound(flag, team);
+        let flag = Team_ResetFlag(ctx, team);
+        Team_ReturnFlagSound(ctx, flag, team);
     }
 }
 
@@ -425,6 +440,7 @@ pub fn Team_DroppedFlagThink(
 // signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:737-825`
 pub fn Team_TouchOurFlag(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     team: c_int,
@@ -438,6 +454,7 @@ pub fn Team_TouchOurFlag(
 // world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:827-846`
 pub fn Team_TouchEnemyFlag(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     team: c_int,
@@ -449,6 +466,7 @@ pub fn Team_TouchEnemyFlag(
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:848-871`
 pub fn Pickup_Team(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) -> c_int {
@@ -467,9 +485,9 @@ pub fn Pickup_Team(
 
         let cl = (*other).client as *mut gclient_t;
         if team == (*cl).sess.sessionTeam as c_int {
-            Team_TouchOurFlag(ent, other, team)
+            Team_TouchOurFlag(ctx, ent, other, team)
         } else {
-            Team_TouchEnemyFlag(ent, other, team)
+            Team_TouchEnemyFlag(ctx, ent, other, team)
         }
     }
 }
@@ -480,6 +498,7 @@ pub fn Pickup_Team(
 // and calls `trap_InPVS` — no world/engine handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:880-909`
 pub fn Team_GetLocation(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> *mut gentity_t {
     todo!("Port Team_GetLocation — parked: raw-ptr-skeleton-no-world-handle (level.locationHead, trap_InPVS)")
@@ -492,6 +511,7 @@ pub fn Team_GetLocation(
 // (`"%c%c%s" S_COLOR_WHITE` / `"%s"`) can't be expressed against it.
 /// Source: `oracle/oracle/codemp/game/g_team.c:919-938`
 pub fn Team_GetLocationMsg(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     loc: *mut c_char,
     loclen: c_int,
@@ -505,6 +525,7 @@ pub fn Team_GetLocationMsg(
 // and `g_gametype` — no world/cvar handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:951-1040`
 pub fn SelectRandomTeamSpawnPoint(
+    ctx: GameContext<'_>,
     teamstate: c_int,
     team: team_t,
     siegeClass: c_int,
@@ -520,6 +541,7 @@ pub fn SelectRandomTeamSpawnPoint(
 // parked `SelectRandomTeamSpawnPoint`.
 /// Source: `oracle/oracle/codemp/game/g_team.c:1049-1063`
 pub fn SelectCTFSpawnPoint(
+    ctx: GameContext<'_>,
     team: team_t,
     teamstate: c_int,
     origin: vec3_t,
@@ -536,6 +558,7 @@ pub fn SelectCTFSpawnPoint(
 // parked `SelectRandomTeamSpawnPoint`.
 /// Source: `oracle/oracle/codemp/game/g_team.c:1071-1085`
 pub fn SelectSiegeSpawnPoint(
+    ctx: GameContext<'_>,
     siegeClass: c_int,
     team: team_t,
     teamstate: c_int,
@@ -562,6 +585,7 @@ pub fn SortClients(
 // world/engine handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:1103-1159`
 pub fn TeamplayInfoMessage(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port TeamplayInfoMessage — parked: raw-ptr-skeleton-no-world-handle (g_entities, g_maxclients, level.sortedClients, trap_SendServerCommand)")
@@ -572,7 +596,7 @@ pub fn TeamplayInfoMessage(
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes `level`,
 // reads `g_entities`, `g_maxclients` — no world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:1161-1202`
-pub fn CheckTeamStatus() {
+pub fn CheckTeamStatus(ctx: GameContext<'_>) {
     todo!("Port CheckTeamStatus — parked: raw-ptr-skeleton-no-world-handle (level, g_entities, g_maxclients)")
 }
 

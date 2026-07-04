@@ -38,14 +38,15 @@ fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
 /// Raven `Rancor_SetBolts`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:19-29`
-pub fn Rancor_SetBolts(self_: *mut gentity_t) {
+pub fn Rancor_SetBolts(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port Rancor_SetBolts — parked: ambient-state")
 }
 
 /// Raven `NPC_Rancor_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:36-45`
-pub fn NPC_Rancor_Precache() {
+pub fn NPC_Rancor_Precache(ctx: GameContext<'_>) {
     for i in 1..3 {
         crate::g_utils::G_SoundIndex(
             std::ffi::CString::new(format!("sound/chars/rancor/snort_{}.wav", i))
@@ -62,7 +63,7 @@ pub fn NPC_Rancor_Precache() {
 /// Raven `Rancor_Idle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:53-63`
-pub fn Rancor_Idle() {
+pub fn Rancor_Idle(ctx: GameContext<'_>) {
     todo!("Port Rancor_Idle — parked: ambient-state")
 }
 
@@ -75,7 +76,8 @@ pub fn Rancor_Idle() {
 // missing `use`. Left as unresolved bare identifiers, these silently
 // type-check as irrefutable match-pattern bindings (always-true), which is
 // a behavioral bug, not just a compile gap — parked instead.
-pub fn Rancor_CheckRoar(self_: *mut gentity_t) -> qboolean {
+pub fn Rancor_CheckRoar(
+    ctx: GameContext<'_>,self_: *mut gentity_t) -> qboolean {
     todo!("Port Rancor_CheckRoar — parked: unported-type (animNumber_t)")
 }
 
@@ -85,7 +87,7 @@ pub fn Rancor_CheckRoar(self_: *mut gentity_t) -> qboolean {
 /// Raven `Rancor_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:83-108`
-pub fn Rancor_Patrol() {
+pub fn Rancor_Patrol(ctx: GameContext<'_>) {
     todo!("Port Rancor_Patrol — parked: ambient-state")
 }
 
@@ -94,7 +96,8 @@ pub fn Rancor_Patrol() {
 /// Raven `Rancor_Move`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:115-130`
-pub fn Rancor_Move(visible: qboolean) {
+pub fn Rancor_Move(
+    ctx: GameContext<'_>,visible: qboolean) {
     todo!("Port Rancor_Move — parked: ambient-state")
 }
 
@@ -103,7 +106,8 @@ pub fn Rancor_Move(visible: qboolean) {
 /// Raven `Rancor_DropVictim`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:140-194`
-pub fn Rancor_DropVictim(self_: *mut gentity_t) {
+pub fn Rancor_DropVictim(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port Rancor_DropVictim — parked: ambient-state")
 }
 
@@ -113,7 +117,8 @@ pub fn Rancor_DropVictim(self_: *mut gentity_t) {
 /// Raven `Rancor_Swing`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:196-306`
-pub fn Rancor_Swing(tryGrab: qboolean) {
+pub fn Rancor_Swing(
+    ctx: GameContext<'_>,tryGrab: qboolean) {
     todo!("Port Rancor_Swing — parked: ambient-state")
 }
 
@@ -122,7 +127,7 @@ pub fn Rancor_Swing(tryGrab: qboolean) {
 /// Raven `Rancor_Smash`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:308-367`
-pub fn Rancor_Smash() {
+pub fn Rancor_Smash(ctx: GameContext<'_>) {
     todo!("Port Rancor_Smash — parked: ambient-state")
 }
 
@@ -131,7 +136,7 @@ pub fn Rancor_Smash() {
 /// Raven `Rancor_Bite`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:369-428`
-pub fn Rancor_Bite() {
+pub fn Rancor_Bite(ctx: GameContext<'_>) {
     todo!("Port Rancor_Bite — parked: ambient-state")
 }
 
@@ -140,7 +145,8 @@ pub fn Rancor_Bite() {
 /// Raven `Rancor_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:431-614`
-pub fn Rancor_Attack(distance: f32, doCharge: qboolean) {
+pub fn Rancor_Attack(
+    ctx: GameContext<'_>,distance: f32, doCharge: qboolean) {
     todo!("Port Rancor_Attack — parked: ambient-state")
 }
 
@@ -149,7 +155,7 @@ pub fn Rancor_Attack(distance: f32, doCharge: qboolean) {
 /// Raven `Rancor_Combat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:617-695`
-pub fn Rancor_Combat() {
+pub fn Rancor_Combat(ctx: GameContext<'_>) {
     todo!("Port Rancor_Combat — parked: ambient-state")
 }
 
@@ -162,7 +168,8 @@ pub fn Rancor_Combat() {
 // missing `use`. Left as unresolved bare identifiers, these silently
 // type-check as irrefutable match-pattern bindings (always-true), which is
 // a behavioral bug, not just a compile gap — parked instead.
-pub fn NPC_Rancor_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+pub fn NPC_Rancor_Pain(
+    ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     todo!("Port NPC_Rancor_Pain — parked: unported-type (animNumber_t)")
 }
 
@@ -172,7 +179,7 @@ pub fn NPC_Rancor_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: 
 /// Raven `Rancor_CheckDropVictim`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:784-802`
-pub fn Rancor_CheckDropVictim() {
+pub fn Rancor_CheckDropVictim(ctx: GameContext<'_>) {
     todo!("Port Rancor_CheckDropVictim — parked: ambient-state")
 }
 
@@ -181,7 +188,7 @@ pub fn Rancor_CheckDropVictim() {
 /// Raven `Rancor_Crush`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:805-821`
-pub fn Rancor_Crush() {
+pub fn Rancor_Crush(ctx: GameContext<'_>) {
     todo!("Port Rancor_Crush — parked: ambient-state")
 }
 
@@ -190,6 +197,6 @@ pub fn Rancor_Crush() {
 /// Raven `NPC_BSRancor_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:828-955`
-pub fn NPC_BSRancor_Default() {
+pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSRancor_Default — parked: ambient-state")
 }

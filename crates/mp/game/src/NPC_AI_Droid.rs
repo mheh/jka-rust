@@ -43,7 +43,7 @@ const TURN_OFF: c_int = 0x00000100;
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn R2D2_PartsMove() {
+pub fn R2D2_PartsMove(ctx: GameContext<'_>) {
     todo!("Port R2D2_PartsMove — parked: ai-context")
 }
 
@@ -62,7 +62,7 @@ pub fn Droid_Idle() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn R2D2_TurnAnims() {
+pub fn R2D2_TurnAnims(ctx: GameContext<'_>) {
     todo!("Port R2D2_TurnAnims — parked: ai-context")
 }
 
@@ -74,7 +74,7 @@ pub fn R2D2_TurnAnims() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Droid_Patrol() {
+pub fn Droid_Patrol(ctx: GameContext<'_>) {
     todo!("Port Droid_Patrol — parked: ai-context")
 }
 
@@ -86,7 +86,7 @@ pub fn Droid_Patrol() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Droid_Run() {
+pub fn Droid_Run(ctx: GameContext<'_>) {
     todo!("Port Droid_Run — parked: ai-context")
 }
 
@@ -98,7 +98,7 @@ pub fn Droid_Run() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Droid_Spin() {
+pub fn Droid_Spin(ctx: GameContext<'_>) {
     todo!("Port Droid_Spin — parked: ai-context")
 }
 
@@ -110,6 +110,7 @@ pub fn Droid_Spin() {
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_Droid_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -125,7 +126,7 @@ pub fn NPC_Droid_Pain(
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Droid_Pain() {
+pub fn Droid_Pain(ctx: GameContext<'_>) {
     todo!("Port Droid_Pain — parked: ai-context")
 }
 
@@ -136,7 +137,7 @@ pub fn Droid_Pain() {
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn NPC_Mouse_Precache() {
+pub fn NPC_Mouse_Precache(ctx: GameContext<'_>) {
     todo!("Port NPC_Mouse_Precache — parked: seam-threading")
 }
 
@@ -147,7 +148,7 @@ pub fn NPC_Mouse_Precache() {
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn NPC_R5D2_Precache() {
+pub fn NPC_R5D2_Precache(ctx: GameContext<'_>) {
     todo!("Port NPC_R5D2_Precache — parked: seam-threading")
 }
 
@@ -158,14 +159,14 @@ pub fn NPC_R5D2_Precache() {
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn NPC_R2D2_Precache() {
+pub fn NPC_R2D2_Precache(ctx: GameContext<'_>) {
     todo!("Port NPC_R2D2_Precache — parked: seam-threading")
 }
 
 /// Raven `NPC_Gonk_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:520-530`
-pub fn NPC_Gonk_Precache() {
+pub fn NPC_Gonk_Precache(ctx: GameContext<'_>) {
     unsafe {
         // SAFETY: string literals valid.
         G_SoundIndex(b"sound/chars/gonk/misc/gonktalk1.wav\0".as_ptr() as *const c_char);
@@ -182,7 +183,7 @@ pub fn NPC_Gonk_Precache() {
 /// Raven `NPC_Protocol_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:537-541`
-pub fn NPC_Protocol_Precache() {
+pub fn NPC_Protocol_Precache(ctx: GameContext<'_>) {
     unsafe {
         // SAFETY: string literals valid.
         G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
@@ -198,6 +199,6 @@ pub fn NPC_Protocol_Precache() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn NPC_BSDroid_Default() {
+pub fn NPC_BSDroid_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSDroid_Default — parked: ai-context")
 }

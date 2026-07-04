@@ -22,6 +22,7 @@ use crate::prelude::*;
 // and use varargs from extern "C" fn with vsprintf, and how to access level.time global
 // (currently threaded as GameWorld in porting-rules §B4)?
 pub fn Debug_Printf(
+    ctx: GameContext<'_>,
     cv: *mut vmCvar_t,
     debugLevel: c_int,
     fmt: *mut c_char,
@@ -40,6 +41,7 @@ pub fn Debug_Printf(
 // and use varargs from extern "C" fn with vsprintf, and how to access level.time global
 // (currently threaded as GameWorld in porting-rules §B4)?
 pub fn Debug_NPCPrintf(
+    ctx: GameContext<'_>,
     printNPC: *mut gentity_t,
     cv: *mut vmCvar_t,
     debugLevel: c_int,

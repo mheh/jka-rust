@@ -33,6 +33,7 @@ pub fn strap_G2API_GetBoltMatrix(
 ///
 /// Source: `oracle/oracle/codemp/game/g_strap.c:12-16`
 pub fn strap_G2API_GetBoltMatrix_NoReconstruct(
+    ctx: GameContext<'_>,
     ghoul2: *mut c_void,
     modelIndex: c_int,
     boltIndex: c_int,
@@ -127,6 +128,7 @@ pub fn strap_G2API_GetBoneAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_strap.c:43-46`
 pub fn strap_G2API_SetRagDoll(
+    ctx: GameContext<'_>,
     ghoul2: *mut c_void,
     params: *mut sharedRagDollParams_t,
 ) {
@@ -176,6 +178,7 @@ pub fn strap_G2API_IKMove(
 ///
 /// Source: `oracle/oracle/codemp/game/g_strap.c:63-66`
 pub fn strap_TrueMalloc(
+    ctx: GameContext<'_>,
     ptr: *mut *mut c_void,
     size: c_int,
 ) {
@@ -187,6 +190,7 @@ pub fn strap_TrueMalloc(
 ///
 /// Source: `oracle/oracle/codemp/game/g_strap.c:68-71`
 pub fn strap_TrueFree(
+    ctx: GameContext<'_>,
     ptr: *mut *mut c_void,
 ) {
     // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?

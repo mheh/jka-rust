@@ -396,7 +396,7 @@ pub fn AI_ValidateGroupMember(
             }
         }
         //must be actually in combat mode
-        if TIMER_Done(member, c"interrogating".as_ptr()) == 0 {
+        if TIMER_Done(ctx, member, c"interrogating".as_ptr()) == 0 {
             return 0;
         }
         //FIXME: need to have a route to enemy and/or clear shot?
@@ -636,7 +636,7 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         && DistanceSquared((*member).r.currentOrigin, (*(*group).enemy).r.currentOrigin) < 65536.0
                     {
                         //those close to enemy run away!
-                        ST_StartFlee(
+                        ST_StartFlee(ctx, 
                             member,
                             (*group).enemy,
                             (*member).r.currentOrigin,
@@ -646,7 +646,7 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         );
                     } else if DistanceSquared((*member).r.currentOrigin, (*self_).r.currentOrigin) < 65536.0 {
                         //those close to me run away!
-                        ST_StartFlee(
+                        ST_StartFlee(ctx, 
                             member,
                             (*group).enemy,
                             (*member).r.currentOrigin,
@@ -658,7 +658,7 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         //else, maybe just a random chance
                         if Q_irand(0, (*selfNpc).rank) > (*memberNpc).rank {
                             //lower rank they are, higher rank I am, more likely they are to flee
-                            ST_StartFlee(
+                            ST_StartFlee(ctx, 
                                 member,
                                 (*group).enemy,
                                 (*member).r.currentOrigin,
@@ -667,7 +667,7 @@ pub fn AI_GroupMemberKilled(ctx: GameContext<'_>, self_: *mut gentity_t) {
                                 5000,
                             );
                         } else {
-                            ST_MarkToCover(member);
+                            ST_MarkToCover(ctx, member);
                         }
                     }
                     (*memberNpc).currentAim -= Q_irand(1, 15);
@@ -826,7 +826,7 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
                 (*group).morale += (*npc).rank;
             }
             // PORT-ESCALATION(unported-consts): the debug draw
-            // `G_TestLine(..., FRAMETIME)` needs `FRAMETIME`, not yet ported
+            // `G_TestLine(ctx, ..., FRAMETIME)` needs `FRAMETIME`, not yet ported
             // anywhere in the crate graph (precedent: `g_nav.rs` parks the
             // same const). This is a debug-visualization side effect only —
             // it does not affect `group->morale`/membership, so the call is
@@ -926,14 +926,15 @@ pub fn AI_GroupContainsEntNum(group: *mut AIGroupInfo_t, entNum: c_int) -> qbool
 /// Raven `AI_CheckEnemyCollision`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Utils.c:1030-1055`
-pub fn AI_CheckEnemyCollision(ent: *mut gentity_t, takeEnemy: qboolean) -> qboolean {
+pub fn AI_CheckEnemyCollision(
+    ctx: GameContext<'_>,ent: *mut gentity_t, takeEnemy: qboolean) -> qboolean {
     unsafe {
         if ent.is_null() {
             return 0;
         }
 
         let mut info: navInfo_t = core::mem::zeroed();
-        NAV_GetLastMove(&mut info as *mut navInfo_t);
+        NAV_GetLastMove(ctx, &mut info as *mut navInfo_t);
 
         //See if we've hit something
         if !info.blocker.is_null() && info.blocker != (*ent).enemy {
@@ -941,7 +942,7 @@ pub fn AI_CheckEnemyCollision(ent: *mut gentity_t, takeEnemy: qboolean) -> qbool
             let entClient = (*ent).client as *mut gclient_t;
             if !blockerClient.is_null() && (*blockerClient).playerTeam == (*entClient).enemyTeam {
                 if takeEnemy != 0 {
-                    G_SetEnemy(ent, info.blocker);
+                    G_SetEnemy(ctx, ent, info.blocker);
                 }
 
                 return 1;

@@ -17,7 +17,7 @@ use crate::prelude::*;
 /// Raven `G_LogWeaponInit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:108-121`
-pub fn G_LogWeaponInit() {
+pub fn G_LogWeaponInit(ctx: GameContext<'_>) {
     todo!("Port G_LogWeaponInit — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -28,6 +28,7 @@ pub fn G_LogWeaponInit() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:123-129`
 pub fn G_LogWeaponPickup(
+    ctx: GameContext<'_>,
     client: c_int,
     weaponid: c_int,
 ) {
@@ -40,6 +41,7 @@ pub fn G_LogWeaponPickup(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:131-145`
 pub fn G_LogWeaponFire(
+    ctx: GameContext<'_>,
     client: c_int,
     weaponid: c_int,
 ) {
@@ -52,6 +54,7 @@ pub fn G_LogWeaponFire(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:147-155`
 pub fn G_LogWeaponDamage(
+    ctx: GameContext<'_>,
     client: c_int,
     r#mod: c_int,
     amount: c_int,
@@ -65,6 +68,7 @@ pub fn G_LogWeaponDamage(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:157-165`
 pub fn G_LogWeaponKill(
+    ctx: GameContext<'_>,
     client: c_int,
     r#mod: c_int,
 ) {
@@ -77,6 +81,7 @@ pub fn G_LogWeaponKill(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:167-175`
 pub fn G_LogWeaponFrag(
+    ctx: GameContext<'_>,
     attacker: c_int,
     deadguy: c_int,
 ) {
@@ -89,6 +94,7 @@ pub fn G_LogWeaponFrag(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:177-185`
 pub fn G_LogWeaponDeath(
+    ctx: GameContext<'_>,
     client: c_int,
     weaponid: c_int,
 ) {
@@ -101,6 +107,7 @@ pub fn G_LogWeaponDeath(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:187-195`
 pub fn G_LogWeaponPowerup(
+    ctx: GameContext<'_>,
     client: c_int,
     powerupid: c_int,
 ) {
@@ -113,6 +120,7 @@ pub fn G_LogWeaponPowerup(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:197-205`
 pub fn G_LogWeaponItem(
+    ctx: GameContext<'_>,
     client: c_int,
     itemid: c_int,
 ) {
@@ -126,7 +134,7 @@ pub fn G_LogWeaponItem(
 /// Raven `G_LogWeaponOutput`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:227-821`
-pub fn G_LogWeaponOutput() {
+pub fn G_LogWeaponOutput(ctx: GameContext<'_>) {
     todo!("Port G_LogWeaponOutput — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -138,6 +146,7 @@ pub fn G_LogWeaponOutput() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:824-863`
 pub fn CalculateEfficiency(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     efficiency: *mut c_int,
 ) -> qboolean {
@@ -151,6 +160,7 @@ pub fn CalculateEfficiency(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:866-903`
 pub fn CalculateSharpshooter(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     frags: *mut c_int,
 ) -> qboolean {
@@ -164,6 +174,7 @@ pub fn CalculateSharpshooter(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:906-928`
 pub fn CalculateUntouchable(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CalculateUntouchable — parked: raw-ptr-skeleton-no-world-handle")
@@ -176,6 +187,7 @@ pub fn CalculateUntouchable(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:931-982`
 pub fn CalculateLogistics(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     stuffUsed: *mut c_int,
 ) -> qboolean {
@@ -190,6 +202,7 @@ pub fn CalculateLogistics(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:988-1081`
 pub fn CalculateTactician(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     kills: *mut c_int,
 ) -> qboolean {
@@ -203,6 +216,7 @@ pub fn CalculateTactician(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1087-1134`
 pub fn CalculateDemolitionist(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     kills: *mut c_int,
 ) -> qboolean {
@@ -229,6 +243,7 @@ pub fn CalculateStreak(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1160-1188`
 pub fn CalculateTeamMVP(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CalculateTeamMVP — parked: raw-ptr-skeleton-no-world-handle")
@@ -241,6 +256,7 @@ pub fn CalculateTeamMVP(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1190-1240`
 pub fn CalculateTeamMVPByRank(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CalculateTeamMVPByRank — parked: raw-ptr-skeleton-no-world-handle")
@@ -252,6 +268,7 @@ pub fn CalculateTeamMVPByRank(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1242-1276`
 pub fn CalculateTeamDefender(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CalculateTeamDefender — parked: raw-ptr-skeleton-no-world-handle")
@@ -263,6 +280,7 @@ pub fn CalculateTeamDefender(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1278-1312`
 pub fn CalculateTeamWarrior(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CalculateTeamWarrior — parked: raw-ptr-skeleton-no-world-handle")
@@ -274,6 +292,7 @@ pub fn CalculateTeamWarrior(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1314-1348`
 pub fn CalculateTeamCarrier(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CalculateTeamCarrier — parked: raw-ptr-skeleton-no-world-handle")
@@ -286,6 +305,7 @@ pub fn CalculateTeamCarrier(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1350-1386`
 pub fn CalculateTeamInterceptor(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CalculateTeamInterceptor — parked: raw-ptr-skeleton-no-world-handle")
@@ -298,6 +318,7 @@ pub fn CalculateTeamInterceptor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1388-1424`
 pub fn CalculateTeamRedShirt(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CalculateTeamRedShirt — parked: raw-ptr-skeleton-no-world-handle")
@@ -312,6 +333,7 @@ pub fn CalculateTeamRedShirt(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1451-1484`
 pub fn CalculateTeamAward(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> c_int {
     todo!("Port CalculateTeamAward — parked: raw-ptr-skeleton-no-world-handle")
@@ -324,6 +346,7 @@ pub fn CalculateTeamAward(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1486-1514`
 pub fn CalculateSection31Award(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port CalculateSection31Award — parked: raw-ptr-skeleton-no-world-handle")
@@ -336,6 +359,7 @@ pub fn CalculateSection31Award(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1518-1587`
 pub fn CalculateAwards(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     msg: *mut c_char,
 ) {
@@ -349,6 +373,7 @@ pub fn CalculateAwards(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1589-1605`
 pub fn GetMaxDeathsForClient(
+    ctx: GameContext<'_>,
     nClient: c_int,
 ) -> c_int {
     todo!("Port GetMaxDeathsForClient — parked: raw-ptr-skeleton-no-world-handle")
@@ -361,6 +386,7 @@ pub fn GetMaxDeathsForClient(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1607-1623`
 pub fn GetMaxKillsForClient(
+    ctx: GameContext<'_>,
     nClient: c_int,
 ) -> c_int {
     todo!("Port GetMaxKillsForClient — parked: raw-ptr-skeleton-no-world-handle")
@@ -373,6 +399,7 @@ pub fn GetMaxKillsForClient(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1625-1642`
 pub fn GetFavoriteTargetForClient(
+    ctx: GameContext<'_>,
     nClient: c_int,
 ) -> c_int {
     todo!("Port GetFavoriteTargetForClient — parked: raw-ptr-skeleton-no-world-handle")
@@ -385,6 +412,7 @@ pub fn GetFavoriteTargetForClient(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1644-1666`
 pub fn GetWorstEnemyForClient(
+    ctx: GameContext<'_>,
     nClient: c_int,
 ) -> c_int {
     todo!("Port GetWorstEnemyForClient — parked: raw-ptr-skeleton-no-world-handle")
@@ -398,6 +426,7 @@ pub fn GetWorstEnemyForClient(
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1668-1702`
 pub fn GetFavoriteWeaponForClient(
+    ctx: GameContext<'_>,
     nClient: c_int,
 ) -> c_int {
     todo!("Port GetFavoriteWeaponForClient — parked: raw-ptr-skeleton-no-world-handle")
@@ -412,6 +441,7 @@ pub fn GetFavoriteWeaponForClient(
 /// have set.
 /// Source: `oracle/oracle/codemp/game/g_log.c:1705-1751`
 pub fn G_ClearClientLog(
+    ctx: GameContext<'_>,
     client: c_int,
 ) {
     todo!("Port G_ClearClientLog — parked: raw-ptr-skeleton-no-world-handle")

@@ -63,6 +63,11 @@ pub use mp_qshared::common::mp::qcommon::task_id_t::{taskID_t, taskID_t::*};
 pub use mp_qshared::shared::trackchan::{trackchan_t, trackchan_t::*};
 pub use mp_qshared::shared::wl_e::{WL_e, WL_e::*};
 
+// Pass-2 ctx threading (fork 8): the module-island dispatch receiver, injected
+// as the first param of every game-tier needs-ctx fn.
+// Source: `docs/handoffs/jampgame-fork-discovery.md` fork 8; `world/game_context.rs`
+pub use crate::world::GameContext;
+
 pub use crate::ai::group_info::AIGroupInfo_t;
 pub use crate::botai::bot_state_s::bot_state_t;
 pub use crate::client::gclient::gclient_t;

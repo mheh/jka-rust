@@ -18,6 +18,6 @@ use crate::prelude::*;
 /// Raven `UpdateTournamentInfo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_arenas.c:20-101`
-pub fn UpdateTournamentInfo() {
+pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
     todo!("Port UpdateTournamentInfo — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_arenas.c:20")
 }

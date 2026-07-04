@@ -40,6 +40,7 @@ use crate::q_math::{AngleNormalize180, AngleNormalize360, AngleSubtract};
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:212-221`
 pub fn Board(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     pEnt: *mut bgEntity_t,
 ) -> qboolean {
@@ -50,6 +51,7 @@ pub fn Board(
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:224-232`
 pub fn Eject(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     pEnt: *mut bgEntity_t,
     forceEject: qboolean,
@@ -65,6 +67,7 @@ pub fn Eject(
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:99-183`
 pub fn BG_FighterUpdate(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     pUcmd: *const usercmd_t,
     trMins: vec3_t,
@@ -382,6 +385,7 @@ pub fn FighterNoseMalfunctionCheck(
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:935-1089`
 pub fn FighterDamageRoutine(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     parent: *mut bgEntity_t,
     parentPS: *mut playerState_t,
@@ -585,6 +589,7 @@ pub fn FighterPitchAdjust(
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:1352-1370`
 pub fn FighterPitchClamp(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     riderPS: *mut playerState_t,
     parentPS: *mut playerState_t,
@@ -638,6 +643,7 @@ pub fn G_SetFighterVehicleFunctions(
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:1994-2014`
 pub fn G_CreateFighterNPC(
+    ctx: GameContext<'_>,
     pVeh: *mut *mut Vehicle_t,
     strType: *const c_char,
 ) {

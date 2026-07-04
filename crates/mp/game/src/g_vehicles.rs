@@ -70,6 +70,7 @@ pub fn Vehicle_SetAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:102-109`
 pub fn G_VehicleTrace(
+    ctx: GameContext<'_>,
     results: *mut trace_t,
     start: vec3_t,
     tMins: vec3_t,
@@ -87,6 +88,7 @@ pub fn G_VehicleTrace(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:111-120`
 pub fn G_IsRidingVehicle(
+    ctx: GameContext<'_>,
     pEnt: *mut gentity_t,
 ) -> *mut Vehicle_t {
     todo!("Port G_IsRidingVehicle — parked: raw-ptr-skeleton-no-world-handle")
@@ -110,6 +112,7 @@ pub fn G_CanJumpToEnemyVeh(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:186-244`
 pub fn G_VehicleSpawn(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port G_VehicleSpawn — parked: raw-ptr-skeleton-no-world-handle")
@@ -122,6 +125,7 @@ pub fn G_VehicleSpawn(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:247-289`
 pub fn G_AttachToVehicle(
+    ctx: GameContext<'_>,
     pEnt: *mut gentity_t,
     ucmd: *mut *mut usercmd_t,
 ) {
@@ -167,6 +171,7 @@ pub fn ValidateBoard(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:630-872`
 pub fn Board(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     pEnt: *mut bgEntity_t,
 ) -> qboolean {
@@ -180,6 +185,7 @@ pub fn Board(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:874-987`
 pub fn VEH_TryEject(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     parent: *mut gentity_t,
     ent: *mut gentity_t,
@@ -196,6 +202,7 @@ pub fn VEH_TryEject(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:989-1016`
 pub fn G_EjectDroidUnit(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     kill: qboolean,
 ) {
@@ -209,6 +216,7 @@ pub fn G_EjectDroidUnit(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1377-1448`
 pub fn EjectAll(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
 ) -> qboolean {
     todo!("Port EjectAll — parked: packet-contract")
@@ -220,6 +228,7 @@ pub fn EjectAll(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1451-1482`
 pub fn StartDeathDelay(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     iDelayTimeOverride: c_int,
 ) {
@@ -233,6 +242,7 @@ pub fn StartDeathDelay(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1626-1757`
 pub fn Initialize(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
 ) -> qboolean {
     todo!("Port Initialize — parked: raw-ptr-skeleton-no-world-handle")
@@ -257,6 +267,7 @@ pub fn Update(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2338-2588`
 pub fn UpdateRider(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     pRider: *mut bgEntity_t,
     pUmcd: *mut usercmd_t,
@@ -270,6 +281,7 @@ pub fn UpdateRider(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2598-2731`
 pub fn AttachRiders(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
 ) {
     todo!("Port AttachRiders — parked: raw-ptr-skeleton-no-world-handle")
@@ -331,6 +343,7 @@ pub fn UnGhost(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2785-2840`
 pub fn G_VehicleDamageBoxSizing(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
 ) {
     todo!("Port G_VehicleDamageBoxSizing — parked: raw-ptr-skeleton-no-world-handle")

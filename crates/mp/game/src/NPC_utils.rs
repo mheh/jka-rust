@@ -73,6 +73,7 @@ use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 // handle this signature carries none of). Same unresolved fork as
 // `g_utils.rs`'s `vec3-outparam-seam` sites.
 pub fn CalcEntitySpot(
+    ctx: GameContext<'_>,
     ent: *const gentity_t,
     spot: spot_t,
     point: vec3_t,
@@ -91,6 +92,7 @@ pub fn CalcEntitySpot(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:182-517`
 pub fn NPC_UpdateAngles(
+    ctx: GameContext<'_>,
     doPitch: qboolean,
     doYaw: qboolean,
 ) -> qboolean {
@@ -103,6 +105,7 @@ pub fn NPC_UpdateAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:519-533`
 pub fn NPC_AimWiggle(
+    ctx: GameContext<'_>,
     enemy_org: vec3_t,
 ) {
     todo!("Port NPC_AimWiggle — parked: ai-context")
@@ -115,6 +118,7 @@ pub fn NPC_AimWiggle(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:540-731`
 pub fn NPC_UpdateFiringAngles(
+    ctx: GameContext<'_>,
     doPitch: qboolean,
     doYaw: qboolean,
 ) -> qboolean {
@@ -127,6 +131,7 @@ pub fn NPC_UpdateFiringAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:740-808`
 pub fn NPC_UpdateShootAngles(
+    ctx: GameContext<'_>,
     angles: vec3_t,
     doPitch: qboolean,
     doYaw: qboolean,
@@ -186,6 +191,7 @@ pub fn SetTeamNumbers(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:851-894`
 pub fn G_ActivateBehavior(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     bset: c_int,
 ) -> qboolean {
@@ -207,7 +213,7 @@ pub fn NPC_SetBoneAngles(
     angles: vec3_t,
 ) {
     unsafe {
-        let boneIndex = G_BoneIndex(bone as *const c_char);
+        let boneIndex = G_BoneIndex(ctx, bone as *const c_char);
 
         // Walk the 4 fixed bone-index/bone-angle slot pairs looking for
         // `boneIndex` (or the first free slot if not already present).
@@ -354,7 +360,7 @@ pub fn NPC_SomeoneLookingAtMe(
                     ),
                 ) != 0
                 //I'm in a 30 fov or so cone from this player.. that's enough I guess.
-                && InFOV(pEnt, ent, 30, 30) != 0
+                && InFOV(ctx, pEnt, ent, 30, 30) != 0
             {
                 return QTRUE;
             }
@@ -373,6 +379,7 @@ pub fn NPC_SomeoneLookingAtMe(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1069-1072`
 pub fn NPC_ClearLOS(
+    ctx: GameContext<'_>,
     start: vec3_t,
     end: vec3_t,
 ) -> qboolean {
@@ -384,6 +391,7 @@ pub fn NPC_ClearLOS(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1073-1076`
 pub fn NPC_ClearLOS5(
+    ctx: GameContext<'_>,
     end: vec3_t,
 ) -> qboolean {
     todo!("Port NPC_ClearLOS5 — parked: ai-context")
@@ -394,6 +402,7 @@ pub fn NPC_ClearLOS5(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1077-1080`
 pub fn NPC_ClearLOS4(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port NPC_ClearLOS4 — parked: ai-context")
@@ -405,6 +414,7 @@ pub fn NPC_ClearLOS4(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1081-1084`
 pub fn NPC_ClearLOS3(
+    ctx: GameContext<'_>,
     start: vec3_t,
     ent: *mut gentity_t,
 ) -> qboolean {
@@ -417,6 +427,7 @@ pub fn NPC_ClearLOS3(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1085-1088`
 pub fn NPC_ClearLOS2(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     end: vec3_t,
 ) -> qboolean {
@@ -430,6 +441,7 @@ pub fn NPC_ClearLOS2(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1096-1187`
 pub fn NPC_ValidEnemy(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port NPC_ValidEnemy — parked: ai-context")
@@ -442,6 +454,7 @@ pub fn NPC_ValidEnemy(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1195-1210`
 pub fn NPC_TargetVisible(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port NPC_TargetVisible — parked: ai-context")
@@ -454,6 +467,7 @@ pub fn NPC_TargetVisible(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1246-1294`
 pub fn NPC_FindNearestEnemy(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> c_int {
     todo!("Port NPC_FindNearestEnemy — parked: ai-context")
@@ -465,6 +479,7 @@ pub fn NPC_FindNearestEnemy(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1302-1348`
 pub fn NPC_PickEnemyExt(
+    ctx: GameContext<'_>,
     checkAlerts: qboolean,
 ) -> *mut gentity_t {
     todo!("Port NPC_PickEnemyExt — parked: ai-context")
@@ -474,7 +489,7 @@ pub fn NPC_PickEnemyExt(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1356-1359`
 pub fn NPC_FindPlayer(ctx: GameContext<'_>) -> qboolean {
-    unsafe { NPC_TargetVisible(&mut (*ctx.world).entities[0] as *mut gentity_t) }
+    unsafe { NPC_TargetVisible(ctx, &mut (*ctx.world).entities[0] as *mut gentity_t) }
 }
 
 /// Raven `NPC_CheckPlayerDistance`.
@@ -495,6 +510,7 @@ fn NPC_CheckPlayerDistance() -> qboolean {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1407-1461`
 pub fn NPC_FindEnemy(
+    ctx: GameContext<'_>,
     checkAlerts: qboolean,
 ) -> qboolean {
     todo!("Port NPC_FindEnemy — parked: ai-context")
@@ -504,9 +520,10 @@ pub fn NPC_FindEnemy(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1469-1483`
 pub fn NPC_CheckEnemyExt(
+    ctx: GameContext<'_>,
     checkAlerts: qboolean,
 ) -> qboolean {
-    NPC_FindEnemy(checkAlerts)
+    NPC_FindEnemy(ctx, checkAlerts)
 }
 
 // PORT-ESCALATION(ai-context): reads/writes the ambient `NPC`/`client`/
@@ -517,6 +534,7 @@ pub fn NPC_CheckEnemyExt(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1491-1547`
 pub fn NPC_FacePosition(
+    ctx: GameContext<'_>,
     position: vec3_t,
     doPitch: qboolean,
 ) -> qboolean {
@@ -532,8 +550,8 @@ pub fn NPC_FaceEntity(
     doPitch: qboolean,
 ) -> qboolean {
     let mut entPos: vec3_t = [0.0; 3];
-    CalcEntitySpot(ent as *const gentity_t, spot_t::SPOT_HEAD_LEAN, entPos);
-    NPC_FacePosition(entPos, doPitch)
+    CalcEntitySpot(ctx, ent as *const gentity_t, spot_t::SPOT_HEAD_LEAN, entPos);
+    NPC_FacePosition(ctx, entPos, doPitch)
 }
 
 // PORT-ESCALATION(ai-context): reads the ambient `NPC` actor (`NPC->enemy`)
@@ -542,6 +560,7 @@ pub fn NPC_FaceEntity(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1571-1580`
 pub fn NPC_FaceEnemy(
+    ctx: GameContext<'_>,
     doPitch: qboolean,
 ) -> qboolean {
     todo!("Port NPC_FaceEnemy — parked: ai-context")
@@ -553,7 +572,7 @@ pub fn NPC_FaceEnemy(
 /// Raven `NPC_CheckCanAttackExt`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1588-1603`
-pub fn NPC_CheckCanAttackExt() -> qboolean {
+pub fn NPC_CheckCanAttackExt(ctx: GameContext<'_>) -> qboolean {
     todo!("Port NPC_CheckCanAttackExt — parked: ai-context")
 }
 
@@ -652,7 +671,7 @@ pub fn NPC_CheckLookTarget(
 /// Raven `NPC_CheckCharmed`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1687-1705`
-pub fn NPC_CheckCharmed() {
+pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
     todo!("Port NPC_CheckCharmed — parked: ai-context")
 }
 
@@ -664,6 +683,7 @@ pub fn NPC_CheckCharmed() {
 // body would not propagate back to the caller. Same unresolved fork as
 // `CalcEntitySpot` above / `g_utils.rs`'s `vec3-outparam-seam` sites.
 pub fn G_GetBoltPosition(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     boltIndex: c_int,
     pos: vec3_t,
@@ -678,6 +698,7 @@ pub fn G_GetBoltPosition(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1742-1754`
 pub fn NPC_EntRangeFromBolt(
+    ctx: GameContext<'_>,
     targEnt: *mut gentity_t,
     boltIndex: c_int,
 ) -> f32 {
@@ -690,6 +711,7 @@ pub fn NPC_EntRangeFromBolt(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1756-1759`
 pub fn NPC_EnemyRangeFromBolt(
+    ctx: GameContext<'_>,
     boltIndex: c_int,
 ) -> f32 {
     todo!("Port NPC_EnemyRangeFromBolt — parked: ai-context")
@@ -702,6 +724,7 @@ pub fn NPC_EnemyRangeFromBolt(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1761-1782`
 pub fn NPC_GetEntsNearBolt(
+    ctx: GameContext<'_>,
     radiusEnts: *mut c_int,
     radius: f32,
     boltIndex: c_int,

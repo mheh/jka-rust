@@ -88,7 +88,8 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
 /// (`_JK2MP` only).
 ///
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:467-470`
-pub fn AnimalProcessOri(pVeh: *mut Vehicle_t) {
+pub fn AnimalProcessOri(
+    ctx: GameContext<'_>,pVeh: *mut Vehicle_t) {
     ProcessOrientCommands(pVeh);
 }
 
@@ -159,6 +160,7 @@ pub fn G_SetAnimalVehicleFunctions(pVehInfo: *mut vehicleInfo_t) {
 // itself still a `*mut c_void` placeholder (`//TODO: Port vehicleInfo_t`,
 // `bg_vehicles.h:586`) pending that type's pointer-field port. Needs both
 // settled before transcription.
-pub fn G_CreateAnimalNPC(pVeh: *mut *mut Vehicle_t, strAnimalType: *const c_char) {
+pub fn G_CreateAnimalNPC(
+    ctx: GameContext<'_>,pVeh: *mut *mut Vehicle_t, strAnimalType: *const c_char) {
     todo!("Port G_CreateAnimalNPC — parked: ambient-global (g_vehicleInfo) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:904")
 }

@@ -45,7 +45,8 @@ static mut NUM_IP_FILTERS: c_int = 0;
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn StringToFilter(s: *mut c_char, f: *mut c_void) -> qboolean {
+pub fn StringToFilter(
+    ctx: GameContext<'_>,s: *mut c_char, f: *mut c_void) -> qboolean {
     todo!("Port StringToFilter — parked: seam-threading")
 }
 
@@ -54,7 +55,7 @@ pub fn StringToFilter(s: *mut c_char, f: *mut c_void) -> qboolean {
 /// Raven `UpdateIPBans`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:109-127`
-pub fn UpdateIPBans() {
+pub fn UpdateIPBans(ctx: GameContext<'_>) {
     todo!("Port UpdateIPBans — parked: file-scope-globals-ip-filters")
 }
 
@@ -63,7 +64,8 @@ pub fn UpdateIPBans() {
 /// Raven `G_FilterPacket`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:134-166`
-pub fn G_FilterPacket(from: *mut c_char) -> qboolean {
+pub fn G_FilterPacket(
+    ctx: GameContext<'_>,from: *mut c_char) -> qboolean {
     todo!("Port G_FilterPacket — parked: file-scope-globals-ip-filters")
 }
 
@@ -72,7 +74,8 @@ pub fn G_FilterPacket(from: *mut c_char) -> qboolean {
 /// Raven `AddIP`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:173-194`
-pub fn AddIP(str: *mut c_char) {
+pub fn AddIP(
+    ctx: GameContext<'_>,str: *mut c_char) {
     todo!("Port AddIP — parked: file-scope-globals-ip-filters")
 }
 
@@ -81,7 +84,7 @@ pub fn AddIP(str: *mut c_char) {
 /// Raven `G_ProcessIPBans`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:201-218`
-pub fn G_ProcessIPBans() {
+pub fn G_ProcessIPBans(ctx: GameContext<'_>) {
     todo!("Port G_ProcessIPBans — parked: file-scope-globals-cvar")
 }
 
@@ -90,7 +93,7 @@ pub fn G_ProcessIPBans() {
 /// Raven `Svcmd_AddIP_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:226-239`
-pub fn Svcmd_AddIP_f() {
+pub fn Svcmd_AddIP_f(ctx: GameContext<'_>) {
     todo!("Port Svcmd_AddIP_f — parked: raw-ptr-skeleton-no-engine-handle")
 }
 
@@ -99,7 +102,7 @@ pub fn Svcmd_AddIP_f() {
 /// Raven `Svcmd_RemoveIP_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:246-274`
-pub fn Svcmd_RemoveIP_f() {
+pub fn Svcmd_RemoveIP_f(ctx: GameContext<'_>) {
     todo!("Port Svcmd_RemoveIP_f — parked: raw-ptr-skeleton-no-engine-handle")
 }
 
@@ -108,7 +111,7 @@ pub fn Svcmd_RemoveIP_f() {
 /// Raven `Svcmd_ListIPs_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:276-297`
-pub fn Svcmd_ListIPs_f() {
+pub fn Svcmd_ListIPs_f(ctx: GameContext<'_>) {
     todo!("Port Svcmd_ListIPs_f — parked: file-scope-globals-ip-filters")
 }
 
@@ -117,7 +120,7 @@ pub fn Svcmd_ListIPs_f() {
 /// Raven `G_SaveBanIP`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:299-331`
-pub fn G_SaveBanIP() {
+pub fn G_SaveBanIP(ctx: GameContext<'_>) {
     todo!("Port G_SaveBanIP — parked: raw-ptr-skeleton-no-engine-handle")
 }
 
@@ -126,7 +129,7 @@ pub fn G_SaveBanIP() {
 /// Raven `G_LoadIPBans`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:333-379`
-pub fn G_LoadIPBans() {
+pub fn G_LoadIPBans(ctx: GameContext<'_>) {
     todo!("Port G_LoadIPBans — parked: raw-ptr-skeleton-no-engine-handle")
 }
 
@@ -135,7 +138,7 @@ pub fn G_LoadIPBans() {
 /// Raven `Svcmd_EntityList_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:386-443`
-pub fn Svcmd_EntityList_f() {
+pub fn Svcmd_EntityList_f(ctx: GameContext<'_>) {
     todo!("Port Svcmd_EntityList_f — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -144,7 +147,8 @@ pub fn Svcmd_EntityList_f() {
 /// Raven `ClientForString`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:445-480`
-pub fn ClientForString(s: *const c_char) -> *mut gclient_t {
+pub fn ClientForString(
+    ctx: GameContext<'_>,s: *const c_char) -> *mut gclient_t {
     todo!("Port ClientForString — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -153,7 +157,7 @@ pub fn ClientForString(s: *const c_char) -> *mut gclient_t {
 /// Raven `Svcmd_ForceTeam_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:489-503`
-pub fn Svcmd_ForceTeam_f() {
+pub fn Svcmd_ForceTeam_f(ctx: GameContext<'_>) {
     todo!("Port Svcmd_ForceTeam_f — parked: raw-ptr-skeleton-no-engine-handle")
 }
 
@@ -162,6 +166,6 @@ pub fn Svcmd_ForceTeam_f() {
 /// Raven `ConsoleCommand`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:513-575`
-pub fn ConsoleCommand() -> qboolean {
+pub fn ConsoleCommand(ctx: GameContext<'_>) -> qboolean {
     todo!("Port ConsoleCommand — parked: raw-ptr-skeleton-no-engine-handle")
 }

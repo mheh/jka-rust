@@ -47,7 +47,7 @@ fn VectorLengthSquared(v: vec3_t) -> vec_t {
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn NPC_MineMonster_Precache() {
+pub fn NPC_MineMonster_Precache(ctx: GameContext<'_>) {
     todo!("Port NPC_MineMonster_Precache — parked: seam-threading")
 }
 
@@ -57,7 +57,7 @@ pub fn NPC_MineMonster_Precache() {
 /// Raven `MineMonster_Idle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:35-42`
-pub fn MineMonster_Idle() {
+pub fn MineMonster_Idle(ctx: GameContext<'_>) {
     todo!("Port MineMonster_Idle — parked: ai-context")
 }
 
@@ -67,7 +67,7 @@ pub fn MineMonster_Idle() {
 /// Raven `MineMonster_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:50-83`
-pub fn MineMonster_Patrol() {
+pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
     todo!("Port MineMonster_Patrol — parked: ai-context")
 }
 
@@ -77,6 +77,7 @@ pub fn MineMonster_Patrol() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:90-98`
 pub fn MineMonster_Move(
+    ctx: GameContext<'_>,
     visible: qboolean,
 ) {
     todo!("Port MineMonster_Move — parked: ai-context")
@@ -89,6 +90,7 @@ pub fn MineMonster_Move(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:101-126`
 pub fn MineMonster_TryDamage(
+    ctx: GameContext<'_>,
     enemy: *mut gentity_t,
     damage: c_int,
 ) {
@@ -100,7 +102,7 @@ pub fn MineMonster_TryDamage(
 /// Raven `MineMonster_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:129-186`
-pub fn MineMonster_Attack() {
+pub fn MineMonster_Attack(ctx: GameContext<'_>) {
     todo!("Port MineMonster_Attack — parked: ai-context")
 }
 
@@ -110,7 +112,7 @@ pub fn MineMonster_Attack() {
 /// Raven `MineMonster_Combat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:189-227`
-pub fn MineMonster_Combat() {
+pub fn MineMonster_Combat(ctx: GameContext<'_>) {
     todo!("Port MineMonster_Combat — parked: ai-context")
 }
 
@@ -124,6 +126,7 @@ pub fn MineMonster_Combat() {
 /// Handles pain/damage response for the MineMonster.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:234-254`
 pub fn NPC_MineMonster_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -136,6 +139,6 @@ pub fn NPC_MineMonster_Pain(
 /// Raven `NPC_BSMineMonster_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:262-278`
-pub fn NPC_BSMineMonster_Default() {
+pub fn NPC_BSMineMonster_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSMineMonster_Default — parked: ai-context")
 }

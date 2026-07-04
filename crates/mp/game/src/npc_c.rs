@@ -51,6 +51,7 @@ const qfalse: qboolean = 0;
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:46-103`
 pub fn CorpsePhysics(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port CorpsePhysics — parked: raw-ptr-skeleton-no-world-handle")
@@ -63,6 +64,7 @@ pub fn CorpsePhysics(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:115-223`
 pub fn NPC_RemoveBody(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port NPC_RemoveBody — parked: raw-ptr-skeleton-no-world-handle")
@@ -108,7 +110,7 @@ pub fn BodyRemovalPadTime(
 /// Raven `NPC_RemoveBodyEffect`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:323-378`
-pub fn NPC_RemoveBodyEffect() {
+pub fn NPC_RemoveBodyEffect(ctx: GameContext<'_>) {
     todo!("Port NPC_RemoveBodyEffect — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -119,6 +121,7 @@ pub fn NPC_RemoveBodyEffect() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:395-470`
 pub fn pitch_roll_for_slope(
+    ctx: GameContext<'_>,
     forwhom: *mut gentity_t,
     pass_slope: vec3_t,
 ) {
@@ -132,7 +135,7 @@ pub fn pitch_roll_for_slope(
 /// Raven `DeadThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:478-607`
-pub fn DeadThink() {
+pub fn DeadThink(ctx: GameContext<'_>) {
     todo!("Port DeadThink — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -143,6 +146,7 @@ pub fn DeadThink() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:617-623`
 pub fn SetNPCGlobals(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SetNPCGlobals — parked: raw-ptr-skeleton-no-world-handle")
@@ -153,7 +157,7 @@ pub fn SetNPCGlobals(
 /// Raven `SaveNPCGlobals`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:630-636`
-pub fn SaveNPCGlobals() {
+pub fn SaveNPCGlobals(ctx: GameContext<'_>) {
     todo!("Port SaveNPCGlobals — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -161,7 +165,7 @@ pub fn SaveNPCGlobals() {
 /// Raven `RestoreNPCGlobals`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:638-644`
-pub fn RestoreNPCGlobals() {
+pub fn RestoreNPCGlobals(ctx: GameContext<'_>) {
     todo!("Port RestoreNPCGlobals — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -171,7 +175,7 @@ pub fn RestoreNPCGlobals() {
 /// Raven: "We MUST do this, other funcs were using NPC illegally when
 /// 'self' wasn't the global NPC" (comment preserved from source).
 /// Source: `oracle/oracle/codemp/game/NPC.c:647-652`
-pub fn ClearNPCGlobals() {
+pub fn ClearNPCGlobals(ctx: GameContext<'_>) {
     todo!("Port ClearNPCGlobals — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -181,7 +185,7 @@ pub fn ClearNPCGlobals() {
 /// Raven `NPC_ShowDebugInfo`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:664-681`
-pub fn NPC_ShowDebugInfo() {
+pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
     todo!("Port NPC_ShowDebugInfo — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -191,7 +195,7 @@ pub fn NPC_ShowDebugInfo() {
 /// Raven `NPC_ApplyScriptFlags`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:683-735`
-pub fn NPC_ApplyScriptFlags() {
+pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
     todo!("Port NPC_ApplyScriptFlags — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -201,7 +205,7 @@ pub fn NPC_ApplyScriptFlags() {
 /// Raven `NPC_HandleAIFlags`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:738-833`
-pub fn NPC_HandleAIFlags() {
+pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
     todo!("Port NPC_HandleAIFlags — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -218,7 +222,7 @@ pub fn NPC_AvoidWallsAndCliffs() {}
 /// Raven `NPC_CheckAttackScript`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:840-848`
-pub fn NPC_CheckAttackScript() {
+pub fn NPC_CheckAttackScript(ctx: GameContext<'_>) {
     todo!("Port NPC_CheckAttackScript — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -228,7 +232,7 @@ pub fn NPC_CheckAttackScript() {
 /// Raven `NPC_CheckAttackHold`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:851-913`
-pub fn NPC_CheckAttackHold() {
+pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
     todo!("Port NPC_CheckAttackHold — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -238,7 +242,7 @@ pub fn NPC_CheckAttackHold() {
 /// Raven `NPC_KeepCurrentFacing`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:920-931`
-pub fn NPC_KeepCurrentFacing() {
+pub fn NPC_KeepCurrentFacing(ctx: GameContext<'_>) {
     todo!("Port NPC_KeepCurrentFacing — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -246,15 +250,16 @@ pub fn NPC_KeepCurrentFacing() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:939-963`
 pub fn NPC_BehaviorSet_Charmed(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
-        x if x == bState_t::BS_FOLLOW_LEADER as c_int => NPC_BSFollowLeader(),
-        x if x == bState_t::BS_REMOVE as c_int => NPC_BSRemove(),
-        x if x == bState_t::BS_SEARCH as c_int => NPC_BSSearch(),
-        x if x == bState_t::BS_WANDER as c_int => NPC_BSWander(),
-        x if x == bState_t::BS_FLEE as c_int => NPC_BSFlee(),
-        _ => NPC_BSDefault(),
+        x if x == bState_t::BS_FOLLOW_LEADER as c_int => NPC_BSFollowLeader(ctx),
+        x if x == bState_t::BS_REMOVE as c_int => NPC_BSRemove(ctx),
+        x if x == bState_t::BS_SEARCH as c_int => NPC_BSSearch(ctx),
+        x if x == bState_t::BS_WANDER as c_int => NPC_BSWander(ctx),
+        x if x == bState_t::BS_FLEE as c_int => NPC_BSFlee(ctx),
+        _ => NPC_BSDefault(ctx),
     }
 }
 
@@ -262,21 +267,22 @@ pub fn NPC_BehaviorSet_Charmed(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:970-1012`
 pub fn NPC_BehaviorSet_Default(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
-        x if x == bState_t::BS_ADVANCE_FIGHT as c_int => NPC_BSAdvanceFight(),
-        x if x == bState_t::BS_SLEEP as c_int => NPC_BSSleep(),
-        x if x == bState_t::BS_FOLLOW_LEADER as c_int => NPC_BSFollowLeader(),
-        x if x == bState_t::BS_JUMP as c_int => NPC_BSJump(),
-        x if x == bState_t::BS_REMOVE as c_int => NPC_BSRemove(),
-        x if x == bState_t::BS_SEARCH as c_int => NPC_BSSearch(),
-        x if x == bState_t::BS_NOCLIP as c_int => NPC_BSNoClip(),
-        x if x == bState_t::BS_WANDER as c_int => NPC_BSWander(),
-        x if x == bState_t::BS_FLEE as c_int => NPC_BSFlee(),
-        x if x == bState_t::BS_WAIT as c_int => NPC_BSWait(),
-        x if x == bState_t::BS_CINEMATIC as c_int => NPC_BSCinematic(),
-        _ => NPC_BSDefault(),
+        x if x == bState_t::BS_ADVANCE_FIGHT as c_int => NPC_BSAdvanceFight(ctx),
+        x if x == bState_t::BS_SLEEP as c_int => NPC_BSSleep(ctx),
+        x if x == bState_t::BS_FOLLOW_LEADER as c_int => NPC_BSFollowLeader(ctx),
+        x if x == bState_t::BS_JUMP as c_int => NPC_BSJump(ctx),
+        x if x == bState_t::BS_REMOVE as c_int => NPC_BSRemove(ctx),
+        x if x == bState_t::BS_SEARCH as c_int => NPC_BSSearch(ctx),
+        x if x == bState_t::BS_NOCLIP as c_int => NPC_BSNoClip(ctx),
+        x if x == bState_t::BS_WANDER as c_int => NPC_BSWander(ctx),
+        x if x == bState_t::BS_FLEE as c_int => NPC_BSFlee(ctx),
+        x if x == bState_t::BS_WAIT as c_int => NPC_BSWait(ctx),
+        x if x == bState_t::BS_CINEMATIC as c_int => NPC_BSCinematic(ctx),
+        _ => NPC_BSDefault(ctx),
     }
 }
 
@@ -284,6 +290,7 @@ pub fn NPC_BehaviorSet_Default(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1019-1034`
 pub fn NPC_BehaviorSet_Interrogator(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -293,9 +300,9 @@ pub fn NPC_BehaviorSet_Interrogator(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSInterrogator_Default();
+            NPC_BSInterrogator_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -303,6 +310,7 @@ pub fn NPC_BehaviorSet_Interrogator(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1045-1060`
 pub fn NPC_BehaviorSet_ImperialProbe(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -312,9 +320,9 @@ pub fn NPC_BehaviorSet_ImperialProbe(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSImperialProbe_Default();
+            NPC_BSImperialProbe_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -322,6 +330,7 @@ pub fn NPC_BehaviorSet_ImperialProbe(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1070-1085`
 pub fn NPC_BehaviorSet_Seeker(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -331,9 +340,9 @@ pub fn NPC_BehaviorSet_Seeker(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSSeeker_Default();
+            NPC_BSSeeker_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -341,15 +350,17 @@ pub fn NPC_BehaviorSet_Seeker(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1094-1097`
 pub fn NPC_BehaviorSet_Remote(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
-    NPC_BSRemote_Default();
+    NPC_BSRemote_Default(ctx);
 }
 
 /// Raven `NPC_BehaviorSet_Sentry`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1106-1121`
 pub fn NPC_BehaviorSet_Sentry(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -359,9 +370,9 @@ pub fn NPC_BehaviorSet_Sentry(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSSentry_Default();
+            NPC_BSSentry_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -369,6 +380,7 @@ pub fn NPC_BehaviorSet_Sentry(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1128-1144`
 pub fn NPC_BehaviorSet_Grenadier(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -378,9 +390,9 @@ pub fn NPC_BehaviorSet_Grenadier(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSGrenadier_Default();
+            NPC_BSGrenadier_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -388,6 +400,7 @@ pub fn NPC_BehaviorSet_Grenadier(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1150-1166`
 pub fn NPC_BehaviorSet_Sniper(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -397,9 +410,9 @@ pub fn NPC_BehaviorSet_Sniper(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSSniper_Default();
+            NPC_BSSniper_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -407,6 +420,7 @@ pub fn NPC_BehaviorSet_Sniper(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1173-1197`
 pub fn NPC_BehaviorSet_Stormtrooper(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -416,11 +430,11 @@ pub fn NPC_BehaviorSet_Stormtrooper(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSST_Default();
+            NPC_BSST_Default(ctx);
         }
-        x if x == bState_t::BS_INVESTIGATE as c_int => NPC_BSST_Investigate(),
-        x if x == bState_t::BS_SLEEP as c_int => NPC_BSST_Sleep(),
-        _ => NPC_BehaviorSet_Default(bState),
+        x if x == bState_t::BS_INVESTIGATE as c_int => NPC_BSST_Investigate(ctx),
+        x if x == bState_t::BS_SLEEP as c_int => NPC_BSST_Sleep(ctx),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -428,6 +442,7 @@ pub fn NPC_BehaviorSet_Stormtrooper(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1205-1225`
 pub fn NPC_BehaviorSet_Jedi(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -437,10 +452,10 @@ pub fn NPC_BehaviorSet_Jedi(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSJedi_Default();
+            NPC_BSJedi_Default(ctx);
         }
-        x if x == bState_t::BS_FOLLOW_LEADER as c_int => NPC_BSJedi_FollowLeader(),
-        _ => NPC_BehaviorSet_Default(bState),
+        x if x == bState_t::BS_FOLLOW_LEADER as c_int => NPC_BSJedi_FollowLeader(ctx),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -448,6 +463,7 @@ pub fn NPC_BehaviorSet_Jedi(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1232-1245`
 pub fn NPC_BehaviorSet_Droid(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -455,9 +471,9 @@ pub fn NPC_BehaviorSet_Droid(
             || x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int =>
         {
-            NPC_BSDroid_Default();
+            NPC_BSDroid_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -465,6 +481,7 @@ pub fn NPC_BehaviorSet_Droid(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1252-1265`
 pub fn NPC_BehaviorSet_Mark1(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -472,9 +489,9 @@ pub fn NPC_BehaviorSet_Mark1(
             || x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int =>
         {
-            NPC_BSMark1_Default();
+            NPC_BSMark1_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -482,6 +499,7 @@ pub fn NPC_BehaviorSet_Mark1(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1272-1286`
 pub fn NPC_BehaviorSet_Mark2(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -490,9 +508,9 @@ pub fn NPC_BehaviorSet_Mark2(
             || x == bState_t::BS_STAND_AND_SHOOT as c_int
             || x == bState_t::BS_HUNT_AND_KILL as c_int =>
         {
-            NPC_BSMark2_Default();
+            NPC_BSMark2_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -500,6 +518,7 @@ pub fn NPC_BehaviorSet_Mark2(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1293-1307`
 pub fn NPC_BehaviorSet_ATST(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -508,9 +527,9 @@ pub fn NPC_BehaviorSet_ATST(
             || x == bState_t::BS_STAND_AND_SHOOT as c_int
             || x == bState_t::BS_HUNT_AND_KILL as c_int =>
         {
-            NPC_BSATST_Default();
+            NPC_BSATST_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -518,6 +537,7 @@ pub fn NPC_BehaviorSet_ATST(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1314-1329`
 pub fn NPC_BehaviorSet_MineMonster(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -527,9 +547,9 @@ pub fn NPC_BehaviorSet_MineMonster(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSMineMonster_Default();
+            NPC_BSMineMonster_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -537,6 +557,7 @@ pub fn NPC_BehaviorSet_MineMonster(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1336-1351`
 pub fn NPC_BehaviorSet_Howler(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -546,9 +567,9 @@ pub fn NPC_BehaviorSet_Howler(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSHowler_Default();
+            NPC_BSHowler_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -556,6 +577,7 @@ pub fn NPC_BehaviorSet_Howler(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1358-1373`
 pub fn NPC_BehaviorSet_Rancor(
+    ctx: GameContext<'_>,
     bState: c_int,
 ) {
     match bState {
@@ -565,9 +587,9 @@ pub fn NPC_BehaviorSet_Rancor(
             || x == bState_t::BS_HUNT_AND_KILL as c_int
             || x == bState_t::BS_DEFAULT as c_int =>
         {
-            NPC_BSRancor_Default();
+            NPC_BSRancor_Default(ctx);
         }
-        _ => NPC_BehaviorSet_Default(bState),
+        _ => NPC_BehaviorSet_Default(ctx, bState),
     }
 }
 
@@ -579,6 +601,7 @@ pub fn NPC_BehaviorSet_Rancor(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1384-1564`
 pub fn NPC_RunBehavior(
+    ctx: GameContext<'_>,
     team: c_int,
     bState: c_int,
 ) {
@@ -592,6 +615,7 @@ pub fn NPC_RunBehavior(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1576-1762`
 pub fn NPC_ExecuteBState(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port NPC_ExecuteBState — parked: raw-ptr-skeleton-no-world-handle")
@@ -604,7 +628,7 @@ pub fn NPC_ExecuteBState(
 /// Raven `NPC_CheckInSolid`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1764-1785`
-pub fn NPC_CheckInSolid() {
+pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
     todo!("Port NPC_CheckInSolid — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -617,6 +641,7 @@ pub fn NPC_CheckInSolid() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1787-1814`
 pub fn G_DroidSounds(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port G_DroidSounds — parked: va-variadic-seam")
@@ -630,6 +655,7 @@ pub fn G_DroidSounds(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1826-1979`
 pub fn NPC_Think(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port NPC_Think — parked: raw-ptr-skeleton-no-world-handle")
@@ -645,8 +671,8 @@ pub fn NPC_InitAI() {}
 /// Raven `NPC_InitGame`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:2041-2056`
-pub fn NPC_InitGame() {
-    NPC_LoadParms();
+pub fn NPC_InitGame(ctx: GameContext<'_>) {
+    NPC_LoadParms(ctx);
     NPC_InitAI();
 }
 

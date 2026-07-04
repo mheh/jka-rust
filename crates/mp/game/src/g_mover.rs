@@ -55,6 +55,7 @@ const BMS_END: c_int = 2;
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:45-60`
 pub fn G_PlayDoorLoopSound(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     unsafe {
@@ -62,7 +63,7 @@ pub fn G_PlayDoorLoopSound(
             return;
         }
 
-        (*ent).s.soundSetIndex = G_SoundSetIndex((*ent).soundSet);
+        (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, (*ent).soundSet);
         (*ent).s.loopIsSoundset = qtrue;
         (*ent).s.loopSound = BMS_MID;
     }
@@ -72,6 +73,7 @@ pub fn G_PlayDoorLoopSound(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:68-78`
 pub fn G_PlayDoorSound(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     r#type: c_int,
 ) {
@@ -80,7 +82,7 @@ pub fn G_PlayDoorSound(
             return;
         }
 
-        (*ent).s.soundSetIndex = G_SoundSetIndex((*ent).soundSet);
+        (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, (*ent).soundSet);
 
         G_AddEvent(ent, entity_event_t::EV_PLAYDOORSOUND as c_int, r#type);
     }
@@ -93,6 +95,7 @@ pub fn G_PlayDoorSound(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:86-111`
 pub fn G_TestEntityPosition(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> *mut gentity_t {
     todo!("Port G_TestEntityPosition — parked: raw-ptr-skeleton-no-world-handle")
@@ -152,6 +155,7 @@ pub fn G_RotatePoint(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:159-269`
 pub fn G_TryPushingEntity(
+    ctx: GameContext<'_>,
     check: *mut gentity_t,
     pusher: *mut gentity_t,
     r#move: vec3_t,
@@ -167,6 +171,7 @@ pub fn G_TryPushingEntity(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:283-408`
 pub fn G_MoverPush(
+    ctx: GameContext<'_>,
     pusher: *mut gentity_t,
     r#move: vec3_t,
     amove: vec3_t,
@@ -181,6 +186,7 @@ pub fn G_MoverPush(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:416-471`
 pub fn G_MoverTeam(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_MoverTeam — parked: raw-ptr-skeleton-no-world-handle")
@@ -193,6 +199,7 @@ pub fn G_MoverTeam(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:479-493`
 pub fn G_RunMover(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_RunMover — parked: unported-flag-consts (FL_TEAMSLAVE)")
@@ -217,6 +224,7 @@ pub fn CalcTeamDoorCenter(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:535-590`
 pub fn SetMoverState(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     moverState: moverState_t,
     time: c_int,
@@ -230,6 +238,7 @@ pub fn SetMoverState(
 /// of time.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:600-606`
 pub fn MatchTeam(
+    ctx: GameContext<'_>,
     teamLeader: *mut gentity_t,
     moverState: c_int,
     time: c_int,
@@ -237,7 +246,7 @@ pub fn MatchTeam(
     unsafe {
         let mut slave = teamLeader;
         while !slave.is_null() {
-            SetMoverState(slave, moverState as moverState_t, time);
+            SetMoverState(ctx, slave, moverState as moverState_t, time);
             slave = (*slave).teamchain;
         }
     }
@@ -248,6 +257,7 @@ pub fn MatchTeam(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:615-625`
 pub fn ReturnToPos1(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port ReturnToPos1 — parked: raw-ptr-skeleton-no-world-handle")
@@ -260,6 +270,7 @@ pub fn ReturnToPos1(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:634-702`
 pub fn Reached_BinaryMover(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Reached_BinaryMover — parked: raw-ptr-skeleton-no-world-handle")
@@ -271,6 +282,7 @@ pub fn Reached_BinaryMover(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:710-828`
 pub fn Use_BinaryMover_Go(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Use_BinaryMover_Go — parked: raw-ptr-skeleton-no-world-handle")
@@ -329,6 +341,7 @@ pub fn LockDoors(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:863-901`
 pub fn Use_BinaryMover(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -372,6 +385,7 @@ pub fn InitMoverTrData(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:936-999`
 pub fn InitMover(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port InitMover — parked: raw-ptr-skeleton-no-world-handle")
@@ -381,6 +395,7 @@ pub fn InitMover(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1018-1029`
 pub fn Blocked_Door(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) {
@@ -405,7 +420,7 @@ pub fn Blocked_Door(
         }
 
         // reverse direction
-        Use_BinaryMover(ent, ent, other);
+        Use_BinaryMover(ctx, ent, ent, other);
     }
 }
 
@@ -415,6 +430,7 @@ pub fn Blocked_Door(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1037-1071`
 pub fn Touch_DoorTriggerSpectator(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -429,6 +445,7 @@ pub fn Touch_DoorTriggerSpectator(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1078-1158`
 pub fn Touch_DoorTrigger(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -444,6 +461,7 @@ pub fn Touch_DoorTrigger(
 /// encloses all of them.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1168-1215`
 pub fn Think_SpawnNewDoorTrigger(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Think_SpawnNewDoorTrigger — parked: raw-ptr-skeleton-no-world-handle")
@@ -454,6 +472,7 @@ pub fn Think_SpawnNewDoorTrigger(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1217-1220`
 pub fn Think_MatchTeam(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Think_MatchTeam — parked: raw-ptr-skeleton-no-world-handle")
@@ -465,6 +484,7 @@ pub fn Think_MatchTeam(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1222-1237`
 pub fn G_EntIsDoor(
+    ctx: GameContext<'_>,
     entityNum: c_int,
 ) -> qboolean {
     todo!("Port G_EntIsDoor — parked: raw-ptr-skeleton-no-world-handle")
@@ -477,6 +497,7 @@ pub fn G_EntIsDoor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1239-1280`
 pub fn G_FindDoorTrigger(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> *mut gentity_t {
     todo!("Port G_FindDoorTrigger — parked: unported-flag-consts (FL_TEAMSLAVE, CONTENTS_TRIGGER)")
@@ -488,6 +509,7 @@ pub fn G_FindDoorTrigger(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1282-1346`
 pub fn G_EntIsUnlockedDoor(
+    ctx: GameContext<'_>,
     entityNum: c_int,
 ) -> qboolean {
     todo!("Port G_EntIsUnlockedDoor — parked: raw-ptr-skeleton-no-world-handle")
@@ -499,6 +521,7 @@ pub fn G_EntIsUnlockedDoor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1380-1472`
 pub fn SP_func_door(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_func_door — parked: raw-ptr-skeleton-no-world-handle")
@@ -510,6 +533,7 @@ pub fn SP_func_door(
 /// Don't allow decent if a living player is on it.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1489-1498`
 pub fn Touch_Plat(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -527,6 +551,7 @@ pub fn Touch_Plat(
 /// If the plat is at the bottom position, start it going up.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1507-1515`
 pub fn Touch_PlatCenterTrigger(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -543,6 +568,7 @@ pub fn Touch_PlatCenterTrigger(
 /// just sit on top of it.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1527-1559`
 pub fn SpawnPlatTrigger(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SpawnPlatTrigger — parked: raw-ptr-skeleton-no-world-handle")
@@ -554,6 +580,7 @@ pub fn SpawnPlatTrigger(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1576-1617`
 pub fn SP_func_plat(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_func_plat — parked: raw-ptr-skeleton-no-world-handle")
@@ -566,6 +593,7 @@ pub fn SP_func_plat(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1633-1641`
 pub fn Touch_Button(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -579,6 +607,7 @@ pub fn Touch_Button(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1660-1702`
 pub fn SP_func_button(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_func_button — parked: raw-ptr-skeleton-no-world-handle")
@@ -589,6 +618,7 @@ pub fn SP_func_button(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1727-1732`
 pub fn Think_BeginMoving(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Think_BeginMoving — parked: raw-ptr-skeleton-no-world-handle")
@@ -599,6 +629,7 @@ pub fn Think_BeginMoving(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1739-1793`
 pub fn Reached_Train(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port Reached_Train — parked: raw-ptr-skeleton-no-world-handle")
@@ -608,10 +639,11 @@ pub fn Reached_Train(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1802-1864`
 pub fn Think_SetupTrainTargets(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     unsafe {
-        (*ent).nextTrain = G_Find(
+        (*ent).nextTrain = G_Find(ctx, 
             core::ptr::null_mut(),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
             (*ent).target,
@@ -643,7 +675,7 @@ pub fn Think_SetupTrainTargets(
             // other targets that get fired when the corner is reached
             let mut next: *mut gentity_t;
             loop {
-                next = G_Find(
+                next = G_Find(ctx, 
                     core::ptr::null_mut(),
                     core::mem::offset_of!(gentity_t, targetname) as c_int,
                     (*path).target,
@@ -674,7 +706,7 @@ pub fn Think_SetupTrainTargets(
         /* start on */
         {
             // start the train moving from the first corner
-            Reached_Train(ent);
+            Reached_Train(ctx, ent);
         } else {
             G_SetOrigin(ent, (*ent).s.origin);
         }
@@ -685,13 +717,14 @@ pub fn Think_SetupTrainTargets(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1873-1880`
 pub fn SP_path_corner(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     unsafe {
         if (*self_).targetname.is_null() {
-            G_Printf(c"path_corner with no targetname at %s\n".as_ptr());
-            let _ = vtos((*self_).s.origin);
-            G_FreeEntity(self_);
+            G_Printf(ctx, c"path_corner with no targetname at %s\n".as_ptr());
+            let _ = vtos(ctx, (*self_).s.origin);
+            G_FreeEntity(ctx, self_);
             return;
         }
         // path corners don't need to be linked in
@@ -704,6 +737,7 @@ pub fn SP_path_corner(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1897-1927`
 pub fn SP_func_train(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port SP_func_train — parked: raw-ptr-skeleton-no-world-handle")
@@ -715,6 +749,7 @@ pub fn SP_func_train(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1956-2019`
 pub fn SP_func_static(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_func_static — parked: raw-ptr-skeleton-no-world-handle")
@@ -724,17 +759,18 @@ pub fn SP_func_static(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2021-2030`
 pub fn func_static_use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
     unsafe {
-        G_ActivateBehavior(self_, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
 
         if (*self_).spawnflags & 4 /* SWITCH_SHADER */ != 0 {
             (*self_).s.frame = if (*self_).s.frame != 0 { 0 } else { 1 }; // toggle frame
         }
-        G_UseTargets(self_, activator);
+        G_UseTargets(ctx, self_, activator);
     }
 }
 
@@ -742,6 +778,7 @@ pub fn func_static_use(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2040-2066`
 pub fn func_rotating_use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -754,12 +791,12 @@ pub fn func_rotating_use(
             (*self_).s.loopIsSoundset = qfalse;
             // play stop sound too?
             if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
-                (*self_).s.soundSetIndex = G_SoundSetIndex((*self_).soundSet);
+                (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
                 G_AddEvent(self_, entity_event_t::EV_BMODEL_SOUND as c_int, BMS_END);
             }
         } else {
             if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
-                (*self_).s.soundSetIndex = G_SoundSetIndex((*self_).soundSet);
+                (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
                 G_AddEvent(self_, entity_event_t::EV_BMODEL_SOUND as c_int, BMS_START);
                 (*self_).s.loopSound = BMS_MID;
                 (*self_).s.loopIsSoundset = qtrue;
@@ -775,6 +812,7 @@ pub fn func_rotating_use(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2133-2209`
 pub fn SP_func_rotating(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_func_rotating — parked: raw-ptr-skeleton-no-world-handle")
@@ -786,6 +824,7 @@ pub fn SP_func_rotating(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2231-2258`
 pub fn SP_func_bobbing(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_func_bobbing — parked: raw-ptr-skeleton-no-world-handle")
@@ -797,6 +836,7 @@ pub fn SP_func_bobbing(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2280-2313`
 pub fn SP_func_pendulum(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_func_pendulum — parked: raw-ptr-skeleton-no-world-handle")
@@ -809,6 +849,7 @@ pub fn SP_func_pendulum(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2323-2361`
 pub fn CacheChunkEffects(
+    ctx: GameContext<'_>,
     material: material_t,
 ) {
     todo!("Port CacheChunkEffects — parked: bg-dep (material_t MAT_* constants unported)")
@@ -818,6 +859,7 @@ pub fn CacheChunkEffects(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2363-2377`
 pub fn G_MiscModelExplosion(
+    ctx: GameContext<'_>,
     mins: vec3_t,
     maxs: vec3_t,
     size: c_int,
@@ -830,7 +872,7 @@ pub fn G_MiscModelExplosion(
             (mins[2] + maxs[2]) * 0.5,
         ];
 
-        let te = G_TempEntity(mid, entity_event_t::EV_MISC_MODEL_EXP as c_int);
+        let te = G_TempEntity(ctx, mid, entity_event_t::EV_MISC_MODEL_EXP as c_int);
 
         (*te).s.origin2 = maxs;
         (*te).s.angles2 = mins;
@@ -843,6 +885,7 @@ pub fn G_MiscModelExplosion(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2379-2395`
 pub fn G_Chunks(
+    ctx: GameContext<'_>,
     owner: c_int,
     origin: vec3_t,
     normal: vec3_t,
@@ -855,7 +898,7 @@ pub fn G_Chunks(
     baseScale: f32,
 ) {
     unsafe {
-        let te = G_TempEntity(origin, entity_event_t::EV_DEBRIS as c_int);
+        let te = G_TempEntity(ctx, origin, entity_event_t::EV_DEBRIS as c_int);
 
         // Now it's time to cram everything horribly into the entitystate of
         // an event entity.
@@ -878,6 +921,7 @@ pub fn G_Chunks(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2398-2498`
 pub fn funcBBrushDieGo(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port funcBBrushDieGo — parked: raw-ptr-skeleton-no-world-handle")
@@ -888,6 +932,7 @@ pub fn funcBBrushDieGo(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2500-2514`
 pub fn funcBBrushDie(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -901,19 +946,20 @@ pub fn funcBBrushDie(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2516-2530`
 pub fn funcBBrushUse(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
     unsafe {
-        G_ActivateBehavior(self_, bSet_t::BSET_USE as c_int);
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
         if (*self_).spawnflags & 64 != 0 {
             // Using it doesn't break it, makes it use it's targets
             if !(*self_).target.is_null() && *(*self_).target != 0 {
-                G_UseTargets(self_, activator);
+                G_UseTargets(ctx, self_, activator);
             }
         } else {
-            funcBBrushDie(self_, other, activator, (*self_).health, meansOfDeath_t::MOD_UNKNOWN as c_int);
+            funcBBrushDie(ctx, self_, other, activator, (*self_).health, meansOfDeath_t::MOD_UNKNOWN as c_int);
         }
     }
 }
@@ -923,6 +969,7 @@ pub fn funcBBrushUse(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2532-2597`
 pub fn funcBBrushPain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -936,6 +983,7 @@ pub fn funcBBrushPain(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2599-2661`
 pub fn InitBBrush(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port InitBBrush — parked: raw-ptr-skeleton-no-world-handle")
@@ -958,6 +1006,7 @@ pub fn funcBBrushTouch(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2731-2829`
 pub fn SP_func_breakable(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port SP_func_breakable — parked: raw-ptr-skeleton-no-world-handle")
@@ -969,6 +1018,7 @@ pub fn SP_func_breakable(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2831-2866`
 pub fn G_EntIsBreakable(
+    ctx: GameContext<'_>,
     entityNum: c_int,
 ) -> qboolean {
     todo!("Port G_EntIsBreakable — parked: raw-ptr-skeleton-no-world-handle")
@@ -978,6 +1028,7 @@ pub fn G_EntIsBreakable(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2875-2903`
 pub fn GlassDie(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -998,18 +1049,18 @@ pub fn GlassDie(
             ((*self_).r.absmax[2] + (*self_).r.absmin[2]) / 2.0,
         ];
 
-        G_UseTargets(self_, attacker);
+        G_UseTargets(ctx, self_, attacker);
 
         (*self_).splashRadius = 40; // ?? some random number, maybe it's ok?
 
-        let te = G_TempEntity(dif, entity_event_t::EV_GLASS_SHATTER as c_int);
+        let te = G_TempEntity(ctx, dif, entity_event_t::EV_GLASS_SHATTER as c_int);
         (*te).s.genericenemyindex = (*self_).s.number;
         (*te).s.origin = (*self_).pos1;
         (*te).s.angles = (*self_).pos2;
         (*te).s.trickedentindex = (*self_).splashRadius;
         (*te).s.pos.trTime = (*self_).genericValue3;
 
-        G_FreeEntity(self_);
+        G_FreeEntity(ctx, self_);
     }
 }
 
@@ -1017,6 +1068,7 @@ pub fn GlassDie(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2905-2922`
 pub fn GlassDie_Old(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -1030,14 +1082,14 @@ pub fn GlassDie_Old(
             ((*self_).r.absmax[2] + (*self_).r.absmin[2]) / 2.0,
         ];
 
-        G_UseTargets(self_, attacker);
+        G_UseTargets(ctx, self_, attacker);
 
-        let te = G_TempEntity(dif, entity_event_t::EV_GLASS_SHATTER as c_int);
+        let te = G_TempEntity(ctx, dif, entity_event_t::EV_GLASS_SHATTER as c_int);
         (*te).s.genericenemyindex = (*self_).s.number;
         (*te).s.origin = (*self_).r.maxs;
         (*te).s.angles = (*self_).r.mins;
 
-        G_FreeEntity(self_);
+        G_FreeEntity(ctx, self_);
     }
 }
 
@@ -1058,6 +1110,7 @@ pub fn GlassPain(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2930-2948`
 pub fn GlassUse(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -1090,7 +1143,7 @@ pub fn GlassUse(
             (*self_).pos2[2] / len * 390.0,
         ];
 
-        GlassDie(self_, other, activator, 100, meansOfDeath_t::MOD_UNKNOWN as c_int);
+        GlassDie(ctx, self_, other, activator, 100, meansOfDeath_t::MOD_UNKNOWN as c_int);
     }
 }
 
@@ -1100,6 +1153,7 @@ pub fn GlassUse(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2957-2990`
 pub fn SP_func_glass(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_func_glass — parked: raw-ptr-skeleton-no-world-handle")
@@ -1111,6 +1165,7 @@ pub fn SP_func_glass(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2995-3025`
 pub fn func_wait_return_solid(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port func_wait_return_solid — parked: raw-ptr-skeleton-no-world-handle")
@@ -1133,6 +1188,7 @@ pub fn func_usable_think(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3037-3048`
 pub fn G_EntIsRemovableUsable(
+    ctx: GameContext<'_>,
     entNum: c_int,
 ) -> qboolean {
     todo!("Port G_EntIsRemovableUsable — parked: raw-ptr-skeleton-no-world-handle")
@@ -1144,6 +1200,7 @@ pub fn G_EntIsRemovableUsable(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3050-3106`
 pub fn func_usable_use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -1186,6 +1243,7 @@ pub fn func_usable_die(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3140-3203`
 pub fn SP_func_usable(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port SP_func_usable — parked: raw-ptr-skeleton-no-world-handle")
@@ -1197,6 +1255,7 @@ pub fn SP_func_usable(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3215-3241`
 pub fn use_wall(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -1210,6 +1269,7 @@ pub fn use_wall(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3256-3279`
 pub fn SP_func_wall(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_func_wall — parked: raw-ptr-skeleton-no-world-handle")

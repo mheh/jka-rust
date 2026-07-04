@@ -20,6 +20,7 @@ use crate::prelude::*;
 ///
 /// Source: `oracle/oracle/codemp/game/g_exphysics.c:21-232`
 pub fn G_RunExPhys(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     gravity: f32,
     mass: f32,

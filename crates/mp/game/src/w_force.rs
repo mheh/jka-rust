@@ -68,7 +68,7 @@ const mindTrickTime: [c_int; 4] = [0 /*none*/, 5000, 10000, 15000];
 /// Source: `oracle/oracle/codemp/game/w_force.c:40-49`
 pub fn G_PreDefSound(ctx: GameContext<'_>, org: vec3_t, pdSound: c_int) -> *mut gentity_t {
     unsafe {
-        let te = G_TempEntity(org, EV_PREDEFSOUND as c_int);
+        let te = G_TempEntity(ctx, org, EV_PREDEFSOUND as c_int);
         (*te).s.eventParm = pdSound;
         (*te).s.origin = org; // VectorCopy(org, te->s.origin)
         te
@@ -206,6 +206,7 @@ pub fn ForcePowerUsableOn(
 // (fork-discovery ruling 1: globals -> GameWorld fields), not just a
 // missing `use`.
 pub fn WP_ForcePowerAvailable(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     forcePower: forcePowers_t,
     overrideAmt: c_int,
@@ -334,7 +335,7 @@ pub fn WP_ForcePowerUsable(
                 }
             }
         }
-        WP_ForcePowerAvailable(self_, forcePower, 0) // OVERRIDEFIXME
+        WP_ForcePowerAvailable(ctx, self_, forcePower, 0) // OVERRIDEFIXME
     }
 }
 
@@ -449,7 +450,7 @@ pub fn WP_ForcePowerStart(
         let mut hearable = qfalse;
         let mut hearDist: f32 = 0.0;
 
-        if WP_ForcePowerAvailable(self_, forcePower, overrideAmt) == 0 {
+        if WP_ForcePowerAvailable(ctx, self_, forcePower, overrideAmt) == 0 {
             return;
         }
 
@@ -656,7 +657,7 @@ pub fn ForceHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
         //NOTE: Decided to make all levels instant.
 
         let snd = std::ffi::CString::new("sound/weapons/force/heal.wav").unwrap();
-        G_Sound(self_, CHAN_ITEM, G_SoundIndex(snd.as_ptr()));
+        G_Sound(ctx, self_, CHAN_ITEM, G_SoundIndex(snd.as_ptr()));
     }
 }
 
@@ -754,8 +755,8 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: *mut gentity_t, forceDuration: c_
 
         WP_ForcePowerStart(ctx, self_, FP_SPEED, forceDuration);
         let snd = std::ffi::CString::new("sound/weapons/force/speed.wav").unwrap();
-        G_Sound(self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
-        G_Sound(self_, TRACK_CHANNEL_2 as c_int, (*ctx.world).speedLoopSound);
+        G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
+        G_Sound(ctx, self_, TRACK_CHANNEL_2 as c_int, (*ctx.world).speedLoopSound);
     }
 }
 
@@ -787,8 +788,8 @@ pub fn ForceSeeing(ctx: GameContext<'_>, self_: *mut gentity_t) {
         WP_ForcePowerStart(ctx, self_, FP_SEE, 0);
 
         let snd = std::ffi::CString::new("sound/weapons/force/see.wav").unwrap();
-        G_Sound(self_, CHAN_AUTO, G_SoundIndex(snd.as_ptr()));
-        G_Sound(self_, TRACK_CHANNEL_5 as c_int, (*ctx.world).seeLoopSound);
+        G_Sound(ctx, self_, CHAN_AUTO, G_SoundIndex(snd.as_ptr()));
+        G_Sound(ctx, self_, TRACK_CHANNEL_5 as c_int, (*ctx.world).seeLoopSound);
     }
 }
 
@@ -827,7 +828,7 @@ pub fn ForceProtect(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         WP_ForcePowerStart(ctx, self_, FP_PROTECT, 0);
         G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_PROTECT as c_int);
-        G_Sound(self_, TRACK_CHANNEL_3 as c_int, (*ctx.world).protectLoopSound);
+        G_Sound(ctx, self_, TRACK_CHANNEL_3 as c_int, (*ctx.world).protectLoopSound);
     }
 }
 
@@ -866,7 +867,7 @@ pub fn ForceAbsorb(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         WP_ForcePowerStart(ctx, self_, FP_ABSORB, 0);
         G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_ABSORB as c_int);
-        G_Sound(self_, TRACK_CHANNEL_3 as c_int, (*ctx.world).absorbLoopSound);
+        G_Sound(ctx, self_, TRACK_CHANNEL_3 as c_int, (*ctx.world).absorbLoopSound);
     }
 }
 
@@ -914,8 +915,8 @@ pub fn ForceRage(ctx: GameContext<'_>, self_: *mut gentity_t) {
         WP_ForcePowerStart(ctx, self_, FP_RAGE, 0);
 
         let snd = std::ffi::CString::new("sound/weapons/force/rage.wav").unwrap();
-        G_Sound(self_, TRACK_CHANNEL_4 as c_int, G_SoundIndex(snd.as_ptr()));
-        G_Sound(self_, TRACK_CHANNEL_3 as c_int, (*ctx.world).rageLoopSound);
+        G_Sound(ctx, self_, TRACK_CHANNEL_4 as c_int, G_SoundIndex(snd.as_ptr()));
+        G_Sound(ctx, self_, TRACK_CHANNEL_3 as c_int, (*ctx.world).rageLoopSound);
     }
 }
 
@@ -952,7 +953,7 @@ pub fn ForceLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*cl).ps.forceHandExtendTime = level_time + 20000;
 
         let snd = std::ffi::CString::new("sound/weapons/force/lightning").unwrap();
-        G_Sound(self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
+        G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
 
         WP_ForcePowerStart(ctx, self_, FP_LIGHTNING, 500);
     }
@@ -1043,7 +1044,7 @@ pub fn ForceLightningDamage(
                                 Q_irand(1, 3)
                             ))
                             .unwrap();
-                            G_Sound(traceEnt, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
+                            G_Sound(ctx, traceEnt, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
                         }
 
                         if (*tcl).ps.electrifyTime < (level_time + 400) {
@@ -1052,7 +1053,7 @@ pub fn ForceLightningDamage(
                         }
                         if (*tcl).ps.powerups[PW_CLOAKED as usize] != 0 {
                             //disable cloak temporarily
-                            Jedi_Decloak(traceEnt);
+                            Jedi_Decloak(ctx, traceEnt);
                             (*tcl).cloakToggleTime = level_time + Q_irand(3000, 10000);
                         }
                     }

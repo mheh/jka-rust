@@ -54,6 +54,7 @@ use crate::q_math::Q_irand;
 // no `GameContext`/entity param carries the per-frame ambient actor (same
 // unresolved fork as `NPC_combat.rs`/`NPC_utils.rs`'s `ai-context` sites).
 pub fn NPC_CheckAttacker(
+    ctx: GameContext<'_>,
     other: *mut gentity_t,
     r#mod: c_int,
 ) {
@@ -134,6 +135,7 @@ pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: *mut gentity_t, damage: c_
 // and reads `self->NPC->rank` against the unported `rank_t` enum's
 // `RANK_CAPTAIN` value (`ai.h:29-41`).
 pub fn NPC_ChoosePainAnimation(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     point: vec3_t,
@@ -156,6 +158,7 @@ pub fn NPC_ChoosePainAnimation(
 // these from this context-free faithful signature. Also stored as a fn
 // pointer (needs an `EntPain` enum variant, `out/gen/ent_fn_enums.rs`).
 pub fn NPC_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -172,6 +175,7 @@ pub fn NPC_Pain(
 // signature (same fork as `NPC_combat.rs`/`NPC_utils.rs`). Also stored as a
 // fn pointer (needs an `EntTouch` enum variant, `out/gen/ent_fn_enums.rs`).
 pub fn NPC_Touch(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -253,7 +257,7 @@ pub fn NPC_UseResponse(
         if (*user).s.number != 0 {
             //not used by the player
             if useWhenDone != 0 {
-                G_ActivateBehavior(self_, bSet_t::BSET_USE as c_int);
+                G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
             }
             return;
         }
@@ -265,7 +269,7 @@ pub fn NPC_UseResponse(
         {
             //only those on the same team react
             if useWhenDone != 0 {
-                G_ActivateBehavior(self_, bSet_t::BSET_USE as c_int);
+                G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
             }
             return;
         }
@@ -276,7 +280,7 @@ pub fn NPC_UseResponse(
         }
 
         if useWhenDone != 0 {
-            G_ActivateBehavior(self_, bSet_t::BSET_USE as c_int);
+            G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
         } else {
             NPC_Respond(ctx, self_, (*user).s.number);
         }
@@ -294,6 +298,7 @@ pub fn NPC_UseResponse(
 // per porting-rules §F (vehicle vtable fork, BLESSED). Also stored as a fn
 // pointer (needs an `EntUse` enum variant, `out/gen/ent_fn_enums.rs`).
 pub fn NPC_Use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,

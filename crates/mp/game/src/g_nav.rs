@@ -128,6 +128,7 @@ pub fn FlyingCreature(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:68-104`
 pub fn NPC_Blocked(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
 ) {
@@ -141,6 +142,7 @@ pub fn NPC_Blocked(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:112-159`
 pub fn NPC_SetMoveGoal(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     point: vec3_t,
     radius: c_int,
@@ -177,6 +179,7 @@ pub fn NAV_HitNavGoal(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:222-344`
 pub fn NAV_ClearPathToPoint(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     pmins: vec3_t,
     pmaxs: vec3_t,
@@ -193,6 +196,7 @@ pub fn NAV_ClearPathToPoint(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:352-356`
 pub fn NAV_FindClosestWaypointForEnt(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     targWp: c_int,
 ) -> c_int {
@@ -205,6 +209,7 @@ pub fn NAV_FindClosestWaypointForEnt(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:358-382`
 pub fn NAV_FindClosestWaypointForPoint(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     point: vec3_t,
 ) -> c_int {
@@ -217,6 +222,7 @@ pub fn NAV_FindClosestWaypointForPoint(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:384-408`
 pub fn NAV_FindClosestWaypointForPoint2(
+    ctx: GameContext<'_>,
     point: vec3_t,
 ) -> c_int {
     todo!("Port NAV_FindClosestWaypointForPoint2 — parked: unported-consts (WAYPOINT_NONE, NF_CLEAR_PATH, MASK_NPCSOLID)")
@@ -254,6 +260,7 @@ pub fn NAV_SetBlockedInfo(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:440-486`
 pub fn NAV_Steer(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     dir: vec3_t,
     distance: f32,
@@ -269,6 +276,7 @@ pub fn NAV_Steer(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:494-547`
 pub fn NAV_CheckAhead(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     end: vec3_t,
     trace: *mut trace_t,
@@ -283,6 +291,7 @@ pub fn NAV_CheckAhead(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:555-581`
 pub fn NAV_TestBypass(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     yaw: f32,
     blocked_dist: f32,
@@ -298,6 +307,7 @@ pub fn NAV_TestBypass(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:589-661`
 pub fn NAV_Bypass(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     blocked_dir: vec3_t,
@@ -328,6 +338,7 @@ pub fn NAV_MoveBlocker(
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
 pub fn NAV_ResolveBlock(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     blocked_dir: vec3_t,
@@ -360,6 +371,7 @@ pub fn NAV_TrueCollision(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:758-816`
 pub fn NAV_StackedCanyon(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     pathDir: vec3_t,
@@ -373,6 +385,7 @@ pub fn NAV_StackedCanyon(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:824-865`
 pub fn NAV_ResolveEntityCollision(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     movedir: vec3_t,
@@ -387,6 +400,7 @@ pub fn NAV_ResolveEntityCollision(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:873-894`
 pub fn NAV_TestForBlocked(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     goal: *mut gentity_t,
     blocker: *mut gentity_t,
@@ -404,6 +418,7 @@ pub fn NAV_TestForBlocked(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:902-963`
 pub fn NAV_AvoidCollision(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     goal: *mut gentity_t,
     info: *mut navInfo_t,
@@ -419,6 +434,7 @@ pub fn NAV_AvoidCollision(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:971-1075`
 pub fn NAV_TestBestNode(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     startID: c_int,
     endID: c_int,
@@ -433,6 +449,7 @@ pub fn NAV_TestBestNode(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1083-1086`
 pub fn NAV_GetNearestNode(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     lastNode: c_int,
 ) -> c_int {
@@ -445,6 +462,7 @@ pub fn NAV_GetNearestNode(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1094-1105`
 pub fn NAV_MicroError(
+    ctx: GameContext<'_>,
     start: vec3_t,
     end: vec3_t,
 ) -> qboolean {
@@ -458,6 +476,7 @@ pub fn NAV_MicroError(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1113-1212`
 pub fn NAV_MoveToGoal(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     info: *mut navInfo_t,
 ) -> c_int {
@@ -472,6 +491,7 @@ pub fn NAV_MoveToGoal(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1220-1243`
 pub fn waypoint_testDirection(
+    ctx: GameContext<'_>,
     origin: vec3_t,
     yaw: f32,
     minDist: c_uint,
@@ -485,6 +505,7 @@ pub fn waypoint_testDirection(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1251-1266`
 pub fn waypoint_getRadius(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> c_uint {
     todo!("Port waypoint_getRadius — parked: unported-consts (MAX_RADIUS_CHECK, YAW_ITERATIONS)")
@@ -498,6 +519,7 @@ pub fn waypoint_getRadius(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1275-1313`
 pub fn SP_waypoint(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_waypoint — parked: raw-ptr-skeleton-no-world-handle (navCalculatePaths), unported-consts")
@@ -509,6 +531,7 @@ pub fn SP_waypoint(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1318-1352`
 pub fn SP_waypoint_small(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_waypoint_small — parked: raw-ptr-skeleton-no-world-handle (navCalculatePaths), unported-consts")
@@ -520,6 +543,7 @@ pub fn SP_waypoint_small(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1370-1386`
 pub fn SP_waypoint_navgoal(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_waypoint_navgoal — parked: raw-ptr-skeleton-no-world-handle (navCalculatePaths), unported-consts")
@@ -531,6 +555,7 @@ pub fn SP_waypoint_navgoal(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1402-1417`
 pub fn SP_waypoint_navgoal_8(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_waypoint_navgoal_8 — parked: raw-ptr-skeleton-no-world-handle (navCalculatePaths), unported-consts")
@@ -542,6 +567,7 @@ pub fn SP_waypoint_navgoal_8(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1433-1448`
 pub fn SP_waypoint_navgoal_4(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_waypoint_navgoal_4 — parked: raw-ptr-skeleton-no-world-handle (navCalculatePaths), unported-consts")
@@ -553,6 +579,7 @@ pub fn SP_waypoint_navgoal_4(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1464-1479`
 pub fn SP_waypoint_navgoal_2(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_waypoint_navgoal_2 — parked: raw-ptr-skeleton-no-world-handle (navCalculatePaths), unported-consts")
@@ -564,6 +591,7 @@ pub fn SP_waypoint_navgoal_2(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1495-1510`
 pub fn SP_waypoint_navgoal_1(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SP_waypoint_navgoal_1 — parked: raw-ptr-skeleton-no-world-handle (navCalculatePaths), unported-consts")
@@ -576,7 +604,7 @@ pub fn SP_waypoint_navgoal_1(
 /// Raven `Svcmd_Nav_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1518-1592`
-pub fn Svcmd_Nav_f() {
+pub fn Svcmd_Nav_f(ctx: GameContext<'_>) {
     todo!("Port Svcmd_Nav_f — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -587,6 +615,7 @@ pub fn Svcmd_Nav_f() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1618-1655`
 pub fn NAV_WaypointsTooFar(
+    ctx: GameContext<'_>,
     wp1: *mut gentity_t,
     wp2: *mut gentity_t,
 ) -> qboolean {
@@ -599,7 +628,7 @@ pub fn NAV_WaypointsTooFar(
 /// Raven `NAV_ClearStoredWaypoints`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1663-1666`
-pub fn NAV_ClearStoredWaypoints() {
+pub fn NAV_ClearStoredWaypoints(ctx: GameContext<'_>) {
     todo!("Port NAV_ClearStoredWaypoints — parked: raw-ptr-skeleton-no-world-handle (stored-waypoint table)")
 }
 
@@ -609,6 +638,7 @@ pub fn NAV_ClearStoredWaypoints() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1669-1711`
 pub fn NAV_StoreWaypoint(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port NAV_StoreWaypoint — parked: raw-ptr-skeleton-no-world-handle (stored-waypoint table)")
@@ -620,6 +650,7 @@ pub fn NAV_StoreWaypoint(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1713-1732`
 pub fn NAV_GetStoredWaypoint(
+    ctx: GameContext<'_>,
     targetname: *mut c_char,
 ) -> c_int {
     todo!("Port NAV_GetStoredWaypoint — parked: raw-ptr-skeleton-no-world-handle (stored-waypoint table)")
@@ -632,6 +663,7 @@ pub fn NAV_GetStoredWaypoint(
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1734-1838`
 pub fn NAV_CalculatePaths(
+    ctx: GameContext<'_>,
     filename: *const c_char,
     checksum: c_int,
 ) {
@@ -643,7 +675,7 @@ pub fn NAV_CalculatePaths(
 /// Raven `NAV_Shutdown`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1846-1849`
-pub fn NAV_Shutdown() {
+pub fn NAV_Shutdown(ctx: GameContext<'_>) {
     todo!("Port NAV_Shutdown — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -653,7 +685,7 @@ pub fn NAV_Shutdown() {
 /// Raven `NAV_ShowDebugInfo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1857-1903`
-pub fn NAV_ShowDebugInfo() {
+pub fn NAV_ShowDebugInfo(ctx: GameContext<'_>) {
     todo!("Port NAV_ShowDebugInfo — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -663,6 +695,7 @@ pub fn NAV_ShowDebugInfo() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1911-1914`
 pub fn NAV_FindPlayerWaypoint(
+    ctx: GameContext<'_>,
     clNum: c_int,
 ) {
     todo!("Port NAV_FindPlayerWaypoint — parked: raw-ptr-skeleton-no-world-handle")

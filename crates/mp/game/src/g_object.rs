@@ -16,6 +16,7 @@ use crate::prelude::*;
 ///
 /// Source: `oracle/oracle/codemp/game/g_object.c:14-59`
 pub fn G_BounceObject(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     trace: *mut trace_t,
 ) {
@@ -27,6 +28,7 @@ pub fn G_BounceObject(
 ///
 /// Source: `oracle/oracle/codemp/game/g_object.c:72-241`
 pub fn G_RunObject(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_RunObject — parked: raw-ptr-skeleton-no-world-handle")
@@ -47,6 +49,7 @@ pub fn G_StopObjectMoving(
 ///
 /// Source: `oracle/oracle/codemp/game/g_object.c:260-287`
 pub fn G_StartObjectMoving(
+    ctx: GameContext<'_>,
     object: *mut gentity_t,
     dir: vec3_t,
     speed: f32,

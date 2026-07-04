@@ -77,6 +77,7 @@ pub fn NPC_TouchFunc(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:215-501`
 pub fn NPC_SetMiscDefaultData(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): touches g_gametype global, ~10
@@ -262,6 +263,7 @@ pub fn NPC_WeaponsForTeam(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:759-797`
 pub fn NPC_SetWeapons(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): needs `weaponData` global (ammoIndex
@@ -285,6 +287,7 @@ pub fn NPC_SpawnEffect(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:817-823`
 pub fn NPC_SetFX_SpawnStates(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): needs `g_gravity` cvar float and a
@@ -297,6 +300,7 @@ pub fn NPC_SetFX_SpawnStates(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:831-859`
 pub fn NPC_SpotWouldTelefrag(
+    ctx: GameContext<'_>,
     npc: *mut gentity_t,
 ) -> qboolean {
     // PORT-ESCALATION(packet-contract): needs trap_EntitiesInBox and the
@@ -308,6 +312,7 @@ pub fn NPC_SpotWouldTelefrag(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:862-1274`
 pub fn NPC_Begin(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): 413-LOC function threading `level`,
@@ -321,6 +326,7 @@ pub fn NPC_Begin(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1278-1297`
 pub fn New_NPC_t(
+    ctx: GameContext<'_>,
     entNum: c_int,
 ) -> *mut gNPC_t {
     // PORT-ESCALATION(packet-contract): needs BG_Alloc and the `gNPCPtrs`
@@ -345,6 +351,7 @@ pub fn NPC_DefaultScriptFlags(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1377-1763`
 pub fn NPC_Spawn_Do(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> *mut gentity_t {
     // PORT-ESCALATION(packet-contract): 387-LOC function creating new
@@ -358,6 +365,7 @@ pub fn NPC_Spawn_Do(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1765-1768`
 pub fn NPC_Spawn_Go(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): trivial body (calls NPC_Spawn_Do)
@@ -369,6 +377,7 @@ pub fn NPC_Spawn_Go(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1814-1831`
 pub fn NPC_ShySpawn(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): needs level/g_entities globals and
@@ -380,6 +389,7 @@ pub fn NPC_ShySpawn(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1839-1873`
 pub fn NPC_Spawn(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -393,6 +403,7 @@ pub fn NPC_Spawn(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1961-1971`
 pub fn NPC_PrecacheType(
+    ctx: GameContext<'_>,
     NPC_type: *mut c_char,
 ) {
     // PORT-ESCALATION(packet-contract): needs G_Spawn/G_FreeEntity/
@@ -404,6 +415,7 @@ pub fn NPC_PrecacheType(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1973-2068`
 pub fn SP_NPC_spawner(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): needs g_allowNPC/level globals,
@@ -416,6 +428,7 @@ pub fn SP_NPC_spawner(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2103-2173`
 pub fn NPC_VehiclePrecache(
+    ctx: GameContext<'_>,
     spawner: *mut gentity_t,
 ) -> qboolean {
     // PORT-ESCALATION(packet-contract): needs G_ModelIndex, several G2API
@@ -428,6 +441,7 @@ pub fn NPC_VehiclePrecache(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2175-2186`
 pub fn NPC_VehicleSpawnUse(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -441,10 +455,11 @@ pub fn NPC_VehicleSpawnUse(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2188-2253`
 pub fn SP_NPC_Vehicle(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): needs G_SpawnFloat/G_SpawnInt/
-    // G_VehicleSpawn/NPC_VehiclePrecache (itself parked), not resolved here.
+    // G_VehicleSpawn/NPC_VehiclePrecache (ctx, itself parked), not resolved here.
     todo!("Port SP_NPC_Vehicle — oracle/oracle/codemp/game/NPC_spawn.c:2188")
 }
 
@@ -452,9 +467,10 @@ pub fn SP_NPC_Vehicle(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2338-2345`
 pub fn SP_NPC_Kyle(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): needs SP_NPC_spawner (parked) plus
+    // PORT-ESCALATION(packet-contract): needs SP_NPC_spawner (ctx, parked) plus
     // field writes on gentity_t::NPC_type not resolved here.
     todo!("Port SP_NPC_Kyle — oracle/oracle/codemp/game/NPC_spawn.c:2338")
 }
@@ -463,9 +479,10 @@ pub fn SP_NPC_Kyle(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2354-2359`
 pub fn SP_NPC_Lando(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Lando — oracle/oracle/codemp/game/NPC_spawn.c:2354")
 }
 
@@ -473,9 +490,10 @@ pub fn SP_NPC_Lando(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2368-2373`
 pub fn SP_NPC_Jan(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Jan — oracle/oracle/codemp/game/NPC_spawn.c:2368")
 }
 
@@ -483,9 +501,10 @@ pub fn SP_NPC_Jan(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2382-2389`
 pub fn SP_NPC_Luke(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Luke — oracle/oracle/codemp/game/NPC_spawn.c:2382")
 }
 
@@ -493,9 +512,10 @@ pub fn SP_NPC_Luke(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2398-2403`
 pub fn SP_NPC_MonMothma(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_MonMothma — oracle/oracle/codemp/game/NPC_spawn.c:2398")
 }
 
@@ -503,9 +523,10 @@ pub fn SP_NPC_MonMothma(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2412-2419`
 pub fn SP_NPC_Tavion(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Tavion — oracle/oracle/codemp/game/NPC_spawn.c:2412")
 }
 
@@ -513,9 +534,10 @@ pub fn SP_NPC_Tavion(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2432-2448`
 pub fn SP_NPC_Tavion_New(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Tavion_New — oracle/oracle/codemp/game/NPC_spawn.c:2432")
 }
 
@@ -523,9 +545,10 @@ pub fn SP_NPC_Tavion_New(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2460-2472`
 pub fn SP_NPC_Alora(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Alora — oracle/oracle/codemp/game/NPC_spawn.c:2460")
 }
 
@@ -533,9 +556,10 @@ pub fn SP_NPC_Alora(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2487-2524`
 pub fn SP_NPC_Reborn_New(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Reborn_New — oracle/oracle/codemp/game/NPC_spawn.c:2487")
 }
 
@@ -543,9 +567,10 @@ pub fn SP_NPC_Reborn_New(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2542-2593`
 pub fn SP_NPC_Cultist_Saber(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Cultist_Saber — oracle/oracle/codemp/game/NPC_spawn.c:2542")
 }
 
@@ -553,9 +578,10 @@ pub fn SP_NPC_Cultist_Saber(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2611-2662`
 pub fn SP_NPC_Cultist_Saber_Powers(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Cultist_Saber_Powers — oracle/oracle/codemp/game/NPC_spawn.c:2611")
 }
 
@@ -563,9 +589,10 @@ pub fn SP_NPC_Cultist_Saber_Powers(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2679-2725`
 pub fn SP_NPC_Cultist(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Cultist — oracle/oracle/codemp/game/NPC_spawn.c:2679")
 }
 
@@ -573,9 +600,10 @@ pub fn SP_NPC_Cultist(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2737-2744`
 pub fn SP_NPC_Cultist_Commando(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Cultist_Commando — oracle/oracle/codemp/game/NPC_spawn.c:2737")
 }
 
@@ -583,9 +611,10 @@ pub fn SP_NPC_Cultist_Commando(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2755-2759`
 pub fn SP_NPC_Cultist_Destroyer(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Cultist_Destroyer — oracle/oracle/codemp/game/NPC_spawn.c:2755")
 }
 
@@ -593,9 +622,10 @@ pub fn SP_NPC_Cultist_Destroyer(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2768-2773`
 pub fn SP_NPC_Reelo(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Reelo — oracle/oracle/codemp/game/NPC_spawn.c:2768")
 }
 
@@ -603,9 +633,10 @@ pub fn SP_NPC_Reelo(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2784-2797`
 pub fn SP_NPC_Galak(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Galak — oracle/oracle/codemp/game/NPC_spawn.c:2784")
 }
 
@@ -613,9 +644,10 @@ pub fn SP_NPC_Galak(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2806-2813`
 pub fn SP_NPC_Desann(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Desann — oracle/oracle/codemp/game/NPC_spawn.c:2806")
 }
 
@@ -623,9 +655,10 @@ pub fn SP_NPC_Desann(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2822-2827`
 pub fn SP_NPC_Bartender(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Bartender — oracle/oracle/codemp/game/NPC_spawn.c:2822")
 }
 
@@ -633,9 +666,10 @@ pub fn SP_NPC_Bartender(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2836-2841`
 pub fn SP_NPC_MorganKatarn(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_MorganKatarn — oracle/oracle/codemp/game/NPC_spawn.c:2836")
 }
 
@@ -643,9 +677,10 @@ pub fn SP_NPC_MorganKatarn(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2857-2887`
 pub fn SP_NPC_Jedi(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Jedi — oracle/oracle/codemp/game/NPC_spawn.c:2857")
 }
 
@@ -653,9 +688,10 @@ pub fn SP_NPC_Jedi(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2896-2911`
 pub fn SP_NPC_Prisoner(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Prisoner — oracle/oracle/codemp/game/NPC_spawn.c:2896")
 }
 
@@ -663,9 +699,10 @@ pub fn SP_NPC_Prisoner(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2920-2935`
 pub fn SP_NPC_Rebel(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Rebel — oracle/oracle/codemp/game/NPC_spawn.c:2920")
 }
 
@@ -673,9 +710,10 @@ pub fn SP_NPC_Rebel(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2955-2986`
 pub fn SP_NPC_Stormtrooper(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Stormtrooper — oracle/oracle/codemp/game/NPC_spawn.c:2955")
 }
 
@@ -683,6 +721,7 @@ pub fn SP_NPC_Stormtrooper(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2987-2991`
 pub fn SP_NPC_StormtrooperOfficer(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): depends on SP_NPC_Stormtrooper
@@ -694,9 +733,10 @@ pub fn SP_NPC_StormtrooperOfficer(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3001-3006`
 pub fn SP_NPC_Snowtrooper(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Snowtrooper — oracle/oracle/codemp/game/NPC_spawn.c:3001")
 }
 
@@ -704,9 +744,10 @@ pub fn SP_NPC_Snowtrooper(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3016-3021`
 pub fn SP_NPC_Tie_Pilot(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Tie_Pilot — oracle/oracle/codemp/game/NPC_spawn.c:3016")
 }
 
@@ -714,9 +755,10 @@ pub fn SP_NPC_Tie_Pilot(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3030-3045`
 pub fn SP_NPC_Ugnaught(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Ugnaught — oracle/oracle/codemp/game/NPC_spawn.c:3030")
 }
 
@@ -724,9 +766,10 @@ pub fn SP_NPC_Ugnaught(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3056-3071`
 pub fn SP_NPC_Jawa(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Jawa — oracle/oracle/codemp/game/NPC_spawn.c:3056")
 }
 
@@ -734,9 +777,10 @@ pub fn SP_NPC_Jawa(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3084-3110`
 pub fn SP_NPC_Gran(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Gran — oracle/oracle/codemp/game/NPC_spawn.c:3084")
 }
 
@@ -744,9 +788,10 @@ pub fn SP_NPC_Gran(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3121-3136`
 pub fn SP_NPC_Rodian(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Rodian — oracle/oracle/codemp/game/NPC_spawn.c:3121")
 }
 
@@ -754,9 +799,10 @@ pub fn SP_NPC_Rodian(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3145-3167`
 pub fn SP_NPC_Weequay(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Weequay — oracle/oracle/codemp/game/NPC_spawn.c:3145")
 }
 
@@ -764,9 +810,10 @@ pub fn SP_NPC_Weequay(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3176-3184`
 pub fn SP_NPC_Trandoshan(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Trandoshan — oracle/oracle/codemp/game/NPC_spawn.c:3176")
 }
 
@@ -774,9 +821,10 @@ pub fn SP_NPC_Trandoshan(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3193-3208`
 pub fn SP_NPC_Tusken(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Tusken — oracle/oracle/codemp/game/NPC_spawn.c:3193")
 }
 
@@ -784,9 +832,10 @@ pub fn SP_NPC_Tusken(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3217-3225`
 pub fn SP_NPC_Noghri(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Noghri — oracle/oracle/codemp/game/NPC_spawn.c:3217")
 }
 
@@ -794,9 +843,10 @@ pub fn SP_NPC_Noghri(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3235-3250`
 pub fn SP_NPC_SwampTrooper(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_SwampTrooper — oracle/oracle/codemp/game/NPC_spawn.c:3235")
 }
 
@@ -804,9 +854,10 @@ pub fn SP_NPC_SwampTrooper(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3267-3301`
 pub fn SP_NPC_Imperial(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Imperial — oracle/oracle/codemp/game/NPC_spawn.c:3267")
 }
 
@@ -814,9 +865,10 @@ pub fn SP_NPC_Imperial(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3310-3329`
 pub fn SP_NPC_ImpWorker(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_ImpWorker — oracle/oracle/codemp/game/NPC_spawn.c:3310")
 }
 
@@ -824,9 +876,10 @@ pub fn SP_NPC_ImpWorker(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3338-3353`
 pub fn SP_NPC_BespinCop(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_BespinCop — oracle/oracle/codemp/game/NPC_spawn.c:3338")
 }
 
@@ -834,9 +887,10 @@ pub fn SP_NPC_BespinCop(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3372-3400`
 pub fn SP_NPC_Reborn(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Reborn — oracle/oracle/codemp/game/NPC_spawn.c:3372")
 }
 
@@ -844,9 +898,10 @@ pub fn SP_NPC_Reborn(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3409-3427`
 pub fn SP_NPC_ShadowTrooper(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_ShadowTrooper — oracle/oracle/codemp/game/NPC_spawn.c:3409")
 }
 
@@ -854,9 +909,10 @@ pub fn SP_NPC_ShadowTrooper(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3439-3444`
 pub fn SP_NPC_Monster_Murjj(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Murjj — oracle/oracle/codemp/game/NPC_spawn.c:3439")
 }
 
@@ -864,9 +920,10 @@ pub fn SP_NPC_Monster_Murjj(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3453-3458`
 pub fn SP_NPC_Monster_Swamp(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Swamp — oracle/oracle/codemp/game/NPC_spawn.c:3453")
 }
 
@@ -874,9 +931,10 @@ pub fn SP_NPC_Monster_Swamp(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3467-3472`
 pub fn SP_NPC_Monster_Howler(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Howler — oracle/oracle/codemp/game/NPC_spawn.c:3467")
 }
 
@@ -884,9 +942,10 @@ pub fn SP_NPC_Monster_Howler(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3481-3487`
 pub fn SP_NPC_MineMonster(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_MineMonster — oracle/oracle/codemp/game/NPC_spawn.c:3481")
 }
 
@@ -894,9 +953,10 @@ pub fn SP_NPC_MineMonster(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3496-3501`
 pub fn SP_NPC_Monster_Claw(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Claw — oracle/oracle/codemp/game/NPC_spawn.c:3496")
 }
 
@@ -904,9 +964,10 @@ pub fn SP_NPC_Monster_Claw(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3510-3515`
 pub fn SP_NPC_Monster_Glider(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Glider — oracle/oracle/codemp/game/NPC_spawn.c:3510")
 }
 
@@ -914,9 +975,10 @@ pub fn SP_NPC_Monster_Glider(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3524-3529`
 pub fn SP_NPC_Monster_Flier2(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Flier2 — oracle/oracle/codemp/game/NPC_spawn.c:3524")
 }
 
@@ -924,9 +986,10 @@ pub fn SP_NPC_Monster_Flier2(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3538-3543`
 pub fn SP_NPC_Monster_Lizard(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Lizard — oracle/oracle/codemp/game/NPC_spawn.c:3538")
 }
 
@@ -934,9 +997,10 @@ pub fn SP_NPC_Monster_Lizard(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3552-3557`
 pub fn SP_NPC_Monster_Fish(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Fish — oracle/oracle/codemp/game/NPC_spawn.c:3552")
 }
 
@@ -944,9 +1008,10 @@ pub fn SP_NPC_Monster_Fish(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3568-3575`
 pub fn SP_NPC_Monster_Wampa(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Wampa — oracle/oracle/codemp/game/NPC_spawn.c:3568")
 }
 
@@ -954,9 +1019,10 @@ pub fn SP_NPC_Monster_Wampa(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3584-3589`
 pub fn SP_NPC_Monster_Rancor(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Monster_Rancor — oracle/oracle/codemp/game/NPC_spawn.c:3584")
 }
 
@@ -964,9 +1030,10 @@ pub fn SP_NPC_Monster_Rancor(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3602-3609`
 pub fn SP_NPC_Droid_Interrogator(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Interrogator — oracle/oracle/codemp/game/NPC_spawn.c:3602")
 }
 
@@ -974,9 +1041,10 @@ pub fn SP_NPC_Droid_Interrogator(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3620-3627`
 pub fn SP_NPC_Droid_Probe(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Probe — oracle/oracle/codemp/game/NPC_spawn.c:3620")
 }
 
@@ -984,9 +1052,10 @@ pub fn SP_NPC_Droid_Probe(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3639-3646`
 pub fn SP_NPC_Droid_Mark1(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Mark1 — oracle/oracle/codemp/game/NPC_spawn.c:3639")
 }
 
@@ -994,9 +1063,10 @@ pub fn SP_NPC_Droid_Mark1(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3658-3665`
 pub fn SP_NPC_Droid_Mark2(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Mark2 — oracle/oracle/codemp/game/NPC_spawn.c:3658")
 }
 
@@ -1004,9 +1074,10 @@ pub fn SP_NPC_Droid_Mark2(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3674-3688`
 pub fn SP_NPC_Droid_ATST(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_ATST — oracle/oracle/codemp/game/NPC_spawn.c:3674")
 }
 
@@ -1014,9 +1085,10 @@ pub fn SP_NPC_Droid_ATST(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3699-3706`
 pub fn SP_NPC_Droid_Remote(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Remote — oracle/oracle/codemp/game/NPC_spawn.c:3699")
 }
 
@@ -1024,9 +1096,10 @@ pub fn SP_NPC_Droid_Remote(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3717-3724`
 pub fn SP_NPC_Droid_Seeker(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Seeker — oracle/oracle/codemp/game/NPC_spawn.c:3717")
 }
 
@@ -1034,9 +1107,10 @@ pub fn SP_NPC_Droid_Seeker(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3735-3742`
 pub fn SP_NPC_Droid_Sentry(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Sentry — oracle/oracle/codemp/game/NPC_spawn.c:3735")
 }
 
@@ -1044,9 +1118,10 @@ pub fn SP_NPC_Droid_Sentry(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3755-3763`
 pub fn SP_NPC_Droid_Gonk(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Gonk — oracle/oracle/codemp/game/NPC_spawn.c:3755")
 }
 
@@ -1054,9 +1129,10 @@ pub fn SP_NPC_Droid_Gonk(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3776-3785`
 pub fn SP_NPC_Droid_Mouse(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Mouse — oracle/oracle/codemp/game/NPC_spawn.c:3776")
 }
 
@@ -1064,9 +1140,10 @@ pub fn SP_NPC_Droid_Mouse(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3798-3812`
 pub fn SP_NPC_Droid_R2D2(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_R2D2 — oracle/oracle/codemp/game/NPC_spawn.c:3798")
 }
 
@@ -1074,9 +1151,10 @@ pub fn SP_NPC_Droid_R2D2(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3826-3840`
 pub fn SP_NPC_Droid_R5D2(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_R5D2 — oracle/oracle/codemp/game/NPC_spawn.c:3826")
 }
 
@@ -1084,9 +1162,10 @@ pub fn SP_NPC_Droid_R5D2(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3851-3864`
 pub fn SP_NPC_Droid_Protocol(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (parked).
+    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
     todo!("Port SP_NPC_Droid_Protocol — oracle/oracle/codemp/game/NPC_spawn.c:3851")
 }
 
@@ -1094,6 +1173,7 @@ pub fn SP_NPC_Droid_Protocol(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3872-4018`
 pub fn NPC_SpawnType(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     npc_type: *mut c_char,
     targetname: *mut c_char,
@@ -1109,9 +1189,10 @@ pub fn NPC_SpawnType(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:4020-4039`
 pub fn NPC_Spawn_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on NPC_SpawnType (parked)
+    // PORT-ESCALATION(packet-contract): depends on NPC_SpawnType (ctx, parked)
     // and trap_Argc/trap_Argv console-arg helpers not resolved here.
     todo!("Port NPC_Spawn_f — oracle/oracle/codemp/game/NPC_spawn.c:4020")
 }
@@ -1119,7 +1200,7 @@ pub fn NPC_Spawn_f(
 /// Raven `NPC_Kill_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:4045-4170`
-pub fn NPC_Kill_f() {
+pub fn NPC_Kill_f(ctx: GameContext<'_>) {
     // PORT-ESCALATION(packet-contract): 126-LOC console command touching
     // g_entities/level and G_Damage, not resolved here.
     todo!("Port NPC_Kill_f — oracle/oracle/codemp/game/NPC_spawn.c:4045")
@@ -1129,6 +1210,7 @@ pub fn NPC_Kill_f() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:4172-4175`
 pub fn NPC_PrintScore(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): needs trap_SendServerCommand /
@@ -1140,10 +1222,11 @@ pub fn NPC_PrintScore(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:4183-4243`
 pub fn Cmd_NPC_f(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     // PORT-ESCALATION(packet-contract): console-command dispatcher over
-    // NPC_Spawn_f/NPC_Kill_f/NPC_PrintScore (all parked) plus trap_Argv, not
+    // NPC_Spawn_f/NPC_Kill_f/NPC_PrintScore (ctx, all parked) plus trap_Argv, not
     // resolved here.
     todo!("Port Cmd_NPC_f — oracle/oracle/codemp/game/NPC_spawn.c:4183")
 }

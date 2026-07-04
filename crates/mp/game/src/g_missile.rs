@@ -28,7 +28,8 @@ use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
 ///
 /// Reflect the missile roughly back at it's owner.
 /// Source: `oracle/oracle/codemp/game/g_missile.c:24-89`
-pub fn G_ReflectMissile(ent: *mut gentity_t, missile: *mut gentity_t, forward: vec3_t) {
+pub fn G_ReflectMissile(
+    ctx: GameContext<'_>,ent: *mut gentity_t, missile: *mut gentity_t, forward: vec3_t) {
     todo!("Port G_ReflectMissile — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -37,7 +38,8 @@ pub fn G_ReflectMissile(ent: *mut gentity_t, missile: *mut gentity_t, forward: v
 /// Raven `G_DeflectMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_missile.c:91-140`
-pub fn G_DeflectMissile(ent: *mut gentity_t, missile: *mut gentity_t, forward: vec3_t) {
+pub fn G_DeflectMissile(
+    ctx: GameContext<'_>,ent: *mut gentity_t, missile: *mut gentity_t, forward: vec3_t) {
     todo!("Port G_DeflectMissile — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -45,7 +47,8 @@ pub fn G_DeflectMissile(ent: *mut gentity_t, missile: *mut gentity_t, forward: v
 /// Raven `G_BounceMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_missile.c:148-205`
-pub fn G_BounceMissile(ent: *mut gentity_t, trace: *mut trace_t) {
+pub fn G_BounceMissile(
+    ctx: GameContext<'_>,ent: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port G_BounceMissile — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -56,7 +59,8 @@ pub fn G_BounceMissile(ent: *mut gentity_t, trace: *mut trace_t) {
 ///
 /// Explode a missile without an impact.
 /// Source: `oracle/oracle/codemp/game/g_missile.c:215-257`
-pub fn G_ExplodeMissile(ent: *mut gentity_t) {
+pub fn G_ExplodeMissile(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port G_ExplodeMissile — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -65,7 +69,8 @@ pub fn G_ExplodeMissile(ent: *mut gentity_t) {
 /// Raven `G_RunStuckMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_missile.c:259-277`
-pub fn G_RunStuckMissile(ent: *mut gentity_t) {
+pub fn G_RunStuckMissile(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port G_RunStuckMissile — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -89,6 +94,7 @@ pub fn G_BounceProjectile(start: vec3_t, impact: vec3_t, dir: vec3_t, endout: ve
 ///
 /// Source: `oracle/oracle/codemp/game/g_missile.c:298-329`
 pub fn CreateMissile(
+    ctx: GameContext<'_>,
     org: vec3_t,
     dir: vec3_t,
     vel: f32,
@@ -102,7 +108,8 @@ pub fn CreateMissile(
 /// Raven `G_MissileBounceEffect`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_missile.c:331-354`
-pub fn G_MissileBounceEffect(ent: *mut gentity_t, org: vec3_t, dir: vec3_t) {
+pub fn G_MissileBounceEffect(
+    ctx: GameContext<'_>,ent: *mut gentity_t, org: vec3_t, dir: vec3_t) {
     //FIXME: have an EV_BOUNCE_MISSILE event that checks the s.weapon and does the appropriate effect
     unsafe {
         match (*ent).s.weapon {
@@ -115,7 +122,7 @@ pub fn G_MissileBounceEffect(ent: *mut gentity_t, org: vec3_t, dir: vec3_t) {
                 G_PlayEffectID(fx, (*ent).r.currentOrigin, dir);
             }
             _ => {
-                let te = G_TempEntity(org, EV_SABER_BLOCK as c_int);
+                let te = G_TempEntity(ctx, org, EV_SABER_BLOCK as c_int);
                 (*te).s.origin = org;
                 (*te).s.angles = dir;
                 (*te).s.eventParm = 0;
@@ -132,7 +139,8 @@ pub fn G_MissileBounceEffect(ent: *mut gentity_t, org: vec3_t, dir: vec3_t) {
 /// Raven `G_MissileImpact`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_missile.c:362-801`
-pub fn G_MissileImpact(ent: *mut gentity_t, trace: *mut trace_t) {
+pub fn G_MissileImpact(
+    ctx: GameContext<'_>,ent: *mut gentity_t, trace: *mut trace_t) {
     todo!("Port G_MissileImpact — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -142,6 +150,7 @@ pub fn G_MissileImpact(ent: *mut gentity_t, trace: *mut trace_t) {
 /// Raven `G_RunMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_missile.c:808-1019`
-pub fn G_RunMissile(ent: *mut gentity_t) {
+pub fn G_RunMissile(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port G_RunMissile — parked: raw-ptr-skeleton-no-world-handle")
 }

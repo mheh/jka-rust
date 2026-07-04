@@ -28,7 +28,7 @@ use crate::prelude::*;
 /// Raven `NPC_LostEnemyDecideChase`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:18-35`
-pub fn NPC_LostEnemyDecideChase() {
+pub fn NPC_LostEnemyDecideChase(ctx: GameContext<'_>) {
     todo!("Port NPC_LostEnemyDecideChase — parked: ambient-ai-state")
 }
 
@@ -43,6 +43,7 @@ pub fn NPC_StandIdle() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:87-158`
 pub fn NPC_StandTrackAndShoot(
+    ctx: GameContext<'_>,
     NPC: *mut gentity_t,
     canDuck: qboolean,
 ) -> qboolean {
@@ -52,49 +53,49 @@ pub fn NPC_StandTrackAndShoot(
 /// Raven `NPC_BSIdle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:161-177`
-pub fn NPC_BSIdle() {
+pub fn NPC_BSIdle(ctx: GameContext<'_>) {
     todo!("Port NPC_BSIdle — parked: ambient-ai-state")
 }
 
 /// Raven `NPC_BSRun`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:179-189`
-pub fn NPC_BSRun() {
+pub fn NPC_BSRun(ctx: GameContext<'_>) {
     todo!("Port NPC_BSRun — parked: ambient-ai-state")
 }
 
 /// Raven `NPC_BSStandGuard`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:191-224`
-pub fn NPC_BSStandGuard() {
+pub fn NPC_BSStandGuard(ctx: GameContext<'_>) {
     todo!("Port NPC_BSStandGuard — parked: ambient-ai-state")
 }
 
 /// Raven `NPC_BSHuntAndKill`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:232-304`
-pub fn NPC_BSHuntAndKill() {
+pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
     todo!("Port NPC_BSHuntAndKill — parked: ambient-ai-state")
 }
 
 /// Raven `NPC_BSStandAndShoot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:306-392`
-pub fn NPC_BSStandAndShoot() {
+pub fn NPC_BSStandAndShoot(ctx: GameContext<'_>) {
     todo!("Port NPC_BSStandAndShoot — parked: ambient-ai-state")
 }
 
 /// Raven `NPC_BSRunAndShoot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:394-487`
-pub fn NPC_BSRunAndShoot() {
+pub fn NPC_BSRunAndShoot(ctx: GameContext<'_>) {
     todo!("Port NPC_BSRunAndShoot — parked: ambient-ai-state")
 }
 
 /// Raven `NPC_BSFace`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:490-503`
-pub fn NPC_BSFace() {
+pub fn NPC_BSFace(ctx: GameContext<'_>) {
     todo!("Port NPC_BSFace — parked: ambient-ai-state")
 }
 
@@ -102,6 +103,7 @@ pub fn NPC_BSFace() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:505-610`
 pub fn NPC_BSPointShoot(
+    ctx: GameContext<'_>,
     shoot: qboolean,
 ) {
     todo!("Port NPC_BSPointShoot — parked: ambient-ai-state")
@@ -110,27 +112,27 @@ pub fn NPC_BSPointShoot(
 /// Raven `NPC_BSMove`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:616-637`
-pub fn NPC_BSMove() {
+pub fn NPC_BSMove(ctx: GameContext<'_>) {
     todo!("Port NPC_BSMove — parked: ambient-ai-state")
 }
 
 /// Raven `NPC_BSShoot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:644-656`
-pub fn NPC_BSShoot() {
+pub fn NPC_BSShoot(ctx: GameContext<'_>) {
     todo!("Port NPC_BSShoot — parked: ambient-ai-state")
 }
 
 /// Raven `NPC_BSPatrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:664-703`
-pub fn NPC_BSPatrol() {
+pub fn NPC_BSPatrol(ctx: GameContext<'_>) {
     todo!("Port NPC_BSPatrol — parked: ambient-ai-state")
 }
 
 /// Raven `NPC_BSDefault`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Default.c:712-957`
-pub fn NPC_BSDefault() {
+pub fn NPC_BSDefault(ctx: GameContext<'_>) {
     todo!("Port NPC_BSDefault — parked: ambient-ai-state")
 }

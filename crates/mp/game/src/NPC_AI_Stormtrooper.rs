@@ -73,22 +73,23 @@ pub fn ST_AggressionAdjust(self_: *mut gentity_t, change: c_int) {
 /// Raven `ST_ClearTimers`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:88-104`
-pub fn ST_ClearTimers(ent: *mut gentity_t) {
-    TIMER_Set(ent, c"chatter".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"duck".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"stand".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"shuffleTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"sleepTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"enemyLastVisible".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"roamTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"hideTime".as_ptr() as *const c_char, 0);
+pub fn ST_ClearTimers(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
+    TIMER_Set(ctx, ent, c"chatter".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"duck".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"stand".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"shuffleTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"sleepTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"enemyLastVisible".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"roamTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"hideTime".as_ptr() as *const c_char, 0);
     // FIXME: Slant for difficulty levels (Raven comment).
-    TIMER_Set(ent, c"attackDelay".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"stick".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"scoutTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"flee".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"interrogating".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"verifyCP".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"attackDelay".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"stick".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"scoutTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"flee".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"interrogating".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"verifyCP".as_ptr() as *const c_char, 0);
 }
 
 // PORT-ESCALATION(ai-context): Raven reads/writes the file-static ambient
@@ -101,21 +102,23 @@ pub fn ST_ClearTimers(ent: *mut gentity_t) {
 /// Raven `ST_Speech`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:124-225`
-pub fn ST_Speech(self_: *mut gentity_t, speechType: c_int, failChance: f32) {
+pub fn ST_Speech(
+    ctx: GameContext<'_>,self_: *mut gentity_t, speechType: c_int, failChance: f32) {
     todo!("Port ST_Speech — parked: ai-context")
 }
 
 /// Raven `ST_MarkToCover`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:227-240`
-pub fn ST_MarkToCover(self_: *mut gentity_t) {
+pub fn ST_MarkToCover(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     unsafe {
         if self_.is_null() || (*self_).NPC.is_null() {
             return;
         }
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).localState = LSTATE_UNDERFIRE;
-        TIMER_Set(
+        TIMER_Set(ctx, 
             self_,
             c"attackDelay".as_ptr() as *const c_char,
             Q_irand(500, 2500),
@@ -123,7 +126,7 @@ pub fn ST_MarkToCover(self_: *mut gentity_t) {
         ST_AggressionAdjust(self_, -3);
         if !(*npc).group.is_null() && (*(*npc).group).numGroup > 1 {
             // FIXME: flee sound? (Raven comment).
-            ST_Speech(self_, SPEECH_COVER, 0.0);
+            ST_Speech(ctx, self_, SPEECH_COVER, 0.0);
         }
     }
 }
@@ -132,6 +135,7 @@ pub fn ST_MarkToCover(self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:242-253`
 pub fn ST_StartFlee(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     enemy: *mut gentity_t,
     dangerPoint: vec3_t,
@@ -143,11 +147,11 @@ pub fn ST_StartFlee(
         if self_.is_null() || (*self_).NPC.is_null() {
             return;
         }
-        G_StartFlee(self_, enemy, dangerPoint, dangerLevel, minTime, maxTime);
+        G_StartFlee(ctx, self_, enemy, dangerPoint, dangerLevel, minTime, maxTime);
         let npc = (*self_).NPC as *mut gNPC_t;
         if !(*npc).group.is_null() && (*(*npc).group).numGroup > 1 {
             // FIXME: flee sound? (Raven comment).
-            ST_Speech(self_, SPEECH_COVER, 0.0);
+            ST_Speech(ctx, self_, SPEECH_COVER, 0.0);
         }
     }
 }
@@ -155,20 +159,21 @@ pub fn ST_StartFlee(
 /// Raven `NPC_ST_Pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:260-274`
-pub fn NPC_ST_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+pub fn NPC_ST_Pain(
+    ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).localState = LSTATE_UNDERFIRE;
 
-        TIMER_Set(self_, c"duck".as_ptr() as *const c_char, -1);
-        TIMER_Set(self_, c"hideTime".as_ptr() as *const c_char, -1);
-        TIMER_Set(self_, c"stand".as_ptr() as *const c_char, 2000);
+        TIMER_Set(ctx, self_, c"duck".as_ptr() as *const c_char, -1);
+        TIMER_Set(ctx, self_, c"hideTime".as_ptr() as *const c_char, -1);
+        TIMER_Set(ctx, self_, c"stand".as_ptr() as *const c_char, 2000);
 
-        NPC_Pain(self_, attacker, damage);
+        NPC_Pain(ctx, self_, attacker, damage);
 
         if damage == 0 && (*self_).health > 0 {
             // FIXME: better way to know I was pushed (Raven comment).
-            G_AddVoiceEvent(
+            G_AddVoiceEvent(ctx, 
                 self_,
                 Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int),
                 2000,
@@ -184,7 +189,7 @@ pub fn NPC_ST_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_in
 /// Raven `ST_HoldPosition`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:282-302`
-pub fn ST_HoldPosition() {
+pub fn ST_HoldPosition(ctx: GameContext<'_>) {
     todo!("Port ST_HoldPosition — parked: ai-context")
 }
 
@@ -193,7 +198,7 @@ pub fn ST_HoldPosition() {
 /// Raven `NPC_ST_SayMovementSpeech`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:304-325`
-pub fn NPC_ST_SayMovementSpeech() {
+pub fn NPC_ST_SayMovementSpeech(ctx: GameContext<'_>) {
     todo!("Port NPC_ST_SayMovementSpeech — parked: ai-context")
 }
 
@@ -202,7 +207,8 @@ pub fn NPC_ST_SayMovementSpeech() {
 /// Raven `NPC_ST_StoreMovementSpeech`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:327-331`
-pub fn NPC_ST_StoreMovementSpeech(speech: c_int, chance: f32) {
+pub fn NPC_ST_StoreMovementSpeech(
+    ctx: GameContext<'_>,speech: c_int, chance: f32) {
     todo!("Port NPC_ST_StoreMovementSpeech — parked: ai-context")
 }
 
@@ -211,7 +217,7 @@ pub fn NPC_ST_StoreMovementSpeech(speech: c_int, chance: f32) {
 /// Raven `ST_Move`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:338-390`
-pub fn ST_Move() -> qboolean {
+pub fn ST_Move(ctx: GameContext<'_>) -> qboolean {
     todo!("Port ST_Move — parked: ai-context")
 }
 
@@ -220,7 +226,7 @@ pub fn ST_Move() -> qboolean {
 /// Raven `NPC_ST_SleepShuffle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:399-439`
-pub fn NPC_ST_SleepShuffle() {
+pub fn NPC_ST_SleepShuffle(ctx: GameContext<'_>) {
     todo!("Port NPC_ST_SleepShuffle — parked: ai-context")
 }
 
@@ -229,7 +235,7 @@ pub fn NPC_ST_SleepShuffle() {
 /// Raven `NPC_BSST_Sleep`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:447-468`
-pub fn NPC_BSST_Sleep() {
+pub fn NPC_BSST_Sleep(ctx: GameContext<'_>) {
     todo!("Port NPC_BSST_Sleep — parked: ai-context")
 }
 
@@ -238,7 +244,8 @@ pub fn NPC_BSST_Sleep() {
 /// Raven `NPC_CheckEnemyStealth`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:476-725`
-pub fn NPC_CheckEnemyStealth(target: *mut gentity_t) -> qboolean {
+pub fn NPC_CheckEnemyStealth(
+    ctx: GameContext<'_>,target: *mut gentity_t) -> qboolean {
     todo!("Port NPC_CheckEnemyStealth — parked: ai-context")
 }
 
@@ -247,7 +254,7 @@ pub fn NPC_CheckEnemyStealth(target: *mut gentity_t) -> qboolean {
 /// Raven `NPC_CheckPlayerTeamStealth`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:727-757`
-pub fn NPC_CheckPlayerTeamStealth() -> qboolean {
+pub fn NPC_CheckPlayerTeamStealth(ctx: GameContext<'_>) -> qboolean {
     todo!("Port NPC_CheckPlayerTeamStealth — parked: ai-context")
 }
 
@@ -256,7 +263,8 @@ pub fn NPC_CheckPlayerTeamStealth() -> qboolean {
 /// Raven `NPC_ST_InvestigateEvent`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:766-919`
-pub fn NPC_ST_InvestigateEvent(eventID: c_int, extraSuspicious: qboolean) -> qboolean {
+pub fn NPC_ST_InvestigateEvent(
+    ctx: GameContext<'_>,eventID: c_int, extraSuspicious: qboolean) -> qboolean {
     todo!("Port NPC_ST_InvestigateEvent — parked: ai-context")
 }
 
@@ -266,7 +274,8 @@ pub fn NPC_ST_InvestigateEvent(eventID: c_int, extraSuspicious: qboolean) -> qbo
 /// Raven `ST_OffsetLook`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:927-938`
-pub fn ST_OffsetLook(offset: f32, out: vec3_t) {
+pub fn ST_OffsetLook(
+    ctx: GameContext<'_>,offset: f32, out: vec3_t) {
     todo!("Port ST_OffsetLook — parked: ai-context")
 }
 
@@ -275,7 +284,7 @@ pub fn ST_OffsetLook(offset: f32, out: vec3_t) {
 /// Raven `ST_LookAround`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:946-970`
-pub fn ST_LookAround() {
+pub fn ST_LookAround(ctx: GameContext<'_>) {
     todo!("Port ST_LookAround — parked: ai-context")
 }
 
@@ -284,7 +293,7 @@ pub fn ST_LookAround() {
 /// Raven `NPC_BSST_Investigate`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:978-1069`
-pub fn NPC_BSST_Investigate() {
+pub fn NPC_BSST_Investigate(ctx: GameContext<'_>) {
     todo!("Port NPC_BSST_Investigate — parked: ai-context")
 }
 
@@ -293,7 +302,7 @@ pub fn NPC_BSST_Investigate() {
 /// Raven `NPC_BSST_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1077-1181`
-pub fn NPC_BSST_Patrol() {
+pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
     todo!("Port NPC_BSST_Patrol — parked: ai-context")
 }
 
@@ -304,7 +313,7 @@ pub fn NPC_BSST_Patrol() {
 /// Raven `ST_CheckMoveState`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1212-1358`
-pub fn ST_CheckMoveState() {
+pub fn ST_CheckMoveState(ctx: GameContext<'_>) {
     todo!("Port ST_CheckMoveState — parked: ai-context")
 }
 
@@ -313,7 +322,8 @@ pub fn ST_CheckMoveState() {
 /// Raven `ST_ResolveBlockedShot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1360-1403`
-pub fn ST_ResolveBlockedShot(hit: c_int) {
+pub fn ST_ResolveBlockedShot(
+    ctx: GameContext<'_>,hit: c_int) {
     todo!("Port ST_ResolveBlockedShot — parked: ai-context")
 }
 
@@ -324,7 +334,7 @@ pub fn ST_ResolveBlockedShot(hit: c_int) {
 /// Raven `ST_CheckFireState`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1411-1534`
-pub fn ST_CheckFireState() {
+pub fn ST_CheckFireState(ctx: GameContext<'_>) {
     todo!("Port ST_CheckFireState — parked: ai-context")
 }
 
@@ -333,7 +343,8 @@ pub fn ST_CheckFireState() {
 /// Raven `ST_TrackEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1536-1548`
-pub fn ST_TrackEnemy(self_: *mut gentity_t, enemyPos: vec3_t) {
+pub fn ST_TrackEnemy(
+    ctx: GameContext<'_>,self_: *mut gentity_t, enemyPos: vec3_t) {
     todo!("Port ST_TrackEnemy — parked: ai-context")
 }
 
@@ -342,7 +353,8 @@ pub fn ST_TrackEnemy(self_: *mut gentity_t, enemyPos: vec3_t) {
 /// Raven `ST_ApproachEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1550-1561`
-pub fn ST_ApproachEnemy(self_: *mut gentity_t) -> c_int {
+pub fn ST_ApproachEnemy(
+    ctx: GameContext<'_>,self_: *mut gentity_t) -> c_int {
     todo!("Port ST_ApproachEnemy — parked: ai-context")
 }
 
@@ -351,7 +363,8 @@ pub fn ST_ApproachEnemy(self_: *mut gentity_t) -> c_int {
 /// Raven `ST_HuntEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1563-1577`
-pub fn ST_HuntEnemy(self_: *mut gentity_t) {
+pub fn ST_HuntEnemy(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port ST_HuntEnemy — parked: ai-context")
 }
 
@@ -360,7 +373,8 @@ pub fn ST_HuntEnemy(self_: *mut gentity_t) {
 /// Raven `ST_TransferTimers`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1579-1593`
-pub fn ST_TransferTimers(self_: *mut gentity_t, other: *mut gentity_t) {
+pub fn ST_TransferTimers(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t) {
     todo!("Port ST_TransferTimers — parked: ai-context")
 }
 
@@ -369,7 +383,8 @@ pub fn ST_TransferTimers(self_: *mut gentity_t, other: *mut gentity_t) {
 /// Raven `ST_TransferMoveGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1595-1626`
-pub fn ST_TransferMoveGoal(self_: *mut gentity_t, other: *mut gentity_t) {
+pub fn ST_TransferMoveGoal(
+    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t) {
     todo!("Port ST_TransferMoveGoal — parked: ai-context")
 }
 
@@ -378,7 +393,7 @@ pub fn ST_TransferMoveGoal(self_: *mut gentity_t, other: *mut gentity_t) {
 /// Raven `ST_GetCPFlags`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1628-1710`
-pub fn ST_GetCPFlags() -> c_int {
+pub fn ST_GetCPFlags(ctx: GameContext<'_>) -> c_int {
     todo!("Port ST_GetCPFlags — parked: ai-context")
 }
 
@@ -388,7 +403,7 @@ pub fn ST_GetCPFlags() -> c_int {
 /// Raven `ST_Commander`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:1724-2401`
-pub fn ST_Commander() {
+pub fn ST_Commander(ctx: GameContext<'_>) {
     todo!("Port ST_Commander — parked: ai-context")
 }
 
@@ -398,7 +413,7 @@ pub fn ST_Commander() {
 /// Raven `NPC_BSST_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:2409-2724`
-pub fn NPC_BSST_Attack() {
+pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
     todo!("Port NPC_BSST_Attack — parked: ai-context")
 }
 
@@ -407,6 +422,6 @@ pub fn NPC_BSST_Attack() {
 /// Raven `NPC_BSST_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:2726-2742`
-pub fn NPC_BSST_Default() {
+pub fn NPC_BSST_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSST_Default — parked: ai-context")
 }

@@ -44,6 +44,7 @@ unsafe fn libc_strstr(haystack: *const c_char, needle: *const c_char) -> *const 
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:36-41`
 pub fn trap_Cvar_VariableValue(
+    ctx: GameContext<'_>,
     var_name: *const c_char,
 ) -> f32 {
     todo!("Port trap_Cvar_VariableValue — parked: raw-ptr-skeleton-no-world-handle")
@@ -58,6 +59,7 @@ pub fn trap_Cvar_VariableValue(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:50-99`
 pub fn G_ParseInfos(
+    ctx: GameContext<'_>,
     buf: *mut c_char,
     max: c_int,
     infos: *mut *mut c_char,
@@ -73,6 +75,7 @@ pub fn G_ParseInfos(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:106-127`
 pub fn G_LoadArenasFromFile(
+    ctx: GameContext<'_>,
     filename: *mut c_char,
 ) {
     todo!("Port G_LoadArenasFromFile — parked: raw-ptr-skeleton-no-world-handle")
@@ -135,6 +138,7 @@ pub unsafe fn G_GetMapTypeBits(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:171-213`
 pub fn G_DoesMapSupportGametype(
+    ctx: GameContext<'_>,
     mapname: *const c_char,
     gametype: c_int,
 ) -> qboolean {
@@ -148,6 +152,7 @@ pub fn G_DoesMapSupportGametype(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:216-288`
 pub fn G_RefreshNextMap(
+    ctx: GameContext<'_>,
     gametype: c_int,
     forced: qboolean,
 ) -> *const c_char {
@@ -160,7 +165,7 @@ pub fn G_RefreshNextMap(
 /// Raven `G_LoadArenas`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:295-321`
-pub fn G_LoadArenas() {
+pub fn G_LoadArenas(ctx: GameContext<'_>) {
     todo!("Port G_LoadArenas — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -170,6 +175,7 @@ pub fn G_LoadArenas() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:329-339`
 pub fn G_GetArenaInfoByMap(
+    ctx: GameContext<'_>,
     map: *const c_char,
 ) -> *const c_char {
     todo!("Port G_GetArenaInfoByMap — parked: raw-ptr-skeleton-no-world-handle")
@@ -184,6 +190,7 @@ pub fn G_GetArenaInfoByMap(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:373-454`
 pub fn G_AddRandomBot(
+    ctx: GameContext<'_>,
     team: c_int,
 ) {
     todo!("Port G_AddRandomBot — parked: raw-ptr-skeleton-no-world-handle")
@@ -196,6 +203,7 @@ pub fn G_AddRandomBot(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:461-492`
 pub fn G_RemoveRandomBot(
+    ctx: GameContext<'_>,
     team: c_int,
 ) -> c_int {
     todo!("Port G_RemoveRandomBot — parked: raw-ptr-skeleton-no-world-handle")
@@ -207,6 +215,7 @@ pub fn G_RemoveRandomBot(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:499-518`
 pub fn G_CountHumanPlayers(
+    ctx: GameContext<'_>,
     team: c_int,
 ) -> c_int {
     todo!("Port G_CountHumanPlayers — parked: raw-ptr-skeleton-no-world-handle")
@@ -219,6 +228,7 @@ pub fn G_CountHumanPlayers(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:525-562`
 pub fn G_CountBotPlayers(
+    ctx: GameContext<'_>,
     team: c_int,
 ) -> c_int {
     todo!("Port G_CountBotPlayers — parked: raw-ptr-skeleton-no-world-handle")
@@ -231,7 +241,7 @@ pub fn G_CountBotPlayers(
 /// Raven `G_CheckMinimumPlayers`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:569-690`
-pub fn G_CheckMinimumPlayers() {
+pub fn G_CheckMinimumPlayers(ctx: GameContext<'_>) {
     todo!("Port G_CheckMinimumPlayers — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -240,7 +250,7 @@ pub fn G_CheckMinimumPlayers() {
 /// Raven `G_CheckBotSpawn`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:697-719`
-pub fn G_CheckBotSpawn() {
+pub fn G_CheckBotSpawn(ctx: GameContext<'_>) {
     todo!("Port G_CheckBotSpawn — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -250,6 +260,7 @@ pub fn G_CheckBotSpawn() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:727-740`
 pub fn AddBotToSpawnQueue(
+    ctx: GameContext<'_>,
     clientNum: c_int,
     delay: c_int,
 ) {
@@ -262,6 +273,7 @@ pub fn AddBotToSpawnQueue(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:751-760`
 pub fn G_RemoveQueuedBotBegin(
+    ctx: GameContext<'_>,
     clientNum: c_int,
 ) {
     todo!("Port G_RemoveQueuedBotBegin — parked: raw-ptr-skeleton-no-world-handle")
@@ -274,6 +286,7 @@ pub fn G_RemoveQueuedBotBegin(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:768-784`
 pub fn G_BotConnect(
+    ctx: GameContext<'_>,
     clientNum: c_int,
     restart: qboolean,
 ) -> qboolean {
@@ -288,6 +301,7 @@ pub fn G_BotConnect(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:792-1033`
 pub fn G_AddBot(
+    ctx: GameContext<'_>,
     name: *const c_char,
     skill: f32,
     team: *const c_char,
@@ -303,7 +317,7 @@ pub fn G_AddBot(
 /// Raven `Svcmd_AddBot_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:1041-1093`
-pub fn Svcmd_AddBot_f() {
+pub fn Svcmd_AddBot_f(ctx: GameContext<'_>) {
     todo!("Port Svcmd_AddBot_f — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -313,7 +327,7 @@ pub fn Svcmd_AddBot_f() {
 /// Raven `Svcmd_BotList_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:1100-1127`
-pub fn Svcmd_BotList_f() {
+pub fn Svcmd_BotList_f(ctx: GameContext<'_>) {
     todo!("Port Svcmd_BotList_f — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -324,6 +338,7 @@ pub fn Svcmd_BotList_f() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:1194-1215`
 pub fn G_LoadBotsFromFile(
+    ctx: GameContext<'_>,
     filename: *mut c_char,
 ) {
     todo!("Port G_LoadBotsFromFile — parked: raw-ptr-skeleton-no-world-handle")
@@ -335,7 +350,7 @@ pub fn G_LoadBotsFromFile(
 /// Raven `G_LoadBots`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:1222-1256`
-pub fn G_LoadBots() {
+pub fn G_LoadBots(ctx: GameContext<'_>) {
     todo!("Port G_LoadBots — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -346,6 +361,7 @@ pub fn G_LoadBots() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:1265-1271`
 pub fn G_GetBotInfoByNumber(
+    ctx: GameContext<'_>,
     num: c_int,
 ) -> *mut c_char {
     todo!("Port G_GetBotInfoByNumber — parked: raw-ptr-skeleton-no-world-handle")
@@ -357,6 +373,7 @@ pub fn G_GetBotInfoByNumber(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:1279-1291`
 pub fn G_GetBotInfoByName(
+    ctx: GameContext<'_>,
     name: *const c_char,
 ) -> *mut c_char {
     todo!("Port G_GetBotInfoByName — parked: raw-ptr-skeleton-no-world-handle")
@@ -368,6 +385,7 @@ pub fn G_GetBotInfoByName(
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:1302-1311`
 pub fn G_InitBots(
+    ctx: GameContext<'_>,
     restart: qboolean,
 ) {
     todo!("Port G_InitBots — parked: raw-ptr-skeleton-no-world-handle")

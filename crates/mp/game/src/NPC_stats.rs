@@ -21,7 +21,7 @@ use crate::prelude::*;
 // signature takes no parameters to thread it through (fork-1 GameWorld
 // placement expects a `&GameWorld`/similar param, absent here). Parking
 // rather than inventing a threading shape.
-pub fn NPC_ReactionTime() -> c_int {
+pub fn NPC_ReactionTime(ctx: GameContext<'_>) -> c_int {
     todo!("Port NPC_ReactionTime — parked: ambient-global NPCInfo has no threading param in this signature")
 }
 
@@ -75,6 +75,7 @@ unsafe fn qstricmp_eq(name: *const c_char, lit: &std::ffi::CStr) -> bool {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:424-437`
 pub fn G_ParseAnimFileSet(
+    ctx: GameContext<'_>,
     filename: *const c_char,
     animCFG: *const c_char,
     animFileIndex: *mut c_int,
@@ -117,6 +118,7 @@ pub fn NPC_PrecacheAnimationCFG(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:551-591`
 pub fn NPC_PrecacheWeapons(
+    ctx: GameContext<'_>,
     playerTeam: team_t,
     spawnflags: c_int,
     NPCtype: *mut c_char,
@@ -129,7 +131,7 @@ pub fn NPC_PrecacheWeapons(
     while curWeap < WP_NUM_WEAPONS {
         if weapons & (1 << curWeap) != 0 {
             let item = crate::bg_misc::BG_FindItemForWeapon(curWeap);
-            crate::g_items::RegisterItem(item);
+            crate::g_items::RegisterItem(ctx, item);
         }
         curWeap += 1;
     }
@@ -148,6 +150,7 @@ pub fn NPC_PrecacheWeapons(
 // C signature `(spawner: *mut gentity_t)` with no GameWorld/table param.
 // Parking rather than inventing where these ambient globals live/thread from.
 pub fn NPC_Precache(
+    ctx: GameContext<'_>,
     spawner: *mut gentity_t,
 ) {
     todo!("Port NPC_Precache — parked: ambient-global NPCParms/NPCFile/TeamTable/WPTable have no threading param in this signature")
@@ -164,6 +167,7 @@ pub fn NPC_Precache(
 // for a single-pass mechanical transcription without the GameWorld threading
 // decision settled first; parking whole.
 pub fn NPC_ParseParms(
+    ctx: GameContext<'_>,
     NPCName: *const c_char,
     NPC: *mut gentity_t,
 ) -> qboolean {
@@ -178,6 +182,6 @@ pub fn NPC_ParseParms(
 // function-scope statics) via `trap_FS_GetFileList`/`trap_FS_FOpenFile`/
 // `trap_FS_Read`, but the resolved skeleton signature `()` has no
 // GameWorld/engine param to thread them or the trap calls through.
-pub fn NPC_LoadParms() {
+pub fn NPC_LoadParms(ctx: GameContext<'_>) {
     todo!("Port NPC_LoadParms — parked: ambient-global NPCParms/npcParseBuffer and trap_FS_* need a threaded engine/world param absent from this signature")
 }

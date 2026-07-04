@@ -19,6 +19,7 @@ use crate::prelude::*;
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_sounds.c:23-64`
 pub fn G_AddVoiceEvent(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     event: c_int,
     speakDebounceTime: c_int,
@@ -33,6 +34,7 @@ pub fn G_AddVoiceEvent(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_sounds.c:66-93`
 pub fn NPC_PlayConfusionSound(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port NPC_PlayConfusionSound — parked: raw-ptr-skeleton-no-world-handle")

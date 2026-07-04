@@ -45,6 +45,7 @@ static mut FRAME_NAV_INFO: navInfo_t = navInfo_t {
 // set by ai_main.c think-loop; no channel to reach them from this
 // context-free faithful signature.
 pub fn NPC_ClearPathToGoal(
+    ctx: GameContext<'_>,
     dir: vec3_t,
     goal: *mut gentity_t,
 ) -> qboolean {
@@ -56,7 +57,7 @@ pub fn NPC_ClearPathToGoal(
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:78-95`
 // PORT-ESCALATION(ai-context): reads ambient `NPC`/`NPCInfo` globals;
 // no channel to reach them from this context-free faithful signature.
-pub fn NPC_CheckCombatMove() -> qboolean {
+pub fn NPC_CheckCombatMove(ctx: GameContext<'_>) -> qboolean {
     todo!("Port NPC_CheckCombatMove — parked: ai-context")
 }
 
@@ -66,6 +67,7 @@ pub fn NPC_CheckCombatMove() -> qboolean {
 // PORT-ESCALATION(ai-context): reads/writes ambient `NPC`/`ucmd` globals;
 // no channel to reach them from this context-free faithful signature.
 pub fn NPC_LadderMove(
+    ctx: GameContext<'_>,
     dir: vec3_t,
 ) {
     todo!("Port NPC_LadderMove — parked: ai-context")
@@ -77,6 +79,7 @@ pub fn NPC_LadderMove(
 // PORT-ESCALATION(ai-context): reads ambient `NPC`/`NPCInfo` globals;
 // no channel to reach them from this context-free faithful signature.
 pub fn NPC_GetMoveInformation(
+    ctx: GameContext<'_>,
     dir: vec3_t,
     distance: *mut f32,
 ) -> qboolean {
@@ -90,6 +93,7 @@ pub fn NPC_GetMoveInformation(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:149-152`
 pub fn NAV_GetLastMove(
+    ctx: GameContext<'_>,
     info: *mut navInfo_t,
 ) {
     unsafe {
@@ -104,6 +108,7 @@ pub fn NAV_GetLastMove(
 // and file-scope `frameNavInfo`; calls navigation functions that need
 // these; no channel to reach them from this context-free faithful signature.
 pub fn NPC_GetMoveDirection(
+    ctx: GameContext<'_>,
     out: vec3_t,
     distance: *mut f32,
 ) -> qboolean {
@@ -118,6 +123,7 @@ pub fn NPC_GetMoveDirection(
 // navigation functions; no channel to reach them from this context-free
 // faithful signature.
 pub fn NPC_GetMoveDirectionAltRoute(
+    ctx: GameContext<'_>,
     out: vec3_t,
     distance: *mut f32,
     tryStraight: qboolean,
@@ -189,6 +195,7 @@ pub fn G_UcmdMoveForDir(
 // globals set by the AI think loop; calls movement functions that read these;
 // no channel to reach them from this context-free faithful signature.
 pub fn NPC_MoveToGoal(
+    ctx: GameContext<'_>,
     tryStraight: qboolean,
 ) -> qboolean {
     todo!("Port NPC_MoveToGoal — parked: ai-context")
@@ -200,7 +207,7 @@ pub fn NPC_MoveToGoal(
 // PORT-ESCALATION(ai-context): reads/writes ambient `NPC`/`NPCInfo` globals;
 // calls NPC_MoveToGoal which also needs ai-context; no channel to reach them
 // from this context-free faithful signature.
-pub fn NPC_SlideMoveToGoal() -> qboolean {
+pub fn NPC_SlideMoveToGoal(ctx: GameContext<'_>) -> qboolean {
     todo!("Port NPC_SlideMoveToGoal — parked: ai-context")
 }
 
@@ -210,6 +217,6 @@ pub fn NPC_SlideMoveToGoal() -> qboolean {
 // PORT-ESCALATION(ai-context): reads ambient `NPC` global and calls
 // `trap_LinkEntity` (needs Engine/GameContext); no channel to reach them from
 // this context-free faithful signature.
-pub fn NPC_ApplyRoff() {
+pub fn NPC_ApplyRoff(ctx: GameContext<'_>) {
     todo!("Port NPC_ApplyRoff — parked: ai-context")
 }

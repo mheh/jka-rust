@@ -17,7 +17,7 @@ use crate::prelude::*;
 /// Caches sound and effect resources for Remote NPCs at map load time.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:17-22`
-pub fn NPC_Remote_Precache() {
+pub fn NPC_Remote_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/chars/remote/misc/fire.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/remote/misc/hiss.wav".as_ptr());
     crate::g_utils::G_EffectIndex(c"env/small_explode".as_ptr());
@@ -28,6 +28,7 @@ pub fn NPC_Remote_Precache() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:29-37`
 pub fn NPC_Remote_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -39,7 +40,7 @@ pub fn NPC_Remote_Pain(
 /// Raven `Remote_MaintainHeight`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:44-128`
-pub fn Remote_MaintainHeight() {
+pub fn Remote_MaintainHeight(ctx: GameContext<'_>) {
     todo!("Port Remote_MaintainHeight — parked: ambient-state")
 }
 
@@ -47,7 +48,7 @@ pub fn Remote_MaintainHeight() {
 /// Raven `Remote_Strafe`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:139-168`
-pub fn Remote_Strafe() {
+pub fn Remote_Strafe(ctx: GameContext<'_>) {
     todo!("Port Remote_Strafe — parked: ambient-state")
 }
 
@@ -56,6 +57,7 @@ pub fn Remote_Strafe() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:178-221`
 pub fn Remote_Hunt(
+    ctx: GameContext<'_>,
     visible: qboolean,
     advance: qboolean,
     retreat: qboolean,
@@ -67,7 +69,7 @@ pub fn Remote_Hunt(
 /// Raven `Remote_Fire`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:229-257`
-pub fn Remote_Fire() {
+pub fn Remote_Fire(ctx: GameContext<'_>) {
     todo!("Port Remote_Fire — parked: ambient-state")
 }
 
@@ -76,6 +78,7 @@ pub fn Remote_Fire() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:264-277`
 pub fn Remote_Ranged(
+    ctx: GameContext<'_>,
     visible: qboolean,
     advance: qboolean,
     retreat: qboolean,
@@ -87,7 +90,7 @@ pub fn Remote_Ranged(
 /// Raven `Remote_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:290-332`
-pub fn Remote_Attack() {
+pub fn Remote_Attack(ctx: GameContext<'_>) {
     todo!("Port Remote_Attack — parked: ambient-state")
 }
 
@@ -95,7 +98,7 @@ pub fn Remote_Attack() {
 /// Raven `Remote_Idle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:339-344`
-pub fn Remote_Idle() {
+pub fn Remote_Idle(ctx: GameContext<'_>) {
     todo!("Port Remote_Idle — parked: ambient-state")
 }
 
@@ -103,7 +106,7 @@ pub fn Remote_Idle() {
 /// Raven `Remote_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:351-367`
-pub fn Remote_Patrol() {
+pub fn Remote_Patrol(ctx: GameContext<'_>) {
     todo!("Port Remote_Patrol — parked: ambient-state")
 }
 
@@ -111,6 +114,6 @@ pub fn Remote_Patrol() {
 /// Raven `NPC_BSRemote_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:375-389`
-pub fn NPC_BSRemote_Default() {
+pub fn NPC_BSRemote_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSRemote_Default — parked: ambient-state")
 }

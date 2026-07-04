@@ -44,6 +44,7 @@ pub fn Q3_TaskIDClear(taskID: *mut c_int) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:275-324`
 pub fn G_DebugPrint(
+    ctx: GameContext<'_>,
     level: c_int,
     format: *const c_char,
     // variadic `...` — C varargs, seam decision pending
@@ -54,12 +55,13 @@ pub fn G_DebugPrint(
 /// Raven `Q3_GetAnimLower`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:331-344`
-pub fn Q3_GetAnimLower(ent: *mut gentity_t) -> *mut c_char {
+pub fn Q3_GetAnimLower(
+    ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut c_char {
     unsafe {
         if (*ent).client.is_null() {
             //TODO: Port g_entities[].client (still `*mut c_void`; legsAnim read needs the typed gclient_t)
             // Source: oracle/oracle/codemp/game/g_ICARUScb.c:335-339
-            G_DebugPrint(
+            G_DebugPrint(ctx, 
                 WL_WARNING as c_int,
                 b"Q3_GetAnimLower: attempted to read animation state off non-client!\n\0".as_ptr()
                     as *const c_char,
@@ -76,12 +78,13 @@ pub fn Q3_GetAnimLower(ent: *mut gentity_t) -> *mut c_char {
 /// Raven `Q3_GetAnimUpper`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:351-364`
-pub fn Q3_GetAnimUpper(ent: *mut gentity_t) -> *mut c_char {
+pub fn Q3_GetAnimUpper(
+    ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut c_char {
     unsafe {
         if (*ent).client.is_null() {
             //TODO: Port g_entities[].client (still `*mut c_void`; torsoAnim read needs the typed gclient_t)
             // Source: oracle/oracle/codemp/game/g_ICARUScb.c:355-359
-            G_DebugPrint(
+            G_DebugPrint(ctx, 
                 WL_WARNING as c_int,
                 b"Q3_GetAnimUpper: attempted to read animation state off non-client!\n\0".as_ptr()
                     as *const c_char,
@@ -98,13 +101,14 @@ pub fn Q3_GetAnimUpper(ent: *mut gentity_t) -> *mut c_char {
 /// Raven `Q3_GetAnimBoth`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:371-398`
-pub fn Q3_GetAnimBoth(ent: *mut gentity_t) -> *mut c_char {
+pub fn Q3_GetAnimBoth(
+    ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut c_char {
     unsafe {
-        let lower_name = Q3_GetAnimLower(ent);
-        let upper_name = Q3_GetAnimUpper(ent);
+        let lower_name = Q3_GetAnimLower(ctx, ent);
+        let upper_name = Q3_GetAnimUpper(ctx, ent);
 
         if lower_name.is_null() || *lower_name == 0 {
-            G_DebugPrint(
+            G_DebugPrint(ctx, 
                 WL_WARNING as c_int,
                 b"Q3_GetAnimBoth: NULL legs animation string found!\n\0".as_ptr() as *const c_char,
             );
@@ -112,7 +116,7 @@ pub fn Q3_GetAnimBoth(ent: *mut gentity_t) -> *mut c_char {
         }
 
         if upper_name.is_null() || *upper_name == 0 {
-            G_DebugPrint(
+            G_DebugPrint(ctx, 
                 WL_WARNING as c_int,
                 b"Q3_GetAnimBoth: NULL torso animation string found!\n\0".as_ptr() as *const c_char,
             );
@@ -130,6 +134,7 @@ pub fn Q3_GetAnimBoth(ent: *mut gentity_t) -> *mut c_char {
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:400-520`
 pub fn Q3_PlaySound(
+    ctx: GameContext<'_>,
     taskID: c_int,
     entID: c_int,
     name: *const c_char,
@@ -143,6 +148,7 @@ pub fn Q3_PlaySound(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:527-560`
 pub fn Q3_Play(
+    ctx: GameContext<'_>,
     taskID: c_int,
     entID: c_int,
     r#type: *const c_char,
@@ -161,7 +167,8 @@ pub fn Q3_Play(
 ///
 /// Utility function.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:569-591`
-pub fn anglerCallback(ent: *mut gentity_t) {
+pub fn anglerCallback(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port anglerCallback — parked: seam-threading")
 }
 
@@ -174,14 +181,16 @@ pub fn anglerCallback(ent: *mut gentity_t) {
 ///
 /// Utility function.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:603-633`
-pub fn moverCallback(ent: *mut gentity_t) {
+pub fn moverCallback(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     todo!("Port moverCallback — parked: seam-threading")
 }
 
 /// Raven `Blocked_Mover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:635-658`
-pub fn Blocked_Mover(ent: *mut gentity_t, other: *mut gentity_t) {
+pub fn Blocked_Mover(
+    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t) {
     unsafe {
         // remove anything other than a client -- no longer the case
 
@@ -197,7 +206,7 @@ pub fn Blocked_Mover(ent: *mut gentity_t, other: *mut gentity_t) {
         {
             // if your not a client, or your a dead client remove yourself...
             // if an item or weapon can we do a little explosion..?
-            G_FreeEntity(other);
+            G_FreeEntity(ctx, other);
             return;
         }
 
@@ -223,11 +232,12 @@ pub fn Blocked_Mover(ent: *mut gentity_t, other: *mut gentity_t) {
 ///
 /// Utility function.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:667-673`
-pub fn moveAndRotateCallback(ent: *mut gentity_t) {
+pub fn moveAndRotateCallback(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     //stop turning
-    anglerCallback(ent);
+    anglerCallback(ctx, ent);
     //stop moving
-    moverCallback(ent);
+    moverCallback(ctx, ent);
 }
 
 // PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
@@ -235,6 +245,7 @@ pub fn moveAndRotateCallback(ent: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:682-721`
 pub fn Q3_Lerp2Start(
+    ctx: GameContext<'_>,
     entID: c_int,
     taskID: c_int,
     duration: f32,
@@ -247,6 +258,7 @@ pub fn Q3_Lerp2Start(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:730-769`
 pub fn Q3_Lerp2End(
+    ctx: GameContext<'_>,
     entID: c_int,
     taskID: c_int,
     duration: f32,
@@ -259,6 +271,7 @@ pub fn Q3_Lerp2End(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:781-883`
 pub fn Q3_Lerp2Pos(
+    ctx: GameContext<'_>,
     taskID: c_int,
     entID: c_int,
     origin: vec3_t,
@@ -273,6 +286,7 @@ pub fn Q3_Lerp2Pos(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:892-939`
 pub fn Q3_Lerp2Angles(
+    ctx: GameContext<'_>,
     taskID: c_int,
     entID: c_int,
     angles: vec3_t,
@@ -286,6 +300,7 @@ pub fn Q3_Lerp2Angles(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:948-970`
 pub fn Q3_GetTag(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
     lookup: c_int,
@@ -299,6 +314,7 @@ pub fn Q3_GetTag(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:981-998`
 pub fn Q3_Use(
+    ctx: GameContext<'_>,
     entID: c_int,
     target: *const c_char,
 ) {
@@ -310,6 +326,7 @@ pub fn Q3_Use(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1009-1052`
 pub fn Q3_Kill(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -320,6 +337,7 @@ pub fn Q3_Kill(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1062-1116`
 pub fn Q3_RemoveEnt(
+    ctx: GameContext<'_>,
     victim: *mut gentity_t,
 ) {
     todo!("Port Q3_RemoveEnt — oracle/oracle/codemp/game/g_ICARUScb.c:1062")
@@ -330,6 +348,7 @@ pub fn Q3_RemoveEnt(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1128-1168`
 pub fn Q3_Remove(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -341,6 +360,7 @@ pub fn Q3_Remove(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1189-1559`
 pub fn Q3_GetFloat(
+    ctx: GameContext<'_>,
     entID: c_int,
     r#type: c_int,
     name: *const c_char,
@@ -354,6 +374,7 @@ pub fn Q3_GetFloat(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1573-1629`
 pub fn Q3_GetVector(
+    ctx: GameContext<'_>,
     entID: c_int,
     r#type: c_int,
     name: *const c_char,
@@ -367,6 +388,7 @@ pub fn Q3_GetVector(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1642-1854`
 pub fn Q3_GetString(
+    ctx: GameContext<'_>,
     entID: c_int,
     r#type: c_int,
     name: *const c_char,
@@ -379,6 +401,7 @@ pub fn Q3_GetString(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1865-1886`
 pub fn MoveOwner(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port MoveOwner — oracle/oracle/codemp/game/g_ICARUScb.c:1865")
@@ -389,6 +412,7 @@ pub fn MoveOwner(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1895-1920`
 pub fn Q3_SetTeleportDest(
+    ctx: GameContext<'_>,
     entID: c_int,
     org: vec3_t,
 ) -> qboolean {
@@ -400,6 +424,7 @@ pub fn Q3_SetTeleportDest(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1929-1961`
 pub fn Q3_SetOrigin(
+    ctx: GameContext<'_>,
     entID: c_int,
     origin: vec3_t,
 ) {
@@ -411,6 +436,7 @@ pub fn Q3_SetOrigin(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1970-1983`
 pub fn Q3_SetCopyOrigin(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -422,6 +448,7 @@ pub fn Q3_SetCopyOrigin(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1992-2013`
 pub fn Q3_SetVelocity(
+    ctx: GameContext<'_>,
     entID: c_int,
     axis: c_int,
     speed: f32,
@@ -434,6 +461,7 @@ pub fn Q3_SetVelocity(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2022-2042`
 pub fn Q3_SetAngles(
+    ctx: GameContext<'_>,
     entID: c_int,
     angles: vec3_t,
 ) {
@@ -445,6 +473,7 @@ pub fn Q3_SetAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2051-2112`
 pub fn Q3_Lerp2Origin(
+    ctx: GameContext<'_>,
     taskID: c_int,
     entID: c_int,
     origin: vec3_t,
@@ -458,6 +487,7 @@ pub fn Q3_Lerp2Origin(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2114-2140`
 pub fn Q3_SetOriginOffset(
+    ctx: GameContext<'_>,
     entID: c_int,
     axis: c_int,
     offset: f32,
@@ -470,6 +500,7 @@ pub fn Q3_SetOriginOffset(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2149-2197`
 pub fn Q3_SetEnemy(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -481,6 +512,7 @@ pub fn Q3_SetEnemy(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2207-2246`
 pub fn Q3_SetLeader(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -492,6 +524,7 @@ pub fn Q3_SetLeader(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2255-2320`
 pub fn Q3_SetNavGoal(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) -> qboolean {
@@ -503,6 +536,7 @@ pub fn Q3_SetNavGoal(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2330-2347`
 pub fn SetLowerAnim(
+    ctx: GameContext<'_>,
     entID: c_int,
     animID: c_int,
 ) {
@@ -514,6 +548,7 @@ pub fn SetLowerAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2358-2375`
 pub fn SetUpperAnim(
+    ctx: GameContext<'_>,
     entID: c_int,
     animID: c_int,
 ) {
@@ -525,6 +560,7 @@ pub fn SetUpperAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2384-2405`
 pub fn Q3_SetAnimUpper(
+    ctx: GameContext<'_>,
     entID: c_int,
     anim_name: *const c_char,
 ) -> qboolean {
@@ -536,6 +572,7 @@ pub fn Q3_SetAnimUpper(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2414-2437`
 pub fn Q3_SetAnimLower(
+    ctx: GameContext<'_>,
     entID: c_int,
     anim_name: *const c_char,
 ) -> qboolean {
@@ -547,6 +584,7 @@ pub fn Q3_SetAnimLower(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2449-2476`
 pub fn Q3_SetAnimHoldTime(
+    ctx: GameContext<'_>,
     entID: c_int,
     int_data: c_int,
     lower: qboolean,
@@ -559,6 +597,7 @@ pub fn Q3_SetAnimHoldTime(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2487-2527`
 pub fn Q3_SetHealth(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: c_int,
 ) {
@@ -570,6 +609,7 @@ pub fn Q3_SetHealth(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2539-2559`
 pub fn Q3_SetArmor(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: c_int,
 ) {
@@ -581,6 +621,7 @@ pub fn Q3_SetArmor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2573-2687`
 pub fn Q3_SetBState(
+    ctx: GameContext<'_>,
     entID: c_int,
     bs_name: *const c_char,
 ) -> qboolean {
@@ -592,6 +633,7 @@ pub fn Q3_SetBState(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2699-2737`
 pub fn Q3_SetTempBState(
+    ctx: GameContext<'_>,
     entID: c_int,
     bs_name: *const c_char,
 ) -> qboolean {
@@ -603,6 +645,7 @@ pub fn Q3_SetTempBState(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2749-2771`
 pub fn Q3_SetDefaultBState(
+    ctx: GameContext<'_>,
     entID: c_int,
     bs_name: *const c_char,
 ) {
@@ -614,6 +657,7 @@ pub fn Q3_SetDefaultBState(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2783-2787`
 pub fn Q3_SetDPitch(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: f32,
 ) {
@@ -625,6 +669,7 @@ pub fn Q3_SetDPitch(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2799-2803`
 pub fn Q3_SetDYaw(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: f32,
 ) {
@@ -636,6 +681,7 @@ pub fn Q3_SetDYaw(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2815-2819`
 pub fn Q3_SetShootDist(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: f32,
 ) {
@@ -647,6 +693,7 @@ pub fn Q3_SetShootDist(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2831-2835`
 pub fn Q3_SetVisrange(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: f32,
 ) {
@@ -658,6 +705,7 @@ pub fn Q3_SetVisrange(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2847-2851`
 pub fn Q3_SetEarshot(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: f32,
 ) {
@@ -669,6 +717,7 @@ pub fn Q3_SetEarshot(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2863-2867`
 pub fn Q3_SetVigilance(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: f32,
 ) {
@@ -680,6 +729,7 @@ pub fn Q3_SetVigilance(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2879-2883`
 pub fn Q3_SetVFOV(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: c_int,
 ) {
@@ -691,6 +741,7 @@ pub fn Q3_SetVFOV(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2895-2899`
 pub fn Q3_SetHFOV(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: c_int,
 ) {
@@ -702,6 +753,7 @@ pub fn Q3_SetHFOV(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2911-2915`
 pub fn Q3_SetWidth(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: c_int,
 ) {
@@ -713,6 +765,7 @@ pub fn Q3_SetWidth(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2926-2929`
 pub fn Q3_SetTimeScale(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: *const c_char,
 ) {
@@ -724,6 +777,7 @@ pub fn Q3_SetTimeScale(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2941-2968`
 pub fn Q3_SetInvisible(
+    ctx: GameContext<'_>,
     entID: c_int,
     invisible: qboolean,
 ) {
@@ -735,6 +789,7 @@ pub fn Q3_SetInvisible(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2979-2983`
 pub fn Q3_SetVampire(
+    ctx: GameContext<'_>,
     entID: c_int,
     vampire: qboolean,
 ) {
@@ -746,6 +801,7 @@ pub fn Q3_SetVampire(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2993-2997`
 pub fn Q3_SetGreetAllies(
+    ctx: GameContext<'_>,
     entID: c_int,
     greet: qboolean,
 ) {
@@ -757,6 +813,7 @@ pub fn Q3_SetGreetAllies(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3009-3013`
 pub fn Q3_SetViewTarget(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -768,6 +825,7 @@ pub fn Q3_SetViewTarget(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3025-3029`
 pub fn Q3_SetWatchTarget(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -779,6 +837,7 @@ pub fn Q3_SetWatchTarget(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3031-3054`
 pub fn Q3_SetLoopSound(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -790,6 +849,7 @@ pub fn Q3_SetLoopSound(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3056-3078`
 pub fn Q3_SetICARUSFreeze(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
     freeze: qboolean,
@@ -802,6 +862,7 @@ pub fn Q3_SetICARUSFreeze(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3089-3092`
 pub fn Q3_SetViewEntity(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -813,6 +874,7 @@ pub fn Q3_SetViewEntity(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3104-3111`
 pub fn Q3_SetWeapon(
+    ctx: GameContext<'_>,
     entID: c_int,
     wp_name: *const c_char,
 ) {
@@ -824,6 +886,7 @@ pub fn Q3_SetWeapon(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3122-3126`
 pub fn Q3_SetItem(
+    ctx: GameContext<'_>,
     entID: c_int,
     item_name: *const c_char,
 ) {
@@ -835,6 +898,7 @@ pub fn Q3_SetItem(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3139-3161`
 pub fn Q3_SetWalkSpeed(
+    ctx: GameContext<'_>,
     entID: c_int,
     int_data: c_int,
 ) {
@@ -846,6 +910,7 @@ pub fn Q3_SetWalkSpeed(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3173-3195`
 pub fn Q3_SetRunSpeed(
+    ctx: GameContext<'_>,
     entID: c_int,
     int_data: c_int,
 ) {
@@ -857,6 +922,7 @@ pub fn Q3_SetRunSpeed(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3207-3211`
 pub fn Q3_SetYawSpeed(
+    ctx: GameContext<'_>,
     entID: c_int,
     float_data: f32,
 ) {
@@ -868,6 +934,7 @@ pub fn Q3_SetYawSpeed(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3223-3227`
 pub fn Q3_SetAggression(
+    ctx: GameContext<'_>,
     entID: c_int,
     int_data: c_int,
 ) {
@@ -879,6 +946,7 @@ pub fn Q3_SetAggression(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3239-3243`
 pub fn Q3_SetAim(
+    ctx: GameContext<'_>,
     entID: c_int,
     int_data: c_int,
 ) {
@@ -890,6 +958,7 @@ pub fn Q3_SetAim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3255-3273`
 pub fn Q3_SetFriction(
+    ctx: GameContext<'_>,
     entID: c_int,
     int_data: c_int,
 ) {
@@ -901,6 +970,7 @@ pub fn Q3_SetFriction(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3285-3307`
 pub fn Q3_SetGravity(
+    ctx: GameContext<'_>,
     entID: c_int,
     float_data: f32,
 ) {
@@ -912,6 +982,7 @@ pub fn Q3_SetGravity(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3319-3330`
 pub fn Q3_SetWait(
+    ctx: GameContext<'_>,
     entID: c_int,
     float_data: f32,
 ) {
@@ -923,6 +994,7 @@ pub fn Q3_SetWait(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3333-3337`
 pub fn Q3_SetShotSpacing(
+    ctx: GameContext<'_>,
     entID: c_int,
     int_data: c_int,
 ) {
@@ -934,6 +1006,7 @@ pub fn Q3_SetShotSpacing(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3348-3352`
 pub fn Q3_SetFollowDist(
+    ctx: GameContext<'_>,
     entID: c_int,
     float_data: f32,
 ) {
@@ -945,6 +1018,7 @@ pub fn Q3_SetFollowDist(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3364-3396`
 pub fn Q3_SetScale(
+    ctx: GameContext<'_>,
     entID: c_int,
     float_data: f32,
 ) {
@@ -965,6 +1039,7 @@ pub fn Q3_GameSideCheckStringCounterIncrement(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3440-3460`
 pub fn Q3_SetCount(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: *const c_char,
 ) {
@@ -976,6 +1051,7 @@ pub fn Q3_SetCount(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3472-3490`
 pub fn Q3_SetTargetName(
+    ctx: GameContext<'_>,
     entID: c_int,
     targetname: *const c_char,
 ) {
@@ -987,6 +1063,7 @@ pub fn Q3_SetTargetName(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3502-3520`
 pub fn Q3_SetTarget(
+    ctx: GameContext<'_>,
     entID: c_int,
     target: *const c_char,
 ) {
@@ -998,6 +1075,7 @@ pub fn Q3_SetTarget(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3531-3552`
 pub fn Q3_SetTarget2(
+    ctx: GameContext<'_>,
     entID: c_int,
     target2: *const c_char,
 ) {
@@ -1009,6 +1087,7 @@ pub fn Q3_SetTarget2(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3562-3566`
 pub fn Q3_SetRemoveTarget(
+    ctx: GameContext<'_>,
     entID: c_int,
     target: *const c_char,
 ) {
@@ -1020,6 +1099,7 @@ pub fn Q3_SetRemoveTarget(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3578-3599`
 pub fn Q3_SetPainTarget(
+    ctx: GameContext<'_>,
     entID: c_int,
     targetname: *const c_char,
 ) {
@@ -1031,6 +1111,7 @@ pub fn Q3_SetPainTarget(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3610-3628`
 pub fn Q3_SetFullName(
+    ctx: GameContext<'_>,
     entID: c_int,
     fullName: *const c_char,
 ) {
@@ -1042,6 +1123,7 @@ pub fn Q3_SetFullName(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3630-3634`
 pub fn Q3_SetMusicState(
+    ctx: GameContext<'_>,
     dms: *const c_char,
 ) {
     todo!("Port Q3_SetMusicState — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3630")
@@ -1052,6 +1134,7 @@ pub fn Q3_SetMusicState(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3636-3640`
 pub fn Q3_SetForcePowerLevel(
+    ctx: GameContext<'_>,
     entID: c_int,
     forcePower: c_int,
     forceLevel: c_int,
@@ -1076,6 +1159,7 @@ pub fn Q3_SetParm(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3701-3705`
 pub fn Q3_SetCaptureGoal(
+    ctx: GameContext<'_>,
     entID: c_int,
     name: *const c_char,
 ) {
@@ -1087,6 +1171,7 @@ pub fn Q3_SetCaptureGoal(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3714-3718`
 pub fn Q3_SetEvent(
+    ctx: GameContext<'_>,
     entID: c_int,
     event_name: *const c_char,
 ) {
@@ -1098,6 +1183,7 @@ pub fn Q3_SetEvent(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3727-3731`
 pub fn Q3_SetIgnorePain(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: qboolean,
 ) {
@@ -1109,6 +1195,7 @@ pub fn Q3_SetIgnorePain(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3740-3744`
 pub fn Q3_SetIgnoreEnemies(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: qboolean,
 ) {
@@ -1120,6 +1207,7 @@ pub fn Q3_SetIgnoreEnemies(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3753-3757`
 pub fn Q3_SetIgnoreAlerts(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: qboolean,
 ) {
@@ -1131,6 +1219,7 @@ pub fn Q3_SetIgnoreAlerts(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3767-3781`
 pub fn Q3_SetNoTarget(
+    ctx: GameContext<'_>,
     entID: c_int,
     data: qboolean,
 ) {
@@ -1142,6 +1231,7 @@ pub fn Q3_SetNoTarget(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3790-3794`
 pub fn Q3_SetDontShoot(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1153,6 +1243,7 @@ pub fn Q3_SetDontShoot(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3803-3807`
 pub fn Q3_SetDontFire(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1164,6 +1255,7 @@ pub fn Q3_SetDontFire(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3816-3820`
 pub fn Q3_SetFireWeapon(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1175,6 +1267,7 @@ pub fn Q3_SetFireWeapon(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3830-3848`
 pub fn Q3_SetInactive(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1186,6 +1279,7 @@ pub fn Q3_SetInactive(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3857-3880`
 pub fn Q3_SetFuncUsableVisible(
+    ctx: GameContext<'_>,
     entID: c_int,
     visible: qboolean,
 ) {
@@ -1197,6 +1291,7 @@ pub fn Q3_SetFuncUsableVisible(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3889-3893`
 pub fn Q3_SetLockedEnemy(
+    ctx: GameContext<'_>,
     entID: c_int,
     locked: qboolean,
 ) {
@@ -1208,6 +1303,7 @@ pub fn Q3_SetLockedEnemy(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3903-3907`
 pub fn Q3_SetCinematicSkipScript(
+    ctx: GameContext<'_>,
     scriptname: *mut c_char,
 ) {
     todo!("Port Q3_SetCinematicSkipScript — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3903")
@@ -1218,6 +1314,7 @@ pub fn Q3_SetCinematicSkipScript(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3916-3920`
 pub fn Q3_SetNoMindTrick(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1229,6 +1326,7 @@ pub fn Q3_SetNoMindTrick(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3929-3933`
 pub fn Q3_SetCrouched(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1240,6 +1338,7 @@ pub fn Q3_SetCrouched(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3942-3967`
 pub fn Q3_SetWalking(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1251,6 +1350,7 @@ pub fn Q3_SetWalking(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3976-3980`
 pub fn Q3_SetRunning(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1262,6 +1362,7 @@ pub fn Q3_SetRunning(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3989-3993`
 pub fn Q3_SetForcedMarch(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1273,6 +1374,7 @@ pub fn Q3_SetForcedMarch(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4001-4005`
 pub fn Q3_SetChaseEnemies(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1284,6 +1386,7 @@ pub fn Q3_SetChaseEnemies(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4015-4019`
 pub fn Q3_SetLookForEnemies(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1295,6 +1398,7 @@ pub fn Q3_SetLookForEnemies(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4027-4031`
 pub fn Q3_SetFaceMoveDir(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1306,6 +1410,7 @@ pub fn Q3_SetFaceMoveDir(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4040-4044`
 pub fn Q3_SetAltFire(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1317,6 +1422,7 @@ pub fn Q3_SetAltFire(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4053-4057`
 pub fn Q3_SetDontFlee(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1328,6 +1434,7 @@ pub fn Q3_SetDontFlee(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4066-4070`
 pub fn Q3_SetNoResponse(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1339,6 +1446,7 @@ pub fn Q3_SetNoResponse(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4079-4083`
 pub fn Q3_SetCombatTalk(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1350,6 +1458,7 @@ pub fn Q3_SetCombatTalk(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4092-4096`
 pub fn Q3_SetAlertTalk(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1361,6 +1470,7 @@ pub fn Q3_SetAlertTalk(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4105-4109`
 pub fn Q3_SetUseCpNearest(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1372,6 +1482,7 @@ pub fn Q3_SetUseCpNearest(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4118-4122`
 pub fn Q3_SetNoForce(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1383,6 +1494,7 @@ pub fn Q3_SetNoForce(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4131-4135`
 pub fn Q3_SetNoAcrobatics(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1394,6 +1506,7 @@ pub fn Q3_SetNoAcrobatics(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4144-4148`
 pub fn Q3_SetUseSubtitles(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1405,6 +1518,7 @@ pub fn Q3_SetUseSubtitles(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4157-4161`
 pub fn Q3_SetNoFallToDeath(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1416,6 +1530,7 @@ pub fn Q3_SetNoFallToDeath(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4170-4174`
 pub fn Q3_SetDismemberable(
+    ctx: GameContext<'_>,
     entID: c_int,
     dismemberable: qboolean,
 ) {
@@ -1427,6 +1542,7 @@ pub fn Q3_SetDismemberable(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4184-4188`
 pub fn Q3_SetMoreLight(
+    ctx: GameContext<'_>,
     entID: c_int,
     add: qboolean,
 ) {
@@ -1438,6 +1554,7 @@ pub fn Q3_SetMoreLight(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4197-4201`
 pub fn Q3_SetUndying(
+    ctx: GameContext<'_>,
     entID: c_int,
     undying: qboolean,
 ) {
@@ -1449,6 +1566,7 @@ pub fn Q3_SetUndying(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4210-4214`
 pub fn Q3_SetInvincible(
+    ctx: GameContext<'_>,
     entID: c_int,
     invincible: qboolean,
 ) {
@@ -1460,6 +1578,7 @@ pub fn Q3_SetInvincible(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4224-4228`
 pub fn Q3_SetForceInvincible(
+    ctx: GameContext<'_>,
     entID: c_int,
     forceInv: qboolean,
 ) {
@@ -1471,6 +1590,7 @@ pub fn Q3_SetForceInvincible(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4237-4261`
 pub fn Q3_SetNoAvoid(
+    ctx: GameContext<'_>,
     entID: c_int,
     noAvoid: qboolean,
 ) {
@@ -1481,6 +1601,7 @@ pub fn Q3_SetNoAvoid(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4271-4295`
 pub fn SolidifyOwner(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port SolidifyOwner — oracle/oracle/codemp/game/g_ICARUScb.c:4271")
@@ -1491,6 +1612,7 @@ pub fn SolidifyOwner(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4305-4345`
 pub fn Q3_SetSolid(
+    ctx: GameContext<'_>,
     entID: c_int,
     solid: qboolean,
 ) -> qboolean {
@@ -1502,6 +1624,7 @@ pub fn Q3_SetSolid(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4354-4372`
 pub fn Q3_SetForwardMove(
+    ctx: GameContext<'_>,
     entID: c_int,
     fmoveVal: c_int,
 ) {
@@ -1513,6 +1636,7 @@ pub fn Q3_SetForwardMove(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4381-4399`
 pub fn Q3_SetRightMove(
+    ctx: GameContext<'_>,
     entID: c_int,
     rmoveVal: c_int,
 ) {
@@ -1524,6 +1648,7 @@ pub fn Q3_SetRightMove(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4408-4445`
 pub fn Q3_SetLockAngle(
+    ctx: GameContext<'_>,
     entID: c_int,
     lockAngle: *const c_char,
 ) {
@@ -1535,6 +1660,7 @@ pub fn Q3_SetLockAngle(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4455-4459`
 pub fn Q3_CameraGroup(
+    ctx: GameContext<'_>,
     entID: c_int,
     camG: *mut c_char,
 ) {
@@ -1546,6 +1672,7 @@ pub fn Q3_CameraGroup(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4468-4472`
 pub fn Q3_CameraGroupZOfs(
+    ctx: GameContext<'_>,
     camGZOfs: f32,
 ) {
     todo!("Port Q3_CameraGroupZOfs — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4468")
@@ -1556,6 +1683,7 @@ pub fn Q3_CameraGroupZOfs(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4480-4484`
 pub fn Q3_CameraGroupTag(
+    ctx: GameContext<'_>,
     camGTag: *mut c_char,
 ) {
     todo!("Port Q3_CameraGroupTag — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4480")
@@ -1566,6 +1694,7 @@ pub fn Q3_CameraGroupTag(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4491-4494`
 pub fn Q3_RemoveRHandModel(
+    ctx: GameContext<'_>,
     entID: c_int,
     addModel: *mut c_char,
 ) {
@@ -1577,6 +1706,7 @@ pub fn Q3_RemoveRHandModel(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4501-4504`
 pub fn Q3_AddRHandModel(
+    ctx: GameContext<'_>,
     entID: c_int,
     addModel: *mut c_char,
 ) {
@@ -1588,6 +1718,7 @@ pub fn Q3_AddRHandModel(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4511-4514`
 pub fn Q3_AddLHandModel(
+    ctx: GameContext<'_>,
     entID: c_int,
     addModel: *mut c_char,
 ) {
@@ -1599,6 +1730,7 @@ pub fn Q3_AddLHandModel(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4521-4524`
 pub fn Q3_RemoveLHandModel(
+    ctx: GameContext<'_>,
     entID: c_int,
     addModel: *mut c_char,
 ) {
@@ -1610,6 +1742,7 @@ pub fn Q3_RemoveLHandModel(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4533-4537`
 pub fn Q3_LookTarget(
+    ctx: GameContext<'_>,
     entID: c_int,
     targetName: *mut c_char,
 ) {
@@ -1621,6 +1754,7 @@ pub fn Q3_LookTarget(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4546-4549`
 pub fn Q3_Face(
+    ctx: GameContext<'_>,
     entID: c_int,
     expression: c_int,
     holdtime: f32,
@@ -1633,6 +1767,7 @@ pub fn Q3_Face(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4560-4564`
 pub fn Q3_SetLocation(
+    ctx: GameContext<'_>,
     entID: c_int,
     location: *const c_char,
 ) -> qboolean {
@@ -1644,6 +1779,7 @@ pub fn Q3_SetLocation(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4576-4579`
 pub fn Q3_SetPlayerLocked(
+    ctx: GameContext<'_>,
     entID: c_int,
     locked: qboolean,
 ) {
@@ -1655,6 +1791,7 @@ pub fn Q3_SetPlayerLocked(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4590-4593`
 pub fn Q3_SetLockPlayerWeapons(
+    ctx: GameContext<'_>,
     entID: c_int,
     locked: qboolean,
 ) {
@@ -1666,6 +1803,7 @@ pub fn Q3_SetLockPlayerWeapons(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4605-4608`
 pub fn Q3_SetNoImpactDamage(
+    ctx: GameContext<'_>,
     entID: c_int,
     noImp: qboolean,
 ) {
@@ -1677,6 +1815,7 @@ pub fn Q3_SetNoImpactDamage(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4617-4708`
 pub fn Q3_SetBehaviorSet(
+    ctx: GameContext<'_>,
     entID: c_int,
     toSet: c_int,
     scriptname: *const c_char,
@@ -1689,6 +1828,7 @@ pub fn Q3_SetBehaviorSet(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4717-4720`
 pub fn Q3_SetDelayScriptTime(
+    ctx: GameContext<'_>,
     entID: c_int,
     delayTime: c_int,
 ) {
@@ -1700,6 +1840,7 @@ pub fn Q3_SetDelayScriptTime(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4734-4752`
 pub fn Q3_SetPlayerUsable(
+    ctx: GameContext<'_>,
     entID: c_int,
     usable: qboolean,
 ) {
@@ -1711,6 +1852,7 @@ pub fn Q3_SetPlayerUsable(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4763-4767`
 pub fn Q3_SetDisableShaderAnims(
+    ctx: GameContext<'_>,
     entID: c_int,
     disabled: c_int,
 ) {
@@ -1722,6 +1864,7 @@ pub fn Q3_SetDisableShaderAnims(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4778-4782`
 pub fn Q3_SetShaderAnim(
+    ctx: GameContext<'_>,
     entID: c_int,
     disabled: c_int,
 ) {
@@ -1733,6 +1876,7 @@ pub fn Q3_SetShaderAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4793-4796`
 pub fn Q3_SetStartFrame(
+    ctx: GameContext<'_>,
     entID: c_int,
     startFrame: c_int,
 ) {
@@ -1744,6 +1888,7 @@ pub fn Q3_SetStartFrame(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4808-4811`
 pub fn Q3_SetEndFrame(
+    ctx: GameContext<'_>,
     entID: c_int,
     endFrame: c_int,
 ) {
@@ -1755,6 +1900,7 @@ pub fn Q3_SetEndFrame(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4822-4825`
 pub fn Q3_SetAnimFrame(
+    ctx: GameContext<'_>,
     entID: c_int,
     animFrame: c_int,
 ) {
@@ -1766,6 +1912,7 @@ pub fn Q3_SetAnimFrame(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4836-4839`
 pub fn Q3_SetLoopAnim(
+    ctx: GameContext<'_>,
     entID: c_int,
     loopAnim: qboolean,
 ) {
@@ -1777,6 +1924,7 @@ pub fn Q3_SetLoopAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4851-4855`
 pub fn Q3_SetShields(
+    ctx: GameContext<'_>,
     entID: c_int,
     shields: qboolean,
 ) {
@@ -1788,6 +1936,7 @@ pub fn Q3_SetShields(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4866-4889`
 pub fn Q3_SetSaberActive(
+    ctx: GameContext<'_>,
     entID: c_int,
     active: qboolean,
 ) {
@@ -1799,6 +1948,7 @@ pub fn Q3_SetSaberActive(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4900-4918`
 pub fn Q3_SetNoKnockback(
+    ctx: GameContext<'_>,
     entID: c_int,
     noKnockback: qboolean,
 ) {
@@ -1809,7 +1959,7 @@ pub fn Q3_SetNoKnockback(
 /// Raven `Q3_SetCleanDamagingEnts`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4927-4931`
-pub fn Q3_SetCleanDamagingEnts() {
+pub fn Q3_SetCleanDamagingEnts(ctx: GameContext<'_>) {
     todo!("Port Q3_SetCleanDamagingEnts — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4927")
 }
 
@@ -1818,6 +1968,7 @@ pub fn Q3_SetCleanDamagingEnts() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4942-4946`
 pub fn SetTextColor(
+    ctx: GameContext<'_>,
     textcolor: vec4_t,
     color: *const c_char,
 ) {
@@ -1829,6 +1980,7 @@ pub fn SetTextColor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4955-4958`
 pub fn Q3_SetCaptionTextColor(
+    ctx: GameContext<'_>,
     color: *const c_char,
 ) {
     todo!("Port Q3_SetCaptionTextColor — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4955")
@@ -1839,6 +1991,7 @@ pub fn Q3_SetCaptionTextColor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4967-4970`
 pub fn Q3_SetCenterTextColor(
+    ctx: GameContext<'_>,
     color: *const c_char,
 ) {
     todo!("Port Q3_SetCenterTextColor — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4967")
@@ -1849,6 +2002,7 @@ pub fn Q3_SetCenterTextColor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4979-4982`
 pub fn Q3_SetScrollTextColor(
+    ctx: GameContext<'_>,
     color: *const c_char,
 ) {
     todo!("Port Q3_SetScrollTextColor — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4979")
@@ -1859,6 +2013,7 @@ pub fn Q3_SetScrollTextColor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4991-4997`
 pub fn Q3_ScrollText(
+    ctx: GameContext<'_>,
     id: *const c_char,
 ) {
     todo!("Port Q3_ScrollText — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4991")
@@ -1869,6 +2024,7 @@ pub fn Q3_ScrollText(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:5006-5012`
 pub fn Q3_LCARSText(
+    ctx: GameContext<'_>,
     id: *const c_char,
 ) {
     todo!("Port Q3_LCARSText — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:5006")
@@ -1879,6 +2035,7 @@ pub fn Q3_LCARSText(
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:5018-6074`
 pub fn Q3_Set(
+    ctx: GameContext<'_>,
     taskID: c_int,
     entID: c_int,
     type_name: *const c_char,

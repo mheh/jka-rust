@@ -45,7 +45,7 @@ const SENTRY_HOVER_HEIGHT: i32 = 24;
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn NPC_Sentry_Precache() {
+pub fn NPC_Sentry_Precache(ctx: GameContext<'_>) {
     todo!("Port NPC_Sentry_Precache — parked: seam-threading")
 }
 
@@ -60,6 +60,7 @@ pub fn NPC_Sentry_Precache() {
 // type-check as irrefutable match-pattern bindings (always-true), which is
 // a behavioral bug, not just a compile gap — parked instead.
 pub fn sentry_use(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
@@ -78,6 +79,7 @@ pub fn sentry_use(
 // type-check as irrefutable match-pattern bindings (always-true), which is
 // a behavioral bug, not just a compile gap — parked instead.
 pub fn NPC_Sentry_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -94,7 +96,7 @@ pub fn NPC_Sentry_Pain(
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Sentry_Fire() {
+pub fn Sentry_Fire(ctx: GameContext<'_>) {
     todo!("Port Sentry_Fire — parked: ai-context")
 }
 
@@ -107,7 +109,7 @@ pub fn Sentry_Fire() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Sentry_MaintainHeight() {
+pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
     todo!("Port Sentry_MaintainHeight — parked: ai-context")
 }
 
@@ -120,7 +122,7 @@ pub fn Sentry_MaintainHeight() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Sentry_Idle() {
+pub fn Sentry_Idle(ctx: GameContext<'_>) {
     todo!("Port Sentry_Idle — parked: ai-context")
 }
 
@@ -133,7 +135,7 @@ pub fn Sentry_Idle() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Sentry_Strafe() {
+pub fn Sentry_Strafe(ctx: GameContext<'_>) {
     todo!("Port Sentry_Strafe — parked: ai-context")
 }
 
@@ -146,7 +148,8 @@ pub fn Sentry_Strafe() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Sentry_Hunt(visible: qboolean, advance: qboolean) {
+pub fn Sentry_Hunt(
+    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
     todo!("Port Sentry_Hunt — parked: ai-context")
 }
 
@@ -159,7 +162,8 @@ pub fn Sentry_Hunt(visible: qboolean, advance: qboolean) {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Sentry_RangedAttack(visible: qboolean, advance: qboolean) {
+pub fn Sentry_RangedAttack(
+    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
     todo!("Port Sentry_RangedAttack — parked: ai-context")
 }
 
@@ -172,7 +176,7 @@ pub fn Sentry_RangedAttack(visible: qboolean, advance: qboolean) {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn Sentry_AttackDecision() {
+pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
     todo!("Port Sentry_AttackDecision — parked: ai-context")
 }
 
@@ -185,7 +189,7 @@ pub fn Sentry_AttackDecision() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn NPC_Sentry_Patrol() {
+pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
     todo!("Port NPC_Sentry_Patrol — parked: ai-context")
 }
 
@@ -198,6 +202,6 @@ pub fn NPC_Sentry_Patrol() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn NPC_BSSentry_Default() {
+pub fn NPC_BSSentry_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSSentry_Default — parked: ai-context")
 }

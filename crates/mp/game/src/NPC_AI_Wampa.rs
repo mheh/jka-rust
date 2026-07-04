@@ -34,6 +34,7 @@ const LSTATE_WAITING: c_int = 1;
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:16-36`
 pub fn Wampa_SetBolts(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Wampa_SetBolts — parked: ai-context-threading")
@@ -44,7 +45,7 @@ pub fn Wampa_SetBolts(
 /// Precaches the swipe-hit sound. All growl/snort variants are commented out
 /// in the oracle source (oracle/oracle/codemp/game/NPC_AI_Wampa.c:45-55).
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:43-58`
-pub fn NPC_Wampa_Precache() {
+pub fn NPC_Wampa_Precache(ctx: GameContext<'_>) {
     // Only the swipe sound is live; growl/snort loops are commented out
     G_SoundIndex(b"sound/chars/rancor/swipehit.wav\0".as_ptr() as *const c_char);
 }
@@ -54,7 +55,7 @@ pub fn NPC_Wampa_Precache() {
 /// Raven `Wampa_Idle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:66-76`
-pub fn Wampa_Idle() {
+pub fn Wampa_Idle(ctx: GameContext<'_>) {
     todo!("Port Wampa_Idle — parked: ai-context-threading")
 }
 
@@ -64,6 +65,7 @@ pub fn Wampa_Idle() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:78-88`
 pub fn Wampa_CheckRoar(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) -> qboolean {
     todo!("Port Wampa_CheckRoar — parked: ai-context-threading")
@@ -74,7 +76,7 @@ pub fn Wampa_CheckRoar(
 /// Raven `Wampa_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:94-119`
-pub fn Wampa_Patrol() {
+pub fn Wampa_Patrol(ctx: GameContext<'_>) {
     todo!("Port Wampa_Patrol — parked: ai-context-threading")
 }
 
@@ -84,6 +86,7 @@ pub fn Wampa_Patrol() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:126-169`
 pub fn Wampa_Move(
+    ctx: GameContext<'_>,
     visible: qboolean,
 ) {
     todo!("Port Wampa_Move — parked: ai-context-threading")
@@ -95,6 +98,7 @@ pub fn Wampa_Move(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:177-264`
 pub fn Wampa_Slash(
+    ctx: GameContext<'_>,
     boltIndex: c_int,
     backhand: qboolean,
 ) {
@@ -107,6 +111,7 @@ pub fn Wampa_Slash(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:267-341`
 pub fn Wampa_Attack(
+    ctx: GameContext<'_>,
     distance: f32,
     doCharge: qboolean,
 ) {
@@ -118,7 +123,7 @@ pub fn Wampa_Attack(
 /// Raven `Wampa_Combat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:344-425`
-pub fn Wampa_Combat() {
+pub fn Wampa_Combat(ctx: GameContext<'_>) {
     todo!("Port Wampa_Combat — parked: ai-context-threading")
 }
 
@@ -128,6 +133,7 @@ pub fn Wampa_Combat() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:433-499`
 pub fn NPC_Wampa_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -140,6 +146,6 @@ pub fn NPC_Wampa_Pain(
 /// Raven `NPC_BSWampa_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:506-654`
-pub fn NPC_BSWampa_Default() {
+pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSWampa_Default — parked: ai-context-threading")
 }

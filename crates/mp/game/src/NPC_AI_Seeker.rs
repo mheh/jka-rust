@@ -18,7 +18,7 @@ use crate::prelude::*;
 /// Caches sound and effect resources for Seeker NPCs at map load time.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:26-31`
-pub fn NPC_Seeker_Precache() {
+pub fn NPC_Seeker_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/fire.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/seeker/misc/hiss.wav".as_ptr());
     crate::g_utils::G_EffectIndex(c"env/small_explode".as_ptr());
@@ -29,6 +29,7 @@ pub fn NPC_Seeker_Precache() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:34-46`
 pub fn NPC_Seeker_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -40,7 +41,7 @@ pub fn NPC_Seeker_Pain(
 /// Raven `Seeker_MaintainHeight`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:49-148`
-pub fn Seeker_MaintainHeight() {
+pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
     todo!("Port Seeker_MaintainHeight — parked: ambient-state")
 }
 
@@ -48,7 +49,7 @@ pub fn Seeker_MaintainHeight() {
 /// Raven `Seeker_Strafe`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:151-239`
-pub fn Seeker_Strafe() {
+pub fn Seeker_Strafe(ctx: GameContext<'_>) {
     todo!("Port Seeker_Strafe — parked: ambient-state")
 }
 
@@ -57,6 +58,7 @@ pub fn Seeker_Strafe() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:242-287`
 pub fn Seeker_Hunt(
+    ctx: GameContext<'_>,
     visible: qboolean,
     advance: qboolean,
 ) {
@@ -67,7 +69,7 @@ pub fn Seeker_Hunt(
 /// Raven `Seeker_Fire`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:290-317`
-pub fn Seeker_Fire() {
+pub fn Seeker_Fire(ctx: GameContext<'_>) {
     todo!("Port Seeker_Fire — parked: ambient-state")
 }
 
@@ -76,6 +78,7 @@ pub fn Seeker_Fire() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:320-347`
 pub fn Seeker_Ranged(
+    ctx: GameContext<'_>,
     visible: qboolean,
     advance: qboolean,
 ) {
@@ -86,7 +89,7 @@ pub fn Seeker_Ranged(
 /// Raven `Seeker_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:350-380`
-pub fn Seeker_Attack() {
+pub fn Seeker_Attack(ctx: GameContext<'_>) {
     todo!("Port Seeker_Attack — parked: ambient-state")
 }
 
@@ -94,7 +97,7 @@ pub fn Seeker_Attack() {
 /// Raven `Seeker_FindEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:383-436`
-pub fn Seeker_FindEnemy() {
+pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
     todo!("Port Seeker_FindEnemy — parked: ambient-state")
 }
 
@@ -102,7 +105,7 @@ pub fn Seeker_FindEnemy() {
 /// Raven `Seeker_FollowOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:439-520`
-pub fn Seeker_FollowOwner() {
+pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
     todo!("Port Seeker_FollowOwner — parked: ambient-state")
 }
 
@@ -110,6 +113,6 @@ pub fn Seeker_FollowOwner() {
 /// Raven `NPC_BSSeeker_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:523-574`
-pub fn NPC_BSSeeker_Default() {
+pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSSeeker_Default — parked: ambient-state")
 }

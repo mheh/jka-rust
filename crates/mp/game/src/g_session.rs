@@ -16,6 +16,7 @@ use crate::prelude::*;
 ///
 /// Source: `oracle/oracle/codemp/game/g_session.c:23-96`
 pub fn G_WriteClientSessionData(
+    ctx: GameContext<'_>,
     client: *mut gclient_t,
 ) {
     todo!("Port G_WriteClientSessionData — parked: va-varargs-and-level-access")
@@ -26,6 +27,7 @@ pub fn G_WriteClientSessionData(
 ///
 /// Source: `oracle/oracle/codemp/game/g_session.c:105-177`
 pub fn G_ReadSessionData(
+    ctx: GameContext<'_>,
     client: *mut gclient_t,
 ) {
     todo!("Port G_ReadSessionData — parked: va-varargs-and-level-access")
@@ -36,6 +38,7 @@ pub fn G_ReadSessionData(
 ///
 /// Source: `oracle/oracle/codemp/game/g_session.c:187-282`
 pub fn G_InitSessionData(
+    ctx: GameContext<'_>,
     client: *mut gclient_t,
     userinfo: *mut c_char,
     isBot: qboolean,
@@ -47,7 +50,7 @@ pub fn G_InitSessionData(
 /// Raven `G_InitWorldSession`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_session.c:291-304`
-pub fn G_InitWorldSession() {
+pub fn G_InitWorldSession(ctx: GameContext<'_>) {
     todo!("Port G_InitWorldSession — parked: level-access-without-gamecontext")
 }
 
@@ -55,6 +58,6 @@ pub fn G_InitWorldSession() {
 /// Raven `G_WriteSessionData`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_session.c:312-322`
-pub fn G_WriteSessionData() {
+pub fn G_WriteSessionData(ctx: GameContext<'_>) {
     todo!("Port G_WriteSessionData — parked: va-varargs-and-level-access")
 }

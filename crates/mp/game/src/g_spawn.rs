@@ -93,7 +93,7 @@ pub fn G_SpawnString(
 
         if level.spawning == QFALSE {
             *out = defaultString as *mut c_char;
-            // G_Error( "G_SpawnString() called while not spawning" ) — commented
+            // G_Error(ctx,  "G_SpawnString(ctx) called while not spawning" ) — commented
             // out in Raven itself; preserved as a no-op per the source.
         }
 
@@ -259,7 +259,7 @@ pub fn SP_gametype_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if !item.is_null() {
                 (*ent).targetname = std::ptr::null_mut();
                 (*ent).classname = (*item).classname;
-                G_SpawnItem(ent, item);
+                G_SpawnItem(ctx, ent, item);
             }
         }
     }
@@ -443,7 +443,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         ];
 
         // get the next free entity
-        let ent = G_Spawn();
+        let ent = G_Spawn(ctx);
 
         let num_spawn_vars = (*ctx.world).level.numSpawnVars;
         for i in 0..num_spawn_vars {
@@ -462,7 +462,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         if (*ctx.world).cvars.g_gametype.integer == GT_SINGLE_PLAYER {
             G_SpawnInt(ctx, c"notsingle".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
-                G_FreeEntity(ent);
+                G_FreeEntity(ctx, ent);
                 return;
             }
         }
@@ -470,20 +470,20 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
             G_SpawnInt(ctx, c"notteam".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
-                G_FreeEntity(ent);
+                G_FreeEntity(ctx, ent);
                 return;
             }
         } else {
             G_SpawnInt(ctx, c"notfree".as_ptr(), c"0".as_ptr(), &mut i);
             if i != 0 {
-                G_FreeEntity(ent);
+                G_FreeEntity(ctx, ent);
                 return;
             }
         }
 
         G_SpawnInt(ctx, c"notta".as_ptr(), c"0".as_ptr(), &mut i);
         if i != 0 {
-            G_FreeEntity(ent);
+            G_FreeEntity(ctx, ent);
             return;
         }
 
@@ -494,7 +494,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
                 let gametype_name = GAMETYPE_NAMES[gt as usize];
                 let value_str = CStr::from_ptr(value).to_string_lossy();
                 if !value_str.contains(gametype_name.to_str().unwrap()) {
-                    G_FreeEntity(ent);
+                    G_FreeEntity(ctx, ent);
                     return;
                 }
             }
@@ -506,7 +506,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
 
         // if we didn't get a classname, don't bother spawning anything
         if G_CallSpawn(ctx, ent) == QFALSE {
-            G_FreeEntity(ent);
+            G_FreeEntity(ctx, ent);
         }
 
         // Tag on the ICARUS scripting information only to valid recipients
@@ -516,7 +516,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
             if !(*ent).classname.is_null() && *(*ent).classname != 0 {
                 if Q_strncmp(c"NPC_".as_ptr(), (*ent).classname, 4) != 0 {
                     // Not an NPC_spawner (rww - probably don't even care for MP, but whatever)
-                    G_ActivateBehavior(ent, BSET_SPAWN);
+                    G_ActivateBehavior(ctx, ent, BSET_SPAWN);
                 }
             }
         }
@@ -535,7 +535,7 @@ pub fn G_AddSpawnVarToken(ctx: GameContext<'_>, string: *const c_char) -> *mut c
 
         let level = &mut (*ctx.world).level;
         if level.numSpawnVarChars + (l as c_int) + 1 > mp_bg::MAX_SPAWN_VARS_CHARS as c_int {
-            // G_Error( "G_AddSpawnVarToken: MAX_SPAWN_CHARS" ) — fatal, panic
+            // G_Error(ctx,  "G_AddSpawnVarToken: MAX_SPAWN_CHARS" ) — fatal, panic
             // per frozen Group A (Com_Error/G_Error -> panic).
             panic!("G_AddSpawnVarToken: MAX_SPAWN_CHARS");
         }
@@ -790,7 +790,7 @@ pub fn G_PrecacheSoundsets(ctx: GameContext<'_>) {
                     panic!("MAX_AMBIENT_SETS was exceeded! (too many soundsets)\n"); // Com_Error(ERR_DROP, ...) -> panic
                 }
 
-                (*ent).s.soundSetIndex = G_SoundSetIndex((*ent).soundSet);
+                (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, (*ent).soundSet);
                 counted_sets += 1;
             }
         }

@@ -29,6 +29,7 @@ const YAW: usize = 1;
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicleTurret.c:12-59`
 pub fn VEH_TurretCheckFire(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     parent: *mut gentity_t,
     turretStats: *mut turretStats_t,
@@ -84,6 +85,7 @@ pub fn VEH_TurretAnglesToEnemy(
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
 pub fn VEH_TurretAim(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     parent: *mut gentity_t,
     turretEnemy: *mut gentity_t,
@@ -100,6 +102,7 @@ pub fn VEH_TurretAim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicleTurret.c:193-302`
 fn VEH_TurretFindEnemies(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     parent: *mut gentity_t,
     turretStats: *mut turretStats_t,
@@ -116,6 +119,7 @@ fn VEH_TurretFindEnemies(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicleTurret.c:304-322`
 pub fn VEH_TurretObeyPassengerControl(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     parent: *mut gentity_t,
     turretNum: c_int,
@@ -129,6 +133,7 @@ pub fn VEH_TurretObeyPassengerControl(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicleTurret.c:324-444`
 pub fn VEH_TurretThink(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     parent: *mut gentity_t,
     turretNum: c_int,

@@ -41,6 +41,7 @@ use crate::prelude::*;
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:703-712`
 pub fn G_Printf(
+    ctx: GameContext<'_>,
     fmt: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
@@ -53,6 +54,7 @@ pub fn G_Printf(
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:714-723`
 pub fn G_Error(
+    ctx: GameContext<'_>,
     fmt: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
@@ -66,7 +68,7 @@ pub fn G_Error(
 /// Raven `G_FindTeams`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:736-781`
-pub fn G_FindTeams() {
+pub fn G_FindTeams(ctx: GameContext<'_>) {
     todo!("Port G_FindTeams — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:736")
 }
 
@@ -85,7 +87,7 @@ pub fn G_RemapTeamShaders() {
 /// Raven `G_RegisterCvars`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:803-845`
-pub fn G_RegisterCvars() {
+pub fn G_RegisterCvars(ctx: GameContext<'_>) {
     todo!("Port G_RegisterCvars — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:803")
 }
 
@@ -95,7 +97,7 @@ pub fn G_RegisterCvars() {
 /// Raven `G_UpdateCvars`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:852-879`
-pub fn G_UpdateCvars() {
+pub fn G_UpdateCvars(ctx: GameContext<'_>) {
     todo!("Port G_UpdateCvars — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:852")
 }
 
@@ -131,7 +133,7 @@ pub fn Com_Printf(
 /// Raven `AddTournamentPlayer`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1248-1295`
-pub fn AddTournamentPlayer() {
+pub fn AddTournamentPlayer(ctx: GameContext<'_>) {
     todo!("Port AddTournamentPlayer — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1248")
 }
 
@@ -140,7 +142,7 @@ pub fn AddTournamentPlayer() {
 /// Raven `RemoveTournamentLoser`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1304-1319`
-pub fn RemoveTournamentLoser() {
+pub fn RemoveTournamentLoser(ctx: GameContext<'_>) {
     todo!("Port RemoveTournamentLoser — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1304")
 }
 
@@ -151,6 +153,7 @@ pub fn RemoveTournamentLoser() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1321-1343`
 pub fn G_PowerDuelCount(
+    ctx: GameContext<'_>,
     loners: *mut c_int,
     doubles: *mut c_int,
     countSpec: qboolean,
@@ -163,7 +166,7 @@ pub fn G_PowerDuelCount(
 /// Raven `AddPowerDuelPlayers`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1346-1425`
-pub fn AddPowerDuelPlayers() {
+pub fn AddPowerDuelPlayers(ctx: GameContext<'_>) {
     todo!("Port AddPowerDuelPlayers — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1346")
 }
 
@@ -172,7 +175,7 @@ pub fn AddPowerDuelPlayers() {
 /// Raven `RemovePowerDuelLosers`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1429-1471`
-pub fn RemovePowerDuelLosers() {
+pub fn RemovePowerDuelLosers(ctx: GameContext<'_>) {
     todo!("Port RemovePowerDuelLosers — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1429")
 }
 
@@ -181,7 +184,7 @@ pub fn RemovePowerDuelLosers() {
 /// Raven `RemoveDuelDrawLoser`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1473-1512`
-pub fn RemoveDuelDrawLoser() {
+pub fn RemoveDuelDrawLoser(ctx: GameContext<'_>) {
     todo!("Port RemoveDuelDrawLoser — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1473")
 }
 
@@ -190,7 +193,7 @@ pub fn RemoveDuelDrawLoser() {
 /// Raven `RemoveTournamentWinner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1519-1534`
-pub fn RemoveTournamentWinner() {
+pub fn RemoveTournamentWinner(ctx: GameContext<'_>) {
     todo!("Port RemoveTournamentWinner — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1519")
 }
 
@@ -199,7 +202,7 @@ pub fn RemoveTournamentWinner() {
 /// Raven `AdjustTournamentScores`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1541-1616`
-pub fn AdjustTournamentScores() {
+pub fn AdjustTournamentScores(ctx: GameContext<'_>) {
     todo!("Port AdjustTournamentScores — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1541")
 }
 
@@ -213,6 +216,7 @@ pub fn AdjustTournamentScores() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1624-1689`
 pub fn SortRanks(
+    ctx: GameContext<'_>,
     a: *const c_void,
     b: *const c_void,
 ) -> c_int {
@@ -224,7 +228,7 @@ pub fn SortRanks(
 /// Raven `G_CanResetDuelists`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1695-1715`
-pub fn G_CanResetDuelists() -> qboolean {
+pub fn G_CanResetDuelists(ctx: GameContext<'_>) -> qboolean {
     todo!("Port G_CanResetDuelists — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1695")
 }
 
@@ -233,7 +237,7 @@ pub fn G_CanResetDuelists() -> qboolean {
 /// Raven `G_ResetDuelists`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1718-1740`
-pub fn G_ResetDuelists() {
+pub fn G_ResetDuelists(ctx: GameContext<'_>) {
     todo!("Port G_ResetDuelists — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1718")
 }
 
@@ -243,7 +247,7 @@ pub fn G_ResetDuelists() {
 /// Raven `CalculateRanks`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1751-1906`
-pub fn CalculateRanks() {
+pub fn CalculateRanks(ctx: GameContext<'_>) {
     todo!("Port CalculateRanks — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1751")
 }
 
@@ -252,7 +256,7 @@ pub fn CalculateRanks() {
 /// Raven `SendScoreboardMessageToAllClients`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1925-1933`
-pub fn SendScoreboardMessageToAllClients() {
+pub fn SendScoreboardMessageToAllClients(ctx: GameContext<'_>) {
     todo!("Port SendScoreboardMessageToAllClients — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1925")
 }
 
@@ -263,6 +267,7 @@ pub fn SendScoreboardMessageToAllClients() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1943-1967`
 pub fn MoveClientToIntermission(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port MoveClientToIntermission — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1943")
@@ -274,7 +279,7 @@ pub fn MoveClientToIntermission(
 /// Raven `FindIntermissionPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1979-2026`
-pub fn FindIntermissionPoint() {
+pub fn FindIntermissionPoint(ctx: GameContext<'_>) {
     todo!("Port FindIntermissionPoint — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1979")
 }
 
@@ -283,7 +288,7 @@ pub fn FindIntermissionPoint() {
 /// Raven `BeginIntermission`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2035-2092`
-pub fn BeginIntermission() {
+pub fn BeginIntermission(ctx: GameContext<'_>) {
     todo!("Port BeginIntermission — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2035")
 }
 
@@ -292,7 +297,7 @@ pub fn BeginIntermission() {
 /// Raven `DuelLimitHit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2094-2112`
-pub fn DuelLimitHit() -> qboolean {
+pub fn DuelLimitHit(ctx: GameContext<'_>) -> qboolean {
     todo!("Port DuelLimitHit — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2094")
 }
 
@@ -301,7 +306,7 @@ pub fn DuelLimitHit() -> qboolean {
 /// Raven `DuelResetWinsLosses`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2114-2128`
-pub fn DuelResetWinsLosses() {
+pub fn DuelResetWinsLosses(ctx: GameContext<'_>) {
     todo!("Port DuelResetWinsLosses — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2114")
 }
 
@@ -310,7 +315,7 @@ pub fn DuelResetWinsLosses() {
 /// Raven `ExitLevel`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2141-2204`
-pub fn ExitLevel() {
+pub fn ExitLevel(ctx: GameContext<'_>) {
     todo!("Port ExitLevel — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2141")
 }
 
@@ -320,6 +325,7 @@ pub fn ExitLevel() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2213-2240`
 pub fn G_LogPrintf(
+    ctx: GameContext<'_>,
     fmt: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
@@ -332,6 +338,7 @@ pub fn G_LogPrintf(
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2249-2303`
 pub fn LogExit(
+    ctx: GameContext<'_>,
     string: *const c_char,
 ) {
     todo!("Port LogExit — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2249")
@@ -342,7 +349,7 @@ pub fn LogExit(
 /// Raven `CheckIntermissionExit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2317-2554`
-pub fn CheckIntermissionExit() {
+pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
     todo!("Port CheckIntermissionExit — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2317")
 }
 
@@ -351,7 +358,7 @@ pub fn CheckIntermissionExit() {
 /// Raven `ScoreIsTied`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2561-2576`
-pub fn ScoreIsTied() -> qboolean {
+pub fn ScoreIsTied(ctx: GameContext<'_>) -> qboolean {
     todo!("Port ScoreIsTied — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2561")
 }
 
@@ -361,7 +368,7 @@ pub fn ScoreIsTied() -> qboolean {
 /// Raven `CheckExitRules`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2588-2911`
-pub fn CheckExitRules() {
+pub fn CheckExitRules(ctx: GameContext<'_>) {
     todo!("Port CheckExitRules — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2588")
 }
 
@@ -371,6 +378,7 @@ pub fn CheckExitRules() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2923-2938`
 pub fn G_RemoveDuelist(
+    ctx: GameContext<'_>,
     team: c_int,
 ) {
     todo!("Port G_RemoveDuelist — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2923")
@@ -381,7 +389,7 @@ pub fn G_RemoveDuelist(
 /// Raven `CheckTournament`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2948-3216`
-pub fn CheckTournament() {
+pub fn CheckTournament(ctx: GameContext<'_>) {
     todo!("Port CheckTournament — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2948")
 }
 
@@ -390,7 +398,7 @@ pub fn CheckTournament() {
 /// Raven `G_KickAllBots`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3218-3239`
-pub fn G_KickAllBots() {
+pub fn G_KickAllBots(ctx: GameContext<'_>) {
     todo!("Port G_KickAllBots — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:3218")
 }
 
@@ -399,7 +407,7 @@ pub fn G_KickAllBots() {
 /// Raven `CheckVote`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3246-3326`
-pub fn CheckVote() {
+pub fn CheckVote(ctx: GameContext<'_>) {
     todo!("Port CheckVote — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:3246")
 }
 
@@ -409,6 +417,7 @@ pub fn CheckVote() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3333-3341`
 pub fn PrintTeam(
+    ctx: GameContext<'_>,
     team: c_int,
     message: *mut c_char,
 ) {
@@ -422,6 +431,7 @@ pub fn PrintTeam(
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3348-3370`
 pub fn SetLeader(
+    ctx: GameContext<'_>,
     team: c_int,
     client: c_int,
 ) {
@@ -434,6 +444,7 @@ pub fn SetLeader(
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3377-3402`
 pub fn CheckTeamLeader(
+    ctx: GameContext<'_>,
     team: c_int,
 ) {
     todo!("Port CheckTeamLeader — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:3377")
@@ -446,6 +457,7 @@ pub fn CheckTeamLeader(
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3409-3447`
 pub fn CheckTeamVote(
+    ctx: GameContext<'_>,
     team: c_int,
 ) {
     todo!("Port CheckTeamVote — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:3409")
@@ -458,7 +470,7 @@ pub fn CheckTeamVote(
 /// Raven `CheckCvars`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3455-3480`
-pub fn CheckCvars() {
+pub fn CheckCvars(ctx: GameContext<'_>) {
     todo!("Port CheckCvars — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:3455")
 }
 
@@ -470,6 +482,7 @@ pub fn CheckCvars() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3489-3512`
 pub fn G_RunThink(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_RunThink — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:3489")
@@ -481,7 +494,7 @@ pub fn G_RunThink(
 /// Raven `NAV_CheckCalcPaths`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3522-3555`
-pub fn NAV_CheckCalcPaths() {
+pub fn NAV_CheckCalcPaths(ctx: GameContext<'_>) {
     todo!("Port NAV_CheckCalcPaths — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:3522")
 }
 
@@ -503,6 +516,7 @@ pub fn BG_GetTime() -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:3582-4102`
 pub fn G_RunFrame(
+    ctx: GameContext<'_>,
     levelTime: c_int,
 ) {
     todo!("Port G_RunFrame — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:3582")
@@ -517,6 +531,7 @@ pub fn G_RunFrame(
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:4104-4120`
 pub fn G_GetStringEdString(
+    ctx: GameContext<'_>,
     refSection: *mut c_char,
     refName: *mut c_char,
 ) -> *const c_char {

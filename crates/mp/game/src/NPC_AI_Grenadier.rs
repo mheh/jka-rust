@@ -39,42 +39,44 @@ const SQUAD_SCOUT: i32 = 6;
 /// Raven `Grenadier_ClearTimers`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:49-63`
-pub fn Grenadier_ClearTimers(ent: *mut gentity_t) {
-    TIMER_Set(ent, c"chatter".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"duck".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"stand".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"shuffleTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"sleepTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"enemyLastVisible".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"roamTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"hideTime".as_ptr() as *const c_char, 0);
+pub fn Grenadier_ClearTimers(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
+    TIMER_Set(ctx, ent, c"chatter".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"duck".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"stand".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"shuffleTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"sleepTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"enemyLastVisible".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"roamTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"hideTime".as_ptr() as *const c_char, 0);
     // FIXME: Slant for difficulty levels (Raven comment).
-    TIMER_Set(ent, c"attackDelay".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"stick".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"scoutTime".as_ptr() as *const c_char, 0);
-    TIMER_Set(ent, c"flee".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"attackDelay".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"stick".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"scoutTime".as_ptr() as *const c_char, 0);
+    TIMER_Set(ctx, ent, c"flee".as_ptr() as *const c_char, 0);
 }
 
 /// Raven `NPC_Grenadier_PlayConfusionSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:65-81`
-pub fn NPC_Grenadier_PlayConfusionSound(self_: *mut gentity_t) {
+pub fn NPC_Grenadier_PlayConfusionSound(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     unsafe {
         // FIXME: make this a custom sound in sound set (Raven comment).
         if (*self_).health > 0 {
-            G_AddVoiceEvent(
+            G_AddVoiceEvent(ctx, 
                 self_,
                 Q_irand(EV_CONFUSE1 as c_int, EV_CONFUSE3 as c_int),
                 2000,
             );
         }
         // reset him to be totally unaware again
-        TIMER_Set(self_, c"enemyLastVisible".as_ptr() as *const c_char, 0);
-        TIMER_Set(self_, c"flee".as_ptr() as *const c_char, 0);
+        TIMER_Set(ctx, self_, c"enemyLastVisible".as_ptr() as *const c_char, 0);
+        TIMER_Set(ctx, self_, c"flee".as_ptr() as *const c_char, 0);
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).squadState = SQUAD_IDLE;
         (*npc).tempBehavior = bState_t::BS_DEFAULT;
-        G_ClearEnemy(self_); // FIXME: or just self->enemy = NULL;? (Raven comment).
+        G_ClearEnemy(ctx, self_); // FIXME: or just self->enemy = NULL;? (Raven comment).
         (*npc).investigateCount = 0;
     }
 }
@@ -83,6 +85,7 @@ pub fn NPC_Grenadier_PlayConfusionSound(self_: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:90-103`
 pub fn NPC_Grenadier_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -91,14 +94,14 @@ pub fn NPC_Grenadier_Pain(
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).localState = LSTATE_UNDERFIRE;
 
-        TIMER_Set(self_, c"duck".as_ptr() as *const c_char, -1);
-        TIMER_Set(self_, c"stand".as_ptr() as *const c_char, 2000);
+        TIMER_Set(ctx, self_, c"duck".as_ptr() as *const c_char, -1);
+        TIMER_Set(ctx, self_, c"stand".as_ptr() as *const c_char, 2000);
 
-        NPC_Pain(self_, attacker, damage);
+        NPC_Pain(ctx, self_, attacker, damage);
 
         if damage == 0 && (*self_).health > 0 {
             // FIXME: better way to know I was pushed (Raven comment).
-            G_AddVoiceEvent(
+            G_AddVoiceEvent(ctx, 
                 self_,
                 Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int),
                 2000,
@@ -114,7 +117,7 @@ pub fn NPC_Grenadier_Pain(
 /// Raven `Grenadier_HoldPosition`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:111-121`
-pub fn Grenadier_HoldPosition() {
+pub fn Grenadier_HoldPosition(ctx: GameContext<'_>) {
     todo!("Port Grenadier_HoldPosition — parked: ai-context")
 }
 
@@ -123,7 +126,7 @@ pub fn Grenadier_HoldPosition() {
 /// Raven `Grenadier_Move`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:129-182`
-pub fn Grenadier_Move() -> qboolean {
+pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
     todo!("Port Grenadier_Move — parked: ai-context")
 }
 
@@ -132,7 +135,7 @@ pub fn Grenadier_Move() -> qboolean {
 /// Raven `NPC_BSGrenadier_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:190-277`
-pub fn NPC_BSGrenadier_Patrol() {
+pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
     todo!("Port NPC_BSGrenadier_Patrol — parked: ai-context")
 }
 
@@ -141,7 +144,7 @@ pub fn NPC_BSGrenadier_Patrol() {
 /// Raven `Grenadier_CheckMoveState`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:307-391`
-pub fn Grenadier_CheckMoveState() {
+pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
     todo!("Port Grenadier_CheckMoveState — parked: ai-context")
 }
 
@@ -150,7 +153,7 @@ pub fn Grenadier_CheckMoveState() {
 /// Raven `Grenadier_CheckFireState`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:399-439`
-pub fn Grenadier_CheckFireState() {
+pub fn Grenadier_CheckFireState(ctx: GameContext<'_>) {
     todo!("Port Grenadier_CheckFireState — parked: ai-context")
 }
 
@@ -159,7 +162,8 @@ pub fn Grenadier_CheckFireState() {
 /// Raven `Grenadier_EvaluateShot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:441-453`
-pub fn Grenadier_EvaluateShot(hit: c_int) -> qboolean {
+pub fn Grenadier_EvaluateShot(
+    ctx: GameContext<'_>,hit: c_int) -> qboolean {
     todo!("Port Grenadier_EvaluateShot — parked: ai-context")
 }
 
@@ -168,7 +172,7 @@ pub fn Grenadier_EvaluateShot(hit: c_int) -> qboolean {
 /// Raven `NPC_BSGrenadier_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:461-662`
-pub fn NPC_BSGrenadier_Attack() {
+pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
     todo!("Port NPC_BSGrenadier_Attack — parked: ai-context")
 }
 
@@ -177,6 +181,6 @@ pub fn NPC_BSGrenadier_Attack() {
 /// Raven `NPC_BSGrenadier_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:664-679`
-pub fn NPC_BSGrenadier_Default() {
+pub fn NPC_BSGrenadier_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSGrenadier_Default — parked: ai-context")
 }

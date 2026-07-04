@@ -55,6 +55,7 @@ const WEAPON_FIRING: c_int = weaponstate_t::WEAPON_FIRING as c_int;
 /// Source: `oracle/oracle/codemp/game/w_saber.c:39-43`
 // PORT-ESCALATION(rng-threading): rand()/RAND_MAX resolved as argless + RAND_MAX unported; ruling 3 wants an owned+threaded LCG — how does it thread into a raw-pointer signature?
 pub fn RandFloat(
+    ctx: GameContext<'_>,
     min: f32,
     max: f32,
 ) -> f32 {
@@ -66,6 +67,7 @@ pub fn RandFloat(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:46-78`
 // PORT-ESCALATION(debug-only-ifdef): body is under #ifdef DEBUG_SABER_BOX (compiled out of the shipping build) — port behind a cfg, or drop?
 pub fn G_DebugBoxLines(
+    ctx: GameContext<'_>,
     mins: vec3_t,
     maxs: vec3_t,
     duration: c_int,
@@ -89,6 +91,7 @@ pub fn G_CanBeEnemy(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:120-217`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_SaberAttackPower(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     attacking: qboolean,
 ) -> c_int {
@@ -99,6 +102,7 @@ pub fn G_SaberAttackPower(
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:219-248`
 pub fn WP_DeactivateSaber(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     clearLength: qboolean,
 ) {
@@ -113,11 +117,11 @@ pub fn WP_DeactivateSaber(
             (*client).ps.saberHolstered = 2;
             // Doesn't matter ATM (SetSaberLength commented out in oracle).
             if (*client).saber[0].soundOff != 0 {
-                crate::g_utils::G_Sound(self_, CHAN_WEAPON as c_int, (*client).saber[0].soundOff);
+                crate::g_utils::G_Sound(ctx, self_, CHAN_WEAPON as c_int, (*client).saber[0].soundOff);
             }
 
             if (*client).saber[1].soundOff != 0 && (*client).saber[1].model[0] != 0 {
-                crate::g_utils::G_Sound(self_, CHAN_WEAPON as c_int, (*client).saber[1].soundOff);
+                crate::g_utils::G_Sound(ctx, self_, CHAN_WEAPON as c_int, (*client).saber[1].soundOff);
             }
         }
     }
@@ -128,6 +132,7 @@ pub fn WP_DeactivateSaber(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:250-282`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_ActivateSaber(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port WP_ActivateSaber — parked: engine-world-threading")
@@ -138,6 +143,7 @@ pub fn WP_ActivateSaber(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:286-358`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn SaberUpdateSelf(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port SaberUpdateSelf — parked: engine-world-threading")
@@ -148,6 +154,7 @@ pub fn SaberUpdateSelf(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:360-370`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn SaberGotHit(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -160,6 +167,7 @@ pub fn SaberGotHit(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:376-564`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn SetSaberBoxSize(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
 ) {
     todo!("Port SetSaberBoxSize — parked: engine-world-threading")
@@ -170,6 +178,7 @@ pub fn SetSaberBoxSize(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:566-637`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberInitBladeData(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port WP_SaberInitBladeData — parked: engine-world-threading")
@@ -180,6 +189,7 @@ pub fn WP_SaberInitBladeData(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:642-724`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_CheckLookTarget(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     lookAngles: vec3_t,
     lookingSpeed: *mut f32,
@@ -192,6 +202,7 @@ pub fn G_CheckLookTarget(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:732-879`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_G2NPCAngles(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     legs: *mut vec3_t,
     angles: vec3_t,
@@ -204,6 +215,7 @@ pub fn G_G2NPCAngles(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:881-1034`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_G2PlayerAngles(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     legs: *mut vec3_t,
     legsAngles: vec3_t,
@@ -270,6 +282,7 @@ pub fn G_SaberLockAnim(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:1218-1460`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SabersCheckLock2(
+    ctx: GameContext<'_>,
     attacker: *mut gentity_t,
     defender: *mut gentity_t,
     //TODO: Port sabersLockMode_t  (C: `sabersLockMode_t`)
@@ -283,6 +296,7 @@ pub fn WP_SabersCheckLock2(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:1462-1889`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SabersCheckLock(
+    ctx: GameContext<'_>,
     ent1: *mut gentity_t,
     ent2: *mut gentity_t,
 ) -> qboolean {
@@ -315,6 +329,7 @@ pub fn G_GetParryForBlock(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:1938-2208`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_GetSaberDeflectionAngle(
+    ctx: GameContext<'_>,
     attacker: *mut gentity_t,
     defender: *mut gentity_t,
     saberHitFraction: f32,
@@ -346,6 +361,7 @@ pub fn G_KnockawayForParry(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2238-2287`
 // PORT-ESCALATION(bg-anim-globals): reads bgAllAnims[...] shared bg animation-table global — where does it live (owned/threaded per ruling 1)?
 pub fn G_GetAttackDamage(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     minDmg: c_int,
     maxDmg: c_int,
@@ -359,6 +375,7 @@ pub fn G_GetAttackDamage(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2290-2310`
 // PORT-ESCALATION(bg-anim-globals): reads bgAllAnims[...] shared bg animation-table global — where does it live (owned/threaded per ruling 1)?
 pub fn G_GetAnimPoint(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) -> f32 {
     todo!("Port G_GetAnimPoint — parked: bg-anim-globals")
@@ -379,6 +396,7 @@ pub fn G_ClientIdleInWorld(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2336-2426`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_G2TraceCollide(
+    ctx: GameContext<'_>,
     tr: *mut trace_t,
     lastValidStart: vec3_t,
     lastValidEnd: vec3_t,
@@ -465,6 +483,7 @@ pub fn G_SabCol_PointRelativeToPlane(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2599-2697`
 // PORT-ESCALATION(saberFace_t-unported): saberFace_t type is unported (skeleton param is *mut c_void).
 pub fn G_SaberFaceCollisionCheck(
+    ctx: GameContext<'_>,
     fNum: c_int,
     //TODO: Port saberFace_t  (C: `saberFace_t *`)
     fList: *mut c_void,
@@ -482,6 +501,7 @@ pub fn G_SaberFaceCollisionCheck(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2700-2777`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_SaberCollide(
+    ctx: GameContext<'_>,
     atk: *mut gentity_t,
     def: *mut gentity_t,
     atkStart: vec3_t,
@@ -556,6 +576,7 @@ pub fn WPDEBUG_SaberColor(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2851-2985`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SabersIntersect(
+    ctx: GameContext<'_>,
     ent1: *mut gentity_t,
     ent1SaberNum: c_int,
     ent1BladeNum: c_int,
@@ -570,6 +591,7 @@ pub fn WP_SabersIntersect(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2987-3501`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_PowerLevelForSaberAnim(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     saberNum: c_int,
     mySaberHit: qboolean,
@@ -581,7 +603,7 @@ pub fn G_PowerLevelForSaberAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3512-3526`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
-pub fn WP_SaberClearDamage() {
+pub fn WP_SaberClearDamage(ctx: GameContext<'_>) {
     todo!("Port WP_SaberClearDamage — parked: engine-world-threading")
 }
 
@@ -590,6 +612,7 @@ pub fn WP_SaberClearDamage() {
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3528-3575`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberDamageAdd(
+    ctx: GameContext<'_>,
     trVictimEntityNum: c_int,
     trDmgDir: vec3_t,
     trDmgSpot: vec3_t,
@@ -605,6 +628,7 @@ pub fn WP_SaberDamageAdd(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3577-3605`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberApplyDamage(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port WP_SaberApplyDamage — parked: engine-world-threading")
@@ -615,6 +639,7 @@ pub fn WP_SaberApplyDamage(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3608-3697`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberDoHit(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     saberNum: c_int,
     bladeNum: c_int,
@@ -627,6 +652,7 @@ pub fn WP_SaberDoHit(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3701-3792`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberRadiusDamage(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     point: vec3_t,
     radius: f32,
@@ -641,6 +667,7 @@ pub fn WP_SaberRadiusDamage(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3798-3810`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberDoClash(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     saberNum: c_int,
     bladeNum: c_int,
@@ -653,6 +680,7 @@ pub fn WP_SaberDoClash(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3812-3844`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberBounceSound(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     saberNum: c_int,
     bladeNum: c_int,
@@ -665,6 +693,7 @@ pub fn WP_SaberBounceSound(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3857-5273`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn CheckSaberDamage(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     rSaberNum: c_int,
     rBladeNum: c_int,
@@ -701,6 +730,7 @@ pub fn VectorCompare2(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:5285-5480`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_SPSaberDamageTraceLerped(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     saberNum: c_int,
     bladeNum: c_int,
@@ -716,6 +746,7 @@ pub fn G_SPSaberDamageTraceLerped(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:5492-5883`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberStartMissileBlockCheck(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     ucmd: *mut usercmd_t,
 ) {
@@ -727,6 +758,7 @@ pub fn WP_SaberStartMissileBlockCheck(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:5894-6125`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn CheckThrownSaberDamaged(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
     ent: *mut gentity_t,
@@ -742,6 +774,7 @@ pub fn CheckThrownSaberDamaged(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6127-6161`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberCheckRadiusDamage(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     returning: c_int,
 ) {
@@ -753,6 +786,7 @@ pub fn saberCheckRadiusDamage(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6165-6227`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberMoveBack(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     goingBack: qboolean,
 ) {
@@ -776,6 +810,7 @@ pub fn SaberBounceSound(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6235-6245`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn DeadSaberThink(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
 ) {
     todo!("Port DeadSaberThink — parked: engine-world-threading")
@@ -786,6 +821,7 @@ pub fn DeadSaberThink(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6247-6335`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn MakeDeadSaber(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port MakeDeadSaber — parked: engine-world-threading")
@@ -796,6 +832,7 @@ pub fn MakeDeadSaber(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6342-6480`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn DownedSaberThink(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
 ) {
     todo!("Port DownedSaberThink — parked: engine-world-threading")
@@ -806,6 +843,7 @@ pub fn DownedSaberThink(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6482-6508`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberReactivate(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
 ) {
@@ -817,6 +855,7 @@ pub fn saberReactivate(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6512-6584`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberKnockDown(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
     other: *mut gentity_t,
@@ -829,6 +868,7 @@ pub fn saberKnockDown(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6589-6595`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberRemoveG2Model(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
 ) {
     todo!("Port WP_SaberRemoveG2Model — parked: engine-world-threading")
@@ -839,6 +879,7 @@ pub fn WP_SaberRemoveG2Model(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6597-6610`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberAddG2Model(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberModel: *const c_char,
     saberSkin: qhandle_t,
@@ -851,6 +892,7 @@ pub fn WP_SaberAddG2Model(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6613-6678`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberKnockOutOfHand(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
     velocity: vec3_t,
@@ -863,6 +905,7 @@ pub fn saberKnockOutOfHand(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6681-6761`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberCheckKnockdown_DuelLoss(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
     other: *mut gentity_t,
@@ -875,6 +918,7 @@ pub fn saberCheckKnockdown_DuelLoss(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6765-6845`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberCheckKnockdown_BrokenParry(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
     other: *mut gentity_t,
@@ -887,6 +931,7 @@ pub fn saberCheckKnockdown_BrokenParry(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6852-6880`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberCheckKnockdown_Smashed(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
     other: *mut gentity_t,
@@ -900,6 +945,7 @@ pub fn saberCheckKnockdown_Smashed(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6884-6915`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberCheckKnockdown_Thrown(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
     other: *mut gentity_t,
@@ -912,6 +958,7 @@ pub fn saberCheckKnockdown_Thrown(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6917-7076`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberBackToOwner(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
 ) {
     todo!("Port saberBackToOwner — parked: engine-world-threading")
@@ -922,6 +969,7 @@ pub fn saberBackToOwner(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7080-7113`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn thrownSaberTouch(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
@@ -934,6 +982,7 @@ pub fn thrownSaberTouch(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7117-7257`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn saberFirstThrown(
+    ctx: GameContext<'_>,
     saberent: *mut gentity_t,
 ) {
     todo!("Port saberFirstThrown — parked: engine-world-threading")
@@ -944,6 +993,7 @@ pub fn saberFirstThrown(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7259-7320`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn UpdateClientRenderBolts(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     renderOrigin: vec3_t,
     renderAngles: vec3_t,
@@ -956,6 +1006,7 @@ pub fn UpdateClientRenderBolts(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7322-7468`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn UpdateClientRenderinfo(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     renderOrigin: vec3_t,
     renderAngles: vec3_t,
@@ -968,6 +1019,7 @@ pub fn UpdateClientRenderinfo(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7474-7500`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_KickDownable(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
     todo!("Port G_KickDownable — parked: engine-world-threading")
@@ -978,6 +1030,7 @@ pub fn G_KickDownable(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7502-7525`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_TossTheMofo(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     tossDir: vec3_t,
     tossStr: f32,
@@ -990,6 +1043,7 @@ pub fn G_TossTheMofo(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7527-7642`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_KickTrace(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     kickDir: vec3_t,
     kickDist: f32,
@@ -1005,6 +1059,7 @@ pub fn G_KickTrace(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7644-7956`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_KickSomeMofos(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_KickSomeMofos — parked: engine-world-threading")
@@ -1029,6 +1084,7 @@ pub fn G_PrettyCloseIGuess(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7969-8082`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_GrabSomeMofos(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port G_GrabSomeMofos — parked: engine-world-threading")
@@ -1039,6 +1095,7 @@ pub fn G_GrabSomeMofos(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:8084-9102`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberPositionUpdate(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     ucmd: *mut usercmd_t,
 ) {
@@ -1078,6 +1135,7 @@ pub fn WP_SaberBlockNonRandom(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9200-9274`
 // PORT-ESCALATION(vec3-outparam-convention): calls AngleVectors/VectorNormalize whose resolved signatures pass vec3_t by value (Copy) and cannot write outputs back — needs the out-param->return convention resolved.
 pub fn WP_SaberBlock(
+    ctx: GameContext<'_>,
     playerent: *mut gentity_t,
     hitloc: vec3_t,
     missileBlock: qboolean,
@@ -1090,6 +1148,7 @@ pub fn WP_SaberBlock(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9276-9451`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberCanBlock(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     point: vec3_t,
     dflags: c_int,
@@ -1104,6 +1163,6 @@ pub fn WP_SaberCanBlock(
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9453-9484`
 // PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
-pub fn HasSetSaberOnly() -> qboolean {
+pub fn HasSetSaberOnly(ctx: GameContext<'_>) -> qboolean {
     todo!("Port HasSetSaberOnly — parked: engine-world-threading")
 }

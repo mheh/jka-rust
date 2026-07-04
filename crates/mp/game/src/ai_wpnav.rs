@@ -28,7 +28,8 @@ use crate::g_utils::G_TempEntity;
 /// this function touches no file-scope globals itself.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:25-210`
-pub fn GetFlagStr(flags: c_int) -> *mut c_char {
+pub fn GetFlagStr(
+    ctx: GameContext<'_>,flags: c_int) -> *mut c_char {
     // Raven flag bit values (`ai_main.h:22-38`); not yet ported anywhere else
     // in the crate graph, so defined locally, verbatim.
     const WPFLAG_JUMP: c_int = 0x00000010;
@@ -47,7 +48,7 @@ pub fn GetFlagStr(flags: c_int) -> *mut c_char {
     const WPFLAG_NOMOVEFUNC: c_int = 0x00200000;
 
     unsafe {
-        let flagstr = B_TempAlloc(128) as *mut c_char;
+        let flagstr = B_TempAlloc(ctx, 128) as *mut c_char;
         let mut i: isize = 0;
 
         // Local helper mirroring the C `flagstr[i] = 'x'; i++;` idiom.
@@ -149,7 +150,8 @@ pub fn GetFlagStr(flags: c_int) -> *mut c_char {
 /// Raven `G_TestLine`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:212-222`
-pub fn G_TestLine(start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
+pub fn G_TestLine(
+    ctx: GameContext<'_>,start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
     let ev_testline = mp_bg::public::entity_event::entity_event_t::EV_TESTLINE as c_int;
     // `SVF_BROADCAST` (svflags #define) is not yet ported anywhere in the
     // crate graph; defined locally, verbatim.
@@ -157,7 +159,7 @@ pub fn G_TestLine(start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
     const SVF_BROADCAST: c_int = 0x00000020;
 
     unsafe {
-        let te = G_TempEntity(start, ev_testline);
+        let te = G_TempEntity(ctx, start, ev_testline);
         (*te).s.origin = start;
         (*te).s.origin2 = end;
         (*te).s.time2 = time;
@@ -175,7 +177,7 @@ pub fn G_TestLine(start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
 /// Raven `BotWaypointRender`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:224-347`
-pub fn BotWaypointRender() {
+pub fn BotWaypointRender(ctx: GameContext<'_>) {
     todo!("Port BotWaypointRender — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -185,7 +187,8 @@ pub fn BotWaypointRender() {
 /// Raven `TransferWPData`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:349-369`
-pub fn TransferWPData(from: c_int, to: c_int) {
+pub fn TransferWPData(
+    ctx: GameContext<'_>,from: c_int, to: c_int) {
     todo!("Port TransferWPData — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -195,7 +198,8 @@ pub fn TransferWPData(from: c_int, to: c_int) {
 /// Raven `CreateNewWP`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:371-401`
-pub fn CreateNewWP(origin: vec3_t, flags: c_int) {
+pub fn CreateNewWP(
+    ctx: GameContext<'_>,origin: vec3_t, flags: c_int) {
     todo!("Port CreateNewWP — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -205,7 +209,8 @@ pub fn CreateNewWP(origin: vec3_t, flags: c_int) {
 /// Raven `CreateNewWP_FromObject`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:403-454`
-pub fn CreateNewWP_FromObject(wp: *mut wpobject_t) {
+pub fn CreateNewWP_FromObject(
+    ctx: GameContext<'_>,wp: *mut wpobject_t) {
     todo!("Port CreateNewWP_FromObject — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -214,7 +219,7 @@ pub fn CreateNewWP_FromObject(wp: *mut wpobject_t) {
 /// Raven `RemoveWP`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:456-482`
-pub fn RemoveWP() {
+pub fn RemoveWP(ctx: GameContext<'_>) {
     todo!("Port RemoveWP — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -223,7 +228,7 @@ pub fn RemoveWP() {
 /// Raven `RemoveAllWP`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:484-489`
-pub fn RemoveAllWP() {
+pub fn RemoveAllWP(ctx: GameContext<'_>) {
     todo!("Port RemoveAllWP — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -233,7 +238,8 @@ pub fn RemoveAllWP() {
 /// Raven `RemoveWP_InTrail`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:491-557`
-pub fn RemoveWP_InTrail(afterindex: c_int) {
+pub fn RemoveWP_InTrail(
+    ctx: GameContext<'_>,afterindex: c_int) {
     todo!("Port RemoveWP_InTrail — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -243,7 +249,8 @@ pub fn RemoveWP_InTrail(afterindex: c_int) {
 /// Raven `CreateNewWP_InTrail`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:559-635`
-pub fn CreateNewWP_InTrail(origin: vec3_t, flags: c_int, afterindex: c_int) -> c_int {
+pub fn CreateNewWP_InTrail(
+    ctx: GameContext<'_>,origin: vec3_t, flags: c_int, afterindex: c_int) -> c_int {
     todo!("Port CreateNewWP_InTrail — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -252,7 +259,8 @@ pub fn CreateNewWP_InTrail(origin: vec3_t, flags: c_int, afterindex: c_int) -> c
 /// Raven `CreateNewWP_InsertUnder`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:637-714`
-pub fn CreateNewWP_InsertUnder(origin: vec3_t, flags: c_int, afterindex: c_int) -> c_int {
+pub fn CreateNewWP_InsertUnder(
+    ctx: GameContext<'_>,origin: vec3_t, flags: c_int, afterindex: c_int) -> c_int {
     todo!("Port CreateNewWP_InsertUnder — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -262,7 +270,8 @@ pub fn CreateNewWP_InsertUnder(origin: vec3_t, flags: c_int, afterindex: c_int) 
 /// Raven `TeleportToWP`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:716-758`
-pub fn TeleportToWP(pl: *mut gentity_t, afterindex: c_int) {
+pub fn TeleportToWP(
+    ctx: GameContext<'_>,pl: *mut gentity_t, afterindex: c_int) {
     todo!("Port TeleportToWP — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -271,7 +280,8 @@ pub fn TeleportToWP(pl: *mut gentity_t, afterindex: c_int) {
 /// Raven `WPFlagsModify`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:760-769`
-pub fn WPFlagsModify(wpnum: c_int, flags: c_int) {
+pub fn WPFlagsModify(
+    ctx: GameContext<'_>,wpnum: c_int, flags: c_int) {
     todo!("Port WPFlagsModify — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -296,7 +306,8 @@ pub fn NotWithinRange(base: c_int, extent: c_int) -> c_int {
 /// Raven `NodeHere`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:787-809`
-pub fn NodeHere(spot: vec3_t) -> c_int {
+pub fn NodeHere(
+    ctx: GameContext<'_>,spot: vec3_t) -> c_int {
     todo!("Port NodeHere — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -307,7 +318,8 @@ pub fn NodeHere(spot: vec3_t) -> c_int {
 /// Raven `CanGetToVector`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:812-824`
-pub fn CanGetToVector(org1: vec3_t, org2: vec3_t, mins: vec3_t, maxs: vec3_t) -> c_int {
+pub fn CanGetToVector(
+    ctx: GameContext<'_>,org1: vec3_t, org2: vec3_t, mins: vec3_t, maxs: vec3_t) -> c_int {
     todo!("Port CanGetToVector — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -319,7 +331,8 @@ pub fn CanGetToVector(org1: vec3_t, org2: vec3_t, mins: vec3_t, maxs: vec3_t) ->
 /// Raven `CanGetToVectorTravel`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:883-996`
-pub fn CanGetToVectorTravel(org1: vec3_t, moveTo: vec3_t, mins: vec3_t, maxs: vec3_t) -> c_int {
+pub fn CanGetToVectorTravel(
+    ctx: GameContext<'_>,org1: vec3_t, moveTo: vec3_t, mins: vec3_t, maxs: vec3_t) -> c_int {
     todo!("Port CanGetToVectorTravel — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -330,7 +343,8 @@ pub fn CanGetToVectorTravel(org1: vec3_t, moveTo: vec3_t, mins: vec3_t, maxs: ve
 /// Raven `ConnectTrail`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1000-1399`
-pub fn ConnectTrail(startindex: c_int, endindex: c_int, behindTheScenes: qboolean) -> c_int {
+pub fn ConnectTrail(
+    ctx: GameContext<'_>,startindex: c_int, endindex: c_int, behindTheScenes: qboolean) -> c_int {
     todo!("Port ConnectTrail — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -339,7 +353,8 @@ pub fn ConnectTrail(startindex: c_int, endindex: c_int, behindTheScenes: qboolea
 /// Raven `OpposingEnds`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1402-1416`
-pub fn OpposingEnds(start: c_int, end: c_int) -> c_int {
+pub fn OpposingEnds(
+    ctx: GameContext<'_>,start: c_int, end: c_int) -> c_int {
     todo!("Port OpposingEnds — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -348,7 +363,8 @@ pub fn OpposingEnds(start: c_int, end: c_int) -> c_int {
 /// Raven `DoorBlockingSection`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1418-1463`
-pub fn DoorBlockingSection(start: c_int, end: c_int) -> c_int {
+pub fn DoorBlockingSection(
+    ctx: GameContext<'_>,start: c_int, end: c_int) -> c_int {
     todo!("Port DoorBlockingSection — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -358,7 +374,8 @@ pub fn DoorBlockingSection(start: c_int, end: c_int) -> c_int {
 /// Raven `RepairPaths`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1466-1523`
-pub fn RepairPaths(behindTheScenes: qboolean) -> c_int {
+pub fn RepairPaths(
+    ctx: GameContext<'_>,behindTheScenes: qboolean) -> c_int {
     todo!("Port RepairPaths — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -367,7 +384,8 @@ pub fn RepairPaths(behindTheScenes: qboolean) -> c_int {
 /// Raven `OrgVisibleCurve`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1526-1547`
-pub fn OrgVisibleCurve(org1: vec3_t, mins: vec3_t, maxs: vec3_t, org2: vec3_t, ignore: c_int) -> c_int {
+pub fn OrgVisibleCurve(
+    ctx: GameContext<'_>,org1: vec3_t, mins: vec3_t, maxs: vec3_t, org2: vec3_t, ignore: c_int) -> c_int {
     todo!("Port OrgVisibleCurve — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -379,7 +397,8 @@ pub fn OrgVisibleCurve(org1: vec3_t, mins: vec3_t, maxs: vec3_t, org2: vec3_t, i
 /// Raven `CanForceJumpTo`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1549-1621`
-pub fn CanForceJumpTo(baseindex: c_int, testingindex: c_int, distance: f32) -> c_int {
+pub fn CanForceJumpTo(
+    ctx: GameContext<'_>,baseindex: c_int, testingindex: c_int, distance: f32) -> c_int {
     todo!("Port CanForceJumpTo — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -390,7 +409,7 @@ pub fn CanForceJumpTo(baseindex: c_int, testingindex: c_int, distance: f32) -> c
 /// Raven `CalculatePaths`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1623-1713`
-pub fn CalculatePaths() {
+pub fn CalculatePaths(ctx: GameContext<'_>) {
     todo!("Port CalculatePaths — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -399,7 +418,8 @@ pub fn CalculatePaths() {
 /// Raven `GetObjectThatTargets`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1715-1732`
-pub fn GetObjectThatTargets(ent: *mut gentity_t) -> *mut gentity_t {
+pub fn GetObjectThatTargets(
+    ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut gentity_t {
     todo!("Port GetObjectThatTargets — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -408,7 +428,7 @@ pub fn GetObjectThatTargets(ent: *mut gentity_t) -> *mut gentity_t {
 /// Raven `CalculateSiegeGoals`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1734-1794`
-pub fn CalculateSiegeGoals() {
+pub fn CalculateSiegeGoals(ctx: GameContext<'_>) {
     todo!("Port CalculateSiegeGoals — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -417,7 +437,8 @@ pub fn CalculateSiegeGoals() {
 /// Raven `GetNearestVisibleWPToItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1817-1856`
-pub fn GetNearestVisibleWPToItem(org: vec3_t, ignore: c_int) -> c_int {
+pub fn GetNearestVisibleWPToItem(
+    ctx: GameContext<'_>,org: vec3_t, ignore: c_int) -> c_int {
     todo!("Port GetNearestVisibleWPToItem — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -426,7 +447,7 @@ pub fn GetNearestVisibleWPToItem(org: vec3_t, ignore: c_int) -> c_int {
 /// Raven `CalculateWeightGoals`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1858-1951`
-pub fn CalculateWeightGoals() {
+pub fn CalculateWeightGoals(ctx: GameContext<'_>) {
     todo!("Port CalculateWeightGoals — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -435,7 +456,7 @@ pub fn CalculateWeightGoals() {
 /// Raven `CalculateJumpRoutes`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1953-2005`
-pub fn CalculateJumpRoutes() {
+pub fn CalculateJumpRoutes(ctx: GameContext<'_>) {
     todo!("Port CalculateJumpRoutes — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -446,7 +467,8 @@ pub fn CalculateJumpRoutes() {
 /// Raven `LoadPathData`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2007-2250`
-pub fn LoadPathData(filename: *const c_char) -> c_int {
+pub fn LoadPathData(
+    ctx: GameContext<'_>,filename: *const c_char) -> c_int {
     todo!("Port LoadPathData — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -455,7 +477,7 @@ pub fn LoadPathData(filename: *const c_char) -> c_int {
 /// Raven `FlagObjects`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2252-2369`
-pub fn FlagObjects() {
+pub fn FlagObjects(ctx: GameContext<'_>) {
     todo!("Port FlagObjects — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -465,7 +487,8 @@ pub fn FlagObjects() {
 /// Raven `SavePathData`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2372-2500`
-pub fn SavePathData(filename: *const c_char) -> c_int {
+pub fn SavePathData(
+    ctx: GameContext<'_>,filename: *const c_char) -> c_int {
     todo!("Port SavePathData — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -474,7 +497,8 @@ pub fn SavePathData(filename: *const c_char) -> c_int {
 /// Raven `G_NearestNodeToPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2510-2541`
-pub fn G_NearestNodeToPoint(point: vec3_t) -> c_int {
+pub fn G_NearestNodeToPoint(
+    ctx: GameContext<'_>,point: vec3_t) -> c_int {
     todo!("Port G_NearestNodeToPoint — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -483,7 +507,7 @@ pub fn G_NearestNodeToPoint(point: vec3_t) -> c_int {
 /// Raven `G_NodeClearForNext`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2545-2556`
-pub fn G_NodeClearForNext() {
+pub fn G_NodeClearForNext(ctx: GameContext<'_>) {
     todo!("Port G_NodeClearForNext — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -492,7 +516,7 @@ pub fn G_NodeClearForNext() {
 /// Raven `G_NodeClearFlags`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2558-2568`
-pub fn G_NodeClearFlags() {
+pub fn G_NodeClearFlags(ctx: GameContext<'_>) {
     todo!("Port G_NodeClearFlags — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -501,7 +525,8 @@ pub fn G_NodeClearFlags() {
 /// Raven `G_NodeMatchingXY`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2570-2587`
-pub fn G_NodeMatchingXY(x: f32, y: f32) -> c_int {
+pub fn G_NodeMatchingXY(
+    ctx: GameContext<'_>,x: f32, y: f32) -> c_int {
     todo!("Port G_NodeMatchingXY — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -510,7 +535,8 @@ pub fn G_NodeMatchingXY(x: f32, y: f32) -> c_int {
 /// Raven `G_NodeMatchingXY_BA`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2589-2614`
-pub fn G_NodeMatchingXY_BA(x: c_int, y: c_int, r#final: c_int) -> c_int {
+pub fn G_NodeMatchingXY_BA(
+    ctx: GameContext<'_>,x: c_int, y: c_int, r#final: c_int) -> c_int {
     todo!("Port G_NodeMatchingXY_BA — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -520,6 +546,7 @@ pub fn G_NodeMatchingXY_BA(x: c_int, y: c_int, r#final: c_int) -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2616-2689`
 pub fn G_RecursiveConnection(
+    ctx: GameContext<'_>,
     start: c_int,
     end: c_int,
     weight: c_int,
@@ -535,7 +562,8 @@ pub fn G_RecursiveConnection(
 /// Raven `G_BackwardAttachment`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2981-3048`
-pub fn G_BackwardAttachment(start: c_int, finalDestination: c_int, insertAfter: c_int) -> qboolean {
+pub fn G_BackwardAttachment(
+    ctx: GameContext<'_>,start: c_int, finalDestination: c_int, insertAfter: c_int) -> qboolean {
     todo!("Port G_BackwardAttachment — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -546,7 +574,7 @@ pub fn G_BackwardAttachment(start: c_int, finalDestination: c_int, insertAfter: 
 /// Raven `G_RMGPathing`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3055-3250`
-pub fn G_RMGPathing() {
+pub fn G_RMGPathing(ctx: GameContext<'_>) {
     todo!("Port G_RMGPathing — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -556,7 +584,7 @@ pub fn G_RMGPathing() {
 /// Raven `BeginAutoPathRoutine`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3254-3342`
-pub fn BeginAutoPathRoutine() {
+pub fn BeginAutoPathRoutine(ctx: GameContext<'_>) {
     todo!("Port BeginAutoPathRoutine — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -566,7 +594,7 @@ pub fn BeginAutoPathRoutine() {
 /// Raven `LoadPath_ThisLevel`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3347-3423`
-pub fn LoadPath_ThisLevel() {
+pub fn LoadPath_ThisLevel(ctx: GameContext<'_>) {
     todo!("Port LoadPath_ThisLevel — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -575,7 +603,8 @@ pub fn LoadPath_ThisLevel() {
 /// Raven `GetClosestSpawn`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3425-3457`
-pub fn GetClosestSpawn(ent: *mut gentity_t) -> *mut gentity_t {
+pub fn GetClosestSpawn(
+    ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut gentity_t {
     todo!("Port GetClosestSpawn — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -584,7 +613,8 @@ pub fn GetClosestSpawn(ent: *mut gentity_t) -> *mut gentity_t {
 /// Raven `GetNextSpawnInIndex`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3459-3499`
-pub fn GetNextSpawnInIndex(currentSpawn: *mut gentity_t) -> *mut gentity_t {
+pub fn GetNextSpawnInIndex(
+    ctx: GameContext<'_>,currentSpawn: *mut gentity_t) -> *mut gentity_t {
     todo!("Port GetNextSpawnInIndex — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -596,6 +626,7 @@ pub fn GetNextSpawnInIndex(currentSpawn: *mut gentity_t) -> *mut gentity_t {
 /// Raven `AcceptBotCommand`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3501-3813`
-pub fn AcceptBotCommand(cmd: *mut c_char, pl: *mut gentity_t) -> c_int {
+pub fn AcceptBotCommand(
+    ctx: GameContext<'_>,cmd: *mut c_char, pl: *mut gentity_t) -> c_int {
     todo!("Port AcceptBotCommand — parked: raw-ptr-skeleton-no-world-handle")
 }

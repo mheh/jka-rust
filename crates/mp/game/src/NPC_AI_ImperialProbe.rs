@@ -53,7 +53,7 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn NPC_Probe_Precache() {
+pub fn NPC_Probe_Precache(ctx: GameContext<'_>) {
     todo!("Port NPC_Probe_Precache — parked: seam-threading")
 }
 
@@ -65,7 +65,7 @@ pub fn NPC_Probe_Precache() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ImperialProbe_MaintainHeight() {
+pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
     todo!("Port ImperialProbe_MaintainHeight — parked: ai-context")
 }
 
@@ -77,7 +77,7 @@ pub fn ImperialProbe_MaintainHeight() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ImperialProbe_Strafe() {
+pub fn ImperialProbe_Strafe(ctx: GameContext<'_>) {
     todo!("Port ImperialProbe_Strafe — parked: ai-context")
 }
 
@@ -89,7 +89,8 @@ pub fn ImperialProbe_Strafe() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ImperialProbe_Hunt(visible: qboolean, advance: qboolean) {
+pub fn ImperialProbe_Hunt(
+    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
     todo!("Port ImperialProbe_Hunt — parked: ai-context")
 }
 
@@ -101,7 +102,7 @@ pub fn ImperialProbe_Hunt(visible: qboolean, advance: qboolean) {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ImperialProbe_FireBlaster() {
+pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
     todo!("Port ImperialProbe_FireBlaster — parked: ai-context")
 }
 
@@ -113,7 +114,8 @@ pub fn ImperialProbe_FireBlaster() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ImperialProbe_Ranged(visible: qboolean, advance: qboolean) {
+pub fn ImperialProbe_Ranged(
+    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
     todo!("Port ImperialProbe_Ranged — parked: ai-context")
 }
 
@@ -125,7 +127,7 @@ pub fn ImperialProbe_Ranged(visible: qboolean, advance: qboolean) {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ImperialProbe_AttackDecision() {
+pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
     todo!("Port ImperialProbe_AttackDecision — parked: ai-context")
 }
 
@@ -136,16 +138,17 @@ pub fn ImperialProbe_AttackDecision() {
 // `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
 // file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
 // `g_weapon.rs`) — how is state threaded in?
-pub fn NPC_Probe_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+pub fn NPC_Probe_Pain(
+    ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     todo!("Port NPC_Probe_Pain — parked: seam-threading")
 }
 
 /// Raven `ImperialProbe_Idle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:506-511`
-pub fn ImperialProbe_Idle() {
-    ImperialProbe_MaintainHeight();
-    NPC_BSIdle();
+pub fn ImperialProbe_Idle(ctx: GameContext<'_>) {
+    ImperialProbe_MaintainHeight(ctx);
+    NPC_BSIdle(ctx);
 }
 
 /// Raven `ImperialProbe_Patrol`.
@@ -156,7 +159,7 @@ pub fn ImperialProbe_Idle() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ImperialProbe_Patrol() {
+pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
     todo!("Port ImperialProbe_Patrol — parked: ai-context")
 }
 
@@ -168,7 +171,7 @@ pub fn ImperialProbe_Patrol() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn ImperialProbe_Wait() {
+pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
     todo!("Port ImperialProbe_Wait — parked: ai-context")
 }
 
@@ -180,6 +183,6 @@ pub fn ImperialProbe_Wait() {
 // `GameWorld`/`GameContext` field or entity param carries them yet (topic
 // `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
 // precedent in this same mega-pass).
-pub fn NPC_BSImperialProbe_Default() {
+pub fn NPC_BSImperialProbe_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSImperialProbe_Default — parked: ai-context")
 }

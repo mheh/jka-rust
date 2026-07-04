@@ -33,20 +33,21 @@ const LSTATE_INVESTIGATE: i32 = 2;
 /// Raven `Sniper_ClearTimers`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:44-58`
-pub fn Sniper_ClearTimers(ent: *mut gentity_t) {
-    TIMER_Set(ent, c"chatter".as_ptr(), 0);
-    TIMER_Set(ent, c"duck".as_ptr(), 0);
-    TIMER_Set(ent, c"stand".as_ptr(), 0);
-    TIMER_Set(ent, c"shuffleTime".as_ptr(), 0);
-    TIMER_Set(ent, c"sleepTime".as_ptr(), 0);
-    TIMER_Set(ent, c"enemyLastVisible".as_ptr(), 0);
-    TIMER_Set(ent, c"roamTime".as_ptr(), 0);
-    TIMER_Set(ent, c"hideTime".as_ptr(), 0);
+pub fn Sniper_ClearTimers(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
+    TIMER_Set(ctx, ent, c"chatter".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"duck".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"stand".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"shuffleTime".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"sleepTime".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"enemyLastVisible".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"roamTime".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"hideTime".as_ptr(), 0);
     // FIXME: Slant for difficulty levels (Raven comment).
-    TIMER_Set(ent, c"attackDelay".as_ptr(), 0);
-    TIMER_Set(ent, c"stick".as_ptr(), 0);
-    TIMER_Set(ent, c"scoutTime".as_ptr(), 0);
-    TIMER_Set(ent, c"flee".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"attackDelay".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"stick".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"scoutTime".as_ptr(), 0);
+    TIMER_Set(ctx, ent, c"flee".as_ptr(), 0);
 }
 
 // PORT-ESCALATION(constants-in-scope): needs the anonymous `squadState_e`
@@ -56,26 +57,28 @@ pub fn Sniper_ClearTimers(ent: *mut gentity_t) {
 /// Raven `NPC_Sniper_PlayConfusionSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:60-76`
-pub fn NPC_Sniper_PlayConfusionSound(self_: *mut gentity_t) {
+pub fn NPC_Sniper_PlayConfusionSound(
+    ctx: GameContext<'_>,self_: *mut gentity_t) {
     todo!("Port NPC_Sniper_PlayConfusionSound — parked: constants-in-scope (SQUAD_IDLE)")
 }
 
 /// Raven `NPC_Sniper_Pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:85-98`
-pub fn NPC_Sniper_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+pub fn NPC_Sniper_Pain(
+    ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).localState = LSTATE_UNDERFIRE;
 
-        TIMER_Set(self_, c"duck".as_ptr(), -1);
-        TIMER_Set(self_, c"stand".as_ptr(), 2000);
+        TIMER_Set(ctx, self_, c"duck".as_ptr(), -1);
+        TIMER_Set(ctx, self_, c"stand".as_ptr(), 2000);
 
-        NPC_Pain(self_, attacker, damage);
+        NPC_Pain(ctx, self_, attacker, damage);
 
         if damage == 0 && (*self_).health > 0 {
             // FIXME: better way to know I was pushed (Raven comment).
-            G_AddVoiceEvent(self_, Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int), 2000);
+            G_AddVoiceEvent(ctx, self_, Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int), 2000);
         }
     }
 }
@@ -87,7 +90,7 @@ pub fn NPC_Sniper_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: 
 /// Raven `Sniper_HoldPosition`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:106-116`
-pub fn Sniper_HoldPosition() {
+pub fn Sniper_HoldPosition(ctx: GameContext<'_>) {
     todo!("Port Sniper_HoldPosition — parked: ambient-state")
 }
 
@@ -96,7 +99,7 @@ pub fn Sniper_HoldPosition() {
 /// Raven `Sniper_Move`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:124-177`
-pub fn Sniper_Move() -> qboolean {
+pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
     todo!("Port Sniper_Move — parked: ambient-state")
 }
 
@@ -105,7 +108,7 @@ pub fn Sniper_Move() -> qboolean {
 /// Raven `NPC_BSSniper_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:185-275`
-pub fn NPC_BSSniper_Patrol() {
+pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
     todo!("Port NPC_BSSniper_Patrol — parked: ambient-state")
 }
 
@@ -115,7 +118,7 @@ pub fn NPC_BSSniper_Patrol() {
 /// Raven `Sniper_CheckMoveState`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:308-381`
-pub fn Sniper_CheckMoveState() {
+pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
     todo!("Port Sniper_CheckMoveState — parked: ambient-state")
 }
 
@@ -124,7 +127,7 @@ pub fn Sniper_CheckMoveState() {
 /// Raven `Sniper_ResolveBlockedShot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:383-434`
-pub fn Sniper_ResolveBlockedShot() {
+pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
     todo!("Port Sniper_ResolveBlockedShot — parked: ambient-state")
 }
 
@@ -134,7 +137,7 @@ pub fn Sniper_ResolveBlockedShot() {
 /// Raven `Sniper_CheckFireState`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:442-486`
-pub fn Sniper_CheckFireState() {
+pub fn Sniper_CheckFireState(ctx: GameContext<'_>) {
     todo!("Port Sniper_CheckFireState — parked: ambient-state")
 }
 
@@ -144,7 +147,8 @@ pub fn Sniper_CheckFireState() {
 /// Raven `Sniper_EvaluateShot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:488-506`
-pub fn Sniper_EvaluateShot(hit: c_int) -> qboolean {
+pub fn Sniper_EvaluateShot(
+    ctx: GameContext<'_>,hit: c_int) -> qboolean {
     todo!("Port Sniper_EvaluateShot — parked: ambient-state")
 }
 
@@ -155,7 +159,7 @@ pub fn Sniper_EvaluateShot(hit: c_int) -> qboolean {
 /// Raven `Sniper_FaceEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:508-603`
-pub fn Sniper_FaceEnemy() {
+pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
     todo!("Port Sniper_FaceEnemy — parked: ambient-state")
 }
 
@@ -164,7 +168,7 @@ pub fn Sniper_FaceEnemy() {
 /// Raven `Sniper_UpdateEnemyPos`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:605-623`
-pub fn Sniper_UpdateEnemyPos() {
+pub fn Sniper_UpdateEnemyPos(ctx: GameContext<'_>) {
     todo!("Port Sniper_UpdateEnemyPos — parked: ambient-state")
 }
 
@@ -173,7 +177,7 @@ pub fn Sniper_UpdateEnemyPos() {
 /// Raven `Sniper_StartHide`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:631-638`
-pub fn Sniper_StartHide() {
+pub fn Sniper_StartHide(ctx: GameContext<'_>) {
     todo!("Port Sniper_StartHide — parked: ambient-state")
 }
 
@@ -184,7 +188,7 @@ pub fn Sniper_StartHide() {
 /// Raven `NPC_BSSniper_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:640-852`
-pub fn NPC_BSSniper_Attack() {
+pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
     todo!("Port NPC_BSSniper_Attack — parked: ambient-state")
 }
 
@@ -193,6 +197,6 @@ pub fn NPC_BSSniper_Attack() {
 /// Raven `NPC_BSSniper_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:854-864`
-pub fn NPC_BSSniper_Default() {
+pub fn NPC_BSSniper_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSSniper_Default — parked: ambient-state")
 }

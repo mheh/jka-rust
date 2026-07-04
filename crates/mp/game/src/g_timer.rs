@@ -55,7 +55,7 @@ pub static mut g_level_time: c_int = 0;
 /// Raven `TIMER_Clear`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:27-41`
-pub fn TIMER_Clear() {
+pub fn TIMER_Clear(ctx: GameContext<'_>) {
     unsafe {
         // Clear all timers for each entity
         for i in 0..MAX_GENTITIES {
@@ -76,7 +76,8 @@ pub fn TIMER_Clear() {
 /// Raven `TIMER_Clear2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:49-74`
-pub fn TIMER_Clear2(ent: *mut gentity_t) {
+pub fn TIMER_Clear2(
+    ctx: GameContext<'_>,ent: *mut gentity_t) {
     unsafe {
         // Rudimentary safety checks
         if ent.is_null() {
@@ -111,7 +112,8 @@ pub fn TIMER_Clear2(ent: *mut gentity_t) {
 /// Raven `TIMER_GetNew`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:79-103`
-pub fn TIMER_GetNew(num: c_int, identifier: *const c_char) -> *mut c_void {
+pub fn TIMER_GetNew(
+    ctx: GameContext<'_>,num: c_int, identifier: *const c_char) -> *mut c_void {
     unsafe {
         let num_usize = num as usize;
         let mut p = g_timers[num_usize];
@@ -142,7 +144,8 @@ pub fn TIMER_GetNew(num: c_int, identifier: *const c_char) -> *mut c_void {
 /// Raven `TIMER_GetExisting`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:106-121`
-pub fn TIMER_GetExisting(num: c_int, identifier: *const c_char) -> *mut c_void {
+pub fn TIMER_GetExisting(
+    ctx: GameContext<'_>,num: c_int, identifier: *const c_char) -> *mut c_void {
     unsafe {
         let num_usize = num as usize;
         let mut p = g_timers[num_usize];
@@ -163,13 +166,14 @@ pub fn TIMER_GetExisting(num: c_int, identifier: *const c_char) -> *mut c_void {
 /// Raven `TIMER_Set`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:129-139`
-pub fn TIMER_Set(ent: *mut gentity_t, identifier: *const c_char, duration: c_int) {
+pub fn TIMER_Set(
+    ctx: GameContext<'_>,ent: *mut gentity_t, identifier: *const c_char, duration: c_int) {
     unsafe {
         if ent.is_null() {
             return;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetNew(ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetNew(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
 
         if timer.is_null() {
             return;
@@ -183,13 +187,14 @@ pub fn TIMER_Set(ent: *mut gentity_t, identifier: *const c_char, duration: c_int
 /// Raven `TIMER_Get`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:147-157`
-pub fn TIMER_Get(ent: *mut gentity_t, identifier: *const c_char) -> c_int {
+pub fn TIMER_Get(
+    ctx: GameContext<'_>,ent: *mut gentity_t, identifier: *const c_char) -> c_int {
     unsafe {
         if ent.is_null() {
             return -1;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
 
         if timer.is_null() {
             return -1;
@@ -202,13 +207,14 @@ pub fn TIMER_Get(ent: *mut gentity_t, identifier: *const c_char) -> c_int {
 /// Raven `TIMER_Done`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:165-175`
-pub fn TIMER_Done(ent: *mut gentity_t, identifier: *const c_char) -> qboolean {
+pub fn TIMER_Done(
+    ctx: GameContext<'_>,ent: *mut gentity_t, identifier: *const c_char) -> qboolean {
     unsafe {
         if ent.is_null() {
             return qtrue;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
 
         if timer.is_null() {
             return qtrue;
@@ -228,7 +234,8 @@ pub fn TIMER_Done(ent: *mut gentity_t, identifier: *const c_char) -> qboolean {
 /// and put it on the free list.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:187-211`
-pub fn TIMER_RemoveHelper(num: c_int, timer: *mut c_void) {
+pub fn TIMER_RemoveHelper(
+    ctx: GameContext<'_>,num: c_int, timer: *mut c_void) {
     unsafe {
         let num_usize = num as usize;
         let timer = timer as *mut gtimer_t;
@@ -266,6 +273,7 @@ pub fn TIMER_RemoveHelper(num: c_int, timer: *mut c_void) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:223-242`
 pub fn TIMER_Done2(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     identifier: *const c_char,
     remove: qboolean,
@@ -275,7 +283,7 @@ pub fn TIMER_Done2(
             return qfalse;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
 
         if timer.is_null() {
             return qfalse;
@@ -285,7 +293,7 @@ pub fn TIMER_Done2(
 
         if res && remove == qtrue {
             // Put it back on the free list
-            TIMER_RemoveHelper(ent_ref.s.number, timer as *mut c_void);
+            TIMER_RemoveHelper(ctx, ent_ref.s.number, timer as *mut c_void);
         }
 
         if res {
@@ -299,13 +307,14 @@ pub fn TIMER_Done2(
 /// Raven `TIMER_Exists`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:249-259`
-pub fn TIMER_Exists(ent: *mut gentity_t, identifier: *const c_char) -> qboolean {
+pub fn TIMER_Exists(
+    ctx: GameContext<'_>,ent: *mut gentity_t, identifier: *const c_char) -> qboolean {
     unsafe {
         if ent.is_null() {
             return qfalse;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
 
         if timer.is_null() {
             qfalse
@@ -320,29 +329,31 @@ pub fn TIMER_Exists(ent: *mut gentity_t, identifier: *const c_char) -> qboolean 
 /// Utility to get rid of any timer.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:267-278`
-pub fn TIMER_Remove(ent: *mut gentity_t, identifier: *const c_char) {
+pub fn TIMER_Remove(
+    ctx: GameContext<'_>,ent: *mut gentity_t, identifier: *const c_char) {
     unsafe {
         if ent.is_null() {
             return;
         }
         let ent_ref = &*ent;
-        let timer = TIMER_GetExisting(ent_ref.s.number, identifier) as *mut gtimer_t;
+        let timer = TIMER_GetExisting(ctx, ent_ref.s.number, identifier) as *mut gtimer_t;
 
         if timer.is_null() {
             return;
         }
 
         // Put it back on the free list
-        TIMER_RemoveHelper(ent_ref.s.number, timer as *mut c_void);
+        TIMER_RemoveHelper(ctx, ent_ref.s.number, timer as *mut c_void);
     }
 }
 
 /// Raven `TIMER_Start`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:286-294`
-pub fn TIMER_Start(self_: *mut gentity_t, identifier: *const c_char, duration: c_int) -> qboolean {
-    if TIMER_Done(self_, identifier) == qtrue {
-        TIMER_Set(self_, identifier, duration);
+pub fn TIMER_Start(
+    ctx: GameContext<'_>,self_: *mut gentity_t, identifier: *const c_char, duration: c_int) -> qboolean {
+    if TIMER_Done(ctx, self_, identifier) == qtrue {
+        TIMER_Set(ctx, self_, identifier, duration);
         qtrue
     } else {
         qfalse

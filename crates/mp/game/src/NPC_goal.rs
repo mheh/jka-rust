@@ -22,6 +22,7 @@ const qfalse: qboolean = 0;
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:10-24`
 pub fn SetGoal(
+    ctx: GameContext<'_>,
     goal: *mut gentity_t,
     rating: f32,
 ) {
@@ -34,6 +35,7 @@ pub fn SetGoal(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:31-58`
 pub fn NPC_SetGoal(
+    ctx: GameContext<'_>,
     goal: *mut gentity_t,
     rating: f32,
 ) {
@@ -45,7 +47,7 @@ pub fn NPC_SetGoal(
 /// Raven `NPC_ClearGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:65-86`
-pub fn NPC_ClearGoal() {
+pub fn NPC_ClearGoal(ctx: GameContext<'_>) {
     todo!("Port NPC_ClearGoal — parked: seam-threading")
 }
 
@@ -93,7 +95,7 @@ pub fn G_BoundsOverlap(
 /// Raven `NPC_ReachedGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:117-129`
-pub fn NPC_ReachedGoal() {
+pub fn NPC_ReachedGoal(ctx: GameContext<'_>) {
     todo!("Port NPC_ReachedGoal — parked: seam-threading")
 }
 
@@ -108,6 +110,7 @@ pub fn NPC_ReachedGoal() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:136-231`
 pub fn ReachedGoal(
+    ctx: GameContext<'_>,
     goal: *mut gentity_t,
 ) -> qboolean {
     todo!("Port ReachedGoal — parked: seam-threading")
@@ -123,6 +126,6 @@ pub fn ReachedGoal(
 /// reached.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:243-267`
-pub fn UpdateGoal() -> *mut gentity_t {
+pub fn UpdateGoal(ctx: GameContext<'_>) -> *mut gentity_t {
     todo!("Port UpdateGoal — parked: seam-threading")
 }

@@ -29,6 +29,12 @@ pub struct GameWorld {
     /// Source: `oracle/oracle/codemp/game/g_main.c:230-475`
     pub cvars: GameCvars,
 
+    /// Raven's remaining game-tier mutable file-scope globals/statics as one
+    /// owned sub-struct (fork ruling 1; grouped by owning `.c` file). Pass-2
+    /// porters reach these through `ctx.world.globals`; they never add a field.
+    /// Source: `crate::game_globals::GameGlobals`
+    pub globals: crate::game_globals::GameGlobals,
+
     /// `w_force.c` file-scope loop-sound handles (fork ruling 1: file-scope
     /// mutable globals become GameWorld fields, grouped by owning .c file).
     /// Cached `G_SoundIndex` results, lazily filled in `WP_InitForcePowers`.
@@ -76,6 +82,7 @@ impl GameWorld {
             entities,
             clients,
             cvars: GameCvars::default(),
+            globals: crate::game_globals::GameGlobals::default(),
             speedLoopSound: 0,
             rageLoopSound: 0,
             protectLoopSound: 0,

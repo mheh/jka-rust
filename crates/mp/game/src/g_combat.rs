@@ -35,6 +35,7 @@ const ROLL: usize = 2;
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:22-31`
 pub fn ObjectDie(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -43,11 +44,11 @@ pub fn ObjectDie(
 ) {
     unsafe {
         if !(*self_).target.is_null() {
-            G_UseTargets(self_, attacker);
+            G_UseTargets(ctx, self_, attacker);
         }
 
         // remove my script_targetname
-        G_FreeEntity(self_);
+        G_FreeEntity(ctx, self_);
     }
 }
 
@@ -59,6 +60,7 @@ pub fn ObjectDie(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:33-44`
 pub fn G_HeavyMelee(
+    ctx: GameContext<'_>,
     attacker: *mut gentity_t,
 ) -> qboolean {
     todo!("Port G_HeavyMelee — parked: raw-ptr-skeleton-no-world-handle")
@@ -71,6 +73,7 @@ pub fn G_HeavyMelee(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:46-266`
 pub fn G_GetHitLocation(
+    ctx: GameContext<'_>,
     target: *mut gentity_t,
     ppoint: vec3_t,
 ) -> c_int {
@@ -84,6 +87,7 @@ pub fn G_GetHitLocation(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:369-409`
 pub fn ExplodeDeath(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port ExplodeDeath — parked: vec3-outparam-seam")
@@ -95,6 +99,7 @@ pub fn ExplodeDeath(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:417-427`
 pub fn ScorePlum(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     origin: vec3_t,
     score: c_int,
@@ -109,6 +114,7 @@ pub fn ScorePlum(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:437-460`
 pub fn AddScore(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     origin: vec3_t,
     score: c_int,
@@ -122,6 +128,7 @@ pub fn AddScore(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:469-559`
 pub fn TossClientWeapon(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     direction: vec3_t,
     speed: f32,
@@ -135,6 +142,7 @@ pub fn TossClientWeapon(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:568-635`
 pub fn TossClientItems(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port TossClientItems — parked: raw-ptr-skeleton-no-world-handle")
@@ -180,6 +188,7 @@ pub fn LookAtKiller(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:668-673`
 pub fn GibEntity(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     killer: c_int,
 ) {
@@ -197,6 +206,7 @@ pub fn GibEntity(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:675-679`
 pub fn BodyRid(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port BodyRid — parked: raw-ptr-skeleton-no-world-handle")
@@ -209,6 +219,7 @@ pub fn BodyRid(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:686-751`
 pub fn body_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -248,6 +259,7 @@ pub fn G_InKnockDown(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:882-1372`
 pub fn G_CheckSpecialDeathAnim(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     point: vec3_t,
     damage: c_int,
@@ -263,6 +275,7 @@ pub fn G_CheckSpecialDeathAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:1374-1742`
 pub fn G_PickDeathAnim(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     point: vec3_t,
     damage: c_int,
@@ -277,7 +290,7 @@ pub fn G_PickDeathAnim(
 /// Raven `G_GetJediMaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:1744-1762`
-pub fn G_GetJediMaster() -> *mut gentity_t {
+pub fn G_GetJediMaster(ctx: GameContext<'_>) -> *mut gentity_t {
     todo!("Port G_GetJediMaster — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -287,6 +300,7 @@ pub fn G_GetJediMaster() -> *mut gentity_t {
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:1770-1858`
 pub fn G_AlertTeam(
+    ctx: GameContext<'_>,
     victim: *mut gentity_t,
     attacker: *mut gentity_t,
     radius: f32,
@@ -300,11 +314,12 @@ pub fn G_AlertTeam(
 /// Raven: FIXME: with all the other alert stuff, do we really need this?
 /// Source: `oracle/oracle/codemp/game/g_combat.c:1869-1872`
 pub fn G_DeathAlert(
+    ctx: GameContext<'_>,
     victim: *mut gentity_t,
     attacker: *mut gentity_t,
 ) {
     // #define DEATH_ALERT_RADIUS 512 / DEATH_ALERT_SOUND_RADIUS 512
-    G_AlertTeam(victim, attacker, 512.0, 512.0);
+    G_AlertTeam(ctx, victim, attacker, 512.0, 512.0);
 }
 
 // PORT-ESCALATION(vec3-outparam-seam): resolved `AngleVectors` takes `vec3_t`
@@ -314,6 +329,7 @@ pub fn G_DeathAlert(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:1883-1984`
 pub fn DeathFX(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port DeathFX — parked: vec3-outparam-seam")
@@ -325,6 +341,7 @@ pub fn DeathFX(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:1986-2014`
 pub fn G_CheckVictoryScript(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port G_CheckVictoryScript — parked: raw-ptr-skeleton-no-world-handle")
@@ -336,6 +353,7 @@ pub fn G_CheckVictoryScript(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:2016-2035`
 pub fn G_AddPowerDuelScore(
+    ctx: GameContext<'_>,
     team: c_int,
     score: c_int,
 ) {
@@ -348,6 +366,7 @@ pub fn G_AddPowerDuelScore(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:2037-2055`
 pub fn G_AddPowerDuelLoserScore(
+    ctx: GameContext<'_>,
     team: c_int,
     score: c_int,
 ) {
@@ -360,6 +379,7 @@ pub fn G_AddPowerDuelLoserScore(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:2059-2105`
 pub fn G_BroadcastObit(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -379,6 +399,7 @@ pub fn G_BroadcastObit(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:2123-3011`
 pub fn player_die(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -394,6 +415,7 @@ pub fn player_die(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3019-3071`
 pub fn CheckArmor(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     damage: c_int,
     dflags: c_int,
@@ -407,6 +429,7 @@ pub fn CheckArmor(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3074-3121`
 pub fn G_ApplyKnockback(
+    ctx: GameContext<'_>,
     targ: *mut gentity_t,
     newDir: vec3_t,
     knockback: f32,
@@ -450,6 +473,7 @@ pub fn G_GetDismemberLoc(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3264-3385`
 pub fn G_GetDismemberBolt(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     boltPoint: vec3_t,
     limbType: c_int,
@@ -474,6 +498,7 @@ pub fn LimbTouch(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3391-3430`
 pub fn LimbThink(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port LimbThink — parked: raw-ptr-skeleton-no-world-handle")
@@ -486,6 +511,7 @@ pub fn LimbThink(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3436-3620`
 pub fn G_Dismember(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     enemy: *mut gentity_t,
     point: vec3_t,
@@ -504,6 +530,7 @@ pub fn G_Dismember(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3622-3633`
 pub fn DismembermentTest(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port DismembermentTest — parked: unported-anim-consts")
@@ -515,6 +542,7 @@ pub fn DismembermentTest(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3635-3669`
 pub fn DismembermentByNum(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     num: c_int,
 ) {
@@ -527,6 +555,7 @@ pub fn DismembermentByNum(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3671-3751`
 pub fn G_GetHitQuad(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     hitloc: vec3_t,
 ) -> c_int {
@@ -539,6 +568,7 @@ pub fn G_GetHitQuad(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3757-4216`
 pub fn G_GetHitLocFromSurfName(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     surfName: *const c_char,
     hitLoc: *mut c_int,
@@ -557,6 +587,7 @@ pub fn G_GetHitLocFromSurfName(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:4218-4344`
 pub fn G_CheckForDismemberment(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     enemy: *mut gentity_t,
     point: vec3_t,
@@ -573,6 +604,7 @@ pub fn G_CheckForDismemberment(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:4346-4425`
 pub fn G_LocationBasedDamageModifier(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     point: vec3_t,
     r#mod: c_int,
@@ -587,7 +619,7 @@ pub fn G_LocationBasedDamageModifier(
 /// Raven `G_ThereIsAMaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:4432-4450`
-pub fn G_ThereIsAMaster() -> qboolean {
+pub fn G_ThereIsAMaster(ctx: GameContext<'_>) -> qboolean {
     todo!("Port G_ThereIsAMaster — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -597,6 +629,7 @@ pub fn G_ThereIsAMaster() -> qboolean {
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:4452-4461`
 pub fn G_Knockdown(
+    ctx: GameContext<'_>,
     victim: *mut gentity_t,
 ) {
     todo!("Port G_Knockdown — parked: raw-ptr-skeleton-no-world-handle")
@@ -608,6 +641,7 @@ pub fn G_Knockdown(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:4463-4526`
 pub fn G_ApplyVehicleOtherKiller(
+    ctx: GameContext<'_>,
     targ: *mut gentity_t,
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
@@ -687,6 +721,7 @@ pub fn G_DamageFromKiller(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:5768-5815`
 pub fn CanDamage(
+    ctx: GameContext<'_>,
     targ: *mut gentity_t,
     origin: vec3_t,
 ) -> qboolean {
@@ -699,6 +734,7 @@ pub fn CanDamage(
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:5823-5943`
 pub fn G_RadiusDamage(
+    ctx: GameContext<'_>,
     origin: vec3_t,
     attacker: *mut gentity_t,
     damage: f32,

@@ -30,6 +30,7 @@ const qfalse: qboolean = 0;
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:20-37`
 pub fn AddRemap(
+    ctx: GameContext<'_>,
     oldShader: *const c_char,
     newShader: *const c_char,
     timeOffset: f32,
@@ -44,7 +45,7 @@ pub fn AddRemap(
 /// Raven `BuildShaderStateConfig`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:39-50`
-pub fn BuildShaderStateConfig() -> *const c_char {
+pub fn BuildShaderStateConfig(ctx: GameContext<'_>) -> *const c_char {
     todo!("Port BuildShaderStateConfig — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -55,6 +56,7 @@ pub fn BuildShaderStateConfig() -> *const c_char {
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:66-95`
 pub fn G_FindConfigstringIndex(
+    ctx: GameContext<'_>,
     name: *const c_char,
     start: c_int,
     max: c_int,
@@ -69,6 +71,7 @@ pub fn G_FindConfigstringIndex(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:101-103`
 pub fn G_BoneIndex(
+    ctx: GameContext<'_>,
     name: *const c_char,
 ) -> c_int {
     todo!("Port G_BoneIndex — parked: raw-ptr-skeleton-no-world-handle")
@@ -87,6 +90,7 @@ pub fn G_ModelIndex(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:132-136`
 pub fn G_IconIndex(
+    ctx: GameContext<'_>,
     name: *const c_char,
 ) -> c_int {
     todo!("Port G_IconIndex — parked: raw-ptr-skeleton-no-world-handle")
@@ -105,6 +109,7 @@ pub fn G_SoundIndex(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:143-146`
 pub fn G_SoundSetIndex(
+    ctx: GameContext<'_>,
     name: *const c_char,
 ) -> c_int {
     todo!("Port G_SoundSetIndex — parked: raw-ptr-skeleton-no-world-handle")
@@ -123,6 +128,7 @@ pub fn G_EffectIndex(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:153-156`
 pub fn G_BSPIndex(
+    ctx: GameContext<'_>,
     name: *const c_char,
 ) -> c_int {
     todo!("Port G_BSPIndex — parked: raw-ptr-skeleton-no-world-handle")
@@ -146,6 +152,7 @@ pub fn G_PlayerHasCustomSkeleton(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:197-207`
 pub fn G_TeamCommand(
+    ctx: GameContext<'_>,
     team: team_t,
     cmd: *mut c_char,
 ) {
@@ -159,6 +166,7 @@ pub fn G_TeamCommand(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:222-243`
 pub fn G_Find(
+    ctx: GameContext<'_>,
     from: *mut gentity_t,
     fieldofs: c_int,
     r#match: *const c_char,
@@ -172,6 +180,7 @@ pub fn G_Find(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:252-311`
 pub fn G_RadiusList(
+    ctx: GameContext<'_>,
     origin: vec3_t,
     radius: f32,
     ignore: *mut gentity_t,
@@ -189,6 +198,7 @@ pub fn G_RadiusList(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:315-370`
 pub fn G_Throw(
+    ctx: GameContext<'_>,
     targ: *mut gentity_t,
     newDir: vec3_t,
     push: f32,
@@ -214,6 +224,7 @@ pub fn G_FreeFakeClient(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:388-410`
 pub fn G_AllocateVehicleObject(
+    ctx: GameContext<'_>,
     pVeh: *mut *mut Vehicle_t,
 ) {
     todo!("Port G_AllocateVehicleObject — parked: raw-ptr-skeleton-no-world-handle")
@@ -223,6 +234,7 @@ pub fn G_AllocateVehicleObject(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:413-426`
 pub fn G_FreeVehicleObject(
+    ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
 ) {
     todo!("Port G_FreeVehicleObject — parked: raw-ptr-skeleton-no-world-handle")
@@ -235,6 +247,7 @@ pub fn G_FreeVehicleObject(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:430-438`
 pub fn G_CreateFakeClient(
+    ctx: GameContext<'_>,
     entNum: c_int,
     cl: *mut *mut gclient_t,
 ) {
@@ -244,7 +257,7 @@ pub fn G_CreateFakeClient(
 /// Raven `G_CleanAllFakeClients`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:450-465`
-pub fn G_CleanAllFakeClients() {
+pub fn G_CleanAllFakeClients(ctx: GameContext<'_>) {
     todo!("Port G_CleanAllFakeClients — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -272,6 +285,7 @@ pub fn G_SetAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:521-550`
 pub fn G_PickTarget(
+    ctx: GameContext<'_>,
     targetname: *mut c_char,
 ) -> *mut gentity_t {
     todo!("Port G_PickTarget — parked: raw-ptr-skeleton-no-world-handle")
@@ -300,6 +314,7 @@ pub fn GlobalUse(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:566-597`
 pub fn G_UseTargets2(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     activator: *mut gentity_t,
     string: *const c_char,
@@ -314,6 +329,7 @@ pub fn G_UseTargets2(
 /// handle — see its PORT-ESCALATION note).
 /// Source: `oracle/oracle/codemp/game/g_utils.c:609-616`
 pub fn G_UseTargets(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
@@ -321,7 +337,7 @@ pub fn G_UseTargets(
         return;
     }
     unsafe {
-        G_UseTargets2(ent, activator, (*ent).target as *const c_char);
+        G_UseTargets2(ctx, ent, activator, (*ent).target as *const c_char);
     }
 }
 
@@ -349,6 +365,7 @@ pub fn tv(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:653-665`
 pub fn vtos(
+    ctx: GameContext<'_>,
     v: vec3_t,
 ) -> *mut c_char {
     todo!("Port vtos — parked: scratch-buffer-return-type-seam")
@@ -375,6 +392,7 @@ pub fn G_SetMovedir(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:694-702`
 pub fn G_InitGentity(
+    ctx: GameContext<'_>,
     e: *mut gentity_t,
 ) {
     todo!("Port G_InitGentity — parked: raw-ptr-skeleton-no-world-handle")
@@ -383,7 +401,7 @@ pub fn G_InitGentity(
 /// Raven `G_SpewEntList`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:705-787`
-pub fn G_SpewEntList() {
+pub fn G_SpewEntList(ctx: GameContext<'_>) {
     todo!("Port G_SpewEntList — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -394,14 +412,14 @@ pub fn G_SpewEntList() {
 /// Raven `G_Spawn`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:804-853`
-pub fn G_Spawn() -> *mut gentity_t {
+pub fn G_Spawn(ctx: GameContext<'_>) -> *mut gentity_t {
     todo!("Port G_Spawn — parked: raw-ptr-skeleton-no-world-handle")
 }
 
 /// Raven `G_EntitiesFree`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:860-873`
-pub fn G_EntitiesFree() -> qboolean {
+pub fn G_EntitiesFree(ctx: GameContext<'_>) -> qboolean {
     todo!("Port G_EntitiesFree — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -411,7 +429,7 @@ pub fn G_EntitiesFree() -> qboolean {
 /// Raven `G_SendG2KillQueue`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:880-907`
-pub fn G_SendG2KillQueue() {
+pub fn G_SendG2KillQueue(ctx: GameContext<'_>) {
     todo!("Port G_SendG2KillQueue — parked: raw-ptr-skeleton-no-world-handle")
 }
 
@@ -419,6 +437,7 @@ pub fn G_SendG2KillQueue() {
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:909-923`
 pub fn G_KillG2Queue(
+    ctx: GameContext<'_>,
     entNum: c_int,
 ) {
     todo!("Port G_KillG2Queue — parked: raw-ptr-skeleton-no-world-handle")
@@ -433,6 +452,7 @@ pub fn G_KillG2Queue(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:932-1043`
 pub fn G_FreeEntity(
+    ctx: GameContext<'_>,
     ed: *mut gentity_t,
 ) {
     todo!("Port G_FreeEntity — parked: raw-ptr-skeleton-no-world-handle")
@@ -444,6 +464,7 @@ pub fn G_FreeEntity(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1054-1077`
 pub fn G_TempEntity(
+    ctx: GameContext<'_>,
     origin: vec3_t,
     event: c_int,
 ) -> *mut gentity_t {
@@ -454,6 +475,7 @@ pub fn G_TempEntity(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1087-1108`
 pub fn G_SoundTempEntity(
+    ctx: GameContext<'_>,
     origin: vec3_t,
     event: c_int,
     channel: c_int,
@@ -478,6 +500,7 @@ pub fn G_ScaleNetHealth(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1162-1193`
 pub fn G_KillBox(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port G_KillBox — parked: raw-ptr-skeleton-no-world-handle")
@@ -535,6 +558,7 @@ pub fn G_PlayEffectID(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1291-1315`
 pub fn G_ScreenShake(
+    ctx: GameContext<'_>,
     org: vec3_t,
     target: *mut gentity_t,
     intensity: f32,
@@ -548,6 +572,7 @@ pub fn G_ScreenShake(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1322-1338`
 pub fn G_MuteSound(
+    ctx: GameContext<'_>,
     entnum: c_int,
     channel: c_int,
 ) {
@@ -561,6 +586,7 @@ pub fn G_MuteSound(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1345-1372`
 pub fn G_Sound(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     channel: c_int,
     soundIndex: c_int,
@@ -572,6 +598,7 @@ pub fn G_Sound(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1379-1385`
 pub fn G_SoundAtLoc(
+    ctx: GameContext<'_>,
     loc: vec3_t,
     channel: c_int,
     soundIndex: c_int,
@@ -583,6 +610,7 @@ pub fn G_SoundAtLoc(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1392-1399`
 pub fn G_EntitySound(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     channel: c_int,
     soundIndex: c_int,
@@ -594,6 +622,7 @@ pub fn G_EntitySound(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1402-1411`
 pub fn G_SoundOnEnt(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     channel: c_int,
     soundPath: *const c_char,
@@ -620,6 +649,7 @@ pub fn ValidUseTarget(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1474-1505`
 pub fn G_UseDispenserOn(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     dispType: c_int,
     target: *mut gentity_t,
@@ -631,6 +661,7 @@ pub fn G_UseDispenserOn(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1508-1544`
 pub fn G_CanUseDispOn(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     dispType: c_int,
 ) -> c_int {
@@ -645,6 +676,7 @@ pub fn G_CanUseDispOn(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1546-1602`
 pub fn TryHeal(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     target: *mut gentity_t,
 ) -> qboolean {
@@ -661,6 +693,7 @@ pub fn TryHeal(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1618-1875`
 pub fn TryUse(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
     todo!("Port TryUse — parked: fn-pointer-dispatch")
@@ -741,6 +774,7 @@ pub fn G_SetAngles(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1934-1946`
 pub fn G_ClearTrace(
+    ctx: GameContext<'_>,
     start: vec3_t,
     mins: vec3_t,
     maxs: vec3_t,
@@ -767,6 +801,7 @@ pub fn G_SetOrigin(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1965-2001`
 pub fn G_CheckInSolid(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     fix: qboolean,
 ) -> qboolean {
@@ -779,6 +814,7 @@ pub fn G_CheckInSolid(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:2011-2037`
 pub fn DebugLine(
+    ctx: GameContext<'_>,
     start: vec3_t,
     end: vec3_t,
     color: c_int,
@@ -790,6 +826,7 @@ pub fn DebugLine(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:2039-2080`
 pub fn G_ROFF_NotetrackCallback(
+    ctx: GameContext<'_>,
     cent: *mut gentity_t,
     notetrack: *const c_char,
 ) {
@@ -800,6 +837,7 @@ pub fn G_ROFF_NotetrackCallback(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:2082-2085`
 pub fn G_SpeechEvent(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     event: c_int,
 ) {
@@ -812,6 +850,7 @@ pub fn G_SpeechEvent(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:2087-2128`
 pub fn G_ExpandPointToBBox(
+    ctx: GameContext<'_>,
     point: vec3_t,
     mins: vec3_t,
     maxs: vec3_t,

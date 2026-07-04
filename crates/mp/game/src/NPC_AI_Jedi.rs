@@ -36,8 +36,8 @@ pub fn G_StartMatrixEffect(
 /// Raven `NPC_ShadowTrooper_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:103-108`
-pub fn NPC_ShadowTrooper_Precache() {
-    crate::g_items::RegisterItem(crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_FORCE));
+pub fn NPC_ShadowTrooper_Precache(ctx: GameContext<'_>) {
+    crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForAmmo(ammo_t::AMMO_FORCE));
     crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/cloak.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/chars/shadowtrooper/decloak.wav".as_ptr());
 }
@@ -46,31 +46,32 @@ pub fn NPC_ShadowTrooper_Precache() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:110-135`
 pub fn Jedi_ClearTimers(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    crate::g_timer::TIMER_Set(ent, c"roamTime".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"chatter".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"strafeLeft".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"strafeRight".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"noStrafe".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"walking".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"taunting".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"parryTime".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"parryReCalcTime".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"forceJumpChasing".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"jumpChaseDebounce".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"moveforward".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"moveback".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"movenone".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"moveright".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"moveleft".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"movecenter".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"saberLevelDebounce".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"noRetreat".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"holdLightning".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"gripping".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"draining".as_ptr(), 0);
-    crate::g_timer::TIMER_Set(ent, c"noturn".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"roamTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"chatter".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"strafeLeft".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"strafeRight".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"noStrafe".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"walking".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"taunting".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"parryTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"parryReCalcTime".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"forceJumpChasing".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"jumpChaseDebounce".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"moveforward".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"moveback".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"movenone".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"moveright".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"moveleft".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"movecenter".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"saberLevelDebounce".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"noRetreat".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"holdLightning".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"gripping".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"draining".as_ptr(), 0);
+    crate::g_timer::TIMER_Set(ctx, ent, c"noturn".as_ptr(), 0);
 }
 
 // PORT-ESCALATION(ambient-state): reads `level.time`; no channel to reach the ai_main globals / Engine from this context-free faithful signature (rule B forbids static mut; resolved cross-file sigs are context-free).
@@ -78,6 +79,7 @@ pub fn Jedi_ClearTimers(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:137-148`
 pub fn Jedi_PlayBlockedPushSound(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Jedi_PlayBlockedPushSound — parked: ambient-state")
@@ -88,6 +90,7 @@ pub fn Jedi_PlayBlockedPushSound(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:150-161`
 pub fn Jedi_PlayDeflectSound(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Jedi_PlayDeflectSound — parked: ambient-state")
@@ -98,6 +101,7 @@ pub fn Jedi_PlayDeflectSound(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:163-180`
 pub fn NPC_Jedi_PlayConfusionSound(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port NPC_Jedi_PlayConfusionSound — parked: constants-in-scope")
@@ -106,7 +110,7 @@ pub fn NPC_Jedi_PlayConfusionSound(
 /// Raven `Boba_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:182-189`
-pub fn Boba_Precache() {
+pub fn Boba_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_SoundIndex(c"sound/boba/jeton.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/boba/jethover.wav".as_ptr());
     crate::g_utils::G_SoundIndex(c"sound/effects/combustfire.mp3".as_ptr());
@@ -119,6 +123,7 @@ pub fn Boba_Precache() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:193-201`
 pub fn Boba_ChangeWeapon(
+    ctx: GameContext<'_>,
     wp: c_int,
 ) {
     todo!("Port Boba_ChangeWeapon — parked: ambient-state")
@@ -129,6 +134,7 @@ pub fn Boba_ChangeWeapon(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:203-270`
 pub fn WP_ResistForcePush(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     pusher: *mut gentity_t,
     noPenalty: qboolean,
@@ -141,6 +147,7 @@ pub fn WP_ResistForcePush(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:272-343`
 pub fn Boba_StopKnockdown(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     pusher: *mut gentity_t,
     pushDir: vec3_t,
@@ -154,6 +161,7 @@ pub fn Boba_StopKnockdown(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:345-365`
 pub fn Boba_FlyStart(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Boba_FlyStart — parked: ambient-state")
@@ -164,6 +172,7 @@ pub fn Boba_FlyStart(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:367-384`
 pub fn Boba_FlyStop(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Boba_FlyStop — parked: ambient-state")
@@ -184,6 +193,7 @@ pub fn Boba_Flying(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:391-416`
 pub fn Boba_FireFlameThrower(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Boba_FireFlameThrower — parked: ambient-state")
@@ -194,6 +204,7 @@ pub fn Boba_FireFlameThrower(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:419-469`
 pub fn Boba_StartFlameThrower(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Boba_StartFlameThrower — parked: ambient-state")
@@ -204,6 +215,7 @@ pub fn Boba_StartFlameThrower(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:471-479`
 pub fn Boba_DoFlameThrower(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Boba_DoFlameThrower — parked: constants-in-scope")
@@ -213,7 +225,7 @@ pub fn Boba_DoFlameThrower(
 /// Raven `Boba_FireDecide`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:481-797`
-pub fn Boba_FireDecide() {
+pub fn Boba_FireDecide(ctx: GameContext<'_>) {
     todo!("Port Boba_FireDecide — parked: ambient-state")
 }
 
@@ -222,6 +234,7 @@ pub fn Boba_FireDecide() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:799-816`
 pub fn Jedi_Cloak(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Jedi_Cloak — parked: constants-in-scope")
@@ -232,6 +245,7 @@ pub fn Jedi_Cloak(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:818-833`
 pub fn Jedi_Decloak(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Jedi_Decloak — parked: constants-in-scope")
@@ -241,7 +255,7 @@ pub fn Jedi_Decloak(
 /// Raven `Jedi_CheckCloak`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:835-857`
-pub fn Jedi_CheckCloak() {
+pub fn Jedi_CheckCloak(ctx: GameContext<'_>) {
     todo!("Port Jedi_CheckCloak — parked: ambient-state")
 }
 
@@ -261,6 +275,7 @@ pub fn Jedi_Aggression(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:900-912`
 pub fn Jedi_AggressionErosion(
+    ctx: GameContext<'_>,
     amt: c_int,
 ) {
     todo!("Port Jedi_AggressionErosion — parked: ambient-state")
@@ -270,6 +285,7 @@ pub fn Jedi_AggressionErosion(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:914-950`
 pub fn NPC_Jedi_RateNewEnemy(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     enemy: *mut gentity_t,
 ) {
@@ -312,7 +328,7 @@ pub fn NPC_Jedi_RateNewEnemy(
         Jedi_Aggression(self_, newAggression - (*((*self_).NPC as *mut gNPC_t)).stats.aggression);
 
         //don't taunt right away
-        crate::g_timer::TIMER_Set(self_, c"chatter".as_ptr(), crate::q_math::Q_irand(4000, 7000));
+        crate::g_timer::TIMER_Set(ctx, self_, c"chatter".as_ptr(), crate::q_math::Q_irand(4000, 7000));
     }
 }
 
@@ -320,7 +336,7 @@ pub fn NPC_Jedi_RateNewEnemy(
 /// Raven `Jedi_Rage`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:952-964`
-pub fn Jedi_Rage() {
+pub fn Jedi_Rage(ctx: GameContext<'_>) {
     todo!("Port Jedi_Rage — parked: ambient-state")
 }
 
@@ -328,12 +344,13 @@ pub fn Jedi_Rage() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:966-973`
 pub fn Jedi_RageStop(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     unsafe {
         if !(*self_).NPC.is_null() {
             //calm down and back off
-            crate::g_timer::TIMER_Set(self_, c"roamTime".as_ptr(), 0);
+            crate::g_timer::TIMER_Set(ctx, self_, c"roamTime".as_ptr(), 0);
             Jedi_Aggression(self_, crate::q_math::Q_irand(-5, 0));
         }
     }
@@ -343,7 +360,7 @@ pub fn Jedi_RageStop(
 /// Raven `Jedi_BattleTaunt`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:980-1013`
-pub fn Jedi_BattleTaunt() -> qboolean {
+pub fn Jedi_BattleTaunt(ctx: GameContext<'_>) -> qboolean {
     todo!("Port Jedi_BattleTaunt — parked: ambient-state")
 }
 
@@ -352,6 +369,7 @@ pub fn Jedi_BattleTaunt() -> qboolean {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1020-1077`
 pub fn Jedi_ClearPathToSpot(
+    ctx: GameContext<'_>,
     dest: vec3_t,
     impactEntNum: c_int,
 ) -> qboolean {
@@ -363,6 +381,7 @@ pub fn Jedi_ClearPathToSpot(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1079-1193`
 pub fn NPC_MoveDirClear(
+    ctx: GameContext<'_>,
     forwardmove: c_int,
     rightmove: c_int,
     reset: qboolean,
@@ -374,7 +393,7 @@ pub fn NPC_MoveDirClear(
 /// Raven `Jedi_HoldPosition`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1200-1211`
-pub fn Jedi_HoldPosition() {
+pub fn Jedi_HoldPosition(ctx: GameContext<'_>) {
     todo!("Port Jedi_HoldPosition — parked: ambient-state")
 }
 
@@ -383,6 +402,7 @@ pub fn Jedi_HoldPosition() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1219-1251`
 pub fn Jedi_Move(
+    ctx: GameContext<'_>,
     goal: *mut gentity_t,
     retreat: qboolean,
 ) {
@@ -393,7 +413,7 @@ pub fn Jedi_Move(
 /// Raven `Jedi_Hunt`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1253-1280`
-pub fn Jedi_Hunt() -> qboolean {
+pub fn Jedi_Hunt(ctx: GameContext<'_>) -> qboolean {
     todo!("Port Jedi_Hunt — parked: ambient-state")
 }
 
@@ -401,7 +421,7 @@ pub fn Jedi_Hunt() -> qboolean {
 /// Raven `Jedi_Retreat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1300-1310`
-pub fn Jedi_Retreat() {
+pub fn Jedi_Retreat(ctx: GameContext<'_>) {
     todo!("Port Jedi_Retreat — parked: ambient-state")
 }
 
@@ -409,7 +429,7 @@ pub fn Jedi_Retreat() {
 /// Raven `Jedi_Advance`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1312-1325`
-pub fn Jedi_Advance() {
+pub fn Jedi_Advance(ctx: GameContext<'_>) {
     todo!("Port Jedi_Advance — parked: ambient-state")
 }
 
@@ -418,6 +438,7 @@ pub fn Jedi_Advance() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1327-1394`
 pub fn Jedi_AdjustSaberAnimLevel(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     newLevel: c_int,
 ) {
@@ -428,7 +449,7 @@ pub fn Jedi_AdjustSaberAnimLevel(
 /// Raven `Jedi_CheckDecreaseSaberAnimLevel`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1396-1411`
-pub fn Jedi_CheckDecreaseSaberAnimLevel() {
+pub fn Jedi_CheckDecreaseSaberAnimLevel(ctx: GameContext<'_>) {
     todo!("Port Jedi_CheckDecreaseSaberAnimLevel — parked: ambient-state")
 }
 
@@ -437,6 +458,7 @@ pub fn Jedi_CheckDecreaseSaberAnimLevel() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1413-1874`
 pub fn Jedi_CombatDistance(
+    ctx: GameContext<'_>,
     enemy_dist: c_int,
 ) {
     todo!("Port Jedi_CombatDistance — parked: ambient-state")
@@ -447,6 +469,7 @@ pub fn Jedi_CombatDistance(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1876-1929`
 pub fn Jedi_Strafe(
+    ctx: GameContext<'_>,
     strafeTimeMin: c_int,
     strafeTimeMax: c_int,
     nextStrafeTimeMin: c_int,
@@ -461,6 +484,7 @@ pub fn Jedi_Strafe(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:1969-2303`
 pub fn Jedi_CheckFlipEvasions(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     rightdot: f32,
     zdiff: f32,
@@ -473,6 +497,7 @@ pub fn Jedi_CheckFlipEvasions(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:2305-2441`
 pub fn Jedi_ReCalcParryTime(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     evasionType: evasionType_t,
 ) -> c_int {
@@ -484,6 +509,7 @@ pub fn Jedi_ReCalcParryTime(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:2443-2453`
 pub fn Jedi_QuickReactions(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) -> qboolean {
     todo!("Port Jedi_QuickReactions — parked: ambient-state")
@@ -504,6 +530,7 @@ pub fn Jedi_SaberBusy(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:2485-3139`
 pub fn Jedi_SaberBlockGo(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     cmd: *mut usercmd_t,
     pHitloc: vec3_t,
@@ -519,6 +546,7 @@ pub fn Jedi_SaberBlockGo(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3143-3372`
 pub fn Jedi_SaberBlock(
+    ctx: GameContext<'_>,
     saberNum: c_int,
     bladeNum: c_int,
 ) -> qboolean {
@@ -530,6 +558,7 @@ pub fn Jedi_SaberBlock(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3380-3666`
 pub fn Jedi_EvasionSaber(
+    ctx: GameContext<'_>,
     enemy_movedir: vec3_t,
     enemy_dist: f32,
     enemy_dir: vec3_t,
@@ -542,6 +571,7 @@ pub fn Jedi_EvasionSaber(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3686-3761`
 pub fn Jedi_FindEnemyInCone(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     fallback: *mut gentity_t,
     minDot: f32,
@@ -554,6 +584,7 @@ pub fn Jedi_FindEnemyInCone(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3763-3796`
 pub fn Jedi_SetEnemyInfo(
+    ctx: GameContext<'_>,
     enemy_dest: vec3_t,
     enemy_dir: vec3_t,
     enemy_dist: *mut f32,
@@ -569,6 +600,7 @@ pub fn Jedi_SetEnemyInfo(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3799-3874`
 pub fn Jedi_FaceEnemy(
+    ctx: GameContext<'_>,
     doPitch: qboolean,
 ) {
     todo!("Port Jedi_FaceEnemy — parked: ambient-state")
@@ -578,7 +610,7 @@ pub fn Jedi_FaceEnemy(
 /// Raven `Jedi_DebounceDirectionChanges`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:3876-4005`
-pub fn Jedi_DebounceDirectionChanges() {
+pub fn Jedi_DebounceDirectionChanges(ctx: GameContext<'_>) {
     todo!("Port Jedi_DebounceDirectionChanges — parked: ambient-state")
 }
 
@@ -586,7 +618,7 @@ pub fn Jedi_DebounceDirectionChanges() {
 /// Raven `Jedi_TimersApply`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4007-4065`
-pub fn Jedi_TimersApply() {
+pub fn Jedi_TimersApply(ctx: GameContext<'_>) {
     todo!("Port Jedi_TimersApply — parked: ambient-state")
 }
 
@@ -595,6 +627,7 @@ pub fn Jedi_TimersApply() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4067-4273`
 pub fn Jedi_CombatTimersUpdate(
+    ctx: GameContext<'_>,
     enemy_dist: c_int,
 ) {
     todo!("Port Jedi_CombatTimersUpdate — parked: ambient-state")
@@ -605,6 +638,7 @@ pub fn Jedi_CombatTimersUpdate(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4275-4337`
 pub fn Jedi_CombatIdle(
+    ctx: GameContext<'_>,
     enemy_dist: c_int,
 ) {
     todo!("Port Jedi_CombatIdle — parked: ambient-state")
@@ -615,6 +649,7 @@ pub fn Jedi_CombatIdle(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4339-4467`
 pub fn Jedi_AttackDecide(
+    ctx: GameContext<'_>,
     enemy_dist: c_int,
 ) -> qboolean {
     todo!("Port Jedi_AttackDecide — parked: ambient-state")
@@ -625,6 +660,7 @@ pub fn Jedi_AttackDecide(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4473-4717`
 pub fn Jedi_Jump(
+    ctx: GameContext<'_>,
     dest: vec3_t,
     goalEntNum: c_int,
 ) -> qboolean {
@@ -636,6 +672,7 @@ pub fn Jedi_Jump(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4719-4865`
 pub fn Jedi_TryJump(
+    ctx: GameContext<'_>,
     goal: *mut gentity_t,
 ) -> qboolean {
     todo!("Port Jedi_TryJump — parked: ambient-state")
@@ -646,6 +683,7 @@ pub fn Jedi_TryJump(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4867-4914`
 pub fn Jedi_Jumping(
+    ctx: GameContext<'_>,
     goal: *mut gentity_t,
 ) -> qboolean {
     todo!("Port Jedi_Jumping — parked: ambient-state")
@@ -656,6 +694,7 @@ pub fn Jedi_Jumping(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:4917-5036`
 pub fn Jedi_CheckEnemyMovement(
+    ctx: GameContext<'_>,
     enemy_dist: f32,
 ) {
     todo!("Port Jedi_CheckEnemyMovement — parked: ambient-state")
@@ -665,7 +704,7 @@ pub fn Jedi_CheckEnemyMovement(
 /// Raven `Jedi_CheckJumps`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5038-5153`
-pub fn Jedi_CheckJumps() {
+pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
     todo!("Port Jedi_CheckJumps — parked: ambient-state")
 }
 
@@ -673,7 +712,7 @@ pub fn Jedi_CheckJumps() {
 /// Raven `Jedi_Combat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5155-5344`
-pub fn Jedi_Combat() {
+pub fn Jedi_Combat(ctx: GameContext<'_>) {
     todo!("Port Jedi_Combat — parked: ambient-state")
 }
 
@@ -682,6 +721,7 @@ pub fn Jedi_Combat() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5358-5444`
 pub fn NPC_Jedi_Pain(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
@@ -693,7 +733,7 @@ pub fn NPC_Jedi_Pain(
 /// Raven `Jedi_CheckDanger`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5446-5463`
-pub fn Jedi_CheckDanger() -> qboolean {
+pub fn Jedi_CheckDanger(ctx: GameContext<'_>) -> qboolean {
     todo!("Port Jedi_CheckDanger — parked: ambient-state")
 }
 
@@ -701,7 +741,7 @@ pub fn Jedi_CheckDanger() -> qboolean {
 /// Raven `Jedi_CheckAmbushPlayer`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5465-5545`
-pub fn Jedi_CheckAmbushPlayer() -> qboolean {
+pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
     todo!("Port Jedi_CheckAmbushPlayer — parked: ambient-state")
 }
 
@@ -710,6 +750,7 @@ pub fn Jedi_CheckAmbushPlayer() -> qboolean {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5547-5559`
 pub fn Jedi_Ambush(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
     todo!("Port Jedi_Ambush — parked: constants-in-scope")
@@ -729,7 +770,7 @@ pub fn Jedi_WaitingAmbush(
 /// Raven `Jedi_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5575-5728`
-pub fn Jedi_Patrol() {
+pub fn Jedi_Patrol(ctx: GameContext<'_>) {
     todo!("Port Jedi_Patrol — parked: ambient-state")
 }
 
@@ -738,6 +779,7 @@ pub fn Jedi_Patrol() {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5730-5752`
 pub fn Jedi_CanPullBackSaber(
+    ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) -> qboolean {
     todo!("Port Jedi_CanPullBackSaber — parked: ambient-state")
@@ -747,7 +789,7 @@ pub fn Jedi_CanPullBackSaber(
 /// Raven `NPC_BSJedi_FollowLeader`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5758-5836`
-pub fn NPC_BSJedi_FollowLeader() {
+pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
     todo!("Port NPC_BSJedi_FollowLeader — parked: ambient-state")
 }
 
@@ -755,7 +797,7 @@ pub fn NPC_BSJedi_FollowLeader() {
 /// Raven `Jedi_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:5845-6166`
-pub fn Jedi_Attack() {
+pub fn Jedi_Attack(ctx: GameContext<'_>) {
     todo!("Port Jedi_Attack — parked: ambient-state")
 }
 
@@ -763,6 +805,6 @@ pub fn Jedi_Attack() {
 /// Raven `NPC_BSJedi_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:6170-6220`
-pub fn NPC_BSJedi_Default() {
+pub fn NPC_BSJedi_Default(ctx: GameContext<'_>) {
     todo!("Port NPC_BSJedi_Default — parked: ambient-state")
 }
