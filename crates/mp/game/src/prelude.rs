@@ -144,6 +144,13 @@ pub use mp_bg::local::pml_t::pml_t;
 // module, spelled bare `trap::X` throughout the pass-2 bodies. Re-exported so the
 // `use crate::prelude::*` glob resolves those call sites.
 pub use crate::trap;
+// Raven `trap_R_RegisterSkin` re-export with Raven name for pass-3 bodies
+// that transcribe the bare Raven spelling (oracle/oracle/codemp/game/g_syscalls.c:1179-1182)
+pub use crate::trap::R_RegisterSkin as trap_R_RegisterSkin;
+// Raven `trap_G2API_*` re-exports with Raven names for pass-3 bodies that
+// transcribe the bare Raven spellings (oracle/oracle/codemp/game/g_syscalls.c)
+pub use crate::trap::G2API_InitGhoul2Model as trap_G2API_InitGhoul2Model;
+pub use crate::trap::G2API_CleanGhoul2Models as trap_G2API_CleanGhoul2Models;
 
 // The entity fn-ID dispatch enums (ruling 2 / `ent_fn_enums`), named bare in the
 // spawn/think/touch/… assignment sites.
@@ -352,7 +359,7 @@ pub use mp_qshared::common::mp::qcommon::parms::{MAX_PARMS};  // .claude/worktre
 pub use crate::NPC_AI_Utils::{MAX_RADIUS_ENTS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Utils.rs
 pub use mp_bg::vehicles::turret_stats_t::{MAX_VEHICLE_TURRET_MUZZLES};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/turret_stats_t.rs
 pub use mp_qshared::shared::q_color::{Q_COLOR_ESCAPE};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/q_color.rs
-pub use crate::w_force::{SFL_TWO_HANDED};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/w_force.rs
+pub use crate::saber::saber_flags::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/saber/saber_flags.rs
 pub use crate::bg_saga::{SIEGECHAR_TAB};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saga.rs
 pub use mp_bg::weapons::ammo_data::{ammoData};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/weapons/ammo_data.rs
 pub use mp_bg::local::bg_toggleable_surfaces::{bgToggleableSurfaces};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/bg_toggleable_surfaces.rs

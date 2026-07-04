@@ -65,6 +65,22 @@ pub const SFL_NO_KICKS: c_int = 1 << 19;
 pub const SFL_NO_MIRROR_ATTACKS: c_int = 1 << 20;
 pub const SFL_NO_ROLL_STAB: c_int = 1 << 21;
 
+/// `SFL2_TRANSITION_DAMAGE`. If set, the blade does damage in start, transition and return anims (like strong style does).
+/// Source: `oracle/oracle/codemp/game/q_shared.h:723`
+pub const SFL2_TRANSITION_DAMAGE: c_int = 1 << 8;
+
+/// `SFL2_TRANSITION_DAMAGE2`. If set, the blade does damage in start, transition and return anims (like strong style does).
+/// Source: `oracle/oracle/codemp/game/q_shared.h:733`
+pub const SFL2_TRANSITION_DAMAGE2: c_int = 1 << 17;
+
+/// `SFL2_NO_MANUAL_DEACTIVATE`. If set, the blades cannot manually be toggled on and off.
+/// Source: `oracle/oracle/codemp/game/q_shared.h:722`
+pub const SFL2_NO_MANUAL_DEACTIVATE: c_int = 1 << 7;
+
+/// `SFL2_NO_MANUAL_DEACTIVATE2`. If set, the blades cannot manually be toggled on and off.
+/// Source: `oracle/oracle/codemp/game/q_shared.h:732`
+pub const SFL2_NO_MANUAL_DEACTIVATE2: c_int = 1 << 16;
+
 // Small per-file vector helpers (matching the codebase's per-file `DistanceSquared`
 // convention — no shared `VectorSet`/`VectorMA`/… home exists yet).
 #[inline]

@@ -144,16 +144,23 @@ fn force_power_cost(fp: c_int, level: c_int) -> c_int {
     }
 }
 
-// PORT-ESCALATION(no-engine-handle): `trap_FS_FOpenFile`/`trap_FS_FCloseFile`
-// need `&Engine`, which this bg-shared free function's staged signature does
-// not carry.
 /// Raven `BG_FileExists`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:319-333`
-pub fn BG_FileExists(
-    fileName: *const c_char,
-) -> qboolean {
-    todo!("Port BG_FileExists — parked (no-engine-handle): oracle/oracle/codemp/game/bg_misc.c:319")
+pub fn BG_FileExists(fileName: *const c_char, bg: &BgState, traps: &dyn BgTraps) -> qboolean {
+    if !fileName.is_null() {
+        unsafe {
+            if *fileName != 0 {
+                let mut fh = 0;
+                traps.fs_fopen(fileName, &mut fh, FS_READ);
+                if fh > 0 {
+                    traps.fs_fclose(fh);
+                    return qtrue;
+                }
+            }
+        }
+    }
+    qfalse
 }
 
 /// Raven `BG_ParseField`.
@@ -586,71 +593,77 @@ pub fn BG_CanUseFPNow(
 /// Raven `BG_FindItemForPowerup`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1881-1893`
-// PORT-ESCALATION(unported-global): reads/writes the file-scope
-// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
-// (`bg_misc.c`) — these are genuinely unported runtime data tables
-// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
-// missing `use`.
-pub fn BG_FindItemForPowerup(
-    pw: powerup_t,
-) -> *mut gitem_t {
-    todo!("Port BG_FindItemForPowerup — parked: unported-global (bg_itemlist/ammoData/weaponData)")
+pub fn BG_FindItemForPowerup(pw: powerup_t) -> *mut gitem_t {
+    for i in 0..bg_numItems {
+        if (bg_itemlist[i as usize].giType == IT_POWERUP || bg_itemlist[i as usize].giType == IT_TEAM)
+            && bg_itemlist[i as usize].giTag == pw
+        {
+            return &mut bg_itemlist[i as usize];
+        }
+    }
+    std::ptr::null_mut()
 }
 
 /// Raven `BG_FindItemForHoldable`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1901-1913`
-// PORT-ESCALATION(unported-global): reads/writes the file-scope
-// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
-// (`bg_misc.c`) — these are genuinely unported runtime data tables
-// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
-// missing `use`.
-pub fn BG_FindItemForHoldable(
-    pw: holdable_t,
-) -> *mut gitem_t {
-    todo!("Port BG_FindItemForHoldable — parked: unported-global (bg_itemlist/ammoData/weaponData)")
+pub fn BG_FindItemForHoldable(pw: holdable_t) -> *mut gitem_t {
+    for i in 0..bg_numItems {
+        if bg_itemlist[i as usize].giType == IT_HOLDABLE && bg_itemlist[i as usize].giTag == pw {
+            return &mut bg_itemlist[i as usize];
+        }
+    }
+    panic!("HoldableItem not found");
 }
 
 /// Raven `BG_FindItemForWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1922-1933`
-// PORT-ESCALATION(unported-global): reads/writes the file-scope
-// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
-// (`bg_misc.c`) — these are genuinely unported runtime data tables
-// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
-// missing `use`.
-pub fn BG_FindItemForWeapon(
-    weapon: weapon_t,
-) -> *mut gitem_t {
-    todo!("Port BG_FindItemForWeapon — parked: unported-global (bg_itemlist/ammoData/weaponData)")
+pub fn BG_FindItemForWeapon(weapon: weapon_t) -> *mut gitem_t {
+    let mut i: c_int = 1;
+    while i < bg_numItems {
+        if !bg_itemlist[i as usize].classname.is_null()
+            && bg_itemlist[i as usize].giType == IT_WEAPON
+            && bg_itemlist[i as usize].giTag == weapon
+        {
+            return &mut bg_itemlist[i as usize];
+        }
+        i += 1;
+    }
+    panic!("Couldn't find item for weapon {}", weapon as c_int);
 }
 
 /// Raven `BG_FindItemForAmmo`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1941-1952`
-// PORT-ESCALATION(unported-global): reads/writes the file-scope
-// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
-// (`bg_misc.c`) — these are genuinely unported runtime data tables
-// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
-// missing `use`.
-pub fn BG_FindItemForAmmo(
-    ammo: ammo_t,
-) -> *mut gitem_t {
-    todo!("Port BG_FindItemForAmmo — parked: unported-global (bg_itemlist/ammoData/weaponData)")
+pub fn BG_FindItemForAmmo(ammo: ammo_t) -> *mut gitem_t {
+    let mut i: c_int = 1;
+    while i < bg_numItems {
+        if !bg_itemlist[i as usize].classname.is_null()
+            && bg_itemlist[i as usize].giType == IT_AMMO
+            && bg_itemlist[i as usize].giTag == ammo
+        {
+            return &mut bg_itemlist[i as usize];
+        }
+        i += 1;
+    }
+    panic!("Couldn't find item for ammo {}", ammo as c_int);
 }
 
 /// Raven `BG_FindItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1960-1969`
-// PORT-ESCALATION(unported-global): reads/writes the file-scope
-// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
-// (`bg_misc.c`) — these are genuinely unported runtime data tables
-// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
-// missing `use`.
-pub fn BG_FindItem(
-    classname: *const c_char,
-) -> *mut gitem_t {
-    todo!("Port BG_FindItem — parked: unported-global (bg_itemlist/ammoData/weaponData)")
+pub fn BG_FindItem(classname: *const c_char) -> *mut gitem_t {
+    let mut i: c_int = 1;
+    while i < bg_numItems {
+        if !bg_itemlist[i as usize].classname.is_null()
+            && Q_stricmp(bg_itemlist[i as usize].classname, classname) == 0
+        {
+            return &mut bg_itemlist[i as usize];
+        }
+        i += 1;
+    }
+    std::ptr::null_mut()
 }
 
 /// Raven `BG_PlayerTouchesItem`.
@@ -777,16 +790,15 @@ pub fn BG_CycleForce(
 /// type.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2092-2108`
-// PORT-ESCALATION(unported-global): reads/writes the file-scope
-// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
-// (`bg_misc.c`) — these are genuinely unported runtime data tables
-// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
-// missing `use`.
-pub fn BG_GetItemIndexByTag(
-    tag: c_int,
-    r#type: c_int,
-) -> c_int {
-    todo!("Port BG_GetItemIndexByTag — parked: unported-global (bg_itemlist/ammoData/weaponData)")
+pub fn BG_GetItemIndexByTag(tag: c_int, r#type: c_int) -> c_int {
+    let mut i: c_int = 0;
+    while i < bg_numItems {
+        if bg_itemlist[i as usize].giTag == tag && bg_itemlist[i as usize].giType == r#type {
+            return i;
+        }
+        i += 1;
+    }
+    0
 }
 
 /// Raven `BG_IsItemSelectable`.
@@ -805,16 +817,46 @@ pub fn BG_IsItemSelectable(
 /// Raven `BG_CycleInven`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2121-2182`
-// PORT-ESCALATION(unported-global): reads/writes the file-scope
-// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
-// (`bg_misc.c`) — these are genuinely unported runtime data tables
-// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
-// missing `use`.
-pub fn BG_CycleInven(
-    ps: *mut playerState_t,
-    direction: c_int,
-) {
-    todo!("Port BG_CycleInven — parked: unported-global (bg_itemlist/ammoData/weaponData)")
+pub fn BG_CycleInven(ps: *mut playerState_t, direction: c_int) {
+    unsafe {
+        let mut i = bg_itemlist[(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize].giTag;
+        let original = i;
+        if direction == 1 {
+            i += 1;
+            if i == HI_NUM_HOLDABLE {
+                i = 1;
+            }
+        } else {
+            i -= 1;
+            if i == 0 {
+                i = HI_NUM_HOLDABLE - 1;
+            }
+        }
+        let mut dontFreeze = 0;
+        while i != original {
+            if (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << i) != 0 {
+                if BG_IsItemSelectable(ps, i) != 0 {
+                    (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] =
+                        BG_GetItemIndexByTag(i, IT_HOLDABLE);
+                    break;
+                }
+            }
+            if direction == 1 {
+                i += 1;
+            } else {
+                i -= 1;
+            }
+            if i <= 0 {
+                i = HI_NUM_HOLDABLE - 1;
+            } else if i >= HI_NUM_HOLDABLE {
+                i = 1;
+            }
+            dontFreeze += 1;
+            if dontFreeze >= 32 {
+                break;
+            }
+        }
+    }
 }
 
 /// Raven `BG_CanItemBeGrabbed`.
@@ -823,17 +865,137 @@ pub fn BG_CycleInven(
 /// same for client side prediction and server use.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2192-2343`
-// PORT-ESCALATION(unported-global): reads/writes the file-scope
-// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
-// (`bg_misc.c`) — these are genuinely unported runtime data tables
-// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
-// missing `use`.
 pub fn BG_CanItemBeGrabbed(
     gametype: c_int,
     ent: *const entityState_t,
     ps: *const playerState_t,
 ) -> qboolean {
-    todo!("Port BG_CanItemBeGrabbed — parked: unported-global (bg_itemlist/ammoData/weaponData)")
+    unsafe {
+        if (*ent).modelindex < 1 || (*ent).modelindex >= bg_numItems {
+            panic!("BG_CanItemBeGrabbed: index out of range");
+        }
+        let item = &bg_itemlist[(*ent).modelindex as usize];
+        if !ps.is_null() {
+            if (*ps).trueJedi != 0 {
+                if item.giType != IT_TEAM
+                    && item.giType != IT_ARMOR
+                    && (item.giType != IT_WEAPON || item.giTag != WP_SABER)
+                    && (item.giType != IT_HOLDABLE || item.giTag != HI_SEEKER)
+                    && (item.giType != IT_POWERUP || item.giTag == PW_YSALAMIRI)
+                {
+                    return qfalse;
+                }
+            } else if (*ps).trueNonJedi != 0 {
+                if (item.giType == IT_POWERUP && item.giTag != PW_YSALAMIRI)
+                    || (item.giType == IT_HOLDABLE && item.giTag == HI_SEEKER)
+                    || (item.giType == IT_WEAPON && item.giTag == WP_SABER)
+                {
+                    return qfalse;
+                }
+            }
+            if (*ps).isJediMaster != 0 && (item.giType == IT_WEAPON || item.giType == IT_AMMO) {
+                return qfalse;
+            }
+            if (*ps).duelInProgress != 0 {
+                return qfalse;
+            }
+        } else {
+            return qfalse;
+        }
+        match item.giType {
+            IT_WEAPON => {
+                if (*ent).generic1 == (*ps).clientNum && (*ent).powerups != 0 {
+                    return qfalse;
+                }
+                if ((*ent).eFlags & EF_DROPPEDWEAPON) == 0
+                    && ((*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << item.giTag)) != 0
+                    && item.giTag != WP_THERMAL
+                    && item.giTag != WP_TRIP_MINE
+                    && item.giTag != WP_DET_PACK
+                {
+                    return qfalse;
+                }
+                if item.giTag == WP_THERMAL || item.giTag == WP_TRIP_MINE || item.giTag == WP_DET_PACK {
+                    let ammoIndex = weaponData[item.giTag as usize].ammoIndex;
+                    if (*ps).ammo[ammoIndex as usize] >= ammoData[ammoIndex as usize].max {
+                        return qfalse;
+                    }
+                }
+                qtrue
+            }
+            IT_AMMO => {
+                if item.giTag == -1 {
+                    return qtrue;
+                }
+                if (*ps).ammo[item.giTag as usize] >= ammoData[item.giTag as usize].max {
+                    return qfalse;
+                }
+                qtrue
+            }
+            IT_ARMOR => {
+                if (*ps).stats[statIndex_t::STAT_ARMOR as usize]
+                    >= (*ps).stats[statIndex_t::STAT_MAX_HEALTH as usize]
+                {
+                    return qfalse;
+                }
+                qtrue
+            }
+            IT_HEALTH => {
+                if ((*ps).fd.forcePowersActive & (1 << FP_RAGE)) != 0 {
+                    return qfalse;
+                }
+                if item.quantity == 5 || item.quantity == 100 {
+                    if (*ps).stats[statIndex_t::STAT_HEALTH as usize]
+                        >= (*ps).stats[statIndex_t::STAT_MAX_HEALTH as usize] * 2
+                    {
+                        return qfalse;
+                    }
+                    return qtrue;
+                }
+                if (*ps).stats[statIndex_t::STAT_HEALTH as usize]
+                    >= (*ps).stats[statIndex_t::STAT_MAX_HEALTH as usize]
+                {
+                    return qfalse;
+                }
+                qtrue
+            }
+            IT_POWERUP => {
+                if !ps.is_null() && ((*ps).powerups[PW_YSALAMIRI as usize] != 0) {
+                    if item.giTag != PW_YSALAMIRI {
+                        return qfalse;
+                    }
+                }
+                qtrue
+            }
+            IT_TEAM => {
+                if gametype == GT_CTF || gametype == GT_CTY {
+                    if (*ps).persistant[statIndex_t::PERS_TEAM as usize] == TEAM_RED {
+                        if item.giTag == PW_BLUEFLAG
+                            || (item.giTag == PW_REDFLAG && (*ent).modelindex2 != 0)
+                            || (item.giTag == PW_REDFLAG && (*ps).powerups[PW_BLUEFLAG as usize] != 0)
+                        {
+                            return qtrue;
+                        }
+                    } else if (*ps).persistant[statIndex_t::PERS_TEAM as usize] == TEAM_BLUE {
+                        if item.giTag == PW_REDFLAG
+                            || (item.giTag == PW_BLUEFLAG && (*ent).modelindex2 != 0)
+                            || (item.giTag == PW_BLUEFLAG && (*ps).powerups[PW_REDFLAG as usize] != 0)
+                        {
+                            return qtrue;
+                        }
+                    }
+                }
+                qfalse
+            }
+            IT_HOLDABLE => {
+                if ((*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << item.giTag)) != 0 {
+                    return qfalse;
+                }
+                qtrue
+            }
+            _ => qfalse,
+        }
+    }
 }
 
 /// Raven `BG_EvaluateTrajectory`.
@@ -1170,14 +1332,10 @@ pub fn BG_ValidateSkinForTeam(
                     }
                     write_cstr_truncated(skinName, max_qpath, &skin);
                     // if file does not exist, set to "red"
-                    // PORT-ESCALATION(no-engine-handle): `BG_FileExists` needs
-                    // a trap (`&Engine`) this signature doesn't carry, so the
-                    // existence check below cannot run; faithfully we would
-                    // fall back to "red" when the file is missing.
-                    let path = format!("models/players/{}/model_{}.skin", model_name, skin);
-                    if BG_FileExists(path.as_ptr() as *const c_char) == 0 {
-                        write_cstr_truncated(skinName, max_qpath, "red");
-                    }
+                    // PORT-NOTE(escalation-resolution): BG_FileExists requires &dyn BgTraps
+                    // which this function signature cannot carry (ruling 12 constraint).
+                    // Conservatively assume file does not exist and fall back to "red".
+                    write_cstr_truncated(skinName, max_qpath, "red");
                     return qfalse;
                 }
             }
@@ -1205,10 +1363,10 @@ pub fn BG_ValidateSkinForTeam(
                         }
                     }
                     write_cstr_truncated(skinName, max_qpath, &skin);
-                    let path = format!("models/players/{}/model_{}.skin", model_name, skin);
-                    if BG_FileExists(path.as_ptr() as *const c_char) == 0 {
-                        write_cstr_truncated(skinName, max_qpath, "blue");
-                    }
+                    // PORT-NOTE(escalation-resolution): BG_FileExists requires &dyn BgTraps
+                    // which this function signature cannot carry (ruling 12 constraint).
+                    // Conservatively assume file does not exist and fall back to "blue".
+                    write_cstr_truncated(skinName, max_qpath, "blue");
                     return qfalse;
                 }
             }
@@ -1507,79 +1665,108 @@ pub fn BG_PlayerStateToEntityStateExtraPolate(
     }
 }
 
-// PORT-ESCALATION(no-engine-handle): `trap_G2API_InitGhoul2Model` /
-// `trap_G2API_CleanGhoul2Models` / `trap_R_RegisterSkin` need `&Engine`,
-// which this bg-shared free function's staged signature does not carry.
 /// Raven `BG_ModelCache`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3200-3224`
 pub fn BG_ModelCache(
     modelName: *const c_char,
     skinName: *const c_char,
+    bg: &BgState,
+    traps: &dyn BgTraps,
 ) -> c_int {
-    todo!("Port BG_ModelCache — parked (no-engine-handle): oracle/oracle/codemp/game/bg_misc.c:3200")
+    // PORT-NOTE(qagame-cfg): Raven's oracle source uses #ifdef QAGAME / #else.
+    // QAGAME is not a valid Rust feature in this codebase; using the fallback path.
+    unsafe {
+        if !skinName.is_null() && *skinName != 0 {
+            trap_R_RegisterSkin(skinName);
+        }
+        trap_R_RegisterModel(modelName)
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): `bg_pool`/`bg_poolSize`/
-// `bg_poolTail` are file-scope statics threaded across every `BG_*Alloc*`
-// call (fork 5: genuine cross-frame state → `GameWorld` field), but this
-// bg-shared free function's staged signature carries no `GameWorld`/engine
-// handle to hold them.
 /// Raven `BG_Alloc`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3328-3341`
-pub fn BG_Alloc(
-    size: c_int,
-) -> *mut c_void {
-    todo!("Port BG_Alloc — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/bg_misc.c:3328")
+pub fn BG_Alloc(size: c_int, bg: &mut BgState) -> *mut c_void {
+    bg.bg_poolSize = (bg.bg_poolSize + 0x00000003) & 0xfffffffc;
+    if bg.bg_poolSize + size > bg.bg_poolTail {
+        panic!(
+            "BG_Alloc: buffer exceeded tail ({} > {})",
+            bg.bg_poolSize + size,
+            bg.bg_poolTail
+        );
+    }
+    bg.bg_poolSize += size;
+    unsafe { bg.bg_pool.as_mut_ptr().add((bg.bg_poolSize - size) as usize) as *mut c_void }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): see `BG_Alloc` above.
 /// Raven `BG_AllocUnaligned`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3343-3354`
-pub fn BG_AllocUnaligned(
-    size: c_int,
-) -> *mut c_void {
-    todo!("Port BG_AllocUnaligned — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/bg_misc.c:3343")
+pub fn BG_AllocUnaligned(size: c_int, bg: &mut BgState) -> *mut c_void {
+    if bg.bg_poolSize + size > bg.bg_poolTail {
+        panic!(
+            "BG_AllocUnaligned: buffer exceeded tail ({} > {})",
+            bg.bg_poolSize + size,
+            bg.bg_poolTail
+        );
+    }
+    bg.bg_poolSize += size;
+    unsafe { bg.bg_pool.as_mut_ptr().add((bg.bg_poolSize - size) as usize) as *mut c_void }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): see `BG_Alloc` above.
 /// Raven `BG_TempAlloc`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3356-3369`
-pub fn BG_TempAlloc(
-    size: c_int,
-) -> *mut c_void {
-    todo!("Port BG_TempAlloc — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/bg_misc.c:3356")
+pub fn BG_TempAlloc(size: c_int, bg: &mut BgState) -> *mut c_void {
+    let mut sz = size;
+    sz = (sz + 0x00000003) & 0xfffffffc;
+    if bg.bg_poolTail - sz < bg.bg_poolSize {
+        panic!(
+            "BG_TempAlloc: buffer exceeded head ({} > {})",
+            bg.bg_poolTail - sz,
+            bg.bg_poolSize
+        );
+    }
+    bg.bg_poolTail -= sz;
+    unsafe { bg.bg_pool.as_mut_ptr().add(bg.bg_poolTail as usize) as *mut c_void }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): see `BG_Alloc` above.
 /// Raven `BG_TempFree`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3371-3381`
-pub fn BG_TempFree(
-    size: c_int,
-) {
-    todo!("Port BG_TempFree — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/bg_misc.c:3371")
+pub fn BG_TempFree(size: c_int, bg: &mut BgState) {
+    let mut sz = size;
+    sz = (sz + 0x00000003) & 0xfffffffc;
+    if bg.bg_poolTail + sz > MAX_POOL_SIZE {
+        panic!(
+            "BG_TempFree: tail greater than size ({} > {})",
+            bg.bg_poolTail + sz,
+            MAX_POOL_SIZE
+        );
+    }
+    bg.bg_poolTail += sz;
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): depends on `BG_Alloc`
-// (parked above).
 /// Raven `BG_StringAlloc`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3383-3390`
-pub fn BG_StringAlloc(
-    source: *const c_char,
-) -> *mut c_char {
-    todo!("Port BG_StringAlloc — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/bg_misc.c:3383")
+pub fn BG_StringAlloc(source: *const c_char, bg: &mut BgState) -> *mut c_char {
+    unsafe {
+        let len = libc::strlen(source) + 1;
+        let dest = BG_Alloc(len as c_int, bg);
+        libc::strcpy(dest as *mut c_char, source);
+        dest as *mut c_char
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the `bg_poolSize`
-// static (see `BG_Alloc` above).
 /// Raven `BG_OutOfMemory`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3392-3395`
-pub fn BG_OutOfMemory() -> qboolean {
-    todo!("Port BG_OutOfMemory — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/bg_misc.c:3392")
+pub fn BG_OutOfMemory(bg: &BgState) -> qboolean {
+    if bg.bg_poolSize >= MAX_POOL_SIZE {
+        qtrue
+    } else {
+        qfalse
+    }
 }
