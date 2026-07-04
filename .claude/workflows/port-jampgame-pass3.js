@@ -45,18 +45,23 @@ const OPUS_FILES = new Set(['ai_main.c', 'w_saber.c', 'NPC_AI_Jedi.c', 'bg_pmove
 const tierFor = p => OPUS_FILES.has(p.file) || (p.loc || 0) > 3500 ? 'opus' : (p.loc || 0) < 900 ? 'haiku' : 'sonnet'
 
 // ---- non-blocking, memoized symbol fixers (fixer = symbol resolver, never logic) ----
+// SERIALIZED through one chain: fixers share prelude.rs/mod.rs files — parallel edits would race.
 const symbolFixers = new Map()   // symbol name -> promise; N reporters share ONE fixer
 const symbolsFixed = []
+let symChain = Promise.resolve()
 function fixSymbol(sym) {
   if (!symbolFixers.has(sym.name)) {
-    symbolFixers.set(sym.name, agent(
+    const run = () => agent(
       `SYMBOL FIXER (resolver contract — you resolve symbols, never logic). Worktree ${WT}, branch skeleton. The symbol \`${sym.name}\` (${sym.kind || 'unknown kind'}${sym.source ? ', oracle: ' + sym.source : ''}) is referenced by freshly-ported jampgame bodies but does not resolve.
 1. grep the worktree crates/mp/ first: if it EXISTS but is private/unimported -> make it pub and add the re-export where bare references resolve (prelude.rs pattern).
 2. If it does not exist -> port it faithfully from the oracle (find it; single const/enum/type/table/helper-fn; house style: doc-comment + Source cite, Raven name, enum-vs-alias fidelity, one type per file beside its subsystem siblings; wire mod decls).
 3. NEVER modify a fn body or an existing signature. Call sites bend toward declarations, never the reverse — and you touch neither.
 ${STYLE} Return JSON {name: "${sym.name}", action: "exported"|"ported"|"already-ok"|"is-state-not-const", path: "<rust file>"}.`,
       { label: `sym:${sym.name}`, phase: 'Port', model: 'haiku', effort: 'low', schema: { type: 'object', properties: { name: { type: 'string' }, action: { type: 'string' }, path: { type: 'string' } }, required: ['name', 'action'] } }
-    ).then(r => { if (r) symbolsFixed.push(r); return r }))
+    ).then(r => { if (r) symbolsFixed.push(r); return r })
+    const p = symChain.then(run)
+    symChain = p.catch(() => {})
+    symbolFixers.set(sym.name, p)
   }
   return symbolFixers.get(sym.name)
 }
