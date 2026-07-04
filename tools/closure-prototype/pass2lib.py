@@ -28,13 +28,40 @@ def compute_needs_ctx(F):
     return need, {f['usr'] for f in F if seed(f)}
 
 # ---- worktree Rust fn scanner
-FN_RE = re.compile(r'(?m)^(?:pub(?:\([\w:]+\))?\s+)?(?:extern\s+"C"\s+)?fn\s+([A-Za-z_]\w*)\s*\(')
+# `^[ \t]*` so INDENTED `impl`-block methods are captured too, not just
+# column-0 free fns (the reality guard needs to see ported PmoveContext/BgState
+# methods, whose real shape must outrank the classifier's prediction).
+FN_RE = re.compile(r'(?m)^[ \t]*(?:pub(?:\([\w:]+\))?\s+)?(?:extern\s+"C"\s+)?fn\s+([A-Za-z_]\w*)\s*\(')
+IMPL_RE = re.compile(r'(?m)^[ \t]*impl(?:\s*<[^>]*>)?\s+(?:[\w:<>\', ]+\s+for\s+)?([A-Za-z_]\w*)')
+SELF_RE = re.compile(r'^\s*&?\s*(?:mut\s+)?self\b')
+
+def _impl_spans(text):
+    """List of (open_brace_idx, close_brace_idx, receiver_type) for each `impl`
+    block, so a fn record can report the type it is a method of."""
+    spans = []
+    for m in IMPL_RE.finditer(text):
+        brace = text.find('{', m.end())
+        if brace == -1:
+            continue
+        d = 0; e = brace
+        while e < len(text):
+            c = text[e]
+            if c == '{': d += 1
+            elif c == '}':
+                d -= 1
+                if d == 0:
+                    break
+            e += 1
+        spans.append((brace, e, m.group(1)))
+    return spans
 
 def scan_rs_file(path):
     """Return list of fn records: name, params, ret, header_start(char idx of
     'pub fn'), body_open(idx of '{'), body_end(matching '}'), is_todo, has_ctx,
+    is_method (leading `self` param), impl_ty (enclosing `impl` receiver or None),
     text slice of signature."""
     text = path.read_text()
+    impls = _impl_spans(text)
     out = []
     for m in FN_RE.finditer(text):
         name = m.group(1)
@@ -71,9 +98,15 @@ def scan_rs_file(path):
         parked = (nocomment.startswith('todo!(') and nocomment.endswith(')')
                   and nocomment.count('todo!(') == 1)
         has_ctx = bool(re.match(r'\s*ctx\s*:\s*GameContext', params_text))
+        is_method = bool(SELF_RE.match(params_text))
+        impl_ty = None
+        for bo, be, ty in impls:
+            if bo < m.start() < be:
+                impl_ty = ty  # innermost wins (spans are source-ordered)
         out.append(dict(name=name, params=params_text, ret=ret,
                         hdr=m.start(), popen=i, pclose=j, bopen=brace, bend=e,
-                        parked=parked, has_ctx=has_ctx))
+                        parked=parked, has_ctx=has_ctx,
+                        is_method=is_method, impl_ty=impl_ty))
     return out, text
 
 def scan_worktree():

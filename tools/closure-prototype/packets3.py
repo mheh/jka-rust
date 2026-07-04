@@ -258,7 +258,66 @@ def main():
         needs_by_name.setdefault(nm, ctx_by.get((fl, nm), {}).get("needs_ctx", False))
 
     def is_pmove_method(name):
-        return tier_by_name.get(name) == "bg" and needs_by_name.get(name, False)
+        # kept for back-compat; the packet body now drives off `shape()` (which
+        # applies the reality guard). A bg fn is a PmoveContext method only when
+        # its REFINED ctx_kind is "pmove" (ruling 12 + disposition refinement).
+        return ctx_by_name.get(name, {}).get("ctx_kind") == "pmove"
+
+    # ------- reality-aware resolved shape (FIX: reality outranks prediction) ---
+    # ctx record by bare name (callees can live in another file).
+    ctx_by_name = {}
+    for x in nc["fns"]:
+        ctx_by_name.setdefault(x["name"], x)
+
+    def impl_hdr(ty):
+        # PmoveContext is the only lifetime-bearing receiver in the bg channel.
+        return "PmoveContext<'_>" if ty in (None, "PmoveContext") else ty
+
+    def real_sig(r):
+        """A worktree record's ACTUAL signature, verbatim (self param and all)."""
+        params = re.sub(r"\s+", " ", r["params"]).strip()
+        ret = r["ret"].strip()
+        return f"pub fn {r['name']}({params}){(' ' + ret) if ret else ''}".rstrip()
+
+    def bgstate_sig(name):
+        """Predicted LAW shape for an OPEN bgstate fn: a free fn taking
+        `bg: &mut BgState` (`&BgState` when it only reads state) plus
+        `traps: &dyn BgTraps` when it hits an engine trap — NOT a PmoveContext
+        method (rulings 12/15)."""
+        r = wt.get(name)
+        if r is None:
+            return None
+        info = ctx_by_name.get(name, {})
+        # drop any trailing comma so appending the bg param never doubles it
+        params = re.sub(r"\s+", " ", r["params"]).strip().rstrip(",").strip()
+        # `&mut` when the fn (or a bg/qshared callee, e.g. BG_TempAlloc) writes
+        # state; `&BgState` only when the whole reachable effect is read-only.
+        bgref = "&mut BgState" if info.get("state_mut") else "&BgState"
+        extra = f"bg: {bgref}" + (", traps: &dyn BgTraps"
+                                  if "trap" in info.get("why", []) else "")
+        newp = (params + ", " + extra) if params else extra
+        ret = r["ret"].strip()
+        return f"pub fn {name}({newp}){(' ' + ret) if ret else ''}".rstrip()
+
+    def shape(name):
+        """Resolved LAW shape. Reality (a FILLED worktree body) OUTRANKS the
+        classifier's prediction; only an OPEN (todo!()) fn falls back to the
+        ctx_kind-predicted form."""
+        r = wt.get(name)
+        info = ctx_by_name.get(name, {})
+        ck = info.get("ctx_kind")
+        if r is not None and not r["parked"]:          # FILLED → reality wins
+            if r.get("is_method"):
+                return dict(kind="method", sig=real_sig(r),
+                            impl_ty=impl_hdr(r.get("impl_ty")), reality=True)
+            return dict(kind="free", sig=wt_sig(name), impl_ty=None, reality=True)
+        if ck == "pmove":                              # OPEN → prediction
+            return dict(kind="method", sig=method_sig(name),
+                        impl_ty="PmoveContext<'_>", reality=False)
+        if ck == "bgstate":
+            return dict(kind="bgstate", sig=bgstate_sig(name), impl_ty=None,
+                        reality=False)
+        return dict(kind="free", sig=wt_sig(name), impl_ty=None, reality=False)
 
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "packets").mkdir(exist_ok=True)
@@ -284,7 +343,7 @@ def main():
             base = cfile[:-2]
             o = render_packet(cfile, tier, is_icarus, chunk, shard, n_shards,
                               rulings, va_table, wt, wt_sig, method_sig,
-                              is_pmove_method, ctx_by, ctxfree,
+                              is_pmove_method, shape, ctx_by, ctxfree,
                               cvar_fields, glob_fields, bgstate_fields, MASTER)
             fname = base + (f".shard{shard}" if shard else "") + ".md"
             (OUT / "packets" / fname).write_text(o)
@@ -313,7 +372,7 @@ def main():
 
 
 def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
-                  va_table, wt, wt_sig, method_sig, is_pmove_method,
+                  va_table, wt, wt_sig, method_sig, is_pmove_method, shape,
                   ctx_by, ctxfree,
                   cvar_fields, glob_fields, bgstate_fields, MASTER):
     o = []
@@ -356,6 +415,16 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
                  "for it (the pre-existing bare-signature stub) — replace it with the method, "
                  "never leave a dead duplicate stub. Peer bg methods are called as "
                  "`self.X(…)` (see `PM_Friction`→`PM_ClipVelocity` in `bg_pmove.rs`).")
+        o.append("- **BGSTATE-SHAPE (ruling 12/15 lineage):** a bg-tier fn that touches "
+                 "**mutable `BgState`** (`bgAllAnims`, saber/vehicle parse buffers, "
+                 "`bg_pool`, siege tables, `rng`) but **NOT** the pmove working set is a "
+                 "**free fn taking `bg: &mut BgState`** (or `&BgState` when it only reads "
+                 "state), plus `traps: &dyn BgTraps` when it hits an engine trap — it is "
+                 "**NOT** a `PmoveContext` method (that channel is reserved for pmove-set "
+                 "fns). Its `LAW` block prints exactly this free-fn shape; match it. A fn "
+                 "that reads only a **const table** (`bgForcePowerCost`, `bg_itemlist`, "
+                 "`saberMoveData`, `ammoData`, `weaponData`, …) needs **no channel at all** "
+                 "— it is a plain free fn (the const table is a Rust `static`/`const`).")
         o.append("- **session tables / RNG** → `self.bg` (`&mut BgState`): `bgAllAnims`, "
                  "saber parse buffers, vehicle info arrays, `bg_pool`, `rng`.")
         o.append("- **engine surface** → `self.traps` (`&dyn BgTraps`): trace, "
@@ -525,25 +594,38 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
     o.append("")
     for f in chunk:
         o.append(f"### `{f['name']}` — {cfile}:{f['line']}-{f['end_line']}")
-        if is_pmove_method(f["name"]):
-            msig = method_sig(f["name"])
-            if msig:
-                o.append("Resolved worktree signature (LAW — this bg-tier ctx-threaded fn is a "
-                         "**`PmoveContext` method**, ruling 12; fill this body, do not change "
-                         "the signature). DELETE the stale free-fn `todo!()` skeleton stub for "
-                         "this fn — replace it, never leave a dead duplicate:")
+        sh = shape(f["name"])
+        if sh["sig"]:
+            if sh["kind"] == "method":
+                lead = ("already ported — match its ACTUAL shape, do not re-derive"
+                        if sh["reality"] else
+                        "ruling 12; DELETE the stale free-fn `todo!()` skeleton stub for "
+                        "this fn — replace it, never leave a dead duplicate")
+                o.append(f"Resolved worktree signature (LAW — this bg-tier fn is a "
+                         f"**`{sh['impl_ty']}` method** ({lead}); fill this body, do not "
+                         "change the signature):")
                 o.append("```rust")
-                o.append("impl PmoveContext<'_> {")
-                o.append("    " + msig + " { /* PORT-NOTE if needed; port here — "
+                o.append(f"impl {sh['impl_ty']} {{")
+                o.append("    " + sh["sig"] + " { /* PORT-NOTE if needed; port here — "
                          "call peer bg fns as `self.X(…)` */ }")
                 o.append("}")
                 o.append("```")
-        else:
-            sig = wt_sig(f["name"])
-            if sig:
-                o.append("Resolved worktree signature (LAW — fill this body, do not change it):")
+            elif sh["kind"] == "bgstate":
+                o.append("Resolved worktree signature (LAW — this bg-tier fn touches mutable "
+                         "**`BgState`** but NOT the pmove working set, so it is a **free fn "
+                         "taking `bg: &mut BgState`** (+ `traps: &dyn BgTraps` when it hits a "
+                         "trap), NOT a `PmoveContext` method — rulings 12/15. Fill this body, "
+                         "do not change the signature):")
                 o.append("```rust")
-                o.append(sig + " { /* PORT-NOTE if needed; port here */ }")
+                o.append(sh["sig"] + " { /* PORT-NOTE if needed; port here */ }")
+                o.append("```")
+            else:  # free
+                extra = (" — already ported; match its ACTUAL shape"
+                         if sh["reality"] else "")
+                o.append(f"Resolved worktree signature (LAW — fill this body, do not change "
+                         f"it{extra}):")
+                o.append("```rust")
+                o.append(sh["sig"] + " { /* PORT-NOTE if needed; port here */ }")
                 o.append("```")
         o.append("```c")
         o.append(numbered_slice(GAME / cfile, f["line"], f["end_line"]))
@@ -561,14 +643,21 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
     o.append("")
     o.append("```rust")
     for name in sorted(callees):
-        pmethod = is_pmove_method(name)
-        sig = method_sig(name) if pmethod else wt_sig(name)
-        if sig:
+        sh = shape(name)
+        if sh["sig"]:
             r = wt.get(name)
             tag = "OPEN" if (r["parked"] or r["esc"]) else "ported"
-            note = "  — PmoveContext method: call as `self." + name + "(…)`" if pmethod else ""
-            o.append(f"// {tag}: {r['path'].name}{note}")
-            o.append(sig + ";")
+            if sh["kind"] == "method":
+                o.append(f"// {tag}: {r['path'].name}  — `{sh['impl_ty']}` method: "
+                         f"call as `self.{name}(…)`")
+                o.append(f"impl {sh['impl_ty']} {{ {sh['sig']}; }}")
+            elif sh["kind"] == "bgstate":
+                o.append(f"// {tag}: {r['path'].name}  — bg-state free fn "
+                         "(`bg: &mut BgState`, rulings 12/15)")
+                o.append(sh["sig"] + ";")
+            else:
+                o.append(f"// {tag}: {r['path'].name}")
+                o.append(sh["sig"] + ";")
         else:
             o.append(f"//TODO: Port {name}  // Source: oracle/oracle/codemp/game/ (unresolved)")
     o.append("```")
