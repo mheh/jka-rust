@@ -943,7 +943,5 @@ pub fn turret_base_spawn_top(
     }
 }
 
-// C standard library atoi
-extern "C" {
-    fn atoi(s: *const c_char) -> c_int;
-}
+// `atoi` is the ported `bg_lib.c` function reached via the prelude
+// (`crate::bg_lib::atoi`); no local extern shim.

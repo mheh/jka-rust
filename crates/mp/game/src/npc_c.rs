@@ -876,7 +876,7 @@ pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
             enemy_origin[1] - self_origin[1],
             enemy_origin[2] - self_origin[2],
         ];
-        if crate::NPC_AI_MineMonster::VectorLengthSquared(vec) > crate::NPC_combat::NPC_MaxDistSquaredForWeapon(ctx) {
+        if crate::q_math::VectorLengthSquared(vec) > crate::NPC_combat::NPC_MaxDistSquaredForWeapon(ctx) {
             (*npc_info).attackHoldTime = 0;
         } else if (*npc_info).attackHoldTime != 0 && (*npc_info).attackHoldTime > world.level.time {
             world.globals.ucmd.buttons |= BUTTON_ATTACK;
@@ -1599,7 +1599,7 @@ pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
         );
         if trace.startsolid == 0 && trace.allsolid == 0 {
             (*npc_info).lastClearOrigin = (*npc_ent).r.currentOrigin;
-        } else if crate::NPC_AI_MineMonster::VectorLengthSquared((*npc_info).lastClearOrigin) != 0.0 {
+        } else if crate::q_math::VectorLengthSquared((*npc_info).lastClearOrigin) != 0.0 {
             //			Com_Printf("%s stuck in solid at %s: fixing...\n", NPC->script_targetname, vtos(NPC->r.currentOrigin));
             crate::g_utils::G_SetOrigin(npc_ent, (*npc_info).lastClearOrigin);
             trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_ent));

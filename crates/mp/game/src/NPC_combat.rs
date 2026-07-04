@@ -2685,14 +2685,8 @@ const ENTITYNUM_NONE_LOCAL: c_int = (mp_qshared::shared::MAX_GENTITIES - 1) as c
 // Source: `oracle/oracle/codemp/game/b_local.h:267`
 pub const CPF_SQUAD: c_int = 0x00000008;
 
-/// `DistanceSquared` — header-inline helper (`static ID_INLINE`), precedent
-/// `NPC_AI_Utils.rs`/`NPC_AI_Rancor.rs` per-file copies.
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1527-1532`
-fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
-    let v = [p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]];
-    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
-}
+// `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
+// via the prelude glob (no per-file copy).
 
 // Raven `WORLD_SIZE` (`MAX_WORLD_COORD - MIN_WORLD_COORD`, `64*1024 -
 // (-64*1024)`) — not yet ported as a central const.

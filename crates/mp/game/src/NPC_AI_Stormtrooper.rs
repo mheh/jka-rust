@@ -11,7 +11,6 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::NPC_AI_Rancor::DistanceSquared;
 use crate::NPC_AI_Utils::{
     AI_GetGroup, AI_GroupContainsEntNum, AI_GroupUpdateClearShotTime, AI_GroupUpdateEnemyLastSeen,
     AI_GroupUpdateSquadstates,

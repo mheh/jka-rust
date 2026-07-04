@@ -2030,7 +2030,7 @@ pub fn WP_VehLeadCrosshairVeh(
                 let mut predShotDir = [0.0f32; 3];
 
                 if distAdjust > 500.0f32
-                    || crate::NPC_AI_Rancor::DistanceSquared(
+                    || crate::q_math::DistanceSquared(
                         (*(*camTraceEnt).client).ps.origin,
                         shotStart,
                     ) > 7000000.0f32

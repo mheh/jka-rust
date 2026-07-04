@@ -264,6 +264,34 @@ pub fn VectorCompare(v1: vec3_t, v2: vec3_t) -> qboolean {
     1
 }
 
+/// Raven `VectorClear` (`q_shared.h` macro; canonical home for the per-file
+/// transcriptions that porters had been re-deriving).
+/// Source: `oracle/oracle/codemp/game/q_shared.h:1397`
+#[inline]
+pub fn VectorClear(a: &mut vec3_t) {
+    a[0] = 0.0;
+    a[1] = 0.0;
+    a[2] = 0.0;
+}
+
+/// Raven `VectorSet` (`q_shared.h` macro). Out-param, matching the macro's
+/// `(v)[0]=(x),…` write-through shape.
+/// Source: `oracle/oracle/codemp/game/q_shared.h:1399`
+#[inline]
+pub fn VectorSet(v: &mut vec3_t, x: f32, y: f32, z: f32) {
+    v[0] = x;
+    v[1] = y;
+    v[2] = z;
+}
+
+/// Raven `DistanceSquared` (header-inline helper).
+/// Source: `oracle/oracle/codemp/game/q_shared.h:1527-1532`
+#[inline]
+pub fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> vec_t {
+    let v = vec_sub(p2, p1);
+    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
+}
+
 /// Raven `Q_rand`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_math.c:126-129`

@@ -294,6 +294,58 @@ pub fn __builtin___memmove_chk(
 // `world.bg_state.rng.srand`/`.rand`.
 // Source: oracle/oracle/codemp/game/bg_lib.c:763-772
 
+/// Raven `atoi`.
+///
+/// Converts a string to an integer. Skips leading whitespace, honours an
+/// optional sign, and reads base-10 digits until a non-digit. Canonical home
+/// for the local `extern "C" { fn atoi }` / `atoi_cstr` shims that stood in
+/// for the unported `bg_lib.c` function.
+///
+/// Source: `oracle/oracle/codemp/game/bg_lib.c:915-958`
+pub fn atoi(string: *const c_char) -> c_int {
+    unsafe {
+        let mut string = string;
+
+        // Skip whitespace
+        loop {
+            let ch = *string as u8;
+            if ch > b' ' {
+                break;
+            }
+            if ch == 0 {
+                return 0;
+            }
+            string = string.add(1);
+        }
+
+        // Check sign
+        let sign = match *string as u8 {
+            b'+' => {
+                string = string.add(1);
+                1
+            }
+            b'-' => {
+                string = string.add(1);
+                -1
+            }
+            _ => 1,
+        };
+
+        // Read digits
+        let mut value: c_int = 0;
+        loop {
+            let c = *string as u8;
+            string = string.add(1);
+            if c < b'0' || c > b'9' {
+                break;
+            }
+            value = value * 10 + (c - b'0') as c_int;
+        }
+
+        value * sign
+    }
+}
+
 /// Raven `atof`.
 ///
 /// Converts a string to a double-precision floating-point number.

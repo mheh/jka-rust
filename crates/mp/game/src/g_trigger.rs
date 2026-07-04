@@ -110,10 +110,8 @@ const EF_RAG: c_int = 1 << 6;
 // Source: oracle/oracle/codemp/game/g_trigger.c:1441
 pub const INITIAL_SUFFOCATION_DELAY: c_int = 500;
 
-// C standard library `atoi` (same local recipe as `g_turret.rs`).
-extern "C" {
-    fn atoi(s: *const c_char) -> c_int;
-}
+// `atoi` is the ported `bg_lib.c` function reached via the prelude
+// (`crate::bg_lib::atoi`); no local extern shim.
 
 // Ruling 22 seam helpers (local to this file, same recipe as `g_missile.rs`):
 // `gentity_t*` stored fields (`activator`) are `Option<EntityId>`; these

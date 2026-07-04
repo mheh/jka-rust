@@ -266,6 +266,7 @@ pub use crate::NPC_move::{NAV_GetLastMove, NPC_MoveToGoal};
 pub use crate::NPC_senses::{InFOV3, NPC_CheckAlertEvents, NPC_CheckForDanger};
 pub use crate::NPC_utils::{CalcEntitySpot, NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_FaceEnemy, NPC_UpdateAngles};
 pub use crate::bg_lib::atof;
+pub use crate::bg_lib::atoi;
 pub use crate::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
 pub use crate::bg_panimate::BG_InKnockDownOnly;
 pub use crate::bg_pmove::BG_SabersOff;

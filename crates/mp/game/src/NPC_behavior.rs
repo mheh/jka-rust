@@ -1143,7 +1143,7 @@ pub fn NPC_CheckSurrender(ctx: GameContext<'_>) -> qboolean {
                     } else {
                         if InFOV(ctx, enemy, NPC, 60, 30) == QFALSE {
                             return QFALSE;
-                        } else if crate::NPC_AI_Rancor::DistanceSquared((*NPC).r.currentOrigin, (*enemy).r.currentOrigin) < 65536.0 {
+                        } else if crate::q_math::DistanceSquared((*NPC).r.currentOrigin, (*enemy).r.currentOrigin) < 65536.0 {
                             return QFALSE;
                         } else if trap::InPVS(ctx.engine, (*NPC).r.currentOrigin, (*enemy).r.currentOrigin) == 0 {
                             return QFALSE;

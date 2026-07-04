@@ -64,34 +64,9 @@ const NIF_COLLISION: i32 = 0x00000008;
 // Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c`
 static mut IMPACT_POS_4: vec3_t = [0.0; 3];
 
-// Raven `q_shared.h` `VectorCopy`/`VectorSubtract`/`VectorClear`/`VectorMA`
-// macros (no C linkage — inlined at each call site); per-file transcription,
-// matching the same precedent as `bg_saber.rs`'s local vector helpers.
-// Source: `oracle/oracle/codemp/game/q_shared.h`
-#[inline]
-fn VectorCopy(a: vec3_t, b: &mut vec3_t) {
-    b[0] = a[0];
-    b[1] = a[1];
-    b[2] = a[2];
-}
-#[inline]
-fn VectorSubtract(a: vec3_t, b: vec3_t, c: &mut vec3_t) {
-    c[0] = a[0] - b[0];
-    c[1] = a[1] - b[1];
-    c[2] = a[2] - b[2];
-}
-#[inline]
-fn VectorClear(a: &mut vec3_t) {
-    a[0] = 0.0;
-    a[1] = 0.0;
-    a[2] = 0.0;
-}
-#[inline]
-fn VectorMA(veca: vec3_t, scale: f32, vecb: vec3_t, vecc: &mut vec3_t) {
-    vecc[0] = veca[0] + scale * vecb[0];
-    vecc[1] = veca[1] + scale * vecb[1];
-    vecc[2] = veca[2] + scale * vecb[2];
-}
+// Vector helpers are the canonical `crate::q_math` forms reached via the
+// prelude glob: `_VectorCopy`/`_VectorSubtract`/`_VectorMA` (out-param) and
+// `VectorClear`. Source: `oracle/oracle/codemp/game/q_shared.h`
 
 // Distance constants for combat logic (derived from oracle source comments).
 // Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c` (various lines with distance checks)
@@ -801,7 +776,7 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
                         let mut forward: vec3_t = [0.0; 3];
                         let mut end: vec3_t = [0.0; 3];
                         AngleVectors((*client).ps.viewangles, Some(&mut forward), None, None);
-                        VectorMA(muzzle, 8192.0, forward, &mut end);
+                        _VectorMA(muzzle, 8192.0, forward, &mut end);
                         trap::Trace(
                             ctx.engine,
                             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
@@ -814,7 +789,7 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
                                 MASK_SHOT,
                             ),
                         );
-                        VectorCopy(tr.endpos, &mut IMPACT_POS_4);
+                        _VectorCopy(tr.endpos, &mut IMPACT_POS_4);
                     }
 
                     // see if impact would be too close to me
@@ -848,7 +823,7 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
 
                     if tooClose == qfalse && tooFar == qfalse {
                         // okay to shoot at last pos
-                        VectorSubtract((*npc_info).enemyLastSeenLocation, muzzle, &mut dir);
+                        _VectorSubtract((*npc_info).enemyLastSeenLocation, muzzle, &mut dir);
                         VectorNormalize(&mut dir);
                         vectoangles(dir, &mut angles);
 
@@ -1030,7 +1005,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     let mut end: vec3_t = [0.0; 3];
                     let mins = [-3.0, -3.0, -3.0];
                     let maxs = [3.0, 3.0, 3.0];
-                    VectorMA((*client).renderInfo.muzzlePoint, 1024.0, (*client).renderInfo.muzzleDir, &mut end);
+                    _VectorMA((*client).renderInfo.muzzlePoint, 1024.0, (*client).renderInfo.muzzleDir, &mut end);
                     trap::Trace(
                         ctx.engine,
                         mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
@@ -1211,7 +1186,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         // can hit enemy or will hit glass or other breakable, so shoot anyway
                         (*ctx.world).globals.enemyCS4 = qtrue;
                         crate::NPC_combat::NPC_AimAdjust(ctx, 2); // adjust aim better longer we have clear shot at enemy
-                        VectorCopy((*(*npc_ent).enemy).r.currentOrigin, &mut (*npc_info).enemyLastSeenLocation);
+                        _VectorCopy((*(*npc_ent).enemy).r.currentOrigin, &mut (*npc_info).enemyLastSeenLocation);
                     } else {
                         // Hmm, have to get around this bastard
                         crate::NPC_combat::NPC_AimAdjust(ctx, 1); // adjust aim better longer we can see enemy
@@ -1317,7 +1292,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
 
             crate::NPC_utils::CalcEntitySpot(ctx, npc_ent, SPOT_WEAPON, &mut muzzle);
 
-            VectorCopy((*(*npc_ent).enemy).r.currentOrigin, &mut target);
+            _VectorCopy((*(*npc_ent).enemy).r.currentOrigin, &mut target);
 
             target[0] += (*ctx.world).bg_state.rng.flrand(-5.0, 5.0)
                 + ((*ctx.world).bg_state.rng.crandom() * (6 - (*npc_info).currentAim) as f32 * 2.0);
@@ -1366,7 +1341,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 (*npc_info).desiredYaw = crate::q_math::AngleNormalize360(angles[YAW]);
                 (*npc_info).desiredPitch = crate::q_math::AngleNormalize360(angles[PITCH]);
 
-                VectorCopy(velocity, &mut (*client).hiddenDir);
+                _VectorCopy(velocity, &mut (*client).hiddenDir);
                 (*client).hiddenDist = VectorNormalize(&mut (*client).hiddenDir);
             }
         } else if (*ctx.world).globals.faceEnemy4 != 0 {
@@ -1403,7 +1378,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             // we want to face in the dir we're running
             if (*ctx.world).globals.move4 == 0 {
                 // if we haven't moved, we should look in the direction we last looked?
-                VectorCopy((*client).ps.viewangles, &mut (*npc_info).lastPathAngles);
+                _VectorCopy((*client).ps.viewangles, &mut (*npc_info).lastPathAngles);
             }
             if (*ctx.world).globals.move4 != 0 {
                 // don't run away and shoot
@@ -1482,7 +1457,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 (*npc_info).touchedByPlayer = None;
                 (*client).ps.powerups[statIndex_t::PW_BATTLESUIT as usize] = level_time + ARMOR_EFFECT_TIME;
 
-                VectorSubtract((*(*npc_ent).enemy).r.currentOrigin, (*npc_ent).r.currentOrigin, &mut smackDir);
+                _VectorSubtract((*(*npc_ent).enemy).r.currentOrigin, (*npc_ent).r.currentOrigin, &mut smackDir);
                 smackDir[2] += 30.0;
                 VectorNormalize(&mut smackDir);
                 crate::g_combat::G_Damage(

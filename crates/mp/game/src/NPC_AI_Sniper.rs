@@ -30,7 +30,6 @@ use crate::g_nav::{FlyingCreature, NAV_GetLastMove, NAV_HitNavGoal};
 use crate::g_timer::{TIMER_Done, TIMER_Get, TIMER_Set};
 use crate::g_utils::GetAnglesForDirection;
 use crate::q_math::{AngleNormalize360, AngleVectors, Q_irand, VectorNormalize, flrand, vectoangles};
-use crate::NPC_AI_Rancor::DistanceSquared;
 use mp_bg::public::entity_event::entity_event_t::{EV_CONFUSE1, EV_CONFUSE3, EV_PUSHED1, EV_PUSHED3};
 use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ATTACK, BUTTON_ALT_ATTACK, BUTTON_WALKING};
 

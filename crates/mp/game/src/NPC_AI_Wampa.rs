@@ -35,15 +35,8 @@ const MAX_DISTANCE_SQR: c_int = MAX_DISTANCE * MAX_DISTANCE;
 const LSTATE_CLEAR: c_int = 0;
 const LSTATE_WAITING: c_int = 1;
 
-/// Raven `DistanceSquared` (`static ID_INLINE`, header-inline helper; ported
-/// inline here per the ruling — plain-C branch only, `_XBOX` asm branch
-/// skipped).
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1527-1532`
-fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
-    let v = [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]];
-    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
-}
+// `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
+// via the prelude glob (no per-file copy).
 
 /// Raven `Wampa_SetBolts`.
 ///
@@ -464,7 +457,7 @@ pub fn NPC_Wampa_Pain(
                 || (*self_).enemy.is_none()
                 || (*(*self_).enemy).health == 0
                 || (!(*self_).enemy.is_none() && !(*(*self_).enemy).client.is_null() && (*(*(*self_).enemy).client).NPC_class == crate::prelude::CLASS_WAMPA)
-                || (!crate::q_math::Q_irand(0, 4) != 0 && crate::NPC_AI_Rancor::DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < crate::NPC_AI_Rancor::DistanceSquared((*(*self_).enemy).r.currentOrigin, (*self_).r.currentOrigin))
+                || (!crate::q_math::Q_irand(0, 4) != 0 && crate::q_math::DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < crate::q_math::DistanceSquared((*(*self_).enemy).r.currentOrigin, (*self_).r.currentOrigin))
             {
                 // if my enemy is dead (or attacked by player) and I'm not still holding/eating someone, turn on the attacker
                 // FIXME: if can't nav to my enemy, take this guy if I can nav to him

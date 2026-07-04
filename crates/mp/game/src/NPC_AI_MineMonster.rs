@@ -31,13 +31,8 @@ const MAX_DISTANCE_SQR: c_int = MAX_DISTANCE * MAX_DISTANCE;
 const LSTATE_CLEAR: i32 = 0;
 const LSTATE_WAITING: i32 = 1;
 
-// Raven `VectorLengthSquared` inline from q_shared.h:1491-1518 (plain-C branch).
-// Port inline per ruling F17.
-// Source: `oracle/oracle/codemp/game/q_shared.h:1491-1518`
-#[inline]
-fn VectorLengthSquared(v: vec3_t) -> vec_t {
-    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
-}
+// `VectorLengthSquared` is the canonical `crate::q_math::VectorLengthSquared`,
+// reached via the prelude glob (the former per-file copy was unused).
 
 /// Raven `NPC_MineMonster_Precache`.
 ///

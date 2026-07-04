@@ -49,13 +49,8 @@ const SCF_NO_GROUPS: c_int = 0x00020000;
 // Source: `oracle/oracle/codemp/game/NPC_stats.c:287-330`
 const RANK_ENSIGN: c_int = 2;
 
-/// `DistanceSquared` — header-inline helper (`static ID_INLINE`).
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1527-1532`
-fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
-    let v = [p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]];
-    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
-}
+// `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
+// via the prelude glob (no per-file copy).
 
 /// Raven `AI_GetGroupSize`.
 ///

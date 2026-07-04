@@ -22,15 +22,9 @@ const MAX_DISTANCE_SQR: c_int = MAX_DISTANCE * MAX_DISTANCE;
 const LSTATE_CLEAR: c_int = 0;
 const LSTATE_WAITING: c_int = 1;
 
-/// Raven `DistanceSquared` (`static ID_INLINE`, header-inline helper; ported
-/// inline here per the ruling — plain-C branch only, `_XBOX` asm branch
-/// skipped).
-///
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1527-1532`
-fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
-    let v = [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]];
-    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
-}
+// `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
+// via the prelude glob (no per-file copy). Cross-module callers that referenced
+// `crate::NPC_AI_Rancor::DistanceSquared` now use `crate::q_math::DistanceSquared`.
 
 /// Raven `Rancor_SetBolts`.
 ///

@@ -81,29 +81,10 @@ pub const SFL2_NO_MANUAL_DEACTIVATE: c_int = 1 << 7;
 /// Source: `oracle/oracle/codemp/game/q_shared.h:732`
 pub const SFL2_NO_MANUAL_DEACTIVATE2: c_int = 1 << 16;
 
-// Small per-file vector helpers (matching the codebase's per-file `DistanceSquared`
-// convention — no shared `VectorSet`/`VectorMA`/… home exists yet).
-#[inline]
-fn VectorSet(x: f32, y: f32, z: f32) -> vec3_t {
-    [x, y, z]
-}
-#[inline]
-fn VectorMA(a: vec3_t, scale: f32, b: vec3_t) -> vec3_t {
-    [a[0] + scale * b[0], a[1] + scale * b[1], a[2] + scale * b[2]]
-}
-#[inline]
-fn VectorScale(a: vec3_t, scale: f32) -> vec3_t {
-    [a[0] * scale, a[1] * scale, a[2] * scale]
-}
-#[inline]
-fn VectorSubtract(a: vec3_t, b: vec3_t) -> vec3_t {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-#[inline]
-fn DistanceSquared(a: vec3_t, b: vec3_t) -> f32 {
-    let d = VectorSubtract(a, b);
-    d[0] * d[0] + d[1] * d[1] + d[2] * d[2]
-}
+// Vector helpers are the canonical `crate::q_math` forms reached via the
+// prelude glob: `VectorSet`/`_VectorMA`/`_VectorScale`/`_VectorSubtract`
+// (out-param) and `DistanceSquared`. Return-value call sites below are rewritten
+// to the out-param shape.
 
 // Raven `qboolean` is `c_int` (`qfalse == 0`, `qtrue == 1`); the lowercase
 // `qtrue`/`qfalse` spellings are not exported here (see `w_saber.rs`), so the
@@ -535,15 +516,19 @@ impl PmoveContext<'_> {
                 (*self.pm).cmd.upmove = 0;
             }
 
-            let facingAngles = VectorSet(0.0, (*ps).viewangles[YAW as usize], 0.0);
+            let mut facingAngles: vec3_t = [0.0; 3];
+            VectorSet(&mut facingAngles, 0.0, (*ps).viewangles[YAW as usize], 0.0);
             let mut faceFwd = [0.0f32; 3];
             AngleVectors(facingAngles, Some(&mut faceFwd), None, None);
 
-            let fwd = VectorMA((*ps).origin, 164.0, faceFwd);
+            let mut fwd: vec3_t = [0.0; 3];
+            _VectorMA((*ps).origin, 164.0, faceFwd, &mut fwd);
 
             let mut tr: trace_t = core::mem::zeroed();
-            let trmins = VectorSet(-15.0, -15.0, -15.0);
-            let trmaxs = VectorSet(15.0, 15.0, 15.0);
+            let mut trmins: vec3_t = [0.0; 3];
+            VectorSet(&mut trmins, -15.0, -15.0, -15.0);
+            let mut trmaxs: vec3_t = [0.0; 3];
+            VectorSet(&mut trmaxs, 15.0, 15.0, 15.0);
             self.traps.trace(
                 &mut tr,
                 &(*ps).origin,
@@ -885,7 +870,8 @@ impl PmoveContext<'_> {
             if victory != 0 {
                 if (*ps).saberLockHits != 0 && superBreak == 0 {
                     let strength = 8;
-                    let mut oppDir = VectorSubtract((*genemy).origin, (*ps).origin);
+                    let mut oppDir: vec3_t = [0.0; 3];
+                    _VectorSubtract((*genemy).origin, (*ps).origin, &mut oppDir);
                     let _ = crate::q_math::VectorNormalize(&mut oppDir);
 
                     if noKnockdown != 0 {
@@ -909,13 +895,15 @@ impl PmoveContext<'_> {
                 }
             } else {
                 let strength = 4;
-                let mut oppDir = VectorSubtract((*genemy).origin, (*ps).origin);
+                let mut oppDir: vec3_t = [0.0; 3];
+                _VectorSubtract((*genemy).origin, (*ps).origin, &mut oppDir);
                 let _ = crate::q_math::VectorNormalize(&mut oppDir);
                 (*genemy).velocity[0] = oppDir[0] * (strength * 40) as f32;
                 (*genemy).velocity[1] = oppDir[1] * (strength * 40) as f32;
                 (*genemy).velocity[2] = 150.0;
 
-                let mut oppDir2 = VectorSubtract((*ps).origin, (*genemy).origin);
+                let mut oppDir2: vec3_t = [0.0; 3];
+                _VectorSubtract((*ps).origin, (*genemy).origin, &mut oppDir2);
                 let _ = crate::q_math::VectorNormalize(&mut oppDir2);
                 (*ps).velocity[0] = oppDir2[0] * (strength * 40) as f32;
                 (*ps).velocity[1] = oppDir2[1] * (strength * 40) as f32;
@@ -1091,8 +1079,10 @@ impl PmoveContext<'_> {
             ];
 
             let mut tr: trace_t = core::mem::zeroed();
-            let trmins = VectorSet(-15.0, -15.0, -8.0);
-            let trmaxs = VectorSet(15.0, 15.0, 8.0);
+            let mut trmins: vec3_t = [0.0; 3];
+            VectorSet(&mut trmins, -15.0, -15.0, -8.0);
+            let mut trmaxs: vec3_t = [0.0; 3];
+            VectorSet(&mut trmaxs, 15.0, 15.0, 8.0);
             self.traps.trace(
                 &mut tr,
                 &(*ps).origin,
@@ -1144,7 +1134,7 @@ impl PmoveContext<'_> {
             fwdAngles[ROLL as usize] = 0.0;
             let mut jumpFwd = [0.0f32; 3];
             AngleVectors(fwdAngles, Some(&mut jumpFwd), None, None);
-            (*ps).velocity = VectorScale(jumpFwd, 150.0);
+            _VectorScale(jumpFwd, 150.0, &mut (*ps).velocity);
             (*ps).velocity[2] = 400.0;
 
             PM_SetForceJumpZStart((*ps).origin[2]);
@@ -1210,8 +1200,10 @@ impl PmoveContext<'_> {
                 (*ps).origin[2] + fwd[2] * FLIPHACK_DISTANCE,
             ];
 
-            let trmins = VectorSet(-15.0, -15.0, -8.0);
-            let trmaxs = VectorSet(15.0, 15.0, 8.0);
+            let mut trmins: vec3_t = [0.0; 3];
+            VectorSet(&mut trmins, -15.0, -15.0, -8.0);
+            let mut trmaxs: vec3_t = [0.0; 3];
+            VectorSet(&mut trmaxs, 15.0, 15.0, 8.0);
             self.traps.trace(
                 tr,
                 &(*ps).origin,
@@ -1265,7 +1257,7 @@ impl PmoveContext<'_> {
                 fwdAngles[ROLL as usize] = 0.0;
                 let mut jumpFwd = [0.0f32; 3];
                 AngleVectors(fwdAngles, Some(&mut jumpFwd), None, None);
-                (*ps).velocity = VectorScale(jumpFwd, 150.0);
+                _VectorScale(jumpFwd, 150.0, &mut (*ps).velocity);
                 PM_AddEvent(EV_JUMP as c_int);
                 return LS_A_LUNGE;
             } else if noSpecials == 0 && (*ps).fd.saberAnimLevel == SS_STAFF as c_int {
@@ -1338,7 +1330,7 @@ impl PmoveContext<'_> {
             fwdAngles[ROLL as usize] = 0.0;
             let mut jumpFwd = [0.0f32; 3];
             AngleVectors(fwdAngles, Some(&mut jumpFwd), None, None);
-            (*ps).velocity = VectorScale(jumpFwd, 300.0);
+            _VectorScale(jumpFwd, 300.0, &mut (*ps).velocity);
             (*ps).velocity[2] = 280.0;
             PM_SetForceJumpZStart((*ps).origin[2]);
 
@@ -1369,7 +1361,8 @@ impl PmoveContext<'_> {
                 MASK_SOLID as c_int,
             );
 
-            let d = VectorSubtract((*ps).origin, tr.endpos);
+            let mut d: vec3_t = [0.0; 3];
+            _VectorSubtract((*ps).origin, tr.endpos, &mut d);
             (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt()
         }
     }
@@ -1397,7 +1390,8 @@ impl PmoveContext<'_> {
                 return 4096.0;
             }
 
-            let d = VectorSubtract((*ps).origin, tr.endpos);
+            let mut d: vec3_t = [0.0; 3];
+            _VectorSubtract((*ps).origin, tr.endpos, &mut d);
             (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt()
         }
     }
@@ -1432,8 +1426,10 @@ impl PmoveContext<'_> {
         unsafe {
             let ps = (*self.pm).ps;
             let tSize = 12.0f32;
-            let tMins = VectorSet(-tSize, -tSize, -tSize);
-            let tMaxs = VectorSet(tSize, tSize, tSize);
+            let mut tMins: vec3_t = [0.0; 3];
+            VectorSet(&mut tMins, -tSize, -tSize, -tSize);
+            let mut tMaxs: vec3_t = [0.0; 3];
+            VectorSet(&mut tMaxs, tSize, tSize, tSize);
 
             let mut angles = (*ps).viewangles;
             angles[PITCH as usize] = 0.0;
@@ -1448,7 +1444,7 @@ impl PmoveContext<'_> {
                 x if x == DIR_LEFT => {
                     let mut right = [0.0f32; 3];
                     AngleVectors(angles, None, Some(&mut right), None);
-                    checkDir = VectorScale(right, -1.0);
+                    _VectorScale(right, -1.0, &mut checkDir);
                 }
                 x if x == DIR_FRONT => {
                     let mut fwd = [0.0f32; 3];
@@ -1458,12 +1454,13 @@ impl PmoveContext<'_> {
                 x if x == DIR_BACK => {
                     let mut fwd = [0.0f32; 3];
                     AngleVectors(angles, Some(&mut fwd), None, None);
-                    checkDir = VectorScale(fwd, -1.0);
+                    _VectorScale(fwd, -1.0, &mut checkDir);
                 }
                 _ => {}
             }
 
-            let tTo = VectorMA((*ps).origin, radius, checkDir);
+            let mut tTo: vec3_t = [0.0; 3];
+            _VectorMA((*ps).origin, radius, checkDir, &mut tTo);
             let mut tr: trace_t = core::mem::zeroed();
             self.traps.trace(
                 &mut tr,
@@ -1567,12 +1564,13 @@ impl PmoveContext<'_> {
                     if overrideJumpRightAttackMove != LS_INVALID {
                         return overrideJumpRightAttackMove;
                     } else {
-                        let fwdAngles = VectorSet(0.0, (*ps).viewangles[YAW as usize], 0.0);
+                        let mut fwdAngles: vec3_t = [0.0; 3];
+                        VectorSet(&mut fwdAngles, 0.0, (*ps).viewangles[YAW as usize], 0.0);
                         let mut right = [0.0f32; 3];
                         AngleVectors(fwdAngles, None, Some(&mut right), None);
                         (*ps).velocity[0] = 0.0;
                         (*ps).velocity[1] = 0.0;
-                        (*ps).velocity = VectorMA((*ps).velocity, 190.0, right);
+                        _VectorMA((*ps).velocity, 190.0, right, &mut (*ps).velocity);
                         if (*ps).fd.saberAnimLevel == SS_STAFF as c_int {
                             newmove = LS_BUTTERFLY_RIGHT;
                             (*ps).velocity[2] = 350.0;
@@ -1602,12 +1600,13 @@ impl PmoveContext<'_> {
                     if overrideJumpLeftAttackMove != LS_INVALID {
                         return overrideJumpLeftAttackMove;
                     } else {
-                        let fwdAngles = VectorSet(0.0, (*ps).viewangles[YAW as usize], 0.0);
+                        let mut fwdAngles: vec3_t = [0.0; 3];
+                        VectorSet(&mut fwdAngles, 0.0, (*ps).viewangles[YAW as usize], 0.0);
                         let mut right = [0.0f32; 3];
                         AngleVectors(fwdAngles, None, Some(&mut right), None);
                         (*ps).velocity[0] = 0.0;
                         (*ps).velocity[1] = 0.0;
-                        (*ps).velocity = VectorMA((*ps).velocity, -190.0, right);
+                        _VectorMA((*ps).velocity, -190.0, right, &mut (*ps).velocity);
                         if (*ps).fd.saberAnimLevel == SS_STAFF as c_int {
                             newmove = LS_BUTTERFLY_LEFT;
                             (*ps).velocity[2] = 250.0;
@@ -2047,11 +2046,14 @@ impl PmoveContext<'_> {
                     && (*ps).fd.forcePowerLevel[FP_SABERTHROW as usize] > 0
                     && self.PM_SaberPowerCheck() != 0
                 {
-                    let sabMins = VectorSet(SABERMINS_X, SABERMINS_Y, SABERMINS_Z);
-                    let sabMaxs = VectorSet(SABERMAXS_X, SABERMAXS_Y, SABERMAXS_Z);
+                    let mut sabMins: vec3_t = [0.0; 3];
+                    VectorSet(&mut sabMins, SABERMINS_X, SABERMINS_Y, SABERMINS_Z);
+                    let mut sabMaxs: vec3_t = [0.0; 3];
+                    VectorSet(&mut sabMaxs, SABERMAXS_X, SABERMAXS_Y, SABERMAXS_Z);
                     let mut fwd = [0.0f32; 3];
                     AngleVectors((*ps).viewangles, Some(&mut fwd), None, None);
-                    let minFwd = VectorMA((*ps).origin, SABER_MIN_THROW_DIST, fwd);
+                    let mut minFwd: vec3_t = [0.0; 3];
+                    _VectorMA((*ps).origin, SABER_MIN_THROW_DIST, fwd, &mut minFwd);
 
                     let mut sabTr: trace_t = core::mem::zeroed();
                     self.traps.trace(

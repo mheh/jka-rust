@@ -205,7 +205,7 @@ pub fn BG_ParseField(
                         *dst.add(2) = vec[2];
                     }
                     fieldtype_t::F_INT => {
-                        let v = atoi_cstr(value);
+                        let v = atoi(value);
                         *(b.offset((*f).ofs as isize) as *mut c_int) = v;
                     }
                     fieldtype_t::F_FLOAT => {
@@ -249,15 +249,6 @@ pub fn BG_ParseField(
             f = f.add(1);
         }
     }
-}
-
-/// `atoi` over a C string pointer (no libc dependency in this crate).
-///
-/// Source: `oracle/oracle/codemp/game/bg_misc.c:385` (`atoi(value)` call site)
-#[inline]
-unsafe fn atoi_cstr(s: *const c_char) -> c_int {
-    let text = std::ffi::CStr::from_ptr(s).to_string_lossy();
-    text.trim().parse::<c_int>().unwrap_or(0)
 }
 
 /// Raven `BG_LegalizedForcePowers`.
