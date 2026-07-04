@@ -8,10 +8,6 @@
 
 use crate::prelude::*;
 
-// Re-export `random` and `crandom` from q_math so callers using
-// `crate::bg_lib::random()` can resolve through this module.
-pub use crate::q_math::{crandom, random};
-
 /// `cmp_t` — comparison function pointer.
 ///
 /// Signature: `int (*)(const void *, const void *)`
@@ -293,27 +289,10 @@ pub fn __builtin___memmove_chk(
     dest
 }
 
-/// Raven `srand`.
-///
-/// Seeds the random number generator (file-static `randSeed`).
-///
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:765-767`
-// PORT-ESCALATION(randSeed-storage): Where should the file-static randSeed variable be stored (GameWorld field, thread-local, etc.)?
-pub fn srand(_seed: c_uint) {
-    todo!("Port srand — parked: randSeed storage")
-}
-
-/// Raven `rand`.
-///
-/// Returns a pseudo-random integer in range [0, 0x7fff] using the
-/// linear congruential generator:
-/// `randSeed = (69069 * randSeed + 1); return randSeed & 0x7fff;`
-///
-/// Source: `oracle/oracle/codemp/game/bg_lib.c:769-772`
-// PORT-ESCALATION(randSeed-storage): Where should the file-static randSeed variable be stored (GameWorld field, thread-local, etc.)?
-pub fn rand() -> c_int {
-    todo!("Port rand — parked: randSeed storage")
-}
+// `srand`/`rand` are ported as the `randSeed` generator on
+// `bg_channel::rng::Rng` (BgState) per ruling 15 — reach them via
+// `world.bg_state.rng.srand`/`.rand`.
+// Source: oracle/oracle/codemp/game/bg_lib.c:763-772
 
 /// Raven `atof`.
 ///

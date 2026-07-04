@@ -288,23 +288,8 @@ pub fn Q_crandom(seed: *mut c_int) -> f32 {
     2.0 * (Q_random(seed) - 0.5)
 }
 
-/// Raven `random()` macro — centered random distribution over `[0..1)`.
-///
-/// Raven's macro: `#define random() ((rand() & 0x7fff) / ((float)0x7fff))`.
-/// Uses the global LCG seeded by `bg_lib::rand()`.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1591`
-pub fn random() -> f32 {
-    ((crate::bg_lib::rand() & 0x7fff) as f32) / (0x7fff as f32)
-}
-
-/// Raven `crandom()` macro — centered random distribution over `[-1..1)`.
-///
-/// Raven's macro: `#define crandom() (2.0 * (random() - 0.5))`.
-/// Balanced around zero, useful for jitter/spread.
-/// Source: `oracle/oracle/codemp/game/q_shared.h:1592`
-pub fn crandom() -> f32 {
-    2.0 * (random() - 0.5)
-}
+// `random()`/`crandom()` (`q_shared.h:1591-1592`) are ported as methods on
+// `bg_channel::rng::Rng` (BgState) per ruling 15 — `Rng::random`/`Rng::crandom`.
 
 /// Raven `ClampChar`.
 ///

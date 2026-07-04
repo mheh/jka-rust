@@ -8,7 +8,6 @@ use crate::prelude::*;
 use crate::NPC_AI_Default::NPC_BSIdle;
 use crate::NPC_reactions::{NPC_GetPainChance, NPC_Pain};
 use crate::NPC_utils::NPC_UpdateAngles;
-use crate::bg_lib::rand;
 use crate::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
 use crate::g_items::RegisterItem;
 use crate::g_utils::{G_EffectIndex, G_SoundIndex};

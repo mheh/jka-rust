@@ -736,9 +736,9 @@ pub fn CanShoot(
             spot[2] - tr.endpos[2],
         ];
         // Raven `random()` (`q_shared.h:1591`, `(rand()&0x7fff)/32767.0`) —
-        // `bg_lib::rand` (distinct from the game's own `Q_flrand`/`Q_irand`
-        // LCG, ruling 3), inlined here per that macro.
-        let random = ((crate::bg_lib::rand() & 0x7fff) as f32) / (0x7fff as f32);
+        // the `bg_lib.c` `randSeed` LCG (distinct from the game's own
+        // `Q_flrand`/`Q_irand` LCG, ruling 15), reached via `bg_state.rng`.
+        let random = (*ctx.world).bg_state.rng.random();
         if VectorLength(diff) < random * 32.0 {
             return 1;
         }

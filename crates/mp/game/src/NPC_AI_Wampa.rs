@@ -131,7 +131,7 @@ pub fn Wampa_Patrol(ctx: GameContext<'_>) {
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
         } else {
             if crate::g_timer::TIMER_Done(ctx, npc, c"patrolTime".as_ptr()) != 0 {
-                crate::g_timer::TIMER_Set(ctx, npc, c"patrolTime".as_ptr(), (crate::q_math::crandom() * 5000.0 + 5000.0) as c_int);
+                crate::g_timer::TIMER_Set(ctx, npc, c"patrolTime".as_ptr(), ((*ctx.world).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int);
             }
         }
 
@@ -315,7 +315,7 @@ pub fn Wampa_Attack(
                 crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 250);
             }
 
-            crate::g_timer::TIMER_Set(ctx, npc, c"attacking".as_ptr(), (*(*npc).client).ps.legsTimer as c_int + (crate::q_math::random() * 200.0) as c_int);
+            crate::g_timer::TIMER_Set(ctx, npc, c"attacking".as_ptr(), (*(*npc).client).ps.legsTimer as c_int + ((*ctx.world).bg_state.rng.random() * 200.0) as c_int);
             // allow us to re-evaluate our running speed/anim
             crate::g_timer::TIMER_Set(ctx, npc, c"runfar".as_ptr(), -1);
             crate::g_timer::TIMER_Set(ctx, npc, c"runclose".as_ptr(), -1);

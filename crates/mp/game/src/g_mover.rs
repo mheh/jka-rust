@@ -2416,8 +2416,7 @@ pub fn funcBBrushDieGo(
         ];
 
         // Raven `random()` macro == `(rand()&RAND_MAX)/(float)RAND_MAX`.
-        let random = || (crate::bg_lib::rand() & RAND_MAX) as f32 / RAND_MAX as f32;
-        let mut num_chunks = (random() * 6.0 + 18.0) as c_int;
+        let mut num_chunks = ((*ctx.world).bg_state.rng.random() * 6.0 + 18.0) as c_int;
 
         // this formula really has no logical basis other than the fact
         // that it seemed to be the closest to yielding the results that I

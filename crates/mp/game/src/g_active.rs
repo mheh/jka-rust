@@ -225,7 +225,7 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     // play a gurp sound instead of a normal pain sound
                     if (*ent).health <= (*ent).damage {
                         G_Sound(ctx, ent, CHAN_VOICE as c_int, G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()));
-                    } else if rand() & 1 != 0 {
+                    } else if (*ctx.world).bg_state.rng.rand() & 1 != 0 {
                         G_Sound(ctx, ent, CHAN_VOICE as c_int, G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()));
                     } else {
                         G_Sound(ctx, ent, CHAN_VOICE as c_int, G_SoundIndex(cstr("sound/player/gurp2.wav").as_ptr()));

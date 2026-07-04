@@ -25,7 +25,6 @@ use crate::g_weapon::WP_FireTurboLaserMissile;
 use crate::g_items::RegisterItem;
 use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
 use crate::NPC_combat::G_SetEnemy;
-use crate::bg_lib::rand;
 use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
 use crate::q_math::{
     flrand, vectoangles, AngleNormalize360, AngleSubtract, AngleVectors, VectorLengthSquared,
@@ -38,13 +37,6 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 /// Raven `bg_public.h:625-660` `EFFECT_*` enum ordinal (`combatEffects_e` —
 /// not yet type-ported); transcribed locally as its raw ordinal (10).
 const EFFECT_EXPLOSION_TURRET: c_int = 10;
-
-/// Raven `random()` macro (`q_shared.h:1591`) over the resolved `rand()`
-/// bridge (fork-3 ruling: the faithful threaded LCG lands elsewhere;
-/// `rand()` is the currently-wired stand-in per the call surface).
-fn random_() -> f32 {
-    ((rand() & 0x7fff) as f32) / (0x7fff as f32)
-}
 
 /// Raven `g_turret_G2.c:11-14` spawnflag `#define`s.
 const SPF_TURRETG2_CANRESPAWN: c_int = 4;
@@ -309,7 +301,7 @@ pub fn TurretG2Pain(
             && (*((*attacker).client as *mut gclient_t)).ps.weapon == WP_DEMP2 as c_int
         {
             (*self_).attackDebounceTime =
-                (*ctx.world).level.time + 2000 + (random_() * 500.0) as c_int;
+                (*ctx.world).level.time + 2000 + ((*ctx.world).bg_state.rng.random() * 500.0) as c_int;
             (*self_).painDebounceTime = (*self_).attackDebounceTime;
         }
         if (*self_).enemy.is_none() {
@@ -985,7 +977,7 @@ pub fn turretG2_base_think(
             }
         } else {
             // keep our enemy for a minimum of 2 seconds from now
-            (*self_).bounceCount = (*ctx.world).level.time + 2000 + (random_() * 150.0) as c_int;
+            (*self_).bounceCount = (*ctx.world).level.time + 2000 + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
         }
 
         turretG2_aim(ctx, self_);

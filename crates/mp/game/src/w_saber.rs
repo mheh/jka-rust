@@ -38,7 +38,6 @@ use mp_qshared::shared::CHAN_WEAPON;
 // (`DAMAGE_NO_KNOCKBACK`, `FL_NO_KNOCKBACK`). Per porting-rules the port
 // preserves the Raven spelling; their exact enum-qualification / module path is
 // resolved at integration (the mega-pass tree is not compiled per porter).
-use crate::bg_lib::rand;
 use crate::bg_pmove::{BG_InKnockDown, BG_KnockDownable};
 use crate::bg_saberLoad::WP_SaberBladeUseSecondBladeStyle;
 use crate::g_combat::{G_Damage, G_Knockdown};
@@ -107,10 +106,9 @@ pub fn RandFloat(
     min: f32,
     max: f32,
 ) -> f32 {
-    let _ = ctx;
     // Raven (linux path): `((rand() * (max - min)) / (float)RAND_MAX) + min`.
-    // The LCG lives behind the resolved `rand()` callee (fork ruling 3).
-    ((rand() as f32 * (max - min)) / RAND_MAX as f32) + min
+    // The LCG lives on `bg_state.rng` (fork ruling 15).
+    unsafe { (((*ctx.world).bg_state.rng.rand() as f32 * (max - min)) / RAND_MAX as f32) + min }
 }
 
 /// Raven `G_DebugBoxLines`.

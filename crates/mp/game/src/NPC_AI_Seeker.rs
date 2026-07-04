@@ -195,7 +195,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
         let mut dir: vec3_t = [0.0f32; 3];
         let mut tr: trace_t = core::mem::zeroed();
 
-        if crate::bg_lib::random() > 0.7f32 || (*NPC).enemy.is_none() || (*(*NPC).enemy).client.is_null() {
+        if (*ctx.world).bg_state.rng.random() > 0.7f32 || (*NPC).enemy.is_none() || (*(*NPC).enemy).client.is_null() {
             // Do a regular style strafe
             crate::q_math::AngleVectors(
                 (*(*NPC).client).renderInfo.eyeAngles,
@@ -206,7 +206,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
 
             // Pick a random strafe direction, then check to see if doing a strafe would be
             // reasonably valid
-            side = if (crate::bg_lib::rand() & 1) != 0 { -1 } else { 1 };
+            side = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 { -1 } else { 1 };
             // Inline VectorMA: end = origin + scalar * right
             for i in 0..3 {
                 end[i] = (*NPC).r.currentOrigin[i] + SEEKER_STRAFE_DIS * side as f32 * right[i];
@@ -236,7 +236,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
                 // Add a slight upward push
                 (*(*NPC).client).ps.velocity[2] += upPush;
 
-                (*NPCInfo).standTime = world.level.time + 1000 + (crate::bg_lib::random() * 500.0f32) as c_int;
+                (*NPCInfo).standTime = world.level.time + 1000 + ((*ctx.world).bg_state.rng.random() * 500.0f32) as c_int;
             }
         } else {
             let mut stDis: f32;
@@ -250,7 +250,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
             );
 
             // Pick a random side
-            side = if (crate::bg_lib::rand() & 1) != 0 { -1 } else { 1 };
+            side = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 { -1 } else { 1 };
             stDis = SEEKER_STRAFE_DIS;
             if (*(*NPC).client).NPC_class == CLASS_BOBAFETT {
                 stDis *= 2.0f32;
@@ -263,7 +263,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
             // then add a very small bit of random in front of/behind the player action
             // Inline VectorMA: end += crandom * 25 * dir
             for i in 0..3 {
-                end[i] += crate::q_math::crandom() * 25.0f32 * dir[i];
+                end[i] += (*ctx.world).bg_state.rng.crandom() * 25.0f32 * dir[i];
             }
 
             crate::trap::Trace(ctx.engine, &mut tr, (*NPC).r.currentOrigin, core::ptr::null(), core::ptr::null(), end, (*NPC).s.number, MASK_SOLID);
@@ -299,7 +299,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
                 // Add a slight upward push
                 (*(*NPC).client).ps.velocity[2] += upPush;
 
-                (*NPCInfo).standTime = world.level.time + 2500 + (crate::bg_lib::random() * 500.0f32) as c_int;
+                (*NPCInfo).standTime = world.level.time + 2500 + ((*ctx.world).bg_state.rng.random() * 500.0f32) as c_int;
             }
         }
     }
@@ -524,7 +524,7 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
 
         if !best.is_null() {
             // used to offset seekers around a circle so they don't occupy the same spot.  This is not a fool-proof method.
-            (*NPC).random = crate::bg_lib::random() * 6.3f32; // roughly 2pi
+            (*NPC).random = (*ctx.world).bg_state.rng.random() * 6.3f32; // roughly 2pi
 
             (*NPC).enemy = best;
         }
@@ -595,7 +595,7 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
         } else {
             if (*(*NPC).client).NPC_class != CLASS_BOBAFETT {
                 if crate::g_timer::TIMER_Done(ctx, NPC, c"seekerhiss".as_ptr()) != 0 {
-                    crate::g_timer::TIMER_Set(ctx, NPC, c"seekerhiss".as_ptr(), (1000 + crate::bg_lib::random() * 1000.0f32) as c_int);
+                    crate::g_timer::TIMER_Set(ctx, NPC, c"seekerhiss".as_ptr(), (1000 + (*ctx.world).bg_state.rng.random() * 1000.0f32) as c_int);
                     crate::g_utils::G_Sound(
                         ctx,
                         NPC,
@@ -653,7 +653,7 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
 
         if (*NPC).random == 0.0f32 {
             // used to offset seekers around a circle so they don't occupy the same spot.  This is not a fool-proof method.
-            (*NPC).random = crate::bg_lib::random() * 6.3f32; // roughly 2pi
+            (*NPC).random = (*ctx.world).bg_state.rng.random() * 6.3f32; // roughly 2pi
         }
 
         if !(*NPC).enemy.is_none() && (*(*NPC).enemy).health > 0 && (*(*NPC).enemy).inuse != 0 {

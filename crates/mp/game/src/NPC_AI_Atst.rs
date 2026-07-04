@@ -10,7 +10,6 @@
 
 use crate::prelude::*;
 use crate::NPC_reactions::NPC_Pain;
-use crate::bg_lib::rand;
 use crate::bg_misc::BG_FindItemForWeapon;
 use crate::g_items::RegisterItem;
 use crate::g_utils::{G_EffectIndex, G_SoundIndex, G_SoundOnEnt};
@@ -73,8 +72,8 @@ pub fn G_ATSTCheckPain(
     damage: c_int,
 ) {
     unsafe {
-        // SAFETY: self_ accessed through game context, rand() via bg-shared.
-        if rand() & 1 != 0 {
+        // SAFETY: self_ accessed through game context, rand() via bg_state.rng.
+        if (*ctx.world).bg_state.rng.rand() & 1 != 0 {
             G_SoundOnEnt(ctx, self_, CHAN_LESS_ATTEN, b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char);
         } else {
             G_SoundOnEnt(ctx, self_, CHAN_LESS_ATTEN, b"sound/chars/atst/atst_damaged2\0".as_ptr() as *const c_char);

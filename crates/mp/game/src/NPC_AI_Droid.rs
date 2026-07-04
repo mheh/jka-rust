@@ -11,7 +11,6 @@
 use crate::prelude::*;
 use crate::NPC_reactions::{NPC_GetPainChance, NPC_Pain};
 use crate::NPC_utils::NPC_SetSurfaceOnOff;
-use crate::bg_lib::rand;
 use crate::g_timer::TIMER_Set;
 use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_SoundIndex};
 use crate::npc_c::NPC_SetAnim;

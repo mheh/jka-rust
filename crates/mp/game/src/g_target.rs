@@ -137,7 +137,7 @@ pub fn Use_Target_Delay(
             return;
         }
         G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
-        (*ent).nextthink = ctx.world.level.time + ((*ent).wait + (*ent).random * crandom()) * 1000.0;
+        (*ent).nextthink = ctx.world.level.time + ((*ent).wait + (*ent).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0;
         (*ent).think = Some(EntThink::Think_Target_Delay);
         (*ent).activator = Some(ent_id(ctx.world.entities.as_mut_ptr(), activator));
     }

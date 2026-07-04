@@ -77,7 +77,7 @@ pub use crate::npc::ai_flags::*;
 pub use crate::npc::script_flags::*;
 pub use crate::npc::squad_state::*;
 pub use crate::q_math::{
-    crandom, random, vec3_origin, vectoangles, RadiusFromBounds, PITCH, ROLL, VEC3_ORIGIN, YAW,
+    vec3_origin, vectoangles, RadiusFromBounds, PITCH, ROLL, VEC3_ORIGIN, YAW,
 };
 pub use crate::w_force::mindTrickTime;
 pub use mp_qshared::shared::q_math_rand::RAND_MAX;
@@ -85,10 +85,6 @@ pub use mp_qshared::shared::q_math_rand::RAND_MAX;
 // (Raven copy-paste convention, porting-rules §F20); `NPC_AI_Mark2`'s copy is
 // the only one already `pub` and is the canonical export for bare-use sites.
 pub use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
-// `rand` exists (parked on the randSeed-storage escalation — see
-// `bg_lib.rs`); re-exported bare so callers resolve. `random()`/`crandom()`
-// are now ported: macro-based random distributions over `[0..1)` and `[-1..1)`.
-pub use crate::bg_lib::rand;
 pub use crate::saber::w_saber_consts::*;
 pub use crate::teams::npcteam::*;
 

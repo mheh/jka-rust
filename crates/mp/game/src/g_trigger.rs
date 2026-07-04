@@ -118,15 +118,6 @@ const EF_RAG: c_int = 1 << 6;
 // Source: oracle/oracle/codemp/game/g_trigger.c:1441
 const INITIAL_SUFFOCATION_DELAY: c_int = 500;
 
-// Raven `random()`/`crandom()` macros (`q_shared.h:1591-1592`) over the
-// resolved `rand()` bridge — same local recipe as `g_items.rs::crandom`.
-fn random_() -> f32 {
-    ((rand() & 0x7fff) as f32) / (0x7fff as f32)
-}
-fn crandom() -> f32 {
-    2.0 * (random_() - 0.5)
-}
-
 // C standard library `atoi` (same local recipe as `g_turret.rs`).
 extern "C" {
     fn atoi(s: *const c_char) -> c_int;
@@ -235,7 +226,7 @@ pub fn multi_trigger_run(
             if (*ent).painDebounceTime != (*ctx.world).level.time {
                 // first ent to touch it this frame
                 (*ent).nextthink = (*ctx.world).level.time
-                    + ((((*ent).wait + (*ent).random * crandom()) * 1000.0) as c_int);
+                    + ((((*ent).wait + (*ent).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0) as c_int);
                 (*ent).painDebounceTime = (*ctx.world).level.time;
             }
         } else if (*ent).wait < 0.0 {
@@ -749,7 +740,7 @@ pub fn trigger_cleared_fire(
         // cleared, so we must "wait" from this point
         if (*self_).wait > 0.0 {
             (*self_).nextthink = (*ctx.world).level.time
-                + (((*self_).wait + (*self_).random * crandom()) * 1000.0) as c_int;
+                + (((*self_).wait + (*self_).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0) as c_int;
         }
     }
 }
@@ -1983,7 +1974,7 @@ pub fn func_timer_think(
         G_UseTargets(ctx, self_, activator_ptr);
         // set time before next firing
         (*self_).nextthink = (*ctx.world).level.time
-            + (1000.0 * ((*self_).wait + crandom() * (*self_).random)) as c_int;
+            + (1000.0 * ((*self_).wait + (*ctx.world).bg_state.rng.crandom() * (*self_).random)) as c_int;
     }
 }
 

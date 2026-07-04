@@ -125,16 +125,6 @@ pub const FRAMETIME: c_int = 100;
 const TURRET_DEATH_DELAY: c_int = 2000;
 const TURRET_LIFETIME: c_int = 60000;
 
-/// Raven `random()`/`crandom()` macros (`q_shared.h:1591-1592`) over the
-/// resolved `rand()` bridge (fork-3 ruling: the faithful threaded LCG lands
-/// elsewhere; `rand()` is the currently-wired stand-in per the call surface).
-fn random_() -> f32 {
-    ((rand() & 0x7fff) as f32) / (0x7fff as f32)
-}
-fn crandom() -> f32 {
-    2.0 * (random_() - 0.5)
-}
-
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_adaptRespawn`
 // (cvar) and `level.numPlayingClients` — no world handle on the staged
 // raw-pointer signature.
@@ -830,7 +820,7 @@ pub fn pas_find_enemies(
                         G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()));
 
                         // Wind up turrets for a bit
-                        (*self_).attackDebounceTime = (*ctx.world).level.time + 900 + (random_() * 200.0) as c_int;
+                        (*self_).attackDebounceTime = (*ctx.world).level.time + 900 + ((*ctx.world).bg_state.rng.random() * 200.0) as c_int;
                     }
 
                     G_SetEnemy(ctx, self_, target);
@@ -890,7 +880,7 @@ pub fn pas_adjust_enemy(
             // shut-down sound
             G_Sound(ctx, ent, CHAN_BODY, G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()));
 
-            (*ent).bounceCount = (*ctx.world).level.time + 500 + (random_() * 150.0) as c_int;
+            (*ent).bounceCount = (*ctx.world).level.time + 500 + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
 
             // make turret play ping sound for 5 seconds
             (*ent).aimDebounceTime = (*ctx.world).level.time + 5000;
@@ -2660,7 +2650,7 @@ pub fn RespawnItem(
                 count += 1;
             }
 
-            let choice = rand() % count;
+            let choice = (*ctx.world).bg_state.rng.rand() % count;
 
             let mut i = 0;
             e = master;
@@ -2939,7 +2929,7 @@ pub fn Touch_Item(
 
         // random can be used to vary the respawn time
         if (*ent).random != 0.0 {
-            respawn += (crandom() * (*ent).random) as c_int;
+            respawn += ((*ctx.world).bg_state.rng.crandom() * (*ent).random) as c_int;
             if respawn < 1 {
                 respawn = 1;
             }
@@ -3021,7 +3011,7 @@ pub fn Drop_Item(
         velocity[0] *= 150.0;
         velocity[1] *= 150.0;
         velocity[2] *= 150.0;
-        velocity[2] += 200.0 + crandom() * 50.0;
+        velocity[2] += 200.0 + (*ctx.world).bg_state.rng.crandom() * 50.0;
 
         LaunchItem(ctx, item, (*ent).s.pos.trBase, velocity)
     }

@@ -211,7 +211,7 @@ pub fn ST_Speech(
         let world = &mut *ctx.world;
         // Raven's `random()` macro: `(rand() & 0x7fff) / (float)0x7fff`.
         // Source: `oracle/oracle/codemp/game/q_shared.h:1591`
-        let random_val = (rand() & 0x7fff) as f32 / 0x7fff as f32;
+        let random_val = world.bg_state.rng.random();
         if random_val < failChance {
             return;
         }
