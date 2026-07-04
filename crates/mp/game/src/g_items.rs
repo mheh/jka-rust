@@ -74,6 +74,22 @@ pub const ITMSF_ALLOWNPC: c_int = 4;
 pub const MAX_MEDPACK_HEAL_AMOUNT: c_int = 25;
 pub const MAX_MEDPACK_BIG_HEAL_AMOUNT: c_int = 50;
 
+// Raven `g_items.c:20-26` respawn-time-by-item-class `#define`s, consumed by
+// `adjustRespawnTime(float preRespawnTime, ...)` — hence `f32`, not `c_int`.
+// Source: `oracle/oracle/codemp/game/g_items.c:20-26`
+pub const RESPAWN_ARMOR: f32 = 20.0;
+pub const RESPAWN_TEAM_WEAPON: f32 = 30.0;
+pub const RESPAWN_HEALTH: f32 = 30.0;
+pub const RESPAWN_AMMO: f32 = 40.0;
+pub const RESPAWN_HOLDABLE: f32 = 60.0;
+pub const RESPAWN_MEGAHEALTH: f32 = 120.0;
+pub const RESPAWN_POWERUP: f32 = 120.0;
+
+// Raven `g_items.c:1274-1275` tossed-item timing `#define`s.
+// Source: `oracle/oracle/codemp/game/g_items.c:1274-1275`
+pub const TOSSED_ITEM_STAY_PERIOD: c_int = 20000;
+pub const TOSSED_ITEM_OWNER_NOTOUCH_DUR: c_int = 1000;
+
 // Raven `g_items.c:1333-1334` dispenser item classnames.
 // (referenced from `G_PrecacheDispensers`)
 
@@ -1544,8 +1560,53 @@ pub fn G_SpecialSpawnItem(
     ent: *mut gentity_t,
     item: *mut gitem_t,
 ) {
-    todo!("Port G_SpecialSpawnItem — parked: unported-global (bg_itemlist)")
+    unsafe {
+        RegisterItem(ctx, item);
+        (*ent).item = item;
+
+        // go away if no one wants me
+        (*ent).genericValue5 = (*ctx.world).level.time + TOSSED_ITEM_STAY_PERIOD;
+        (*ent).think = Some(EntThink::SpecialItemThink);
+        (*ent).nextthink = (*ctx.world).level.time + 50;
+        (*ent).clipmask = MASK_SOLID;
+
+        (*ent).physicsBounce = 0.50; // items are bouncy
+        (*ent).r.mins = [-8.0, -8.0, -0.0];
+        (*ent).r.maxs = [8.0, 8.0, 16.0];
+
+        (*ent).s.eType = ET_ITEM as c_int;
+        // store item number in modelindex
+        //TODO: Port bg_itemlist
+        // Source: oracle/oracle/codemp/game/g_items.c:1311 — `item - bg_itemlist`
+        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
+        // crate graph; see `bg_misc.rs`).
+        (*ent).s.modelindex = item.offset_from(bg_itemlist.as_ptr()) as c_int;
+
+        (*ent).r.contents = CONTENTS_TRIGGER;
+        (*ent).touch = Some(EntTouch::Touch_Item);
+
+        // can't touch owner for x seconds
+        (*ent).genericValue11 = (*ent).r.ownerNum;
+        (*ent).genericValue10 = (*ctx.world).level.time + TOSSED_ITEM_OWNER_NOTOUCH_DUR;
+
+        // so we know to remove when picked up, not respawn
+        (*ent).genericValue9 = 1;
+
+        // kind of a lame value to use, but oh well. This means don't
+        // pick up this item clientside with prediction, because we
+        // aren't sending over all the data necessary for the player
+        // to know if he can.
+        (*ent).s.brokenLimbs = 1;
+
+        // since it uses my server-only physics
+        (*ent).s.eFlags |= EF_CLIENTSMOOTH;
+    }
 }
+
+// PORT-ESCALATION(missing-const): `TOSSED_ITEM_STAY_PERIOD`/
+// `TOSSED_ITEM_OWNER_NOTOUCH_DUR` (`g_items.c` #defines) are not in this
+// packet's cited source slice/call surface — referenced above by name,
+// undefined here; reported as missing symbols rather than guessed.
 
 /// Raven `G_PrecacheDispensers`.
 ///
@@ -2472,8 +2533,23 @@ pub fn Pickup_Holdable(
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) -> c_int {
-    todo!("Port Pickup_Holdable — parked: unported-global (bg_itemlist)")
+    unsafe {
+        //TODO: Port bg_itemlist
+        // Source: oracle/oracle/codemp/game/g_items.c:2106 — `ent->item - bg_itemlist`
+        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
+        // crate graph; see `bg_misc.rs`).
+        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] = (*ent).item.offset_from(bg_itemlist.as_ptr()) as c_int;
+
+        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] |= 1 << (*(*ent).item).giTag;
+
+        G_LogWeaponItem(ctx, (*other).s.number, (*(*ent).item).giTag);
+
+        adjustRespawnTime(ctx, RESPAWN_HOLDABLE, (*(*ent).item).giType as c_int, (*(*ent).item).giTag)
+    }
 }
+
+// PORT-ESCALATION(missing-const): `RESPAWN_HOLDABLE` (`g_items.c` #define) is
+// not in this packet's cited source slice; referenced above, undefined here.
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the `ammoData`
 // table — no world handle.
@@ -2486,10 +2562,17 @@ pub fn Add_Ammo(
     weapon: c_int,
     count: c_int,
 ) {
-    // PORT-ESCALATION(unported-global): `ammoData[weapon]` needs the bg-owned
-    // `ammoData` table (not ported anywhere in the crate graph). Not
-    // decidable from this packet.
-    todo!("Port Add_Ammo — parked: unported-global (ammoData)")
+    unsafe {
+        //TODO: Port ammoData
+        // Source: oracle/oracle/codemp/game/g_items.c:2120-2126 — needs the
+        // bg-owned `ammoData` table (unported anywhere in the crate graph).
+        if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] < ammoData[weapon as usize].max {
+            (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] += count;
+            if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] > ammoData[weapon as usize].max {
+                (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] = ammoData[weapon as usize].max;
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
@@ -2549,11 +2632,50 @@ pub fn Pickup_Weapon(
     ent: *mut gentity_t,
     other: *mut gentity_t,
 ) -> c_int {
-    // PORT-ESCALATION(unported-global): `weaponData[...].ammoIndex` needs the
-    // bg-owned `weaponData` table (not ported anywhere in the crate graph).
-    // Not decidable from this packet.
-    todo!("Port Pickup_Weapon — parked: unported-global (weaponData)")
+    unsafe {
+        let mut quantity: c_int;
+
+        if (*ent).count < 0 {
+            quantity = 0; // None for you, sir!
+        } else {
+            quantity = if (*ent).count != 0 { (*ent).count } else { (*(*ent).item).quantity };
+
+            // dropped items and teamplay weapons always have full ammo
+            if ((*ent).flags & FL_DROPPED_ITEM) == 0 && (*ctx.world).cvars.g_gametype.integer != GT_TEAM {
+                // respawning rules
+
+                // New method:  If the player has less than half the minimum, give them the minimum, else add 1/2 the min.
+
+                // drop the quantity if the already have over the minimum
+                if ((*((*other).client as *mut gclient_t)).ps.ammo[(*(*ent).item).giTag as usize] as f32) < quantity as f32 * 0.5 {
+                    quantity -= (*((*other).client as *mut gclient_t)).ps.ammo[(*(*ent).item).giTag as usize];
+                } else {
+                    quantity = (quantity as f32 * 0.5) as c_int; // only add half the value.
+                }
+            }
+        }
+
+        // add the weapon
+        (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |= 1 << (*(*ent).item).giTag;
+
+        //TODO: Port weaponData
+        // Source: oracle/oracle/codemp/game/g_items.c:2221 — needs the
+        // bg-owned `weaponData` table (unported anywhere in the crate graph).
+        Add_Ammo(ctx, other, weaponData[(*(*ent).item).giTag as usize].ammoIndex, quantity);
+
+        G_LogWeaponPickup(ctx, (*other).s.number, (*(*ent).item).giTag);
+
+        // team deathmatch has slow weapon respawns
+        if (*ctx.world).cvars.g_gametype.integer == GT_TEAM {
+            return adjustRespawnTime(ctx, RESPAWN_TEAM_WEAPON, (*(*ent).item).giType as c_int, (*(*ent).item).giTag);
+        }
+
+        adjustRespawnTime(ctx, (*ctx.world).cvars.g_weaponRespawn.integer as f32, (*(*ent).item).giType as c_int, (*(*ent).item).giTag)
+    }
 }
+
+// PORT-ESCALATION(missing-const): `RESPAWN_TEAM_WEAPON` (`g_items.c` #define)
+// is not in this packet's cited source slice; referenced above, undefined here.
 
 /// Raven `Pickup_Health`.
 ///
@@ -2986,8 +3108,82 @@ pub fn LaunchItem(
     origin: vec3_t,
     velocity: vec3_t,
 ) -> *mut gentity_t {
-    todo!("Port LaunchItem — parked: unported-global (bg_itemlist)")
+    unsafe {
+        let dropped = G_Spawn(ctx);
+
+        (*dropped).s.eType = ET_ITEM as c_int;
+        //TODO: Port bg_itemlist
+        // Source: oracle/oracle/codemp/game/g_items.c:2664 — `item - bg_itemlist`
+        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
+        // crate graph; see `bg_misc.rs`).
+        (*dropped).s.modelindex = item.offset_from(bg_itemlist.as_ptr()) as c_int; // store item number in modelindex
+        if (*dropped).s.modelindex < 0 {
+            (*dropped).s.modelindex = 0;
+        }
+        (*dropped).s.modelindex2 = 1; // This is non-zero is it's a dropped item
+
+        (*dropped).classname = (*item).classname;
+        (*dropped).item = item;
+        (*dropped).r.mins = [-ITEM_RADIUS, -ITEM_RADIUS, -ITEM_RADIUS];
+        (*dropped).r.maxs = [ITEM_RADIUS, ITEM_RADIUS, ITEM_RADIUS];
+
+        (*dropped).r.contents = CONTENTS_TRIGGER;
+
+        (*dropped).touch = Some(EntTouch::Touch_Item);
+
+        G_SetOrigin(dropped, origin);
+        (*dropped).s.pos.trType = trType_t::TR_GRAVITY;
+        (*dropped).s.pos.trTime = (*ctx.world).level.time;
+        (*dropped).s.pos.trDelta = velocity;
+
+        (*dropped).flags |= FL_BOUNCE_HALF;
+        if ((*ctx.world).cvars.g_gametype.integer == GT_CTF || (*ctx.world).cvars.g_gametype.integer == GT_CTY) && (*item).giType == IT_TEAM {
+            // Special case for CTF flags
+            (*dropped).think = Some(EntThink::Team_DroppedFlagThink);
+            (*dropped).nextthink = (*ctx.world).level.time + 30000;
+            Team_CheckDroppedItem(ctx, dropped);
+
+            // rww - so bots know
+            let classname = core::ffi::CStr::from_ptr((*dropped).classname);
+            if classname.to_bytes() == b"team_CTF_redflag" {
+                (*ctx.world).globals.droppedRedFlag = dropped;
+            } else if classname.to_bytes() == b"team_CTF_blueflag" {
+                (*ctx.world).globals.droppedBlueFlag = dropped;
+            }
+        } else {
+            // auto-remove after 30 seconds
+            (*dropped).think = Some(EntThink::G_FreeEntity);
+            (*dropped).nextthink = (*ctx.world).level.time + 30000;
+        }
+
+        (*dropped).flags = FL_DROPPED_ITEM;
+
+        if (*item).giType == IT_WEAPON || (*item).giType == IT_POWERUP {
+            (*dropped).s.eFlags |= EF_DROPPEDWEAPON;
+        }
+
+        vectoangles(velocity, &mut (*dropped).s.angles);
+        (*dropped).s.angles[PITCH] = 0.0;
+
+        if (*item).giTag == WP_TRIP_MINE as c_int || (*item).giTag == WP_DET_PACK as c_int {
+            (*dropped).s.angles[PITCH] = -90.0;
+        }
+
+        if (*item).giTag != WP_BOWCASTER as c_int && (*item).giTag != WP_DET_PACK as c_int && (*item).giTag != WP_THERMAL as c_int {
+            (*dropped).s.angles[ROLL] = -90.0;
+        }
+
+        (*dropped).physicsObject = qtrue;
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(dropped));
+
+        dropped
+    }
 }
+
+// PORT-ESCALATION(missing-const): `EF_DROPPEDWEAPON`/`FL_BOUNCE_HALF`
+// (`bg_public.h`/`g_local.h` #defines) are not in this packet's cited source
+// slice; referenced above, undefined here.
 
 // PORT-ESCALATION(vec3-outparam-seam): resolved `AngleVectors` takes
 // `vec3_t` by value, so its `forward`/`right` out-params (used to compute
@@ -3039,7 +3235,139 @@ pub fn FinishSpawningItem(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port FinishSpawningItem — parked: unported-global (bg_itemlist)")
+    unsafe {
+        if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
+            // in siege remove all powerups
+            if (*(*ent).item).giType == IT_POWERUP {
+                G_FreeEntity(ctx, ent);
+                return;
+            }
+        }
+
+        if (*ctx.world).cvars.g_gametype.integer != GT_JEDIMASTER {
+            if HasSetSaberOnly(ctx) != 0 {
+                if (*(*ent).item).giType == IT_AMMO {
+                    G_FreeEntity(ctx, ent);
+                    return;
+                }
+
+                if (*(*ent).item).giType == IT_HOLDABLE {
+                    if (*(*ent).item).giTag == HI_SEEKER as c_int || (*(*ent).item).giTag == HI_SHIELD as c_int || (*(*ent).item).giTag == HI_SENTRY_GUN as c_int {
+                        G_FreeEntity(ctx, ent);
+                        return;
+                    }
+                }
+            }
+        } else {
+            // no powerups in jedi master
+            if (*(*ent).item).giType == IT_POWERUP {
+                G_FreeEntity(ctx, ent);
+                return;
+            }
+        }
+
+        if (*ctx.world).cvars.g_gametype.integer == GT_HOLOCRON {
+            if (*(*ent).item).giType == IT_POWERUP {
+                if (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int {
+                    G_FreeEntity(ctx, ent);
+                    return;
+                }
+            }
+        }
+
+        if (*ctx.world).cvars.g_forcePowerDisable.integer != 0 {
+            // if force powers disabled, don't add force powerups
+            if (*(*ent).item).giType == IT_POWERUP {
+                if (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int || (*(*ent).item).giTag == PW_FORCE_BOON as c_int {
+                    G_FreeEntity(ctx, ent);
+                    return;
+                }
+            }
+        }
+
+        if (*ctx.world).cvars.g_gametype.integer == GT_DUEL || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL {
+            if (*(*ent).item).giType == IT_ARMOR
+                || (*(*ent).item).giType == IT_HEALTH
+                || ((*(*ent).item).giType == IT_HOLDABLE && ((*(*ent).item).giTag == HI_MEDPAC as c_int || (*(*ent).item).giTag == HI_MEDPAC_BIG as c_int))
+            {
+                G_FreeEntity(ctx, ent);
+                return;
+            }
+        }
+
+        if (*ctx.world).cvars.g_gametype.integer != GT_CTF && (*ctx.world).cvars.g_gametype.integer != GT_CTY && (*(*ent).item).giType == IT_TEAM {
+            let mut killMe = false;
+
+            match (*(*ent).item).giTag {
+                x if x == PW_REDFLAG as c_int => killMe = true,
+                x if x == PW_BLUEFLAG as c_int => killMe = true,
+                x if x == PW_NEUTRALFLAG as c_int => killMe = true,
+                _ => {}
+            }
+
+            if killMe {
+                G_FreeEntity(ctx, ent);
+                return;
+            }
+        }
+
+        (*ent).r.mins = [-8.0, -8.0, -0.0];
+        (*ent).r.maxs = [8.0, 8.0, 16.0];
+
+        (*ent).s.eType = ET_ITEM as c_int;
+        //TODO: Port bg_itemlist
+        // Source: oracle/oracle/codemp/game/g_items.c:2897 — `ent->item - bg_itemlist`
+        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
+        // crate graph; see `bg_misc.rs`).
+        (*ent).s.modelindex = (*ent).item.offset_from(bg_itemlist.as_ptr()) as c_int; // store item number in modelindex
+        (*ent).s.modelindex2 = 0; // zero indicates this isn't a dropped item
+
+        (*ent).r.contents = CONTENTS_TRIGGER;
+        (*ent).touch = Some(EntTouch::Touch_Item);
+        // useing an item causes it to respawn
+        (*ent).use_ = Some(EntUse::Use_Item);
+
+        if ((*ent).spawnflags & ITMSF_SUSPEND) != 0 {
+            // suspended
+            G_SetOrigin(ent, (*ent).s.origin);
+        } else {
+            // drop to floor
+
+            // if it is directly even with the floor it will return startsolid, so raise up by 0.1
+            // and temporarily subtract 0.1 from the z maxs so that going up doesn't push into the ceiling
+            (*ent).s.origin[2] += 0.1;
+            (*ent).r.maxs[2] -= 0.1;
+
+            let dest: vec3_t = [(*ent).s.origin[0], (*ent).s.origin[1], (*ent).s.origin[2] - 4096.0];
+            let mut tr: trace_t = core::mem::zeroed();
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(&mut tr as *mut trace_t, &(*ent).s.origin as *const vec3_t, &(*ent).r.mins as *const vec3_t, &(*ent).r.maxs as *const vec3_t, &dest as *const vec3_t, (*ent).s.number, MASK_SOLID),
+            );
+            if tr.startsolid != 0 {
+                G_Printf(ctx, c"FinishSpawningItem: %s startsolid at %s\n".as_ptr());
+                G_FreeEntity(ctx, ent);
+                return;
+            }
+
+            // add the 0.1 back after the trace
+            (*ent).r.maxs[2] += 0.1;
+
+            // allow to ride movers
+            (*ent).s.groundEntityNum = tr.entityNum as c_int;
+
+            G_SetOrigin(ent, tr.endpos);
+        }
+
+        // team slaves and targeted items aren't present at start
+        if ((*ent).flags & FL_TEAMSLAVE) != 0 || !(*ent).targetname.is_null() {
+            (*ent).s.eFlags |= EF_NODRAW;
+            (*ent).r.contents = 0;
+            return;
+        }
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
@@ -3048,7 +3376,26 @@ pub fn FinishSpawningItem(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2973-2991`
 pub fn G_CheckTeamItems(ctx: GameContext<'_>) {
-    todo!("Port G_CheckTeamItems — parked: unported-global (bg_itemlist)")
+    unsafe {
+        // Set up team stuff
+        Team_InitGame(ctx);
+
+        if (*ctx.world).cvars.g_gametype.integer == GT_CTF || (*ctx.world).cvars.g_gametype.integer == GT_CTY {
+            // check for the two flags
+            let mut item = BG_FindItem(c"team_CTF_redflag".as_ptr());
+            //TODO: Port bg_itemlist
+            // Source: oracle/oracle/codemp/game/g_items.c:2983 — `item - bg_itemlist`
+            // needs the bg-owned `bg_itemlist` table (unported anywhere in the
+            // crate graph; see `bg_misc.rs`).
+            if item.is_null() || (*ctx.world).globals.itemRegistered.0[item.offset_from(bg_itemlist.as_ptr()) as usize] == 0 {
+                G_Printf(ctx, c"WARNING: No team_CTF_redflag in map".as_ptr());
+            }
+            item = BG_FindItem(c"team_CTF_blueflag".as_ptr());
+            if item.is_null() || (*ctx.world).globals.itemRegistered.0[item.offset_from(bg_itemlist.as_ptr()) as usize] == 0 {
+                G_Printf(ctx, c"WARNING: No team_CTF_blueflag in map".as_ptr());
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
@@ -3084,7 +3431,16 @@ pub fn RegisterItem(
     ctx: GameContext<'_>,
     item: *mut gitem_t,
 ) {
-    todo!("Port RegisterItem — parked: unported-global (bg_itemlist)")
+    unsafe {
+        if item.is_null() {
+            G_Error(ctx, c"RegisterItem: NULL".as_ptr());
+        }
+        //TODO: Port bg_itemlist
+        // Source: oracle/oracle/codemp/game/g_items.c:3024 — `item - bg_itemlist`
+        // needs the bg-owned `bg_itemlist` table (unported anywhere in the
+        // crate graph; see `bg_misc.rs`).
+        (*ctx.world).globals.itemRegistered.0[item.offset_from(bg_itemlist.as_ptr()) as usize] = qtrue;
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
@@ -3094,10 +3450,26 @@ pub fn RegisterItem(
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3036-3054`
 pub fn SaveRegisteredItems(ctx: GameContext<'_>) {
-    // PORT-ESCALATION(unported-global): `bg_numItems` (bg-owned item-table
-    // count) is not ported anywhere in the crate graph. Not decidable from
-    // this packet.
-    todo!("Port SaveRegisteredItems — parked: unported-global (bg_numItems)")
+    unsafe {
+        //TODO: Port bg_numItems
+        // Source: oracle/oracle/codemp/game/g_items.c:3042 — bg-owned
+        // item-table count, not ported anywhere in the crate graph.
+        let mut string: Vec<c_char> = vec![0; crate::game_globals::MAX_ITEMS + 1];
+        let mut count = 0;
+        for i in 0..bg_numItems {
+            if (*ctx.world).globals.itemRegistered.0[i as usize] != 0 {
+                count += 1;
+                string[i as usize] = b'1' as c_char;
+            } else {
+                string[i as usize] = b'0' as c_char;
+            }
+        }
+        string[bg_numItems as usize] = 0;
+
+        //	G_Printf( "%i items registered\n", count );
+        let s = core::ffi::CStr::from_ptr(string.as_ptr()).to_owned();
+        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_ITEMS, s));
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls

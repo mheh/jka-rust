@@ -8,6 +8,7 @@ pub mod animation;
 pub mod animevent;
 pub mod bg_entity;
 pub mod bg_field;
+pub mod bg_itemlist;
 pub mod bg_loaded_anim;
 pub mod bg_loaded_events;
 pub mod broken_limb;
@@ -49,6 +50,7 @@ pub mod team;
 pub mod teamtask;
 pub mod weaponstate;
 
+pub use bg_itemlist::{bg_itemlist, bg_numItems};
 pub use jump_velocity::JUMP_VELOCITY;
 pub use spawn::{MAX_SPAWN_VARS, MAX_SPAWN_VARS_CHARS};
 pub use team::{team_t, TEAM_BLUE, TEAM_FREE, TEAM_NUM_TEAMS, TEAM_RED, TEAM_SPECTATOR};

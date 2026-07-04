@@ -30,6 +30,144 @@ use crate::q_shared::Q_stricmp;
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:17`
 pub const SIEGECHAR_TAB: c_char = 9;
 
+/// Raven `bgSiegeClassFlagNames` — siege class flag name/id table
+/// (`ENUM2STRING`-built).
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.c:45-56`
+pub static bgSiegeClassFlagNames: [stringID_table_t; 9] = [
+    stringID_table_t { name: c"CFL_MORESABERDMG".as_ptr() as *mut c_char, id: CFL_MORESABERDMG as c_int },
+    stringID_table_t { name: c"CFL_STRONGAGAINSTPHYSICAL".as_ptr() as *mut c_char, id: CFL_STRONGAGAINSTPHYSICAL as c_int },
+    stringID_table_t { name: c"CFL_FASTFORCEREGEN".as_ptr() as *mut c_char, id: CFL_FASTFORCEREGEN as c_int },
+    stringID_table_t { name: c"CFL_STATVIEWER".as_ptr() as *mut c_char, id: CFL_STATVIEWER as c_int },
+    stringID_table_t { name: c"CFL_HEAVYMELEE".as_ptr() as *mut c_char, id: CFL_HEAVYMELEE as c_int },
+    stringID_table_t { name: c"CFL_SINGLE_ROCKET".as_ptr() as *mut c_char, id: CFL_SINGLE_ROCKET as c_int },
+    stringID_table_t { name: c"CFL_CUSTOMSKEL".as_ptr() as *mut c_char, id: CFL_CUSTOMSKEL as c_int },
+    stringID_table_t { name: c"CFL_EXTRA_AMMO".as_ptr() as *mut c_char, id: CFL_EXTRA_AMMO as c_int },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+];
+
+/// Raven `StanceTable` — saber stance name/id table.
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.c:59-69`
+pub static StanceTable: [stringID_table_t; 9] = [
+    stringID_table_t { name: c"SS_NONE".as_ptr() as *mut c_char, id: SS_NONE as c_int },
+    stringID_table_t { name: c"SS_FAST".as_ptr() as *mut c_char, id: SS_FAST as c_int },
+    stringID_table_t { name: c"SS_MEDIUM".as_ptr() as *mut c_char, id: SS_MEDIUM as c_int },
+    stringID_table_t { name: c"SS_STRONG".as_ptr() as *mut c_char, id: SS_STRONG as c_int },
+    stringID_table_t { name: c"SS_DESANN".as_ptr() as *mut c_char, id: SS_DESANN as c_int },
+    stringID_table_t { name: c"SS_TAVION".as_ptr() as *mut c_char, id: SS_TAVION as c_int },
+    stringID_table_t { name: c"SS_DUAL".as_ptr() as *mut c_char, id: SS_DUAL as c_int },
+    stringID_table_t { name: c"SS_STAFF".as_ptr() as *mut c_char, id: SS_STAFF as c_int },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: 0 },
+];
+
+/// Raven `WPTable` — weapon name/id table (also used by NPC parsing).
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.c:72-97`
+pub static WPTable: [stringID_table_t; 21] = [
+    stringID_table_t { name: c"NULL".as_ptr() as *mut c_char, id: WP_NONE },
+    stringID_table_t { name: c"WP_NONE".as_ptr() as *mut c_char, id: WP_NONE },
+    stringID_table_t { name: c"WP_STUN_BATON".as_ptr() as *mut c_char, id: WP_STUN_BATON },
+    stringID_table_t { name: c"WP_MELEE".as_ptr() as *mut c_char, id: WP_MELEE },
+    stringID_table_t { name: c"WP_SABER".as_ptr() as *mut c_char, id: WP_SABER },
+    stringID_table_t { name: c"WP_BRYAR_PISTOL".as_ptr() as *mut c_char, id: WP_BRYAR_PISTOL },
+    stringID_table_t { name: c"WP_BLASTER_PISTOL".as_ptr() as *mut c_char, id: WP_BRYAR_PISTOL },
+    stringID_table_t { name: c"WP_BLASTER".as_ptr() as *mut c_char, id: WP_BLASTER },
+    stringID_table_t { name: c"WP_DISRUPTOR".as_ptr() as *mut c_char, id: WP_DISRUPTOR },
+    stringID_table_t { name: c"WP_BOWCASTER".as_ptr() as *mut c_char, id: WP_BOWCASTER },
+    stringID_table_t { name: c"WP_REPEATER".as_ptr() as *mut c_char, id: WP_REPEATER },
+    stringID_table_t { name: c"WP_DEMP2".as_ptr() as *mut c_char, id: WP_DEMP2 },
+    stringID_table_t { name: c"WP_FLECHETTE".as_ptr() as *mut c_char, id: WP_FLECHETTE },
+    stringID_table_t { name: c"WP_ROCKET_LAUNCHER".as_ptr() as *mut c_char, id: WP_ROCKET_LAUNCHER },
+    stringID_table_t { name: c"WP_THERMAL".as_ptr() as *mut c_char, id: WP_THERMAL },
+    stringID_table_t { name: c"WP_TRIP_MINE".as_ptr() as *mut c_char, id: WP_TRIP_MINE },
+    stringID_table_t { name: c"WP_DET_PACK".as_ptr() as *mut c_char, id: WP_DET_PACK },
+    stringID_table_t { name: c"WP_CONCUSSION".as_ptr() as *mut c_char, id: WP_CONCUSSION },
+    stringID_table_t { name: c"WP_BRYAR_OLD".as_ptr() as *mut c_char, id: WP_BRYAR_OLD },
+    stringID_table_t { name: c"WP_EMPLACED_GUN".as_ptr() as *mut c_char, id: WP_EMPLACED_GUN },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: 0 },
+];
+
+/// Raven `FPTable` — force-power name/id table.
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.c:100-121`
+pub static FPTable: [stringID_table_t; 19] = [
+    stringID_table_t { name: c"FP_HEAL".as_ptr() as *mut c_char, id: FP_HEAL },
+    stringID_table_t { name: c"FP_LEVITATION".as_ptr() as *mut c_char, id: FP_LEVITATION },
+    stringID_table_t { name: c"FP_SPEED".as_ptr() as *mut c_char, id: FP_SPEED },
+    stringID_table_t { name: c"FP_PUSH".as_ptr() as *mut c_char, id: FP_PUSH },
+    stringID_table_t { name: c"FP_PULL".as_ptr() as *mut c_char, id: FP_PULL },
+    stringID_table_t { name: c"FP_TELEPATHY".as_ptr() as *mut c_char, id: FP_TELEPATHY },
+    stringID_table_t { name: c"FP_GRIP".as_ptr() as *mut c_char, id: FP_GRIP },
+    stringID_table_t { name: c"FP_LIGHTNING".as_ptr() as *mut c_char, id: FP_LIGHTNING },
+    stringID_table_t { name: c"FP_RAGE".as_ptr() as *mut c_char, id: FP_RAGE },
+    stringID_table_t { name: c"FP_PROTECT".as_ptr() as *mut c_char, id: FP_PROTECT },
+    stringID_table_t { name: c"FP_ABSORB".as_ptr() as *mut c_char, id: FP_ABSORB },
+    stringID_table_t { name: c"FP_TEAM_HEAL".as_ptr() as *mut c_char, id: FP_TEAM_HEAL },
+    stringID_table_t { name: c"FP_TEAM_FORCE".as_ptr() as *mut c_char, id: FP_TEAM_FORCE },
+    stringID_table_t { name: c"FP_DRAIN".as_ptr() as *mut c_char, id: FP_DRAIN },
+    stringID_table_t { name: c"FP_SEE".as_ptr() as *mut c_char, id: FP_SEE },
+    stringID_table_t { name: c"FP_SABER_OFFENSE".as_ptr() as *mut c_char, id: FP_SABER_OFFENSE },
+    stringID_table_t { name: c"FP_SABER_DEFENSE".as_ptr() as *mut c_char, id: FP_SABER_DEFENSE },
+    stringID_table_t { name: c"FP_SABERTHROW".as_ptr() as *mut c_char, id: FP_SABERTHROW },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+];
+
+/// Raven `HoldableTable` — holdable item name/id table.
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.c:123-138`
+pub static HoldableTable: [stringID_table_t; 13] = [
+    stringID_table_t { name: c"HI_NONE".as_ptr() as *mut c_char, id: HI_NONE },
+    stringID_table_t { name: c"HI_SEEKER".as_ptr() as *mut c_char, id: HI_SEEKER },
+    stringID_table_t { name: c"HI_SHIELD".as_ptr() as *mut c_char, id: HI_SHIELD },
+    stringID_table_t { name: c"HI_MEDPAC".as_ptr() as *mut c_char, id: HI_MEDPAC },
+    stringID_table_t { name: c"HI_MEDPAC_BIG".as_ptr() as *mut c_char, id: HI_MEDPAC_BIG },
+    stringID_table_t { name: c"HI_BINOCULARS".as_ptr() as *mut c_char, id: HI_BINOCULARS },
+    stringID_table_t { name: c"HI_SENTRY_GUN".as_ptr() as *mut c_char, id: HI_SENTRY_GUN },
+    stringID_table_t { name: c"HI_JETPACK".as_ptr() as *mut c_char, id: HI_JETPACK },
+    stringID_table_t { name: c"HI_HEALTHDISP".as_ptr() as *mut c_char, id: HI_HEALTHDISP },
+    stringID_table_t { name: c"HI_AMMODISP".as_ptr() as *mut c_char, id: HI_AMMODISP },
+    stringID_table_t { name: c"HI_EWEB".as_ptr() as *mut c_char, id: HI_EWEB },
+    stringID_table_t { name: c"HI_CLOAK".as_ptr() as *mut c_char, id: HI_CLOAK },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+];
+
+/// Raven `PowerupTable` — powerup name/id table.
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.c:142-161`
+pub static PowerupTable: [stringID_table_t; 17] = [
+    stringID_table_t { name: c"PW_NONE".as_ptr() as *mut c_char, id: PW_NONE },
+    stringID_table_t { name: c"PW_QUAD".as_ptr() as *mut c_char, id: PW_QUAD },
+    stringID_table_t { name: c"PW_BATTLESUIT".as_ptr() as *mut c_char, id: PW_BATTLESUIT },
+    stringID_table_t { name: c"PW_PULL".as_ptr() as *mut c_char, id: PW_PULL },
+    stringID_table_t { name: c"PW_REDFLAG".as_ptr() as *mut c_char, id: PW_REDFLAG },
+    stringID_table_t { name: c"PW_BLUEFLAG".as_ptr() as *mut c_char, id: PW_BLUEFLAG },
+    stringID_table_t { name: c"PW_NEUTRALFLAG".as_ptr() as *mut c_char, id: PW_NEUTRALFLAG },
+    stringID_table_t { name: c"PW_SHIELDHIT".as_ptr() as *mut c_char, id: PW_SHIELDHIT },
+    stringID_table_t { name: c"PW_SPEEDBURST".as_ptr() as *mut c_char, id: PW_SPEEDBURST },
+    stringID_table_t { name: c"PW_DISINT_4".as_ptr() as *mut c_char, id: PW_DISINT_4 },
+    stringID_table_t { name: c"PW_SPEED".as_ptr() as *mut c_char, id: PW_SPEED },
+    stringID_table_t { name: c"PW_CLOAKED".as_ptr() as *mut c_char, id: PW_CLOAKED },
+    stringID_table_t { name: c"PW_FORCE_ENLIGHTENED_LIGHT".as_ptr() as *mut c_char, id: PW_FORCE_ENLIGHTENED_LIGHT },
+    stringID_table_t { name: c"PW_FORCE_ENLIGHTENED_DARK".as_ptr() as *mut c_char, id: PW_FORCE_ENLIGHTENED_DARK },
+    stringID_table_t { name: c"PW_FORCE_BOON".as_ptr() as *mut c_char, id: PW_FORCE_BOON },
+    stringID_table_t { name: c"PW_YSALAMIRI".as_ptr() as *mut c_char, id: PW_YSALAMIRI },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+];
+
+/// Raven `classTitles` — Raven icon suffix strings for player-class detection,
+/// indexed by `siegePlayerClassFlags_t`.
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.c:748-756`
+pub static classTitles: [&core::ffi::CStr; SPC_MAX as usize] = [
+    c"infantry",       // SPC_INFANTRY
+    c"vanguard",       // SPC_VANGUARD
+    c"support",        // SPC_SUPPORT
+    c"jedi_general",   // SPC_JEDI
+    c"demolitionist",  // SPC_DEMOLITIONIST
+    c"heavy_weapons",  // SPC_HEAVY_WEAPONS
+];
+
 /// Raven `BG_SiegeStripTabs`.
 ///
 /// Raven: converts tabs to spaces in place (the compacting index `i_r` always
@@ -459,12 +597,104 @@ pub fn BG_SiegeGetPairedValue(buf: *mut c_char, key: *mut c_char, outbuf: *mut c
 /// Raven `BG_SiegeTranslateForcePowers`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:571-682`
-// PORT-ESCALATION(bg-dep): faithful body needs `FPTable` (bg_saga.c file-scope
-// const table, ENUM2STRING-built from force-power enum names) which is not a
-// resolved out-of-file symbol in this packet and NUM_FORCE_POWERS/FORCE_LEVEL_*
-// consts are not in the prelude; parking rather than guessing the table shape.
 pub fn BG_SiegeTranslateForcePowers(buf: *mut c_char, siegeClass: *mut siegeClass_t) {
-    todo!("Port BG_SiegeTranslateForcePowers — parked: bg-dep")
+    unsafe {
+        let mut check_power = [0 as c_char; 1024];
+        let mut check_level = [0 as c_char; 256];
+        let mut l: isize = 0;
+        let mut k: isize = 0;
+        let mut j: isize = 0;
+        let mut i: isize = 0;
+        let mut parsed_level: c_int = 0;
+        let mut all_powers: bool = false;
+        let mut no_powers: bool = false;
+
+        if Q_stricmp(buf, c"FP_ALL".as_ptr()) == 0 {
+            all_powers = true;
+        }
+
+        if *buf.offset(0) == b'0' as c_char && *buf.offset(1) == 0 {
+            no_powers = true;
+        }
+
+        while i < NUM_FORCE_POWERS as isize {
+            if all_powers {
+                (*siegeClass).forcePowerLevels[i as usize] = FORCE_LEVEL_3;
+            } else {
+                (*siegeClass).forcePowerLevels[i as usize] = 0;
+            }
+            i += 1;
+        }
+
+        if all_powers || no_powers {
+            return;
+        }
+
+        i = 0;
+        while *buf.offset(i) != 0 {
+            if *buf.offset(i) != b' ' as c_char && *buf.offset(i) != b'|' as c_char {
+                j = 0;
+
+                while *buf.offset(i) != 0
+                    && *buf.offset(i) != b' ' as c_char
+                    && *buf.offset(i) != b'|' as c_char
+                    && *buf.offset(i) != b',' as c_char
+                {
+                    check_power[j as usize] = *buf.offset(i);
+                    j += 1;
+                    i += 1;
+                }
+                check_power[j as usize] = 0;
+
+                if *buf.offset(i) == b',' as c_char {
+                    i += 1;
+                    l = 0;
+                    while *buf.offset(i) != 0
+                        && *buf.offset(i) != b' ' as c_char
+                        && *buf.offset(i) != b'|' as c_char
+                    {
+                        check_level[l as usize] = *buf.offset(i);
+                        l += 1;
+                        i += 1;
+                    }
+                    check_level[l as usize] = 0;
+                    parsed_level = atoi(check_level.as_ptr());
+
+                    if parsed_level < 0 {
+                        parsed_level = 0;
+                    }
+                    if parsed_level > FORCE_LEVEL_5 {
+                        parsed_level = FORCE_LEVEL_5;
+                    }
+                } else {
+                    parsed_level = 3;
+                }
+
+                if check_power[0] != 0 {
+                    k = 0;
+
+                    if Q_stricmp(check_power.as_ptr(), c"FP_JUMP".as_ptr()) == 0 {
+                        strcpy(check_power.as_mut_ptr(), c"FP_LEVITATION".as_ptr());
+                    }
+
+                    while FPTable[k as usize].id != -1 && !FPTable[k as usize].name.is_null()
+                        && *FPTable[k as usize].name as u8 != 0
+                    {
+                        if Q_stricmp(check_power.as_ptr(), FPTable[k as usize].name) == 0 {
+                            (*siegeClass).forcePowerLevels[k as usize] = parsed_level;
+                            break;
+                        }
+                        k += 1;
+                    }
+                }
+            }
+
+            if *buf.offset(i) == 0 {
+                break;
+            }
+            i += 1;
+        }
+    }
 }
 
 /// Raven `BG_SiegeTranslateGenericTable`.
@@ -542,44 +772,269 @@ pub fn BG_SiegeTranslateGenericTable(
 /// Raven `BG_SiegeParseClassFile`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:759-1068`
-// PORT-ESCALATION(state-threading): reads/writes the module-scope
-// `bgSiegeClasses[bgNumSiegeClasses]`/`bgNumSiegeClasses` state (GameWorld
-// fields per fork-ruling 1) and calls the engine-bearing FS_* trap seam, but
-// the faithful signature (`filename`, `descBuffer`) carries no
-// `GameContext`/`world`/`engine` channel — same systemic gap as g_active.c.
-pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeClassDesc_t) {
-    todo!("Port BG_SiegeParseClassFile — parked: state-threading")
+pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeClassDesc_t, bg: &mut BgState, traps: &dyn BgTraps) {
+    unsafe {
+        let mut f: fileHandle_t = 0;
+        let mut len: c_int;
+        let mut i: isize = 0;
+        let mut class_info = [0 as c_char; 4096];
+        let mut parse_buf = [0 as c_char; 4096];
+
+        len = traps.fs_fopen(filename, &mut f, FS_READ);
+
+        if f == 0 || len >= 4096 {
+            return;
+        }
+
+        traps.fs_read(class_info.as_mut_ptr(), len, f);
+        traps.fs_fclose(f);
+        class_info[len as usize] = 0;
+
+        if !descBuffer.is_null() {
+            if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"description".as_ptr() as *mut c_char, descBuffer.as_mut().unwrap().desc.as_mut_ptr()) == 0 {
+                strcpy((*descBuffer).desc.as_mut_ptr(), c"DESCRIPTION UNAVAILABLE".as_ptr());
+            }
+            assert!(strlen((*descBuffer).desc.as_ptr()) < SIEGE_CLASS_DESC_LEN as usize);
+        }
+
+        BG_SiegeGetValueGroup(class_info.as_mut_ptr(), c"ClassInfo".as_ptr() as *mut c_char, class_info.as_mut_ptr());
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"name".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].name.as_mut_ptr(), parse_buf.as_ptr());
+        } else {
+            panic!("Siege class without name entry");
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"model".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedModel.as_mut_ptr(), parse_buf.as_ptr());
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedModel[0] = 0;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"skin".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSkin.as_mut_ptr(), parse_buf.as_ptr());
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSkin[0] = 0;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"saber1".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber1.as_mut_ptr(), parse_buf.as_ptr());
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber1[0] = 0;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"saber2".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber2.as_mut_ptr(), parse_buf.as_ptr());
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber2[0] = 0;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"saberstyle".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), StanceTable.as_mut_ptr(), qtrue);
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance = 0;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"sabercolor".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSaberColor = atoi(parse_buf.as_ptr());
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaberColor = qtrue;
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaberColor = qfalse;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"saber2color".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSaber2Color = atoi(parse_buf.as_ptr());
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaber2Color = qtrue;
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaber2Color = qfalse;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"weapons".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), WPTable.as_mut_ptr(), qtrue);
+        } else {
+            panic!("Siege class without weapons entry");
+        }
+
+        if (bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons & (1 << WP_SABER)) == 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons |= 1 << WP_MELEE;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"forcepowers".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            BG_SiegeTranslateForcePowers(parse_buf.as_mut_ptr(), &mut bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]);
+        } else {
+            i = 0;
+            while i < NUM_FORCE_POWERS as isize {
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcePowerLevels[i as usize] = 0;
+                i += 1;
+            }
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"classflags".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), bgSiegeClassFlagNames.as_mut_ptr(), qtrue);
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags = 0;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"maxhealth".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth = atoi(parse_buf.as_ptr());
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth = 100;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"starthealth".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].starthealth = atoi(parse_buf.as_ptr());
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].starthealth = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"maxarmor".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor = atoi(parse_buf.as_ptr());
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor = 0;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"startarmor".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].startarmor = atoi(parse_buf.as_ptr());
+            if bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor == 0 {
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].startarmor;
+            }
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].startarmor = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"speed".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].speed = atof(parse_buf.as_ptr()) as f32;
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].speed = 1.0f32;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"uishader".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortraitShader = 0;
+            core::ptr::write_bytes(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortrait.as_mut_ptr(), 0, bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortrait.len());
+        } else {
+            panic!("Siege class without uishader entry");
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"class_shader".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader = 0;
+            let title_length: usize = strlen(parse_buf.as_ptr());
+            let mut found_class: bool = false;
+            for i in 0..SPC_MAX {
+                let array_title_length: usize = strlen(classTitles[i as usize]);
+                if array_title_length > title_length {
+                    break;
+                }
+
+                let hold_buf = parse_buf.as_ptr().add(title_length - array_title_length);
+                if strcmp(hold_buf, classTitles[i as usize]) == 0 {
+                    bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = i;
+                    found_class = true;
+                    break;
+                }
+            }
+
+            if !found_class {
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY;
+            }
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"holdables".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), HoldableTable.as_mut_ptr(), qtrue);
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems = 0;
+        }
+
+        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"powerups".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].powerups = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), PowerupTable.as_mut_ptr(), qtrue);
+        } else {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].powerups = 0;
+        }
+
+        bg.bgNumSiegeClasses += 1;
+    }
 }
 
 /// Raven `BG_SiegeCountBaseClass`.
 ///
 /// Raven: count the number of like base classes.
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1071-1092`
-// PORT-ESCALATION(state-threading): calls `BG_SiegeFindThemeForTeam`, which
-// reads the module-scope `team1Theme`/`team2Theme` globals (GameWorld fields
-// per fork-ruling 1); the faithful signature carries no world/engine channel.
-pub fn BG_SiegeCountBaseClass(team: c_int, classIndex: c_short) -> c_int {
-    todo!("Port BG_SiegeCountBaseClass — parked: state-threading")
+pub fn BG_SiegeCountBaseClass(team: c_int, classIndex: c_short, bg: &BgState) -> c_int {
+    unsafe {
+        let mut count: c_int = 0;
+        let mut i: isize;
+
+        let stm = BG_SiegeFindThemeForTeam(team, bg);
+        if stm.is_null() {
+            return 0;
+        }
+
+        i = 0;
+        while i < (*stm).numClasses as isize {
+            if (*(*stm).classes[i as usize]).playerClass == classIndex {
+                count += 1;
+            }
+            i += 1;
+        }
+        count
+    }
 }
 
 /// Raven `BG_GetUIPortraitFile`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1094-1121`
-// PORT-ESCALATION(state-threading): calls `BG_SiegeFindThemeForTeam` (module-
-// scope `team1Theme`/`team2Theme` globals); no world/engine channel in the
-// faithful signature.
-pub fn BG_GetUIPortraitFile(team: c_int, classIndex: c_short, cntIndex: c_short) -> *mut c_char {
-    todo!("Port BG_GetUIPortraitFile — parked: state-threading")
+pub fn BG_GetUIPortraitFile(team: c_int, classIndex: c_short, cntIndex: c_short, bg: &BgState) -> *mut c_char {
+    unsafe {
+        let mut count: isize = 0;
+        let mut i: isize;
+
+        let stm = BG_SiegeFindThemeForTeam(team, bg);
+        if stm.is_null() {
+            return core::ptr::null_mut();
+        }
+
+        i = 0;
+        while i < (*stm).numClasses as isize {
+            if (*(*stm).classes[i as usize]).playerClass == classIndex {
+                if count == cntIndex as isize {
+                    return (*(*stm).classes[i as usize]).uiPortrait.as_mut_ptr();
+                }
+                count += 1;
+            }
+            i += 1;
+        }
+
+        core::ptr::null_mut()
+    }
 }
 
 /// Raven `BG_GetUIPortrait`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1123-1150`
-// PORT-ESCALATION(state-threading): calls `BG_SiegeFindThemeForTeam` (module-
-// scope `team1Theme`/`team2Theme` globals); no world/engine channel in the
-// faithful signature.
-pub fn BG_GetUIPortrait(team: c_int, classIndex: c_short, cntIndex: c_short) -> c_int {
-    todo!("Port BG_GetUIPortrait — parked: state-threading")
+pub fn BG_GetUIPortrait(team: c_int, classIndex: c_short, cntIndex: c_short, bg: &BgState) -> c_int {
+    unsafe {
+        let mut count: isize = 0;
+        let mut i: isize;
+
+        let stm = BG_SiegeFindThemeForTeam(team, bg);
+        if stm.is_null() {
+            return 0;
+        }
+
+        i = 0;
+        while i < (*stm).numClasses as isize {
+            if (*(*stm).classes[i as usize]).playerClass == classIndex {
+                if count == cntIndex as isize {
+                    return (*(*stm).classes[i as usize]).uiPortraitShader;
+                }
+                count += 1;
+            }
+            i += 1;
+        }
+
+        0
+    }
 }
 
 /// Raven `BG_GetClassOnBaseClass`.
@@ -587,117 +1042,340 @@ pub fn BG_GetUIPortrait(team: c_int, classIndex: c_short, cntIndex: c_short) -> 
 /// Raven: this is really getting ugly - looking to get the base class (within
 /// a class) based on the index passed in.
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1153-1179`
-// PORT-ESCALATION(state-threading): calls `BG_SiegeFindThemeForTeam` (module-
-// scope `team1Theme`/`team2Theme` globals); no world/engine channel in the
-// faithful signature.
 pub fn BG_GetClassOnBaseClass(
     team: c_int,
     classIndex: c_short,
     cntIndex: c_short,
+    bg: &BgState,
 ) -> *mut siegeClass_t {
-    todo!("Port BG_GetClassOnBaseClass — parked: state-threading")
+    unsafe {
+        let mut count: isize = 0;
+        let mut i: isize;
+
+        let stm = BG_SiegeFindThemeForTeam(team, bg);
+        if stm.is_null() {
+            return core::ptr::null_mut();
+        }
+
+        i = 0;
+        while i < (*stm).numClasses as isize {
+            if (*(*stm).classes[i as usize]).playerClass == classIndex {
+                if count == cntIndex as isize {
+                    return (*stm).classes[i as usize];
+                }
+                count += 1;
+            }
+            i += 1;
+        }
+
+        core::ptr::null_mut()
+    }
 }
 
 /// Raven `BG_SiegeLoadClasses`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1181-1210`
-// PORT-ESCALATION(state-threading): writes module-scope `bgNumSiegeClasses`,
-// calls the engine-bearing `trap_FS_GetFileList` seam and `BG_SiegeParseClassFile`
-// (itself parked state-threading); the faithful signature carries no
-// world/engine channel.
-pub fn BG_SiegeLoadClasses(descBuffer: *mut siegeClassDesc_t) {
-    todo!("Port BG_SiegeLoadClasses — parked: state-threading")
+pub fn BG_SiegeLoadClasses(descBuffer: *mut siegeClassDesc_t, bg: &mut BgState, traps: &dyn BgTraps) {
+    unsafe {
+        let mut num_files: c_int;
+        let mut filelen: usize;
+        let mut filelist = [0 as c_char; 4096];
+        let mut filename = [0 as c_char; MAX_QPATH as usize];
+        let mut fileptr: *mut c_char;
+        let mut i: isize;
+
+        bg.bgNumSiegeClasses = 0;
+
+        num_files = traps.fs_getfilelist(
+            c"ext_data/Siege/Classes".as_ptr(),
+            c".scl".as_ptr(),
+            filelist.as_mut_ptr(),
+            4096,
+        );
+        fileptr = filelist.as_mut_ptr();
+
+        i = 0;
+        while i < num_files as isize {
+            filelen = strlen(fileptr);
+            strcpy(filename.as_mut_ptr(), c"ext_data/Siege/Classes/".as_ptr());
+            strcat(filename.as_mut_ptr(), fileptr);
+
+            if !descBuffer.is_null() {
+                BG_SiegeParseClassFile(filename.as_ptr(), &mut *descBuffer.offset(i), bg, traps);
+            } else {
+                BG_SiegeParseClassFile(filename.as_ptr(), core::ptr::null_mut(), bg, traps);
+            }
+
+            fileptr = fileptr.offset((filelen + 1) as isize);
+            i += 1;
+        }
+    }
 }
 
 /// Raven `BG_SiegeFindClassByName`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1219-1233`
-// PORT-ESCALATION(state-threading): reads module-scope
-// `bgNumSiegeClasses`/`bgSiegeClasses` (GameWorld fields per fork-ruling 1);
-// the faithful signature carries no world/engine channel.
-pub fn BG_SiegeFindClassByName(classname: *const c_char) -> *mut siegeClass_t {
-    todo!("Port BG_SiegeFindClassByName — parked: state-threading")
+pub fn BG_SiegeFindClassByName(classname: *const c_char, bg: &BgState) -> *mut siegeClass_t {
+    unsafe {
+        let mut i: isize = 0;
+
+        while i < bg.bgNumSiegeClasses as isize {
+            if Q_stricmp(bg.bgSiegeClasses[i as usize].name.as_ptr(), classname) == 0 {
+                return &mut bg.bgSiegeClasses[i as usize] as *mut siegeClass_t;
+            }
+            i += 1;
+        }
+
+        core::ptr::null_mut()
+    }
 }
 
 /// Raven `BG_SiegeParseTeamFile`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1235-1312`
-// PORT-ESCALATION(state-threading): reads/writes module-scope
-// `bgSiegeTeams`/`bgNumSiegeTeams`, calls the engine-bearing FS_* trap seam and
-// `BG_SiegeFindClassByName` (itself parked); no world/engine channel in the
-// faithful signature.
-pub fn BG_SiegeParseTeamFile(filename: *const c_char) {
-    todo!("Port BG_SiegeParseTeamFile — parked: state-threading")
+pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &dyn BgTraps) {
+    unsafe {
+        let mut f: fileHandle_t = 0;
+        let mut len: c_int;
+        let mut team_info = [0 as c_char; 2048];
+        let mut parse_buf = [0 as c_char; 1024];
+        let mut look_string = [0 as c_char; 256];
+        let mut i: isize = 1;
+        let mut success: bool = true;
+
+        len = traps.fs_fopen(filename, &mut f, FS_READ);
+
+        if f == 0 || len >= 2048 {
+            return;
+        }
+
+        traps.fs_read(team_info.as_mut_ptr(), len, f);
+        traps.fs_fclose(f);
+        team_info[len as usize] = 0;
+
+        if BG_SiegeGetPairedValue(team_info.as_mut_ptr(), c"name".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+            strcpy(bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].name.as_mut_ptr(), parse_buf.as_ptr());
+        } else {
+            panic!("Siege team with no name definition");
+        }
+
+        bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].friendlyShader = 0;
+
+        bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses = 0;
+
+        if BG_SiegeGetValueGroup(team_info.as_mut_ptr(), c"Classes".as_ptr() as *mut c_char, team_info.as_mut_ptr()) != 0 {
+            while success && i < MAX_SIEGE_CLASSES as isize {
+                // Build the lookString for class#i
+                let look_string_str = format!("class{}", i);
+                strcpy(look_string.as_mut_ptr(), c"class".as_ptr());
+                let num_str = format!("{}", i);
+                strcat(look_string.as_mut_ptr(), cstr(&num_str).as_ptr());
+
+                success = BG_SiegeGetPairedValue(team_info.as_mut_ptr(), look_string.as_mut_ptr(), parse_buf.as_mut_ptr()) != 0;
+
+                if !success {
+                    break;
+                }
+
+                bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses as usize] =
+                    BG_SiegeFindClassByName(parse_buf.as_ptr(), bg);
+
+                if bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses as usize].is_null() {
+                    panic!("Invalid class specified: '{}'", crate::q_shared::cstr_to_str(parse_buf.as_ptr()));
+                }
+
+                bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses += 1;
+
+                i += 1;
+            }
+        }
+
+        if bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses == 0 {
+            panic!("Team defined with no allowable classes\n");
+        }
+
+        bg.bgNumSiegeTeams += 1;
+    }
 }
 
 /// Raven `BG_SiegeLoadTeams`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1314-1335`
-// PORT-ESCALATION(state-threading): writes module-scope `bgNumSiegeTeams`,
-// calls the engine-bearing `trap_FS_GetFileList` seam and
-// `BG_SiegeParseTeamFile` (itself parked); no world/engine channel.
-pub fn BG_SiegeLoadTeams() {
-    todo!("Port BG_SiegeLoadTeams — parked: state-threading")
+pub fn BG_SiegeLoadTeams(bg: &mut BgState, traps: &dyn BgTraps) {
+    unsafe {
+        let mut num_files: c_int;
+        let mut filelen: usize;
+        let mut filelist = [0 as c_char; 4096];
+        let mut filename = [0 as c_char; MAX_QPATH as usize];
+        let mut fileptr: *mut c_char;
+        let mut i: isize;
+
+        bg.bgNumSiegeTeams = 0;
+
+        num_files = traps.fs_getfilelist(
+            c"ext_data/Siege/Teams".as_ptr(),
+            c".team".as_ptr(),
+            filelist.as_mut_ptr(),
+            4096,
+        );
+        fileptr = filelist.as_mut_ptr();
+
+        i = 0;
+        while i < num_files as isize {
+            filelen = strlen(fileptr);
+            strcpy(filename.as_mut_ptr(), c"ext_data/Siege/Teams/".as_ptr());
+            strcat(filename.as_mut_ptr(), fileptr);
+            BG_SiegeParseTeamFile(filename.as_ptr(), bg, traps);
+
+            fileptr = fileptr.offset((filelen + 1) as isize);
+            i += 1;
+        }
+    }
 }
 
 /// Raven `BG_SiegeFindThemeForTeam`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1344-1356`
-// PORT-ESCALATION(state-threading): reads module-scope
-// `team1Theme`/`team2Theme` (GameWorld fields per fork-ruling 1); the
-// faithful signature carries no world/engine channel.
-pub fn BG_SiegeFindThemeForTeam(team: c_int) -> *mut siegeTeam_t {
-    todo!("Port BG_SiegeFindThemeForTeam — parked: state-threading")
+pub fn BG_SiegeFindThemeForTeam(team: c_int, bg: &BgState) -> *mut siegeTeam_t {
+    unsafe {
+        if team == SIEGETEAM_TEAM1 {
+            return bg.team1Theme;
+        } else if team == SIEGETEAM_TEAM2 {
+            return bg.team2Theme;
+        }
+
+        core::ptr::null_mut()
+    }
 }
 
 /// Raven `BG_PrecacheSabersForSiegeTeam`.
 ///
 /// Raven: precache all the sabers for the active classes for the team.
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1363-1413`
-// PORT-ESCALATION(state-threading): calls `BG_SiegeFindThemeForTeam` (module-
-// scope globals) and the bg-tier `WP_SaberParseParms`/`BG_ModelCache`; no
-// world/engine channel in the faithful signature.
-pub fn BG_PrecacheSabersForSiegeTeam(team: c_int) {
-    todo!("Port BG_PrecacheSabersForSiegeTeam — parked: state-threading")
+pub fn BG_PrecacheSabersForSiegeTeam(team: c_int, bg: &mut BgState) {
+    unsafe {
+        let mut saber: saberInfo_t = core::mem::zeroed();
+        let mut saber_name: *mut c_char;
+        let mut s_num: isize;
+
+        let t = BG_SiegeFindThemeForTeam(team, bg);
+
+        if !t.is_null() {
+            let mut i: isize = 0;
+
+            while i < (*t).numClasses as isize {
+                s_num = 0;
+
+                while s_num < MAX_SABERS as isize {
+                    saber_name = match s_num {
+                        0 => &mut (*(*t).classes[i as usize]).saber1[0] as *mut c_char,
+                        1 => &mut (*(*t).classes[i as usize]).saber2[0] as *mut c_char,
+                        _ => core::ptr::null_mut(),
+                    };
+
+                    if !saber_name.is_null() && *saber_name != 0 {
+                        WP_SaberParseParms(saber_name as *const c_char, &mut saber, bg, &mp_abi::game::syscalls::BgTrapsImpl);
+                        if Q_stricmp(saber_name as *const c_char, saber.name.as_ptr()) == 0 {
+                            if saber.model[0] != 0 {
+                                BG_ModelCache(saber.model.as_ptr(), core::ptr::null(), bg, &mp_abi::game::syscalls::BgTrapsImpl);
+                            }
+                        }
+                    }
+
+                    s_num += 1;
+                }
+
+                i += 1;
+            }
+        }
+    }
 }
 
 /// Raven `BG_SiegeCheckClassLegality`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1416-1453`
-// PORT-ESCALATION(state-threading): reads module-scope
-// `team1Theme`/`team2Theme` (GameWorld fields per fork-ruling 1); no
-// world/engine channel in the faithful signature.
-pub fn BG_SiegeCheckClassLegality(team: c_int, classname: *mut c_char) -> qboolean {
-    todo!("Port BG_SiegeCheckClassLegality — parked: state-threading")
+pub fn BG_SiegeCheckClassLegality(team: c_int, classname: *mut c_char, bg: &BgState) -> qboolean {
+    unsafe {
+        let mut team_ptr: *mut *mut siegeTeam_t = core::ptr::null_mut();
+        let mut i: isize = 0;
+
+        if team == SIEGETEAM_TEAM1 {
+            team_ptr = &mut bg.team1Theme as *mut *mut siegeTeam_t;
+        } else if team == SIEGETEAM_TEAM2 {
+            team_ptr = &mut bg.team2Theme as *mut *mut siegeTeam_t;
+        } else {
+            return qtrue;
+        }
+
+        if team_ptr.is_null() || (*team_ptr).is_null() {
+            return qtrue;
+        }
+
+        while i < (**team_ptr).numClasses as isize {
+            if Q_stricmp(classname, (**team_ptr).classes[i as usize].as_ptr().cast()) == 0 {
+                return qtrue;
+            }
+            i += 1;
+        }
+
+        strcpy(classname, (*(**team_ptr).classes[0]).name.as_ptr());
+
+        qfalse
+    }
 }
 
 /// Raven `BG_SiegeFindTeamForTheme`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1455-1471`
-// PORT-ESCALATION(state-threading): reads module-scope
-// `bgNumSiegeTeams`/`bgSiegeTeams` (GameWorld fields per fork-ruling 1); no
-// world/engine channel in the faithful signature.
-pub fn BG_SiegeFindTeamForTheme(themeName: *mut c_char) -> *mut siegeTeam_t {
-    todo!("Port BG_SiegeFindTeamForTheme — parked: state-threading")
+pub fn BG_SiegeFindTeamForTheme(themeName: *mut c_char, bg: &BgState) -> *mut siegeTeam_t {
+    unsafe {
+        let mut i: isize = 0;
+
+        while i < bg.bgNumSiegeTeams as isize {
+            if !bg.bgSiegeTeams[i as usize].name.is_null()
+                && Q_stricmp(bg.bgSiegeTeams[i as usize].name.as_ptr(), themeName) == 0
+            {
+                return &mut bg.bgSiegeTeams[i as usize] as *mut siegeTeam_t;
+            }
+
+            i += 1;
+        }
+
+        core::ptr::null_mut()
+    }
 }
 
 /// Raven `BG_SiegeSetTeamTheme`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1473-1487`
-// PORT-ESCALATION(state-threading): writes module-scope
-// `team1Theme`/`team2Theme` (GameWorld fields per fork-ruling 1) via
-// `BG_SiegeFindTeamForTheme` (itself parked); no world/engine channel in the
-// faithful signature.
-pub fn BG_SiegeSetTeamTheme(team: c_int, themeName: *mut c_char) {
-    todo!("Port BG_SiegeSetTeamTheme — parked: state-threading")
+pub fn BG_SiegeSetTeamTheme(team: c_int, themeName: *mut c_char, bg: &mut BgState) {
+    unsafe {
+        let mut team_ptr: *mut *mut siegeTeam_t = core::ptr::null_mut();
+
+        if team == SIEGETEAM_TEAM1 {
+            team_ptr = &mut bg.team1Theme as *mut *mut siegeTeam_t;
+        } else {
+            team_ptr = &mut bg.team2Theme as *mut *mut siegeTeam_t;
+        }
+
+        *team_ptr = BG_SiegeFindTeamForTheme(themeName, bg);
+    }
 }
 
 /// Raven `BG_SiegeFindClassIndexByName`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1489-1503`
-// PORT-ESCALATION(state-threading): reads module-scope
-// `bgNumSiegeClasses`/`bgSiegeClasses` (GameWorld fields per fork-ruling 1);
-// no world/engine channel in the faithful signature.
-pub fn BG_SiegeFindClassIndexByName(classname: *const c_char) -> c_int {
-    todo!("Port BG_SiegeFindClassIndexByName — parked: state-threading")
+pub fn BG_SiegeFindClassIndexByName(classname: *const c_char, bg: &BgState) -> c_int {
+    unsafe {
+        let mut i: isize = 0;
+
+        while i < bg.bgNumSiegeClasses as isize {
+            if Q_stricmp(bg.bgSiegeClasses[i as usize].name.as_ptr(), classname) == 0 {
+                return i as c_int;
+            }
+            i += 1;
+        }
+
+        -1
+    }
 }

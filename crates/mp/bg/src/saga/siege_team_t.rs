@@ -7,6 +7,16 @@ use super::siege_class_t::siegeClass_t;
 /// Source: `oracle/oracle/codemp/game/bg_saga.h:13`
 pub const MAX_SIEGE_CLASSES_PER_TEAM: usize = 16;
 
+/// Raven `SIEGETEAM_TEAM1` (e.g. TEAM_RED).
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.h:3`
+pub const SIEGETEAM_TEAM1: i32 = 1;
+
+/// Raven `SIEGETEAM_TEAM2` (e.g. TEAM_BLUE).
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.h:4`
+pub const SIEGETEAM_TEAM2: i32 = 2;
+
 /// Raven `siegeTeam_t` — one team's siege class roster.
 ///
 /// Type definition source: `oracle/oracle/codemp/game/bg_saga.h:82-88`

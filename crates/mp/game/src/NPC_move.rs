@@ -10,6 +10,8 @@
 
 use crate::prelude::*;
 use crate::q_math::{AngleVectors, VectorNormalize};
+use crate::trap;
+use std::ffi::c_int;
 
 /// File-scope static for `NPC_move.c` navigation state (oracle/oracle/codemp/game/NPC_move.c:14).
 /// Zeroed initially, written by NPC_GetMoveDirection and similar functions (all parked).
@@ -41,49 +43,126 @@ static mut FRAME_NAV_INFO: navInfo_t = navInfo_t {
 /// Raven `NPC_ClearPathToGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:27-70`
-// PORT-ESCALATION(ai-context): reads/writes ambient `NPC`/`NPCInfo` globals
-// set by ai_main.c think-loop; no channel to reach them from this
-// context-free faithful signature.
 pub fn NPC_ClearPathToGoal(
     ctx: GameContext<'_>,
     dir: vec3_t,
     goal: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port NPC_ClearPathToGoal — parked: ai-context")
+    unsafe {
+        let mut trace = trace_t::default();
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = &(*ctx.world).globals.NPCInfo;
+
+        // Look ahead and see if we're clear to move to our goal position
+        if NAV_CheckAhead(ctx, npc, (*goal).r.currentOrigin, &mut trace, ((*npc).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP) == qtrue {
+            return qtrue;
+        }
+
+        if FlyingCreature(npc) == qfalse {
+            // See if we're too far above
+            if ((*npc).r.currentOrigin[2] - (*goal).r.currentOrigin[2]).abs() > 48.0 {
+                return qfalse;
+            }
+        }
+
+        // This is a work around
+        let radius = if (*npc).r.maxs[0] > (*npc).r.maxs[1] {
+            (*npc).r.maxs[0]
+        } else {
+            (*npc).r.maxs[1]
+        };
+        let dist = crate::q_math::Distance((*npc).r.currentOrigin, (*goal).r.currentOrigin);
+        let t_frac = 1.0f32 - (radius / dist);
+
+        if trace.fraction >= t_frac {
+            return qtrue;
+        }
+
+        // See if we're looking for a navgoal
+        if ((*goal).flags & FL_NAVGOAL) != 0 {
+            // Okay, didn't get all the way there, let's see if we got close enough
+            if NAV_HitNavGoal(trace.endpos, (*npc).r.mins, (*npc).r.maxs, (*goal).r.currentOrigin, npc_info.goalRadius, FlyingCreature(npc)) == qtrue {
+                return qtrue;
+            }
+        }
+
+        return qfalse;
+    }
 }
 
 /// Raven `NPC_CheckCombatMove`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:78-95`
-// PORT-ESCALATION(ai-context): reads ambient `NPC`/`NPCInfo` globals;
-// no channel to reach them from this context-free faithful signature.
 pub fn NPC_CheckCombatMove(ctx: GameContext<'_>) -> qboolean {
-    todo!("Port NPC_CheckCombatMove — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = &(*ctx.world).globals.NPCInfo;
+
+        if (npc_info.goalEntity.is_some() && (*npc).enemy.is_some() && npc_info.goalEntity == (*npc).enemy)
+            || npc_info.combatMove != 0
+        {
+            return qtrue;
+        }
+
+        if npc_info.goalEntity.is_some() && npc_info.watchTarget.is_some() {
+            if npc_info.goalEntity != npc_info.watchTarget {
+                return qtrue;
+            }
+        }
+
+        return qfalse;
+    }
 }
 
 /// Raven `NPC_LadderMove`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:103-118`
-// PORT-ESCALATION(ai-context): reads/writes ambient `NPC`/`ucmd` globals;
-// no channel to reach them from this context-free faithful signature.
 pub fn NPC_LadderMove(
     ctx: GameContext<'_>,
     dir: vec3_t,
 ) {
-    todo!("Port NPC_LadderMove — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let ucmd = &mut (*ctx.world).globals.ucmd;
+
+        if (dir[2] > 0.0) || (dir[2] < 0.0 && (*(*npc).client).ps.groundEntityNum == ENTITYNUM_NONE) {
+            // Set our movement direction
+            ucmd.upmove = if dir[2] > 0.0 { 127 } else { -127 };
+
+            // Don't move around on XY
+            ucmd.forwardmove = 0;
+            ucmd.rightmove = 0;
+        }
+    }
 }
 
 /// Raven `NPC_GetMoveInformation`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:126-141`
-// PORT-ESCALATION(ai-context): reads ambient `NPC`/`NPCInfo` globals;
-// no channel to reach them from this context-free faithful signature.
 pub fn NPC_GetMoveInformation(
     ctx: GameContext<'_>,
-    dir: vec3_t,
+    mut dir: vec3_t,
     distance: *mut f32,
 ) -> qboolean {
-    todo!("Port NPC_GetMoveInformation — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = &mut (*ctx.world).globals.NPCInfo;
+
+        // Make sure we have somewhere to go
+        if let Some(goal_id) = npc_info.goalEntity {
+            let goal_ptr = entity_from_id((*ctx.world).entities.as_mut_ptr(), goal_id);
+
+            // Get our move info
+            crate::q_math::_VectorSubtract((*goal_ptr).r.currentOrigin, (*npc).r.currentOrigin, &mut dir);
+            *distance = crate::q_math::VectorNormalize(&mut dir);
+
+            crate::q_math::_VectorCopy((*goal_ptr).r.currentOrigin, &mut npc_info.blockedDest);
+
+            return qtrue;
+        }
+
+        return qfalse;
+    }
 }
 
 /// Raven `NAV_GetLastMove`.
@@ -104,31 +183,172 @@ pub fn NAV_GetLastMove(
 /// Raven `NPC_GetMoveDirection`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:160-230`
-// PORT-ESCALATION(ai-context): reads/writes ambient `NPC`/`NPCInfo` globals
-// and file-scope `frameNavInfo`; calls navigation functions that need
-// these; no channel to reach them from this context-free faithful signature.
 pub fn NPC_GetMoveDirection(
     ctx: GameContext<'_>,
-    out: vec3_t,
+    mut out: vec3_t,
     distance: *mut f32,
 ) -> qboolean {
-    todo!("Port NPC_GetMoveDirection — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = &mut (*ctx.world).globals.NPCInfo;
+        let mut angles = [0.0f32; 3];
+
+        // Clear the struct
+        FRAME_NAV_INFO = unsafe { std::mem::zeroed() };
+
+        // Get our movement, if any
+        if NPC_GetMoveInformation(ctx, FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.distance) == qfalse {
+            return qfalse;
+        }
+
+        // Setup the return value
+        *distance = FRAME_NAV_INFO.distance;
+
+        // For starters
+        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.pathDirection);
+
+        // If on a ladder, move appropriately
+        if ((*npc).watertype & CONTENTS_LADDER) != 0 {
+            NPC_LadderMove(ctx, FRAME_NAV_INFO.direction);
+            return qtrue;
+        }
+
+        // Attempt a straight move to goal
+        if let Some(goal_id) = npc_info.goalEntity {
+            let goal_ptr = entity_from_id((*ctx.world).entities.as_mut_ptr(), goal_id);
+            if NPC_ClearPathToGoal(ctx, FRAME_NAV_INFO.direction, goal_ptr) == qfalse {
+                // See if we're just stuck
+                if NAV_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO) == WAYPOINT_NONE {
+                    // Can't reach goal, just face
+                    crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
+                    npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
+                    crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
+                    *distance = FRAME_NAV_INFO.distance;
+                    return qfalse;
+                }
+
+                FRAME_NAV_INFO.flags |= NIF_MACRO_NAV;
+            }
+        }
+
+        // Avoid any collisions on the way
+        if let Some(goal_id) = npc_info.goalEntity {
+            let goal_ptr = entity_from_id((*ctx.world).entities.as_mut_ptr(), goal_id);
+            if NAV_AvoidCollision(ctx, npc, goal_ptr, &mut FRAME_NAV_INFO) == qfalse {
+                if (FRAME_NAV_INFO.flags & NIF_MACRO_NAV) == 0 {
+                    // we had a clear path to goal and didn't try macro nav, but can't avoid collision so try macro nav here
+                    // See if we're just stuck
+                    if NAV_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO) == WAYPOINT_NONE {
+                        // Can't reach goal, just face
+                        crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
+                        npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
+                        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
+                        *distance = FRAME_NAV_INFO.distance;
+                        return qfalse;
+                    }
+
+                    FRAME_NAV_INFO.flags |= NIF_MACRO_NAV;
+                }
+            }
+        }
+
+        // Setup the return values
+        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
+        *distance = FRAME_NAV_INFO.distance;
+
+        return qtrue;
+    }
 }
 
 /// Raven `NPC_GetMoveDirectionAltRoute`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:239-322`
-// PORT-ESCALATION(ai-context): reads/writes ambient `NPC`/`NPCInfo` globals,
-// file-scope `frameNavInfo`, and accesses `d_altRoutes` cvar; calls
-// navigation functions; no channel to reach them from this context-free
-// faithful signature.
 pub fn NPC_GetMoveDirectionAltRoute(
     ctx: GameContext<'_>,
-    out: vec3_t,
+    mut out: vec3_t,
     distance: *mut f32,
     tryStraight: qboolean,
 ) -> qboolean {
-    todo!("Port NPC_GetMoveDirectionAltRoute — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = &mut (*ctx.world).globals.NPCInfo;
+        let mut angles = [0.0f32; 3];
+
+        npc_info.aiFlags &= !NPCAI_BLOCKED;
+
+        // Clear the struct
+        FRAME_NAV_INFO = unsafe { std::mem::zeroed() };
+
+        // Get our movement, if any
+        if NPC_GetMoveInformation(ctx, FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.distance) == qfalse {
+            return qfalse;
+        }
+
+        // Setup the return value
+        *distance = FRAME_NAV_INFO.distance;
+
+        // For starters
+        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.pathDirection);
+
+        // If on a ladder, move appropriately
+        if ((*npc).watertype & CONTENTS_LADDER) != 0 {
+            NPC_LadderMove(ctx, FRAME_NAV_INFO.direction);
+            return qtrue;
+        }
+
+        // Attempt a straight move to goal
+        if let Some(goal_id) = npc_info.goalEntity {
+            let goal_ptr = entity_from_id((*ctx.world).entities.as_mut_ptr(), goal_id);
+            if tryStraight == qfalse || NPC_ClearPathToGoal(ctx, FRAME_NAV_INFO.direction, goal_ptr) == qfalse {
+                // blocked — Can't get straight to goal, use macro nav
+                if NAVNEW_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO) == WAYPOINT_NONE {
+                    // Can't reach goal, just face
+                    crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
+                    npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
+                    crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
+                    *distance = FRAME_NAV_INFO.distance;
+                    return qfalse;
+                }
+                // else we are on our way
+                FRAME_NAV_INFO.flags |= NIF_MACRO_NAV;
+            } else {
+                // we have no architectural problems, see if there are ents inthe way and try to go around them
+                // not blocked
+                if (*ctx.world).cvars.d_altRoutes.integer != 0 {
+                    // try macro nav
+                    let mut temp_info = FRAME_NAV_INFO;
+                    if NAVNEW_AvoidCollision(ctx, npc, goal_ptr, &mut temp_info, qtrue, 5) == qfalse {
+                        // revert to macro nav — Can't get straight to goal, dump tempInfo and use macro nav
+                        if NAVNEW_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO) == WAYPOINT_NONE {
+                            // Can't reach goal, just face
+                            crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
+                            npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
+                            crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
+                            *distance = FRAME_NAV_INFO.distance;
+                            return qfalse;
+                        }
+                        // else we are on our way
+                        FRAME_NAV_INFO.flags |= NIF_MACRO_NAV;
+                    } else {
+                        // otherwise, either clear or can avoid
+                        FRAME_NAV_INFO = temp_info;
+                    }
+                } else {
+                    // OR: just give up
+                    if NAVNEW_AvoidCollision(ctx, npc, goal_ptr, &mut FRAME_NAV_INFO, qtrue, 30) == qfalse {
+                        // give up
+                        return qfalse;
+                    }
+                }
+            }
+        }
+
+        // Setup the return values
+        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
+        *distance = FRAME_NAV_INFO.distance;
+
+        return qtrue;
+    }
 }
 
 /// Raven `G_UcmdMoveForDir`.
@@ -191,32 +411,103 @@ pub fn G_UcmdMoveForDir(
 /// Raven `NPC_MoveToGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:382-467`
-// PORT-ESCALATION(ai-context): reads/writes ambient `NPC`/`NPCInfo`/`ucmd`
-// globals set by the AI think loop; calls movement functions that read these;
-// no channel to reach them from this context-free faithful signature.
 pub fn NPC_MoveToGoal(
     ctx: GameContext<'_>,
     tryStraight: qboolean,
 ) -> qboolean {
-    todo!("Port NPC_MoveToGoal — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = &mut (*ctx.world).globals.NPCInfo;
+        let ucmd = &mut (*ctx.world).globals.ucmd;
+
+        let mut distance = 0.0f32;
+        let mut dir = [0.0f32; 3];
+
+        // If taking full body pain, don't move
+        if PM_InKnockDown(&mut (*(*npc).client).ps) == qtrue
+            || ((*npc).s.legsAnim >= BOTH_PAIN1 && (*npc).s.legsAnim <= BOTH_PAIN18)
+        {
+            return qtrue;
+        }
+
+        // Get our movement direction
+        if NPC_GetMoveDirectionAltRoute(ctx, dir, &mut distance, tryStraight) == qfalse {
+            return qfalse;
+        }
+
+        npc_info.distToGoal = distance;
+
+        // Convert the move to angles
+        crate::q_math::vectoangles(dir, &mut npc_info.lastPathAngles);
+        if (ucmd.buttons & BUTTON_WALKING) != 0 {
+            (*(*npc).client).ps.speed = npc_info.stats.walkSpeed;
+        } else {
+            (*(*npc).client).ps.speed = npc_info.stats.runSpeed;
+        }
+
+        // If in combat move, then move directly towards our goal
+        if NPC_CheckCombatMove(ctx) == qtrue {
+            // keep current facing
+            G_UcmdMoveForDir(npc, ucmd, dir);
+        } else {
+            // face our goal
+            npc_info.desiredPitch = 0.0f32;
+            npc_info.desiredYaw = crate::q_math::AngleNormalize360(npc_info.lastPathAngles[1]);
+
+            // Pitch towards the goal and also update if flying or swimming
+            if ((*(*npc).client).ps.eFlags2 & EF2_FLYING) != 0 {
+                npc_info.desiredPitch =
+                    crate::q_math::AngleNormalize360(npc_info.lastPathAngles[0]);
+
+                if dir[2] != 0.0 {
+                    let mut scale = dir[2] * distance;
+                    if scale > 64.0 {
+                        scale = 64.0;
+                    } else if scale < -64.0 {
+                        scale = -64.0;
+                    }
+                    (*(*npc).client).ps.velocity[2] = scale;
+                }
+            }
+
+            // Set any final info
+            ucmd.forwardmove = 127;
+        }
+
+        return qtrue;
+    }
 }
 
 /// Raven `NPC_SlideMoveToGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:476-488`
-// PORT-ESCALATION(ai-context): reads/writes ambient `NPC`/`NPCInfo` globals;
-// calls NPC_MoveToGoal which also needs ai-context; no channel to reach them
-// from this context-free faithful signature.
 pub fn NPC_SlideMoveToGoal(ctx: GameContext<'_>) -> qboolean {
-    todo!("Port NPC_SlideMoveToGoal — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = &mut (*ctx.world).globals.NPCInfo;
+
+        let save_yaw = (*(*npc).client).ps.viewangles[1];
+
+        npc_info.combatMove = 1;
+
+        let ret = NPC_MoveToGoal(ctx, qtrue);
+
+        npc_info.desiredYaw = save_yaw;
+
+        return ret;
+    }
 }
 
 /// Raven `NPC_ApplyRoff`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:497-505`
-// PORT-ESCALATION(ai-context): reads ambient `NPC` global and calls
-// `trap_LinkEntity` (needs Engine/GameContext); no channel to reach them from
-// this context-free faithful signature.
 pub fn NPC_ApplyRoff(ctx: GameContext<'_>) {
-    todo!("Port NPC_ApplyRoff — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+
+        BG_PlayerStateToEntityState(&mut (*(*npc).client).ps, &mut (*npc).s, qfalse);
+
+        // use the precise origin for linking
+        crate::trap::LinkEntity(ctx.engine, crate::trap::GLinkentityArgs::new(npc));
+    }
 }

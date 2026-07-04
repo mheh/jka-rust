@@ -2,7 +2,7 @@
 
 // Non-XBOX build; `#define SIEGE_CLASS_DESC_LEN 4096`.
 // Source: `oracle/oracle/codemp/game/bg_saga.h:45-48`
-const SIEGE_CLASS_DESC_LEN: usize = 4096;
+pub const SIEGE_CLASS_DESC_LEN: usize = 4096;
 
 /// Raven `siegeClassDesc_t` — siege class description text buffer.
 ///

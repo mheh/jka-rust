@@ -41,6 +41,7 @@ pub use mp_bg::public::gametype::{
     gametype_t, GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_MAX_GAME_TYPE,
     GT_POWERDUEL, GT_SIEGE, GT_SINGLE_PLAYER, GT_TEAM,
 };
+pub use mp_bg::public::bg_itemlist::{bg_itemlist, bg_numItems};
 pub use mp_bg::public::holdable::*;
 pub use mp_bg::public::powerup::*;
 pub use mp_bg::public::saber_move_name::*;
@@ -178,9 +179,11 @@ pub use mp_bg::public::pmove_t::pmove_t;
 pub use mp_bg::public::powerup::powerup_t;
 pub use mp_bg::public::saber_move_name::saberMoveName_t;
 pub use mp_bg::public::team::team_t;
-pub use mp_bg::saga::siege_class_desc_t::siegeClassDesc_t;
-pub use mp_bg::saga::siege_class_t::siegeClass_t;
-pub use mp_bg::saga::siege_team_t::siegeTeam_t;
+pub use mp_bg::saga::siege_class_desc_t::{siegeClassDesc_t, SIEGE_CLASS_DESC_LEN};
+pub use mp_bg::saga::siege_class_t::{siegeClass_t, MAX_SIEGE_CLASSES};
+pub use mp_bg::saga::siege_team_t::{siegeTeam_t, SIEGETEAM_TEAM1, SIEGETEAM_TEAM2};
+pub use mp_bg::saga::siege_class_flags_t::siegeClassFlags_t::*;
+pub use mp_bg::saga::siege_player_class_flags_t::siegePlayerClassFlags_t::{self, *};
 pub use mp_bg::vehicles::turret_stats_t::turretStats_t;
 pub use mp_bg::vehicles::veh_weapon_info_t::vehWeaponInfo_t;
 pub use mp_bg::vehicles::vehicle_info_t::vehicleInfo_t;
@@ -313,6 +316,7 @@ pub use crate::NPC_AI_Seeker::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/c
 pub use crate::NPC_combat::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_combat.rs
 pub use mp_qshared::shared::saber_blocked_type::{saberBlockedType_t, saberBlockedType_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/saber_blocked_type.rs
 pub use crate::bg_misc::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_misc.rs
+pub use crate::bg_saberLoad::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saberLoad.rs
 pub use crate::NPC_AI_Droid::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Droid.rs
 pub use mp_bg::public::saberlock::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saberlock.rs
 pub use mp_bg::public::saber_move_data_table::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_move_data_table.rs
