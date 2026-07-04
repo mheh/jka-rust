@@ -598,7 +598,7 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
         crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
 
         if (*npc).health != 0 {
-            crate::NPC_utils::crate::NPC_utils::CalcEntitySpot(ctx, (*npc).enemy, spot_t::SPOT_HEAD, &mut enemy_org1);
+            crate::NPC_utils::CalcEntitySpot(ctx, (*npc).enemy, spot_t::SPOT_HEAD, &mut enemy_org1);
             delta1[0] = enemy_org1[0] - muzzle1[0];
             delta1[1] = enemy_org1[1] - muzzle1[1];
             delta1[2] = enemy_org1[2] - muzzle1[2];
@@ -726,7 +726,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
 
         crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
 
-        crate::NPC_utils::crate::NPC_utils::CalcEntitySpot(ctx, (*npc).enemy, spot_t::SPOT_HEAD, &mut enemy_org1);
+        crate::NPC_utils::CalcEntitySpot(ctx, (*npc).enemy, spot_t::SPOT_HEAD, &mut enemy_org1);
         delta1[0] = enemy_org1[0] - muzzle1[0];
         delta1[1] = enemy_org1[1] - muzzle1[1];
         delta1[2] = enemy_org1[2] - muzzle1[2];
