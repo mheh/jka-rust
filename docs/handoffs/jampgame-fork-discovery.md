@@ -63,6 +63,51 @@ gSharedBuffer typed structs (SEAM-D4's known high-arity escape).
     alias to Server vs wrapper struct bundling what the syscall arms need.
     **RULING: Wrapper struct: pub struct ServerGame<'a> bundling the &mut borrows the syscall arms need; grows per arm (user, 2026-07-03)**
 
+## Post-mega-pass rulings (2026-07-03, pass-1 escalation triage — accepted-for-now, user)
+
+Pass 1 (wf_55d03832-2c3): 88 files, 717 fns ported, 1,875 parked, 619
+escalations (clustered in `docs/handoffs/jampgame-escalations.json`). ~95% of
+parks trace to the generated signatures not carrying already-settled rulings.
+
+8. **Context threading in generated signatures** (~450 escalations:
+   raw-ptr-skeleton-no-world-handle, ambient-state, ai-context, seam-threading,
+   pmove-working-state, …). fnskel emitted faithful C signatures with no
+   world/engine channel; B3/B4 forbid ambient reach, so every stateful fn
+   parked. **RULING: every fn in the transitive stateful closure gains
+   `ctx: GameContext` as first param, by value (the `g_init_game` shape;
+   SEAM-Q12 Copy struct, world via STATE-D6 leaf reborrows, traps via
+   `trap::X(ctx.engine, …)`). Needs-ctx set computed mechanically by tooling:
+   a fn needs ctx iff it touches traps/globals/cvars/file-statics or calls a
+   needs-ctx fn. Cross-file resolved signatures regenerate to match.
+   (accepted-for-now, user, 2026-07-03)**
+   - 8a. bg-tier fns cannot see `GameContext` (bg < game). **RULING: bg_pmove's
+     file-static working set (pm, pml, pm_entSelf/pm_entVeh, pm_flying,
+     gPMDoSlowFall, pm_cancelOutZoom) becomes a bg-owned `PmoveContext`
+     constructed per Pmove call and threaded through; game-tier builds it; no
+     game type leaks below game. Same pattern for other bg working sets.
+     (accepted-for-now, user, 2026-07-03)**
+   - 8b. AI/bot/saber file statics (botstates, floattime, w_saber damage
+     arrays, IP filters, …) → GameWorld fields per fork 1, reached via ctx.
+     **RULING: BLESSED (accepted-for-now, user, 2026-07-03)**
+9. **vec3 out-param mechanical shape** (~32 escalations). §C7 was blessed but
+   the generator emitted by-value `[f32;3]` (Copy — writes can't propagate).
+   **RULING: NULL-able multi-outs (AngleVectors) → `Option<&mut [f32;3]>`;
+   non-nullable outs → `&mut [f32;3]`; mutate+scalar-return (VectorNormalize)
+   → `&mut` + scalar; single-out pure helpers → return value.
+   (accepted-for-now, user, 2026-07-03)**
+10. **Const/enum backfill wave before pass 2** (~30 escalations):
+    animNumber_t (#[repr(i32)] enum per fidelity rule), BUTTON_*,
+    WEAPON_CHARGING/_ALT, saberFace_t, SABERLOCK_*, ai_main.h const families
+    (BWEAPONRANGE_*/TEAMPLAYSTATE_*/SIEGESTATE_*/CTFSTATE_*),
+    MIN_LANDING_SLOPE, JUMP_VELOCITY, RAND_MAX (0x7fff beside the fork-3 LCG),
+    Q_IsColorString as a q_shared helper.
+    **RULING: BLESSED as listed (accepted-for-now, user, 2026-07-03)**
+11. **Riders**: raw C fn-ptr params (localTrace) → typed Rust fn params;
+    #ifdef-only debug fns (G_DebugBoxLines, DEBUG_SABER_BOX) → dropped with
+    module-doc note per §20; runtime anim tables (bgAllAnims,
+    bgHumanoidAnimations, WeaponReadyAnim/WeaponAttackAnim/…) → bg-owned state
+    threaded per 8a. **RULING: BLESSED (accepted-for-now, user, 2026-07-03)**
+
 ## Already covered — no decision (bless-the-rule appendix)
 
 vec3_t out-params (§C7; VectorCopy ×1358), qboolean returns → bool ×652
