@@ -572,7 +572,7 @@ pub fn AddSpawnField(ctx: GameContext<'_>, field: *mut c_char, value: *mut c_cha
     }
 }
 
-const NOVALUE: &CStr = c"novalue";
+pub const NOVALUE: &CStr = c"novalue";
 
 /// Raven `HandleEntityAdjustment` (file-static) — sub-BSP instance origin/
 /// angle/name-prefix rewriting.
@@ -784,7 +784,7 @@ pub fn G_PrecacheSoundsets(ctx: GameContext<'_>) {
             let ent = &mut (*ctx.world).entities[i] as *mut gentity_t;
 
             if (*ent).inuse != QFALSE && !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
-                const MAX_AMBIENT_SETS: c_int = 64; //TODO: Port MAX_AMBIENT_SETS
+                pub const MAX_AMBIENT_SETS: c_int = 64; //TODO: Port MAX_AMBIENT_SETS
                 // Source: oracle/oracle/codemp/game/g_local.h (MAX_AMBIENT_SETS)
                 if counted_sets >= MAX_AMBIENT_SETS {
                     panic!("MAX_AMBIENT_SETS was exceeded! (too many soundsets)\n"); // Com_Error(ERR_DROP, ...) -> panic

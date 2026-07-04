@@ -75,31 +75,31 @@ const FRAMETIME: c_int = 100;
 const PMF_FOLLOW: c_int = 4096;
 //TODO: Port CS_GLOBAL_AMBIENT_SET
 // Source: oracle/oracle/codemp/game/bg_public.h:88
-const CS_GLOBAL_AMBIENT_SET: c_int = 32;
+pub const CS_GLOBAL_AMBIENT_SET: c_int = 32;
 //TODO: Port SIEGETEAM_TEAM1
 // Source: oracle/oracle/codemp/game/bg_saga.h:3
-const SIEGETEAM_TEAM1: c_int = 1;
+pub const SIEGETEAM_TEAM1: c_int = 1;
 //TODO: Port SIEGETEAM_TEAM2
 // Source: oracle/oracle/codemp/game/bg_saga.h:4
-const SIEGETEAM_TEAM2: c_int = 2;
+pub const SIEGETEAM_TEAM2: c_int = 2;
 //TODO: Port PUSH_CONSTANT
 // Source: oracle/oracle/codemp/game/g_trigger.c:899
-const PUSH_CONSTANT: c_int = 2;
+pub const PUSH_CONSTANT: c_int = 2;
 //TODO: Port PUSH_LINEAR
 // Source: oracle/oracle/codemp/game/g_trigger.c:895
-const PUSH_LINEAR: c_int = 4;
+pub const PUSH_LINEAR: c_int = 4;
 //TODO: Port PUSH_RELATIVE
 // Source: oracle/oracle/codemp/game/g_trigger.c:896
-const PUSH_RELATIVE: c_int = 16;
+pub const PUSH_RELATIVE: c_int = 16;
 //TODO: Port PUSH_MULTIPLE
 // Source: oracle/oracle/codemp/game/g_trigger.c:897
-const PUSH_MULTIPLE: c_int = 2048;
+pub const PUSH_MULTIPLE: c_int = 2048;
 //TODO: Port HYPERSPACE_TIME
 // Source: oracle/oracle/codemp/game/bg_public.h:1679
-const HYPERSPACE_TIME: c_int = 4000;
+pub const HYPERSPACE_TIME: c_int = 4000;
 //TODO: Port HYPERSPACE_TELEPORT_FRAC
 // Source: oracle/oracle/codemp/game/bg_public.h:1680
-const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75;
+pub const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75;
 //TODO: Port EF2_HYPERSPACE
 // Source: oracle/oracle/codemp/game/bg_public.h:621
 const EF2_HYPERSPACE: c_int = 1 << 5;
@@ -108,7 +108,7 @@ const EF2_HYPERSPACE: c_int = 1 << 5;
 const EF_RAG: c_int = 1 << 6;
 //TODO: Port INITIAL_SUFFOCATION_DELAY
 // Source: oracle/oracle/codemp/game/g_trigger.c:1441
-const INITIAL_SUFFOCATION_DELAY: c_int = 500;
+pub const INITIAL_SUFFOCATION_DELAY: c_int = 500;
 
 // C standard library `atoi` (same local recipe as `g_turret.rs`).
 extern "C" {

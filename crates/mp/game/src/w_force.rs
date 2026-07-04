@@ -101,7 +101,7 @@ const PMF_STUCK_TO_WALL: c_int = 16384;
 
 /// Raven `SFL_TWO_HANDED` (`weaponData_t::weaponflags` bit) — uses both hands.
 /// Source: `oracle/oracle/codemp/game/q_shared.h:691`
-const SFL_TWO_HANDED: c_int = 1 << 4;
+pub const SFL_TWO_HANDED: c_int = 1 << 4;
 
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_bg::public::entity_event::entity_event_t::{EV_FORCE_DRAINED, EV_PREDEFSOUND, EV_TEAM_POWER};

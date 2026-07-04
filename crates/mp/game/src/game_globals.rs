@@ -14,7 +14,7 @@ use crate::botai::nodeobject_s::nodeobject_t;
 
 // Raven `#define MAX_ITEMS 256`.
 // Source: `oracle/oracle/codemp/game/bg_public.h:31`
-const MAX_ITEMS: usize = 256;
+pub const MAX_ITEMS: usize = 256;
 
 // Raven `ai_wpnav.c` / `q_shared.h` waypoint-arena sizes.
 // Source: `oracle/oracle/codemp/game/q_shared.h:993`,

@@ -51,21 +51,21 @@ const PMF_FOLLOW: c_int = 4096;
 // Raven `#define MAX_SIGHT_DISTANCE`/`MAX_SIGHT_FOV`/`MAX_JEDIMASTER_DISTANCE`/
 // `MAX_JEDIMASTER_FOV` — file-scope in `g_active.c` (not referenced elsewhere).
 // Source: `oracle/oracle/codemp/game/g_active.c:1097-1101`
-const MAX_SIGHT_DISTANCE: c_float = 1500.0;
-const MAX_SIGHT_FOV: c_float = 100.0;
-const MAX_JEDIMASTER_DISTANCE: c_float = 2500.0;
-const MAX_JEDIMASTER_FOV: c_float = 100.0;
+pub const MAX_SIGHT_DISTANCE: c_float = 1500.0;
+pub const MAX_SIGHT_FOV: c_float = 100.0;
+pub const MAX_JEDIMASTER_DISTANCE: c_float = 2500.0;
+pub const MAX_JEDIMASTER_FOV: c_float = 100.0;
 
 // Raven's taunt selector is a file-scope anonymous `enum { TAUNT_TAUNT = 0,
 // TAUNT_BOW, TAUNT_MEDITATE, TAUNT_FLOURISH, TAUNT_GLOAT };` in `g_active.c`
 // (no typedef name), so per enum-vs-alias fidelity these are plain `c_int`
 // consts, private to this file like the Raven original.
 // Source: `oracle/oracle/codemp/game/g_active.c:1652-1659`
-const TAUNT_TAUNT: c_int = 0;
-const TAUNT_BOW: c_int = 1;
-const TAUNT_MEDITATE: c_int = 2;
-const TAUNT_FLOURISH: c_int = 3;
-const TAUNT_GLOAT: c_int = 4;
+pub const TAUNT_TAUNT: c_int = 0;
+pub const TAUNT_BOW: c_int = 1;
+pub const TAUNT_MEDITATE: c_int = 2;
+pub const TAUNT_FLOURISH: c_int = 3;
+pub const TAUNT_GLOAT: c_int = 4;
 
 //TODO: Port VectorCompare           // Source: oracle/oracle/codemp/game/q_shared.h
 

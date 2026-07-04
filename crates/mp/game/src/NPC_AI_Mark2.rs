@@ -35,9 +35,9 @@ const TURN_OFF: c_int = 0x00000100;
 /// Local state enums.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:19-25`
 const LSTATE_NONE: c_int = 0;
-const LSTATE_DROPPINGDOWN: c_int = 1;
-const LSTATE_DOWN: c_int = 2;
-const LSTATE_RISINGUP: c_int = 3;
+pub const LSTATE_DROPPINGDOWN: c_int = 1;
+pub const LSTATE_DOWN: c_int = 2;
+pub const LSTATE_RISINGUP: c_int = 3;
 
 /// Distance constants for Mark2.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:8-12`
@@ -54,12 +54,12 @@ pub fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, ve
     // (`q_shared.h:3086-3095`); local `c_int`-typed aliases let the match
     // patterns below compare directly against the scrutinee's type.
     const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
-    const POSITIVE_Y: c_int = Eorientations::POSITIVE_Y as c_int;
-    const POSITIVE_X: c_int = Eorientations::POSITIVE_X as c_int;
-    const POSITIVE_Z: c_int = Eorientations::POSITIVE_Z as c_int;
+    pub const POSITIVE_Y: c_int = Eorientations::POSITIVE_Y as c_int;
+    pub const POSITIVE_X: c_int = Eorientations::POSITIVE_X as c_int;
+    pub const POSITIVE_Z: c_int = Eorientations::POSITIVE_Z as c_int;
     const NEGATIVE_Y: c_int = Eorientations::NEGATIVE_Y as c_int;
-    const NEGATIVE_X: c_int = Eorientations::NEGATIVE_X as c_int;
-    const NEGATIVE_Z: c_int = Eorientations::NEGATIVE_Z as c_int;
+    pub const NEGATIVE_X: c_int = Eorientations::NEGATIVE_X as c_int;
+    pub const NEGATIVE_Z: c_int = Eorientations::NEGATIVE_Z as c_int;
     unsafe {
         match flags {
             ORIGIN => {

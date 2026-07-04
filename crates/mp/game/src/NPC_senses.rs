@@ -353,11 +353,11 @@ pub fn NPC_CheckVisibility(
     flags: c_int,
 ) -> visibility_t {
     // Visibility check flags
-    const CHECK_PVS: c_int = 1;
-    const CHECK_360: c_int = 2;
-    const CHECK_FOV: c_int = 4;
-    const CHECK_SHOOT: c_int = 8;
-    const CHECK_VISRANGE: c_int = 16;
+    pub const CHECK_PVS: c_int = 1;
+    pub const CHECK_360: c_int = 2;
+    pub const CHECK_FOV: c_int = 4;
+    pub const CHECK_SHOOT: c_int = 8;
+    pub const CHECK_VISRANGE: c_int = 16;
 
     // flags should never be 0
     if flags == 0 {
@@ -882,7 +882,7 @@ pub fn AddSightEvent(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:660-693`
 pub fn ClearPlayerAlertEvents(ctx: GameContext<'_>) {
-    const ALERT_CLEAR_TIME: c_int = 200;
+    pub const ALERT_CLEAR_TIME: c_int = 200;
 
     let world = unsafe { ctx.world.cast_mut() };
     let cur_num_alerts = world.level.numAlertEvents;
@@ -1172,7 +1172,7 @@ pub fn G_FindLocalInterestPoint(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) -> c_int {
-    const MAX_INTEREST_DIST: f32 = 256.0 * 256.0; // 65536.0
+    pub const MAX_INTEREST_DIST: f32 = 256.0 * 256.0; // 65536.0
 
     let mut best_point = ENTITYNUM_NONE;
     let mut best_dist = 16777216.0; // Q3_INFINITE

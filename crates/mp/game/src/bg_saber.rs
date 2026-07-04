@@ -44,26 +44,26 @@ use mp_bg::public::anim_number::animNumber_t as A;
 // Per-file `#define` consts (porting-rules convention: cite the Raven #define,
 // keep them local since no shared home exists yet).
 /// `BACK_STAB_DISTANCE`. Source: `oracle/oracle/codemp/game/bg_saber.c:1623`
-const BACK_STAB_DISTANCE: f32 = 128.0;
+pub const BACK_STAB_DISTANCE: f32 = 128.0;
 /// `FLIPHACK_DISTANCE`. Source: `oracle/oracle/codemp/game/bg_saber.c:1802`
-const FLIPHACK_DISTANCE: f32 = 200.0;
+pub const FLIPHACK_DISTANCE: f32 = 200.0;
 /// `SABER_ALT_ATTACK_POWER`. Source: `oracle/oracle/codemp/game/bg_saber.c:2112`
-const SABER_ALT_ATTACK_POWER: c_int = 50;
+pub const SABER_ALT_ATTACK_POWER: c_int = 50;
 /// `SABER_ALT_ATTACK_POWER_LR`. Source: `oracle/oracle/codemp/game/bg_saber.c:2113`
-const SABER_ALT_ATTACK_POWER_LR: c_int = 10;
+pub const SABER_ALT_ATTACK_POWER_LR: c_int = 10;
 /// `SABER_ALT_ATTACK_POWER_FB`. Source: `oracle/oracle/codemp/game/bg_saber.c:2114`
-const SABER_ALT_ATTACK_POWER_FB: c_int = 25;
+pub const SABER_ALT_ATTACK_POWER_FB: c_int = 25;
 /// `DIR_*`. Source: `oracle/oracle/codemp/game/bg_public.h:220-225`
-const DIR_RIGHT: c_int = 0;
-const DIR_LEFT: c_int = 1;
-const DIR_FRONT: c_int = 2;
-const DIR_BACK: c_int = 3;
+pub const DIR_RIGHT: c_int = 0;
+pub const DIR_LEFT: c_int = 1;
+pub const DIR_FRONT: c_int = 2;
+pub const DIR_BACK: c_int = 3;
 /// `SFL_NO_*` saber flags. Source: `oracle/oracle/codemp/game/q_shared.h:703-712`
-const SFL_NO_STABDOWN: c_int = 1 << 12;
-const SFL_NO_CARTWHEELS: c_int = 1 << 18;
-const SFL_NO_KICKS: c_int = 1 << 19;
-const SFL_NO_MIRROR_ATTACKS: c_int = 1 << 20;
-const SFL_NO_ROLL_STAB: c_int = 1 << 21;
+pub const SFL_NO_STABDOWN: c_int = 1 << 12;
+pub const SFL_NO_CARTWHEELS: c_int = 1 << 18;
+pub const SFL_NO_KICKS: c_int = 1 << 19;
+pub const SFL_NO_MIRROR_ATTACKS: c_int = 1 << 20;
+pub const SFL_NO_ROLL_STAB: c_int = 1 << 21;
 
 // Small per-file vector helpers (matching the codebase's per-file `DistanceSquared`
 // convention — no shared `VectorSet`/`VectorMA`/… home exists yet).

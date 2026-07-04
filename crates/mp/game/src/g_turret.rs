@@ -57,7 +57,7 @@ const CLASS_VEHICLE: c_int = 10;
 
 //TODO: Port VH_WALKER
 // Source: oracle/oracle/codemp/game/bg_vehicles.h
-const VH_WALKER: c_int = 1;
+pub const VH_WALKER: c_int = 1;
 
 /// Raven `TurretPain`.
 ///
@@ -297,7 +297,7 @@ pub fn turret_fire(
     }
 }
 
-const START_DIS: f32 = 15.0;
+pub const START_DIS: f32 = 15.0;
 
 /// Raven `turret_head_think`.
 ///

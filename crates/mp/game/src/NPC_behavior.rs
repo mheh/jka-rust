@@ -47,8 +47,8 @@ use mp_qshared::shared::MASK_SHOT;
 // Raven `MIN_ANGLE_ERROR`/`APEX_HEIGHT` (`NPC_behavior.c` file-scope consts
 // used by `NPC_BSAdvanceFight`/`NPC_BSJump`).
 // Source: `oracle/oracle/codemp/game/NPC_behavior.c` (top-of-file consts)
-const MIN_ANGLE_ERROR: f32 = 4.0;
-const APEX_HEIGHT: f32 = 30.0;
+pub const MIN_ANGLE_ERROR: f32 = 4.0;
+pub const APEX_HEIGHT: f32 = 30.0;
 
 /// Raven `NPC_BSAdvanceFight`.
 ///

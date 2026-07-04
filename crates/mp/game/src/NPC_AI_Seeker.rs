@@ -21,16 +21,16 @@ const MIN_DISTANCE: c_int = 80;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 
 // Raven `#define SEEKER_STRAFE_VEL 100` / `SEEKER_STRAFE_DIS 200` / `SEEKER_UPWARD_PUSH 32`.
-const SEEKER_STRAFE_VEL: f32 = 100.0f32;
-const SEEKER_STRAFE_DIS: f32 = 200.0f32;
-const SEEKER_UPWARD_PUSH: f32 = 32.0f32;
+pub const SEEKER_STRAFE_VEL: f32 = 100.0f32;
+pub const SEEKER_STRAFE_DIS: f32 = 200.0f32;
+pub const SEEKER_UPWARD_PUSH: f32 = 32.0f32;
 
 // Raven `#define SEEKER_FORWARD_BASE_SPEED 10` / `SEEKER_FORWARD_MULTIPLIER 2`.
-const SEEKER_FORWARD_BASE_SPEED: f32 = 10.0f32;
-const SEEKER_FORWARD_MULTIPLIER: f32 = 2.0f32;
+pub const SEEKER_FORWARD_BASE_SPEED: f32 = 10.0f32;
+pub const SEEKER_FORWARD_MULTIPLIER: f32 = 2.0f32;
 
 // Raven `#define SEEKER_SEEK_RADIUS 1024`.
-const SEEKER_SEEK_RADIUS: f32 = 1024.0f32;
+pub const SEEKER_SEEK_RADIUS: f32 = 1024.0f32;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 const qtrue: qboolean = 1;

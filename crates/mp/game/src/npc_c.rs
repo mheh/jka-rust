@@ -671,7 +671,7 @@ pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
             return;
         }
         // Raven `NPCDEBUG_RED` (`NPC.c:658`) — const color, not GameWorld state.
-        const NPCDEBUG_RED: vec3_t = [1.0, 0.0, 0.0];
+        pub const NPCDEBUG_RED: vec3_t = [1.0, 0.0, 0.0];
         // Raven `FOFS(classname)` macro.
         let fieldofs = core::mem::offset_of!(gentity_t, classname) as c_int;
 
@@ -1639,7 +1639,7 @@ pub fn NPC_Think(
     const PMF_FOLLOW: c_int = 4096;
     // Raven `ai.h:36` `rank_e`: CIVILIAN=0, CREWMAN=1, ENSIGN=2, LT_JG=3
     // (`NPC_stats.rs:51` precedent comment).
-    const RANK_LT_JG: c_int = 3;
+    pub const RANK_LT_JG: c_int = 3;
     use mp_bg::vehicles::vehicle_s::Vehicle_t;
 
     unsafe {

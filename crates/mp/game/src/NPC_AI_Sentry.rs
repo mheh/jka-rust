@@ -21,21 +21,21 @@ use crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth;
 const LSTATE_NONE: i32 = 0;
 const LSTATE_ASLEEP: i32 = 1;
 const LSTATE_WAKEUP: i32 = 2;
-const LSTATE_ACTIVE: i32 = 3;
-const LSTATE_POWERING_UP: i32 = 4;
-const LSTATE_ATTACKING: i32 = 5;
+pub const LSTATE_ACTIVE: i32 = 3;
+pub const LSTATE_POWERING_UP: i32 = 4;
+pub const LSTATE_ATTACKING: i32 = 5;
 
 const MIN_DISTANCE: i32 = 256;
 const MIN_DISTANCE_SQR: i32 = MIN_DISTANCE * MIN_DISTANCE;
 
-const SENTRY_FORWARD_BASE_SPEED: i32 = 10;
-const SENTRY_FORWARD_MULTIPLIER: i32 = 5;
+pub const SENTRY_FORWARD_BASE_SPEED: i32 = 10;
+pub const SENTRY_FORWARD_MULTIPLIER: i32 = 5;
 
-const SENTRY_VELOCITY_DECAY: f32 = 0.85f32;
-const SENTRY_STRAFE_VEL: i32 = 256;
-const SENTRY_STRAFE_DIS: i32 = 200;
-const SENTRY_UPWARD_PUSH: i32 = 32;
-const SENTRY_HOVER_HEIGHT: i32 = 24;
+pub const SENTRY_VELOCITY_DECAY: f32 = 0.85f32;
+pub const SENTRY_STRAFE_VEL: i32 = 256;
+pub const SENTRY_STRAFE_DIS: i32 = 200;
+pub const SENTRY_UPWARD_PUSH: i32 = 32;
+pub const SENTRY_HOVER_HEIGHT: i32 = 24;
 
 /// Raven `NPC_Sentry_Precache`.
 ///

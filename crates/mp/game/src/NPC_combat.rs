@@ -33,7 +33,7 @@ use mp_bg::weapons::weapon_t::*;
 // `NPC_stats.rs`'s `TranslateRankName` comment ("crewman" -> 1), precedent
 // `NPC_AI_Utils.rs`'s `RANK_ENSIGN`.
 // Source: `oracle/oracle/codemp/game/NPC_stats.c:287-330`
-const RANK_CREWMAN: c_int = 1;
+pub const RANK_CREWMAN: c_int = 1;
 
 // Unported types referenced in this file (need porting before this compiles):
 // combatPt_t
@@ -86,8 +86,8 @@ pub fn G_ClearEnemy(
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:44-59`
 pub fn G_AngerAlert(
     ctx: GameContext<'_>,self_: *mut gentity_t) {
-    const ANGER_ALERT_RADIUS: f32 = 512.0;
-    const ANGER_ALERT_SOUND_RADIUS: f32 = 256.0;
+    pub const ANGER_ALERT_RADIUS: f32 = 512.0;
+    pub const ANGER_ALERT_SOUND_RADIUS: f32 = 256.0;
     unsafe {
         if !self_.is_null() {
             let npc = (*self_).NPC as *mut gNPC_t;
@@ -1027,7 +1027,7 @@ pub fn NPC_FindCombatPoint(
 // Raven `CPF_SQUAD` (`combatPoint_t::flags` bit) — not yet ported as a
 // central const; inlined here from the header value.
 // Source: `oracle/oracle/codemp/game/b_local.h:267`
-const CPF_SQUAD: c_int = 0x00000008;
+pub const CPF_SQUAD: c_int = 0x00000008;
 
 /// `DistanceSquared` — header-inline helper (`static ID_INLINE`), precedent
 /// `NPC_AI_Utils.rs`/`NPC_AI_Rancor.rs` per-file copies.
@@ -1041,7 +1041,7 @@ fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
 // Raven `WORLD_SIZE` (`MAX_WORLD_COORD - MIN_WORLD_COORD`, `64*1024 -
 // (-64*1024)`) — not yet ported as a central const.
 // Source: `oracle/oracle/codemp/game/q_shared.h:18-20`
-const WORLD_SIZE: f32 = 131072.0;
+pub const WORLD_SIZE: f32 = 131072.0;
 
 /// Raven `NPC_FindSquadPoint`.
 ///

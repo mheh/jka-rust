@@ -43,16 +43,16 @@ use mp_bg::vehicles::vehicleType_t;
 // (the integrator wires the const home later; the name preserves intent).
 // Boarding sentinels stored in `m_iBoarding`.
 // Source: `oracle/oracle/codemp/game/bg_vehicles.h:402-403`
-const VEH_MOUNT_THROW_LEFT: c_int = -5;
-const VEH_MOUNT_THROW_RIGHT: c_int = -6;
+pub const VEH_MOUNT_THROW_LEFT: c_int = -5;
+pub const VEH_MOUNT_THROW_RIGHT: c_int = -6;
 // Eject-direction anon enum.
 // Source: `oracle/oracle/codemp/game/bg_vehicles.h:407-414`
-const VEH_EJECT_LEFT: c_int = 0;
-const VEH_EJECT_RIGHT: c_int = 1;
-const VEH_EJECT_FRONT: c_int = 2;
-const VEH_EJECT_REAR: c_int = 3;
-const VEH_EJECT_TOP: c_int = 4;
-const VEH_EJECT_BOTTOM: c_int = 5;
+pub const VEH_EJECT_LEFT: c_int = 0;
+pub const VEH_EJECT_RIGHT: c_int = 1;
+pub const VEH_EJECT_FRONT: c_int = 2;
+pub const VEH_EJECT_REAR: c_int = 3;
+pub const VEH_EJECT_TOP: c_int = 4;
+pub const VEH_EJECT_BOTTOM: c_int = 5;
 // Default player bbox z-extents (used for the MP eject-clearance trace).
 // Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
 const DEFAULT_MINS_2: f32 = -24.0;
@@ -63,10 +63,10 @@ const DEFAULT_MAXS_2: f32 = 40.0;
 const SVF_NOCLIENT: c_int = 0x0000_0001;
 
 /// Raven vehicle-surface indices (`bg_vehicles.h:427-430`).
-const SHIPSURF_FRONT: c_int = 0;
-const SHIPSURF_BACK: c_int = 1;
-const SHIPSURF_RIGHT: c_int = 2;
-const SHIPSURF_LEFT: c_int = 3;
+pub const SHIPSURF_FRONT: c_int = 0;
+pub const SHIPSURF_BACK: c_int = 1;
+pub const SHIPSURF_RIGHT: c_int = 2;
+pub const SHIPSURF_LEFT: c_int = 3;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`

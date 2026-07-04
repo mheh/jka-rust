@@ -29,9 +29,9 @@ use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 
 // Raven's file-scope `#define`s (`NPC_AI_GalakMech.c:24-26`) — not central
 // constants, ported as file-local consts matching the C values.
-const TURN_ON: c_int = 0x00000000;
+pub const TURN_ON: c_int = 0x00000000;
 const TURN_OFF: c_int = 0x00000100;
-const GALAK_SHIELD_HEALTH: c_int = 500;
+pub const GALAK_SHIELD_HEALTH: c_int = 500;
 
 // Raven `bState_t::BS_CINEMATIC` bare spelling (not glob-imported by the
 // prelude, unlike the other Raven enums it re-exports).
@@ -58,8 +58,8 @@ const FRAMETIME: c_int = 100;
 /// `fn`-private to that file).
 #[inline]
 fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, vec: &mut vec3_t) {
-    const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
-    const NEGATIVE_Y: c_int = Eorientations::NEGATIVE_Y as c_int;
+    pub const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
+    pub const NEGATIVE_Y: c_int = Eorientations::NEGATIVE_Y as c_int;
     unsafe {
         match flags {
             ORIGIN => {

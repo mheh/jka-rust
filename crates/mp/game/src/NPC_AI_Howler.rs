@@ -27,8 +27,8 @@ use crate::npc_c::NPC_SetAnim;
 // Raven `#define LSTATE_*` — file-scope local state for Howler NPC
 // (stored in `gNPC_t::localState`).
 // Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:10-11`
-const LSTATE_CLEAR: i32 = 0;
-const LSTATE_WAITING: i32 = 1;
+pub const LSTATE_CLEAR: i32 = 0;
+pub const LSTATE_WAITING: i32 = 1;
 
 // Animation constants (bg_public.h) — Howler pain response anim.
 // Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:187`

@@ -39,10 +39,10 @@ use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 const EFFECT_EXPLOSION_TURRET: c_int = 10;
 
 /// Raven `g_turret_G2.c:11-14` spawnflag `#define`s.
-const SPF_TURRETG2_CANRESPAWN: c_int = 4;
-const SPF_TURRETG2_TURBO: c_int = 8;
-const SPF_TURRETG2_LEAD_ENEMY: c_int = 16;
-const SPF_SHOWONRADAR: c_int = 32;
+pub const SPF_TURRETG2_CANRESPAWN: c_int = 4;
+pub const SPF_TURRETG2_TURBO: c_int = 8;
+pub const SPF_TURRETG2_LEAD_ENEMY: c_int = 16;
+pub const SPF_SHOWONRADAR: c_int = 32;
 
 /// Raven `g_turret_G2.c:318` (`START_DIS`).
 const START_DIS: f32 = 15.0;

@@ -60,7 +60,7 @@ use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
 
 // Raven `#define VALID_ATTACK_CONE 2.0f` (this file's own macro).
 // Source: `oracle/oracle/codemp/game/NPC_utils.c:11`
-const VALID_ATTACK_CONE: f32 = 2.0;
+pub const VALID_ATTACK_CONE: f32 = 2.0;
 
 // Raven `#define MIN_ANGLE_ERROR 0.01f` (`b_local.h`).
 // Source: `oracle/oracle/codemp/game/b_local.h:29`
@@ -112,11 +112,11 @@ fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
 
 /// Raven `BONE_ANGLES_POSTMULT` (ghoul2 bone-angle apply mode).
 /// Source: `oracle/oracle/code/game/ghoul2_shared.h:54`
-const BONE_ANGLES_POSTMULT: c_int = 0x0002;
+pub const BONE_ANGLES_POSTMULT: c_int = 0x0002;
 
 /// Raven `BG_NUM_TOGGLEABLE_SURFACES`.
 /// Source: `oracle/oracle/codemp/game/bg_public.h:138`
-const BG_NUM_TOGGLEABLE_SURFACES: c_int = 31;
+pub const BG_NUM_TOGGLEABLE_SURFACES: c_int = 31;
 
 /// Raven `PMF_FOLLOW` — spectate following another player.
 /// Source: `oracle/oracle/codemp/game/bg_public.h:415`

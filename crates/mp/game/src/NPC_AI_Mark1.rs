@@ -26,8 +26,8 @@ use crate::npc::spot_t::spot_t;
 use mp_bg::public::anim_number::animNumber_t::*;
 
 // Distance constants for combat
-const DIST_MELEE: c_int = 0;
-const DIST_LONG: c_int = 1;
+pub const DIST_MELEE: c_int = 0;
+pub const DIST_LONG: c_int = 1;
 
 // Raven's file-scope `#define`s (`NPC_AI_Mark1.c:4-22`) — not central
 // constants, ported as file-local consts matching the C values.
@@ -38,26 +38,26 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 const TURN_OFF: c_int = 0x00000100;
 const LEFT_ARM_HEALTH: c_int = 40;
 const RIGHT_ARM_HEALTH: c_int = 40;
-const AMMO_POD_HEALTH: c_int = 40;
-const BOWCASTER_VELOCITY: c_int = 1300;
+pub const AMMO_POD_HEALTH: c_int = 40;
+pub const BOWCASTER_VELOCITY: c_int = 1300;
 const BOWCASTER_NPC_DAMAGE_EASY: c_int = 12;
 const BOWCASTER_NPC_DAMAGE_NORMAL: c_int = 24;
 const BOWCASTER_NPC_DAMAGE_HARD: c_int = 36;
-const BOWCASTER_SIZE: c_int = 2;
-const BOWCASTER_SPLASH_DAMAGE: c_int = 0;
-const BOWCASTER_SPLASH_RADIUS: c_int = 0;
+pub const BOWCASTER_SIZE: c_int = 2;
+pub const BOWCASTER_SPLASH_DAMAGE: c_int = 0;
+pub const BOWCASTER_SPLASH_RADIUS: c_int = 0;
 
 // Raven's anonymous local-state `enum` (`NPC_AI_Mark1.c:25-35`) — no
 // separate typedef name, so it stays a plain set of `c_int` consts per
 // house rule (typedef int + anonymous enum -> consts).
 const LSTATE_NONE: c_int = 0;
 const LSTATE_ASLEEP: c_int = 1;
-const LSTATE_WAKEUP: c_int = 2;
-const LSTATE_FIRED0: c_int = 3;
-const LSTATE_FIRED1: c_int = 4;
-const LSTATE_FIRED2: c_int = 5;
-const LSTATE_FIRED3: c_int = 6;
-const LSTATE_FIRED4: c_int = 7;
+pub const LSTATE_WAKEUP: c_int = 2;
+pub const LSTATE_FIRED0: c_int = 3;
+pub const LSTATE_FIRED1: c_int = 4;
+pub const LSTATE_FIRED2: c_int = 5;
+pub const LSTATE_FIRED3: c_int = 6;
+pub const LSTATE_FIRED4: c_int = 7;
 
 // Shot mask constant (collision mask for projectiles)
 pub(crate) const MASK_SHOT: c_int = 0x00000001 | 0x00000100 | 0x00000200 | 0x00040000; // CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE|CONTENTS_TERRAIN

@@ -49,7 +49,7 @@ const qfalse: qboolean = 0;
 
 /// Raven `MAX_TOKEN_CHARS` — command/argument token buffer size.
 /// Source: `oracle/oracle/codemp/game/q_shared.h`
-const MAX_TOKEN_CHARS: usize = 1024;
+pub const MAX_TOKEN_CHARS: usize = 1024;
 
 /// `ent - g_entities` — the entity's slot index (client number for players).
 #[inline]
@@ -732,7 +732,7 @@ pub fn SanitizeString2(
     r#in: *mut c_char,
     out: *mut c_char,
 ) {
-    const MAX_NAME_LENGTH: usize = 32; // Source: `oracle/oracle/codemp/game/bg_public.h`
+    pub const MAX_NAME_LENGTH: usize = 32; // Source: `oracle/oracle/codemp/game/bg_public.h`
     unsafe {
         let mut i: isize = 0;
         let mut r: isize = 0;

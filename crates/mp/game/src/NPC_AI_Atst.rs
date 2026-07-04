@@ -20,27 +20,27 @@ const MIN_MELEE_RANGE: c_int = 640;
 
 /// Min melee range squared.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:4`
-const MIN_MELEE_RANGE_SQR: c_int = MIN_MELEE_RANGE * MIN_MELEE_RANGE;
+pub const MIN_MELEE_RANGE_SQR: c_int = MIN_MELEE_RANGE * MIN_MELEE_RANGE;
 
 /// Min distance.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:6`
-const MIN_DISTANCE: c_int = 128;
+pub const MIN_DISTANCE: c_int = 128;
 
 /// Min distance squared.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:7`
-const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
+pub const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 
 /// Surface render status flag: turn off.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:9`
-const TURN_OFF: c_int = 0x00000100;
+pub const TURN_OFF: c_int = 0x00000100;
 
 /// Left arm health.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:11`
-const LEFT_ARM_HEALTH: c_int = 40;
+pub const LEFT_ARM_HEALTH: c_int = 40;
 
 /// Right arm health.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:12`
-const RIGHT_ARM_HEALTH: c_int = 40;
+pub const RIGHT_ARM_HEALTH: c_int = 40;
 
 /// Raven `NPC_ATST_Precache`.
 ///

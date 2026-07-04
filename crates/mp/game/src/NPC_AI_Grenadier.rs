@@ -22,8 +22,8 @@ use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 // as file-local consts matching the C values.
 // Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:42-47`
 const LSTATE_NONE: i32 = 0;
-const LSTATE_UNDERFIRE: i32 = 1;
-const LSTATE_INVESTIGATE: i32 = 2;
+pub const LSTATE_UNDERFIRE: i32 = 1;
+pub const LSTATE_INVESTIGATE: i32 = 2;
 
 // Raven's `enum { SQUAD_IDLE, SQUAD_STAND_AND_SHOOT, ... }` from `ai.h`
 // (squad state selector, `gNPC_t::squadState`) — file-scope consts matching C values.
@@ -38,7 +38,7 @@ const SQUAD_SCOUT: i32 = 6;
 
 // Navigation flag constants (fork ruling 5: file-scope consts).
 // Source: `oracle/oracle/codemp/game/b_local.h:314-322`
-const NIF_COLLISION: i32 = 0x00000004;
+pub const NIF_COLLISION: i32 = 0x00000004;
 
 // Script flags (fork ruling 5: file-scope consts).
 // Source: `oracle/oracle/codemp/game/b_public.h`
@@ -51,13 +51,13 @@ const SCF_LOOK_FOR_ENEMIES: i32 = 0x00000080;
 
 // Combat point flags (fork ruling 5: file-scope consts).
 // Source: `oracle/oracle/codemp/game/b_public.h`
-const CP_CLEAR: c_int = 0x00000002;           // Has a clear shot to the enemy
-const CP_NEAREST: c_int = 0x00000010;         // Find the nearest combat point
-const CP_APPROACH_ENEMY: c_int = 0x00000200;  // Try to get closer to enemy
-const CP_CLOSEST: c_int = 0x00000400;         // Take closest to enemy
-const CP_FLANK: c_int = 0x00000800;           // Pick a combatPoint behind enemy
-const CP_HAS_ROUTE: c_int = 0x00001000;       // We have a route to this point
-const CP_HORZ_DIST_COLL: c_int = 0x00008000;  // Collect within horizontal dist
+pub const CP_CLEAR: c_int = 0x00000002;           // Has a clear shot to the enemy
+pub const CP_NEAREST: c_int = 0x00000010;         // Find the nearest combat point
+pub const CP_APPROACH_ENEMY: c_int = 0x00000200;  // Try to get closer to enemy
+pub const CP_CLOSEST: c_int = 0x00000400;         // Take closest to enemy
+pub const CP_FLANK: c_int = 0x00000800;           // Pick a combatPoint behind enemy
+pub const CP_HAS_ROUTE: c_int = 0x00001000;       // We have a route to this point
+pub const CP_HORZ_DIST_COLL: c_int = 0x00008000;  // Collect within horizontal dist
 
 // Angle indices for vec3 arrays.
 const PITCH: usize = 0;

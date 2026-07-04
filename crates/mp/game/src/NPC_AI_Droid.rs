@@ -19,15 +19,15 @@ use crate::q_shared::va;
 
 /// Local state enums.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:10-17`
-const LSTATE_NONE: c_int = 0;
+pub const LSTATE_NONE: c_int = 0;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:12`
-const LSTATE_BACKINGUP: c_int = 1;
+pub const LSTATE_BACKINGUP: c_int = 1;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:13`
-const LSTATE_SPINNING: c_int = 2;
+pub const LSTATE_SPINNING: c_int = 2;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:14`
-const LSTATE_PAIN: c_int = 3;
+pub const LSTATE_PAIN: c_int = 3;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:15`
-const LSTATE_DROP: c_int = 4;
+pub const LSTATE_DROP: c_int = 4;
 
 /// Surface render status flag: turn off.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:84`

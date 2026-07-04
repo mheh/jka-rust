@@ -45,22 +45,22 @@ use mp_qshared::common::mp::trace_t::trace_t;
 // the file's own local-const precedent — cf. `GetFlagStr`/`G_TestLine`). ──
 // Source: `oracle/oracle/codemp/game/q_shared.h:993`,
 //         `oracle/oracle/codemp/game/ai_wpnav.c:2505`
-const MAX_WPARRAY_SIZE: c_int = 4096;
-const MAX_NODETABLE_SIZE: c_int = 16384;
-const MAX_SPAWNPOINT_ARRAY: usize = 64;
+pub const MAX_WPARRAY_SIZE: c_int = 4096;
+pub const MAX_NODETABLE_SIZE: c_int = 16384;
+pub const MAX_SPAWNPOINT_ARRAY: usize = 64;
 // Source: `oracle/oracle/codemp/game/q_shared.h:996,999`,
 //         `oracle/oracle/codemp/game/ai_main.h:14`
-const MAX_NEIGHBOR_LINK_DISTANCE: f32 = 128.0;
-const DEFAULT_GRID_SPACING: f32 = 400.0;
-const TABLE_BRANCH_DISTANCE: f32 = 32.0;
+pub const MAX_NEIGHBOR_LINK_DISTANCE: f32 = 128.0;
+pub const DEFAULT_GRID_SPACING: f32 = 400.0;
+pub const TABLE_BRANCH_DISTANCE: f32 = 32.0;
 // Waypoint flag bits (`ai_main.h:22-38`).
-const WPFLAG_JUMP: c_int = 0x00000010;
-const WPFLAG_ONEWAY_FWD: c_int = 0x00004000;
-const WPFLAG_ONEWAY_BACK: c_int = 0x00008000;
-const WPFLAG_RED_FLAG: c_int = 0x00020000;
-const WPFLAG_BLUE_FLAG: c_int = 0x00040000;
-const WPFLAG_CALCULATED: c_int = 0x00400000;
-const WPFLAG_NEVERONEWAY: c_int = 0x00800000;
+pub const WPFLAG_JUMP: c_int = 0x00000010;
+pub const WPFLAG_ONEWAY_FWD: c_int = 0x00004000;
+pub const WPFLAG_ONEWAY_BACK: c_int = 0x00008000;
+pub const WPFLAG_RED_FLAG: c_int = 0x00020000;
+pub const WPFLAG_BLUE_FLAG: c_int = 0x00040000;
+pub const WPFLAG_CALCULATED: c_int = 0x00400000;
+pub const WPFLAG_NEVERONEWAY: c_int = 0x00800000;
 // `MASK_PLAYERSOLID = CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY|CONTENTS_TERRAIN`
 // (`bg_public.h:1172`); `CONTENTS_PLAYERCLIP` (`surfaceflags.h:14`) has no
 // ported home yet, so both are transcribed here verbatim.
@@ -101,19 +101,19 @@ pub fn GetFlagStr(
     // Raven flag bit values (`ai_main.h:22-38`); not yet ported anywhere else
     // in the crate graph, so defined locally, verbatim.
     const WPFLAG_JUMP: c_int = 0x00000010;
-    const WPFLAG_DUCK: c_int = 0x00000020;
-    const WPFLAG_NOVIS: c_int = 0x00000400;
-    const WPFLAG_SNIPEORCAMPSTAND: c_int = 0x00000800;
-    const WPFLAG_WAITFORFUNC: c_int = 0x00001000;
-    const WPFLAG_SNIPEORCAMP: c_int = 0x00002000;
+    pub const WPFLAG_DUCK: c_int = 0x00000020;
+    pub const WPFLAG_NOVIS: c_int = 0x00000400;
+    pub const WPFLAG_SNIPEORCAMPSTAND: c_int = 0x00000800;
+    pub const WPFLAG_WAITFORFUNC: c_int = 0x00001000;
+    pub const WPFLAG_SNIPEORCAMP: c_int = 0x00002000;
     const WPFLAG_ONEWAY_FWD: c_int = 0x00004000;
     const WPFLAG_ONEWAY_BACK: c_int = 0x00008000;
-    const WPFLAG_GOALPOINT: c_int = 0x00010000;
+    pub const WPFLAG_GOALPOINT: c_int = 0x00010000;
     const WPFLAG_RED_FLAG: c_int = 0x00020000;
     const WPFLAG_BLUE_FLAG: c_int = 0x00040000;
-    const WPFLAG_SIEGE_REBELOBJ: c_int = 0x00080000;
-    const WPFLAG_SIEGE_IMPERIALOBJ: c_int = 0x00100000;
-    const WPFLAG_NOMOVEFUNC: c_int = 0x00200000;
+    pub const WPFLAG_SIEGE_REBELOBJ: c_int = 0x00080000;
+    pub const WPFLAG_SIEGE_IMPERIALOBJ: c_int = 0x00100000;
+    pub const WPFLAG_NOMOVEFUNC: c_int = 0x00200000;
 
     unsafe {
         let flagstr = B_TempAlloc(ctx, 128) as *mut c_char;

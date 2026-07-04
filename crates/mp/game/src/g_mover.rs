@@ -67,7 +67,7 @@ const CONTENTS_TRIGGER: c_int = 0x0000_0400;
 const SVF_NOCLIENT: c_int = 0x0000_0001;
 const SVF_BROADCAST: c_int = 0x0000_0020;
 const FRAMETIME: c_int = 100;
-const FUNC_WALL_OFF: c_int = 1;
+pub const FUNC_WALL_OFF: c_int = 1;
 
 // Raven `YAW` axis index (`q_shared.h`); same value used throughout the
 // crate (e.g. `g_active.rs`'s local `const YAW: usize = 1`).
@@ -81,13 +81,13 @@ const qfalse: qboolean = 0;
 // Raven file-scope `#define`s (this file's own bitflags on `ent->spawnflags`).
 // Source: `oracle/oracle/codemp/game/g_mover.c:26-33`
 const MOVER_START_ON: c_int = 1;
-const MOVER_FORCE_ACTIVATE: c_int = 2;
-const MOVER_CRUSHER: c_int = 4;
-const MOVER_TOGGLE: c_int = 8;
-const MOVER_LOCKED: c_int = 16;
+pub const MOVER_FORCE_ACTIVATE: c_int = 2;
+pub const MOVER_CRUSHER: c_int = 4;
+pub const MOVER_TOGGLE: c_int = 8;
+pub const MOVER_LOCKED: c_int = 16;
 const MOVER_GOODIE: c_int = 32;
-const MOVER_PLAYER_USE: c_int = 64;
-const MOVER_INACTIVE: c_int = 128;
+pub const MOVER_PLAYER_USE: c_int = 64;
+pub const MOVER_INACTIVE: c_int = 128;
 
 // Raven file-scope `int BMS_START/BMS_MID/BMS_END` (g_mover.c:35-37) — never
 // reassigned at runtime (fork ruling 5: const tables -> const).
@@ -1985,7 +1985,7 @@ pub fn SP_func_train(
         // named const anywhere in the crate graph — transcribed as its
         // literal bit here (single call site, no cross-file reuse to justify
         // a shared const yet).
-        const TRAIN_BLOCK_STOPS: c_int = 1;
+        pub const TRAIN_BLOCK_STOPS: c_int = 1;
         if (*self_).spawnflags & TRAIN_BLOCK_STOPS != 0 {
             (*self_).damage = 0;
         } else if (*self_).damage == 0 {

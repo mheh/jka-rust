@@ -26,21 +26,21 @@ use mp_qshared::shared::trajectory::trType_t;
 // convention, cf. `bg_pmove.rs`'s `MIN_WALK_NORMAL`/`PMF_STUCK_TO_WALL`). ---
 
 /// `MAX_IMPACT_TURN_ANGLE`. Source: `oracle/oracle/codemp/game/bg_slidemove.c:48`
-const MAX_IMPACT_TURN_ANGLE: f32 = 45.0;
+pub const MAX_IMPACT_TURN_ANGLE: f32 = 45.0;
 /// `MAX_CLIP_PLANES`. Source: `oracle/oracle/codemp/game/bg_slidemove.c:633`
-const MAX_CLIP_PLANES: usize = 5;
+pub const MAX_CLIP_PLANES: usize = 5;
 /// `MIN_LANDING_SPEED`. Source: `oracle/oracle/codemp/game/bg_vehicles.h:399`
-const MIN_LANDING_SPEED: f32 = 200.0;
+pub const MIN_LANDING_SPEED: f32 = 200.0;
 /// `OVERCLIP`. Source: `oracle/oracle/codemp/game/bg_local.h:10`
-const OVERCLIP: f32 = 1.001;
+pub const OVERCLIP: f32 = 1.001;
 /// `STEPSIZE`. Source: `oracle/oracle/codemp/game/bg_public.h:22`
-const STEPSIZE: f32 = 18.0;
+pub const STEPSIZE: f32 = 18.0;
 /// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
 const MIN_WALK_NORMAL: f32 = 0.7;
 /// `PMF_STUCK_TO_WALL`. Source: `oracle/oracle/codemp/game/bg_public.h:417`
 const PMF_STUCK_TO_WALL: c_int = 16384;
 /// `SOLID_BMODEL`. Source: `oracle/oracle/codemp/game/q_shared.h:2642`
-const SOLID_BMODEL: c_int = 0xffffff;
+pub const SOLID_BMODEL: c_int = 0xffffff;
 
 impl PmoveContext<'_> {
     /// Raven `PM_VehicleImpact` — vehicle-vs-world/entity impact damage,

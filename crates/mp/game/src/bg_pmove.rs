@@ -37,25 +37,25 @@ use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 // read-only tunables, so they stay module `const`s (post-mega-pass ruling 15:
 // "the pm_* float constants can stay consts").
 // Source: `oracle/oracle/codemp/game/bg_pmove.c:41-55`
-const pm_stopspeed: f32 = 100.0;
-const pm_friction: f32 = 6.0;
-const pm_waterfriction: f32 = 1.0;
-const pm_spectatorfriction: f32 = 5.0;
+pub const pm_stopspeed: f32 = 100.0;
+pub const pm_friction: f32 = 6.0;
+pub const pm_waterfriction: f32 = 1.0;
+pub const pm_spectatorfriction: f32 = 5.0;
 
 // --- `bg_pmove.c` local `FLY_*` enum (bg_pmove.c:441-444). Mirrors `pm_flying`.
 // Source: `oracle/oracle/codemp/game/bg_pmove.c:441-444`
-const FLY_NONE: c_int = 0;
-const FLY_NORMAL: c_int = 1;
-const FLY_VEHICLE: c_int = 2;
-const FLY_HOVER: c_int = 3;
+pub const FLY_NONE: c_int = 0;
+pub const FLY_NORMAL: c_int = 1;
+pub const FLY_VEHICLE: c_int = 2;
+pub const FLY_HOVER: c_int = 3;
 
 // --- Constants the pmove slice reads that are not (yet) centrally exported;
 // defined here per the codebase's per-file `#define` convention (cf. w_force.rs
 // defining its own `PMF_STUCK_TO_WALL`). Each cites its Raven `#define`.
 /// `MINS_Z`. Source: `oracle/oracle/codemp/game/bg_public.h:46`
-const MINS_Z: c_int = -24;
+pub const MINS_Z: c_int = -24;
 /// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
-const MIN_WALK_NORMAL: f32 = 0.7;
+pub const MIN_WALK_NORMAL: f32 = 0.7;
 /// `SURF_SLICK`. Source: `oracle/oracle/codemp/game/surfaceflags.h:39`
 const SURF_SLICK: c_int = 0x0000_4000;
 /// `CONTENTS_LAVA|WATER|SLIME`. Source: `oracle/oracle/codemp/game/surfaceflags.h:11,12,30`
@@ -67,7 +67,7 @@ const PMF_TIME_KNOCKBACK: c_int = 64;
 /// `PMF_JUMP_HELD`. Source: `oracle/oracle/codemp/game/bg_public.h:404`
 const PMF_JUMP_HELD: c_int = 2;
 /// `PS_PMOVEFRAMECOUNTBITS`. Source: `oracle/oracle/codemp/game/q_shared.h:2141`
-const PS_PMOVEFRAMECOUNTBITS: c_int = 6;
+pub const PS_PMOVEFRAMECOUNTBITS: c_int = 6;
 /// `BUTTON_ATTACK`. Source: `oracle/oracle/codemp/game/q_shared.h:2451`
 const BUTTON_ATTACK: c_int = 1;
 /// `BUTTON_ALT_ATTACK`. Source: `oracle/oracle/codemp/game/q_shared.h:2462`

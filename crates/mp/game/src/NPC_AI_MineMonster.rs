@@ -24,7 +24,7 @@ use mp_bg::public::entity_event::entity_event_t;
 const MIN_DISTANCE: c_int = 54;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 
-const MAX_DISTANCE: c_int = 128;
+pub const MAX_DISTANCE: c_int = 128;
 const MAX_DISTANCE_SQR: c_int = MAX_DISTANCE * MAX_DISTANCE;
 
 // Raven's file-scope local state (NPC_AI_MineMonster.c:10-11):

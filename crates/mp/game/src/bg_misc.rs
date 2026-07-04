@@ -34,7 +34,7 @@ use crate::q_shared::Q_stricmp;
 
 /// Raven `GIB_HEALTH` — health threshold below which a corpse gibs.
 /// Source: `oracle/oracle/codemp/game/bg_public.h:25`
-const GIB_HEALTH: c_int = -40;
+pub const GIB_HEALTH: c_int = -40;
 
 use mp_bg::public::fieldtype::fieldtype_t;
 use mp_bg::public::stat_index::statIndex_t;

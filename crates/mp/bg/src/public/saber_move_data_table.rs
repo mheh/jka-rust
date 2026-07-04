@@ -19,14 +19,14 @@ use super::set_anim::{
 // Per-move animation-flag presets — combinations of the `SETANIM_FLAG_*` bits, used by
 // the `animSetFlags` column below.
 // Source: `oracle/oracle/codemp/game/bg_saber.c:113-117`
-const AFLAG_IDLE: c_uint = SETANIM_FLAG_NORMAL as c_uint;
-const AFLAG_ACTIVE: c_uint =
+pub const AFLAG_IDLE: c_uint = SETANIM_FLAG_NORMAL as c_uint;
+pub const AFLAG_ACTIVE: c_uint =
     (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS) as c_uint;
 // AFLAG_WAIT is defined by bg_saber.c but referenced by no row in this table (a C
 // `#define` warns on neither side); kept for fidelity.
 #[allow(dead_code)]
 const AFLAG_WAIT: c_uint = (SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS) as c_uint;
-const AFLAG_FINISH: c_uint = SETANIM_FLAG_HOLD as c_uint;
+pub const AFLAG_FINISH: c_uint = SETANIM_FLAG_HOLD as c_uint;
 
 /// Raven `saberMoveData[LS_MOVE_MAX]` — per-move animation and chaining data for
 /// every saber move: name, animation, start/end quadrants, anim flags, blend time,

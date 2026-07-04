@@ -32,19 +32,19 @@ pub struct gtimer_t {
 
 /// Maximum number of timers in the pool (Raven `MAX_GTIMERS`).
 /// Source: `oracle/oracle/codemp/game/g_timer.c:8`
-const MAX_GTIMERS: usize = 16384;
+pub const MAX_GTIMERS: usize = 16384;
 
 // Timer state — file-scope globals per oracle (fork ruling 1: become GameWorld fields).
 // Accessed via unsafe statics to match oracle structure until architecture threads GameWorld.
 // Source: `oracle/oracle/codemp/game/g_timer.c:17-19`
-static mut g_timerPool: [gtimer_t; MAX_GTIMERS] = [gtimer_t {
+pub static mut g_timerPool: [gtimer_t; MAX_GTIMERS] = [gtimer_t {
     name: core::ptr::null(),
     time: 0,
     next: core::ptr::null_mut(),
 }; MAX_GTIMERS];
-static mut g_timers: [*mut gtimer_t; MAX_GENTITIES as usize] =
+pub static mut g_timers: [*mut gtimer_t; MAX_GENTITIES as usize] =
     [core::ptr::null_mut(); MAX_GENTITIES as usize];
-static mut g_timerFreeList: *mut gtimer_t = core::ptr::null_mut();
+pub static mut g_timerFreeList: *mut gtimer_t = core::ptr::null_mut();
 
 // PORT-ESCALATION(level-global-access): Timer functions need level.time from GameWorld but
 // have no GameWorld parameter. Temporarily using a global-scope reference passed from engine init.

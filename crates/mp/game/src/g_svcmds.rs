@@ -26,7 +26,7 @@ const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
 // Constants from the Raven source.
-const MAX_IPFILTERS: usize = 1024;
+pub const MAX_IPFILTERS: usize = 1024;
 
 // File-scope globals: IP filtering state.
 // Source: oracle/oracle/codemp/game/g_svcmds.c:54-55

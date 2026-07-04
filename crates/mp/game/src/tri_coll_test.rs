@@ -15,8 +15,8 @@
 
 use crate::prelude::*;
 
-const USE_EPSILON_TEST: bool = true;
-const EPSILON: f32 = 0.000001;
+pub const USE_EPSILON_TEST: bool = true;
+pub const EPSILON: f32 = 0.000001;
 
 /// Raven `coplanar_tri_tri`.
 ///

@@ -25,18 +25,18 @@ const LSTATE_DROP: i32 = 4;
 
 // Height maintenance
 // Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:124-127
-const VELOCITY_DECAY: f32 = 0.85;
+pub const VELOCITY_DECAY: f32 = 0.85;
 
 // Strafe parameters
 // Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:178-181
-const HUNTER_STRAFE_VEL: c_int = 256;
-const HUNTER_STRAFE_DIS: c_int = 200;
-const HUNTER_UPWARD_PUSH: c_int = 32;
+pub const HUNTER_STRAFE_VEL: c_int = 256;
+pub const HUNTER_STRAFE_DIS: c_int = 200;
+pub const HUNTER_UPWARD_PUSH: c_int = 32;
 
 // Hunt parameters
 // Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:294-296
-const HUNTER_FORWARD_BASE_SPEED: c_int = 10;
-const HUNTER_FORWARD_MULTIPLIER: c_int = 5;
+pub const HUNTER_FORWARD_BASE_SPEED: c_int = 10;
+pub const HUNTER_FORWARD_MULTIPLIER: c_int = 5;
 
 // Melee range
 // Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:448-452

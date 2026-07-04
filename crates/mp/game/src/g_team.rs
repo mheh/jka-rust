@@ -29,10 +29,10 @@ const qfalse: qboolean = 0;
 
 // Raven color escape `#define`s (porting-rules §C8: `#define` -> `const`).
 // Source: `oracle/oracle/codemp/game/q_shared.h:1145-1167`
-const S_COLOR_RED: &CStr = c"^1";
-const S_COLOR_YELLOW: &CStr = c"^3";
-const S_COLOR_BLUE: &CStr = c"^4";
-const S_COLOR_WHITE: &CStr = c"^7";
+pub const S_COLOR_RED: &CStr = c"^1";
+pub const S_COLOR_YELLOW: &CStr = c"^3";
+pub const S_COLOR_BLUE: &CStr = c"^4";
+pub const S_COLOR_WHITE: &CStr = c"^7";
 
 // Raven team indices (`q_shared.h`).
 const TEAM_FREE: c_int = 0;

@@ -62,49 +62,49 @@ use mp_bg::public::weaponstate::weaponstate_t::WEAPON_READY;
 // the NPC_AI_Sniper.rs precedent — each AI file replicates its own copy of
 // these #defines).
 // Source: `oracle/oracle/codemp/game/b_local.h:243-263`
-const CP_ANY: c_int = 0x0000_0000;
-const CP_COVER: c_int = 0x0000_0001;
+pub const CP_ANY: c_int = 0x0000_0000;
+pub const CP_COVER: c_int = 0x0000_0001;
 const CP_CLEAR: c_int = 0x0000_0002;
-const CP_FLEE: c_int = 0x0000_0004;
-const CP_DUCK: c_int = 0x0000_0008;
+pub const CP_FLEE: c_int = 0x0000_0004;
+pub const CP_DUCK: c_int = 0x0000_0008;
 const CP_NEAREST: c_int = 0x0000_0010;
-const CP_AVOID_ENEMY: c_int = 0x0000_0020;
-const CP_INVESTIGATE: c_int = 0x0000_0040;
-const CP_SQUAD: c_int = 0x0000_0080;
-const CP_AVOID: c_int = 0x0000_0100;
+pub const CP_AVOID_ENEMY: c_int = 0x0000_0020;
+pub const CP_INVESTIGATE: c_int = 0x0000_0040;
+pub const CP_SQUAD: c_int = 0x0000_0080;
+pub const CP_AVOID: c_int = 0x0000_0100;
 const CP_APPROACH_ENEMY: c_int = 0x0000_0200;
 const CP_CLOSEST: c_int = 0x0000_0400;
 const CP_FLANK: c_int = 0x0000_0800;
 const CP_HAS_ROUTE: c_int = 0x0000_1000;
-const CP_SAFE: c_int = 0x0000_4000;
+pub const CP_SAFE: c_int = 0x0000_4000;
 const CP_HORZ_DIST_COLL: c_int = 0x0000_8000;
-const CP_RETREAT: c_int = 0x0002_0000;
-const CPF_DUCK: c_int = 0x0000_0001;
+pub const CP_RETREAT: c_int = 0x0002_0000;
+pub const CPF_DUCK: c_int = 0x0000_0001;
 
 // Raven `rank_t` (anonymous enum) — value pinned per file, matching the
 // `NPC_AI_Utils.rs`/`NPC_combat.rs` precedent copies.
 // Source: `oracle/oracle/codemp/game/b_local.h`
-const RANK_ENSIGN: c_int = 2;
-const RANK_LT: c_int = 4;
+pub const RANK_ENSIGN: c_int = 2;
+pub const RANK_LT: c_int = 4;
 
 // File-scope constants (`#define`).
 // Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:19-34`
-const MAX_VIEW_DIST: f32 = 1024.0;
-const MAX_VIEW_SPEED: f32 = 250.0;
-const MAX_LIGHT_INTENSITY: f32 = 255.0;
-const MIN_LIGHT_THRESHOLD: f32 = 0.1;
-const ST_MIN_LIGHT_THRESHOLD: c_int = 30;
-const ST_MAX_LIGHT_THRESHOLD: c_int = 180;
-const DISTANCE_THRESHOLD: f32 = 0.075;
-const DISTANCE_SCALE: f32 = 0.35;
-const FOV_SCALE: f32 = 0.40;
-const LIGHT_SCALE: f32 = 0.25;
-const SPEED_SCALE: f32 = 0.25;
-const TURNING_SCALE: f32 = 0.25;
-const REALIZE_THRESHOLD: f32 = 0.6;
-const CAUTIOUS_THRESHOLD: f32 = REALIZE_THRESHOLD * 0.75;
+pub const MAX_VIEW_DIST: f32 = 1024.0;
+pub const MAX_VIEW_SPEED: f32 = 250.0;
+pub const MAX_LIGHT_INTENSITY: f32 = 255.0;
+pub const MIN_LIGHT_THRESHOLD: f32 = 0.1;
+pub const ST_MIN_LIGHT_THRESHOLD: c_int = 30;
+pub const ST_MAX_LIGHT_THRESHOLD: c_int = 180;
+pub const DISTANCE_THRESHOLD: f32 = 0.075;
+pub const DISTANCE_SCALE: f32 = 0.35;
+pub const FOV_SCALE: f32 = 0.40;
+pub const LIGHT_SCALE: f32 = 0.25;
+pub const SPEED_SCALE: f32 = 0.25;
+pub const TURNING_SCALE: f32 = 0.25;
+pub const REALIZE_THRESHOLD: f32 = 0.6;
+pub const CAUTIOUS_THRESHOLD: f32 = REALIZE_THRESHOLD * 0.75;
 // `MIN_ROCKET_DIST_SQUARED` (`b_local.h`) — 128*128.
-const MIN_ROCKET_DIST_SQUARED: f32 = 16384.0;
+pub const MIN_ROCKET_DIST_SQUARED: f32 = 16384.0;
 
 // Ruling 22 seam helpers (local to this file, mirroring the `g_missile.rs`
 // precedent): `gentity_t*` stored fields (`enemy`/`goalEntity`/`tempGoal`/…)
@@ -139,20 +139,20 @@ const LSTATE_INVESTIGATE: i32 = 2;
 // speech-type selector for `ST_Speech`) — not a central type, ported as
 // file-local consts matching the C values.
 // Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:106-122`
-const SPEECH_CHASE: i32 = 0;
-const SPEECH_CONFUSED: i32 = 1;
-const SPEECH_COVER: i32 = 2;
-const SPEECH_DETECTED: i32 = 3;
-const SPEECH_GIVEUP: i32 = 4;
-const SPEECH_LOOK: i32 = 5;
-const SPEECH_LOST: i32 = 6;
-const SPEECH_OUTFLANK: i32 = 7;
-const SPEECH_ESCAPING: i32 = 8;
-const SPEECH_SIGHT: i32 = 9;
-const SPEECH_SOUND: i32 = 10;
-const SPEECH_SUSPICIOUS: i32 = 11;
-const SPEECH_YELL: i32 = 12;
-const SPEECH_PUSHED: i32 = 13;
+pub const SPEECH_CHASE: i32 = 0;
+pub const SPEECH_CONFUSED: i32 = 1;
+pub const SPEECH_COVER: i32 = 2;
+pub const SPEECH_DETECTED: i32 = 3;
+pub const SPEECH_GIVEUP: i32 = 4;
+pub const SPEECH_LOOK: i32 = 5;
+pub const SPEECH_LOST: i32 = 6;
+pub const SPEECH_OUTFLANK: i32 = 7;
+pub const SPEECH_ESCAPING: i32 = 8;
+pub const SPEECH_SIGHT: i32 = 9;
+pub const SPEECH_SOUND: i32 = 10;
+pub const SPEECH_SUSPICIOUS: i32 = 11;
+pub const SPEECH_YELL: i32 = 12;
+pub const SPEECH_PUSHED: i32 = 13;
 
 /// Raven `ST_AggressionAdjust`.
 ///

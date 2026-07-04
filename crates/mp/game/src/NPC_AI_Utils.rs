@@ -36,7 +36,7 @@ use crate::ai_wpnav::G_TestLine;
 use crate::g_timer::TIMER_Done;
 use crate::q_math::Q_irand;
 
-const MAX_RADIUS_ENTS: usize = 128;
+pub const MAX_RADIUS_ENTS: usize = 128;
 
 // Raven `SCF_NO_GROUPS` (`gNPC_t::scriptFlags` bit) — not yet ported as a
 // central const; inlined here from the header value (precedent:

@@ -28,7 +28,7 @@ use crate::q_shared::Q_stricmp;
 /// Raven's `#define SIEGECHAR_TAB 9` (tab literal used by the hand-rolled
 /// siege-file parser instead of `'\t'`).
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:17`
-const SIEGECHAR_TAB: c_char = 9;
+pub const SIEGECHAR_TAB: c_char = 9;
 
 /// Raven `BG_SiegeStripTabs`.
 ///

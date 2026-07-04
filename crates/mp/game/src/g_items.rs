@@ -68,11 +68,11 @@ const ROLL: usize = 2;
 /// may pick this item up).
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:32`
-const ITMSF_ALLOWNPC: c_int = 4;
+pub const ITMSF_ALLOWNPC: c_int = 4;
 
 // Raven `g_items.c:42-44` medpack heal caps.
-const MAX_MEDPACK_HEAL_AMOUNT: c_int = 25;
-const MAX_MEDPACK_BIG_HEAL_AMOUNT: c_int = 50;
+pub const MAX_MEDPACK_HEAL_AMOUNT: c_int = 25;
+pub const MAX_MEDPACK_BIG_HEAL_AMOUNT: c_int = 50;
 
 // Raven `g_items.c:1333-1334` dispenser item classnames.
 // (referenced from `G_PrecacheDispensers`)
@@ -101,7 +101,7 @@ const SVF_BROADCAST: c_int = 0x0000_0020;
 const SVF_SINGLECLIENT: c_int = 0x0000_0040;
 
 // Raven `bg_public.h:82` `CS_ITEMS`.
-const CS_ITEMS: c_int = 27;
+pub const CS_ITEMS: c_int = 27;
 
 // Raven `bg_public.h` `EF_ITEMPLACEHOLDER`/`EF_CLIENTSMOOTH`/`EF_G2ANIMATING`
 // (not yet ported to `mp_bg::public::entity_effects`).
@@ -113,7 +113,7 @@ const EF_G2ANIMATING: c_int = 1 << 0;
 use mp_bg::public::entity_event::entity_event_t;
 
 // Raven `ITEM_RADIUS` (`bg_public.h:35`).
-const ITEM_RADIUS: f32 = 15.0;
+pub const ITEM_RADIUS: f32 = 15.0;
 
 // Raven `FRAMETIME` (`g_local.h:37`). `pub` + prelude re-export (pass-3
 // symbol backfill) — sibling files (`NPC_AI_GalakMech.rs`, `g_mover.rs`, …)
@@ -122,8 +122,8 @@ const ITEM_RADIUS: f32 = 15.0;
 pub const FRAMETIME: c_int = 100;
 
 // Raven `#define TURRET_DEATH_DELAY 2000` / `TURRET_LIFETIME 60000` (`g_items.c:697-698`).
-const TURRET_DEATH_DELAY: c_int = 2000;
-const TURRET_LIFETIME: c_int = 60000;
+pub const TURRET_DEATH_DELAY: c_int = 2000;
+pub const TURRET_LIFETIME: c_int = 60000;
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_adaptRespawn`
 // (cvar) and `level.numPlayingClients` — no world handle on the staged
@@ -138,7 +138,7 @@ pub fn adjustRespawnTime(
     itemTag: c_int,
 ) -> c_int {
     // Raven `#define RESPAWN_AMMO 40` (`g_items.c:26`).
-    const RESPAWN_AMMO: f32 = 40.0;
+    pub const RESPAWN_AMMO: f32 = 40.0;
     const IT_WEAPON: c_int = crate::prelude::IT_WEAPON as c_int;
     const WP_THERMAL: c_int = mp_bg::weapons::weapon_t::WP_THERMAL as c_int;
     const WP_TRIP_MINE: c_int = mp_bg::weapons::weapon_t::WP_TRIP_MINE as c_int;
@@ -210,8 +210,8 @@ pub fn ShieldThink(
     self_: *mut gentity_t,
 ) {
     // Raven `#define SHIELD_HEALTH_DEC 10` / `SHIELD_SIEGE_HEALTH_DEC (2000/25)` (`g_items.c:92,99`).
-    const SHIELD_SIEGE_HEALTH_DEC: c_int = 2000 / 25;
-    const SHIELD_HEALTH_DEC: c_int = 10;
+    pub const SHIELD_SIEGE_HEALTH_DEC: c_int = 2000 / 25;
+    pub const SHIELD_HEALTH_DEC: c_int = 10;
 
     unsafe {
         (*self_).s.trickedentindex = 0;
@@ -393,11 +393,11 @@ pub fn CreateShield(
     ent: *mut gentity_t,
 ) {
     // Raven `g_items.c:91-99` shield #defines.
-    const SHIELD_HEALTH: f32 = 250.0;
-    const SHIELD_SIEGE_HEALTH: f32 = 2000.0;
-    const MAX_SHIELD_HEIGHT: f32 = 254.0;
-    const MAX_SHIELD_HALFWIDTH: f32 = 255.0;
-    const SHIELD_HALFTHICKNESS: f32 = 4.0;
+    pub const SHIELD_HEALTH: f32 = 250.0;
+    pub const SHIELD_SIEGE_HEALTH: f32 = 2000.0;
+    pub const MAX_SHIELD_HEIGHT: f32 = 254.0;
+    pub const MAX_SHIELD_HALFWIDTH: f32 = 255.0;
+    pub const SHIELD_HALFTHICKNESS: f32 = 4.0;
 
     unsafe {
         let mut tr: trace_t = core::mem::zeroed();
@@ -547,7 +547,7 @@ pub fn PlaceShield(
     ctx: GameContext<'_>,
     playerent: *mut gentity_t,
 ) -> qboolean {
-    const SHIELD_PLACEDIST: f32 = 64.0;
+    pub const SHIELD_PLACEDIST: f32 = 64.0;
 
     unsafe {
         let mut shield: *mut gentity_t = core::ptr::null_mut();
@@ -748,7 +748,7 @@ pub fn pas_find_enemies(
     self_: *mut gentity_t,
 ) -> qboolean {
     // Raven `#define TURRET_RADIUS 800` (`g_items.c:544`).
-    const TURRET_RADIUS: f32 = 800.0;
+    pub const TURRET_RADIUS: f32 = 800.0;
     const MAX_GENTITIES: usize = mp_qshared::shared::MAX_GENTITIES;
 
     unsafe {
@@ -1164,7 +1164,7 @@ pub fn SP_PAS(
     base: *mut gentity_t,
 ) {
     // Raven `#define TURRET_AMMO_COUNT 40` (`g_items.c:975`).
-    const TURRET_AMMO_COUNT: c_int = 40;
+    pub const TURRET_AMMO_COUNT: c_int = 40;
 
     unsafe {
         if (*base).count == 0 {
@@ -1426,7 +1426,7 @@ pub fn ItemUse_Jetpack(
     ent: *mut gentity_t,
 ) {
     // Raven `#define JETPACK_TOGGLE_TIME` (`g_items.c`).
-    const JETPACK_TOGGLE_TIME: c_int = 500;
+    pub const JETPACK_TOGGLE_TIME: c_int = 500;
 
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
@@ -1469,7 +1469,7 @@ pub fn ItemUse_UseCloak(
     ent: *mut gentity_t,
 ) {
     // Raven `#define CLOAK_TOGGLE_TIME` (`g_items.c`).
-    const CLOAK_TOGGLE_TIME: c_int = 500;
+    pub const CLOAK_TOGGLE_TIME: c_int = 500;
 
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
@@ -1576,7 +1576,7 @@ pub fn ItemUse_UseDisp(
     r#type: c_int,
 ) {
     // Raven `#define TOSS_DEBOUNCE_TIME 5000` (`bg_public.h:181`).
-    const TOSS_DEBOUNCE_TIME: c_int = 5000;
+    pub const TOSS_DEBOUNCE_TIME: c_int = 5000;
 
     unsafe {
         if (*ent).client.is_null() || (*((*ent).client as *mut gclient_t)).tossableItemDebounce > (*ctx.world).level.time {
@@ -1674,8 +1674,8 @@ pub fn EWebDie(
     r#mod: c_int,
 ) {
     // Raven `#define EWEB_DEATH_DMG 90` / `EWEB_DEATH_RADIUS 128` (`g_items.c:1442-1443`).
-    const EWEB_DEATH_DMG: f32 = 90.0;
-    const EWEB_DEATH_RADIUS: f32 = 128.0;
+    pub const EWEB_DEATH_DMG: f32 = 90.0;
+    pub const EWEB_DEATH_RADIUS: f32 = 128.0;
 
     unsafe {
         G_RadiusDamage(ctx, (*self_).r.currentOrigin, self_, EWEB_DEATH_DMG, EWEB_DEATH_RADIUS, self_, self_, MOD_SUICIDE as c_int);
@@ -1853,8 +1853,8 @@ pub fn EWeb_SetBoneAnim(
 
         // Raven `ghoul2/G2.h:22-25` bone-anim flags — not yet ported; transcribed locally.
         const BONE_ANIM_OVERRIDE: c_int = 0x0008;
-        const BONE_ANIM_OVERRIDE_FREEZE: c_int = 0x0040 + BONE_ANIM_OVERRIDE;
-        const BONE_ANIM_BLEND: c_int = 0x0080;
+        pub const BONE_ANIM_OVERRIDE_FREEZE: c_int = 0x0040 + BONE_ANIM_OVERRIDE;
+        pub const BONE_ANIM_BLEND: c_int = 0x0080;
 
         // now set the animation on the server ghoul2 instance.
         debug_assert!(!(*eweb).ghoul2.is_null());
@@ -1888,7 +1888,7 @@ pub fn EWebFire(
     eweb: *mut gentity_t,
 ) {
     // Raven `#define EWEB_MISSILE_DAMAGE 20` (`g_items.c:1623`).
-    const EWEB_MISSILE_DAMAGE: c_int = 20;
+    pub const EWEB_MISSILE_DAMAGE: c_int = 20;
     // Raven `DAMAGE_DEATH_KNOCKBACK` (`g_local.h`) — not yet ported; transcribed locally.
     const DAMAGE_DEATH_KNOCKBACK: c_int = 0x00000008;
 
@@ -2191,7 +2191,7 @@ pub fn EWeb_Create(
     spawner: *mut gentity_t,
 ) -> *mut gentity_t {
     // Raven `#define EWEB_HEALTH 200` (`g_items.c:1856`).
-    const EWEB_HEALTH: c_int = 200;
+    pub const EWEB_HEALTH: c_int = 200;
 
     unsafe {
         let modelName = c"models/map_objects/hoth/eweb_model.glm";
@@ -2334,7 +2334,7 @@ pub fn ItemUse_UseEWeb(
     ent: *mut gentity_t,
 ) {
     // Raven `#define EWEB_USE_DEBOUNCE 1000` (`g_items.c:1982`).
-    const EWEB_USE_DEBOUNCE: c_int = 1000;
+    pub const EWEB_USE_DEBOUNCE: c_int = 1000;
 
     unsafe {
         if (*((*ent).client as *mut gclient_t)).ewebTime > (*ctx.world).level.time {
@@ -2383,9 +2383,9 @@ pub fn Pickup_Powerup(
     other: *mut gentity_t,
 ) -> c_int {
     // Raven `#define RESPAWN_POWERUP 120` (`g_items.c:27`).
-    const RESPAWN_POWERUP: c_int = 120;
+    pub const RESPAWN_POWERUP: c_int = 120;
     // Raven `PLAYEREVENT_DENIEDREWARD` (`bg_public.h:716`) — not yet ported; transcribed locally.
-    const PLAYEREVENT_DENIEDREWARD: c_int = 0x0001;
+    pub const PLAYEREVENT_DENIEDREWARD: c_int = 0x0001;
 
     unsafe {
         let giTag = (*(*ent).item).giTag;
@@ -2564,8 +2564,8 @@ pub fn Pickup_Health(
     other: *mut gentity_t,
 ) -> c_int {
     // Raven local `#define`s (`g_items.c:23-27`).
-    const RESPAWN_HEALTH: f32 = 30.0;
-    const RESPAWN_MEGAHEALTH: c_int = 120;
+    pub const RESPAWN_HEALTH: f32 = 30.0;
+    pub const RESPAWN_MEGAHEALTH: c_int = 120;
 
     unsafe {
         let item = (*ent).item;
@@ -2608,7 +2608,7 @@ pub fn Pickup_Armor(
     other: *mut gentity_t,
 ) -> c_int {
     // Raven local `#define` (`g_items.c:21`).
-    const RESPAWN_ARMOR: f32 = 20.0;
+    pub const RESPAWN_ARMOR: f32 = 20.0;
 
     unsafe {
         let item = (*ent).item;

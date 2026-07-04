@@ -15,9 +15,9 @@ use crate::q_math::Q_irand;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:8-13`
 const LSTATE_BLADESTOP: c_int = 0;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:11`
-const LSTATE_BLADEUP: c_int = 1;
+pub const LSTATE_BLADEUP: c_int = 1;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:12`
-const LSTATE_BLADEDOWN: c_int = 2;
+pub const LSTATE_BLADEDOWN: c_int = 2;
 
 /// Velocity decay factor for Interrogator hovering.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:129`
