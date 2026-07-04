@@ -419,8 +419,9 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
     o.append("- `cstr(&str) -> CString` — own a NUL-terminated C string for a syscall; bind it "
              "to a local so it outlives the call, pass `.as_ptr()` where Raven passed a "
              "`char*` (the va/printf table below uses `cstr(&s)` for exactly this).")
-    o.append("- `cstr_to_str(*const c_char) -> &str` (`unsafe`) — borrow an engine-supplied "
-             "C string as a Rust `&str` (used by the va/printf examples as `cstr_to_str(name)`).")
+    o.append("- `cstr_to_str(*const c_char) -> String` (`unsafe`) — decode an engine-supplied "
+             "C string to an owned, lossy `String` (used by the va/printf examples as "
+             "`cstr_to_str(name)`; `cstr_to_string` is an alias).")
     o.append("- `write_cstr_field(&mut [c_char], &str)` — write a Rust `&str` into a fixed "
              "`[c_char; N]` struct field with truncation + NUL, replacing a Raven "
              "`Q_strncpyz`/`strcpy` into a char array.")
