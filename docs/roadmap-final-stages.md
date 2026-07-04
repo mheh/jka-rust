@@ -90,7 +90,7 @@ Payoff ceiling: surplus → higher sv_fps / tick rate = feel, not benchmarks.
 
 ## Stage 5 — The mod story (why the structure was worth it)
 
-A server mod (Lugormod-class) = ONE crate depending on mp_qshared/mp_bg/
+A server mod = ONE crate depending on mp_qshared/mp_bg/
 mp_abi; flat src/ mirroring the .c files; navigation experience matches the C
 tree a modder already knows. Near-term: fork the game crate (as C mods fork
 game/). Long-term: hook points on GameWorld/Game so mods depend-and-override
