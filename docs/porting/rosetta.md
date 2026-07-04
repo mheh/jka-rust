@@ -67,6 +67,13 @@ self.traps.trace(
     (*self.pm).tracemask,
 );
 ```
+Byte-buffer args (`fs_read`/`fs_write`) take `*mut c_void`/`*const c_void` —
+cast the `c_char` buffer at the call, don't change the buffer's type:
+```rust
+// C: trap_FS_Read(class_info, len, f);   char class_info[4096];
+let mut class_info: [c_char; 4096] = [0; 4096];
+self.traps.fs_read(class_info.as_mut_ptr() as *mut c_void, len, f);
+```
 
 ### vec3 / q_shared macros → reshaped `crate::q_math` fns (inputs BY VALUE, outputs `&mut`)
 Raven's `q_shared.h` `Vector*`/`DotProduct`/`CrossProduct` MACROS are reshaped functions — NEVER macro call syntax, NEVER a local shim. Note the `_` prefix on the assignment-style ones. Exact names/signatures:
