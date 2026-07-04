@@ -236,6 +236,30 @@ def main():
         ret = r["ret"].strip()
         return f"pub fn {name}({params}){(' ' + ret) if ret else ''}".rstrip()
 
+    def method_sig(name):
+        """LAW form for a bg-tier ctx-threaded fn: the `impl PmoveContext<'_>`
+        method shape (`&mut self` prepended, remaining params + ret as resolved).
+        The proven precedent is `bg_pmove.rs` (`PM_Friction`, `PM_ClipVelocity`)."""
+        r = wt.get(name)
+        if r is None:
+            return None
+        params = re.sub(r"\s+", " ", r["params"]).strip()
+        ret = r["ret"].strip()
+        selfp = "&mut self" + (", " + params if params else "")
+        return f"pub fn {name}({selfp}){(' ' + ret) if ret else ''}".rstrip()
+
+    # per-name tier + needs-ctx (for LAW method-form detection of callees whose
+    # own oracle file differs from the packet's): a bg-tier ctx-threaded fn is a
+    # PmoveContext method, not a free fn (ruling 12).
+    tier_by_name, needs_by_name = {}, {}
+    for f in F:
+        nm, fl = f["name"], f["file"]
+        tier_by_name.setdefault(nm, L.tier(fl))
+        needs_by_name.setdefault(nm, ctx_by.get((fl, nm), {}).get("needs_ctx", False))
+
+    def is_pmove_method(name):
+        return tier_by_name.get(name) == "bg" and needs_by_name.get(name, False)
+
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "packets").mkdir(exist_ok=True)
     manifest_out = []
@@ -259,7 +283,8 @@ def main():
             shard = (si + 1) if n_shards > 1 else None
             base = cfile[:-2]
             o = render_packet(cfile, tier, is_icarus, chunk, shard, n_shards,
-                              rulings, va_table, wt, wt_sig, ctx_by, ctxfree,
+                              rulings, va_table, wt, wt_sig, method_sig,
+                              is_pmove_method, ctx_by, ctxfree,
                               cvar_fields, glob_fields, bgstate_fields, MASTER)
             fname = base + (f".shard{shard}" if shard else "") + ".md"
             (OUT / "packets" / fname).write_text(o)
@@ -288,7 +313,8 @@ def main():
 
 
 def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
-                  va_table, wt, wt_sig, ctx_by, ctxfree,
+                  va_table, wt, wt_sig, method_sig, is_pmove_method,
+                  ctx_by, ctxfree,
                   cvar_fields, glob_fields, bgstate_fields, MASTER):
     o = []
     title = cfile + (f" — shard {shard}/{n_shards}" if shard else "")
@@ -321,6 +347,15 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
                  "`gPMDoSlowFall`/`pm_cancelOutZoom`) → methods on **`PmoveContext`** "
                  "(`impl PmoveContext<'_> { fn PM_X(&mut self, …) }`, the proven shape in "
                  "`bg_pmove.rs`); reach the working set via `self.pm`/`self.pml`/… .")
+        o.append("- **WRITE-SHAPE (critical, ruling 12):** a bg-tier ctx-threaded fn is an "
+                 "`impl PmoveContext<'_>` **method** (`pub fn PM_X(&mut self, …)`), NOT a free "
+                 "fn — a bare free fn cannot reach `pm`/`pml`/`BgState`/`BgTraps`/"
+                 "`GameCallbacks` without a §B3 static. The `LAW` block under each such fn "
+                 "prints the method form (`impl PmoveContext<'_> { … }`); match it exactly. "
+                 "When you port the fn, **DELETE the stale free-fn `todo!()` skeleton stub** "
+                 "for it (the pre-existing bare-signature stub) — replace it with the method, "
+                 "never leave a dead duplicate stub. Peer bg methods are called as "
+                 "`self.X(…)` (see `PM_Friction`→`PM_ClipVelocity` in `bg_pmove.rs`).")
         o.append("- **session tables / RNG** → `self.bg` (`&mut BgState`): `bgAllAnims`, "
                  "saber parse buffers, vehicle info arrays, `bg_pool`, `rng`.")
         o.append("- **engine surface** → `self.traps` (`&dyn BgTraps`): trace, "
@@ -344,6 +379,49 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
                  "the fork-3 LCG: it lives in `BgState.rng` (ruling 15) and is reached by "
                  "the bg/game caller, not by an ambient global. Pure math/string helpers "
                  "take/return values (fork-9 vec3 out-param rules apply).")
+    o.append("")
+
+    # ---- RNG mapping (ruling 15 — the LCG lives on BgState.rng)
+    rng_path = ("`ctx.world.bg_state.rng`" if tier == "game"
+                else "`self.bg.rng`" if tier == "bg"
+                else "the caller's `bg_state.rng`")
+    o.append("## RNG (ruling 15) — Raven `rand`/`srand`/`random`/`crandom`/`*rand` → `BgState.rng`")
+    o.append("")
+    o.append(f"Every RNG call site routes to the ONE generator on `BgState`: {rng_path}. "
+             "NEVER a local recipe, NEVER libc `rand`, NEVER the `rand` crate — every draw is "
+             "parity-visible. Raven kept two independent generator states "
+             "(`q_math.c:1432` holdrand and `bg_lib.c:763` randSeed); both now live on the one "
+             "`Rng` (methods below). API on `Rng` "
+             "(`crates/mp/game/src/bg_channel/rng.rs`):")
+    o.append("")
+    o.append(f"| Raven call | Rust |")
+    o.append(f"| --- | --- |")
+    for raw, mapped in [
+        ("Rand_Init(seed)", "Rand_Init(seed)"), ("flrand(min,max)", "flrand(min, max)"),
+        ("Q_flrand(min,max)", "Q_flrand(min, max)"), ("irand(min,max)", "irand(min, max)"),
+        ("Q_irand(min,max)", "Q_irand(min, max)"), ("srand(seed)", "srand(seed)"),
+        ("rand()", "rand()"), ("random()", "random()"), ("crandom()", "crandom()"),
+    ]:
+        o.append(f"| `{raw}` | `{rng_path[1:-1]}.{mapped}` |")
+    o.append("")
+    o.append("(These are all methods on `Rng`; call them through the path above. A bg-tier "
+             "`PmoveContext` method reaches it as `self.bg.rng.<m>()`.)")
+    o.append("")
+
+    # ---- known seam helpers (in the prelude — do NOT report as missing)
+    o.append("## KNOWN SEAM HELPERS (in the prelude — import, never report as missing)")
+    o.append("")
+    o.append("These are LANDED helpers, re-exported via the crate prelude "
+             "(`crates/mp/game/src/cstr_util.rs`). Do NOT report them as missing symbols and "
+             "do NOT invent your own `CString`/`&str` conversions — use these exact names:")
+    o.append("- `cstr(&str) -> CString` — own a NUL-terminated C string for a syscall; bind it "
+             "to a local so it outlives the call, pass `.as_ptr()` where Raven passed a "
+             "`char*` (the va/printf table below uses `cstr(&s)` for exactly this).")
+    o.append("- `cstr_to_str(*const c_char) -> &str` (`unsafe`) — borrow an engine-supplied "
+             "C string as a Rust `&str` (used by the va/printf examples as `cstr_to_str(name)`).")
+    o.append("- `write_cstr_field(&mut [c_char], &str)` — write a Rust `&str` into a fixed "
+             "`[c_char; N]` struct field with truncation + NUL, replacing a Raven "
+             "`Q_strncpyz`/`strcpy` into a char array.")
     o.append("")
 
     # ---- threading digest per fn
@@ -443,12 +521,26 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
     o.append("")
     for f in chunk:
         o.append(f"### `{f['name']}` — {cfile}:{f['line']}-{f['end_line']}")
-        sig = wt_sig(f["name"])
-        if sig:
-            o.append("Resolved worktree signature (LAW — fill this body, do not change it):")
-            o.append("```rust")
-            o.append(sig + " { /* PORT-NOTE if needed; port here */ }")
-            o.append("```")
+        if is_pmove_method(f["name"]):
+            msig = method_sig(f["name"])
+            if msig:
+                o.append("Resolved worktree signature (LAW — this bg-tier ctx-threaded fn is a "
+                         "**`PmoveContext` method**, ruling 12; fill this body, do not change "
+                         "the signature). DELETE the stale free-fn `todo!()` skeleton stub for "
+                         "this fn — replace it, never leave a dead duplicate:")
+                o.append("```rust")
+                o.append("impl PmoveContext<'_> {")
+                o.append("    " + msig + " { /* PORT-NOTE if needed; port here — "
+                         "call peer bg fns as `self.X(…)` */ }")
+                o.append("}")
+                o.append("```")
+        else:
+            sig = wt_sig(f["name"])
+            if sig:
+                o.append("Resolved worktree signature (LAW — fill this body, do not change it):")
+                o.append("```rust")
+                o.append(sig + " { /* PORT-NOTE if needed; port here */ }")
+                o.append("```")
         o.append("```c")
         o.append(numbered_slice(GAME / cfile, f["line"], f["end_line"]))
         o.append("```")
@@ -465,11 +557,13 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
     o.append("")
     o.append("```rust")
     for name in sorted(callees):
-        sig = wt_sig(name)
+        pmethod = is_pmove_method(name)
+        sig = method_sig(name) if pmethod else wt_sig(name)
         if sig:
             r = wt.get(name)
             tag = "OPEN" if (r["parked"] or r["esc"]) else "ported"
-            o.append(f"// {tag}: {r['path'].name}")
+            note = "  — PmoveContext method: call as `self." + name + "(…)`" if pmethod else ""
+            o.append(f"// {tag}: {r['path'].name}{note}")
             o.append(sig + ";")
         else:
             o.append(f"//TODO: Port {name}  // Source: oracle/oracle/codemp/game/ (unresolved)")
