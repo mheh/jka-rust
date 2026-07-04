@@ -40,7 +40,6 @@ use crate::bg_channel::PmoveContext;
 use crate::q_math::{Q_random, AngleVectors, PITCH, ROLL, YAW};
 use mp_bg::public::saber_move_name as ls;
 use mp_bg::public::anim_number::animNumber_t as A;
-use mp_bg::public::saber_quadrant::saberQuadrant_t::*;
 
 // Per-file `#define` consts (porting-rules convention: cite the Raven #define,
 // keep them local since no shared home exists yet).

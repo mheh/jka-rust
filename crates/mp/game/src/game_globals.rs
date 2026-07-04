@@ -217,9 +217,11 @@ pub struct GameGlobals {
     pub _saved_client: *mut gclient_t,
     /// `client`. Source: `oracle/oracle/codemp/game/NPC.c:35`
     pub client: *mut gclient_t,
-    //TODO: Port visibility_t
-    // Source: oracle/oracle/codemp/game/NPC.c:38
-    pub enemyVisibility: (),
+    /// `enemyVisibility` (pass-2 backfill of the `()` placeholder — porting-rules
+    /// §E13: "replace a ()-placeholder field's type with the real one if your
+    /// packet cites it").
+    /// Source: `oracle/oracle/codemp/game/NPC.c:38`
+    pub enemyVisibility: crate::npc::visibility_t::visibility_t,
     /// `ucmd`. Source: `oracle/oracle/codemp/game/NPC.c:36`
     pub ucmd: usercmd_t,
     /// `_saved_ucmd` — the `SaveNPCGlobals`/`RestoreNPCGlobals` shadow copy of

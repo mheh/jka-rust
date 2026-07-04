@@ -19,6 +19,8 @@ use crate::prelude::*;
 use super::rng::Rng;
 use mp_bg::public::bg_loaded_anim::bgLoadedAnim_t;
 use mp_bg::public::bg_loaded_events::bgLoadedEvents_t;
+use mp_bg::public::saber_move_data::saberMoveData_t;
+use mp_bg::public::saber_move_data_table::saberMoveData;
 
 /// The bg tier's session-lifetime state, owned by `GameWorld` (ruling 12).
 ///
@@ -63,6 +65,12 @@ pub struct BgState {
     /// scratch during saber-parm loading.
     /// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2736`
     pub bgSaberParseTBuffer: Vec<u8>,
+
+    // --- `bg_saber.c` saber-move tables ---
+    /// Raven `saberMoveData_t saberMoveData[LS_MOVE_MAX]` — per-move animation
+    /// and chaining data (a static const array in C, stored here as a static ref).
+    /// Source: `oracle/oracle/codemp/game/bg_saber.c:120-321`
+    pub saberMoveData: &'static [saberMoveData_t],
 
     // --- `bg_vehicleLoad.c` vehicle tables ---
     /// Raven `vehWeaponInfo_t g_vehWeaponInfo[MAX_VEH_WEAPONS]`.
@@ -121,6 +129,7 @@ impl BgState {
             BGPAFtextLoaded: QFALSE,
             SaberParms: Vec::new(),
             bgSaberParseTBuffer: Vec::new(),
+            saberMoveData: &saberMoveData,
             g_vehWeaponInfo: Vec::new(),
             // Raven initialises to 1 (first entry is the null/default).
             numVehicleWeapons: 1,

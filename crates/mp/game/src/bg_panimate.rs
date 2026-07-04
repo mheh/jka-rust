@@ -23,6 +23,26 @@ use crate::bg_saber::BG_MySaber;
 use crate::q_math::Q_irand;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::broken_limb::brokenLimb_t;
+use mp_bg::public::saber_move_name::{
+    LS_A_BACK, LS_A_BACK_CR, LS_A_BACKFLIP_ATK, LS_A_BACKSTAB, LS_A_FLIP_SLASH, LS_A_FLIP_STAB,
+    LS_A_JUMP_T__B_, LS_A_LUNGE, LS_A_T2B, LS_A_TL2BR, LS_A1_SPECIAL, LS_A2_SPECIAL,
+    LS_A3_SPECIAL, LS_B1__L, LS_B1__R, LS_B1_BL, LS_B1_BR, LS_B1_T_, LS_B1_TL, LS_B1_TR,
+    LS_BUTTERFLY_LEFT, LS_BUTTERFLY_RIGHT, LS_D1__L, LS_D1__R, LS_D1_B_, LS_D1_BL, LS_D1_BR,
+    LS_D1_T_, LS_D1_TL, LS_D1_TR, LS_DRAW, LS_DUAL_FB, LS_DUAL_LR, LS_DUAL_SPIN_PROTECT,
+    LS_H1_B_, LS_H1_BL, LS_H1_BR, LS_H1_T_, LS_H1_TL, LS_H1_TR, LS_HILT_BASH,
+    LS_JUMPATTACK_ARIAL_LEFT, LS_JUMPATTACK_ARIAL_RIGHT, LS_JUMPATTACK_CART_LEFT,
+    LS_JUMPATTACK_CART_RIGHT, LS_JUMPATTACK_DUAL, LS_JUMPATTACK_STAFF_LEFT, LS_JUMPATTACK_STAFF_RIGHT,
+    LS_K1_BL, LS_K1_BR, LS_K1_T_, LS_K1_TL, LS_K1_TR, LS_KICK_B, LS_KICK_B_AIR, LS_KICK_BF,
+    LS_KICK_F, LS_KICK_F_AIR, LS_KICK_L, LS_KICK_L_AIR, LS_KICK_R, LS_KICK_R_AIR, LS_KICK_RL,
+    LS_KICK_S, LS_LEAP_ATTACK, LS_NONE, LS_PARRY_LL, LS_PARRY_LR, LS_PARRY_UL, LS_PARRY_UP,
+    LS_PARRY_UR, LS_PULL_ATTACK_STAB, LS_PULL_ATTACK_SWING, LS_PUTAWAY, LS_R_T2B, LS_R_TL2BR,
+    LS_READY, LS_REFLECT_LL, LS_REFLECT_UP, LS_ROLL_STAB, LS_S_T2B, LS_S_TL2BR, LS_SPINATTACK,
+    LS_SPINATTACK_ALORA, LS_SPINATTACK_DUAL, LS_STABDOWN, LS_STABDOWN_DUAL, LS_STABDOWN_STAFF,
+    LS_STAFF_SOULCAL, LS_SWOOP_ATTACK_LEFT, LS_SWOOP_ATTACK_RIGHT, LS_T1_BL__L, LS_T1_BR__R,
+    LS_TAUNTAUN_ATTACK_LEFT, LS_TAUNTAUN_ATTACK_RIGHT, LS_UPSIDE_DOWN_ATTACK, LS_V1__L, LS_V1__R,
+    LS_V1_B_, LS_V1_BL, LS_V1_BR, LS_V1_T_, LS_V1_TL, LS_V1_TR,
+};
+use mp_bg::public::saber_quadrant::{Q_B, Q_BL, Q_BR, Q_L, Q_R, Q_T, Q_TL, Q_TR};
 
 // Raven `qboolean` is `c_int` (`qfalse == 0`, `qtrue == 1`); the lowercase
 // `qtrue`/`qfalse` spellings are not exported here (see `bg_saber.rs`), so the
@@ -663,11 +683,20 @@ pub fn BG_InGrappleMove(anim: c_int) -> c_int {
 /// saber was hit — for now presumes the saber gets knocked away from center.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:692-725`
-// PORT-ESCALATION(saber-move-data-table): reads `saberMoveData[move].startQuad`,
-// the ~90-entry move-data const table not yet ported into the Rust tree (see
-// `bg_saber.rs`'s identical `saber-move-data-table` parks).
-pub fn BG_BrokenParryForAttack(r#move: c_int) -> c_int {
-    todo!("Port BG_BrokenParryForAttack — parked: saber-move-data-table")
+impl PmoveContext<'_> {
+    pub fn BG_BrokenParryForAttack(&mut self, r#move: c_int) -> c_int {
+        match self.bg.saberMoveData[r#move as usize].startQuad {
+            Q_B => LS_V1_B_,
+            Q_BR => LS_V1_BR,
+            Q_R => LS_V1__R,
+            Q_TR => LS_V1_TR,
+            Q_T => LS_V1_T_,
+            Q_TL => LS_V1_TL,
+            Q_L => LS_V1__L,
+            Q_BL => LS_V1_BL,
+            _ => LS_NONE,
+        }
+    }
 }
 
 /// Raven `BG_BrokenParryForParry`.
@@ -964,12 +993,50 @@ pub fn PM_InCartwheel(anim: c_int) -> qboolean {
 /// Raven `BG_InKnockDownOnGround`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1010-1072`
-// PORT-ESCALATION(own-file-static-no-world-handle): the `BOTH_GETUP_*` arm
-// calls `BG_AnimLength(0, ps->legsAnim)`, which is itself parked on the
-// file-static `bgAllAnims` table with no world handle in its staged skeleton
-// signature — this fn is transitively blocked on that same park.
-pub fn BG_InKnockDownOnGround(ps: *mut playerState_t) -> qboolean {
-    todo!("Port BG_InKnockDownOnGround — parked: own-file-static-no-world-handle (bgAllAnims, via BG_AnimLength)")
+impl PmoveContext<'_> {
+    pub fn BG_InKnockDownOnGround(&mut self, ps: *mut playerState_t) -> qboolean {
+        unsafe {
+            match (*ps).legsAnim {
+                BOTH_KNOCKDOWN1 | BOTH_KNOCKDOWN2 | BOTH_KNOCKDOWN3 | BOTH_KNOCKDOWN4
+                | BOTH_KNOCKDOWN5 | BOTH_RELEASED => 1,
+                BOTH_GETUP1 | BOTH_GETUP2 | BOTH_GETUP3 | BOTH_GETUP4 | BOTH_GETUP5
+                | BOTH_GETUP_CROUCH_F1 | BOTH_GETUP_CROUCH_B1 | BOTH_FORCE_GETUP_F1
+                | BOTH_FORCE_GETUP_F2 | BOTH_FORCE_GETUP_B1 | BOTH_FORCE_GETUP_B2
+                | BOTH_FORCE_GETUP_B3 | BOTH_FORCE_GETUP_B4 | BOTH_FORCE_GETUP_B5
+                | BOTH_FORCE_GETUP_B6 => {
+                    if self.BG_AnimLength(0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                BOTH_GETUP_BROLL_B | BOTH_GETUP_BROLL_F | BOTH_GETUP_BROLL_L | BOTH_GETUP_BROLL_R
+                | BOTH_GETUP_FROLL_B | BOTH_GETUP_FROLL_F | BOTH_GETUP_FROLL_L
+                | BOTH_GETUP_FROLL_R => {
+                    if self.BG_AnimLength(0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                BOTH_LK_DL_ST_T_SB_1_L => {
+                    if (*ps).legsTimer < 1000 {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                BOTH_PLAYER_PA_3_FLY => {
+                    if (*ps).legsTimer < 300 {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                _ => 0,
+            }
+        }
+    }
 }
 
 /// Raven `BG_StabDownAnim`.
@@ -993,10 +1060,19 @@ pub fn BG_StabDownAnim(anim: c_int) -> qboolean {
 /// Raven `PM_SaberBounceForAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1086-1114`
-// PORT-ESCALATION(saber-move-data-table): reads `saberMoveData[move].startQuad`,
-// the ~90-entry move-data const table not yet ported into the Rust tree.
-pub fn PM_SaberBounceForAttack(r#move: c_int) -> c_int {
-    todo!("Port PM_SaberBounceForAttack — parked: saber-move-data-table")
+impl PmoveContext<'_> {
+    pub fn PM_SaberBounceForAttack(&mut self, r#move: c_int) -> c_int {
+        match self.bg.saberMoveData[r#move as usize].startQuad {
+            Q_B | Q_BR => LS_B1_BR,
+            Q_R => LS_B1__R,
+            Q_TR => LS_B1_TR,
+            Q_T => LS_B1_T_,
+            Q_TL => LS_B1_TL,
+            Q_L => LS_B1__L,
+            Q_BL => LS_B1_BL,
+            _ => LS_NONE,
+        }
+    }
 }
 
 /// Raven `PM_SaberDeflectionForQuad`.
@@ -1503,17 +1579,15 @@ pub fn BG_FullBodyTauntAnim(anim: c_int) -> qboolean {
 /// anim while force speeding (as an example) and whatnot into account.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1573-1581`
-// PORT-ESCALATION(own-file-static-no-world-handle): reads the file-static
-// `bgLoadedAnim_t bgAllAnims[MAX_ANIM_FILES]` with no world handle in the
-// staged skeleton signature (`BG_AnimLength(index, anim)` takes neither
-// `&GameWorld` nor an owning-crate handle) — matches the `pmove-working-state`
-// precedent for `bg_saber.rs`'s file-static `pm`.
-pub fn BG_AnimLength(
-    index: c_int,
-    //TODO: Port animNumber_t  (C: `animNumber_t`)
-    anim: c_int,
-) -> c_int {
-    todo!("Port BG_AnimLength — parked: own-file-static-no-world-handle (bgAllAnims)")
+impl PmoveContext<'_> {
+    pub fn BG_AnimLength(&mut self, index: c_int, anim: c_int) -> c_int {
+        if anim >= MAX_ANIMATIONS {
+            return -1;
+        }
+        (self.bg.bgAllAnims[index as usize].anims[anim as usize].numFrames as f32
+            * (self.bg.bgAllAnims[index as usize].anims[anim as usize].frameLerp as f32).abs())
+            as c_int
+    }
 }
 
 /// Raven `PM_AnimLength`.
@@ -1521,24 +1595,42 @@ pub fn BG_AnimLength(
 /// Raven: just use whatever pm->animations is.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1584-1595`
-// PORT-ESCALATION(pmove-working-state): reads the file-static `pmove_t *pm`
-// (`pm->animations`) with no pmove handle in the staged skeleton signature.
-pub fn PM_AnimLength(
-    index: c_int,
-    //TODO: Port animNumber_t  (C: `animNumber_t`)
-    anim: c_int,
-) -> c_int {
-    todo!("Port PM_AnimLength — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_AnimLength(&mut self, index: c_int, anim: c_int) -> c_int {
+        if anim >= MAX_ANIMATIONS || self.pm.animations.is_null() {
+            return -1;
+        }
+        if anim < 0 {
+            let s = format!("ERROR: anim {} < 0\n", anim);
+            self.traps.Com_Error(ERR_DROP, cstr(&s));
+        }
+        unsafe {
+            ((*self.pm.animations.offset(anim as isize)).numFrames as f32
+                * ((*self.pm.animations.offset(anim as isize)).frameLerp as f32).abs())
+                as c_int
+        }
+    }
 }
 
 /// Raven `PM_DebugLegsAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1597-1608`
-// PORT-ESCALATION(pmove-working-state): reads the file-static `pmove_t *pm`
-// (`pm->ps->legsAnim`) and `animTable`, with no pmove handle in the staged
-// skeleton signature.
-pub fn PM_DebugLegsAnim(anim: c_int) {
-    todo!("Port PM_DebugLegsAnim — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_DebugLegsAnim(&mut self, anim: c_int) {
+        unsafe {
+            let oldAnim = (*self.pm.ps).legsAnim;
+            let newAnim = anim;
+
+            if oldAnim < MAX_TOTALANIMATIONS && oldAnim >= BOTH_DEATH1 as c_int
+                && newAnim < MAX_TOTALANIMATIONS && newAnim >= BOTH_DEATH1 as c_int
+            {
+                let old_str = format!("OLD: {}\n", cstr_to_str(animTable[oldAnim as usize].as_ptr()));
+                let new_str = format!("NEW: {}\n", cstr_to_str(animTable[newAnim as usize].as_ptr()));
+                self.traps.Com_Printf(cstr(&old_str));
+                self.traps.Com_Printf(cstr(&new_str));
+            }
+        }
+    }
 }
 
 /// Raven `PM_SaberInTransition`.
@@ -1583,11 +1675,11 @@ pub fn BG_FlipPart(ps: *mut playerState_t, part: c_int) {
 /// Raven: ALWAYS call on game/cgame init.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1706-1710`
-// PORT-ESCALATION(own-file-static-no-world-handle): writes the file-static
-// `bgAllAnims`/`BGPAFtextLoaded` with no world handle in the staged skeleton
-// signature (`BG_InitAnimsets()` takes no params at all).
-pub fn BG_InitAnimsets() {
-    todo!("Port BG_InitAnimsets — parked: own-file-static-no-world-handle (bgAllAnims, BGPAFtextLoaded)")
+impl PmoveContext<'_> {
+    pub fn BG_InitAnimsets(&mut self) {
+        self.bg.bgAllAnims = Default::default();
+        self.bg.BGPAFtextLoaded = 0;
+    }
 }
 
 /// Raven `BG_ClearAnimsets`.
@@ -1602,11 +1694,15 @@ pub fn BG_ClearAnimsets() {}
 /// Raven `BG_AnimsetAlloc`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1729-1735`
-// PORT-ESCALATION(own-file-static-no-world-handle): reads/writes the
-// file-static `bgAllAnims`/`bgNumAllAnims` with no world handle in the staged
-// skeleton signature (`BG_AnimsetAlloc()` takes no params at all).
-pub fn BG_AnimsetAlloc() -> *mut animation_t {
-    todo!("Port BG_AnimsetAlloc — parked: own-file-static-no-world-handle (bgAllAnims, bgNumAllAnims)")
+impl PmoveContext<'_> {
+    pub fn BG_AnimsetAlloc(&mut self) -> *mut animation_t {
+        debug_assert!(self.bg.bgNumAllAnims < MAX_ANIM_FILES as c_int);
+        let anims_ptr = self
+            .BG_Alloc((std::mem::size_of::<animation_t>() * MAX_TOTALANIMATIONS as usize) as c_int)
+            as *mut animation_t;
+        self.bg.bgAllAnims[self.bg.bgNumAllAnims as usize].anims = anims_ptr;
+        anims_ptr
+    }
 }
 
 /// Raven `BG_AnimsetFree`.
@@ -1621,63 +1717,310 @@ pub fn BG_AnimsetFree(animset: *mut animation_t) {}
 /// Raven `BG_ParseAnimationFile`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2339-2580`
-// PORT-ESCALATION(own-file-static-no-world-handle): 242-LOC animation-config
-// parser that reads/writes `bgAllAnims`/`bgNumAllAnims`/`BGPAFtextLoaded`/
-// `bgHumanoidAnimations` and calls the `trap_FS_*` file traps, with no world
-// handle in the staged skeleton signature.
-pub fn BG_ParseAnimationFile(
-    filename: *const c_char,
-    animset: *mut animation_t,
-    isHumanoid: qboolean,
-) -> c_int {
-    todo!("Port BG_ParseAnimationFile — parked: own-file-static-no-world-handle (bgAllAnims, bgNumAllAnims, BGPAFtextLoaded, bgHumanoidAnimations)")
+impl PmoveContext<'_> {
+    pub fn BG_ParseAnimationFile(
+        &mut self,
+        filename: *const c_char,
+        mut animset: *mut animation_t,
+        isHumanoid: qboolean,
+    ) -> c_int {
+        let mut text_p: *const c_char;
+        let mut len: c_int;
+        let mut i: c_int;
+        let mut token: *mut c_char;
+        let mut fps: f64;
+        let mut skip: c_int;
+        let mut usedIndex: c_int = -1;
+        let mut nextIndex: c_int = self.bg.bgNumAllAnims;
+        let mut dynAlloc: qboolean = 0;
+        let mut wasLoaded: qboolean = 0;
+        let mut BGPAFtext: [c_char; 60000] = [0; 60000];
+        let mut f: fileHandle_t = 0;
+        let mut animNum: c_int;
+
+        if isHumanoid == 0 {
+            i = 0;
+            while i < self.bg.bgNumAllAnims {
+                if Q_stricmp(
+                    self.bg.bgAllAnims[i as usize].filename.as_ptr(),
+                    filename,
+                ) == 0
+                {
+                    animset = self.bg.bgAllAnims[i as usize].anims;
+                    return i;
+                }
+                i += 1;
+            }
+
+            if animset.is_null() {
+                let filename_str = cstr_to_str(filename);
+                if filename_str.contains("players/_humanoid/") {
+                    animset = self.bg.bgHumanoidAnimations;
+                    nextIndex = 0;
+                } else if filename_str.contains("players/rockettrooper/") {
+                    nextIndex = 1;
+                    animset = self.BG_AnimsetAlloc();
+                    dynAlloc = 1;
+
+                    if animset.is_null() {
+                        debug_assert!(false, "Anim set alloc failed!");
+                        return -1;
+                    }
+                } else {
+                    animset = self.BG_AnimsetAlloc();
+                    dynAlloc = 1;
+
+                    if animset.is_null() {
+                        debug_assert!(false, "Anim set alloc failed!");
+                        return -1;
+                    }
+                }
+            }
+        }
+
+        if self.bg.BGPAFtextLoaded == 0 || isHumanoid == 0 {
+            len = self.traps.fs_fopen(filename, &mut f, FS_READ);
+            if len <= 0 || len >= BGPAFtext.len() as c_int - 1 {
+                if dynAlloc != 0 {
+                    BG_AnimsetFree(animset);
+                }
+                if len > 0 {
+                    let s = format!(
+                        "{} exceeds the allowed game-side animation buffer!",
+                        cstr_to_str(filename)
+                    );
+                    self.traps.Com_Error(ERR_DROP, cstr(&s));
+                }
+                return -1;
+            }
+
+            self.traps.fs_read(BGPAFtext.as_mut_ptr(), len, f);
+            BGPAFtext[len as usize] = 0;
+            self.traps.fs_fclose(f);
+        } else {
+            if dynAlloc != 0 {
+                debug_assert!(false, "Should not have allocated dynamically for humanoid");
+                BG_AnimsetFree(animset);
+            }
+            return 0;
+        }
+
+        text_p = BGPAFtext.as_ptr();
+
+        for i in 0..MAX_ANIMATIONS {
+            unsafe {
+                (*animset.offset(i as isize)).firstFrame = 0;
+                (*animset.offset(i as isize)).numFrames = 0;
+                (*animset.offset(i as isize)).loopFrames = -1;
+                (*animset.offset(i as isize)).frameLerp = 100;
+            }
+        }
+
+        loop {
+            token = COM_Parse(&mut text_p);
+
+            if token.is_null() || (*token as u8) == 0 {
+                break;
+            }
+
+            animNum = GetIDForString(animTable.as_mut_ptr(), token);
+            if animNum == -1 {
+                continue;
+            }
+
+            token = COM_Parse(&mut text_p);
+            if token.is_null() {
+                break;
+            }
+            unsafe {
+                (*animset.offset(animNum as isize)).firstFrame = atoi(token) as c_int;
+            }
+
+            token = COM_Parse(&mut text_p);
+            if token.is_null() {
+                break;
+            }
+            unsafe {
+                (*animset.offset(animNum as isize)).numFrames = atoi(token) as c_int;
+            }
+
+            token = COM_Parse(&mut text_p);
+            if token.is_null() {
+                break;
+            }
+            unsafe {
+                (*animset.offset(animNum as isize)).loopFrames = atoi(token) as c_int;
+            }
+
+            token = COM_Parse(&mut text_p);
+            if token.is_null() {
+                break;
+            }
+            fps = atof(token);
+            if fps == 0.0 {
+                fps = 1.0;
+            }
+            if fps < 0.0 {
+                unsafe {
+                    (*animset.offset(animNum as isize)).frameLerp =
+                        (1000.0 / fps).floor() as c_int;
+                }
+            } else {
+                unsafe {
+                    (*animset.offset(animNum as isize)).frameLerp =
+                        (1000.0 / fps).ceil() as c_int;
+                }
+            }
+        }
+
+        wasLoaded = self.bg.BGPAFtextLoaded;
+
+        if isHumanoid != 0 {
+            write_cstr_field(
+                &mut self.bg.bgAllAnims[0].filename,
+                &cstr_to_str(filename),
+            );
+            self.bg.bgAllAnims[0].anims = animset;
+            self.bg.BGPAFtextLoaded = 1;
+
+            usedIndex = 0;
+        } else {
+            write_cstr_field(
+                &mut self.bg.bgAllAnims[nextIndex as usize].filename,
+                &cstr_to_str(filename),
+            );
+            self.bg.bgAllAnims[nextIndex as usize].anims = animset;
+
+            usedIndex = self.bg.bgNumAllAnims;
+
+            if nextIndex > 1 {
+                self.bg.bgNumAllAnims += 1;
+            } else {
+                self.bg.BGPAFtextLoaded = 1;
+                usedIndex = nextIndex;
+            }
+        }
+
+        usedIndex
+    }
 }
 
 /// Raven `BG_StartLegsAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2588-2624`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the bare
-// `g_entities` global (indexed by `ps->clientNum`) with no world/entity-arena
-// handle in the staged skeleton signature — matches `g_combat.rs`.
-pub fn BG_StartLegsAnim(ps: *mut playerState_t, anim: c_int) {
-    todo!("Port BG_StartLegsAnim — parked: raw-ptr-skeleton-no-world-handle (g_entities)")
+impl PmoveContext<'_> {
+    pub fn BG_StartLegsAnim(&mut self, ps: *mut playerState_t, anim: c_int) {
+        unsafe {
+            if (*ps).pm_type >= PM_DEAD {
+                debug_assert!(!BG_InDeathAnim(anim) != 0);
+                if (*ps).clientNum < MAX_CLIENTS as c_int || anim != BOTH_VT_DEATH1 as c_int {
+                    return;
+                }
+            }
+            if (*ps).legsTimer > 0 {
+                return;
+            }
+
+            if (*ps).legsAnim == anim {
+                BG_FlipPart(ps, SETANIM_LEGS);
+            } else {
+                // PORT-NOTE(qagame-ifdef): original has #ifdef QAGAME check for g_entities access
+                // We're in the bg module context; this is the faithful Raven condition but marked
+                // as conditional-world access. The overlay access is unavailable here without context.
+                let base = g_entities as *const gentity_t;
+                if base.is_null() {
+                    return; // Safety fallback if g_entities is null
+                }
+                let client_ent = base.offset((*ps).clientNum as isize) as *const gentity_t;
+                if (*client_ent).s.legsAnim == anim {
+                    BG_FlipPart(ps, SETANIM_LEGS);
+                }
+            }
+            (*ps).legsAnim = anim;
+        }
+    }
 }
 
 /// Raven `PM_ContinueLegsAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2626-2635`
-// PORT-ESCALATION(pmove-working-state): reads the file-static `pmove_t *pm`
-// with no pmove handle in the staged skeleton signature.
-pub fn PM_ContinueLegsAnim(anim: c_int) {
-    todo!("Port PM_ContinueLegsAnim — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_ContinueLegsAnim(&mut self, anim: c_int) {
+        unsafe {
+            if (*self.pm.ps).legsAnim == anim {
+                return;
+            }
+            if (*self.pm.ps).legsTimer > 0 {
+                return;
+            }
+
+            self.BG_StartLegsAnim(self.pm.ps, anim);
+        }
+    }
 }
 
 /// Raven `PM_ForceLegsAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2637-2654`
-// PORT-ESCALATION(pmove-working-state): writes the file-static `pmove_t *pm`
-// with no pmove handle in the staged skeleton signature.
-pub fn PM_ForceLegsAnim(anim: c_int) {
-    todo!("Port PM_ForceLegsAnim — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_ForceLegsAnim(&mut self, anim: c_int) {
+        unsafe {
+            if BG_InSpecialJump((*self.pm.ps).legsAnim) != 0
+                && (*self.pm.ps).legsTimer > 0
+                && BG_InSpecialJump(anim) == 0
+            {
+                return;
+            }
+
+            if BG_InRoll(self.pm.ps, (*self.pm.ps).legsAnim) != 0
+                && (*self.pm.ps).legsTimer > 0
+                && BG_InRoll(self.pm.ps, anim) == 0
+            {
+                return;
+            }
+
+            (*self.pm.ps).legsTimer = 0;
+            self.BG_StartLegsAnim(self.pm.ps, anim);
+        }
+    }
 }
 
 /// Raven `BG_StartTorsoAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2664-2685`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the bare
-// `g_entities` global (indexed by `ps->clientNum`) with no world/entity-arena
-// handle in the staged skeleton signature — matches `g_combat.rs`.
-pub fn BG_StartTorsoAnim(ps: *mut playerState_t, anim: c_int) {
-    todo!("Port BG_StartTorsoAnim — parked: raw-ptr-skeleton-no-world-handle (g_entities)")
+impl PmoveContext<'_> {
+    pub fn BG_StartTorsoAnim(&mut self, ps: *mut playerState_t, anim: c_int) {
+        unsafe {
+            if (*ps).pm_type >= PM_DEAD {
+                debug_assert!(!BG_InDeathAnim(anim) != 0);
+                return;
+            }
+
+            if (*ps).torsoAnim == anim {
+                BG_FlipPart(ps, SETANIM_TORSO);
+            } else {
+                // PORT-NOTE(qagame-ifdef): original has #ifdef QAGAME check for g_entities access
+                let base = g_entities as *const gentity_t;
+                if base.is_null() {
+                    return;
+                }
+                let client_ent = base.offset((*ps).clientNum as isize) as *const gentity_t;
+                if (*client_ent).s.torsoAnim == anim {
+                    BG_FlipPart(ps, SETANIM_TORSO);
+                }
+            }
+            (*ps).torsoAnim = anim;
+        }
+    }
 }
 
 /// Raven `PM_StartTorsoAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2687-2690`
-// PORT-ESCALATION(pmove-working-state): reads the file-static `pmove_t *pm`
-// with no pmove handle in the staged skeleton signature.
-pub fn PM_StartTorsoAnim(anim: c_int) {
-    todo!("Port PM_StartTorsoAnim — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_StartTorsoAnim(&mut self, anim: c_int) {
+        self.BG_StartTorsoAnim(self.pm.ps, anim);
+    }
 }
 
 /// Raven `BG_SetLegsAnimTimer`.
@@ -1697,10 +2040,10 @@ pub fn BG_SetLegsAnimTimer(ps: *mut playerState_t, time: c_int) {
 /// Raven `PM_SetLegsAnimTimer`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2708-2711`
-// PORT-ESCALATION(pmove-working-state): reads the file-static `pmove_t *pm`
-// (`pm->ps`) with no pmove handle in the staged skeleton signature.
-pub fn PM_SetLegsAnimTimer(time: c_int) {
-    todo!("Port PM_SetLegsAnimTimer — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_SetLegsAnimTimer(&mut self, time: c_int) {
+        BG_SetLegsAnimTimer(self.pm.ps, time);
+    }
 }
 
 /// Raven `BG_SetTorsoAnimTimer`.
@@ -1720,10 +2063,10 @@ pub fn BG_SetTorsoAnimTimer(ps: *mut playerState_t, time: c_int) {
 /// Raven `PM_SetTorsoAnimTimer`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2728-2731`
-// PORT-ESCALATION(pmove-working-state): reads the file-static `pmove_t *pm`
-// (`pm->ps`) with no pmove handle in the staged skeleton signature.
-pub fn PM_SetTorsoAnimTimer(time: c_int) {
-    todo!("Port PM_SetTorsoAnimTimer — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_SetTorsoAnimTimer(&mut self, time: c_int) {
+        BG_SetTorsoAnimTimer(self.pm.ps, time);
+    }
 }
 
 /// Raven `BG_SaberStartTransAnim`.
@@ -1904,21 +2247,33 @@ pub fn BG_SetAnimFinal(
 /// Raven `PM_SetAnimFinal`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2926-2930`
-// PORT-ESCALATION(pmove-working-state): reads the file-static `pmove_t *pm`
-// (`pm->ps`, `pm->animations`) with no pmove handle in the staged skeleton
-// signature.
-pub fn PM_SetAnimFinal(setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
-    todo!("Port PM_SetAnimFinal — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_SetAnimFinal(&mut self, setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
+        self.BG_SetAnimFinal(self.pm.ps, self.pm.animations, setAnimParts, anim, setAnimFlags, blendTime);
+    }
 }
 
 /// Raven `BG_HasAnimation`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2933-2955`
-// PORT-ESCALATION(own-file-static-no-world-handle): reads the file-static
-// `bgAllAnims`/`bgNumAllAnims` with no world handle in the staged skeleton
-// signature.
-pub fn BG_HasAnimation(animIndex: c_int, animation: c_int) -> qboolean {
-    todo!("Port BG_HasAnimation — parked: own-file-static-no-world-handle (bgAllAnims, bgNumAllAnims)")
+impl PmoveContext<'_> {
+    pub fn BG_HasAnimation(&mut self, animIndex: c_int, animation: c_int) -> qboolean {
+        if animation < 0 || animation >= MAX_ANIMATIONS {
+            return 0;
+        }
+
+        if animIndex < 0 || animIndex > self.bg.bgNumAllAnims {
+            return 0;
+        }
+
+        let animations = self.bg.bgAllAnims[animIndex as usize].anims;
+
+        if unsafe { (*animations.offset(animation as isize)).numFrames } == 0 {
+            return 0;
+        }
+
+        1
+    }
 }
 
 /// Raven `BG_PickAnim`.
@@ -1951,25 +2306,63 @@ pub fn BG_PickAnim(animIndex: c_int, minAnim: c_int, maxAnim: c_int) -> c_int {
 /// will cry. -rww
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2981-3035`
-// PORT-ESCALATION(own-file-static-no-world-handle): falls back to the
-// file-static `bgAllAnims[0].anims` when `animations` is null, with no world
-// handle in the staged skeleton signature.
-pub fn BG_SetAnim(
-    ps: *mut playerState_t,
-    animations: *mut animation_t,
-    setAnimParts: c_int,
-    anim: c_int,
-    setAnimFlags: c_int,
-    blendTime: c_int,
-) {
-    todo!("Port BG_SetAnim — parked: own-file-static-no-world-handle (bgAllAnims)")
+impl PmoveContext<'_> {
+    pub fn BG_SetAnim(
+        &mut self,
+        ps: *mut playerState_t,
+        mut animations: *mut animation_t,
+        setAnimParts: c_int,
+        anim: c_int,
+        setAnimFlags: c_int,
+        blendTime: c_int,
+    ) {
+        if animations.is_null() {
+            animations = self.bg.bgAllAnims[0].anims;
+        }
+
+        unsafe {
+            if (*animations.offset(anim as isize)).firstFrame == 0
+                && (*animations.offset(anim as isize)).numFrames == 0
+            {
+                let mut fallback_anim = anim;
+                if anim == BOTH_RUNBACK1 as c_int
+                    || anim == BOTH_WALKBACK1 as c_int
+                    || anim == BOTH_RUN1 as c_int
+                {
+                    fallback_anim = BOTH_WALK2 as c_int;
+                }
+
+                if (*animations.offset(fallback_anim as isize)).firstFrame == 0
+                    && (*animations.offset(fallback_anim as isize)).numFrames == 0
+                {
+                    return;
+                }
+                animations = animations.offset((fallback_anim - anim) as isize);
+            }
+
+            if setAnimFlags & SETANIM_FLAG_OVERRIDE != 0 {
+                if setAnimParts & SETANIM_TORSO != 0 {
+                    if (setAnimFlags & SETANIM_FLAG_RESTART) != 0 || (*ps).torsoAnim != anim {
+                        BG_SetTorsoAnimTimer(ps, 0);
+                    }
+                }
+                if setAnimParts & SETANIM_LEGS != 0 {
+                    if (setAnimFlags & SETANIM_FLAG_RESTART) != 0 || (*ps).legsAnim != anim {
+                        BG_SetLegsAnimTimer(ps, 0);
+                    }
+                }
+            }
+
+            self.BG_SetAnimFinal(ps, animations, setAnimParts, anim, setAnimFlags, blendTime);
+        }
+    }
 }
 
 /// Raven `PM_SetAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:3037-3040`
-// PORT-ESCALATION(pmove-working-state): reads the file-static `pmove_t *pm`
-// with no pmove handle in the staged skeleton signature.
-pub fn PM_SetAnim(setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
-    todo!("Port PM_SetAnim — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_SetAnim(&mut self, setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
+        self.BG_SetAnim(self.pm.ps, self.pm.animations, setAnimParts, anim, setAnimFlags, blendTime);
+    }
 }

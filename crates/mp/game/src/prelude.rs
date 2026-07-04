@@ -107,6 +107,9 @@ pub use mp_bg::public::pd_sounds::{pdSounds_t, pdSounds_t::*};
 pub use mp_bg::public::pers_enum::{persEnum_t, persEnum_t::*};
 pub use mp_bg::public::pmtype::{pmtype_t, pmtype_t::*};
 pub use mp_bg::public::stat_index::{statIndex_t, statIndex_t::*};
+pub use mp_bg::public::saber_quadrant::{
+    saberQuadrant_t, Q_BR, Q_R, Q_TR, Q_T, Q_TL, Q_L, Q_BL, Q_B, Q_NUM_QUADS,
+};
 pub use mp_qshared::common::mp::qcommon::b_set_t::{bSet_t, bSet_t::*};
 pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t::*;
 pub use mp_qshared::common::mp::qcommon::task_id_t::{taskID_t, taskID_t::*};
