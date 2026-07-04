@@ -108,6 +108,41 @@ parks trace to the generated signatures not carrying already-settled rulings.
     bgHumanoidAnimations, WeaponReadyAnim/WeaponAttackAnim/…) → bg-owned state
     threaded per 8a. **RULING: BLESSED (accepted-for-now, user, 2026-07-03)**
 
+## Pass-3 design session rulings (2026-07-04, user — supersede the
+## accepted-for-now placeholders in 8a where they conflict)
+
+12. **bg state = PmoveContext (per-call) + BgState (session).** PmoveContext
+    built per Pmove call holds the pm/pml working set + &mut BgState; BgState
+    owned by GameWorld (cgame later owns its own), holding bgAllAnims, saber
+    parse buffers, vehicle info arrays, item list, bg pool.
+    **RULING: BLESSED (user, 2026-07-04)**
+13. **bg→engine = BgTraps trait** declared in the bg tier covering the full
+    surface (trace, pointcontents, fs_*, g2api_* straps, fx_*, snap_vector);
+    game implements over trap.rs; PmoveContext/BgState carry &dyn BgTraps.
+    **RULING: BLESSED (user, 2026-07-04)**
+14. **bg entity access stays the faithful baseEnt/entSize overlay**
+    (unsafe seam helpers, PM_BGEntForNum shape); EntityId cleanup post-parity.
+    **RULING: BLESSED (user, 2026-07-04)**
+15. **RNG (fork-3 LCG) lives in BgState**; game reaches it via
+    world.bg_state.rng. **RULING: BLESSED (user, 2026-07-04)**
+16. **bg→game upcalls = GameCallbacks trait** (16 methods: damage, add_event,
+    play_effect, alloc, …) declared in bg with bg-visible types; game
+    implements; PmoveContext carries &mut dyn GameCallbacks.
+    **RULING: BLESSED (user, 2026-07-04)**
+17. **Fork-4 EntityId applies NOW (pass 3)**: the 38 stored gentity_t*
+    struct fields become EntityId before porters run; porters write id
+    compares natively. **RULING: BLESSED (user, 2026-07-04)**
+18. **va/printf: mechanical format! mapping table**; Com_sprintf into
+    char[N] → write bytes+NUL. **Diverge at g_target.c:800** (owned String;
+    ≤2-line site note per §19; excluded from shared fixtures).
+    **RULING: BLESSED (user, 2026-07-04)**
+19. **bg crate split deferred to post-parity** — bg modules stay in mp_game
+    for pass 3; tier discipline enforced by the trait boundary.
+    **RULING: BLESSED (user, 2026-07-04)**
+20. Pass-2 remainder (32 unfinished porters + never-run integration) is
+    **folded into pass 3** — no pass-2 resume; files fill once against final
+    signatures. (Recommendation accepted with this session.)
+
 ## Already covered — no decision (bless-the-rule appendix)
 
 vec3_t out-params (§C7; VectorCopy ×1358), qboolean returns → bool ×652
