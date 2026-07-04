@@ -141,7 +141,7 @@ pub fn NPC_LadderMove(
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:126-141`
 pub fn NPC_GetMoveInformation(
     ctx: GameContext<'_>,
-    mut dir: vec3_t,
+    dir: &mut vec3_t,
     distance: *mut f32,
 ) -> qboolean {
     unsafe {
@@ -153,8 +153,8 @@ pub fn NPC_GetMoveInformation(
             let goal_ptr = entity_from_id((*ctx.world).entities.as_mut_ptr(), goal_id);
 
             // Get our move info
-            crate::q_math::_VectorSubtract((*goal_ptr).r.currentOrigin, (*npc).r.currentOrigin, &mut dir);
-            *distance = crate::q_math::VectorNormalize(&mut dir);
+            crate::q_math::_VectorSubtract((*goal_ptr).r.currentOrigin, (*npc).r.currentOrigin, dir);
+            *distance = crate::q_math::VectorNormalize(dir);
 
             crate::q_math::_VectorCopy((*goal_ptr).r.currentOrigin, &mut npc_info.blockedDest);
 
@@ -197,7 +197,7 @@ pub fn NPC_GetMoveDirection(
         FRAME_NAV_INFO = unsafe { std::mem::zeroed() };
 
         // Get our movement, if any
-        if NPC_GetMoveInformation(ctx, FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.distance) == qfalse {
+        if NPC_GetMoveInformation(ctx, &mut FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.distance) == qfalse {
             return qfalse;
         }
 
@@ -280,7 +280,7 @@ pub fn NPC_GetMoveDirectionAltRoute(
         FRAME_NAV_INFO = unsafe { std::mem::zeroed() };
 
         // Get our movement, if any
-        if NPC_GetMoveInformation(ctx, FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.distance) == qfalse {
+        if NPC_GetMoveInformation(ctx, &mut FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.distance) == qfalse {
             return qfalse;
         }
 

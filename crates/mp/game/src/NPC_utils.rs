@@ -221,10 +221,7 @@ pub fn CalcEntitySpot(
                 } else {
                     AngleVectors((*client).ps.viewangles, Some(&mut forward), Some(&mut right), Some(&mut up));
                 }
-                // Cross-file callee's own `muzzlePoint` out-param is not yet
-                // fork-9 reshaped (still by-value `vec3_t`); its porter's job
-                // per this pass's cross-file convention.
-                crate::g_weapon::CalcMuzzlePoint(ctx, ent as *mut gentity_t, forward, right, up, *point);
+                crate::g_weapon::CalcMuzzlePoint(ctx, ent as *mut gentity_t, forward, right, up, point);
                 //NOTE: automatically takes leaning into account!
             }
             spot_t::SPOT_GROUND => {

@@ -1926,7 +1926,7 @@ pub fn WP_LobFire(
     mins: vec3_t,
     maxs: vec3_t,
     clipmask: c_int,
-    velocity: vec3_t,
+    velocity: &mut vec3_t,
     tracePath: qboolean,
     ignoreEntNum: c_int,
     enemyNum: c_int,
@@ -2068,16 +2068,15 @@ pub fn WP_LobFire(
 
         if hitCount >= maxHits {
             // NOTE: worst case scenario, use the one that impacted closest to the target (or just use the first try...?)
-            let _ = velocity; // out-param overlay pattern: caller-visible via return + PORT-NOTE below
+            *velocity = failCase;
             return qfalse;
         }
+        *velocity = shotVel;
         qtrue
     }
-    // PORT-NOTE(out-param-vec3): Raven writes the result into the caller's
-    // `velocity` vec3_t out-param (`vec3_t` is a raw array, mutated in place);
-    // this fn's resolved signature takes `velocity: vec3_t` by value (not
-    // `&mut`), so the computed `shotVel`/`failCase` cannot be written back
-    // here. Flagged as a shape mismatch — caller needs an out-ref shape.
+    // PORT-NOTE(out-param-vec3): `velocity` is a vec3_t out-param per the
+    // settled vec3 rule (docs/porting/rosetta.md: outputs are `&mut`); Raven
+    // copies `failCase` (worst case) or `shotVel` (success) back through it.
 }
 
 // PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
@@ -2866,7 +2865,7 @@ pub fn WP_DropDetPack(
         } else {
             crate::q_math::AngleVectors((*(*ent).client).ps.viewangles, Some(&mut forward), Some(&mut vright), Some(&mut up));
 
-            CalcMuzzlePoint(ctx, ent, forward, vright, up, muzzle);
+            CalcMuzzlePoint(ctx, ent, forward, vright, up, &mut muzzle);
 
             crate::q_math::VectorNormalize(&mut forward);
             crate::q_math::_VectorMA(muzzle, -4.0, forward, &mut muzzle);
@@ -3334,11 +3333,11 @@ pub fn CalcMuzzlePoint(
     forward: vec3_t,
     right: vec3_t,
     up: vec3_t,
-    muzzlePoint: vec3_t,
+    muzzlePoint: &mut vec3_t,
 ) {
     unsafe {
         let weapontype: c_int = (*ent).s.weapon;
-        let mut muzzlePoint = (*ent).s.pos.trBase;
+        *muzzlePoint = (*ent).s.pos.trBase;
 
         // PORT-NOTE(weapon-muzzle-table): `WP_MuzzlePoint[]` — the per-weapon
         // muzzle offset table — is not yet ported anywhere in the crate graph;
@@ -3348,15 +3347,15 @@ pub fn CalcMuzzlePoint(
         if weapontype > crate::shared::WP_NONE && weapontype < WP_NUM_WEAPONS {
             // Use the table to generate the muzzlepoint;
             // Crouching.  Use the add-to-Z method to adjust vertically.
-            let tmp = muzzlePoint;
-            crate::q_math::_VectorMA(tmp, muzzleOffPoint[0], forward, &mut muzzlePoint);
-            let tmp = muzzlePoint;
-            crate::q_math::_VectorMA(tmp, muzzleOffPoint[1], right, &mut muzzlePoint);
+            let tmp = *muzzlePoint;
+            crate::q_math::_VectorMA(tmp, muzzleOffPoint[0], forward, muzzlePoint);
+            let tmp = *muzzlePoint;
+            crate::q_math::_VectorMA(tmp, muzzleOffPoint[1], right, muzzlePoint);
             muzzlePoint[2] += (*(*ent).client).ps.viewheight as f32 + muzzleOffPoint[2];
         }
 
         // snap to integer coordinates for more efficient network bandwidth usage
-        trap::SnapVector(ctx.engine, crate::trap::GSnapvector::new(&mut muzzlePoint));
+        trap::SnapVector(ctx.engine, crate::trap::GSnapvector::new(muzzlePoint));
     }
 }
 
@@ -3747,7 +3746,7 @@ pub fn G_EstimateCamPos(
     vertOffset: f32,
     pitchOffset: f32,
     ignoreEntNum: c_int,
-    camPos: vec3_t,
+    camPos: &mut vec3_t,
 ) {
     unsafe {
         // PORT-NOTE(unported-const): `CONTENTS_PLAYERCLIP` isn't in the ported
@@ -3816,9 +3815,10 @@ pub fn G_EstimateCamPos(
             crate::q_math::_VectorMA(tmp, thirdPersonHorzOffset, viewaxis[1], &mut cameraCurLoc);
         }
 
-        let _ = camPos; // PORT-NOTE(out-param-vec3): same shape mismatch as `WP_LobFire` —
-        // resolved signature takes `camPos: vec3_t` by value, but Raven writes the
-        // result into the caller's out-param; `cameraCurLoc` is the would-be result.
+        // PORT-NOTE(out-param-vec3): `camPos` is a vec3_t out-param per the
+        // settled vec3 rule (docs/porting/rosetta.md: outputs are `&mut`);
+        // Raven copies `cameraCurLoc` back through it.
+        *camPos = cameraCurLoc;
     }
 }
 
@@ -3869,7 +3869,7 @@ pub fn WP_GetVehicleCamPos(ent: *mut gentity_t, pilot: *mut gentity_t, camPos: &
         // Control Scheme 3 Method:
         G_EstimateCamPos(
             ctx, (*(*ent).client).ps.viewangles, (*(*pilot).client).ps.origin, (*(*pilot).client).ps.viewheight as f32,
-            thirdPersonRange, thirdPersonHorzOffset, vertOffset, pitchOffset, (*pilot).s.number, *camPos,
+            thirdPersonRange, thirdPersonHorzOffset, vertOffset, pitchOffset, (*pilot).s.number, camPos,
         );
     }
 }

@@ -1282,7 +1282,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             let mut muzzle: vec3_t = [0.0; 3];
             let mut angles: vec3_t = [0.0; 3];
             let mut target: vec3_t = [0.0; 3];
-            let velocity = [0.0; 3];
+            let mut velocity: vec3_t = [0.0; 3];
             let mins = [
                 -REPEATER_ALT_SIZE,
                 -REPEATER_ALT_SIZE,
@@ -1310,7 +1310,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 mins,
                 maxs,
                 MASK_SHOT | CONTENTS_LIGHTSABER,
-                velocity,
+                &mut velocity,
                 qtrue,
                 (*npc_ent).s.number,
                 (*(*npc_ent).enemy).s.number as c_int,
