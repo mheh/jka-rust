@@ -1358,7 +1358,7 @@ pub fn Q3_SetTeleportDest(ctx: GameContext<'_>, entID: c_int, org: vec3_t) -> qb
 /// Raven `Q3_SetOrigin`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1929-1961`
-// PORT-ESCALATION(client-still-void): the client branch writes
+// PORT-NOTE(client-still-void): the client branch writes
 // `ent->client->ps.{origin,velocity,pm_time,pm_flags,eFlags}`; the non-client
 // (`G_SetOrigin`) branch is faithful, the client branch panics loudly.
 pub fn Q3_SetOrigin(ctx: GameContext<'_>, entID: c_int, origin: vec3_t) {
@@ -2189,7 +2189,7 @@ pub fn Q3_SetTimeScale(ctx: GameContext<'_>, entID: c_int, data: *const c_char) 
     }
 }
 
-// PORT-ESCALATION(client-still-void): `self->client->ps.eFlags` toggle is a
+// PORT-NOTE(client-still-void): `self->client->ps.eFlags` toggle is a
 // real field write, not just a null check; leaving the whole fn parked rather
 // than silently skipping that half of the behavior.
 /// Raven `Q3_SetInvisible`.

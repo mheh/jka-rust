@@ -15,7 +15,7 @@
 //! have not been type-ported anywhere in the crate graph yet (`FL_*`,
 //! `SVF_*`, `EF_*`, `CONTENTS_*`, `MAT_*`, and `moverState_t`'s
 //! `MOVER_POS1`/`MOVER_1TO2`/`MOVER_POS2`/`MOVER_2TO1` values — `g_local.h`
-//! is out of this file's packet). See PORT-ESCALATION markers at each site.
+//! is out of this file's packet). See PORT-NOTE markers at each site.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

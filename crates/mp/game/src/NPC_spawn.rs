@@ -18,7 +18,7 @@ use crate::prelude::*;
 pub const SFB_RIFLEMAN: c_int = 2;
 pub const SFB_PHASER: c_int = 4;
 
-// PORT-ESCALATION(packet-contract): this packet's manifest rows list callee
+// PORT-NOTE(packet-contract): this packet's manifest rows list callee
 // names (in-module callees / bg_ callees / traps / globals) but never give the
 // resolved Rust signature of any out-of-file symbol (no `## RESOLVED` /
 // `prelude` section), unlike what the task brief promises. Nearly every

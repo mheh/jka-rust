@@ -26,7 +26,7 @@
 //! signature), so per §C7 (out-params -> return values / mutable refs) they
 //! are declared `movedir: &mut vec3_t` here instead of parking.
 //!
-//! PARKED (see PORT-ESCALATION markers): `NPC_SetBlocked`,
+//! PARKED (see PORT-NOTE markers): `NPC_SetBlocked`,
 //! `NAVNEW_PushBlocker`, `NAVNEW_SidestepBlocker`, `NAVNEW_Bypass`,
 //! `NAVNEW_ResolveEntityCollision`, `NAVNEW_AvoidCollision`,
 //! `NAVNEW_TestNodeConnectionBlocked`, `NAVNEW_MoveToGoal` all read JKA-added

@@ -17,7 +17,7 @@
 //! (`gentity_t::NPC`/`::client` are opaque `*mut c_void`, cast per the
 //! `NPC_combat.rs` precedent).
 //!
-//! PARKED (see PORT-ESCALATION markers): several functions read the ambient
+//! PARKED (see PORT-NOTE markers): several functions read the ambient
 //! bot-AI "current actor" globals (`NPC`, `NPCInfo`) that Raven's
 //! `ai_main.c` think-loop sets per NPC frame — there is no `GameWorld`/
 //! `GameContext` field for them and no entity parameter to substitute (topic

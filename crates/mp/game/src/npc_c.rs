@@ -7,7 +7,7 @@
 //! `NPC`/`NPCInfo`/`client`/`ucmd` file-scope globals, `level`, `g_entities`,
 //! cvars) or an engine trap (`trap_*`) cannot be threaded against the staged
 //! raw-pointer signatures (no `GameWorld`/engine handle) and are parked;
-//! see PORT-ESCALATION markers, matching the g_utils.c precedent.
+//! see PORT-NOTE markers, matching the g_utils.c precedent.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

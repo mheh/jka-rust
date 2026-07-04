@@ -9,7 +9,7 @@
 //! the representation of that working set is a genuine unsettled design fork.
 //! Every function that reads/writes it — and every function whose skeleton
 //! signature passes a mutated `vec3_t` out-param BY VALUE (`[f32;3]` is `Copy`,
-//! so in-place writes cannot propagate) — is parked with a `PORT-ESCALATION`.
+//! so in-place writes cannot propagate) — is parked with a `PORT-NOTE`.
 //! The clean, pointer-parameterized / pure functions are ported.
 #![allow(non_snake_case, unused, clippy::all)]
 

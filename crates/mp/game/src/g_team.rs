@@ -6,7 +6,7 @@
 //! wired into crates/. Functions that reach file-scope game state
 //! (`level`, `teamgame`, `g_entities`, cvars) or an engine trap cannot be
 //! threaded against the staged raw-pointer signatures (no `GameWorld`/engine
-//! handle) and are parked; see PORT-ESCALATION markers.
+//! handle) and are parked; see PORT-NOTE markers.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

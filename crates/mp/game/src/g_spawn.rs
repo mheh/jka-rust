@@ -28,7 +28,7 @@
 //! (same convention as `g_team.rs`'s local `TEAM_RED`/`TEAM_BLUE`), resolved
 //! at integration.
 //!
-//! PARKED (see PORT-ESCALATION markers): `G_CallSpawn` (the ~180-entry
+//! PARKED (see PORT-NOTE markers): `G_CallSpawn` (the ~180-entry
 //! `spawns[]` classname->`SP_*` dispatch table lives in other porters'
 //! not-yet-resolved files — none of those `SP_*` targets are in this
 //! packet's out-of-file call surface, so the table can't be built without

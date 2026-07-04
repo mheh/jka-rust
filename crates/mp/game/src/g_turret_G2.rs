@@ -8,7 +8,7 @@
 //! is the type-port's frozen `Option<unsafe extern "C" fn(...)>` — the
 //! fork-2 `EntThink`/`EntUse`/`EntPain`/`EntDie` dispatch enums this pass's
 //! `pub fn` bodies would need to assign through are a different type than
-//! what `gentity_t` actually carries. See each fn's PORT-ESCALATION marker.
+//! what `gentity_t` actually carries. See each fn's PORT-NOTE marker.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

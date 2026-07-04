@@ -17,7 +17,7 @@
 //! `G_PlayEffect`/`G_PlayEffectID`); or fn-pointer dispatch (`GlobalUse`/
 //! `TryUse`) per the fn-ID-enum ruling that `gentity_t.use_` (still a raw
 //! `Option<unsafe extern "C" fn(...)>`) doesn't yet wire. See
-//! PORT-ESCALATION markers.
+//! PORT-NOTE markers.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

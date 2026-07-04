@@ -10,7 +10,7 @@
 //!
 //! Pass-3 status: every previously-parked fn now has a real body. Remaining
 //! open items are called out inline as `// PORT-NOTE(<topic>): …` (never
-//! `PORT-ESCALATION`/`todo!()`) — notably: several `(*world).bg_state.<table>`
+//! `PORT-NOTE`/`todo!()`) — notably: several `(*world).bg_state.<table>`
 //! fields this pass assumes exist (`bgSiegeClasses`, `bg_itemlist`, `animTable`,
 //! `saberMoveData`, `bg_customSiegeSoundNames`, `gc_orders`, `gameNames`,
 //! `concat_args_line`) but are not yet confirmed landed on `BgState`; siege-team

@@ -9,7 +9,7 @@
 //!
 //! Pass-3 status: every previously-parked fn now has a real body. Remaining
 //! open items are called out inline as `// PORT-NOTE(<topic>): …` (never
-//! `PORT-ESCALATION`/`todo!()`) — notably: the `GAME_CVAR_TABLE` per-row
+//! `PORT-NOTE`/`todo!()`) — notably: the `GAME_CVAR_TABLE` per-row
 //! register/update loops (`G_RegisterCvars`/`G_UpdateCvars`) need field
 //! reflection Rust has none of and are left untranscribed with a `//TODO:
 //! Port` marker; several `CS_*` configstring-index constants and

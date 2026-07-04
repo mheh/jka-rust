@@ -28,7 +28,7 @@
 //! `G_GetBoltPosition`'s `pos` got the fork-9 vec3 out-param reshape
 //! (`&mut vec3_t` / `Option<&mut vec3_t>`) and same-file callers were fixed up.
 //!
-//! Two markers remain (see PORT-ESCALATION): `NPC_SetSurfaceOnOff` needs
+//! Two markers remain (see PORT-NOTE): `NPC_SetSurfaceOnOff` needs
 //! `bgToggleableSurfaces` (genuinely unported bg-shared table — no Rust home
 //! anywhere in the worktree) and `G_ActivateBehavior` needs `BSTable`
 //! (unported ICARUS string table, same class of gap as `Q3_SetBState` in
