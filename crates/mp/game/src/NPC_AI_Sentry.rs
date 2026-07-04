@@ -1,207 +1,667 @@
-// PORT-COMPLETE: NPC_AI_Sentry.c 12/12
-//! Faithful port of `oracle/oracle/codemp/game/NPC_AI_Sentry.c`.
+//! Faithful port of `oracle/oracle/codemp/game/NPC_AI_Sentry.c` (MP only).
 //!
-//! Sentry droid NPC AI behavior.
+//! Sentry gun AI behavior: hovering turret NPC that maintains height, fires
+//! at enemies, and has separate idle/patrol/attack states.
+//!
+//! Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c`
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::NPC_reactions::NPC_Pain;
-use crate::NPC_utils::G_ActivateBehavior;
-use crate::bg_misc::BG_FindItemForAmmo;
-use crate::entity::flags::FL_SHIELDED;
-use crate::g_items::RegisterItem;
-use crate::g_timer::TIMER_Set;
-use crate::g_utils::{G_EffectIndex, G_Sound, G_SoundIndex};
-use crate::npc_c::NPC_SetAnim;
-use crate::q_math::Q_irand;
-use crate::q_shared::va;
-use crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth;
 
-// Local state enums
-const LSTATE_NONE: i32 = 0;
-const LSTATE_ASLEEP: i32 = 1;
-const LSTATE_WAKEUP: i32 = 2;
-pub const LSTATE_ACTIVE: i32 = 3;
-pub const LSTATE_POWERING_UP: i32 = 4;
-pub const LSTATE_ATTACKING: i32 = 5;
+/// Sentry hover height constants.
+const SENTRY_HOVER_HEIGHT: f32 = 50.0f32;
+const SENTRY_VELOCITY_DECAY: f32 = 0.6f32;
+const SENTRY_STRAFE_DIS: f32 = 150.0f32;
+const SENTRY_STRAFE_VEL: f32 = 300.0f32;
+const SENTRY_UPWARD_PUSH: f32 = 25.0f32;
+const SENTRY_FORWARD_BASE_SPEED: f32 = 150.0f32;
+const SENTRY_FORWARD_MULTIPLIER: f32 = 25.0f32;
+const MIN_DISTANCE_SQR: f32 = 10000.0f32;
 
-const MIN_DISTANCE: i32 = 256;
-const MIN_DISTANCE_SQR: i32 = MIN_DISTANCE * MIN_DISTANCE;
-
-pub const SENTRY_FORWARD_BASE_SPEED: i32 = 10;
-pub const SENTRY_FORWARD_MULTIPLIER: i32 = 5;
-
-pub const SENTRY_VELOCITY_DECAY: f32 = 0.85f32;
-pub const SENTRY_STRAFE_VEL: i32 = 256;
-pub const SENTRY_STRAFE_DIS: i32 = 200;
-pub const SENTRY_UPWARD_PUSH: i32 = 32;
-pub const SENTRY_HOVER_HEIGHT: i32 = 24;
-
-/// Raven `NPC_Sentry_Precache`.
+/// `NPC_Sentry_Precache` — Precache sounds and effects for the sentry gun.
 ///
-/// Precache sentry sounds and effects.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:37-57`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
-// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
-// `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_Sentry_Precache(ctx: GameContext<'_>) {
-    todo!("Port NPC_Sentry_Precache — parked: seam-threading")
+    let world = unsafe { &mut *ctx.world };
+
+    world.callbacks.sound_index("sound/chars/sentry/misc/sentry_explo");
+    world.callbacks.sound_index("sound/chars/sentry/misc/sentry_pain");
+    world.callbacks.sound_index("sound/chars/sentry/misc/sentry_shield_open");
+    world.callbacks.sound_index("sound/chars/sentry/misc/sentry_shield_close");
+    world.callbacks.sound_index("sound/chars/sentry/misc/sentry_hover_1_lp");
+    world.callbacks.sound_index("sound/chars/sentry/misc/sentry_hover_2_lp");
+
+    for i in 1..4 {
+        let talk_idx = i;
+        let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
+        world.callbacks.sound_index(&s);
+    }
+
+    world.callbacks.effect_index("bryar/muzzle_flash");
+    world.callbacks.effect_index("env/med_explode");
+
+    if let Some(item) = unsafe { crate::bg_misc::BG_FindItemForAmmo(AMMO_BLASTER) }.as_mut() {
+        crate::g_items::RegisterItem(ctx, item);
+    }
 }
 
-/// Raven `sentry_use`.
+/// `sentry_use` — Entrypoint when sentry gun is activated via trigger.
 ///
-/// Callback when sentry is used. Activates behavior and transitions from sleep.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:64-72`
-// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
-// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
-// documented deferred type-port item (`docs/type-port-todo.md`), not a
-// missing `use`. Left as unresolved bare identifiers, these silently
-// type-check as irrefutable match-pattern bindings (always-true), which is
-// a behavioral bug, not just a compile gap — parked instead.
 pub fn sentry_use(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port sentry_use — parked: unported-type (animNumber_t)")
+    unsafe {
+        crate::NPC_utils::G_ActivateBehavior(ctx, self_, BSET_USE);
+
+        (*self_).flags &= !FL_SHIELDED;
+        crate::npc_c::NPC_SetAnim(
+            self_,
+            SETANIM_BOTH,
+            BOTH_POWERUP1,
+            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+        );
+        (*(*self_).NPC).localState = LSTATE_ACTIVE;
+    }
 }
 
-/// Raven `NPC_Sentry_Pain`.
+/// `NPC_Sentry_Pain` — Sentry pain behavior (hit by damage).
 ///
-/// Handle sentry taking damage. Special handling for DEMP2 disable.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:79-105`
-// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
-// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
-// documented deferred type-port item (`docs/type-port-todo.md`), not a
-// missing `use`. Left as unresolved bare identifiers, these silently
-// type-check as irrefutable match-pattern bindings (always-true), which is
-// a behavioral bug, not just a compile gap — parked instead.
 pub fn NPC_Sentry_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
 ) {
-    todo!("Port NPC_Sentry_Pain — parked: unported-type (animNumber_t)")
+    unsafe {
+        let world = &mut *ctx.world;
+        let mod_ = world.globals.gPainMOD;
+
+        crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
+
+        if mod_ == MOD_DEMP2 || mod_ == MOD_DEMP2_ALT {
+            (*(*self_).NPC).burstCount = 0;
+            crate::g_timer::TIMER_Set(
+                ctx,
+                self_,
+                cstr("attackDelay").as_ptr(),
+                (*world).bg_state.rng.Q_irand(9000, 12000),
+            );
+            (*self_).flags |= FL_SHIELDED;
+            crate::npc_c::NPC_SetAnim(
+                self_,
+                SETANIM_BOTH,
+                BOTH_FLY_SHIELDED,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
+            crate::g_utils::G_Sound(
+                ctx,
+                self_,
+                CHAN_AUTO,
+                world.callbacks.sound_index("sound/chars/sentry/misc/sentry_pain"),
+            );
+
+            (*(*self_).NPC).localState = LSTATE_ACTIVE;
+        }
+    }
 }
 
-/// Raven `Sentry_Fire`.
+/// `Sentry_Fire` — Fire a bryar projectile from one of the muzzle bolts.
 ///
-/// Fire a blaster bolt from one of three muzzles. Difficulty-scaled damage.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:112-203`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Sentry_Fire(ctx: GameContext<'_>) {
-    todo!("Port Sentry_Fire — parked: ai-context")
+    unsafe {
+        let world = &mut *ctx.world;
+        let NPC = world.globals.NPC;
+        let NPCInfo = world.globals.NPCInfo;
+
+        let mut muzzle: vec3_t = [0.0; 3];
+        let mut forward: vec3_t = [0.0; 3];
+        let mut vright: vec3_t = [0.0; 3];
+        let mut up: vec3_t = [0.0; 3];
+        let mut boltMatrix: mdxaBone_t = [0; 12];
+
+        (*NPC).flags &= !FL_SHIELDED;
+
+        if (*NPCInfo).localState == LSTATE_POWERING_UP {
+            if crate::g_timer::TIMER_Done(
+                ctx,
+                NPC,
+                cstr("powerup").as_ptr(),
+            ) {
+                (*NPCInfo).localState = LSTATE_ATTACKING;
+                crate::npc_c::NPC_SetAnim(
+                    NPC,
+                    SETANIM_BOTH,
+                    BOTH_ATTACK1,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                );
+            } else {
+                return;
+            }
+        } else if (*NPCInfo).localState == LSTATE_ACTIVE {
+            (*NPCInfo).localState = LSTATE_POWERING_UP;
+
+            crate::g_utils::G_Sound(
+                ctx,
+                NPC,
+                CHAN_AUTO,
+                world.callbacks.sound_index("sound/chars/sentry/misc/sentry_shield_open"),
+            );
+            crate::npc_c::NPC_SetAnim(
+                NPC,
+                SETANIM_BOTH,
+                BOTH_POWERUP1,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
+            crate::g_timer::TIMER_Set(ctx, NPC, cstr("powerup").as_ptr(), 250);
+            return;
+        } else if (*NPCInfo).localState != LSTATE_ATTACKING {
+            (*NPCInfo).localState = LSTATE_ACTIVE;
+            return;
+        }
+
+        // Which muzzle to fire from?
+        let which = (*NPCInfo).burstCount % 3;
+        let bolt = match which {
+            0 => crate::trap::G2API_AddBolt(
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddBoltArgs::new(
+                    (*NPC).ghoul2,
+                    0,
+                    cstr("*flash1").as_ptr() as *const c_char,
+                ),
+            ),
+            1 => crate::trap::G2API_AddBolt(
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddBoltArgs::new(
+                    (*NPC).ghoul2,
+                    0,
+                    cstr("*flash2").as_ptr() as *const c_char,
+                ),
+            ),
+            _ => crate::trap::G2API_AddBolt(
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddBoltArgs::new(
+                    (*NPC).ghoul2,
+                    0,
+                    cstr("*flash03").as_ptr() as *const c_char,
+                ),
+            ),
+        };
+
+        crate::trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                (*NPC).ghoul2,
+                0,
+                bolt,
+                &mut boltMatrix as *mut mdxaBone_t,
+                &(*NPC).r.currentAngles as *const vec3_t,
+                &(*NPC).r.currentOrigin as *const vec3_t,
+                world.level.time,
+                core::ptr::null_mut(),
+                &(*NPC).modelScale as *const vec3_t,
+            ),
+        );
+
+        crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN, &mut muzzle);
+
+        crate::q_math::AngleVectors(
+            (*NPC).r.currentAngles,
+            Some(&mut forward),
+            Some(&mut vright),
+            Some(&mut up),
+        );
+
+        crate::g_utils::G_PlayEffectID(
+            world.callbacks.effect_index("bryar/muzzle_flash"),
+            muzzle,
+            forward,
+        );
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, 1600.0, 10000, NPC, qfalse);
+
+        (*missile).classname = cstr("bryar_proj").as_ptr();
+        (*missile).s.weapon = WP_BRYAR_PISTOL;
+
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = MOD_BRYAR_PISTOL;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+        (*NPCInfo).burstCount += 1;
+        (*NPC).attackDebounceTime = world.level.time + 50;
+        (*missile).damage = 5;
+
+        // now scale for difficulty
+        if world.cvars.g_spskill.integer == 0 {
+            (*NPC).attackDebounceTime += 200;
+            (*missile).damage = 1;
+        } else if world.cvars.g_spskill.integer == 1 {
+            (*NPC).attackDebounceTime += 100;
+            (*missile).damage = 3;
+        }
+    }
 }
 
-/// Raven `Sentry_MaintainHeight`.
+/// `Sentry_MaintainHeight` — Maintain hover height relative to enemies/goals.
 ///
-/// Maintain hovering height relative to enemy or goal. Apply friction to velocity.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:210-304`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
-    todo!("Port Sentry_MaintainHeight — parked: ai-context")
+    unsafe {
+        let world = &mut *ctx.world;
+        let NPC = world.globals.NPC;
+        let NPCInfo = world.globals.NPCInfo;
+        let ucmd = &mut world.globals.ucmd;
+
+        (*NPC).s.loopSound = world.callbacks.sound_index("sound/chars/sentry/misc/sentry_hover_1_lp");
+
+        // Update our angles regardless
+        crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
+
+        // If we have an enemy, we should try to hover at about enemy eye level
+        if let Some(enemy_id) = (*NPC).enemy {
+            let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+            let mut dif: f32 = (enemy.r.currentOrigin[2] + enemy.r.maxs[2]) - (*NPC).r.currentOrigin[2];
+
+            // cap to prevent dramatic height shifts
+            if dif.abs() > 8.0 {
+                if dif.abs() > SENTRY_HOVER_HEIGHT {
+                    dif = if dif < 0.0 { -24.0 } else { 24.0 };
+                }
+
+                (*(*NPC).client).ps.velocity[2] = ((*(*NPC).client).ps.velocity[2] + dif) / 2.0;
+            }
+        } else {
+            let goal: *mut gentity_t = if let Some(goal_id) = (*NPCInfo).goalEntity {
+                unsafe { &*(*world).entities.as_ptr().add(goal_id.0 as usize) } as *const gentity_t as *mut gentity_t
+            } else if let Some(last_goal_id) = (*NPCInfo).lastGoalEntity {
+                unsafe { &*(*world).entities.as_ptr().add(last_goal_id.0 as usize) } as *const gentity_t as *mut gentity_t
+            } else {
+                core::ptr::null_mut()
+            };
+
+            if !goal.is_null() {
+                let mut dif: f32 = (*goal).r.currentOrigin[2] - (*NPC).r.currentOrigin[2];
+
+                if dif.abs() > SENTRY_HOVER_HEIGHT {
+                    ucmd.upmove = if ucmd.upmove < 0 { -4 } else { 4 };
+                } else {
+                    if (*(*NPC).client).ps.velocity[2] != 0.0 {
+                        (*(*NPC).client).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
+
+                        if (*(*NPC).client).ps.velocity[2].abs() < 2.0 {
+                            (*(*NPC).client).ps.velocity[2] = 0.0;
+                        }
+                    }
+                }
+            } else if (*(*NPC).client).ps.velocity[2] != 0.0 {
+                (*(*NPC).client).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
+
+                if (*(*NPC).client).ps.velocity[2].abs() < 1.0 {
+                    (*(*NPC).client).ps.velocity[2] = 0.0;
+                }
+            }
+        }
+
+        // Apply friction
+        if (*(*NPC).client).ps.velocity[0] != 0.0 {
+            (*(*NPC).client).ps.velocity[0] *= SENTRY_VELOCITY_DECAY;
+
+            if (*(*NPC).client).ps.velocity[0].abs() < 1.0 {
+                (*(*NPC).client).ps.velocity[0] = 0.0;
+            }
+        }
+
+        if (*(*NPC).client).ps.velocity[1] != 0.0 {
+            (*(*NPC).client).ps.velocity[1] *= SENTRY_VELOCITY_DECAY;
+
+            if (*(*NPC).client).ps.velocity[1].abs() < 1.0 {
+                (*(*NPC).client).ps.velocity[1] = 0.0;
+            }
+        }
+
+        crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
+    }
 }
 
-/// Raven `Sentry_Idle`.
+/// `Sentry_Idle` — Idle behavior; sleeping/waking up states.
 ///
-/// Idle behavior: sleep or wake up based on local state.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:311-331`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Sentry_Idle(ctx: GameContext<'_>) {
-    todo!("Port Sentry_Idle — parked: ai-context")
+    unsafe {
+        let world = &mut *ctx.world;
+        let NPC = world.globals.NPC;
+        let NPCInfo = world.globals.NPCInfo;
+
+        Sentry_MaintainHeight(ctx);
+
+        // Is he waking up?
+        if (*NPCInfo).localState == LSTATE_WAKEUP {
+            if (*(*NPC).client).ps.torsoTimer <= 0 {
+                (*NPCInfo).scriptFlags |= SCF_LOOK_FOR_ENEMIES;
+                (*NPCInfo).burstCount = 0;
+            }
+        } else {
+            crate::npc_c::NPC_SetAnim(
+                NPC,
+                SETANIM_BOTH,
+                BOTH_SLEEP1,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
+            (*NPC).flags |= FL_SHIELDED;
+
+            crate::NPC_AI_Default::NPC_BSIdle(ctx);
+        }
+    }
 }
 
-/// Raven `Sentry_Strafe`.
+/// `Sentry_Strafe` — Perform a strafe maneuver.
 ///
-/// Strafe horizontally away from enemy. Trace to check validity.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:338-365`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Sentry_Strafe(ctx: GameContext<'_>) {
-    todo!("Port Sentry_Strafe — parked: ai-context")
+    unsafe {
+        let world = &mut *ctx.world;
+        let NPC = world.globals.NPC;
+        let NPCInfo = world.globals.NPCInfo;
+
+        let mut right: vec3_t = [0.0; 3];
+        let mut end: vec3_t = [0.0; 3];
+        let mut tr: trace_t = core::mem::zeroed();
+
+        crate::q_math::AngleVectors(
+            (*(*NPC).client).renderInfo.eyeAngles,
+            None,
+            Some(&mut right),
+            None,
+        );
+
+        // Pick a random strafe direction, then check to see if doing a strafe would be
+        // reasonable valid
+        let dir = if (world.bg_state.rng.rand() & 1) != 0 { -1 } else { 1 };
+        crate::q_math::_VectorMA((*NPC).r.currentOrigin, (SENTRY_STRAFE_DIS * dir as f32), right, &mut end);
+
+        crate::trap::Trace(
+            ctx.engine,
+            mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &(*NPC).r.currentOrigin as *const vec3_t,
+                core::ptr::null::<vec3_t>(),
+                core::ptr::null::<vec3_t>(),
+                &end as *const vec3_t,
+                (*NPC).s.number,
+                MASK_SOLID,
+            ),
+        );
+
+        // Close enough
+        if tr.fraction > 0.9f32 {
+            crate::q_math::_VectorMA(
+                (*(*NPC).client).ps.velocity,
+                (SENTRY_STRAFE_VEL * dir as f32),
+                right,
+                &mut (*(*NPC).client).ps.velocity,
+            );
+
+            // Add a slight upward push
+            (*(*NPC).client).ps.velocity[2] += SENTRY_UPWARD_PUSH;
+
+            // Set the strafe start time so we can do a controlled roll
+            (*NPCInfo).standTime = world.level.time + 3000 + (world.bg_state.rng.random() * 500.0) as c_int;
+        }
+    }
 }
 
-/// Raven `Sentry_Hunt`.
+/// `Sentry_Hunt` — Hunt the enemy, either strafing or chasing.
 ///
-/// Hunt the enemy. Move toward or strafe, depending on visibility.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:372-411`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
-pub fn Sentry_Hunt(
-    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
-    todo!("Port Sentry_Hunt — parked: ai-context")
+pub fn Sentry_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+    unsafe {
+        let world = &mut *ctx.world;
+        let NPC = world.globals.NPC;
+        let NPCInfo = world.globals.NPCInfo;
+
+        let mut forward: vec3_t = [0.0; 3];
+        let mut distance: f32 = 0.0;
+
+        // If we're not supposed to stand still, pursue the player
+        if (*NPCInfo).standTime < world.level.time {
+            // Only strafe when we can see the player
+            if visible != qfalse {
+                Sentry_Strafe(ctx);
+                return;
+            }
+        }
+
+        // If we don't want to advance, stop here
+        if advance == qfalse && visible != qfalse {
+            return;
+        }
+
+        // Only try and navigate if the player is visible
+        if visible == qfalse {
+            // Move towards our goal
+            if let Some(enemy_id) = (*NPC).enemy {
+                (*NPCInfo).goalEntity = Some(enemy_id);
+            }
+            (*NPCInfo).goalRadius = 12;
+
+            // Get our direction from the navigator if we can't see our target
+            if crate::NPC_move::NPC_GetMoveDirection(ctx, forward, &mut distance) == qfalse {
+                return;
+            }
+        } else {
+            if let Some(enemy_id) = (*NPC).enemy {
+                let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+                crate::q_math::_VectorSubtract(enemy.r.currentOrigin, (*NPC).r.currentOrigin, &mut forward);
+                distance = crate::q_math::VectorNormalize(&mut forward);
+            }
+        }
+
+        let speed = SENTRY_FORWARD_BASE_SPEED + (SENTRY_FORWARD_MULTIPLIER * world.cvars.g_spskill.integer as f32);
+        crate::q_math::_VectorMA(
+            (*(*NPC).client).ps.velocity,
+            speed,
+            forward,
+            &mut (*(*NPC).client).ps.velocity,
+        );
+    }
 }
 
-/// Raven `Sentry_RangedAttack`.
+/// `Sentry_RangedAttack` — Ranged attack behavior.
 ///
-/// Ranged attack: fire or close shield. Hunt if pursuing.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:418-448`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
-pub fn Sentry_RangedAttack(
-    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
-    todo!("Port Sentry_RangedAttack — parked: ai-context")
+pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+    unsafe {
+        let world = &mut *ctx.world;
+        let NPC = world.globals.NPC;
+        let NPCInfo = world.globals.NPCInfo;
+
+        if crate::g_timer::TIMER_Done(ctx, NPC, cstr("attackDelay").as_ptr())
+            && (*NPC).attackDebounceTime < world.level.time
+            && visible != qfalse
+        {
+            if (*NPCInfo).burstCount > 6 {
+                if (*NPC).fly_sound_debounce_time == 0 {
+                    // delay closing down to give the player an opening
+                    (*NPC).fly_sound_debounce_time = world.level.time + world.bg_state.rng.Q_irand(500, 2000);
+                } else if (*NPC).fly_sound_debounce_time < world.level.time {
+                    (*NPCInfo).localState = LSTATE_ACTIVE;
+                    (*NPC).fly_sound_debounce_time = 0;
+                    (*NPCInfo).burstCount = 0;
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        NPC,
+                        cstr("attackDelay").as_ptr(),
+                        world.bg_state.rng.Q_irand(2000, 3500),
+                    );
+                    (*NPC).flags |= FL_SHIELDED;
+                    crate::npc_c::NPC_SetAnim(
+                        NPC,
+                        SETANIM_BOTH,
+                        BOTH_FLY_SHIELDED,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    );
+                    crate::g_utils::G_SoundOnEnt(
+                        ctx,
+                        NPC,
+                        CHAN_AUTO,
+                        cstr("sound/chars/sentry/misc/sentry_shield_close").as_ptr(),
+                    );
+                }
+            } else {
+                Sentry_Fire(ctx);
+            }
+        }
+
+        if ((*NPCInfo).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
+            Sentry_Hunt(ctx, visible, advance);
+        }
+    }
 }
 
-/// Raven `Sentry_AttackDecision`.
+/// `Sentry_AttackDecision` — Decide how to attack the enemy.
 ///
-/// Decide how to attack: maintain height, check enemy, determine if visible/in range.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:455-510`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
-    todo!("Port Sentry_AttackDecision — parked: ai-context")
+    unsafe {
+        let world = &mut *ctx.world;
+        let NPC = world.globals.NPC;
+        let NPCInfo = world.globals.NPCInfo;
+
+        let mut distance: f32 = 0.0;
+        let visible: qboolean;
+        let advance: qboolean;
+
+        // Always keep a good height off the ground
+        Sentry_MaintainHeight(ctx);
+
+        (*NPC).s.loopSound = world.callbacks.sound_index("sound/chars/sentry/misc/sentry_hover_2_lp");
+
+        // randomly talk
+        if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) {
+            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("angerNoise").as_ptr()) {
+                let talk_idx = world.bg_state.rng.Q_irand(1, 3);
+                let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
+                crate::g_utils::G_SoundOnEnt(ctx, NPC, CHAN_AUTO, cstr(&s).as_ptr());
+
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    NPC,
+                    cstr("patrolNoise").as_ptr(),
+                    world.bg_state.rng.Q_irand(4000, 10000),
+                );
+            }
+        }
+
+        // He's dead.
+        if let Some(enemy_id) = (*NPC).enemy {
+            let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+            if enemy.health < 1 {
+                (*NPC).enemy = None;
+                Sentry_Idle(ctx);
+                return;
+            }
+        }
+
+        // If we don't have an enemy, just idle
+        if crate::NPC_utils::NPC_CheckEnemyExt(ctx, qfalse) == qfalse {
+            Sentry_Idle(ctx);
+            return;
+        }
+
+        // Rate our distance to the target and visibilty
+        if let Some(enemy_id) = (*NPC).enemy {
+            let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+            distance = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, enemy.r.currentOrigin);
+            visible = crate::NPC_utils::NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
+            advance = if distance > MIN_DISTANCE_SQR { qtrue } else { qfalse };
+        } else {
+            visible = qfalse;
+            advance = qfalse;
+        }
+
+        // If we cannot see our target, move to see it
+        if visible == qfalse {
+            if ((*NPCInfo).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
+                Sentry_Hunt(ctx, visible, advance);
+                return;
+            }
+        }
+
+        crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
+
+        Sentry_RangedAttack(ctx, visible, advance);
+    }
 }
 
-/// Raven `NPC_Sentry_Patrol`.
+/// `NPC_Sentry_Patrol` — Patrol behavior when no enemy.
 ///
-/// Patrol behavior: maintain height, check for stealth, update goal, talk.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:519-550`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
-    todo!("Port NPC_Sentry_Patrol — parked: ai-context")
+    unsafe {
+        let world = &mut *ctx.world;
+        let NPC = world.globals.NPC;
+        let ucmd = &mut world.globals.ucmd;
+
+        Sentry_MaintainHeight(ctx);
+
+        // If we have somewhere to go, then do that
+        if (*NPC).enemy.is_none() {
+            if crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth(ctx) != qfalse {
+                crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
+                return;
+            }
+
+            if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
+                // start loop sound once we move
+                ucmd.buttons |= BUTTON_WALKING;
+                crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
+            }
+
+            // randomly talk
+            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) {
+                let talk_idx = world.bg_state.rng.Q_irand(1, 3);
+                let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
+                crate::g_utils::G_SoundOnEnt(ctx, NPC, CHAN_AUTO, cstr(&s).as_ptr());
+
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    NPC,
+                    cstr("patrolNoise").as_ptr(),
+                    world.bg_state.rng.Q_irand(2000, 4000),
+                );
+            }
+        }
+
+        crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
+    }
 }
 
-/// Raven `NPC_BSSentry_Default`.
+/// `NPC_BSSentry_Default` — Main behavior state for sentry gun.
 ///
-/// Main behavior selector: handle use callbacks, attack if enemy, patrol, or idle.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:557-577`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn NPC_BSSentry_Default(ctx: GameContext<'_>) {
-    todo!("Port NPC_BSSentry_Default — parked: ai-context")
+    unsafe {
+        let world = &mut *ctx.world;
+        let NPC = world.globals.NPC;
+        let NPCInfo = world.globals.NPCInfo;
+
+        if !(*NPC).targetname.is_null() {
+            (*NPC).use_fn = Some(crate::ent_fn_enums::EntUse::sentry_use);
+        }
+
+        if (*NPC).enemy.is_some() && (*NPCInfo).localState != LSTATE_WAKEUP {
+            // Don't attack if waking up or if no enemy
+            Sentry_AttackDecision(ctx);
+        } else if ((*NPCInfo).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
+            NPC_Sentry_Patrol(ctx);
+        } else {
+            Sentry_Idle(ctx);
+        }
+    }
 }

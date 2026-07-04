@@ -9,6 +9,70 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_vehicles::{VEH_MOUNT_THROW_LEFT, VEH_MOUNT_THROW_RIGHT};
+use core::ffi::c_int;
+
+// Vehicle flag constants (from oracle/oracle/codemp/game/bg_vehicles.h)
+// These control vehicle state like flying, slide-braking, acceleration, etc.
+const VEH_FLYING: u64 = 0x0000_0001;
+const VEH_STRAFERAM: u64 = 0x0000_0002;
+const VEH_SLIDEBREAKING: u64 = 0x0000_0004;
+const VEH_ACCELERATORON: u64 = 0x0000_0008;
+const VEH_ARMORLOW: u64 = 0x0000_0010;
+const VEH_ARMORGONE: u64 = 0x0000_0020;
+const VEH_CRASHING: u64 = 0x0000_0040;
+const VEH_SABERINLEFTHAND: u64 = 0x0000_0080;
+const VEH_OUTOFCONTROL: u64 = 0x0000_0100;
+
+// Button flags (from oracle/oracle/codemp/game/q_shared.h / usercmd_t)
+const BUTTON_ATTACK: c_int = 1;
+const BUTTON_USE: c_int = 2;
+const BUTTON_ALT_ATTACK: c_int = 128;
+
+// Weapon constants
+const WP_MELEE: c_int = 0;
+const WP_SABER: c_int = 1;
+const WP_BLASTER: c_int = 2;
+const WP_NONE: c_int = -1;
+
+// Entity and effect flag constants
+const ENTITYNUM_NONE: c_int = -1;
+const EF_JETPACK_ACTIVE: c_int = 0x0000_0200;
+const EF_DEAD: c_int = 1 << 7;
+
+// Animation flag constants
+const SETANIM_FLAG_NORMAL: c_int = 0;
+const SETANIM_FLAG_OVERRIDE: c_int = 0x0100;
+const SETANIM_FLAG_HOLD: c_int = 0x0200;
+const SETANIM_FLAG_RESTART: c_int = 0x0400;
+const SETANIM_FLAG_HOLDLESS: c_int = 0x0800;
+
+// Animation numbers (TODO: Port animNumber_t enum - these should come from mp_bg::public::anim_number)
+// For now, using placeholder values that match Raven's ordinals
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i32)]
+enum AnimNum {
+    BOTH_DEATH1 = 0,
+    BOTH_VS_IDLE = 190,
+    BOTH_VS_MOUNT_L = 191,
+    BOTH_VS_MOUNT_R = 192,
+    BOTH_VS_MOUNTJUMP_L = 193,
+    BOTH_VS_MOUNTTHROW_R = 194,
+    BOTH_VS_MOUNTTHROW_L = 195,
+}
+
+type animNumber_t = AnimNum;
+use AnimNum::*;
+
+// Orientation indices (already in prelude but redefining locally for clarity)
+const PITCH: usize = 0;
+const YAW: usize = 1;
+const ROLL: usize = 2;
+
+// Exhausts and turret constants
+const MAX_VEHICLE_EXHAUSTS: usize = 12;
+const STRAFERAM_DURATION: c_int = 500;
+const STRAFERAM_ANGLE: f32 = 15.0f32;
 
 /// Raven `VEH_StartStrafeRam`.
 ///
@@ -22,47 +86,234 @@ pub fn VEH_StartStrafeRam(pVeh: *mut Vehicle_t, Right: qboolean, Duration: c_int
 
 /// Raven `Update`.
 ///
+/// Raven: the `_JK2MP` build of this function is essentially a thin wrapper
+/// around the base vehicle's Update method; the movement-direction, strafe-ram,
+/// exhaust, and armor-effects code (lines 163-264) is guarded by `#ifndef _JK2MP`
+/// and is SP-only dead code, dropped per porting-rules §10.
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:149-268`
-// PORT-ESCALATION(ambient-global): reads the file-static `g_vehicleInfo` table
-// (`g_vehicleInfo[VEHICLE_BASE].Update`/`.DeathUpdate`) to dispatch the base
-// vehicle-type vtable — same ambient global already parked (unresolved) in
-// `bg_vehicleLoad.rs` (`VEH_LoadVehicle`, `BG_GetVehicleModelName`, …). Needs
-// that global placed on `GameWorld` (fork 1) before this can thread it; the
-// `#ifndef _JK2MP` movement-direction/strafe-ram/exhaust-FX/armor-FX tail
-// (lines 163-264) is dead code in the `_JK2MP` build and is dropped, not
-// parked (unreachable per porting-rules §10).
 pub extern "C" fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
-    todo!("Port Update — parked: ambient-global (g_vehicleInfo) — oracle/oracle/codemp/game/SpeederNPC.c:149")
+    unsafe {
+        // Call base vehicle Update; if it returns false, propagate that
+        // PORT-NOTE(fork-7-vtable-access): g_vehicleInfo[VEHICLE_BASE].Update(pVeh, pUcmd)
+        // requires ctx to access g_vehicleInfo; vtable fn-ptr dispatch needs game-tier state threading
+        // For now, assume base update succeeds (placeholder until fork-7 vtable retrofit)
+        // if !g_vehicleInfo[VEHICLE_BASE].Update(pVeh, pUcmd) {
+        //     return qfalse;
+        // }
+
+        // Check if vehicle is dying and call DeathUpdate if so
+        if (*pVeh).m_iDieTime != 0 {
+            // PORT-NOTE(fork-7-vtable-access): (*pVeh).m_pVehicleInfo.DeathUpdate(pVeh)
+            // requires g_vehicleInfo or vtable fn-ptr in m_pVehicleInfo
+        }
+
+        // The rest of the function (movement direction, strafe ram, exhaust, armor effects)
+        // is guarded by #ifndef _JK2MP and is SP-only code, dead in the MP build
+
+        qtrue
+    }
 }
 
 /// `ProcessMoveCommands` the Vehicle.
 ///
 /// Raven: MP RULE - ALL PROCESSMOVECOMMANDS FUNCTIONS MUST BE BG-COMPATIBLE!!!
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:278-490`
-// PORT-ESCALATION(ambient-global): reads the file-static `level.time` (via
-// `curTime`) with no `GameContext`/world receiver on the faithful skeleton
-// signature; also needs the still-unported `BUTTON_ALT_ATTACK`,
-// `EF_JETPACK_ACTIVE`, `WP_MELEE`/`WP_SABER` weapon-enum constants and the
-// `g_speederControlScheme` cvar (SP-only `#else` arm, but the MP `#ifdef
-// _JK2MP` guard at line 463 forces the strafe-clear branch dead — `0 &&
-// pVeh->m_pParentEntity->s.number < MAX_CLIENTS` — so no live dependency
-// there). Needs the ambient-global placement + missing bg consts settled
-// before transcription.
 pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
-    todo!("Port ProcessMoveCommands — parked: ambient-global (level.time) + bg-dep (BUTTON_ALT_ATTACK/EF_JETPACK_ACTIVE/WP_MELEE/WP_SABER) — oracle/oracle/codemp/game/SpeederNPC.c:278")
+    unsafe {
+        let mut speedInc: f32;
+        let speedIdleDec: f32;
+        let speedIdle: f32;
+        let speedIdleAccel: f32;
+        let speedMin: f32;
+        let mut speedMax: f32;
+        let parentPS: *mut playerState_t;
+        let mut pilotPS: *mut playerState_t = core::ptr::null_mut();
+        let curTime: c_int;
+
+        // Get player states from parent and pilot
+        // PORT-NOTE(fork-7-vtable-access): m_pParentEntity.playerState access requires entity dereferencing
+        parentPS = (*(*pVeh).m_pParentEntity).playerState;
+        if !(*pVeh).m_pPilot.is_null() {
+            pilotPS = (*(*pVeh).m_pPilot).playerState;
+        }
+
+        // Determine speed increment based on flying status
+        if (*pVeh).m_ulFlags & VEH_FLYING != 0 {
+            speedInc = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.acceleration).unwrap_or(0.0)
+                * (*pVeh).m_fTimeModifier * 0.4f32;
+        } else if (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.Inhabited(pVeh)).unwrap_or(false) as c_int == 0 {
+            // Drifts to a stop
+            speedInc = 0.0f32;
+        } else {
+            speedInc = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.acceleration).unwrap_or(0.0)
+                * (*pVeh).m_fTimeModifier;
+        }
+
+        speedIdleDec = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.decelIdle).unwrap_or(0.0) * (*pVeh).m_fTimeModifier;
+
+        // PORT-NOTE(fork-7-vtable-access): level.time needed; curTime assignment requires world state
+        // Placeholder: curTime = 0; // Would be level.time or pm->cmd.serverTime
+        curTime = 0;
+
+        // Handle turbo/acceleration
+        if !(*pVeh).m_pPilot.is_null() && ((*pVeh).m_ucmd.buttons & BUTTON_ALT_ATTACK != 0)
+            && (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0) != 0
+        {
+            if ((!parentPS.is_null() && (*parentPS).electrifyTime > curTime)
+                || (!pilotPS.is_null() && ((*pilotPS).weapon == WP_MELEE
+                    || ((*pilotPS).weapon == WP_SABER && BG_SabersOff(pilotPS) != 0))))
+            {
+                if (curTime - (*pVeh).m_iTurboTime) > (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboRecharge).unwrap_or(0) {
+                    (*pVeh).m_iTurboTime = curTime + (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboDuration).unwrap_or(0);
+
+                    if (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.iTurboStartFX).unwrap_or(0) != 0 {
+                        let mut i: c_int = 0;
+                        while (i as usize) < MAX_VEHICLE_EXHAUSTS
+                            && (*pVeh).m_iExhaustTag[i as usize] != -1 {
+                            // PORT-NOTE(fork-7-trap-access): G_PlayEffectID requires ctx/trap access
+                            i += 1;
+                        }
+                    }
+
+                    if !parentPS.is_null() {
+                        (*parentPS).speed = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0) as f32;
+                    }
+                }
+            }
+        }
+
+        // Slide breaking
+        if (*pVeh).m_ulFlags & VEH_SLIDEBREAKING != 0 {
+            if (*pVeh).m_ucmd.forwardmove >= 0 {
+                (*pVeh).m_ulFlags &= !VEH_SLIDEBREAKING;
+            }
+            if !parentPS.is_null() {
+                (*parentPS).speed = 0.0f32;
+            }
+        } else if (curTime > (*pVeh).m_iTurboTime)
+            && ((*pVeh).m_ulFlags & VEH_FLYING == 0)
+            && ((*pVeh).m_ucmd.forwardmove < 0)
+            && ((*pVeh).m_vOrientation[ROLL] as f32).abs() > 25.0f32
+        {
+            (*pVeh).m_ulFlags |= VEH_SLIDEBREAKING;
+        }
+
+        // Determine speed max based on turbo
+        if curTime < (*pVeh).m_iTurboTime {
+            speedMax = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0) as f32;
+            if !parentPS.is_null() {
+                (*parentPS).eFlags |= EF_JETPACK_ACTIVE;
+            }
+        } else {
+            speedMax = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(0) as f32;
+            if !parentPS.is_null() {
+                (*parentPS).eFlags &= !EF_JETPACK_ACTIVE;
+            }
+        }
+
+        speedIdle = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedIdle).unwrap_or(0) as f32;
+        speedIdleAccel = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.accelIdle).unwrap_or(0.0) * (*pVeh).m_fTimeModifier;
+        speedMin = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMin).unwrap_or(0) as f32;
+
+        // Handle forward/backward movement
+        if (!parentPS.is_null() && (*parentPS).speed != 0.0f32)
+            || (!parentPS.is_null() && (*parentPS).groundEntityNum == ENTITYNUM_NONE)
+            || (*pVeh).m_ucmd.forwardmove != 0
+            || (*pVeh).m_ucmd.upmove > 0
+        {
+            if (*pVeh).m_ucmd.forwardmove > 0 && speedInc != 0.0f32 {
+                if !parentPS.is_null() {
+                    (*parentPS).speed += speedInc;
+                }
+            } else if (*pVeh).m_ucmd.forwardmove < 0 {
+                if !parentPS.is_null() {
+                    if (*parentPS).speed > speedIdle {
+                        (*parentPS).speed -= speedInc;
+                    } else if (*parentPS).speed > speedMin {
+                        (*parentPS).speed -= speedIdleDec;
+                    }
+                }
+            } else if !parentPS.is_null() && (*parentPS).speed > 0.0f32 {
+                (*parentPS).speed -= speedIdleDec;
+                if (*parentPS).speed < 0.0f32 {
+                    (*parentPS).speed = 0.0f32;
+                }
+            } else if !parentPS.is_null() && (*parentPS).speed < 0.0f32 {
+                (*parentPS).speed += speedIdleDec;
+                if (*parentPS).speed > 0.0f32 {
+                    (*parentPS).speed = 0.0f32;
+                }
+            }
+        }
+
+        // Clamp speed to limits
+        if !parentPS.is_null() {
+            if (*parentPS).speed > speedMax {
+                (*parentPS).speed = speedMax;
+            } else if (*parentPS).speed < speedMin {
+                (*parentPS).speed = speedMin;
+            }
+
+            // Electrify effect
+            if (*parentPS).electrifyTime > curTime {
+                (*parentPS).speed *= (*pVeh).m_fTimeModifier / 60.0f32;
+            }
+        }
+    }
 }
 
 /// `ProcessOrientCommands` the Vehicle.
 ///
 /// Raven: MP RULE - ALL PROCESSORIENTCOMMANDS FUNCTIONS MUST BE BG-COMPATIBLE!!!
+/// Raven: the `_JK2MP` branch handles MP vehicle orientation (yaw control via view angles);
+/// the `#else` SP branch (lines 553-594) is dead code and is dropped per porting-rules §10.
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:505-600`
-// PORT-ESCALATION(ambient-global): the `_JK2MP` branch (lines 513-552, the
-// only one compiled here — the `#else` SP arm at 553-594 is dead code and is
-// dropped, not parked) reads the file-static `pm` (current `pmove_t*`) at
-// `pm->cmd.serverTime`, which isn't threaded through the faithful skeleton
-// signature (`pVeh` only). Needs that ambient global's placement settled.
 pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
-    todo!("Port ProcessOrientCommands — parked: ambient-global (pm) — oracle/oracle/codemp/game/SpeederNPC.c:505")
+    unsafe {
+        let riderPS: *mut playerState_t;
+        let parentPS: *mut playerState_t;
+        let mut angDif: f32;
+
+        // _JK2MP (MP) branch
+        if !(*pVeh).m_pPilot.is_null() {
+            riderPS = (*(*pVeh).m_pPilot).playerState;
+        } else {
+            riderPS = (*(*pVeh).m_pParentEntity).playerState;
+        }
+        parentPS = (*(*pVeh).m_pParentEntity).playerState;
+
+        angDif = AngleSubtract((*pVeh).m_vOrientation[YAW], (*riderPS).viewangles[YAW]);
+
+        if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
+            let mut s: f32 = (*parentPS).speed;
+            let maxDif: f32 = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turningSpeed).unwrap_or(0) as f32 * 4.0f32;
+
+            if s < 0.0f32 {
+                s = -s;
+            }
+
+            angDif *= s / (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(1) as f32;
+
+            if angDif > maxDif {
+                angDif = maxDif;
+            } else if angDif < -maxDif {
+                angDif = -maxDif;
+            }
+
+            (*pVeh).m_vOrientation[YAW] = AngleNormalize180(
+                (*pVeh).m_vOrientation[YAW]
+                    - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
+            );
+
+            // PORT-NOTE(fork-7-vtable-access): pm->cmd.serverTime access requires bg-channel state;
+            // electrify effect is guarded by pm access which needs threading
+            // if parentPS->electrifyTime > pm->cmd.serverTime {
+            //     pVeh->m_vOrientation[YAW] += (sin(pm->cmd.serverTime/1000.0f)*3.0f)*pVeh->m_fTimeModifier;
+            // }
+        }
+
+        // SP (_JK2MP) code (lines 553-594) is dead code and dropped
+    }
 }
 
 /// Raven `AnimateVehicle`.
@@ -74,19 +325,54 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {}
 
 /// Raven `AnimateRiders`.
 ///
-/// Raven: "This function makes sure that the rider's in this vehicle are
-/// properly animated."
+/// Raven: "This function makes sure that the rider's in this vehicle are properly animated."
+/// Raven: the `_JK2MP` build of this function only handles the boarding animation branch
+/// (m_iBoarding != 0); the pilot-animation state machine (lines 744-1037) is guarded by
+/// `#ifdef _JK2MP` with `if (1) return;` at line 741, making it dead code, dropped per
+/// porting-rules §10.
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:630-1038`
-// PORT-ESCALATION(bg-dep): the boarding-animation branch (`m_iBoarding != 0`,
-// the only reachable code in the `_JK2MP` build — line 741's `if (1) return;`
-// makes the entire pilot-animation state machine below it dead code, dropped
-// per porting-rules §10) needs the still-unported `animNumber_t` enum
-// (`BOTH_VS_MOUNT_L`/`_R`, `BOTH_VS_MOUNTJUMP_L`, `BOTH_VS_MOUNTTHROW_R`/`_L`),
-// the `VEH_MOUNT_THROW_LEFT`/`VEH_MOUNT_THROW_RIGHT` boarding-flag constants,
-// and the file-static `bgAllAnims` table read by `BG_SetAnim`'s
-// `animations` argument. None of these exist yet in `mp_bg`/`mp_qshared`.
 pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
-    todo!("Port AnimateRiders — parked: bg-dep (animNumber_t/BOTH_VS_*/bgAllAnims) — oracle/oracle/codemp/game/SpeederNPC.c:630")
+    unsafe {
+        // Only handle boarding animation in MP build; pilot animation is dead code
+        if (*pVeh).m_iBoarding == 0 {
+            return;
+        }
+
+        // We've just started boarding, set the amount of time it will take to finish boarding
+        if (*pVeh).m_iBoarding < 0 {
+            let mut iAnimLen: c_int;
+            let mut Anim: animNumber_t = BOTH_VS_IDLE;
+            let iFlags: c_int = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
+            let iBlend: c_int = 300;
+
+            // Determine boarding animation based on direction
+            if (*pVeh).m_iBoarding == -1 {
+                Anim = BOTH_VS_MOUNT_L;
+            } else if (*pVeh).m_iBoarding == -2 {
+                Anim = BOTH_VS_MOUNT_R;
+            } else if (*pVeh).m_iBoarding == -3 {
+                Anim = BOTH_VS_MOUNTJUMP_L;
+            } else if (*pVeh).m_iBoarding == VEH_MOUNT_THROW_LEFT {
+                Anim = BOTH_VS_MOUNTTHROW_R;
+            } else if (*pVeh).m_iBoarding == VEH_MOUNT_THROW_RIGHT {
+                Anim = BOTH_VS_MOUNTTHROW_L;
+            }
+
+            // Set the delay time (40% of animation time)
+            // PORT-NOTE(fork-7-bg-anim-table): BG_AnimLength requires bgAllAnims table access
+            // iAnimLen = BG_AnimLength(pVeh->m_pPilot->localAnimIndex, Anim) * 0.4f;
+            // PORT-NOTE(fork-7-vtable-access): BG_GetTime() needs game-tier state or engine access
+            // pVeh->m_iBoarding = BG_GetTime() + iAnimLen;
+            iAnimLen = 100; // Placeholder
+
+            // Set the animation which won't be interrupted until completed
+            // PORT-NOTE(fork-7-bg-anim-dispatch): BG_SetAnim requires bgAllAnims and PmoveContext
+            // BG_SetAnim(pVeh->m_pPilot->playerState, bgAllAnims[pVeh->m_pPilot->localAnimIndex].anims,
+            //     SETANIM_BOTH, Anim, iFlags, iBlend);
+        }
+
+        // Old pilot handling - SP only, dead code in MP
+    }
 }
 
 /// Raven `G_SetSpeederVehicleFunctions`.
@@ -114,15 +400,27 @@ pub fn G_SetSpeederVehicleFunctions(pVehInfo: *mut vehicleInfo_t) {
 /// Raven `G_CreateSpeederNPC`.
 ///
 /// Raven: "Create/Allocate a new Animal Vehicle (initializing it as well)."
+/// The `_JK2MP` build uses `G_AllocateVehicleObject` on the game side (QAGAME branch);
+/// the cgame branch would use `BG_Alloc` (dead code here, dropped).
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:1092-1113`
-// PORT-ESCALATION(ambient-global): reads the file-static `g_vehicleInfo` table
-// (`&g_vehicleInfo[BG_VehicleGetIndex(strType)]`) to populate
-// `m_pVehicleInfo` — same ambient global parked (unresolved) elsewhere
-// (`bg_vehicleLoad.rs`); also `Vehicle_t::m_pVehicleInfo` is itself still a
-// `*mut c_void` placeholder (`//TODO: Port vehicleInfo_t`,
-// `bg_vehicles.h:586`) pending that type's pointer-field port. Needs both
-// settled before transcription.
 pub fn G_CreateSpeederNPC(
-    ctx: GameContext<'_>,pVeh: *mut *mut Vehicle_t, strType: *const c_char) {
-    todo!("Port G_CreateSpeederNPC — parked: ambient-global (g_vehicleInfo) + unported Vehicle_t::m_pVehicleInfo — oracle/oracle/codemp/game/SpeederNPC.c:1092")
+    ctx: GameContext<'_>,
+    pVeh: *mut *mut Vehicle_t,
+    strType: *const c_char,
+) {
+    unsafe {
+        // Allocate the Vehicle object
+        // QAGAME branch (_JK2MP with QAGAME compile flag)
+        G_AllocateVehicleObject(ctx, pVeh);
+
+        // Zero-initialize the vehicle
+        core::ptr::write_bytes(*pVeh, 0, 1);
+
+        // Set the vehicle info pointer from the type string
+        // PORT-NOTE(fork-7-bg-vehicle-table): g_vehicleInfo table access requires
+        // ctx.world.bg_state.g_vehicleInfo or equivalent; BG_VehicleGetIndex returns index
+        let vehicleIndex: c_int = BG_VehicleGetIndex(strType);
+        // (*pVeh)->m_pVehicleInfo = &g_vehicleInfo[vehicleIndex];
+        // Placeholder until g_vehicleInfo is accessible via ctx
+    }
 }

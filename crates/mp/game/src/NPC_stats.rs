@@ -9,6 +9,15 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use std::ffi::CString;
+
+// Raven `DEFAULT_MINS_2`/`DEFAULT_MAXS_2`/`CROUCH_MAXS_2` (`bg_public.h`) —
+// redeclared locally per the existing per-file-local-const convention
+// (`g_nav.rs`/`g_weapon.rs` each carry their own copy rather than a shared
+// export).
+const DEFAULT_MINS_2: f32 = -24.0;
+const DEFAULT_MAXS_2: f32 = 40.0;
+const CROUCH_MAXS_2: f32 = 16.0;
 
 // Unported types referenced in this file (need porting before this compiles):
 // rank_t
@@ -16,15 +25,10 @@ use crate::prelude::*;
 /// Raven `NPC_ReactionTime`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:220-223`
-// PORT-ESCALATION(ambient-ai-state): `ctx.world.globals.NPCInfo` (GameGlobals,
-// `NPC.c:35`) is still a `()` placeholder — its real type (`gNPC_t **` in
-// oracle) needs the same "current NPC" AI-context design decision flagged
-// across the other `NPC_AI_*` files (does `gNPC_t` live in an arena addressed
-// by `EntityId`, or behind a raw-pointer seam?) before this body can deref
-// `NPCInfo->stats.reactions`. Not decidable from this packet's rulings alone;
-// parking rather than inventing the representation.
 pub fn NPC_ReactionTime(ctx: GameContext<'_>) -> c_int {
-    todo!("Port NPC_ReactionTime — parked: ambient-ai-state NPCInfo field is an unresolved () placeholder (needs gNPC_t representation decision)")
+    // `NPCInfo` (`NPC.c:34`) is a real `*mut gNPC_t` field on `GameGlobals` now
+    // (pass-2 backfill) — deref straight through.
+    unsafe { 200 * (6 - (*(*ctx.world).globals.NPCInfo).stats.reactions) }
 }
 
 /// Raven `TranslateRankName`.
@@ -146,47 +150,1705 @@ pub fn NPC_PrecacheWeapons(
 /// Raven `NPC_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:599-873`
-// PORT-ESCALATION(unported-const-table): body parses the `NPCParms`/`NPCFile`
-// buffers and looks up `TeamTable`/`WPTable` (string-ID const tables). None of
-// these exist anywhere in `crates/mp/{game,bg,qshared}` yet (confirmed by
-// grep — not even a `()` placeholder in `GameGlobals`), matching the same
-// unresolved dependency other porters parked on (e.g. `g_misc.rs`'s
-// `WPTable` escalation). `ctx: GameContext` is available now, but there is
-// nowhere to reach these tables from it; parking rather than inventing their
-// placement/shape.
 pub fn NPC_Precache(
     ctx: GameContext<'_>,
     spawner: *mut gentity_t,
 ) {
-    todo!("Port NPC_Precache — parked: unported-const-table NPCParms/NPCFile/TeamTable/WPTable not present anywhere in the worktree")
+    use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
+
+    unsafe {
+        // PORT-NOTE(unported-global): `NPCParms`/`NPCFile`/`TeamTable` are not
+        // real `GameGlobals` fields yet (confirmed by grep — no placeholder
+        // exists for any of the three). Referenced through the globals path
+        // per ruling 8 pending backfill; see missing_symbols.
+        let mut player_team: team_t = NPCTEAM_FREE;
+        let mut md3_model: qboolean = 0; // qfalse
+        let mut custom_skin: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
+        let mut sound: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
+        let mut playerModel: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
+
+        if crate::q_shared::Q_stricmp(cstr("random").as_ptr(), (*spawner).NPC_type) == 0 {
+            //sorry, can't precache a random just yet
+            return;
+        }
+        write_cstr_field(&mut custom_skin, "default");
+
+        let npc_parms: *const c_char =
+            (&(*ctx.world).globals.NPCParms) as *const _ as *const c_char;
+        let npc_file: *const c_char = (&(*ctx.world).globals.NPCFile) as *const _ as *const c_char;
+        let mut p: *const c_char = npc_parms;
+        crate::q_shared::COM_BeginParseSession(npc_file);
+
+        // look for the right NPC
+        loop {
+            if p.is_null() {
+                break;
+            }
+            let token = crate::q_shared::COM_ParseExt(&mut p as *mut *const c_char, 1);
+            if *token == 0 {
+                return;
+            }
+            if crate::q_shared::Q_stricmp(token, (*spawner).NPC_type) == 0 {
+                break;
+            }
+            crate::q_shared::SkipBracedSection(&mut p as *mut *const c_char);
+        }
+
+        if p.is_null() {
+            return;
+        }
+
+        if crate::bg_saberLoad::BG_ParseLiteral(&mut p as *mut *const c_char, cstr("{").as_ptr())
+            != 0
+        {
+            return;
+        }
+
+        // parse the NPC info block
+        loop {
+            let token = crate::q_shared::COM_ParseExt(&mut p as *mut *const c_char, 1);
+            if *token == 0 {
+                let msg = format!(
+                    "ERROR: unexpected EOF while parsing '{}'\n",
+                    cstr_to_str((*spawner).NPC_type)
+                );
+                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                return;
+            }
+
+            if qstricmp_eq(token, c"}") {
+                break;
+            }
+
+            // headmodel
+            if qstricmp_eq(token, c"headmodel") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if crate::q_shared::Q_stricmp(cstr("none").as_ptr(), value) == 0 {
+                    // (nothing — headModelName not wired yet, matches oracle's
+                    // commented-out Q_strncpyz)
+                }
+                md3_model = 1;
+                continue;
+            }
+
+            // torsomodel
+            if qstricmp_eq(token, c"torsomodel") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if crate::q_shared::Q_stricmp(cstr("none").as_ptr(), value) == 0 {
+                    // (nothing — torsoModelName not wired yet)
+                }
+                md3_model = 1;
+                continue;
+            }
+
+            // legsmodel
+            if qstricmp_eq(token, c"legsmodel") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                md3_model = 1;
+                continue;
+            }
+
+            // playerModel
+            if qstricmp_eq(token, c"playerModel") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                crate::q_shared::Q_strncpyz(
+                    playerModel.as_mut_ptr(),
+                    value,
+                    playerModel.len() as c_int,
+                );
+                md3_model = 0;
+                continue;
+            }
+
+            // customSkin
+            if qstricmp_eq(token, c"customSkin") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                crate::q_shared::Q_strncpyz(
+                    custom_skin.as_mut_ptr(),
+                    value,
+                    custom_skin.len() as c_int,
+                );
+                continue;
+            }
+
+            // playerTeam
+            if qstricmp_eq(token, c"playerTeam") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                // Raven bug (transcribed faithfully): sprintf's from `token`
+                // (still "playerTeam"), not the just-parsed `value`.
+                let tk = format!("NPC{}", cstr_to_str(token));
+                let tk_c = cstr(&tk);
+                player_team = crate::q_shared::GetIDForString(
+                    &(*ctx.world).globals.TeamTable as *const _ as *mut stringID_table_t,
+                    tk_c.as_ptr(),
+                );
+                continue;
+            }
+
+            // snd
+            if qstricmp_eq(token, c"snd") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if (*spawner).r.svFlags & SVF_NO_BASIC_SOUNDS == 0 {
+                    crate::q_shared::Q_strncpyz(sound.as_mut_ptr(), value, sound.len() as c_int);
+                    let sound_s = cstr_to_str(sound.as_ptr());
+                    let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
+                    let idx_s = format!("*${}", trimmed);
+                    (*spawner).s.csSounds_Std = crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
+                }
+                continue;
+            }
+
+            // sndcombat
+            if qstricmp_eq(token, c"sndcombat") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if (*spawner).r.svFlags & SVF_NO_COMBAT_SOUNDS == 0 {
+                    crate::q_shared::Q_strncpyz(sound.as_mut_ptr(), value, sound.len() as c_int);
+                    let sound_s = cstr_to_str(sound.as_ptr());
+                    let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
+                    let idx_s = format!("*${}", trimmed);
+                    (*spawner).s.csSounds_Combat =
+                        crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
+                }
+                continue;
+            }
+
+            // sndextra
+            if qstricmp_eq(token, c"sndextra") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if (*spawner).r.svFlags & SVF_NO_EXTRA_SOUNDS == 0 {
+                    crate::q_shared::Q_strncpyz(sound.as_mut_ptr(), value, sound.len() as c_int);
+                    let sound_s = cstr_to_str(sound.as_ptr());
+                    let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
+                    let idx_s = format!("*${}", trimmed);
+                    (*spawner).s.csSounds_Extra =
+                        crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
+                }
+                continue;
+            }
+
+            // sndjedi
+            if qstricmp_eq(token, c"sndjedi") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if (*spawner).r.svFlags & SVF_NO_EXTRA_SOUNDS == 0 {
+                    crate::q_shared::Q_strncpyz(sound.as_mut_ptr(), value, sound.len() as c_int);
+                    let sound_s = cstr_to_str(sound.as_ptr());
+                    let trimmed = sound_s.split('/').next().unwrap_or(&sound_s);
+                    let idx_s = format!("*${}", trimmed);
+                    (*spawner).s.csSounds_Jedi =
+                        crate::g_utils::G_SoundIndex(cstr(&idx_s).as_ptr());
+                }
+                continue;
+            }
+
+            if qstricmp_eq(token, c"weapon") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                let cur_weap = crate::q_shared::GetIDForString(
+                    crate::bg_saga::WPTable.as_ptr() as *mut stringID_table_t,
+                    value,
+                );
+                if cur_weap > WP_NONE && cur_weap < WP_NUM_WEAPONS {
+                    crate::g_items::RegisterItem(
+                        ctx,
+                        crate::bg_misc::BG_FindItemForWeapon(cur_weap as weapon_t),
+                    );
+                }
+                continue;
+            }
+
+            // (unrecognized token inside this block falls through — the
+            // oracle loop has no `else` catch-all here, matching its while(1))
+            break;
+        }
+
+        // If we're not a vehicle, then an error here would be valid...
+        let client_ptr = (*spawner).client as *mut gclient_t;
+        if client_ptr.is_null() || (*client_ptr).NPC_class != CLASS_VEHICLE {
+            if md3_model != 0 {
+                crate::g_main::Com_Printf(
+                    cstr("MD3 model using NPCs are not supported in MP\n").as_ptr(),
+                );
+            } else {
+                //if we have a model/skin then index them so they'll be registered immediately
+                //when the client gets a configstring update.
+                let mut model_name = format!(
+                    "models/players/{}/model.glm",
+                    cstr_to_str(playerModel.as_ptr())
+                );
+                if custom_skin[0] != 0 {
+                    //append it after a *
+                    model_name.push_str(&format!("*{}", cstr_to_str(custom_skin.as_ptr())));
+                }
+                crate::g_utils::G_ModelIndex(cstr(&model_name).as_ptr());
+            }
+        }
+
+        //precache this NPC's possible weapons
+        crate::NPC_stats::NPC_PrecacheWeapons(
+            ctx,
+            player_team,
+            (*spawner).spawnflags,
+            (*spawner).NPC_type,
+        );
+
+        //	CG_RegisterNPCCustomSounds( &ci );
+        //	CG_RegisterNPCEffects( playerTeam );
+        //rwwFIXMEFIXME: same
+        //FIXME: Look for a "sounds" directory and precache death, pain, alert sounds
+    }
 }
 
 /// Raven `NPC_ParseParms`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:974-3233`
-// PORT-ESCALATION(scope): 2260 LOC single-function NPC .cfg field parser
-// (largest function in the jampgame port); needs the same ambient
-// NPCParms/NPCFile/ClassTable/TeamTable/WPTable/FPTable/weaponData globals as
-// NPC_Precache (see that fn's escalation) plus BG_TempAlloc/Free scratch
-// allocation and dozens of per-field parse branches. Genuinely out of scope
-// for a single-pass mechanical transcription without the GameWorld threading
-// decision settled first; parking whole.
 pub fn NPC_ParseParms(
     ctx: GameContext<'_>,
-    NPCName: *const c_char,
+    NPCName_in: *const c_char,
     NPC: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port NPC_ParseParms — parked: ambient-global threading (NPCParms/NPCFile/*Table) unresolved; 2260 LOC scope")
+    use crate::client::render_info::renderInfo_t;
+    use crate::npc::g_npcstats_e::gNPCstats_t;
+    use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
+
+    unsafe {
+        let mut NPCName = NPCName_in;
+
+        let mut n: c_int;
+        let mut f: f32;
+        let mut sound: [c_char; MAX_QPATH] = [0; MAX_QPATH];
+        let mut playerModel: [c_char; MAX_QPATH] = [0; MAX_QPATH];
+        let mut customSkin: [c_char; MAX_QPATH] = [0; MAX_QPATH];
+        let client_ptr = (*NPC).client as *mut gclient_t;
+        let ri: *mut renderInfo_t = &mut (*client_ptr).renderInfo as *mut renderInfo_t;
+        let mut stats: *mut gNPCstats_t = std::ptr::null_mut();
+        let mut md3Model: qboolean = 1; // qtrue
+        let mut surfOff: [c_char; 1024] = [0; 1024];
+        let mut surfOn: [c_char; 1024] = [0; 1024];
+        let parsingPlayer: qboolean =
+            if (*NPC).s.number == 0 && !client_ptr.is_null() { 1 } else { 0 };
+        let mut playerMins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2];
+        let mut playerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];
+        let mut npcSaber1: c_int = 0;
+        let mut npcSaber2: c_int = 0;
+
+        write_cstr_field(&mut customSkin, "default");
+        if NPCName.is_null() || *NPCName == 0 {
+            NPCName = cstr("Player").as_ptr();
+        }
+
+        let npc_ptr = (*NPC).NPC as *mut gNPC_t;
+        if !npc_ptr.is_null() {
+            stats = &mut (*npc_ptr).stats as *mut gNPCstats_t;
+            // fill in defaults
+            (*stats).aggression = 3;
+            (*stats).aim = 3;
+            (*stats).earshot = 1024.0;
+            (*stats).evasion = 3;
+            (*stats).hfov = 90;
+            (*stats).intelligence = 3;
+            (*stats).r#move = 3;
+            (*stats).reactions = 3;
+            (*stats).vfov = 60;
+            (*stats).vigilance = 0.1f32;
+            (*stats).visrange = 1024.0;
+
+            (*stats).health = 0;
+
+            (*stats).yawSpeed = 90.0;
+            (*stats).walkSpeed = 90.0;
+            (*stats).runSpeed = 300.0;
+            (*stats).acceleration = 15; //Increase/descrease speed this much per frame (20fps)
+        } else {
+            stats = std::ptr::null_mut();
+        }
+
+        //Set defaults
+        //FIXME: should probably put default torso and head models, but what about enemies
+        //that don't have any- like Stasis?
+        //Q_strncpyz( ri->headModelName,	DEFAULT_HEADMODEL,  sizeof(ri->headModelName),	qtrue);
+        //Q_strncpyz( ri->torsoModelName, DEFAULT_TORSOMODEL, sizeof(ri->torsoModelName),	qtrue);
+        //Q_strncpyz( ri->legsModelName,	DEFAULT_LEGSMODEL,  sizeof(ri->legsModelName),	qtrue);
+        surfOff = [0; 1024];
+        surfOn = [0; 1024];
+
+        (*ri).headYawRangeLeft = 80;
+        (*ri).headYawRangeRight = 80;
+        (*ri).headPitchRangeUp = 45;
+        (*ri).headPitchRangeDown = 45;
+        (*ri).torsoYawRangeLeft = 60;
+        (*ri).torsoYawRangeRight = 60;
+        (*ri).torsoPitchRangeUp = 30;
+        (*ri).torsoPitchRangeDown = 50;
+
+        (*NPC).r.mins = playerMins;
+        (*NPC).r.maxs = playerMaxs;
+        (*client_ptr).ps.crouchheight = CROUCH_MAXS_2 as c_int;
+        (*client_ptr).ps.standheight = DEFAULT_MAXS_2 as c_int;
+
+        (*client_ptr).ps.customRGBA[0] = 255;
+        (*client_ptr).ps.customRGBA[1] = 255;
+        (*client_ptr).ps.customRGBA[2] = 255;
+        (*client_ptr).ps.customRGBA[3] = 255;
+
+        if crate::q_shared::Q_stricmp(cstr("random").as_ptr(), NPCName) == 0 {
+            //Randomly assemble a starfleet guy
+            //NPC_BuildRandom( NPC );
+            crate::g_main::Com_Printf(cstr("RANDOM NPC NOT SUPPORTED IN MP\n").as_ptr());
+            return 0; // qfalse
+        }
+
+        // PORT-NOTE(unported-global): `NPCParms`/`NPCFile`/`ClassTable`/
+        // `TeamTable` are not real `GameGlobals` fields yet — referenced
+        // through the globals path per ruling 8 pending backfill; see
+        // missing_symbols.
+        let npc_parms: *const c_char =
+            (&(*ctx.world).globals.NPCParms) as *const _ as *const c_char;
+        let npc_file: *const c_char = (&(*ctx.world).globals.NPCFile) as *const _ as *const c_char;
+        let mut p: *const c_char = npc_parms;
+        crate::q_shared::COM_BeginParseSession(npc_file);
+
+        // look for the right NPC
+        loop {
+            if p.is_null() {
+                return 0;
+            }
+            let token = crate::q_shared::COM_ParseExt(&mut p as *mut *const c_char, 1);
+            if *token == 0 {
+                return 0;
+            }
+            if crate::q_shared::Q_stricmp(token, NPCName) == 0 {
+                break;
+            }
+            crate::q_shared::SkipBracedSection(&mut p as *mut *const c_char);
+        }
+        if p.is_null() {
+            return 0;
+        }
+
+        if crate::bg_saberLoad::BG_ParseLiteral(&mut p as *mut *const c_char, cstr("{").as_ptr())
+            != 0
+        {
+            return 0;
+        }
+
+        // parse the NPC info block
+        'parse: loop {
+            let token = crate::q_shared::COM_ParseExt(&mut p as *mut *const c_char, 1);
+            if *token == 0 {
+                let msg = format!(
+                    "ERROR: unexpected EOF while parsing '{}'\n",
+                    cstr_to_str(NPCName)
+                );
+                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                return 0;
+            }
+
+            if qstricmp_eq(token, c"}") {
+                break;
+            }
+
+            //===MODEL PROPERTIES===========================================================
+            // custom color
+            if qstricmp_eq(token, c"customRGBA") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if crate::q_shared::Q_stricmp(value, cstr("random").as_ptr()) == 0 {
+                    (*client_ptr).ps.customRGBA[0] = (*ctx.world).bg_state.rng.Q_irand(0, 255);
+                    (*client_ptr).ps.customRGBA[1] = (*ctx.world).bg_state.rng.Q_irand(0, 255);
+                    (*client_ptr).ps.customRGBA[2] = (*ctx.world).bg_state.rng.Q_irand(0, 255);
+                    (*client_ptr).ps.customRGBA[3] = 255;
+                } else {
+                    (*client_ptr).ps.customRGBA[0] = crate::bg_lib::atoi(value);
+
+                    let mut n0: c_int = 0;
+                    if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                        continue;
+                    }
+                    (*client_ptr).ps.customRGBA[1] = n0;
+
+                    if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                        continue;
+                    }
+                    (*client_ptr).ps.customRGBA[2] = n0;
+
+                    if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                        continue;
+                    }
+                    (*client_ptr).ps.customRGBA[3] = n0;
+                }
+                continue;
+            }
+
+            // headmodel
+            if qstricmp_eq(token, c"headmodel") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if crate::q_shared::Q_stricmp(cstr("none").as_ptr(), value) == 0 {
+                    //Zero the head clamp range so the torso & legs don't lag behind
+                    (*ri).headYawRangeLeft = 0;
+                    (*ri).headYawRangeRight = 0;
+                    (*ri).headPitchRangeUp = 0;
+                    (*ri).headPitchRangeDown = 0;
+                }
+                continue;
+            }
+
+            // torsomodel
+            if qstricmp_eq(token, c"torsomodel") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if crate::q_shared::Q_stricmp(cstr("none").as_ptr(), value) == 0 {
+                    //Zero the torso clamp range so the legs don't lag behind
+                    (*ri).torsoYawRangeLeft = 0;
+                    (*ri).torsoYawRangeRight = 0;
+                    (*ri).torsoPitchRangeUp = 0;
+                    (*ri).torsoPitchRangeDown = 0;
+                }
+                continue;
+            }
+
+            // legsmodel
+            if qstricmp_eq(token, c"legsmodel") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                continue;
+            }
+
+            // playerModel
+            if qstricmp_eq(token, c"playerModel") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                crate::q_shared::Q_strncpyz(
+                    playerModel.as_mut_ptr(),
+                    value,
+                    playerModel.len() as c_int,
+                );
+                md3Model = 0;
+                continue;
+            }
+
+            // customSkin
+            if qstricmp_eq(token, c"customSkin") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                crate::q_shared::Q_strncpyz(
+                    customSkin.as_mut_ptr(),
+                    value,
+                    customSkin.len() as c_int,
+                );
+                continue;
+            }
+
+            // surfOff
+            if qstricmp_eq(token, c"surfOff") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if surfOff[0] != 0 {
+                    crate::q_shared::Q_strcat(
+                        surfOff.as_mut_ptr(),
+                        surfOff.len() as c_int,
+                        cstr(",").as_ptr(),
+                    );
+                    crate::q_shared::Q_strcat(surfOff.as_mut_ptr(), surfOff.len() as c_int, value);
+                } else {
+                    crate::q_shared::Q_strncpyz(
+                        surfOff.as_mut_ptr(),
+                        value,
+                        surfOff.len() as c_int,
+                    );
+                }
+                continue;
+            }
+
+            // surfOn
+            if qstricmp_eq(token, c"surfOn") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if surfOn[0] != 0 {
+                    crate::q_shared::Q_strcat(
+                        surfOn.as_mut_ptr(),
+                        surfOn.len() as c_int,
+                        cstr(",").as_ptr(),
+                    );
+                    crate::q_shared::Q_strcat(surfOn.as_mut_ptr(), surfOn.len() as c_int, value);
+                } else {
+                    crate::q_shared::Q_strncpyz(surfOn.as_mut_ptr(), value, surfOn.len() as c_int);
+                }
+                continue;
+            }
+
+            // headYawRangeLeft / Right / headPitchRangeUp / Down /
+            // torsoYawRangeLeft / Right / torsoPitchRangeUp / Down — all share
+            // the same shape (parse int, reject negative, store on `ri`).
+            macro_rules! range_field {
+                ($lit:literal, $field:ident) => {
+                    if qstricmp_eq(token, $lit) {
+                        let mut n0: c_int = 0;
+                        if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0)
+                            != 0
+                        {
+                            crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                            continue 'parse;
+                        }
+                        if n0 < 0 {
+                            let msg =
+                                format!("WARNING: bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                            continue 'parse;
+                        }
+                        (*ri).$field = n0;
+                        continue 'parse;
+                    }
+                };
+            }
+            range_field!(c"headYawRangeLeft", headYawRangeLeft);
+            range_field!(c"headYawRangeRight", headYawRangeRight);
+            range_field!(c"headPitchRangeUp", headPitchRangeUp);
+            range_field!(c"headPitchRangeDown", headPitchRangeDown);
+            range_field!(c"torsoYawRangeLeft", torsoYawRangeLeft);
+            range_field!(c"torsoYawRangeRight", torsoYawRangeRight);
+            range_field!(c"torsoPitchRangeUp", torsoPitchRangeUp);
+            range_field!(c"torsoPitchRangeDown", torsoPitchRangeDown);
+
+            // Uniform XYZ scale
+            if qstricmp_eq(token, c"scale") {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                if n0 < 0 {
+                    let msg = format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                    crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                    continue;
+                }
+                if n0 != 100 {
+                    (*client_ptr).ps.iModelScale = n0; //so the client knows
+                    if n0 >= 1024 {
+                        crate::g_main::Com_Printf(
+                            cstr("WARNING: MP does not support scaling up to or over 1024%\n")
+                                .as_ptr(),
+                        );
+                        n0 = 1023;
+                    }
+
+                    let scale = n0 as f32 / 100.0f32;
+                    (*NPC).modelScale = [scale, scale, scale];
+                }
+                continue;
+            }
+
+            // X/Y/Z scale — unsupported in MP, parsed and discarded.
+            macro_rules! scale_axis {
+                ($lit:literal) => {
+                    if qstricmp_eq(token, $lit) {
+                        let mut n0: c_int = 0;
+                        if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0)
+                            != 0
+                        {
+                            crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                            continue 'parse;
+                        }
+                        if n0 < 0 {
+                            let msg =
+                                format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                            continue 'parse;
+                        }
+                        if n0 != 100 {
+                            crate::g_main::Com_Printf(
+                                cstr("MP doesn't support xyz scaling, use 'scale'.\n").as_ptr(),
+                            );
+                        }
+                        continue 'parse;
+                    }
+                };
+            }
+            scale_axis!(c"scaleX");
+            scale_axis!(c"scaleY");
+            scale_axis!(c"scaleZ");
+
+            //===AI STATS=====================================================================
+            if parsingPlayer == 0 {
+                // int-valued 1-5-range NPC stats (aggression/aim/evasion/
+                // intelligence/move/reactions) — same shape.
+                macro_rules! stat_1_5 {
+                    ($lit:literal, $field:ident) => {
+                        if qstricmp_eq(token, $lit) {
+                            let mut n0: c_int = 0;
+                            if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0)
+                                != 0
+                            {
+                                crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                                continue 'parse;
+                            }
+                            if n0 < 1 || n0 > 5 {
+                                let msg = format!(
+                                    "bad {} in NPC '{}'\n",
+                                    cstr_to_str(token),
+                                    cstr_to_str(NPCName)
+                                );
+                                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                                continue 'parse;
+                            }
+                            if !npc_ptr.is_null() {
+                                (*stats).$field = n0;
+                            }
+                            continue 'parse;
+                        }
+                    };
+                }
+                stat_1_5!(c"aggression", aggression);
+                stat_1_5!(c"aim", aim);
+                // earshot (float)
+                if qstricmp_eq(token, c"earshot") {
+                    let mut f0: f32 = 0.0;
+                    if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if f0 < 0.0f32 {
+                        let msg = format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*stats).earshot = f0;
+                    }
+                    continue;
+                }
+                stat_1_5!(c"evasion", evasion);
+                // hfov
+                if qstricmp_eq(token, c"hfov") {
+                    let mut n0: c_int = 0;
+                    if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if n0 < 30 || n0 > 180 {
+                        let msg = format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*stats).hfov = n0; // / 2;	//FIXME: Why was this being done?!
+                    }
+                    continue;
+                }
+                stat_1_5!(c"intelligence", intelligence);
+                stat_1_5!(c"move", r#move);
+                stat_1_5!(c"reactions", reactions);
+                // shootDistance (float)
+                if qstricmp_eq(token, c"shootDistance") {
+                    let mut f0: f32 = 0.0;
+                    if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if f0 < 0.0f32 {
+                        let msg = format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*stats).shootDistance = f0;
+                    }
+                    continue;
+                }
+                // vfov
+                if qstricmp_eq(token, c"vfov") {
+                    let mut n0: c_int = 0;
+                    if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if n0 < 30 || n0 > 180 {
+                        let msg = format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*stats).vfov = n0 / 2;
+                    }
+                    continue;
+                }
+                // vigilance (float)
+                if qstricmp_eq(token, c"vigilance") {
+                    let mut f0: f32 = 0.0;
+                    if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if f0 < 0.0f32 {
+                        let msg = format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*stats).vigilance = f0;
+                    }
+                    continue;
+                }
+                // visrange (float)
+                if qstricmp_eq(token, c"visrange") {
+                    let mut f0: f32 = 0.0;
+                    if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if f0 < 0.0f32 {
+                        let msg = format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*stats).visrange = f0;
+                    }
+                    continue;
+                }
+                // race — commented out in oracle, dropped per §17/§20.
+
+                // rank
+                if qstricmp_eq(token, c"rank") {
+                    let mut value: *const c_char = std::ptr::null();
+                    if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value)
+                        != 0
+                    {
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*npc_ptr).rank = TranslateRankName(value);
+                    }
+                    continue;
+                }
+            }
+
+            // health
+            if qstricmp_eq(token, c"health") {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                if n0 < 0 {
+                    let msg = format!("WARNING: bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                    crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                    continue;
+                }
+                if !npc_ptr.is_null() {
+                    (*stats).health = n0;
+                } else if parsingPlayer != 0 {
+                    (*client_ptr).ps.stats[crate::prelude::STAT_MAX_HEALTH as usize] = n0;
+                    (*client_ptr).pers.maxHealth = n0;
+                }
+                continue;
+            }
+
+            // fullName
+            if qstricmp_eq(token, c"fullName") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                (*NPC).fullName = crate::g_spawn::G_NewString(value);
+                continue;
+            }
+
+            // playerTeam
+            if qstricmp_eq(token, c"playerTeam") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                let tk = format!("NPC{}", cstr_to_str(token));
+                let tk_c = cstr(&tk);
+                let team_id = crate::q_shared::GetIDForString(
+                    &(*ctx.world).globals.TeamTable as *const _ as *mut stringID_table_t,
+                    tk_c.as_ptr(),
+                );
+                (*client_ptr).playerTeam = team_id;
+                (*NPC).s.teamowner = team_id;
+                continue;
+            }
+
+            // enemyTeam
+            if qstricmp_eq(token, c"enemyTeam") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                let tk = format!("NPC{}", cstr_to_str(token));
+                let tk_c = cstr(&tk);
+                (*client_ptr).enemyTeam = crate::q_shared::GetIDForString(
+                    &(*ctx.world).globals.TeamTable as *const _ as *mut stringID_table_t,
+                    tk_c.as_ptr(),
+                );
+                continue;
+            }
+
+            // class
+            if qstricmp_eq(token, c"class") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                let class_id = crate::q_shared::GetIDForString(
+                    &(*ctx.world).globals.ClassTable as *const _ as *mut stringID_table_t,
+                    value,
+                );
+                (*client_ptr).NPC_class = core::mem::transmute::<c_int, class_t>(class_id);
+                (*NPC).s.NPC_class = class_id; //we actually only need this value now, but at the moment I don't feel like changing the 200+ references to client->NPC_class.
+
+                // No md3's for vehicles.
+                if (*client_ptr).NPC_class == CLASS_VEHICLE {
+                    if (*NPC).m_pVehicle.is_null() {
+                        //you didn't spawn this guy right!
+                        let msg = format!(
+                            "ERROR: Tried to spawn a vehicle NPC ({}) without using NPC_Vehicle or 'NPC spawn vehicle <vehiclename>'!!!  Bad, bad, bad!  Shame on you!\n",
+                            cstr_to_str(NPCName)
+                        );
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        return 0; // qfalse
+                    }
+                    md3Model = 0;
+                }
+
+                continue;
+            }
+
+            // dismemberment probabilities — parsed, never applied (MP doesn't
+            // support dismemberment; matches oracle's commented-out fields).
+            macro_rules! dismember_stub {
+                ($lit:literal) => {
+                    if qstricmp_eq(token, $lit) {
+                        let mut n0: c_int = 0;
+                        if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0)
+                            != 0
+                        {
+                            crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                            continue 'parse;
+                        }
+                        if n0 < 0 {
+                            let msg =
+                                format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                            continue 'parse;
+                        }
+                        //rwwFIXMEFIXME: support for this?
+                        continue 'parse;
+                    }
+                };
+            }
+            dismember_stub!(c"dismemberProbHead");
+            dismember_stub!(c"dismemberProbArms");
+            dismember_stub!(c"dismemberProbHands");
+            dismember_stub!(c"dismemberProbWaist");
+            dismember_stub!(c"dismemberProbLegs");
+
+            //===MOVEMENT STATS============================================================
+            if qstricmp_eq(token, c"width") {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    continue;
+                }
+                (*NPC).r.mins[0] = -(n0 as f32);
+                (*NPC).r.mins[1] = -(n0 as f32);
+                (*NPC).r.maxs[0] = n0 as f32;
+                (*NPC).r.maxs[1] = n0 as f32;
+                continue;
+            }
+
+            if qstricmp_eq(token, c"height") {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    continue;
+                }
+                // PORT-NOTE(vehicle-info-shape): `m_pVehicleInfo->type` requires
+                // the vehicleInfo_t layout; `m_pVehicle` is still `*mut c_void`
+                // here so this branch checks non-null only (never resolves
+                // VH_FIGHTER) — see missing_symbols.
+                if (*client_ptr).NPC_class == CLASS_VEHICLE && !(*NPC).m_pVehicle.is_null() {
+                    (*NPC).r.maxs[2] = n0 as f32 / 2.0f32;
+                    (*client_ptr).ps.standheight = (*NPC).r.maxs[2] as c_int;
+                    (*NPC).r.mins[2] = -(*NPC).r.maxs[2];
+                    (*NPC).s.origin[2] += (DEFAULT_MINS_2 - (*NPC).r.mins[2]) + 0.125f32;
+                    crate::q_math::_VectorCopy((*NPC).s.origin, &mut (*client_ptr).ps.origin);
+                    crate::q_math::_VectorCopy((*NPC).s.origin, &mut (*NPC).r.currentOrigin);
+                    crate::g_utils::G_SetOrigin(NPC, (*NPC).s.origin);
+                    trap::LinkEntity(
+                        ctx.engine,
+                        mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(NPC),
+                    );
+                } else {
+                    (*NPC).r.mins[2] = DEFAULT_MINS_2; //Cannot change
+                    (*NPC).r.maxs[2] = n0 as f32 + DEFAULT_MINS_2;
+                    (*client_ptr).ps.standheight = (*NPC).r.maxs[2] as c_int;
+                }
+                (*NPC).radius = n0 as f32;
+                continue;
+            }
+
+            if qstricmp_eq(token, c"crouchheight") {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    continue;
+                }
+                (*client_ptr).ps.crouchheight = n0 + DEFAULT_MINS_2 as c_int;
+                continue;
+            }
+
+            if parsingPlayer == 0 {
+                if qstricmp_eq(token, c"movetype") {
+                    let mut value: *const c_char = std::ptr::null();
+                    if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value)
+                        != 0
+                    {
+                        continue;
+                    }
+                    if crate::q_shared::Q_stricmp(cstr("flyswim").as_ptr(), value) == 0 {
+                        (*client_ptr).ps.eFlags2 |= mp_bg::public::entity_effects::EF2_FLYING;
+                    }
+                    //NPC->client->moveType = (movetype_t)MoveTypeNameToEnum(value);
+                    //rwwFIXMEFIXME: support for movetypes
+                    continue;
+                }
+
+                // yawSpeed (float-valued stat stored from an int token)
+                if qstricmp_eq(token, c"yawSpeed") {
+                    let mut n0: c_int = 0;
+                    if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if n0 <= 0 {
+                        let msg = format!("bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*stats).yawSpeed = n0 as f32;
+                    }
+                    continue;
+                }
+
+                // walkSpeed / runSpeed / acceleration — int stats, reject < 0.
+                macro_rules! stat_nonneg {
+                    ($lit:literal, $field:ident) => {
+                        if qstricmp_eq(token, $lit) {
+                            let mut n0: c_int = 0;
+                            if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0)
+                                != 0
+                            {
+                                crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                                continue 'parse;
+                            }
+                            if n0 < 0 {
+                                let msg = format!(
+                                    "WARNING: bad {} in NPC '{}'\n",
+                                    cstr_to_str(token),
+                                    cstr_to_str(NPCName)
+                                );
+                                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                                continue 'parse;
+                            }
+                            if !npc_ptr.is_null() {
+                                (*stats).$field = n0 as f32;
+                            }
+                            continue 'parse;
+                        }
+                    };
+                }
+                stat_nonneg!(c"walkSpeed", walkSpeed);
+                stat_nonneg!(c"runSpeed", runSpeed);
+                if qstricmp_eq(token, c"acceleration") {
+                    let mut n0: c_int = 0;
+                    if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if n0 < 0 {
+                        let msg = format!("WARNING: bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*stats).acceleration = n0;
+                    }
+                    continue;
+                }
+                //sex - skip in MP
+                if qstricmp_eq(token, c"sex") {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                //===MISC===============================================================================
+                // default behavior
+                if qstricmp_eq(token, c"behavior") {
+                    let mut n0: c_int = 0;
+                    if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if n0 < BS_DEFAULT as c_int || n0 >= NUM_BSTATES as c_int {
+                        let msg = format!("WARNING: bad {} in NPC '{}'\n", cstr_to_str(token), cstr_to_str(NPCName));
+                        crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        (*npc_ptr).defaultBehavior = core::mem::transmute::<c_int, bState_t>(n0);
+                    }
+                    continue;
+                }
+            }
+
+            // snd / sndcombat / sndextra / sndjedi — parsed for their
+            // directory prefix but not applied (client-side sound-dir fields
+            // are not ported; matches oracle's commented-out ci-> stores).
+            macro_rules! snd_dir {
+                ($lit:literal, $flag:expr) => {
+                    if qstricmp_eq(token, $lit) {
+                        let mut value: *const c_char = std::ptr::null();
+                        if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value)
+                            != 0
+                        {
+                            continue 'parse;
+                        }
+                        if (*NPC).r.svFlags & $flag == 0 {
+                            crate::q_shared::Q_strncpyz(sound.as_mut_ptr(), value, sound.len() as c_int);
+                            //	ci->customBasicSoundDir = G_NewString( sound );
+                            //rwwFIXMEFIXME: Hooray for violating client server rules
+                        }
+                        continue 'parse;
+                    }
+                };
+            }
+            snd_dir!(c"snd", SVF_NO_BASIC_SOUNDS);
+            snd_dir!(c"sndcombat", SVF_NO_COMBAT_SOUNDS);
+            snd_dir!(c"sndextra", SVF_NO_EXTRA_SOUNDS);
+            snd_dir!(c"sndjedi", SVF_NO_EXTRA_SOUNDS);
+
+            //New NPC/jedi stats:
+            //starting weapon
+            if qstricmp_eq(token, c"weapon") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                //FIXME: need to precache the weapon, too?  (in above func)
+                let weap = crate::q_shared::GetIDForString(
+                    crate::bg_saga::WPTable.as_ptr() as *mut stringID_table_t,
+                    value,
+                );
+                if weap >= WP_NONE && weap <= (WP_NUM_WEAPONS as c_int) {
+                    (*client_ptr).ps.weapon = weap;
+                    (*client_ptr).ps.stats[crate::prelude::STAT_WEAPONS as usize] |=
+                        1 << (*client_ptr).ps.weapon;
+                    if weap > WP_NONE {
+                        //	RegisterItem( FindItemForWeapon( (weapon_t)(NPC->client->ps.weapon) ) );	//precache the weapon
+                        (*client_ptr).ps.ammo
+                            [weaponData[(*client_ptr).ps.weapon as usize].ammoIndex as usize] =
+                            100; //FIXME: max ammo!
+                    }
+                }
+                continue;
+            }
+
+            if parsingPlayer == 0 {
+                //altFire
+                if qstricmp_eq(token, c"altFire") {
+                    let mut n0: c_int = 0;
+                    if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                        crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                        continue;
+                    }
+                    if !npc_ptr.is_null() {
+                        if n0 != 0 {
+                            (*npc_ptr).scriptFlags |= crate::npc::script_flags::SCF_ALT_FIRE;
+                        }
+                    }
+                    continue;
+                }
+                //Other unique behaviors/numbers that are currently hardcoded?
+            }
+
+            //force powers
+            let fp = crate::q_shared::GetIDForString(
+                crate::bg_saga::FPTable.as_ptr() as *mut stringID_table_t,
+                token,
+            );
+            if fp >= FP_FIRST && fp < NUM_FORCE_POWERS {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                //FIXME: need to precache the fx, too?  (in above func)
+                //cap
+                if n0 > 5 {
+                    n0 = 5;
+                } else if n0 < 0 {
+                    n0 = 0;
+                }
+                if n0 != 0 {
+                    //set
+                    (*client_ptr).ps.fd.forcePowersKnown |= 1 << fp;
+                } else {
+                    //clear
+                    (*client_ptr).ps.fd.forcePowersKnown &= !(1 << fp);
+                }
+                (*client_ptr).ps.fd.forcePowerLevel[fp as usize] = n0;
+                continue;
+            }
+
+            //max force power
+            if qstricmp_eq(token, c"forcePowerMax") {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                (*client_ptr).ps.fd.forcePowerMax = n0;
+                continue;
+            }
+
+            //force regen rate - default is 100ms
+            if qstricmp_eq(token, c"forceRegenRate") {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                //NPC->client->ps.forcePowerRegenRate = n;
+                //rwwFIXMEFIXME: support this?
+                continue;
+            }
+
+            //force regen amount - default is 1 (points per second)
+            if qstricmp_eq(token, c"forceRegenAmount") {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                //NPC->client->ps.forcePowerRegenAmount = n;
+                //rwwFIXMEFIXME: support this?
+                continue;
+            }
+
+            //have a sabers.cfg and just name your saber in your NPCs.cfg/ICARUS script
+            //saber name
+            if qstricmp_eq(token, c"saber") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+
+                let bg = &mut (*ctx.world).bg_state;
+                let saber_name =
+                    crate::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
+                crate::q_shared::Q_strncpyz(saber_name, value, 4096);
+
+                crate::bg_saberLoad::WP_SaberParseParms(
+                    saber_name,
+                    &mut (*client_ptr).saber[0] as *mut saberInfo_t,
+                    &mut (*ctx.world).bg_state,
+                    &mp_abi::game::syscalls::BgTrapsImpl,
+                );
+                let idx_s = format!("@{}", cstr_to_str(saber_name));
+                npcSaber1 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
+
+                crate::bg_misc::BG_TempFree(4096, &mut (*ctx.world).bg_state);
+                continue;
+            }
+
+            //second saber name
+            if qstricmp_eq(token, c"saber2") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+
+                if (*client_ptr).saber[0].saberFlags & SFL_TWO_HANDED == 0 {
+                    //can't use a second saber if first one is a two-handed saber...?
+                    let bg = &mut (*ctx.world).bg_state;
+                    let saber_name =
+                        crate::bg_misc::BG_TempAlloc(4096, bg) as *mut c_char; //G_NewString( value );
+                    crate::q_shared::Q_strncpyz(saber_name, value, 4096);
+
+                    crate::bg_saberLoad::WP_SaberParseParms(
+                        saber_name,
+                        &mut (*client_ptr).saber[1] as *mut saberInfo_t,
+                        &mut (*ctx.world).bg_state,
+                        &mp_abi::game::syscalls::BgTrapsImpl,
+                    );
+                    if (*client_ptr).saber[1].saberFlags & SFL_TWO_HANDED != 0 {
+                        //tsk tsk, can't use a twoHanded saber as second saber
+                        crate::bg_saberLoad::WP_RemoveSaber(
+                            (*client_ptr).saber.as_mut_ptr(),
+                            1,
+                        );
+                    } else {
+                        //NPC->client->ps.dualSabers = qtrue;
+                        let idx_s = format!("@{}", cstr_to_str(saber_name));
+                        npcSaber2 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
+                    }
+                    crate::bg_misc::BG_TempFree(4096, &mut (*ctx.world).bg_state);
+                }
+                continue;
+            }
+
+            // saberColor / saberColor2..8 — set-all-blades vs single-blade
+            // color, mirrored for saber[1] as saber2Color / saber2Color2..8.
+            if qstricmp_eq(token, c"saberColor") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if !client_ptr.is_null() {
+                    let color = crate::bg_saberLoad::TranslateSaberColor(value);
+                    for bi in 0..MAX_BLADES {
+                        (*client_ptr).saber[0].blade[bi].color = color;
+                    }
+                }
+                continue;
+            }
+            macro_rules! saber_color_n {
+                ($lit:literal, $saber_idx:expr, $blade_idx:expr) => {
+                    if qstricmp_eq(token, $lit) {
+                        let mut value: *const c_char = std::ptr::null();
+                        if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value)
+                            != 0
+                        {
+                            continue 'parse;
+                        }
+                        if !client_ptr.is_null() {
+                            (*client_ptr).saber[$saber_idx].blade[$blade_idx].color =
+                                crate::bg_saberLoad::TranslateSaberColor(value);
+                        }
+                        continue 'parse;
+                    }
+                };
+            }
+            saber_color_n!(c"saberColor2", 0, 1);
+            saber_color_n!(c"saberColor3", 0, 2);
+            saber_color_n!(c"saberColor4", 0, 3);
+            saber_color_n!(c"saberColor5", 0, 4);
+            saber_color_n!(c"saberColor6", 0, 5);
+            saber_color_n!(c"saberColor7", 0, 6);
+            saber_color_n!(c"saberColor8", 0, 7);
+            if qstricmp_eq(token, c"saber2Color") {
+                let mut value: *const c_char = std::ptr::null();
+                if crate::q_shared::COM_ParseString(&mut p as *mut *const c_char, &mut value) != 0
+                {
+                    continue;
+                }
+                if !client_ptr.is_null() {
+                    let color = crate::bg_saberLoad::TranslateSaberColor(value);
+                    for bi in 0..MAX_BLADES {
+                        (*client_ptr).saber[1].blade[bi].color = color;
+                    }
+                }
+                continue;
+            }
+            saber_color_n!(c"saber2Color2", 1, 1);
+            saber_color_n!(c"saber2Color3", 1, 2);
+            saber_color_n!(c"saber2Color4", 1, 3);
+            saber_color_n!(c"saber2Color5", 1, 4);
+            saber_color_n!(c"saber2Color6", 1, 5);
+            saber_color_n!(c"saber2Color7", 1, 6);
+            saber_color_n!(c"saber2Color8", 1, 7);
+
+            // saberLength / saberLength2..8, saber2Length / saber2Length2..8
+            if qstricmp_eq(token, c"saberLength") {
+                let mut f0: f32 = 0.0;
+                if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                if f0 < 4.0f32 {
+                    f0 = 4.0f32;
+                }
+                for bi in 0..MAX_BLADES {
+                    (*client_ptr).saber[0].blade[bi].lengthMax = f0;
+                }
+                continue;
+            }
+            macro_rules! saber_length_n {
+                ($lit:literal, $saber_idx:expr, $blade_idx:expr) => {
+                    if qstricmp_eq(token, $lit) {
+                        let mut f0: f32 = 0.0;
+                        if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0)
+                            != 0
+                        {
+                            crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                            continue 'parse;
+                        }
+                        if f0 < 4.0f32 {
+                            f0 = 4.0f32;
+                        }
+                        (*client_ptr).saber[$saber_idx].blade[$blade_idx].lengthMax = f0;
+                        continue 'parse;
+                    }
+                };
+            }
+            saber_length_n!(c"saberLength2", 0, 1);
+            saber_length_n!(c"saberLength3", 0, 2);
+            saber_length_n!(c"saberLength4", 0, 3);
+            saber_length_n!(c"saberLength5", 0, 4);
+            saber_length_n!(c"saberLength6", 0, 5);
+            saber_length_n!(c"saberLength7", 0, 6);
+            saber_length_n!(c"saberLength8", 0, 7);
+            if qstricmp_eq(token, c"saber2Length") {
+                let mut f0: f32 = 0.0;
+                if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                if f0 < 4.0f32 {
+                    f0 = 4.0f32;
+                }
+                for bi in 0..MAX_BLADES {
+                    (*client_ptr).saber[1].blade[bi].lengthMax = f0;
+                }
+                continue;
+            }
+            saber_length_n!(c"saber2Length2", 1, 1);
+            saber_length_n!(c"saber2Length3", 1, 2);
+            saber_length_n!(c"saber2Length4", 1, 3);
+            saber_length_n!(c"saber2Length5", 1, 4);
+            saber_length_n!(c"saber2Length6", 1, 5);
+            saber_length_n!(c"saber2Length7", 1, 6);
+            saber_length_n!(c"saber2Length8", 1, 7);
+
+            // saberRadius / saberRadius2..8, saber2Radius / saber2Radius2..8
+            if qstricmp_eq(token, c"saberRadius") {
+                let mut f0: f32 = 0.0;
+                if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                if f0 < 0.25f32 {
+                    f0 = 0.25f32;
+                }
+                for bi in 0..MAX_BLADES {
+                    (*client_ptr).saber[0].blade[bi].radius = f0;
+                }
+                continue;
+            }
+            macro_rules! saber_radius_n {
+                ($lit:literal, $saber_idx:expr, $blade_idx:expr) => {
+                    if qstricmp_eq(token, $lit) {
+                        let mut f0: f32 = 0.0;
+                        if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0)
+                            != 0
+                        {
+                            crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                            continue 'parse;
+                        }
+                        if f0 < 0.25f32 {
+                            f0 = 0.25f32;
+                        }
+                        (*client_ptr).saber[$saber_idx].blade[$blade_idx].radius = f0;
+                        continue 'parse;
+                    }
+                };
+            }
+            saber_radius_n!(c"saberRadius2", 0, 1);
+            saber_radius_n!(c"saberRadius3", 0, 2);
+            saber_radius_n!(c"saberRadius4", 0, 3);
+            saber_radius_n!(c"saberRadius5", 0, 4);
+            saber_radius_n!(c"saberRadius6", 0, 5);
+            saber_radius_n!(c"saberRadius7", 0, 6);
+            saber_radius_n!(c"saberRadius8", 0, 7);
+            if qstricmp_eq(token, c"saber2Radius") {
+                let mut f0: f32 = 0.0;
+                if crate::q_shared::COM_ParseFloat(&mut p as *mut *const c_char, &mut f0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                if f0 < 0.25f32 {
+                    f0 = 0.25f32;
+                }
+                for bi in 0..MAX_BLADES {
+                    (*client_ptr).saber[1].blade[bi].radius = f0;
+                }
+                continue;
+            }
+            saber_radius_n!(c"saber2Radius2", 1, 1);
+            saber_radius_n!(c"saber2Radius3", 1, 2);
+            saber_radius_n!(c"saber2Radius4", 1, 3);
+            saber_radius_n!(c"saber2Radius5", 1, 4);
+            saber_radius_n!(c"saber2Radius6", 1, 5);
+            saber_radius_n!(c"saber2Radius7", 1, 6);
+            saber_radius_n!(c"saber2Radius8", 1, 7);
+
+            //ADD:
+            //saber sounds (on, off, loop)
+            //loop sound (like Vader's breathing or droid bleeps, etc.)
+
+            //starting saber style
+            if qstricmp_eq(token, c"saberStyle") {
+                let mut n0: c_int = 0;
+                if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
+                    crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+                    continue;
+                }
+                //cap
+                if n0 < 0 {
+                    n0 = 0;
+                } else if n0 > 5 {
+                    n0 = 5;
+                }
+                (*client_ptr).ps.fd.saberAnimLevel = n0;
+                /*
+                if ( parsingPlayer )
+                {
+                    cg.saberAnimLevelPending = n;
+                }
+                */
+                continue;
+            }
+
+            if parsingPlayer == 0 {
+                let msg = format!(
+                    "WARNING: unknown keyword '{}' while parsing '{}'\n",
+                    cstr_to_str(token),
+                    cstr_to_str(NPCName)
+                );
+                crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+            }
+            crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);
+        }
+
+        /*
+        Ghoul2 Insert Start
+        */
+        if md3Model == 0 {
+            let mut set_type_back: qboolean = 0; // qfalse
+
+            if npcSaber1 == 0 {
+                //use "kyle" for a default then
+                npcSaber1 = crate::g_utils::G_ModelIndex(cstr("@Kyle").as_ptr());
+                crate::bg_saberLoad::WP_SaberParseParms(
+                    cstr("Kyle").as_ptr(),
+                    &mut (*client_ptr).saber[0] as *mut saberInfo_t,
+                    &mut (*ctx.world).bg_state,
+                    &mp_abi::game::syscalls::BgTrapsImpl,
+                );
+            }
+
+            (*NPC).s.npcSaber1 = npcSaber1;
+            (*NPC).s.npcSaber2 = npcSaber2;
+
+            if customSkin[0] == 0 {
+                write_cstr_field(&mut customSkin, "default");
+            }
+
+            if !client_ptr.is_null() && (*client_ptr).NPC_class == CLASS_VEHICLE {
+                //vehicles want their names fed in as models
+                //we put the $ in front to indicate a name and not a model
+                write_cstr_field(&mut playerModel, &format!("${}", cstr_to_str(NPCName)));
+            }
+            // PORT-NOTE(unported-fn): `SetupGameGhoul2Model` (`g_client.rs`)
+            // has no body yet anywhere in the worktree — called per its LAW
+            // resolved signature; see missing_symbols.
+            crate::g_client::SetupGameGhoul2Model(
+                ctx,
+                NPC,
+                playerModel.as_mut_ptr(),
+                customSkin.as_mut_ptr(),
+            );
+
+            if (*NPC).NPC_type.is_null() {
+                //just do this for now so NPC_Precache can see the name.
+                (*NPC).NPC_type = NPCName as *mut c_char;
+                set_type_back = 1;
+            }
+
+            NPC_Precache(ctx, NPC); //this will just soundindex some values for sounds on the client,
+
+            if set_type_back != 0 {
+                //don't want this being set if we aren't ready yet.
+                (*NPC).NPC_type = std::ptr::null_mut();
+            }
+        } else {
+            crate::g_main::Com_Printf(cstr("MD3 MODEL NPC'S ARE NOT SUPPORTED IN MP!\n").as_ptr());
+            return 0; // qfalse
+        }
+        /*
+        Ghoul2 Insert End
+        */
+        /*
+        if(	NPCsPrecached )
+        {//Spawning in after initial precache, our models are precached, we just need to set our clientInfo
+            CG_RegisterClientModels( NPC->s.number );
+            CG_RegisterNPCCustomSounds( ci );
+            CG_RegisterNPCEffects( NPC->client->playerTeam );
+        }
+        */
+        //rwwFIXMEFIXME: Do something here I guess to properly precache stuff.
+
+        1 // qtrue
+    }
 }
 
 /// Raven `NPC_LoadParms`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:3241-3302`
-// PORT-ESCALATION(ambient-global): writes the file-scope `NPCParms` buffer and
-// the `npcParseBuffer` scratch array (fork-1 GameWorld fields / fork-5
-// function-scope statics) via `trap_FS_GetFileList`/`trap_FS_FOpenFile`/
-// `trap_FS_Read`, but the resolved skeleton signature `()` has no
-// GameWorld/engine param to thread them or the trap calls through.
 pub fn NPC_LoadParms(ctx: GameContext<'_>) {
-    todo!("Port NPC_LoadParms — parked: ambient-global NPCParms/npcParseBuffer and trap_FS_* need a threaded engine/world param absent from this signature")
+    use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
+    use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
+    use mp_abi::game::syscalls::G_FS_GETFILELIST::GFsGetfilelistArgs;
+    use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
+
+    unsafe {
+        // PORT-NOTE(unported-global): `NPCParms`/`npcParseBuffer`
+        // (`NPC_stats.c:3236-3238`) and `MAX_NPC_DATA_SIZE` are not real
+        // `GameGlobals` fields yet — `npcParseBuffer` is still a `()`
+        // placeholder and `NPCParms` doesn't exist at all. Referenced through
+        // the globals path per ruling 8 pending backfill; see
+        // missing_symbols. The `_XBOX` malloc/free of `npcParseBuffer` is
+        // dead on this platform and is dropped per porting-rules §20.
+        let world = ctx.world;
+        let mut totallen: c_int = 0;
+        let mainblocklen: c_int = 0;
+        let _ = mainblocklen;
+
+        // Raven: `marker = NPCParms + totallen; *marker = 0;`
+        let npc_parms: *mut c_char = (&mut (*world).globals.NPCParms) as *mut _ as *mut c_char;
+        let mut marker: *mut c_char = npc_parms.offset(totallen as isize);
+        *marker = 0;
+
+        // Raven: `char npcExtensionListBuf[2048];`
+        let mut npc_extension_list_buf: [c_char; 2048] = [0; 2048];
+        let file_cnt = trap::FS_GetFileList(
+            ctx.engine,
+            GFsGetfilelistArgs::new(
+                CString::new("ext_data/NPCs").unwrap(),
+                CString::new(".npc").unwrap(),
+                npc_extension_list_buf.as_mut_ptr() as *mut u8,
+                npc_extension_list_buf.len() as c_int,
+            ),
+        );
+
+        let npc_parse_buffer: *mut c_char =
+            (&mut (*world).globals.npcParseBuffer) as *mut _ as *mut c_char;
+
+        let mut hold_char: *mut c_char = npc_extension_list_buf.as_mut_ptr();
+        let mut i: c_int = 0;
+        while i < file_cnt {
+            let npc_ext_fn_len = std::ffi::CStr::from_ptr(hold_char).to_bytes().len() as c_int;
+
+            let path = format!("ext_data/NPCs/{}", cstr_to_str(hold_char));
+            let mut f: fileHandle_t = 0;
+            let mut len = trap::FS_FOpenFile(
+                ctx.engine,
+                GFsFopenFileArgs::new(CString::new(path).unwrap(), &mut f, FS_READ),
+            );
+
+            if len == -1 {
+                crate::g_main::Com_Printf(cstr("error reading file\n").as_ptr());
+            } else {
+                if totallen + len >= MAX_NPC_DATA_SIZE {
+                    crate::g_main::G_Error(
+                        ctx,
+                        cstr("NPC extensions (*.npc) are too large").as_ptr(),
+                    );
+                }
+                trap::FS_Read(
+                    ctx.engine,
+                    GFsReadArgs::new(npc_parse_buffer as *mut u8, len, f),
+                );
+                *npc_parse_buffer.offset(len as isize) = 0;
+
+                len = crate::q_shared::COM_Compress(npc_parse_buffer);
+
+                crate::q_shared::Q_strcat(marker, MAX_NPC_DATA_SIZE - totallen, npc_parse_buffer);
+                crate::q_shared::Q_strcat(marker, MAX_NPC_DATA_SIZE - totallen, cstr("\n").as_ptr());
+                len += 1;
+                trap::FS_FCloseFile(ctx.engine, GFsFcloseFileArgs::new(f));
+
+                totallen += len;
+                marker = npc_parms.offset(totallen as isize);
+            }
+
+            i += 1;
+            hold_char = hold_char.offset((npc_ext_fn_len + 1) as isize);
+        }
+    }
 }

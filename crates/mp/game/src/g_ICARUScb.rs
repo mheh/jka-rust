@@ -35,6 +35,7 @@ use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBu
 use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDSET::GIcarusTaskidsetArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
+use mp_abi::game::syscalls::G_ICARUS_SETVAR::GIcarusSetvarArgs;
 use mp_abi::game::syscalls::G_ROFF_CACHE::GRoffCacheArgs;
 use mp_abi::game::syscalls::G_ROFF_PLAY::GRoffPlayArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
@@ -51,13 +52,13 @@ pub fn Q3_TaskIDClear(taskID: *mut c_int) {
     }
 }
 
-// PORT-ESCALATION(variadic-c-abi): G_DebugPrint takes C varargs (`...`); the
-// skeleton itself flags "seam decision pending" — what Rust shape represents
-// a variadic printf-style entry point at the ABI seam (fmt::Arguments? a
-// fixed-arity family per call site?). Every other function in this file that
-// logs goes through this same unresolved seam.
 /// Raven `G_DebugPrint`.
 ///
+// PORT-NOTE(variadic-c-abi): Raven `vsprintf(text, format, argptr)` expands
+// the caller's varargs into `text`; this seam has no varargs channel, so
+// every call site in this file passes an already-formatted string and
+// `format` is treated as that finished `text` verbatim (ruling 18: va/printf
+// callers bind a `format!`ed String before the call).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:275-324`
 pub fn G_DebugPrint(
     ctx: GameContext<'_>,
@@ -65,7 +66,47 @@ pub fn G_DebugPrint(
     format: *const c_char,
     // variadic `...` — C varargs, seam decision pending
 ) {
-    todo!("Port G_DebugPrint — parked (variadic-c-abi): oracle/oracle/codemp/game/g_ICARUScb.c:275")
+    unsafe {
+        if (*ctx.world).cvars.g_developer.integer != 2 {
+            return;
+        }
+
+        let text = cstr_to_str(format);
+
+        if level == WL_ERROR as c_int {
+            Com_Printf(cstr(&format!("{}ERROR: {}", S_COLOR_RED, text)).as_ptr());
+        } else if level == WL_WARNING as c_int {
+            Com_Printf(cstr(&format!("{}WARNING: {}", S_COLOR_YELLOW, text)).as_ptr());
+        } else if level == WL_DEBUG as c_int {
+            let mut ent_num: c_int = text
+                .split_whitespace()
+                .next()
+                .and_then(|t| t.parse().ok())
+                .unwrap_or(0);
+            let buffer = if text.len() > 5 { &text[5..] } else { "" };
+
+            if ent_num < 0 || ent_num > MAX_GENTITIES as c_int {
+                ent_num = 0;
+            }
+
+            let targ = (*ctx.world).entities[ent_num as usize].script_targetname;
+            let targ_str = if targ.is_null() {
+                String::new()
+            } else {
+                cstr_to_str(targ)
+            };
+            Com_Printf(
+                cstr(&format!(
+                    "{}DEBUG: {}({}): {}\n",
+                    S_COLOR_BLUE, targ_str, ent_num, buffer
+                ))
+                .as_ptr(),
+            );
+        } else {
+            // default / WL_VERBOSE
+            Com_Printf(cstr(&format!("{}INFO: {}", S_COLOR_GREEN, text)).as_ptr());
+        }
+    }
 }
 
 /// Raven `Q3_GetAnimLower`.
@@ -299,16 +340,32 @@ pub fn anglerCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-ESCALATION(unported-global): `moverCallback` reads `BMS_END`
-// (`g_local.h:1216`) via `G_PlayDoorSound(ent, BMS_END)` — the `BMS_*` sound-slot
-// consts are not ported anywhere in the worktree yet (see STATE FIELDS TOUCHED
-// in the packet digest).
 /// Raven `moverCallback`.
 ///
 /// Utility function.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:603-633`
 pub fn moverCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    todo!("Port moverCallback — parked (unported-global: BMS_END): oracle/oracle/codemp/game/g_ICARUScb.c:603")
+    unsafe {
+        trap::ICARUS_TaskIDComplete(
+            ctx.engine,
+            GIcarusTaskidcompleteArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int),
+        );
+
+        (*ent).s.loopSound = 0;
+        (*ent).s.loopIsSoundset = qfalse;
+        // BMS_END: unported sound-slot const (missing_symbols).
+        G_PlayDoorSound(ctx, ent, BMS_END);
+
+        if (*ent).moverState == MOVER_1TO2 {
+            MatchTeam(ctx, ent, MOVER_POS2 as c_int, (*ctx.world).level.time);
+        } else if (*ent).moverState == MOVER_2TO1 {
+            MatchTeam(ctx, ent, MOVER_POS1 as c_int, (*ctx.world).level.time);
+        }
+
+        if (*ent).blocked == Some(EntBlocked::Blocked_Mover) {
+            (*ent).blocked = None;
+        }
+    }
 }
 
 /// Raven `Blocked_Mover`.
@@ -365,8 +422,6 @@ pub fn moveAndRotateCallback(
     moverCallback(ctx, ent);
 }
 
-// PORT-ESCALATION(unported-global): calls `G_PlayDoorSound(ent, BMS_START)` —
-// `BMS_START` is not ported anywhere in the worktree.
 /// Raven `Q3_Lerp2Start`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:682-721`
@@ -376,10 +431,45 @@ pub fn Q3_Lerp2Start(
     taskID: c_int,
     duration: f32,
 ) {
-    todo!("Port Q3_Lerp2Start — parked (unported-global: BMS_START): oracle/oracle/codemp/game/g_ICARUScb.c:682")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if !(*ent).client.is_null()
+            || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
+        {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!("Q3_Lerp2Start: ent {} is NOT a mover!\n", entID)).as_ptr(),
+            );
+            return;
+        }
+
+        if (*ent).s.eType != entityType_t::ET_MOVER as c_int {
+            (*ent).s.eType = entityType_t::ET_MOVER as c_int;
+        }
+
+        (*ent).moverState = MOVER_2TO1;
+        (*ent).s.eType = entityType_t::ET_MOVER as c_int;
+        (*ent).reached = Some(EntReached::moverCallback);
+        if (*ent).damage != 0 {
+            (*ent).blocked = Some(EntBlocked::Blocked_Mover);
+        }
+
+        (*ent).s.pos.trDuration = (duration * 10.0) as c_int;
+        (*ent).s.pos.trTime = (*ctx.world).level.time;
+
+        trap::ICARUS_TaskIDSet(
+            ctx.engine,
+            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+        );
+        G_PlayDoorLoopSound(ctx, ent);
+        G_PlayDoorSound(ctx, ent, BMS_START);
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
-// PORT-ESCALATION(unported-global): same `BMS_START` dependency as `Q3_Lerp2Start`.
 /// Raven `Q3_Lerp2End`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:730-769`
@@ -389,10 +479,45 @@ pub fn Q3_Lerp2End(
     taskID: c_int,
     duration: f32,
 ) {
-    todo!("Port Q3_Lerp2End — parked (unported-global: BMS_START): oracle/oracle/codemp/game/g_ICARUScb.c:730")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if !(*ent).client.is_null()
+            || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
+        {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!("Q3_Lerp2End: ent {} is NOT a mover!\n", entID)).as_ptr(),
+            );
+            return;
+        }
+
+        if (*ent).s.eType != entityType_t::ET_MOVER as c_int {
+            (*ent).s.eType = entityType_t::ET_MOVER as c_int;
+        }
+
+        (*ent).moverState = MOVER_1TO2;
+        (*ent).s.eType = entityType_t::ET_MOVER as c_int;
+        (*ent).reached = Some(EntReached::moverCallback);
+        if (*ent).damage != 0 {
+            (*ent).blocked = Some(EntBlocked::Blocked_Mover);
+        }
+
+        (*ent).s.pos.trDuration = (duration * 10.0) as c_int;
+        (*ent).s.time = (*ctx.world).level.time;
+
+        trap::ICARUS_TaskIDSet(
+            ctx.engine,
+            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+        );
+        G_PlayDoorLoopSound(ctx, ent);
+        G_PlayDoorSound(ctx, ent, BMS_START);
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
-// PORT-ESCALATION(unported-global): same `BMS_START` dependency (`G_PlayDoorSound(ent, BMS_START)`).
 /// Raven `Q3_Lerp2Pos`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:781-883`
@@ -404,7 +529,87 @@ pub fn Q3_Lerp2Pos(
     angles: Option<&mut [f32; 3]>,
     duration: f32,
 ) {
-    todo!("Port Q3_Lerp2Pos — parked (unported-global: BMS_START): oracle/oracle/codemp/game/g_ICARUScb.c:781")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if !(*ent).client.is_null()
+            || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
+        {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!("Q3_Lerp2Pos: ent {} is NOT a mover!\n", entID)).as_ptr(),
+            );
+            return;
+        }
+
+        if (*ent).s.eType != entityType_t::ET_MOVER as c_int {
+            (*ent).s.eType = entityType_t::ET_MOVER as c_int;
+        }
+
+        let mut duration = duration;
+        if duration == 0.0 {
+            duration = 1.0;
+        }
+
+        let mut moverState = (*ent).moverState;
+
+        if moverState == MOVER_POS1 || moverState == MOVER_2TO1 {
+            (*ent).pos1 = (*ent).r.currentOrigin;
+            (*ent).pos2 = *origin;
+            moverState = MOVER_1TO2;
+        } else {
+            (*ent).pos2 = (*ent).r.currentOrigin;
+            (*ent).pos1 = *origin;
+            moverState = MOVER_2TO1;
+        }
+        (*ent).moverState = moverState;
+
+        InitMoverTrData(ent);
+
+        (*ent).s.pos.trDuration = duration as c_int;
+
+        MatchTeam(ctx, ent, moverState as c_int, (*ctx.world).level.time);
+
+        if let Some(angles) = angles {
+            let mut ang = [0.0f32; 3];
+            for i in 0..3 {
+                ang[i] = AngleDelta(angles[i], (*ent).r.currentAngles[i]);
+                (*ent).s.apos.trDelta[i] = ang[i] / (duration * 0.001);
+            }
+
+            (*ent).s.apos.trBase = (*ent).r.currentAngles;
+
+            (*ent).s.apos.trType = if (*ent).alt_fire != 0 {
+                trType_t::TR_LINEAR_STOP
+            } else {
+                trType_t::TR_NONLINEAR_STOP
+            };
+            (*ent).s.apos.trDuration = duration as c_int;
+            (*ent).s.apos.trTime = (*ctx.world).level.time;
+
+            (*ent).reached = Some(EntReached::moveAndRotateCallback);
+            trap::ICARUS_TaskIDSet(
+                ctx.engine,
+                GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+            );
+        } else {
+            (*ent).reached = Some(EntReached::moverCallback);
+        }
+
+        if (*ent).damage != 0 {
+            (*ent).blocked = Some(EntBlocked::Blocked_Mover);
+        }
+
+        trap::ICARUS_TaskIDSet(
+            ctx.engine,
+            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+        );
+        G_PlayDoorLoopSound(ctx, ent);
+        G_PlayDoorSound(ctx, ent, BMS_START);
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
 /// Raven `Q3_Lerp2Angles`.
@@ -453,11 +658,6 @@ pub fn Q3_Lerp2Angles(
     }
 }
 
-// PORT-ESCALATION(vec3-out-param-mismatch): `info: &mut [f32;3]` per fork-9,
-// but the cross-file `TAG_GetOrigin`/`TAG_GetAngles` (g_misc.rs, still parked)
-// have `vec3_t` (by-value) params per the call-surface digest — a same-file
-// reshape here can't propagate through a not-yet-reshaped callee; parked
-// rather than silently dropping the out-write.
 /// Raven `Q3_GetTag`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:948-970`
@@ -468,7 +668,23 @@ pub fn Q3_GetTag(
     lookup: c_int,
     info: &mut [f32; 3],
 ) -> c_int {
-    todo!("Port Q3_GetTag — parked (vec3-out-param-mismatch): oracle/oracle/codemp/game/g_ICARUScb.c:948")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).inuse == 0 {
+            debug_assert!(false);
+            return 0;
+        }
+
+        // TYPE_ORIGIN / TYPE_ANGLES: unported-global consts (missing_symbols).
+        if lookup == TYPE_ORIGIN {
+            return TAG_GetOrigin(ctx, (*ent).ownername, name, info);
+        } else if lookup == TYPE_ANGLES {
+            return TAG_GetAngles(ctx, (*ent).ownername, name, info);
+        }
+
+        0
+    }
 }
 
 /// Raven `Q3_Use`.
@@ -491,28 +707,92 @@ pub fn Q3_Use(ctx: GameContext<'_>, entID: c_int, target: *const c_char) {
     }
 }
 
-// PORT-ESCALATION(die-dispatch-invoke): `victim->die(victim, victim, victim,
-// o_health, MOD_UNKNOWN)` calls through the stored `die` fn pointer directly;
-// `gentity_t.die` is still a raw `Option<extern "C" fn(...)>`, not the
-// `EntDie` variant `dispatch_die` (ent_fn_enums.rs) needs to route the call —
-// there is no way to recover which `EntDie` variant a stored raw pointer
-// corresponds to from here.
 /// Raven `Q3_Kill`.
 ///
+// PORT-NOTE(die-dispatch-invoke): Raven calls the stored `victim->die` fn
+// pointer directly with (victim,victim,victim,o_health,MOD_UNKNOWN); the
+// ported field is `Option<EntDie>` so the call routes through the central
+// `dispatch_die` (ent_fn_enums.rs) per the fn-ptr-dispatch idiom.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1009-1052`
 pub fn Q3_Kill(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
-    todo!("Port Q3_Kill — parked (die-dispatch-invoke): oracle/oracle/codemp/game/g_ICARUScb.c:1009")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let mut victim: *mut gentity_t = std::ptr::null_mut();
+
+        if Q_stricmp(name, b"self\0".as_ptr() as *const c_char) == 0 {
+            victim = ent;
+        } else if Q_stricmp(name, b"enemy\0".as_ptr() as *const c_char) == 0 {
+            if let Some(enemy_id) = (*ent).enemy {
+                victim = &mut (*ctx.world).entities[enemy_id.0 as usize] as *mut gentity_t;
+            }
+        } else {
+            victim = G_Find(
+                ctx,
+                std::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                name,
+            );
+        }
+
+        if victim.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!("Q3_Kill: can't find {}\n", cstr_to_str(name))).as_ptr(),
+            );
+            return;
+        }
+
+        let o_health = (*victim).health;
+        (*victim).health = 0;
+        if !(*victim).client.is_null() {
+            (*victim).flags |= FL_NO_KNOCKBACK;
+        }
+
+        if let Some(die_fn) = (*victim).die {
+            crate::ent_fn_enums::dispatch_die(
+                ctx,
+                die_fn,
+                victim,
+                victim,
+                victim,
+                o_health,
+                MOD_UNKNOWN as c_int,
+            );
+        }
+    }
 }
 
-// PORT-ESCALATION(client-still-void): the NPC-removal/vehicle-eject branch
-// reads `victim->client->NPC_class`/`m_pVehicle->m_pVehicleInfo`; the
-// non-client branch (`victim->think = G_FreeEntity`) is trivial but parking
-// the whole fn keeps parity honest rather than silently dropping the NPC path.
 /// Raven `Q3_RemoveEnt`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1062-1116`
 pub fn Q3_RemoveEnt(ctx: GameContext<'_>, victim: *mut gentity_t) {
-    todo!("Port Q3_RemoveEnt — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:1062")
+    unsafe {
+        if !(*victim).client.is_null() {
+            if (*victim).s.eType != ET_NPC as c_int {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_RemoveEnt: You can't remove clients in MP!\n\0".as_ptr() as *const c_char,
+                );
+                debug_assert!(false);
+            } else {
+                // Remove the NPC.
+                let client = (*victim).client as *mut gclient_t;
+                if (*client).NPC_class == CLASS_VEHICLE {
+                    // Eject everyone out of a vehicle that's about to remove itself.
+                    // PORT-NOTE(vehicle-eject): Vehicle_t/m_pVehicleInfo->EjectAll is
+                    // C++-track (icarus/vehicle) surface — not transcribed here; see
+                    // porting-rules §F (idiomatic C++ reimplementation, not yet ported).
+                }
+                (*victim).think = Some(EntThink::G_FreeEntity);
+                (*victim).nextthink = (*ctx.world).level.time + 100;
+            }
+        } else {
+            (*victim).think = Some(EntThink::G_FreeEntity);
+            (*victim).nextthink = (*ctx.world).level.time + 100;
+        }
+    }
 }
 
 /// Raven `Q3_Remove`.
@@ -563,10 +843,11 @@ pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
     }
 }
 
-// PORT-ESCALATION(unported-global): `toGet = GetIDForString(setTable, name)`
-// gates the entire switch — `setTable` is not ported anywhere in the worktree.
 /// Raven `Q3_GetFloat`.
 ///
+// PORT-NOTE(unported-global): `setTable`/`SET_*` (the ICARUS set-table) are
+// not ported anywhere in the worktree yet — referenced verbatim per
+// zero-park (missing_symbols).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1189-1559`
 pub fn Q3_GetFloat(
     ctx: GameContext<'_>,
@@ -575,12 +856,216 @@ pub fn Q3_GetFloat(
     name: *const c_char,
     value: *mut f32,
 ) -> c_int {
-    todo!("Port Q3_GetFloat — parked (unported-global: setTable): oracle/oracle/codemp/game/g_ICARUScb.c:1189")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        let toGet = GetIDForString(setTable, name);
+
+        match toGet {
+            SET_PARM1 | SET_PARM2 | SET_PARM3 | SET_PARM4 | SET_PARM5 | SET_PARM6 | SET_PARM7
+            | SET_PARM8 | SET_PARM9 | SET_PARM10 | SET_PARM11 | SET_PARM12 | SET_PARM13
+            | SET_PARM14 | SET_PARM15 | SET_PARM16 => {
+                if (*ent).parms.is_null() {
+                    G_DebugPrint(
+                        ctx,
+                        WL_ERROR as c_int,
+                        cstr(&format!(
+                            "GET_PARM: {} {} did not have any parms set!\n",
+                            cstr_to_str((*ent).classname),
+                            cstr_to_str((*ent).targetname)
+                        ))
+                        .as_ptr(),
+                    );
+                    return 0;
+                }
+                *value = atof((*(*ent).parms).parm[(toGet - SET_PARM1) as usize].as_ptr()) as f32;
+            }
+            SET_COUNT => *value = (*ent).count as f32,
+            SET_HEALTH => *value = (*ent).health as f32,
+            SET_SKILL => return 0,
+            SET_XVELOCITY => {
+                if (*ent).client.is_null() {
+                    G_DebugPrint(
+                        ctx,
+                        WL_WARNING as c_int,
+                        cstr(&format!(
+                            "Q3_GetFloat: SET_XVELOCITY, {} not a client\n",
+                            cstr_to_str((*ent).targetname)
+                        ))
+                        .as_ptr(),
+                    );
+                    return 0;
+                }
+                *value = (*((*ent).client as *mut gclient_t)).ps.velocity[0];
+            }
+            SET_YVELOCITY => {
+                if (*ent).client.is_null() {
+                    G_DebugPrint(
+                        ctx,
+                        WL_WARNING as c_int,
+                        cstr(&format!(
+                            "Q3_GetFloat: SET_YVELOCITY, {} not a client\n",
+                            cstr_to_str((*ent).targetname)
+                        ))
+                        .as_ptr(),
+                    );
+                    return 0;
+                }
+                *value = (*((*ent).client as *mut gclient_t)).ps.velocity[1];
+            }
+            SET_ZVELOCITY => {
+                if (*ent).client.is_null() {
+                    G_DebugPrint(
+                        ctx,
+                        WL_WARNING as c_int,
+                        cstr(&format!(
+                            "Q3_GetFloat: SET_ZVELOCITY, {} not a client\n",
+                            cstr_to_str((*ent).targetname)
+                        ))
+                        .as_ptr(),
+                    );
+                    return 0;
+                }
+                *value = (*((*ent).client as *mut gclient_t)).ps.velocity[2];
+            }
+            SET_Z_OFFSET => *value = (*ent).r.currentOrigin[2] - (*ent).s.origin[2],
+            SET_DPITCH => return 0,
+            SET_DYAW => return 0,
+            SET_WIDTH => *value = (*ent).r.mins[0],
+            SET_TIMESCALE => return 0,
+            SET_CAMERA_GROUP_Z_OFS => return 0,
+            SET_VISRANGE => return 0,
+            SET_EARSHOT => return 0,
+            SET_VIGILANCE => return 0,
+            SET_GRAVITY => *value = (*ctx.world).cvars.g_gravity.value,
+            SET_FACEEYESCLOSED | SET_FACEEYESOPENED | SET_FACEAUX | SET_FACEBLINK
+            | SET_FACEBLINKFROWN | SET_FACEFROWN | SET_FACENORMAL => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetFloat: SET_FACE___ not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_WAIT => *value = (*ent).wait,
+            SET_FOLLOWDIST => return 0,
+            SET_ANIM_HOLDTIME_LOWER => {
+                if (*ent).client.is_null() {
+                    G_DebugPrint(
+                        ctx,
+                        WL_WARNING as c_int,
+                        cstr(&format!(
+                            "Q3_GetFloat: SET_ANIM_HOLDTIME_LOWER, {} not a client\n",
+                            cstr_to_str((*ent).targetname)
+                        ))
+                        .as_ptr(),
+                    );
+                    return 0;
+                }
+                *value = (*((*ent).client as *mut gclient_t)).ps.legsTimer as f32;
+            }
+            SET_ANIM_HOLDTIME_UPPER => {
+                if (*ent).client.is_null() {
+                    G_DebugPrint(
+                        ctx,
+                        WL_WARNING as c_int,
+                        cstr(&format!(
+                            "Q3_GetFloat: SET_ANIM_HOLDTIME_UPPER, {} not a client\n",
+                            cstr_to_str((*ent).targetname)
+                        ))
+                        .as_ptr(),
+                    );
+                    return 0;
+                }
+                *value = (*((*ent).client as *mut gclient_t)).ps.torsoTimer as f32;
+            }
+            SET_ANIM_HOLDTIME_BOTH => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetFloat: SET_ANIM_HOLDTIME_BOTH not implemented\n\0".as_ptr()
+                        as *const c_char,
+                );
+                return 0;
+            }
+            SET_ARMOR => {
+                if (*ent).client.is_null() {
+                    G_DebugPrint(
+                        ctx,
+                        WL_WARNING as c_int,
+                        cstr(&format!(
+                            "Q3_GetFloat: SET_ARMOR, {} not a client\n",
+                            cstr_to_str((*ent).targetname)
+                        ))
+                        .as_ptr(),
+                    );
+                    return 0;
+                }
+                *value = (*((*ent).client as *mut gclient_t)).ps.stats[STAT_ARMOR as usize] as f32;
+            }
+            SET_WALKSPEED | SET_RUNSPEED | SET_YAWSPEED | SET_AGGRESSION | SET_AIM
+            | SET_FRICTION | SET_SHOOTDIST | SET_HFOV | SET_VFOV | SET_DELAYSCRIPTTIME
+            | SET_FORWARDMOVE | SET_RIGHTMOVE | SET_STARTFRAME | SET_ENDFRAME | SET_ANIMFRAME
+            | SET_SHOT_SPACING | SET_MISSIONSTATUSTIME | SET_IGNOREPAIN | SET_IGNOREENEMIES
+            | SET_IGNOREALERTS | SET_DONTSHOOT => return 0,
+            SET_NOTARGET => *value = ((*ent).flags & FL_NOTARGET) as f32,
+            SET_DONTFIRE | SET_LOCKED_ENEMY | SET_CROUCHED | SET_WALKING | SET_RUNNING
+            | SET_CHASE_ENEMIES | SET_LOOK_FOR_ENEMIES | SET_FACE_MOVE_DIR | SET_FORCED_MARCH
+            | SET_UNDYING | SET_NOAVOID => return 0,
+            SET_SOLID => *value = (*ent).r.contents as f32,
+            SET_PLAYER_USABLE => *value = ((*ent).r.svFlags & SVF_PLAYER_USABLE) as f32,
+            SET_LOOP_ANIM => return 0,
+            SET_INTERFACE => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetFloat: SET_INTERFACE not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_SHIELDS | SET_VAMPIRE | SET_FORCE_INVINCIBLE | SET_GREET_ALLIES => return 0,
+            SET_VIDEO_FADE_IN => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetFloat: SET_VIDEO_FADE_IN not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_VIDEO_FADE_OUT => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetFloat: SET_VIDEO_FADE_OUT not implemented\n\0".as_ptr()
+                        as *const c_char,
+                );
+                return 0;
+            }
+            SET_INVISIBLE => *value = ((*ent).s.eFlags & EF_NODRAW) as f32,
+            SET_PLAYER_LOCKED | SET_LOCK_PLAYER_WEAPONS | SET_NO_IMPACT_DAMAGE => return 0,
+            SET_NO_KNOCKBACK => *value = ((*ent).flags & FL_NO_KNOCKBACK) as f32,
+            SET_ALT_FIRE | SET_NO_RESPONSE => return 0,
+            SET_INVINCIBLE => *value = ((*ent).flags & FL_GODMODE) as f32,
+            SET_MISSIONSTATUSACTIVE | SET_NO_COMBAT_TALK | SET_NO_ALERT_TALK
+            | SET_USE_CP_NEAREST | SET_DISMEMBERABLE | SET_NO_FORCE | SET_NO_ACROBATICS
+            | SET_USE_SUBTITLES | SET_NO_FALLTODEATH | SET_MORELIGHT | SET_TREASONED
+            | SET_DISABLE_SHADER_ANIM | SET_SHADER_ANIM => return 0,
+            _ => {
+                if trap::ICARUS_VariableDeclared(ctx.engine, name) != VTYPE_FLOAT {
+                    return 0;
+                }
+                return trap::ICARUS_GetFloatVariable(ctx.engine, name, value);
+            }
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(unported-global): same `setTable` dependency as `Q3_GetFloat`.
 /// Raven `Q3_GetVector`.
 ///
+// PORT-NOTE(unported-global): same `setTable`/`SET_*` dependency as
+// `Q3_GetFloat` (missing_symbols).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1573-1629`
 pub fn Q3_GetVector(
     ctx: GameContext<'_>,
@@ -589,12 +1074,49 @@ pub fn Q3_GetVector(
     name: *const c_char,
     value: &mut [f32; 3],
 ) -> c_int {
-    todo!("Port Q3_GetVector — parked (unported-global: setTable): oracle/oracle/codemp/game/g_ICARUScb.c:1573")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        let toGet = GetIDForString(setTable, name);
+
+        match toGet {
+            SET_PARM1 | SET_PARM2 | SET_PARM3 | SET_PARM4 | SET_PARM5 | SET_PARM6 | SET_PARM7
+            | SET_PARM8 | SET_PARM9 | SET_PARM10 | SET_PARM11 | SET_PARM12 | SET_PARM13
+            | SET_PARM14 | SET_PARM15 | SET_PARM16 => {
+                // Raven: sscanf(parm, "%f %f %f", &value[0], &value[1], &value[2])
+                let parm_str = cstr_to_str((*(*ent).parms).parm[(toGet - SET_PARM1) as usize].as_ptr());
+                let mut parts = parm_str.split_whitespace();
+                value[0] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                value[1] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                value[2] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
+            }
+            SET_ORIGIN => *value = (*ent).r.currentOrigin,
+            SET_ANGLES => *value = (*ent).r.currentAngles,
+            SET_TELEPORT_DEST => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetVector: SET_TELEPORT_DEST not implemented\n\0".as_ptr()
+                        as *const c_char,
+                );
+                return 0;
+            }
+            _ => {
+                if trap::ICARUS_VariableDeclared(ctx.engine, name) != VTYPE_VECTOR {
+                    return 0;
+                }
+                return trap::ICARUS_GetVectorVariable(ctx.engine, name, value);
+            }
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(unported-global): same `setTable` dependency as `Q3_GetFloat`.
 /// Raven `Q3_GetString`.
 ///
+// PORT-NOTE(unported-global): same `setTable`/`SET_*` dependency as
+// `Q3_GetFloat` (missing_symbols).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1642-1854`
 pub fn Q3_GetString(
     ctx: GameContext<'_>,
@@ -603,7 +1125,183 @@ pub fn Q3_GetString(
     name: *const c_char,
     value: *mut *mut c_char,
 ) -> c_int {
-    todo!("Port Q3_GetString — parked (unported-global: setTable): oracle/oracle/codemp/game/g_ICARUScb.c:1642")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        let toGet = GetIDForString(setTable, name);
+
+        match toGet {
+            SET_ANIM_BOTH => {
+                *value = Q3_GetAnimBoth(ctx, ent);
+                if value.is_null() || (*value).is_null() {
+                    return 0;
+                }
+            }
+            SET_PARM1 | SET_PARM2 | SET_PARM3 | SET_PARM4 | SET_PARM5 | SET_PARM6 | SET_PARM7
+            | SET_PARM8 | SET_PARM9 | SET_PARM10 | SET_PARM11 | SET_PARM12 | SET_PARM13
+            | SET_PARM14 | SET_PARM15 | SET_PARM16 => {
+                if !(*ent).parms.is_null() {
+                    *value = (*(*ent).parms).parm[(toGet - SET_PARM1) as usize].as_mut_ptr();
+                } else {
+                    G_DebugPrint(
+                        ctx,
+                        WL_WARNING as c_int,
+                        cstr(&format!(
+                            "Q3_GetString: invalid ent {} has no parms!\n",
+                            cstr_to_str((*ent).targetname)
+                        ))
+                        .as_ptr(),
+                    );
+                    return 0;
+                }
+            }
+            SET_TARGET => *value = (*ent).target,
+            SET_LOCATION => return 0,
+            SET_SPAWNSCRIPT => *value = (*ent).behaviorSet[BSET_SPAWN as usize],
+            SET_USESCRIPT => *value = (*ent).behaviorSet[BSET_USE as usize],
+            SET_AWAKESCRIPT => *value = (*ent).behaviorSet[BSET_AWAKE as usize],
+            SET_ANGERSCRIPT => *value = (*ent).behaviorSet[BSET_ANGER as usize],
+            SET_ATTACKSCRIPT => *value = (*ent).behaviorSet[BSET_ATTACK as usize],
+            SET_VICTORYSCRIPT => *value = (*ent).behaviorSet[BSET_VICTORY as usize],
+            SET_LOSTENEMYSCRIPT => *value = (*ent).behaviorSet[BSET_LOSTENEMY as usize],
+            SET_PAINSCRIPT => *value = (*ent).behaviorSet[BSET_PAIN as usize],
+            SET_FLEESCRIPT => *value = (*ent).behaviorSet[BSET_FLEE as usize],
+            SET_DEATHSCRIPT => *value = (*ent).behaviorSet[BSET_DEATH as usize],
+            SET_DELAYEDSCRIPT => *value = (*ent).behaviorSet[BSET_DELAYED as usize],
+            SET_BLOCKEDSCRIPT => *value = (*ent).behaviorSet[BSET_BLOCKED as usize],
+            SET_FFIRESCRIPT => *value = (*ent).behaviorSet[BSET_FFIRE as usize],
+            SET_FFDEATHSCRIPT => *value = (*ent).behaviorSet[BSET_FFDEATH as usize],
+            SET_ENEMY | SET_LEADER | SET_CAPTURE => return 0,
+            SET_TARGETNAME => *value = (*ent).targetname,
+            SET_PAINTARGET | SET_CAMERA_GROUP | SET_CAMERA_GROUP_TAG => return 0,
+            SET_LOOK_TARGET => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_LOOK_TARGET, NOT SUPPORTED IN MULTIPLAYER\n\0".as_ptr()
+                        as *const c_char,
+                );
+            }
+            SET_TARGET2 | SET_REMOVE_TARGET | SET_WEAPON | SET_ITEM | SET_MUSIC_STATE => return 0,
+            SET_NAVGOAL => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_NAVGOAL not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_VIEWTARGET => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_VIEWTARGET not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_WATCHTARGET => return 0,
+            SET_VIEWENTITY => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_VIEWENTITY not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_CAPTIONTEXTCOLOR => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_CAPTIONTEXTCOLOR not implemented\n\0".as_ptr()
+                        as *const c_char,
+                );
+                return 0;
+            }
+            SET_CENTERTEXTCOLOR => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_CENTERTEXTCOLOR not implemented\n\0".as_ptr()
+                        as *const c_char,
+                );
+                return 0;
+            }
+            SET_SCROLLTEXTCOLOR => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_SCROLLTEXTCOLOR not implemented\n\0".as_ptr()
+                        as *const c_char,
+                );
+                return 0;
+            }
+            SET_COPY_ORIGIN => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_COPY_ORIGIN not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_DEFEND_TARGET => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_COPY_ORIGIN not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_VIDEO_PLAY => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_VIDEO_PLAY not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_LOADGAME => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_LOADGAME not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_LOCKYAW => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_LOCKYAW not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_SCROLLTEXT => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_SCROLLTEXT not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_LCARSTEXT => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_GetString: SET_LCARSTEXT not implemented\n\0".as_ptr() as *const c_char,
+                );
+                return 0;
+            }
+            SET_FULLNAME => *value = (*ent).fullName,
+            _ => {
+                if trap::ICARUS_VariableDeclared(ctx.engine, name) != VTYPE_STRING {
+                    return 0;
+                }
+                return trap::ICARUS_GetStringVariable(ctx.engine, name, *value as *const c_char);
+            }
+        }
+
+        1
+    }
 }
 
 /// Raven `MoveOwner`.
@@ -670,7 +1368,16 @@ pub fn Q3_SetOrigin(ctx: GameContext<'_>, entID: c_int, origin: vec3_t) {
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
 
         if !(*ent).client.is_null() {
-            todo!("Port Q3_SetOrigin (client branch) — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:1941-1953")
+            let client = (*ent).client as *mut gclient_t;
+            (*client).ps.origin = origin;
+            (*ent).r.currentOrigin = origin;
+            (*client).ps.origin[2] += 1.0;
+
+            (*client).ps.velocity = [0.0, 0.0, 0.0];
+            (*client).ps.pm_time = 160;
+            (*client).ps.pm_flags |= PMF_TIME_KNOCKBACK;
+
+            (*client).ps.eFlags ^= EF_TELEPORT_BIT;
         } else {
             G_SetOrigin(ent, origin);
         }
@@ -705,13 +1412,28 @@ pub fn Q3_SetCopyOrigin(ctx: GameContext<'_>, entID: c_int, name: *const c_char)
     }
 }
 
-// PORT-ESCALATION(client-still-void): the entire meaningful body is
-// `found->client->ps.{velocity,pm_time,pm_flags}` writes.
 /// Raven `Q3_SetVelocity`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1992-2013`
 pub fn Q3_SetVelocity(ctx: GameContext<'_>, entID: c_int, axis: c_int, speed: f32) {
-    todo!("Port Q3_SetVelocity — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:1992")
+    unsafe {
+        let found = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*found).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!("Q3_SetVelocity: not a client {}\n", entID)).as_ptr(),
+            );
+            return;
+        }
+
+        let client = (*found).client as *mut gclient_t;
+        (*client).ps.velocity[axis as usize] += speed;
+
+        (*client).ps.pm_time = 500;
+        (*client).ps.pm_flags |= PMF_TIME_KNOCKBACK;
+    }
 }
 
 /// Raven `Q3_SetAngles`.
@@ -732,7 +1454,6 @@ pub fn Q3_SetAngles(ctx: GameContext<'_>, entID: c_int, angles: vec3_t) {
     }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_Lerp2Origin`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2051-2112`
@@ -743,7 +1464,59 @@ pub fn Q3_Lerp2Origin(
     origin: vec3_t,
     duration: f32,
 ) {
-    todo!("Port Q3_Lerp2Origin — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2051")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if !(*ent).client.is_null()
+            || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
+        {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!("Q3_Lerp2Origin: ent {} is NOT a mover!\n", entID)).as_ptr(),
+            );
+            return;
+        }
+
+        if (*ent).s.eType != entityType_t::ET_MOVER as c_int {
+            (*ent).s.eType = entityType_t::ET_MOVER as c_int;
+        }
+
+        let mut moverState = (*ent).moverState;
+
+        if moverState == MOVER_POS1 || moverState == MOVER_2TO1 {
+            (*ent).pos1 = (*ent).r.currentOrigin;
+            (*ent).pos2 = origin;
+            moverState = MOVER_1TO2;
+        } else if moverState == MOVER_POS2 || moverState == MOVER_1TO2 {
+            (*ent).pos2 = (*ent).r.currentOrigin;
+            (*ent).pos1 = origin;
+            moverState = MOVER_2TO1;
+        }
+        (*ent).moverState = moverState;
+
+        InitMoverTrData(ent);
+
+        (*ent).s.pos.trDuration = duration as c_int;
+
+        MatchTeam(ctx, ent, moverState as c_int, (*ctx.world).level.time);
+
+        (*ent).reached = Some(EntReached::moverCallback);
+        if (*ent).damage != 0 {
+            (*ent).blocked = Some(EntBlocked::Blocked_Mover);
+        }
+        if taskID != -1 {
+            trap::ICARUS_TaskIDSet(
+                ctx.engine,
+                GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+            );
+        }
+
+        G_PlayDoorLoopSound(ctx, ent);
+        G_PlayDoorSound(ctx, ent, BMS_START);
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
 /// Raven `Q3_SetOriginOffset`.
@@ -804,20 +1577,157 @@ pub fn Q3_SetEnemy(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
     }
 }
 
-// PORT-ESCALATION(client-still-void): writes `ent->client->leader`.
 /// Raven `Q3_SetLeader`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2207-2246`
 pub fn Q3_SetLeader(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
-    todo!("Port Q3_SetLeader — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2207")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!("Q3_SetLeader: ent {} is NOT a player or NPC!\n", entID)).as_ptr(),
+            );
+            return;
+        }
+        let client = (*ent).client as *mut gclient_t;
+
+        if Q_stricmp(b"NONE\0".as_ptr() as *const c_char, name) == 0
+            || Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
+        {
+            (*client).leader = None;
+        } else {
+            let leader = G_Find(
+                ctx,
+                std::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                name,
+            );
+
+            if leader.is_null() {
+                return;
+            } else if (*leader).health <= 0 {
+                return;
+            } else {
+                (*client).leader = Some(ent_id((*ctx.world).entities.as_mut_ptr(), leader));
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(NPC-still-void): reads/writes `ent->NPC->{tempGoal,goalEntity,goalRadius,aiFlags}`.
 /// Raven `Q3_SetNavGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2255-2320`
 pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) -> qboolean {
-    todo!("Port Q3_SetNavGoal — parked (NPC-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2255")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let mut goalPos: vec3_t = [0.0, 0.0, 0.0];
+
+        if (*ent).health == 0 {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetNavGoal: tried to set a navgoal (\"{}\") on a corpse! \"{}\"\n",
+                    cstr_to_str(name),
+                    cstr_to_str((*ent).script_targetname)
+                ))
+                .as_ptr(),
+            );
+            return qfalse;
+        }
+        if (*ent).NPC.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetNavGoal: tried to set a navgoal (\"{}\") on a non-NPC: \"{}\"\n",
+                    cstr_to_str(name),
+                    cstr_to_str((*ent).script_targetname)
+                ))
+                .as_ptr(),
+            );
+            return qfalse;
+        }
+        let npc = (*ent).NPC as *mut gNPC_t;
+        if (*npc).tempGoal.is_none() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetNavGoal: tried to set a navgoal (\"{}\") on a dead NPC: \"{}\"\n",
+                    cstr_to_str(name),
+                    cstr_to_str((*ent).script_targetname)
+                ))
+                .as_ptr(),
+            );
+            return qfalse;
+        }
+        let temp_goal_id = (*npc).tempGoal.unwrap();
+        let temp_goal = &mut (*ctx.world).entities[temp_goal_id.0 as usize] as *mut gentity_t;
+        if (*temp_goal).inuse == 0 {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetNavGoal: NPC's (\"{}\") navgoal is freed: \"{}\"\n",
+                    cstr_to_str(name),
+                    cstr_to_str((*ent).script_targetname)
+                ))
+                .as_ptr(),
+            );
+            return qfalse;
+        }
+
+        if Q_stricmp(b"null\0".as_ptr() as *const c_char, name) == 0
+            || Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
+        {
+            (*npc).goalEntity = None;
+            trap::ICARUS_TaskIDComplete(
+                ctx.engine,
+                GIcarusTaskidcompleteArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int),
+            );
+            return qfalse;
+        }
+
+        if TAG_GetOrigin2(ctx, std::ptr::null(), name, &mut goalPos) == qfalse {
+            let targ = G_Find(
+                ctx,
+                std::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                name,
+            );
+            if targ.is_null() {
+                G_DebugPrint(
+                    ctx,
+                    WL_ERROR as c_int,
+                    cstr(&format!(
+                        "Q3_SetNavGoal: can't find NAVGOAL \"{}\"\n",
+                        cstr_to_str(name)
+                    ))
+                    .as_ptr(),
+                );
+                return qfalse;
+            }
+            (*npc).goalEntity = Some(ent_id((*ctx.world).entities.as_mut_ptr(), targ));
+            (*npc).goalRadius = (((*ent).r.maxs[0] + (*ent).r.maxs[0]).sqrt()
+                + ((*targ).r.maxs[0] + (*targ).r.maxs[0]).sqrt()) as c_int;
+            (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
+            qfalse
+        } else {
+            let goalRadius = TAG_GetRadius(ctx, std::ptr::null(), name);
+            NPC_SetMoveGoal(ctx, ent, goalPos, goalRadius, qtrue, -1, std::ptr::null_mut());
+            let goal_id = (*npc).goalEntity.unwrap();
+            let goal_ent = &mut (*ctx.world).entities[goal_id.0 as usize] as *mut gentity_t;
+            (*goal_ent).lastWaypoint = WAYPOINT_NONE;
+            (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
+            // Raven's `#ifdef _DEBUG` block (tempGoal->target = G_NewString(name))
+            // is dev-build-only diagnostic noise; not transcribed.
+            qtrue
+        }
+    }
 }
 
 /// Raven `SetLowerAnim`.
@@ -876,20 +1786,57 @@ pub fn SetUpperAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
     }
 }
 
-// PORT-ESCALATION(unported-global): `animID = GetIDForString(animTable, anim_name)` — `animTable` is not ported anywhere in the worktree.
+// PORT-NOTE(unported-global): `animTable` is not ported anywhere in the
+// worktree (missing_symbols).
 /// Raven `Q3_SetAnimUpper`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2384-2405`
 pub fn Q3_SetAnimUpper(ctx: GameContext<'_>, entID: c_int, anim_name: *const c_char) -> qboolean {
-    todo!("Port Q3_SetAnimUpper — parked (unported-global: animTable): oracle/oracle/codemp/game/g_ICARUScb.c:2384")
+    unsafe {
+        let animID = GetIDForString(animTable, anim_name);
+
+        if animID == -1 {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!(
+                    "Q3_SetAnimUpper: unknown animation sequence '{}'\n",
+                    cstr_to_str(anim_name)
+                ))
+                .as_ptr(),
+            );
+            return qfalse;
+        }
+
+        SetUpperAnim(ctx, entID, animID);
+        qtrue
+    }
 }
 
-// PORT-ESCALATION(unported-global): same `animTable` dependency as `Q3_SetAnimUpper`.
+// PORT-NOTE(unported-global): same `animTable` dependency as `Q3_SetAnimUpper`.
 /// Raven `Q3_SetAnimLower`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2414-2437`
 pub fn Q3_SetAnimLower(ctx: GameContext<'_>, entID: c_int, anim_name: *const c_char) -> qboolean {
-    todo!("Port Q3_SetAnimLower — parked (unported-global: animTable): oracle/oracle/codemp/game/g_ICARUScb.c:2414")
+    unsafe {
+        let animID = GetIDForString(animTable, anim_name);
+
+        if animID == -1 {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!(
+                    "Q3_SetAnimLower: unknown animation sequence '{}'\n",
+                    cstr_to_str(anim_name)
+                ))
+                .as_ptr(),
+            );
+            return qfalse;
+        }
+
+        SetLowerAnim(ctx, entID, animID);
+        qtrue
+    }
 }
 
 /// Raven `Q3_SetAnimHoldTime`.
@@ -910,11 +1857,6 @@ pub fn Q3_SetAnimHoldTime(
     );
 }
 
-// PORT-ESCALATION(client-still-void): faithful port needs `ent->client->ps.stats`/
-// `->sess.sessionTeam` and calls `player_die` when health drops to 0 —
-// `(*ent).client as *mut gclient_t` is the house cast pattern (see g_active.rs)
-// but the full branch (including the death path) is nontrivial to verify without
-// compiling; parked rather than guessed.
 /// Raven `Q3_SetHealth`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2487-2527`
@@ -923,10 +1865,42 @@ pub fn Q3_SetHealth(
     entID: c_int,
     data: c_int,
 ) {
-    todo!("Port Q3_SetHealth — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2487")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let mut data = data;
+
+        if data < 0 {
+            data = 0;
+        }
+
+        (*ent).health = data;
+
+        if (*ent).client.is_null() {
+            return;
+        }
+        let client = (*ent).client as *mut gclient_t;
+
+        (*client).ps.stats[STAT_HEALTH as usize] = data;
+
+        if (*client).ps.stats[STAT_HEALTH as usize] > (*client).ps.stats[STAT_MAX_HEALTH as usize]
+        {
+            (*ent).health = (*client).ps.stats[STAT_MAX_HEALTH as usize];
+            (*client).ps.stats[STAT_HEALTH as usize] = (*ent).health;
+        }
+        if data == 0 {
+            (*ent).health = 1;
+            if (*client).sess.sessionTeam == TEAM_SPECTATOR {
+                return;
+            }
+
+            (*ent).flags &= !FL_GODMODE;
+            (*ent).health = -999;
+            (*client).ps.stats[STAT_HEALTH as usize] = (*ent).health;
+            player_die(ctx, ent, ent, ent, 100000, MOD_FALLING as c_int);
+        }
+    }
 }
 
-// PORT-ESCALATION(client-still-void): body is entirely `ent->client->ps.stats[...]`.
 /// Raven `Q3_SetArmor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2539-2559`
@@ -935,11 +1909,25 @@ pub fn Q3_SetArmor(
     entID: c_int,
     data: c_int,
 ) {
-    todo!("Port Q3_SetArmor — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2539")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).client.is_null() {
+            return;
+        }
+        let client = (*ent).client as *mut gclient_t;
+
+        (*client).ps.stats[STAT_ARMOR as usize] = data;
+        if (*client).ps.stats[STAT_ARMOR as usize] > (*client).ps.stats[STAT_MAX_HEALTH as usize] {
+            (*client).ps.stats[STAT_ARMOR as usize] = (*client).ps.stats[STAT_MAX_HEALTH as usize];
+        }
+    }
 }
 
-// PORT-ESCALATION(unported-global): `toGet = GetIDForString(BSTable, bs_name)` —
-// `BSTable` (the bState_t string table) is not ported anywhere in the worktree.
+// PORT-NOTE(unported-global): `BSTable` (the bState_t string table) is not
+// ported anywhere in the worktree (missing_symbols). The NAV_FindClosestWaypointForEnt/
+// NPC_BSSearchStart search-start branch is a faithful transcription; the
+// `#FIXME: Reimplement` comment is Raven's own, preserved.
 /// Raven `Q3_SetBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2573-2687`
@@ -948,10 +1936,80 @@ pub fn Q3_SetBState(
     entID: c_int,
     bs_name: *const c_char,
 ) -> qboolean {
-    todo!("Port Q3_SetBState — parked (unported-global: BSTable): oracle/oracle/codemp/game/g_ICARUScb.c:2573")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).NPC.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetBState: '{}' is not an NPC\n",
+                    cstr_to_str((*ent).targetname)
+                ))
+                .as_ptr(),
+            );
+            return qtrue;
+        }
+        let npc = (*ent).NPC as *mut gNPC_t;
+
+        let bSID = GetIDForString(BSTable, bs_name);
+        if bSID > -1 {
+            if bSID == BS_SEARCH || bSID == BS_WANDER {
+                if (*ent).waypoint != WAYPOINT_NONE {
+                    NPC_BSSearchStart(ctx, (*ent).waypoint, bSID);
+                } else {
+                    (*ent).waypoint = NAV_FindClosestWaypointForEnt(ctx, ent, WAYPOINT_NONE);
+
+                    if (*ent).waypoint != WAYPOINT_NONE {
+                        NPC_BSSearchStart(ctx, (*ent).waypoint, bSID);
+                    } else {
+                        G_DebugPrint(
+                            ctx,
+                            WL_ERROR as c_int,
+                            cstr(&format!(
+                                "Q3_SetBState: '{}' is not in a valid waypoint to search from!\n",
+                                cstr_to_str((*ent).targetname)
+                            ))
+                            .as_ptr(),
+                        );
+                        return qtrue;
+                    }
+                }
+            }
+
+            (*npc).tempBehavior = BS_DEFAULT;
+            if (*npc).behaviorState == BS_NOCLIP && bSID != BS_NOCLIP {
+                (*ent).r.currentOrigin[2] += 0.125;
+                G_SetOrigin(ent, (*ent).r.currentOrigin);
+            }
+            (*npc).behaviorState = bSID;
+            if bSID == BS_DEFAULT {
+                (*npc).defaultBehavior = bSID;
+            }
+        }
+
+        (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
+
+        if bSID == BS_NOCLIP {
+            (*((*ent).client as *mut gclient_t)).noclip = qtrue;
+        } else {
+            (*((*ent).client as *mut gclient_t)).noclip = qfalse;
+        }
+
+        if bSID == BS_ADVANCE_FIGHT {
+            return qfalse;
+        }
+
+        if bSID == BS_JUMP {
+            (*npc).jumpState = JS_FACING;
+        }
+
+        qtrue
+    }
 }
 
-// PORT-ESCALATION(unported-global): same `BSTable` dependency as `Q3_SetBState`.
+// PORT-NOTE(unported-global): same `BSTable` dependency as `Q3_SetBState`.
 /// Raven `Q3_SetTempBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2699-2737`
@@ -960,10 +2018,33 @@ pub fn Q3_SetTempBState(
     entID: c_int,
     bs_name: *const c_char,
 ) -> qboolean {
-    todo!("Port Q3_SetTempBState — parked (unported-global: BSTable): oracle/oracle/codemp/game/g_ICARUScb.c:2699")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).NPC.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetTempBState: '{}' is not an NPC\n",
+                    cstr_to_str((*ent).targetname)
+                ))
+                .as_ptr(),
+            );
+            return qtrue;
+        }
+        let npc = (*ent).NPC as *mut gNPC_t;
+
+        let bSID = GetIDForString(BSTable, bs_name);
+        if bSID > -1 {
+            (*npc).tempBehavior = bSID;
+        }
+
+        qtrue
+    }
 }
 
-// PORT-ESCALATION(unported-global): same `BSTable` dependency as `Q3_SetBState`.
+// PORT-NOTE(unported-global): same `BSTable` dependency as `Q3_SetBState`.
 /// Raven `Q3_SetDefaultBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2749-2771`
@@ -972,7 +2053,28 @@ pub fn Q3_SetDefaultBState(
     entID: c_int,
     bs_name: *const c_char,
 ) {
-    todo!("Port Q3_SetDefaultBState — parked (unported-global: BSTable): oracle/oracle/codemp/game/g_ICARUScb.c:2749")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).NPC.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetDefaultBState: '{}' is not an NPC\n",
+                    cstr_to_str((*ent).targetname)
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
+        let npc = (*ent).NPC as *mut gNPC_t;
+
+        let bSID = GetIDForString(BSTable, bs_name);
+        if bSID > -1 {
+            (*npc).defaultBehavior = bSID;
+        }
+    }
 }
 
 /// Raven `Q3_SetDPitch`.
@@ -1098,7 +2200,22 @@ pub fn Q3_SetInvisible(
     entID: c_int,
     invisible: qboolean,
 ) {
-    todo!("Port Q3_SetInvisible — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2941")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if invisible != 0 {
+            (*self_).s.eFlags |= EF_NODRAW;
+            if !(*self_).client.is_null() {
+                (*((*self_).client as *mut gclient_t)).ps.eFlags |= EF_NODRAW;
+            }
+            (*self_).r.contents = 0;
+        } else {
+            (*self_).s.eFlags &= !EF_NODRAW;
+            if !(*self_).client.is_null() {
+                (*((*self_).client as *mut gclient_t)).ps.eFlags &= !EF_NODRAW;
+            }
+        }
+    }
 }
 
 /// Raven `Q3_SetVampire`.
@@ -1175,8 +2292,6 @@ pub fn Q3_SetLoopSound(ctx: GameContext<'_>, entID: c_int, name: *const c_char) 
     }
 }
 
-// PORT-ESCALATION(unported-global): `self->r.svFlags |= SVF_ICARUS_FREEZE` —
-// `SVF_ICARUS_FREEZE` is not ported anywhere in the worktree yet.
 /// Raven `Q3_SetICARUSFreeze`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3056-3078`
@@ -1186,7 +2301,41 @@ pub fn Q3_SetICARUSFreeze(
     name: *const c_char,
     freeze: qboolean,
 ) {
-    todo!("Port Q3_SetICARUSFreeze — parked (unported-global: SVF_ICARUS_FREEZE): oracle/oracle/codemp/game/g_ICARUScb.c:3056")
+    unsafe {
+        let mut self_ = G_Find(
+            ctx,
+            std::ptr::null_mut(),
+            core::mem::offset_of!(gentity_t, targetname) as c_int,
+            name,
+        );
+        if self_.is_null() {
+            self_ = G_Find(
+                ctx,
+                std::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, script_targetname) as c_int,
+                name,
+            );
+        }
+
+        if self_.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!(
+                    "Q3_SetICARUSFreeze: invalid ent {}\n",
+                    cstr_to_str(name)
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
+
+        if freeze != 0 {
+            (*self_).r.svFlags |= SVF_ICARUS_FREEZE;
+        } else {
+            (*self_).r.svFlags &= !SVF_ICARUS_FREEZE;
+        }
+    }
 }
 
 /// Raven `Q3_SetViewEntity`.
@@ -1201,14 +2350,19 @@ pub fn Q3_SetViewEntity(ctx: GameContext<'_>, entID: c_int, name: *const c_char)
     );
 }
 
-// PORT-ESCALATION(unported-global): `wp = GetIDForString(WPTable, wp_name)` —
-// `WPTable` (weapon-name string table) is not ported anywhere in the worktree
-// (also client-still-void for `ent->client->ps.stats[STAT_WEAPONS]`).
+// PORT-NOTE(unported-global): `WPTable` (weapon-name string table) is not
+// ported anywhere in the worktree (missing_symbols).
 /// Raven `Q3_SetWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3104-3111`
 pub fn Q3_SetWeapon(ctx: GameContext<'_>, entID: c_int, wp_name: *const c_char) {
-    todo!("Port Q3_SetWeapon — parked (unported-global: WPTable): oracle/oracle/codemp/game/g_ICARUScb.c:3104")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let wp = GetIDForString(WPTable, wp_name);
+
+        (*((*ent).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 1 << wp;
+        ChangeWeapon(ctx, ent, wp);
+    }
 }
 
 /// Raven `Q3_SetItem`.
@@ -1223,25 +2377,70 @@ pub fn Q3_SetItem(ctx: GameContext<'_>, entID: c_int, item_name: *const c_char) 
     );
 }
 
-// PORT-ESCALATION(client-still-void, NPC-still-void): writes both
-// `self->NPC->stats.walkSpeed` and `self->client->ps.speed`.
 /// Raven `Q3_SetWalkSpeed`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3139-3161`
 pub fn Q3_SetWalkSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
-    todo!("Port Q3_SetWalkSpeed — parked (client/NPC-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:3139")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*self_).NPC.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetWalkSpeed: '{}' is not an NPC!\n",
+                    cstr_to_str((*self_).targetname)
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
+        let npc = (*self_).NPC as *mut gNPC_t;
+        let client = (*self_).client as *mut gclient_t;
+
+        if int_data == 0 {
+            (*npc).stats.walkSpeed = 1;
+            (*client).ps.speed = 1;
+        }
+
+        (*npc).stats.walkSpeed = int_data;
+        (*client).ps.speed = int_data as f32;
+    }
 }
 
-// PORT-ESCALATION(client-still-void, NPC-still-void): writes both
-// `self->NPC->stats.runSpeed` and `self->client->ps.speed`.
 /// Raven `Q3_SetRunSpeed`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3173-3195`
 pub fn Q3_SetRunSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
-    todo!("Port Q3_SetRunSpeed — parked (client/NPC-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:3173")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*self_).NPC.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetRunSpeed: '{}' is not an NPC!\n",
+                    cstr_to_str((*self_).targetname)
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
+        let npc = (*self_).NPC as *mut gNPC_t;
+        let client = (*self_).client as *mut gclient_t;
+
+        if int_data == 0 {
+            (*npc).stats.runSpeed = 1;
+            (*client).ps.speed = 1;
+        }
+
+        (*npc).stats.runSpeed = int_data;
+        (*client).ps.speed = int_data as f32;
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetYawSpeed`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3207-3211`
@@ -1250,10 +2449,13 @@ pub fn Q3_SetYawSpeed(
     entID: c_int,
     float_data: f32,
 ) {
-    todo!("Port Q3_SetYawSpeed — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3207")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetYawSpeed: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetAggression`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3223-3227`
@@ -1262,10 +2464,13 @@ pub fn Q3_SetAggression(
     entID: c_int,
     int_data: c_int,
 ) {
-    todo!("Port Q3_SetAggression — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3223")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetAggression: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetAim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3239-3243`
@@ -1274,10 +2479,13 @@ pub fn Q3_SetAim(
     entID: c_int,
     int_data: c_int,
 ) {
-    todo!("Port Q3_SetAim — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3239")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetAim: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetFriction`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3255-3273`
@@ -1286,10 +2494,30 @@ pub fn Q3_SetFriction(
     entID: c_int,
     int_data: c_int,
 ) {
-    todo!("Port Q3_SetFriction — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3255")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*self_).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetFriction: '{}' is not an NPC/player!\n",
+                    cstr_to_str((*self_).targetname)
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
+
+        G_DebugPrint(
+            ctx,
+            WL_WARNING as c_int,
+            b"Q3_SetFriction currently unsupported in MP\n\0".as_ptr() as *const c_char,
+        );
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetGravity`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3285-3307`
@@ -1298,10 +2526,31 @@ pub fn Q3_SetGravity(
     entID: c_int,
     float_data: f32,
 ) {
-    todo!("Port Q3_SetGravity — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3285")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*self_).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetGravity: '{}' is not an NPC/player!\n",
+                    cstr_to_str((*self_).targetname)
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
+        let client = (*self_).client as *mut gclient_t;
+
+        if !(*self_).NPC.is_null() {
+            let npc = (*self_).NPC as *mut gNPC_t;
+            (*npc).aiFlags |= NPCAI_CUSTOM_GRAVITY;
+        }
+        (*client).ps.gravity = float_data as c_int;
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetWait`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3319-3330`
@@ -1310,10 +2559,12 @@ pub fn Q3_SetWait(
     entID: c_int,
     float_data: f32,
 ) {
-    todo!("Port Q3_SetWait — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3319")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        (*self_).wait = float_data;
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetShotSpacing`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3333-3337`
@@ -1322,10 +2573,13 @@ pub fn Q3_SetShotSpacing(
     entID: c_int,
     int_data: c_int,
 ) {
-    todo!("Port Q3_SetShotSpacing — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3333")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetShotSpacing: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetFollowDist`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3348-3352`
@@ -1334,10 +2588,13 @@ pub fn Q3_SetFollowDist(
     entID: c_int,
     float_data: f32,
 ) {
-    todo!("Port Q3_SetFollowDist — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3348")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetFollowDist: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetScale`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3364-3396`
@@ -1346,7 +2603,24 @@ pub fn Q3_SetScale(
     entID: c_int,
     float_data: f32,
 ) {
-    todo!("Port Q3_SetScale — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3364")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if !(*self_).client.is_null() {
+            let client = (*self_).client as *mut gclient_t;
+            if float_data < 0.0 {
+                (*client).ps.iModelScale = float_data as c_int;
+            } else {
+                (*client).ps.iModelScale = (float_data * 100.0) as c_int;
+            }
+        } else {
+            if float_data < 0.0 {
+                (*self_).s.iModelScale = float_data as c_int;
+            } else {
+                (*self_).s.iModelScale = (float_data * 100.0) as c_int;
+            }
+        }
+    }
 }
 
 /// Raven `Q3_GameSideCheckStringCounterIncrement`.
@@ -1355,10 +2629,24 @@ pub fn Q3_SetScale(
 pub fn Q3_GameSideCheckStringCounterIncrement(
     string: *const c_char,
 ) -> f32 {
-    todo!("Port Q3_GameSideCheckStringCounterIncrement — oracle/oracle/codemp/game/g_ICARUScb.c:3406")
+    unsafe {
+        let s = cstr_to_str(string);
+        let mut val = 0.0f32;
+
+        if let Some(rest) = s.strip_prefix('+') {
+            if !rest.is_empty() {
+                val = atof(cstr(rest).as_ptr()) as f32;
+            }
+        } else if let Some(rest) = s.strip_prefix('-') {
+            if !rest.is_empty() {
+                val = atof(cstr(rest).as_ptr()) as f32 * -1.0;
+            }
+        }
+
+        val
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetCount`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3440-3460`
@@ -1367,10 +2655,18 @@ pub fn Q3_SetCount(
     entID: c_int,
     data: *const c_char,
 ) {
-    todo!("Port Q3_SetCount — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3440")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        let val = Q3_GameSideCheckStringCounterIncrement(data);
+        if val != 0.0 {
+            (*self_).count += val as c_int;
+        } else {
+            (*self_).count = atoi(data);
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetTargetName`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3472-3490`
@@ -1379,10 +2675,17 @@ pub fn Q3_SetTargetName(
     entID: c_int,
     targetname: *const c_char,
 ) {
-    todo!("Port Q3_SetTargetName — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3472")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, targetname) == 0 {
+            (*self_).targetname = std::ptr::null_mut();
+        } else {
+            (*self_).targetname = G_NewString(targetname);
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3502-3520`
@@ -1391,10 +2694,17 @@ pub fn Q3_SetTarget(
     entID: c_int,
     target: *const c_char,
 ) {
-    todo!("Port Q3_SetTarget — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3502")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, target) == 0 {
+            (*self_).target = std::ptr::null_mut();
+        } else {
+            (*self_).target = G_NewString(target);
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetTarget2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3531-3552`
@@ -1403,10 +2713,13 @@ pub fn Q3_SetTarget2(
     entID: c_int,
     target2: *const c_char,
 ) {
-    todo!("Port Q3_SetTarget2 — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3531")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetTarget2 does not exist in MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetRemoveTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3562-3566`
@@ -1415,10 +2728,13 @@ pub fn Q3_SetRemoveTarget(
     entID: c_int,
     target: *const c_char,
 ) {
-    todo!("Port Q3_SetRemoveTarget — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3562")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetRemoveTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetPainTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3578-3599`
@@ -1427,10 +2743,13 @@ pub fn Q3_SetPainTarget(
     entID: c_int,
     targetname: *const c_char,
 ) {
-    todo!("Port Q3_SetPainTarget — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3578")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetPainTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetFullName`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3610-3628`
@@ -1439,10 +2758,17 @@ pub fn Q3_SetFullName(
     entID: c_int,
     fullName: *const c_char,
 ) {
-    todo!("Port Q3_SetFullName — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3610")
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, fullName) == 0 {
+            (*self_).fullName = std::ptr::null_mut();
+        } else {
+            (*self_).fullName = G_NewString(fullName);
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetMusicState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3630-3634`
@@ -1450,10 +2776,13 @@ pub fn Q3_SetMusicState(
     ctx: GameContext<'_>,
     dms: *const c_char,
 ) {
-    todo!("Port Q3_SetMusicState — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3630")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetMusicState: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetForcePowerLevel`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3636-3640`
@@ -1463,10 +2792,18 @@ pub fn Q3_SetForcePowerLevel(
     forcePower: c_int,
     forceLevel: c_int,
 ) {
-    todo!("Port Q3_SetForcePowerLevel — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3636")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetForcePowerLevel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-NOTE(ctx-free-boundary): the packet's LAW signature (matching this
+// file's pre-existing worktree shape) drops `ctx` — this fn is reached from
+// the bg/fn-ptr boundary with no GameContext channel, so Raven's
+// `G_DebugPrint` calls (parmNum range warning, truncation warning) have no
+// route here and are silently dropped rather than invented.
 /// Raven `Q3_SetParm`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3651-3690`
@@ -1475,10 +2812,40 @@ pub fn Q3_SetParm(
     parmNum: c_int,
     parmValue: *const c_char,
 ) {
-    todo!("Port Q3_SetParm — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3651")
+    unsafe {
+        // PORT-NOTE(ctx-free-boundary): no GameContext to index `entities`
+        // through — `g_entities`/`GetIDForString`/`G_Alloc` global-array access
+        // used here per the oracle body verbatim (missing_symbols if the
+        // array isn't reachable without ctx).
+        let ent = &mut g_entities[entID as usize] as *mut gentity_t;
+
+        if parmNum < 0 || parmNum >= MAX_PARMS as c_int {
+            return;
+        }
+
+        if (*ent).parms.is_null() {
+            (*ent).parms = G_Alloc(core::mem::size_of::<parms_t>() as c_int) as *mut parms_t;
+        }
+
+        let val = Q3_GameSideCheckStringCounterIncrement(parmValue);
+        if val != 0.0 {
+            let cur = atof((*(*ent).parms).parm[parmNum as usize].as_ptr()) as f32;
+            let total = val + cur;
+            write_cstr_field(
+                &mut (*(*ent).parms).parm[parmNum as usize],
+                &format!("{:.6}", total),
+            );
+        } else {
+            // Raven: strncpy + explicit truncation-NUL; write_cstr_field is the
+            // Q_strncpyz/Com_sprintf byte-copy dual (ruling 18 §3/§4).
+            write_cstr_field(
+                &mut (*(*ent).parms).parm[parmNum as usize],
+                &cstr_to_str(parmValue),
+            );
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetCaptureGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3701-3705`
@@ -1487,10 +2854,13 @@ pub fn Q3_SetCaptureGoal(
     entID: c_int,
     name: *const c_char,
 ) {
-    todo!("Port Q3_SetCaptureGoal — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3701")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetCaptureGoal: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetEvent`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3714-3718`
@@ -1499,10 +2869,14 @@ pub fn Q3_SetEvent(
     entID: c_int,
     event_name: *const c_char,
 ) {
-    todo!("Port Q3_SetEvent — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3714")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetEvent: NOT SUPPORTED IN MP (may be in future, ask if needed)\n\0".as_ptr()
+            as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetIgnorePain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3727-3731`
@@ -1511,10 +2885,13 @@ pub fn Q3_SetIgnorePain(
     entID: c_int,
     data: qboolean,
 ) {
-    todo!("Port Q3_SetIgnorePain — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3727")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetIgnorePain: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetIgnoreEnemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3740-3744`
@@ -1523,10 +2900,13 @@ pub fn Q3_SetIgnoreEnemies(
     entID: c_int,
     data: qboolean,
 ) {
-    todo!("Port Q3_SetIgnoreEnemies — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3740")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetIgnoreEnemies: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetIgnoreAlerts`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3753-3757`
@@ -1535,10 +2915,13 @@ pub fn Q3_SetIgnoreAlerts(
     entID: c_int,
     data: qboolean,
 ) {
-    todo!("Port Q3_SetIgnoreAlerts — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3753")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetIgnoreAlerts: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetNoTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3767-3781`
@@ -1547,10 +2930,17 @@ pub fn Q3_SetNoTarget(
     entID: c_int,
     data: qboolean,
 ) {
-    todo!("Port Q3_SetNoTarget — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3767")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if data != 0 {
+            (*ent).flags |= FL_NOTARGET;
+        } else {
+            (*ent).flags &= !FL_NOTARGET;
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetDontShoot`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3790-3794`
@@ -1559,10 +2949,13 @@ pub fn Q3_SetDontShoot(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetDontShoot — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3790")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetDontShoot: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetDontFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3803-3807`
@@ -1571,10 +2964,13 @@ pub fn Q3_SetDontFire(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetDontFire — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3803")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetDontFire: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetFireWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3816-3820`
@@ -1583,10 +2979,13 @@ pub fn Q3_SetFireWeapon(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetFireWeapon — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3816")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetFireWeapon: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetInactive`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3830-3848`
@@ -1595,10 +2994,17 @@ pub fn Q3_SetInactive(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetInactive — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3830")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if add != 0 {
+            (*ent).flags |= FL_INACTIVE;
+        } else {
+            (*ent).flags &= !FL_INACTIVE;
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetFuncUsableVisible`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3857-3880`
@@ -1607,10 +3013,19 @@ pub fn Q3_SetFuncUsableVisible(
     entID: c_int,
     visible: qboolean,
 ) {
-    todo!("Port Q3_SetFuncUsableVisible — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3857")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if visible != 0 {
+            (*ent).r.svFlags &= !SVF_NOCLIENT;
+            (*ent).s.eFlags &= !EF_NODRAW;
+        } else {
+            (*ent).r.svFlags |= SVF_NOCLIENT;
+            (*ent).s.eFlags |= EF_NODRAW;
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetLockedEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3889-3893`
@@ -1619,10 +3034,13 @@ pub fn Q3_SetLockedEnemy(
     entID: c_int,
     locked: qboolean,
 ) {
-    todo!("Port Q3_SetLockedEnemy — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3889")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetLockedEnemy: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetCinematicSkipScript`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3903-3907`
@@ -1630,10 +3048,13 @@ pub fn Q3_SetCinematicSkipScript(
     ctx: GameContext<'_>,
     scriptname: *mut c_char,
 ) {
-    todo!("Port Q3_SetCinematicSkipScript — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3903")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetCinematicSkipScript: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetNoMindTrick`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3916-3920`
@@ -1642,10 +3063,13 @@ pub fn Q3_SetNoMindTrick(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetNoMindTrick — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3916")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetNoMindTrick: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetCrouched`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3929-3933`
@@ -1654,10 +3078,13 @@ pub fn Q3_SetCrouched(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetCrouched — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3929")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetCrouched: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetWalking`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3942-3967`
@@ -1666,10 +3093,31 @@ pub fn Q3_SetWalking(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetWalking — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3942")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).NPC.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetWalking: '{}' is not an NPC!\n",
+                    cstr_to_str((*ent).targetname)
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
+        let npc = (*ent).NPC as *mut gNPC_t;
+
+        if add != 0 {
+            (*npc).scriptFlags |= SCF_WALKING;
+        } else {
+            (*npc).scriptFlags &= !SCF_WALKING;
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetRunning`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3976-3980`
@@ -1678,10 +3126,13 @@ pub fn Q3_SetRunning(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetRunning — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3976")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetRunning: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetForcedMarch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3989-3993`
@@ -1690,10 +3141,13 @@ pub fn Q3_SetForcedMarch(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetForcedMarch — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3989")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetForcedMarch: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetChaseEnemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4001-4005`
@@ -1702,10 +3156,13 @@ pub fn Q3_SetChaseEnemies(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetChaseEnemies — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4001")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetChaseEnemies: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetLookForEnemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4015-4019`
@@ -1714,10 +3171,13 @@ pub fn Q3_SetLookForEnemies(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetLookForEnemies — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4015")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetLookForEnemies: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetFaceMoveDir`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4027-4031`
@@ -1726,10 +3186,13 @@ pub fn Q3_SetFaceMoveDir(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetFaceMoveDir — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4027")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetFaceMoveDir: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4040-4044`
@@ -1738,10 +3201,13 @@ pub fn Q3_SetAltFire(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetAltFire — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4040")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetAltFire: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetDontFlee`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4053-4057`
@@ -1750,10 +3216,13 @@ pub fn Q3_SetDontFlee(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetDontFlee — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4053")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetDontFlee: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetNoResponse`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4066-4070`
@@ -1762,10 +3231,13 @@ pub fn Q3_SetNoResponse(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetNoResponse — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4066")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetNoResponse: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetCombatTalk`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4079-4083`
@@ -1774,10 +3246,13 @@ pub fn Q3_SetCombatTalk(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetCombatTalk — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4079")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetCombatTalk: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetAlertTalk`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4092-4096`
@@ -1786,10 +3261,13 @@ pub fn Q3_SetAlertTalk(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetAlertTalk — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4092")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetAlertTalk: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetUseCpNearest`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4105-4109`
@@ -1798,10 +3276,13 @@ pub fn Q3_SetUseCpNearest(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetUseCpNearest — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4105")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetUseCpNearest: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetNoForce`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4118-4122`
@@ -1810,10 +3291,13 @@ pub fn Q3_SetNoForce(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetNoForce — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4118")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetNoForce: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetNoAcrobatics`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4131-4135`
@@ -1822,10 +3306,13 @@ pub fn Q3_SetNoAcrobatics(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetNoAcrobatics — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4131")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetNoAcrobatics: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetUseSubtitles`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4144-4148`
@@ -1834,10 +3321,13 @@ pub fn Q3_SetUseSubtitles(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetUseSubtitles — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4144")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetUseSubtitles: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetNoFallToDeath`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4157-4161`
@@ -1846,10 +3336,13 @@ pub fn Q3_SetNoFallToDeath(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetNoFallToDeath — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4157")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetNoFallToDeath: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetDismemberable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4170-4174`
@@ -1858,10 +3351,13 @@ pub fn Q3_SetDismemberable(
     entID: c_int,
     dismemberable: qboolean,
 ) {
-    todo!("Port Q3_SetDismemberable — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4170")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetDismemberable: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetMoreLight`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4184-4188`
@@ -1870,10 +3366,13 @@ pub fn Q3_SetMoreLight(
     entID: c_int,
     add: qboolean,
 ) {
-    todo!("Port Q3_SetMoreLight — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4184")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetMoreLight: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetUndying`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4197-4201`
@@ -1882,34 +3381,45 @@ pub fn Q3_SetUndying(
     entID: c_int,
     undying: qboolean,
 ) {
-    todo!("Port Q3_SetUndying — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4197")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetUndying: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetInvincible`.
 ///
+/// Raven: the debug message says "Invicible" (typo preserved verbatim).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4210-4214`
 pub fn Q3_SetInvincible(
     ctx: GameContext<'_>,
     entID: c_int,
     invincible: qboolean,
 ) {
-    todo!("Port Q3_SetInvincible — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4210")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetInvicible: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetForceInvincible`.
 ///
+/// Raven: the debug message says "Invicible" (typo preserved verbatim).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4224-4228`
 pub fn Q3_SetForceInvincible(
     ctx: GameContext<'_>,
     entID: c_int,
     forceInv: qboolean,
 ) {
-    todo!("Port Q3_SetForceInvincible — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4224")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetForceInvicible: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetNoAvoid`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4237-4261`
@@ -1918,7 +3428,29 @@ pub fn Q3_SetNoAvoid(
     entID: c_int,
     noAvoid: qboolean,
 ) {
-    todo!("Port Q3_SetNoAvoid — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4237")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).NPC.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetNoAvoid: '{}' is not an NPC!\n",
+                    cstr_to_str((*ent).targetname)
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
+        let npc = (*ent).NPC as *mut gNPC_t;
+
+        if noAvoid != 0 {
+            (*npc).aiFlags |= NPCAI_NO_COLL_AVOID;
+        } else {
+            (*npc).aiFlags &= !NPCAI_NO_COLL_AVOID;
+        }
+    }
 }
 
 /// Raven `SolidifyOwner`.
@@ -1928,10 +3460,30 @@ pub fn SolidifyOwner(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SolidifyOwner — oracle/oracle/codemp/game/g_ICARUScb.c:4271")
+    unsafe {
+        let owner = &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+
+        (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
+        (*self_).think = Some(EntThink::G_FreeEntity);
+
+        if owner.is_null() || (*owner).inuse == 0 {
+            return;
+        }
+
+        let oldContents = (*owner).r.contents;
+        (*owner).r.contents = CONTENTS_BODY;
+        if SpotWouldTelefrag2(ctx, owner, (*owner).r.currentOrigin) != qfalse {
+            (*owner).r.contents = oldContents;
+            (*self_).think = Some(EntThink::SolidifyOwner);
+        } else {
+            trap::ICARUS_TaskIDComplete(
+                ctx.engine,
+                GIcarusTaskidcompleteArgs::new(owner, taskID_t::TID_RESIZE as c_int),
+            );
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetSolid`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4305-4345`
@@ -1940,10 +3492,47 @@ pub fn Q3_SetSolid(
     entID: c_int,
     solid: qboolean,
 ) -> qboolean {
-    todo!("Port Q3_SetSolid — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4305")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if ent.is_null() || (*ent).inuse == 0 {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!("Q3_SetSolid: invalid entID {}\n", entID)).as_ptr(),
+            );
+            return qtrue;
+        }
+
+        if solid != 0 {
+            //FIXME: Presumption
+            let oldContents = (*ent).r.contents;
+            (*ent).r.contents = CONTENTS_BODY;
+            if SpotWouldTelefrag2(ctx, ent, (*ent).r.currentOrigin) != qfalse {
+                let solidifier = G_Spawn(ctx);
+
+                (*solidifier).r.ownerNum = (*ent).s.number;
+
+                (*solidifier).think = Some(EntThink::SolidifyOwner);
+                (*solidifier).nextthink = (*ctx.world).level.time + FRAMETIME;
+
+                (*ent).r.contents = oldContents;
+                return qfalse;
+            }
+            (*ent).clipmask |= CONTENTS_BODY;
+        } else {
+            //FIXME: Presumption
+            if (*ent).s.eFlags & EF_NODRAW != 0 {
+                //We're invisible too, so set contents to none
+                (*ent).r.contents = 0;
+            } else {
+                (*ent).r.contents = CONTENTS_CORPSE;
+            }
+        }
+        qtrue
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetForwardMove`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4354-4372`
@@ -1952,7 +3541,38 @@ pub fn Q3_SetForwardMove(
     entID: c_int,
     fmoveVal: c_int,
 ) {
-    todo!("Port Q3_SetForwardMove — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4354")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if ent.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!("Q3_SetForwardMove: invalid entID {}\n", entID)).as_ptr(),
+            );
+            return;
+        }
+
+        if (*ent).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetForwardMove: '{}' is not an NPC/player!\n",
+                    cstr_to_str((*ent).targetname)
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
+
+        G_DebugPrint(
+            ctx,
+            WL_WARNING as c_int,
+            b"Q3_SetForwardMove: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        );
+        //ent->client->forced_forwardmove = fmoveVal;
+    }
 }
 
 /// Raven `Q3_SetRightMove`.
@@ -2149,11 +3769,6 @@ pub fn Q3_SetNoImpactDamage(ctx: GameContext<'_>, entID: c_int, noImp: qboolean)
     );
 }
 
-// PORT-ESCALATION(unported-consts): the `toSet`->`bSet_t` switch needs
-// `bSet_t`/`BSET_*`/`NUM_BSETS` (ICARUS behavior-set enum) and
-// `gentity_t::behaviorSet` indexing — none are ported anywhere in the
-// worktree (matches the `setTable`/`BSTable`/`WPTable` unported-global
-// precedent above, g_ICARUScb.c:1189/1573/1642/1839).
 /// Raven `Q3_SetBehaviorSet`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4617-4708`
@@ -2163,7 +3778,59 @@ pub fn Q3_SetBehaviorSet(
     toSet: c_int,
     scriptname: *const c_char,
 ) -> qboolean {
-    todo!("Port Q3_SetBehaviorSet — parked (unported-consts: bSet_t/BSET_*/NUM_BSETS): oracle/oracle/codemp/game/g_ICARUScb.c:4617")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let mut bSet = bSet_t::BSET_INVALID;
+
+        if ent.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!("Q3_SetBehaviorSet: invalid entID {}\n", entID)).as_ptr(),
+            );
+            return qfalse;
+        }
+
+        bSet = match toSet {
+            // PORT-NOTE(unported-consts): `SET_*` (the ICARUS set-table field
+            // ids) are not ported anywhere in the worktree — matches the
+            // `setTable`/`BSTable`/`WPTable` unported-global precedent above
+            // (g_ICARUScb.c:1189/1573/1642/1839); missing_symbols.
+            SET_SPAWNSCRIPT => bSet_t::BSET_SPAWN,
+            SET_USESCRIPT => bSet_t::BSET_USE,
+            SET_AWAKESCRIPT => bSet_t::BSET_AWAKE,
+            SET_ANGERSCRIPT => bSet_t::BSET_ANGER,
+            SET_ATTACKSCRIPT => bSet_t::BSET_ATTACK,
+            SET_VICTORYSCRIPT => bSet_t::BSET_VICTORY,
+            SET_LOSTENEMYSCRIPT => bSet_t::BSET_LOSTENEMY,
+            SET_PAINSCRIPT => bSet_t::BSET_PAIN,
+            SET_FLEESCRIPT => bSet_t::BSET_FLEE,
+            SET_DEATHSCRIPT => bSet_t::BSET_DEATH,
+            SET_DELAYEDSCRIPT => bSet_t::BSET_DELAYED,
+            SET_BLOCKEDSCRIPT => bSet_t::BSET_BLOCKED,
+            SET_FFIRESCRIPT => bSet_t::BSET_FFIRE,
+            SET_FFDEATHSCRIPT => bSet_t::BSET_FFDEATH,
+            SET_MINDTRICKSCRIPT => bSet_t::BSET_MINDTRICK,
+            _ => bSet,
+        };
+
+        if (bSet as c_int) < (bSet_t::BSET_SPAWN as c_int) || (bSet as c_int) >= (bSet_t::NUM_BSETS as c_int) {
+            return qfalse;
+        }
+
+        if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, scriptname) == 0 {
+            if !(*ent).behaviorSet[bSet as usize].is_null() {
+                //			gi.TagFree( ent->behaviorSet[bSet] );
+            }
+            (*ent).behaviorSet[bSet as usize] = core::ptr::null_mut();
+        } else if !scriptname.is_null() {
+            if !(*ent).behaviorSet[bSet as usize].is_null() {
+                //				gi.TagFree( ent->behaviorSet[bSet] );
+            }
+            (*ent).behaviorSet[bSet as usize] = G_NewString(scriptname); //FIXME: This really isn't good...
+        }
+        qtrue
+    }
 }
 
 /// Raven `Q3_SetDelayScriptTime`.
@@ -2177,14 +3844,31 @@ pub fn Q3_SetDelayScriptTime(ctx: GameContext<'_>, entID: c_int, delayTime: c_in
     );
 }
 
-// PORT-ESCALATION(unported-consts): `SVF_PLAYER_USABLE` is not ported
-// anywhere in the worktree (matches the `ValidUseTarget` precedent,
-// g_utils.rs:1349).
 /// Raven `Q3_SetPlayerUsable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4734-4752`
 pub fn Q3_SetPlayerUsable(ctx: GameContext<'_>, entID: c_int, usable: qboolean) {
-    todo!("Port Q3_SetPlayerUsable — parked: unported-consts (SVF_PLAYER_USABLE): oracle/oracle/codemp/game/g_ICARUScb.c:4734")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if ent.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!("Q3_SetPlayerUsable: invalid entID {}\n", entID)).as_ptr(),
+            );
+            return;
+        }
+
+        if usable != 0 {
+            // PORT-NOTE(unported-consts): `SVF_PLAYER_USABLE` is not ported
+            // anywhere in the worktree (matches the `ValidUseTarget`
+            // precedent, g_utils.rs:1349); missing_symbols.
+            (*ent).r.svFlags |= SVF_PLAYER_USABLE;
+        } else {
+            (*ent).r.svFlags &= !SVF_PLAYER_USABLE;
+        }
+    }
 }
 
 /// Raven `Q3_SetDisableShaderAnims`.
@@ -2264,16 +3948,33 @@ pub fn Q3_SetShields(ctx: GameContext<'_>, entID: c_int, shields: qboolean) {
     );
 }
 
-// PORT-ESCALATION(client-still-void): the real body reads
-// `ent->client->ps.saberHolstered` / calls `BG_SabersOff(&ent->client->ps)` —
-// `gentity_t::client` is still an opaque `*mut c_void` at this seam (matches
-// the `Q3_SetVelocity`/`Q3_SetOrigin` client-branch precedent above,
-// g_ICARUScb.c:1941-1953/1992).
 /// Raven `Q3_SetSaberActive`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4866-4889`
 pub fn Q3_SetSaberActive(ctx: GameContext<'_>, entID: c_int, active: qboolean) {
-    todo!("Port Q3_SetSaberActive — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:4866")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if ent.is_null() || (*ent).inuse == 0 {
+            return;
+        }
+
+        if (*ent).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                cstr(&format!("Q3_SetSaberActive: {} is not a client\n", entID)).as_ptr(),
+            );
+        }
+
+        //fixme: Take into account player being in state where saber won't toggle? For now we simply won't care.
+        let client = (*ent).client as *mut gclient_t;
+        if (*client).ps.saberHolstered == 0 && active != 0 {
+            Cmd_ToggleSaber_f(ctx, ent);
+        } else if BG_SabersOff(&mut (*client).ps as *mut playerState_t) != 0 && active == 0 {
+            Cmd_ToggleSaber_f(ctx, ent);
+        }
+    }
 }
 
 /// Raven `Q3_SetNoKnockback`.
@@ -2315,32 +4016,32 @@ pub fn SetTextColor(ctx: GameContext<'_>, textcolor: vec4_t, color: *const c_cha
     );
 }
 
-// PORT-ESCALATION(unported-global): `textcolor_caption` (the file-scope
-// `vec4_t` this forwards to `SetTextColor`) is not ported anywhere in the
-// worktree — same class of gap as `setTable`/`BSTable` above.
+// PORT-NOTE(unported-global): `textcolor_caption` (the file-scope `vec4_t`
+// this forwards to `SetTextColor`) is not ported anywhere in the worktree —
+// same class of gap as `setTable`/`BSTable` above; missing_symbols.
 /// Raven `Q3_SetCaptionTextColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4955-4958`
 pub fn Q3_SetCaptionTextColor(ctx: GameContext<'_>, color: *const c_char) {
-    todo!("Port Q3_SetCaptionTextColor — parked: unported-global (textcolor_caption): oracle/oracle/codemp/game/g_ICARUScb.c:4955")
+    SetTextColor(ctx, textcolor_caption, color);
 }
 
-// PORT-ESCALATION(unported-global): `textcolor_center` is not ported anywhere
-// in the worktree.
+// PORT-NOTE(unported-global): `textcolor_center` is not ported anywhere in
+// the worktree; missing_symbols.
 /// Raven `Q3_SetCenterTextColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4967-4970`
 pub fn Q3_SetCenterTextColor(ctx: GameContext<'_>, color: *const c_char) {
-    todo!("Port Q3_SetCenterTextColor — parked: unported-global (textcolor_center): oracle/oracle/codemp/game/g_ICARUScb.c:4967")
+    SetTextColor(ctx, textcolor_center, color);
 }
 
-// PORT-ESCALATION(unported-global): `textcolor_scroll` is not ported anywhere
-// in the worktree.
+// PORT-NOTE(unported-global): `textcolor_scroll` is not ported anywhere in
+// the worktree; missing_symbols.
 /// Raven `Q3_SetScrollTextColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4979-4982`
 pub fn Q3_SetScrollTextColor(ctx: GameContext<'_>, color: *const c_char) {
-    todo!("Port Q3_SetScrollTextColor — parked: unported-global (textcolor_scroll): oracle/oracle/codemp/game/g_ICARUScb.c:4979")
+    SetTextColor(ctx, textcolor_scroll, color);
 }
 
 /// Raven `Q3_ScrollText`.
@@ -2370,12 +4071,12 @@ pub fn Q3_LCARSText(ctx: GameContext<'_>, id: *const c_char) {
     );
 }
 
-// PORT-ESCALATION(unported-consts): the entire 150-case switch keys off the
-// ICARUS `SET_*` field-id enum (`toSet = GetIDForString(setTable, type_name)`)
-// and touches `bSet_t`/`setTable` plus dozens of still-unported `Q3_Set*`
-// helper bodies (client-still-void / unported-const dependents throughout
-// this file) — none of the `SET_*` constants or `setTable` exist anywhere in
-// the worktree (same gap as `Q3_SetBehaviorSet` above).
+// PORT-NOTE(unported-consts): the entire 150-case switch keys off the ICARUS
+// `SET_*` field-id enum (`toSet = GetIDForString(setTable, type_name)`) —
+// `setTable`/`SET_*` are not ported anywhere in the worktree (same gap as
+// `Q3_SetBehaviorSet`/`Q3_GetString` above); missing_symbols. Bodies of
+// dozens of `Q3_Set*` helpers are transcribed literally against those bare
+// names too.
 /// Raven `Q3_Set`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:5018-6074`
@@ -2386,5 +4087,1133 @@ pub fn Q3_Set(
     type_name: *const c_char,
     data: *const c_char,
 ) -> qboolean {
-    todo!("Port Q3_Set — parked: unported-consts (SET_*/bSet_t/setTable): oracle/oracle/codemp/game/g_ICARUScb.c:5018")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let mut float_data: f32;
+        let mut int_data: c_int;
+        let mut vector_data: vec3_t = [0.0, 0.0, 0.0];
+
+        // Set this for callbacks
+        let toSet = GetIDForString(setTable, type_name);
+
+        // PORT-NOTE(sscanf): Raven's `sscanf(data, "%f %f %f", ...)` has no
+        // ported dual in this crate (g_spawn.rs's `sscanf_3f` is a private
+        // helper in a different module) — inlined the same whitespace-split
+        // float-parse literally at each of the two call sites below rather
+        // than defining a new shared shim.
+        match toSet {
+            SET_ORIGIN => {
+                {
+                    let s = cstr_to_str(data);
+                    let mut it = s.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
+                    vector_data[0] = it.next().unwrap_or(0.0);
+                    vector_data[1] = it.next().unwrap_or(0.0);
+                    vector_data[2] = it.next().unwrap_or(0.0);
+                }
+                G_SetOrigin(ent, vector_data);
+                if Q_strncmp(b"NPC_\0".as_ptr() as *const c_char, (*ent).classname, 4) == 0 {
+                    //hack for moving spawners
+                    crate::q_math::_VectorCopy(vector_data, &mut (*ent).s.origin);
+                }
+            }
+
+            SET_TELEPORT_DEST => {
+                {
+                    let s = cstr_to_str(data);
+                    let mut it = s.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
+                    vector_data[0] = it.next().unwrap_or(0.0);
+                    vector_data[1] = it.next().unwrap_or(0.0);
+                    vector_data[2] = it.next().unwrap_or(0.0);
+                }
+                if Q3_SetTeleportDest(ctx, entID, vector_data) == qfalse {
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+                    );
+                    return qfalse;
+                }
+            }
+
+            SET_COPY_ORIGIN => Q3_SetCopyOrigin(ctx, entID, data),
+
+            SET_ANGLES => {
+                let s = cstr_to_str(data);
+                let mut it = s.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
+                vector_data[0] = it.next().unwrap_or(0.0);
+                vector_data[1] = it.next().unwrap_or(0.0);
+                vector_data[2] = it.next().unwrap_or(0.0);
+                Q3_SetAngles(ctx, entID, vector_data);
+            }
+
+            SET_XVELOCITY => {
+                float_data = atof(data) as f32;
+                Q3_SetVelocity(ctx, entID, 0, float_data);
+            }
+            SET_YVELOCITY => {
+                float_data = atof(data) as f32;
+                Q3_SetVelocity(ctx, entID, 1, float_data);
+            }
+            SET_ZVELOCITY => {
+                float_data = atof(data) as f32;
+                Q3_SetVelocity(ctx, entID, 2, float_data);
+            }
+
+            SET_Z_OFFSET => {
+                float_data = atof(data) as f32;
+                Q3_SetOriginOffset(ctx, entID, 2, float_data);
+            }
+
+            SET_ENEMY => Q3_SetEnemy(ctx, entID, data),
+            SET_LEADER => Q3_SetLeader(ctx, entID, data),
+
+            SET_NAVGOAL => {
+                if Q3_SetNavGoal(ctx, entID, data) != qfalse {
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+                    );
+                    return qfalse; //Don't call it back
+                }
+            }
+
+            SET_ANIM_UPPER => {
+                if Q3_SetAnimUpper(ctx, entID, data) != qfalse {
+                    Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the top
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_UPPER as c_int, taskID),
+                    );
+                    return qfalse; //Don't call it back
+                }
+            }
+
+            SET_ANIM_LOWER => {
+                if Q3_SetAnimLower(ctx, entID, data) != qfalse {
+                    Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the bottom
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_LOWER as c_int, taskID),
+                    );
+                    return qfalse; //Don't call it back
+                }
+            }
+
+            SET_ANIM_BOTH => {
+                let mut both: c_int = 0;
+                if Q3_SetAnimUpper(ctx, entID, data) != qfalse {
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_UPPER as c_int, taskID),
+                    );
+                    both += 1;
+                } else {
+                    G_DebugPrint(
+                        ctx,
+                        WL_ERROR as c_int,
+                        cstr(&format!(
+                            "Q3_SetAnimUpper: {} does not have anim {}!\n",
+                            cstr_to_str((*ent).targetname),
+                            cstr_to_str(data)
+                        ))
+                        .as_ptr(),
+                    );
+                }
+                if Q3_SetAnimLower(ctx, entID, data) != qfalse {
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_LOWER as c_int, taskID),
+                    );
+                    both += 1;
+                } else {
+                    G_DebugPrint(
+                        ctx,
+                        WL_ERROR as c_int,
+                        cstr(&format!(
+                            "Q3_SetAnimLower: {} does not have anim {}!\n",
+                            cstr_to_str((*ent).targetname),
+                            cstr_to_str(data)
+                        ))
+                        .as_ptr(),
+                    );
+                }
+                if both >= 2 {
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_BOTH as c_int, taskID),
+                    );
+                }
+                if both != 0 {
+                    return qfalse; //Don't call it back
+                }
+            }
+
+            SET_ANIM_HOLDTIME_LOWER => {
+                int_data = atoi(data);
+                Q3_SetAnimHoldTime(ctx, entID, int_data, qtrue);
+                Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the bottom
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_LOWER as c_int, taskID),
+                );
+                return qfalse; //Don't call it back
+            }
+
+            SET_ANIM_HOLDTIME_UPPER => {
+                int_data = atoi(data);
+                Q3_SetAnimHoldTime(ctx, entID, int_data, qfalse);
+                Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the top
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_UPPER as c_int, taskID),
+                );
+                return qfalse; //Don't call it back
+            }
+
+            SET_ANIM_HOLDTIME_BOTH => {
+                int_data = atoi(data);
+                Q3_SetAnimHoldTime(ctx, entID, int_data, qfalse);
+                Q3_SetAnimHoldTime(ctx, entID, int_data, qtrue);
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_BOTH as c_int, taskID),
+                );
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_UPPER as c_int, taskID),
+                );
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_LOWER as c_int, taskID),
+                );
+                return qfalse; //Don't call it back
+            }
+
+            SET_PLAYER_TEAM => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_SetPlayerTeam: Not in MP ATM, let a programmer (ideally Rich) know if you need it\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_ENEMY_TEAM => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_SetEnemyTeam: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_HEALTH => {
+                int_data = atoi(data);
+                Q3_SetHealth(ctx, entID, int_data);
+            }
+
+            SET_ARMOR => {
+                int_data = atoi(data);
+                Q3_SetArmor(ctx, entID, int_data);
+            }
+
+            SET_BEHAVIOR_STATE => {
+                if Q3_SetBState(ctx, entID, data) == qfalse {
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_BSTATE as c_int, taskID),
+                    );
+                    return qfalse; //don't complete
+                }
+            }
+
+            SET_DEFAULT_BSTATE => Q3_SetDefaultBState(ctx, entID, data),
+
+            SET_TEMP_BSTATE => {
+                if Q3_SetTempBState(ctx, entID, data) == qfalse {
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_BSTATE as c_int, taskID),
+                    );
+                    return qfalse; //don't complete
+                }
+            }
+
+            SET_CAPTURE => Q3_SetCaptureGoal(ctx, entID, data),
+
+            SET_DPITCH => {
+                //FIXME: make these set tempBehavior to BS_FACE and await completion?  Or set lockedDesiredPitch/Yaw and aimTime?
+                float_data = atof(data) as f32;
+                Q3_SetDPitch(ctx, entID, float_data);
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+                );
+                return qfalse;
+            }
+
+            SET_DYAW => {
+                float_data = atof(data) as f32;
+                Q3_SetDYaw(ctx, entID, float_data);
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+                );
+                return qfalse;
+            }
+
+            SET_EVENT => Q3_SetEvent(ctx, entID, data),
+
+            SET_VIEWTARGET => {
+                Q3_SetViewTarget(ctx, entID, data);
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+                );
+                return qfalse;
+            }
+
+            SET_WATCHTARGET => Q3_SetWatchTarget(ctx, entID, data),
+            SET_VIEWENTITY => Q3_SetViewEntity(ctx, entID, data),
+            SET_LOOPSOUND => Q3_SetLoopSound(ctx, entID, data),
+
+            SET_ICARUS_FREEZE | SET_ICARUS_UNFREEZE => {
+                Q3_SetICARUSFreeze(ctx, entID, data, if toSet == SET_ICARUS_FREEZE { qtrue } else { qfalse });
+            }
+
+            SET_WEAPON => Q3_SetWeapon(ctx, entID, data),
+            SET_ITEM => Q3_SetItem(ctx, entID, data),
+
+            SET_WALKSPEED => {
+                int_data = atoi(data);
+                Q3_SetWalkSpeed(ctx, entID, int_data);
+            }
+
+            SET_RUNSPEED => {
+                int_data = atoi(data);
+                Q3_SetRunSpeed(ctx, entID, int_data);
+            }
+
+            SET_WIDTH => {
+                int_data = atoi(data);
+                Q3_SetWidth(ctx, entID, int_data);
+                return qfalse;
+            }
+
+            SET_YAWSPEED => {
+                float_data = atof(data) as f32;
+                Q3_SetYawSpeed(ctx, entID, float_data);
+            }
+
+            SET_AGGRESSION => {
+                int_data = atoi(data);
+                Q3_SetAggression(ctx, entID, int_data);
+            }
+
+            SET_AIM => {
+                int_data = atoi(data);
+                Q3_SetAim(ctx, entID, int_data);
+            }
+
+            SET_FRICTION => {
+                int_data = atoi(data);
+                Q3_SetFriction(ctx, entID, int_data);
+            }
+
+            SET_GRAVITY => {
+                float_data = atof(data) as f32;
+                Q3_SetGravity(ctx, entID, float_data);
+            }
+
+            SET_WAIT => {
+                float_data = atof(data) as f32;
+                Q3_SetWait(ctx, entID, float_data);
+            }
+
+            SET_FOLLOWDIST => {
+                float_data = atof(data) as f32;
+                Q3_SetFollowDist(ctx, entID, float_data);
+            }
+
+            SET_SCALE => {
+                float_data = atof(data) as f32;
+                Q3_SetScale(ctx, entID, float_data);
+            }
+
+            SET_COUNT => Q3_SetCount(ctx, entID, data),
+
+            SET_SHOT_SPACING => {
+                int_data = atoi(data);
+                Q3_SetShotSpacing(ctx, entID, int_data);
+            }
+
+            SET_IGNOREPAIN => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetIgnorePain(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetIgnorePain(ctx, entID, qfalse);
+                }
+            }
+
+            SET_IGNOREENEMIES => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetIgnoreEnemies(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetIgnoreEnemies(ctx, entID, qfalse);
+                }
+            }
+
+            SET_IGNOREALERTS => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetIgnoreAlerts(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetIgnoreAlerts(ctx, entID, qfalse);
+                }
+            }
+
+            SET_DONTSHOOT => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetDontShoot(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetDontShoot(ctx, entID, qfalse);
+                }
+            }
+
+            SET_DONTFIRE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetDontFire(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetDontFire(ctx, entID, qfalse);
+                }
+            }
+
+            SET_LOCKED_ENEMY => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetLockedEnemy(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetLockedEnemy(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NOTARGET => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoTarget(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoTarget(ctx, entID, qfalse);
+                }
+            }
+
+            SET_LEAN => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_LEAN NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_SHOOTDIST => {
+                float_data = atof(data) as f32;
+                Q3_SetShootDist(ctx, entID, float_data);
+            }
+
+            SET_TIMESCALE => Q3_SetTimeScale(ctx, entID, data),
+
+            SET_VISRANGE => {
+                float_data = atof(data) as f32;
+                Q3_SetVisrange(ctx, entID, float_data);
+            }
+
+            SET_EARSHOT => {
+                float_data = atof(data) as f32;
+                Q3_SetEarshot(ctx, entID, float_data);
+            }
+
+            SET_VIGILANCE => {
+                float_data = atof(data) as f32;
+                Q3_SetVigilance(ctx, entID, float_data);
+            }
+
+            SET_VFOV => {
+                int_data = atoi(data);
+                Q3_SetVFOV(ctx, entID, int_data);
+            }
+
+            SET_HFOV => {
+                int_data = atoi(data);
+                Q3_SetHFOV(ctx, entID, int_data);
+            }
+
+            SET_TARGETNAME => Q3_SetTargetName(ctx, entID, data),
+            SET_TARGET => Q3_SetTarget(ctx, entID, data),
+            SET_TARGET2 => Q3_SetTarget2(ctx, entID, data),
+
+            SET_LOCATION => {
+                if Q3_SetLocation(ctx, entID, data) == qfalse {
+                    trap::ICARUS_TaskIDSet(
+                        ctx.engine,
+                        GIcarusTaskidsetArgs::new(ent, taskID_t::TID_LOCATION as c_int, taskID),
+                    );
+                    return qfalse;
+                }
+            }
+
+            SET_PAINTARGET => Q3_SetPainTarget(ctx, entID, data),
+
+            SET_DEFEND_TARGET => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    cstr("Q3_SetDefendTarget unimplemented\n").as_ptr(),
+                );
+                //Q3_SetEnemy( entID, (char *) data);
+            }
+
+            SET_PARM1 | SET_PARM2 | SET_PARM3 | SET_PARM4 | SET_PARM5 | SET_PARM6 | SET_PARM7
+            | SET_PARM8 | SET_PARM9 | SET_PARM10 | SET_PARM11 | SET_PARM12 | SET_PARM13
+            | SET_PARM14 | SET_PARM15 | SET_PARM16 => {
+                Q3_SetParm(entID, toSet - SET_PARM1, data);
+            }
+
+            SET_SPAWNSCRIPT | SET_USESCRIPT | SET_AWAKESCRIPT | SET_ANGERSCRIPT
+            | SET_ATTACKSCRIPT | SET_VICTORYSCRIPT | SET_PAINSCRIPT | SET_FLEESCRIPT
+            | SET_DEATHSCRIPT | SET_DELAYEDSCRIPT | SET_BLOCKEDSCRIPT | SET_FFIRESCRIPT
+            | SET_FFDEATHSCRIPT | SET_MINDTRICKSCRIPT => {
+                if Q3_SetBehaviorSet(ctx, entID, toSet, data) == qfalse {
+                    G_DebugPrint(
+                        ctx,
+                        WL_ERROR as c_int,
+                        cstr(&format!(
+                            "Q3_SetBehaviorSet: Invalid bSet {}\n",
+                            cstr_to_str(type_name)
+                        ))
+                        .as_ptr(),
+                    );
+                }
+            }
+
+            SET_NO_MINDTRICK => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoMindTrick(ctx, entID, qtrue);
+                } else {
+                    Q3_SetNoMindTrick(ctx, entID, qfalse);
+                }
+            }
+
+            SET_CINEMATIC_SKIPSCRIPT => {
+                Q3_SetCinematicSkipScript(ctx, data as *mut c_char);
+            }
+
+            SET_DELAYSCRIPTTIME => {
+                int_data = atoi(data);
+                Q3_SetDelayScriptTime(ctx, entID, int_data);
+            }
+
+            SET_CROUCHED => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetCrouched(ctx, entID, qtrue);
+                } else {
+                    Q3_SetCrouched(ctx, entID, qfalse);
+                }
+            }
+
+            SET_WALKING => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetWalking(ctx, entID, qtrue);
+                } else {
+                    Q3_SetWalking(ctx, entID, qfalse);
+                }
+            }
+
+            SET_RUNNING => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetRunning(ctx, entID, qtrue);
+                } else {
+                    Q3_SetRunning(ctx, entID, qfalse);
+                }
+            }
+
+            SET_CHASE_ENEMIES => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetChaseEnemies(ctx, entID, qtrue);
+                } else {
+                    Q3_SetChaseEnemies(ctx, entID, qfalse);
+                }
+            }
+
+            SET_LOOK_FOR_ENEMIES => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetLookForEnemies(ctx, entID, qtrue);
+                } else {
+                    Q3_SetLookForEnemies(ctx, entID, qfalse);
+                }
+            }
+
+            SET_FACE_MOVE_DIR => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetFaceMoveDir(ctx, entID, qtrue);
+                } else {
+                    Q3_SetFaceMoveDir(ctx, entID, qfalse);
+                }
+            }
+
+            SET_ALT_FIRE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetAltFire(ctx, entID, qtrue);
+                } else {
+                    Q3_SetAltFire(ctx, entID, qfalse);
+                }
+            }
+
+            SET_DONT_FLEE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetDontFlee(ctx, entID, qtrue);
+                } else {
+                    Q3_SetDontFlee(ctx, entID, qfalse);
+                }
+            }
+
+            SET_FORCED_MARCH => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetForcedMarch(ctx, entID, qtrue);
+                } else {
+                    Q3_SetForcedMarch(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NO_RESPONSE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoResponse(ctx, entID, qtrue);
+                } else {
+                    Q3_SetNoResponse(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NO_COMBAT_TALK => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetCombatTalk(ctx, entID, qtrue);
+                } else {
+                    Q3_SetCombatTalk(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NO_ALERT_TALK => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetAlertTalk(ctx, entID, qtrue);
+                } else {
+                    Q3_SetAlertTalk(ctx, entID, qfalse);
+                }
+            }
+
+            SET_USE_CP_NEAREST => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetUseCpNearest(ctx, entID, qtrue);
+                } else {
+                    Q3_SetUseCpNearest(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NO_FORCE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoForce(ctx, entID, qtrue);
+                } else {
+                    Q3_SetNoForce(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NO_ACROBATICS => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoAcrobatics(ctx, entID, qtrue);
+                } else {
+                    Q3_SetNoAcrobatics(ctx, entID, qfalse);
+                }
+            }
+
+            SET_USE_SUBTITLES => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetUseSubtitles(ctx, entID, qtrue);
+                } else {
+                    Q3_SetUseSubtitles(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NO_FALLTODEATH => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoFallToDeath(ctx, entID, qtrue);
+                } else {
+                    Q3_SetNoFallToDeath(ctx, entID, qfalse);
+                }
+            }
+
+            SET_DISMEMBERABLE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetDismemberable(ctx, entID, qtrue);
+                } else {
+                    Q3_SetDismemberable(ctx, entID, qfalse);
+                }
+            }
+
+            SET_MORELIGHT => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetMoreLight(ctx, entID, qtrue);
+                } else {
+                    Q3_SetMoreLight(ctx, entID, qfalse);
+                }
+            }
+
+            SET_TREASONED => {
+                G_DebugPrint(
+                    ctx,
+                    WL_VERBOSE as c_int,
+                    b"SET_TREASONED is disabled, do not use\n\0".as_ptr() as *const c_char,
+                );
+                /*
+                G_TeamRetaliation( NULL, SV_GentityNum(0), qfalse );
+                ffireLevel = FFIRE_LEVEL_RETALIATION;
+                */
+            }
+
+            SET_UNDYING => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetUndying(ctx, entID, qtrue);
+                } else {
+                    Q3_SetUndying(ctx, entID, qfalse);
+                }
+            }
+
+            SET_INVINCIBLE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetInvincible(ctx, entID, qtrue);
+                } else {
+                    Q3_SetInvincible(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NOAVOID => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoAvoid(ctx, entID, qtrue);
+                } else {
+                    Q3_SetNoAvoid(ctx, entID, qfalse);
+                }
+            }
+
+            SET_SOLID => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    if Q3_SetSolid(ctx, entID, qtrue) == qfalse {
+                        trap::ICARUS_TaskIDSet(
+                            ctx.engine,
+                            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_RESIZE as c_int, taskID),
+                        );
+                        return qfalse;
+                    }
+                } else {
+                    Q3_SetSolid(ctx, entID, qfalse);
+                }
+            }
+
+            SET_INVISIBLE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetInvisible(ctx, entID, qtrue);
+                } else {
+                    Q3_SetInvisible(ctx, entID, qfalse);
+                }
+            }
+
+            SET_VAMPIRE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetVampire(ctx, entID, qtrue);
+                } else {
+                    Q3_SetVampire(ctx, entID, qfalse);
+                }
+            }
+
+            SET_FORCE_INVINCIBLE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetForceInvincible(ctx, entID, qtrue);
+                } else {
+                    Q3_SetForceInvincible(ctx, entID, qfalse);
+                }
+            }
+
+            SET_GREET_ALLIES => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetGreetAllies(ctx, entID, qtrue);
+                } else {
+                    Q3_SetGreetAllies(ctx, entID, qfalse);
+                }
+            }
+
+            SET_PLAYER_LOCKED => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetPlayerLocked(ctx, entID, qtrue);
+                } else {
+                    Q3_SetPlayerLocked(ctx, entID, qfalse);
+                }
+            }
+
+            SET_LOCK_PLAYER_WEAPONS => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetLockPlayerWeapons(ctx, entID, qtrue);
+                } else {
+                    Q3_SetLockPlayerWeapons(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NO_IMPACT_DAMAGE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoImpactDamage(ctx, entID, qtrue);
+                } else {
+                    Q3_SetNoImpactDamage(ctx, entID, qfalse);
+                }
+            }
+
+            SET_FORWARDMOVE => {
+                int_data = atoi(data);
+                Q3_SetForwardMove(ctx, entID, int_data);
+            }
+
+            SET_RIGHTMOVE => {
+                int_data = atoi(data);
+                Q3_SetRightMove(ctx, entID, int_data);
+            }
+
+            SET_LOCKYAW => Q3_SetLockAngle(ctx, entID, data),
+
+            SET_CAMERA_GROUP => Q3_CameraGroup(ctx, entID, data as *mut c_char),
+            SET_CAMERA_GROUP_Z_OFS => {
+                float_data = atof(data) as f32;
+                Q3_CameraGroupZOfs(ctx, float_data);
+            }
+            SET_CAMERA_GROUP_TAG => Q3_CameraGroupTag(ctx, data as *mut c_char),
+
+            //FIXME: put these into camera commands
+            SET_LOOK_TARGET => Q3_LookTarget(ctx, entID, data as *mut c_char),
+            SET_ADDRHANDBOLT_MODEL => Q3_AddRHandModel(ctx, entID, data as *mut c_char),
+            SET_REMOVERHANDBOLT_MODEL => Q3_RemoveRHandModel(ctx, entID, data as *mut c_char),
+            SET_ADDLHANDBOLT_MODEL => Q3_AddLHandModel(ctx, entID, data as *mut c_char),
+            SET_REMOVELHANDBOLT_MODEL => Q3_RemoveLHandModel(ctx, entID, data as *mut c_char),
+
+            SET_FACEEYESCLOSED | SET_FACEEYESOPENED | SET_FACEAUX | SET_FACEBLINK
+            | SET_FACEBLINKFROWN | SET_FACEFROWN | SET_FACENORMAL => {
+                float_data = atof(data) as f32;
+                Q3_Face(ctx, entID, toSet, float_data);
+            }
+
+            SET_SCROLLTEXT => Q3_ScrollText(ctx, data),
+            SET_LCARSTEXT => Q3_LCARSText(ctx, data),
+            SET_CAPTIONTEXTCOLOR => Q3_SetCaptionTextColor(ctx, data),
+            SET_CENTERTEXTCOLOR => Q3_SetCenterTextColor(ctx, data),
+            SET_SCROLLTEXTCOLOR => Q3_SetScrollTextColor(ctx, data),
+
+            SET_PLAYER_USABLE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetPlayerUsable(ctx, entID, qtrue);
+                } else {
+                    Q3_SetPlayerUsable(ctx, entID, qfalse);
+                }
+            }
+
+            SET_STARTFRAME => {
+                int_data = atoi(data);
+                Q3_SetStartFrame(ctx, entID, int_data);
+            }
+
+            SET_ENDFRAME => {
+                int_data = atoi(data);
+                Q3_SetEndFrame(ctx, entID, int_data);
+
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANIM_BOTH as c_int, taskID),
+                );
+                return qfalse;
+            }
+
+            SET_ANIMFRAME => {
+                int_data = atoi(data);
+                Q3_SetAnimFrame(ctx, entID, int_data);
+                return qfalse;
+            }
+
+            SET_LOOP_ANIM => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetLoopAnim(ctx, entID, qtrue);
+                } else {
+                    Q3_SetLoopAnim(ctx, entID, qfalse);
+                }
+            }
+
+            SET_INTERFACE => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_SetInterface: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_SHIELDS => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetShields(ctx, entID, qtrue);
+                } else {
+                    Q3_SetShields(ctx, entID, qfalse);
+                }
+            }
+
+            SET_SABERACTIVE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetSaberActive(ctx, entID, qtrue);
+                } else {
+                    Q3_SetSaberActive(ctx, entID, qfalse);
+                }
+            }
+
+            SET_ADJUST_AREA_PORTALS => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_SetAdjustAreaPortals: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_DMG_BY_HEAVY_WEAP_ONLY => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_SetDmgByHeavyWeapOnly: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_SHIELDED => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_SetShielded: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_NO_GROUPS => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_SetNoGroups: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_FIRE_WEAPON => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetFireWeapon(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetFireWeapon(ctx, entID, qfalse);
+                }
+            }
+
+            SET_INACTIVE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetInactive(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetInactive(ctx, entID, qfalse);
+                } else if Q_stricmp(b"unlocked\0".as_ptr() as *const c_char, data) == 0 {
+                    UnLockDoors(&(*ctx.world).entities[entID as usize] as *const gentity_t);
+                } else if Q_stricmp(b"locked\0".as_ptr() as *const c_char, data) == 0 {
+                    LockDoors(&(*ctx.world).entities[entID as usize] as *const gentity_t);
+                }
+            }
+
+            SET_END_SCREENDISSOLVE => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_END_SCREENDISSOLVE: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_MISSION_STATUS_SCREEN => {
+                //Cvar_Set("cg_missionstatusscreen", "1");
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_MISSION_STATUS_SCREEN: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_FUNC_USABLE_VISIBLE => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetFuncUsableVisible(ctx, entID, qtrue);
+                } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetFuncUsableVisible(ctx, entID, qfalse);
+                }
+            }
+
+            SET_NO_KNOCKBACK => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetNoKnockback(ctx, entID, qtrue);
+                } else {
+                    Q3_SetNoKnockback(ctx, entID, qfalse);
+                }
+            }
+
+            SET_VIDEO_PLAY => {
+                // don't do this check now, James doesn't want a scripted cinematic to also skip any Video cinematics as well,
+                //	the "timescale" and "skippingCinematic" cvars will be set back to normal in the Video code, so doing a
+                //	skip will now only skip one section of a multiple-part story (eg VOY1 bridge sequence)
+                //
+                //		if ( g_timescale->value <= 1.0f )
+                {
+                    G_DebugPrint(
+                        ctx,
+                        WL_WARNING as c_int,
+                        b"SET_VIDEO_PLAY: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                    );
+                    //SV_SendConsoleCommand( va("inGameCinematic %s\n", (char *)data) );
+                }
+            }
+
+            SET_VIDEO_FADE_IN => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_VIDEO_FADE_IN: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_VIDEO_FADE_OUT => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_VIDEO_FADE_OUT: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_REMOVE_TARGET => Q3_SetRemoveTarget(ctx, entID, data),
+
+            SET_LOADGAME => {
+                //gi.SendConsoleCommand( va("load %s\n", (const char *) data ) );
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_LOADGAME: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_MENU_SCREEN => {
+                //UI_SetActiveMenu( (const char *) data );
+            }
+
+            SET_OBJECTIVE_SHOW => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_OBJECTIVE_SHOW: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+            SET_OBJECTIVE_HIDE => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_OBJECTIVE_HIDE: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+            SET_OBJECTIVE_SUCCEEDED => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_OBJECTIVE_SUCCEEDED: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+            SET_OBJECTIVE_FAILED => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_OBJECTIVE_FAILED: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_OBJECTIVE_CLEARALL => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_OBJECTIVE_CLEARALL: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_MISSIONFAILED => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_MISSIONFAILED: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_MISSIONSTATUSTEXT => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_MISSIONSTATUSTEXT: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_MISSIONSTATUSTIME => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_MISSIONSTATUSTIME: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_CLOSINGCREDITS => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_CLOSINGCREDITS: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_SKILL => {
+                //		//can never be set
+            }
+
+            SET_FULLNAME => Q3_SetFullName(ctx, entID, data),
+
+            SET_DISABLE_SHADER_ANIM => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetDisableShaderAnims(ctx, entID, qtrue);
+                } else {
+                    Q3_SetDisableShaderAnims(ctx, entID, qfalse);
+                }
+            }
+
+            SET_SHADER_ANIM => {
+                if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
+                    Q3_SetShaderAnim(ctx, entID, qtrue);
+                } else {
+                    Q3_SetShaderAnim(ctx, entID, qfalse);
+                }
+            }
+
+            SET_MUSIC_STATE => Q3_SetMusicState(ctx, data),
+            SET_CLEAN_DAMAGING_ENTS => Q3_SetCleanDamagingEnts(ctx),
+
+            SET_HUD => {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"SET_HUD: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+                );
+            }
+
+            SET_FORCE_HEAL_LEVEL | SET_FORCE_JUMP_LEVEL | SET_FORCE_SPEED_LEVEL
+            | SET_FORCE_PUSH_LEVEL | SET_FORCE_PULL_LEVEL | SET_FORCE_MINDTRICK_LEVEL
+            | SET_FORCE_GRIP_LEVEL | SET_FORCE_LIGHTNING_LEVEL | SET_SABER_THROW
+            | SET_SABER_DEFENSE | SET_SABER_OFFENSE => {
+                int_data = atoi(data);
+                Q3_SetForcePowerLevel(ctx, entID, toSet - SET_FORCE_HEAL_LEVEL, int_data);
+            }
+
+            _ => {
+                //G_DebugPrint( WL_ERROR, "Q3_Set: '%s' is not a valid set field\n", type_name );
+                trap::ICARUS_SetVar(
+                    ctx.engine,
+                    GIcarusSetvarArgs::new(taskID, entID, type_name, data),
+                );
+            }
+        }
+
+        qtrue
+    }
 }

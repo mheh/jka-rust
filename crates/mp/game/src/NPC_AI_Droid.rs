@@ -11,11 +11,16 @@
 use crate::prelude::*;
 use crate::NPC_reactions::{NPC_GetPainChance, NPC_Pain};
 use crate::NPC_utils::NPC_SetSurfaceOnOff;
-use crate::g_timer::TIMER_Set;
-use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_SoundIndex};
+use crate::g_timer::{TIMER_Done, TIMER_Set};
+use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_SoundIndex, G_SoundOnEnt};
 use crate::npc_c::NPC_SetAnim;
-use crate::q_math::{AngleVectors, Q_irand, VectorNormalize};
+use crate::q_math::{AngleDelta, AngleNormalize360, AngleVectors, VectorNormalize, _VectorSubtract, _VectorMA};
 use crate::q_shared::va;
+use crate::NPC_utils::{NPC_UpdateAngles, NPC_SetBoneAngles};
+use crate::NPC_goal::UpdateGoal;
+use crate::NPC_move::NPC_MoveToGoal;
+use std::ffi::CStr;
+use crate::cstr_util::cstr;
 
 /// Local state enums.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:10-17`
@@ -37,13 +42,26 @@ const TURN_OFF: c_int = 0x00000100;
 ///
 /// Raven: Front 'eye' lense animation.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:24-46`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn R2D2_PartsMove(ctx: GameContext<'_>) {
-    todo!("Port R2D2_PartsMove — parked: ai-context")
+    // PORT-NOTE(globals-access): NPC accessed as (*ctx.world).globals.NPC per threading digest
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        if npc.is_null() {
+            return;
+        }
+
+        if TIMER_Done(ctx, npc, b"eyeDelay\0".as_ptr() as *const c_char) != 0 {
+            (*npc).pos1[1] = AngleNormalize360((*npc).pos1[1]);
+
+            (*npc).pos1[0] += (*ctx.world).bg_state.rng.Q_irand(-20, 20) as f32;
+            (*npc).pos1[1] = (*ctx.world).bg_state.rng.Q_irand(-20, 20) as f32;
+            (*npc).pos1[2] = (*ctx.world).bg_state.rng.Q_irand(-20, 20) as f32;
+
+            NPC_SetBoneAngles(ctx, npc, b"f_eye\0".as_ptr() as *mut c_char, (*npc).pos1);
+
+            TIMER_Set(ctx, npc, b"eyeDelay\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(100, 1000));
+        }
+    }
 }
 
 /// Raven `Droid_Idle`.
@@ -56,110 +74,396 @@ pub fn Droid_Idle() {
 /// Raven `R2D2_TurnAnims`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:65-95`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn R2D2_TurnAnims(ctx: GameContext<'_>) {
-    todo!("Port R2D2_TurnAnims — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        if npc.is_null() || npc_info.is_null() {
+            return;
+        }
+
+        let turndelta = AngleDelta((*npc).r.currentAngles[1], (*npc_info).desiredYaw); // YAW = 1
+        let anim: c_int;
+
+        if (turndelta.abs() > 20.0) && (((*(*npc).client).NPC_class == 2) || ((*(*npc).client).NPC_class == 3)) {
+            // CLASS_R2D2 = 2, CLASS_R5D2 = 3 (or check from globals)
+            anim = (*(*npc).client).ps.legsAnim;
+            if turndelta < 0.0 {
+                if anim != 24 { // BOTH_TURN_LEFT1
+                    NPC_SetAnim(npc, 0, 24, 0x80 | 0x200); // SETANIM_BOTH = 0, SETANIM_FLAG_OVERRIDE = 0x80, SETANIM_FLAG_HOLD = 0x200
+                }
+            } else {
+                if anim != 25 { // BOTH_TURN_RIGHT1
+                    NPC_SetAnim(npc, 0, 25, 0x80 | 0x200);
+                }
+            }
+        } else {
+            NPC_SetAnim(npc, 0, 5, 0x80 | 0x200); // BOTH_RUN1 = 5
+        }
+    }
 }
 
 /// Raven `Droid_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:102-168`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Droid_Patrol(ctx: GameContext<'_>) {
-    todo!("Port Droid_Patrol — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        let ucmd = &mut (*ctx.world).globals.ucmd;
+        if npc.is_null() || npc_info.is_null() {
+            return;
+        }
+
+        (*npc).pos1[1] = AngleNormalize360((*npc).pos1[1]);
+
+        if !(*npc).client.is_null() && (*(*npc).client).NPC_class != 0 { // 0 = CLASS_GONK
+            if (*(*npc).client).NPC_class != 3 { // CLASS_R5D2 = 3
+                R2D2_PartsMove(ctx);
+            }
+            R2D2_TurnAnims(ctx);
+        }
+
+        if !UpdateGoal(ctx).is_null() {
+            ucmd.buttons |= 1; // BUTTON_WALKING
+            NPC_MoveToGoal(ctx, 1 as qboolean); // qtrue
+
+            if !(*npc).client.is_null() && (*(*npc).client).NPC_class == 4 { // CLASS_MOUSE = 4
+                (*npc_info).desiredYaw += ((*ctx.world).level.time as f32 * 0.5).sin() * 25.0;
+
+                if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
+                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                    let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", idx);
+                    G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr()); // CHAN_AUTO = 0
+
+                    TIMER_Set(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                }
+            } else if !(*npc).client.is_null() && (*(*npc).client).NPC_class == 2 { // CLASS_R2D2 = 2
+                if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
+                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                    let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx);
+                    G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr());
+
+                    TIMER_Set(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                }
+            } else if !(*npc).client.is_null() && (*(*npc).client).NPC_class == 3 { // CLASS_R5D2 = 3
+                if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
+                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
+                    let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", idx);
+                    G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr());
+
+                    TIMER_Set(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                }
+            }
+            if !(*npc).client.is_null() && (*(*npc).client).NPC_class == 0 { // CLASS_GONK = 0
+                if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
+                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 2);
+                    let sound_path = format!("sound/chars/gonk/misc/gonktalk{}.wav", idx);
+                    G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr());
+
+                    TIMER_Set(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                }
+            }
+        }
+
+        NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
+    }
 }
 
 /// Raven `Droid_Run`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:175-200`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Droid_Run(ctx: GameContext<'_>) {
-    todo!("Port Droid_Run — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        let ucmd = &mut (*ctx.world).globals.ucmd;
+        if npc.is_null() || npc_info.is_null() {
+            return;
+        }
+
+        R2D2_PartsMove(ctx);
+
+        if (*npc_info).localState == LSTATE_BACKINGUP {
+            ucmd.forwardmove = -127;
+            (*npc_info).desiredYaw += 5.0;
+
+            (*npc_info).localState = LSTATE_NONE;
+        } else {
+            ucmd.forwardmove = 64;
+            if !UpdateGoal(ctx).is_null() {
+                if NPC_MoveToGoal(ctx, 0 as qboolean) != 0 { // qfalse
+                    (*npc_info).desiredYaw += ((*ctx.world).level.time as f32 * 0.5).sin() * 5.0;
+                }
+            }
+        }
+
+        NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
+    }
 }
 
 /// Raven `Droid_Spin`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:207-266`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Droid_Spin(ctx: GameContext<'_>) {
-    todo!("Port Droid_Spin — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        let ucmd = &mut (*ctx.world).globals.ucmd;
+        if npc.is_null() || npc_info.is_null() {
+            return;
+        }
+
+        let mut dir = [0.0f32, 0.0f32, 1.0f32];
+
+        R2D2_TurnAnims(ctx);
+
+        if (*(*npc).client).NPC_class == 3 || (*(*npc).client).NPC_class == 2 { // CLASS_R5D2 = 3, CLASS_R2D2 = 2
+            // No head?
+            if trap::G2API_GetSurfaceRenderStatus(
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfaceenderstatusArgs::new(
+                    (*npc).ghoul2,
+                    0,
+                    b"head\0".as_ptr() as *const c_char,
+                ),
+            ) > 0 {
+                if TIMER_Done(ctx, npc, b"smoke\0".as_ptr() as *const c_char) != 0 && TIMER_Done(ctx, npc, b"droidsmoketotal\0".as_ptr() as *const c_char) == 0 {
+                    TIMER_Set(ctx, npc, b"smoke\0".as_ptr() as *const c_char, 100);
+                    G_PlayEffectID(G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char), (*npc).r.currentOrigin, dir);
+                }
+
+                if TIMER_Done(ctx, npc, b"droidspark\0".as_ptr() as *const c_char) != 0 {
+                    TIMER_Set(ctx, npc, b"droidspark\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(100, 500));
+                    G_PlayEffectID(G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char), (*npc).r.currentOrigin, dir);
+                }
+
+                ucmd.forwardmove = (*ctx.world).bg_state.rng.Q_irand(-64, 64) as c_int as i8 as c_int;
+
+                if TIMER_Done(ctx, npc, b"roam\0".as_ptr() as *const c_char) != 0 {
+                    TIMER_Set(ctx, npc, b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(250, 1000));
+                    (*npc_info).desiredYaw = (*ctx.world).bg_state.rng.Q_irand(0, 360) as f32;
+                }
+            } else {
+                if TIMER_Done(ctx, npc, b"roam\0".as_ptr() as *const c_char) != 0 {
+                    (*npc_info).localState = LSTATE_NONE;
+                } else {
+                    (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 40.0);
+                }
+            }
+        } else {
+            if TIMER_Done(ctx, npc, b"roam\0".as_ptr() as *const c_char) != 0 {
+                (*npc_info).localState = LSTATE_NONE;
+            } else {
+                (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 40.0);
+            }
+        }
+
+        NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
+    }
 }
 
 /// Raven `NPC_Droid_Pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:273-434`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
-// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
-// `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_Droid_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
 ) {
-    todo!("Port NPC_Droid_Pain — parked: seam-threading")
+    unsafe {
+        let mod_: c_int = (*ctx.world).globals.gPainMOD;
+        let mut pain_chance: f32;
+
+        // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
+        crate::q_math::_VectorCopy((*(*self_).NPC).lastPathAngles, &mut (*self_).s.angles);
+
+        if (*(*self_).client).NPC_class == 3 { // CLASS_R5D2 = 3
+            pain_chance = NPC_GetPainChance(ctx, self_, damage);
+
+            if mod_ == 47 || mod_ == 48 || (*ctx.world).bg_state.rng.random() < pain_chance { // MOD_DEMP2 = 47, MOD_DEMP2_ALT = 48
+                if (*self_).s.m_iVehicleNum == 0 && ((*self_).health < 30 || mod_ == 47 || mod_ == 48) {
+                    if ((*self_).spawnflags & 2) == 0 {
+                        if ((*(*self_).NPC).localState != LSTATE_SPINNING) &&
+                           (trap::G2API_GetSurfaceRenderStatus(
+                                ctx.engine,
+                                mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfaceenderstatusArgs::new(
+                                    (*self_).ghoul2,
+                                    0,
+                                    b"head\0".as_ptr() as *const c_char,
+                                ),
+                            ) == 0) {
+                            NPC_SetSurfaceOnOff(ctx, self_, b"head\0".as_ptr() as *const c_char, TURN_OFF);
+
+                            if (*(*self_).client).ps.m_iVehicleNum != 0 {
+                                let mut up = [0.0f32; 3];
+                                AngleVectors((*self_).r.currentAngles, None, None, Some(&mut up));
+                                G_PlayEffectID(G_EffectIndex(b"chunks/r5d2head_veh\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, up);
+                            } else {
+                                G_PlayEffectID(G_EffectIndex(b"small_chunks\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
+                                G_PlayEffectID(G_EffectIndex(b"chunks/r5d2head\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
+                            }
+
+                            (*(*self_).client).ps.electrifyTime = (*ctx.world).level.time + 3000;
+
+                            TIMER_Set(ctx, self_, b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
+                            TIMER_Set(ctx, self_, b"droidspark\0".as_ptr() as *const c_char, 100);
+                            (*(*self_).NPC).localState = LSTATE_SPINNING;
+                        }
+                    }
+                } else {
+                    let anim = (*(*self_).client).ps.legsAnim;
+
+                    if anim == 14 { // BOTH_STAND2 = 14
+                        NPC_SetAnim(self_, 0, 20, 0x80 | 0x200); // BOTH_PAIN1 = 20
+                    } else {
+                        NPC_SetAnim(self_, 0, 21, 0x80 | 0x200); // BOTH_PAIN2 = 21
+                    }
+
+                    (*(*self_).NPC).localState = LSTATE_SPINNING;
+                    TIMER_Set(ctx, self_, b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(1000, 2000));
+                }
+            }
+        } else if (*(*self_).client).NPC_class == 4 { // CLASS_MOUSE = 4
+            if mod_ == 47 || mod_ == 48 {
+                (*(*self_).NPC).localState = LSTATE_SPINNING;
+                (*(*self_).client).ps.electrifyTime = (*ctx.world).level.time + 3000;
+            } else {
+                (*(*self_).NPC).localState = LSTATE_BACKINGUP;
+            }
+
+            (*(*self_).NPC).scriptFlags &= !4; // SCF_LOOK_FOR_ENEMIES = 4
+        } else if (*(*self_).client).NPC_class == 2 { // CLASS_R2D2 = 2
+            pain_chance = NPC_GetPainChance(ctx, self_, damage);
+
+            if mod_ == 47 || mod_ == 48 || (*ctx.world).bg_state.rng.random() < pain_chance {
+                if (*self_).s.m_iVehicleNum == 0 && ((*self_).health < 30 || mod_ == 47 || mod_ == 48) {
+                    if ((*self_).spawnflags & 2) == 0 {
+                        if ((*(*self_).NPC).localState != LSTATE_SPINNING) &&
+                           (trap::G2API_GetSurfaceRenderStatus(
+                                ctx.engine,
+                                mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfaceenderstatusArgs::new(
+                                    (*self_).ghoul2,
+                                    0,
+                                    b"head\0".as_ptr() as *const c_char,
+                                ),
+                            ) == 0) {
+                            NPC_SetSurfaceOnOff(ctx, self_, b"head\0".as_ptr() as *const c_char, TURN_OFF);
+
+                            if (*(*self_).client).ps.m_iVehicleNum != 0 {
+                                let mut up = [0.0f32; 3];
+                                AngleVectors((*self_).r.currentAngles, None, None, Some(&mut up));
+                                G_PlayEffectID(G_EffectIndex(b"chunks/r2d2head_veh\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, up);
+                            } else {
+                                G_PlayEffectID(G_EffectIndex(b"small_chunks\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
+                                G_PlayEffectID(G_EffectIndex(b"chunks/r2d2head\0".as_ptr() as *const c_char), (*self_).r.currentOrigin, [0.0, 0.0, 0.0]);
+                            }
+
+                            (*(*self_).client).ps.electrifyTime = (*ctx.world).level.time + 3000;
+
+                            TIMER_Set(ctx, self_, b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
+                            TIMER_Set(ctx, self_, b"droidspark\0".as_ptr() as *const c_char, 100);
+                            (*(*self_).NPC).localState = LSTATE_SPINNING;
+                        }
+                    }
+                } else {
+                    let anim = (*(*self_).client).ps.legsAnim;
+
+                    if anim == 14 { // BOTH_STAND2 = 14
+                        NPC_SetAnim(self_, 0, 20, 0x80 | 0x200); // BOTH_PAIN1 = 20
+                    } else {
+                        NPC_SetAnim(self_, 0, 21, 0x80 | 0x200); // BOTH_PAIN2 = 21
+                    }
+
+                    (*(*self_).NPC).localState = LSTATE_SPINNING;
+                    TIMER_Set(ctx, self_, b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(1000, 2000));
+                }
+            }
+        } else if (*(*self_).client).NPC_class == 5 && (mod_ == 47 || mod_ == 48) && !attacker.is_null() { // CLASS_INTERROGATOR = 5
+            let mut dir = [0.0f32; 3];
+            crate::q_math::_VectorSubtract((*self_).r.currentOrigin, (*attacker).r.currentOrigin, &mut dir);
+            VectorNormalize(&mut dir);
+
+            crate::q_math::_VectorMA((*(*self_).client).ps.velocity, 550.0, dir, &mut (*(*self_).client).ps.velocity);
+            (*(*self_).client).ps.velocity[2] -= 127.0;
+        }
+
+        NPC_Pain(ctx, self_, attacker, damage);
+    }
 }
 
 /// Raven `Droid_Pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:442-448`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Droid_Pain(ctx: GameContext<'_>) {
-    todo!("Port Droid_Pain — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        if npc.is_null() || npc_info.is_null() {
+            return;
+        }
+
+        if TIMER_Done(ctx, npc, b"droidpain\0".as_ptr() as *const c_char) != 0 {
+            (*npc_info).localState = LSTATE_NONE;
+        }
+    }
 }
 
 /// Raven `NPC_Mouse_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:455-467`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
-// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
-// `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_Mouse_Precache(ctx: GameContext<'_>) {
-    todo!("Port NPC_Mouse_Precache — parked: seam-threading")
+    unsafe {
+        for i in 1..4 {
+            let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", i);
+            G_SoundIndex(cstr(&sound_path).as_ptr());
+        }
+
+        G_EffectIndex(b"env/small_explode\0".as_ptr() as *const c_char);
+        G_SoundIndex(b"sound/chars/mouse/misc/death1\0".as_ptr() as *const c_char);
+        G_SoundIndex(b"sound/chars/mouse/misc/mouse_lp\0".as_ptr() as *const c_char);
+    }
 }
 
 /// Raven `NPC_R5D2_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:474-490`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
-// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
-// `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_R5D2_Precache(ctx: GameContext<'_>) {
-    todo!("Port NPC_R5D2_Precache — parked: seam-threading")
+    unsafe {
+        for i in 1..5 {
+            let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", i);
+            G_SoundIndex(cstr(&sound_path).as_ptr());
+        }
+
+        G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
+        G_SoundIndex(b"sound/chars/r2d2/misc/r2_move_lp2.wav\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"chunks/r5d2head\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"chunks/r5d2head_veh\0".as_ptr() as *const c_char);
+    }
 }
 
 /// Raven `NPC_R2D2_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:497-513`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
-// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
-// `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_R2D2_Precache(ctx: GameContext<'_>) {
-    todo!("Port NPC_R2D2_Precache — parked: seam-threading")
+    unsafe {
+        for i in 1..4 {
+            let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", i);
+            G_SoundIndex(cstr(&sound_path).as_ptr());
+        }
+
+        G_SoundIndex(b"sound/chars/mark2/misc/mark2_explo\0".as_ptr() as *const c_char);
+        G_SoundIndex(b"sound/chars/r2d2/misc/r2_move_lp.wav\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"env/med_explode\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"volumetric/droid_smoke\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"chunks/r2d2head\0".as_ptr() as *const c_char);
+        G_EffectIndex(b"chunks/r2d2head_veh\0".as_ptr() as *const c_char);
+    }
 }
 
 /// Raven `NPC_Gonk_Precache`.
@@ -193,11 +497,24 @@ pub fn NPC_Protocol_Precache(ctx: GameContext<'_>) {
 /// Raven `NPC_BSDroid_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:597-621`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn NPC_BSDroid_Default(ctx: GameContext<'_>) {
-    todo!("Port NPC_BSDroid_Default — parked: ai-context")
+    unsafe {
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        if npc_info.is_null() {
+            return;
+        }
+
+        if (*npc_info).localState == LSTATE_SPINNING {
+            Droid_Spin(ctx);
+        } else if (*npc_info).localState == LSTATE_PAIN {
+            Droid_Pain(ctx);
+        } else if (*npc_info).localState == LSTATE_DROP {
+            NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
+            (*ctx.world).globals.ucmd.upmove = ((*ctx.world).bg_state.rng.crandom() * 64.0) as c_int;
+        } else if ((*npc_info).scriptFlags & 1) != 0 { // SCF_LOOK_FOR_ENEMIES = 1
+            Droid_Patrol(ctx);
+        } else {
+            Droid_Run(ctx);
+        }
+    }
 }

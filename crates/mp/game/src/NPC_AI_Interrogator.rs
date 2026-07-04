@@ -99,26 +99,156 @@ pub fn Interrogator_die(
 ///
 /// Move the syringe, scalpel, and claw parts of the Interrogator.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:64-127`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
-    todo!("Port Interrogator_PartsMove — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        // Syringe
+        if crate::g_timer::TIMER_Done(ctx, npc, c"syringeDelay".as_ptr()) != 0 {
+            (*npc).pos1[1] = crate::q_math::AngleNormalize360((*npc).pos1[1]);
+
+            if ((*npc).pos1[1] < 60.0) || ((*npc).pos1[1] > 300.0) {
+                (*npc).pos1[1] += (*ctx.world).bg_state.rng.Q_irand(-20, 20) as f32;
+            } else if (*npc).pos1[1] > 180.0 {
+                (*npc).pos1[1] = (*ctx.world).bg_state.rng.Q_irand(300, 360) as f32;
+            } else {
+                (*npc).pos1[1] = (*ctx.world).bg_state.rng.Q_irand(0, 60) as f32;
+            }
+
+            crate::NPC_utils::NPC_SetBoneAngles(ctx, npc, c"left_arm".as_ptr() as *mut c_char, (*npc).pos1);
+
+            crate::g_timer::TIMER_Set(ctx, npc, c"syringeDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(100, 1000));
+        }
+
+        // Scalpel
+        if crate::g_timer::TIMER_Done(ctx, npc, c"scalpelDelay".as_ptr()) != 0 {
+            // Change pitch
+            if (*npc_info).localState == LSTATE_BLADEDOWN {
+                // Blade is moving down
+                (*npc).pos2[0] -= 30.0;
+                if (*npc).pos2[0] < 180.0 {
+                    (*npc).pos2[0] = 180.0;
+                    (*npc_info).localState = LSTATE_BLADEUP;	// Make it move up
+                }
+            } else {
+                // Blade is coming back up
+                (*npc).pos2[0] += 30.0;
+                if (*npc).pos2[0] >= 360.0 {
+                    (*npc).pos2[0] = 360.0;
+                    (*npc_info).localState = LSTATE_BLADEDOWN;	// Make it move down
+                    crate::g_timer::TIMER_Set(ctx, npc, c"scalpelDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(100, 1000));
+                }
+            }
+
+            (*npc).pos2[0] = crate::q_math::AngleNormalize360((*npc).pos2[0]);
+
+            crate::NPC_utils::NPC_SetBoneAngles(ctx, npc, c"right_arm".as_ptr() as *mut c_char, (*npc).pos2);
+        }
+
+        // Claw
+        (*npc).pos3[1] += (*ctx.world).bg_state.rng.Q_irand(10, 30) as f32;
+        (*npc).pos3[1] = crate::q_math::AngleNormalize360((*npc).pos3[1]);
+        crate::NPC_utils::NPC_SetBoneAngles(ctx, npc, c"claw".as_ptr() as *mut c_char, (*npc).pos3);
+    }
 }
 
 /// Raven `Interrogator_MaintainHeight`.
 ///
 /// Maintain hover height relative to enemy or goal.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:137-229`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
-    todo!("Port Interrogator_MaintainHeight — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        let ucmd = &mut (*ctx.world).globals.ucmd;
+        let base = (*ctx.world).entities.as_mut_ptr();
+
+        (*npc).s.loopSound = crate::g_utils::G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr());
+
+        // Update our angles regardless
+        crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1);
+
+        let mut dif: f32;
+
+        // If we have an enemy, we should try to hover at about enemy eye level
+        if (*npc).enemy.is_some() {
+            let enemy_ptr = match (*npc).enemy {
+                Some(id) => base.add(id.index()),
+                None => core::ptr::null_mut(),
+            };
+
+            if !enemy_ptr.is_null() {
+                // Find the height difference
+                dif = ((*enemy_ptr).r.currentOrigin[2] + (*enemy_ptr).r.maxs[2]) - (*npc).r.currentOrigin[2];
+
+                // cap to prevent dramatic height shifts
+                if dif.abs() > 2.0 {
+                    if dif.abs() > 16.0 {
+                        dif = if dif < 0.0 { -16.0 } else { 16.0 };
+                    }
+
+                    (*(*npc).client).ps.velocity[2] = ((*(*npc).client).ps.velocity[2] + dif) / 2.0;
+                }
+            }
+        } else {
+            let mut goal: *mut gentity_t = core::ptr::null_mut();
+
+            if (*npc_info).goalEntity.is_some() {
+                // Is there a goal?
+                goal = match (*npc_info).goalEntity {
+                    Some(id) => base.add(id.index()),
+                    None => core::ptr::null_mut(),
+                };
+            } else {
+                goal = match (*npc_info).lastGoalEntity {
+                    Some(id) => base.add(id.index()),
+                    None => core::ptr::null_mut(),
+                };
+            }
+
+            if !goal.is_null() {
+                dif = (*goal).r.currentOrigin[2] - (*npc).r.currentOrigin[2];
+
+                if dif.abs() > 24.0 {
+                    ucmd.upmove = if ucmd.upmove < 0 { -4 } else { 4 };
+                } else {
+                    if (*(*npc).client).ps.velocity[2] != 0.0 {
+                        (*(*npc).client).ps.velocity[2] *= VELOCITY_DECAY;
+
+                        if (*(*npc).client).ps.velocity[2].abs() < 2.0 {
+                            (*(*npc).client).ps.velocity[2] = 0.0;
+                        }
+                    }
+                }
+            }
+            // Apply friction
+            else if (*(*npc).client).ps.velocity[2] != 0.0 {
+                (*(*npc).client).ps.velocity[2] *= VELOCITY_DECAY;
+
+                if (*(*npc).client).ps.velocity[2].abs() < 1.0 {
+                    (*(*npc).client).ps.velocity[2] = 0.0;
+                }
+            }
+        }
+
+        // Apply friction
+        if (*(*npc).client).ps.velocity[0] != 0.0 {
+            (*(*npc).client).ps.velocity[0] *= VELOCITY_DECAY;
+
+            if (*(*npc).client).ps.velocity[0].abs() < 1.0 {
+                (*(*npc).client).ps.velocity[0] = 0.0;
+            }
+        }
+
+        if (*(*npc).client).ps.velocity[1] != 0.0 {
+            (*(*npc).client).ps.velocity[1] *= VELOCITY_DECAY;
+
+            if (*(*npc).client).ps.velocity[1].abs() < 1.0 {
+                (*(*npc).client).ps.velocity[1] = 0.0;
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(trap-no-engine): `Interrogator_Strafe` calls `trap_Trace`

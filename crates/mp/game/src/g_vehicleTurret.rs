@@ -16,8 +16,12 @@ use crate::prelude::*;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 use crate::NPC_utils::NPC_SetBoneAngles;
-use crate::g_weapon::WP_CalcVehMuzzle;
-use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorNormalize, _VectorCopy, _VectorMA, _VectorSubtract, vectoangles};
+use crate::g_weapon::{WP_CalcVehMuzzle, WP_FireVehicleWeapon, G_VehMuzzleFireFX};
+use crate::g_utils::G_RadiusList;
+use crate::g_team::OnSameTeam;
+use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorNormalize, VectorLengthSquared, _VectorCopy, _VectorMA, _VectorSubtract, vectoangles};
+use crate::q_shared::{Q_stricmp, Q_strncmp};
+use crate::trap;
 
 // Helper: Raven angle-vector indices
 const PITCH: usize = 0;
@@ -37,8 +41,60 @@ pub fn VEH_TurretCheckFire(
     turretNum: c_int,
     curMuzzle: c_int,
 ) {
-    // PORT-ESCALATION(level-access): function requires access to level.time for muzzle wait checks and delay timing
-    todo!("Port VEH_TurretCheckFire — parked: level-access (level.time)")
+    unsafe {
+        // if it's time to fire and we have an enemy, then gun 'em down!  pushDebounce time controls next fire time
+        if (*pVeh).m_iMuzzleTag[curMuzzle as usize] == -1 {
+            // invalid muzzle?
+            return;
+        }
+
+        if (*pVeh).m_iMuzzleWait[curMuzzle as usize] >= (*ctx.world).level.time {
+            // can't fire yet
+            return;
+        }
+
+        if (*pVeh).turretStatus[turretNum as usize].ammo < (*vehWeapon).iAmmoPerShot {
+            // no ammo, can't fire
+            return;
+        }
+
+        // FIXME: check to see if I'm aiming generally where I want to
+        let mut nextMuzzle: c_int = 0;
+        let muzzlesFired: c_int = 1 << curMuzzle;
+        let missile: *mut gentity_t;
+        WP_CalcVehMuzzle(ctx, parent, curMuzzle);
+
+        // FIXME: some variation in fire dir
+        missile = WP_FireVehicleWeapon(
+            ctx,
+            parent,
+            (*pVeh).m_vMuzzlePos[curMuzzle as usize],
+            (*pVeh).m_vMuzzleDir[curMuzzle as usize],
+            vehWeapon,
+            if turretNum != 0 { qtrue } else { qfalse },
+            qtrue,
+        );
+
+        // play the weapon's muzzle effect if we have one
+        G_VehMuzzleFireFX(ctx, parent, missile, muzzlesFired);
+
+        // take the ammo away
+        (*pVeh).turretStatus[turretNum as usize].ammo -= (*vehWeapon).iAmmoPerShot;
+        // toggle to the next muzzle on this turret, if there is one
+        nextMuzzle = if (curMuzzle + 1) == (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[0] {
+            (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[1]
+        } else {
+            (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[0]
+        };
+        if nextMuzzle != 0 {
+            // a valid muzzle to toggle to
+            (*pVeh).turretStatus[turretNum as usize].nextMuzzle = nextMuzzle - 1;
+            // -1 because you type muzzles 1-10 in the .veh file
+        }
+        // add delay to the next muzzle so it doesn't fire right away on the next frame
+        (*pVeh).m_iMuzzleWait[(*pVeh).turretStatus[turretNum as usize].nextMuzzle as usize] =
+            (*ctx.world).level.time + (*turretStats).iDelay;
+    }
 }
 
 /// Raven `VEH_TurretAnglesToEnemy`.
@@ -80,10 +136,6 @@ pub fn VEH_TurretAnglesToEnemy(
 /// Raven `VEH_TurretAim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicleTurret.c:89-190`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
-// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
-// `g_weapon.rs`) — how is state threaded in?
 pub fn VEH_TurretAim(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
@@ -95,13 +147,115 @@ pub fn VEH_TurretAim(
     curMuzzle: c_int,
     desiredAngles: &mut vec3_t,
 ) -> qboolean {
-    todo!("Port VEH_TurretAim — parked: seam-threading")
+    unsafe {
+        let mut curAngles = [0f32; 3];
+        let mut addAngles = [0f32; 3];
+        let mut newAngles = [0f32; 3];
+        let mut yawAngles = [0f32; 3];
+        let mut pitchAngles = [0f32; 3];
+        let mut aimCorrect: qboolean = qfalse;
+
+        WP_CalcVehMuzzle(ctx, parent, curMuzzle);
+        // get the current absolute angles of the turret right now
+        vectoangles((*pVeh).m_vMuzzleDir[curMuzzle as usize], &mut curAngles);
+        // subtract out the vehicle's angles to get the relative alignment
+        AnglesSubtract(curAngles, (*pVeh).m_vOrientation, &mut curAngles);
+
+        if !turretEnemy.is_null() {
+            aimCorrect = qtrue;
+            // ...then we'll calculate what new aim adjustments we should attempt to make this frame
+            // Aim at enemy
+            VEH_TurretAnglesToEnemy(
+                pVeh,
+                curMuzzle,
+                (*vehWeapon).fSpeed,
+                turretEnemy,
+                (*turretStats).bAILead,
+                desiredAngles,
+            );
+        }
+        // subtract out the vehicle's angles to get the relative desired alignment
+        AnglesSubtract(*desiredAngles, (*pVeh).m_vOrientation, desiredAngles);
+        // Now clamp the desired relative angles
+        // clamp yaw
+        (*desiredAngles)[YAW] = AngleNormalize180((*desiredAngles)[YAW]);
+        if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft != 0.0
+            && (*desiredAngles)[YAW] > (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft
+        {
+            aimCorrect = qfalse;
+            (*desiredAngles)[YAW] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft;
+        }
+        if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight != 0.0
+            && (*desiredAngles)[YAW] < (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight
+        {
+            aimCorrect = qfalse;
+            (*desiredAngles)[YAW] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight;
+        }
+        // clamp pitch
+        (*desiredAngles)[PITCH] = AngleNormalize180((*desiredAngles)[PITCH]);
+        if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown != 0.0
+            && (*desiredAngles)[PITCH] > (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown
+        {
+            aimCorrect = qfalse;
+            (*desiredAngles)[PITCH] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown;
+        }
+        if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp != 0.0
+            && (*desiredAngles)[PITCH] < (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp
+        {
+            aimCorrect = qfalse;
+            (*desiredAngles)[PITCH] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp;
+        }
+        // Now get the offset we want from our current relative angles
+        AnglesSubtract(*desiredAngles, curAngles, &mut addAngles);
+        // Now cap the addAngles for our fTurnSpeed
+        if addAngles[PITCH] > (*turretStats).fTurnSpeed {
+            // aimCorrect = qfalse;//???
+            addAngles[PITCH] = (*turretStats).fTurnSpeed;
+        } else if addAngles[PITCH] < -(*turretStats).fTurnSpeed {
+            // aimCorrect = qfalse;//???
+            addAngles[PITCH] = -(*turretStats).fTurnSpeed;
+        }
+        if addAngles[YAW] > (*turretStats).fTurnSpeed {
+            // aimCorrect = qfalse;//???
+            addAngles[YAW] = (*turretStats).fTurnSpeed;
+        } else if addAngles[YAW] < -(*turretStats).fTurnSpeed {
+            // aimCorrect = qfalse;//???
+            addAngles[YAW] = -(*turretStats).fTurnSpeed;
+        }
+        // Now add the additional angles back in to our current relative angles
+        // FIXME: add some AI aim error randomness...?
+        newAngles[PITCH] = AngleNormalize180(curAngles[PITCH] + addAngles[PITCH]);
+        newAngles[YAW] = AngleNormalize180(curAngles[YAW] + addAngles[YAW]);
+        // Now set the bone angles to the new angles
+        // set yaw
+        if (*turretStats).yawBone != core::ptr::null_mut() {
+            // VectorClear( yawAngles );
+            yawAngles[0] = 0.0;
+            yawAngles[1] = 0.0;
+            yawAngles[2] = 0.0;
+            yawAngles[(*turretStats).yawAxis as usize] = newAngles[YAW];
+            NPC_SetBoneAngles(ctx, parent, (*turretStats).yawBone, yawAngles);
+        }
+        // set pitch
+        if (*turretStats).pitchBone != core::ptr::null_mut() {
+            // VectorClear( pitchAngles );
+            pitchAngles[0] = 0.0;
+            pitchAngles[1] = 0.0;
+            pitchAngles[2] = 0.0;
+            pitchAngles[(*turretStats).pitchAxis as usize] = newAngles[PITCH];
+            NPC_SetBoneAngles(ctx, parent, (*turretStats).pitchBone, pitchAngles);
+        }
+        // force muzzle to recalc next check
+        (*pVeh).m_iMuzzleTime[curMuzzle as usize] = 0;
+
+        return aimCorrect;
+    }
 }
 
 /// Raven `VEH_TurretFindEnemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicleTurret.c:193-302`
-fn VEH_TurretFindEnemies(
+pub fn VEH_TurretFindEnemies(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
     parent: *mut gentity_t,
@@ -109,10 +263,135 @@ fn VEH_TurretFindEnemies(
     turretNum: c_int,
     curMuzzle: c_int,
 ) -> qboolean {
-    // PORT-ESCALATION(trap-engine-access): requires Engine context to call trap::InPVS and trap::Trace syscalls; not available in seam-stage skeleton function
-    // PORT-ESCALATION(global-g-entities): g_entities global array access (needs GameWorld entity arena exposing)
-    // PORT-ESCALATION(undefined-constants): WP_TURRET, FL_NOTARGET, FL_BBRUSH, MASK_SHOT, ENTITYNUM_WORLD constants not imported
-    todo!("Port VEH_TurretFindEnemies — parked: trap-engine-access + global-g-entities + undefined-constants")
+    unsafe {
+        let mut found: qboolean = qfalse;
+        let mut i: c_int;
+        let mut count: c_int;
+        let mut bestDist: f32 = (*turretStats).fAIRange * (*turretStats).fAIRange;
+        let mut enemyDist: f32;
+        let mut enemyDir = [0f32; 3];
+        let mut org = [0f32; 3];
+        let mut org2 = [0f32; 3];
+        let mut foundClient: qboolean = qfalse;
+        let mut entity_list: [*mut gentity_t; 512] = [core::ptr::null_mut(); 512]; // MAX_GENTITIES approximated as 512
+        let mut target: *mut gentity_t;
+        let mut bestTarget: *mut gentity_t = core::ptr::null_mut();
+
+        WP_CalcVehMuzzle(ctx, parent, curMuzzle);
+        _VectorCopy((*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut org2);
+
+        count = G_RadiusList(ctx, org2, (*turretStats).fAIRange, parent, qtrue, entity_list.as_mut_ptr());
+
+        i = 0;
+        while i < count {
+            let mut tr: trace_t = core::mem::zeroed();
+            target = entity_list[i as usize];
+
+            if target == parent
+                || (*target).takedamage == qfalse
+                || (*target).health <= 0
+                || ((*target).flags & crate::constants::FL_NOTARGET) != 0
+            {
+                i += 1;
+                continue;
+            }
+            if (*target).client.is_null() {
+                // only attack clients
+                if ((*target).flags & crate::constants::FL_BBRUSH) == 0
+                    // not a breakable brush
+                    || (*target).takedamage == qfalse
+                    // is a bbrush, but invincible
+                    || (!(*target).NPC_targetname.is_null()
+                        && !(*parent).targetname.is_null()
+                        && Q_stricmp((*target).NPC_targetname, (*parent).targetname) != 0)
+                {
+                    // not in invicible bbrush, but can only be broken by an NPC that is not me
+                    if (*target).s.weapon == crate::constants::WP_TURRET
+                        && !(*target).classname.is_null()
+                        && Q_strncmp(
+                            (*target).classname,
+                            cstr("misc_turret").as_ptr(),
+                            11,
+                        ) == 0
+                    {
+                        // these guys we want to shoot at
+                    } else {
+                        i += 1;
+                        continue;
+                    }
+                }
+                // else: we will shoot at bbrushes!
+            } else if !(*target).client.is_null()
+                && (*(*target).client).sess.sessionTeam == crate::constants::TEAM_SPECTATOR
+            {
+                i += 1;
+                continue;
+            }
+            if target == (*pVeh).m_pPilot as *mut gentity_t || (*target).r.ownerNum == (*parent).s.number {
+                // don't get angry at my pilot or passengers?
+                i += 1;
+                continue;
+            }
+            if !(*parent).client.is_null() && !(*(*parent).client).sess.sessionTeam.is_null() {
+                if !(*target).client.is_null() {
+                    if (*(*target).client).sess.sessionTeam == (*(*parent).client).sess.sessionTeam {
+                        // A bot/client/NPC we don't want to shoot
+                        i += 1;
+                        continue;
+                    }
+                } else if (*target).teamnodmg == (*(*parent).client).sess.sessionTeam {
+                    // some other entity that's allied with us
+                    i += 1;
+                    continue;
+                }
+            }
+            if trap::InPVS(ctx.engine, org2, (*target).r.currentOrigin) == qfalse {
+                i += 1;
+                continue;
+            }
+
+            _VectorCopy((*target).r.currentOrigin, &mut org);
+
+            trap::Trace(
+                ctx.engine,
+                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &org2 as *const vec3_t,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &org as *const vec3_t,
+                    (*parent).s.number,
+                    crate::constants::MASK_SHOT,
+                ),
+            );
+
+            if tr.entityNum == (*target).s.number
+                || (!tr.allsolid && !tr.startsolid && tr.fraction == 1.0f32)
+            {
+                // Only acquire if have a clear shot, Is it in range and closer than our best?
+                _VectorSubtract((*target).r.currentOrigin, org2, &mut enemyDir);
+                enemyDist = VectorLengthSquared(enemyDir);
+
+                if enemyDist < bestDist || (!(*target).client.is_null() && foundClient == qfalse) {
+                    // all things equal, keep current
+                    bestTarget = target;
+                    bestDist = enemyDist;
+                    found = qtrue;
+                    if !(*target).client.is_null() {
+                        // prefer clients over non-clients
+                        foundClient = qtrue;
+                    }
+                }
+            }
+            i += 1;
+        }
+
+        if found != qfalse {
+            (*pVeh).turretStatus[turretNum as usize].enemyEntNum = (*bestTarget).s.number;
+        }
+
+        return found;
+    }
 }
 
 /// Raven `VEH_TurretObeyPassengerControl`.
@@ -124,9 +403,54 @@ pub fn VEH_TurretObeyPassengerControl(
     parent: *mut gentity_t,
     turretNum: c_int,
 ) {
-    // PORT-ESCALATION(global-g-vehWeaponInfo): g_vehWeaponInfo global array not accessible (needs GameWorld or data module exposing)
-    // PORT-ESCALATION(undefined-constants): BUTTON_ATTACK, BUTTON_ALT_ATTACK constants not imported
-    todo!("Port VEH_TurretObeyPassengerControl — parked: global-g-vehWeaponInfo + undefined-constants")
+    unsafe {
+        let turretStats: *mut turretStats_t =
+            &mut (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize];
+        let passenger: *mut gentity_t =
+            (*pVeh).m_ppPassengers[((*turretStats).passengerNum - 1) as usize] as *mut gentity_t;
+
+        if !passenger.is_null()
+            && !(*passenger).client.is_null()
+            && (*passenger).health > 0
+        {
+            // a valid, living passenger client
+            let vehWeapon: *mut vehWeaponInfo_t =
+                &mut (*ctx.world).bg_state.g_vehWeaponInfo[(*turretStats).iWeapon as usize];
+            let curMuzzle: c_int = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
+            let mut aimAngles = [0f32; 3];
+            _VectorCopy(
+                (*(*passenger).client).ps.viewangles,
+                &mut aimAngles,
+            );
+
+            VEH_TurretAim(
+                ctx,
+                pVeh,
+                parent,
+                core::ptr::null_mut(),
+                turretStats,
+                vehWeapon,
+                turretNum,
+                curMuzzle,
+                &mut aimAngles,
+            );
+            if ((*(*passenger).client).pers.cmd.buttons
+                & (crate::constants::BUTTON_ATTACK | crate::constants::BUTTON_ALT_ATTACK))
+                != 0
+            {
+                // he's pressing an attack button, so fire!
+                VEH_TurretCheckFire(
+                    ctx,
+                    pVeh,
+                    parent,
+                    turretStats,
+                    vehWeapon,
+                    turretNum,
+                    curMuzzle,
+                );
+            }
+        }
+    }
 }
 
 /// Raven `VEH_TurretThink`.

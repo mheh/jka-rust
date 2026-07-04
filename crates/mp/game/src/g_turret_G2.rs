@@ -451,12 +451,6 @@ pub fn TurboLaser_SetBoneAnim(
     }
 }
 
-// PORT-ESCALATION(entfield-fnptr-abi-mismatch): assigns a named function
-// (`bolt->think = G_FreeEntity`) to `gentity_t::think`, typed
-// `Option<unsafe extern "C" fn(...)>` (frozen type port); the fnskel-staged
-// body here is a plain `pub fn`, and the fork-2 `EntThink` dispatch enum is a
-// different field type than what `gentity_t` actually carries — which
-// mechanism bridges the two?
 /// Raven `turretG2_fire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:344-412`
@@ -466,16 +460,73 @@ pub fn turretG2_fire(
     start: vec3_t,
     dir: &mut vec3_t,
 ) {
-    todo!("Port turretG2_fire — parked: entfield-fnptr-abi-mismatch (bolt->think = G_FreeEntity)")
+    unsafe {
+        // Check if start position is inside a wall
+        if (trap::PointContents(ctx.engine, mp_abi::game::syscalls::G_POINTCONTENTS::GPointcontentsArgs::new(&start as *const vec3_t, (*ent).s.number)) & MASK_SHOT) != 0 {
+            return;
+        }
+
+        let mut org: vec3_t = [0.0; 3];
+        let mut ang: vec3_t = [0.0; 3];
+
+        // Offset the origin back along the direction
+        crate::q_math::_VectorMA(start, -START_DIS, *dir, &mut org);
+
+        // Add random error if needed
+        if (*ent).random != 0.0 {
+            crate::q_math::vectoangles(*dir, &mut ang);
+            ang[PITCH as usize] += (*ctx.world).bg_state.rng.flrand(-(*ent).random, (*ent).random);
+            ang[YAW as usize] += (*ctx.world).bg_state.rng.flrand(-(*ent).random, (*ent).random);
+            crate::q_math::AngleVectors(ang, Some(&mut *dir), None, None);
+        }
+
+        crate::q_math::vectoangles(*dir, &mut ang);
+
+        if (*ent).spawnflags & SPF_TURRETG2_TURBO != 0 {
+            // Turbo laser: fire with muzzle flash and special missile
+            G_PlayEffectID((*ent).genericValue13, org, ang);
+            WP_FireTurboLaserMissile(ctx, ent, start, *dir);
+            if (*ent).alt_fire != 0 {
+                TurboLaser_SetBoneAnim(ctx, ent, 2, 3);
+            } else {
+                TurboLaser_SetBoneAnim(ctx, ent, 0, 1);
+            }
+        } else {
+            // Regular blaster turret: fire standard missile
+            G_PlayEffectID(G_EffectIndex(c"blaster/muzzle_flash".as_ptr()), org, ang);
+            let bolt = G_Spawn(ctx);
+
+            (*bolt).classname = c"turret_proj".as_ptr() as *mut c_char;
+            (*bolt).nextthink = (*ctx.world).level.time + 10000;
+            (*bolt).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity);
+            (*bolt).s.eType = ET_MISSILE;
+            (*bolt).s.weapon = WP_BLASTER as c_int;
+            (*bolt).r.ownerNum = (*ent).s.number;
+            (*bolt).damage = (*ent).damage;
+            (*bolt).alliedTeam = (*ent).alliedTeam;
+            (*bolt).teamnodmg = (*ent).teamnodmg;
+            // PORT-NOTE(damage-flags): DAMAGE_NO_KNOCKBACK and DAMAGE_HEAVY_WEAP_CLASS are game constants used by Raven
+            (*bolt).dflags = DAMAGE_NO_KNOCKBACK | DAMAGE_HEAVY_WEAP_CLASS;
+            (*bolt).splashDamage = (*ent).splashDamage;
+            (*bolt).splashRadius = (*ent).splashDamage;
+            (*bolt).methodOfDeath = MOD_TARGET_LASER;
+            (*bolt).splashMethodOfDeath = MOD_TARGET_LASER;
+            (*bolt).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+            // Set bounding box
+            (*bolt).r.maxs = [1.5, 1.5, 1.5];
+            crate::q_math::_VectorScale((*bolt).r.maxs, -1.0, &mut (*bolt).r.mins);
+
+            (*bolt).s.pos.trType = TR_LINEAR;
+            (*bolt).s.pos.trTime = (*ctx.world).level.time;
+            crate::q_math::_VectorCopy(start, &mut (*bolt).s.pos.trBase);
+            crate::q_math::_VectorScale(*dir, (*ent).mass, &mut (*bolt).s.pos.trDelta);
+            trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut (*bolt).s.pos.trDelta as *mut vec3_t));
+            crate::q_math::_VectorCopy(start, &mut (*bolt).r.currentOrigin);
+        }
+    }
 }
 
-// PORT-ESCALATION(entfield-fnptr-abi-mismatch): assigns named functions
-// (`self->use = turretG2_base_use`, `self->pain = TurretG2Pain`, `self->die =
-// turretG2_die`) to `gentity_t` fields typed
-// `Option<unsafe extern "C" fn(...)>` (frozen type port); the fnskel-staged
-// body here is a plain `pub fn`, and the fork-2 `EntUse`/`EntPain`/`EntDie`
-// dispatch enums are a different field type than what `gentity_t` actually
-// carries — which mechanism bridges the two?
 /// Raven `turretG2_respawn`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:414-434`
@@ -483,7 +534,30 @@ pub fn turretG2_respawn(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port turretG2_respawn — parked: entfield-fnptr-abi-mismatch")
+    unsafe {
+        (*self_).use_ = Some(crate::ent_fn_enums::EntUse::turretG2_base_use);
+        (*self_).pain = Some(crate::ent_fn_enums::EntPain::TurretG2Pain);
+        (*self_).die = Some(crate::ent_fn_enums::EntDie::turretG2_die);
+        (*self_).takedamage = qtrue;
+        (*self_).s.shouldtarget = qtrue;
+
+        // Clear shader animation frame if needed
+        if (*self_).s.eFlags & EF_SHADER_ANIM != 0 {
+            (*self_).s.frame = 0; // normal
+        }
+
+        (*self_).s.weapon = WP_TURRET as c_int; // crosshair code uses this to mark crosshair red
+
+        turretG2_set_models(ctx, self_, qfalse);
+        (*self_).s.health = (*self_).genericValue6;
+        (*self_).health = (*self_).genericValue6;
+
+        if (*self_).maxHealth != 0 {
+            G_ScaleNetHealth(self_);
+        }
+
+        (*self_).genericValue5 = 0; // clear this now
+    }
 }
 
 /// Raven `turretG2_head_think`.
@@ -1059,14 +1133,6 @@ pub fn SP_misc_turretG2(
     }
 }
 
-// PORT-ESCALATION(entfield-fnptr-abi-mismatch): assigns named functions
-// (`base->use = turretG2_base_use`, `base->pain = TurretG2Pain`, `base->think
-// = turretG2_base_think`, `base->die = turretG2_die`) to `gentity_t` fields
-// typed `Option<unsafe extern "C" fn(...)>` (frozen type port); the
-// fnskel-staged body here is a plain `pub fn`, and the fork-2
-// `EntUse`/`EntPain`/`EntThink`/`EntDie` dispatch enums are a different field
-// type than what `gentity_t` actually carries — which mechanism bridges the
-// two?
 /// Raven `finish_spawning_turretG2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:1084-1297`
@@ -1074,5 +1140,196 @@ pub fn finish_spawning_turretG2(
     ctx: GameContext<'_>,
     base: *mut gentity_t,
 ) {
-    todo!("Port finish_spawning_turretG2 — parked: entfield-fnptr-abi-mismatch")
+    unsafe {
+        let mut fwd: vec3_t = [0.0; 3];
+        let mut t: c_int = 0;
+
+        // Handle upside-down spawn flag
+        if (*base).spawnflags & 2 != 0 {
+            (*base).s.angles[ROLL as usize] += 180.0;
+            (*base).s.origin[2] -= 22.0;
+        }
+
+        G_SetAngles(base, (*base).s.angles);
+        crate::q_math::AngleVectors((*base).r.currentAngles, Some(&mut fwd), None, None);
+
+        G_SetOrigin(base, (*base).s.origin);
+
+        (*base).s.eType = ET_GENERAL;
+
+        // Handle team damage immunity
+        if !(*base).team.is_null() && *(*base).team != 0 && (*base).teamnodmg == 0 {
+            // PORT-NOTE(atoi-usage): Raven uses atoi() to parse team string; we convert directly
+            let team_str = core::ffi::CStr::from_ptr((*base).team as *const c_char).to_string_lossy();
+            (*base).teamnodmg = team_str.parse::<c_int>().unwrap_or(0);
+        }
+        (*base).team = core::ptr::null_mut();
+
+        // Set up explosion effects
+        G_EffectIndex(c"turret/explode".as_ptr());
+        G_EffectIndex(c"sparks/spark_exp_nosnd".as_ptr());
+
+        // Set up callbacks
+        (*base).use_ = Some(crate::ent_fn_enums::EntUse::turretG2_base_use);
+        (*base).pain = Some(crate::ent_fn_enums::EntPain::TurretG2Pain);
+
+        // Don't start working right away
+        (*base).think = Some(crate::ent_fn_enums::EntThink::turretG2_base_think);
+        (*base).nextthink = (*ctx.world).level.time + FRAMETIME * 5;
+
+        // Pitch angle
+        (*base).speed = 0.0;
+
+        // Respawn time defaults to 20 seconds
+        if (*base).spawnflags & SPF_TURRETG2_CANRESPAWN != 0 && (*base).count == 0 {
+            (*base).count = 20000;
+        }
+
+        G_SpawnFloat(ctx, c"shotspeed".as_ptr(), c"0".as_ptr(), &mut (*base).mass as *mut f32);
+
+        if (*base).spawnflags & SPF_TURRETG2_TURBO != 0 {
+            // TURBO LASER configuration
+            if (*base).random == 0.0 {
+                // error worked into projectile direction
+                (*base).random = 2.0;
+            }
+
+            if (*base).mass == 0.0 {
+                // misnomer: speed of projectile
+                (*base).mass = 20000.0;
+            }
+
+            if (*base).health == 0 {
+                (*base).health = 2000;
+            }
+
+            // search radius
+            if (*base).radius == 0.0 {
+                (*base).radius = 32768.0;
+            }
+
+            // How quickly to fire
+            if (*base).wait == 0.0 {
+                (*base).wait = 1000.0;
+            }
+
+            if (*base).splashDamage == 0 {
+                (*base).splashDamage = 200;
+            }
+
+            if (*base).splashRadius == 0 {
+                (*base).splashRadius = 500;
+            }
+
+            // how much damage each shot does
+            if (*base).damage == 0 {
+                (*base).damage = 500;
+            }
+
+            if (*base).spawnflags & SPF_TURRETG2_TURBO != 0 {
+                (*base).r.maxs = [64.0, 64.0, 30.0];
+                (*base).r.mins = [-64.0, -64.0, -30.0];
+            }
+
+            // start in "off" anim
+            TurboLaser_SetBoneAnim(ctx, base, 4, 5);
+
+            if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
+                (*base).s.eFlags2 |= EF2_BRACKET_ENTITY;
+            }
+        } else {
+            // STANDARD TURRET configuration
+            if (*base).random == 0.0 {
+                // error worked into projectile direction
+                (*base).random = 2.0;
+            }
+
+            if (*base).mass == 0.0 {
+                // misnomer: speed of projectile
+                (*base).mass = 1100.0;
+            }
+
+            if (*base).health == 0 {
+                (*base).health = 100;
+            }
+
+            // search radius
+            if (*base).radius == 0.0 {
+                (*base).radius = 512.0;
+            }
+
+            // How quickly to fire
+            if (*base).wait == 0.0 {
+                (*base).wait = 150.0 + (*ctx.world).bg_state.rng.random() * 55.0;
+            }
+
+            if (*base).splashDamage == 0 {
+                (*base).splashDamage = 10;
+            }
+
+            if (*base).splashRadius == 0 {
+                (*base).splashRadius = 25;
+            }
+
+            // how much damage each shot does
+            if (*base).damage == 0 {
+                (*base).damage = 5;
+            }
+
+            if (*base).spawnflags & 2 != 0 {
+                // upside-down, invert r.mins and maxs
+                (*base).r.maxs = [10.0, 10.0, 30.0];
+                (*base).r.mins = [-10.0, -10.0, 0.0];
+            } else {
+                (*base).r.maxs = [10.0, 10.0, 0.0];
+                (*base).r.mins = [-10.0, -10.0, -30.0];
+            }
+        }
+
+        // stash health off for respawn
+        (*base).genericValue6 = (*base).health;
+
+        G_SpawnInt(ctx, c"showhealth".as_ptr(), c"0".as_ptr(), &mut t as *mut c_int);
+        if t != 0 {
+            // a non-0 maxhealth value will mean we want to show the health on the hud
+            (*base).maxHealth = (*base).health;
+            G_ScaleNetHealth(base);
+            (*base).s.shouldtarget = qtrue;
+        }
+
+        if (*base).s.iModelScale != 0 {
+            // let's scale the bbox too...
+            let fScale = (*base).s.iModelScale as f32 / 100.0;
+            crate::q_math::_VectorScale((*base).r.mins, fScale, &mut (*base).r.mins);
+            crate::q_math::_VectorScale((*base).r.maxs, fScale, &mut (*base).r.maxs);
+        }
+
+        // Precache special FX and moving sounds
+        if (*base).spawnflags & SPF_TURRETG2_TURBO != 0 {
+            (*base).genericValue13 = G_EffectIndex(c"turret/turb_muzzle_flash".as_ptr());
+            (*base).genericValue14 = G_EffectIndex(c"turret/turb_shot".as_ptr());
+            (*base).genericValue15 = G_EffectIndex(c"turret/turb_impact".as_ptr());
+            G_SoundIndex(c"sound/vehicles/weapons/turbolaser/turn.wav".as_ptr());
+        } else {
+            G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr());
+            G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr());
+            G_SoundIndex(c"sound/chars/turret/ping.wav".as_ptr());
+            G_SoundIndex(c"sound/chars/turret/move.wav".as_ptr());
+        }
+
+        (*base).r.contents = CONTENTS_BODY | CONTENTS_PLAYERCLIP | CONTENTS_MONSTERCLIP | CONTENTS_SHOTCLIP;
+
+        (*base).takedamage = qtrue;
+        (*base).die = Some(crate::ent_fn_enums::EntDie::turretG2_die);
+
+        (*base).material = MAT_METAL;
+
+        // Register this so that we can use it for the missile effect
+        RegisterItem(ctx, BG_FindItemForWeapon(WP_BLASTER));
+
+        // But set us as a turret so that we can be identified as a turret
+        (*base).s.weapon = WP_TURRET as c_int;
+
+        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base));
+    }
 }

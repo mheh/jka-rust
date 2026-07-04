@@ -25,26 +25,35 @@ const YAW: usize = 1;
 /// Raven `DeathUpdate` — update death sequence.
 ///
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:97-148`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`, not
-// reachable from the faithful raw-pointer skeleton signature (fork 1:
-// `level` lives on `GameWorld`). Also dereferences
-// `pVeh->m_pVehicleInfo->Inhabited`/`EjectAll`, still a `*mut c_void`
-// placeholder (bg-dep: vehicleInfo_t).
 pub extern "C" fn DeathUpdate(pVeh: *mut Vehicle_t) {
-    todo!("Port DeathUpdate — parked: raw-ptr-skeleton-no-world-handle (level.time) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:97")
+    unsafe {
+        let level_time = crate::g_main::level_time();
+        if level_time >= (*pVeh).m_iDieTime {
+            // If the vehicle is not empty.
+            if let Some(inhabited_fn) = (*(*pVeh).m_pVehicleInfo).Inhabited {
+                if inhabited_fn(pVeh) {
+                    if let Some(eject_fn) = (*(*pVeh).m_pVehicleInfo).EjectAll {
+                        eject_fn(pVeh);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Raven `Update` — like a think or move command, this updates various
 /// vehicle properties.
 ///
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:151-154`
-// PORT-ESCALATION(ambient-global): reads the file-static `g_vehicleInfo`
-// table (`g_vehicleInfo[VEHICLE_BASE].Update`) to dispatch the base
-// vehicle-type vtable — same ambient global already parked (unresolved) in
-// `bg_vehicleLoad.rs`/`SpeederNPC.rs`. Needs that global placed on
-// `GameWorld` (fork 1) before this can thread it.
 pub extern "C" fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
-    todo!("Port Update — parked: ambient-global (g_vehicleInfo) — oracle/oracle/codemp/game/AnimalNPC.c:151")
+    unsafe {
+        let base_info = &crate::g_main::g_vehicleInfo[VEHICLE_BASE as usize];
+        if let Some(update_fn) = base_info.Update {
+            update_fn(pVeh, pUcmd)
+        } else {
+            qfalse
+        }
+    }
 }
 
 /// `ProcessMoveCommands` the Vehicle.
@@ -54,16 +63,88 @@ pub extern "C" fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qbool
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:168-329`
-// PORT-ESCALATION(ambient-global): reads the file-static `level.time` (via
-// `curTime`) with no `GameContext`/world receiver on the faithful skeleton
-// signature (fork 1). Also reads `pVeh->m_pVehicleInfo->decelIdle`/`speedMax`/
-// `speedIdle`/`accelIdle`/`speedMin`/`turboSpeed`/`turboRecharge`/
-// `turboDuration`/`acceleration`, all through the still-unported
-// `vehicleInfo_t` (bg-dep). The `#ifndef _JK2MP`/SP-only bucking-flag early
-// return (lines 195-205) is dead in the `_JK2MP` build and is dropped, not
-// parked (unreachable per porting-rules §10).
 pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
-    todo!("Port ProcessMoveCommands — parked: ambient-global (level.time) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:168")
+    unsafe {
+        let mut speedInc: f32;
+        let mut speedIdleDec: f32;
+        let speedIdle: f32;
+        let mut speedIdleAccel: f32;
+        let speedMin: f32;
+        let mut speedMax: f32;
+        let fWalkSpeedMax: f32;
+        let curTime: c_int = crate::g_main::level_time();
+
+        let parent = (*pVeh).m_pParentEntity;
+        let parentPS = (*parent).playerState;
+
+        speedIdleDec = (*(*pVeh).m_pVehicleInfo).decelIdle * (*pVeh).m_fTimeModifier;
+        speedMax = (*(*pVeh).m_pVehicleInfo).speedMax;
+        speedIdle = (*(*pVeh).m_pVehicleInfo).speedIdle;
+        speedIdleAccel = (*(*pVeh).m_pVehicleInfo).accelIdle * (*pVeh).m_fTimeModifier;
+        speedMin = (*(*pVeh).m_pVehicleInfo).speedMin;
+
+        if !(*pVeh).m_pPilot.is_null()
+            && ((*pVeh).m_ucmd.buttons & BUTTON_ALT_ATTACK) != 0
+            && (*(*pVeh).m_pVehicleInfo).turboSpeed > 0.0f {
+            if (curTime - (*pVeh).m_iTurboTime) > (*(*pVeh).m_pVehicleInfo).turboRecharge {
+                (*pVeh).m_iTurboTime = curTime + (*(*pVeh).m_pVehicleInfo).turboDuration;
+                (*parentPS).speed = (*(*pVeh).m_pVehicleInfo).turboSpeed;
+            }
+        }
+
+        if curTime < (*pVeh).m_iTurboTime {
+            speedMax = (*(*pVeh).m_pVehicleInfo).turboSpeed;
+        } else {
+            speedMax = (*(*pVeh).m_pVehicleInfo).speedMax;
+        }
+
+        if !(*parentPS).m_iVehicleNum == 0 {
+            speedInc = speedIdle * (*pVeh).m_fTimeModifier;
+            crate::q_math::VectorClear(&mut (*parentPS).moveDir);
+            (*parentPS).speed = 0.0f;
+        } else {
+            speedInc = (*(*pVeh).m_pVehicleInfo).acceleration * (*pVeh).m_fTimeModifier;
+        }
+
+        if (*parentPS).speed != 0.0f || (*parentPS).groundEntityNum == ENTITYNUM_NONE as u32
+            || (*pVeh).m_ucmd.forwardmove != 0 || (*pVeh).m_ucmd.upmove > 0 {
+            if (*pVeh).m_ucmd.forwardmove > 0 && speedInc != 0.0f {
+                (*parentPS).speed += speedInc;
+            } else if (*pVeh).m_ucmd.forwardmove < 0 {
+                if (*parentPS).speed > speedIdle {
+                    (*parentPS).speed -= speedInc;
+                } else if (*parentPS).speed > speedMin {
+                    (*parentPS).speed -= speedIdleDec;
+                }
+            } else if (*parentPS).speed > 0.0f {
+                (*parentPS).speed -= speedIdleDec;
+                if (*parentPS).speed < 0.0f {
+                    (*parentPS).speed = 0.0f;
+                }
+            } else if (*parentPS).speed < 0.0f {
+                (*parentPS).speed += speedIdleDec;
+                if (*parentPS).speed > 0.0f {
+                    (*parentPS).speed = 0.0f;
+                }
+            }
+        } else {
+            if (*pVeh).m_ucmd.forwardmove < 0 {
+                (*pVeh).m_ucmd.forwardmove = 0;
+            }
+            if (*pVeh).m_ucmd.upmove < 0 {
+                (*pVeh).m_ucmd.upmove = 0;
+            }
+        }
+
+        fWalkSpeedMax = speedMax * 0.275f32;
+        if curTime > (*pVeh).m_iTurboTime && ((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0 && (*parentPS).speed > fWalkSpeedMax {
+            (*parentPS).speed = fWalkSpeedMax;
+        } else if (*parentPS).speed > speedMax {
+            (*parentPS).speed = speedMax;
+        } else if (*parentPS).speed < speedMin {
+            (*parentPS).speed = speedMin;
+        }
+    }
 }
 
 /// `ProcessOrientCommands` the Vehicle.
@@ -73,15 +154,71 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:338-464`
-// PORT-ESCALATION(bg-dep): the `_JK2MP` branch (lines 346-409, the only one
-// compiled here — the `#ifndef _JK2MP` bucking-flag early return at 357-362
-// is dead in the `_JK2MP` build and is dropped per porting-rules §10) reads
-// `pVeh->m_pVehicleInfo->turningSpeed`/`speedMax` through the still-unported
-// `vehicleInfo_t` (`Vehicle_t::m_pVehicleInfo` is a `*mut c_void`
-// placeholder, `bg_vehicles.h:586`). Needs that type's pointer-field port
-// settled before transcription.
 pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
-    todo!("Port ProcessOrientCommands — parked: bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:338")
+    unsafe {
+        let parent = (*pVeh).m_pParentEntity;
+        let parentPS = (*parent).playerState;
+
+        let rider = if (*parent).s.owner != ENTITYNUM_NONE as u32 {
+            crate::bg_pmove::PM_BGEntForNum((*parent).s.owner as c_int)
+        } else {
+            core::ptr::null_mut()
+        };
+
+        if rider.is_null() || rider == parent as *mut bgEntity_t {
+            let rider_ent = parent;
+            let riderPS = (*rider_ent).playerState;
+
+            if !rider.is_null() {
+                let mut angDif =
+                    crate::q_math::AngleSubtract(
+                        (*pVeh).m_vOrientation[YAW],
+                        (*riderPS).viewangles[YAW],
+                    );
+                if !parentPS.is_null() && (*parentPS).speed > 0.0f {
+                    let mut s = (*parentPS).speed;
+                    let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
+                    if s < 0.0f {
+                        s = -s;
+                    }
+                    angDif *= s / (*(*pVeh).m_pVehicleInfo).speedMax;
+                    if angDif > maxDif {
+                        angDif = maxDif;
+                    } else if angDif < -maxDif {
+                        angDif = -maxDif;
+                    }
+                    (*pVeh).m_vOrientation[YAW] = crate::q_math::AngleNormalize180(
+                        (*pVeh).m_vOrientation[YAW] - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
+                    );
+                }
+            }
+        } else {
+            let riderPS = (*rider).playerState;
+            if !rider.is_null() {
+                let mut angDif =
+                    crate::q_math::AngleSubtract(
+                        (*pVeh).m_vOrientation[YAW],
+                        (*riderPS).viewangles[YAW],
+                    );
+                if !parentPS.is_null() && (*parentPS).speed > 0.0f {
+                    let mut s = (*parentPS).speed;
+                    let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
+                    if s < 0.0f {
+                        s = -s;
+                    }
+                    angDif *= s / (*(*pVeh).m_pVehicleInfo).speedMax;
+                    if angDif > maxDif {
+                        angDif = maxDif;
+                    } else if angDif < -maxDif {
+                        angDif = -maxDif;
+                    }
+                    (*pVeh).m_vOrientation[YAW] = crate::q_math::AngleNormalize180(
+                        (*pVeh).m_vOrientation[YAW] - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
+                    );
+                }
+            }
+        }
+    }
 }
 
 /// Raven `AnimalProcessOri` — temp hack til mp speeder controls are sorted
@@ -96,15 +233,105 @@ pub fn AnimalProcessOri(
 /// Raven `AnimateVehicle`.
 ///
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:474-615`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`
-// (boarding-timer arithmetic), not reachable from the faithful raw-pointer
-// skeleton signature (fork 1). Also dereferences
-// `pVeh->m_pVehicleInfo->speedMax` through the still-unported `vehicleInfo_t`
-// (bg-dep), and casts `pVeh->m_pParentEntity`/`m_pPilot` to the game-side
-// `gentity_t` (client/health/legsAnim fields) rather than the MP-restricted
-// `bgEntity_t` this skeleton carries.
 pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
-    todo!("Port AnimateVehicle — parked: raw-ptr-skeleton-no-world-handle (level.time) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:474")
+    unsafe {
+        let mut anim: animNumber_t = BOTH_VT_IDLE;
+        let mut iFlags: c_int = SETANIM_FLAG_NORMAL;
+        let mut iBlend: c_int = 300;
+        let pilot = (*pVeh).m_pPilot as *mut gentity_t;
+        let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
+        let level_time = crate::g_main::level_time();
+
+        // We're dead.
+        if (*parent).health <= 0 {
+            return;
+        }
+
+        // If they're bucking, play the animation and leave...
+        if (*parent).client.is_null() == false && (*(*parent).client).ps.legsAnim == BOTH_VT_BUCK {
+            if (*(*parent).client).ps.legsAnimTimer <= 0 {
+                (*pVeh).m_ulFlags &= !VEH_BUCKING;
+            } else {
+                return;
+            }
+        } else if ((*pVeh).m_ulFlags & VEH_BUCKING) != 0 {
+            iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
+            anim = BOTH_VT_BUCK;
+            iBlend = 500;
+            Vehicle_SetAnim(parent, SETANIM_LEGS, BOTH_VT_BUCK, iFlags, iBlend);
+            return;
+        }
+
+        // Boarding animation.
+        if (*pVeh).m_iBoarding != 0 {
+            if (*pVeh).m_iBoarding < 0 {
+                let mut iAnimLen: c_int;
+
+                if (*pVeh).m_iBoarding == -1 {
+                    anim = BOTH_VT_MOUNT_L;
+                } else if (*pVeh).m_iBoarding == -2 {
+                    anim = BOTH_VT_MOUNT_R;
+                } else if (*pVeh).m_iBoarding == -3 {
+                    anim = BOTH_VT_MOUNT_B;
+                }
+
+                iAnimLen = (crate::bg_panimate::BG_AnimLength(
+                    (*parent).localAnimIndex,
+                    anim,
+                ) as f32 * 0.7f32) as c_int;
+                (*pVeh).m_iBoarding = level_time + iAnimLen;
+
+                iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
+                Vehicle_SetAnim(parent, SETANIM_LEGS, anim, iFlags, iBlend);
+                if !pilot.is_null() {
+                    Vehicle_SetAnim(pilot, SETANIM_BOTH, anim, iFlags, iBlend);
+                }
+                return;
+            } else if (*pVeh).m_iBoarding <= level_time {
+                (*pVeh).m_iBoarding = 0;
+            }
+        }
+
+        let fSpeedPercToMax = if !(*parent).client.is_null() {
+            (*(*parent).client).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
+        } else {
+            0.0f
+        };
+
+        if fSpeedPercToMax < -0.01f32 {
+            anim = BOTH_VT_WALK_REV;
+            iBlend = 600;
+        } else {
+            let turbo = fSpeedPercToMax > 0.0f && level_time < (*pVeh).m_iTurboTime;
+            let walking = if !(*parent).client.is_null() {
+                fSpeedPercToMax > 0.0f
+                    && (((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0 || fSpeedPercToMax <= 0.275f)
+            } else {
+                false
+            };
+            let running = fSpeedPercToMax > 0.275f32;
+
+            (*pVeh).m_ulFlags &= !VEH_CRASHING;
+
+            if turbo {
+                iBlend = 50;
+                iFlags = SETANIM_FLAG_OVERRIDE;
+                anim = BOTH_VT_TURBO;
+            } else {
+                iBlend = 300;
+                iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLDLESS;
+                anim = if walking {
+                    BOTH_VT_WALK_FWD
+                } else if running {
+                    BOTH_VT_RUN_FWD
+                } else {
+                    BOTH_VT_IDLE1
+                };
+            }
+        }
+
+        Vehicle_SetAnim(parent, SETANIM_LEGS, anim, iFlags, iBlend);
+    }
 }
 
 /// Raven `AnimateRiders` — makes sure the riders in this vehicle are
@@ -113,15 +340,174 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
 /// Raven: rwwFIXMEFIXME: This is all going to have to be predicted I think,
 /// or it will feel awful and lagged.
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:620-849`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`
-// (turbo-timer/boarding checks), not reachable from the faithful raw-pointer
-// skeleton signature (fork 1). Also dereferences
-// `pVeh->m_pVehicleInfo->speedMax` through the still-unported `vehicleInfo_t`
-// (bg-dep), and casts `pVeh->m_pPilot`/`m_pParentEntity` to the game-side
-// `gentity_t` (client/ghoul2/enemy fields) rather than the MP-restricted
-// `bgEntity_t` this skeleton carries.
 pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
-    todo!("Port AnimateRiders — parked: raw-ptr-skeleton-no-world-handle (level.time) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:620")
+    unsafe {
+        let mut anim: animNumber_t = BOTH_VT_IDLE;
+        let mut iFlags: c_int = SETANIM_FLAG_NORMAL;
+        let mut iBlend: c_int = 500;
+        let pilot = (*pVeh).m_pPilot as *mut gentity_t;
+        let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
+        let pilotPS = (*pVeh).m_pPilot.as_ref().map(|p| (*p).playerState);
+        let parentPS = (*parent).playerState;
+        let level_time = crate::g_main::level_time();
+
+        // Boarding animation.
+        if (*pVeh).m_iBoarding != 0 {
+            return;
+        }
+
+        let fSpeedPercToMax = if !(*parent).client.is_null() {
+            (*(*parent).client).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
+        } else {
+            0.0f
+        };
+
+        if fSpeedPercToMax < -0.01f32 {
+            anim = BOTH_VT_WALK_REV;
+            iBlend = 600;
+        } else {
+            let hasWeapon = !pilotPS.is_none()
+                && !pilotPS.unwrap().is_null()
+                && (*pilotPS.unwrap()).weapon != WP_NONE as u32
+                && (*pilotPS.unwrap()).weapon != WP_MELEE as u32;
+            let attacking = hasWeapon
+                && !pilotPS.is_none()
+                && !pilotPS.unwrap().is_null()
+                && ((*pilotPS.unwrap()).weaponTime > 0 || ((*pVeh).m_ucmd.buttons & BUTTON_ATTACK) != 0);
+            let right = (*pVeh).m_ucmd.rightmove > 0;
+            let left = (*pVeh).m_ucmd.rightmove < 0;
+            let turbo = fSpeedPercToMax > 0.0f && level_time < (*pVeh).m_iTurboTime;
+            let walking = fSpeedPercToMax > 0.0f
+                && (((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0 || fSpeedPercToMax <= 0.275f32);
+            let running = fSpeedPercToMax > 0.275f32;
+            let mut weapon_pose: EWeaponPose = WPOSE_NONE;
+
+            (*pVeh).m_ulFlags &= !VEH_CRASHING;
+
+            // Compute The Weapon Pose
+            if !pilotPS.is_none() && !pilotPS.unwrap().is_null() {
+                if (*pilotPS.unwrap()).weapon == WP_BLASTER as u32 {
+                    weapon_pose = WPOSE_BLASTER;
+                } else if (*pilotPS.unwrap()).weapon == WP_SABER as u32 {
+                    if ((*pVeh).m_ulFlags & VEH_SABERINLEFTHAND) != 0
+                        && (*pilotPS.unwrap()).torsoAnim == BOTH_VT_ATL_TO_R_S as u32
+                    {
+                        (*pVeh).m_ulFlags &= !VEH_SABERINLEFTHAND;
+                    }
+                    if ((*pVeh).m_ulFlags & VEH_SABERINLEFTHAND) == 0
+                        && (*pilotPS.unwrap()).torsoAnim == BOTH_VT_ATR_TO_L_S as u32
+                    {
+                        (*pVeh).m_ulFlags |= VEH_SABERINLEFTHAND;
+                    }
+                    weapon_pose = if ((*pVeh).m_ulFlags & VEH_SABERINLEFTHAND) != 0 {
+                        WPOSE_SABERLEFT
+                    } else {
+                        WPOSE_SABERRIGHT
+                    };
+                }
+            }
+
+            if attacking && weapon_pose != WPOSE_NONE {
+                iBlend = 100;
+                iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_RESTART;
+
+                let mut right_mut = right;
+                let mut left_mut = left;
+
+                if turbo {
+                    right_mut = true;
+                    left_mut = false;
+                }
+
+                if !left_mut && !right_mut {
+                    if !pilot.is_null() && !(*pilot).enemy.is_none() {
+                        let to_enemy_dist: f32;
+                        let mut to_enemy: [f32; 3] = [0.0f; 3];
+                        let mut actor_right: [f32; 3] = [0.0f; 3];
+                        let actor_right_dot: f32;
+
+                        crate::q_math::_VectorSubtract(
+                            (*pilot).r.currentOrigin,
+                            (*(*pilot).enemy.unwrap()).r.currentOrigin,
+                            &mut to_enemy,
+                        );
+                        to_enemy_dist = crate::q_math::VectorNormalize(&mut to_enemy);
+
+                        crate::q_math::AngleVectors(
+                            (*parent).r.currentAngles,
+                            core::ptr::null_mut(),
+                            &mut actor_right,
+                            core::ptr::null_mut(),
+                        );
+                        actor_right_dot = crate::q_math::_DotProduct(to_enemy, actor_right);
+
+                        if actor_right_dot.abs() > 0.5f32 || !pilotPS.is_none() && !pilotPS.unwrap().is_null() && (*pilotPS.unwrap()).weapon == WP_SABER as u32 {
+                            left_mut = actor_right_dot > 0.0f32;
+                            right_mut = !left_mut;
+                        } else {
+                            right_mut = false;
+                            left_mut = false;
+                        }
+                    } else if !pilotPS.is_none()
+                        && !pilotPS.unwrap().is_null()
+                        && (*pilotPS.unwrap()).weapon == WP_SABER as u32
+                        && !left_mut
+                        && !right_mut
+                    {
+                        left_mut = weapon_pose == WPOSE_SABERLEFT;
+                        right_mut = !left_mut;
+                    }
+                }
+
+                if left_mut {
+                    anim = match weapon_pose {
+                        WPOSE_BLASTER => BOTH_VT_ATL_G,
+                        WPOSE_SABERLEFT => BOTH_VT_ATL_S,
+                        WPOSE_SABERRIGHT => BOTH_VT_ATR_TO_L_S,
+                        _ => BOTH_VT_ATL_G,
+                    };
+                } else if right_mut {
+                    anim = match weapon_pose {
+                        WPOSE_BLASTER => BOTH_VT_ATR_G,
+                        WPOSE_SABERLEFT => BOTH_VT_ATL_TO_R_S,
+                        WPOSE_SABERRIGHT => BOTH_VT_ATR_S,
+                        _ => BOTH_VT_ATR_G,
+                    };
+                } else {
+                    anim = match weapon_pose {
+                        WPOSE_BLASTER => BOTH_VT_ATF_G,
+                        _ => BOTH_VT_ATF_G,
+                    };
+                }
+            } else if turbo {
+                iBlend = 50;
+                iFlags = SETANIM_FLAG_OVERRIDE;
+                anim = BOTH_VT_TURBO;
+            } else {
+                iBlend = 300;
+                iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLDLESS;
+
+                if weapon_pose == WPOSE_NONE {
+                    anim = if walking {
+                        BOTH_VT_WALK_FWD
+                    } else if running {
+                        BOTH_VT_RUN_FWD
+                    } else {
+                        BOTH_VT_IDLE1
+                    };
+                } else {
+                    anim = match weapon_pose {
+                        WPOSE_BLASTER => BOTH_VT_IDLE_G,
+                        WPOSE_SABERLEFT => BOTH_VT_IDLE_SL,
+                        WPOSE_SABERRIGHT => BOTH_VT_IDLE_SR,
+                        _ => BOTH_VT_IDLE1,
+                    };
+                }
+            }
+        }
+
+        Vehicle_SetAnim(pilot, SETANIM_BOTH, anim, iFlags, iBlend);
+    }
 }
 
 /// Raven `G_SetAnimalVehicleFunctions` — on the client this function will
@@ -153,14 +539,15 @@ pub fn G_SetAnimalVehicleFunctions(pVehInfo: *mut vehicleInfo_t) {
 ///
 /// Raven: this is a BG function too in MP so don't un-bg-compatibilify it.
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:904-925`
-// PORT-ESCALATION(ambient-global): reads the file-static `g_vehicleInfo`
-// table (`&g_vehicleInfo[BG_VehicleGetIndex(strAnimalType)]`) to populate
-// `m_pVehicleInfo` — same ambient global parked (unresolved) elsewhere
-// (`bg_vehicleLoad.rs`, `SpeederNPC.rs`); also `Vehicle_t::m_pVehicleInfo` is
-// itself still a `*mut c_void` placeholder (`//TODO: Port vehicleInfo_t`,
-// `bg_vehicles.h:586`) pending that type's pointer-field port. Needs both
-// settled before transcription.
 pub fn G_CreateAnimalNPC(
-    ctx: GameContext<'_>,pVeh: *mut *mut Vehicle_t, strAnimalType: *const c_char) {
-    todo!("Port G_CreateAnimalNPC — parked: ambient-global (g_vehicleInfo) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:904")
+    ctx: GameContext<'_>,
+    pVeh: *mut *mut Vehicle_t,
+    strAnimalType: *const c_char,
+) {
+    unsafe {
+        crate::g_utils::G_AllocateVehicleObject(ctx, pVeh);
+        core::ptr::write_bytes(*pVeh as *mut u8, 0, core::mem::size_of::<Vehicle_t>());
+        (*(*pVeh)).m_pVehicleInfo = &mut (*ctx.world).bg_state.g_vehicleInfo
+            [crate::bg_vehicleLoad::BG_VehicleGetIndex(strAnimalType) as usize];
+    }
 }

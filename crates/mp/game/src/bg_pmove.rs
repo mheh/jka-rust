@@ -36,6 +36,18 @@ use crate::bg_panimate::{
     PM_CanRollFromSoulCal, PM_SaberInTransition,
 };
 use crate::bg_saber::BG_MySaber;
+// Additional bg helpers reached by the pmove pipeline (pass-3 call surface).
+use crate::bg_panimate::{
+    BG_FlippingAnim, BG_InBackFlip, BG_InDeathAnim, BG_InReboundHold, BG_InReboundJump,
+    BG_InSpecialJump, BG_KickingAnim, BG_SaberInSpecialAttack, PM_InKnockDown, PM_InOnGroundAnim,
+    PM_InRollComplete, PM_InSaberAnim, PM_LandingAnim, PM_PainAnim, PM_SaberInStart,
+};
+use crate::bg_misc::{
+    BG_AddPredictableEventToPlayerstate, BG_CanUseFPNow, BG_CycleInven, BG_HasYsalamiri,
+    BG_IsItemSelectable, vectoyaw,
+};
+use crate::bg_saber::BG_ForcePowerDrain;
+use crate::q_math::{CrossProduct, VectorLength};
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::vehicles::MIN_LANDING_SLOPE;
 use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
@@ -93,16 +105,8 @@ const BUTTON_ALT_ATTACK: c_int = 128;
 const BONE_ANGLES_POSTMULT: c_int = 0x0002;
 
 
-/// Raven `PM_BGEntForNum`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:172-199`
-// PORT-ESCALATION(pmove-working-state): how is the file-static `pmove_t *pm` (and
-// `pml`/`pm_entSelf`) threaded into these no-arg C-signature fns without a §B3 static?
-pub fn PM_BGEntForNum(
-    num: c_int,
-) -> *mut bgEntity_t {
-    todo!("Port PM_BGEntForNum — parked: pmove-working-state")
-}
+// `PM_BGEntForNum` is a `PmoveContext<'_>` method below (already filled); the stale
+// free-fn stub is removed per ruling 12 (no dead duplicate).
 
 /// Raven `BG_SabersOff`.
 ///
@@ -158,50 +162,287 @@ pub fn PM_IsRocketTrooper() -> qboolean {
     qfalse
 }
 
-/// Raven `PM_GetSaberStance`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:261-319`
-// PORT-ESCALATION(pmove-working-state): reads `pm->ps->...`; needs the pmove working-set threading decision.
-pub fn PM_GetSaberStance() -> c_int {
-    todo!("Port PM_GetSaberStance — parked: pmove-working-state")
-}
+impl PmoveContext<'_> {
+    /// Raven `PM_GetSaberStance`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:261-319`
+    pub fn PM_GetSaberStance(&mut self) -> c_int {
+        use animNumber_t::*;
+        unsafe {
+            let ps = (*self.pm).ps;
+            let mut anim = BOTH_STAND2 as c_int;
+            let saber1 = BG_MySaber((*ps).clientNum, 0, self.bg);
+            let saber2 = BG_MySaber((*ps).clientNum, 1, self.bg);
 
-/// Raven `PM_DoSlowFall`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:321-329`
-// PORT-ESCALATION(pmove-working-state): reads `pm->ps`; needs the pmove working-set threading decision.
-pub fn PM_DoSlowFall() -> qboolean {
-    todo!("Port PM_DoSlowFall — parked: pmove-working-state")
-}
+            if (*ps).saberEntityNum == 0 {
+                //lost it
+                return BOTH_STAND1 as c_int;
+            }
 
-/// Raven `PM_pitch_roll_for_slope`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:346-439`
-// PORT-ESCALATION(pmove-working-state): writes `pm`; `storeAngles` is also a by-value vec3_t out-param.
-pub fn PM_pitch_roll_for_slope(
-    forwhom: *mut bgEntity_t,
-    pass_slope: vec3_t,
-    storeAngles: vec3_t,
-) {
-    todo!("Port PM_pitch_roll_for_slope — parked: pmove-working-state")
-}
+            if BG_SabersOff(ps) != qfalse {
+                return BOTH_STAND1 as c_int;
+            }
 
-/// Raven `PM_SetSpecialMoveValues`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:447-480`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`pm_entSelf`, writes `pm_flying`.
-pub fn PM_SetSpecialMoveValues() {
-    todo!("Port PM_SetSpecialMoveValues — parked: pmove-working-state")
-}
+            if !saber1.is_null() && (*saber1).readyAnim != -1 {
+                return (*saber1).readyAnim;
+            }
 
-/// Raven `PM_SetVehicleAngles`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:482-635`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`pm_entSelf`/`pml`.
-pub fn PM_SetVehicleAngles(
-    normal: vec3_t,
-) {
-    todo!("Port PM_SetVehicleAngles — parked: pmove-working-state")
+            if !saber2.is_null() && (*saber2).readyAnim != -1 {
+                return (*saber2).readyAnim;
+            }
+
+            if !saber1.is_null() && !saber2.is_null() && (*ps).saberHolstered == 0 {
+                //dual sabers, both on
+                return BOTH_SABERDUAL_STANCE as c_int;
+            }
+
+            let lvl = (*ps).fd.saberAnimLevel;
+            if lvl == saber_styles_t::SS_DUAL as c_int {
+                anim = BOTH_SABERDUAL_STANCE as c_int;
+            } else if lvl == saber_styles_t::SS_STAFF as c_int {
+                anim = BOTH_SABERSTAFF_STANCE as c_int;
+            } else if lvl == saber_styles_t::SS_FAST as c_int
+                || lvl == saber_styles_t::SS_TAVION as c_int
+            {
+                anim = BOTH_SABERFAST_STANCE as c_int;
+            } else if lvl == saber_styles_t::SS_STRONG as c_int {
+                anim = BOTH_SABERSLOW_STANCE as c_int;
+            } else {
+                // SS_NONE / SS_MEDIUM / SS_DESANN / default
+                anim = BOTH_STAND2 as c_int;
+            }
+            anim
+        }
+    }
+
+    /// Raven `PM_pitch_roll_for_slope`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:346-439`
+    // PORT-NOTE(fork-9): the resolved LAW signature keeps `storeAngles` by value, so
+    // writes into it are lost to the caller; the Raven `if (storeAngles)` NULL test is
+    // always-true here (only live caller PM_SetVehicleAngles passes a non-NULL buffer),
+    // so the else (viewangles) branch is unreachable. Reported as a shape_mismatch.
+    pub fn PM_pitch_roll_for_slope(
+        &mut self,
+        forwhom: *mut bgEntity_t,
+        pass_slope: vec3_t,
+        storeAngles: vec3_t,
+    ) {
+        unsafe {
+            let mut storeAngles = storeAngles;
+            let mut slope: vec3_t = [0.0; 3];
+            let mut nvf: vec3_t = [0.0; 3];
+            let mut ovf: vec3_t = [0.0; 3];
+            let mut ovr: vec3_t = [0.0; 3];
+            let mut startspot: vec3_t = [0.0; 3];
+            let mut endspot: vec3_t = [0.0; 3];
+            let mut new_angles: vec3_t = [0.0, 0.0, 0.0];
+
+            //if we don't have a slope, get one
+            if VectorCompare(crate::q_math::vec3_origin, pass_slope) != qfalse {
+                let mut trace: trace_t = core::mem::zeroed();
+
+                _VectorCopy((*(*self.pm).ps).origin, &mut startspot);
+                startspot[2] += (*self.pm).mins[2] + 4.0;
+                _VectorCopy(startspot, &mut endspot);
+                endspot[2] -= 300.0;
+                self.traps.trace(
+                    &mut trace,
+                    core::ptr::addr_of!((*(*self.pm).ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
+                    core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
+                    core::ptr::addr_of!(endspot) as *const vec3_t,
+                    (*forwhom).s.number,
+                    MASK_SOLID,
+                );
+
+                if trace.fraction >= 1.0 {
+                    return;
+                }
+
+                if VectorCompare(crate::q_math::vec3_origin, trace.plane.normal) != qfalse {
+                    return;
+                }
+
+                _VectorCopy(trace.plane.normal, &mut slope);
+            } else {
+                _VectorCopy(pass_slope, &mut slope);
+            }
+
+            if (*forwhom).s.NPC_class == CLASS_VEHICLE as c_int {
+                //special code for vehicles
+                let pVeh = (*forwhom).m_pVehicle as *mut Vehicle_t;
+                let mut tempAngles: vec3_t = [0.0; 3];
+
+                tempAngles[PITCH] = 0.0;
+                tempAngles[ROLL] = 0.0;
+                tempAngles[YAW] = (*pVeh).m_vOrientation[YAW];
+                AngleVectors(tempAngles, Some(&mut ovf), Some(&mut ovr), None);
+            } else {
+                AngleVectors((*(*self.pm).ps).viewangles, Some(&mut ovf), Some(&mut ovr), None);
+            }
+
+            vectoangles(slope, &mut new_angles);
+            let pitch = new_angles[PITCH] + 90.0;
+            new_angles[ROLL] = 0.0;
+            new_angles[PITCH] = 0.0;
+
+            AngleVectors(new_angles, Some(&mut nvf), None, None);
+
+            let mut r#mod = nvf[0] * ovr[0] + nvf[1] * ovr[1] + nvf[2] * ovr[2];
+            if r#mod < 0.0 {
+                r#mod = -1.0;
+            } else {
+                r#mod = 1.0;
+            }
+
+            let dot = nvf[0] * ovf[0] + nvf[1] * ovf[1] + nvf[2] * ovf[2];
+
+            // storeAngles is always "present" under the by-value LAW signature.
+            storeAngles[PITCH] = dot * pitch;
+            storeAngles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * r#mod;
+            let _ = &mut storeAngles;
+        }
+    }
+
+    /// Raven `PM_SetSpecialMoveValues`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:447-480`
+    pub fn PM_SetSpecialMoveValues(&mut self) {
+        unsafe {
+            if (*(*self.pm).ps).clientNum < MAX_CLIENTS as c_int {
+                //we know that real players aren't vehs
+                self.pm_flying = FLY_NONE;
+                return;
+            }
+
+            //default until we decide otherwise
+            self.pm_flying = FLY_NONE;
+
+            let pEnt = self.pm_entSelf;
+
+            if !pEnt.is_null() {
+                if (*(*self.pm).ps).eFlags2 & EF2_FLYING != 0 {
+                    self.pm_flying = FLY_NORMAL;
+                } else if (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int {
+                    let pv = (*pEnt).m_pVehicle as *mut Vehicle_t;
+                    if (*(*pv).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_FIGHTER as c_int {
+                        self.pm_flying = FLY_VEHICLE;
+                    } else if (*(*pv).m_pVehicleInfo).hoverHeight > 0.0 {
+                        self.pm_flying = FLY_HOVER;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Raven `PM_SetVehicleAngles`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:482-635`
+    // PORT-NOTE(fork-9): resolved LAW keeps `normal` by value, so the Raven `else if (normal)`
+    // NULL test cannot be expressed — the "in air" (normal==NULL) branch is unreachable here
+    // and callers pass a zero vec for the flying case. Reported as a shape_mismatch.
+    pub fn PM_SetVehicleAngles(&mut self, normal: vec3_t) {
+        unsafe {
+            let pEnt = self.pm_entSelf;
+            if pEnt.is_null() || (*pEnt).s.NPC_class != CLASS_VEHICLE as c_int {
+                return;
+            }
+
+            let pVeh = (*pEnt).m_pVehicle as *mut Vehicle_t;
+            let info = (*pVeh).m_pVehicleInfo;
+            let mut vAngles: vec3_t = [0.0; 3];
+            let pitchBias: f32;
+
+            let mut vehicleBankingSpeed = ((*info).bankingSpeed * 32.0) * self.pml.frametime;
+
+            if vehicleBankingSpeed <= 0.0
+                || ((*info).pitchLimit == 0.0 && (*info).rollLimit == 0.0)
+            {
+                //don't bother, this vehicle doesn't bank
+                return;
+            }
+
+            if (*info).r#type as c_int == vehicleType_t::VH_FIGHTER as c_int {
+                pitchBias = 0.0;
+            } else {
+                pitchBias = 90.0 * (*info).centerOfGravity[0];
+            }
+
+            VectorClear(&mut vAngles);
+            if (*self.pm).waterlevel > 0 {
+                //in water
+                vAngles[PITCH] += ((*(*self.pm).ps).viewangles[PITCH] - vAngles[PITCH]) * 0.75
+                    + (pitchBias as f64 * 0.5) as f32;
+            } else {
+                //have a valid surface below me (normal is always present under LAW)
+                self.PM_pitch_roll_for_slope(pEnt, normal, vAngles);
+                if self.pml.groundTrace.contents & (CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA)
+                    != 0
+                {
+                    //on water
+                    vAngles[PITCH] += ((*(*self.pm).ps).viewangles[PITCH] - vAngles[PITCH]) * 0.5
+                        + (pitchBias * 0.5);
+                }
+            }
+
+            //NOTE: if angles are flat and we're moving through air (not on ground), then pitch/bank?
+            if (*info).rollLimit > 0.0 {
+                //roll when banking
+                let mut velocity: vec3_t = [0.0; 3];
+                _VectorCopy((*(*self.pm).ps).velocity, &mut velocity);
+                velocity[2] = 0.0;
+                let mut speed = VectorNormalize(&mut velocity);
+                if speed > 32.0 || speed < -32.0 {
+                    let mut rt: vec3_t = [0.0; 3];
+                    let mut tempVAngles: vec3_t = [0.0; 3];
+
+                    // modulate the speed by a sine wave
+                    speed *= ((150.0 + self.pml.frametime) as f64 * 0.003).sin() as f32;
+
+                    if speed > 60.0 {
+                        speed = 60.0;
+                    }
+
+                    _VectorCopy((*pVeh).m_vOrientation, &mut tempVAngles);
+                    tempVAngles[ROLL] = 0.0;
+                    AngleVectors(tempVAngles, None, Some(&mut rt), None);
+                    let dp = velocity[0] * rt[0] + velocity[1] * rt[1] + velocity[2] * rt[2];
+                    let side = speed * dp;
+                    vAngles[ROLL] -= side;
+                }
+            }
+
+            //cap
+            if (*info).pitchLimit != -1.0 {
+                if vAngles[PITCH] > (*info).pitchLimit {
+                    vAngles[PITCH] = (*info).pitchLimit;
+                } else if vAngles[PITCH] < -(*info).pitchLimit {
+                    vAngles[PITCH] = -(*info).pitchLimit;
+                }
+            }
+
+            if vAngles[ROLL] > (*info).rollLimit {
+                vAngles[ROLL] = (*info).rollLimit;
+            } else if vAngles[ROLL] < -(*info).rollLimit {
+                vAngles[ROLL] = -(*info).rollLimit;
+            }
+
+            //do it
+            for i in 0..3usize {
+                if i == YAW {
+                    //yawing done elsewhere
+                    continue;
+                }
+                {
+                    if (*pVeh).m_vOrientation[i] >= vAngles[i] + vehicleBankingSpeed {
+                        (*pVeh).m_vOrientation[i] -= vehicleBankingSpeed;
+                    } else if (*pVeh).m_vOrientation[i] <= vAngles[i] - vehicleBankingSpeed {
+                        (*pVeh).m_vOrientation[i] += vehicleBankingSpeed;
+                    } else {
+                        (*pVeh).m_vOrientation[i] = vAngles[i];
+                    }
+                }
+            }
+            let _ = &mut vehicleBankingSpeed;
+        }
+    }
 }
 
 /// Raven `BG_ExternThisSoICanRecompileInDebug`.
@@ -251,43 +492,242 @@ pub fn BG_VehicleTurnRateForSpeed(
     }
 }
 
-/// Raven `PM_HoverTrace`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:719-901`
-// PORT-ESCALATION(pmove-working-state): reads `pm_entSelf`, writes `pm`/`pml`.
-pub fn PM_HoverTrace() {
-    todo!("Port PM_HoverTrace — parked: pmove-working-state")
-}
+impl PmoveContext<'_> {
+    /// Raven `PM_HoverTrace`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:719-901`
+    pub fn PM_HoverTrace(&mut self) {
+        unsafe {
+            let pEnt = self.pm_entSelf;
+            if pEnt.is_null() || (*pEnt).s.NPC_class != CLASS_VEHICLE as c_int {
+                return;
+            }
 
-/// Raven `PM_AddEvent`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:910-912`
-// PORT-ESCALATION(pmove-working-state): reads `pm`.
-pub fn PM_AddEvent(
-    newEvent: c_int,
-) {
-    todo!("Port PM_AddEvent — parked: pmove-working-state")
-}
+            let pVeh = (*pEnt).m_pVehicle as *mut Vehicle_t;
+            let info = (*pVeh).m_pVehicleInfo;
+            let hoverHeight = (*info).hoverHeight;
+            let trace = core::ptr::addr_of_mut!(self.pml.groundTrace);
 
-/// Raven `PM_AddEventWithParm`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:914-917`
-// PORT-ESCALATION(pmove-working-state): reads `pm`.
-pub fn PM_AddEventWithParm(
-    newEvent: c_int,
-    parm: c_int,
-) {
-    todo!("Port PM_AddEventWithParm — parked: pmove-working-state")
-}
+            let mut point: vec3_t = [0.0; 3];
+            let mut vAng: vec3_t = [0.0; 3];
+            let mut fxAxis: [vec3_t; 3] = [[0.0; 3]; 3];
 
-/// Raven `PM_AddTouchEnt`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:924-944`
-// PORT-ESCALATION(pmove-working-state): writes `pm->touchents`.
-pub fn PM_AddTouchEnt(
-    entityNum: c_int,
-) {
-    todo!("Port PM_AddTouchEnt — parked: pmove-working-state")
+            self.pml.groundPlane = qfalse;
+
+            let relativeWaterLevel = (*self.pm).waterlevel as f32;
+            if (*self.pm).waterlevel != 0 && relativeWaterLevel >= 0.0 {
+                //in water
+                if (*info).bouyancy <= 0.0 {
+                    //sink like a rock
+                } else {
+                    //rise up
+                    let floatHeight = ((*info).bouyancy
+                        * (((*self.pm).maxs[2] - (*self.pm).mins[2]) * 0.5))
+                        - (hoverHeight * 0.5);
+                    if relativeWaterLevel > floatHeight {
+                        //too low, should rise up
+                        (*(*self.pm).ps).velocity[2] +=
+                            (relativeWaterLevel - floatHeight) * (*pVeh).m_fTimeModifier;
+                    }
+                }
+                if (*self.pm).waterlevel <= 1 {
+                    //part of us is sticking out of water
+                    if Q_fabs((*(*self.pm).ps).velocity[0]) + Q_fabs((*(*self.pm).ps).velocity[1])
+                        > 100.0
+                    {
+                        //moving at a decent speed
+                        if self.bg.rng.Q_irand(self.pml.frametime as c_int, 100) >= 50 {
+                            //splash
+                            let mut wakeOrg: vec3_t = [0.0; 3];
+
+                            vAng[PITCH] = 0.0;
+                            vAng[ROLL] = 0.0;
+                            vAng[YAW] = (*pVeh).m_vOrientation[YAW];
+                            AngleVectors(
+                                vAng,
+                                Some(&mut fxAxis[2]),
+                                Some(&mut fxAxis[1]),
+                                Some(&mut fxAxis[0]),
+                            );
+                            _VectorCopy((*(*self.pm).ps).origin, &mut wakeOrg);
+                            if (*self.pm).waterlevel >= 2 {
+                                wakeOrg[2] = (*(*self.pm).ps).origin[2] + 16.0;
+                            } else {
+                                wakeOrg[2] = (*(*self.pm).ps).origin[2];
+                            }
+                            // QAGAME: tempent use bad!
+                            if (*info).iWakeFX != 0 {
+                                self.callbacks.add_event(
+                                    (*pEnt).s.number,
+                                    EV_PLAY_EFFECT_ID as c_int,
+                                    (*info).iWakeFX,
+                                );
+                            }
+                        }
+                    }
+                }
+            } else {
+                let mut minNormal = MIN_WALK_NORMAL;
+                minNormal = (*info).maxSlope;
+
+                point[0] = (*(*self.pm).ps).origin[0];
+                point[1] = (*(*self.pm).ps).origin[1];
+                point[2] = (*(*self.pm).ps).origin[2] - hoverHeight;
+
+                let mut traceContents = (*self.pm).tracemask;
+                if (*info).bouyancy >= 2.0 {
+                    //sit on water
+                    traceContents |= CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA;
+                }
+                self.traps.trace(
+                    trace,
+                    core::ptr::addr_of!((*(*self.pm).ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!((*self.pm).mins) as *const vec3_t,
+                    core::ptr::addr_of!((*self.pm).maxs) as *const vec3_t,
+                    core::ptr::addr_of!(point) as *const vec3_t,
+                    (*(*self.pm).ps).clientNum,
+                    traceContents,
+                );
+                if (*trace).plane.normal[0] > 0.5
+                    || (*trace).plane.normal[0] < -0.5
+                    || (*trace).plane.normal[1] > 0.5
+                    || (*trace).plane.normal[1] < -0.5
+                {
+                    //steep slanted hill, don't go up it.
+                    let mut d = Q_fabs((*trace).plane.normal[0]);
+                    let e = Q_fabs((*trace).plane.normal[1]);
+                    if e > d {
+                        d = e;
+                    }
+                    (*(*self.pm).ps).velocity[2] = -300.0 * d;
+                } else if (*trace).plane.normal[2] >= minNormal {
+                    //not a steep slope, so push us up
+                    if (*trace).fraction < 1.0 {
+                        //push up off ground
+                        let hoverForce = (*info).hoverStrength;
+                        if (*trace).fraction > 0.5 {
+                            (*(*self.pm).ps).velocity[2] +=
+                                (1.0 - (*trace).fraction) * hoverForce * (*pVeh).m_fTimeModifier;
+                        } else {
+                            (*(*self.pm).ps).velocity[2] += (0.5
+                                - ((*trace).fraction * (*trace).fraction))
+                                * hoverForce
+                                * 2.0
+                                * (*pVeh).m_fTimeModifier;
+                        }
+                        if (*trace).contents & (CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA)
+                            != 0
+                        {
+                            //hovering on water, make a spash if moving
+                            if Q_fabs((*(*self.pm).ps).velocity[0])
+                                + Q_fabs((*(*self.pm).ps).velocity[1])
+                                > 100.0
+                            {
+                                //moving at a decent speed
+                                if self.bg.rng.Q_irand(self.pml.frametime as c_int, 100) >= 50 {
+                                    //splash
+                                    vAng[PITCH] = 0.0;
+                                    vAng[ROLL] = 0.0;
+                                    vAng[YAW] = (*pVeh).m_vOrientation[YAW];
+                                    AngleVectors(
+                                        vAng,
+                                        Some(&mut fxAxis[2]),
+                                        Some(&mut fxAxis[1]),
+                                        Some(&mut fxAxis[0]),
+                                    );
+                                    if (*info).iWakeFX != 0 {
+                                        self.callbacks.play_effect_id(
+                                            (*info).iWakeFX,
+                                            core::ptr::addr_of!((*trace).endpos),
+                                            core::ptr::addr_of!(fxAxis[0]),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        self.pml.groundPlane = qtrue;
+                    }
+                }
+                let _ = &mut minNormal;
+            }
+            if self.pml.groundPlane != qfalse {
+                let n = self.pml.groundTrace.plane.normal;
+                self.PM_SetVehicleAngles(n);
+                // We're on the ground.
+                (*pVeh).m_ulFlags &= !VEH_FLYING;
+
+                (*pVeh).m_vAngularVelocity = 0.0;
+            } else {
+                // NULL call: flying-in-air; by-value normal cannot express NULL (fork-9).
+                self.PM_SetVehicleAngles(crate::q_math::vec3_origin);
+                // We're flying in the air.
+                (*pVeh).m_ulFlags |= VEH_FLYING;
+
+                if (*pVeh).m_vAngularVelocity == 0.0 {
+                    (*pVeh).m_vAngularVelocity =
+                        (*pVeh).m_vOrientation[YAW] - (*pVeh).m_vPrevOrientation[YAW];
+                    if (*pVeh).m_vAngularVelocity < -15.0 {
+                        (*pVeh).m_vAngularVelocity = -15.0;
+                    }
+                    if (*pVeh).m_vAngularVelocity > 15.0 {
+                        (*pVeh).m_vAngularVelocity = 15.0;
+                    }
+                }
+                if (*pVeh).m_vAngularVelocity > 0.0 {
+                    (*pVeh).m_vAngularVelocity -= self.pml.frametime;
+                    if (*pVeh).m_vAngularVelocity < 0.0 {
+                        (*pVeh).m_vAngularVelocity = 0.0;
+                    }
+                } else if (*pVeh).m_vAngularVelocity < 0.0 {
+                    (*pVeh).m_vAngularVelocity += self.pml.frametime;
+                    if (*pVeh).m_vAngularVelocity > 0.0 {
+                        (*pVeh).m_vAngularVelocity = 0.0;
+                    }
+                }
+            }
+            self.PM_GroundTraceMissed();
+        }
+    }
+
+    /// Raven `PM_AddEvent`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:910-912`
+    pub fn PM_AddEvent(&mut self, newEvent: c_int) {
+        unsafe {
+            BG_AddPredictableEventToPlayerstate(newEvent, 0, (*self.pm).ps);
+        }
+    }
+
+    /// Raven `PM_AddEventWithParm`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:914-917`
+    pub fn PM_AddEventWithParm(&mut self, newEvent: c_int, parm: c_int) {
+        unsafe {
+            BG_AddPredictableEventToPlayerstate(newEvent, parm, (*self.pm).ps);
+        }
+    }
+
+    /// Raven `PM_AddTouchEnt`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:924-944`
+    pub fn PM_AddTouchEnt(&mut self, entityNum: c_int) {
+        unsafe {
+            let pm = self.pm;
+            if entityNum == ENTITYNUM_WORLD {
+                return;
+            }
+            if (*pm).numtouch == MAXTOUCH as c_int {
+                return;
+            }
+
+            // see if it is already added
+            for i in 0..(*pm).numtouch {
+                if (*pm).touchents[i as usize] == entityNum {
+                    return;
+                }
+            }
+
+            // add it
+            (*pm).touchents[(*pm).numtouch as usize] = entityNum;
+            (*pm).numtouch += 1;
+        }
+    }
 }
 
 // The pmove pipeline as `PmoveContext` methods (pass-3 rulings 12/8a). Each was
@@ -511,11 +951,20 @@ impl PmoveContext<'_> {
         }
     }
 
-    /// Raven `PM_DoSlowFall` — reads `pm->ps`; ported in the pass-3 remainder.
-    //TODO: Port PM_DoSlowFall
-    // Source: oracle/oracle/codemp/game/bg_pmove.c:321-329
+    /// Raven `PM_DoSlowFall`.
+    /// Source: oracle/oracle/codemp/game/bg_pmove.c:321-329
     pub fn PM_DoSlowFall(&mut self) -> qboolean {
-        todo!("Port PM_DoSlowFall — pass 3 (bg_pmove.c:321-329)")
+        use animNumber_t::*;
+        unsafe {
+            let ps = (*self.pm).ps;
+            if ((*ps).legsAnim == BOTH_WALL_RUN_RIGHT as c_int
+                || (*ps).legsAnim == BOTH_WALL_RUN_LEFT as c_int)
+                && (*ps).legsTimer > 500
+            {
+                return qtrue;
+            }
+            qfalse
+        }
     }
 
     /// Raven `PmoveSingle` — one fixed-timestep move. The opening (proxy button
@@ -573,50 +1022,202 @@ impl PmoveContext<'_> {
     }
 }
 
-/// Raven `PM_Accelerate`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1133-1186`
-// PORT-ESCALATION(pmove-working-state): reads `pml`, writes `pm`.
-pub fn PM_Accelerate(
-    wishdir: vec3_t,
-    wishspeed: f32,
-    accel: f32,
-) {
-    todo!("Port PM_Accelerate — parked: pmove-working-state")
-}
+impl PmoveContext<'_> {
+    /// Raven `PM_Accelerate`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1133-1186`
+    pub fn PM_Accelerate(&mut self, wishdir: vec3_t, wishspeed: f32, accel: f32) {
+        unsafe {
+            let ps = (*self.pm).ps;
+            if (*self.pm).gametype != GT_SIEGE as c_int
+                || (*ps).m_iVehicleNum != 0
+                || (*ps).clientNum >= MAX_CLIENTS as c_int
+                || (*ps).pm_type != PM_NORMAL as c_int
+            {
+                //standard method, allows "bunnyhopping" and whatnot
+                let currentspeed = (*ps).velocity[0] * wishdir[0]
+                    + (*ps).velocity[1] * wishdir[1]
+                    + (*ps).velocity[2] * wishdir[2];
+                let addspeed = wishspeed - currentspeed;
+                if addspeed <= 0.0 && (*ps).clientNum < MAX_CLIENTS as c_int {
+                    return;
+                }
 
-/// Raven `PM_CmdScale`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1199-1222`
-// PORT-ESCALATION(pmove-working-state): reads `pm`.
-pub fn PM_CmdScale(
-    cmd: *mut usercmd_t,
-) -> f32 {
-    todo!("Port PM_CmdScale — parked: pmove-working-state")
-}
+                let accelspeed;
+                if addspeed < 0.0 {
+                    let mut a = (-accel) * self.pml.frametime * wishspeed;
+                    if a < addspeed {
+                        a = addspeed;
+                    }
+                    accelspeed = a;
+                } else {
+                    let mut a = accel * self.pml.frametime * wishspeed;
+                    if a > addspeed {
+                        a = addspeed;
+                    }
+                    accelspeed = a;
+                }
 
-/// Raven `PM_SetMovementDir`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1233-1262`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_SetMovementDir() {
-    todo!("Port PM_SetMovementDir — parked: pmove-working-state")
-}
+                for i in 0..3 {
+                    (*ps).velocity[i] += accelspeed * wishdir[i];
+                }
+            } else {
+                //use the proper way for siege
+                let mut wishVelocity: vec3_t = [0.0; 3];
+                let mut pushDir: vec3_t = [0.0; 3];
 
-/// Raven `PM_ForceJumpingUp`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1266-1306`
-// PORT-ESCALATION(pmove-working-state): reads `pm`.
-pub fn PM_ForceJumpingUp() -> qboolean {
-    todo!("Port PM_ForceJumpingUp — parked: pmove-working-state")
-}
+                _VectorScale(wishdir, wishspeed, &mut wishVelocity);
+                _VectorSubtract(wishVelocity, (*ps).velocity, &mut pushDir);
+                let pushLen = VectorNormalize(&mut pushDir);
 
-/// Raven `PM_JumpForDir`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1308-1340`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_JumpForDir() {
-    todo!("Port PM_JumpForDir — parked: pmove-working-state")
+                let mut canPush = accel * self.pml.frametime * wishspeed;
+                if canPush > pushLen {
+                    canPush = pushLen;
+                }
+
+                let v = (*ps).velocity;
+                _VectorMA(v, canPush, pushDir, &mut (*ps).velocity);
+            }
+        }
+    }
+
+    /// Raven `PM_CmdScale`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1199-1222`
+    pub fn PM_CmdScale(&mut self, cmd: *mut usercmd_t) -> f32 {
+        unsafe {
+            let umove: c_int = 0; //cmd->upmove; don't factor upmove into scaling speed
+
+            let mut max = ((*cmd).forwardmove as c_int).abs();
+            if ((*cmd).rightmove as c_int).abs() > max {
+                max = ((*cmd).rightmove as c_int).abs();
+            }
+            if umove.abs() > max {
+                max = umove.abs();
+            }
+            if max == 0 {
+                return 0.0;
+            }
+
+            let total = ((((*cmd).forwardmove as c_int) * ((*cmd).forwardmove as c_int)
+                + ((*cmd).rightmove as c_int) * ((*cmd).rightmove as c_int)
+                + umove * umove) as f32)
+                .sqrt();
+            let scale = (*(*self.pm).ps).speed * max as f32 / (127.0 * total);
+
+            scale
+        }
+    }
+
+    /// Raven `PM_SetMovementDir`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1233-1262`
+    pub fn PM_SetMovementDir(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            if (*pm).cmd.forwardmove != 0 || (*pm).cmd.rightmove != 0 {
+                if (*pm).cmd.rightmove == 0 && (*pm).cmd.forwardmove > 0 {
+                    (*ps).movementDir = 0;
+                } else if (*pm).cmd.rightmove < 0 && (*pm).cmd.forwardmove > 0 {
+                    (*ps).movementDir = 1;
+                } else if (*pm).cmd.rightmove < 0 && (*pm).cmd.forwardmove == 0 {
+                    (*ps).movementDir = 2;
+                } else if (*pm).cmd.rightmove < 0 && (*pm).cmd.forwardmove < 0 {
+                    (*ps).movementDir = 3;
+                } else if (*pm).cmd.rightmove == 0 && (*pm).cmd.forwardmove < 0 {
+                    (*ps).movementDir = 4;
+                } else if (*pm).cmd.rightmove > 0 && (*pm).cmd.forwardmove < 0 {
+                    (*ps).movementDir = 5;
+                } else if (*pm).cmd.rightmove > 0 && (*pm).cmd.forwardmove == 0 {
+                    (*ps).movementDir = 6;
+                } else if (*pm).cmd.rightmove > 0 && (*pm).cmd.forwardmove > 0 {
+                    (*ps).movementDir = 7;
+                }
+            } else {
+                // if they aren't actively going directly sideways, change the
+                // animation to the diagonal so they don't stop too crooked
+                if (*ps).movementDir == 2 {
+                    (*ps).movementDir = 1;
+                } else if (*ps).movementDir == 6 {
+                    (*ps).movementDir = 7;
+                }
+            }
+        }
+    }
+
+    /// Raven `PM_ForceJumpingUp`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1266-1306`
+    pub fn PM_ForceJumpingUp(&mut self) -> qboolean {
+        unsafe {
+            let ps = (*self.pm).ps;
+            if (*ps).fd.forcePowersActive & (1 << FP_LEVITATION) == 0
+                && (*ps).fd.forceJumpCharge != 0
+            {
+                //already jumped and let go
+                return qfalse;
+            }
+
+            if BG_InSpecialJump((*ps).legsAnim) != qfalse {
+                return qfalse;
+            }
+
+            if BG_SaberInSpecial((*ps).saberMove) != qfalse {
+                return qfalse;
+            }
+
+            if BG_SaberInSpecialAttack((*ps).legsAnim) != qfalse {
+                return qfalse;
+            }
+
+            if BG_HasYsalamiri((*self.pm).gametype, ps) != qfalse {
+                return qfalse;
+            }
+
+            if BG_CanUseFPNow((*self.pm).gametype, ps, (*self.pm).cmd.serverTime, FP_LEVITATION)
+                == qfalse
+            {
+                return qfalse;
+            }
+
+            if (*ps).groundEntityNum == ENTITYNUM_NONE //in air
+                && (*ps).pm_flags & PMF_JUMP_HELD != 0 //jumped
+                && (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] > FORCE_LEVEL_0 //force-jump capable
+                && (*ps).velocity[2] > 0.0
+            //going up
+            {
+                return qtrue;
+            }
+            qfalse
+        }
+    }
+
+    /// Raven `PM_JumpForDir`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1308-1340`
+    pub fn PM_JumpForDir(&mut self) {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let anim;
+            if (*pm).cmd.forwardmove > 0 {
+                anim = BOTH_JUMP1 as c_int;
+                (*ps).pm_flags &= !PMF_BACKWARDS_JUMP;
+            } else if (*pm).cmd.forwardmove < 0 {
+                anim = BOTH_JUMPBACK1 as c_int;
+                (*ps).pm_flags |= PMF_BACKWARDS_JUMP;
+            } else if (*pm).cmd.rightmove > 0 {
+                anim = BOTH_JUMPRIGHT1 as c_int;
+                (*ps).pm_flags &= !PMF_BACKWARDS_JUMP;
+            } else if (*pm).cmd.rightmove < 0 {
+                anim = BOTH_JUMPLEFT1 as c_int;
+                (*ps).pm_flags &= !PMF_BACKWARDS_JUMP;
+            } else {
+                anim = BOTH_JUMP1 as c_int;
+                (*ps).pm_flags &= !PMF_BACKWARDS_JUMP;
+            }
+            if BG_InDeathAnim((*ps).legsAnim) == qfalse {
+                self.PM_SetAnim(SETANIM_LEGS, anim, SETANIM_FLAG_OVERRIDE, 100);
+            }
+        }
+    }
 }
 
 /// Raven `PM_SetPMViewAngle`.
@@ -637,253 +1238,3058 @@ pub fn PM_SetPMViewAngle(
     }
 }
 
-/// Raven `PM_AdjustAngleForWallRun`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1356-1462`
-// PORT-ESCALATION(pmove-working-state): reads `pm`.
-pub fn PM_AdjustAngleForWallRun(
-    ps: *mut playerState_t,
-    ucmd: *mut usercmd_t,
-    doMove: qboolean,
-) -> qboolean {
-    todo!("Port PM_AdjustAngleForWallRun — parked: pmove-working-state")
-}
+impl PmoveContext<'_> {
+    /// Raven `PM_AdjustAngleForWallRun`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1356-1462`
+    pub fn PM_AdjustAngleForWallRun(
+        &mut self,
+        ps: *mut playerState_t,
+        ucmd: *mut usercmd_t,
+        doMove: qboolean,
+    ) -> qboolean {
+        use animNumber_t::*;
+        unsafe {
+            if ((*ps).legsAnim == BOTH_WALL_RUN_RIGHT as c_int
+                || (*ps).legsAnim == BOTH_WALL_RUN_LEFT as c_int)
+                && (*ps).legsTimer > 500
+            {
+                //wall-running and not at end of anim
+                let mut fwd: vec3_t = [0.0; 3];
+                let mut rt: vec3_t = [0.0; 3];
+                let mut traceTo: vec3_t = [0.0; 3];
+                let mut mins: vec3_t = [0.0; 3];
+                let mut maxs: vec3_t = [0.0; 3];
+                let mut fwdAngles: vec3_t = [0.0; 3];
+                let mut trace: trace_t = core::mem::zeroed();
+                let dist;
+                let yawAdjust;
 
-/// Raven `PM_AdjustAnglesForWallRunUpFlipAlt`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1464-1470`
-// PORT-ESCALATION(pmove-working-state): reads `pm`.
-pub fn PM_AdjustAnglesForWallRunUpFlipAlt(
-    ucmd: *mut usercmd_t,
-) -> qboolean {
-    todo!("Port PM_AdjustAnglesForWallRunUpFlipAlt — parked: pmove-working-state")
-}
+                VectorSet(&mut mins, -15.0, -15.0, 0.0);
+                VectorSet(&mut maxs, 15.0, 15.0, 24.0);
+                VectorSet(&mut fwdAngles, 0.0, (*(*self.pm).ps).viewangles[YAW], 0.0);
 
-/// Raven `PM_AdjustAngleForWallRunUp`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1472-1598`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_AdjustAngleForWallRunUp(
-    ps: *mut playerState_t,
-    ucmd: *mut usercmd_t,
-    doMove: qboolean,
-) -> qboolean {
-    todo!("Port PM_AdjustAngleForWallRunUp — parked: pmove-working-state")
+                AngleVectors(fwdAngles, Some(&mut fwd), Some(&mut rt), None);
+                if (*ps).legsAnim == BOTH_WALL_RUN_RIGHT as c_int {
+                    dist = 128.0;
+                    yawAdjust = -90.0;
+                } else {
+                    dist = -128.0;
+                    yawAdjust = 90.0;
+                }
+                _VectorMA((*ps).origin, dist, rt, &mut traceTo);
+
+                self.traps.trace(
+                    &mut trace,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!(mins) as *const vec3_t,
+                    core::ptr::addr_of!(maxs) as *const vec3_t,
+                    core::ptr::addr_of!(traceTo) as *const vec3_t,
+                    (*ps).clientNum,
+                    MASK_PLAYERSOLID,
+                );
+
+                if trace.fraction < 1.0
+                    && (trace.plane.normal[2] >= 0.0 && trace.plane.normal[2] <= 0.4)
+                {
+                    let mut trace2: trace_t = core::mem::zeroed();
+                    let mut traceTo2: vec3_t = [0.0; 3];
+                    let mut wallRunFwd: vec3_t = [0.0; 3];
+                    let mut wallRunAngles: vec3_t = [0.0; 3];
+
+                    VectorClear(&mut wallRunAngles);
+                    wallRunAngles[YAW] = vectoyaw(trace.plane.normal) + yawAdjust;
+                    AngleVectors(wallRunAngles, Some(&mut wallRunFwd), None, None);
+
+                    _VectorMA((*(*self.pm).ps).origin, 32.0, wallRunFwd, &mut traceTo2);
+                    self.traps.trace(
+                        &mut trace2,
+                        core::ptr::addr_of!((*(*self.pm).ps).origin) as *const vec3_t,
+                        core::ptr::addr_of!(mins) as *const vec3_t,
+                        core::ptr::addr_of!(maxs) as *const vec3_t,
+                        core::ptr::addr_of!(traceTo2) as *const vec3_t,
+                        (*(*self.pm).ps).clientNum,
+                        MASK_PLAYERSOLID,
+                    );
+                    if trace2.fraction < 1.0
+                        && (trace2.plane.normal[0] * wallRunFwd[0]
+                            + trace2.plane.normal[1] * wallRunFwd[1]
+                            + trace2.plane.normal[2] * wallRunFwd[2])
+                            <= -0.999
+                    {
+                        //wall we can't run on in front of us
+                        trace.fraction = 1.0; //just a way to get it to kick us off the wall below
+                    }
+                }
+
+                if trace.fraction < 1.0
+                    && (trace.plane.normal[2] >= 0.0 && trace.plane.normal[2] <= 0.4)
+                {
+                    //still a wall there
+                    if (*ps).legsAnim == BOTH_WALL_RUN_RIGHT as c_int {
+                        (*ucmd).rightmove = 127;
+                    } else {
+                        (*ucmd).rightmove = -127;
+                    }
+                    if (*ucmd).upmove < 0 {
+                        (*ucmd).upmove = 0;
+                    }
+                    //make me face perpendicular to the wall
+                    (*ps).viewangles[YAW] = vectoyaw(trace.plane.normal) + yawAdjust;
+
+                    PM_SetPMViewAngle(ps, (*ps).viewangles, ucmd);
+
+                    (*ucmd).angles[YAW] = ((((*ps).viewangles[YAW] * 65536.0 / 360.0) as c_int
+                        & 65535)
+                        - (*ps).delta_angles[YAW] as c_int)
+                        as i16;
+                    if doMove != qfalse {
+                        //push me forward
+                        let zVel = (*ps).velocity[2];
+                        if (*ps).legsTimer > 500 {
+                            //not at end of anim yet
+                            let mut speed = 175.0;
+                            if (*ucmd).forwardmove < 0 {
+                                speed = 100.0;
+                            } else if (*ucmd).forwardmove > 0 {
+                                speed = 250.0; //running speed
+                            }
+                            _VectorScale(fwd, speed, &mut (*ps).velocity);
+                        }
+                        (*ps).velocity[2] = zVel; //preserve z velocity
+                        //pull me toward the wall, too
+                        let v = (*ps).velocity;
+                        _VectorMA(v, dist, rt, &mut (*ps).velocity);
+                    }
+                    (*ucmd).forwardmove = 0;
+                    return qtrue;
+                } else if doMove != qfalse {
+                    //stop it
+                    if (*ps).legsAnim == BOTH_WALL_RUN_RIGHT as c_int {
+                        self.PM_SetAnim(
+                            SETANIM_BOTH,
+                            BOTH_WALL_RUN_RIGHT_STOP as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            0,
+                        );
+                    } else if (*ps).legsAnim == BOTH_WALL_RUN_LEFT as c_int {
+                        self.PM_SetAnim(
+                            SETANIM_BOTH,
+                            BOTH_WALL_RUN_LEFT_STOP as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            0,
+                        );
+                    }
+                }
+            }
+
+            qfalse
+        }
+    }
+
+    /// Raven `PM_AdjustAnglesForWallRunUpFlipAlt`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1464-1470`
+    pub fn PM_AdjustAnglesForWallRunUpFlipAlt(&mut self, ucmd: *mut usercmd_t) -> qboolean {
+        unsafe {
+            PM_SetPMViewAngle((*self.pm).ps, (*(*self.pm).ps).viewangles, ucmd);
+            qtrue
+        }
+    }
+
+    /// Raven `PM_AdjustAngleForWallRunUp`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1472-1598`
+    pub fn PM_AdjustAngleForWallRunUp(
+        &mut self,
+        ps: *mut playerState_t,
+        ucmd: *mut usercmd_t,
+        doMove: qboolean,
+    ) -> qboolean {
+        use animNumber_t::*;
+        unsafe {
+            if (*ps).legsAnim == BOTH_FORCEWALLRUNFLIP_START as c_int {
+                //wall-running up
+                let mut fwd: vec3_t = [0.0; 3];
+                let mut traceTo: vec3_t = [0.0; 3];
+                let mut mins: vec3_t = [0.0; 3];
+                let mut maxs: vec3_t = [0.0; 3];
+                let mut fwdAngles: vec3_t = [0.0; 3];
+                let mut trace: trace_t = core::mem::zeroed();
+                let dist = 128.0f32;
+
+                VectorSet(&mut mins, -15.0, -15.0, 0.0);
+                VectorSet(&mut maxs, 15.0, 15.0, 24.0);
+                VectorSet(&mut fwdAngles, 0.0, (*(*self.pm).ps).viewangles[YAW], 0.0);
+
+                AngleVectors(fwdAngles, Some(&mut fwd), None, None);
+                _VectorMA((*ps).origin, dist, fwd, &mut traceTo);
+                self.traps.trace(
+                    &mut trace,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!(mins) as *const vec3_t,
+                    core::ptr::addr_of!(maxs) as *const vec3_t,
+                    core::ptr::addr_of!(traceTo) as *const vec3_t,
+                    (*ps).clientNum,
+                    MASK_PLAYERSOLID,
+                );
+                if trace.fraction > 0.5 {
+                    //hmm, some room, see if there's a floor right here
+                    let mut trace2: trace_t = core::mem::zeroed();
+                    let mut top: vec3_t = [0.0; 3];
+                    let mut bottom: vec3_t = [0.0; 3];
+
+                    _VectorCopy(trace.endpos, &mut top);
+                    top[2] += ((*self.pm).mins[2] * -1.0) + 4.0;
+                    _VectorCopy(top, &mut bottom);
+                    bottom[2] -= 64.0;
+                    self.traps.trace(
+                        &mut trace2,
+                        core::ptr::addr_of!(top) as *const vec3_t,
+                        core::ptr::addr_of!((*self.pm).mins) as *const vec3_t,
+                        core::ptr::addr_of!((*self.pm).maxs) as *const vec3_t,
+                        core::ptr::addr_of!(bottom) as *const vec3_t,
+                        (*ps).clientNum,
+                        MASK_PLAYERSOLID,
+                    );
+                    if trace2.allsolid == qfalse
+                        && trace2.startsolid == qfalse
+                        && trace2.fraction < 1.0
+                        && trace2.plane.normal[2] > 0.7
+                    {
+                        //slope we can stand on
+                        _VectorScale(fwd, 100.0, &mut (*(*self.pm).ps).velocity);
+                        (*(*self.pm).ps).velocity[2] += 400.0;
+                        self.PM_SetAnim(
+                            SETANIM_BOTH,
+                            BOTH_FORCEWALLRUNFLIP_ALT as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            0,
+                        );
+                        (*(*self.pm).ps).pm_flags |= PMF_JUMP_HELD;
+                        self.PM_AddEvent(EV_JUMP as c_int);
+                        (*ucmd).upmove = 0;
+                        return qfalse;
+                    }
+                }
+
+                if (*ps).legsTimer > 0
+                    && (*ucmd).forwardmove > 0
+                    && trace.fraction < 1.0
+                    && (trace.plane.normal[2] >= 0.0 && trace.plane.normal[2] <= 0.4)
+                {
+                    //still a vertical wall there
+                    //make sure there's not a ceiling above us!
+                    let mut trace2: trace_t = core::mem::zeroed();
+                    _VectorCopy((*ps).origin, &mut traceTo);
+                    traceTo[2] += 64.0;
+                    self.traps.trace(
+                        &mut trace2,
+                        core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                        core::ptr::addr_of!(mins) as *const vec3_t,
+                        core::ptr::addr_of!(maxs) as *const vec3_t,
+                        core::ptr::addr_of!(traceTo) as *const vec3_t,
+                        (*ps).clientNum,
+                        MASK_PLAYERSOLID,
+                    );
+                    if trace2.fraction < 1.0 {
+                        //will hit a ceiling, so force jump-off right now
+                    } else {
+                        //all clear, keep going
+                        (*ucmd).forwardmove = 127;
+                        if (*ucmd).upmove < 0 {
+                            (*ucmd).upmove = 0;
+                        }
+                        //make me face the wall
+                        (*ps).viewangles[YAW] = vectoyaw(trace.plane.normal) + 180.0;
+                        PM_SetPMViewAngle(ps, (*ps).viewangles, ucmd);
+                        (*ucmd).angles[YAW] = ((((*ps).viewangles[YAW] * 65536.0 / 360.0)
+                            as c_int
+                            & 65535)
+                            - (*ps).delta_angles[YAW] as c_int)
+                            as i16;
+                        if true
+                        //aslkfhsakf
+                        {
+                            if doMove != qfalse {
+                                //pull me toward the wall
+                                _VectorScale(
+                                    trace.plane.normal,
+                                    -dist * trace.fraction,
+                                    &mut (*ps).velocity,
+                                );
+                                //push me up
+                                if (*ps).legsTimer > 200 {
+                                    //not at end of anim yet
+                                    let speed = 300.0;
+                                    (*ps).velocity[2] = speed; //preserve z velocity
+                                }
+                            }
+                        }
+                        (*ucmd).forwardmove = 0;
+                        return qtrue;
+                    }
+                }
+                //failed!
+                if doMove != qfalse {
+                    //stop it
+                    _VectorScale(fwd, -300.0, &mut (*ps).velocity);
+                    (*ps).velocity[2] += 200.0;
+                    self.PM_SetAnim(
+                        SETANIM_BOTH,
+                        BOTH_FORCEWALLRUNFLIP_END as c_int,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        0,
+                    );
+                    (*ps).pm_flags |= PMF_JUMP_HELD;
+                    self.PM_AddEvent(EV_JUMP as c_int);
+                    (*ucmd).upmove = 0;
+                }
+            }
+            qfalse
+        }
+    }
 }
 
 /// Raven `BG_ForceWallJumpStrength`.
-///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1602-1605`
-// PORT-ESCALATION(missing-global-table): returns `forceJumpStrength[FORCE_LEVEL_3]/2.5f`. The
-// backfill supplies only `JUMP_VELOCITY` (element 0); the full `forceJumpStrength` file-scope
-// table (a bg_pmove.c global, also parked in NPC_AI_Jedi.rs) is unresolved — no invention allowed.
 pub fn BG_ForceWallJumpStrength() -> f32 {
-    todo!("Port BG_ForceWallJumpStrength — parked: missing-global-table")
+    mp_bg::local::forceJumpStrength[FORCE_LEVEL_3 as usize] / 2.5
 }
 
-/// Raven `PM_AdjustAngleForWallJump`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1607-1756`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_AdjustAngleForWallJump(
-    ps: *mut playerState_t,
-    ucmd: *mut usercmd_t,
-    doMove: qboolean,
-) -> qboolean {
-    todo!("Port PM_AdjustAngleForWallJump — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_AdjustAngleForWallJump`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1607-1756`
+    pub fn PM_AdjustAngleForWallJump(
+        &mut self,
+        ps: *mut playerState_t,
+        ucmd: *mut usercmd_t,
+        doMove: qboolean,
+    ) -> qboolean {
+        use crate::saber::saber_flags::*;
+        use animNumber_t::*;
+        unsafe {
+            if ((BG_InReboundJump((*ps).legsAnim) != qfalse
+                || BG_InReboundHold((*ps).legsAnim) != qfalse)
+                && (BG_InReboundJump((*ps).torsoAnim) != qfalse
+                    || BG_InReboundHold((*ps).torsoAnim) != qfalse))
+                || ((*(*self.pm).ps).pm_flags & PMF_STUCK_TO_WALL != 0)
+            {
+                //hugging wall, getting ready to jump off
+                let mut checkDir: vec3_t = [0.0; 3];
+                let mut traceTo: vec3_t = [0.0; 3];
+                let mut mins: vec3_t = [0.0; 3];
+                let mut maxs: vec3_t = [0.0; 3];
+                let mut fwdAngles: vec3_t = [0.0; 3];
+                let mut trace: trace_t = core::mem::zeroed();
+                let dist = 128.0f32;
+                let yawAdjust;
+
+                VectorSet(&mut mins, (*self.pm).mins[0], (*self.pm).mins[1], 0.0);
+                VectorSet(&mut maxs, (*self.pm).maxs[0], (*self.pm).maxs[1], 24.0);
+                VectorSet(&mut fwdAngles, 0.0, (*(*self.pm).ps).viewangles[YAW], 0.0);
+
+                let la = (*ps).legsAnim;
+                if la == BOTH_FORCEWALLREBOUND_RIGHT as c_int
+                    || la == BOTH_FORCEWALLHOLD_RIGHT as c_int
+                {
+                    AngleVectors(fwdAngles, None, Some(&mut checkDir), None);
+                    yawAdjust = -90.0;
+                } else if la == BOTH_FORCEWALLREBOUND_LEFT as c_int
+                    || la == BOTH_FORCEWALLHOLD_LEFT as c_int
+                {
+                    AngleVectors(fwdAngles, None, Some(&mut checkDir), None);
+                    let c = checkDir;
+                    _VectorScale(c, -1.0, &mut checkDir);
+                    yawAdjust = 90.0;
+                } else if la == BOTH_FORCEWALLREBOUND_FORWARD as c_int
+                    || la == BOTH_FORCEWALLHOLD_FORWARD as c_int
+                {
+                    AngleVectors(fwdAngles, Some(&mut checkDir), None, None);
+                    yawAdjust = 180.0;
+                } else if la == BOTH_FORCEWALLREBOUND_BACK as c_int
+                    || la == BOTH_FORCEWALLHOLD_BACK as c_int
+                {
+                    AngleVectors(fwdAngles, Some(&mut checkDir), None, None);
+                    let c = checkDir;
+                    _VectorScale(c, -1.0, &mut checkDir);
+                    yawAdjust = 0.0;
+                } else {
+                    //WTF???
+                    (*(*self.pm).ps).pm_flags &= !PMF_STUCK_TO_WALL;
+                    return qfalse;
+                }
+                if (*self.pm).debugMelee != 0 {
+                    //uber-skillz
+                    if (*ucmd).upmove > 0 {
+                        //hold on until you let go manually
+                        if BG_InReboundHold((*ps).legsAnim) != qfalse {
+                            //keep holding
+                            if (*ps).legsTimer < 150 {
+                                (*ps).legsTimer = 150;
+                            }
+                        } else {
+                            //if got to hold part of anim, play hold anim
+                            if (*ps).legsTimer <= 300 {
+                                (*ps).saberHolstered = 2;
+                                self.PM_SetAnim(
+                                    SETANIM_BOTH,
+                                    BOTH_FORCEWALLRELEASE_FORWARD as c_int
+                                        + ((*ps).legsAnim - BOTH_FORCEWALLHOLD_FORWARD as c_int),
+                                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                    0,
+                                );
+                                (*ps).legsTimer = 150;
+                                (*ps).torsoTimer = 150;
+                            }
+                        }
+                    }
+                }
+                _VectorMA((*ps).origin, dist, checkDir, &mut traceTo);
+                self.traps.trace(
+                    &mut trace,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!(mins) as *const vec3_t,
+                    core::ptr::addr_of!(maxs) as *const vec3_t,
+                    core::ptr::addr_of!(traceTo) as *const vec3_t,
+                    (*ps).clientNum,
+                    MASK_PLAYERSOLID,
+                );
+                if (*ps).legsTimer > 100
+                    && trace.fraction < 1.0
+                    && Q_fabs(trace.plane.normal[2]) <= 0.2
+                {
+                    //still a vertical wall there
+                    if (*ucmd).upmove < 0 {
+                        (*ucmd).upmove = 0;
+                    }
+                    //align me to the wall
+                    (*ps).viewangles[YAW] = vectoyaw(trace.plane.normal) + yawAdjust;
+                    PM_SetPMViewAngle(ps, (*ps).viewangles, ucmd);
+                    (*ucmd).angles[YAW] = ((((*ps).viewangles[YAW] * 65536.0 / 360.0) as c_int
+                        & 65535)
+                        - (*ps).delta_angles[YAW] as c_int)
+                        as i16;
+                    if true {
+                        if doMove != qfalse {
+                            //pull me toward the wall
+                            _VectorScale(trace.plane.normal, -128.0, &mut (*ps).velocity);
+                        }
+                    }
+                    (*ucmd).upmove = 0;
+                    (*ps).pm_flags |= PMF_STUCK_TO_WALL;
+                    return qtrue;
+                } else if doMove != qfalse && (*ps).pm_flags & PMF_STUCK_TO_WALL != 0 {
+                    //jump off
+                    //push off of it!
+                    (*ps).pm_flags &= !PMF_STUCK_TO_WALL;
+                    (*ps).velocity[0] = 0.0;
+                    (*ps).velocity[1] = 0.0;
+                    _VectorScale(checkDir, -(JUMP_OFF_WALL_SPEED as f32), &mut (*ps).velocity);
+                    (*ps).velocity[2] = BG_ForceWallJumpStrength();
+                    (*ps).pm_flags |= PMF_JUMP_HELD;
+                    (*ps).fd.forceJumpSound = 1; //this is a stupid thing, i should fix it.
+                    if (*ps).origin[2] < (*ps).fd.forceJumpZStart {
+                        (*ps).fd.forceJumpZStart = (*ps).origin[2];
+                    }
+
+                    BG_ForcePowerDrain(ps, FP_LEVITATION, 10);
+                    //no control for half a second
+                    (*ps).pm_flags |= PMF_TIME_KNOCKBACK;
+                    (*ps).pm_time = 500;
+                    (*ucmd).forwardmove = 0;
+                    (*ucmd).rightmove = 0;
+                    (*ucmd).upmove = 127;
+
+                    if BG_InReboundHold((*ps).legsAnim) != qfalse {
+                        //if was in hold pose, release now
+                        self.PM_SetAnim(
+                            SETANIM_BOTH,
+                            BOTH_FORCEWALLRELEASE_FORWARD as c_int
+                                + ((*ps).legsAnim - BOTH_FORCEWALLHOLD_FORWARD as c_int),
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            0,
+                        );
+                    } else {
+                        self.PM_SetAnim(
+                            SETANIM_LEGS,
+                            BOTH_FORCEJUMP1 as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_RESTART,
+                            0,
+                        );
+                    }
+                }
+            }
+            (*ps).pm_flags &= !PMF_STUCK_TO_WALL;
+            qfalse
+        }
+    }
+
+    /// Raven `PM_SetForceJumpZStart`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1759-1766`
+    pub fn PM_SetForceJumpZStart(&mut self, value: f32) {
+        unsafe {
+            let ps = (*self.pm).ps;
+            (*ps).fd.forceJumpZStart = value;
+            if (*ps).fd.forceJumpZStart == 0.0 {
+                (*ps).fd.forceJumpZStart -= 0.1;
+            }
+        }
+    }
+
+    /// Raven `PM_GrabWallForJump`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1776-1781`
+    //NOTE!!! assumes an appropriate anim is being passed in!!!
+    pub fn PM_GrabWallForJump(&mut self, anim: c_int) {
+        unsafe {
+            self.PM_SetAnim(
+                SETANIM_BOTH,
+                anim,
+                SETANIM_FLAG_RESTART | SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                0,
+            );
+            self.PM_AddEvent(EV_JUMP as c_int); //make sound for grab
+            (*(*self.pm).ps).pm_flags |= PMF_STUCK_TO_WALL;
+        }
+    }
 }
 
-/// Raven `PM_SetForceJumpZStart`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1759-1766`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_SetForceJumpZStart(
-    value: f32,
-) {
-    todo!("Port PM_SetForceJumpZStart — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_CheckJump`. `METROID_JUMP` is defined, so that block is compiled.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1788-2775`
+    pub fn PM_CheckJump(&mut self) -> qboolean {
+        use crate::bg_slidemove::SOLID_BMODEL;
+        use crate::saber::saber_flags::*;
+        use animNumber_t::*;
+        use mp_bg::public::jump_velocity::JUMP_VELOCITY;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut allowFlips = qtrue;
+
+            if (*ps).clientNum >= MAX_CLIENTS as c_int {
+                let pEnt = self.pm_entSelf;
+                if (*pEnt).s.eType == entityType_t::ET_NPC as c_int
+                    && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int
+                {
+                    //no!
+                    return qfalse;
+                }
+            }
+
+            if (*ps).forceHandExtend == HANDEXTEND_KNOCKDOWN as c_int
+                || (*ps).forceHandExtend == HANDEXTEND_PRETHROWN as c_int
+                || (*ps).forceHandExtend == HANDEXTEND_POSTTHROWN as c_int
+            {
+                return qfalse;
+            }
+
+            if (*ps).pm_type == PM_JETPACK as c_int {
+                //there's no actual jumping while we jetpack
+                return qfalse;
+            }
+
+            //Don't allow jump until all buttons are up
+            if (*ps).pm_flags & PMF_RESPAWNED != 0 {
+                return qfalse;
+            }
+
+            if PM_InKnockDown(ps) != qfalse || BG_InRoll(ps, (*ps).legsAnim) != qfalse {
+                //in knockdown
+                return qfalse;
+            }
+
+            if (*ps).weapon == WP_SABER as c_int {
+                let saber1 = BG_MySaber((*ps).clientNum, 0, self.bg);
+                let saber2 = BG_MySaber((*ps).clientNum, 1, self.bg);
+                if !saber1.is_null() && (*saber1).saberFlags & SFL_NO_FLIPS != 0 {
+                    allowFlips = qfalse;
+                }
+                if !saber2.is_null() && (*saber2).saberFlags & SFL_NO_FLIPS != 0 {
+                    allowFlips = qfalse;
+                }
+            }
+
+            if (*ps).groundEntityNum != ENTITYNUM_NONE
+                || (*ps).origin[2] < (*ps).fd.forceJumpZStart
+            {
+                (*ps).fd.forcePowersActive &= !(1 << FP_LEVITATION);
+            }
+
+            if (*ps).fd.forcePowersActive & (1 << FP_LEVITATION) != 0 {
+                //Force jump is already active.. continue draining power appropriately until we land.
+                if (*ps).fd.forcePowerDebounce[FP_LEVITATION as usize] < (*pm).cmd.serverTime {
+                    if (*pm).gametype == GT_DUEL as c_int || (*pm).gametype == GT_POWERDUEL as c_int
+                    {
+                        //jump takes less power
+                        BG_ForcePowerDrain(ps, FP_LEVITATION, 1);
+                    } else {
+                        BG_ForcePowerDrain(ps, FP_LEVITATION, 5);
+                    }
+                    if (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] >= FORCE_LEVEL_2 {
+                        (*ps).fd.forcePowerDebounce[FP_LEVITATION as usize] =
+                            (*pm).cmd.serverTime + 300;
+                    } else {
+                        (*ps).fd.forcePowerDebounce[FP_LEVITATION as usize] =
+                            (*pm).cmd.serverTime + 200;
+                    }
+                }
+            }
+
+            if (*ps).forceJumpFlip != 0 {
+                //Forced jump anim
+                let mut anim = BOTH_FORCEINAIR1 as c_int;
+                let mut parts = SETANIM_BOTH;
+                if allowFlips != qfalse {
+                    if (*pm).cmd.forwardmove > 0 {
+                        anim = BOTH_FLIP_F as c_int;
+                    } else if (*pm).cmd.forwardmove < 0 {
+                        anim = BOTH_FLIP_B as c_int;
+                    } else if (*pm).cmd.rightmove > 0 {
+                        anim = BOTH_FLIP_R as c_int;
+                    } else if (*pm).cmd.rightmove < 0 {
+                        anim = BOTH_FLIP_L as c_int;
+                    }
+                } else {
+                    if (*pm).cmd.forwardmove > 0 {
+                        anim = BOTH_FORCEINAIR1 as c_int;
+                    } else if (*pm).cmd.forwardmove < 0 {
+                        anim = BOTH_FORCEINAIRBACK1 as c_int;
+                    } else if (*pm).cmd.rightmove > 0 {
+                        anim = BOTH_FORCEINAIRRIGHT1 as c_int;
+                    } else if (*pm).cmd.rightmove < 0 {
+                        anim = BOTH_FORCEINAIRLEFT1 as c_int;
+                    }
+                }
+                if (*ps).weaponTime != 0 {
+                    parts = SETANIM_LEGS;
+                }
+
+                self.PM_SetAnim(parts, anim, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD, 150);
+                (*ps).forceJumpFlip = qfalse;
+                return qtrue;
+            }
+
+            // #if METROID_JUMP (defined)
+            if (*pm).waterlevel < 2 {
+                if (*ps).gravity > 0.0 {
+                    //can't do this in zero-G
+                    if self.PM_ForceJumpingUp() != qfalse {
+                        //holding jump in air
+                        let curHeight = (*ps).origin[2] - (*ps).fd.forceJumpZStart;
+                        let lvl = (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] as usize;
+                        //check for max force jump level and cap off & cut z vel
+                        if (curHeight <= forceJumpHeight[0]
+                            || ((*ps).fd.forcePower != 0 && (*pm).cmd.upmove >= 10))
+                            && curHeight < forceJumpHeight[lvl]
+                            && (*ps).fd.forceJumpZStart != 0.0
+                        {
+                            //can still go up
+                            if curHeight > forceJumpHeight[0] {
+                                //passed normal jump height  *2?
+                                if (*ps).fd.forcePowersActive & (1 << FP_LEVITATION) == 0 {
+                                    //haven't started forcejump yet
+                                    (*ps).fd.forcePowersActive |= 1 << FP_LEVITATION;
+                                    (*ps).fd.forceJumpSound = 1;
+                                    //play flip
+                                    if ((*pm).cmd.forwardmove != 0 || (*pm).cmd.rightmove != 0)
+                                        && (*ps).legsAnim != BOTH_FLIP_F as c_int
+                                        && (*ps).legsAnim != BOTH_FLIP_B as c_int
+                                        && (*ps).legsAnim != BOTH_FLIP_R as c_int
+                                        && (*ps).legsAnim != BOTH_FLIP_L as c_int
+                                        && allowFlips != qfalse
+                                    {
+                                        let mut anim = BOTH_FORCEINAIR1 as c_int;
+                                        let mut parts = SETANIM_BOTH;
+
+                                        if (*pm).cmd.forwardmove > 0 {
+                                            anim = BOTH_FLIP_F as c_int;
+                                        } else if (*pm).cmd.forwardmove < 0 {
+                                            anim = BOTH_FLIP_B as c_int;
+                                        } else if (*pm).cmd.rightmove > 0 {
+                                            anim = BOTH_FLIP_R as c_int;
+                                        } else if (*pm).cmd.rightmove < 0 {
+                                            anim = BOTH_FLIP_L as c_int;
+                                        }
+                                        if (*ps).weaponTime != 0 {
+                                            parts = SETANIM_LEGS;
+                                        }
+
+                                        self.PM_SetAnim(
+                                            parts,
+                                            anim,
+                                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                            150,
+                                        );
+                                    } else if (*ps).fd.forcePowerLevel[FP_LEVITATION as usize]
+                                        > FORCE_LEVEL_1
+                                    {
+                                        let mut facingFwd: vec3_t = [0.0; 3];
+                                        let mut facingRight: vec3_t = [0.0; 3];
+                                        let mut facingAngles: vec3_t = [0.0; 3];
+                                        let mut anim = -1;
+
+                                        VectorSet(
+                                            &mut facingAngles,
+                                            0.0,
+                                            (*ps).viewangles[YAW],
+                                            0.0,
+                                        );
+
+                                        AngleVectors(
+                                            facingAngles,
+                                            Some(&mut facingFwd),
+                                            Some(&mut facingRight),
+                                            None,
+                                        );
+                                        let dotR = facingRight[0] * (*ps).velocity[0]
+                                            + facingRight[1] * (*ps).velocity[1]
+                                            + facingRight[2] * (*ps).velocity[2];
+                                        let dotF = facingFwd[0] * (*ps).velocity[0]
+                                            + facingFwd[1] * (*ps).velocity[1]
+                                            + facingFwd[2] * (*ps).velocity[2];
+
+                                        if Q_fabs(dotR) > Q_fabs(dotF) * 1.5 {
+                                            if dotR > 150.0 {
+                                                anim = BOTH_FORCEJUMPRIGHT1 as c_int;
+                                            } else if dotR < -150.0 {
+                                                anim = BOTH_FORCEJUMPLEFT1 as c_int;
+                                            }
+                                        } else {
+                                            if dotF > 150.0 {
+                                                anim = BOTH_FORCEJUMP1 as c_int;
+                                            } else if dotF < -150.0 {
+                                                anim = BOTH_FORCEJUMPBACK1 as c_int;
+                                            }
+                                        }
+                                        if anim != -1 {
+                                            let mut parts = SETANIM_BOTH;
+                                            if (*ps).weaponTime != 0 {
+                                                parts = SETANIM_LEGS;
+                                            }
+
+                                            self.PM_SetAnim(
+                                                parts,
+                                                anim,
+                                                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                                150,
+                                            );
+                                        }
+                                    }
+                                } else {
+                                    //jump is already active (the anim has started)
+                                    if (*ps).legsTimer < 1 {
+                                        //not in the middle of a legsAnim
+                                        let anim = (*ps).legsAnim;
+                                        let mut newAnim = -1;
+                                        if anim == BOTH_FORCEJUMP1 as c_int {
+                                            newAnim = BOTH_FORCELAND1 as c_int;
+                                        } else if anim == BOTH_FORCEJUMPBACK1 as c_int {
+                                            newAnim = BOTH_FORCELANDBACK1 as c_int;
+                                        } else if anim == BOTH_FORCEJUMPLEFT1 as c_int {
+                                            newAnim = BOTH_FORCELANDLEFT1 as c_int;
+                                        } else if anim == BOTH_FORCEJUMPRIGHT1 as c_int {
+                                            newAnim = BOTH_FORCELANDRIGHT1 as c_int;
+                                        }
+                                        if newAnim != -1 {
+                                            let mut parts = SETANIM_BOTH;
+                                            if (*ps).weaponTime != 0 {
+                                                parts = SETANIM_LEGS;
+                                            }
+
+                                            self.PM_SetAnim(
+                                                parts,
+                                                newAnim,
+                                                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                                150,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+
+                            //need to scale this down, start with height velocity and scale down to regular jump vel
+                            (*ps).velocity[2] = (forceJumpHeight[lvl] - curHeight)
+                                / forceJumpHeight[lvl]
+                                * forceJumpStrength[lvl];
+                            (*ps).velocity[2] /= 10.0;
+                            (*ps).velocity[2] += JUMP_VELOCITY;
+                            (*ps).pm_flags |= PMF_JUMP_HELD;
+                        } else if curHeight > forceJumpHeight[0]
+                            && curHeight < forceJumpHeight[lvl] - forceJumpHeight[0]
+                        {
+                            //still have some headroom, don't totally stop it
+                            if (*ps).velocity[2] > JUMP_VELOCITY {
+                                (*ps).velocity[2] = JUMP_VELOCITY;
+                            }
+                        } else {
+                            //rww - changed for the sake of balance in multiplayer
+                            if (*ps).velocity[2] > JUMP_VELOCITY {
+                                (*ps).velocity[2] = JUMP_VELOCITY;
+                            }
+                        }
+                        (*pm).cmd.upmove = 0;
+                        return qfalse;
+                    }
+                }
+            }
+            // #endif
+
+            //Not jumping
+            if (*pm).cmd.upmove < 10 && (*ps).groundEntityNum != ENTITYNUM_NONE {
+                return qfalse;
+            }
+
+            // must wait for jump to be released
+            if (*ps).pm_flags & PMF_JUMP_HELD != 0 {
+                // clear upmove so cmdscale doesn't lower running speed
+                (*pm).cmd.upmove = 0;
+                return qfalse;
+            }
+
+            if (*ps).gravity <= 0.0 {
+                //in low grav, you push in the dir you're facing as long as there is something behind you to shove off of
+                let mut forward: vec3_t = [0.0; 3];
+                let mut back: vec3_t = [0.0; 3];
+                let mut trace: trace_t = core::mem::zeroed();
+
+                AngleVectors((*ps).viewangles, Some(&mut forward), None, None);
+                _VectorMA((*ps).origin, -8.0, forward, &mut back);
+                self.traps.trace(
+                    &mut trace,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!((*pm).mins) as *const vec3_t,
+                    core::ptr::addr_of!((*pm).maxs) as *const vec3_t,
+                    core::ptr::addr_of!(back) as *const vec3_t,
+                    (*ps).clientNum,
+                    (*pm).tracemask,
+                );
+
+                if trace.fraction <= 1.0 {
+                    let v = (*ps).velocity;
+                    _VectorMA(v, JUMP_VELOCITY * 2.0, forward, &mut (*ps).velocity);
+                    self.PM_SetAnim(
+                        SETANIM_LEGS,
+                        BOTH_FORCEJUMP1 as c_int,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_RESTART,
+                        150,
+                    );
+                } //else no surf close enough to push off of
+                (*pm).cmd.upmove = 0;
+            } else if (*pm).cmd.upmove > 0
+                && (*pm).waterlevel < 2
+                && (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] > FORCE_LEVEL_0
+                && (*ps).pm_flags & PMF_JUMP_HELD == 0
+                && ((*ps).weapon == WP_SABER as c_int || (*ps).weapon == WP_MELEE as c_int)
+                && PM_IsRocketTrooper() == qfalse
+                && BG_HasYsalamiri((*pm).gametype, ps) == qfalse
+                && BG_CanUseFPNow((*pm).gametype, ps, (*pm).cmd.serverTime, FP_LEVITATION)
+                    != qfalse
+            {
+                let mut allowWallRuns = qtrue;
+                let mut allowWallFlips = qtrue;
+                let mut allowFlips = qtrue;
+                let mut allowWallGrabs = qtrue;
+                if (*ps).weapon == WP_SABER as c_int {
+                    let saber1 = BG_MySaber((*ps).clientNum, 0, self.bg);
+                    let saber2 = BG_MySaber((*ps).clientNum, 1, self.bg);
+                    if !saber1.is_null() && (*saber1).saberFlags & SFL_NO_WALL_RUNS != 0 {
+                        allowWallRuns = qfalse;
+                    }
+                    if !saber2.is_null() && (*saber2).saberFlags & SFL_NO_WALL_RUNS != 0 {
+                        allowWallRuns = qfalse;
+                    }
+                    if !saber1.is_null() && (*saber1).saberFlags & SFL_NO_WALL_FLIPS != 0 {
+                        allowWallFlips = qfalse;
+                    }
+                    if !saber2.is_null() && (*saber2).saberFlags & SFL_NO_WALL_FLIPS != 0 {
+                        allowWallFlips = qfalse;
+                    }
+                    if !saber1.is_null() && (*saber1).saberFlags & SFL_NO_FLIPS != 0 {
+                        allowFlips = qfalse;
+                    }
+                    if !saber2.is_null() && (*saber2).saberFlags & SFL_NO_FLIPS != 0 {
+                        allowFlips = qfalse;
+                    }
+                    if !saber1.is_null() && (*saber1).saberFlags & SFL_NO_WALL_GRAB != 0 {
+                        allowWallGrabs = qfalse;
+                    }
+                    if !saber2.is_null() && (*saber2).saberFlags & SFL_NO_WALL_GRAB != 0 {
+                        allowWallGrabs = qfalse;
+                    }
+                }
+
+                if (*ps).groundEntityNum != ENTITYNUM_NONE {
+                    //on the ground
+                    //check for left-wall and right-wall special jumps
+                    let mut anim = -1;
+                    let mut vertPush = 0.0f32;
+                    if (*pm).cmd.rightmove > 0
+                        && (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] > FORCE_LEVEL_1
+                    {
+                        //strafing right
+                        if (*pm).cmd.forwardmove > 0 {
+                            //wall-run
+                            if allowWallRuns != qfalse {
+                                vertPush = forceJumpStrength[FORCE_LEVEL_2 as usize] / 2.0;
+                                anim = BOTH_WALL_RUN_RIGHT as c_int;
+                            }
+                        } else if (*pm).cmd.forwardmove == 0 {
+                            //wall-flip
+                            if allowWallFlips != qfalse {
+                                vertPush = forceJumpStrength[FORCE_LEVEL_2 as usize] / 2.25;
+                                anim = BOTH_WALL_FLIP_RIGHT as c_int;
+                            }
+                        }
+                    } else if (*pm).cmd.rightmove < 0
+                        && (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] > FORCE_LEVEL_1
+                    {
+                        //strafing left
+                        if (*pm).cmd.forwardmove > 0 {
+                            //wall-run
+                            if allowWallRuns != qfalse {
+                                vertPush = forceJumpStrength[FORCE_LEVEL_2 as usize] / 2.0;
+                                anim = BOTH_WALL_RUN_LEFT as c_int;
+                            }
+                        } else if (*pm).cmd.forwardmove == 0 {
+                            //wall-flip
+                            if allowWallFlips != qfalse {
+                                vertPush = forceJumpStrength[FORCE_LEVEL_2 as usize] / 2.25;
+                                anim = BOTH_WALL_FLIP_LEFT as c_int;
+                            }
+                        }
+                    } else if (*pm).cmd.forwardmove < 0
+                        && (*pm).cmd.buttons & BUTTON_ATTACK == 0
+                    {
+                        //backflip
+                        if allowFlips != qfalse {
+                            vertPush = JUMP_VELOCITY;
+                            anim = BOTH_FLIP_BACK1 as c_int;
+                        }
+                    }
+
+                    vertPush += 128.0; //give them an extra shove
+
+                    if anim != -1 {
+                        let mut fwd: vec3_t = [0.0; 3];
+                        let mut right: vec3_t = [0.0; 3];
+                        let mut traceto: vec3_t = [0.0; 3];
+                        let mut mins: vec3_t = [0.0; 3];
+                        let mut maxs: vec3_t = [0.0; 3];
+                        let mut fwdAngles: vec3_t = [0.0; 3];
+                        let mut idealNormal: vec3_t = [0.0; 3];
+                        let mut wallNormal: vec3_t = [0.0; 3];
+                        let mut trace: trace_t = core::mem::zeroed();
+                        let mut doTrace = qfalse;
+                        let contents = MASK_SOLID;
+
+                        VectorSet(&mut mins, (*pm).mins[0], (*pm).mins[1], 0.0);
+                        VectorSet(&mut maxs, (*pm).maxs[0], (*pm).maxs[1], 24.0);
+                        VectorSet(&mut fwdAngles, 0.0, (*ps).viewangles[YAW], 0.0);
+
+                        AngleVectors(fwdAngles, Some(&mut fwd), Some(&mut right), None);
+
+                        //trace-check for a wall, if necc.
+                        if anim == BOTH_WALL_FLIP_LEFT as c_int
+                            || anim == BOTH_WALL_RUN_LEFT as c_int
+                        {
+                            doTrace = qtrue;
+                            _VectorMA((*ps).origin, -16.0, right, &mut traceto);
+                        } else if anim == BOTH_WALL_FLIP_RIGHT as c_int
+                            || anim == BOTH_WALL_RUN_RIGHT as c_int
+                        {
+                            doTrace = qtrue;
+                            _VectorMA((*ps).origin, 16.0, right, &mut traceto);
+                        } else if anim == BOTH_WALL_FLIP_BACK1 as c_int {
+                            doTrace = qtrue;
+                            _VectorMA((*ps).origin, 16.0, fwd, &mut traceto);
+                        }
+
+                        if doTrace != qfalse {
+                            self.traps.trace(
+                                &mut trace,
+                                core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                                core::ptr::addr_of!(mins) as *const vec3_t,
+                                core::ptr::addr_of!(maxs) as *const vec3_t,
+                                core::ptr::addr_of!(traceto) as *const vec3_t,
+                                (*ps).clientNum,
+                                contents,
+                            );
+                            _VectorCopy(trace.plane.normal, &mut wallNormal);
+                            VectorNormalize(&mut wallNormal);
+                            _VectorSubtract((*ps).origin, traceto, &mut idealNormal);
+                            VectorNormalize(&mut idealNormal);
+                        }
+
+                        if doTrace == qfalse
+                            || (trace.fraction < 1.0
+                                && (trace.entityNum < MAX_CLIENTS as c_int
+                                    || (wallNormal[0] * idealNormal[0]
+                                        + wallNormal[1] * idealNormal[1]
+                                        + wallNormal[2] * idealNormal[2])
+                                        > 0.7))
+                        {
+                            //there is a wall there.. or hit a client
+                            if (anim != BOTH_WALL_RUN_LEFT as c_int
+                                && anim != BOTH_WALL_RUN_RIGHT as c_int
+                                && anim != BOTH_FORCEWALLRUNFLIP_START as c_int)
+                                || (wallNormal[2] >= 0.0 && wallNormal[2] <= 0.4)
+                            {
+                                //wall-runs can only run on perfectly flat walls, sorry.
+                                let mut parts;
+                                //move me to side
+                                if anim == BOTH_WALL_FLIP_LEFT as c_int {
+                                    (*ps).velocity[0] = 0.0;
+                                    (*ps).velocity[1] = 0.0;
+                                    let v = (*ps).velocity;
+                                    _VectorMA(v, 150.0, right, &mut (*ps).velocity);
+                                } else if anim == BOTH_WALL_FLIP_RIGHT as c_int {
+                                    (*ps).velocity[0] = 0.0;
+                                    (*ps).velocity[1] = 0.0;
+                                    let v = (*ps).velocity;
+                                    _VectorMA(v, -150.0, right, &mut (*ps).velocity);
+                                } else if anim == BOTH_FLIP_BACK1 as c_int
+                                    || anim == BOTH_FLIP_BACK2 as c_int
+                                    || anim == BOTH_FLIP_BACK3 as c_int
+                                    || anim == BOTH_WALL_FLIP_BACK1 as c_int
+                                {
+                                    (*ps).velocity[0] = 0.0;
+                                    (*ps).velocity[1] = 0.0;
+                                    let v = (*ps).velocity;
+                                    _VectorMA(v, -150.0, fwd, &mut (*ps).velocity);
+                                }
+
+                                //up
+                                if vertPush != 0.0 {
+                                    (*ps).velocity[2] = vertPush;
+                                    (*ps).fd.forcePowersActive |= 1 << FP_LEVITATION;
+                                }
+                                //animate me
+                                parts = SETANIM_LEGS;
+                                if anim == BOTH_BUTTERFLY_LEFT as c_int {
+                                    parts = SETANIM_BOTH;
+                                    (*pm).cmd.buttons &= !BUTTON_ATTACK;
+                                    (*ps).saberMove = saberMoveName_t::LS_NONE as c_int;
+                                } else if (*ps).weaponTime == 0 {
+                                    parts = SETANIM_BOTH;
+                                }
+                                self.PM_SetAnim(
+                                    parts,
+                                    anim,
+                                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                    0,
+                                );
+                                if anim == BOTH_BUTTERFLY_LEFT as c_int {
+                                    (*ps).weaponTime = (*ps).torsoTimer;
+                                }
+                                self.PM_SetForceJumpZStart((*ps).origin[2]); //so we don't take damage if we land at same height
+                                (*ps).pm_flags |= PMF_JUMP_HELD;
+                                (*pm).cmd.upmove = 0;
+                                (*ps).fd.forceJumpSound = 1;
+                            }
+                        }
+                    }
+                } else {
+                    //in the air
+                    let legsAnim = (*ps).legsAnim;
+
+                    if legsAnim == BOTH_WALL_RUN_LEFT as c_int
+                        || legsAnim == BOTH_WALL_RUN_RIGHT as c_int
+                    {
+                        //running on a wall
+                        let mut right: vec3_t = [0.0; 3];
+                        let mut traceto: vec3_t = [0.0; 3];
+                        let mut mins: vec3_t = [0.0; 3];
+                        let mut maxs: vec3_t = [0.0; 3];
+                        let mut fwdAngles: vec3_t = [0.0; 3];
+                        let mut trace: trace_t = core::mem::zeroed();
+                        let mut anim = -1;
+
+                        VectorSet(&mut mins, (*pm).mins[0], (*pm).mins[0], 0.0);
+                        VectorSet(&mut maxs, (*pm).maxs[0], (*pm).maxs[0], 24.0);
+                        VectorSet(&mut fwdAngles, 0.0, (*ps).viewangles[YAW], 0.0);
+
+                        AngleVectors(fwdAngles, None, Some(&mut right), None);
+
+                        if legsAnim == BOTH_WALL_RUN_LEFT as c_int {
+                            if (*ps).legsTimer > 400 {
+                                //not at the end of the anim
+                                let animLen =
+                                    self.PM_AnimLength(0, BOTH_WALL_RUN_LEFT as c_int) as f32;
+                                if ((*ps).legsTimer as f32) < animLen - 400.0 {
+                                    //not at start of anim
+                                    _VectorMA((*ps).origin, -16.0, right, &mut traceto);
+                                    anim = BOTH_WALL_RUN_LEFT_FLIP as c_int;
+                                }
+                            }
+                        } else if legsAnim == BOTH_WALL_RUN_RIGHT as c_int {
+                            if (*ps).legsTimer > 400 {
+                                //not at the end of the anim
+                                let animLen =
+                                    self.PM_AnimLength(0, BOTH_WALL_RUN_RIGHT as c_int) as f32;
+                                if ((*ps).legsTimer as f32) < animLen - 400.0 {
+                                    //not at start of anim
+                                    _VectorMA((*ps).origin, 16.0, right, &mut traceto);
+                                    anim = BOTH_WALL_RUN_RIGHT_FLIP as c_int;
+                                }
+                            }
+                        }
+                        if anim != -1 {
+                            self.traps.trace(
+                                &mut trace,
+                                core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                                core::ptr::addr_of!(mins) as *const vec3_t,
+                                core::ptr::addr_of!(maxs) as *const vec3_t,
+                                core::ptr::addr_of!(traceto) as *const vec3_t,
+                                (*ps).clientNum,
+                                CONTENTS_SOLID | CONTENTS_BODY,
+                            );
+                            if trace.fraction < 1.0 {
+                                //flip off wall
+                                let mut parts;
+
+                                if anim == BOTH_WALL_RUN_LEFT_FLIP as c_int {
+                                    (*ps).velocity[0] *= 0.5;
+                                    (*ps).velocity[1] *= 0.5;
+                                    let v = (*ps).velocity;
+                                    _VectorMA(v, 150.0, right, &mut (*ps).velocity);
+                                } else if anim == BOTH_WALL_RUN_RIGHT_FLIP as c_int {
+                                    (*ps).velocity[0] *= 0.5;
+                                    (*ps).velocity[1] *= 0.5;
+                                    let v = (*ps).velocity;
+                                    _VectorMA(v, -150.0, right, &mut (*ps).velocity);
+                                }
+                                parts = SETANIM_LEGS;
+                                if (*ps).weaponTime == 0 {
+                                    parts = SETANIM_BOTH;
+                                }
+                                self.PM_SetAnim(
+                                    parts,
+                                    anim,
+                                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                    0,
+                                );
+                                (*pm).cmd.upmove = 0;
+                            }
+                        }
+                        if (*pm).cmd.upmove != 0 {
+                            //jump failed, so don't try to do normal jump code, just return
+                            return qfalse;
+                        }
+                    }
+                    //NEW JKA
+                    else if (*ps).legsAnim == BOTH_FORCEWALLRUNFLIP_START as c_int {
+                        let mut fwd: vec3_t = [0.0; 3];
+                        let mut traceto: vec3_t = [0.0; 3];
+                        let mut mins: vec3_t = [0.0; 3];
+                        let mut maxs: vec3_t = [0.0; 3];
+                        let mut fwdAngles: vec3_t = [0.0; 3];
+                        let mut trace: trace_t = core::mem::zeroed();
+                        let mut anim = -1;
+
+                        VectorSet(&mut mins, (*pm).mins[0], (*pm).mins[0], 0.0);
+                        VectorSet(&mut maxs, (*pm).maxs[0], (*pm).maxs[0], 24.0);
+                        VectorSet(&mut fwdAngles, 0.0, (*ps).viewangles[YAW], 0.0);
+                        AngleVectors(fwdAngles, Some(&mut fwd), None, None);
+
+                        let animLen = self.BG_AnimLength(
+                            (*self.pm_entSelf).localAnimIndex,
+                            BOTH_FORCEWALLRUNFLIP_START as c_int,
+                        ) as f32;
+                        if ((*ps).legsTimer as f32) < animLen - 400.0 {
+                            //not at start of anim
+                            _VectorMA((*ps).origin, 16.0, fwd, &mut traceto);
+                            anim = BOTH_FORCEWALLRUNFLIP_END as c_int;
+                        }
+                        if anim != -1 {
+                            self.traps.trace(
+                                &mut trace,
+                                core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                                core::ptr::addr_of!(mins) as *const vec3_t,
+                                core::ptr::addr_of!(maxs) as *const vec3_t,
+                                core::ptr::addr_of!(traceto) as *const vec3_t,
+                                (*ps).clientNum,
+                                CONTENTS_SOLID | CONTENTS_BODY,
+                            );
+                            if trace.fraction < 1.0 {
+                                //flip off wall
+                                let mut parts = SETANIM_LEGS;
+
+                                (*ps).velocity[0] *= 0.5;
+                                (*ps).velocity[1] *= 0.5;
+                                let v = (*ps).velocity;
+                                _VectorMA(v, -300.0, fwd, &mut (*ps).velocity);
+                                (*ps).velocity[2] += 200.0;
+                                if (*ps).weaponTime == 0 {
+                                    //not attacking, set anim on both
+                                    parts = SETANIM_BOTH;
+                                }
+                                self.PM_SetAnim(
+                                    parts,
+                                    anim,
+                                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                    0,
+                                );
+                                (*pm).cmd.upmove = 0;
+                                self.PM_AddEvent(EV_JUMP as c_int);
+                            }
+                        }
+                        if (*pm).cmd.upmove != 0 {
+                            //jump failed, so don't try to do normal jump code, just return
+                            return qfalse;
+                        }
+                    } else if (*pm).cmd.forwardmove > 0 //pushing forward
+                        && (*ps).fd.forceRageRecoveryTime < (*pm).cmd.serverTime //not in a force Rage recovery period
+                        && (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] > FORCE_LEVEL_1
+                        && self.PM_WalkableGroundDistance() <= 80.0
+                        && ((*ps).legsAnim == BOTH_JUMP1 as c_int
+                            || (*ps).legsAnim == BOTH_INAIR1 as c_int)
+                    {
+                        //run up wall, flip backwards
+                        if allowWallRuns != qfalse {
+                            let mut wallWalkAnim = BOTH_WALL_FLIP_BACK1 as c_int;
+                            let mut parts = SETANIM_LEGS;
+                            let contents = MASK_SOLID;
+                            if (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] > FORCE_LEVEL_2 {
+                                wallWalkAnim = BOTH_FORCEWALLRUNFLIP_START as c_int;
+                                parts = SETANIM_BOTH;
+                            } else {
+                                if (*ps).weaponTime == 0 {
+                                    parts = SETANIM_BOTH;
+                                }
+                            }
+                            if true {
+                                let mut fwd: vec3_t = [0.0; 3];
+                                let mut traceto: vec3_t = [0.0; 3];
+                                let mut mins: vec3_t = [0.0; 3];
+                                let mut maxs: vec3_t = [0.0; 3];
+                                let mut fwdAngles: vec3_t = [0.0; 3];
+                                let mut trace: trace_t = core::mem::zeroed();
+                                let mut idealNormal: vec3_t = [0.0; 3];
+
+                                VectorSet(&mut mins, (*pm).mins[0], (*pm).mins[1], 0.0);
+                                VectorSet(&mut maxs, (*pm).maxs[0], (*pm).maxs[1], 24.0);
+                                VectorSet(&mut fwdAngles, 0.0, (*ps).viewangles[YAW], 0.0);
+
+                                AngleVectors(fwdAngles, Some(&mut fwd), None, None);
+                                _VectorMA((*ps).origin, 32.0, fwd, &mut traceto);
+
+                                self.traps.trace(
+                                    &mut trace,
+                                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                                    core::ptr::addr_of!(mins) as *const vec3_t,
+                                    core::ptr::addr_of!(maxs) as *const vec3_t,
+                                    core::ptr::addr_of!(traceto) as *const vec3_t,
+                                    (*ps).clientNum,
+                                    contents,
+                                );
+                                _VectorSubtract((*ps).origin, traceto, &mut idealNormal);
+                                VectorNormalize(&mut idealNormal);
+                                let traceEnt = self.PM_BGEntForNum(trace.entityNum);
+
+                                if trace.fraction < 1.0
+                                    && ((trace.entityNum < ENTITYNUM_WORLD
+                                        && !traceEnt.is_null()
+                                        && (*traceEnt).s.solid != SOLID_BMODEL)
+                                        || (trace.plane.normal[0] * idealNormal[0]
+                                            + trace.plane.normal[1] * idealNormal[1]
+                                            + trace.plane.normal[2] * idealNormal[2])
+                                            > 0.7)
+                                {
+                                    //there is a wall there
+                                    (*ps).velocity[0] = 0.0;
+                                    (*ps).velocity[1] = 0.0;
+                                    if wallWalkAnim == BOTH_FORCEWALLRUNFLIP_START as c_int {
+                                        (*ps).velocity[2] =
+                                            forceJumpStrength[FORCE_LEVEL_3 as usize] / 2.0;
+                                    } else {
+                                        let v = (*ps).velocity;
+                                        _VectorMA(v, -150.0, fwd, &mut (*ps).velocity);
+                                        (*ps).velocity[2] += 150.0;
+                                    }
+                                    //animate me
+                                    self.PM_SetAnim(
+                                        parts,
+                                        wallWalkAnim,
+                                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                        0,
+                                    );
+                                    self.PM_SetForceJumpZStart((*ps).origin[2]); //so we don't take damage if we land at same height
+                                    (*pm).cmd.upmove = 0;
+                                    (*ps).fd.forceJumpSound = 1;
+                                    BG_ForcePowerDrain(ps, FP_LEVITATION, 5);
+
+                                    (*pm).cmd.rightmove = 0;
+                                    (*pm).cmd.forwardmove = 0;
+                                }
+                            }
+                        }
+                    } else if (BG_InSpecialJump(legsAnim) == qfalse //not in a special jump anim
+                        || BG_InReboundJump(legsAnim) != qfalse //we're already in a rebound
+                        || BG_InBackFlip(legsAnim) != qfalse)//a backflip
+                        && (*ps).velocity[2] > -1200.0 //not falling down very fast
+                        && (*ps).pm_flags & PMF_JUMP_HELD == 0 //have to have released jump since last press
+                        && ((*pm).cmd.forwardmove != 0 || (*pm).cmd.rightmove != 0) //pushing in a direction
+                        && (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] > FORCE_LEVEL_2 //level 3 jump or better
+                        && BG_CanUseFPNow((*pm).gametype, ps, (*pm).cmd.serverTime, FP_LEVITATION)
+                            != qfalse
+                        && ((*ps).origin[2] - (*ps).fd.forceJumpZStart)
+                            < (forceJumpHeightMax[FORCE_LEVEL_3 as usize]
+                                - (BG_ForceWallJumpStrength() / 2.0))
+                    {
+                        //see if we're pushing at a wall and jump off it if so
+                        if allowWallGrabs != qfalse {
+                            let mut checkDir: vec3_t = [0.0; 3];
+                            let mut traceto: vec3_t = [0.0; 3];
+                            let mut mins: vec3_t = [0.0; 3];
+                            let mut maxs: vec3_t = [0.0; 3];
+                            let mut fwdAngles: vec3_t = [0.0; 3];
+                            let mut trace: trace_t = core::mem::zeroed();
+                            let mut idealNormal: vec3_t = [0.0; 3];
+                            let mut anim = -1;
+
+                            VectorSet(&mut mins, (*pm).mins[0], (*pm).mins[1], 0.0);
+                            VectorSet(&mut maxs, (*pm).maxs[0], (*pm).maxs[1], 24.0);
+                            VectorSet(&mut fwdAngles, 0.0, (*ps).viewangles[YAW], 0.0);
+
+                            if (*pm).cmd.rightmove != 0 {
+                                if (*pm).cmd.rightmove > 0 {
+                                    anim = BOTH_FORCEWALLREBOUND_RIGHT as c_int;
+                                    AngleVectors(fwdAngles, None, Some(&mut checkDir), None);
+                                } else if (*pm).cmd.rightmove < 0 {
+                                    anim = BOTH_FORCEWALLREBOUND_LEFT as c_int;
+                                    AngleVectors(fwdAngles, None, Some(&mut checkDir), None);
+                                    let c = checkDir;
+                                    _VectorScale(c, -1.0, &mut checkDir);
+                                }
+                            } else if (*pm).cmd.forwardmove > 0 {
+                                anim = BOTH_FORCEWALLREBOUND_FORWARD as c_int;
+                                AngleVectors(fwdAngles, Some(&mut checkDir), None, None);
+                            } else if (*pm).cmd.forwardmove < 0 {
+                                anim = BOTH_FORCEWALLREBOUND_BACK as c_int;
+                                AngleVectors(fwdAngles, Some(&mut checkDir), None, None);
+                                let c = checkDir;
+                                _VectorScale(c, -1.0, &mut checkDir);
+                            }
+                            if anim != -1 {
+                                //trace in the dir we're pushing in and see if there's a vertical wall there
+                                _VectorMA((*ps).origin, 8.0, checkDir, &mut traceto);
+                                self.traps.trace(
+                                    &mut trace,
+                                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                                    core::ptr::addr_of!(mins) as *const vec3_t,
+                                    core::ptr::addr_of!(maxs) as *const vec3_t,
+                                    core::ptr::addr_of!(traceto) as *const vec3_t,
+                                    (*ps).clientNum,
+                                    CONTENTS_SOLID,
+                                );
+                                _VectorSubtract((*ps).origin, traceto, &mut idealNormal);
+                                VectorNormalize(&mut idealNormal);
+                                let traceEnt = self.PM_BGEntForNum(trace.entityNum);
+                                if trace.fraction < 1.0
+                                    && Q_fabs(trace.plane.normal[2]) <= 0.2
+                                    && ((trace.entityNum < ENTITYNUM_WORLD
+                                        && !traceEnt.is_null()
+                                        && (*traceEnt).s.solid != SOLID_BMODEL)
+                                        || (trace.plane.normal[0] * idealNormal[0]
+                                            + trace.plane.normal[1] * idealNormal[1]
+                                            + trace.plane.normal[2] * idealNormal[2])
+                                            > 0.7)
+                                {
+                                    //there is a wall there
+                                    let dot = (*ps).velocity[0] * trace.plane.normal[0]
+                                        + (*ps).velocity[1] * trace.plane.normal[1]
+                                        + (*ps).velocity[2] * trace.plane.normal[2];
+                                    if dot < 1.0 {
+                                        //can't be heading *away* from the wall!
+                                        //grab it!
+                                        self.PM_GrabWallForJump(anim);
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        //FIXME: if in a butterfly, kick people away?
+                    }
+                    //END NEW JKA
+                }
+            }
+
+            if (*ps).groundEntityNum == ENTITYNUM_NONE {
+                return qfalse;
+            }
+            if (*pm).cmd.upmove > 0 {
+                //no special jumps
+                (*ps).velocity[2] = JUMP_VELOCITY;
+                self.PM_SetForceJumpZStart((*ps).origin[2]); //so we don't take damage if we land at same height
+                (*ps).pm_flags |= PMF_JUMP_HELD;
+            }
+
+            //Jumping
+            self.pml.groundPlane = qfalse;
+            self.pml.walking = qfalse;
+            (*ps).pm_flags |= PMF_JUMP_HELD;
+            (*ps).groundEntityNum = ENTITYNUM_NONE;
+            self.PM_SetForceJumpZStart((*ps).origin[2]);
+
+            self.PM_AddEvent(EV_JUMP as c_int);
+
+            //Set the animations
+            if (*ps).gravity > 0.0 && BG_InSpecialJump((*ps).legsAnim) == qfalse {
+                self.PM_JumpForDir();
+            }
+
+            qtrue
+        }
+    }
 }
 
-/// Raven `PM_GrabWallForJump`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1776-1781`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_GrabWallForJump(
-    anim: c_int,
-) {
-    todo!("Port PM_GrabWallForJump — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_CheckWaterJump`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:2781-2821`
+    pub fn PM_CheckWaterJump(&mut self) -> qboolean {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut spot: vec3_t = [0.0; 3];
+            let mut flatforward: vec3_t = [0.0; 3];
+
+            if (*ps).pm_time != 0 {
+                return qfalse;
+            }
+
+            // check for water jump
+            if (*pm).waterlevel != 2 {
+                return qfalse;
+            }
+
+            flatforward[0] = self.pml.forward[0];
+            flatforward[1] = self.pml.forward[1];
+            flatforward[2] = 0.0;
+            VectorNormalize(&mut flatforward);
+
+            _VectorMA((*ps).origin, 30.0, flatforward, &mut spot);
+            spot[2] += 4.0;
+            let mut cont = self
+                .traps
+                .pointcontents(core::ptr::addr_of!(spot), (*ps).clientNum);
+            if cont & CONTENTS_SOLID == 0 {
+                return qfalse;
+            }
+
+            spot[2] += 16.0;
+            cont = self
+                .traps
+                .pointcontents(core::ptr::addr_of!(spot), (*ps).clientNum);
+            if cont != 0 {
+                return qfalse;
+            }
+
+            // jump out of water
+            _VectorScale(self.pml.forward, 200.0, &mut (*ps).velocity);
+            (*ps).velocity[2] = 350.0;
+
+            (*ps).pm_flags |= PMF_TIME_WATERJUMP;
+            (*ps).pm_time = 2000;
+
+            qtrue
+        }
+    }
+
+    /// Raven `PM_WaterJumpMove`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:2833-2844`
+    pub fn PM_WaterJumpMove(&mut self) {
+        unsafe {
+            // waterjump has no control, but falls
+            self.PM_StepSlideMove(qtrue);
+
+            let ps = (*self.pm).ps;
+            (*ps).velocity[2] -= (*ps).gravity * self.pml.frametime;
+            if (*ps).velocity[2] < 0.0 {
+                // cancel as soon as we are falling down again
+                (*ps).pm_flags &= !PMF_ALL_TIMES;
+                (*ps).pm_time = 0;
+            }
+        }
+    }
+
+    /// Raven `PM_WaterMove`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:2852-2916`
+    pub fn PM_WaterMove(&mut self) {
+        use crate::bg_slidemove::OVERCLIP;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut wishvel: vec3_t = [0.0; 3];
+            let mut wishdir: vec3_t = [0.0; 3];
+
+            if self.PM_CheckWaterJump() != qfalse {
+                self.PM_WaterJumpMove();
+                return;
+            }
+
+            self.PM_Friction();
+
+            let scale = self.PM_CmdScale(core::ptr::addr_of_mut!((*pm).cmd));
+            //
+            // user intentions
+            //
+            if scale == 0.0 {
+                wishvel[0] = 0.0;
+                wishvel[1] = 0.0;
+                wishvel[2] = -60.0; // sink towards bottom
+            } else {
+                for i in 0..3 {
+                    wishvel[i] = scale * self.pml.forward[i] * (*pm).cmd.forwardmove as f32
+                        + scale * self.pml.right[i] * (*pm).cmd.rightmove as f32;
+                }
+                wishvel[2] += scale * (*pm).cmd.upmove as f32;
+            }
+
+            _VectorCopy(wishvel, &mut wishdir);
+            let mut wishspeed = VectorNormalize(&mut wishdir);
+
+            if wishspeed > (*ps).speed * pm_swimScale {
+                wishspeed = (*ps).speed * pm_swimScale;
+            }
+
+            self.PM_Accelerate(wishdir, wishspeed, pm_wateraccelerate);
+
+            // make sure we can go up slopes easily under water
+            let dp = (*ps).velocity[0] * self.pml.groundTrace.plane.normal[0]
+                + (*ps).velocity[1] * self.pml.groundTrace.plane.normal[1]
+                + (*ps).velocity[2] * self.pml.groundTrace.plane.normal[2];
+            if self.pml.groundPlane != qfalse && dp < 0.0 {
+                let vel = VectorLength((*ps).velocity);
+                // slide along the ground plane
+                let inp = (*ps).velocity;
+                let norm = self.pml.groundTrace.plane.normal;
+                self.PM_ClipVelocity(inp, norm, &mut (*ps).velocity, OVERCLIP);
+
+                VectorNormalize(&mut (*ps).velocity);
+                let v = (*ps).velocity;
+                _VectorScale(v, vel, &mut (*ps).velocity);
+            }
+
+            self.PM_SlideMove(qfalse);
+        }
+    }
+
+    /// Raven `PM_FlyVehicleMove`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:2924-3012`
+    pub fn PM_FlyVehicleMove(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut wishvel: vec3_t = [0.0; 3];
+            let mut wishdir: vec3_t = [0.0; 3];
+            let mut wishspeed;
+            let fmove = 0.0f32;
+            let smove = 0.0f32;
+
+            // normal slowdown
+            if (*ps).gravity != 0.0
+                && (*ps).velocity[2] < 0.0
+                && (*ps).groundEntityNum == ENTITYNUM_NONE
+            {
+                //falling
+                let zVel = (*ps).velocity[2];
+                self.PM_Friction();
+                (*ps).velocity[2] = zVel;
+            } else {
+                self.PM_Friction();
+                if (*ps).velocity[2] < 0.0 && (*ps).groundEntityNum != ENTITYNUM_NONE {
+                    (*ps).velocity[2] = 0.0; // ignore slope movement
+                }
+            }
+
+            let scale = self.PM_CmdScale(core::ptr::addr_of_mut!((*pm).cmd));
+
+            // Get The WishVel And WishSpeed
+            if (*ps).clientNum >= MAX_CLIENTS as c_int {
+                //NPC
+                if (fmove != 0.0 || smove != 0.0)
+                    && VectorCompare((*ps).moveDir, crate::q_math::vec3_origin) != qfalse
+                {
+                    for i in 0..3 {
+                        wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
+                    }
+
+                    _VectorCopy(wishvel, &mut wishdir);
+                    wishspeed = VectorNormalize(&mut wishdir);
+                    wishspeed *= scale;
+                } else {
+                    wishspeed = (*ps).speed;
+                    _VectorScale((*ps).moveDir, (*ps).speed, &mut wishvel);
+                    _VectorCopy((*ps).moveDir, &mut wishdir);
+                }
+            } else {
+                for i in 0..3 {
+                    wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
+                }
+                _VectorCopy(wishvel, &mut wishdir);
+                wishspeed = VectorNormalize(&mut wishdir);
+                wishspeed *= scale;
+            }
+
+            // Handle negative speed.
+            if wishspeed < 0.0 {
+                wishspeed = wishspeed * -1.0;
+                let wv = wishvel;
+                _VectorScale(wv, -1.0, &mut wishvel);
+                let wd = wishdir;
+                _VectorScale(wd, -1.0, &mut wishdir);
+            }
+
+            _VectorCopy(wishvel, &mut wishdir);
+            wishspeed = VectorNormalize(&mut wishdir);
+
+            self.PM_Accelerate(wishdir, wishspeed, 100.0);
+
+            self.PM_StepSlideMove(qtrue);
+        }
+    }
+
+    /// Raven `PM_FlyMove`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3021-3059`
+    pub fn PM_FlyMove(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut wishvel: vec3_t = [0.0; 3];
+            let mut wishdir: vec3_t = [0.0; 3];
+
+            // normal slowdown
+            self.PM_Friction();
+
+            let mut scale = self.PM_CmdScale(core::ptr::addr_of_mut!((*pm).cmd));
+
+            if (*ps).pm_type == PM_SPECTATOR as c_int && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                //turbo boost
+                scale *= 10.0;
+            }
+
+            //
+            // user intentions
+            //
+            if scale == 0.0 {
+                wishvel[0] = 0.0;
+                wishvel[1] = 0.0;
+                wishvel[2] = (*ps).speed * ((*pm).cmd.upmove as f32 / 127.0);
+            } else {
+                for i in 0..3 {
+                    wishvel[i] = scale * self.pml.forward[i] * (*pm).cmd.forwardmove as f32
+                        + scale * self.pml.right[i] * (*pm).cmd.rightmove as f32;
+                }
+                wishvel[2] += scale * (*pm).cmd.upmove as f32;
+            }
+
+            _VectorCopy(wishvel, &mut wishdir);
+            let wishspeed = VectorNormalize(&mut wishdir);
+
+            self.PM_Accelerate(wishdir, wishspeed, pm_flyaccelerate);
+
+            self.PM_StepSlideMove(qfalse);
+        }
+    }
 }
 
-/// Raven `PM_CheckJump`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1788-2775`
-// PORT-ESCALATION(pmove-working-state): reads/writes `pm`/`pml`/`pm_entSelf`.
-pub fn PM_CheckJump() -> qboolean {
-    todo!("Port PM_CheckJump — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_AirMove`. `METROID_JUMP` is defined, so the unconditional `PM_CheckJump`
+    /// path is compiled. The `#if 0` hover strafe block is dropped (dead).
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3068-3297`
+    pub fn PM_AirMove(&mut self) {
+        use crate::bg_slidemove::OVERCLIP;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut wishvel: vec3_t = [0.0; 3];
+            let mut wishdir: vec3_t = [0.0; 3];
+            let mut wishspeed;
+            let mut pVeh: *mut Vehicle_t = core::ptr::null_mut();
+
+            if (*ps).clientNum >= MAX_CLIENTS as c_int {
+                let pEnt = self.pm_entSelf;
+                if !pEnt.is_null() && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int {
+                    pVeh = (*pEnt).m_pVehicle as *mut Vehicle_t;
+                }
+            }
+
+            if (*ps).pm_type != PM_SPECTATOR as c_int {
+                // #if METROID_JUMP
+                self.PM_CheckJump();
+            }
+            self.PM_Friction();
+
+            let fmove = (*pm).cmd.forwardmove as f32;
+            let smove = (*pm).cmd.rightmove as f32;
+
+            let mut scale = self.PM_CmdScale(core::ptr::addr_of_mut!((*pm).cmd));
+
+            // set the movementDir so clients can rotate the legs for strafing
+            self.PM_SetMovementDir();
+
+            // project moves down to flat plane
+            self.pml.forward[2] = 0.0;
+            self.pml.right[2] = 0.0;
+            VectorNormalize(&mut self.pml.forward);
+            VectorNormalize(&mut self.pml.right);
+
+            if !pVeh.is_null() && (*(*pVeh).m_pVehicleInfo).hoverHeight > 0.0 {
+                //in a hovering vehicle, have air control
+                wishspeed = (*ps).speed;
+                _VectorScale((*ps).moveDir, (*ps).speed, &mut wishvel);
+                _VectorCopy((*ps).moveDir, &mut wishdir);
+                scale = 1.0;
+            } else if self.gPMDoSlowFall != qfalse {
+                //no air-control
+                VectorClear(&mut wishvel);
+            } else if (*ps).pm_type == PM_JETPACK as c_int {
+                //reduced air control while not jetting
+                for i in 0..2 {
+                    wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
+                }
+                wishvel[2] = 0.0;
+
+                if (*pm).cmd.upmove <= 0 {
+                    let wv = wishvel;
+                    _VectorScale(wv, 0.8, &mut wishvel);
+                } else {
+                    //if we are jetting then we have more control than usual
+                    let wv = wishvel;
+                    _VectorScale(wv, 2.0, &mut wishvel);
+                }
+            } else {
+                for i in 0..2 {
+                    wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
+                }
+                wishvel[2] = 0.0;
+            }
+
+            _VectorCopy(wishvel, &mut wishdir);
+            wishspeed = VectorNormalize(&mut wishdir);
+            wishspeed *= scale;
+
+            let mut accelerate = pm_airaccelerate;
+            if !pVeh.is_null()
+                && (*(*pVeh).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_SPEEDER as c_int
+            {
+                //speeders have more control in air
+                accelerate = (*(*pVeh).m_pVehicleInfo).traction;
+                if self.pml.groundPlane != qfalse {
+                    //on a slope of some kind, shouldn't have much control and should slide a lot
+                    accelerate *= 0.5;
+                }
+            }
+            // not on ground, so little effect on velocity
+            self.PM_Accelerate(wishdir, wishspeed, accelerate);
+
+            // we may have a ground plane that is very steep, even though we don't have a groundentity
+            if self.pml.groundPlane != qfalse {
+                if (*ps).pm_flags & PMF_STUCK_TO_WALL == 0 {
+                    //don't slide when stuck to a wall
+                    if self.PM_GroundSlideOkay(self.pml.groundTrace.plane.normal[2]) != qfalse {
+                        let inp = (*ps).velocity;
+                        let norm = self.pml.groundTrace.plane.normal;
+                        self.PM_ClipVelocity(inp, norm, &mut (*ps).velocity, OVERCLIP);
+                    }
+                }
+            }
+
+            if (*ps).pm_flags & PMF_STUCK_TO_WALL != 0 {
+                //no grav when stuck to wall
+                self.PM_StepSlideMove(qfalse);
+            } else {
+                self.PM_StepSlideMove(qtrue);
+            }
+        }
+    }
+
+    /// Raven `PM_WalkMove`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3305-3484`
+    pub fn PM_WalkMove(&mut self) {
+        use crate::bg_slidemove::OVERCLIP;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut wishvel: vec3_t = [0.0; 3];
+            let mut wishdir: vec3_t = [0.0; 3];
+            let mut wishspeed = 0.0f32;
+            let mut npcMovement = qfalse;
+
+            let dpf = self.pml.forward[0] * self.pml.groundTrace.plane.normal[0]
+                + self.pml.forward[1] * self.pml.groundTrace.plane.normal[1]
+                + self.pml.forward[2] * self.pml.groundTrace.plane.normal[2];
+            if (*pm).waterlevel > 2 && dpf > 0.0 {
+                // begin swimming
+                self.PM_WaterMove();
+                return;
+            }
+
+            if (*ps).pm_type != PM_SPECTATOR as c_int {
+                if self.PM_CheckJump() != qfalse {
+                    // jumped away
+                    if (*pm).waterlevel > 1 {
+                        self.PM_WaterMove();
+                    } else {
+                        self.PM_AirMove();
+                    }
+                    return;
+                }
+            }
+
+            self.PM_Friction();
+
+            let fmove = (*pm).cmd.forwardmove as f32;
+            let smove = (*pm).cmd.rightmove as f32;
+
+            let scale = self.PM_CmdScale(core::ptr::addr_of_mut!((*pm).cmd));
+
+            // set the movementDir so clients can rotate the legs for strafing
+            self.PM_SetMovementDir();
+
+            // project moves down to flat plane
+            self.pml.forward[2] = 0.0;
+            self.pml.right[2] = 0.0;
+
+            // project the forward and right directions onto the ground plane
+            let inp = self.pml.forward;
+            let norm = self.pml.groundTrace.plane.normal;
+            let mut out = self.pml.forward;
+            self.PM_ClipVelocity(inp, norm, &mut out, OVERCLIP);
+            self.pml.forward = out;
+            let inp = self.pml.right;
+            let mut out = self.pml.right;
+            self.PM_ClipVelocity(inp, norm, &mut out, OVERCLIP);
+            self.pml.right = out;
+            //
+            VectorNormalize(&mut self.pml.forward);
+            VectorNormalize(&mut self.pml.right);
+
+            // Get The WishVel And WishSpeed
+            if (*ps).clientNum >= MAX_CLIENTS as c_int
+                && VectorCompare((*ps).moveDir, crate::q_math::vec3_origin) == qfalse
+            {
+                //NPC
+                let pEnt = self.pm_entSelf;
+
+                if !pEnt.is_null() && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int {
+                    if (fmove != 0.0 || smove != 0.0)
+                        && VectorCompare((*ps).moveDir, crate::q_math::vec3_origin) != qfalse
+                    {
+                        for i in 0..3 {
+                            wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
+                        }
+
+                        _VectorCopy(wishvel, &mut wishdir);
+                        wishspeed = VectorNormalize(&mut wishdir);
+                        wishspeed *= scale;
+                    } else {
+                        _VectorScale((*ps).moveDir, (*ps).speed, &mut wishvel);
+                        _VectorCopy(wishvel, &mut wishdir);
+                        wishspeed = VectorNormalize(&mut wishdir);
+                    }
+
+                    npcMovement = qtrue;
+                }
+            }
+
+            if npcMovement == qfalse {
+                for i in 0..3 {
+                    wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
+                }
+                _VectorCopy(wishvel, &mut wishdir);
+                wishspeed = VectorNormalize(&mut wishdir);
+                wishspeed *= scale;
+            }
+
+            // clamp the speed lower if ducking
+            if (*ps).pm_flags & PMF_DUCKED != 0 {
+                if wishspeed > (*ps).speed * pm_duckScale {
+                    wishspeed = (*ps).speed * pm_duckScale;
+                }
+            } else if (*ps).pm_flags & PMF_ROLLING != 0
+                && BG_InRoll(ps, (*ps).legsAnim) == qfalse
+                && PM_InRollComplete(ps, (*ps).legsAnim) == qfalse
+            {
+                if wishspeed > (*ps).speed * pm_duckScale {
+                    wishspeed = (*ps).speed * pm_duckScale;
+                }
+            }
+
+            // clamp the speed lower if wading or walking on the bottom
+            if (*pm).waterlevel != 0 {
+                let mut waterScale = ((*pm).waterlevel as f64 / 3.0) as f32;
+                waterScale = (1.0 - (1.0 - pm_swimScale as f64) * waterScale as f64) as f32;
+                if wishspeed > (*ps).speed * waterScale {
+                    wishspeed = (*ps).speed * waterScale;
+                }
+            }
+
+            // when a player gets hit, they temporarily lose full control
+            let accelerate;
+            if self.pm_flying == FLY_HOVER {
+                accelerate = pm_vehicleaccelerate;
+            } else if self.pml.groundTrace.surfaceFlags & SURF_SLICK != 0
+                || (*ps).pm_flags & PMF_TIME_KNOCKBACK != 0
+            {
+                accelerate = pm_airaccelerate;
+            } else {
+                accelerate = pm_accelerate;
+            }
+
+            self.PM_Accelerate(wishdir, wishspeed, accelerate);
+
+            if self.pml.groundTrace.surfaceFlags & SURF_SLICK != 0
+                || (*ps).pm_flags & PMF_TIME_KNOCKBACK != 0
+            {
+                (*ps).velocity[2] -= (*ps).gravity * self.pml.frametime;
+            }
+
+            let vel = VectorLength((*ps).velocity);
+
+            // slide along the ground plane
+            let inp = (*ps).velocity;
+            let norm = self.pml.groundTrace.plane.normal;
+            self.PM_ClipVelocity(inp, norm, &mut (*ps).velocity, OVERCLIP);
+
+            // don't decrease velocity when going up or down a slope
+            VectorNormalize(&mut (*ps).velocity);
+            let v = (*ps).velocity;
+            _VectorScale(v, vel, &mut (*ps).velocity);
+
+            // don't do anything if standing still
+            if (*ps).velocity[0] == 0.0 && (*ps).velocity[1] == 0.0 {
+                return;
+            }
+
+            self.PM_StepSlideMove(qfalse);
+        }
+    }
+
+    /// Raven `PM_DeadMove`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3492-3509`
+    pub fn PM_DeadMove(&mut self) {
+        unsafe {
+            let ps = (*self.pm).ps;
+            if self.pml.walking == qfalse {
+                return;
+            }
+
+            // extra friction
+            let mut forward = VectorLength((*ps).velocity);
+            forward -= 20.0;
+            if forward <= 0.0 {
+                VectorClear(&mut (*ps).velocity);
+            } else {
+                VectorNormalize(&mut (*ps).velocity);
+                let v = (*ps).velocity;
+                _VectorScale(v, forward, &mut (*ps).velocity);
+            }
+        }
+    }
 }
 
-/// Raven `PM_CheckWaterJump`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:2781-2821`
-// PORT-ESCALATION(pmove-working-state): reads `pml`, writes `pm`.
-pub fn PM_CheckWaterJump() -> qboolean {
-    todo!("Port PM_CheckWaterJump — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_NoclipMove`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3517-3576`
+    pub fn PM_NoclipMove(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut wishvel: vec3_t = [0.0; 3];
+            let mut wishdir: vec3_t = [0.0; 3];
+
+            (*ps).viewheight = DEFAULT_VIEWHEIGHT;
+
+            // friction
+            let speed = VectorLength((*ps).velocity);
+            if speed < 1.0 {
+                _VectorCopy(crate::q_math::vec3_origin, &mut (*ps).velocity);
+            } else {
+                let mut drop = 0.0f32;
+
+                let friction = (pm_friction as f64 * 1.5) as f32; // extra friction
+                let control = if speed < pm_stopspeed { pm_stopspeed } else { speed };
+                drop += control * friction * self.pml.frametime;
+
+                // scale the velocity
+                let mut newspeed = speed - drop;
+                if newspeed < 0.0 {
+                    newspeed = 0.0;
+                }
+                newspeed /= speed;
+
+                let v = (*ps).velocity;
+                _VectorScale(v, newspeed, &mut (*ps).velocity);
+            }
+
+            // accelerate
+            let mut scale = self.PM_CmdScale(core::ptr::addr_of_mut!((*pm).cmd));
+            if (*pm).cmd.buttons & BUTTON_ATTACK != 0 {
+                //turbo boost
+                scale *= 10.0;
+            }
+            if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                //turbo boost
+                scale *= 10.0;
+            }
+
+            let fmove = (*pm).cmd.forwardmove as f32;
+            let smove = (*pm).cmd.rightmove as f32;
+
+            for i in 0..3 {
+                wishvel[i] = self.pml.forward[i] * fmove + self.pml.right[i] * smove;
+            }
+            wishvel[2] += (*pm).cmd.upmove as f32;
+
+            _VectorCopy(wishvel, &mut wishdir);
+            let mut wishspeed = VectorNormalize(&mut wishdir);
+            wishspeed *= scale;
+
+            self.PM_Accelerate(wishdir, wishspeed, pm_accelerate);
+
+            // move
+            let o = (*ps).origin;
+            _VectorMA(o, self.pml.frametime, (*ps).velocity, &mut (*ps).origin);
+        }
+    }
+
+    /// Raven `PM_FootstepForSurface`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3587-3594`
+    pub fn PM_FootstepForSurface(&mut self) -> c_int {
+        if self.pml.groundTrace.surfaceFlags & SURF_NOSTEPS != 0 {
+            return 0;
+        }
+        self.pml.groundTrace.surfaceFlags & MATERIAL_MASK
+    }
+
+    /// Raven `PM_TryRoll`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3597-3681`
+    pub fn PM_TryRoll(&mut self) -> c_int {
+        use crate::bg_slidemove::STEPSIZE;
+        use crate::saber::saber_flags::*;
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut anim = -1;
+            let mut fwd: vec3_t = [0.0; 3];
+            let mut right: vec3_t = [0.0; 3];
+            let mut traceto: vec3_t = [0.0; 3];
+            let mut mins: vec3_t = [0.0; 3];
+            let mut maxs: vec3_t = [0.0; 3];
+            let mut fwdAngles: vec3_t = [0.0; 3];
+
+            if BG_SaberInAttack((*ps).saberMove) != qfalse
+                || BG_SaberInSpecialAttack((*ps).torsoAnim) != qfalse
+                || BG_SpinningSaberAnim((*ps).legsAnim) != qfalse
+                || PM_SaberInStart((*ps).saberMove) != qfalse
+            {
+                //attacking or spinning (or, if player, starting an attack)
+                if PM_CanRollFromSoulCal(ps) != qfalse {
+                    //hehe
+                } else {
+                    return 0;
+                }
+            }
+
+            if ((*ps).weapon != WP_SABER as c_int && (*ps).weapon != WP_MELEE as c_int)
+                || PM_IsRocketTrooper() != qfalse
+                || BG_HasYsalamiri((*pm).gametype, ps) != qfalse
+                || BG_CanUseFPNow((*pm).gametype, ps, (*pm).cmd.serverTime, FP_LEVITATION)
+                    == qfalse
+            {
+                //Not using saber, or can't use jump
+                return 0;
+            }
+
+            if (*ps).weapon == WP_SABER as c_int {
+                let mut saber = BG_MySaber((*ps).clientNum, 0, self.bg);
+                if !saber.is_null() && (*saber).saberFlags & SFL_NO_ROLLS != 0 {
+                    return 0;
+                }
+                saber = BG_MySaber((*ps).clientNum, 1, self.bg);
+                if !saber.is_null() && (*saber).saberFlags & SFL_NO_ROLLS != 0 {
+                    return 0;
+                }
+            }
+
+            VectorSet(
+                &mut mins,
+                (*pm).mins[0],
+                (*pm).mins[1],
+                (*pm).mins[2] + STEPSIZE,
+            );
+            VectorSet(&mut maxs, (*pm).maxs[0], (*pm).maxs[1], (*ps).crouchheight as f32);
+
+            VectorSet(&mut fwdAngles, 0.0, (*ps).viewangles[YAW], 0.0);
+
+            AngleVectors(fwdAngles, Some(&mut fwd), Some(&mut right), None);
+
+            if (*pm).cmd.forwardmove != 0 {
+                //check forward/backward rolls
+                if (*ps).pm_flags & PMF_BACKWARDS_RUN != 0 {
+                    anim = BOTH_ROLL_B as c_int;
+                    _VectorMA((*ps).origin, -64.0, fwd, &mut traceto);
+                } else {
+                    anim = BOTH_ROLL_F as c_int;
+                    _VectorMA((*ps).origin, 64.0, fwd, &mut traceto);
+                }
+            } else if (*pm).cmd.rightmove > 0 {
+                //right
+                anim = BOTH_ROLL_R as c_int;
+                _VectorMA((*ps).origin, 64.0, right, &mut traceto);
+            } else if (*pm).cmd.rightmove < 0 {
+                //left
+                anim = BOTH_ROLL_L as c_int;
+                _VectorMA((*ps).origin, -64.0, right, &mut traceto);
+            }
+
+            if anim != -1 {
+                //We want to roll. Perform a trace to see if we can, and if so, send us into one.
+                let mut trace: trace_t = core::mem::zeroed();
+                self.traps.trace(
+                    &mut trace,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!(mins) as *const vec3_t,
+                    core::ptr::addr_of!(maxs) as *const vec3_t,
+                    core::ptr::addr_of!(traceto) as *const vec3_t,
+                    (*ps).clientNum,
+                    CONTENTS_SOLID,
+                );
+                if trace.fraction >= 1.0 {
+                    (*ps).saberMove = saberMoveName_t::LS_NONE as c_int;
+                    return anim;
+                }
+            }
+            0
+        }
+    }
 }
 
-/// Raven `PM_WaterJumpMove`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:2833-2844`
-// PORT-ESCALATION(pmove-working-state): reads `pml`, writes `pm`.
-pub fn PM_WaterJumpMove() {
-    todo!("Port PM_WaterJumpMove — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_CrashLandEffect`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3684-3722`
+    pub fn PM_CrashLandEffect(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            if (*pm).waterlevel != 0 {
+                return;
+            }
+            let delta = Q_fabs(self.pml.previous_velocity[2]) / 10.0;
+            if delta >= 30.0 {
+                let mut bottom: vec3_t = [0.0; 3];
+                let mut effectID = -1;
+                let material = self.pml.groundTrace.surfaceFlags & MATERIAL_MASK;
+                VectorSet(
+                    &mut bottom,
+                    (*ps).origin[0],
+                    (*ps).origin[1],
+                    (*ps).origin[2] + (*pm).mins[2] + 1.0,
+                );
+                if material == MATERIAL_MUD {
+                    effectID = EFFECT_LANDING_MUD as c_int;
+                } else if material == MATERIAL_SAND {
+                    effectID = EFFECT_LANDING_SAND as c_int;
+                } else if material == MATERIAL_DIRT {
+                    effectID = EFFECT_LANDING_DIRT as c_int;
+                } else if material == MATERIAL_SNOW {
+                    effectID = EFFECT_LANDING_SNOW as c_int;
+                } else if material == MATERIAL_GRAVEL {
+                    effectID = EFFECT_LANDING_GRAVEL as c_int;
+                }
+
+                if effectID != -1 {
+                    let normal = self.pml.groundTrace.plane.normal;
+                    self.callbacks.play_effect(
+                        effectID,
+                        core::ptr::addr_of!(bottom),
+                        core::ptr::addr_of!(normal),
+                    );
+                }
+            }
+        }
+    }
+
+    /// Raven `PM_CrashLand`. `QAGAME` is defined, so the `PM_CrashLandEffect` call is compiled.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:3731-4002`
+    pub fn PM_CrashLand(&mut self) {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut didRoll = qfalse;
+
+            // calculate the exact velocity on landing
+            let dist = (*ps).origin[2] - self.pml.previous_origin[2];
+            let vel = self.pml.previous_velocity[2];
+            let acc = -(*ps).gravity;
+
+            let a = acc / 2.0;
+            let b = vel;
+            let c = -dist;
+
+            let den = b * b - 4.0 * a * c;
+            if den < 0.0 {
+                (*ps).inAirAnim = qfalse;
+                return;
+            }
+            let t = ((-b as f64 - (den as f64).sqrt()) / (2.0 * a as f64)) as f32;
+
+            let mut delta = vel + t * acc;
+            delta = ((delta * delta) as f64 * 0.0001) as f32;
+
+            // QAGAME
+            self.PM_CrashLandEffect();
+
+            // ducking while falling doubles damage
+            if (*ps).pm_flags & PMF_DUCKED != 0 {
+                delta *= 2.0;
+            }
+
+            let la = (*ps).legsAnim;
+            if la == BOTH_A7_KICK_F_AIR as c_int
+                || la == BOTH_A7_KICK_B_AIR as c_int
+                || la == BOTH_A7_KICK_R_AIR as c_int
+                || la == BOTH_A7_KICK_L_AIR as c_int
+            {
+                let mut landAnim = -1;
+                if la == BOTH_A7_KICK_F_AIR as c_int {
+                    landAnim = BOTH_FORCELAND1 as c_int;
+                } else if la == BOTH_A7_KICK_B_AIR as c_int {
+                    landAnim = BOTH_FORCELANDBACK1 as c_int;
+                } else if la == BOTH_A7_KICK_R_AIR as c_int {
+                    landAnim = BOTH_FORCELANDRIGHT1 as c_int;
+                } else if la == BOTH_A7_KICK_L_AIR as c_int {
+                    landAnim = BOTH_FORCELANDLEFT1 as c_int;
+                }
+                if landAnim != -1 {
+                    if (*ps).torsoAnim == (*ps).legsAnim {
+                        self.PM_SetAnim(
+                            SETANIM_BOTH,
+                            landAnim,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            0,
+                        );
+                    } else {
+                        self.PM_SetAnim(
+                            SETANIM_LEGS,
+                            landAnim,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            0,
+                        );
+                    }
+                }
+            } else if la == BOTH_FORCEJUMPLEFT1 as c_int
+                || la == BOTH_FORCEJUMPRIGHT1 as c_int
+                || la == BOTH_FORCEJUMPBACK1 as c_int
+                || la == BOTH_FORCEJUMP1 as c_int
+            {
+                let fjAnim;
+                if la == BOTH_FORCEJUMPLEFT1 as c_int {
+                    fjAnim = BOTH_LANDLEFT1 as c_int;
+                } else if la == BOTH_FORCEJUMPRIGHT1 as c_int {
+                    fjAnim = BOTH_LANDRIGHT1 as c_int;
+                } else if la == BOTH_FORCEJUMPBACK1 as c_int {
+                    fjAnim = BOTH_LANDBACK1 as c_int;
+                } else {
+                    fjAnim = BOTH_LAND1 as c_int;
+                }
+                self.PM_SetAnim(SETANIM_BOTH, fjAnim, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD, 0);
+            }
+            // decide which landing animation to use
+            else if BG_InRoll(ps, (*ps).legsAnim) == qfalse
+                && (*ps).inAirAnim != 0
+                && (*ps).m_iVehicleNum == 0
+            {
+                //only play a land animation if we transitioned into an in-air animation while off the ground
+                if BG_SaberInSpecial((*ps).saberMove) == qfalse {
+                    if (*ps).pm_flags & PMF_BACKWARDS_JUMP != 0 {
+                        self.PM_ForceLegsAnim(BOTH_LANDBACK1 as c_int);
+                    } else {
+                        self.PM_ForceLegsAnim(BOTH_LAND1 as c_int);
+                    }
+                }
+            }
+
+            if (*ps).weapon != WP_SABER as c_int
+                && (*ps).weapon != WP_MELEE as c_int
+                && PM_IsRocketTrooper() == qfalse
+            {
+                //saber handles its own anims
+                //This will push us back into our weaponready stance from the land anim.
+                if (*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode == 1 {
+                    self.PM_StartTorsoAnim(TORSO_WEAPONREADY4 as c_int);
+                } else {
+                    if (*ps).weapon == WP_EMPLACED_GUN as c_int {
+                        self.PM_StartTorsoAnim(BOTH_GUNSIT1 as c_int);
+                    } else {
+                        self.PM_StartTorsoAnim(WeaponReadyAnim[(*ps).weapon as usize]);
+                    }
+                }
+            }
+
+            if BG_InSpecialJump((*ps).legsAnim) == qfalse
+                || (*ps).legsTimer < 1
+                || (*ps).legsAnim == BOTH_WALL_RUN_LEFT as c_int
+                || (*ps).legsAnim == BOTH_WALL_RUN_RIGHT as c_int
+            {
+                //Only set the timer if we're in an anim that can be interrupted (this would not be, say, a flip)
+                if BG_InRoll(ps, (*ps).legsAnim) == qfalse && (*ps).inAirAnim != 0 {
+                    if BG_SaberInSpecial((*ps).saberMove) == qfalse
+                        || (*ps).weapon != WP_SABER as c_int
+                    {
+                        if (*ps).legsAnim != BOTH_FORCELAND1 as c_int
+                            && (*ps).legsAnim != BOTH_FORCELANDBACK1 as c_int
+                            && (*ps).legsAnim != BOTH_FORCELANDRIGHT1 as c_int
+                            && (*ps).legsAnim != BOTH_FORCELANDLEFT1 as c_int
+                        {
+                            //don't override if we have started a force land
+                            (*ps).legsTimer = TIMER_LAND;
+                        }
+                    }
+                }
+            }
+
+            (*ps).inAirAnim = qfalse;
+
+            if (*ps).m_iVehicleNum != 0 {
+                //don't do fall stuff while on a vehicle
+                return;
+            }
+
+            // never take falling damage if completely underwater
+            if (*pm).waterlevel == 3 {
+                return;
+            }
+
+            // reduce falling damage if there is standing water
+            if (*pm).waterlevel == 2 {
+                delta *= 0.25;
+            }
+            if (*pm).waterlevel == 1 {
+                delta *= 0.5;
+            }
+
+            if delta < 1.0 {
+                return;
+            }
+
+            if (*ps).pm_flags & PMF_DUCKED != 0 {
+                if delta >= 2.0
+                    && PM_InOnGroundAnim((*ps).legsAnim) == qfalse
+                    && PM_InKnockDown(ps) == qfalse
+                    && BG_InRoll(ps, (*ps).legsAnim) == qfalse
+                    && (*ps).forceHandExtend == HANDEXTEND_NONE as c_int
+                {
+                    //roll!
+                    let mut anim = self.PM_TryRoll();
+
+                    if PM_InRollComplete(ps, (*ps).legsAnim) != qfalse {
+                        anim = 0;
+                        (*ps).legsTimer = 0;
+                        (*ps).legsAnim = 0;
+                        self.PM_SetAnim(
+                            SETANIM_BOTH,
+                            BOTH_LAND1 as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            150,
+                        );
+                        (*ps).legsTimer = TIMER_LAND;
+                    }
+
+                    if anim != 0 {
+                        //absorb some impact
+                        (*ps).legsTimer = 0;
+                        delta /= 3.0;
+                        (*ps).legsAnim = 0;
+                        if (*ps).torsoAnim == BOTH_A7_SOULCAL as c_int {
+                            //get out of it on torso
+                            (*ps).torsoTimer = 0;
+                        }
+                        self.PM_SetAnim(
+                            SETANIM_BOTH,
+                            anim,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            150,
+                        );
+                        didRoll = qtrue;
+                    }
+                }
+            }
+
+            // SURF_NODAMAGE is used for bounce pads
+            if self.pml.groundTrace.surfaceFlags & SURF_NODAMAGE == 0 {
+                if delta > 7.0 {
+                    let mut delta_send = delta as c_int;
+
+                    if delta_send > 600 {
+                        delta_send = 600;
+                    }
+
+                    if (*ps).fd.forceJumpZStart != 0.0 {
+                        if ((*ps).origin[2] as c_int) >= ((*ps).fd.forceJumpZStart as c_int) {
+                            //was force jumping, landed on higher or same level as when force jump was started
+                            if delta_send > 8 {
+                                delta_send = 8;
+                            }
+                        } else {
+                            if delta_send > 8 {
+                                let dif =
+                                    ((*ps).fd.forceJumpZStart as c_int) - ((*ps).origin[2] as c_int);
+                                let lvl = (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] as usize;
+                                let mut dmgLess = (forceJumpHeight[lvl] - dif as f32) as c_int;
+
+                                if dmgLess < 0 {
+                                    dmgLess = 0;
+                                }
+
+                                delta_send = (delta_send as f64 - dmgLess as f64 * 0.3) as c_int;
+
+                                if delta_send < 8 {
+                                    delta_send = 8;
+                                }
+                            }
+                        }
+                    }
+
+                    if didRoll != qfalse {
+                        //Add the appropriate event..
+                        self.PM_AddEventWithParm(EV_ROLL as c_int, delta_send);
+                    } else {
+                        self.PM_AddEventWithParm(EV_FALL as c_int, delta_send);
+                    }
+                } else {
+                    if didRoll != qfalse {
+                        self.PM_AddEventWithParm(EV_ROLL as c_int, 0);
+                    } else {
+                        let fs = self.PM_FootstepForSurface();
+                        self.PM_AddEventWithParm(EV_FOOTSTEP as c_int, fs);
+                    }
+                }
+            }
+
+            // make sure velocity resets so we don't bounce back up again
+            (*ps).velocity[2] = 0.0;
+
+            // start footstep cycle over
+            (*ps).bobCycle = 0;
+        }
+    }
 }
 
-/// Raven `PM_WaterMove`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:2852-2916`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`pml` + movement-param globals.
-pub fn PM_WaterMove() {
-    todo!("Port PM_WaterMove — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_CorrectAllSolid`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4009-4044`
+    pub fn PM_CorrectAllSolid(&mut self, trace: *mut trace_t) -> c_int {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut point: vec3_t = [0.0; 3];
+
+            if (*pm).debugLevel != 0 {
+                crate::g_main::Com_Printf(
+                    cstr(&format!("{}:allsolid\n", self.bg.c_pmove)).as_ptr(),
+                );
+            }
+
+            // jitter around
+            for i in -1..=1 {
+                for j in -1..=1 {
+                    for k in -1..=1 {
+                        _VectorCopy((*ps).origin, &mut point);
+                        point[0] += i as f32;
+                        point[1] += j as f32;
+                        point[2] += k as f32;
+                        self.traps.trace(
+                            trace,
+                            core::ptr::addr_of!(point) as *const vec3_t,
+                            core::ptr::addr_of!((*pm).mins) as *const vec3_t,
+                            core::ptr::addr_of!((*pm).maxs) as *const vec3_t,
+                            core::ptr::addr_of!(point) as *const vec3_t,
+                            (*ps).clientNum,
+                            (*pm).tracemask,
+                        );
+                        if (*trace).allsolid == qfalse {
+                            point[0] = (*ps).origin[0];
+                            point[1] = (*ps).origin[1];
+                            point[2] = (*ps).origin[2] - 0.25;
+
+                            self.traps.trace(
+                                trace,
+                                core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                                core::ptr::addr_of!((*pm).mins) as *const vec3_t,
+                                core::ptr::addr_of!((*pm).maxs) as *const vec3_t,
+                                core::ptr::addr_of!(point) as *const vec3_t,
+                                (*ps).clientNum,
+                                (*pm).tracemask,
+                            );
+                            self.pml.groundTrace = *trace;
+                            return qtrue;
+                        }
+                    }
+                }
+            }
+
+            (*ps).groundEntityNum = ENTITYNUM_NONE;
+            self.pml.groundPlane = qfalse;
+            self.pml.walking = qfalse;
+
+            qfalse
+        }
+    }
+
+    /// Raven `PM_GroundTraceMissed`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4053-4133`
+    pub fn PM_GroundTraceMissed(&mut self) {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut trace: trace_t = core::mem::zeroed();
+            let mut point: vec3_t = [0.0; 3];
+
+            if (*ps).pm_type == PM_FLOAT as c_int {
+                //we're assuming this is because you're being choked
+                self.PM_SetAnim(SETANIM_LEGS, BOTH_CHOKE3 as c_int, SETANIM_FLAG_OVERRIDE, 100);
+            } else if (*ps).pm_type == PM_JETPACK as c_int {
+                //jetpacking (nothing)
+            }
+            //If the anim is choke3, act like we just went into the air because we aren't in a float
+            else if (*ps).groundEntityNum != ENTITYNUM_NONE
+                || (*ps).legsAnim == BOTH_CHOKE3 as c_int
+            {
+                // we just transitioned into freefall
+                if (*pm).debugLevel != 0 {
+                    crate::g_main::Com_Printf(
+                        cstr(&format!("{}:lift\n", self.bg.c_pmove)).as_ptr(),
+                    );
+                }
+
+                _VectorCopy((*ps).origin, &mut point);
+                point[2] -= 64.0;
+
+                self.traps.trace(
+                    &mut trace,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!((*pm).mins) as *const vec3_t,
+                    core::ptr::addr_of!((*pm).maxs) as *const vec3_t,
+                    core::ptr::addr_of!(point) as *const vec3_t,
+                    (*ps).clientNum,
+                    (*pm).tracemask,
+                );
+                if trace.fraction == 1.0 || (*ps).pm_type == PM_FLOAT as c_int {
+                    if (*ps).velocity[2] <= 0.0 && (*ps).pm_flags & PMF_JUMP_HELD == 0 {
+                        self.PM_SetAnim(SETANIM_LEGS, BOTH_INAIR1 as c_int, 0, 100);
+                        (*ps).pm_flags &= !PMF_BACKWARDS_JUMP;
+                    } else if (*pm).cmd.forwardmove >= 0 {
+                        self.PM_SetAnim(
+                            SETANIM_LEGS,
+                            BOTH_JUMP1 as c_int,
+                            SETANIM_FLAG_OVERRIDE,
+                            100,
+                        );
+                        (*ps).pm_flags &= !PMF_BACKWARDS_JUMP;
+                    } else {
+                        self.PM_SetAnim(
+                            SETANIM_LEGS,
+                            BOTH_JUMPBACK1 as c_int,
+                            SETANIM_FLAG_OVERRIDE,
+                            100,
+                        );
+                        (*ps).pm_flags |= PMF_BACKWARDS_JUMP;
+                    }
+
+                    (*ps).inAirAnim = qtrue;
+                }
+            } else if (*ps).inAirAnim == 0 {
+                _VectorCopy((*ps).origin, &mut point);
+                point[2] -= 64.0;
+
+                self.traps.trace(
+                    &mut trace,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!((*pm).mins) as *const vec3_t,
+                    core::ptr::addr_of!((*pm).maxs) as *const vec3_t,
+                    core::ptr::addr_of!(point) as *const vec3_t,
+                    (*ps).clientNum,
+                    (*pm).tracemask,
+                );
+                if trace.fraction == 1.0 || (*ps).pm_type == PM_FLOAT as c_int {
+                    (*ps).inAirAnim = qtrue;
+                }
+            }
+
+            if PM_InRollComplete(ps, (*ps).legsAnim) != qfalse {
+                self.PM_SetAnim(
+                    SETANIM_BOTH,
+                    BOTH_INAIR1 as c_int,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    150,
+                );
+                (*ps).inAirAnim = qtrue;
+            }
+
+            (*ps).groundEntityNum = ENTITYNUM_NONE;
+            self.pml.groundPlane = qfalse;
+            self.pml.walking = qfalse;
+        }
+    }
 }
 
-/// Raven `PM_FlyVehicleMove`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:2924-3012`
-// PORT-ESCALATION(pmove-working-state): reads `pml`, writes `pm`.
-pub fn PM_FlyVehicleMove() {
-    todo!("Port PM_FlyVehicleMove — parked: pmove-working-state")
-}
+impl PmoveContext<'_> {
+    /// Raven `PM_GroundTrace`. `QAGAME` is defined, so the vehicle-board block is compiled.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4141-4277`
+    pub fn PM_GroundTrace(&mut self) {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut point: vec3_t = [0.0; 3];
+            let mut trace: trace_t = core::mem::zeroed();
+            let mut minNormal = MIN_WALK_NORMAL;
 
-/// Raven `PM_FlyMove`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:3021-3059`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`pml`.
-pub fn PM_FlyMove() {
-    todo!("Port PM_FlyMove — parked: pmove-working-state")
-}
+            if (*ps).clientNum >= MAX_CLIENTS as c_int {
+                let pEnt = self.pm_entSelf;
+                if !pEnt.is_null() && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int {
+                    let pv = (*pEnt).m_pVehicle as *mut Vehicle_t;
+                    minNormal = (*(*pv).m_pVehicleInfo).maxSlope;
+                }
+            }
 
-/// Raven `PM_AirMove`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:3068-3297`
-// PORT-ESCALATION(pmove-working-state): reads `gPMDoSlowFall`/`pm`/`pm_entSelf`, writes `pml`.
-pub fn PM_AirMove() {
-    todo!("Port PM_AirMove — parked: pmove-working-state")
-}
+            point[0] = (*ps).origin[0];
+            point[1] = (*ps).origin[1];
+            point[2] = (*ps).origin[2] - 0.25;
 
-/// Raven `PM_WalkMove`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:3305-3484`
-// PORT-ESCALATION(pmove-working-state): reads/writes `pm`/`pml`/`pm_entSelf` + movement-param globals.
-pub fn PM_WalkMove() {
-    todo!("Port PM_WalkMove — parked: pmove-working-state")
-}
+            self.traps.trace(
+                &mut trace,
+                core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                core::ptr::addr_of!((*pm).mins) as *const vec3_t,
+                core::ptr::addr_of!((*pm).maxs) as *const vec3_t,
+                core::ptr::addr_of!(point) as *const vec3_t,
+                (*ps).clientNum,
+                (*pm).tracemask,
+            );
+            self.pml.groundTrace = trace;
 
-/// Raven `PM_DeadMove`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:3492-3509`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`pml`.
-pub fn PM_DeadMove() {
-    todo!("Port PM_DeadMove — parked: pmove-working-state")
-}
+            // do something corrective if the trace starts in a solid...
+            if trace.allsolid != qfalse {
+                if self.PM_CorrectAllSolid(&mut trace) == qfalse {
+                    return;
+                }
+            }
 
-/// Raven `PM_NoclipMove`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:3517-3576`
-// PORT-ESCALATION(pmove-working-state): reads `pml`, writes `pm`.
-pub fn PM_NoclipMove() {
-    todo!("Port PM_NoclipMove — parked: pmove-working-state")
-}
+            if (*ps).pm_type == PM_FLOAT as c_int || (*ps).pm_type == PM_JETPACK as c_int {
+                self.PM_GroundTraceMissed();
+                self.pml.groundPlane = qfalse;
+                self.pml.walking = qfalse;
+                return;
+            }
 
-/// Raven `PM_FootstepForSurface`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:3587-3594`
-// PORT-ESCALATION(pmove-working-state): reads `pml`.
-pub fn PM_FootstepForSurface() -> c_int {
-    todo!("Port PM_FootstepForSurface — parked: pmove-working-state")
-}
+            // if the trace didn't hit anything, we are in free fall
+            if trace.fraction == 1.0 {
+                self.PM_GroundTraceMissed();
+                self.pml.groundPlane = qfalse;
+                self.pml.walking = qfalse;
+                return;
+            }
 
-/// Raven `PM_TryRoll`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:3597-3681`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_TryRoll() -> c_int {
-    todo!("Port PM_TryRoll — parked: pmove-working-state")
-}
+            // check if getting thrown off the ground
+            let dp = (*ps).velocity[0] * trace.plane.normal[0]
+                + (*ps).velocity[1] * trace.plane.normal[1]
+                + (*ps).velocity[2] * trace.plane.normal[2];
+            if (*ps).velocity[2] > 0.0 && dp > 10.0 {
+                if (*pm).debugLevel != 0 {
+                    crate::g_main::Com_Printf(
+                        cstr(&format!("{}:kickoff\n", self.bg.c_pmove)).as_ptr(),
+                    );
+                }
+                // go into jump animation
+                if (*pm).cmd.forwardmove >= 0 {
+                    self.PM_ForceLegsAnim(BOTH_JUMP1 as c_int);
+                    (*ps).pm_flags &= !PMF_BACKWARDS_JUMP;
+                } else {
+                    self.PM_ForceLegsAnim(BOTH_JUMPBACK1 as c_int);
+                    (*ps).pm_flags |= PMF_BACKWARDS_JUMP;
+                }
 
-/// Raven `PM_CrashLandEffect`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:3684-3722`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`pml`.
-pub fn PM_CrashLandEffect() {
-    todo!("Port PM_CrashLandEffect — parked: pmove-working-state")
-}
+                (*ps).groundEntityNum = ENTITYNUM_NONE;
+                self.pml.groundPlane = qfalse;
+                self.pml.walking = qfalse;
+                return;
+            }
 
-/// Raven `PM_CrashLand`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:3731-4002`
-// PORT-ESCALATION(pmove-working-state): reads `pml`/`WeaponReadyAnim`, writes `pm`.
-pub fn PM_CrashLand() {
-    todo!("Port PM_CrashLand — parked: pmove-working-state")
-}
+            // slopes that are too steep will not be considered onground
+            if trace.plane.normal[2] < minNormal {
+                if (*pm).debugLevel != 0 {
+                    crate::g_main::Com_Printf(
+                        cstr(&format!("{}:steep\n", self.bg.c_pmove)).as_ptr(),
+                    );
+                }
+                (*ps).groundEntityNum = ENTITYNUM_NONE;
+                self.pml.groundPlane = qtrue;
+                self.pml.walking = qfalse;
+                return;
+            }
 
-/// Raven `PM_CorrectAllSolid`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4009-4044`
-// PORT-ESCALATION(pmove-working-state): reads `c_pmove`, writes `pm`/`pml`.
-pub fn PM_CorrectAllSolid(
-    trace: *mut trace_t,
-) -> c_int {
-    todo!("Port PM_CorrectAllSolid — parked: pmove-working-state")
-}
+            self.pml.groundPlane = qtrue;
+            self.pml.walking = qtrue;
 
-/// Raven `PM_GroundTraceMissed`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4053-4133`
-// PORT-ESCALATION(pmove-working-state): writes `pm`/`pml`.
-pub fn PM_GroundTraceMissed() {
-    todo!("Port PM_GroundTraceMissed — parked: pmove-working-state")
-}
+            // hitting solid ground will end a waterjump
+            if (*ps).pm_flags & PMF_TIME_WATERJUMP != 0 {
+                (*ps).pm_flags &= !(PMF_TIME_WATERJUMP | PMF_TIME_LAND);
+                (*ps).pm_time = 0;
+            }
 
-/// Raven `PM_GroundTrace`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4141-4277`
-// PORT-ESCALATION(pmove-working-state): reads `g_entities`/`g_gametype`/`pm_entSelf`, writes `pm`/`pml`.
-pub fn PM_GroundTrace() {
-    todo!("Port PM_GroundTrace — parked: pmove-working-state")
+            if (*ps).groundEntityNum == ENTITYNUM_NONE {
+                // just hit the ground
+                if (*pm).debugLevel != 0 {
+                    crate::g_main::Com_Printf(
+                        cstr(&format!("{}:Land\n", self.bg.c_pmove)).as_ptr(),
+                    );
+                }
+
+                self.PM_CrashLand();
+
+                // QAGAME: check if we landed on a vehicle
+                if (*ps).clientNum < MAX_CLIENTS as c_int
+                    && (*ps).m_iVehicleNum == 0
+                    && trace.entityNum < ENTITYNUM_WORLD
+                    && trace.entityNum >= MAX_CLIENTS as c_int
+                    && (*ps).zoomMode == 0
+                    && !self.pm_entSelf.is_null()
+                {
+                    let trEnt = self.PM_BGEntForNum(trace.entityNum) as *mut gentity_t;
+                    let veh = (*trEnt).m_pVehicle as *mut Vehicle_t;
+                    if (*trEnt).inuse != 0
+                        && !(*trEnt).client.is_null()
+                        && (*trEnt).s.eType == entityType_t::ET_NPC as c_int
+                        && (*trEnt).s.NPC_class == CLASS_VEHICLE as c_int
+                        && (*(*trEnt).client).ps.m_iVehicleNum == 0
+                        && !veh.is_null()
+                        && (*(*veh).m_pVehicleInfo).r#type as c_int
+                            != vehicleType_t::VH_WALKER as c_int
+                        && (*(*veh).m_pVehicleInfo).r#type as c_int
+                            != vehicleType_t::VH_FIGHTER as c_int
+                    {
+                        //it's a vehicle alright, let's board it.. if it's not an atst or ship
+                        if BG_SaberInSpecial((*ps).saberMove) == qfalse
+                            && (*ps).forceHandExtend == HANDEXTEND_NONE as c_int
+                            && (*ps).weaponTime <= 0
+                        {
+                            let servEnt = self.pm_entSelf as *mut gentity_t;
+                            // PORT-NOTE(g_gametype): bg tier has no game-cvar channel; gametype
+                            // value is read from pm->gametype (same value as g_gametype.integer).
+                            if (*pm).gametype < GT_TEAM as c_int
+                                || (*trEnt).alliedTeam as c_int == 0
+                                || (*trEnt).alliedTeam as c_int
+                                    == (*(*servEnt).client).sess.sessionTeam as c_int
+                            {
+                                //not belonging to a team, or client is on same team
+                                if let Some(board) = (*(*veh).m_pVehicleInfo).Board {
+                                    board(veh, self.pm_entSelf);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // don't do landing time if we were just going down a slope
+                if self.pml.previous_velocity[2] < -200.0 {
+                    // don't allow another jump for a little while
+                    (*ps).pm_flags |= PMF_TIME_LAND;
+                    (*ps).pm_time = 250;
+                }
+            }
+
+            (*ps).groundEntityNum = trace.entityNum;
+            (*ps).lastOnGround = (*pm).cmd.serverTime;
+
+            self.PM_AddTouchEnt(trace.entityNum);
+        }
+    }
 }
 
 // `PM_SetWaterLevel` is a `PmoveContext` method above (it reads the pmove
 // working set and drives `BgTraps::pointcontents`).
 
-/// Raven `PM_CheckDualForwardJumpDuck`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4322-4339`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_CheckDualForwardJumpDuck() -> qboolean {
-    todo!("Port PM_CheckDualForwardJumpDuck — parked: pmove-working-state")
-}
+impl PmoveContext<'_> {
+    /// Raven `PM_CheckDualForwardJumpDuck`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4322-4339`
+    pub fn PM_CheckDualForwardJumpDuck(&mut self) -> qboolean {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut resized = qfalse;
+            if (*ps).legsAnim == BOTH_JUMPATTACK6 as c_int {
+                //dynamically reduce bounding box to let character sail over heads of enemies
+                let animLen = self.PM_AnimLength(0, BOTH_JUMPATTACK6 as c_int);
+                if ((*ps).legsTimer >= 1450 && animLen - (*ps).legsTimer >= 400)
+                    || ((*ps).legsTimer >= 400 && animLen - (*ps).legsTimer >= 1100)
+                {
+                    //in a part of the anim that we're pretty much sideways in, raise up the mins
+                    (*pm).mins[2] = 0.0;
+                    (*ps).pm_flags |= PMF_FIX_MINS;
+                    resized = qtrue;
+                }
+            }
+            resized
+        }
+    }
 
-/// Raven `PM_CheckFixMins`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4341-4401`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_CheckFixMins() {
-    todo!("Port PM_CheckFixMins — parked: pmove-working-state")
-}
+    /// Raven `PM_CheckFixMins`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4341-4401`
+    pub fn PM_CheckFixMins(&mut self) {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            if (*ps).pm_flags & PMF_FIX_MINS != 0 {
+                //drop the mins back down
+                let mut trace: trace_t = core::mem::zeroed();
+                let mut end: vec3_t = [0.0; 3];
+                let mut curMins: vec3_t = [0.0; 3];
+                let mut curMaxs: vec3_t = [0.0; 3];
 
-/// Raven `PM_CheckDuck`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4410-4542`
-// PORT-ESCALATION(pmove-working-state): reads `g_entities`/`level`/`pm_entVeh`, writes `pm`.
-pub fn PM_CheckDuck() {
-    todo!("Port PM_CheckDuck — parked: pmove-working-state")
-}
+                VectorSet(
+                    &mut end,
+                    (*ps).origin[0],
+                    (*ps).origin[1],
+                    (*ps).origin[2] + MINS_Z as f32,
+                );
+                VectorSet(&mut curMins, (*pm).mins[0], (*pm).mins[1], 0.0);
+                VectorSet(&mut curMaxs, (*pm).maxs[0], (*pm).maxs[1], (*ps).standheight as f32);
 
-/// Raven `PM_Use`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4559-4577`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_Use() {
-    todo!("Port PM_Use — parked: pmove-working-state")
+                self.traps.trace(
+                    &mut trace,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!(curMins) as *const vec3_t,
+                    core::ptr::addr_of!(curMaxs) as *const vec3_t,
+                    core::ptr::addr_of!(end) as *const vec3_t,
+                    (*ps).clientNum,
+                    (*pm).tracemask,
+                );
+                if trace.allsolid == qfalse && trace.startsolid == qfalse {
+                    //should never start in solid
+                    if trace.fraction >= 1.0 {
+                        //all clear: drop the bottom of my bbox back down
+                        (*pm).mins[2] = MINS_Z as f32;
+                        (*ps).pm_flags &= !PMF_FIX_MINS;
+                    } else {
+                        //move me up so the bottom of my bbox will be where the trace ended
+                        let updist = (1.0 - trace.fraction) * -(MINS_Z as f32);
+                        end[2] = (*ps).origin[2] + updist;
+                        self.traps.trace(
+                            &mut trace,
+                            core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                            core::ptr::addr_of!(curMins) as *const vec3_t,
+                            core::ptr::addr_of!(curMaxs) as *const vec3_t,
+                            core::ptr::addr_of!(end) as *const vec3_t,
+                            (*ps).clientNum,
+                            (*pm).tracemask,
+                        );
+                        if trace.allsolid == qfalse && trace.startsolid == qfalse {
+                            if trace.fraction >= 1.0 {
+                                //all clear: move me up
+                                (*ps).origin[2] += updist;
+                                (*pm).mins[2] = MINS_Z as f32;
+                                (*ps).pm_flags &= !PMF_FIX_MINS;
+                            } else {
+                                //no room to expand, so just crouch us
+                                if (*ps).legsAnim != BOTH_JUMPATTACK6 as c_int
+                                    || (*ps).legsTimer <= 200
+                                {
+                                    //drop the maxs, put the mins back and move us up
+                                    (*pm).maxs[2] += MINS_Z as f32;
+                                    (*ps).origin[2] -= MINS_Z as f32;
+                                    (*pm).mins[2] = MINS_Z as f32;
+                                    //this way we'll be in a crouch when we're done
+                                    if (*ps).legsAnim == BOTH_JUMPATTACK6 as c_int {
+                                        (*ps).legsTimer = 0;
+                                        (*ps).torsoTimer = 0;
+                                    }
+                                    (*ps).pm_flags |= PMF_DUCKED;
+                                    (*ps).pm_flags &= !PMF_FIX_MINS;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Raven `PM_CheckDuck`. `QAGAME` is defined, so the solidHack block is compiled.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4410-4542`
+    pub fn PM_CheckDuck(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut trace: trace_t = core::mem::zeroed();
+
+            if (*ps).m_iVehicleNum > 0 && (*ps).m_iVehicleNum < ENTITYNUM_NONE {
+                //riding a vehicle or are a vehicle: no ducking or rolling when on a vehicle
+                (*ps).pm_flags &= !PMF_DUCKED;
+                (*ps).pm_flags &= !PMF_ROLLING;
+
+                if (*ps).clientNum >= MAX_CLIENTS as c_int {
+                    return;
+                }
+                if !self.pm_entVeh.is_null() && {
+                    let pv = (*self.pm_entVeh).m_pVehicle as *mut Vehicle_t;
+                    !pv.is_null()
+                        && ((*(*pv).m_pVehicleInfo).r#type as c_int
+                            == vehicleType_t::VH_SPEEDER as c_int
+                            || (*(*pv).m_pVehicleInfo).r#type as c_int
+                                == vehicleType_t::VH_ANIMAL as c_int)
+                } {
+                    let mut solidTr: trace_t = core::mem::zeroed();
+
+                    (*pm).mins[0] = -16.0;
+                    (*pm).mins[1] = -16.0;
+                    (*pm).mins[2] = MINS_Z as f32;
+
+                    (*pm).maxs[0] = 16.0;
+                    (*pm).maxs[1] = 16.0;
+                    (*pm).maxs[2] = (*ps).standheight as f32;
+                    (*ps).viewheight = DEFAULT_VIEWHEIGHT;
+
+                    self.traps.trace(
+                        &mut solidTr,
+                        core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                        core::ptr::addr_of!((*pm).mins) as *const vec3_t,
+                        core::ptr::addr_of!((*pm).maxs) as *const vec3_t,
+                        core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                        (*ps).m_iVehicleNum,
+                        (*pm).tracemask,
+                    );
+                    if solidTr.startsolid != qfalse
+                        || solidTr.allsolid != qfalse
+                        || solidTr.fraction != 1.0
+                    {
+                        //whoops, can't fit here. Down to 0!
+                        VectorClear(&mut (*pm).mins);
+                        VectorClear(&mut (*pm).maxs);
+                        // QAGAME solidHack
+                        let me = self.PM_BGEntForNum((*ps).clientNum) as *mut gentity_t;
+                        if (*me).inuse != 0 && !(*me).client.is_null() {
+                            (*(*me).client).solidHack = self.callbacks.get_time() + 200;
+                        }
+                    }
+                }
+            } else {
+                if (*ps).clientNum < MAX_CLIENTS as c_int {
+                    (*pm).mins[0] = -15.0;
+                    (*pm).mins[1] = -15.0;
+
+                    (*pm).maxs[0] = 15.0;
+                    (*pm).maxs[1] = 15.0;
+                }
+
+                if self.PM_CheckDualForwardJumpDuck() != qfalse {
+                    //special anim resizing us
+                } else {
+                    self.PM_CheckFixMins();
+
+                    if (*pm).mins[2] == 0.0 {
+                        (*pm).mins[2] = MINS_Z as f32;
+                    }
+                }
+
+                if (*ps).pm_type == PM_DEAD as c_int && (*ps).clientNum < MAX_CLIENTS as c_int {
+                    (*pm).maxs[2] = -8.0;
+                    (*ps).viewheight = DEAD_VIEWHEIGHT;
+                    return;
+                }
+
+                if BG_InRoll(ps, (*ps).legsAnim) != qfalse
+                    && BG_KickingAnim((*ps).legsAnim) == qfalse
+                {
+                    (*pm).maxs[2] = (*ps).crouchheight as f32;
+                    (*ps).viewheight = DEFAULT_VIEWHEIGHT;
+                    (*ps).pm_flags &= !PMF_DUCKED;
+                    (*ps).pm_flags |= PMF_ROLLING;
+                    return;
+                } else if (*ps).pm_flags & PMF_ROLLING != 0 {
+                    // try to stand up
+                    (*pm).maxs[2] = (*ps).standheight as f32;
+                    self.traps.trace(
+                        &mut trace,
+                        core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                        core::ptr::addr_of!((*pm).mins) as *const vec3_t,
+                        core::ptr::addr_of!((*pm).maxs) as *const vec3_t,
+                        core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                        (*ps).clientNum,
+                        (*pm).tracemask,
+                    );
+                    if trace.allsolid == qfalse {
+                        (*ps).pm_flags &= !PMF_ROLLING;
+                    }
+                } else if (*pm).cmd.upmove < 0
+                    || (*ps).forceHandExtend == HANDEXTEND_KNOCKDOWN as c_int
+                    || (*ps).forceHandExtend == HANDEXTEND_PRETHROWN as c_int
+                    || (*ps).forceHandExtend == HANDEXTEND_POSTTHROWN as c_int
+                {
+                    // duck
+                    (*ps).pm_flags |= PMF_DUCKED;
+                } else {
+                    // stand up if possible
+                    if (*ps).pm_flags & PMF_DUCKED != 0 {
+                        // try to stand up
+                        (*pm).maxs[2] = (*ps).standheight as f32;
+                        self.traps.trace(
+                            &mut trace,
+                            core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                            core::ptr::addr_of!((*pm).mins) as *const vec3_t,
+                            core::ptr::addr_of!((*pm).maxs) as *const vec3_t,
+                            core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                            (*ps).clientNum,
+                            (*pm).tracemask,
+                        );
+                        if trace.allsolid == qfalse {
+                            (*ps).pm_flags &= !PMF_DUCKED;
+                        }
+                    }
+                }
+            }
+
+            if (*ps).pm_flags & PMF_DUCKED != 0 {
+                (*pm).maxs[2] = (*ps).crouchheight as f32;
+                (*ps).viewheight = CROUCH_VIEWHEIGHT;
+            } else if (*ps).pm_flags & PMF_ROLLING != 0 {
+                (*pm).maxs[2] = (*ps).crouchheight as f32;
+                (*ps).viewheight = DEFAULT_VIEWHEIGHT;
+            } else {
+                (*pm).maxs[2] = (*ps).standheight as f32;
+                (*ps).viewheight = DEFAULT_VIEWHEIGHT;
+            }
+        }
+    }
+
+    /// Raven `PM_Use`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4559-4577`
+    pub fn PM_Use(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            if (*ps).useTime > 0 {
+                (*ps).useTime -= 100; //pm->cmd.msec;
+            }
+
+            if (*ps).useTime > 0 {
+                return;
+            }
+
+            if (*pm).cmd.buttons & BUTTON_USE == 0 {
+                (*pm).useEvent = 0;
+                (*ps).useTime = 0;
+                return;
+            }
+
+            (*pm).useEvent = EV_USE as c_int;
+            (*ps).useTime = USE_DELAY;
+        }
+    }
 }
 
 /// Raven `PM_WalkingAnim`.
@@ -1024,15 +4430,121 @@ pub fn PM_AnglesForSlope(
     angles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * r#mod;
 }
 
-/// Raven `PM_FootSlopeTrace`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4677-4740`
-// PORT-ESCALATION(pmove-working-state): reads `pm` (ghoul2, trace, modelScale, mins, ...).
-pub fn PM_FootSlopeTrace(
-    pDiff: *mut f32,
-    pInterval: *mut f32,
-) {
-    todo!("Port PM_FootSlopeTrace — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_FootSlopeTrace`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4677-4740`
+    pub fn PM_FootSlopeTrace(&mut self, pDiff: *mut f32, pInterval: *mut f32) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut footLOrg: vec3_t = [0.0; 3];
+            let mut footROrg: vec3_t = [0.0; 3];
+            let mut footLBot: vec3_t = [0.0; 3];
+            let mut footRBot: vec3_t = [0.0; 3];
+            let mut footLPoint: vec3_t = [0.0; 3];
+            let mut footRPoint: vec3_t = [0.0; 3];
+            let mut footMins: vec3_t = [0.0; 3];
+            let mut footMaxs: vec3_t = [0.0; 3];
+            let mut footLSlope: vec3_t = [0.0; 3];
+            let mut footRSlope: vec3_t = [0.0; 3];
+
+            let mut trace: trace_t = core::mem::zeroed();
+
+            let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+            let mut G2Angles: vec3_t = [0.0; 3];
+
+            VectorSet(&mut G2Angles, 0.0, (*ps).viewangles[YAW], 0.0);
+
+            let interval = 4.0f32;
+
+            strap_G2API_GetBoltMatrix(
+                (*pm).ghoul2,
+                0,
+                (*pm).g2Bolts_LFoot,
+                &mut boltMatrix,
+                G2Angles,
+                (*ps).origin,
+                (*pm).cmd.serverTime,
+                core::ptr::null_mut(),
+                (*pm).modelScale,
+            );
+            footLPoint[0] = boltMatrix.matrix[0][3];
+            footLPoint[1] = boltMatrix.matrix[1][3];
+            footLPoint[2] = boltMatrix.matrix[2][3];
+
+            strap_G2API_GetBoltMatrix(
+                (*pm).ghoul2,
+                0,
+                (*pm).g2Bolts_RFoot,
+                &mut boltMatrix,
+                G2Angles,
+                (*ps).origin,
+                (*pm).cmd.serverTime,
+                core::ptr::null_mut(),
+                (*pm).modelScale,
+            );
+            footRPoint[0] = boltMatrix.matrix[0][3];
+            footRPoint[1] = boltMatrix.matrix[1][3];
+            footRPoint[2] = boltMatrix.matrix[2][3];
+
+            _VectorCopy(footLPoint, &mut footLOrg);
+            _VectorCopy(footRPoint, &mut footROrg);
+
+            //step 2: adjust foot tag z height to bottom of bbox+1
+            footLOrg[2] = (*ps).origin[2] + (*pm).mins[2] + 1.0;
+            footROrg[2] = (*ps).origin[2] + (*pm).mins[2] + 1.0;
+            VectorSet(
+                &mut footLBot,
+                footLOrg[0],
+                footLOrg[1],
+                footLOrg[2] - interval * 10.0,
+            );
+            VectorSet(
+                &mut footRBot,
+                footROrg[0],
+                footROrg[1],
+                footROrg[2] - interval * 10.0,
+            );
+
+            //step 3: trace down from each, find difference
+            VectorSet(&mut footMins, -3.0, -3.0, 0.0);
+            VectorSet(&mut footMaxs, 3.0, 3.0, 1.0);
+
+            self.traps.trace(
+                &mut trace,
+                core::ptr::addr_of!(footLOrg) as *const vec3_t,
+                core::ptr::addr_of!(footMins) as *const vec3_t,
+                core::ptr::addr_of!(footMaxs) as *const vec3_t,
+                core::ptr::addr_of!(footLBot) as *const vec3_t,
+                (*ps).clientNum,
+                (*pm).tracemask,
+            );
+            _VectorCopy(trace.endpos, &mut footLBot);
+            _VectorCopy(trace.plane.normal, &mut footLSlope);
+
+            self.traps.trace(
+                &mut trace,
+                core::ptr::addr_of!(footROrg) as *const vec3_t,
+                core::ptr::addr_of!(footMins) as *const vec3_t,
+                core::ptr::addr_of!(footMaxs) as *const vec3_t,
+                core::ptr::addr_of!(footRBot) as *const vec3_t,
+                (*ps).clientNum,
+                (*pm).tracemask,
+            );
+            _VectorCopy(trace.endpos, &mut footRBot);
+            _VectorCopy(trace.plane.normal, &mut footRSlope);
+
+            let diff = footLBot[2] - footRBot[2];
+
+            if !pDiff.is_null() {
+                *pDiff = diff;
+            }
+            if !pInterval.is_null() {
+                *pInterval = interval;
+            }
+            let _ = (footLSlope, footRSlope);
+        }
+    }
 }
 
 /// Raven `BG_InSlopeAnim`.
@@ -1069,38 +4581,676 @@ pub fn BG_InSlopeAnim(
     }
 }
 
-/// Raven `PM_AdjustStandAnimForSlope`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4804-5102`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_AdjustStandAnimForSlope() -> qboolean {
-    todo!("Port PM_AdjustStandAnimForSlope — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_AdjustStandAnimForSlope`. `SLOPERECALCVAR` = `pm->ps->slopeRecalcTime`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4804-5102`
+    pub fn PM_AdjustStandAnimForSlope(&mut self) -> qboolean {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+
+            if (*pm).ghoul2.is_null() {
+                //probably just changed models and not quite in sync yet
+                return qfalse;
+            }
+
+            if (*pm).g2Bolts_LFoot == -1 || (*pm).g2Bolts_RFoot == -1 {
+                //need these bolts!
+                return qfalse;
+            }
+
+            //step 1: find the 2 foot tags
+            let mut diff = 0.0f32;
+            let mut interval = 0.0f32;
+            self.PM_FootSlopeTrace(&mut diff, &mut interval);
+
+            //step 4: choose left/right slope-match interval
+            let mut destAnim;
+            if diff >= interval * 5.0 {
+                destAnim = LEGS_LEFTUP5 as c_int;
+            } else if diff >= interval * 4.0 {
+                destAnim = LEGS_LEFTUP4 as c_int;
+            } else if diff >= interval * 3.0 {
+                destAnim = LEGS_LEFTUP3 as c_int;
+            } else if diff >= interval * 2.0 {
+                destAnim = LEGS_LEFTUP2 as c_int;
+            } else if diff >= interval {
+                destAnim = LEGS_LEFTUP1 as c_int;
+            } else if diff <= interval * -5.0 {
+                destAnim = LEGS_RIGHTUP5 as c_int;
+            } else if diff <= interval * -4.0 {
+                destAnim = LEGS_RIGHTUP4 as c_int;
+            } else if diff <= interval * -3.0 {
+                destAnim = LEGS_RIGHTUP3 as c_int;
+            } else if diff <= interval * -2.0 {
+                destAnim = LEGS_RIGHTUP2 as c_int;
+            } else if diff <= interval * -1.0 {
+                destAnim = LEGS_RIGHTUP1 as c_int;
+            } else {
+                return qfalse;
+            }
+
+            let mut legsAnim = (*ps).legsAnim;
+            //adjust for current legs anim (remap to stance family)
+            if legsAnim == BOTH_STAND1 as c_int
+                || (legsAnim >= LEGS_S1_LUP1 as c_int && legsAnim <= LEGS_S1_LUP5 as c_int)
+                || (legsAnim >= LEGS_S1_RUP1 as c_int && legsAnim <= LEGS_S1_RUP5 as c_int)
+            {
+                destAnim = LEGS_S1_LUP1 as c_int + (destAnim - LEGS_LEFTUP1 as c_int);
+            } else if legsAnim == BOTH_STAND2 as c_int
+                || legsAnim == BOTH_SABERFAST_STANCE as c_int
+                || legsAnim == BOTH_SABERSLOW_STANCE as c_int
+                || legsAnim == BOTH_CROUCH1IDLE as c_int
+                || legsAnim == BOTH_CROUCH1 as c_int
+                || (legsAnim >= LEGS_LEFTUP1 as c_int && legsAnim <= LEGS_LEFTUP5 as c_int)
+                || (legsAnim >= LEGS_RIGHTUP1 as c_int && legsAnim <= LEGS_RIGHTUP5 as c_int)
+            {
+                //fine
+            } else if legsAnim == BOTH_STAND3 as c_int
+                || (legsAnim >= LEGS_S3_LUP1 as c_int && legsAnim <= LEGS_S3_LUP5 as c_int)
+                || (legsAnim >= LEGS_S3_RUP1 as c_int && legsAnim <= LEGS_S3_RUP5 as c_int)
+            {
+                destAnim = LEGS_S3_LUP1 as c_int + (destAnim - LEGS_LEFTUP1 as c_int);
+            } else if legsAnim == BOTH_STAND4 as c_int
+                || (legsAnim >= LEGS_S4_LUP1 as c_int && legsAnim <= LEGS_S4_LUP5 as c_int)
+                || (legsAnim >= LEGS_S4_RUP1 as c_int && legsAnim <= LEGS_S4_RUP5 as c_int)
+            {
+                destAnim = LEGS_S4_LUP1 as c_int + (destAnim - LEGS_LEFTUP1 as c_int);
+            } else if legsAnim == BOTH_STAND5 as c_int
+                || (legsAnim >= LEGS_S5_LUP1 as c_int && legsAnim <= LEGS_S5_LUP5 as c_int)
+                || (legsAnim >= LEGS_S5_RUP1 as c_int && legsAnim <= LEGS_S5_RUP5 as c_int)
+            {
+                destAnim = LEGS_S5_LUP1 as c_int + (destAnim - LEGS_LEFTUP1 as c_int);
+            } else {
+                // BOTH_STAND6 / default
+                return qfalse;
+            }
+
+            let in_leftup = (legsAnim >= LEGS_LEFTUP1 as c_int && legsAnim <= LEGS_LEFTUP5 as c_int)
+                || (legsAnim >= LEGS_S1_LUP1 as c_int && legsAnim <= LEGS_S1_LUP5 as c_int)
+                || (legsAnim >= LEGS_S3_LUP1 as c_int && legsAnim <= LEGS_S3_LUP5 as c_int)
+                || (legsAnim >= LEGS_S4_LUP1 as c_int && legsAnim <= LEGS_S4_LUP5 as c_int)
+                || (legsAnim >= LEGS_S5_LUP1 as c_int && legsAnim <= LEGS_S5_LUP5 as c_int);
+            let in_rightup = (legsAnim >= LEGS_RIGHTUP1 as c_int
+                && legsAnim <= LEGS_RIGHTUP5 as c_int)
+                || (legsAnim >= LEGS_S1_RUP1 as c_int && legsAnim <= LEGS_S1_RUP5 as c_int)
+                || (legsAnim >= LEGS_S3_RUP1 as c_int && legsAnim <= LEGS_S3_RUP5 as c_int)
+                || (legsAnim >= LEGS_S4_RUP1 as c_int && legsAnim <= LEGS_S4_RUP5 as c_int)
+                || (legsAnim >= LEGS_S5_RUP1 as c_int && legsAnim <= LEGS_S5_RUP5 as c_int);
+
+            if in_leftup {
+                //already in left-side up
+                if destAnim > legsAnim && (*ps).slopeRecalcTime < (*pm).cmd.serverTime {
+                    legsAnim += 1;
+                    (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                } else if destAnim < legsAnim && (*ps).slopeRecalcTime < (*pm).cmd.serverTime {
+                    legsAnim -= 1;
+                    (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                } else {
+                    legsAnim = destAnim;
+                }
+                destAnim = legsAnim;
+            } else if in_rightup {
+                //already in right-side up
+                if destAnim > legsAnim && (*ps).slopeRecalcTime < (*pm).cmd.serverTime {
+                    legsAnim += 1;
+                    (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                } else if destAnim < legsAnim && (*ps).slopeRecalcTime < (*pm).cmd.serverTime {
+                    legsAnim -= 1;
+                    (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                } else {
+                    legsAnim = destAnim;
+                }
+                destAnim = legsAnim;
+            } else {
+                //in a stand of some sort?
+                if legsAnim == BOTH_STAND1 as c_int
+                    || legsAnim == TORSO_WEAPONREADY1 as c_int
+                    || legsAnim == TORSO_WEAPONREADY2 as c_int
+                    || legsAnim == TORSO_WEAPONREADY3 as c_int
+                    || legsAnim == TORSO_WEAPONREADY10 as c_int
+                {
+                    if destAnim >= LEGS_S1_LUP1 as c_int && destAnim <= LEGS_S1_LUP5 as c_int {
+                        destAnim = LEGS_S1_LUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else if destAnim >= LEGS_S1_RUP1 as c_int
+                        && destAnim <= LEGS_S1_RUP5 as c_int
+                    {
+                        destAnim = LEGS_S1_RUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else {
+                        return qfalse;
+                    }
+                } else if legsAnim == BOTH_STAND2 as c_int
+                    || legsAnim == BOTH_SABERFAST_STANCE as c_int
+                    || legsAnim == BOTH_SABERSLOW_STANCE as c_int
+                    || legsAnim == BOTH_CROUCH1IDLE as c_int
+                {
+                    if destAnim >= LEGS_LEFTUP1 as c_int && destAnim <= LEGS_LEFTUP5 as c_int {
+                        destAnim = LEGS_LEFTUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else if destAnim >= LEGS_RIGHTUP1 as c_int
+                        && destAnim <= LEGS_RIGHTUP5 as c_int
+                    {
+                        destAnim = LEGS_RIGHTUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else {
+                        return qfalse;
+                    }
+                } else if legsAnim == BOTH_STAND3 as c_int {
+                    if destAnim >= LEGS_S3_LUP1 as c_int && destAnim <= LEGS_S3_LUP5 as c_int {
+                        destAnim = LEGS_S3_LUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else if destAnim >= LEGS_S3_RUP1 as c_int
+                        && destAnim <= LEGS_S3_RUP5 as c_int
+                    {
+                        destAnim = LEGS_S3_RUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else {
+                        return qfalse;
+                    }
+                } else if legsAnim == BOTH_STAND4 as c_int {
+                    if destAnim >= LEGS_S4_LUP1 as c_int && destAnim <= LEGS_S4_LUP5 as c_int {
+                        destAnim = LEGS_S4_LUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else if destAnim >= LEGS_S4_RUP1 as c_int
+                        && destAnim <= LEGS_S4_RUP5 as c_int
+                    {
+                        destAnim = LEGS_S4_RUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else {
+                        return qfalse;
+                    }
+                } else if legsAnim == BOTH_STAND5 as c_int {
+                    if destAnim >= LEGS_S5_LUP1 as c_int && destAnim <= LEGS_S5_LUP5 as c_int {
+                        destAnim = LEGS_S5_LUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else if destAnim >= LEGS_S5_RUP1 as c_int
+                        && destAnim <= LEGS_S5_RUP5 as c_int
+                    {
+                        destAnim = LEGS_S5_RUP1 as c_int;
+                        (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
+                    } else {
+                        return qfalse;
+                    }
+                } else {
+                    // BOTH_STAND6 / default
+                    return qfalse;
+                }
+            }
+            //step 7: set the anim
+            self.PM_ContinueLegsAnim(destAnim);
+
+            qtrue
+        }
+    }
+
+    /// Raven `PM_LegsSlopeBackTransition`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5107-5168`
+    pub fn PM_LegsSlopeBackTransition(&mut self, desiredAnim: c_int) -> c_int {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let anim = (*ps).legsAnim;
+            let mut resultingAnim = desiredAnim;
+
+            let match_case = (anim >= LEGS_LEFTUP2 as c_int && anim <= LEGS_LEFTUP5 as c_int)
+                || (anim >= LEGS_RIGHTUP2 as c_int && anim <= LEGS_RIGHTUP5 as c_int)
+                || (anim >= LEGS_S1_LUP2 as c_int && anim <= LEGS_S1_LUP5 as c_int)
+                || (anim >= LEGS_S1_RUP2 as c_int && anim <= LEGS_S1_RUP5 as c_int)
+                || (anim >= LEGS_S3_LUP2 as c_int && anim <= LEGS_S3_LUP5 as c_int)
+                || (anim >= LEGS_S3_RUP2 as c_int && anim <= LEGS_S3_RUP5 as c_int)
+                || (anim >= LEGS_S4_LUP2 as c_int && anim <= LEGS_S4_LUP5 as c_int)
+                || (anim >= LEGS_S4_RUP2 as c_int && anim <= LEGS_S4_RUP5 as c_int)
+                || (anim >= LEGS_S5_LUP2 as c_int && anim <= LEGS_S5_LUP5 as c_int)
+                || (anim >= LEGS_S5_RUP2 as c_int && anim <= LEGS_S5_RUP5 as c_int);
+
+            if match_case {
+                if (*ps).slopeRecalcTime < (*pm).cmd.serverTime {
+                    resultingAnim = anim - 1;
+                    (*ps).slopeRecalcTime = (*pm).cmd.serverTime + 8; //SLOPE_RECALC_INT
+                } else {
+                    resultingAnim = anim;
+                }
+                VectorClear(&mut (*ps).velocity);
+            }
+
+            resultingAnim
+        }
+    }
 }
 
-/// Raven `PM_LegsSlopeBackTransition`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:5107-5168`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_LegsSlopeBackTransition(
-    desiredAnim: c_int,
-) -> c_int {
-    todo!("Port PM_LegsSlopeBackTransition — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_Footsteps`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5175-5661`
+    pub fn PM_Footsteps(&mut self) {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut bobmove = 0.0f32;
+            let mut footstep = qfalse;
+            let mut setAnimFlags = 0;
+
+            let la = (*ps).legsAnim;
+            if (PM_InSaberAnim(la) != qfalse && BG_SpinningSaberAnim(la) == qfalse)
+                || la == BOTH_STAND1 as c_int
+                || la == BOTH_STAND1TO2 as c_int
+                || la == BOTH_STAND2TO1 as c_int
+                || la == BOTH_STAND2 as c_int
+                || la == BOTH_SABERFAST_STANCE as c_int
+                || la == BOTH_SABERSLOW_STANCE as c_int
+                || la == BOTH_BUTTON_HOLD as c_int
+                || la == BOTH_BUTTON_RELEASE as c_int
+                || PM_LandingAnim(la) != qfalse
+                || PM_PainAnim(la) != qfalse
+            {
+                //legs are in a saber anim, and not spinning, be sure to override it
+                setAnimFlags |= SETANIM_FLAG_OVERRIDE;
+            }
+
+            // calculate speed and cycle
+            (*pm).xyspeed = ((*ps).velocity[0] * (*ps).velocity[0]
+                + (*ps).velocity[1] * (*ps).velocity[1])
+                .sqrt();
+
+            if (*ps).saberMove == saberMoveName_t::LS_SPINATTACK as c_int {
+                self.PM_ContinueLegsAnim((*ps).torsoAnim);
+            } else if (*ps).groundEntityNum == ENTITYNUM_NONE {
+                // airborne leaves position in cycle intact, but doesn't advance
+                if (*pm).waterlevel > 1 {
+                    if (*pm).xyspeed > 60.0 {
+                        self.PM_ContinueLegsAnim(BOTH_SWIMFORWARD as c_int);
+                    } else {
+                        self.PM_ContinueLegsAnim(BOTH_SWIM_IDLE1 as c_int);
+                    }
+                }
+                return;
+            }
+            // if not trying to move
+            else if (*pm).cmd.forwardmove == 0 && (*pm).cmd.rightmove == 0 {
+                if (*pm).xyspeed < 5.0 {
+                    (*ps).bobCycle = 0; // start at beginning of cycle again
+                    if (*ps).clientNum >= MAX_CLIENTS as c_int
+                        && !self.pm_entSelf.is_null()
+                        && (*self.pm_entSelf).s.NPC_class == CLASS_RANCOR as c_int
+                    {
+                        if (*ps).eFlags2 & EF2_USE_ALT_ANIM != 0 {
+                            self.PM_ContinueLegsAnim(BOTH_STAND4 as c_int);
+                        } else if (*ps).eFlags2 & EF2_ALERTED != 0 {
+                            self.PM_ContinueLegsAnim(BOTH_STAND2 as c_int);
+                        } else {
+                            self.PM_ContinueLegsAnim(BOTH_STAND1 as c_int);
+                        }
+                    } else if (*ps).clientNum >= MAX_CLIENTS as c_int
+                        && !self.pm_entSelf.is_null()
+                        && (*self.pm_entSelf).s.NPC_class == CLASS_WAMPA as c_int
+                    {
+                        if (*ps).eFlags2 & EF2_USE_ALT_ANIM != 0 {
+                            self.PM_ContinueLegsAnim(BOTH_STAND2 as c_int);
+                        } else {
+                            self.PM_ContinueLegsAnim(BOTH_STAND1 as c_int);
+                        }
+                    } else if (*ps).pm_flags & PMF_DUCKED != 0 || (*ps).pm_flags & PMF_ROLLING != 0
+                    {
+                        if (*ps).legsAnim != BOTH_CROUCH1IDLE as c_int {
+                            self.PM_SetAnim(SETANIM_LEGS, BOTH_CROUCH1IDLE as c_int, setAnimFlags, 100);
+                        } else {
+                            self.PM_ContinueLegsAnim(BOTH_CROUCH1IDLE as c_int);
+                        }
+                    } else {
+                        if (*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode == 1 {
+                            self.PM_ContinueLegsAnim(TORSO_WEAPONREADY4 as c_int);
+                        } else {
+                            if (*ps).weapon == WP_SABER as c_int && BG_SabersOff(ps) != qfalse {
+                                if self.PM_AdjustStandAnimForSlope() == qfalse {
+                                    let a = self.PM_LegsSlopeBackTransition(BOTH_STAND1 as c_int);
+                                    self.PM_ContinueLegsAnim(a);
+                                }
+                            } else {
+                                if (*ps).weapon != WP_SABER as c_int
+                                    || self.PM_AdjustStandAnimForSlope() == qfalse
+                                {
+                                    if (*ps).weapon == WP_SABER as c_int {
+                                        let st = self.PM_GetSaberStance();
+                                        let a = self.PM_LegsSlopeBackTransition(st);
+                                        self.PM_ContinueLegsAnim(a);
+                                    } else {
+                                        let a = self.PM_LegsSlopeBackTransition(
+                                            WeaponReadyLegsAnim[(*ps).weapon as usize],
+                                        );
+                                        self.PM_ContinueLegsAnim(a);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
+            let _ = footstep;
+            footstep = qfalse;
+
+            if (*ps).saberMove == saberMoveName_t::LS_SPINATTACK as c_int {
+                bobmove = 0.2;
+                self.PM_ContinueLegsAnim((*ps).torsoAnim);
+            } else if (*ps).pm_flags & PMF_DUCKED != 0 {
+                let mut rolled = 0;
+
+                bobmove = 0.5; // ducked characters bob much faster
+
+                if ((PM_RunningAnim((*ps).legsAnim) != qfalse
+                    && crate::q_math::VectorLengthSquared((*ps).velocity) >= 40000.0)
+                    || PM_CanRollFromSoulCal(ps) != qfalse)
+                    && BG_InRoll(ps, (*ps).legsAnim) == qfalse
+                {
+                    //roll!
+                    rolled = self.PM_TryRoll();
+                }
+                if rolled == 0 {
+                    //standard crouching anim stuff
+                    if (*ps).pm_flags & PMF_BACKWARDS_RUN != 0 {
+                        if (*ps).legsAnim != BOTH_CROUCH1WALKBACK as c_int {
+                            self.PM_SetAnim(SETANIM_LEGS, BOTH_CROUCH1WALKBACK as c_int, setAnimFlags, 100);
+                        } else {
+                            self.PM_ContinueLegsAnim(BOTH_CROUCH1WALKBACK as c_int);
+                        }
+                    } else {
+                        if (*ps).legsAnim != BOTH_CROUCH1WALK as c_int {
+                            self.PM_SetAnim(SETANIM_LEGS, BOTH_CROUCH1WALK as c_int, setAnimFlags, 100);
+                        } else {
+                            self.PM_ContinueLegsAnim(BOTH_CROUCH1WALK as c_int);
+                        }
+                    }
+                } else {
+                    //send us into the roll
+                    (*ps).legsTimer = 0;
+                    (*ps).legsAnim = 0;
+                    self.PM_SetAnim(
+                        SETANIM_BOTH,
+                        rolled,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        150,
+                    );
+                    self.PM_AddEventWithParm(EV_ROLL as c_int, 0);
+                    (*pm).maxs[2] = (*ps).crouchheight as f32;
+                    (*ps).viewheight = DEFAULT_VIEWHEIGHT;
+                    (*ps).pm_flags &= !PMF_DUCKED;
+                    (*ps).pm_flags |= PMF_ROLLING;
+                }
+            } else if (*ps).pm_flags & PMF_ROLLING != 0
+                && BG_InRoll(ps, (*ps).legsAnim) == qfalse
+                && PM_InRollComplete(ps, (*ps).legsAnim) == qfalse
+            {
+                bobmove = 0.5; // ducked characters bob much faster
+
+                if (*ps).pm_flags & PMF_BACKWARDS_RUN != 0 {
+                    if (*ps).legsAnim != BOTH_CROUCH1WALKBACK as c_int {
+                        self.PM_SetAnim(SETANIM_LEGS, BOTH_CROUCH1WALKBACK as c_int, setAnimFlags, 100);
+                    } else {
+                        self.PM_ContinueLegsAnim(BOTH_CROUCH1WALKBACK as c_int);
+                    }
+                } else {
+                    if (*ps).legsAnim != BOTH_CROUCH1WALK as c_int {
+                        self.PM_SetAnim(SETANIM_LEGS, BOTH_CROUCH1WALK as c_int, setAnimFlags, 100);
+                    } else {
+                        self.PM_ContinueLegsAnim(BOTH_CROUCH1WALK as c_int);
+                    }
+                }
+            } else {
+                let mut desiredAnim = -1;
+
+                let sl = (*ps).fd.saberAnimLevel;
+                if ((*ps).legsAnim == BOTH_FORCELAND1 as c_int
+                    || (*ps).legsAnim == BOTH_FORCELANDBACK1 as c_int
+                    || (*ps).legsAnim == BOTH_FORCELANDRIGHT1 as c_int
+                    || (*ps).legsAnim == BOTH_FORCELANDLEFT1 as c_int)
+                    && (*ps).legsTimer > 0
+                {
+                    //let it finish first
+                    bobmove = 0.2;
+                } else if (*pm).cmd.buttons & BUTTON_WALKING == 0 {
+                    //running
+                    bobmove = 0.4;
+                    if (*ps).clientNum >= MAX_CLIENTS as c_int
+                        && !self.pm_entSelf.is_null()
+                        && (*self.pm_entSelf).s.NPC_class == CLASS_WAMPA as c_int
+                    {
+                        if (*ps).eFlags2 & EF2_USE_ALT_ANIM != 0 {
+                            desiredAnim = BOTH_RUN1 as c_int;
+                        } else {
+                            desiredAnim = BOTH_RUN2 as c_int;
+                        }
+                    } else if (*ps).clientNum >= MAX_CLIENTS as c_int
+                        && !self.pm_entSelf.is_null()
+                        && (*self.pm_entSelf).s.NPC_class == CLASS_RANCOR as c_int
+                    {
+                        //no run anims
+                        if (*ps).pm_flags & PMF_BACKWARDS_RUN != 0 {
+                            desiredAnim = BOTH_WALKBACK1 as c_int;
+                        } else {
+                            desiredAnim = BOTH_WALK1 as c_int;
+                        }
+                    } else if (*ps).pm_flags & PMF_BACKWARDS_RUN != 0 {
+                        if sl == saber_styles_t::SS_STAFF as c_int {
+                            if (*ps).saberHolstered > 1 {
+                                desiredAnim = BOTH_RUNBACK1 as c_int;
+                            } else {
+                                desiredAnim = BOTH_RUNBACK2 as c_int;
+                            }
+                        } else if sl == saber_styles_t::SS_DUAL as c_int {
+                            if (*ps).saberHolstered > 1 {
+                                desiredAnim = BOTH_RUNBACK1 as c_int;
+                            } else {
+                                desiredAnim = BOTH_RUNBACK2 as c_int;
+                            }
+                        } else {
+                            if (*ps).saberHolstered != 0 {
+                                desiredAnim = BOTH_RUNBACK1 as c_int;
+                            } else {
+                                desiredAnim = BOTH_RUNBACK2 as c_int;
+                            }
+                        }
+                    } else {
+                        if sl == saber_styles_t::SS_STAFF as c_int {
+                            if (*ps).saberHolstered > 1 {
+                                desiredAnim = BOTH_RUN1 as c_int;
+                            } else if (*ps).saberHolstered == 1 {
+                                desiredAnim = BOTH_RUN2 as c_int;
+                            } else {
+                                if (*ps).fd.forcePowersActive & (1 << FP_SPEED) != 0 {
+                                    desiredAnim = BOTH_RUN1 as c_int;
+                                } else {
+                                    desiredAnim = BOTH_RUN_STAFF as c_int;
+                                }
+                            }
+                        } else if sl == saber_styles_t::SS_DUAL as c_int {
+                            if (*ps).saberHolstered > 1 {
+                                desiredAnim = BOTH_RUN1 as c_int;
+                            } else if (*ps).saberHolstered == 1 {
+                                desiredAnim = BOTH_RUN2 as c_int;
+                            } else {
+                                desiredAnim = BOTH_RUN_DUAL as c_int;
+                            }
+                        } else {
+                            if (*ps).saberHolstered != 0 {
+                                desiredAnim = BOTH_RUN1 as c_int;
+                            } else {
+                                desiredAnim = BOTH_RUN2 as c_int;
+                            }
+                        }
+                    }
+                    footstep = qtrue;
+                } else {
+                    bobmove = 0.2; // walking bobs slow
+                    if (*ps).pm_flags & PMF_BACKWARDS_RUN != 0 {
+                        if sl == saber_styles_t::SS_STAFF as c_int {
+                            if (*ps).saberHolstered > 1 {
+                                desiredAnim = BOTH_WALKBACK1 as c_int;
+                            } else if (*ps).saberHolstered != 0 {
+                                desiredAnim = BOTH_WALKBACK2 as c_int;
+                            } else {
+                                desiredAnim = BOTH_WALKBACK_STAFF as c_int;
+                            }
+                        } else if sl == saber_styles_t::SS_DUAL as c_int {
+                            if (*ps).saberHolstered > 1 {
+                                desiredAnim = BOTH_WALKBACK1 as c_int;
+                            } else if (*ps).saberHolstered != 0 {
+                                desiredAnim = BOTH_WALKBACK2 as c_int;
+                            } else {
+                                desiredAnim = BOTH_WALKBACK_DUAL as c_int;
+                            }
+                        } else {
+                            if (*ps).saberHolstered != 0 {
+                                desiredAnim = BOTH_WALKBACK1 as c_int;
+                            } else {
+                                desiredAnim = BOTH_WALKBACK2 as c_int;
+                            }
+                        }
+                    } else {
+                        if (*ps).weapon == WP_MELEE as c_int {
+                            desiredAnim = BOTH_WALK1 as c_int;
+                        } else if BG_SabersOff(ps) != qfalse {
+                            desiredAnim = BOTH_WALK1 as c_int;
+                        } else {
+                            if sl == saber_styles_t::SS_STAFF as c_int {
+                                if (*ps).saberHolstered > 1 {
+                                    desiredAnim = BOTH_WALK1 as c_int;
+                                } else if (*ps).saberHolstered != 0 {
+                                    desiredAnim = BOTH_WALK2 as c_int;
+                                } else {
+                                    desiredAnim = BOTH_WALK_STAFF as c_int;
+                                }
+                            } else if sl == saber_styles_t::SS_DUAL as c_int {
+                                if (*ps).saberHolstered > 1 {
+                                    desiredAnim = BOTH_WALK1 as c_int;
+                                } else if (*ps).saberHolstered != 0 {
+                                    desiredAnim = BOTH_WALK2 as c_int;
+                                } else {
+                                    desiredAnim = BOTH_WALK_DUAL as c_int;
+                                }
+                            } else {
+                                if (*ps).saberHolstered != 0 {
+                                    desiredAnim = BOTH_WALK1 as c_int;
+                                } else {
+                                    desiredAnim = BOTH_WALK2 as c_int;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if desiredAnim != -1 {
+                    let ires = self.PM_LegsSlopeBackTransition(desiredAnim);
+
+                    if (*ps).legsAnim != desiredAnim && ires == desiredAnim {
+                        self.PM_SetAnim(SETANIM_LEGS, desiredAnim, setAnimFlags, 100);
+                    } else {
+                        self.PM_ContinueLegsAnim(ires);
+                    }
+                }
+            }
+
+            // check for footstep / splash sounds
+            let old = (*ps).bobCycle;
+            (*ps).bobCycle =
+                ((old as f32 + bobmove * self.pml.msec as f32) as c_int) & 255;
+
+            // if we just crossed a cycle boundary, play an appropriate footstep event
+            if ((old + 64) ^ ((*ps).bobCycle + 64)) & 128 != 0 {
+                (*ps).footstepTime = (*pm).cmd.serverTime + 300;
+                if (*pm).waterlevel == 1 {
+                    // splashing
+                    self.PM_AddEvent(EV_FOOTSPLASH as c_int);
+                } else if (*pm).waterlevel == 2 {
+                    // wading / swimming at surface
+                    self.PM_AddEvent(EV_SWIM as c_int);
+                } else if (*pm).waterlevel == 3 {
+                    // no sound when completely underwater
+                }
+            }
+            let _ = footstep;
+        }
+    }
 }
 
-/// Raven `PM_Footsteps`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:5175-5661`
-// PORT-ESCALATION(pmove-working-state): reads `WeaponReadyLegsAnim`/`pm_entSelf`/`pml`, writes `pm`.
-pub fn PM_Footsteps() {
-    todo!("Port PM_Footsteps — parked: pmove-working-state")
-}
+impl PmoveContext<'_> {
+    /// Raven `PM_WaterEvents`. `QAGAME` is defined, so the impact-splash block is compiled.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5670-5748`
+    pub fn PM_WaterEvents(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut impact_splash = qfalse;
 
-/// Raven `PM_WaterEvents`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:5670-5748`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`pml`.
-pub fn PM_WaterEvents() {
-    todo!("Port PM_WaterEvents — parked: pmove-working-state")
+            // if just entered a water volume, play a sound
+            if self.pml.previous_waterlevel == 0 && (*pm).waterlevel != 0 {
+                if crate::q_math::VectorLengthSquared((*ps).velocity) > 40000.0 {
+                    impact_splash = qtrue;
+                }
+                self.PM_AddEvent(EV_WATER_TOUCH as c_int);
+            }
+
+            // if just completely exited a water volume, play a sound
+            if self.pml.previous_waterlevel != 0 && (*pm).waterlevel == 0 {
+                if crate::q_math::VectorLengthSquared((*ps).velocity) > 40000.0 {
+                    impact_splash = qtrue;
+                }
+                self.PM_AddEvent(EV_WATER_LEAVE as c_int);
+            }
+
+            if impact_splash != qfalse {
+                //play the splash effect
+                let mut tr: trace_t = core::mem::zeroed();
+                let mut start: vec3_t = [0.0; 3];
+                let mut end: vec3_t = [0.0; 3];
+
+                _VectorCopy((*ps).origin, &mut start);
+                _VectorCopy((*ps).origin, &mut end);
+
+                start[2] += 10.0;
+                end[2] -= 40.0;
+
+                self.traps.trace(
+                    &mut tr,
+                    core::ptr::addr_of!(start) as *const vec3_t,
+                    core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
+                    core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
+                    core::ptr::addr_of!(end) as *const vec3_t,
+                    (*ps).clientNum,
+                    MASK_WATER,
+                );
+
+                if tr.fraction < 1.0 {
+                    let fx = if tr.contents & CONTENTS_LAVA != 0 {
+                        EFFECT_LAVA_SPLASH as c_int
+                    } else if tr.contents & CONTENTS_SLIME != 0 {
+                        EFFECT_ACID_SPLASH as c_int
+                    } else {
+                        EFFECT_WATER_SPLASH as c_int
+                    };
+                    self.callbacks.play_effect(
+                        fx,
+                        core::ptr::addr_of!(tr.endpos),
+                        core::ptr::addr_of!(tr.plane.normal),
+                    );
+                }
+            }
+
+            // check for head just going under water
+            if self.pml.previous_waterlevel != 3 && (*pm).waterlevel == 3 {
+                self.PM_AddEvent(EV_WATER_UNDER as c_int);
+            }
+
+            // check for head just coming out of water
+            if self.pml.previous_waterlevel == 3 && (*pm).waterlevel != 3 {
+                self.PM_AddEvent(EV_WATER_CLEAR as c_int);
+            }
+        }
+    }
 }
 
 /// Raven `BG_ClearRocketLock`.
@@ -1119,125 +5269,1734 @@ pub fn BG_ClearRocketLock(
     }
 }
 
-/// Raven `PM_BeginWeaponChange`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:5766-5793`
-// PORT-ESCALATION(pmove-working-state): reads/writes `pm->ps`.
-pub fn PM_BeginWeaponChange(
-    weapon: c_int,
-) {
-    todo!("Port PM_BeginWeaponChange — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_BeginWeaponChange`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5766-5793`
+    pub fn PM_BeginWeaponChange(&mut self, weapon: c_int) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            if weapon <= WP_NONE as c_int || weapon >= WP_NUM_WEAPONS as c_int {
+                return;
+            }
+
+            if (*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << weapon) == 0 {
+                return;
+            }
+
+            if (*ps).weaponstate == WEAPON_DROPPING as c_int {
+                return;
+            }
+
+            // turn off any kind of zooming when weapon switching.
+            if (*ps).zoomMode != 0 {
+                (*ps).zoomMode = 0;
+                (*ps).zoomTime = (*ps).commandTime;
+            }
+
+            self.PM_AddEventWithParm(EV_CHANGE_WEAPON as c_int, weapon);
+            (*ps).weaponstate = WEAPON_DROPPING as c_int;
+            (*ps).weaponTime += 200;
+            self.PM_SetAnim(SETANIM_TORSO, TORSO_DROPWEAP1 as c_int, SETANIM_FLAG_OVERRIDE, 0);
+
+            BG_ClearRocketLock((*pm).ps);
+        }
+    }
+
+    /// Raven `PM_FinishWeaponChange`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5801-5825`
+    pub fn PM_FinishWeaponChange(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut weapon = (*pm).cmd.weapon as c_int;
+            if weapon < WP_NONE as c_int || weapon >= WP_NUM_WEAPONS as c_int {
+                weapon = WP_NONE as c_int;
+            }
+
+            if (*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << weapon) == 0 {
+                weapon = WP_NONE as c_int;
+            }
+
+            if weapon == WP_SABER as c_int {
+                self.PM_SetSaberMove(saberMoveName_t::LS_DRAW as c_short);
+            } else {
+                self.PM_SetAnim(SETANIM_TORSO, TORSO_RAISEWEAP1 as c_int, SETANIM_FLAG_OVERRIDE, 0);
+            }
+            (*ps).weapon = weapon;
+            (*ps).weaponstate = WEAPON_RAISING as c_int;
+            (*ps).weaponTime += 250;
+        }
+    }
 }
 
-/// Raven `PM_FinishWeaponChange`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:5801-5825`
-// PORT-ESCALATION(pmove-working-state): reads/writes `pm->ps`/`pm->cmd`.
-pub fn PM_FinishWeaponChange() {
-    todo!("Port PM_FinishWeaponChange — parked: pmove-working-state")
-}
-
-/// Raven `BG_VehTraceFromCamPos`.
-///
+/// Raven `BG_VehTraceFromCamPos`. `QAGAME` is defined, so the game-side branch is compiled.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5833-5872`
-// PORT-ESCALATION(engine-trap-threading): the QAGAME path calls `trap_Trace`, whose SEAM-D13
-// wrapper needs an engine handle (`trap::Trace(engine, ..)`), but this C-signature fn threads none.
 pub fn BG_VehTraceFromCamPos(
     camTrace: *mut trace_t,
     bgEnt: *mut bgEntity_t,
     entOrg: vec3_t,
     shotStart: vec3_t,
     end: vec3_t,
-    newEnd: vec3_t,
-    shotDir: vec3_t,
+    newEnd: &mut vec3_t,
+    shotDir: &mut vec3_t,
     bestDist: f32,
+    bg: &BgState,
+    traps: &dyn BgTraps,
 ) -> c_int {
-    todo!("Port BG_VehTraceFromCamPos — parked: engine-trap-threading")
+    let _ = bg;
+    unsafe {
+        let mut viewDir2End: vec3_t = [0.0; 3];
+        let mut extraEnd: vec3_t = [0.0; 3];
+        let mut camPos: vec3_t = [0.0; 3];
+
+        let veh = (*bgEnt).m_pVehicle as *mut Vehicle_t;
+        // QAGAME
+        crate::g_weapon::WP_GetVehicleCamPos(
+            bgEnt as *mut gentity_t,
+            (*veh).m_pPilot as *mut gentity_t,
+            &mut camPos,
+        );
+
+        let minAutoAimDist = crate::q_math::Distance(entOrg, camPos)
+            + ((*(*veh).m_pVehicleInfo).length / 2.0)
+            + 200.0;
+
+        _VectorCopy(end, newEnd);
+        _VectorSubtract(end, camPos, &mut viewDir2End);
+        VectorNormalize(&mut viewDir2End);
+        _VectorMA(
+            camPos,
+            crate::g_weapon::MAX_XHAIR_DIST_ACCURACY,
+            viewDir2End,
+            &mut extraEnd,
+        );
+
+        // QAGAME
+        traps.trace(
+            camTrace,
+            core::ptr::addr_of!(camPos) as *const vec3_t,
+            core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
+            core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
+            core::ptr::addr_of!(extraEnd) as *const vec3_t,
+            (*bgEnt).s.number,
+            CONTENTS_SOLID | CONTENTS_BODY,
+        );
+
+        if (*camTrace).allsolid == qfalse
+            && (*camTrace).startsolid == qfalse
+            && (*camTrace).fraction < 1.0
+            && ((*camTrace).fraction * crate::g_weapon::MAX_XHAIR_DIST_ACCURACY) > minAutoAimDist
+            && (((*camTrace).fraction * crate::g_weapon::MAX_XHAIR_DIST_ACCURACY)
+                - crate::q_math::Distance(entOrg, camPos))
+                < bestDist
+        {
+            //this trace hit something closer than the main trace hit, so use this result instead
+            _VectorCopy((*camTrace).endpos, newEnd);
+            _VectorSubtract(*newEnd, shotStart, shotDir);
+            VectorNormalize(shotDir);
+            return (*camTrace).entityNum + 1;
+        }
+        0
+    }
 }
 
-/// Raven `PM_RocketLock`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:5874-5977`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_RocketLock(
-    lockDist: f32,
-    vehicleLock: qboolean,
-) {
-    todo!("Port PM_RocketLock — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_RocketLock`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5874-5977`
+    pub fn PM_RocketLock(&mut self, lockDist: f32, vehicleLock: qboolean) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut ang: vec3_t = [0.0; 3];
+            let mut tr: trace_t = core::mem::zeroed();
+
+            let mut muzzleOffPoint: vec3_t = [0.0; 3];
+            let mut muzzlePoint: vec3_t = [0.0; 3];
+            let mut forward: vec3_t = [0.0; 3];
+            let mut right: vec3_t = [0.0; 3];
+            let mut up: vec3_t = [0.0; 3];
+
+            if vehicleLock != qfalse {
+                AngleVectors(
+                    (*ps).viewangles,
+                    Some(&mut forward),
+                    Some(&mut right),
+                    Some(&mut up),
+                );
+                _VectorCopy((*ps).origin, &mut muzzlePoint);
+                _VectorMA(muzzlePoint, lockDist, forward, &mut ang);
+            } else {
+                AngleVectors(
+                    (*ps).viewangles,
+                    Some(&mut forward),
+                    Some(&mut right),
+                    Some(&mut up),
+                );
+
+                AngleVectors((*ps).viewangles, Some(&mut ang), None, None);
+
+                _VectorCopy((*ps).origin, &mut muzzlePoint);
+                _VectorCopy(
+                    WP_MuzzlePoint[WP_ROCKET_LAUNCHER as usize],
+                    &mut muzzleOffPoint,
+                );
+
+                let mp = muzzlePoint;
+                _VectorMA(mp, muzzleOffPoint[0], forward, &mut muzzlePoint);
+                let mp = muzzlePoint;
+                _VectorMA(mp, muzzleOffPoint[1], right, &mut muzzlePoint);
+                muzzlePoint[2] += (*ps).viewheight as f32 + muzzleOffPoint[2];
+                ang[0] = muzzlePoint[0] + ang[0] * lockDist;
+                ang[1] = muzzlePoint[1] + ang[1] * lockDist;
+                ang[2] = muzzlePoint[2] + ang[2] * lockDist;
+            }
+
+            self.traps.trace(
+                &mut tr,
+                core::ptr::addr_of!(muzzlePoint) as *const vec3_t,
+                core::ptr::null(),
+                core::ptr::null(),
+                core::ptr::addr_of!(ang) as *const vec3_t,
+                (*ps).clientNum,
+                MASK_PLAYERSOLID,
+            );
+
+            if vehicleLock != qfalse {
+                //vehicles also do a trace from the camera point if the main one misses
+                if tr.fraction >= 1.0 {
+                    let mut camTrace: trace_t = core::mem::zeroed();
+                    let mut newEnd: vec3_t = [0.0; 3];
+                    let mut shotDir: vec3_t = [0.0; 3];
+                    let ent = self.PM_BGEntForNum((*ps).clientNum);
+                    if BG_VehTraceFromCamPos(
+                        &mut camTrace,
+                        ent,
+                        (*ps).origin,
+                        muzzlePoint,
+                        tr.endpos,
+                        &mut newEnd,
+                        &mut shotDir,
+                        tr.fraction * lockDist,
+                        self.bg,
+                        self.traps,
+                    ) != 0
+                    {
+                        tr = camTrace;
+                    }
+                }
+            }
+
+            if tr.fraction != 1.0
+                && tr.entityNum < ENTITYNUM_NONE
+                && tr.entityNum != (*ps).clientNum
+            {
+                let bgEnt = self.PM_BGEntForNum(tr.entityNum);
+                if !bgEnt.is_null() && (*bgEnt).s.powerups & (1 << PW_CLOAKED) != 0 {
+                    (*ps).rocketLockIndex = ENTITYNUM_NONE;
+                    (*ps).rocketLockTime = 0.0;
+                } else if !bgEnt.is_null()
+                    && ((*bgEnt).s.eType == entityType_t::ET_PLAYER as c_int
+                        || (*bgEnt).s.eType == entityType_t::ET_NPC as c_int)
+                {
+                    if (*ps).rocketLockIndex == ENTITYNUM_NONE {
+                        (*ps).rocketLockIndex = tr.entityNum;
+                        (*ps).rocketLockTime = (*pm).cmd.serverTime as f32;
+                    } else if (*ps).rocketLockIndex != tr.entityNum
+                        && (*ps).rocketTargetTime < (*pm).cmd.serverTime as f32
+                    {
+                        (*ps).rocketLockIndex = tr.entityNum;
+                        (*ps).rocketLockTime = (*pm).cmd.serverTime as f32;
+                    } else if (*ps).rocketLockIndex == tr.entityNum {
+                        if (*ps).rocketLockTime == -1.0 {
+                            (*ps).rocketLockTime = (*ps).rocketLastValidTime;
+                        }
+                    }
+
+                    if (*ps).rocketLockIndex == tr.entityNum {
+                        (*ps).rocketTargetTime = ((*pm).cmd.serverTime + 500) as f32;
+                    }
+                } else if vehicleLock == qfalse {
+                    if (*ps).rocketTargetTime < (*pm).cmd.serverTime as f32 {
+                        (*ps).rocketLockIndex = ENTITYNUM_NONE;
+                        (*ps).rocketLockTime = 0.0;
+                    }
+                }
+            } else if (*ps).rocketTargetTime < (*pm).cmd.serverTime as f32 {
+                (*ps).rocketLockIndex = ENTITYNUM_NONE;
+                (*ps).rocketLockTime = 0.0;
+            } else {
+                if (*ps).rocketLockTime != -1.0 {
+                    (*ps).rocketLastValidTime = (*ps).rocketLockTime;
+                }
+                (*ps).rocketLockTime = -1.0;
+            }
+        }
+    }
 }
 
-/// Raven `PM_DoChargedWeapons`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:5980-6233`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_DoChargedWeapons(
-    vehicleRocketLock: qboolean,
-    veh: *mut bgEntity_t,
-) -> qboolean {
-    todo!("Port PM_DoChargedWeapons — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_DoChargedWeapons`. `_DEBUG` prints are dropped. The C `goto rest` is
+    /// modeled with a labeled block whose value short-circuits the `return qtrue`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5980-6233`
+    pub fn PM_DoChargedWeapons(&mut self, vehicleRocketLock: qboolean, veh: *mut bgEntity_t) -> qboolean {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let mut charging = qfalse;
+            let mut altFire = qfalse;
+
+            if vehicleRocketLock != qfalse {
+                if (*pm).cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK) != 0 {
+                    //actually charging
+                    if !veh.is_null() && !(*veh).m_pVehicle.is_null() {
+                        let pv = (*veh).m_pVehicle as *mut Vehicle_t;
+                        let info = (*pv).m_pVehicleInfo;
+                        let id0 = (*info).weapon[0].ID as usize;
+                        let id1 = (*info).weapon[1].ID as usize;
+                        if ((*pm).cmd.buttons & BUTTON_ATTACK != 0
+                            && self.bg.g_vehWeaponInfo[id0].fHoming != 0
+                            && (*ps).ammo[0] >= self.bg.g_vehWeaponInfo[id0].iAmmoPerShot)
+                            || ((*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+                                && self.bg.g_vehWeaponInfo[id1].fHoming != 0
+                                && (*ps).ammo[1] >= self.bg.g_vehWeaponInfo[id1].iAmmoPerShot)
+                        {
+                            //pressing the appropriate fire button for the lock-on/charging weapon
+                            self.PM_RocketLock(16384.0, qtrue);
+                            charging = qtrue;
+                        }
+                        if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                            altFire = qtrue;
+                        }
+                    }
+                }
+            } else {
+                let w = (*ps).weapon;
+                if w == weapon_t::WP_BRYAR_PISTOL as c_int {
+                    if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                        charging = qtrue;
+                        altFire = qtrue;
+                    }
+                } else if w == weapon_t::WP_CONCUSSION as c_int {
+                    if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                        altFire = qtrue;
+                    }
+                } else if w == weapon_t::WP_BRYAR_OLD as c_int {
+                    if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                        charging = qtrue;
+                        altFire = qtrue;
+                    }
+                } else if w == weapon_t::WP_BOWCASTER as c_int {
+                    if (*pm).cmd.buttons & BUTTON_ATTACK != 0 {
+                        charging = qtrue;
+                    }
+                } else if w == weapon_t::WP_ROCKET_LAUNCHER as c_int {
+                    if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+                        && (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize]
+                            >= weaponData[(*ps).weapon as usize].altEnergyPerShot
+                    {
+                        self.PM_RocketLock(2048.0, qfalse);
+                        charging = qtrue;
+                        altFire = qtrue;
+                    }
+                } else if w == weapon_t::WP_THERMAL as c_int {
+                    if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                        altFire = qtrue;
+                        charging = qtrue;
+                    } else if (*pm).cmd.buttons & BUTTON_ATTACK != 0 {
+                        charging = qtrue;
+                    }
+                } else if w == weapon_t::WP_DEMP2 as c_int {
+                    if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                        altFire = qtrue;
+                        charging = qtrue;
+                    }
+                } else if w == weapon_t::WP_DISRUPTOR as c_int {
+                    if (*pm).cmd.buttons & BUTTON_ATTACK != 0
+                        && (*ps).zoomMode == 1
+                        && (*ps).zoomLocked != qfalse
+                    {
+                        if (*pm).cmd.forwardmove == 0
+                            && (*pm).cmd.rightmove == 0
+                            && (*pm).cmd.upmove <= 0
+                        {
+                            charging = qtrue;
+                            altFire = qtrue;
+                        } else {
+                            charging = qfalse;
+                            altFire = qfalse;
+                        }
+                    }
+
+                    if (*ps).zoomMode != 1 && (*ps).weaponstate == WEAPON_CHARGING_ALT as c_int {
+                        (*ps).weaponstate = WEAPON_READY as c_int;
+                        charging = qfalse;
+                        altFire = qfalse;
+                    }
+                }
+            }
+
+            // set up the appropriate weapon state based on the button that's down.
+            if charging != qfalse {
+                let short_circuit = 'chg: {
+                    if altFire != qfalse {
+                        if (*ps).weaponstate != WEAPON_CHARGING_ALT as c_int {
+                            // charge isn't started, so do it now
+                            (*ps).weaponstate = WEAPON_CHARGING_ALT as c_int;
+                            (*ps).weaponChargeTime = (*pm).cmd.serverTime;
+                            (*ps).weaponChargeSubtractTime = (*pm).cmd.serverTime
+                                + weaponData[(*ps).weapon as usize].altChargeSubTime;
+                            BG_AddPredictableEventToPlayerstate(
+                                EV_WEAPON_CHARGE_ALT as c_int,
+                                (*ps).weapon,
+                                ps,
+                            );
+                        }
+
+                        if vehicleRocketLock != qfalse {
+                            if !veh.is_null() {
+                                let pv = (*veh).m_pVehicle as *mut Vehicle_t;
+                                let id1 = (*(*pv).m_pVehicleInfo).weapon[1].ID as usize;
+                                if (*ps).ammo[1] < self.bg.g_vehWeaponInfo[id1].iAmmoPerShot {
+                                    (*ps).weaponstate = WEAPON_CHARGING_ALT as c_int;
+                                    break 'chg false;
+                                }
+                            }
+                        } else if (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize]
+                            < (weaponData[(*ps).weapon as usize].altChargeSub
+                                + weaponData[(*ps).weapon as usize].altEnergyPerShot)
+                        {
+                            (*ps).weaponstate = WEAPON_CHARGING_ALT as c_int;
+                            break 'chg false;
+                        } else if ((*pm).cmd.serverTime - (*ps).weaponChargeTime)
+                            < weaponData[(*ps).weapon as usize].altMaxCharge
+                        {
+                            if (*ps).weaponChargeSubtractTime < (*pm).cmd.serverTime {
+                                (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] -=
+                                    weaponData[(*ps).weapon as usize].altChargeSub;
+                                (*ps).weaponChargeSubtractTime = (*pm).cmd.serverTime
+                                    + weaponData[(*ps).weapon as usize].altChargeSubTime;
+                            }
+                        }
+                    } else {
+                        if (*ps).weaponstate != WEAPON_CHARGING as c_int {
+                            (*ps).weaponstate = WEAPON_CHARGING as c_int;
+                            (*ps).weaponChargeTime = (*pm).cmd.serverTime;
+                            (*ps).weaponChargeSubtractTime = (*pm).cmd.serverTime
+                                + weaponData[(*ps).weapon as usize].chargeSubTime;
+                            BG_AddPredictableEventToPlayerstate(
+                                EV_WEAPON_CHARGE as c_int,
+                                (*ps).weapon,
+                                ps,
+                            );
+                        }
+
+                        if vehicleRocketLock != qfalse {
+                            if !veh.is_null() {
+                                let pv = (*veh).m_pVehicle as *mut Vehicle_t;
+                                let id0 = (*(*pv).m_pVehicleInfo).weapon[0].ID as usize;
+                                if (*ps).ammo[0] < self.bg.g_vehWeaponInfo[id0].iAmmoPerShot {
+                                    (*ps).weaponstate = WEAPON_CHARGING as c_int;
+                                    break 'chg false;
+                                }
+                            }
+                        } else if (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize]
+                            < (weaponData[(*ps).weapon as usize].chargeSub
+                                + weaponData[(*ps).weapon as usize].energyPerShot)
+                        {
+                            (*ps).weaponstate = WEAPON_CHARGING as c_int;
+                            break 'chg false;
+                        } else if ((*pm).cmd.serverTime - (*ps).weaponChargeTime)
+                            < weaponData[(*ps).weapon as usize].maxCharge
+                        {
+                            if (*ps).weaponChargeSubtractTime < (*pm).cmd.serverTime {
+                                (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] -=
+                                    weaponData[(*ps).weapon as usize].chargeSub;
+                                (*ps).weaponChargeSubtractTime = (*pm).cmd.serverTime
+                                    + weaponData[(*ps).weapon as usize].chargeSubTime;
+                            }
+                        }
+                    }
+                    true // did not goto rest
+                };
+
+                if short_circuit {
+                    return qtrue; // short-circuit rest of weapon code
+                }
+            }
+            // rest:
+            if (*ps).weaponstate == WEAPON_CHARGING as c_int {
+                // weapon has a charge, so let us do an attack
+                (*pm).cmd.buttons |= BUTTON_ATTACK;
+                (*ps).eFlags |= EF_FIRING;
+            } else if (*ps).weaponstate == WEAPON_CHARGING_ALT as c_int {
+                // weapon has a charge, so let us do an alt-attack
+                (*pm).cmd.buttons |= BUTTON_ALT_ATTACK;
+                (*ps).eFlags |= EF_FIRING | EF_ALT_FIRING;
+            }
+
+            qfalse
+        }
+    }
+
+    /// Raven `PM_ItemUsable`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6239-6366`
+    pub fn PM_ItemUsable(&mut self, ps: *mut playerState_t, forcedUse: c_int) -> c_int {
+        use holdable_t::*;
+        unsafe {
+            let mut fwd: vec3_t = [0.0; 3];
+            let mut fwdorg: vec3_t = [0.0; 3];
+            let mut dest: vec3_t = [0.0; 3];
+            let mut pos: vec3_t = [0.0; 3];
+            let mut yawonly: vec3_t = [0.0; 3];
+            let mut mins: vec3_t = [0.0; 3];
+            let mut maxs: vec3_t = [0.0; 3];
+            let mut trtest: vec3_t = [0.0; 3];
+            let mut tr: trace_t = core::mem::zeroed();
+
+            if (*ps).m_iVehicleNum != 0 {
+                return 0;
+            }
+
+            if (*ps).pm_flags & PMF_USE_ITEM_HELD != 0 {
+                //force to let go first
+                return 0;
+            }
+
+            if (*ps).duelInProgress != 0 {
+                //not allowed to use holdables while in a private duel.
+                return 0;
+            }
+
+            let mut forcedUse = forcedUse;
+            if forcedUse == 0 {
+                forcedUse =
+                    bg_itemlist[(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize].giTag;
+            }
+
+            if BG_IsItemSelectable(ps, forcedUse) == qfalse {
+                return 0;
+            }
+
+            if forcedUse == HI_MEDPAC as c_int || forcedUse == HI_MEDPAC_BIG as c_int {
+                if (*ps).stats[statIndex_t::STAT_HEALTH as usize]
+                    >= (*ps).stats[statIndex_t::STAT_MAX_HEALTH as usize]
+                {
+                    return 0;
+                }
+                if (*ps).stats[statIndex_t::STAT_HEALTH as usize] <= 0
+                    || (*ps).eFlags & EF_DEAD != 0
+                {
+                    return 0;
+                }
+                return 1;
+            } else if forcedUse == HI_SEEKER as c_int {
+                if (*ps).eFlags & EF_SEEKERDRONE != 0 {
+                    self.PM_AddEventWithParm(EV_ITEMUSEFAIL as c_int, SEEKER_ALREADYDEPLOYED);
+                    return 0;
+                }
+                return 1;
+            } else if forcedUse == HI_SENTRY_GUN as c_int {
+                if (*ps).fd.sentryDeployed != 0 {
+                    self.PM_AddEventWithParm(EV_ITEMUSEFAIL as c_int, SENTRY_ALREADYPLACED);
+                    return 0;
+                }
+
+                yawonly[ROLL] = 0.0;
+                yawonly[PITCH] = 0.0;
+                yawonly[YAW] = (*ps).viewangles[YAW];
+
+                VectorSet(&mut mins, -8.0, -8.0, 0.0);
+                VectorSet(&mut maxs, 8.0, 8.0, 24.0);
+
+                AngleVectors(yawonly, Some(&mut fwd), None, None);
+
+                fwdorg[0] = (*ps).origin[0] + fwd[0] * 64.0;
+                fwdorg[1] = (*ps).origin[1] + fwd[1] * 64.0;
+                fwdorg[2] = (*ps).origin[2] + fwd[2] * 64.0;
+
+                trtest[0] = fwdorg[0] + fwd[0] * 16.0;
+                trtest[1] = fwdorg[1] + fwd[1] * 16.0;
+                trtest[2] = fwdorg[2] + fwd[2] * 16.0;
+
+                self.traps.trace(
+                    &mut tr,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!(mins) as *const vec3_t,
+                    core::ptr::addr_of!(maxs) as *const vec3_t,
+                    core::ptr::addr_of!(trtest) as *const vec3_t,
+                    (*ps).clientNum,
+                    MASK_PLAYERSOLID,
+                );
+
+                if (tr.fraction != 1.0 && tr.entityNum != (*ps).clientNum)
+                    || tr.startsolid != qfalse
+                    || tr.allsolid != qfalse
+                {
+                    self.PM_AddEventWithParm(EV_ITEMUSEFAIL as c_int, SENTRY_NOROOM);
+                    return 0;
+                }
+                return 1;
+            } else if forcedUse == HI_SHIELD as c_int {
+                mins[0] = -8.0;
+                mins[1] = -8.0;
+                mins[2] = 0.0;
+
+                maxs[0] = 8.0;
+                maxs[1] = 8.0;
+                maxs[2] = 8.0;
+
+                AngleVectors((*ps).viewangles, Some(&mut fwd), None, None);
+                fwd[2] = 0.0;
+                _VectorMA((*ps).origin, 64.0, fwd, &mut dest);
+                self.traps.trace(
+                    &mut tr,
+                    core::ptr::addr_of!((*ps).origin) as *const vec3_t,
+                    core::ptr::addr_of!(mins) as *const vec3_t,
+                    core::ptr::addr_of!(maxs) as *const vec3_t,
+                    core::ptr::addr_of!(dest) as *const vec3_t,
+                    (*ps).clientNum,
+                    MASK_SHOT,
+                );
+                if tr.fraction > 0.9 && tr.startsolid == qfalse && tr.allsolid == qfalse {
+                    _VectorCopy(tr.endpos, &mut pos);
+                    VectorSet(&mut dest, pos[0], pos[1], pos[2] - 4096.0);
+                    self.traps.trace(
+                        &mut tr,
+                        core::ptr::addr_of!(pos) as *const vec3_t,
+                        core::ptr::addr_of!(mins) as *const vec3_t,
+                        core::ptr::addr_of!(maxs) as *const vec3_t,
+                        core::ptr::addr_of!(dest) as *const vec3_t,
+                        (*ps).clientNum,
+                        MASK_SOLID,
+                    );
+                    if tr.startsolid == qfalse && tr.allsolid == qfalse {
+                        return 1;
+                    }
+                }
+                self.PM_AddEventWithParm(EV_ITEMUSEFAIL as c_int, SHIELD_NOROOM);
+                return 0;
+            } else if forcedUse == HI_JETPACK as c_int {
+                return 1;
+            } else if forcedUse == HI_HEALTHDISP as c_int {
+                return 1;
+            } else if forcedUse == HI_AMMODISP as c_int {
+                return 1;
+            } else if forcedUse == HI_EWEB as c_int {
+                return 1;
+            } else if forcedUse == HI_CLOAK as c_int {
+                return 1;
+            } else {
+                return 1;
+            }
+        }
+    }
+
+    /// Raven `PM_CanSetWeaponAnims`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6369-6377`
+    pub fn PM_CanSetWeaponAnims(&mut self) -> qboolean {
+        unsafe {
+            if (*(*self.pm).ps).m_iVehicleNum != 0 {
+                return qfalse;
+            }
+            qtrue
+        }
+    }
 }
 
-/// Raven `PM_ItemUsable`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:6239-6366`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`bg_itemlist`.
-pub fn PM_ItemUsable(
-    ps: *mut playerState_t,
-    forcedUse: c_int,
-) -> c_int {
-    todo!("Port PM_ItemUsable — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_VehicleWeaponAnimate`. The `backAgain` goto is a loop; the `VEH_FLYING`/
+    /// `VEH_CRASHING` branches are `if (0)` (dead) in the oracle.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6381-6631`
+    pub fn PM_VehicleWeaponAnimate(&mut self) {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let veh = self.pm_entVeh;
+            let mut iFlags = 0;
+            let mut iBlend = 0;
+            let mut Anim = -1;
+
+            if veh.is_null() || (*veh).m_pVehicle.is_null() {
+                return;
+            }
+            let pVeh = (*veh).m_pVehicle as *mut Vehicle_t;
+            if (*pVeh).m_pPilot.is_null()
+                || (*(*pVeh).m_pPilot).playerState.is_null()
+                || (*ps).clientNum != (*(*(*pVeh).m_pPilot).playerState).clientNum
+            {
+                //make sure the vehicle exists, and its pilot is this player
+                return;
+            }
+
+            if (*(*pVeh).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_WALKER as c_int
+                || (*(*pVeh).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_FIGHTER as c_int
+            {
+                return;
+            }
+            'back: loop {
+                // If they're firing, play the right fire animation.
+                if (*pm).cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK) != 0 {
+                    iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
+                    iBlend = 200;
+
+                    if (*ps).weapon == WP_SABER as c_int {
+                        if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                            //don't do anything.. I guess.
+                            (*pm).cmd.buttons &= !BUTTON_ALT_ATTACK;
+                            continue 'back;
+                        }
+                        // If we're already in an attack animation, leave.
+                        if (*ps).torsoTimer <= 0 {
+                            self.PM_AddEvent(EV_SABER_ATTACK as c_int);
+                        }
+
+                        (*ps).saberMove = saberMoveName_t::LS_R_TL2BR as c_int;
+
+                        if (*ps).torsoTimer > 0
+                            && ((*ps).torsoAnim == BOTH_VS_ATR_S as c_int
+                                || (*ps).torsoAnim == BOTH_VS_ATL_S as c_int)
+                        {
+                            return;
+                        }
+
+                        // Start the attack.
+                        if (*pm).cmd.rightmove > 0 {
+                            Anim = BOTH_VS_ATR_S as c_int;
+                        } else if (*pm).cmd.rightmove < 0 {
+                            Anim = BOTH_VS_ATL_S as c_int;
+                        } else {
+                            if self.PM_irand_timesync(0, 1) == 0 {
+                                Anim = BOTH_VS_ATR_S as c_int;
+                            } else {
+                                Anim = BOTH_VS_ATL_S as c_int;
+                            }
+                        }
+
+                        if (*ps).torsoTimer <= 0 {
+                            iFlags |= SETANIM_FLAG_RESTART;
+                        }
+                    } else if (*ps).weapon == WP_BLASTER as c_int {
+                        // Override the shoot anim.
+                        if (*ps).torsoAnim == BOTH_ATTACK3 as c_int {
+                            if (*pm).cmd.rightmove > 0 {
+                                Anim = BOTH_VS_ATR_G as c_int;
+                            } else if (*pm).cmd.rightmove < 0 {
+                                Anim = BOTH_VS_ATL_G as c_int;
+                            } else {
+                                Anim = BOTH_VS_ATF_G as c_int;
+                            }
+                        }
+                    } else {
+                        Anim = BOTH_VS_IDLE as c_int;
+                    }
+                } else if !(*veh).playerState.is_null()
+                    && (*(*veh).playerState).speed < 0.0
+                    && (*(*pVeh).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_ANIMAL as c_int
+                {
+                    //tauntaun is going backwards
+                    Anim = BOTH_VT_WALK_REV as c_int;
+                    iBlend = 600;
+                } else if !(*veh).playerState.is_null()
+                    && (*(*veh).playerState).speed < 0.0
+                    && (*(*pVeh).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_SPEEDER as c_int
+                {
+                    //speeder is going backwards
+                    Anim = BOTH_VS_REV as c_int;
+                    iBlend = 600;
+                } else {
+                    iFlags = SETANIM_FLAG_NORMAL;
+
+                    if (*ps).weapon == WP_SABER as c_int {
+                        if BG_SabersOff(ps) != qfalse {
+                            Anim = BOTH_VS_IDLE as c_int;
+                        } else if false {
+                            iBlend = 800;
+                            Anim = BOTH_VS_AIR_G as c_int;
+                            iFlags = SETANIM_FLAG_OVERRIDE;
+                        } else if false {
+                            iBlend = 800;
+                            Anim = BOTH_VS_LAND_SR as c_int;
+                            iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
+                        } else {
+                            Anim = BOTH_VS_IDLE_SR as c_int;
+                        }
+                    } else if (*ps).weapon == WP_BLASTER as c_int {
+                        if false {
+                            iBlend = 800;
+                            Anim = BOTH_VS_AIR_G as c_int;
+                            iFlags = SETANIM_FLAG_OVERRIDE;
+                        } else if false {
+                            iBlend = 800;
+                            Anim = BOTH_VS_LAND_G as c_int;
+                            iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
+                        } else {
+                            Anim = BOTH_VS_IDLE_G as c_int;
+                        }
+                    } else {
+                        Anim = BOTH_VS_IDLE as c_int;
+                    }
+                }
+                break;
+            }
+
+            if Anim != -1 {
+                //override it
+                if (*(*pVeh).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_ANIMAL as c_int {
+                    //remap anims for the tauntaun
+                    if Anim == BOTH_VS_IDLE as c_int {
+                        if !(*veh).playerState.is_null() && (*(*veh).playerState).speed > 0.0 {
+                            if (*(*veh).playerState).speed > (*(*pVeh).m_pVehicleInfo).speedMax {
+                                Anim = BOTH_VT_TURBO as c_int;
+                            } else {
+                                Anim = BOTH_VT_RUN_FWD as c_int;
+                            }
+                        } else {
+                            Anim = BOTH_VT_IDLE as c_int;
+                        }
+                    } else if Anim == BOTH_VS_ATR_S as c_int {
+                        Anim = BOTH_VT_ATR_S as c_int;
+                    } else if Anim == BOTH_VS_ATL_S as c_int {
+                        Anim = BOTH_VT_ATL_S as c_int;
+                    } else if Anim == BOTH_VS_ATR_G as c_int {
+                        Anim = BOTH_VT_ATR_G as c_int;
+                    } else if Anim == BOTH_VS_ATL_G as c_int {
+                        Anim = BOTH_VT_ATL_G as c_int;
+                    } else if Anim == BOTH_VS_ATF_G as c_int {
+                        Anim = BOTH_VT_ATF_G as c_int;
+                    } else if Anim == BOTH_VS_IDLE_SL as c_int {
+                        Anim = BOTH_VT_IDLE_S as c_int;
+                    } else if Anim == BOTH_VS_IDLE_SR as c_int {
+                        Anim = BOTH_VT_IDLE_S as c_int;
+                    } else if Anim == BOTH_VS_IDLE_G as c_int {
+                        Anim = BOTH_VT_IDLE_G as c_int;
+                    } else if Anim == BOTH_VS_AIR_G as c_int
+                        || Anim == BOTH_VS_LAND_SL as c_int
+                        || Anim == BOTH_VS_LAND_SR as c_int
+                        || Anim == BOTH_VS_LAND_G as c_int
+                    {
+                        //should not happen for tauntaun
+                        return;
+                    }
+                }
+
+                self.PM_SetAnim(SETANIM_BOTH, Anim, iFlags, iBlend);
+            }
+        }
+    }
 }
 
-/// Raven `PM_CanSetWeaponAnims`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:6369-6377`
-// PORT-ESCALATION(pmove-working-state): reads `pm`.
-pub fn PM_CanSetWeaponAnims() -> qboolean {
-    todo!("Port PM_CanSetWeaponAnims — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    /// Raven `PM_Weapon`. `QAGAME` is defined (npc/grapple/vehicle-fire branches compiled);
+    /// `#if 0` melee-grab and dead alt-fire branches are dropped.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6641-7672`
+    pub fn PM_Weapon(&mut self) {
+        use animNumber_t::*;
+        use holdable_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            let addTime;
+            let mut amount;
+            let mut killAfterItem = 0;
+            let mut veh: *mut bgEntity_t = core::ptr::null_mut();
+            let mut vehicleRocketLock = qfalse;
+
+            // QAGAME: npc with no weapon
+            if (*ps).clientNum >= MAX_CLIENTS as c_int
+                && (*ps).weapon == WP_NONE as c_int
+                && (*pm).cmd.weapon as c_int == WP_NONE as c_int
+                && !self.pm_entSelf.is_null()
+            {
+                let gent = self.pm_entSelf as *mut gentity_t;
+                if (*gent).inuse != 0 && !(*gent).client.is_null() && (*gent).localAnimIndex == 0 {
+                    //humanoid
+                    (*ps).torsoAnim = (*ps).legsAnim;
+                    (*ps).torsoTimer = (*ps).legsTimer;
+                    return;
+                }
+            }
+
+            if (*ps).emplacedIndex == 0 && (*ps).weapon == WP_EMPLACED_GUN as c_int {
+                //oh no!
+                let mut i = 0;
+                let mut weap = -1;
+
+                while i < WP_NUM_WEAPONS as c_int {
+                    if (*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << i) != 0
+                        && i != WP_NONE as c_int
+                    {
+                        weap = i;
+                        break;
+                    }
+                    i += 1;
+                }
+
+                if weap != -1 {
+                    (*pm).cmd.weapon = weap as i8;
+                    (*ps).weapon = weap;
+                    return;
+                }
+            }
+
+            if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int && (*ps).m_iVehicleNum != 0 {
+                //riding a vehicle
+                veh = self.pm_entVeh;
+                if !veh.is_null() && {
+                    let pv = (*veh).m_pVehicle as *mut Vehicle_t;
+                    (!(*veh).m_pVehicle.is_null()
+                        && (*(*pv).m_pVehicleInfo).r#type as c_int
+                            == vehicleType_t::VH_WALKER as c_int)
+                        || (!(*veh).m_pVehicle.is_null()
+                            && (*(*pv).m_pVehicleInfo).r#type as c_int
+                                == vehicleType_t::VH_FIGHTER as c_int)
+                } {
+                    //riding a walker/fighter: keep saber off, do no weapon stuff at all!
+                    (*ps).saberHolstered = 2;
+                    // QAGAME
+                    (*pm).cmd.buttons &= !(BUTTON_ATTACK | BUTTON_ALT_ATTACK);
+                }
+            }
+
+            if (*ps).weapon != WP_DISRUPTOR as c_int
+                && (*ps).weapon != WP_ROCKET_LAUNCHER as c_int
+                && (*ps).weapon != WP_THERMAL as c_int
+                && (*ps).m_iVehicleNum == 0
+            {
+                //check for exceeding max charge time
+                if (*ps).weaponstate == WEAPON_CHARGING_ALT as c_int {
+                    let timeDif = (*pm).cmd.serverTime - (*ps).weaponChargeTime;
+                    if timeDif > MAX_WEAPON_CHARGE_TIME {
+                        (*pm).cmd.buttons &= !BUTTON_ALT_ATTACK;
+                    }
+                }
+
+                if (*ps).weaponstate == WEAPON_CHARGING as c_int {
+                    let timeDif = (*pm).cmd.serverTime - (*ps).weaponChargeTime;
+                    if timeDif > MAX_WEAPON_CHARGE_TIME {
+                        (*pm).cmd.buttons &= !BUTTON_ATTACK;
+                    }
+                }
+            }
+
+            if (*ps).forceHandExtend == HANDEXTEND_WEAPONREADY as c_int
+                && self.PM_CanSetWeaponAnims() != qfalse
+            {
+                //reset into weapon stance
+                if (*ps).weapon != WP_SABER as c_int
+                    && (*ps).weapon != WP_MELEE as c_int
+                    && PM_IsRocketTrooper() == qfalse
+                {
+                    if (*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode == 1 {
+                        self.PM_StartTorsoAnim(TORSO_RAISEWEAP1 as c_int);
+                    } else {
+                        if (*ps).weapon == WP_EMPLACED_GUN as c_int {
+                            self.PM_StartTorsoAnim(BOTH_GUNSIT1 as c_int);
+                        } else {
+                            self.PM_StartTorsoAnim(TORSO_RAISEWEAP1 as c_int);
+                        }
+                    }
+                }
+
+                (*ps).weaponstate = WEAPON_RAISING as c_int;
+                (*ps).weaponTime += 250;
+
+                (*ps).forceHandExtend = HANDEXTEND_NONE as c_int;
+            } else if (*ps).forceHandExtend != HANDEXTEND_NONE as c_int {
+                //nothing else should be allowed to happen during this time
+                let mut desiredAnim = 0;
+                let mut seperateOnTorso = qfalse;
+                let mut playFullBody = qfalse;
+                let mut desiredOnTorso = 0;
+
+                let fhe = (*ps).forceHandExtend;
+                if fhe == HANDEXTEND_FORCEPUSH as c_int {
+                    desiredAnim = BOTH_FORCEPUSH as c_int;
+                } else if fhe == HANDEXTEND_FORCEPULL as c_int {
+                    desiredAnim = BOTH_FORCEPULL as c_int;
+                } else if fhe == HANDEXTEND_FORCE_HOLD as c_int {
+                    if (*ps).fd.forcePowersActive & (1 << FP_GRIP) != 0 {
+                        desiredAnim = BOTH_FORCEGRIP_HOLD as c_int;
+                    } else if (*ps).fd.forcePowersActive & (1 << FP_LIGHTNING) != 0 {
+                        if (*ps).weapon == WP_MELEE as c_int
+                            && (*ps).activeForcePass > FORCE_LEVEL_2
+                        {
+                            desiredAnim = BOTH_FORCE_2HANDEDLIGHTNING_HOLD as c_int;
+                        } else {
+                            desiredAnim = BOTH_FORCELIGHTNING_HOLD as c_int;
+                        }
+                    } else if (*ps).fd.forcePowersActive & (1 << FP_DRAIN) != 0 {
+                        desiredAnim = BOTH_FORCEGRIP_HOLD as c_int;
+                    } else {
+                        desiredAnim = BOTH_FORCEGRIP_HOLD as c_int;
+                    }
+                } else if fhe == HANDEXTEND_SABERPULL as c_int {
+                    desiredAnim = BOTH_SABERPULL as c_int;
+                } else if fhe == HANDEXTEND_CHOKE as c_int {
+                    desiredAnim = BOTH_CHOKE3 as c_int;
+                } else if fhe == HANDEXTEND_DODGE as c_int {
+                    desiredAnim = (*ps).forceDodgeAnim as c_int;
+                } else if fhe == HANDEXTEND_KNOCKDOWN as c_int {
+                    if (*ps).forceDodgeAnim != 0 {
+                        if (*ps).forceDodgeAnim > 4 {
+                            let originalDAnim = (*ps).forceDodgeAnim as c_int - 8;
+                            if originalDAnim == 2 {
+                                desiredAnim = BOTH_FORCE_GETUP_B1 as c_int;
+                            } else if originalDAnim == 3 {
+                                desiredAnim = BOTH_FORCE_GETUP_B3 as c_int;
+                            } else {
+                                desiredAnim = BOTH_GETUP1 as c_int;
+                            }
+                            seperateOnTorso = qtrue;
+                            desiredOnTorso = BOTH_FORCEPUSH as c_int;
+                        } else if (*ps).forceDodgeAnim == 2 {
+                            desiredAnim = BOTH_FORCE_GETUP_B1 as c_int;
+                        } else if (*ps).forceDodgeAnim == 3 {
+                            desiredAnim = BOTH_FORCE_GETUP_B3 as c_int;
+                        } else {
+                            desiredAnim = BOTH_GETUP1 as c_int;
+                        }
+                    } else {
+                        desiredAnim = BOTH_KNOCKDOWN1 as c_int;
+                    }
+                } else if fhe == HANDEXTEND_DUELCHALLENGE as c_int {
+                    desiredAnim = BOTH_ENGAGETAUNT as c_int;
+                } else if fhe == HANDEXTEND_TAUNT as c_int {
+                    desiredAnim = (*ps).forceDodgeAnim as c_int;
+                    if desiredAnim != BOTH_ENGAGETAUNT as c_int
+                        && VectorCompare((*ps).velocity, crate::q_math::vec3_origin) != qfalse
+                        && (*ps).groundEntityNum != ENTITYNUM_NONE
+                    {
+                        playFullBody = qtrue;
+                    }
+                } else if fhe == HANDEXTEND_PRETHROW as c_int {
+                    desiredAnim = BOTH_A3_TL_BR as c_int;
+                    playFullBody = qtrue;
+                } else if fhe == HANDEXTEND_POSTTHROW as c_int {
+                    desiredAnim = BOTH_D3_TL___ as c_int;
+                    playFullBody = qtrue;
+                } else if fhe == HANDEXTEND_PRETHROWN as c_int {
+                    desiredAnim = BOTH_KNEES1 as c_int;
+                    playFullBody = qtrue;
+                } else if fhe == HANDEXTEND_POSTTHROWN as c_int {
+                    if (*ps).forceDodgeAnim != 0 {
+                        desiredAnim = BOTH_FORCE_GETUP_F2 as c_int;
+                    } else {
+                        desiredAnim = BOTH_KNOCKDOWN5 as c_int;
+                    }
+                    playFullBody = qtrue;
+                } else if fhe == HANDEXTEND_DRAGGING as c_int {
+                    desiredAnim = BOTH_B1_BL___ as c_int;
+                } else if fhe == HANDEXTEND_JEDITAUNT as c_int {
+                    desiredAnim = BOTH_GESTURE1 as c_int;
+                } else {
+                    desiredAnim = BOTH_FORCEPUSH as c_int;
+                }
+
+                if seperateOnTorso == qfalse {
+                    self.PM_SetAnim(
+                        SETANIM_TORSO,
+                        desiredAnim,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        100,
+                    );
+                    (*ps).torsoTimer = 1;
+                }
+
+                if playFullBody != qfalse {
+                    self.PM_SetAnim(
+                        SETANIM_BOTH,
+                        desiredAnim,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        100,
+                    );
+                    (*ps).legsTimer = 1;
+                    (*ps).torsoTimer = 1;
+                } else if (*ps).forceHandExtend == HANDEXTEND_DODGE as c_int
+                    || (*ps).forceHandExtend == HANDEXTEND_KNOCKDOWN as c_int
+                    || ((*ps).forceHandExtend == HANDEXTEND_CHOKE as c_int
+                        && (*ps).groundEntityNum == ENTITYNUM_NONE)
+                {
+                    if seperateOnTorso != qfalse {
+                        self.PM_SetAnim(
+                            SETANIM_LEGS,
+                            desiredAnim,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            100,
+                        );
+                        (*ps).legsTimer = 1;
+
+                        self.PM_SetAnim(
+                            SETANIM_TORSO,
+                            desiredOnTorso,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            100,
+                        );
+                        (*ps).torsoTimer = 1;
+                    } else {
+                        self.PM_SetAnim(
+                            SETANIM_LEGS,
+                            desiredAnim,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            100,
+                        );
+                        (*ps).legsTimer = 1;
+                    }
+                }
+
+                return;
+            }
+
+            if BG_InSpecialJump((*ps).legsAnim) != qfalse
+                || BG_InRoll(ps, (*ps).legsAnim) != qfalse
+                || PM_InRollComplete(ps, (*ps).legsAnim) != qfalse
+            {
+                if (*ps).weaponTime < (*ps).legsTimer {
+                    (*ps).weaponTime = (*ps).legsTimer;
+                }
+            }
+
+            if (*ps).duelInProgress != 0 {
+                (*pm).cmd.weapon = WP_SABER as i8;
+                (*ps).weapon = WP_SABER as c_int;
+
+                if (*ps).duelTime >= (*pm).cmd.serverTime {
+                    (*pm).cmd.upmove = 0;
+                    (*pm).cmd.forwardmove = 0;
+                    (*pm).cmd.rightmove = 0;
+                }
+            }
+
+            if (*ps).weapon == WP_SABER as c_int
+                && (*ps).saberMove != saberMoveName_t::LS_READY as c_int
+                && (*ps).saberMove != saberMoveName_t::LS_NONE as c_int
+            {
+                (*pm).cmd.weapon = WP_SABER as i8; //don't allow switching out mid-attack
+            }
+
+            if (*ps).weapon == WP_SABER as c_int {
+                self.PM_WeaponLightsaber();
+                killAfterItem = 1;
+            } else if (*ps).weapon != WP_EMPLACED_GUN as c_int {
+                (*ps).saberHolstered = 0;
+            }
+
+            if self.PM_CanSetWeaponAnims() != qfalse {
+                if (*ps).weapon == WP_THERMAL as c_int
+                    || (*ps).weapon == WP_TRIP_MINE as c_int
+                    || (*ps).weapon == WP_DET_PACK as c_int
+                {
+                    if (*ps).weapon == WP_THERMAL as c_int {
+                        if (*ps).torsoAnim == WeaponAttackAnim[(*ps).weapon as usize]
+                            && ((*ps).weaponTime - 200) <= 0
+                        {
+                            self.PM_StartTorsoAnim(WeaponReadyAnim[(*ps).weapon as usize]);
+                        }
+                    } else {
+                        if (*ps).torsoAnim == WeaponAttackAnim[(*ps).weapon as usize]
+                            && ((*ps).weaponTime - 700) <= 0
+                        {
+                            self.PM_StartTorsoAnim(WeaponReadyAnim[(*ps).weapon as usize]);
+                        }
+                    }
+                }
+            }
+
+            // don't allow attack until all buttons are up
+            if (*ps).pm_flags & PMF_RESPAWNED != 0 {
+                return;
+            }
+
+            // ignore if spectator
+            if (*ps).clientNum < MAX_CLIENTS as c_int
+                && (*ps).persistant[PERS_TEAM as usize] == TEAM_SPECTATOR as c_int
+            {
+                return;
+            }
+
+            // check for dead player
+            if (*ps).stats[statIndex_t::STAT_HEALTH as usize] <= 0 {
+                (*ps).weapon = WP_NONE as c_int;
+                return;
+            }
+
+            // check for item using
+            if (*pm).cmd.buttons & BUTTON_USE_HOLDABLE != 0 {
+                if (*ps).pm_flags & PMF_USE_ITEM_HELD == 0 {
+                    if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int
+                        && (*ps).m_iVehicleNum != 0
+                    {
+                        return;
+                    }
+
+                    if (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] == 0 {
+                        return;
+                    }
+
+                    if self.PM_ItemUsable(ps, 0) == 0 {
+                        (*ps).pm_flags |= PMF_USE_ITEM_HELD;
+                        return;
+                    } else {
+                        let giTag = bg_itemlist
+                            [(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize]
+                            .giTag;
+                        if (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << giTag)
+                            != 0
+                        {
+                            if giTag != HI_BINOCULARS as c_int
+                                && giTag != HI_JETPACK as c_int
+                                && giTag != HI_HEALTHDISP as c_int
+                                && giTag != HI_AMMODISP as c_int
+                                && giTag != HI_CLOAK as c_int
+                                && giTag != HI_EWEB as c_int
+                            {
+                                (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] -=
+                                    1 << giTag;
+                            }
+                        } else {
+                            return; //this should not happen...
+                        }
+
+                        (*ps).pm_flags |= PMF_USE_ITEM_HELD;
+                        self.PM_AddEvent(EV_USE_ITEM0 as c_int + giTag);
+
+                        if giTag != HI_BINOCULARS as c_int
+                            && giTag != HI_JETPACK as c_int
+                            && giTag != HI_HEALTHDISP as c_int
+                            && giTag != HI_AMMODISP as c_int
+                            && giTag != HI_CLOAK as c_int
+                            && giTag != HI_EWEB as c_int
+                        {
+                            (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] = 0;
+                            BG_CycleInven(ps, 1);
+                        }
+                    }
+                    return;
+                }
+            } else {
+                (*ps).pm_flags &= !PMF_USE_ITEM_HELD;
+            }
+
+            if killAfterItem != 0 {
+                return;
+            }
+
+            // make weapon function
+            if (*ps).weaponTime > 0 {
+                (*ps).weaponTime -= self.pml.msec;
+            }
+
+            if (*ps).isJediMaster != 0 && (*ps).emplacedIndex != 0 {
+                (*ps).emplacedIndex = 0;
+                (*ps).saberHolstered = 0;
+            }
+
+            if (*ps).duelInProgress != 0 && (*ps).emplacedIndex != 0 {
+                (*ps).emplacedIndex = 0;
+                (*ps).saberHolstered = 0;
+            }
+
+            if (*ps).weapon == WP_EMPLACED_GUN as c_int && (*ps).emplacedIndex != 0 {
+                (*pm).cmd.weapon = WP_EMPLACED_GUN as i8;
+                self.PM_StartTorsoAnim(BOTH_GUNSIT1 as c_int);
+            }
+
+            if (*ps).isJediMaster != 0 || (*ps).duelInProgress != 0 || (*ps).trueJedi != 0 {
+                (*pm).cmd.weapon = WP_SABER as i8;
+                (*ps).weapon = WP_SABER as c_int;
+
+                if (*ps).isJediMaster != 0 || (*ps).trueJedi != 0 {
+                    (*ps).stats[statIndex_t::STAT_WEAPONS as usize] = 1 << WP_SABER as c_int;
+                }
+            }
+
+            amount = weaponData[(*ps).weapon as usize].energyPerShot;
+
+            // take an ammo away if not infinite
+            if (*ps).weapon != WP_NONE as c_int
+                && (*ps).weapon == (*pm).cmd.weapon as c_int
+                && ((*ps).weaponTime <= 0 || (*ps).weaponstate != WEAPON_FIRING as c_int)
+            {
+                if (*ps).clientNum < MAX_CLIENTS as c_int
+                    && (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] != -1
+                {
+                    if (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize]
+                        < weaponData[(*ps).weapon as usize].energyPerShot
+                        && (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize]
+                            < weaponData[(*ps).weapon as usize].altEnergyPerShot
+                    {
+                        self.PM_AddEventWithParm(
+                            EV_NOAMMO as c_int,
+                            WP_NUM_WEAPONS as c_int + (*ps).weapon,
+                        );
+
+                        if (*ps).weaponTime < 500 {
+                            (*ps).weaponTime += 500;
+                        }
+                        return;
+                    }
+
+                    if (*ps).weapon == WP_DET_PACK as c_int
+                        && (*ps).hasDetPackPlanted == 0
+                        && (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] < 1
+                    {
+                        self.PM_AddEventWithParm(
+                            EV_NOAMMO as c_int,
+                            WP_NUM_WEAPONS as c_int + (*ps).weapon,
+                        );
+
+                        if (*ps).weaponTime < 500 {
+                            (*ps).weaponTime += 500;
+                        }
+                        return;
+                    }
+                }
+            }
+
+            // check for weapon change
+            if (*ps).weaponTime <= 0 || (*ps).weaponstate != WEAPON_FIRING as c_int {
+                if (*ps).weapon != (*pm).cmd.weapon as c_int {
+                    self.PM_BeginWeaponChange((*pm).cmd.weapon as c_int);
+                }
+            }
+
+            if (*ps).weaponTime > 0 {
+                return;
+            }
+
+            if (*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode == 1 {
+                if self.pm_cancelOutZoom != qfalse {
+                    (*ps).zoomMode = 0;
+                    (*ps).zoomFov = 0.0;
+                    (*ps).zoomLocked = qfalse;
+                    (*ps).zoomLockTime = 0;
+                    self.PM_AddEvent(EV_DISRUPTOR_ZOOMSOUND as c_int);
+                    return;
+                }
+
+                if (*pm).cmd.forwardmove != 0 || (*pm).cmd.rightmove != 0 || (*pm).cmd.upmove > 0 {
+                    return;
+                }
+            }
+
+            // change weapon if time
+            if (*ps).weaponstate == WEAPON_DROPPING as c_int {
+                self.PM_FinishWeaponChange();
+                return;
+            }
+
+            if (*ps).weaponstate == WEAPON_RAISING as c_int {
+                (*ps).weaponstate = WEAPON_READY as c_int;
+                if self.PM_CanSetWeaponAnims() != qfalse {
+                    if (*ps).weapon == WP_SABER as c_int {
+                        let st = self.PM_GetSaberStance();
+                        self.PM_StartTorsoAnim(st);
+                    } else if (*ps).weapon == WP_MELEE as c_int || PM_IsRocketTrooper() != qfalse {
+                        self.PM_StartTorsoAnim((*ps).legsAnim);
+                    } else {
+                        if (*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode == 1 {
+                            self.PM_StartTorsoAnim(TORSO_WEAPONREADY4 as c_int);
+                        } else {
+                            if (*ps).weapon == WP_EMPLACED_GUN as c_int {
+                                self.PM_StartTorsoAnim(BOTH_GUNSIT1 as c_int);
+                            } else {
+                                self.PM_StartTorsoAnim(WeaponReadyAnim[(*ps).weapon as usize]);
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
+            if self.PM_CanSetWeaponAnims() != qfalse
+                && PM_IsRocketTrooper() == qfalse
+                && (*ps).weaponstate == WEAPON_READY as c_int
+                && (*ps).weaponTime <= 0
+                && ((*ps).weapon >= WP_BRYAR_PISTOL as c_int
+                    || (*ps).weapon == WP_STUN_BATON as c_int)
+                && (*ps).torsoTimer <= 0
+                && (*ps).torsoAnim != WeaponReadyAnim[(*ps).weapon as usize]
+                && (*ps).torsoAnim != TORSO_WEAPONIDLE3 as c_int
+                && (*ps).weapon != WP_EMPLACED_GUN as c_int
+            {
+                self.PM_StartTorsoAnim(WeaponReadyAnim[(*ps).weapon as usize]);
+            } else if self.PM_CanSetWeaponAnims() != qfalse && (*ps).weapon == WP_MELEE as c_int {
+                if (*ps).weaponTime <= 0 && (*ps).forceHandExtend == HANDEXTEND_NONE as c_int {
+                    let mut desTAnim = (*ps).legsAnim;
+
+                    if desTAnim == BOTH_STAND1 as c_int || desTAnim == BOTH_STAND2 as c_int {
+                        desTAnim = BOTH_STAND6 as c_int;
+                    }
+
+                    if (*pm).cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK) == 0 {
+                        if (*ps).torsoAnim != desTAnim {
+                            self.PM_StartTorsoAnim(desTAnim);
+                        }
+                    }
+                }
+            } else if self.PM_CanSetWeaponAnims() != qfalse && PM_IsRocketTrooper() != qfalse {
+                let desTAnim = (*ps).legsAnim;
+
+                if (*pm).cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK) == 0 {
+                    if (*ps).torsoAnim != desTAnim {
+                        self.PM_StartTorsoAnim(desTAnim);
+                    }
+                }
+            }
+
+            if ((*ps).torsoAnim == TORSO_WEAPONREADY4 as c_int
+                || (*ps).torsoAnim == BOTH_ATTACK4 as c_int)
+                && ((*ps).weapon != WP_DISRUPTOR as c_int || (*ps).zoomMode != 1)
+            {
+                if (*ps).weapon == WP_EMPLACED_GUN as c_int {
+                    self.PM_StartTorsoAnim(BOTH_GUNSIT1 as c_int);
+                } else if self.PM_CanSetWeaponAnims() != qfalse {
+                    self.PM_StartTorsoAnim(WeaponReadyAnim[(*ps).weapon as usize]);
+                }
+            } else if (*ps).torsoAnim != TORSO_WEAPONREADY4 as c_int
+                && (*ps).torsoAnim != BOTH_ATTACK4 as c_int
+                && self.PM_CanSetWeaponAnims() != qfalse
+                && ((*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode == 1)
+            {
+                self.PM_StartTorsoAnim(TORSO_WEAPONREADY4 as c_int);
+            }
+
+            if (*ps).clientNum >= MAX_CLIENTS as c_int
+                && !self.pm_entSelf.is_null()
+                && (*self.pm_entSelf).s.NPC_class == CLASS_VEHICLE as c_int
+            {
+                //we are a vehicle
+                veh = self.pm_entSelf;
+            }
+            if !veh.is_null() && !(*veh).m_pVehicle.is_null() {
+                let pv = (*veh).m_pVehicle as *mut Vehicle_t;
+                let id0 = (*(*pv).m_pVehicleInfo).weapon[0].ID as usize;
+                let id1 = (*(*pv).m_pVehicleInfo).weapon[1].ID as usize;
+                if self.bg.g_vehWeaponInfo[id0].fHoming != 0
+                    || self.bg.g_vehWeaponInfo[id1].fHoming != 0
+                {
+                    vehicleRocketLock = qtrue;
+                }
+            }
+
+            if vehicleRocketLock == qfalse {
+                if (*ps).weapon != WP_ROCKET_LAUNCHER as c_int {
+                    if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int
+                        && (*ps).m_iVehicleNum != 0
+                    {
+                        //riding a vehicle, the vehicle will tell me my rocketlock stuff...
+                    } else {
+                        (*ps).rocketLockIndex = ENTITYNUM_NONE;
+                        (*ps).rocketLockTime = 0.0;
+                        (*ps).rocketTargetTime = 0.0;
+                    }
+                }
+            }
+
+            if self.PM_DoChargedWeapons(vehicleRocketLock, veh) != qfalse {
+                return;
+            }
+
+            // check for fire
+            if (*pm).cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK) == 0 {
+                (*ps).weaponTime = 0;
+                (*ps).weaponstate = WEAPON_READY as c_int;
+                return;
+            }
+
+            if (*ps).weapon == WP_EMPLACED_GUN as c_int {
+                addTime = weaponData[(*ps).weapon as usize].fireTime;
+                (*ps).weaponTime += addTime;
+                if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                    self.PM_AddEvent(EV_ALT_FIRE as c_int);
+                } else {
+                    self.PM_AddEvent(EV_FIRE_WEAPON as c_int);
+                }
+                return;
+            } else if (*ps).m_iVehicleNum != 0
+                && (*self.pm_entSelf).s.NPC_class == CLASS_VEHICLE as c_int
+            {
+                //a vehicle NPC that has a pilot
+                (*ps).weaponstate = WEAPON_FIRING as c_int;
+                (*ps).weaponTime += 100;
+                // QAGAME
+                if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                    self.callbacks
+                        .cheap_weapon_fire((*ps).clientNum, EV_ALT_FIRE as c_int);
+                } else {
+                    self.callbacks
+                        .cheap_weapon_fire((*ps).clientNum, EV_FIRE_WEAPON as c_int);
+                }
+                return;
+            }
+
+            if (*ps).weapon == WP_DISRUPTOR as c_int
+                && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+                && (*ps).zoomLocked == qfalse
+            {
+                return;
+            }
+
+            if (*ps).weapon == WP_DISRUPTOR as c_int
+                && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+                && (*ps).zoomMode == 2
+            {
+                return;
+            }
+
+            if (*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode == 1 {
+                self.PM_StartTorsoAnim(BOTH_ATTACK4 as c_int);
+            } else if (*ps).weapon == WP_MELEE as c_int {
+                //special anims for standard melee attacks
+                if (*ps).m_iVehicleNum == 0 {
+                    if (*pm).debugMelee != 0
+                        && (*pm).cmd.buttons & BUTTON_ATTACK != 0
+                        && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+                    {
+                        //ok, grapple time (QAGAME)
+                        if !self.pm_entSelf.is_null() {
+                            if self.callbacks.try_grapple((*self.pm_entSelf).s.number) != qfalse {
+                                return;
+                            }
+                        }
+                    } else if (*pm).debugMelee != 0 && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                        //kicks
+                        if BG_KickingAnim((*ps).torsoAnim) == qfalse
+                            && BG_KickingAnim((*ps).legsAnim) == qfalse
+                        {
+                            let mut kickMove = self.PM_KickMoveForConditions();
+                            if kickMove == saberMoveName_t::LS_HILT_BASH as c_int {
+                                kickMove = saberMoveName_t::LS_KICK_F as c_int;
+                            }
+
+                            if kickMove != -1 {
+                                if (*ps).groundEntityNum == ENTITYNUM_NONE {
+                                    //if in air, convert kick to an in-air kick
+                                    let gDist = self.PM_GroundDistance();
+                                    if (BG_FlippingAnim((*ps).legsAnim) == qfalse
+                                        || (*ps).legsTimer <= 0)
+                                        && gDist > 64.0
+                                        && gDist > (-(*ps).velocity[2]) - 64.0
+                                    {
+                                        if kickMove == saberMoveName_t::LS_KICK_F as c_int {
+                                            kickMove = saberMoveName_t::LS_KICK_F_AIR as c_int;
+                                        } else if kickMove == saberMoveName_t::LS_KICK_B as c_int {
+                                            kickMove = saberMoveName_t::LS_KICK_B_AIR as c_int;
+                                        } else if kickMove == saberMoveName_t::LS_KICK_R as c_int {
+                                            kickMove = saberMoveName_t::LS_KICK_R_AIR as c_int;
+                                        } else if kickMove == saberMoveName_t::LS_KICK_L as c_int {
+                                            kickMove = saberMoveName_t::LS_KICK_L_AIR as c_int;
+                                        } else {
+                                            kickMove = -1;
+                                        }
+                                    } else {
+                                        //off ground, but too close to ground
+                                        kickMove = -1;
+                                    }
+                                }
+                            }
+
+                            if kickMove != -1 {
+                                let kickAnim = self.bg.saberMoveData[kickMove as usize].animToUse;
+
+                                if kickAnim != -1 {
+                                    self.PM_SetAnim(
+                                        SETANIM_BOTH,
+                                        kickAnim,
+                                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                        0,
+                                    );
+                                    if (*ps).legsAnim == kickAnim {
+                                        (*ps).weaponTime = (*ps).legsTimer;
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+
+                        //if got here then no move to do so put torso into leg idle or whatever
+                        if (*ps).torsoAnim != (*ps).legsAnim {
+                            self.PM_SetAnim(
+                                SETANIM_BOTH,
+                                (*ps).legsAnim,
+                                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                                0,
+                            );
+                        }
+                        (*ps).weaponTime = 0;
+                        return;
+                    } else {
+                        //just punch
+                        let mut desTAnim = BOTH_MELEE1 as c_int;
+                        if (*ps).torsoAnim == BOTH_MELEE1 as c_int {
+                            desTAnim = BOTH_MELEE2 as c_int;
+                        }
+                        self.PM_StartTorsoAnim(desTAnim);
+
+                        if (*ps).torsoAnim == desTAnim {
+                            (*ps).weaponTime = (*ps).torsoTimer;
+                        }
+                    }
+                }
+            } else {
+                self.PM_StartTorsoAnim(WeaponAttackAnim[(*ps).weapon as usize]);
+            }
+
+            if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                amount = weaponData[(*ps).weapon as usize].altEnergyPerShot;
+            } else {
+                amount = weaponData[(*ps).weapon as usize].energyPerShot;
+            }
+
+            (*ps).weaponstate = WEAPON_FIRING as c_int;
+
+            // take an ammo away if not infinite
+            if (*ps).clientNum < MAX_CLIENTS as c_int
+                && (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] != -1
+            {
+                if ((*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] - amount) >= 0 {
+                    (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] -= amount;
+                } else {
+                    // Not enough energy: Switch weapons
+                    if (*ps).weapon != WP_DET_PACK as c_int || (*ps).hasDetPackPlanted == 0 {
+                        self.PM_AddEventWithParm(
+                            EV_NOAMMO as c_int,
+                            WP_NUM_WEAPONS as c_int + (*ps).weapon,
+                        );
+                        if (*ps).weaponTime < 500 {
+                            (*ps).weaponTime += 500;
+                        }
+                    }
+                    return;
+                }
+            }
+
+            let mut addTime = if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                if (*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode != 1 {
+                    self.PM_AddEvent(EV_FIRE_WEAPON as c_int);
+                    weaponData[(*ps).weapon as usize].fireTime
+                } else {
+                    if (*ps).weapon != WP_MELEE as c_int || (*ps).m_iVehicleNum == 0 {
+                        self.PM_AddEvent(EV_ALT_FIRE as c_int);
+                    }
+                    weaponData[(*ps).weapon as usize].altFireTime
+                }
+            } else {
+                if (*ps).weapon != WP_MELEE as c_int || (*ps).m_iVehicleNum == 0 {
+                    self.PM_AddEvent(EV_FIRE_WEAPON as c_int);
+                }
+                let mut at = weaponData[(*ps).weapon as usize].fireTime;
+                if (*pm).gametype == GT_SIEGE as c_int && (*ps).weapon == WP_DET_PACK as c_int {
+                    at *= 2;
+                }
+                at
+            };
+
+            if (*ps).fd.forcePowersActive & (1 << FP_RAGE) != 0 {
+                addTime = (addTime as f64 * 0.75) as c_int;
+            } else if (*ps).fd.forceRageRecoveryTime > (*pm).cmd.serverTime {
+                addTime = (addTime as f64 * 1.5) as c_int;
+            }
+
+            (*ps).weaponTime += addTime;
+            let _ = amount;
+        }
+    }
 }
 
-/// Raven `PM_VehicleWeaponAnimate`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:6381-6631`
-// PORT-ESCALATION(pmove-working-state): reads `pm_entVeh`, writes `pm`.
-pub fn PM_VehicleWeaponAnimate() {
-    todo!("Port PM_VehicleWeaponAnimate — parked: pmove-working-state")
-}
+impl PmoveContext<'_> {
+    /// Raven `PM_Animate`. The `#if 0` TA gesture-button block is dropped.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:7680-7740`
+    pub fn PM_Animate(&mut self) {
+        use animNumber_t::*;
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+            if (*pm).cmd.buttons & BUTTON_GESTURE != 0 {
+                if (*ps).m_iVehicleNum != 0 {
+                    //eh, fine, clear it
+                    if (*ps).forceHandExtendTime < (*pm).cmd.serverTime {
+                        (*ps).forceHandExtend = HANDEXTEND_NONE as c_int;
+                    }
+                }
 
-/// Raven `PM_Weapon`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:6641-7672`
-// PORT-ESCALATION(pmove-working-state): reads `pm_entSelf`/`pm_entVeh`/`pml`/many tables, writes `pm`.
-pub fn PM_Weapon() {
-    todo!("Port PM_Weapon — parked: pmove-working-state")
-}
+                if (*ps).torsoTimer < 1
+                    && (*ps).forceHandExtend == HANDEXTEND_NONE as c_int
+                    && (*ps).legsTimer < 1
+                    && (*ps).weaponTime < 1
+                    && (*ps).saberLockTime < (*pm).cmd.serverTime
+                {
+                    (*ps).forceHandExtend = HANDEXTEND_TAUNT as c_int;
 
-/// Raven `PM_Animate`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:7680-7740`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_Animate() {
-    todo!("Port PM_Animate — parked: pmove-working-state")
-}
+                    (*ps).forceDodgeAnim = BOTH_ENGAGETAUNT as _;
 
-/// Raven `PM_DropTimers`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:7748-7773`
-// PORT-ESCALATION(pmove-working-state): reads `pml`, writes `pm`.
-pub fn PM_DropTimers() {
-    todo!("Port PM_DropTimers — parked: pmove-working-state")
+                    (*ps).forceHandExtendTime = (*pm).cmd.serverTime + 1000;
+
+                    self.PM_AddEvent(EV_TAUNT as c_int);
+                }
+            }
+        }
+    }
+
+    /// Raven `PM_DropTimers`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:7748-7773`
+    pub fn PM_DropTimers(&mut self) {
+        unsafe {
+            let ps = (*self.pm).ps;
+            // drop misc timing counter
+            if (*ps).pm_time != 0 {
+                if self.pml.msec >= (*ps).pm_time {
+                    (*ps).pm_flags &= !PMF_ALL_TIMES;
+                    (*ps).pm_time = 0;
+                } else {
+                    (*ps).pm_time -= self.pml.msec;
+                }
+            }
+
+            // drop animation counter
+            if (*ps).legsTimer > 0 {
+                (*ps).legsTimer -= self.pml.msec;
+                if (*ps).legsTimer < 0 {
+                    (*ps).legsTimer = 0;
+                }
+            }
+
+            if (*ps).torsoTimer > 0 {
+                (*ps).torsoTimer -= self.pml.msec;
+                if (*ps).torsoTimer < 0 {
+                    (*ps).torsoTimer = 0;
+                }
+            }
+        }
+    }
 }
 
 /// Raven `BG_UnrestrainedPitchRoll`.
-///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:7784-7798`
-// PORT-ESCALATION(bg-global): reads the extern cvar `bg_fighterAltControl.integer`, which is
-// not resolved in the packet (a bg-tier vmCvar global; ruling 1 places it in GameCvars, no threading here).
+// PORT-NOTE(bg_fighterAltControl): the `bg_fighterAltControl.integer` cvar lives on GameCvars
+// (game tier) and has no channel through `bg: &BgState`; referenced as cited pending a fixer to
+// thread it. Reported as a missing symbol.
 pub fn BG_UnrestrainedPitchRoll(
     ps: *mut playerState_t,
     pVeh: *mut Vehicle_t,
+    bg: &BgState,
 ) -> qboolean {
-    todo!("Port BG_UnrestrainedPitchRoll — parked: bg-global")
+    let _ = bg;
+    unsafe {
+        if bg_fighterAltControl.integer != 0
+            && (*ps).clientNum < MAX_CLIENTS as c_int //real client
+            && (*ps).m_iVehicleNum != 0 //in a vehicle
+            && !pVeh.is_null() //valid vehicle data pointer
+            && !(*pVeh).m_pVehicleInfo.is_null() //valid vehicle info
+            && (*(*pVeh).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_FIGHTER as c_int
+        //fighter
+        {
+            //can roll and pitch without limitation!
+            return qtrue;
+        }
+        qfalse
+    }
 }
 
 /// Raven `PM_UpdateViewAngles` — circularly clamp view angles with deltas.
