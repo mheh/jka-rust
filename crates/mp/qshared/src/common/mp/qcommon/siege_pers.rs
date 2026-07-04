@@ -12,7 +12,7 @@ use crate::shared::qboolean;
 ///
 /// Type definition source: `oracle/oracle/codemp/game/q_shared.h:2437-2442`
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct siegePers_t {
     pub beatingTime: qboolean,
     pub lastTeam: c_int,

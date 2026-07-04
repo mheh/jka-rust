@@ -13,7 +13,7 @@ use crate::prelude::*;
 
 use core::ffi::CStr;
 
-use crate::entity::flags::FL_DROPPED_ITEM;
+use crate::entity::flags::{FL_DROPPED_ITEM, FL_FORCE_GESTURE};
 use crate::g_items::RespawnItem;
 use crate::g_utils::{G_Find, G_FreeEntity, G_TempEntity};
 use mp_bg::public::ctf_msg::ctfMsg_t;
@@ -54,12 +54,20 @@ fn fofs_classname() -> c_int {
 
 /// Raven `Team_InitGame`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype` and
-// writes the file-scope `teamgame` global — no world/cvar handle in this
-// signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:22-35`
 pub fn Team_InitGame(ctx: GameContext<'_>) {
-    todo!("Port Team_InitGame — parked: raw-ptr-skeleton-no-world-handle (g_gametype, teamgame)")
+    unsafe {
+        let world = &mut *ctx.world;
+        world.globals.teamgame = Default::default();
+
+        let gametype = world.cvars.g_gametype.integer;
+        if gametype == GT_CTF as c_int || gametype == GT_CTY as c_int {
+            world.globals.teamgame.redStatus = -1; // Invalid to force update
+            world.globals.teamgame.blueStatus = -1;
+            Team_SetFlagStatus(ctx, TEAM_RED, FLAG_ATBASE);
+            Team_SetFlagStatus(ctx, TEAM_BLUE, FLAG_ATBASE);
+        }
+    }
 }
 
 /// Raven `OtherTeam`.
@@ -159,8 +167,6 @@ pub fn PrintCTFMessage(
 
 /// Raven `AddTeamScore`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes
-// `level.teamScores` — no world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:142-179`
 pub fn AddTeamScore(
     ctx: GameContext<'_>,
@@ -168,34 +174,178 @@ pub fn AddTeamScore(
     team: c_int,
     score: c_int,
 ) {
-    todo!("Port AddTeamScore — parked: raw-ptr-skeleton-no-world-handle (level.teamScores)")
+    unsafe {
+        let te = G_TempEntity(ctx, origin, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+        (*te).r.svFlags |= SVF_BROADCAST;
+
+        let world = &mut *ctx.world;
+
+        if team == TEAM_RED {
+            if world.level.teamScores[TEAM_RED as usize] + score == world.level.teamScores[TEAM_BLUE as usize] {
+                (*te).s.eventParm = global_team_sound_t::GTS_TEAMS_ARE_TIED as c_int;
+            } else if world.level.teamScores[TEAM_RED as usize] <= world.level.teamScores[TEAM_BLUE as usize]
+                && world.level.teamScores[TEAM_RED as usize] + score > world.level.teamScores[TEAM_BLUE as usize]
+            {
+                (*te).s.eventParm = global_team_sound_t::GTS_REDTEAM_TOOK_LEAD as c_int;
+            } else {
+                (*te).s.eventParm = global_team_sound_t::GTS_REDTEAM_SCORED as c_int;
+            }
+        } else {
+            if world.level.teamScores[TEAM_BLUE as usize] + score == world.level.teamScores[TEAM_RED as usize] {
+                (*te).s.eventParm = global_team_sound_t::GTS_TEAMS_ARE_TIED as c_int;
+            } else if world.level.teamScores[TEAM_BLUE as usize] <= world.level.teamScores[TEAM_RED as usize]
+                && world.level.teamScores[TEAM_BLUE as usize] + score > world.level.teamScores[TEAM_RED as usize]
+            {
+                (*te).s.eventParm = global_team_sound_t::GTS_BLUETEAM_TOOK_LEAD as c_int;
+            } else {
+                (*te).s.eventParm = global_team_sound_t::GTS_BLUETEAM_SCORED as c_int;
+            }
+        }
+
+        world.level.teamScores[team as usize] += score;
+    }
 }
 
 /// Raven `OnSameTeam`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
-// cvar/world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:187-276`
 pub fn OnSameTeam(
     ctx: GameContext<'_>,
     ent1: *mut gentity_t,
     ent2: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port OnSameTeam — parked: raw-ptr-skeleton-no-world-handle (g_gametype)")
+    unsafe {
+        if (*ent1).client.is_null() || (*ent2).client.is_null() {
+            return qfalse;
+        }
+
+        let world = &*ctx.world;
+        let gametype = world.cvars.g_gametype.integer;
+
+        if gametype == GT_POWERDUEL as c_int {
+            if (*((*ent1).client)).sess.duelTeam == (*((*ent2).client)).sess.duelTeam {
+                return qtrue;
+            }
+            return qfalse;
+        }
+
+        if gametype == GT_SINGLE_PLAYER as c_int {
+            let ent1IsBot =
+                if (*ent1).r.svFlags & 0x0001 != 0 { qtrue } else { qfalse };
+            let ent2IsBot =
+                if (*ent2).r.svFlags & 0x0001 != 0 { qtrue } else { qfalse };
+
+            if (ent1IsBot != 0 && ent2IsBot != 0) || (ent1IsBot == 0 && ent2IsBot == 0) {
+                return qtrue;
+            }
+            return qfalse;
+        }
+
+        if gametype < GT_TEAM as c_int {
+            return qfalse;
+        }
+
+        if (*ent1).s.eType == entityType_t::ET_NPC as c_int
+            && (*ent1).s.NPC_class as c_int == 130 // CLASS_VEHICLE
+            && !(*ent1).client.is_null()
+            && (*((*ent1).client)).sess.sessionTeam as c_int != TEAM_FREE
+            && !(*ent2).client.is_null()
+            && (*((*ent1).client)).sess.sessionTeam as c_int == (*((*ent2).client)).sess.sessionTeam as c_int
+        {
+            return qtrue;
+        }
+        if (*ent2).s.eType == entityType_t::ET_NPC as c_int
+            && (*ent2).s.NPC_class as c_int == 130 // CLASS_VEHICLE
+            && !(*ent2).client.is_null()
+            && (*((*ent2).client)).sess.sessionTeam as c_int != TEAM_FREE
+            && !(*ent1).client.is_null()
+            && (*((*ent2).client)).sess.sessionTeam as c_int == (*((*ent1).client)).sess.sessionTeam as c_int
+        {
+            return qtrue;
+        }
+
+        if (*((*ent1).client)).sess.sessionTeam as c_int == TEAM_FREE
+            && (*((*ent2).client)).sess.sessionTeam as c_int == TEAM_FREE
+            && (*ent1).s.eType == entityType_t::ET_NPC as c_int
+            && (*ent2).s.eType == entityType_t::ET_NPC as c_int
+        {
+            return qfalse;
+        }
+
+        if (*ent1).s.eType == entityType_t::ET_NPC as c_int
+            && (*ent2).s.eType == entityType_t::ET_PLAYER as c_int
+        {
+            if G_CheckVehicleNPCTeamDamage(ent1) != 0 {
+                if (*((*ent1).client)).sess.sessionTeam as c_int == (*((*ent2).client)).sess.sessionTeam as c_int
+                    || (*ent1).teamnodmg == (*((*ent2).client)).sess.sessionTeam as c_int
+                {
+                    return qtrue;
+                }
+            }
+            return qfalse;
+        } else if (*ent1).s.eType == entityType_t::ET_PLAYER as c_int
+            && (*ent2).s.eType == entityType_t::ET_NPC as c_int
+        {
+            return qfalse;
+        }
+
+        if (*((*ent1).client)).sess.sessionTeam as c_int == (*((*ent2).client)).sess.sessionTeam as c_int {
+            return qtrue;
+        }
+
+        qfalse
+    }
 }
 
 /// Raven `Team_SetFlagStatus`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
-// file-scope `teamgame` global, reads `g_gametype`, and calls
-// `trap_SetConfigstring` — no world/engine handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:281-318`
 pub fn Team_SetFlagStatus(
     ctx: GameContext<'_>,
     team: c_int,
     status: flagStatus_t,
 ) {
-    todo!("Port Team_SetFlagStatus — parked: raw-ptr-skeleton-no-world-handle (teamgame, g_gametype, trap_SetConfigstring)")
+    unsafe {
+        let world = &mut *ctx.world;
+        let mut modified = qfalse;
+
+        match team {
+            TEAM_RED => {
+                if world.globals.teamgame.redStatus != status {
+                    world.globals.teamgame.redStatus = status;
+                    modified = qtrue;
+                }
+            }
+            TEAM_BLUE => {
+                if world.globals.teamgame.blueStatus != status {
+                    world.globals.teamgame.blueStatus = status;
+                    modified = qtrue;
+                }
+            }
+            TEAM_FREE => {
+                if world.globals.teamgame.flagStatus != status {
+                    world.globals.teamgame.flagStatus = status;
+                    modified = qtrue;
+                }
+            }
+            _ => {}
+        }
+
+        if modified != 0 {
+            let ctfFlagStatusRemap: &[u8] = &[b'0', b'1', b'*', b'*', b'2'];
+            let mut st: [c_char; 4] = [0; 4];
+
+            if world.cvars.g_gametype.integer == GT_CTF as c_int
+                || world.cvars.g_gametype.integer == GT_CTY as c_int
+            {
+                st[0] = ctfFlagStatusRemap[world.globals.teamgame.redStatus as usize] as c_char;
+                st[1] = ctfFlagStatusRemap[world.globals.teamgame.blueStatus as usize] as c_char;
+                st[2] = 0;
+            }
+
+            trap::SetConfigstring(ctx.engine, 6, st.as_ptr());
+        }
+    }
 }
 
 /// Raven `Team_CheckDroppedItem`.
@@ -219,21 +369,34 @@ pub fn Team_CheckDroppedItem(
 
 /// Raven `Team_ForceGesture`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): iterates `g_entities` —
-// no world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:337-352`
 pub fn Team_ForceGesture(
     ctx: GameContext<'_>,
     team: c_int,
 ) {
-    todo!("Port Team_ForceGesture — parked: raw-ptr-skeleton-no-world-handle (g_entities)")
+    unsafe {
+        let world = &mut *ctx.world;
+        let max_clients = world.cvars.g_maxclients.integer;
+
+        for i in 0..max_clients {
+            let ent = &mut world.entities[i as usize];
+            if (*ent).inuse == 0 {
+                continue;
+            }
+            if (*ent).client.is_null() {
+                continue;
+            }
+            if (*((*ent).client)).sess.sessionTeam as c_int != team {
+                continue;
+            }
+
+            (*ent).flags |= FL_FORCE_GESTURE;
+        }
+    }
 }
 
 /// Raven `Team_FragBonuses`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`,
-// `g_maxclients`, `level`, and calls `trap_InPVS` — no world/engine handle in
-// this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:363-534`
 pub fn Team_FragBonuses(
     ctx: GameContext<'_>,
@@ -241,20 +404,225 @@ pub fn Team_FragBonuses(
     inflictor: *mut gentity_t,
     attacker: *mut gentity_t,
 ) {
-    todo!("Port Team_FragBonuses — parked: raw-ptr-skeleton-no-world-handle (g_entities, g_maxclients, level, trap_InPVS)")
+    unsafe {
+        // no bonus for fragging yourself or team mates
+        if (*targ).client.is_null() || (*attacker).client.is_null() || targ == attacker
+            || OnSameTeam(ctx, targ, attacker) != 0
+        {
+            return;
+        }
+
+        let world = &mut *ctx.world;
+        let team = (*((*targ).client)).sess.sessionTeam as c_int;
+        let otherteam = OtherTeam(team);
+        if otherteam < 0 {
+            return; // whoever died isn't on a team
+        }
+
+        // same team, if the flag at base, check to he has the enemy flag
+        let (flag_pw, enemy_flag_pw) = if team == TEAM_RED {
+            (PW_REDFLAG, PW_BLUEFLAG)
+        } else {
+            (PW_BLUEFLAG, PW_REDFLAG)
+        };
+
+        // did the attacker frag the flag carrier?
+        if (*((*targ).client)).ps.powerups[enemy_flag_pw as usize] != 0 {
+            (*((*attacker).client)).pers.teamState.lastfraggedcarrier = world.level.time;
+            // AddScore(attacker, targ->r.currentOrigin, CTF_FRAG_CARRIER_BONUS);
+            (*((*attacker).client)).pers.teamState.fragcarrier += 1;
+            PrintCTFMessage((*attacker).s.number, team, ctfMsg_t::CTFMESSAGE_FRAGGED_FLAG_CARRIER as c_int);
+
+            // the target had the flag, clear the hurt carrier field on the other team
+            let max_clients = world.cvars.g_maxclients.integer;
+            for i in 0..max_clients {
+                let ent = &mut world.entities[i as usize];
+                if (*ent).inuse != 0 && (*((*ent).client)).sess.sessionTeam as c_int == otherteam {
+                    (*((*ent).client)).pers.teamState.lasthurtcarrier = 0;
+                }
+            }
+            return;
+        }
+
+        // did the attacker frag a head carrier? other->client->ps.generic1
+        if (*((*targ).client)).ps.generic1 != 0 {
+            (*((*attacker).client)).pers.teamState.lastfraggedcarrier = world.level.time;
+            // AddScore(attacker, targ->r.currentOrigin, CTF_FRAG_CARRIER_BONUS * tokens * tokens);
+            (*((*attacker).client)).pers.teamState.fragcarrier += 1;
+
+            // the target had the flag, clear the hurt carrier field on the other team
+            let max_clients = world.cvars.g_maxclients.integer;
+            for i in 0..max_clients {
+                let ent = &mut world.entities[i as usize];
+                if (*ent).inuse != 0 && (*((*ent).client)).sess.sessionTeam as c_int == otherteam {
+                    (*((*ent).client)).pers.teamState.lasthurtcarrier = 0;
+                }
+            }
+            return;
+        }
+
+        if (*((*targ).client)).pers.teamState.lasthurtcarrier != 0
+            && world.level.time - (*((*targ).client)).pers.teamState.lasthurtcarrier < 10000
+            && (*((*attacker).client)).ps.powerups[flag_pw as usize] == 0
+        {
+            // attacker is on the same team as the flag carrier and fragged a guy who hurt our flag carrier
+            // AddScore(attacker, targ->r.currentOrigin, CTF_CARRIER_DANGER_PROTECT_BONUS);
+
+            (*((*attacker).client)).pers.teamState.carrierdefense += 1;
+            (*((*targ).client)).pers.teamState.lasthurtcarrier = 0;
+
+            (*((*attacker).client)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
+            let _team = (*((*attacker).client)).sess.sessionTeam as c_int;
+            (*((*attacker).client)).rewardTime = world.level.time + 2000;
+
+            return;
+        }
+
+        if (*((*targ).client)).pers.teamState.lasthurtcarrier != 0
+            && world.level.time - (*((*targ).client)).pers.teamState.lasthurtcarrier < 10000
+        {
+            // attacker is on the same team as the skull carrier and
+            // AddScore(attacker, targ->r.currentOrigin, CTF_CARRIER_DANGER_PROTECT_BONUS);
+
+            (*((*attacker).client)).pers.teamState.carrierdefense += 1;
+            (*((*targ).client)).pers.teamState.lasthurtcarrier = 0;
+
+            (*((*attacker).client)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
+            let _team = (*((*attacker).client)).sess.sessionTeam as c_int;
+            (*((*attacker).client)).rewardTime = world.level.time + 2000;
+
+            return;
+        }
+
+        // flag and flag carrier area defense bonuses
+
+        // we have to find the flag and carrier entities
+
+        // find the flag
+        let c = if (*((*attacker).client)).sess.sessionTeam as c_int == TEAM_RED {
+            c"team_CTF_redflag"
+        } else if (*((*attacker).client)).sess.sessionTeam as c_int == TEAM_BLUE {
+            c"team_CTF_blueflag"
+        } else {
+            return;
+        };
+
+        // find attacker's team's flag carrier
+        let mut carrier: *mut gentity_t = core::ptr::null_mut();
+        let max_clients = world.cvars.g_maxclients.integer;
+        for i in 0..max_clients {
+            carrier = &mut world.entities[i as usize];
+            if (*carrier).inuse != 0 && (*((*carrier).client)).ps.powerups[flag_pw as usize] != 0 {
+                break;
+            }
+            carrier = core::ptr::null_mut();
+        }
+
+        let mut flag: *mut gentity_t = core::ptr::null_mut();
+        loop {
+            flag = G_Find(ctx, flag, fofs_classname(), c.as_ptr());
+            if flag.is_null() {
+                break;
+            }
+            if (*flag).flags & FL_DROPPED_ITEM == 0 {
+                break;
+            }
+        }
+
+        if flag.is_null() {
+            return; // can't find attacker's flag
+        }
+
+        // ok we have the attackers flag and a pointer to the carrier
+
+        // check to see if we are defending the base's flag
+        let mut v1 = [0.0f32; 3];
+        let mut v2 = [0.0f32; 3];
+        v1[0] = (*targ).r.currentOrigin[0] - (*flag).r.currentOrigin[0];
+        v1[1] = (*targ).r.currentOrigin[1] - (*flag).r.currentOrigin[1];
+        v1[2] = (*targ).r.currentOrigin[2] - (*flag).r.currentOrigin[2];
+        v2[0] = (*attacker).r.currentOrigin[0] - (*flag).r.currentOrigin[0];
+        v2[1] = (*attacker).r.currentOrigin[1] - (*flag).r.currentOrigin[1];
+        v2[2] = (*attacker).r.currentOrigin[2] - (*flag).r.currentOrigin[2];
+
+        let v1_len = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
+        let v2_len = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
+
+        if ((v1_len < 500.0 && trap::InPVS(ctx.engine, (*flag).r.currentOrigin.as_ptr(), (*targ).r.currentOrigin.as_ptr()) != 0)
+            || (v2_len < 500.0 && trap::InPVS(ctx.engine, (*flag).r.currentOrigin.as_ptr(), (*attacker).r.currentOrigin.as_ptr()) != 0))
+            && (*((*attacker).client)).sess.sessionTeam as c_int != (*((*targ).client)).sess.sessionTeam as c_int
+        {
+            // we defended the base flag
+            // AddScore(attacker, targ->r.currentOrigin, CTF_FLAG_DEFENSE_BONUS);
+            (*((*attacker).client)).pers.teamState.basedefense += 1;
+
+            (*((*attacker).client)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
+            (*((*attacker).client)).rewardTime = world.level.time + 2000;
+
+            return;
+        }
+
+        if !carrier.is_null() && carrier != attacker {
+            v1[0] = (*targ).r.currentOrigin[0] - (*carrier).r.currentOrigin[0];
+            v1[1] = (*targ).r.currentOrigin[1] - (*carrier).r.currentOrigin[1];
+            v1[2] = (*targ).r.currentOrigin[2] - (*carrier).r.currentOrigin[2];
+            v2[0] = (*attacker).r.currentOrigin[0] - (*carrier).r.currentOrigin[0];
+            v2[1] = (*attacker).r.currentOrigin[1] - (*carrier).r.currentOrigin[1];
+            v2[2] = (*attacker).r.currentOrigin[2] - (*carrier).r.currentOrigin[2];
+
+            let v1_len = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
+            let v2_len = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
+
+            if ((v1_len < 300.0 && trap::InPVS(ctx.engine, (*carrier).r.currentOrigin.as_ptr(), (*targ).r.currentOrigin.as_ptr()) != 0)
+                || (v2_len < 300.0 && trap::InPVS(ctx.engine, (*carrier).r.currentOrigin.as_ptr(), (*attacker).r.currentOrigin.as_ptr()) != 0))
+                && (*((*attacker).client)).sess.sessionTeam as c_int != (*((*targ).client)).sess.sessionTeam as c_int
+            {
+                // AddScore(attacker, targ->r.currentOrigin, CTF_CARRIER_PROTECT_BONUS);
+                (*((*attacker).client)).pers.teamState.carrierdefense += 1;
+
+                (*((*attacker).client)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
+                (*((*attacker).client)).rewardTime = world.level.time + 2000;
+
+                return;
+            }
+        }
+    }
 }
 
 /// Raven `Team_CheckHurtCarrier`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
-// world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:544-565`
 pub fn Team_CheckHurtCarrier(
     ctx: GameContext<'_>,
     targ: *mut gentity_t,
     attacker: *mut gentity_t,
 ) {
-    todo!("Port Team_CheckHurtCarrier — parked: raw-ptr-skeleton-no-world-handle (level.time)")
+    unsafe {
+        if (*targ).client.is_null() || (*attacker).client.is_null() {
+            return;
+        }
+
+        let flag_pw = if (*((*targ).client)).sess.sessionTeam as c_int == TEAM_RED {
+            PW_BLUEFLAG
+        } else {
+            PW_REDFLAG
+        };
+
+        let world = &mut *ctx.world;
+        // flags
+        if (*((*targ).client)).ps.powerups[flag_pw as usize] != 0
+            && (*((*targ).client)).sess.sessionTeam as c_int != (*((*attacker).client)).sess.sessionTeam as c_int
+        {
+            (*((*attacker).client)).pers.teamState.lasthurtcarrier = world.level.time;
+        }
+
+        // skulls
+        if (*((*targ).client)).ps.generic1 != 0
+            && (*((*targ).client)).sess.sessionTeam as c_int != (*((*attacker).client)).sess.sessionTeam as c_int
+        {
+            (*((*attacker).client)).pers.teamState.lasthurtcarrier = world.level.time;
+        }
+    }
 }
 
 /// Raven `Team_ResetFlag`.
@@ -298,11 +666,17 @@ pub fn Team_ResetFlag(
 
 /// Raven `Team_ResetFlags`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
-// cvar handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:601-606`
 pub fn Team_ResetFlags(ctx: GameContext<'_>) {
-    todo!("Port Team_ResetFlags — parked: raw-ptr-skeleton-no-world-handle (g_gametype)")
+    unsafe {
+        let world = &*ctx.world;
+        if world.cvars.g_gametype.integer == GT_CTF as c_int
+            || world.cvars.g_gametype.integer == GT_CTY as c_int
+        {
+            Team_ResetFlag(ctx, TEAM_RED);
+            Team_ResetFlag(ctx, TEAM_BLUE);
+        }
+    }
 }
 
 /// Raven `Team_ReturnFlagSound`.
@@ -333,15 +707,50 @@ pub fn Team_ReturnFlagSound(
 
 /// Raven `Team_TakeFlagSound`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes `teamgame`
-// and `level.time` — no world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:626-662`
 pub fn Team_TakeFlagSound(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
     team: c_int,
 ) {
-    todo!("Port Team_TakeFlagSound — parked: raw-ptr-skeleton-no-world-handle (teamgame, level.time)")
+    unsafe {
+        if ent.is_null() {
+            // G_Printf ("Warning:  NULL passed to Team_TakeFlagSound\n");
+            return;
+        }
+
+        let world = &mut *ctx.world;
+
+        // only play sound when the flag was at the base
+        // or not picked up the last 10 seconds
+        match team {
+            TEAM_RED => {
+                if world.globals.teamgame.blueStatus != FLAG_ATBASE {
+                    if world.globals.teamgame.blueTakenTime > world.level.time - 10000 {
+                        return;
+                    }
+                }
+                world.globals.teamgame.blueTakenTime = world.level.time;
+            }
+            TEAM_BLUE => {
+                if world.globals.teamgame.redStatus != FLAG_ATBASE {
+                    if world.globals.teamgame.redTakenTime > world.level.time - 10000 {
+                        return;
+                    }
+                }
+                world.globals.teamgame.redTakenTime = world.level.time;
+            }
+            _ => {}
+        }
+
+        let te = G_TempEntity(ctx, (*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+        if team == TEAM_BLUE {
+            (*te).s.eventParm = global_team_sound_t::GTS_RED_TAKEN as c_int;
+        } else {
+            (*te).s.eventParm = global_team_sound_t::GTS_BLUE_TAKEN as c_int;
+        }
+        (*te).r.svFlags |= SVF_BROADCAST;
+    }
 }
 
 /// Raven `Team_CaptureFlagSound`.
@@ -435,9 +844,6 @@ pub fn Team_DroppedFlagThink(
 
 /// Raven `Team_TouchOurFlag`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`,
-// `g_maxclients`, `level`, writes `teamgame` — no world handle in this
-// signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:737-825`
 pub fn Team_TouchOurFlag(
     ctx: GameContext<'_>,
@@ -445,13 +851,89 @@ pub fn Team_TouchOurFlag(
     other: *mut gentity_t,
     team: c_int,
 ) -> c_int {
-    todo!("Port Team_TouchOurFlag — parked: raw-ptr-skeleton-no-world-handle (g_entities, g_maxclients, level, teamgame)")
+    unsafe {
+        let cl = (*other).client as *mut gclient_t;
+        let world = &mut *ctx.world;
+
+        let enemy_flag = if (*cl).sess.sessionTeam as c_int == TEAM_RED {
+            PW_BLUEFLAG
+        } else {
+            PW_REDFLAG
+        };
+
+        if (*ent).flags & FL_DROPPED_ITEM != 0 {
+            // flag is not at home, return it by teleporting it back
+            PrintCTFMessage(ctx, (*other).s.number, team, ctfMsg_t::CTFMESSAGE_PLAYER_RETURNED_FLAG as c_int);
+            // AddScore(other, ent->r.currentOrigin, CTF_RECOVERY_BONUS);
+            (*cl).pers.teamState.flagrecovery += 1;
+            (*cl).pers.teamState.lastreturnedflag = world.level.time;
+            Team_ReturnFlagSound(ctx, Team_ResetFlag(ctx, team), team);
+            return 0;
+        }
+
+        // the flag is at home base. if the player has the enemy flag, he's just won!
+        if (*cl).ps.powerups[enemy_flag as usize] == 0 {
+            return 0; // We don't have the flag
+        }
+
+        PrintCTFMessage(ctx, (*other).s.number, team, ctfMsg_t::CTFMESSAGE_PLAYER_CAPTURED_FLAG as c_int);
+
+        (*cl).ps.powerups[enemy_flag as usize] = 0;
+
+        world.globals.teamgame.last_flag_capture = world.level.time as f32;
+        world.globals.teamgame.last_capture_team = team;
+
+        // Increase the team's score
+        AddTeamScore(ctx, (*ent).s.pos.trBase, (*cl).sess.sessionTeam as c_int, 1);
+
+        (*cl).pers.teamState.captures += 1;
+        (*cl).rewardTime = world.level.time + 2000; // REWARD_SPRITE_TIME
+        (*cl).ps.persistant[persEnum_t::PERS_CAPTURES as usize] += 1;
+
+        // other gets another 10 frag bonus
+        // AddScore(other, ent->r.currentOrigin, CTF_CAPTURE_BONUS);
+
+        Team_CaptureFlagSound(ctx, ent, team);
+
+        // Ok, let's do the player loop, hand out the bonuses
+        let max_clients = world.cvars.g_maxclients.integer;
+        for i in 0..max_clients {
+            let player = &mut world.entities[i as usize];
+            if (*player).inuse == 0 {
+                continue;
+            }
+
+            if (*(*player).client).sess.sessionTeam as c_int != (*cl).sess.sessionTeam as c_int {
+                (*(*player).client).pers.teamState.lasthurtcarrier = -5;
+            } else if (*(*player).client).sess.sessionTeam as c_int == (*cl).sess.sessionTeam as c_int {
+                if player != other {
+                    // AddScore(player, ent->r.currentOrigin, CTF_TEAM_BONUS);
+                }
+                // award extra points for capture assists
+                if (*(*player).client).pers.teamState.lastreturnedflag + 300000 > world.level.time {
+                    // AddScore (player, ent->r.currentOrigin, CTF_RETURN_FLAG_ASSIST_BONUS);
+                    (*cl).pers.teamState.assists += 1;
+
+                    (*(*player).client).ps.persistant[persEnum_t::PERS_ASSIST_COUNT as usize] += 1;
+                    (*(*player).client).rewardTime = world.level.time + 2000;
+                } else if (*(*player).client).pers.teamState.lastfraggedcarrier + 300000 > world.level.time {
+                    // AddScore(player, ent->r.currentOrigin, CTF_FRAG_CARRIER_ASSIST_BONUS);
+                    (*cl).pers.teamState.assists += 1;
+                    (*(*player).client).ps.persistant[persEnum_t::PERS_ASSIST_COUNT as usize] += 1;
+                    (*(*player).client).rewardTime = world.level.time + 2000;
+                }
+            }
+        }
+        Team_ResetFlags(ctx);
+
+        // CalculateRanks(ctx); // parked
+
+        0 // Do not respawn this automatically
+    }
 }
 
 /// Raven `Team_TouchEnemyFlag`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
-// world handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:827-846`
 pub fn Team_TouchEnemyFlag(
     ctx: GameContext<'_>,
@@ -459,7 +941,26 @@ pub fn Team_TouchEnemyFlag(
     other: *mut gentity_t,
     team: c_int,
 ) -> c_int {
-    todo!("Port Team_TouchEnemyFlag — parked: raw-ptr-skeleton-no-world-handle (level.time)")
+    unsafe {
+        let cl = (*other).client as *mut gclient_t;
+
+        PrintCTFMessage(ctx, (*other).s.number, team, ctfMsg_t::CTFMESSAGE_PLAYER_GOT_FLAG as c_int);
+
+        if team == TEAM_RED {
+            (*cl).ps.powerups[PW_REDFLAG as usize] = c_int::MAX; // flags never expire
+        } else {
+            (*cl).ps.powerups[PW_BLUEFLAG as usize] = c_int::MAX;
+        }
+
+        Team_SetFlagStatus(ctx, team, 1); // FLAG_TAKEN
+
+        let world = &*ctx.world;
+        // AddScore call is parked - needs from g_combat
+        (*cl).pers.teamState.flagsince = world.level.time;
+        Team_TakeFlagSound(ctx, ent, team);
+
+        -1 // Do not respawn this automatically, but do delete it if it was FL_DROPPED
+    }
 }
 
 /// Raven `Pickup_Team`.
@@ -494,14 +995,44 @@ pub fn Pickup_Team(
 
 /// Raven `Team_GetLocation`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.locationHead`
-// and calls `trap_InPVS` — no world/engine handle in this signature.
 /// Source: `oracle/oracle/codemp/game/g_team.c:880-909`
 pub fn Team_GetLocation(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> *mut gentity_t {
-    todo!("Port Team_GetLocation — parked: raw-ptr-skeleton-no-world-handle (level.locationHead, trap_InPVS)")
+    unsafe {
+        let world = &*ctx.world;
+        let mut best: *mut gentity_t = core::ptr::null_mut();
+        let mut bestlen: f32 = 3.0 * 8192.0 * 8192.0;
+
+        let mut origin = [0.0f32; 3];
+        origin[0] = (*ent).r.currentOrigin[0];
+        origin[1] = (*ent).r.currentOrigin[1];
+        origin[2] = (*ent).r.currentOrigin[2];
+
+        let mut eloc = world.level.locationHead;
+        while !eloc.is_null() {
+            let len = (origin[0] - (*eloc).r.currentOrigin[0]) * (origin[0] - (*eloc).r.currentOrigin[0])
+                + (origin[1] - (*eloc).r.currentOrigin[1]) * (origin[1] - (*eloc).r.currentOrigin[1])
+                + (origin[2] - (*eloc).r.currentOrigin[2]) * (origin[2] - (*eloc).r.currentOrigin[2]);
+
+            if len > bestlen {
+                eloc = (*eloc).nextTrain;
+                continue;
+            }
+
+            if trap::InPVS(ctx.engine, origin.as_ptr(), (*eloc).r.currentOrigin.as_ptr()) == 0 {
+                eloc = (*eloc).nextTrain;
+                continue;
+            }
+
+            bestlen = len;
+            best = eloc;
+            eloc = (*eloc).nextTrain;
+        }
+
+        best
+    }
 }
 
 /// Raven `Team_GetLocationMsg`.
@@ -516,13 +1047,13 @@ pub fn Team_GetLocationMsg(
     loc: *mut c_char,
     loclen: c_int,
 ) -> qboolean {
-    todo!("Port Team_GetLocationMsg — parked: unresolved-varargs (Com_sprintf format of best->count/message)")
+    todo!("Port Team_GetLocationMsg — parked: unresolved-varargs (Com_sprintf varargs)")
 }
 
 /// Raven `SelectRandomTeamSpawnPoint`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `bgSiegeClasses`
-// and `g_gametype` — no world/cvar handle in this signature.
+// PORT-ESCALATION(unported-bg-const): needs `bgSiegeClasses` array from bg crate
+// (not yet ported as public constant) and `g_gametype` cvar.
 /// Source: `oracle/oracle/codemp/game/g_team.c:951-1040`
 pub fn SelectRandomTeamSpawnPoint(
     ctx: GameContext<'_>,
@@ -530,15 +1061,13 @@ pub fn SelectRandomTeamSpawnPoint(
     team: team_t,
     siegeClass: c_int,
 ) -> *mut gentity_t {
-    todo!("Port SelectRandomTeamSpawnPoint — parked: raw-ptr-skeleton-no-world-handle (bgSiegeClasses, g_gametype)")
+    todo!("Port SelectRandomTeamSpawnPoint — parked: unported-bg-const (bgSiegeClasses)")
 }
 
 /// Raven `SelectCTFSpawnPoint`.
 ///
-// PORT-ESCALATION(vec3-outparam-seam): `origin`/`angles` are by-value
-// `vec3_t` in this staged signature, so the C out-param mutation
-// (`VectorCopy(spot->s.origin, origin)`) can't be expressed; also calls the
-// parked `SelectRandomTeamSpawnPoint`.
+// PORT-ESCALATION(parked-dependency): calls `SelectRandomTeamSpawnPoint` which
+// is parked due to unported-bg-const (bgSiegeClasses).
 /// Source: `oracle/oracle/codemp/game/g_team.c:1049-1063`
 pub fn SelectCTFSpawnPoint(
     ctx: GameContext<'_>,
@@ -547,15 +1076,13 @@ pub fn SelectCTFSpawnPoint(
     origin: vec3_t,
     angles: vec3_t,
 ) -> *mut gentity_t {
-    todo!("Port SelectCTFSpawnPoint — parked: vec3-outparam-seam (origin/angles out-params not expressible on by-value vec3_t)")
+    todo!("Port SelectCTFSpawnPoint — parked: parked-dependency (SelectRandomTeamSpawnPoint)")
 }
 
 /// Raven `SelectSiegeSpawnPoint`.
 ///
-// PORT-ESCALATION(vec3-outparam-seam): `origin`/`angles` are by-value
-// `vec3_t` in this staged signature, so the C out-param mutation
-// (`VectorCopy(spot->s.origin, origin)`) can't be expressed; also calls the
-// parked `SelectRandomTeamSpawnPoint`.
+// PORT-ESCALATION(parked-dependency): calls `SelectRandomTeamSpawnPoint` which
+// is parked due to unported-bg-const (bgSiegeClasses).
 /// Source: `oracle/oracle/codemp/game/g_team.c:1071-1085`
 pub fn SelectSiegeSpawnPoint(
     ctx: GameContext<'_>,
@@ -565,7 +1092,7 @@ pub fn SelectSiegeSpawnPoint(
     origin: vec3_t,
     angles: vec3_t,
 ) -> *mut gentity_t {
-    todo!("Port SelectSiegeSpawnPoint — parked: vec3-outparam-seam (origin/angles out-params not expressible on by-value vec3_t)")
+    todo!("Port SelectSiegeSpawnPoint — parked: parked-dependency (SelectRandomTeamSpawnPoint)")
 }
 
 /// Raven `SortClients`.
@@ -580,24 +1107,23 @@ pub fn SortClients(
 
 /// Raven `TeamplayInfoMessage`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`,
-// `g_maxclients`, `level.sortedClients`, calls `trap_SendServerCommand` — no
-// world/engine handle in this signature.
+// PORT-ESCALATION(unresolved-varargs): `va` and `trap_SendServerCommand` call
+// uses variadic formatting that cannot be expressed in current skeleton.
 /// Source: `oracle/oracle/codemp/game/g_team.c:1103-1159`
 pub fn TeamplayInfoMessage(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port TeamplayInfoMessage — parked: raw-ptr-skeleton-no-world-handle (g_entities, g_maxclients, level.sortedClients, trap_SendServerCommand)")
+    todo!("Port TeamplayInfoMessage — parked: unresolved-varargs (va + trap_SendServerCommand)")
 }
 
 /// Raven `CheckTeamStatus`.
 ///
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes `level`,
-// reads `g_entities`, `g_maxclients` — no world handle in this signature.
+// PORT-ESCALATION(parked-dependency): calls `TeamplayInfoMessage` which is
+// parked due to unresolved-varargs (va + trap_SendServerCommand).
 /// Source: `oracle/oracle/codemp/game/g_team.c:1161-1202`
 pub fn CheckTeamStatus(ctx: GameContext<'_>) {
-    todo!("Port CheckTeamStatus — parked: raw-ptr-skeleton-no-world-handle (level, g_entities, g_maxclients)")
+    todo!("Port CheckTeamStatus — parked: parked-dependency (TeamplayInfoMessage)")
 }
 
 /// Raven `SP_team_CTF_redplayer`.

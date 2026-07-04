@@ -10,10 +10,32 @@
 #![allow(non_snake_case, non_camel_case_types, unused)]
 
 use crate::prelude::*;
+use crate::botai::nodeobject_s::nodeobject_t;
 
 // Raven `#define MAX_ITEMS 256`.
 // Source: `oracle/oracle/codemp/game/bg_public.h:31`
 const MAX_ITEMS: usize = 256;
+
+// Raven `ai_wpnav.c` / `q_shared.h` waypoint-arena sizes.
+// Source: `oracle/oracle/codemp/game/q_shared.h:993`,
+//         `oracle/oracle/codemp/game/ai_main.h:15`,
+//         `oracle/oracle/codemp/game/ai_wpnav.c:2505`
+const MAX_WPARRAY_SIZE: usize = 4096;
+const MAX_NODETABLE_SIZE: usize = 16384;
+const MAX_SPAWNPOINT_ARRAY: usize = 64;
+
+// Raven `#define MAX_SHADER_REMAPS 128` / `MAX_G2_KILL_QUEUE 256` /
+// `MAX_VEHICLES_AT_A_TIME 128` (`g_utils.c:15,875,384`). Pass-2 backfill of
+// the `()` placeholders these fields carried (allowed: "replace a
+// ()-placeholder field's type with the real one if your packet cites it").
+pub(crate) const MAX_SHADER_REMAPS: usize = 128;
+pub(crate) const MAX_G2_KILL_QUEUE: usize = 256;
+pub(crate) const MAX_VEHICLES_AT_A_TIME: usize = 128;
+
+// Raven `#define MAX_CHAT_BUFFER_SIZE 8192` (unless `_XBOX` is defined; MP
+// uses the full 8192). `ai_main.h:19`.
+// Source: `oracle/oracle/codemp/game/ai_main.h:15-18`
+pub(crate) const MAX_CHAT_BUFFER_SIZE: usize = 8192;
 
 /// `itemRegistered[MAX_ITEMS]` (`g_items.c:2966`). A thin wrapper because
 /// `[qboolean; 256]` has no library `Default` impl (only arrays up to 32
@@ -27,34 +49,183 @@ impl Default for ItemRegistered {
     }
 }
 
+/// `gBotChatBuffer[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]` — bot personality
+/// chat message buffers, one per client. Newtype because a 32×8192 array of
+/// bytes has no library `Default` impl (only arrays up to 32 elements do in
+/// stable Rust).
+/// Source: `oracle/oracle/codemp/game/ai_util.c:12`
+pub struct BotChatBuffer(pub [[c_char; MAX_CHAT_BUFFER_SIZE]; mp_qshared::shared::MAX_CLIENTS]);
+
+impl Default for BotChatBuffer {
+    fn default() -> Self {
+        BotChatBuffer([[0; MAX_CHAT_BUFFER_SIZE]; mp_qshared::shared::MAX_CLIENTS])
+    }
+}
+
+/// `wpobject_t *gWPArray[MAX_WPARRAY_SIZE]` — the waypoint arena, faithfully a
+/// fixed array of raw pointers into the `B_Alloc` bump arena (individually
+/// allocated, never freed). Newtype because a 4096-element array has no
+/// library `Default` (>32) and the entries are raw pointers (null-init).
+/// Source: `oracle/oracle/codemp/game/ai_main.h:398`
+pub struct WpArray(pub [*mut wpobject_t; MAX_WPARRAY_SIZE]);
+
+impl Default for WpArray {
+    fn default() -> Self {
+        WpArray([core::ptr::null_mut(); MAX_WPARRAY_SIZE])
+    }
+}
+
+/// `gentity_t *gSpawnPoints[MAX_SPAWNPOINT_ARRAY]` (RMG autopath spawn set).
+/// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2507`
+pub struct SpawnPointArray(pub [*mut gentity_t; MAX_SPAWNPOINT_ARRAY]);
+
+impl Default for SpawnPointArray {
+    fn default() -> Self {
+        SpawnPointArray([core::ptr::null_mut(); MAX_SPAWNPOINT_ARRAY])
+    }
+}
+
+/// `int G_WeaponLogDamage[MAX_CLIENTS][MOD_MAX]` (`g_log.c:21`). Newtype
+/// because the inner `[c_int; MOD_MAX]` (45 elements) has no library
+/// `Default` impl (only arrays up to 32 elements do in stable Rust).
+#[derive(Clone, Copy)]
+pub struct WeaponLogDamage(pub [[c_int; meansOfDeath_t::MOD_MAX as usize]; MAX_CLIENTS]);
+
+impl Default for WeaponLogDamage {
+    fn default() -> Self {
+        WeaponLogDamage([[0; meansOfDeath_t::MOD_MAX as usize]; MAX_CLIENTS])
+    }
+}
+
+/// `int G_WeaponLogKills[MAX_CLIENTS][MOD_MAX]` (`g_log.c:22`). Same
+/// >32-inner-array `Default` gap as `WeaponLogDamage`.
+#[derive(Clone, Copy)]
+pub struct WeaponLogKills(pub [[c_int; meansOfDeath_t::MOD_MAX as usize]; MAX_CLIENTS]);
+
+impl Default for WeaponLogKills {
+    fn default() -> Self {
+        WeaponLogKills([[0; meansOfDeath_t::MOD_MAX as usize]; MAX_CLIENTS])
+    }
+}
+
+/// `nodeobject_t nodetable[MAX_NODETABLE_SIZE]` — the 16384-entry node-graph
+/// scratch table. Boxed so the ~458 KB of POD lives on the heap (not the
+/// `GameWorld` stack image) and default-zeroed (`nodeobject_t` is `#[repr(C)]`
+/// POD, so an all-zero image is valid).
+/// Source: `oracle/oracle/codemp/game/ai_wpnav.c:19`
+pub struct NodeTable(pub Box<[nodeobject_t; MAX_NODETABLE_SIZE]>);
+
+impl Default for NodeTable {
+    fn default() -> Self {
+        // SAFETY: `nodeobject_t` is `#[repr(C)]` POD (`vec3_t`/`f32`/`c_int`);
+        // an all-zero bit pattern is a valid inhabitant.
+        NodeTable(Box::new(unsafe { core::mem::zeroed() }))
+    }
+}
+
+/// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH];
+/// char newShader[MAX_QPATH]; float timeOffset; }`.
+/// Source: `oracle/oracle/codemp/game/g_utils.c:8-13`
+#[derive(Clone, Copy)]
+pub struct shaderRemap_t {
+    pub oldShader: [c_char; MAX_QPATH],
+    pub newShader: [c_char; MAX_QPATH],
+    pub timeOffset: f32,
+}
+
+impl Default for shaderRemap_t {
+    fn default() -> Self {
+        shaderRemap_t {
+            oldShader: [0; MAX_QPATH],
+            newShader: [0; MAX_QPATH],
+            timeOffset: 0.0,
+        }
+    }
+}
+
+/// `shaderRemap_t remappedShaders[MAX_SHADER_REMAPS]` (`g_utils.c:18`).
+/// Newtype because a 128-element array of a non-`Copy`-array-friendly struct
+/// has no library `Default` (>32).
+pub struct RemappedShaders(pub [shaderRemap_t; MAX_SHADER_REMAPS]);
+
+impl Default for RemappedShaders {
+    fn default() -> Self {
+        RemappedShaders([shaderRemap_t::default(); MAX_SHADER_REMAPS])
+    }
+}
+
+/// `gclient_t *gClPtrs[MAX_GENTITIES]` (`g_utils.c:428`) — the dynamically
+/// allocated NPC `gclient_t` backing store, indexed by entity number.
+/// Source: `oracle/oracle/codemp/game/g_utils.c:428`
+pub struct GClPtrs(pub [*mut c_void; mp_qshared::shared::MAX_GENTITIES]);
+
+impl Default for GClPtrs {
+    fn default() -> Self {
+        GClPtrs([core::ptr::null_mut(); mp_qshared::shared::MAX_GENTITIES])
+    }
+}
+
+/// `int gG2KillIndex[MAX_G2_KILL_QUEUE]` (`g_utils.c:877`).
+pub struct GG2KillIndex(pub [c_int; MAX_G2_KILL_QUEUE]);
+
+impl Default for GG2KillIndex {
+    fn default() -> Self {
+        GG2KillIndex([0; MAX_G2_KILL_QUEUE])
+    }
+}
+
+/// `qboolean g_vehiclePoolOccupied[MAX_VEHICLES_AT_A_TIME]` (`g_utils.c:386`).
+pub struct VehiclePoolOccupied(pub [qboolean; MAX_VEHICLES_AT_A_TIME]);
+
+impl Default for VehiclePoolOccupied {
+    fn default() -> Self {
+        VehiclePoolOccupied([0; MAX_VEHICLES_AT_A_TIME])
+    }
+}
+
+/// `teamgame_t` — CTF flag-state file global (`g_team.c:18`).
+///
+/// Source: `oracle/oracle/codemp/game/g_team.c:18`
+#[derive(Clone, Copy, Default)]
+pub struct teamgame_t {
+    pub last_flag_capture: f32,
+    pub last_capture_team: c_int,
+    pub redStatus: flagStatus_t,
+    pub blueStatus: flagStatus_t,
+    pub flagStatus: flagStatus_t,
+    pub redTakenTime: c_int,
+    pub blueTakenTime: c_int,
+}
+
 /// Raven game-tier mutable file-scope globals (fork ruling 1).
 #[derive(Default)]
 pub struct GameGlobals {
     // --- `NPC.c` file-scope globals ---
-    //TODO: Port gentity_t **
-    // Source: oracle/oracle/codemp/game/NPC.c:34
-    pub NPC: (),
-    //TODO: Port gNPC_t **
-    // Source: oracle/oracle/codemp/game/NPC.c:35
-    pub NPCInfo: (),
-    //TODO: Port gentity_t **
-    // Source: oracle/oracle/codemp/game/NPC.c:625
-    pub _saved_NPC: (),
-    //TODO: Port gNPC_t **
-    // Source: oracle/oracle/codemp/game/NPC.c:626
-    pub _saved_NPCInfo: (),
-    //TODO: Port gclient_t **
-    // Source: oracle/oracle/codemp/game/NPC.c:627
-    pub _saved_client: (),
-    //TODO: Port gclient_t **
-    // Source: oracle/oracle/codemp/game/NPC.c:36
-    pub client: (),
+    // Pass-2 backfill: `gentity_t *NPC;`/`gNPC_t *NPCInfo;`/`gclient_t *client;`
+    // are single-pointer file statics (not `**` — the placeholder comment
+    // mis-described the level of indirection), null-init like the other raw
+    // pointer fields above.
+    /// `NPC`. Source: `oracle/oracle/codemp/game/NPC.c:33`
+    pub NPC: *mut gentity_t,
+    /// `NPCInfo`. Source: `oracle/oracle/codemp/game/NPC.c:34`
+    pub NPCInfo: *mut gNPC_t,
+    /// `_saved_NPC`. Source: `oracle/oracle/codemp/game/NPC.c:625`
+    pub _saved_NPC: *mut gentity_t,
+    /// `_saved_NPCInfo`. Source: `oracle/oracle/codemp/game/NPC.c:626`
+    pub _saved_NPCInfo: *mut gNPC_t,
+    /// `_saved_client`. Source: `oracle/oracle/codemp/game/NPC.c:627`
+    pub _saved_client: *mut gclient_t,
+    /// `client`. Source: `oracle/oracle/codemp/game/NPC.c:35`
+    pub client: *mut gclient_t,
     //TODO: Port visibility_t
     // Source: oracle/oracle/codemp/game/NPC.c:38
     pub enemyVisibility: (),
-    //TODO: Port usercmd_t
-    // Source: oracle/oracle/codemp/game/NPC.c:37
-    pub ucmd: (),
+    /// `ucmd`. Source: `oracle/oracle/codemp/game/NPC.c:36`
+    pub ucmd: usercmd_t,
+    /// `_saved_ucmd` — the `SaveNPCGlobals`/`RestoreNPCGlobals` shadow copy of
+    /// `ucmd` (fork ruling 1: genuine cross-frame state).
+    /// Source: `oracle/oracle/codemp/game/NPC.c:628`
+    pub _saved_ucmd: usercmd_t,
     // --- `NPC_AI_GalakMech.c` file-scope globals ---
     /// `enemyCS4`. Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:34`
     pub enemyCS4: qboolean,
@@ -145,18 +316,16 @@ pub struct GameGlobals {
     /// `droppedRedFlag` (`gentity_t *`).
     /// Source: `oracle/oracle/codemp/game/ai_main.c:92`
     pub droppedRedFlag: *mut gentity_t,
-    //TODO: Port gentity_t **
-    // Source: oracle/oracle/codemp/game/ai_main.c:93
-    pub eFlagBlue: (),
-    //TODO: Port gentity_t **
-    // Source: oracle/oracle/codemp/game/ai_main.c:91
-    pub eFlagRed: (),
-    //TODO: Port wpobject_t **
-    // Source: oracle/oracle/codemp/game/ai_main.c:88
-    pub flagBlue: (),
-    //TODO: Port wpobject_t **
-    // Source: oracle/oracle/codemp/game/ai_main.c:86
-    pub flagRed: (),
+    /// `eFlagBlue` (`gentity_t *`). Source: `oracle/oracle/codemp/game/ai_main.c:93`
+    pub eFlagBlue: *mut gentity_t,
+    /// `eFlagRed` (`gentity_t *`). Source: `oracle/oracle/codemp/game/ai_main.c:91`
+    pub eFlagRed: *mut gentity_t,
+    /// `flagBlue` (`wpobject_t *`; points into `gWPArray`).
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:88`
+    pub flagBlue: *mut wpobject_t,
+    /// `flagRed` (`wpobject_t *`; points into `gWPArray`).
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:86`
+    pub flagRed: *mut wpobject_t,
     //TODO: Port boteventtracker_t[MAX_CLIENTS]
     // Source: oracle/oracle/codemp/game/ai_main.c:59
     pub gBotEventTracker: (),
@@ -164,22 +333,22 @@ pub struct GameGlobals {
     pub gUpdateVars: c_int,
     /// `numbots`. Source: `oracle/oracle/codemp/game/ai_main.c:48`
     pub numbots: c_int,
-    //TODO: Port wpobject_t **
-    // Source: oracle/oracle/codemp/game/ai_main.c:89
-    pub oFlagBlue: (),
-    //TODO: Port wpobject_t **
-    // Source: oracle/oracle/codemp/game/ai_main.c:87
-    pub oFlagRed: (),
+    /// `oFlagBlue` (`wpobject_t *`). Source: `oracle/oracle/codemp/game/ai_main.c:89`
+    pub oFlagBlue: *mut wpobject_t,
+    /// `oFlagRed` (`wpobject_t *`). Source: `oracle/oracle/codemp/game/ai_main.c:87`
+    pub oFlagRed: *mut wpobject_t,
     /// `regularupdate_time`. Source: `oracle/oracle/codemp/game/ai_main.c:52`
     pub regularupdate_time: f32,
     // --- `ai_main.h` file-scope globals ---
-    //TODO: Port wpobject_t *[MAX_WPARRAY_SIZE]*
-    // Source: oracle/oracle/codemp/game/ai_main.h:398
-    pub gWPArray: (),
+    /// `wpobject_t *gWPArray[MAX_WPARRAY_SIZE]` (see `WpArray`).
+    /// Source: `oracle/oracle/codemp/game/ai_main.h:398`
+    pub gWPArray: WpArray,
     // --- `ai_util.c` file-scope globals ---
-    //TODO: Port char[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]
-    // Source: oracle/oracle/codemp/game/ai_util.c:12
-    pub gBotChatBuffer: (),
+    /// `gBotChatBuffer[MAX_CLIENTS][MAX_CHAT_BUFFER_SIZE]` — bot chat message
+    /// buffers, one per client. Newtype because a 32×8192 array has no library
+    /// `Default` impl (only arrays up to 32 elements do in stable Rust).
+    /// Source: `oracle/oracle/codemp/game/ai_util.c:12`
+    pub gBotChatBuffer: BotChatBuffer,
     // --- `ai_wpnav.c` file-scope globals ---
     /// `gBotEdit`. Source: `oracle/oracle/codemp/game/ai_wpnav.c:8`
     pub gBotEdit: f32,
@@ -191,9 +360,9 @@ pub struct GameGlobals {
     pub gLevelFlags: c_int,
     /// `gSpawnPointNum`. Source: `oracle/oracle/codemp/game/ai_wpnav.c:2506`
     pub gSpawnPointNum: c_int,
-    //TODO: Port gentity_t *[MAX_SPAWNPOINT_ARRAY]*
-    // Source: oracle/oracle/codemp/game/ai_wpnav.c:2507
-    pub gSpawnPoints: (),
+    /// `gentity_t *gSpawnPoints[MAX_SPAWNPOINT_ARRAY]` (see `SpawnPointArray`).
+    /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2507`
+    pub gSpawnPoints: SpawnPointArray,
     /// `gWPNum`. Source: `oracle/oracle/codemp/game/ai_wpnav.c:13`
     pub gWPNum: c_int,
     /// `gWPRenderTime`. Source: `oracle/oracle/codemp/game/ai_wpnav.c:6`
@@ -202,9 +371,9 @@ pub struct GameGlobals {
     pub gWPRenderedFrame: c_int,
     /// `nodenum`. Source: `oracle/oracle/codemp/game/ai_wpnav.c:20`
     pub nodenum: c_int,
-    //TODO: Port nodeobject_t[MAX_NODETABLE_SIZE]
-    // Source: oracle/oracle/codemp/game/ai_wpnav.c:19
-    pub nodetable: (),
+    /// `nodeobject_t nodetable[MAX_NODETABLE_SIZE]` (see `NodeTable`).
+    /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:19`
+    pub nodetable: NodeTable,
     // --- `g_bot.c` file-scope globals ---
     //TODO: Port botSpawnQueue_t[BOT_SPAWN_QUEUE_DEPTH]
     // Source: oracle/oracle/codemp/game/g_bot.c:27
@@ -217,9 +386,14 @@ pub struct GameGlobals {
     //TODO: Port void **
     // Source: oracle/oracle/codemp/game/g_client.c:1511
     pub g2SaberInstance: (),
-    //TODO: Port gentity_t **
-    // Source: oracle/oracle/codemp/game/g_client.c:471
-    pub gJMSaberEnt: (),
+    /// Raven `gentity_t *gJMSaberEnt` — the current Jedi-Master saber entity.
+    /// Source: `oracle/oracle/codemp/game/g_client.c:471`
+    //
+    // Fork-4 rules stored `gentity_t*` → `EntityId`, but g_client.rs transcribes
+    // entities as raw `*mut gentity_t` throughout (its resolved signatures keep
+    // raw pointers); `Option<_>` gives the nullable-pointer semantics a Default
+    // (`None`) that a bare `*mut` lacks under this struct's `#[derive(Default)]`.
+    pub gJMSaberEnt: Option<*mut gentity_t>,
     // --- `g_cmds.c` file-scope globals ---
     /// `g_dontPenalizeTeam`. Source: `oracle/oracle/codemp/game/g_cmds.c:750`
     pub g_dontPenalizeTeam: qboolean,
@@ -254,39 +428,43 @@ pub struct GameGlobals {
     /// Source: `oracle/oracle/codemp/game/g_items.c:101`
     pub shieldLoopSound: qhandle_t,
     // --- `g_log.c` file-scope globals ---
-    //TODO: Port qboolean[MAX_CLIENTS]
-    // Source: oracle/oracle/codemp/game/g_log.c:27
-    pub G_WeaponLogClientTouch: (),
-    //TODO: Port int[MAX_CLIENTS][MOD_MAX]
-    // Source: oracle/oracle/codemp/game/g_log.c:21
-    pub G_WeaponLogDamage: (),
-    //TODO: Port int[MAX_CLIENTS][WP_NUM_WEAPONS]
-    // Source: oracle/oracle/codemp/game/g_log.c:23
-    pub G_WeaponLogDeaths: (),
-    //TODO: Port int[MAX_CLIENTS][WP_NUM_WEAPONS]
-    // Source: oracle/oracle/codemp/game/g_log.c:20
-    pub G_WeaponLogFired: (),
-    //TODO: Port int[MAX_CLIENTS][MAX_CLIENTS]
-    // Source: oracle/oracle/codemp/game/g_log.c:24
-    pub G_WeaponLogFrags: (),
-    //TODO: Port int[MAX_CLIENTS][PW_NUM_POWERUPS]
-    // Source: oracle/oracle/codemp/game/g_log.c:29
-    pub G_WeaponLogItems: (),
-    //TODO: Port int[MAX_CLIENTS][MOD_MAX]
-    // Source: oracle/oracle/codemp/game/g_log.c:22
-    pub G_WeaponLogKills: (),
-    //TODO: Port int[MAX_CLIENTS]
-    // Source: oracle/oracle/codemp/game/g_log.c:26
-    pub G_WeaponLogLastTime: (),
-    //TODO: Port int[MAX_CLIENTS][WP_NUM_WEAPONS]
-    // Source: oracle/oracle/codemp/game/g_log.c:19
-    pub G_WeaponLogPickups: (),
-    //TODO: Port int[MAX_CLIENTS][HI_NUM_HOLDABLE]
-    // Source: oracle/oracle/codemp/game/g_log.c:28
-    pub G_WeaponLogPowerups: (),
-    //TODO: Port int[MAX_CLIENTS][WP_NUM_WEAPONS]
-    // Source: oracle/oracle/codemp/game/g_log.c:25
-    pub G_WeaponLogTime: (),
+    // Pass-2 backfill of the `()` placeholders (allowed: "replace a
+    // ()-placeholder field's type with the real one if your packet cites
+    // it"); shapes are exactly what the `g_log.md` packet's TODO comments
+    // spelled out.
+    /// `qboolean G_WeaponLogClientTouch[MAX_CLIENTS]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:27`
+    pub G_WeaponLogClientTouch: [qboolean; MAX_CLIENTS],
+    /// `int G_WeaponLogDamage[MAX_CLIENTS][MOD_MAX]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:21`
+    pub G_WeaponLogDamage: WeaponLogDamage,
+    /// `int G_WeaponLogDeaths[MAX_CLIENTS][WP_NUM_WEAPONS]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:23`
+    pub G_WeaponLogDeaths: [[c_int; WP_NUM_WEAPONS as usize]; MAX_CLIENTS],
+    /// `int G_WeaponLogFired[MAX_CLIENTS][WP_NUM_WEAPONS]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:20`
+    pub G_WeaponLogFired: [[c_int; WP_NUM_WEAPONS as usize]; MAX_CLIENTS],
+    /// `int G_WeaponLogFrags[MAX_CLIENTS][MAX_CLIENTS]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:24`
+    pub G_WeaponLogFrags: [[c_int; MAX_CLIENTS]; MAX_CLIENTS],
+    /// `int G_WeaponLogItems[MAX_CLIENTS][PW_NUM_POWERUPS]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:29`
+    pub G_WeaponLogItems: [[c_int; PW_NUM_POWERUPS as usize]; MAX_CLIENTS],
+    /// `int G_WeaponLogKills[MAX_CLIENTS][MOD_MAX]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:22`
+    pub G_WeaponLogKills: WeaponLogKills,
+    /// `int G_WeaponLogLastTime[MAX_CLIENTS]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:26`
+    pub G_WeaponLogLastTime: [c_int; MAX_CLIENTS],
+    /// `int G_WeaponLogPickups[MAX_CLIENTS][WP_NUM_WEAPONS]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:19`
+    pub G_WeaponLogPickups: [[c_int; WP_NUM_WEAPONS as usize]; MAX_CLIENTS],
+    /// `int G_WeaponLogPowerups[MAX_CLIENTS][HI_NUM_HOLDABLE]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:28`
+    pub G_WeaponLogPowerups: [[c_int; HI_NUM_HOLDABLE as usize]; MAX_CLIENTS],
+    /// `int G_WeaponLogTime[MAX_CLIENTS][WP_NUM_WEAPONS]`.
+    /// Source: `oracle/oracle/codemp/game/g_log.c:25`
+    pub G_WeaponLogTime: [[c_int; WP_NUM_WEAPONS as usize]; MAX_CLIENTS],
     // --- `g_main.c` file-scope globals ---
     /// `eventClearTime`. Source: `oracle/oracle/codemp/game/g_main.c:11`
     pub eventClearTime: c_int,
@@ -331,9 +509,15 @@ pub struct GameGlobals {
     // Source: oracle/oracle/codemp/game/g_misc.c:3351
     pub g_shooterClients: (),
     // --- `g_mover.c` file-scope globals ---
-    //TODO: Port **
-    // Source: oracle/oracle/codemp/game/g_mover.c:24
-    pub pushed_p: (),
+    /// `pushed_t pushed[MAX_GENTITIES]` / `pushed_p` save-stack
+    /// (`g_mover.c:19-24`) — one saved position/angle/deltayaw snapshot per
+    /// moved entity, so a blocked mover push can roll everything back.
+    /// Modeled as an owned `Vec` + cursor index rather than a raw pointer
+    /// pair into a fixed array (porting-rules B3/B5); `pushed_p` (Raven:
+    /// `pushed_t *pushed_p`) becomes an index into `pushed`.
+    /// Source: `oracle/oracle/codemp/game/g_mover.c:19-24`
+    pub pushed: Vec<crate::g_mover::PushedEntry>,
+    pub pushed_p: usize,
     // --- `g_nav.c` file-scope globals ---
     /// `NAVDEBUG_curGoal`. Source: `oracle/oracle/codemp/game/g_nav.c:1607`
     pub NAVDEBUG_curGoal: c_int,
@@ -380,9 +564,10 @@ pub struct GameGlobals {
     pub gSiegeRoundWinningTeam: qboolean,
     /// `g_preroundState`. Source: `oracle/oracle/codemp/game/g_saga.c:41`
     pub g_preroundState: c_int,
-    //TODO: Port siegePers_t
-    // Source: oracle/oracle/codemp/game/g_saga.c:20
-    pub g_siegePersistant: (),
+    /// `g_siegePersistant` (`siegePers_t`) — cross-round siege team-switch
+    /// persistence, mirrored to the engine via `trap_SiegePersGet`/`Set`.
+    /// Source: `oracle/oracle/codemp/game/g_saga.c:20`
+    pub g_siegePersistant: siegePers_t,
     /// `imperial_attackers`. Source: `oracle/oracle/codemp/game/g_saga.c:34`
     pub imperial_attackers: c_int,
     /// `imperial_goals_completed`. Source: `oracle/oracle/codemp/game/g_saga.c:23`
@@ -413,9 +598,9 @@ pub struct GameGlobals {
     /// `numNewICARUSEnts`. Source: `oracle/oracle/codemp/game/g_target.c:753`
     pub numNewICARUSEnts: c_int,
     // --- `g_team.c` file-scope globals ---
-    //TODO: Port teamgame_t
-    // Source: oracle/oracle/codemp/game/g_team.c:18
-    pub teamgame: (),
+    /// `teamgame` — CTF flag state.
+    /// Source: oracle/oracle/codemp/game/g_team.c:18
+    pub teamgame: teamgame_t,
     // --- `g_timer.c` file-scope globals ---
     //TODO: Port gtimer_t **
     // Source: oracle/oracle/codemp/game/g_timer.c:19
@@ -430,24 +615,29 @@ pub struct GameGlobals {
     /// `gTrigFallSound`. Source: `oracle/oracle/codemp/game/g_trigger.c:6`
     pub gTrigFallSound: c_int,
     // --- `g_utils.c` file-scope globals ---
-    //TODO: Port gclient_t *[MAX_GENTITIES]*
-    // Source: oracle/oracle/codemp/game/g_utils.c:428
-    pub gClPtrs: (),
-    //TODO: Port int[MAX_G2_KILL_QUEUE]
-    // Source: oracle/oracle/codemp/game/g_utils.c:877
-    pub gG2KillIndex: (),
+    /// `gclient_t *gClPtrs[MAX_GENTITIES]` (see `GClPtrs`). Held as
+    /// `*mut c_void` — same tiering rationale as `gentity_t.client`
+    /// (`gentity.rs`): the real `gclient_t` pointee type isn't nameable from
+    /// this field's declaration site without a cast at each use.
+    /// Source: `oracle/oracle/codemp/game/g_utils.c:428`
+    pub gClPtrs: GClPtrs,
+    /// `int gG2KillIndex[MAX_G2_KILL_QUEUE]` (see `GG2KillIndex`).
+    /// Source: `oracle/oracle/codemp/game/g_utils.c:877`
+    pub gG2KillIndex: GG2KillIndex,
     /// `gG2KillNum`. Source: `oracle/oracle/codemp/game/g_utils.c:878`
     pub gG2KillNum: c_int,
     /// `g_vehiclePoolInit`. Source: `oracle/oracle/codemp/game/g_utils.c:387`
     pub g_vehiclePoolInit: qboolean,
-    //TODO: Port qboolean[MAX_VEHICLES_AT_A_TIME]
-    // Source: oracle/oracle/codemp/game/g_utils.c:386
-    pub g_vehiclePoolOccupied: (),
+    /// `qboolean g_vehiclePoolOccupied[MAX_VEHICLES_AT_A_TIME]` (see
+    /// `VehiclePoolOccupied`).
+    /// Source: `oracle/oracle/codemp/game/g_utils.c:386`
+    pub g_vehiclePoolOccupied: VehiclePoolOccupied,
     /// `remapCount`. Source: `oracle/oracle/codemp/game/g_utils.c:17`
     pub remapCount: c_int,
-    //TODO: Port shaderRemap_t[MAX_SHADER_REMAPS]
-    // Source: oracle/oracle/codemp/game/g_utils.c:18
-    pub remappedShaders: (),
+    /// `shaderRemap_t remappedShaders[MAX_SHADER_REMAPS]` (see
+    /// `RemappedShaders`).
+    /// Source: `oracle/oracle/codemp/game/g_utils.c:18`
+    pub remappedShaders: RemappedShaders,
     // --- `g_weapon.c` file-scope globals ---
     /// `s_quadFactor`. Source: `oracle/oracle/codemp/game/g_weapon.c:12`
     pub s_quadFactor: f32,

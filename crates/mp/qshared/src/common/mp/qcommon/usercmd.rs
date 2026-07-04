@@ -27,6 +27,15 @@ pub struct usercmd_t {
     pub upmove: c_schar,
 }
 
+// All-zero is a valid `usercmd_t` (POD `#[repr(C)]`, ints/bytes only);
+// needed so `GameGlobals` (mp_game) can `#[derive(Default)]` over its
+// `ucmd`/`_saved_ucmd` fields (NPC.c pass-2).
+impl Default for usercmd_t {
+    fn default() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+
 const _: () = assert!(core::mem::size_of::<usercmd_t>() == 28);
 const _: () = assert!(core::mem::offset_of!(usercmd_t, serverTime) == 0);
 const _: () = assert!(core::mem::offset_of!(usercmd_t, angles) == 4);

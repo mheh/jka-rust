@@ -1,4 +1,6 @@
-// PORT-COMPLETE: g_vehicles.c 12/20
+// PORT-STATUS: g_vehicles.c — pass-2 added 6 ports (G_VehicleTrace,
+// G_IsRidingVehicle, G_VehicleSpawn, StartDeathDelay, ValidateBoard, VEH_TryEject);
+// 14 of the packet's 20 remain parked (see PORT-ESCALATION markers below).
 //! FAITHFUL port of `oracle/oracle/codemp/game/g_vehicles.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
@@ -27,6 +29,34 @@
 
 use crate::prelude::*;
 use crate::q_shared::Q_strncmp;
+use crate::trap;
+use crate::NPC_spawn::NPC_Spawn_Do;
+use crate::g_utils::G_SoundIndex;
+use crate::q_math::{
+    AngleVectors, VectorNormalize, _DotProduct, _VectorAdd, _VectorCopy, _VectorSubtract,
+};
+use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_bg::vehicles::vehicleType_t;
+
+// Raven vehicle constants spelled locally per this file's staging convention
+// (the integrator wires the const home later; the name preserves intent).
+// Boarding sentinels stored in `m_iBoarding`.
+// Source: `oracle/oracle/codemp/game/bg_vehicles.h:402-403`
+const VEH_MOUNT_THROW_LEFT: c_int = -5;
+const VEH_MOUNT_THROW_RIGHT: c_int = -6;
+// Eject-direction anon enum.
+// Source: `oracle/oracle/codemp/game/bg_vehicles.h:407-414`
+const VEH_EJECT_LEFT: c_int = 0;
+const VEH_EJECT_RIGHT: c_int = 1;
+const VEH_EJECT_FRONT: c_int = 2;
+const VEH_EJECT_REAR: c_int = 3;
+const VEH_EJECT_TOP: c_int = 4;
+const VEH_EJECT_BOTTOM: c_int = 5;
+// Default player bbox z-extents (used for the MP eject-clearance trace).
+// Source: `oracle/oracle/codemp/game/bg_public.h:41-42`
+const DEFAULT_MINS_2: f32 = -24.0;
+const DEFAULT_MAXS_2: f32 = 40.0;
 
 /// Raven `SVF_NOCLIENT` — don't send entity to clients, even if it has effects.
 /// Source: `oracle/oracle/codemp/game/g_public.h:17`
@@ -64,8 +94,6 @@ pub fn Vehicle_SetAnim(
     todo!("Port Vehicle_SetAnim — parked: bg-anim-globals")
 }
 
-// PORT-ESCALATION(seam-threading): calls `trap_Trace`, which routes through the
-// engine handle; the skeleton signature threads no `&Engine`.
 /// Raven `G_VehicleTrace`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:102-109`
@@ -79,11 +107,20 @@ pub fn G_VehicleTrace(
     passEntityNum: c_int,
     contentmask: c_int,
 ) {
-    todo!("Port G_VehicleTrace — parked: seam-threading")
+    trap::Trace(
+        ctx.engine,
+        GTraceArgs::new(
+            results,
+            &start as *const vec3_t,
+            &tMins as *const vec3_t,
+            &tMaxs as *const vec3_t,
+            &end as *const vec3_t,
+            passEntityNum,
+            contentmask,
+        ),
+    );
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): indexes
-// `g_entities[ent->s.m_iVehicleNum]`, which lives on the world, not a static.
 /// Raven `G_IsRidingVehicle`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:111-120`
@@ -91,7 +128,17 @@ pub fn G_IsRidingVehicle(
     ctx: GameContext<'_>,
     pEnt: *mut gentity_t,
 ) -> *mut Vehicle_t {
-    todo!("Port G_IsRidingVehicle — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let ent = pEnt;
+        if !ent.is_null() && !(*ent).client.is_null() {
+            let client = (*ent).client as *mut gclient_t;
+            if (*client).NPC_class != CLASS_VEHICLE && (*ent).s.m_iVehicleNum != 0 {
+                let vehNum = (*ent).s.m_iVehicleNum as usize;
+                return (*ctx.world).entities[vehNum].m_pVehicle as *mut Vehicle_t;
+            }
+        }
+        core::ptr::null_mut()
+    }
 }
 
 /// Raven `G_CanJumpToEnemyVeh`.
@@ -106,8 +153,6 @@ pub fn G_CanJumpToEnemyVeh(
     0.0
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// and reads `level.time` — no engine/world handle in the skeleton signature.
 /// Raven `G_VehicleSpawn`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:186-244`
@@ -115,12 +160,50 @@ pub fn G_VehicleSpawn(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port G_VehicleSpawn — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        (*self_).s.origin = (*self_).r.currentOrigin;
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+
+        if (*self_).count == 0 {
+            (*self_).count = 1;
+        }
+
+        // save this because self gets removed in next func
+        let yaw = (*self_).s.angles[YAW];
+
+        let vehEnt = NPC_Spawn_Do(ctx, self_);
+        if vehEnt.is_null() {
+            return; // return NULL;
+        }
+
+        (*vehEnt).s.angles[YAW] = yaw;
+        let vp = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+        let vi = (*vp).m_pVehicleInfo as *mut vehicleInfo_t;
+        if (*vi).r#type != vehicleType_t::VH_ANIMAL {
+            let npc = (*vehEnt).NPC as *mut gNPC_t;
+            (*npc).behaviorState = bState_t::BS_CINEMATIC;
+        }
+
+        // special check in case someone disconnects/dies while boarding
+        if (*vehEnt).spawnflags & 1 != 0 {
+            // die without pilot
+            if (*vehEnt).damage == 0 {
+                // default 10 sec
+                (*vehEnt).damage = 10000;
+            }
+            if (*vehEnt).speed == 0.0 {
+                // default 512 units
+                (*vehEnt).speed = 512.0;
+            }
+            (*vp).m_iPilotTime = (*ctx.world).level.time + (*vehEnt).damage;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): indexes `g_entities`, reads
-// `level.time`, and calls `trap_G2API_*`/`trap_LinkEntity` — no world/engine
-// handle in the skeleton signature.
+// PORT-ESCALATION(helper-visibility): needs `BG_GiveMeVectorFromMatrix` to pull
+// the driver-tag origin out of the bolt matrix, but the only ported copy is a
+// private `fn` inside `NPC_AI_Mark2.rs` (not `pub`, no shared home) — unreachable
+// from here. (ctx now supplies g_entities/level.time/G2 traps.)
 /// Raven `G_AttachToVehicle`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:247-289`
@@ -129,7 +212,7 @@ pub fn G_AttachToVehicle(
     pEnt: *mut gentity_t,
     ucmd: *mut *mut usercmd_t,
 ) {
-    todo!("Port G_AttachToVehicle — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port G_AttachToVehicle — parked: helper-visibility (BG_GiveMeVectorFromMatrix not pub)")
 }
 
 /// Raven `Animate` — animate the vehicle and its riders.
@@ -152,9 +235,6 @@ pub fn Animate(
     }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): relies on `AngleVectors`(out right) and
-// `VectorNormalize`(in-place) whose resolved signatures take `vec3_t` by value
-// and cannot write the out-params back; the signatures can't be re-declared.
 /// Raven `ValidateBoard`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:496-594`
@@ -162,11 +242,90 @@ pub fn ValidateBoard(
     pVeh: *mut Vehicle_t,
     pEnt: *mut bgEntity_t,
 ) -> qboolean {
-    todo!("Port ValidateBoard — parked: vec3-outparam-seam")
+    unsafe {
+        // Determine where the entity is entering the vehicle from (left, right, or back).
+        let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
+        let ent = pEnt as *mut gentity_t;
+        let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
+
+        if (*pVeh).m_iDieTime > 0 {
+            return qfalse;
+        }
+
+        if !(*pVeh).m_pPilot.is_null() {
+            // already have a driver!
+            if (*vi).r#type == vehicleType_t::VH_FIGHTER {
+                // can never steal a fighter from its pilot
+                if (*pVeh).m_iNumPassengers < (*vi).maxPassengers {
+                    return qtrue;
+                } else {
+                    return qfalse;
+                }
+            } else if (*vi).r#type == vehicleType_t::VH_WALKER {
+                // can only steal an occupied AT-ST if you're on top (by the hatch)
+                let cl = (*ent).client as *mut gclient_t;
+                if (*ent).client.is_null() || (*cl).ps.groundEntityNum != (*parent).s.number {
+                    return qfalse;
+                }
+            } else if (*vi).r#type == vehicleType_t::VH_SPEEDER {
+                // you can only steal the bike from the driver if you landed on the driver or bike
+                if (*pVeh).m_iBoarding == VEH_MOUNT_THROW_LEFT
+                    || (*pVeh).m_iBoarding == VEH_MOUNT_THROW_RIGHT
+                {
+                    return qtrue;
+                } else {
+                    return qfalse;
+                }
+            }
+        } else if (*vi).r#type == vehicleType_t::VH_FIGHTER {
+            // If you're a fighter, you allow everyone to enter you from all directions.
+            return qtrue;
+        }
+
+        // Clear out all orientation axis except for the yaw.
+        let vVehAngles: vec3_t = [0.0, (*parent).r.currentAngles[YAW], 0.0];
+
+        // Vector from Entity to Vehicle.
+        let mut vVehToEnt: vec3_t = [0.0; 3];
+        _VectorSubtract((*ent).r.currentOrigin, (*parent).r.currentOrigin, &mut vVehToEnt);
+        vVehToEnt[2] = 0.0;
+        VectorNormalize(&mut vVehToEnt);
+
+        // Get the right vector.
+        let mut vVehDir: vec3_t = [0.0; 3];
+        AngleVectors(vVehAngles, None, Some(&mut vVehDir), None);
+        VectorNormalize(&mut vVehDir);
+
+        // Find the angle between the vehicle right vector and the vehicle to entity vector.
+        let fDot = _DotProduct(vVehToEnt, vVehDir);
+
+        if fDot >= 0.5 {
+            // Right board.
+            (*pVeh).m_iBoarding = -2;
+        } else if fDot <= -0.5 {
+            // Left board.
+            (*pVeh).m_iBoarding = -1;
+        } else {
+            // Maybe they're trying to board from the back... Jump board.
+            (*pVeh).m_iBoarding = -3;
+        }
+
+        // If for some reason we couldn't board, leave...
+        if (*pVeh).m_iBoarding > -1 {
+            return qfalse;
+        }
+
+        qtrue
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): the `QAGAME` suspend branch
-// reads `level.time` — no world handle in the skeleton signature.
+// PORT-ESCALATION(struct-layout): portable in principle (ctx now supplies
+// level.time/G_Sound), but the body touches a wide playerState/entityState/
+// vehicleInfo field surface (generic1, loopSound, m_iVehicleNum, owner/ownerNum,
+// soundLoop/soundOn/numHands/hideRider, m_iDropTime, …) and copies
+// Vehicle_t::m_vOrientation, which the type port models as `*mut f32` (not an
+// array) — the exact Rust field paths/repr aren't given in the packet, so a
+// faithful transcription can't be pinned down without exploring those layouts.
 /// Raven `Board`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:630-872`
@@ -175,14 +334,13 @@ pub fn Board(
     pVeh: *mut Vehicle_t,
     pEnt: *mut bgEntity_t,
 ) -> qboolean {
-    todo!("Port Board — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port Board — parked: struct-layout beyond packet")
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): uses `AngleVectors`(out leave-dir) and
-// `VectorNormalize`(in-place) whose resolved `vec3_t`-by-value signatures cannot
-// return the out-params.
 /// Raven `VEH_TryEject`.
 ///
+/// `vExitPos` is Raven's out-param exit position (fork-9: written through, never
+/// NULL at any oracle caller) → `&mut vec3_t`.
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:874-987`
 pub fn VEH_TryEject(
     ctx: GameContext<'_>,
@@ -190,9 +348,97 @@ pub fn VEH_TryEject(
     parent: *mut gentity_t,
     ent: *mut gentity_t,
     ejectDir: c_int,
-    vExitPos: vec3_t,
+    vExitPos: &mut vec3_t,
 ) -> qboolean {
-    todo!("Port VEH_TryEject — parked: vec3-outparam-seam")
+    unsafe {
+        let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
+
+        // Make sure that the entity is not 'stuck' inside the vehicle (since their
+        // bboxes will now intersect). Leave the vehicle from the right side.
+        let vVehAngles: vec3_t = [0.0, (*parent).r.currentAngles[YAW], 0.0];
+        let mut vVehLeaveDir: vec3_t = [0.0; 3];
+        match ejectDir {
+            VEH_EJECT_LEFT => {
+                AngleVectors(vVehAngles, None, Some(&mut vVehLeaveDir), None);
+                vVehLeaveDir[0] = -vVehLeaveDir[0];
+                vVehLeaveDir[1] = -vVehLeaveDir[1];
+                vVehLeaveDir[2] = -vVehLeaveDir[2];
+            }
+            VEH_EJECT_RIGHT => {
+                AngleVectors(vVehAngles, None, Some(&mut vVehLeaveDir), None);
+            }
+            VEH_EJECT_FRONT => {
+                AngleVectors(vVehAngles, Some(&mut vVehLeaveDir), None, None);
+            }
+            VEH_EJECT_REAR => {
+                AngleVectors(vVehAngles, Some(&mut vVehLeaveDir), None, None);
+                vVehLeaveDir[0] = -vVehLeaveDir[0];
+                vVehLeaveDir[1] = -vVehLeaveDir[1];
+                vVehLeaveDir[2] = -vVehLeaveDir[2];
+            }
+            VEH_EJECT_TOP => {
+                AngleVectors(vVehAngles, None, None, Some(&mut vVehLeaveDir));
+            }
+            VEH_EJECT_BOTTOM => {}
+            _ => {}
+        }
+        VectorNormalize(&mut vVehLeaveDir);
+
+        // Diagonal Length == sqrt( sqr(Sidex/2) + sqr(Sidey/2) ).
+        let mut fBias = 1.0f32;
+        if (*vi).r#type == vehicleType_t::VH_WALKER {
+            // hacktastic!
+            fBias += 0.2;
+        }
+        _VectorCopy((*ent).r.currentOrigin, vExitPos);
+        let fVehDiag =
+            ((*parent).r.maxs[0] * (*parent).r.maxs[0] + (*parent).r.maxs[1] * (*parent).r.maxs[1])
+                .sqrt();
+        let mut vEntMaxs: vec3_t = (*ent).r.maxs;
+        if (*ent).s.number < MAX_CLIENTS as c_int {
+            // in MP, player client mins/maxs are never stored permanently, just set
+            // to these hardcoded numbers in PMove.
+            vEntMaxs[0] = 15.0;
+            vEntMaxs[1] = 15.0;
+        }
+        let fEntDiag = (vEntMaxs[0] * vEntMaxs[0] + vEntMaxs[1] * vEntMaxs[1]).sqrt();
+        vVehLeaveDir[0] *= (fVehDiag + fEntDiag) * fBias;
+        vVehLeaveDir[1] *= (fVehDiag + fEntDiag) * fBias;
+        vVehLeaveDir[2] *= (fVehDiag + fEntDiag) * fBias;
+        let curExit = *vExitPos;
+        _VectorAdd(curExit, vVehLeaveDir, vExitPos);
+
+        // Check to see if this new position is a valid place for our entity to go.
+        let vEntMins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2];
+        let vEntMaxs2: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];
+        let oldOwner = (*ent).r.ownerNum;
+        (*ent).r.ownerNum = ENTITYNUM_NONE;
+        let mut m_ExitTrace: trace_t = core::mem::zeroed();
+        G_VehicleTrace(
+            ctx,
+            &mut m_ExitTrace,
+            (*ent).r.currentOrigin,
+            vEntMins,
+            vEntMaxs2,
+            *vExitPos,
+            (*ent).s.number,
+            (*ent).clipmask,
+        );
+        (*ent).r.ownerNum = oldOwner;
+
+        if m_ExitTrace.allsolid != 0 || m_ExitTrace.startsolid != 0 {
+            // in solid
+            return qfalse;
+        }
+        // If the trace hit something, we can't go there!
+        if m_ExitTrace.fraction < 1.0 {
+            // not totally clear. In MP the inner `(parent->clipmask&ent->r.contents)`
+            // guard is commented out in the oracle, so the "don't let them get out"
+            // block runs unconditionally and the trace.endpos fallback below is dead.
+            return qfalse;
+        }
+        qtrue
+    }
 }
 
 // PORT-ESCALATION(packet-contract): the `QAGAME` kill branch calls
@@ -222,8 +468,6 @@ pub fn EjectAll(
     todo!("Port EjectAll — parked: packet-contract")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): sets
-// `m_iDieTime = level.time + ...` — no world handle in the skeleton signature.
 /// Raven `StartDeathDelay`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1451-1482`
@@ -232,12 +476,30 @@ pub fn StartDeathDelay(
     pVeh: *mut Vehicle_t,
     iDelayTimeOverride: c_int,
 ) {
-    todo!("Port StartDeathDelay — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
+        let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
+        let level_time = (*ctx.world).level.time;
+
+        if iDelayTimeOverride != 0 {
+            (*pVeh).m_iDieTime = level_time + iDelayTimeOverride;
+        } else {
+            (*pVeh).m_iDieTime = level_time + (*vi).explosionDelay;
+        }
+
+        if (*vi).flammable != qfalse {
+            let snd = G_SoundIndex(c"sound/vehicles/common/fire_lp.wav".as_ptr());
+            let client = (*parent).client as *mut gclient_t;
+            (*parent).s.loopSound = snd;
+            (*client).ps.loopSound = snd;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the `g_gravity` cvar
-// global and the `bgAllAnims` global table (and calls `BG_SetAnim` against it) —
-// no world handle in the skeleton signature.
+// PORT-ESCALATION(bg-anim-globals): ctx now reaches the `g_gravity` cvar, but the
+// closing landed-anim block still indexes the runtime `bgAllAnims` table and calls
+// `BG_SetAnim` against it; `bgAllAnims` is bg-owned (ruling 11 threads it via a bg
+// context) and has no handle here, so the fn can't be finished faithfully.
 /// Raven `Initialize`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1626-1757`
@@ -245,12 +507,14 @@ pub fn Initialize(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
 ) -> qboolean {
-    todo!("Port Initialize — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port Initialize — parked: bg-anim-globals (bgAllAnims not threaded)")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`, indexes
-// `g_entities`, and calls `Q_irand` (owned-RNG global) — no world handle in the
-// skeleton signature.
+// PORT-ESCALATION(bg-boundary): fork-8a — `Update` is a `vehicleInfo_t` vtable
+// member whose fixed slot signature carries NO `ctx`, yet its body reads
+// `level.time` and calls ctx-requiring fns (`VEH_TurretThink`, `G_VehUpdateShields`,
+// `G_VehicleTrace`). With no ctx channel it can't reach the world/engine; needs the
+// vtable-dispatch ctx-threading resolution (same seam as `G_SetSharedVehicleFunctions`).
 /// Raven `Update`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1763-2334`
@@ -258,11 +522,15 @@ pub fn Update(
     pVeh: *mut Vehicle_t,
     pUmcd: *const usercmd_t,
 ) -> qboolean {
-    todo!("Port Update — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port Update — parked: bg-boundary (vtable member, no ctx in slot signature)")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and calls
-// `trap_ICARUS_TaskIDPending` — no world/engine handle in the skeleton signature.
+// PORT-ESCALATION(struct-layout): portable in principle (ctx now supplies
+// level.time / trap_ICARUS_TaskIDPending), but the body routes core control through
+// the `Eject` vtable slot and touches a broad playerState/entityState field surface
+// (velocity, weaponTime, torsoAnimTimer, rocketLock*, eFlags/flags boarding bits, …)
+// not enumerated in the packet — needs field-layout confirmation to transcribe
+// faithfully without guessing.
 /// Raven `UpdateRider`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2338-2588`
@@ -272,11 +540,13 @@ pub fn UpdateRider(
     pRider: *mut bgEntity_t,
     pUmcd: *mut usercmd_t,
 ) -> qboolean {
-    todo!("Port UpdateRider — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port UpdateRider — parked: struct-layout beyond packet")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and calls
-// `trap_G2API_*`/`trap_LinkEntity` — no world/engine handle in the skeleton.
+// PORT-ESCALATION(helper-visibility): ctx now supplies level.time and the G2/link
+// traps, but the passenger/droid attach loops need `BG_GiveMeVectorFromMatrix` to
+// read origins out of the bolt matrix, and the only ported copy is a private `fn`
+// in `NPC_AI_Mark2.rs` (not `pub`, no shared home) — unreachable from here.
 /// Raven `AttachRiders`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2598-2731`
@@ -284,7 +554,7 @@ pub fn AttachRiders(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
 ) {
-    todo!("Port AttachRiders — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port AttachRiders — parked: helper-visibility (BG_GiveMeVectorFromMatrix not pub)")
 }
 
 /// Raven `Ghost` — make someone invisible and un-collidable.
@@ -337,8 +607,10 @@ pub fn UnGhost(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_Trace` (engine)
-// and `G_Damage` — no engine/world handle in the skeleton signature.
+// PORT-ESCALATION(packet-contract): ctx now reaches trap_Trace, but the "oh well,
+// DIE!" branch calls `G_Damage(parent, parent, parent, NULL, origin, …)` with a
+// NULL `dir`; the resolved `G_Damage` takes `dir: vec3_t` by value (fork-9 only
+// reshaped vec3 OUT-params, not nullable INs), so the C NULL can't be expressed.
 /// Raven `G_VehicleDamageBoxSizing`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2785-2840`
@@ -346,12 +618,13 @@ pub fn G_VehicleDamageBoxSizing(
     ctx: GameContext<'_>,
     pVeh: *mut Vehicle_t,
 ) {
-    todo!("Port G_VehicleDamageBoxSizing — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port G_VehicleDamageBoxSizing — parked: packet-contract (G_Damage NULL dir)")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_Trace` (engine)
-// and relies on `AngleVectors` out-params — no engine handle, and the resolved
-// `AngleVectors` `vec3_t`-by-value signature cannot return the out-params.
+// PORT-ESCALATION(bg-boundary): fork-8a — the retrofit did NOT thread `ctx` into
+// this signature (its caller `G_FlyVehicleSurfaceDestruction` invokes it ctx-free),
+// yet the body needs `trap_Trace` (engine). `AngleVectors` is now reshaped/usable,
+// so the ONLY blocker is the missing ctx channel; needs a ctx param to proceed.
 /// Raven `G_FlyVehicleImpactDir`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2843-2924`
@@ -359,7 +632,7 @@ pub fn G_FlyVehicleImpactDir(
     veh: *mut gentity_t,
     trace: *mut trace_t,
 ) -> c_int {
-    todo!("Port G_FlyVehicleImpactDir — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port G_FlyVehicleImpactDir — parked: bg-boundary (no ctx, needs trap_Trace)")
 }
 
 /// Raven `G_ShipSurfaceForSurfName` — map a surface name to its ship surface id.
@@ -472,9 +745,10 @@ pub fn G_VehicleSetDamageLocFlags(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): sets
-// `veh->client->ps.electrifyTime = level.time + 10000` and calls
-// `G_RadiusDamage`/`G_EntitySound` — no world handle in the skeleton signature.
+// PORT-ESCALATION(bg-boundary): fork-8a — the retrofit did NOT thread `ctx` into
+// this signature (its caller `G_FlyVehicleSurfaceDestruction` invokes it ctx-free),
+// yet the body reads `level.time` and calls ctx-requiring fns (`NPC_SetSurfaceOnOff`,
+// `G_RadiusDamage`, `G_EntitySound`, `G_SoundIndex`). Needs a ctx param to proceed.
 /// Raven `G_FlyVehicleDestroySurface`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3102-3188`
@@ -482,7 +756,7 @@ pub fn G_FlyVehicleDestroySurface(
     veh: *mut gentity_t,
     surface: c_int,
 ) -> qboolean {
-    todo!("Port G_FlyVehicleDestroySurface — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port G_FlyVehicleDestroySurface — parked: bg-boundary (no ctx, needs level.time/traps)")
 }
 
 /// Raven `G_FlyVehicleSurfaceDestruction`.

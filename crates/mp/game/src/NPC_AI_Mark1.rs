@@ -18,6 +18,16 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::npc_c::NPC_SetAnim;
+use crate::trap;
+use crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
+use crate::entity::hit_location::*;
+use crate::npc::spot_t::spot_t;
+use mp_bg::public::anim_number::animNumber_t::*;
+
+// Distance constants for combat
+const DIST_MELEE: c_int = 0;
+const DIST_LONG: c_int = 1;
 
 // Raven's file-scope `#define`s (`NPC_AI_Mark1.c:4-22`) — not central
 // constants, ported as file-local consts matching the C values.
@@ -48,6 +58,10 @@ const LSTATE_FIRED1: c_int = 4;
 const LSTATE_FIRED2: c_int = 5;
 const LSTATE_FIRED3: c_int = 6;
 const LSTATE_FIRED4: c_int = 7;
+
+// Shot mask constant (collision mask for projectiles)
+pub(crate) const MASK_SHOT: c_int = 0x00000001 | 0x00000100 | 0x00000200 | 0x00040000; // CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE|CONTENTS_TERRAIN
+pub(crate) const CONTENTS_LIGHTSABER: c_int = 0x00040000;
 
 // PORT-ESCALATION(ambient-state): needs `level.time` (via
 // `trap_G2API_GetBoltMatrix`); no channel from this context-free faithful
@@ -92,7 +106,41 @@ pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:81-102`
 pub fn NPC_Mark1_Part_Explode(
     ctx: GameContext<'_>,self_: *mut gentity_t, bolt: c_int) {
-    todo!("Port NPC_Mark1_Part_Explode — parked: ambient-state")
+    if bolt >= 0 {
+        unsafe {
+            let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+            let mut org: vec3_t = [0.0; 3];
+            let mut dir: vec3_t = [0.0; 3];
+
+            trap::G2API_GetBoltMatrix(
+                ctx.engine,
+                (*self_).ghoul2,
+                0,
+                bolt,
+                &mut boltMatrix,
+                (*self_).r.currentAngles,
+                (*self_).r.currentOrigin,
+                (*ctx.world).level.time,
+                core::ptr::null_mut(),
+                (*self_).modelScale,
+            );
+
+            crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut org);
+            crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut dir);
+
+            crate::g_utils::G_PlayEffectID(
+                crate::g_utils::G_EffectIndex(c"env/med_explode2".as_ptr()),
+                org,
+                dir,
+            );
+
+            crate::g_utils::G_PlayEffectID(
+                crate::g_utils::G_EffectIndex(c"blaster/smoke_bolton".as_ptr()),
+                org,
+                dir,
+            );
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
@@ -101,7 +149,13 @@ pub fn NPC_Mark1_Part_Explode(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:109-115`
 pub fn Mark1_Idle(ctx: GameContext<'_>) {
-    todo!("Port Mark1_Idle — parked: ambient-state")
+    unsafe {
+        crate::NPC_AI_Default::NPC_BSIdle(ctx);
+        let npc = (*ctx.world).globals.NPC;
+        if !npc.is_null() {
+            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_SLEEP1, SETANIM_FLAG_NORMAL);
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and
@@ -111,7 +165,66 @@ pub fn Mark1_Idle(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:123-163`
 pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
-    todo!("Port Mark1Dead_FireRocket — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        if npc.is_null() {
+            return;
+        }
+
+        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+        let mut muzzle1: vec3_t = [0.0; 3];
+        let mut muzzle_dir: vec3_t = [0.0; 3];
+
+        let damage = 50;
+        let bolt = trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash5".as_ptr());
+
+        trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            (*npc).ghoul2,
+            0,
+            bolt,
+            &mut boltMatrix,
+            (*npc).r.currentAngles,
+            (*npc).r.currentOrigin,
+            (*ctx.world).level.time,
+            core::ptr::null_mut(),
+            (*npc).modelScale,
+        );
+
+        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
+        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
+
+        crate::g_utils::G_PlayEffectID(
+            crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
+            muzzle1,
+            muzzle_dir,
+        );
+
+        crate::g_utils::G_Sound(ctx, npc, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()));
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle1, muzzle_dir, BOWCASTER_VELOCITY as f32, 10000, npc, QFALSE);
+
+        if !missile.is_null() {
+            (*missile).classname = c"bowcaster_proj".as_ptr();
+            (*missile).s.weapon = WP_BOWCASTER as c_int;
+
+            (*missile).r.maxs[0] = BOWCASTER_SIZE as f32;
+            (*missile).r.maxs[1] = BOWCASTER_SIZE as f32;
+            (*missile).r.maxs[2] = BOWCASTER_SIZE as f32;
+            (*missile).r.mins[0] = -(BOWCASTER_SIZE as f32);
+            (*missile).r.mins[1] = -(BOWCASTER_SIZE as f32);
+            (*missile).r.mins[2] = -(BOWCASTER_SIZE as f32);
+
+            (*missile).damage = damage;
+            (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+            (*missile).methodOfDeath = MOD_ROCKET;
+            (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+            (*missile).splashDamage = BOWCASTER_SPLASH_DAMAGE;
+            (*missile).splashRadius = BOWCASTER_SPLASH_RADIUS;
+
+            (*missile).bounceCount = 0;
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and
@@ -121,7 +234,54 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:171-202`
 pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
-    todo!("Port Mark1Dead_FireBlaster — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        if npc.is_null() {
+            return;
+        }
+
+        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+        let mut muzzle1: vec3_t = [0.0; 3];
+        let mut muzzle_dir: vec3_t = [0.0; 3];
+
+        let bolt = trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash1".as_ptr());
+
+        trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            (*npc).ghoul2,
+            0,
+            bolt,
+            &mut boltMatrix,
+            (*npc).r.currentAngles,
+            (*npc).r.currentOrigin,
+            (*ctx.world).level.time,
+            core::ptr::null_mut(),
+            (*npc).modelScale,
+        );
+
+        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
+        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
+
+        crate::g_utils::G_PlayEffectID(
+            crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
+            muzzle1,
+            muzzle_dir,
+        );
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle1, muzzle_dir, 1600.0, 10000, npc, QFALSE);
+
+        crate::g_utils::G_Sound(ctx, npc, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()));
+
+        if !missile.is_null() {
+            (*missile).classname = c"bryar_proj".as_ptr();
+            (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
+
+            (*missile).damage = 1;
+            (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+            (*missile).methodOfDeath = MOD_BRYAR_PISTOL;
+            (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+        }
+    }
 }
 
 // PORT-ESCALATION(variadic-c-abi): the live body's only non-trivial call is
@@ -143,7 +303,38 @@ pub fn Mark1_die(
     dFlags: c_int,
     hitLoc: c_int,
 ) {
-    todo!("Port Mark1_die — parked: variadic-c-abi")
+    unsafe {
+        if self_.is_null() {
+            return;
+        }
+
+        crate::g_utils::G_Sound(
+            ctx,
+            self_,
+            CHAN_AUTO,
+            crate::g_utils::G_SoundIndex(crate::q_shared::va(
+                c"sound/chars/mark1/misc/death%d.wav".as_ptr(),
+                crate::q_math::Q_irand(1, 2),
+            )),
+        );
+
+        // Choose a death anim
+        if crate::q_math::Q_irand(1, 10) > 5 {
+            NPC_SetAnim(
+                self_,
+                SETANIM_BOTH,
+                BOTH_DEATH2,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
+        } else {
+            NPC_SetAnim(
+                self_,
+                SETANIM_BOTH,
+                BOTH_DEATH1,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
+        }
+    }
 }
 
 // PORT-ESCALATION(client-cast): reads `self->client->ps.torsoTimer`; `client`
@@ -155,7 +346,67 @@ pub fn Mark1_die(
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:250-312`
 pub fn Mark1_dying(
     ctx: GameContext<'_>,self_: *mut gentity_t) {
-    todo!("Port Mark1_dying — parked: client-cast")
+    unsafe {
+        if self_.is_null() {
+            return;
+        }
+
+        if (*(*self_).client).ps.torsoTimer > 0 {
+            if crate::g_timer::TIMER_Done(ctx, self_, c"dyingExplosion".as_ptr()) != 0 {
+                let num = crate::q_math::Q_irand(1, 3);
+
+                // Find place to generate explosion
+                if num == 1 {
+                    let random_num = crate::q_math::Q_irand(8, 10);
+                    let newBolt = trap::G2API_AddBolt(
+                        ctx.engine,
+                        (*self_).ghoul2,
+                        0,
+                        crate::q_shared::va(c"*flash%d".as_ptr(), random_num),
+                    );
+                    NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                } else {
+                    let random_num = crate::q_math::Q_irand(1, 6);
+                    let newBolt = trap::G2API_AddBolt(
+                        ctx.engine,
+                        (*self_).ghoul2,
+                        0,
+                        crate::q_shared::va(c"*torso_tube%d".as_ptr(), random_num),
+                    );
+                    NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                    crate::NPC_utils::NPC_SetSurfaceOnOff(
+                        ctx,
+                        self_,
+                        crate::q_shared::va(c"torso_tube%d".as_ptr(), random_num),
+                        TURN_OFF,
+                    );
+                }
+
+                crate::g_timer::TIMER_Set(ctx, self_, c"dyingExplosion".as_ptr(), crate::q_math::Q_irand(300, 1000));
+            }
+
+            // See which weapons are there
+            // Randomly fire blaster
+            if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"l_arm".as_ptr()) == 0 {
+                if crate::q_math::Q_irand(1, 5) == 1 {
+                    crate::npc_c::SaveNPCGlobals(ctx);
+                    crate::npc_c::SetNPCGlobals(ctx, self_);
+                    Mark1Dead_FireBlaster(ctx);
+                    crate::npc_c::RestoreNPCGlobals(ctx);
+                }
+            }
+
+            // Randomly fire rocket
+            if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"r_arm".as_ptr()) == 0 {
+                if crate::q_math::Q_irand(1, 10) == 1 {
+                    crate::npc_c::SaveNPCGlobals(ctx);
+                    crate::npc_c::SetNPCGlobals(ctx, self_);
+                    Mark1Dead_FireRocket(ctx);
+                    crate::npc_c::RestoreNPCGlobals(ctx);
+                }
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads the `gPainHitLoc` ambient global; no
@@ -166,7 +417,103 @@ pub fn Mark1_dying(
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:320-396`
 pub fn NPC_Mark1_Pain(
     ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
-    todo!("Port NPC_Mark1_Pain — parked: ambient-state")
+    unsafe {
+        if self_.is_null() {
+            return;
+        }
+
+        crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
+
+        crate::g_utils::G_Sound(ctx, self_, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_pain".as_ptr()));
+
+        let hitLoc = (*ctx.world).globals.gPainHitLoc;
+
+        // Hit in the CHEST???
+        if hitLoc == HL_CHEST {
+            let chance = crate::q_math::Q_irand(1, 4);
+
+            if chance == 1 && damage > 5 {
+                NPC_SetAnim(
+                    self_,
+                    SETANIM_BOTH,
+                    BOTH_PAIN1,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                );
+            }
+        }
+        // Hit in the left arm?
+        else if hitLoc == HL_ARM_LT && (*self_).locationDamage[HL_ARM_LT as usize] > LEFT_ARM_HEALTH {
+            if (*self_).locationDamage[hitLoc as usize] >= LEFT_ARM_HEALTH {
+                let newBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*flash3".as_ptr());
+                if newBolt != -1 {
+                    NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                }
+
+                crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"l_arm".as_ptr(), TURN_OFF);
+            }
+        }
+        // Hit in the right arm?
+        else if hitLoc == HL_ARM_RT && (*self_).locationDamage[HL_ARM_RT as usize] > RIGHT_ARM_HEALTH {
+            if (*self_).locationDamage[hitLoc as usize] >= RIGHT_ARM_HEALTH {
+                let newBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*flash4".as_ptr());
+                if newBolt != -1 {
+                    NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                }
+
+                crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, self_, c"r_arm".as_ptr(), TURN_OFF);
+            }
+        }
+        // Check ammo pods
+        else {
+            for i in 0..6 {
+                let location_idx = HL_GENERIC1 as usize + i;
+                if hitLoc == HL_GENERIC1 + i as c_int
+                    && (*self_).locationDamage[location_idx] > AMMO_POD_HEALTH
+                {
+                    if (*self_).locationDamage[hitLoc as usize] >= AMMO_POD_HEALTH {
+                        let newBolt = trap::G2API_AddBolt(
+                            ctx.engine,
+                            (*self_).ghoul2,
+                            0,
+                            crate::q_shared::va(c"*torso_tube%d".as_ptr(), (i + 1) as c_int),
+                        );
+                        if newBolt != -1 {
+                            NPC_Mark1_Part_Explode(ctx, self_, newBolt);
+                        }
+                        crate::NPC_utils::NPC_SetSurfaceOnOff(
+                            ctx,
+                            self_,
+                            crate::q_shared::va(c"torso_tube%d".as_ptr(), (i + 1) as c_int),
+                            TURN_OFF,
+                        );
+                        NPC_SetAnim(
+                            self_,
+                            SETANIM_BOTH,
+                            BOTH_PAIN1,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        );
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Are both guns shot off?
+        if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"l_arm".as_ptr()) > 0
+            && trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"r_arm".as_ptr()) > 0
+        {
+            crate::g_combat::G_Damage(
+                self_,
+                core::ptr::null_mut(),
+                core::ptr::null_mut(),
+                [0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+                (*self_).health,
+                0,
+                MOD_UNKNOWN,
+            );
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and
@@ -175,7 +522,23 @@ pub fn NPC_Mark1_Pain(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:404-416`
 pub fn Mark1_Hunt(ctx: GameContext<'_>) {
-    todo!("Port Mark1_Hunt — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        if !npc_info.is_null() {
+            if (*npc_info).goalEntity.is_null() {
+                (*npc_info).goalEntity = (*npc).enemy;
+            }
+        }
+
+        crate::NPC_utils::NPC_FaceEnemy(ctx, QTRUE);
+
+        if !npc_info.is_null() {
+            (*npc_info).combatMove = QTRUE;
+        }
+        crate::NPC_move::NPC_MoveToGoal(ctx, QTRUE);
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
@@ -187,7 +550,84 @@ pub fn Mark1_Hunt(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:424-488`
 pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
-    todo!("Port Mark1_FireBlaster — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        if npc.is_null() || npc_info.is_null() {
+            return;
+        }
+
+        let mut muzzle1: vec3_t = [0.0; 3];
+        let mut enemy_org1: vec3_t = [0.0; 3];
+        let mut delta1: vec3_t = [0.0; 3];
+        let mut angleToEnemy1: vec3_t = [0.0; 3];
+        let mut forward: vec3_t = [0.0; 3];
+        let mut vright: vec3_t = [0.0; 3];
+        let mut up: vec3_t = [0.0; 3];
+        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+
+        // Which muzzle to fire from?
+        let bolt = if (*npc_info).localState <= LSTATE_FIRED0 || (*npc_info).localState == LSTATE_FIRED4 {
+            (*npc_info).localState = LSTATE_FIRED1;
+            trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash1".as_ptr())
+        } else if (*npc_info).localState == LSTATE_FIRED1 {
+            (*npc_info).localState = LSTATE_FIRED2;
+            trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash2".as_ptr())
+        } else if (*npc_info).localState == LSTATE_FIRED2 {
+            (*npc_info).localState = LSTATE_FIRED3;
+            trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash3".as_ptr())
+        } else {
+            (*npc_info).localState = LSTATE_FIRED4;
+            trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash4".as_ptr())
+        };
+
+        trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            (*npc).ghoul2,
+            0,
+            bolt,
+            &mut boltMatrix,
+            (*npc).r.currentAngles,
+            (*npc).r.currentOrigin,
+            (*ctx.world).level.time,
+            core::ptr::null_mut(),
+            (*npc).modelScale,
+        );
+
+        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
+
+        if (*npc).health != 0 {
+            crate::NPC_utils::crate::NPC_utils::CalcEntitySpot(ctx, (*npc).enemy, spot_t::SPOT_HEAD, &mut enemy_org1);
+            delta1[0] = enemy_org1[0] - muzzle1[0];
+            delta1[1] = enemy_org1[1] - muzzle1[1];
+            delta1[2] = enemy_org1[2] - muzzle1[2];
+            crate::q_math::vectoangles(delta1, &mut angleToEnemy1);
+            crate::q_math::AngleVectors(angleToEnemy1, Some(&mut forward), Some(&mut vright), Some(&mut up));
+        } else {
+            crate::q_math::AngleVectors((*npc).r.currentAngles, Some(&mut forward), Some(&mut vright), Some(&mut up));
+        }
+
+        crate::g_utils::G_PlayEffectID(
+            crate::g_utils::G_EffectIndex(c"bryar/muzzle_flash".as_ptr()),
+            muzzle1,
+            forward,
+        );
+
+        crate::g_utils::G_Sound(ctx, npc, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()));
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc, QFALSE);
+
+        if !missile.is_null() {
+            (*missile).classname = c"bryar_proj".as_ptr();
+            (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
+
+            (*missile).damage = 1;
+            (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+            (*missile).methodOfDeath = MOD_BRYAR_PISTOL;
+            (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
@@ -197,7 +637,53 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:495-548`
 pub fn Mark1_BlasterAttack(
     ctx: GameContext<'_>,advance: qboolean) {
-    todo!("Port Mark1_BlasterAttack — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        if npc.is_null() || npc_info.is_null() {
+            return;
+        }
+
+        if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
+            let mut chance = crate::q_math::Q_irand(1, 5);
+
+            (*npc_info).burstCount += 1;
+
+            if (*npc_info).burstCount < 3 {
+                // Too few shots this burst?
+                chance = 2; // Force it to keep firing.
+            } else if (*npc_info).burstCount > 12 {
+                // Too many shots fired this burst?
+                (*npc_info).burstCount = 0;
+                chance = 1; // Force it to stop firing.
+            }
+
+            // Stop firing.
+            if chance == 1 {
+                (*npc_info).burstCount = 0;
+                crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), crate::q_math::Q_irand(1000, 3000));
+                (*(*npc).client).ps.torsoTimer = 0;
+            } else {
+                if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay2".as_ptr()) != 0 {
+                    crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay2".as_ptr(), crate::q_math::Q_irand(50, 50));
+                    Mark1_FireBlaster(ctx);
+                    NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                }
+                return;
+            }
+        } else if advance != 0 {
+            if (*(*npc).client).ps.torsoAnim == BOTH_ATTACK1 {
+                (*(*npc).client).ps.torsoTimer = 0;
+            }
+            Mark1_Hunt(ctx);
+        } else {
+            // Make sure he's not firing.
+            if (*(*npc).client).ps.torsoAnim == BOTH_ATTACK1 {
+                (*(*npc).client).ps.torsoTimer = 0;
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads the `NPC` ambient global, `level.time`,
@@ -207,7 +693,71 @@ pub fn Mark1_BlasterAttack(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:555-599`
 pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
-    todo!("Port Mark1_FireRocket — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        if npc.is_null() {
+            return;
+        }
+
+        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+        let mut muzzle1: vec3_t = [0.0; 3];
+        let mut enemy_org1: vec3_t = [0.0; 3];
+        let mut delta1: vec3_t = [0.0; 3];
+        let mut angleToEnemy1: vec3_t = [0.0; 3];
+        let mut forward: vec3_t = [0.0; 3];
+        let mut vright: vec3_t = [0.0; 3];
+        let mut up: vec3_t = [0.0; 3];
+
+        let damage = 50;
+        let bolt = trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash5".as_ptr());
+
+        trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            (*npc).ghoul2,
+            0,
+            bolt,
+            &mut boltMatrix,
+            (*npc).r.currentAngles,
+            (*npc).r.currentOrigin,
+            (*ctx.world).level.time,
+            core::ptr::null_mut(),
+            (*npc).modelScale,
+        );
+
+        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
+
+        crate::NPC_utils::crate::NPC_utils::CalcEntitySpot(ctx, (*npc).enemy, spot_t::SPOT_HEAD, &mut enemy_org1);
+        delta1[0] = enemy_org1[0] - muzzle1[0];
+        delta1[1] = enemy_org1[1] - muzzle1[1];
+        delta1[2] = enemy_org1[2] - muzzle1[2];
+        crate::q_math::vectoangles(delta1, &mut angleToEnemy1);
+        crate::q_math::AngleVectors(angleToEnemy1, Some(&mut forward), Some(&mut vright), Some(&mut up));
+
+        crate::g_utils::G_Sound(ctx, npc, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()));
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle1, forward, BOWCASTER_VELOCITY as f32, 10000, npc, QFALSE);
+
+        if !missile.is_null() {
+            (*missile).classname = c"bowcaster_proj".as_ptr();
+            (*missile).s.weapon = WP_BOWCASTER as c_int;
+
+            (*missile).r.maxs[0] = BOWCASTER_SIZE as f32;
+            (*missile).r.maxs[1] = BOWCASTER_SIZE as f32;
+            (*missile).r.maxs[2] = BOWCASTER_SIZE as f32;
+            (*missile).r.mins[0] = -(BOWCASTER_SIZE as f32);
+            (*missile).r.mins[1] = -(BOWCASTER_SIZE as f32);
+            (*missile).r.mins[2] = -(BOWCASTER_SIZE as f32);
+
+            (*missile).damage = damage;
+            (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+            (*missile).methodOfDeath = MOD_ROCKET;
+            (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+            (*missile).splashDamage = BOWCASTER_SPLASH_DAMAGE;
+            (*missile).splashRadius = BOWCASTER_SPLASH_RADIUS;
+
+            (*missile).bounceCount = 0;
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads the `NPC` ambient global; no channel
@@ -217,7 +767,20 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:606-618`
 pub fn Mark1_RocketAttack(
     ctx: GameContext<'_>,advance: qboolean) {
-    todo!("Port Mark1_RocketAttack — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        if npc.is_null() {
+            return;
+        }
+
+        if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
+            crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), crate::q_math::Q_irand(1000, 3000));
+            NPC_SetAnim(npc, SETANIM_TORSO, BOTH_ATTACK2, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+            Mark1_FireRocket(ctx);
+        } else if advance != 0 {
+            Mark1_Hunt(ctx);
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads/writes the `NPC` ambient global and
@@ -227,7 +790,73 @@ pub fn Mark1_RocketAttack(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:625-704`
 pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
-    todo!("Port Mark1_AttackDecision — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        if npc.is_null() || npc_info.is_null() {
+            return;
+        }
+
+        // Randomly talk
+        if crate::g_timer::TIMER_Done(ctx, npc, c"patrolNoise".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, npc, c"angerNoise".as_ptr()) != 0 {
+                crate::g_timer::TIMER_Set(ctx, npc, c"patrolNoise".as_ptr(), crate::q_math::Q_irand(4000, 10000));
+            }
+        }
+
+        // Enemy is dead or he has no enemy.
+        if (*(*npc).enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
+            (*npc).enemy = core::ptr::null_mut();
+            return;
+        }
+
+        // Rate our distance to the target and visibility
+        let distance = crate::q_math::DistanceHorizontalSquared((*npc).r.currentOrigin, (*(*npc).enemy).r.currentOrigin) as c_int;
+        let distRate = if distance > MIN_MELEE_RANGE_SQR { DIST_LONG } else { DIST_MELEE };
+        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, (*npc).enemy);
+        let advance = if distance > MIN_DISTANCE_SQR { QTRUE } else { QFALSE };
+
+        // If we cannot see our target, move to see it
+        if visible == QFALSE || crate::NPC_utils::NPC_FaceEnemy(ctx, QTRUE) == QFALSE {
+            Mark1_Hunt(ctx);
+            return;
+        }
+
+        // See if the side weapons are there
+        let blasterTest = trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*npc).ghoul2, 0, c"l_arm".as_ptr());
+        let rocketTest = trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*npc).ghoul2, 0, c"r_arm".as_ptr());
+
+        let final_distRate =
+            // It has both side weapons
+            if blasterTest == 0 && rocketTest == 0 {
+                distRate
+            }
+            else if blasterTest != -1 && blasterTest != 0 {
+                DIST_LONG
+            }
+            else if rocketTest != -1 && rocketTest != 0 {
+                DIST_MELEE
+            }
+            else {
+                // It should never get here, but just in case
+                (*npc).health = 0;
+                (*(*npc).client).ps.stats[STAT_HEALTH] = 0;
+                if let Some(die_fn) = (*npc).die {
+                    die_fn(npc, npc, npc, 100, MOD_UNKNOWN as c_int);
+                }
+                return;
+            };
+
+        // We can see enemy so shoot him if timers let you.
+        crate::NPC_utils::NPC_FaceEnemy(ctx, QTRUE);
+
+        if final_distRate == DIST_MELEE {
+            Mark1_BlasterAttack(ctx, advance);
+        } else if final_distRate == DIST_LONG {
+            Mark1_RocketAttack(ctx, advance);
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and writes
@@ -236,7 +865,28 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:711-739`
 pub fn Mark1_Patrol(ctx: GameContext<'_>) {
-    todo!("Port Mark1_Patrol — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        if npc.is_null() {
+            return;
+        }
+
+        if crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth(ctx) != 0 {
+            crate::g_utils::G_Sound(ctx, npc, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_wakeup".as_ptr()));
+            crate::NPC_utils::NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+            return;
+        }
+
+        // If we have somewhere to go, then do that
+        if (*npc).enemy.is_null() {
+            let goal = crate::NPC_goal::UpdateGoal(ctx);
+            if !goal.is_null() {
+                (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
+                crate::NPC_move::NPC_MoveToGoal(ctx, QTRUE);
+                crate::NPC_utils::NPC_UpdateAngles(ctx, QTRUE, QTRUE);
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and
@@ -245,5 +895,21 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:747-764`
 pub fn NPC_BSMark1_Default(ctx: GameContext<'_>) {
-    todo!("Port NPC_BSMark1_Default — parked: ambient-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        if npc.is_null() || npc_info.is_null() {
+            return;
+        }
+
+        if !(*npc).enemy.is_null() {
+            (*npc_info).goalEntity = (*npc).enemy;
+            Mark1_AttackDecision(ctx);
+        } else if (*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES != 0 {
+            Mark1_Patrol(ctx);
+        } else {
+            Mark1_Idle(ctx);
+        }
+    }
 }

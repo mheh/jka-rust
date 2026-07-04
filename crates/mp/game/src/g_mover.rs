@@ -20,13 +20,58 @@
 
 use crate::prelude::*;
 
-use crate::g_combat::G_Damage;
-use crate::g_main::{Com_Printf, G_Printf};
-use crate::g_utils::{G_AddEvent, G_Find, G_FreeEntity, G_SetOrigin, G_SoundSetIndex, G_TempEntity, G_UseTargets, GlobalUse, vtos};
+use crate::g_combat::{G_Damage, G_RadiusDamage};
+use crate::g_main::{Com_Printf, G_Error, G_Printf};
+use crate::g_misc::TeleportPlayer;
+use crate::g_utils::{
+    G_AddEvent, G_EffectIndex, G_Find, G_FreeEntity, G_ModelIndex, G_PlayEffectID,
+    G_ScaleNetHealth, G_SetAngles, G_SetMovedir, G_SetOrigin, G_SoundIndex, G_SoundSetIndex,
+    G_Spawn, G_TempEntity, G_UseTargets, G_UseTargets2, GlobalUse, vtos,
+};
+use crate::q_math::{AngleVectors, Q_irand};
 use crate::NPC_utils::G_ActivateBehavior;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::means_of_death::meansOfDeath_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
+
+use mp_abi::game::syscalls::G_ADJUST_AREA_PORTAL_STATE::GAdjustAreaPortalStateArgs;
+use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
+use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
+use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
+
+/// Raven `pushed_t` (`g_mover.c:19-24`) — one saved position/angle/deltayaw
+/// snapshot per moved entity, so a blocked mover push can roll everything
+/// back. Owned by `GameGlobals::pushed`/`pushed_p` (fork ruling 1/5: the
+/// `pushed[]`/`pushed_p` save-stack is genuine cross-call scratch state,
+/// modeled as a `Vec` + cursor index rather than a raw pointer pair per
+/// porting-rules B3/B5).
+///
+/// Source: `oracle/oracle/codemp/game/g_mover.c:19-24`
+#[derive(Clone, Copy)]
+pub struct PushedEntry {
+    pub ent: *mut gentity_t,
+    pub origin: vec3_t,
+    pub angles: vec3_t,
+    pub deltayaw: c_int,
+}
+
+// Raven file-scope `#define`s not yet ported anywhere in the crate graph;
+// values reused from the identical local transcriptions already present in
+// sibling files (`CONTENTS_TRIGGER`: `g_items.rs:44`; `SVF_NOCLIENT`:
+// `g_vehicles.rs:33`; `SVF_BROADCAST`: `g_combat.rs:876`; `FRAMETIME`:
+// `g_items.rs:79`) rather than freshly guessed here.
+// Source: `oracle/oracle/codemp/game/q_shared.h`, `oracle/oracle/codemp/game/g_local.h`
+const CONTENTS_TRIGGER: c_int = 0x0000_0400;
+const SVF_NOCLIENT: c_int = 0x0000_0001;
+const SVF_BROADCAST: c_int = 0x0000_0020;
+const FRAMETIME: c_int = 100;
+const FUNC_WALL_OFF: c_int = 1;
+
+// Raven `YAW` axis index (`q_shared.h`); same value used throughout the
+// crate (e.g. `g_active.rs`'s local `const YAW: usize = 1`).
+const YAW: usize = 1;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
@@ -88,9 +133,6 @@ pub fn G_PlayDoorSound(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): `g_entities` (global
-// array) and `trap_Trace` (needs `&Engine`) are both unreachable from the
-// staged raw-pointer signature.
 /// Raven `G_TestEntityPosition`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:86-111`
@@ -98,20 +140,79 @@ pub fn G_TestEntityPosition(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> *mut gentity_t {
-    todo!("Port G_TestEntityPosition — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mask = if (*ent).clipmask != 0 {
+            (*ent).clipmask
+        } else {
+            CONTENTS_SOLID
+        };
+
+        let mut tr = core::mem::zeroed::<trace_t>();
+        if !(*ent).client.is_null() {
+            let client = (*ent).client as *mut crate::client::gclient::gclient_t;
+            let mut v_max = (*ent).r.maxs;
+            if v_max[2] < 1.0 {
+                v_max[2] = 1.0;
+            }
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &(*client).ps.origin as *const vec3_t,
+                    &(*ent).r.mins as *const vec3_t,
+                    &v_max as *const vec3_t,
+                    &(*client).ps.origin as *const vec3_t,
+                    (*ent).s.number,
+                    mask,
+                ),
+            );
+        } else {
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &(*ent).s.pos.trBase as *const vec3_t,
+                    &(*ent).r.mins as *const vec3_t,
+                    &(*ent).r.maxs as *const vec3_t,
+                    &(*ent).s.pos.trBase as *const vec3_t,
+                    (*ent).s.number,
+                    mask,
+                ),
+            );
+        }
+
+        if tr.startsolid != 0 {
+            &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t
+        } else {
+            core::ptr::null_mut()
+        }
+    }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): resolved `AngleVectors(angles,
-// forward, right, up)` takes `forward`/`right`/`up` by value ([f32;3]), so
-// the out-params it must write into `matrix[0..3]` cannot be received.
 /// Raven `G_CreateRotationMatrix`.
 ///
+/// `angles` is never written through in Raven (only read by `AngleVectors`),
+/// so it stays by value; `matrix` is the `vec3_t matrix[3]` out-param, walked
+/// as a 3-row array via pointer arithmetic (same convention as
+/// `G_TransposeMatrix` in this file).
 /// Source: `oracle/oracle/codemp/game/g_mover.c:118-121`
 pub fn G_CreateRotationMatrix(
     angles: vec3_t,
     matrix: *mut vec3_t,
 ) {
-    todo!("Port G_CreateRotationMatrix — parked: vec3-outparam-seam")
+    unsafe {
+        AngleVectors(
+            angles,
+            Some(&mut *matrix.add(0)),
+            Some(&mut *matrix.add(1)),
+            Some(&mut *matrix.add(2)),
+        );
+        // Raven `VectorInverse(matrix[1])` — not itself ported anywhere in
+        // the crate graph (call surface: unresolved), inlined here.
+        for c in (*matrix.add(1)).iter_mut() {
+            *c = -*c;
+        }
+    }
 }
 
 /// Raven `G_TransposeMatrix`.
@@ -133,26 +234,30 @@ pub fn G_TransposeMatrix(
     }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): Raven's `point` parameter is a
-// `vec3_t` that decays to a pointer in C and is mutated in place (the caller
-// reads the mutated value back); the resolved signature takes it by value
-// ([f32;3]), so the out-param mutation cannot be observed by the caller.
+// Fork-9 reshape: Raven's `point` is written through (`point[i] =
+// DotProduct(...)`, read back by the caller), so it becomes `&mut vec3_t`
+// per the ruling's non-nullable-out case. Same-file callers (below)
+// updated to pass `&mut`.
 /// Raven `G_RotatePoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:142-149`
 pub fn G_RotatePoint(
-    point: vec3_t,
+    point: &mut vec3_t,
     matrix: *mut vec3_t,
 ) {
-    todo!("Port G_RotatePoint — parked: vec3-outparam-seam")
+    unsafe {
+        let tvec = *point;
+        point[0] = (*matrix.add(0))[0] * tvec[0] + (*matrix.add(0))[1] * tvec[1] + (*matrix.add(0))[2] * tvec[2];
+        point[1] = (*matrix.add(1))[0] * tvec[0] + (*matrix.add(1))[1] * tvec[1] + (*matrix.add(1))[2] * tvec[2];
+        point[2] = (*matrix.add(2))[0] * tvec[0] + (*matrix.add(2))[1] * tvec[1] + (*matrix.add(2))[2] * tvec[2];
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): the `pushed[]`/`pushed_p`
-// save-stack is a file-scope global (not owned by any threaded world
-// handle here), `G_Error` has no engine/world seam yet, and `trap_LinkEntity`
-// needs `&Engine`.
 /// Raven `G_TryPushingEntity`.
 ///
+/// `move`/`amove` are read-only in Raven (never written back through), so
+/// they stay by value per the fork-9 "keep by-value only if never written"
+/// clause.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:159-269`
 pub fn G_TryPushingEntity(
     ctx: GameContext<'_>,
@@ -161,14 +266,150 @@ pub fn G_TryPushingEntity(
     r#move: vec3_t,
     amove: vec3_t,
 ) -> qboolean {
-    todo!("Port G_TryPushingEntity — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // This was only serverside not to mention it was never set (Raven
+        // comment — the EF_MOVER_STOP branch is `#if 0`'d out, g_mover.c:164-172).
+        if (*pusher).apos.trType != trType_t::TR_STATIONARY
+            && ((*pusher).spawnflags & 16) != 0
+            && crate::q_shared::Q_stricmp((*pusher).classname, c"func_rotating".as_ptr()) == 0
+        {
+            // just blow the fuck out of them
+            G_Damage(
+                check,
+                pusher,
+                pusher,
+                [0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+                (*pusher).damage,
+                0, // DAMAGE_NO_KNOCKBACK — not yet ported as a const; Raven passes it here.
+                meansOfDeath_t::MOD_CRUSH as c_int,
+            );
+            return qtrue;
+        }
+
+        // save off the old position
+        let world = &mut *ctx.world;
+        let mut entry = PushedEntry {
+            ent: check,
+            origin: (*check).s.pos.trBase,
+            angles: (*check).s.apos.trBase,
+            deltayaw: 0,
+        };
+        if !(*check).client.is_null() {
+            let client = (*check).client as *mut crate::client::gclient::gclient_t;
+            entry.deltayaw = (*client).ps.delta_angles[YAW];
+            entry.origin = (*client).ps.origin;
+        }
+        world.globals.pushed.push(entry);
+        world.globals.pushed_p += 1;
+
+        // try moving the contacted entity
+        // figure movement due to the pusher's amove
+        let mut transpose: [vec3_t; 3] = [[0.0; 3]; 3];
+        let mut matrix: [vec3_t; 3] = [[0.0; 3]; 3];
+        G_CreateRotationMatrix(amove, transpose.as_mut_ptr());
+        G_TransposeMatrix(transpose.as_mut_ptr(), matrix.as_mut_ptr());
+
+        let mut org = if !(*check).client.is_null() {
+            let client = (*check).client as *mut crate::client::gclient::gclient_t;
+            [
+                (*client).ps.origin[0] - (*pusher).r.currentOrigin[0],
+                (*client).ps.origin[1] - (*pusher).r.currentOrigin[1],
+                (*client).ps.origin[2] - (*pusher).r.currentOrigin[2],
+            ]
+        } else {
+            [
+                (*check).s.pos.trBase[0] - (*pusher).r.currentOrigin[0],
+                (*check).s.pos.trBase[1] - (*pusher).r.currentOrigin[1],
+                (*check).s.pos.trBase[2] - (*pusher).r.currentOrigin[2],
+            ]
+        };
+        let mut org2 = org;
+        G_RotatePoint(&mut org2, matrix.as_mut_ptr());
+        let move2 = [org2[0] - org[0], org2[1] - org[1], org2[2] - org[2]];
+
+        // add movement
+        for i in 0..3 {
+            (*check).s.pos.trBase[i] += r#move[i];
+            (*check).s.pos.trBase[i] += move2[i];
+        }
+        if !(*check).client.is_null() {
+            let client = (*check).client as *mut crate::client::gclient::gclient_t;
+            for i in 0..3 {
+                (*client).ps.origin[i] += r#move[i];
+                (*client).ps.origin[i] += move2[i];
+            }
+            // make sure the client's view rotates when on a rotating mover.
+            // Raven `ANGLE2SHORT(x)` == `((int)((x)*65536/360) & 65535)`
+            // (same transcription as `bg_pmove.rs:312`).
+            (*client).ps.delta_angles[YAW] += ((amove[YAW] * 65536.0 / 360.0) as c_int) & 65535;
+        }
+
+        // may have pushed them off an edge
+        if (*check).s.groundEntityNum != (*pusher).s.number {
+            (*check).s.groundEntityNum = ENTITYNUM_NONE;
+        }
+
+        let mut block = G_TestEntityPosition(ctx, check);
+        if block.is_null() {
+            // pushed ok
+            if !(*check).client.is_null() {
+                let client = (*check).client as *mut crate::client::gclient::gclient_t;
+                (*check).r.currentOrigin = (*client).ps.origin;
+            } else {
+                (*check).r.currentOrigin = (*check).s.pos.trBase;
+            }
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(check));
+            return qtrue;
+        }
+
+        if (*check).takedamage != 0
+            && (*check).client.is_null()
+            && (*check).s.weapon != 0
+            && (*check).r.ownerNum < MAX_CLIENTS as c_int
+            && (*check).health < 500
+        {
+            if (*check).health > 0 {
+                G_Damage(
+                    check,
+                    pusher,
+                    pusher,
+                    [0.0, 0.0, 0.0], // Raven passes `vec3_origin` here.
+                    (*check).r.currentOrigin,
+                    999,
+                    0,
+                    meansOfDeath_t::MOD_UNKNOWN as c_int,
+                );
+            }
+            return qfalse;
+        }
+
+        // if it is ok to leave in the old position, do it — this is only
+        // relevant for riding entities, not pushed. Sliding trapdoors can
+        // cause this.
+        let last = world.globals.pushed[world.globals.pushed_p - 1];
+        (*check).s.pos.trBase = last.origin;
+        if !(*check).client.is_null() {
+            let client = (*check).client as *mut crate::client::gclient::gclient_t;
+            (*client).ps.origin = last.origin;
+        }
+        (*check).s.apos.trBase = last.angles;
+        block = G_TestEntityPosition(ctx, check);
+        if block.is_null() {
+            (*check).s.groundEntityNum = -1;
+            world.globals.pushed_p -= 1;
+            world.globals.pushed.pop();
+            return qtrue;
+        }
+
+        // blocked
+        qfalse
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes `g_entities`
-// and the `pushed[]`/`pushed_p` save-stack, and calls `trap_UnlinkEntity` /
-// `trap_EntitiesInBox` / `trap_LinkEntity` (all need `&Engine`).
 /// Raven `G_MoverPush`.
 ///
+/// `move`/`amove` are read-only in Raven, so they stay by value (fork-9).
 /// Source: `oracle/oracle/codemp/game/g_mover.c:283-408`
 pub fn G_MoverPush(
     ctx: GameContext<'_>,
@@ -177,11 +418,180 @@ pub fn G_MoverPush(
     amove: vec3_t,
     obstacle: *mut *mut gentity_t,
 ) -> qboolean {
-    todo!("Port G_MoverPush — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        *obstacle = core::ptr::null_mut();
+
+        // mins/maxs are the bounds at the destination; totalMins/totalMaxs
+        // are the bounds for the entire move.
+        let (mut mins, mut maxs, mut total_mins, mut total_maxs) =
+            ([0.0f32; 3], [0.0f32; 3], [0.0f32; 3], [0.0f32; 3]);
+        if (*pusher).r.currentAngles[0] != 0.0
+            || (*pusher).r.currentAngles[1] != 0.0
+            || (*pusher).r.currentAngles[2] != 0.0
+            || amove[0] != 0.0
+            || amove[1] != 0.0
+            || amove[2] != 0.0
+        {
+            let radius = RadiusFromBounds((*pusher).r.mins, (*pusher).r.maxs);
+            for i in 0..3 {
+                mins[i] = (*pusher).r.currentOrigin[i] + r#move[i] - radius;
+                maxs[i] = (*pusher).r.currentOrigin[i] + r#move[i] + radius;
+                total_mins[i] = mins[i] - r#move[i];
+                total_maxs[i] = maxs[i] - r#move[i];
+            }
+        } else {
+            for i in 0..3 {
+                mins[i] = (*pusher).r.absmin[i] + r#move[i];
+                maxs[i] = (*pusher).r.absmax[i] + r#move[i];
+            }
+            total_mins = (*pusher).r.absmin;
+            total_maxs = (*pusher).r.absmax;
+            for i in 0..3 {
+                if r#move[i] > 0.0 {
+                    total_maxs[i] += r#move[i];
+                } else {
+                    total_mins[i] += r#move[i];
+                }
+            }
+        }
+
+        // unlink the pusher so we don't get it in the entityList
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(pusher));
+
+        let mut entity_list = [0i32; mp_qshared::shared::MAX_GENTITIES];
+        let listed_entities = trap::EntitiesInBox(
+            ctx.engine,
+            GEntitiesInBoxArgs::new(
+                &total_mins as *const vec3_t,
+                &total_maxs as *const vec3_t,
+                entity_list.as_mut_ptr(),
+                entity_list.len() as c_int,
+            ),
+        );
+
+        // move the pusher to its final position
+        for i in 0..3 {
+            (*pusher).r.currentOrigin[i] += r#move[i];
+            (*pusher).r.currentAngles[i] += amove[i];
+        }
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(pusher));
+
+        // see if any solid entities are inside the final position
+        for e in 0..listed_entities {
+            let check = &mut (*ctx.world).entities[entity_list[e as usize] as usize] as *mut gentity_t;
+
+            // only push items and players
+            if (*check).s.eType != entityType_t::ET_PLAYER as c_int
+                && (*check).s.eType != entityType_t::ET_NPC as c_int
+                && (*check).physicsObject == 0
+            {
+                continue;
+            }
+
+            // if the entity is standing on the pusher, it will definitely be moved
+            if (*check).s.groundEntityNum != (*pusher).s.number {
+                // see if the ent needs to be tested
+                if (*check).r.absmin[0] >= maxs[0]
+                    || (*check).r.absmin[1] >= maxs[1]
+                    || (*check).r.absmin[2] >= maxs[2]
+                    || (*check).r.absmax[0] <= mins[0]
+                    || (*check).r.absmax[1] <= mins[1]
+                    || (*check).r.absmax[2] <= mins[2]
+                {
+                    continue;
+                }
+                // see if the ent's bbox is inside the pusher's final position —
+                // this does allow a fast moving object to pass through a thin
+                // entity...
+                if G_TestEntityPosition(ctx, check).is_null() {
+                    continue;
+                }
+            }
+
+            // the entity needs to be pushed
+            if G_TryPushingEntity(ctx, check, pusher, r#move, amove) != 0 {
+                continue;
+            }
+
+            if (*pusher).damage != 0 && !(*check).client.is_null() && ((*pusher).spawnflags & 32) != 0 {
+                G_Damage(
+                    check,
+                    pusher,
+                    pusher,
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    (*pusher).damage,
+                    0,
+                    meansOfDeath_t::MOD_CRUSH as c_int,
+                );
+                continue;
+            }
+
+            if (*check).s.eType == entityType_t::ET_BODY as c_int
+                || ((*check).s.eType == entityType_t::ET_PLAYER as c_int && (*check).health < 1)
+            {
+                // whatever, just crush it
+                G_Damage(
+                    check,
+                    pusher,
+                    pusher,
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    999,
+                    0,
+                    meansOfDeath_t::MOD_CRUSH as c_int,
+                );
+                continue;
+            }
+
+            // the move was blocked an entity
+
+            // bobbing entities are instant-kill and never get blocked
+            if (*pusher).s.pos.trType == trType_t::TR_SINE || (*pusher).s.apos.trType == trType_t::TR_SINE {
+                G_Damage(
+                    check,
+                    pusher,
+                    pusher,
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    99999,
+                    0,
+                    meansOfDeath_t::MOD_CRUSH as c_int,
+                );
+                continue;
+            }
+
+            // save off the obstacle so we can call the block function (crush, etc)
+            *obstacle = check;
+
+            // move back any entities we already moved — go backwards, so if
+            // the same entity was pushed twice, it goes back to the
+            // original position.
+            // (Raven leaves `pushed_p` itself untouched here — only
+            // `G_MoverTeam`'s next call resets it — so this walks the
+            // snapshot without popping.)
+            let world = &mut *ctx.world;
+            for i in (0..world.globals.pushed_p).rev() {
+                let p = world.globals.pushed[i];
+                (*p.ent).s.pos.trBase = p.origin;
+                (*p.ent).s.apos.trBase = p.angles;
+                if !(*p.ent).client.is_null() {
+                    let client = (*p.ent).client as *mut crate::client::gclient::gclient_t;
+                    (*client).ps.delta_angles[YAW] = p.deltayaw;
+                    (*client).ps.origin = p.origin;
+                }
+                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(p.ent));
+            }
+            return qfalse;
+        }
+
+        qtrue
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// the `pushed[]`/`pushed_p` save-stack.
+// PORT-ESCALATION(bg-boundary): `BG_EvaluateTrajectory` (`bg_misc.rs`) is
+// itself still parked (call surface: PARKED); called faithfully here and
+// will panic until that lands.
 /// Raven `G_MoverTeam`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:416-471`
@@ -189,12 +599,82 @@ pub fn G_MoverTeam(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port G_MoverTeam — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut obstacle: *mut gentity_t = core::ptr::null_mut();
+
+        // make sure all team slaves can move before commiting any moves or
+        // calling any think functions — if the move is blocked, all moved
+        // objects will be backed out.
+        (*ctx.world).globals.pushed.clear();
+        (*ctx.world).globals.pushed_p = 0;
+
+        let mut part = ent;
+        while !part.is_null() {
+            let mut origin: vec3_t = [0.0; 3];
+            let mut angles: vec3_t = [0.0; 3];
+            let time = (*ctx.world).level.time;
+            crate::bg_misc::BG_EvaluateTrajectory(&(*part).s.pos as *const trajectory_t, time, origin);
+            crate::bg_misc::BG_EvaluateTrajectory(&(*part).s.apos as *const trajectory_t, time, angles);
+            let r#move = [
+                origin[0] - (*part).r.currentOrigin[0],
+                origin[1] - (*part).r.currentOrigin[1],
+                origin[2] - (*part).r.currentOrigin[2],
+            ];
+            let amove = [
+                angles[0] - (*part).r.currentAngles[0],
+                angles[1] - (*part).r.currentAngles[1],
+                angles[2] - (*part).r.currentAngles[2],
+            ];
+            if r#move != [0.0, 0.0, 0.0] || amove != [0.0, 0.0, 0.0] {
+                // actually moved
+                if G_MoverPush(ctx, part, r#move, amove, &mut obstacle as *mut *mut gentity_t) == 0 {
+                    break; // move was blocked
+                }
+            }
+            part = (*part).teamchain;
+        }
+
+        if !part.is_null() {
+            // go back to the previous position
+            let mut p = ent;
+            while !p.is_null() {
+                let dt = (*ctx.world).level.time - (*ctx.world).level.previousTime;
+                (*p).s.pos.trTime += dt;
+                (*p).s.apos.trTime += dt;
+                let time = (*ctx.world).level.time;
+                let mut cur_origin = (*p).r.currentOrigin;
+                let mut cur_angles = (*p).r.currentAngles;
+                crate::bg_misc::BG_EvaluateTrajectory(&(*p).s.pos as *const trajectory_t, time, cur_origin);
+                crate::bg_misc::BG_EvaluateTrajectory(&(*p).s.apos as *const trajectory_t, time, cur_angles);
+                (*p).r.currentOrigin = cur_origin;
+                (*p).r.currentAngles = cur_angles;
+                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(p));
+                p = (*p).teamchain;
+            }
+
+            // if the pusher has a "blocked" function, call it
+            if let Some(blocked) = (*ent).blocked {
+                crate::ent_fn_enums::dispatch_blocked(ctx, blocked, ent, obstacle);
+            }
+            return;
+        }
+
+        // the move succeeded
+        let mut p = ent;
+        while !p.is_null() {
+            // call the reached function if time is at or past end point
+            if (*p).s.pos.trType == trType_t::TR_LINEAR_STOP || (*p).s.pos.trType == trType_t::TR_NONLINEAR_STOP {
+                if (*ctx.world).level.time >= (*p).s.pos.trTime + (*p).s.pos.trDuration {
+                    if let Some(reached) = (*p).reached {
+                        crate::ent_fn_enums::dispatch_reached(ctx, reached, p);
+                    }
+                }
+            }
+            p = (*p).teamchain;
+        }
+    }
 }
 
-// PORT-ESCALATION(unported-flag-consts): `ent->flags & FL_TEAMSLAVE` needs
-// `FL_TEAMSLAVE` (`g_local.h`), not type-ported anywhere in the crate graph
-// yet.
 /// Raven `G_RunMover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:479-493`
@@ -202,24 +682,54 @@ pub fn G_RunMover(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port G_RunMover — parked: unported-flag-consts (FL_TEAMSLAVE)")
+    unsafe {
+        // if not a team captain, don't do anything, because the captain
+        // will handle everything
+        if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+            return;
+        }
+
+        // if stationary at one of the positions, don't move anything
+        if (*ent).s.pos.trType != trType_t::TR_STATIONARY || (*ent).s.apos.trType != trType_t::TR_STATIONARY {
+            G_MoverTeam(ctx, ent);
+        }
+
+        // check think function
+        crate::g_main::G_RunThink(ctx, ent);
+    }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): `center` is Raven's `vec3_t center`
-// out-param (decays to pointer in C, mutated in place and read back by the
-// caller); the resolved signature takes it by value ([f32;3]).
+// Fork-9 reshape: Raven's `center` is written through (built up across the
+// slave loop, read back by every caller), so it becomes `&mut vec3_t` per
+// the ruling's non-nullable-out case. Same-file callers updated below.
 /// Raven `CalcTeamDoorCenter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:511-528`
 pub fn CalcTeamDoorCenter(
     ent: *mut gentity_t,
-    center: vec3_t,
+    center: &mut vec3_t,
 ) {
-    todo!("Port CalcTeamDoorCenter — parked: vec3-outparam-seam")
+    unsafe {
+        // start with our own center
+        for i in 0..3 {
+            center[i] = ((*ent).r.mins[i] + (*ent).r.maxs[i]) * 0.5;
+        }
+        let mut slave = (*ent).teamchain;
+        while !slave.is_null() {
+            // find slave's center
+            let mut slave_center = [0.0f32; 3];
+            for i in 0..3 {
+                slave_center[i] = ((*slave).r.mins[i] + (*slave).r.maxs[i]) * 0.5;
+            }
+            // add that to our own, find middle
+            for i in 0..3 {
+                center[i] = (center[i] + slave_center[i]) * 0.5;
+            }
+            slave = (*slave).teamchain;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// calls `trap_LinkEntity` (needs `&Engine`).
 /// Raven `SetMoverState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:535-590`
@@ -229,7 +739,62 @@ pub fn SetMoverState(
     moverState: moverState_t,
     time: c_int,
 ) {
-    todo!("Port SetMoverState — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        (*ent).moverState = moverState;
+        (*ent).s.pos.trTime = time;
+
+        if (*ent).s.pos.trDuration <= 0 {
+            // don't allow divide by zero!
+            (*ent).s.pos.trDuration = 1;
+        }
+
+        match moverState {
+            MOVER_POS1 => {
+                (*ent).s.pos.trBase = (*ent).pos1;
+                (*ent).s.pos.trType = trType_t::TR_STATIONARY;
+            }
+            MOVER_POS2 => {
+                (*ent).s.pos.trBase = (*ent).pos2;
+                (*ent).s.pos.trType = trType_t::TR_STATIONARY;
+            }
+            MOVER_1TO2 => {
+                (*ent).s.pos.trBase = (*ent).pos1;
+                let delta = [
+                    (*ent).pos2[0] - (*ent).pos1[0],
+                    (*ent).pos2[1] - (*ent).pos1[1],
+                    (*ent).pos2[2] - (*ent).pos1[2],
+                ];
+                let f = 1000.0 / (*ent).s.pos.trDuration as f32;
+                (*ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
+                (*ent).s.pos.trType = if (*ent).alt_fire != 0 {
+                    trType_t::TR_LINEAR_STOP
+                } else {
+                    trType_t::TR_NONLINEAR_STOP
+                };
+            }
+            MOVER_2TO1 => {
+                (*ent).s.pos.trBase = (*ent).pos2;
+                let delta = [
+                    (*ent).pos1[0] - (*ent).pos2[0],
+                    (*ent).pos1[1] - (*ent).pos2[1],
+                    (*ent).pos1[2] - (*ent).pos2[2],
+                ];
+                let f = 1000.0 / (*ent).s.pos.trDuration as f32;
+                (*ent).s.pos.trDelta = [delta[0] * f, delta[1] * f, delta[2] * f];
+                (*ent).s.pos.trType = if (*ent).alt_fire != 0 {
+                    trType_t::TR_LINEAR_STOP
+                } else {
+                    trType_t::TR_NONLINEAR_STOP
+                };
+            }
+            _ => {}
+        }
+        let time = (*ctx.world).level.time;
+        let mut cur_origin = (*ent).r.currentOrigin;
+        crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos as *const trajectory_t, time, cur_origin);
+        (*ent).r.currentOrigin = cur_origin;
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
 /// Raven `MatchTeam`.
@@ -252,7 +817,6 @@ pub fn MatchTeam(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `ReturnToPos1`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:615-625`
@@ -260,12 +824,19 @@ pub fn ReturnToPos1(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port ReturnToPos1 — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        (*ent).think = None;
+        (*ent).nextthink = 0;
+        (*ent).s.time = (*ctx.world).level.time;
+
+        MatchTeam(ctx, ent, MOVER_2TO1, (*ctx.world).level.time);
+
+        // starting sound
+        G_PlayDoorLoopSound(ctx, ent);
+        G_PlayDoorSound(ctx, ent, BMS_START); // ??
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`,
-// calls `trap_AdjustAreaPortalState` (needs `&Engine`) and `G_Error` (no
-// engine/world seam yet).
 /// Raven `Reached_BinaryMover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:634-702`
@@ -273,11 +844,59 @@ pub fn Reached_BinaryMover(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port Reached_BinaryMover — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // stop the looping sound
+        (*ent).s.loopSound = 0;
+        (*ent).s.loopIsSoundset = qfalse;
+
+        if (*ent).moverState == MOVER_1TO2 {
+            // reached open
+            let mut doorcenter: vec3_t = [0.0; 3];
+
+            SetMoverState(ctx, ent, MOVER_POS2, (*ctx.world).level.time);
+            CalcTeamDoorCenter(ent, &mut doorcenter);
+            G_PlayDoorSound(ctx, ent, BMS_END);
+
+            if (*ent).wait < 0.0 {
+                // done for good
+                (*ent).think = None;
+                (*ent).nextthink = 0;
+                (*ent).use_ = None;
+            } else {
+                // return to pos1 after a delay
+                (*ent).think = Some(EntThink::ReturnToPos1);
+                if (*ent).spawnflags & 8 != 0 {
+                    // toggle, keep think, wait for next use
+                    (*ent).nextthink = -1;
+                } else {
+                    (*ent).nextthink = (*ctx.world).level.time + (*ent).wait as c_int;
+                }
+            }
+
+            // fire targets
+            if (*ent).activator.is_null() {
+                (*ent).activator = ent;
+            }
+            G_UseTargets2(ctx, ent, (*ent).activator, (*ent).opentarget);
+        } else if (*ent).moverState == MOVER_2TO1 {
+            // closed
+            let mut doorcenter: vec3_t = [0.0; 3];
+
+            SetMoverState(ctx, ent, MOVER_POS1, (*ctx.world).level.time);
+            CalcTeamDoorCenter(ent, &mut doorcenter);
+            G_PlayDoorSound(ctx, ent, BMS_END);
+
+            // close areaportals
+            if (*ent).teammaster == ent || (*ent).teammaster.is_null() {
+                trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qfalse));
+            }
+            G_UseTargets2(ctx, ent, (*ent).activator, (*ent).closetarget);
+        } else {
+            G_Error(ctx, c"Reached_BinaryMover: bad moverState".as_ptr());
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`
-// throughout.
 /// Raven `Use_BinaryMover_Go`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:710-828`
@@ -285,7 +904,110 @@ pub fn Use_BinaryMover_Go(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port Use_BinaryMover_Go — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let activator = (*ent).activator;
+        (*ent).activator = activator;
+
+        if (*ent).moverState == MOVER_POS1 {
+            let mut doorcenter: vec3_t = [0.0; 3];
+
+            // start moving 50 msec later, because if this was player
+            // triggered, level.time hasn't been advanced yet
+            MatchTeam(ctx, ent, MOVER_1TO2, (*ctx.world).level.time + 50);
+            CalcTeamDoorCenter(ent, &mut doorcenter);
+
+            // starting sound
+            G_PlayDoorLoopSound(ctx, ent);
+            G_PlayDoorSound(ctx, ent, BMS_START);
+            (*ent).s.time = (*ctx.world).level.time;
+
+            // open areaportal
+            if (*ent).teammaster == ent || (*ent).teammaster.is_null() {
+                trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qtrue));
+            }
+            G_UseTargets(ctx, ent, (*ent).activator);
+            return;
+        }
+
+        // if all the way up, just delay before coming down
+        if (*ent).moverState == MOVER_POS2 {
+            // have to do this because the delay sets our think to Use_BinaryMover_Go
+            (*ent).think = Some(EntThink::ReturnToPos1);
+            if (*ent).spawnflags & 8 != 0 {
+                // TOGGLE doors don't use wait!
+                (*ent).nextthink = (*ctx.world).level.time + FRAMETIME;
+            } else {
+                (*ent).nextthink = (*ctx.world).level.time + (*ent).wait as c_int;
+            }
+            G_UseTargets2(ctx, ent, (*ent).activator, (*ent).target2);
+            return;
+        }
+
+        // only partway down before reversing
+        if (*ent).moverState == MOVER_2TO1 {
+            let total;
+            let partial;
+            if (*ent).s.pos.trType == trType_t::TR_NONLINEAR_STOP {
+                let cur_total = (*ent).s.pos.trDuration - 50;
+                let cur_delta = [
+                    (*ent).r.currentOrigin[0] - (*ent).pos1[0],
+                    (*ent).r.currentOrigin[1] - (*ent).pos1[1],
+                    (*ent).r.currentOrigin[2] - (*ent).pos1[2],
+                ];
+                let len = |v: vec3_t| (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+                let mut f_partial = len(cur_delta) / len((*ent).s.pos.trDelta);
+                f_partial /= (*ent).s.pos.trDuration as f32;
+                f_partial /= 0.001f32;
+                f_partial = f_partial.acos();
+                f_partial = f_partial.to_degrees();
+                f_partial = (90.0 - f_partial) / 90.0 * (*ent).s.pos.trDuration as f32;
+                total = cur_total;
+                partial = total - f_partial.floor() as c_int;
+            } else {
+                total = (*ent).s.pos.trDuration;
+                partial = (*ctx.world).level.time - (*ent).s.pos.trTime;
+            }
+
+            let partial = if partial > total { total } else { partial };
+            (*ent).s.pos.trTime = (*ctx.world).level.time - (total - partial);
+
+            MatchTeam(ctx, ent, MOVER_1TO2, (*ent).s.pos.trTime);
+            G_PlayDoorSound(ctx, ent, BMS_START);
+            return;
+        }
+
+        // only partway up before reversing
+        if (*ent).moverState == MOVER_1TO2 {
+            let total;
+            let partial;
+            if (*ent).s.pos.trType == trType_t::TR_NONLINEAR_STOP {
+                let cur_total = (*ent).s.pos.trDuration - 50;
+                let cur_delta = [
+                    (*ent).r.currentOrigin[0] - (*ent).pos2[0],
+                    (*ent).r.currentOrigin[1] - (*ent).pos2[1],
+                    (*ent).r.currentOrigin[2] - (*ent).pos2[2],
+                ];
+                let len = |v: vec3_t| (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+                let mut f_partial = len(cur_delta) / len((*ent).s.pos.trDelta);
+                f_partial /= (*ent).s.pos.trDuration as f32;
+                f_partial /= 0.001f32;
+                f_partial = f_partial.acos();
+                f_partial = f_partial.to_degrees();
+                f_partial = (90.0 - f_partial) / 90.0 * (*ent).s.pos.trDuration as f32;
+                total = cur_total;
+                partial = total - f_partial.floor() as c_int;
+            } else {
+                total = (*ent).s.pos.trDuration;
+                partial = (*ctx.world).level.time - (*ent).s.pos.trTime;
+            }
+
+            let partial = if partial > total { total } else { partial };
+            (*ent).s.pos.trTime = (*ctx.world).level.time - (total - partial);
+
+            MatchTeam(ctx, ent, MOVER_2TO1, (*ent).s.pos.trTime);
+            G_PlayDoorSound(ctx, ent, BMS_START);
+        }
+    }
 }
 
 /// Raven `UnLockDoors`.
@@ -335,8 +1057,6 @@ pub fn LockDoors(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`
-// (`ent->nextthink = level.time + ent->delay`).
 /// Raven `Use_BinaryMover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:863-901`
@@ -346,7 +1066,39 @@ pub fn Use_BinaryMover(
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port Use_BinaryMover — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*ent).use_.is_none() {
+            // I cannot be used anymore, must be a door with a wait of -1 that's opened.
+            return;
+        }
+
+        // only the master should be used
+        if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+            Use_BinaryMover(ctx, (*ent).teammaster, other, activator);
+            return;
+        }
+
+        if (*ent).flags & crate::entity::flags::FL_INACTIVE != 0 {
+            return;
+        }
+
+        if (*ent).spawnflags & MOVER_LOCKED != 0 {
+            // a locked door, unlock it
+            UnLockDoors(ent);
+            return;
+        }
+
+        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
+
+        (*ent).enemy = other;
+        (*ent).activator = activator;
+        if (*ent).delay != 0 {
+            (*ent).think = Some(EntThink::Use_BinaryMover_Go);
+            (*ent).nextthink = (*ctx.world).level.time + (*ent).delay;
+        } else {
+            Use_BinaryMover_Go(ctx, ent);
+        }
+    }
 }
 
 /// Raven `InitMoverTrData`.
@@ -379,8 +1131,11 @@ pub fn InitMoverTrData(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// (needs `&Engine`).
+// PORT-ESCALATION(unported-consts): `ent->r.svFlags = SVF_USE_CURRENT_ORIGIN`
+// needs `SVF_USE_CURRENT_ORIGIN`'s bit value (`q_shared.h`), not type-ported
+// anywhere in the crate graph yet (`entity_effects.rs`/`surface_flags.rs`
+// only transcribe the subset already referenced elsewhere — porting-rules
+// rule 2 forbids guessing a fresh bit pattern).
 /// Raven `InitMover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:936-999`
@@ -388,7 +1143,7 @@ pub fn InitMover(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port InitMover — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port InitMover — parked: unported-consts (SVF_USE_CURRENT_ORIGIN, SVF_PLAYER_USABLE)")
 }
 
 /// Raven `Blocked_Door`.
@@ -424,8 +1179,9 @@ pub fn Blocked_Door(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_Trace`
-// (needs `&Engine`).
+// PORT-ESCALATION(unported-consts): `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` bit/
+// value constants (`g_local.h`) are not type-ported anywhere in the crate
+// graph yet — no sourceable value to transcribe without guessing (rule 2).
 /// Raven `Touch_DoorTriggerSpectator`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1037-1071`
@@ -435,12 +1191,9 @@ pub fn Touch_DoorTriggerSpectator(
     other: *mut gentity_t,
     trace: *mut trace_t,
 ) {
-    todo!("Port Touch_DoorTriggerSpectator — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port Touch_DoorTriggerSpectator — parked: unported-consts (DEFAULT_MINS_2, DEFAULT_MAXS_2)")
 }
 
-// PORT-ESCALATION(unported-flag-consts): `ent->flags & FL_INACTIVE`,
-// `ent->parent->flags & FL_TEAMSLAVE` need `FL_INACTIVE`/`FL_TEAMSLAVE`
-// (`g_local.h`), not type-ported anywhere in the crate graph yet.
 /// Raven `Touch_DoorTrigger`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1078-1158`
@@ -450,11 +1203,74 @@ pub fn Touch_DoorTrigger(
     other: *mut gentity_t,
     trace: *mut trace_t,
 ) {
-    todo!("Port Touch_DoorTrigger — parked: unported-flag-consts (FL_INACTIVE, FL_TEAMSLAVE)")
+    unsafe {
+        let mut relock_ent: *mut gentity_t = core::ptr::null_mut();
+
+        if !(*other).client.is_null()
+            && (*((*other).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
+        {
+            // if the door is not open and not opening
+            if (*(*ent).parent).moverState != MOVER_1TO2 && (*(*ent).parent).moverState != MOVER_POS2 {
+                Touch_DoorTriggerSpectator(ctx, ent, other, trace);
+            }
+            return;
+        }
+
+        if (*ent).genericValue14 == 0 && ((*ent).parent.is_null() || (*(*ent).parent).genericValue14 == 0) {
+            if !(*other).client.is_null()
+                && (*other).s.number >= MAX_CLIENTS as c_int
+                && (*other).s.eType == entityType_t::ET_NPC as c_int
+                && (*other).s.NPC_class == class_t::CLASS_VEHICLE as c_int
+            {
+                // doors don't open for vehicles
+                return;
+            }
+
+            if !(*other).client.is_null()
+                && (*other).s.number < MAX_CLIENTS as c_int
+                && (*((*other).client as *mut gclient_t)).ps.m_iVehicleNum != 0
+            {
+                // can't open a door while on a vehicle
+                return;
+            }
+        }
+
+        if (*ent).flags & crate::entity::flags::FL_INACTIVE != 0 {
+            return;
+        }
+
+        if (*(*ent).parent).spawnflags & MOVER_LOCKED != 0 {
+            // don't even try to use the door if it's locked
+            if (*(*ent).parent).alliedTeam == 0
+                || (*other).client.is_null()
+                || (*((*other).client as *mut gclient_t)).sess.sessionTeam != (*(*ent).parent).alliedTeam
+            {
+                return;
+            } else {
+                // temporarily unlock us while we call Use_BinaryMover (so it
+                // doesn't unlock all the doors in this team)
+                if (*(*ent).parent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+                    relock_ent = (*(*ent).parent).teammaster;
+                } else {
+                    relock_ent = (*ent).parent;
+                }
+                if !relock_ent.is_null() {
+                    (*relock_ent).spawnflags &= !MOVER_LOCKED;
+                }
+            }
+        }
+
+        if (*(*ent).parent).moverState != MOVER_1TO2 {
+            // door is not already opening — if closed, opening or open, check this
+            Use_BinaryMover(ctx, (*ent).parent, ent, other);
+        }
+        if !relock_ent.is_null() {
+            // re-lock us
+            (*relock_ent).spawnflags |= MOVER_LOCKED;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `G_Spawn`/
-// `trap_LinkEntity` and reads `level.time`.
 /// Raven `Think_SpawnNewDoorTrigger`.
 ///
 /// All of the parts of a door have been spawned, so create a trigger that
@@ -464,10 +1280,53 @@ pub fn Think_SpawnNewDoorTrigger(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port Think_SpawnNewDoorTrigger — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // set all of the slaves as shootable
+        if (*ent).takedamage != 0 {
+            let mut other = ent;
+            while !other.is_null() {
+                (*other).takedamage = qtrue;
+                other = (*other).teamchain;
+            }
+        }
+
+        // find the bounds of everything on the team
+        let mut mins = (*ent).r.absmin;
+        let mut maxs = (*ent).r.absmax;
+
+        let mut other = (*ent).teamchain;
+        while !other.is_null() {
+            AddPointToBounds((*other).r.absmin, &mut mins, &mut maxs);
+            AddPointToBounds((*other).r.absmax, &mut mins, &mut maxs);
+            other = (*other).teamchain;
+        }
+
+        // find the thinnest axis, which will be the one we expand
+        let mut best = 0usize;
+        for i in 1..3 {
+            if maxs[i] - mins[i] < maxs[best] - mins[best] {
+                best = i;
+            }
+        }
+        maxs[best] += 120.0;
+        mins[best] -= 120.0;
+
+        // create a trigger with this size
+        let other = G_Spawn(ctx);
+        (*other).r.mins = mins;
+        (*other).r.maxs = maxs;
+        (*other).parent = ent;
+        (*other).r.contents = CONTENTS_TRIGGER;
+        (*other).touch = Some(EntTouch::Touch_DoorTrigger);
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(other));
+        (*other).classname = c"trigger_door".as_ptr() as *mut c_char;
+        // remember the thinnest axis
+        (*other).count = best as c_int;
+
+        MatchTeam(ctx, ent, (*ent).moverState, (*ctx.world).level.time);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `Think_MatchTeam`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1217-1220`
@@ -475,11 +1334,11 @@ pub fn Think_MatchTeam(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port Think_MatchTeam — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        MatchTeam(ctx, ent, (*ent).moverState, (*ctx.world).level.time);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`
-// (global array).
 /// Raven `G_EntIsDoor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1222-1237`
@@ -487,12 +1346,20 @@ pub fn G_EntIsDoor(
     ctx: GameContext<'_>,
     entityNum: c_int,
 ) -> qboolean {
-    todo!("Port G_EntIsDoor — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
+            return qfalse;
+        }
+
+        let ent = &mut (*ctx.world).entities[entityNum as usize] as *mut gentity_t;
+        if crate::q_shared::Q_stricmp((*ent).classname, c"func_door".as_ptr()) == 0 {
+            // blocked by a door
+            return qtrue;
+        }
+        qfalse
+    }
 }
 
-// PORT-ESCALATION(unported-flag-consts): `door->flags & FL_TEAMSLAVE` needs
-// `FL_TEAMSLAVE`, and `owner->r.contents & CONTENTS_TRIGGER` needs
-// `CONTENTS_TRIGGER` — neither type-ported anywhere in the crate graph yet.
 /// Raven `G_FindDoorTrigger`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1239-1280`
@@ -500,11 +1367,53 @@ pub fn G_FindDoorTrigger(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> *mut gentity_t {
-    todo!("Port G_FindDoorTrigger — parked: unported-flag-consts (FL_TEAMSLAVE, CONTENTS_TRIGGER)")
+    unsafe {
+        let mut owner: *mut gentity_t = core::ptr::null_mut();
+        let mut door = ent;
+        if (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+            // not the master door, get the master door
+            while !(*door).teammaster.is_null() && (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+                door = (*door).teammaster;
+            }
+        }
+        if !(*door).targetname.is_null() {
+            // find out what is targeting it
+            loop {
+                owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, target) as c_int, (*door).targetname);
+                if owner.is_null() {
+                    break;
+                }
+                if (*owner).r.contents & CONTENTS_TRIGGER != 0 {
+                    return owner;
+                }
+            }
+            owner = core::ptr::null_mut();
+            loop {
+                owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, target2) as c_int, (*door).targetname);
+                if owner.is_null() {
+                    break;
+                }
+                if (*owner).r.contents & CONTENTS_TRIGGER != 0 {
+                    return owner;
+                }
+            }
+        }
+
+        owner = core::ptr::null_mut();
+        loop {
+            owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, classname) as c_int, c"trigger_door".as_ptr());
+            if owner.is_null() {
+                break;
+            }
+            if (*owner).parent == door {
+                return owner;
+            }
+        }
+
+        core::ptr::null_mut()
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities` and
-// calls `G_EntIsDoor`/`G_FindDoorTrigger`, both parked.
 /// Raven `G_EntIsUnlockedDoor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1282-1346`
@@ -512,11 +1421,68 @@ pub fn G_EntIsUnlockedDoor(
     ctx: GameContext<'_>,
     entityNum: c_int,
 ) -> qboolean {
-    todo!("Port G_EntIsUnlockedDoor — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
+            return qfalse;
+        }
+
+        if G_EntIsDoor(ctx, entityNum) != 0 {
+            let mut ent = &mut (*ctx.world).entities[entityNum as usize] as *mut gentity_t;
+            let mut owner: *mut gentity_t;
+            if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+                // not the master door, get the master door
+                while !(*ent).teammaster.is_null() && (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+                    ent = (*ent).teammaster;
+                }
+            }
+            if !(*ent).targetname.is_null() {
+                // find out what is targeting it
+                owner = core::ptr::null_mut();
+                loop {
+                    owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, target) as c_int, (*ent).targetname);
+                    if owner.is_null() {
+                        break;
+                    }
+                    if crate::q_shared::Q_stricmp((*owner).classname, c"trigger_multiple".as_ptr()) == 0
+                        && (*owner).flags & crate::entity::flags::FL_INACTIVE == 0
+                    {
+                        return qtrue;
+                    }
+                }
+                owner = core::ptr::null_mut();
+                loop {
+                    owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, target2) as c_int, (*ent).targetname);
+                    if owner.is_null() {
+                        break;
+                    }
+                    if crate::q_shared::Q_stricmp((*owner).classname, c"trigger_multiple".as_ptr()) == 0
+                        && (*owner).flags & crate::entity::flags::FL_INACTIVE == 0
+                    {
+                        return qtrue;
+                    }
+                }
+                return qfalse;
+            } else {
+                // check the door's auto-created trigger instead
+                owner = G_FindDoorTrigger(ctx, ent);
+                if !owner.is_null() && (*owner).flags & crate::entity::flags::FL_INACTIVE != 0 {
+                    // owning auto-created trigger is inactive
+                    return qfalse;
+                }
+            }
+            if (*ent).flags & crate::entity::flags::FL_INACTIVE == 0
+                && (*ent).health == 0
+                && (*ent).spawnflags & MOVER_PLAYER_USE == 0
+                && (*ent).spawnflags & MOVER_FORCE_ACTIVATE == 0
+                && (*ent).spawnflags & MOVER_LOCKED == 0
+            {
+                return qtrue;
+            }
+        }
+        qfalse
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// calls `trap_SetBrushModel` (needs `&Engine`).
 /// Raven `SP_func_door`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1380-1472`
@@ -524,10 +1490,105 @@ pub fn SP_func_door(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_func_door — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        G_SpawnInt(ctx, c"vehopen".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue14 as *mut c_int);
+
+        (*ent).blocked = Some(EntBlocked::Blocked_Door);
+
+        // default speed of 400
+        if (*ent).speed == 0.0 {
+            (*ent).speed = 400.0;
+        }
+
+        // default wait of 2 seconds
+        if (*ent).wait == 0.0 {
+            (*ent).wait = 2.0;
+        }
+        (*ent).wait *= 1000.0;
+
+        (*ent).delay *= 1000;
+
+        // default lip of 8 units
+        let mut lip = 0.0f32;
+        G_SpawnFloat(ctx, c"lip".as_ptr(), c"8".as_ptr(), &mut lip as *mut f32);
+
+        // default damage of 2 points
+        G_SpawnInt(ctx, c"dmg".as_ptr(), c"2".as_ptr(), &mut (*ent).damage as *mut c_int);
+        if (*ent).damage < 0 {
+            (*ent).damage = 0;
+        }
+
+        G_SpawnInt(ctx, c"teamallow".as_ptr(), c"0".as_ptr(), &mut (*ent).alliedTeam as *mut c_int);
+
+        // first position at start
+        (*ent).pos1 = (*ent).s.origin;
+
+        // calculate second position
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+        );
+        G_SetMovedir((*ent).s.angles, (*ent).movedir);
+        let abs_movedir = [
+            (*ent).movedir[0].abs(),
+            (*ent).movedir[1].abs(),
+            (*ent).movedir[2].abs(),
+        ];
+        let size = [
+            (*ent).r.maxs[0] - (*ent).r.mins[0],
+            (*ent).r.maxs[1] - (*ent).r.mins[1],
+            (*ent).r.maxs[2] - (*ent).r.mins[2],
+        ];
+        let distance = (abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2]) - lip;
+        for i in 0..3 {
+            (*ent).pos2[i] = (*ent).pos1[i] + distance * (*ent).movedir[i];
+        }
+
+        // if "start_open", reverse position 1 and 2
+        if (*ent).spawnflags & 1 != 0 {
+            let temp = (*ent).pos2;
+            (*ent).pos2 = (*ent).s.origin;
+            (*ent).pos1 = temp;
+        }
+
+        //TODO: Port EF_SHADER_ANIM
+        // Source: oracle/oracle/codemp/game/g_mover.c:1438-1441 — a locked
+        // door additionally sets `s.eFlags |= EF_SHADER_ANIM; s.frame = 0`
+        // here; `EF_SHADER_ANIM`'s bit value is not type-ported anywhere in
+        // the crate graph yet.
+        if (*ent).spawnflags & MOVER_LOCKED != 0 {
+            (*ent).s.frame = 0; // first stage of anim
+        }
+        InitMover(ctx, ent);
+
+        (*ent).nextthink = (*ctx.world).level.time + FRAMETIME;
+
+        if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE == 0 {
+            let mut health = 0;
+            G_SpawnInt(ctx, c"health".as_ptr(), c"0".as_ptr(), &mut health as *mut c_int);
+
+            if health != 0 {
+                (*ent).takedamage = qtrue;
+            }
+
+            if (*ent).spawnflags & MOVER_LOCKED == 0
+                && (!(*ent).targetname.is_null() || health != 0 || (*ent).spawnflags & MOVER_PLAYER_USE != 0 || (*ent).spawnflags & MOVER_FORCE_ACTIVATE != 0)
+            {
+                // non touch/shoot doors
+                (*ent).think = Some(EntThink::Think_MatchTeam);
+
+                if (*ent).spawnflags & MOVER_FORCE_ACTIVATE != 0 {
+                    // so we know it's push/pullable on the client
+                    (*ent).s.bolt1 = 1;
+                }
+            } else {
+                // locked doors still spawn a trigger
+                (*ent).think = Some(EntThink::Think_SpawnNewDoorTrigger);
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `Touch_Plat`.
 ///
 /// Don't allow decent if a living player is on it.
@@ -538,14 +1599,18 @@ pub fn Touch_Plat(
     other: *mut gentity_t,
     trace: *mut trace_t,
 ) {
-    todo!("Port Touch_Plat — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*other).client.is_null() || (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0 {
+            return;
+        }
+
+        // delay return-to-pos1 by one second
+        if (*ent).moverState == MOVER_POS2 {
+            (*ent).nextthink = (*ctx.world).level.time + 1000;
+        }
+    }
 }
 
-// PORT-ESCALATION(moverstate-enum-unported): `ent->parent->moverState ==
-// MOVER_POS1` needs `moverState_t`'s enum values, which live in
-// `g_local.h` (out of this file's packet) and aren't type-ported anywhere
-// in the crate graph yet — no source to transcribe an authoritative value
-// from without guessing.
 /// Raven `Touch_PlatCenterTrigger`.
 ///
 /// If the plat is at the bottom position, start it going up.
@@ -556,11 +1621,17 @@ pub fn Touch_PlatCenterTrigger(
     other: *mut gentity_t,
     trace: *mut trace_t,
 ) {
-    todo!("Port Touch_PlatCenterTrigger — parked: moverstate-enum-unported")
+    unsafe {
+        if (*other).client.is_null() {
+            return;
+        }
+
+        if (*(*ent).parent).moverState == MOVER_POS1 {
+            Use_BinaryMover(ctx, (*ent).parent, ent, other);
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `G_Spawn`/
-// `trap_LinkEntity`.
 /// Raven `SpawnPlatTrigger`.
 ///
 /// Spawn a trigger in the middle of the plat's low position. Elevator cars
@@ -571,11 +1642,40 @@ pub fn SpawnPlatTrigger(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SpawnPlatTrigger — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // the middle trigger will be a thin trigger just above the starting
+        // position
+        let trigger = G_Spawn(ctx);
+        (*trigger).touch = Some(EntTouch::Touch_PlatCenterTrigger);
+        (*trigger).r.contents = CONTENTS_TRIGGER;
+        (*trigger).parent = ent;
+
+        let mut tmin = [0.0f32; 3];
+        let mut tmax = [0.0f32; 3];
+        tmin[0] = (*ent).pos1[0] + (*ent).r.mins[0] + 33.0;
+        tmin[1] = (*ent).pos1[1] + (*ent).r.mins[1] + 33.0;
+        tmin[2] = (*ent).pos1[2] + (*ent).r.mins[2];
+
+        tmax[0] = (*ent).pos1[0] + (*ent).r.maxs[0] - 33.0;
+        tmax[1] = (*ent).pos1[1] + (*ent).r.maxs[1] - 33.0;
+        tmax[2] = (*ent).pos1[2] + (*ent).r.maxs[2] + 8.0;
+
+        if tmax[0] <= tmin[0] {
+            tmin[0] = (*ent).pos1[0] + ((*ent).r.mins[0] + (*ent).r.maxs[0]) * 0.5;
+            tmax[0] = tmin[0] + 1.0;
+        }
+        if tmax[1] <= tmin[1] {
+            tmin[1] = (*ent).pos1[1] + ((*ent).r.mins[1] + (*ent).r.maxs[1]) * 0.5;
+            tmax[1] = tmin[1] + 1.0;
+        }
+
+        (*trigger).r.mins = tmin;
+        (*trigger).r.maxs = tmax;
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(trigger));
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
-// `trap_SetBrushModel` (needs `&Engine`).
 /// Raven `SP_func_plat`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1576-1617`
@@ -583,12 +1683,50 @@ pub fn SP_func_plat(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_func_plat — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        (*ent).s.angles = [0.0; 3];
+
+        G_SpawnFloat(ctx, c"speed".as_ptr(), c"200".as_ptr(), &mut (*ent).speed as *mut f32);
+        G_SpawnInt(ctx, c"dmg".as_ptr(), c"2".as_ptr(), &mut (*ent).damage as *mut c_int);
+        G_SpawnFloat(ctx, c"wait".as_ptr(), c"1".as_ptr(), &mut (*ent).wait as *mut f32);
+        let mut lip = 0.0f32;
+        G_SpawnFloat(ctx, c"lip".as_ptr(), c"8".as_ptr(), &mut lip as *mut f32);
+
+        (*ent).wait = 1000.0;
+
+        // create second position
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+        );
+
+        let mut height = 0.0f32;
+        if G_SpawnFloat(ctx, c"height".as_ptr(), c"0".as_ptr(), &mut height as *mut f32) == 0 {
+            height = ((*ent).r.maxs[2] - (*ent).r.mins[2]) - lip;
+        }
+
+        // pos1 is the rest (bottom) position, pos2 is the top
+        (*ent).pos2 = (*ent).s.origin;
+        (*ent).pos1 = (*ent).pos2;
+        (*ent).pos1[2] -= height;
+
+        InitMover(ctx, ent);
+
+        // touch function keeps the plat from returning while a live player
+        // is standing on it
+        (*ent).touch = Some(EntTouch::Touch_Plat);
+
+        (*ent).blocked = Some(EntBlocked::Blocked_Door);
+
+        (*ent).parent = ent; // so it can be treated as a door
+
+        // spawn the trigger if one hasn't been custom made
+        if (*ent).targetname.is_null() {
+            SpawnPlatTrigger(ctx, ent);
+        }
+    }
 }
 
-// PORT-ESCALATION(moverstate-enum-unported): `ent->moverState == MOVER_POS1`
-// needs `moverState_t`'s enum values (`g_local.h`, out of this file's
-// packet, not type-ported anywhere in the crate graph yet).
 /// Raven `Touch_Button`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1633-1641`
@@ -598,11 +1736,17 @@ pub fn Touch_Button(
     other: *mut gentity_t,
     trace: *mut trace_t,
 ) {
-    todo!("Port Touch_Button — parked: moverstate-enum-unported")
+    unsafe {
+        if (*other).client.is_null() {
+            return;
+        }
+
+        if (*ent).moverState == MOVER_POS1 {
+            Use_BinaryMover(ctx, ent, other, other);
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
-// `trap_SetBrushModel` (needs `&Engine`).
 /// Raven `SP_func_button`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1660-1702`
@@ -610,10 +1754,56 @@ pub fn SP_func_button(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_func_button — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*ent).speed == 0.0 {
+            (*ent).speed = 40.0;
+        }
+
+        if (*ent).wait == 0.0 {
+            (*ent).wait = 1.0;
+        }
+        (*ent).wait *= 1000.0;
+
+        // first position
+        (*ent).pos1 = (*ent).s.origin;
+
+        // calculate second position
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+        );
+
+        let mut lip = 0.0f32;
+        G_SpawnFloat(ctx, c"lip".as_ptr(), c"4".as_ptr(), &mut lip as *mut f32);
+
+        G_SetMovedir((*ent).s.angles, (*ent).movedir);
+        let abs_movedir = [
+            (*ent).movedir[0].abs(),
+            (*ent).movedir[1].abs(),
+            (*ent).movedir[2].abs(),
+        ];
+        let size = [
+            (*ent).r.maxs[0] - (*ent).r.mins[0],
+            (*ent).r.maxs[1] - (*ent).r.mins[1],
+            (*ent).r.maxs[2] - (*ent).r.mins[2],
+        ];
+        let distance = abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2] - lip;
+        for i in 0..3 {
+            (*ent).pos2[i] = (*ent).pos1[i] + distance * (*ent).movedir[i];
+        }
+
+        if (*ent).health != 0 {
+            // shootable button
+            (*ent).takedamage = qtrue;
+        } else {
+            // touchable button
+            (*ent).touch = Some(EntTouch::Touch_Button);
+        }
+
+        InitMover(ctx, ent);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `Think_BeginMoving`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1727-1732`
@@ -621,10 +1811,14 @@ pub fn Think_BeginMoving(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port Think_BeginMoving — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        G_PlayDoorSound(ctx, ent, BMS_START);
+        G_PlayDoorLoopSound(ctx, ent);
+        (*ent).s.pos.trTime = (*ctx.world).level.time;
+        (*ent).s.pos.trType = trType_t::TR_LINEAR_STOP;
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `Reached_Train`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1739-1793`
@@ -632,7 +1826,53 @@ pub fn Reached_Train(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port Reached_Train — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // copy the appropriate values
+        let next = (*ent).nextTrain;
+        if next.is_null() || (*next).nextTrain.is_null() {
+            return; // just stop
+        }
+
+        // fire all other targets
+        G_UseTargets(ctx, next, core::ptr::null_mut());
+
+        // set the new trajectory
+        (*ent).nextTrain = (*next).nextTrain;
+        (*ent).pos1 = (*next).s.origin;
+        (*ent).pos2 = (*(*next).nextTrain).s.origin;
+
+        // if the path_corner has a speed, use that
+        let mut speed = if (*next).speed != 0.0 { (*next).speed } else { (*ent).speed };
+        if speed < 1.0 {
+            speed = 1.0;
+        }
+
+        // calculate duration
+        let r#move = [
+            (*ent).pos2[0] - (*ent).pos1[0],
+            (*ent).pos2[1] - (*ent).pos1[1],
+            (*ent).pos2[2] - (*ent).pos1[2],
+        ];
+        let length = (r#move[0] * r#move[0] + r#move[1] * r#move[1] + r#move[2] * r#move[2]).sqrt();
+
+        (*ent).s.pos.trDuration = (length * 1000.0 / speed) as c_int;
+
+        // start it going
+        SetMoverState(ctx, ent, MOVER_1TO2, (*ctx.world).level.time);
+
+        G_PlayDoorSound(ctx, ent, BMS_END);
+
+        // if there is a "wait" value on the target, don't start moving yet
+        if (*next).wait != 0.0 {
+            (*ent).s.loopSound = 0;
+            (*ent).s.loopIsSoundset = qfalse;
+            (*ent).nextthink = (*ctx.world).level.time + ((*next).wait * 1000.0) as c_int;
+            (*ent).think = Some(EntThink::Think_BeginMoving);
+            (*ent).s.pos.trType = trType_t::TR_STATIONARY;
+        } else {
+            G_PlayDoorLoopSound(ctx, ent);
+        }
+    }
 }
 
 /// Raven `Think_SetupTrainTargets`.
@@ -731,8 +1971,6 @@ pub fn SP_path_corner(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// calls `trap_SetBrushModel` (needs `&Engine`).
 /// Raven `SP_func_train`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1897-1927`
@@ -740,11 +1978,52 @@ pub fn SP_func_train(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_func_train — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        (*self_).s.angles = [0.0; 3];
+
+        // Raven `TRAIN_BLOCK_STOPS` spawnflag (`g_mover.c:1900`); not yet a
+        // named const anywhere in the crate graph — transcribed as its
+        // literal bit here (single call site, no cross-file reuse to justify
+        // a shared const yet).
+        const TRAIN_BLOCK_STOPS: c_int = 1;
+        if (*self_).spawnflags & TRAIN_BLOCK_STOPS != 0 {
+            (*self_).damage = 0;
+        } else if (*self_).damage == 0 {
+            (*self_).damage = 2;
+        }
+
+        if (*self_).speed == 0.0 {
+            (*self_).speed = 100.0;
+        }
+
+        if (*self_).target.is_null() {
+            let _ = vtos(ctx, (*self_).r.absmin);
+            G_Printf(ctx, c"func_train without a target at %s\n".as_ptr());
+            G_FreeEntity(ctx, self_);
+            return;
+        }
+
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(self_, std::ffi::CStr::from_ptr((*self_).model).to_owned()),
+        );
+        InitMover(ctx, self_);
+
+        (*self_).reached = Some(EntReached::Reached_Train);
+
+        // start trains on the second frame, to make sure their targets have
+        // had a chance to spawn
+        (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
+        (*self_).think = Some(EntThink::Think_SetupTrainTargets);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// calls `trap_SetBrushModel` (needs `&Engine`).
+// PORT-ESCALATION(unported-consts): `EF_SHADER_ANIM`/`SVF_BROADCAST`-adjacent
+// `EF2_HYPERSPACE` bit values (`q_shared.h`) are not type-ported anywhere in
+// the crate graph yet — the `model2scale`/`hyperspace` tail (g_mover.c:1988-
+// 2018) needs them; the rest of the spawn body is faithfully ported below it
+// with those two statements each left as an explicit `//TODO: Port` no-op
+// per the marker convention (rule 2: no guessed bit patterns).
 /// Raven `SP_func_static`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1956-2019`
@@ -752,7 +2031,63 @@ pub fn SP_func_static(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_func_static — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+        );
+
+        (*ent).pos1 = (*ent).s.origin;
+        (*ent).pos2 = (*ent).s.origin;
+
+        InitMover(ctx, ent);
+
+        (*ent).use_ = Some(EntUse::func_static_use);
+        (*ent).reached = None;
+
+        G_SetOrigin(ent, (*ent).s.origin);
+        G_SetAngles(ent, (*ent).s.angles);
+
+        if (*ent).spawnflags & 2048 != 0 {
+            // yes this is very very evil, but for now (pre-alpha) it's a
+            // solution — I need to rotate something that is huge and it's
+            // touching too many area portals...
+            (*ent).r.svFlags |= SVF_BROADCAST;
+        }
+
+        //TODO: Port EF_SHADER_ANIM
+        // Source: oracle/oracle/codemp/game/g_mover.c:1977-1981
+
+        if (*ent).spawnflags & 1 != 0 || (*ent).spawnflags & 2 != 0 {
+            // so we know it's push/pullable on the client
+            (*ent).s.bolt1 = 1;
+        }
+
+        G_SpawnInt(ctx, c"model2scale".as_ptr(), c"0".as_ptr(), &mut (*ent).s.iModelScale as *mut c_int);
+        if (*ent).s.iModelScale < 0 {
+            // NOTE: -1 scale is x -100% (so -3 is 300%)
+            (*ent).s.legsFlip = qtrue;
+            (*ent).s.iModelScale = -(*ent).s.iModelScale;
+        } else if (*ent).s.iModelScale > 1023 {
+            (*ent).s.iModelScale = 1023;
+        }
+
+        //TODO: Port EF2_HYPERSPACE
+        // Source: oracle/oracle/codemp/game/g_mover.c:2006-2011 — a nonzero
+        // "hyperspace" spawn key additionally sets `r.svFlags |=
+        // SVF_BROADCAST; s.eFlags2 |= EF2_HYPERSPACE` here.
+        let mut test = 0;
+        G_SpawnInt(ctx, c"hyperspace".as_ptr(), c"0".as_ptr(), &mut test as *mut c_int);
+        if test != 0 {
+            (*ent).r.svFlags |= SVF_BROADCAST;
+        }
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+
+        //TODO: Port EF_PERMANENT
+        // Source: oracle/oracle/codemp/game/g_mover.c:2015-2018 — inside a
+        // BSP instance, `s.eFlags = EF_PERMANENT` here.
+    }
 }
 
 /// Raven `func_static_use`.
@@ -806,8 +2141,9 @@ pub fn func_rotating_use(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_SetBrushModel`
-// (needs `&Engine`).
+// PORT-ESCALATION(unported-consts): the `IMPACT`/`RADAR` spawnflag branches
+// need `EF_RADAROBJECT`'s bit value (`bg_public.h`), not type-ported
+// anywhere in the crate graph yet; left as an explicit `//TODO: Port` no-op.
 /// Raven `SP_func_rotating`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2133-2209`
@@ -815,11 +2151,70 @@ pub fn SP_func_rotating(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_func_rotating — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut spinangles: vec3_t = [0.0; 3];
+        if (*ent).health != 0 {
+            let sav_spawnflags = (*ent).spawnflags;
+            (*ent).spawnflags = 0;
+            SP_func_breakable(ctx, ent);
+            (*ent).spawnflags = sav_spawnflags;
+        } else {
+            trap::SetBrushModel(
+                ctx.engine,
+                GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+            );
+            InitMover(ctx, ent);
+
+            (*ent).s.pos.trBase = (*ent).s.origin;
+            (*ent).r.currentOrigin = (*ent).s.pos.trBase;
+            (*ent).r.currentAngles = (*ent).s.apos.trBase;
+
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+        }
+
+        G_SpawnInt(ctx, c"model2scale".as_ptr(), c"0".as_ptr(), &mut (*ent).s.iModelScale as *mut c_int);
+        if (*ent).s.iModelScale < 0 {
+            (*ent).s.legsFlip = qtrue;
+            (*ent).s.iModelScale = -(*ent).s.iModelScale;
+        } else if (*ent).s.iModelScale > 1023 {
+            (*ent).s.iModelScale = 1023;
+        }
+
+        if G_SpawnVector(ctx, c"spinangles".as_ptr(), c"0 0 0".as_ptr(), spinangles.as_mut_ptr()) != 0 {
+            (*ent).speed =
+                (spinangles[0] * spinangles[0] + spinangles[1] * spinangles[1] + spinangles[2] * spinangles[2]).sqrt();
+            // set the axis of rotation
+            (*ent).s.apos.trDelta = spinangles;
+        } else {
+            if (*ent).speed == 0.0 {
+                (*ent).speed = 100.0;
+            }
+            // set the axis of rotation
+            if (*ent).spawnflags & 4 != 0 {
+                (*ent).s.apos.trDelta[2] = (*ent).speed;
+            } else if (*ent).spawnflags & 8 != 0 {
+                (*ent).s.apos.trDelta[0] = (*ent).speed;
+            } else {
+                (*ent).s.apos.trDelta[1] = (*ent).speed;
+            }
+        }
+        (*ent).s.apos.trType = trType_t::TR_LINEAR;
+
+        if (*ent).damage == 0 {
+            if (*ent).spawnflags & 16 != 0 {
+                // IMPACT
+                (*ent).damage = 10000;
+            } else {
+                (*ent).damage = 2;
+            }
+        }
+        //TODO: Port EF_RADAROBJECT
+        // Source: oracle/oracle/codemp/game/g_mover.c:2204-2208 — the RADAR
+        // spawnflag (2) additionally sets `s.speed = Distance(absmin,
+        // absmax)*0.5` and `s.eFlags |= EF_RADAROBJECT` here.
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_SetBrushModel`
-// (needs `&Engine`).
 /// Raven `SP_func_bobbing`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2231-2258`
@@ -827,11 +2222,39 @@ pub fn SP_func_bobbing(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_func_bobbing — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut height = 0.0f32;
+        let mut phase = 0.0f32;
+
+        G_SpawnFloat(ctx, c"speed".as_ptr(), c"4".as_ptr(), &mut (*ent).speed as *mut f32);
+        G_SpawnFloat(ctx, c"height".as_ptr(), c"32".as_ptr(), &mut height as *mut f32);
+        G_SpawnInt(ctx, c"dmg".as_ptr(), c"2".as_ptr(), &mut (*ent).damage as *mut c_int);
+        G_SpawnFloat(ctx, c"phase".as_ptr(), c"0".as_ptr(), &mut phase as *mut f32);
+
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+        );
+        InitMover(ctx, ent);
+
+        (*ent).s.pos.trBase = (*ent).s.origin;
+        (*ent).r.currentOrigin = (*ent).s.origin;
+
+        (*ent).s.pos.trDuration = ((*ent).speed * 1000.0) as c_int;
+        (*ent).s.pos.trTime = ((*ent).s.pos.trDuration as f32 * phase) as c_int;
+        (*ent).s.pos.trType = trType_t::TR_SINE;
+
+        // set the axis of bobbing
+        if (*ent).spawnflags & 1 != 0 {
+            (*ent).s.pos.trDelta[0] = height;
+        } else if (*ent).spawnflags & 2 != 0 {
+            (*ent).s.pos.trDelta[1] = height;
+        } else {
+            (*ent).s.pos.trDelta[2] = height;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_SetBrushModel`
-// (needs `&Engine`).
 /// Raven `SP_func_pendulum`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2280-2313`
@@ -839,7 +2262,41 @@ pub fn SP_func_pendulum(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_func_pendulum — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut speed = 0.0f32;
+        let mut phase = 0.0f32;
+
+        G_SpawnFloat(ctx, c"speed".as_ptr(), c"30".as_ptr(), &mut speed as *mut f32);
+        G_SpawnInt(ctx, c"dmg".as_ptr(), c"2".as_ptr(), &mut (*ent).damage as *mut c_int);
+        G_SpawnFloat(ctx, c"phase".as_ptr(), c"0".as_ptr(), &mut phase as *mut f32);
+
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+        );
+
+        // find pendulum length
+        let mut length = (*ent).r.mins[2].abs();
+        if length < 8.0 {
+            length = 8.0;
+        }
+
+        let freq = 1.0 / (core::f32::consts::PI * 2.0) * ((*ctx.world).cvars.g_gravity.value / (3.0 * length)).sqrt();
+
+        (*ent).s.pos.trDuration = (1000.0 / freq) as c_int;
+
+        InitMover(ctx, ent);
+
+        (*ent).s.pos.trBase = (*ent).s.origin;
+        (*ent).r.currentOrigin = (*ent).s.origin;
+
+        (*ent).s.apos.trBase = (*ent).s.angles;
+
+        (*ent).s.apos.trDuration = (1000.0 / freq) as c_int;
+        (*ent).s.apos.trTime = ((*ent).s.apos.trDuration as f32 * phase) as c_int;
+        (*ent).s.apos.trType = trType_t::TR_SINE;
+        (*ent).s.apos.trDelta[2] = speed;
+    }
 }
 
 // PORT-ESCALATION(bg-dep): `material_t` (`MAT_GLASS`, `MAT_METAL`, …) is a
@@ -915,8 +2372,6 @@ pub fn G_Chunks(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`,
-// `level.time`, calls `trap_` syscalls.
 /// Raven `funcBBrushDieGo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2398-2498`
@@ -924,10 +2379,120 @@ pub fn funcBBrushDieGo(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port funcBBrushDieGo — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let attacker = (*self_).enemy;
+        let chunk_type = (*self_).material;
+
+        // if a missile is stuck to us, blow it up so we don't look dumb
+        for i in 0..mp_qshared::shared::MAX_GENTITIES {
+            let other = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            //TODO: Port EF_MISSILE_STICK
+            // Source: oracle/oracle/codemp/game/g_mover.c:2409 — the
+            // `EF_MISSILE_STICK` eFlags bit isn't type-ported anywhere in
+            // the crate graph yet, so this sub-condition can't be checked
+            // faithfully; left unguarded (over-inclusive) rather than
+            // silently dropped.
+            if (*other).s.groundEntityNum == (*self_).s.number {
+                G_Damage(other, self_, self_, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 99999, 0, meansOfDeath_t::MOD_CRUSH as c_int);
+            }
+        }
+
+        // so chunks don't get stuck inside me
+        (*self_).s.solid = 0;
+        (*self_).r.contents = 0;
+        (*self_).clipmask = 0;
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+
+        let up = [0.0f32, 0.0, 1.0];
+
+        if !(*self_).target.is_null() && !attacker.is_null() {
+            G_UseTargets(ctx, self_, attacker);
+        }
+
+        let org_size = [
+            (*self_).r.absmax[0] - (*self_).r.absmin[0],
+            (*self_).r.absmax[1] - (*self_).r.absmin[1],
+            (*self_).r.absmax[2] - (*self_).r.absmin[2],
+        ];
+
+        // Raven `random()` macro == `(rand()&RAND_MAX)/(float)RAND_MAX`.
+        let random = || (crate::bg_lib::rand() & RAND_MAX) as f32 / RAND_MAX as f32;
+        let mut num_chunks = (random() * 6.0 + 18.0) as c_int;
+
+        // this formula really has no logical basis other than the fact
+        // that it seemed to be the closest to yielding the results that I
+        // wanted. Volume is length * width * height...then break that
+        // volume down based on how many chunks we have.
+        let mut scale = (org_size[0] * org_size[1] * org_size[2]).sqrt().sqrt() * 1.75;
+
+        let size = if scale > 48.0 {
+            2
+        } else if scale > 24.0 {
+            1
+        } else {
+            0
+        };
+
+        scale /= num_chunks as f32;
+
+        if (*self_).radius > 0.0 {
+            // designer wants to scale number of chunks, helpful because the
+            // above scale code is far from perfect — I do this after the
+            // scale calculation because it seems that the chunk size
+            // generally seems to be very close, it's just the number of
+            // chunks is a bit weak.
+            num_chunks = (num_chunks as f32 * (*self_).radius) as c_int;
+        }
+
+        let mut org = [
+            (*self_).r.absmin[0] + (*self_).r.absmax[0],
+            (*self_).r.absmin[1] + (*self_).r.absmax[1],
+            (*self_).r.absmin[2] + (*self_).r.absmax[2],
+        ];
+        for c in org.iter_mut() {
+            *c *= 0.5;
+        }
+
+        let dir = if !attacker.is_null() && !(*attacker).client.is_null() {
+            let mut d = [
+                org[0] - (*attacker).r.currentOrigin[0],
+                org[1] - (*attacker).r.currentOrigin[1],
+                org[2] - (*attacker).r.currentOrigin[2],
+            ];
+            VectorNormalize(&mut d);
+            d
+        } else {
+            up
+        };
+
+        if (*self_).spawnflags & 2048 == 0 {
+            // NO_EXPLOSION — we are allowed to explode
+            G_MiscModelExplosion(ctx, (*self_).r.absmin, (*self_).r.absmax, size, chunk_type);
+        }
+
+        if (*self_).genericValue15 != 0 {
+            // a custom effect to play
+            let ang = [0.0f32, 1.0, 0.0];
+            G_PlayEffectID((*self_).genericValue15, org, ang);
+        }
+
+        if (*self_).splashDamage > 0 && (*self_).splashRadius > 0 {
+            // explode
+            G_RadiusDamage(ctx, org, self_, (*self_).splashDamage as f32, (*self_).splashRadius as f32, self_, core::ptr::null_mut(), meansOfDeath_t::MOD_UNKNOWN as c_int);
+
+            let te = G_TempEntity(ctx, org, entity_event_t::EV_GENERAL_SOUND as c_int);
+            (*te).s.eventParm = G_SoundIndex(c"sound/weapons/explosions/cargoexplode.wav".as_ptr());
+        }
+
+        //FIXME: base numChunks off size?
+        G_Chunks(ctx, (*self_).s.number, org, dir, (*self_).r.absmin, (*self_).r.absmax, 300.0, num_chunks, chunk_type, 0, scale * (*self_).mass);
+
+        trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(self_, qtrue));
+        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).nextthink = (*ctx.world).level.time + 50;
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `funcBBrushDie`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2500-2514`
@@ -939,7 +2504,18 @@ pub fn funcBBrushDie(
     damage: c_int,
     r#mod: c_int,
 ) {
-    todo!("Port funcBBrushDie — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        (*self_).takedamage = qfalse; // stop chain reaction runaway loops
+        (*self_).enemy = attacker;
+
+        if (*self_).delay != 0 {
+            (*self_).think = Some(EntThink::funcBBrushDieGo);
+            (*self_).nextthink = (*ctx.world).level.time + ((*self_).delay as f32 * 1000.0).floor() as c_int;
+            return;
+        }
+
+        funcBBrushDieGo(ctx, self_);
+    }
 }
 
 /// Raven `funcBBrushUse`.
@@ -964,7 +2540,12 @@ pub fn funcBBrushUse(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
+// PORT-ESCALATION(unported-consts): the stone-chunk branch compares
+// `material` against `MAT_DRK_STONE`/`MAT_LT_STONE`/`MAT_GREY_STONE`/
+// `MAT_SNOWY_ROCK` (`material_t`'s anonymous enum, `q_shared.h`) — not
+// type-ported anywhere in the crate graph yet (same blocker as
+// `CacheChunkEffects` in this file); left as an explicit `//TODO: Port`
+// no-op, rest of the body faithfully ported.
 /// Raven `funcBBrushPain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2532-2597`
@@ -974,11 +2555,38 @@ pub fn funcBBrushPain(
     attacker: *mut gentity_t,
     damage: c_int,
 ) {
-    todo!("Port funcBBrushPain — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*self_).painDebounceTime > (*ctx.world).level.time {
+            return;
+        }
+
+        if !(*self_).paintarget.is_null() && *(*self_).paintarget != 0 {
+            if (*self_).activator.is_null() {
+                if !attacker.is_null() && (*attacker).inuse != 0 && !(*attacker).client.is_null() {
+                    G_UseTargets2(ctx, self_, attacker, (*self_).paintarget);
+                }
+            } else {
+                G_UseTargets2(ctx, self_, (*self_).activator, (*self_).paintarget);
+            }
+        }
+
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_PAIN as c_int);
+
+        //TODO: Port MAT_DRK_STONE, MAT_LT_STONE, MAT_GREY_STONE, MAT_SNOWY_ROCK
+        // Source: oracle/oracle/codemp/game/g_mover.c:2556-2588 — the stone
+        // chunk-spawning branch (`G_Chunks` with a `Q_irand(1,3)`-scaled
+        // count) needs these `material_t` values, not type-ported anywhere
+        // in the crate graph yet.
+
+        if (*self_).wait == 0.0 {
+            (*self_).pain = None;
+            return;
+        }
+
+        (*self_).painDebounceTime = (*ctx.world).level.time + (*self_).wait as c_int;
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// (needs `&Engine`).
 /// Raven `InitBBrush`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2599-2661`
@@ -986,7 +2594,60 @@ pub fn InitBBrush(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port InitBBrush — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        (*ent).pos1 = (*ent).s.origin;
+
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+        );
+
+        (*ent).die = Some(EntDie::funcBBrushDie);
+        (*ent).flags |= crate::entity::flags::FL_BBRUSH;
+
+        // if the "model2" key is set, use a separate model for drawing, but
+        // clip against the brushes
+        if !(*ent).model2.is_null() && *(*ent).model2 != 0 {
+            (*ent).s.modelindex2 = G_ModelIndex((*ent).model2);
+        }
+
+        // if the "color" or "light" keys are set, setup constantLight
+        let mut light = 0.0f32;
+        let mut color: vec3_t = [0.0; 3];
+        let light_set = G_SpawnFloat(ctx, c"light".as_ptr(), c"100".as_ptr(), &mut light as *mut f32);
+        let color_set = G_SpawnVector(ctx, c"color".as_ptr(), c"1 1 1".as_ptr(), color.as_mut_ptr());
+        if light_set != 0 || color_set != 0 {
+            let mut r = (color[0] * 255.0) as c_int;
+            if r > 255 {
+                r = 255;
+            }
+            let mut g = (color[1] * 255.0) as c_int;
+            if g > 255 {
+                g = 255;
+            }
+            let mut b = (color[2] * 255.0) as c_int;
+            if b > 255 {
+                b = 255;
+            }
+            let mut i = (light / 4.0) as c_int;
+            if i > 255 {
+                i = 255;
+            }
+            (*ent).s.constantLight = r | (g << 8) | (b << 16) | (i << 24);
+        }
+
+        //TODO: Port SVF_PLAYER_USABLE
+        // Source: oracle/oracle/codemp/game/g_mover.c:2651-2654 — spawnflag
+        // bit 128 additionally sets `r.svFlags |= SVF_PLAYER_USABLE` here;
+        // that flag's bit value isn't type-ported anywhere in the crate
+        // graph yet.
+
+        (*ent).s.eType = entityType_t::ET_MOVER as c_int;
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+
+        (*ent).s.pos.trType = trType_t::TR_STATIONARY;
+        (*ent).s.pos.trBase = (*ent).pos1;
+    }
 }
 
 /// Raven `funcBBrushTouch`.
@@ -1000,8 +2661,6 @@ pub fn funcBBrushTouch(
 ) {
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): `G_Error` has no
-// engine/world seam yet.
 /// Raven `SP_func_breakable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2731-2829`
@@ -1009,11 +2668,85 @@ pub fn SP_func_breakable(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_func_breakable — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut s: *mut c_char = core::ptr::null_mut();
+        G_SpawnString(ctx, c"playfx".as_ptr(), c"".as_ptr(), &mut s as *mut *mut c_char);
+
+        if !s.is_null() && *s != 0 {
+            // should we play a special death effect?
+            (*self_).genericValue15 = G_EffectIndex(s);
+        } else {
+            (*self_).genericValue15 = 0;
+        }
+
+        if (*self_).spawnflags & 1 == 0 && (*self_).health == 0 {
+            (*self_).health = 10;
+        }
+
+        let mut t = 0;
+        G_SpawnInt(ctx, c"showhealth".as_ptr(), c"0".as_ptr(), &mut t as *mut c_int);
+        if t != 0 {
+            // a non-0 maxhealth value will mean we want to show the health
+            // on the hud
+            (*self_).maxHealth = (*self_).health;
+            G_ScaleNetHealth(self_);
+        }
+
+        if (*self_).spawnflags & 16 != 0 {
+            // saber only
+            (*self_).flags |= crate::entity::flags::FL_DMG_BY_SABER_ONLY;
+        } else if (*self_).spawnflags & 32 != 0 {
+            // heavy weap
+            (*self_).flags |= crate::entity::flags::FL_DMG_BY_HEAVY_WEAP_ONLY;
+        }
+
+        if (*self_).health != 0 {
+            (*self_).takedamage = qtrue;
+        }
+
+        G_SoundIndex(c"sound/weapons/explosions/cargoexplode.wav".as_ptr()); // precaching
+        G_SpawnFloat(ctx, c"radius".as_ptr(), c"1".as_ptr(), &mut (*self_).radius as *mut f32); // used to scale chunk code if desired by a designer
+        G_SpawnInt(ctx, c"material".as_ptr(), c"0".as_ptr(), &mut (*self_).material as *mut material_t);
+
+        G_SpawnInt(ctx, c"splashDamage".as_ptr(), c"0".as_ptr(), &mut (*self_).splashDamage as *mut c_int);
+        G_SpawnInt(ctx, c"splashRadius".as_ptr(), c"0".as_ptr(), &mut (*self_).splashRadius as *mut c_int);
+
+        CacheChunkEffects(ctx, (*self_).material);
+
+        (*self_).use_ = Some(EntUse::funcBBrushUse);
+
+        (*self_).pain = Some(EntPain::funcBBrushPain);
+        (*self_).touch = Some(EntTouch::funcBBrushTouch);
+
+        if !(*self_).team.is_null()
+            && *(*self_).team != 0
+            && (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
+            && (*self_).teamnodmg == 0
+        {
+            (*self_).teamnodmg = atoi_cstr((*self_).team);
+        }
+        (*self_).team = core::ptr::null_mut();
+        if (*self_).model.is_null() {
+            G_Error(ctx, c"func_breakable with NULL model\n".as_ptr());
+        }
+        InitBBrush(ctx, self_);
+
+        if (*self_).radius == 0.0 {
+            // numchunks multiplier
+            (*self_).radius = 1.0;
+        }
+        if (*self_).mass == 0.0 {
+            // chunksize multiplier
+            (*self_).mass = 1.0;
+        }
+        (*self_).genericValue4 = 1; // so damage sys knows it's a bbrush
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`
-// (global array).
+// PORT-ESCALATION(unported-consts): the first branch (`SVF_GLASS_BRUSH`)
+// needs that bit value (`q_shared.h`), not type-ported anywhere in the
+// crate graph yet; skipped with an explicit `//TODO: Port` — the remaining
+// classname checks are faithfully ported.
 /// Raven `G_EntIsBreakable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2831-2866`
@@ -1021,7 +2754,29 @@ pub fn G_EntIsBreakable(
     ctx: GameContext<'_>,
     entityNum: c_int,
 ) -> qboolean {
-    todo!("Port G_EntIsBreakable — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
+            return qfalse;
+        }
+
+        let ent = &mut (*ctx.world).entities[entityNum as usize] as *mut gentity_t;
+
+        //TODO: Port SVF_GLASS_BRUSH
+        // Source: oracle/oracle/codemp/game/g_mover.c:2841-2844
+
+        if crate::q_shared::Q_stricmp((*ent).classname, c"func_breakable".as_ptr()) == 0 {
+            return qtrue;
+        }
+
+        if crate::q_shared::Q_stricmp((*ent).classname, c"misc_model_breakable".as_ptr()) == 0 {
+            return qtrue;
+        }
+        if crate::q_shared::Q_stricmp((*ent).classname, c"misc_maglock".as_ptr()) == 0 {
+            return qtrue;
+        }
+
+        qfalse
+    }
 }
 
 /// Raven `GlassDie`.
@@ -1147,8 +2902,9 @@ pub fn GlassUse(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_SetBrushModel`
-// (needs `&Engine`).
+// PORT-ESCALATION(unported-consts): `ent->r.svFlags = SVF_GLASS_BRUSH` needs
+// that bit value (`q_shared.h`), not type-ported anywhere in the crate graph
+// yet — the rest of the spawn body is faithfully ported below it.
 /// Raven `SP_func_glass`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2957-2990`
@@ -1156,11 +2912,41 @@ pub fn SP_func_glass(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_func_glass — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+        );
+        InitMover(ctx, ent);
+
+        //TODO: Port SVF_GLASS_BRUSH
+        // Source: oracle/oracle/codemp/game/g_mover.c:2961 — Raven sets
+        // `ent->r.svFlags = SVF_GLASS_BRUSH` here.
+
+        (*ent).s.pos.trBase = (*ent).s.origin;
+        (*ent).r.currentOrigin = (*ent).s.origin;
+        if (*ent).health == 0 {
+            (*ent).health = 1;
+        }
+
+        G_SpawnInt(ctx, c"maxshards".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue3 as *mut c_int);
+
+        (*ent).genericValue1 = 0;
+        (*ent).genericValue4 = 1;
+        (*ent).moverState = MOVER_POS1;
+
+        if (*ent).spawnflags & 1 != 0 {
+            (*ent).takedamage = qfalse;
+        } else {
+            (*ent).takedamage = qtrue;
+        }
+
+        (*ent).die = Some(EntDie::GlassDie);
+        (*ent).use_ = Some(EntUse::GlassUse);
+        (*ent).pain = Some(EntPain::GlassPain);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// calls `trap_LinkEntity`.
 /// Raven `func_wait_return_solid`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2995-3025`
@@ -1168,22 +2954,57 @@ pub fn func_wait_return_solid(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port func_wait_return_solid — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // once a frame, see if it's clear
+        (*self_).clipmask = CONTENTS_BODY;
+        if (*self_).spawnflags & 16 == 0 || G_TestEntityPosition(ctx, self_).is_null() {
+            trap::SetBrushModel(
+                ctx.engine,
+                GSetBrushModelArgs::new(self_, std::ffi::CStr::from_ptr((*self_).model).to_owned()),
+            );
+            InitMover(ctx, self_);
+            (*self_).s.pos.trBase = (*self_).s.origin;
+            (*self_).r.currentOrigin = (*self_).s.origin;
+            (*self_).r.svFlags &= !SVF_NOCLIENT;
+            (*self_).s.eFlags &= !EF_NODRAW;
+            (*self_).use_ = Some(EntUse::func_usable_use);
+            (*self_).clipmask = 0;
+            if !(*self_).target2.is_null() && *(*self_).target2 != 0 {
+                G_UseTargets2(ctx, self_, (*self_).activator, (*self_).target2);
+            }
+        } else {
+            (*self_).clipmask = 0;
+            (*self_).think = Some(EntThink::func_wait_return_solid);
+            (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
+        }
+    }
 }
 
-// PORT-ESCALATION(unported-flag-consts): `self->r.svFlags |= SVF_PLAYER_USABLE`
-// needs `SVF_PLAYER_USABLE`, not type-ported anywhere in the crate graph yet.
+// PORT-ESCALATION(unported-consts): `self->r.svFlags |= SVF_PLAYER_USABLE`
+// needs that bit value (`q_shared.h`), not type-ported anywhere in the crate
+// graph yet.
 /// Raven `func_usable_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3027-3035`
 pub fn func_usable_think(
     self_: *mut gentity_t,
 ) {
-    todo!("Port func_usable_think — parked: unported-flag-consts (SVF_PLAYER_USABLE)")
+    unsafe {
+        if (*self_).spawnflags & 8 != 0 {
+            //TODO: Port SVF_PLAYER_USABLE
+            // Source: oracle/oracle/codemp/game/g_mover.c:3031 — Raven sets
+            // `self->r.svFlags |= SVF_PLAYER_USABLE` here (replace the
+            // usable flag).
+            (*self_).use_ = Some(EntUse::func_usable_use);
+            (*self_).think = None;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`
-// (global array).
+// PORT-ESCALATION(unported-consts): the central condition needs
+// `EF_SHADER_ANIM`'s bit value (`bg_public.h`), which is not type-ported
+// anywhere in the crate graph yet, and is load-bearing for the branch
+// (not a side-effect-only assignment) — parked rather than guessed (rule 2).
 /// Raven `G_EntIsRemovableUsable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3037-3048`
@@ -1191,11 +3012,13 @@ pub fn G_EntIsRemovableUsable(
     ctx: GameContext<'_>,
     entNum: c_int,
 ) -> qboolean {
-    todo!("Port G_EntIsRemovableUsable — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port G_EntIsRemovableUsable — parked: unported-consts (EF_SHADER_ANIM)")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`
-// (`self->nextthink = level.time + ...`).
+// PORT-ESCALATION(unported-consts): the first branch dispatches on
+// `self->s.eFlags & EF_SHADER_ANIM`, which is not type-ported anywhere in
+// the crate graph yet and is load-bearing control flow (not a side-effect-
+// only assignment) — parked rather than guessed (rule 2).
 /// Raven `func_usable_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3050-3106`
@@ -1205,7 +3028,7 @@ pub fn func_usable_use(
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port func_usable_use — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port func_usable_use — parked: unported-consts (EF_SHADER_ANIM)")
 }
 
 /// Raven `func_usable_pain`.
@@ -1237,8 +3060,12 @@ pub fn func_usable_die(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): `G_Error` has no
-// engine/world seam yet.
+// PORT-ESCALATION(unported-consts): the `spawnflags & 1` branch and the
+// `genericValue5 > 0` tail need `SVF_NOCLIENT`/`EF_NODRAW`/`EF_SHADER_ANIM`;
+// `SVF_NOCLIENT`/`EF_NODRAW` are available (reused above) but
+// `EF_SHADER_ANIM` is not type-ported anywhere in the crate graph yet —
+// that one assignment is left as an explicit `//TODO: Port` no-op, the rest
+// of the body faithfully ported.
 /// Raven `SP_func_usable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3140-3203`
@@ -1246,11 +3073,59 @@ pub fn SP_func_usable(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_func_usable — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(self_, std::ffi::CStr::from_ptr((*self_).model).to_owned()),
+        );
+        InitMover(ctx, self_);
+        (*self_).s.pos.trBase = (*self_).s.origin;
+        (*self_).r.currentOrigin = (*self_).s.origin;
+        (*self_).pos1 = (*self_).s.origin;
+
+        G_SpawnInt(ctx, c"endframe".as_ptr(), c"0".as_ptr(), &mut (*self_).genericValue5 as *mut c_int);
+
+        if !(*self_).model2.is_null() && *(*self_).model2 != 0 {
+            // Raven `strstr(self->model2, ".glm")` — no ported `strstr`
+            // binding in this crate; `CStr::contains` is the equivalent
+            // substring check.
+            if std::ffi::CStr::from_ptr((*self_).model2).to_string_lossy().contains(".glm") {
+                // for now, not supported in MP.
+                (*self_).s.modelindex2 = 0;
+            } else {
+                (*self_).s.modelindex2 = G_ModelIndex((*self_).model2);
+            }
+        }
+
+        (*self_).count = 1;
+        if (*self_).spawnflags & 1 != 0 {
+            (*self_).s.solid = 0;
+            (*self_).r.contents = 0;
+            (*self_).clipmask = 0;
+            (*self_).r.svFlags |= SVF_NOCLIENT;
+            (*self_).s.eFlags |= EF_NODRAW;
+            (*self_).count = 0;
+        }
+
+        (*self_).use_ = Some(EntUse::func_usable_use);
+
+        if (*self_).health != 0 {
+            (*self_).takedamage = qtrue;
+            (*self_).die = Some(EntDie::func_usable_die);
+            (*self_).pain = Some(EntPain::func_usable_pain);
+        }
+
+        if (*self_).genericValue5 > 0 {
+            (*self_).s.frame = 0;
+            //TODO: Port EF_SHADER_ANIM
+            // Source: oracle/oracle/codemp/game/g_mover.c:3198
+            (*self_).s.time = (*self_).genericValue5 + 1;
+        }
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// (needs `&Engine`).
 /// Raven `use_wall`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3215-3241`
@@ -1260,11 +3135,31 @@ pub fn use_wall(
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port use_wall — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
+
+        // not there so make it there
+        if (*ent).r.contents & CONTENTS_SOLID == 0 {
+            (*ent).r.svFlags &= !SVF_NOCLIENT;
+            (*ent).s.eFlags &= !EF_NODRAW;
+            (*ent).r.contents = CONTENTS_SOLID;
+            if (*ent).spawnflags & 1 == 0 {
+                // START_OFF doesn't affect area portals
+                trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qfalse));
+            }
+        } else {
+            // make it go away
+            (*ent).r.contents = 0;
+            (*ent).r.svFlags |= SVF_NOCLIENT;
+            (*ent).s.eFlags |= EF_NODRAW;
+            if (*ent).spawnflags & 1 == 0 {
+                // START_OFF doesn't affect area portals
+                trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qtrue));
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
-// (needs `&Engine`).
 /// Raven `SP_func_wall`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3256-3279`
@@ -1272,5 +3167,28 @@ pub fn SP_func_wall(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_func_wall — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
+        );
+
+        (*ent).pos1 = (*ent).s.origin;
+        (*ent).pos2 = (*ent).s.origin;
+
+        InitMover(ctx, ent);
+        (*ent).s.pos.trBase = (*ent).s.origin;
+        (*ent).r.currentOrigin = (*ent).s.origin;
+
+        // it must be START_OFF
+        if (*ent).spawnflags & FUNC_WALL_OFF != 0 {
+            (*ent).r.contents = 0;
+            (*ent).r.svFlags |= SVF_NOCLIENT;
+            (*ent).s.eFlags |= EF_NODRAW;
+        }
+
+        (*ent).use_ = Some(EntUse::use_wall);
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }

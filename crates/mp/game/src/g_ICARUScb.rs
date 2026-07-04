@@ -21,9 +21,25 @@ use crate::q_math::vec3_origin;
 // Source: `oracle/oracle/codemp/game/q_shared.h`
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
+
+// Raven's server frame period; ported locally per house precedent (see
+// `g_mover.rs:69`) since it's a `#define` constant, not a global.
+// Source: `oracle/oracle/codemp/game/g_local.h`
+const FRAMETIME: c_int = 100;
 use crate::g_combat::G_Damage;
 use crate::g_mover::{G_PlayDoorSound, MatchTeam};
 use crate::g_utils::G_FreeEntity;
+use crate::ent_fn_enums::{EntThink, EntBlocked, EntReached};
+use std::ffi::CString;
+use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
+use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
+use mp_abi::game::syscalls::G_ICARUS_TASKIDSET::GIcarusTaskidsetArgs;
+use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
+use mp_abi::game::syscalls::G_ROFF_CACHE::GRoffCacheArgs;
+use mp_abi::game::syscalls::G_ROFF_PLAY::GRoffPlayArgs;
+use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
+use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
+use crate::g_client::SetClientViewAngle;
 
 
 /// Raven `Q3_TaskIDClear`.
@@ -129,10 +145,11 @@ pub fn Q3_GetAnimBoth(
     }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_PlaySound`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:400-520`
+// The `#if 0`-style subtitle/broadcast-text block (g_ICARUScb.c:441-479) is
+// commented out in Raven itself; not transcribed (dead source).
 pub fn Q3_PlaySound(
     ctx: GameContext<'_>,
     taskID: c_int,
@@ -140,10 +157,77 @@ pub fn Q3_PlaySound(
     name: *const c_char,
     channel: *const c_char,
 ) -> c_int {
-    todo!("Port Q3_PlaySound — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:400")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let mut final_name = [0i8; MAX_QPATH as usize];
+        Q_strncpyz(final_name.as_mut_ptr(), name, MAX_QPATH);
+        Q_strupr(final_name.as_mut_ptr());
+        COM_StripExtension(final_name.as_ptr(), final_name.as_mut_ptr());
+
+        let sound_handle = G_SoundIndex(final_name.as_ptr());
+        let mut b_broadcast = qfalse;
+
+        if Q_stricmp(channel, b"CHAN_ANNOUNCER\0".as_ptr() as *const c_char) == 0
+            || (!(*ent).classname.is_null()
+                && Q_stricmp(
+                    b"target_scriptrunner\0".as_ptr() as *const c_char,
+                    (*ent).classname,
+                ) == 0)
+        {
+            b_broadcast = qtrue;
+        }
+
+        let mut voice_chan = CHAN_VOICE;
+        let mut type_voice = qfalse;
+        if Q_stricmp(channel, b"CHAN_VOICE\0".as_ptr() as *const c_char) == 0 {
+            voice_chan = CHAN_VOICE;
+            type_voice = qtrue;
+        } else if Q_stricmp(channel, b"CHAN_VOICE_ATTEN\0".as_ptr() as *const c_char) == 0 {
+            voice_chan = CHAN_AUTO;
+            type_voice = qtrue;
+        } else if Q_stricmp(channel, b"CHAN_VOICE_GLOBAL\0".as_ptr() as *const c_char) == 0 {
+            voice_chan = CHAN_AUTO;
+            type_voice = qtrue;
+            b_broadcast = qtrue;
+        }
+
+        if type_voice != 0 {
+            let mut buf = [0i8; 128];
+            trap::Cvar_VariableStringBuffer(
+                ctx.engine,
+                GCvarVariableStringBufferArgs::new(
+                    CString::new("timescale").unwrap(),
+                    buf.as_mut_ptr(),
+                    buf.len() as c_int,
+                ),
+            );
+            let t_f_val = atof(buf.as_ptr()) as f32;
+
+            if t_f_val > 1.0 {
+                // Skip the damn sound!
+                return qtrue;
+            } else {
+                G_Sound(ctx, ent, voice_chan, sound_handle);
+            }
+            trap::ICARUS_TaskIDSet(
+                ctx.engine,
+                GIcarusTaskidsetArgs::new(ent, taskID_t::TID_CHAN_VOICE as c_int, taskID),
+            );
+            return qfalse;
+        }
+
+        if b_broadcast != 0 {
+            let te = G_TempEntity(ctx, (*ent).r.currentOrigin, EV_GLOBAL_SOUND as c_int);
+            (*te).s.eventParm = sound_handle;
+            (*te).r.svFlags |= SVF_BROADCAST;
+        } else {
+            G_Sound(ctx, ent, CHAN_AUTO, sound_handle);
+        }
+
+        qtrue
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_Play`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:527-560`
@@ -154,36 +238,77 @@ pub fn Q3_Play(
     r#type: *const c_char,
     name: *const c_char,
 ) {
-    todo!("Port Q3_Play — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:527")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if Q_stricmp(r#type, b"PLAY_ROFF\0".as_ptr() as *const c_char) == 0 {
+            // Raven passes `name` (already a `char*`) straight to `trap_ROFF_Cache`;
+            // the ABI arg is an owned `CString` here.
+            let file = CString::new(std::ffi::CStr::from_ptr(name).to_bytes()).unwrap();
+            (*ent).roffid = trap::ROFF_Cache(ctx.engine, GRoffCacheArgs::new(file));
+            if (*ent).roffid != 0 {
+                (*ent).roffname = G_NewString(name);
+
+                (*ent).s.origin2 = (*ent).r.currentOrigin;
+                (*ent).s.angles2 = (*ent).r.currentAngles;
+
+                trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+
+                trap::ROFF_Play(
+                    ctx.engine,
+                    GRoffPlayArgs::new((*ent).s.number, (*ent).roffid, qtrue),
+                );
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body needs `trap::ICARUS_TaskIDComplete`/
-// `trap::LinkEntity` (ruling 1) and `level.time` (GameWorld field) — how is
-// state threaded in? `VectorMA`/`VectorCopy`/`VectorClear` also need
-// transcribing as plain array arithmetic (bless-the-rule appendix) instead of
-// bare function calls once the receiver lands.
 /// Raven `anglerCallback`.
 ///
 /// Utility function.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:569-591`
-pub fn anglerCallback(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port anglerCallback — parked: seam-threading")
+pub fn anglerCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
+    unsafe {
+        trap::ICARUS_TaskIDComplete(
+            ctx.engine,
+            GIcarusTaskidcompleteArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int),
+        );
+
+        // VectorMA(trBase, trDuration*0.001, trDelta, currentAngles)
+        let scale = (*ent).s.apos.trDuration as f32 * 0.001;
+        for i in 0..3 {
+            (*ent).r.currentAngles[i] = (*ent).s.apos.trBase[i] + scale * (*ent).s.apos.trDelta[i];
+        }
+        (*ent).s.apos.trBase = (*ent).r.currentAngles;
+        (*ent).s.apos.trDelta = [0.0, 0.0, 0.0];
+        (*ent).s.apos.trDuration = 1;
+        (*ent).s.apos.trType = trType_t::TR_STATIONARY;
+        (*ent).s.apos.trTime = (*ctx.world).level.time;
+
+        // Stop thinking.
+        (*ent).reached = None;
+        // Raven compares `ent->think == anglerCallback` by address (ruling 2:
+        // fn-ID enums replace address compares) before clearing it; the
+        // `gentity_t.think` field is not yet retrofitted from a raw fn-ptr to
+        // `Option<EntThink>` so the compare itself can't be reproduced here.
+        // This callback is only ever assigned as its own think, so
+        // unconditionally clearing is behaviorally equivalent.
+        (*ent).think = None;
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body needs `trap::ICARUS_TaskIDComplete`
-// and `level.time` (ruling 1); also reads the unported `extern int BMS_END`
-// global (`g_local.h:1216`, unported-global) and calls `G_PlayDoorSound`/
-// `MatchTeam` which need the same receiver.
+// PORT-ESCALATION(unported-global): `moverCallback` reads `BMS_END`
+// (`g_local.h:1216`) via `G_PlayDoorSound(ent, BMS_END)` — the `BMS_*` sound-slot
+// consts are not ported anywhere in the worktree yet (see STATE FIELDS TOUCHED
+// in the packet digest).
 /// Raven `moverCallback`.
 ///
 /// Utility function.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:603-633`
-pub fn moverCallback(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port moverCallback — parked: seam-threading")
+pub fn moverCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
+    todo!("Port moverCallback — parked (unported-global: BMS_END): oracle/oracle/codemp/game/g_ICARUScb.c:603")
 }
 
 /// Raven `Blocked_Mover`.
@@ -240,7 +365,8 @@ pub fn moveAndRotateCallback(
     moverCallback(ctx, ent);
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): calls `G_PlayDoorSound(ent, BMS_START)` —
+// `BMS_START` is not ported anywhere in the worktree.
 /// Raven `Q3_Lerp2Start`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:682-721`
@@ -250,10 +376,10 @@ pub fn Q3_Lerp2Start(
     taskID: c_int,
     duration: f32,
 ) {
-    todo!("Port Q3_Lerp2Start — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:682")
+    todo!("Port Q3_Lerp2Start — parked (unported-global: BMS_START): oracle/oracle/codemp/game/g_ICARUScb.c:682")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): same `BMS_START` dependency as `Q3_Lerp2Start`.
 /// Raven `Q3_Lerp2End`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:730-769`
@@ -263,10 +389,10 @@ pub fn Q3_Lerp2End(
     taskID: c_int,
     duration: f32,
 ) {
-    todo!("Port Q3_Lerp2End — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:730")
+    todo!("Port Q3_Lerp2End — parked (unported-global: BMS_START): oracle/oracle/codemp/game/g_ICARUScb.c:730")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): same `BMS_START` dependency (`G_PlayDoorSound(ent, BMS_START)`).
 /// Raven `Q3_Lerp2Pos`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:781-883`
@@ -274,16 +400,18 @@ pub fn Q3_Lerp2Pos(
     ctx: GameContext<'_>,
     taskID: c_int,
     entID: c_int,
-    origin: vec3_t,
-    angles: vec3_t,
+    origin: &mut [f32; 3],
+    angles: Option<&mut [f32; 3]>,
     duration: f32,
 ) {
-    todo!("Port Q3_Lerp2Pos — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:781")
+    todo!("Port Q3_Lerp2Pos — parked (unported-global: BMS_START): oracle/oracle/codemp/game/g_ICARUScb.c:781")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_Lerp2Angles`.
 ///
+/// `angles` is written through (`ang[i] = AngleSubtract(...)`, but the
+/// output is `ent->s.apos.trDelta`, not `angles` itself) — re-checking the
+/// oracle: `angles` is only ever read here, so it stays by-value per fork-9.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:892-939`
 pub fn Q3_Lerp2Angles(
     ctx: GameContext<'_>,
@@ -292,10 +420,44 @@ pub fn Q3_Lerp2Angles(
     angles: vec3_t,
     duration: f32,
 ) {
-    todo!("Port Q3_Lerp2Angles — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:892")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        (*ent).s.apos.trDuration = if duration > 0.0 { duration as c_int } else { 1 };
+
+        let mut ang = [0.0f32; 3];
+        for i in 0..3 {
+            ang[i] = AngleSubtract(angles[i], (*ent).r.currentAngles[i]);
+            (*ent).s.apos.trDelta[i] = ang[i] / ((*ent).s.apos.trDuration as f32 * 0.001);
+        }
+
+        (*ent).s.apos.trBase = (*ent).r.currentAngles;
+
+        (*ent).s.apos.trType = if (*ent).alt_fire != 0 {
+            trType_t::TR_LINEAR_STOP
+        } else {
+            trType_t::TR_NONLINEAR_STOP
+        };
+
+        (*ent).s.apos.trTime = (*ctx.world).level.time;
+
+        trap::ICARUS_TaskIDSet(
+            ctx.engine,
+            GIcarusTaskidsetArgs::new(ent, taskID_t::TID_ANGLE_FACE as c_int, taskID),
+        );
+
+        (*ent).think = Some(EntThink::anglerCallback);
+        (*ent).nextthink = (*ctx.world).level.time + duration as c_int;
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(vec3-out-param-mismatch): `info: &mut [f32;3]` per fork-9,
+// but the cross-file `TAG_GetOrigin`/`TAG_GetAngles` (g_misc.rs, still parked)
+// have `vec3_t` (by-value) params per the call-surface digest — a same-file
+// reshape here can't propagate through a not-yet-reshaped callee; parked
+// rather than silently dropping the out-write.
 /// Raven `Q3_GetTag`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:948-970`
@@ -304,58 +466,105 @@ pub fn Q3_GetTag(
     entID: c_int,
     name: *const c_char,
     lookup: c_int,
-    info: vec3_t,
+    info: &mut [f32; 3],
 ) -> c_int {
-    todo!("Port Q3_GetTag — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:948")
+    todo!("Port Q3_GetTag — parked (vec3-out-param-mismatch): oracle/oracle/codemp/game/g_ICARUScb.c:948")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_Use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:981-998`
-pub fn Q3_Use(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    target: *const c_char,
-) {
-    todo!("Port Q3_Use — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:981")
+pub fn Q3_Use(ctx: GameContext<'_>, entID: c_int, target: *const c_char) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if target.is_null() || *target == 0 {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                b"Q3_Use: string is NULL!\n\0".as_ptr() as *const c_char,
+            );
+            return;
+        }
+
+        G_UseTargets2(ctx, ent, ent, target);
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(die-dispatch-invoke): `victim->die(victim, victim, victim,
+// o_health, MOD_UNKNOWN)` calls through the stored `die` fn pointer directly;
+// `gentity_t.die` is still a raw `Option<extern "C" fn(...)>`, not the
+// `EntDie` variant `dispatch_die` (ent_fn_enums.rs) needs to route the call —
+// there is no way to recover which `EntDie` variant a stored raw pointer
+// corresponds to from here.
 /// Raven `Q3_Kill`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1009-1052`
-pub fn Q3_Kill(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
-    todo!("Port Q3_Kill — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:1009")
+pub fn Q3_Kill(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
+    todo!("Port Q3_Kill — parked (die-dispatch-invoke): oracle/oracle/codemp/game/g_ICARUScb.c:1009")
 }
 
+// PORT-ESCALATION(client-still-void): the NPC-removal/vehicle-eject branch
+// reads `victim->client->NPC_class`/`m_pVehicle->m_pVehicleInfo`; the
+// non-client branch (`victim->think = G_FreeEntity`) is trivial but parking
+// the whole fn keeps parity honest rather than silently dropping the NPC path.
 /// Raven `Q3_RemoveEnt`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1062-1116`
-pub fn Q3_RemoveEnt(
-    ctx: GameContext<'_>,
-    victim: *mut gentity_t,
-) {
-    todo!("Port Q3_RemoveEnt — oracle/oracle/codemp/game/g_ICARUScb.c:1062")
+pub fn Q3_RemoveEnt(ctx: GameContext<'_>, victim: *mut gentity_t) {
+    todo!("Port Q3_RemoveEnt — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:1062")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_Remove`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1128-1168`
-pub fn Q3_Remove(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
-    todo!("Port Q3_Remove — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:1128")
+pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if Q_stricmp(b"self\0".as_ptr() as *const c_char, name) == 0 {
+            Q3_RemoveEnt(ctx, ent);
+        } else if Q_stricmp(b"enemy\0".as_ptr() as *const c_char, name) == 0 {
+            let victim = (*ent).enemy;
+            if victim.is_null() {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_Remove: can't find enemy\n\0".as_ptr() as *const c_char,
+                );
+                return;
+            }
+            Q3_RemoveEnt(ctx, victim);
+        } else {
+            let mut victim = G_Find(
+                ctx,
+                std::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                name,
+            );
+            if victim.is_null() {
+                G_DebugPrint(
+                    ctx,
+                    WL_WARNING as c_int,
+                    b"Q3_Remove: can't find target\n\0".as_ptr() as *const c_char,
+                );
+                return;
+            }
+            while !victim.is_null() {
+                Q3_RemoveEnt(ctx, victim);
+                victim = G_Find(
+                    ctx,
+                    victim,
+                    core::mem::offset_of!(gentity_t, targetname) as c_int,
+                    name,
+                );
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): `toGet = GetIDForString(setTable, name)`
+// gates the entire switch — `setTable` is not ported anywhere in the worktree.
 /// Raven `Q3_GetFloat`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1189-1559`
@@ -366,10 +575,10 @@ pub fn Q3_GetFloat(
     name: *const c_char,
     value: *mut f32,
 ) -> c_int {
-    todo!("Port Q3_GetFloat — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:1189")
+    todo!("Port Q3_GetFloat — parked (unported-global: setTable): oracle/oracle/codemp/game/g_ICARUScb.c:1189")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): same `setTable` dependency as `Q3_GetFloat`.
 /// Raven `Q3_GetVector`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1573-1629`
@@ -378,12 +587,12 @@ pub fn Q3_GetVector(
     entID: c_int,
     r#type: c_int,
     name: *const c_char,
-    value: vec3_t,
+    value: &mut [f32; 3],
 ) -> c_int {
-    todo!("Port Q3_GetVector — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:1573")
+    todo!("Port Q3_GetVector — parked (unported-global: setTable): oracle/oracle/codemp/game/g_ICARUScb.c:1573")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): same `setTable` dependency as `Q3_GetFloat`.
 /// Raven `Q3_GetString`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1642-1854`
@@ -394,78 +603,133 @@ pub fn Q3_GetString(
     name: *const c_char,
     value: *mut *mut c_char,
 ) -> c_int {
-    todo!("Port Q3_GetString — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:1642")
+    todo!("Port Q3_GetString — parked (unported-global: setTable): oracle/oracle/codemp/game/g_ICARUScb.c:1642")
 }
 
 /// Raven `MoveOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1865-1886`
-pub fn MoveOwner(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    todo!("Port MoveOwner — oracle/oracle/codemp/game/g_ICARUScb.c:1865")
+pub fn MoveOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
+    unsafe {
+        let owner = &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+
+        (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
+        (*self_).think = Some(EntThink::G_FreeEntity);
+
+        if owner.is_null() || (*owner).inuse == 0 {
+            return;
+        }
+
+        if SpotWouldTelefrag2(ctx, owner, (*self_).r.currentOrigin) != 0 {
+            (*self_).think = Some(EntThink::MoveOwner);
+        } else {
+            G_SetOrigin(owner, (*self_).r.currentOrigin);
+            trap::ICARUS_TaskIDComplete(
+                ctx.engine,
+                GIcarusTaskidcompleteArgs::new(owner, taskID_t::TID_MOVE_NAV as c_int),
+            );
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetTeleportDest`.
 ///
+/// `org` is only ever read here, so it stays by-value per fork-9.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1895-1920`
-pub fn Q3_SetTeleportDest(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    org: vec3_t,
-) -> qboolean {
-    todo!("Port Q3_SetTeleportDest — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:1895")
+pub fn Q3_SetTeleportDest(ctx: GameContext<'_>, entID: c_int, org: vec3_t) -> qboolean {
+    unsafe {
+        let tele_ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if SpotWouldTelefrag2(ctx, tele_ent, org) != 0 {
+            let teleporter = G_Spawn(ctx);
+
+            G_SetOrigin(teleporter, org);
+            (*teleporter).r.ownerNum = (*tele_ent).s.number;
+
+            (*teleporter).think = Some(EntThink::MoveOwner);
+            (*teleporter).nextthink = (*ctx.world).level.time + FRAMETIME;
+
+            qfalse
+        } else {
+            G_SetOrigin(tele_ent, org);
+            qtrue
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetOrigin`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1929-1961`
-pub fn Q3_SetOrigin(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    origin: vec3_t,
-) {
-    todo!("Port Q3_SetOrigin — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:1929")
+// PORT-ESCALATION(client-still-void): the client branch writes
+// `ent->client->ps.{origin,velocity,pm_time,pm_flags,eFlags}`; the non-client
+// (`G_SetOrigin`) branch is faithful, the client branch panics loudly.
+pub fn Q3_SetOrigin(ctx: GameContext<'_>, entID: c_int, origin: vec3_t) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
+
+        if !(*ent).client.is_null() {
+            todo!("Port Q3_SetOrigin (client branch) — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:1941-1953")
+        } else {
+            G_SetOrigin(ent, origin);
+        }
+
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetCopyOrigin`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1970-1983`
-pub fn Q3_SetCopyOrigin(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
-    todo!("Port Q3_SetCopyOrigin — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:1970")
+pub fn Q3_SetCopyOrigin(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
+    unsafe {
+        let found = G_Find(
+            ctx,
+            std::ptr::null_mut(),
+            core::mem::offset_of!(gentity_t, targetname) as c_int,
+            name,
+        );
+
+        if !found.is_null() {
+            Q3_SetOrigin(ctx, entID, (*found).r.currentOrigin);
+            let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+            SetClientViewAngle(ent, (*found).s.angles);
+        } else {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                b"Q3_SetCopyOrigin: ent not found!\n\0".as_ptr() as *const c_char,
+            );
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(client-still-void): the entire meaningful body is
+// `found->client->ps.{velocity,pm_time,pm_flags}` writes.
 /// Raven `Q3_SetVelocity`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1992-2013`
-pub fn Q3_SetVelocity(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    axis: c_int,
-    speed: f32,
-) {
-    todo!("Port Q3_SetVelocity — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:1992")
+pub fn Q3_SetVelocity(ctx: GameContext<'_>, entID: c_int, axis: c_int, speed: f32) {
+    todo!("Port Q3_SetVelocity — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:1992")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetAngles`.
 ///
+/// `angles` is only ever read here (never written through), so it stays a
+/// by-value `vec3_t` per fork-9 ("keep by-value only if never written").
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2022-2042`
-pub fn Q3_SetAngles(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    angles: vec3_t,
-) {
-    todo!("Port Q3_SetAngles — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2022")
+pub fn Q3_SetAngles(ctx: GameContext<'_>, entID: c_int, angles: vec3_t) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).client.is_null() {
+            (*ent).s.angles = angles;
+        } else {
+            SetClientViewAngle(ent, angles);
+        }
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+    }
 }
 
 // PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
@@ -482,106 +746,156 @@ pub fn Q3_Lerp2Origin(
     todo!("Port Q3_Lerp2Origin — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2051")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetOriginOffset`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2114-2140`
-pub fn Q3_SetOriginOffset(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    axis: c_int,
-    offset: f32,
-) {
-    todo!("Port Q3_SetOriginOffset — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2114")
+pub fn Q3_SetOriginOffset(ctx: GameContext<'_>, entID: c_int, axis: c_int, offset: f32) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        let mut origin = (*ent).s.origin;
+        origin[axis as usize] += offset;
+        let mut duration = 0.0f32;
+        if (*ent).speed != 0.0 {
+            duration = (offset.abs() / (*ent).speed.abs()) * 1000.0;
+        }
+        Q3_Lerp2Origin(ctx, -1, entID, origin, duration);
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetEnemy`.
 ///
+/// `ent->NPC` is only null-checked (never dereferenced) in this fn.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2149-2197`
-pub fn Q3_SetEnemy(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
-    todo!("Port Q3_SetEnemy — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2149")
+pub fn Q3_SetEnemy(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if Q_stricmp(b"NONE\0".as_ptr() as *const c_char, name) == 0
+            || Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
+        {
+            if !(*ent).NPC.is_null() {
+                G_ClearEnemy(ctx, ent);
+            } else {
+                (*ent).enemy = std::ptr::null_mut();
+            }
+        } else {
+            let enemy = G_Find(
+                ctx,
+                std::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                name,
+            );
+
+            if enemy.is_null() {
+                G_DebugPrint(
+                    ctx,
+                    WL_ERROR as c_int,
+                    b"Q3_SetEnemy: no such enemy\n\0".as_ptr() as *const c_char,
+                );
+                return;
+            }
+
+            G_SetEnemy(ctx, ent, enemy);
+            if !(*ent).NPC.is_null() {
+                (*ent).cantHitEnemyCounter = 0;
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(client-still-void): writes `ent->client->leader`.
 /// Raven `Q3_SetLeader`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2207-2246`
-pub fn Q3_SetLeader(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
-    todo!("Port Q3_SetLeader — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2207")
+pub fn Q3_SetLeader(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
+    todo!("Port Q3_SetLeader — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2207")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(NPC-still-void): reads/writes `ent->NPC->{tempGoal,goalEntity,goalRadius,aiFlags}`.
 /// Raven `Q3_SetNavGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2255-2320`
-pub fn Q3_SetNavGoal(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) -> qboolean {
-    todo!("Port Q3_SetNavGoal — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2255")
+pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) -> qboolean {
+    todo!("Port Q3_SetNavGoal — parked (NPC-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2255")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `SetLowerAnim`.
 ///
+/// `ent->client` is only null-checked (never dereferenced) in this fn.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2330-2347`
-pub fn SetLowerAnim(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    animID: c_int,
-) {
-    todo!("Port SetLowerAnim — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2330")
+pub fn SetLowerAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                b"SetLowerAnim: ent is NOT a player or NPC!\n\0".as_ptr() as *const c_char,
+            );
+            return;
+        }
+
+        G_SetAnim(
+            ent,
+            std::ptr::null_mut(),
+            SETANIM_LEGS,
+            animID,
+            SETANIM_FLAG_RESTART | SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+            0,
+        );
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `SetUpperAnim`.
 ///
+/// `ent->client` is only null-checked (never dereferenced) in this fn.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2358-2375`
-pub fn SetUpperAnim(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    animID: c_int,
-) {
-    todo!("Port SetUpperAnim — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2358")
+pub fn SetUpperAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if (*ent).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                b"SetUpperAnim: ent is NOT a player or NPC!\n\0".as_ptr() as *const c_char,
+            );
+            return;
+        }
+
+        G_SetAnim(
+            ent,
+            std::ptr::null_mut(),
+            SETANIM_TORSO,
+            animID,
+            SETANIM_FLAG_RESTART | SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+            0,
+        );
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): `animID = GetIDForString(animTable, anim_name)` — `animTable` is not ported anywhere in the worktree.
 /// Raven `Q3_SetAnimUpper`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2384-2405`
-pub fn Q3_SetAnimUpper(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    anim_name: *const c_char,
-) -> qboolean {
-    todo!("Port Q3_SetAnimUpper — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2384")
+pub fn Q3_SetAnimUpper(ctx: GameContext<'_>, entID: c_int, anim_name: *const c_char) -> qboolean {
+    todo!("Port Q3_SetAnimUpper — parked (unported-global: animTable): oracle/oracle/codemp/game/g_ICARUScb.c:2384")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): same `animTable` dependency as `Q3_SetAnimUpper`.
 /// Raven `Q3_SetAnimLower`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2414-2437`
-pub fn Q3_SetAnimLower(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    anim_name: *const c_char,
-) -> qboolean {
-    todo!("Port Q3_SetAnimLower — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2414")
+pub fn Q3_SetAnimLower(ctx: GameContext<'_>, entID: c_int, anim_name: *const c_char) -> qboolean {
+    todo!("Port Q3_SetAnimLower — parked (unported-global: animTable): oracle/oracle/codemp/game/g_ICARUScb.c:2414")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetAnimHoldTime`.
 ///
+/// Raven: the real body (`PM_SetLegsAnimTimer`/`PM_SetTorsoAnimTimer`) is
+/// `#if 0`'d out in the oracle itself; only the "not supported" print remains live.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2449-2476`
 pub fn Q3_SetAnimHoldTime(
     ctx: GameContext<'_>,
@@ -589,10 +903,18 @@ pub fn Q3_SetAnimHoldTime(
     int_data: c_int,
     lower: qboolean,
 ) {
-    todo!("Port Q3_SetAnimHoldTime — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2449")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetAnimHoldTime is not currently supported in MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(client-still-void): faithful port needs `ent->client->ps.stats`/
+// `->sess.sessionTeam` and calls `player_die` when health drops to 0 —
+// `(*ent).client as *mut gclient_t` is the house cast pattern (see g_active.rs)
+// but the full branch (including the death path) is nontrivial to verify without
+// compiling; parked rather than guessed.
 /// Raven `Q3_SetHealth`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2487-2527`
@@ -601,10 +923,10 @@ pub fn Q3_SetHealth(
     entID: c_int,
     data: c_int,
 ) {
-    todo!("Port Q3_SetHealth — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2487")
+    todo!("Port Q3_SetHealth — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2487")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(client-still-void): body is entirely `ent->client->ps.stats[...]`.
 /// Raven `Q3_SetArmor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2539-2559`
@@ -613,10 +935,11 @@ pub fn Q3_SetArmor(
     entID: c_int,
     data: c_int,
 ) {
-    todo!("Port Q3_SetArmor — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2539")
+    todo!("Port Q3_SetArmor — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2539")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): `toGet = GetIDForString(BSTable, bs_name)` —
+// `BSTable` (the bState_t string table) is not ported anywhere in the worktree.
 /// Raven `Q3_SetBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2573-2687`
@@ -625,10 +948,10 @@ pub fn Q3_SetBState(
     entID: c_int,
     bs_name: *const c_char,
 ) -> qboolean {
-    todo!("Port Q3_SetBState — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2573")
+    todo!("Port Q3_SetBState — parked (unported-global: BSTable): oracle/oracle/codemp/game/g_ICARUScb.c:2573")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): same `BSTable` dependency as `Q3_SetBState`.
 /// Raven `Q3_SetTempBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2699-2737`
@@ -637,10 +960,10 @@ pub fn Q3_SetTempBState(
     entID: c_int,
     bs_name: *const c_char,
 ) -> qboolean {
-    todo!("Port Q3_SetTempBState — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2699")
+    todo!("Port Q3_SetTempBState — parked (unported-global: BSTable): oracle/oracle/codemp/game/g_ICARUScb.c:2699")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): same `BSTable` dependency as `Q3_SetBState`.
 /// Raven `Q3_SetDefaultBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2749-2771`
@@ -649,130 +972,124 @@ pub fn Q3_SetDefaultBState(
     entID: c_int,
     bs_name: *const c_char,
 ) {
-    todo!("Port Q3_SetDefaultBState — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2749")
+    todo!("Port Q3_SetDefaultBState — parked (unported-global: BSTable): oracle/oracle/codemp/game/g_ICARUScb.c:2749")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetDPitch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2783-2787`
-pub fn Q3_SetDPitch(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: f32,
-) {
-    todo!("Port Q3_SetDPitch — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2783")
+pub fn Q3_SetDPitch(ctx: GameContext<'_>, entID: c_int, data: f32) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetDPitch: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetDYaw`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2799-2803`
-pub fn Q3_SetDYaw(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: f32,
-) {
-    todo!("Port Q3_SetDYaw — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2799")
+pub fn Q3_SetDYaw(ctx: GameContext<'_>, entID: c_int, data: f32) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetDYaw: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetShootDist`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2815-2819`
-pub fn Q3_SetShootDist(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: f32,
-) {
-    todo!("Port Q3_SetShootDist — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2815")
+pub fn Q3_SetShootDist(ctx: GameContext<'_>, entID: c_int, data: f32) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetShootDist: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetVisrange`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2831-2835`
-pub fn Q3_SetVisrange(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: f32,
-) {
-    todo!("Port Q3_SetVisrange — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2831")
+pub fn Q3_SetVisrange(ctx: GameContext<'_>, entID: c_int, data: f32) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetVisrange: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetEarshot`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2847-2851`
-pub fn Q3_SetEarshot(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: f32,
-) {
-    todo!("Port Q3_SetEarshot — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2847")
+pub fn Q3_SetEarshot(ctx: GameContext<'_>, entID: c_int, data: f32) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetEarshot: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetVigilance`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2863-2867`
-pub fn Q3_SetVigilance(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: f32,
-) {
-    todo!("Port Q3_SetVigilance — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2863")
+pub fn Q3_SetVigilance(ctx: GameContext<'_>, entID: c_int, data: f32) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetVigilance: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetVFOV`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2879-2883`
-pub fn Q3_SetVFOV(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: c_int,
-) {
-    todo!("Port Q3_SetVFOV — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2879")
+pub fn Q3_SetVFOV(ctx: GameContext<'_>, entID: c_int, data: c_int) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetVFOV: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetHFOV`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2895-2899`
-pub fn Q3_SetHFOV(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: c_int,
-) {
-    todo!("Port Q3_SetHFOV — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2895")
+pub fn Q3_SetHFOV(ctx: GameContext<'_>, entID: c_int, data: c_int) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetHFOV: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetWidth`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2911-2915`
-pub fn Q3_SetWidth(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: c_int,
-) {
-    todo!("Port Q3_SetWidth — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2911")
+pub fn Q3_SetWidth(ctx: GameContext<'_>, entID: c_int, data: c_int) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetWidth: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetTimeScale`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2926-2929`
-pub fn Q3_SetTimeScale(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: *const c_char,
-) {
-    todo!("Port Q3_SetTimeScale — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2926")
+pub fn Q3_SetTimeScale(ctx: GameContext<'_>, entID: c_int, data: *const c_char) {
+    unsafe {
+        let value = CString::new(std::ffi::CStr::from_ptr(data).to_bytes()).unwrap();
+        trap::Cvar_Set(
+            ctx.engine,
+            GCvarSetArgs::new(CString::new("timescale").unwrap(), value),
+        );
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(client-still-void): `self->client->ps.eFlags` toggle is a
+// real field write, not just a null check; leaving the whole fn parked rather
+// than silently skipping that half of the behavior.
 /// Raven `Q3_SetInvisible`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2941-2968`
@@ -781,70 +1098,85 @@ pub fn Q3_SetInvisible(
     entID: c_int,
     invisible: qboolean,
 ) {
-    todo!("Port Q3_SetInvisible — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2941")
+    todo!("Port Q3_SetInvisible — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:2941")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetVampire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2979-2983`
-pub fn Q3_SetVampire(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    vampire: qboolean,
-) {
-    todo!("Port Q3_SetVampire — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2979")
+pub fn Q3_SetVampire(ctx: GameContext<'_>, entID: c_int, vampire: qboolean) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetVampire: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetGreetAllies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2993-2997`
-pub fn Q3_SetGreetAllies(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    greet: qboolean,
-) {
-    todo!("Port Q3_SetGreetAllies — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:2993")
+pub fn Q3_SetGreetAllies(ctx: GameContext<'_>, entID: c_int, greet: qboolean) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetGreetAllies: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetViewTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3009-3013`
-pub fn Q3_SetViewTarget(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
-    todo!("Port Q3_SetViewTarget — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3009")
+pub fn Q3_SetViewTarget(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetViewTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetWatchTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3025-3029`
-pub fn Q3_SetWatchTarget(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
-    todo!("Port Q3_SetWatchTarget — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3025")
+pub fn Q3_SetWatchTarget(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetWatchTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetLoopSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3031-3054`
-pub fn Q3_SetLoopSound(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
-    todo!("Port Q3_SetLoopSound — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3031")
+pub fn Q3_SetLoopSound(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
+    unsafe {
+        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+
+        if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
+            || Q_stricmp(b"NONE\0".as_ptr() as *const c_char, name) == 0
+        {
+            (*self_).s.loopSound = 0;
+            (*self_).s.loopIsSoundset = qfalse;
+            return;
+        }
+
+        let index = G_SoundIndex(name);
+
+        if index != 0 {
+            (*self_).s.loopSound = index;
+            (*self_).s.loopIsSoundset = qfalse;
+        } else {
+            G_DebugPrint(
+                ctx,
+                WL_WARNING as c_int,
+                b"Q3_SetLoopSound: can't find sound file\n\0".as_ptr() as *const c_char,
+            );
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): `self->r.svFlags |= SVF_ICARUS_FREEZE` —
+// `SVF_ICARUS_FREEZE` is not ported anywhere in the worktree yet.
 /// Raven `Q3_SetICARUSFreeze`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3056-3078`
@@ -854,67 +1186,59 @@ pub fn Q3_SetICARUSFreeze(
     name: *const c_char,
     freeze: qboolean,
 ) {
-    todo!("Port Q3_SetICARUSFreeze — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3056")
+    todo!("Port Q3_SetICARUSFreeze — parked (unported-global: SVF_ICARUS_FREEZE): oracle/oracle/codemp/game/g_ICARUScb.c:3056")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetViewEntity`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3089-3092`
-pub fn Q3_SetViewEntity(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
-    todo!("Port Q3_SetViewEntity — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3089")
+pub fn Q3_SetViewEntity(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetViewEntity currently unsupported in MP, ask if you need it.\n\0".as_ptr()
+            as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): `wp = GetIDForString(WPTable, wp_name)` —
+// `WPTable` (weapon-name string table) is not ported anywhere in the worktree
+// (also client-still-void for `ent->client->ps.stats[STAT_WEAPONS]`).
 /// Raven `Q3_SetWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3104-3111`
-pub fn Q3_SetWeapon(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    wp_name: *const c_char,
-) {
-    todo!("Port Q3_SetWeapon — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3104")
+pub fn Q3_SetWeapon(ctx: GameContext<'_>, entID: c_int, wp_name: *const c_char) {
+    todo!("Port Q3_SetWeapon — parked (unported-global: WPTable): oracle/oracle/codemp/game/g_ICARUScb.c:3104")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetItem`.
 ///
+/// Raven: `//rww - unused in mp`.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3122-3126`
-pub fn Q3_SetItem(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    item_name: *const c_char,
-) {
-    todo!("Port Q3_SetItem — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3122")
+pub fn Q3_SetItem(ctx: GameContext<'_>, entID: c_int, item_name: *const c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetItem: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(client-still-void, NPC-still-void): writes both
+// `self->NPC->stats.walkSpeed` and `self->client->ps.speed`.
 /// Raven `Q3_SetWalkSpeed`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3139-3161`
-pub fn Q3_SetWalkSpeed(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    int_data: c_int,
-) {
-    todo!("Port Q3_SetWalkSpeed — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3139")
+pub fn Q3_SetWalkSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
+    todo!("Port Q3_SetWalkSpeed — parked (client/NPC-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:3139")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(client-still-void, NPC-still-void): writes both
+// `self->NPC->stats.runSpeed` and `self->client->ps.speed`.
 /// Raven `Q3_SetRunSpeed`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3173-3195`
-pub fn Q3_SetRunSpeed(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    int_data: c_int,
-) {
-    todo!("Port Q3_SetRunSpeed — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:3173")
+pub fn Q3_SetRunSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
+    todo!("Port Q3_SetRunSpeed — parked (client/NPC-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:3173")
 }
 
 // PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
@@ -1631,186 +1955,205 @@ pub fn Q3_SetForwardMove(
     todo!("Port Q3_SetForwardMove — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4354")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetRightMove`.
 ///
+/// Raven: entID/gentity_t is never null (address-of array element); the
+/// `!ent`/`!ent->client` guards are dead/live-checked here as client-null
+/// only. Body is a debug-print stub — behavior is commented out in Raven.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4381-4399`
-pub fn Q3_SetRightMove(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    rmoveVal: c_int,
-) {
-    todo!("Port Q3_SetRightMove — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4381")
+pub fn Q3_SetRightMove(ctx: GameContext<'_>, entID: c_int, rmoveVal: c_int) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        if (*ent).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                b"Q3_SetRightMove: '%s' is not an NPC/player!\n\0".as_ptr() as *const c_char,
+            );
+            return;
+        }
+        G_DebugPrint(
+            ctx,
+            WL_WARNING as c_int,
+            b"Q3_SetRightMove: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+        );
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetLockAngle`.
 ///
+/// Raven: the renderInfo.lockYaw/RF_LOCKEDANGLE assignment is fully
+/// commented out in Raven; body is a debug-print stub only.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4408-4445`
-pub fn Q3_SetLockAngle(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    lockAngle: *const c_char,
-) {
-    todo!("Port Q3_SetLockAngle — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4408")
+pub fn Q3_SetLockAngle(ctx: GameContext<'_>, entID: c_int, lockAngle: *const c_char) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        if (*ent).client.is_null() {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                b"Q3_SetLockAngle: '%s' is not an NPC/player!\n\0".as_ptr() as *const c_char,
+            );
+            return;
+        }
+        G_DebugPrint(
+            ctx,
+            WL_WARNING as c_int,
+            b"Q3_SetLockAngle is not currently available. Ask if you really need it.\n\0".as_ptr()
+                as *const c_char,
+        );
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_CameraGroup`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4455-4459`
-pub fn Q3_CameraGroup(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    camG: *mut c_char,
-) {
-    todo!("Port Q3_CameraGroup — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4455")
+pub fn Q3_CameraGroup(ctx: GameContext<'_>, entID: c_int, camG: *mut c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_CameraGroup: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_CameraGroupZOfs`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4468-4472`
-pub fn Q3_CameraGroupZOfs(
-    ctx: GameContext<'_>,
-    camGZOfs: f32,
-) {
-    todo!("Port Q3_CameraGroupZOfs — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4468")
+pub fn Q3_CameraGroupZOfs(ctx: GameContext<'_>, camGZOfs: f32) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_CameraGroupZOfs: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_CameraGroupTag`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4480-4484`
-pub fn Q3_CameraGroupTag(
-    ctx: GameContext<'_>,
-    camGTag: *mut c_char,
-) {
-    todo!("Port Q3_CameraGroupTag — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4480")
+pub fn Q3_CameraGroupTag(ctx: GameContext<'_>, camGTag: *mut c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_CameraGroupTag: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_RemoveRHandModel`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4491-4494`
-pub fn Q3_RemoveRHandModel(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    addModel: *mut c_char,
-) {
-    todo!("Port Q3_RemoveRHandModel — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4491")
+pub fn Q3_RemoveRHandModel(ctx: GameContext<'_>, entID: c_int, addModel: *mut c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_RemoveRHandModel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_AddRHandModel`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4501-4504`
-pub fn Q3_AddRHandModel(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    addModel: *mut c_char,
-) {
-    todo!("Port Q3_AddRHandModel — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4501")
+pub fn Q3_AddRHandModel(ctx: GameContext<'_>, entID: c_int, addModel: *mut c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_AddRHandModel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_AddLHandModel`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4511-4514`
-pub fn Q3_AddLHandModel(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    addModel: *mut c_char,
-) {
-    todo!("Port Q3_AddLHandModel — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4511")
+pub fn Q3_AddLHandModel(ctx: GameContext<'_>, entID: c_int, addModel: *mut c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_AddLHandModel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_RemoveLHandModel`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4521-4524`
-pub fn Q3_RemoveLHandModel(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    addModel: *mut c_char,
-) {
-    todo!("Port Q3_RemoveLHandModel — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4521")
+pub fn Q3_RemoveLHandModel(ctx: GameContext<'_>, entID: c_int, addModel: *mut c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_RemoveLHandModel: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_LookTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4533-4537`
-pub fn Q3_LookTarget(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    targetName: *mut c_char,
-) {
-    todo!("Port Q3_LookTarget — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4533")
+pub fn Q3_LookTarget(ctx: GameContext<'_>, entID: c_int, targetName: *mut c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_LookTarget: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_Face`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4546-4549`
-pub fn Q3_Face(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    expression: c_int,
-    holdtime: f32,
-) {
-    todo!("Port Q3_Face — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4546")
+pub fn Q3_Face(ctx: GameContext<'_>, entID: c_int, expression: c_int, holdtime: f32) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_Face: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetLocation`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4560-4564`
-pub fn Q3_SetLocation(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    location: *const c_char,
-) -> qboolean {
-    todo!("Port Q3_SetLocation — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4560")
+pub fn Q3_SetLocation(ctx: GameContext<'_>, entID: c_int, location: *const c_char) -> qboolean {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetLocation: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
+    qtrue
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetPlayerLocked`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4576-4579`
-pub fn Q3_SetPlayerLocked(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    locked: qboolean,
-) {
-    todo!("Port Q3_SetPlayerLocked — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4576")
+pub fn Q3_SetPlayerLocked(ctx: GameContext<'_>, entID: c_int, locked: qboolean) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetPlayerLocked: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetLockPlayerWeapons`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4590-4593`
-pub fn Q3_SetLockPlayerWeapons(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    locked: qboolean,
-) {
-    todo!("Port Q3_SetLockPlayerWeapons — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4590")
+pub fn Q3_SetLockPlayerWeapons(ctx: GameContext<'_>, entID: c_int, locked: qboolean) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetLockPlayerWeapons: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetNoImpactDamage`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4605-4608`
-pub fn Q3_SetNoImpactDamage(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    noImp: qboolean,
-) {
-    todo!("Port Q3_SetNoImpactDamage — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4605")
+pub fn Q3_SetNoImpactDamage(ctx: GameContext<'_>, entID: c_int, noImp: qboolean) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetNoImpactDamage: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-consts): the `toSet`->`bSet_t` switch needs
+// `bSet_t`/`BSET_*`/`NUM_BSETS` (ICARUS behavior-set enum) and
+// `gentity_t::behaviorSet` indexing — none are ported anywhere in the
+// worktree (matches the `setTable`/`BSTable`/`WPTable` unported-global
+// precedent above, g_ICARUScb.c:1189/1573/1642/1839).
 /// Raven `Q3_SetBehaviorSet`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4617-4708`
@@ -1820,217 +2163,219 @@ pub fn Q3_SetBehaviorSet(
     toSet: c_int,
     scriptname: *const c_char,
 ) -> qboolean {
-    todo!("Port Q3_SetBehaviorSet — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4617")
+    todo!("Port Q3_SetBehaviorSet — parked (unported-consts: bSet_t/BSET_*/NUM_BSETS): oracle/oracle/codemp/game/g_ICARUScb.c:4617")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetDelayScriptTime`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4717-4720`
-pub fn Q3_SetDelayScriptTime(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    delayTime: c_int,
-) {
-    todo!("Port Q3_SetDelayScriptTime — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4717")
+pub fn Q3_SetDelayScriptTime(ctx: GameContext<'_>, entID: c_int, delayTime: c_int) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetDelayScriptTime: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-consts): `SVF_PLAYER_USABLE` is not ported
+// anywhere in the worktree (matches the `ValidUseTarget` precedent,
+// g_utils.rs:1349).
 /// Raven `Q3_SetPlayerUsable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4734-4752`
-pub fn Q3_SetPlayerUsable(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    usable: qboolean,
-) {
-    todo!("Port Q3_SetPlayerUsable — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4734")
+pub fn Q3_SetPlayerUsable(ctx: GameContext<'_>, entID: c_int, usable: qboolean) {
+    todo!("Port Q3_SetPlayerUsable — parked: unported-consts (SVF_PLAYER_USABLE): oracle/oracle/codemp/game/g_ICARUScb.c:4734")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetDisableShaderAnims`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4763-4767`
-pub fn Q3_SetDisableShaderAnims(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    disabled: c_int,
-) {
-    todo!("Port Q3_SetDisableShaderAnims — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4763")
+pub fn Q3_SetDisableShaderAnims(ctx: GameContext<'_>, entID: c_int, disabled: c_int) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetDisableShaderAnims: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetShaderAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4778-4782`
-pub fn Q3_SetShaderAnim(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    disabled: c_int,
-) {
-    todo!("Port Q3_SetShaderAnim — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4778")
+pub fn Q3_SetShaderAnim(ctx: GameContext<'_>, entID: c_int, disabled: c_int) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetShaderAnim: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetStartFrame`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4793-4796`
-pub fn Q3_SetStartFrame(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    startFrame: c_int,
-) {
-    todo!("Port Q3_SetStartFrame — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4793")
+pub fn Q3_SetStartFrame(ctx: GameContext<'_>, entID: c_int, startFrame: c_int) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetStartFrame: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetEndFrame`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4808-4811`
-pub fn Q3_SetEndFrame(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    endFrame: c_int,
-) {
-    todo!("Port Q3_SetEndFrame — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4808")
+pub fn Q3_SetEndFrame(ctx: GameContext<'_>, entID: c_int, endFrame: c_int) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetEndFrame: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetAnimFrame`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4822-4825`
-pub fn Q3_SetAnimFrame(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    animFrame: c_int,
-) {
-    todo!("Port Q3_SetAnimFrame — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4822")
+pub fn Q3_SetAnimFrame(ctx: GameContext<'_>, entID: c_int, animFrame: c_int) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetAnimFrame: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetLoopAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4836-4839`
-pub fn Q3_SetLoopAnim(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    loopAnim: qboolean,
-) {
-    todo!("Port Q3_SetLoopAnim — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4836")
+pub fn Q3_SetLoopAnim(ctx: GameContext<'_>, entID: c_int, loopAnim: qboolean) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetLoopAnim: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetShields`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4851-4855`
-pub fn Q3_SetShields(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    shields: qboolean,
-) {
-    todo!("Port Q3_SetShields — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4851")
+pub fn Q3_SetShields(ctx: GameContext<'_>, entID: c_int, shields: qboolean) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetShields: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(client-still-void): the real body reads
+// `ent->client->ps.saberHolstered` / calls `BG_SabersOff(&ent->client->ps)` —
+// `gentity_t::client` is still an opaque `*mut c_void` at this seam (matches
+// the `Q3_SetVelocity`/`Q3_SetOrigin` client-branch precedent above,
+// g_ICARUScb.c:1941-1953/1992).
 /// Raven `Q3_SetSaberActive`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4866-4889`
-pub fn Q3_SetSaberActive(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    active: qboolean,
-) {
-    todo!("Port Q3_SetSaberActive — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4866")
+pub fn Q3_SetSaberActive(ctx: GameContext<'_>, entID: c_int, active: qboolean) {
+    todo!("Port Q3_SetSaberActive — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:4866")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetNoKnockback`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4900-4918`
-pub fn Q3_SetNoKnockback(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    noKnockback: qboolean,
-) {
-    todo!("Port Q3_SetNoKnockback — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4900")
+pub fn Q3_SetNoKnockback(ctx: GameContext<'_>, entID: c_int, noKnockback: qboolean) {
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        if noKnockback != 0 {
+            (*ent).flags |= FL_NO_KNOCKBACK;
+        } else {
+            (*ent).flags &= !FL_NO_KNOCKBACK;
+        }
+    }
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_SetCleanDamagingEnts`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4927-4931`
 pub fn Q3_SetCleanDamagingEnts(ctx: GameContext<'_>) {
-    todo!("Port Q3_SetCleanDamagingEnts — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4927")
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_SetCleanDamagingEnts: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `SetTextColor`.
 ///
+/// Raven: `textcolor` is only ever read (never written) in this NOT-SUPPORTED
+/// stub body, so it stays by-value `vec4_t` per fork-9 ("keep by-value only
+/// if never written").
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4942-4946`
-pub fn SetTextColor(
-    ctx: GameContext<'_>,
-    textcolor: vec4_t,
-    color: *const c_char,
-) {
-    todo!("Port SetTextColor — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4942")
+pub fn SetTextColor(ctx: GameContext<'_>, textcolor: vec4_t, color: *const c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"SetTextColor: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): `textcolor_caption` (the file-scope
+// `vec4_t` this forwards to `SetTextColor`) is not ported anywhere in the
+// worktree — same class of gap as `setTable`/`BSTable` above.
 /// Raven `Q3_SetCaptionTextColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4955-4958`
-pub fn Q3_SetCaptionTextColor(
-    ctx: GameContext<'_>,
-    color: *const c_char,
-) {
-    todo!("Port Q3_SetCaptionTextColor — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4955")
+pub fn Q3_SetCaptionTextColor(ctx: GameContext<'_>, color: *const c_char) {
+    todo!("Port Q3_SetCaptionTextColor — parked: unported-global (textcolor_caption): oracle/oracle/codemp/game/g_ICARUScb.c:4955")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): `textcolor_center` is not ported anywhere
+// in the worktree.
 /// Raven `Q3_SetCenterTextColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4967-4970`
-pub fn Q3_SetCenterTextColor(
-    ctx: GameContext<'_>,
-    color: *const c_char,
-) {
-    todo!("Port Q3_SetCenterTextColor — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4967")
+pub fn Q3_SetCenterTextColor(ctx: GameContext<'_>, color: *const c_char) {
+    todo!("Port Q3_SetCenterTextColor — parked: unported-global (textcolor_center): oracle/oracle/codemp/game/g_ICARUScb.c:4967")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-global): `textcolor_scroll` is not ported anywhere
+// in the worktree.
 /// Raven `Q3_SetScrollTextColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4979-4982`
-pub fn Q3_SetScrollTextColor(
-    ctx: GameContext<'_>,
-    color: *const c_char,
-) {
-    todo!("Port Q3_SetScrollTextColor — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4979")
+pub fn Q3_SetScrollTextColor(ctx: GameContext<'_>, color: *const c_char) {
+    todo!("Port Q3_SetScrollTextColor — parked: unported-global (textcolor_scroll): oracle/oracle/codemp/game/g_ICARUScb.c:4979")
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_ScrollText`.
 ///
+/// Raven: the `trap_SendServerCommand` call is commented out; body is a
+/// debug-print stub only.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4991-4997`
-pub fn Q3_ScrollText(
-    ctx: GameContext<'_>,
-    id: *const c_char,
-) {
-    todo!("Port Q3_ScrollText — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:4991")
+pub fn Q3_ScrollText(ctx: GameContext<'_>, id: *const c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_ScrollText: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
 /// Raven `Q3_LCARSText`.
 ///
+/// Raven: the `trap_SendServerCommand` call is commented out; body is a
+/// debug-print stub only (Raven's message string says "Q3_ScrollText" too —
+/// preserved verbatim, not a transcription error).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:5006-5012`
-pub fn Q3_LCARSText(
-    ctx: GameContext<'_>,
-    id: *const c_char,
-) {
-    todo!("Port Q3_LCARSText — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:5006")
+pub fn Q3_LCARSText(ctx: GameContext<'_>, id: *const c_char) {
+    G_DebugPrint(
+        ctx,
+        WL_WARNING as c_int,
+        b"Q3_ScrollText: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
+    );
 }
 
-// PORT-ESCALATION(entid-lookup): no g_entities/EntityId accessor is exposed to this raw *mut gentity_t-staged skeleton (client is still an opaque *mut c_void, think/blocked/reached are raw C fn-ptr fields) — how does entID resolve to a gentity_t here?
+// PORT-ESCALATION(unported-consts): the entire 150-case switch keys off the
+// ICARUS `SET_*` field-id enum (`toSet = GetIDForString(setTable, type_name)`)
+// and touches `bSet_t`/`setTable` plus dozens of still-unported `Q3_Set*`
+// helper bodies (client-still-void / unported-const dependents throughout
+// this file) — none of the `SET_*` constants or `setTable` exist anywhere in
+// the worktree (same gap as `Q3_SetBehaviorSet` above).
 /// Raven `Q3_Set`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:5018-6074`
@@ -2041,5 +2386,5 @@ pub fn Q3_Set(
     type_name: *const c_char,
     data: *const c_char,
 ) -> qboolean {
-    todo!("Port Q3_Set — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:5018")
+    todo!("Port Q3_Set — parked: unported-consts (SET_*/bSet_t/setTable): oracle/oracle/codemp/game/g_ICARUScb.c:5018")
 }

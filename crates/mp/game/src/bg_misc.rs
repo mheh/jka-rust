@@ -653,11 +653,6 @@ pub fn BG_FindItem(
     todo!("Port BG_FindItem — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): needs `BG_EvaluateTrajectory`'s result,
-// whose staged `result: vec3_t` parameter is by-value (the fnskel resolver
-// cannot express the C `vec3_t` out-param as a pointer here) — see the note
-// on `BG_EvaluateTrajectory` below (g_combat.rs precedent: `G_GetHitLocation`,
-// `ExplodeDeath`).
 /// Raven `BG_PlayerTouchesItem`.
 ///
 /// Items can be picked up without actually touching their physical bounds
@@ -669,7 +664,23 @@ pub fn BG_PlayerTouchesItem(
     item: *mut entityState_t,
     atTime: c_int,
 ) -> qboolean {
-    todo!("Port BG_PlayerTouchesItem — parked (vec3-outparam-seam): oracle/oracle/codemp/game/bg_misc.c:1979")
+    unsafe {
+        let mut origin = [0.0f32; 3];
+        BG_EvaluateTrajectory(&(*item).pos, atTime, &mut origin);
+
+        // we are ignoring ducked differences here
+        if (*ps).origin[0] - origin[0] > 44.0
+            || (*ps).origin[0] - origin[0] < -50.0
+            || (*ps).origin[1] - origin[1] > 36.0
+            || (*ps).origin[1] - origin[1] < -36.0
+            || (*ps).origin[2] - origin[2] > 36.0
+            || (*ps).origin[2] - origin[2] < -36.0
+        {
+            return qfalse;
+        }
+
+        qtrue
+    }
 }
 
 /// Raven `BG_ProperForceIndex`.
@@ -825,27 +836,76 @@ pub fn BG_CanItemBeGrabbed(
     todo!("Port BG_CanItemBeGrabbed — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): Raven's `result` is a `vec3_t` (float*)
-// out-param the caller reads after the call; the staged skeleton resolves
-// `vec3_t` by value (`[f32;3]`, `Copy`), so a write to the local `result`
-// inside this function is invisible to the caller. Same class of blocker as
-// g_combat.rs's `G_GetHitLocation`/`ExplodeDeath` — needs the fnskel
-// vec3-out-param convention settled (pointer vs. return-value) before this
-// can be filled in for real. Not parking speculatively: the switch arms below
-// are transcribed faithfully in the doc comment for the future porter.
 /// Raven `BG_EvaluateTrajectory`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2353-2410`
 pub fn BG_EvaluateTrajectory(
     tr: *const trajectory_t,
     atTime: c_int,
-    result: vec3_t,
+    result: &mut [f32; 3],
 ) {
-    todo!("Port BG_EvaluateTrajectory — parked (vec3-outparam-seam): oracle/oracle/codemp/game/bg_misc.c:2353")
+    unsafe {
+        let tr_ref = &*tr;
+        match tr_ref.trType {
+            crate::trajectory::trType_t::TR_STATIONARY | crate::trajectory::trType_t::TR_INTERPOLATE => {
+                result[0] = tr_ref.trBase[0];
+                result[1] = tr_ref.trBase[1];
+                result[2] = tr_ref.trBase[2];
+            }
+            crate::trajectory::trType_t::TR_LINEAR => {
+                let deltaTime = (atTime - tr_ref.trTime) as f32 * 0.001;
+                result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
+                result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
+                result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2];
+            }
+            crate::trajectory::trType_t::TR_SINE => {
+                let deltaTime = (atTime - tr_ref.trTime) as f32 / tr_ref.trDuration as f32;
+                let phase = (deltaTime * std::f32::consts::PI * 2.0).sin();
+                result[0] = tr_ref.trBase[0] + phase * tr_ref.trDelta[0];
+                result[1] = tr_ref.trBase[1] + phase * tr_ref.trDelta[1];
+                result[2] = tr_ref.trBase[2] + phase * tr_ref.trDelta[2];
+            }
+            crate::trajectory::trType_t::TR_LINEAR_STOP => {
+                let mut t = atTime;
+                if t > tr_ref.trTime + tr_ref.trDuration {
+                    t = tr_ref.trTime + tr_ref.trDuration;
+                }
+                let mut deltaTime = (t - tr_ref.trTime) as f32 * 0.001;
+                if deltaTime < 0.0 {
+                    deltaTime = 0.0;
+                }
+                result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
+                result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
+                result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2];
+            }
+            crate::trajectory::trType_t::TR_NONLINEAR_STOP => {
+                let mut t = atTime;
+                if t > tr_ref.trTime + tr_ref.trDuration {
+                    t = tr_ref.trTime + tr_ref.trDuration;
+                }
+                let deltaTime = if t - tr_ref.trTime > tr_ref.trDuration || t - tr_ref.trTime <= 0 {
+                    0.0
+                } else {
+                    let angle = 90.0 - (90.0 * ((t - tr_ref.trTime) as f32) / tr_ref.trDuration as f32);
+                    tr_ref.trDuration as f32 * 0.001 * angle.to_radians().cos()
+                };
+                result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
+                result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
+                result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2];
+            }
+            crate::trajectory::trType_t::TR_GRAVITY => {
+                let deltaTime = (atTime - tr_ref.trTime) as f32 * 0.001;
+                result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
+                result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
+                result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2] - 0.5 * 800.0 * deltaTime * deltaTime;
+            }
+            _ => {
+                panic!("BG_EvaluateTrajectory: unknown trType: {}", tr_ref.trType as c_int);
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): see `BG_EvaluateTrajectory` above —
-// same by-value `vec3_t` out-param blocker.
 /// Raven `BG_EvaluateTrajectoryDelta` — for determining velocity at a given
 /// time.
 ///
@@ -853,9 +913,62 @@ pub fn BG_EvaluateTrajectory(
 pub fn BG_EvaluateTrajectoryDelta(
     tr: *const trajectory_t,
     atTime: c_int,
-    result: vec3_t,
+    result: &mut [f32; 3],
 ) {
-    todo!("Port BG_EvaluateTrajectoryDelta — parked (vec3-outparam-seam): oracle/oracle/codemp/game/bg_misc.c:2419")
+    unsafe {
+        let tr_ref = &*tr;
+        match tr_ref.trType {
+            crate::trajectory::trType_t::TR_STATIONARY | crate::trajectory::trType_t::TR_INTERPOLATE => {
+                result[0] = 0.0;
+                result[1] = 0.0;
+                result[2] = 0.0;
+            }
+            crate::trajectory::trType_t::TR_LINEAR => {
+                result[0] = tr_ref.trDelta[0];
+                result[1] = tr_ref.trDelta[1];
+                result[2] = tr_ref.trDelta[2];
+            }
+            crate::trajectory::trType_t::TR_SINE => {
+                let deltaTime = (atTime - tr_ref.trTime) as f32 / tr_ref.trDuration as f32;
+                let phase = (deltaTime * std::f32::consts::PI * 2.0).cos() * 0.5;
+                result[0] = phase * tr_ref.trDelta[0];
+                result[1] = phase * tr_ref.trDelta[1];
+                result[2] = phase * tr_ref.trDelta[2];
+            }
+            crate::trajectory::trType_t::TR_LINEAR_STOP => {
+                if atTime > tr_ref.trTime + tr_ref.trDuration {
+                    result[0] = 0.0;
+                    result[1] = 0.0;
+                    result[2] = 0.0;
+                    return;
+                }
+                result[0] = tr_ref.trDelta[0];
+                result[1] = tr_ref.trDelta[1];
+                result[2] = tr_ref.trDelta[2];
+            }
+            crate::trajectory::trType_t::TR_NONLINEAR_STOP => {
+                if atTime - tr_ref.trTime > tr_ref.trDuration || atTime - tr_ref.trTime <= 0 {
+                    result[0] = 0.0;
+                    result[1] = 0.0;
+                    result[2] = 0.0;
+                    return;
+                }
+                let deltaTime = tr_ref.trDuration as f32 * 0.001 * ((90.0 - (90.0 * ((atTime - tr_ref.trTime) as f32) / tr_ref.trDuration as f32)).to_radians().cos());
+                result[0] = deltaTime * tr_ref.trDelta[0];
+                result[1] = deltaTime * tr_ref.trDelta[1];
+                result[2] = deltaTime * tr_ref.trDelta[2];
+            }
+            crate::trajectory::trType_t::TR_GRAVITY => {
+                let deltaTime = (atTime - tr_ref.trTime) as f32 * 0.001;
+                result[0] = tr_ref.trDelta[0];
+                result[1] = tr_ref.trDelta[1];
+                result[2] = tr_ref.trDelta[2] - 800.0 * deltaTime;
+            }
+            _ => {
+                panic!("BG_EvaluateTrajectoryDelta: unknown trType: {}", tr_ref.trType as c_int);
+            }
+        }
+    }
 }
 
 /// Raven `BG_AddPredictableEventToPlayerstate` — handles the sequence
@@ -879,10 +992,6 @@ pub fn BG_AddPredictableEventToPlayerstate(
     }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): computes `angles` via
-// `vectoangles(jumppad->origin2, angles)`, whose staged `angles: vec3_t`
-// out-param is by-value (same blocker as `BG_EvaluateTrajectory` above) —
-// `vectoangles` cannot report its result back through this signature.
 /// Raven `BG_TouchJumpPad`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2667-2694`
@@ -890,7 +999,35 @@ pub fn BG_TouchJumpPad(
     ps: *mut playerState_t,
     jumppad: *mut entityState_t,
 ) {
-    todo!("Port BG_TouchJumpPad — parked (vec3-outparam-seam): oracle/oracle/codemp/game/bg_misc.c:2667")
+    unsafe {
+        let ps_ref = &mut *ps;
+        let jumppad_ref = &*jumppad;
+
+        // spectators don't use jump pads
+        if ps_ref.pm_type != PM_NORMAL as c_int
+            && ps_ref.pm_type != PM_JETPACK as c_int
+            && ps_ref.pm_type != PM_FLOAT as c_int
+        {
+            return;
+        }
+
+        // if we didn't hit this same jumppad the previous frame
+        // then don't play the event sound again if we are in a fat trigger
+        if ps_ref.jumppad_ent != jumppad_ref.number {
+            let mut angles = [0.0f32; 3];
+            vectoangles(jumppad_ref.origin2, &mut angles);
+            let p = (AngleNormalize180(angles[PITCH])).abs();
+            // effectNum is computed but not used; Raven's code path doesn't emit the effect
+        }
+
+        // remember hitting this jumppad this frame
+        ps_ref.jumppad_ent = jumppad_ref.number;
+        ps_ref.jumppad_frame = ps_ref.pmove_framecount;
+        // give the player the velocity from the jumppad
+        ps_ref.velocity[0] = jumppad_ref.origin2[0];
+        ps_ref.velocity[1] = jumppad_ref.origin2[1];
+        ps_ref.velocity[2] = jumppad_ref.origin2[2];
+    }
 }
 
 /// Raven `BG_EmplacedView` — shared code for emplaced angle gun

@@ -934,8 +934,10 @@ pub fn SP_NPC_Monster_Howler(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Monster_Howler — oracle/oracle/codemp/game/NPC_spawn.c:3467")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"howler".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
 }
 
 /// Raven `SP_NPC_MineMonster`.
@@ -945,8 +947,11 @@ pub fn SP_NPC_MineMonster(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_MineMonster — oracle/oracle/codemp/game/NPC_spawn.c:3481")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"minemonster".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_MineMonster_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Monster_Claw`.
@@ -956,8 +961,10 @@ pub fn SP_NPC_Monster_Claw(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Monster_Claw — oracle/oracle/codemp/game/NPC_spawn.c:3496")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"Claw".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
 }
 
 /// Raven `SP_NPC_Monster_Glider`.
@@ -967,8 +974,10 @@ pub fn SP_NPC_Monster_Glider(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Monster_Glider — oracle/oracle/codemp/game/NPC_spawn.c:3510")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"Glider".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
 }
 
 /// Raven `SP_NPC_Monster_Flier2`.
@@ -978,8 +987,10 @@ pub fn SP_NPC_Monster_Flier2(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Monster_Flier2 — oracle/oracle/codemp/game/NPC_spawn.c:3524")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"Flier2".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
 }
 
 /// Raven `SP_NPC_Monster_Lizard`.
@@ -989,8 +1000,10 @@ pub fn SP_NPC_Monster_Lizard(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Monster_Lizard — oracle/oracle/codemp/game/NPC_spawn.c:3538")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"Lizard".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
 }
 
 /// Raven `SP_NPC_Monster_Fish`.
@@ -1000,8 +1013,10 @@ pub fn SP_NPC_Monster_Fish(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Monster_Fish — oracle/oracle/codemp/game/NPC_spawn.c:3552")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"Fish".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
 }
 
 /// Raven `SP_NPC_Monster_Wampa`.
@@ -1011,8 +1026,11 @@ pub fn SP_NPC_Monster_Wampa(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Monster_Wampa — oracle/oracle/codemp/game/NPC_spawn.c:3568")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"wampa".as_ptr() as *const c_char);
+    }
+    NPC_Wampa_Precache(ctx);
+    SP_NPC_spawner(ctx, self_);
 }
 
 /// Raven `SP_NPC_Monster_Rancor`.
@@ -1022,8 +1040,10 @@ pub fn SP_NPC_Monster_Rancor(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Monster_Rancor — oracle/oracle/codemp/game/NPC_spawn.c:3584")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"rancor".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
 }
 
 /// Raven `SP_NPC_Droid_Interrogator`.
@@ -1033,8 +1053,11 @@ pub fn SP_NPC_Droid_Interrogator(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Interrogator — oracle/oracle/codemp/game/NPC_spawn.c:3602")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"interrogator".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Interrogator_Precache(ctx, self_);
 }
 
 /// Raven `SP_NPC_Droid_Probe`.
@@ -1044,8 +1067,11 @@ pub fn SP_NPC_Droid_Probe(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Probe — oracle/oracle/codemp/game/NPC_spawn.c:3620")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"probe".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Probe_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_Mark1`.
@@ -1055,8 +1081,11 @@ pub fn SP_NPC_Droid_Mark1(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Mark1 — oracle/oracle/codemp/game/NPC_spawn.c:3639")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"mark1".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Mark1_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_Mark2`.
@@ -1066,8 +1095,11 @@ pub fn SP_NPC_Droid_Mark2(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Mark2 — oracle/oracle/codemp/game/NPC_spawn.c:3658")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"mark2".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Mark2_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_ATST`.
@@ -1077,8 +1109,15 @@ pub fn SP_NPC_Droid_ATST(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_ATST — oracle/oracle/codemp/game/NPC_spawn.c:3674")
+    unsafe {
+        if ((*self_).spawnflags & 1) != 0 {
+            (*self_).NPC_type = G_NewString(c"atst_vehicle".as_ptr() as *const c_char);
+        } else {
+            (*self_).NPC_type = G_NewString(c"atst".as_ptr() as *const c_char);
+        }
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_ATST_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_Remote`.
@@ -1088,8 +1127,11 @@ pub fn SP_NPC_Droid_Remote(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Remote — oracle/oracle/codemp/game/NPC_spawn.c:3699")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"remote".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Remote_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_Seeker`.
@@ -1099,8 +1141,11 @@ pub fn SP_NPC_Droid_Seeker(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Seeker — oracle/oracle/codemp/game/NPC_spawn.c:3717")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"seeker".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Seeker_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_Sentry`.
@@ -1110,8 +1155,11 @@ pub fn SP_NPC_Droid_Sentry(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Sentry — oracle/oracle/codemp/game/NPC_spawn.c:3735")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"sentry".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Sentry_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_Gonk`.
@@ -1121,8 +1169,11 @@ pub fn SP_NPC_Droid_Gonk(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Gonk — oracle/oracle/codemp/game/NPC_spawn.c:3755")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"gonk".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Gonk_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_Mouse`.
@@ -1132,8 +1183,11 @@ pub fn SP_NPC_Droid_Mouse(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Mouse — oracle/oracle/codemp/game/NPC_spawn.c:3776")
+    unsafe {
+        (*self_).NPC_type = G_NewString(c"mouse".as_ptr() as *const c_char);
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Mouse_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_R2D2`.
@@ -1143,8 +1197,15 @@ pub fn SP_NPC_Droid_R2D2(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_R2D2 — oracle/oracle/codemp/game/NPC_spawn.c:3798")
+    unsafe {
+        if ((*self_).spawnflags & 1) != 0 {
+            (*self_).NPC_type = G_NewString(c"r2d2_imp".as_ptr() as *const c_char);
+        } else {
+            (*self_).NPC_type = G_NewString(c"r2d2".as_ptr() as *const c_char);
+        }
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_R2D2_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_R5D2`.
@@ -1154,8 +1215,15 @@ pub fn SP_NPC_Droid_R5D2(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_R5D2 — oracle/oracle/codemp/game/NPC_spawn.c:3826")
+    unsafe {
+        if ((*self_).spawnflags & 1) != 0 {
+            (*self_).NPC_type = G_NewString(c"r5d2_imp".as_ptr() as *const c_char);
+        } else {
+            (*self_).NPC_type = G_NewString(c"r5d2".as_ptr() as *const c_char);
+        }
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_R5D2_Precache(ctx);
 }
 
 /// Raven `SP_NPC_Droid_Protocol`.
@@ -1165,8 +1233,15 @@ pub fn SP_NPC_Droid_Protocol(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Droid_Protocol — oracle/oracle/codemp/game/NPC_spawn.c:3851")
+    unsafe {
+        if ((*self_).spawnflags & 1) != 0 {
+            (*self_).NPC_type = G_NewString(c"protocol_imp".as_ptr() as *const c_char);
+        } else {
+            (*self_).NPC_type = G_NewString(c"protocol".as_ptr() as *const c_char);
+        }
+    }
+    SP_NPC_spawner(ctx, self_);
+    NPC_Protocol_Precache(ctx);
 }
 
 /// Raven `NPC_SpawnType`.
@@ -1179,10 +1254,134 @@ pub fn NPC_SpawnType(
     targetname: *mut c_char,
     isVehicle: qboolean,
 ) -> *mut gentity_t {
-    // PORT-ESCALATION(packet-contract): 146-LOC dispatcher over every
-    // SP_NPC_* constructor above (all parked) plus G_Spawn/G_FreeEntity, not
-    // resolved here.
-    todo!("Port NPC_SpawnType — oracle/oracle/codemp/game/NPC_spawn.c:3872")
+    let npc_spawner = G_Spawn(ctx);
+
+    if npc_spawner.is_null() {
+        Com_Printf(c"NPC_Spawn Error: Out of entities!\n".as_ptr() as *const c_char);
+        return std::ptr::null_mut();
+    }
+
+    unsafe {
+        (*npc_spawner).think = Some(G_FreeEntity);
+        (*npc_spawner).nextthink = ctx.world.level.time + 50; // FRAMETIME
+    }
+
+    if npc_type.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    unsafe {
+        if (*npc_type) == b'\0' as c_char {
+            Com_Printf(c"Error, expected one of:\n NPC spawn [NPC type (from ext_data/NPCs)]\n NPC spawn vehicle [VEH type (from ext_data/vehicles)]\n".as_ptr() as *const c_char);
+            return std::ptr::null_mut();
+        }
+    }
+
+    if ent.is_null() || unsafe { (*ent).client.is_null() } {
+        return std::ptr::null_mut();
+    }
+
+    // Spawn it at spot of first player
+    let mut forward = [0.0f32; 3];
+    let mut end = [0.0f32; 3];
+    let mut trace: trap::Trace = unsafe { std::mem::zeroed() };
+
+    AngleVectors(unsafe { (*ent).client.as_ref().unwrap().ps.viewangles }, Some(&mut forward), None, None);
+    let _ = VectorNormalize(&mut forward);
+
+    unsafe {
+        let ent_origin = (*ent).r.currentOrigin;
+        end[0] = ent_origin[0] + 64.0 * forward[0];
+        end[1] = ent_origin[1] + 64.0 * forward[1];
+        end[2] = ent_origin[2] + 64.0 * forward[2];
+    }
+
+    trap::Trace(ctx.engine, &mut trace, unsafe { (*ent).r.currentOrigin }, std::ptr::null(), std::ptr::null(), end, 0, 1);
+
+    unsafe {
+        end = trace.endpos;
+        end[2] -= 24.0;
+    }
+
+    trap::Trace(ctx.engine, &mut trace, unsafe { trace.endpos }, std::ptr::null(), std::ptr::null(), end, 0, 1);
+
+    unsafe {
+        end = trace.endpos;
+        end[2] += 24.0;
+    }
+
+    G_SetOrigin(npc_spawner, end);
+
+    unsafe {
+        (*npc_spawner).s.origin = (*npc_spawner).r.currentOrigin;
+        (*npc_spawner).s.angles[1] = (*ent).client.as_ref().unwrap().ps.viewangles[1];
+    }
+
+    trap::LinkEntity(ctx.engine, npc_spawner);
+
+    unsafe {
+        (*npc_spawner).NPC_type = G_NewString(npc_type);
+
+        if !targetname.is_null() {
+            (*npc_spawner).NPC_targetname = G_NewString(targetname);
+        }
+
+        (*npc_spawner).count = 1;
+        (*npc_spawner).delay = 0.0;
+
+        if isVehicle != 0 {
+            (*npc_spawner).classname = G_NewString(c"NPC_Vehicle".as_ptr() as *const c_char);
+        }
+    }
+
+    // Call precache funcs
+    let npc_type_str = unsafe {
+        if npc_type.is_null() {
+            ""
+        } else {
+            std::ffi::CStr::from_ptr(npc_type).to_str().unwrap_or("")
+        }
+    };
+
+    if Q_stricmp(c"gonk".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Gonk_Precache(ctx);
+    } else if Q_stricmp(c"mouse".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Mouse_Precache(ctx);
+    } else if Q_strncmp(c"r2d2".as_ptr() as *const c_char, npc_type, 4) == 0 {
+        NPC_R2D2_Precache(ctx);
+    } else if Q_stricmp(c"atst".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_ATST_Precache(ctx);
+    } else if Q_strncmp(c"r5d2".as_ptr() as *const c_char, npc_type, 4) == 0 {
+        NPC_R5D2_Precache(ctx);
+    } else if Q_stricmp(c"mark1".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Mark1_Precache(ctx);
+    } else if Q_stricmp(c"mark2".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Mark2_Precache(ctx);
+    } else if Q_stricmp(c"interrogator".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Interrogator_Precache(ctx, std::ptr::null_mut());
+    } else if Q_stricmp(c"probe".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Probe_Precache(ctx);
+    } else if Q_stricmp(c"seeker".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Seeker_Precache(ctx);
+    } else if Q_stricmp(c"remote".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Remote_Precache(ctx);
+    } else if Q_strncmp(c"shadowtrooper".as_ptr() as *const c_char, npc_type, 13) == 0 {
+        NPC_ShadowTrooper_Precache(ctx);
+    } else if Q_stricmp(c"minemonster".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_MineMonster_Precache(ctx);
+    } else if Q_stricmp(c"howler".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Howler_Precache();
+    } else if Q_stricmp(c"sentry".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Sentry_Precache(ctx);
+    } else if Q_stricmp(c"protocol".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Protocol_Precache(ctx);
+    } else if Q_stricmp(c"galak_mech".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_GalakMech_Precache(ctx);
+    } else if Q_stricmp(c"wampa".as_ptr() as *const c_char, npc_type) == 0 {
+        NPC_Wampa_Precache(ctx);
+    }
+
+    NPC_Spawn_Do(ctx, npc_spawner)
 }
 
 /// Raven `NPC_Spawn_f`.
@@ -1192,18 +1391,131 @@ pub fn NPC_Spawn_f(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on NPC_SpawnType (ctx, parked)
-    // and trap_Argc/trap_Argv console-arg helpers not resolved here.
-    todo!("Port NPC_Spawn_f — oracle/oracle/codemp/game/NPC_spawn.c:4020")
+    let mut npc_type: [u8; 1024] = [0; 1024];
+    let mut targetname: [u8; 1024] = [0; 1024];
+    let mut is_vehicle = 0u32;
+
+    trap::Argv(ctx.engine, 2, npc_type.as_mut_ptr() as *mut c_char, 1024);
+
+    if Q_stricmp(c"vehicle".as_ptr() as *const c_char, npc_type.as_ptr() as *const c_char) == 0 {
+        is_vehicle = 1;
+        trap::Argv(ctx.engine, 3, npc_type.as_mut_ptr() as *mut c_char, 1024);
+        trap::Argv(ctx.engine, 4, targetname.as_mut_ptr() as *mut c_char, 1024);
+    } else {
+        trap::Argv(ctx.engine, 3, targetname.as_mut_ptr() as *mut c_char, 1024);
+    }
+
+    NPC_SpawnType(ctx, ent, npc_type.as_mut_ptr() as *mut c_char, targetname.as_mut_ptr() as *mut c_char, is_vehicle);
 }
 
 /// Raven `NPC_Kill_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:4045-4170`
 pub fn NPC_Kill_f(ctx: GameContext<'_>) {
-    // PORT-ESCALATION(packet-contract): 126-LOC console command touching
-    // g_entities/level and G_Damage, not resolved here.
-    todo!("Port NPC_Kill_f — oracle/oracle/codemp/game/NPC_spawn.c:4045")
+    let mut name: [u8; 1024] = [0; 1024];
+    let mut kill_team: team_t = TEAM_FREE;
+    let mut kill_non_sf = 0u32;
+
+    trap::Argv(ctx.engine, 2, name.as_mut_ptr() as *mut c_char, 1024);
+
+    if name[0] == b'\0' as u8 {
+        Com_Printf(c"Error, Expected:\n".as_ptr() as *const c_char);
+        Com_Printf(c"NPC kill '[NPC targetname]' - kills NPCs with certain targetname\n".as_ptr() as *const c_char);
+        Com_Printf(c"or\n".as_ptr() as *const c_char);
+        Com_Printf(c"NPC kill 'all' - kills all NPCs\n".as_ptr() as *const c_char);
+        Com_Printf(c"or\n".as_ptr() as *const c_char);
+        Com_Printf(c"NPC team '[teamname]' - kills all NPCs of a certain team ('nonally' is all but your allies)\n".as_ptr() as *const c_char);
+        return;
+    }
+
+    if Q_stricmp(c"team".as_ptr() as *const c_char, name.as_ptr() as *const c_char) == 0 {
+        trap::Argv(ctx.engine, 3, name.as_mut_ptr() as *mut c_char, 1024);
+
+        if name[0] == b'\0' as u8 {
+            Com_Printf(c"NPC_Kill Error: 'npc kill team' requires a team name!\n".as_ptr() as *const c_char);
+            Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
+            for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
+                // PORT-ESCALATION(unresolved): TeamNames array access
+                // Com_Printf(c"%s\n".as_ptr() as *const c_char, TeamNames[n]);
+            }
+            Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
+            return;
+        }
+
+        if Q_stricmp(c"nonally".as_ptr() as *const c_char, name.as_ptr() as *const c_char) == 0 {
+            kill_non_sf = 1;
+        } else {
+            kill_team = GetIDForString(std::ptr::null_mut(), name.as_ptr() as *const c_char) as team_t;
+
+            if kill_team == TEAM_FREE {
+                Com_Printf(c"NPC_Kill Error: team '%s' not recognized\n".as_ptr() as *const c_char, name.as_ptr() as *const c_char);
+                Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
+                for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
+                    // PORT-ESCALATION(unresolved): TeamNames array access
+                }
+                Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
+                return;
+            }
+        }
+    }
+
+    for n in 1..2048 {
+        let player = unsafe { ctx.world.entities.as_mut().unwrap().get_mut(n as usize) };
+        if player.is_none() {
+            continue;
+        }
+        let player = player.unwrap();
+
+        if !player.inuse {
+            continue;
+        }
+
+        if kill_non_sf != 0 {
+            if !player.client.is_null() {
+                if unsafe { (*player.client).playerTeam } != NPCTEAM_PLAYER {
+                    Com_Printf(c"Killing NPC %s named %s\n".as_ptr() as *const c_char, player.NPC_type, player.targetname);
+                    player.health = 0;
+
+                    if !player.die.is_none() && !player.client.is_null() {
+                        // PORT-ESCALATION(fn-ptr): die function pointer call with MOD_UNKNOWN
+                        // player.die(player, player, player, unsafe { (*player.client).pers.maxHealth }, MOD_UNKNOWN);
+                    }
+                }
+            } else if !player.NPC_type.is_null() && !player.classname.is_null() {
+                unsafe {
+                    if (*player.classname) != b'\0' as c_char
+                        && Q_stricmp(c"NPC_starfleet".as_ptr() as *const c_char, player.classname) != 0
+                    {
+                        Com_Printf(c"Removing NPC spawner %s with NPC named %s\n".as_ptr() as *const c_char, player.NPC_type, player.NPC_targetname);
+                        G_FreeEntity(ctx, player);
+                    }
+                }
+            }
+        } else if !player.NPC.is_null() && !player.client.is_null() {
+            if kill_team != TEAM_FREE {
+                if unsafe { (*player.client).playerTeam } == kill_team {
+                    Com_Printf(c"Killing NPC %s named %s\n".as_ptr() as *const c_char, player.NPC_type, player.targetname);
+                    player.health = 0;
+                    if !player.die.is_none() {
+                        // PORT-ESCALATION(fn-ptr): die function pointer call
+                    }
+                }
+            } else if (!player.targetname.is_null()
+                && Q_stricmp(name.as_ptr() as *const c_char, player.targetname) == 0)
+                || Q_stricmp(c"all".as_ptr() as *const c_char, name.as_ptr() as *const c_char)
+                    == 0
+            {
+                Com_Printf(c"Killing NPC %s named %s\n".as_ptr() as *const c_char, player.NPC_type, player.targetname);
+                player.health = 0;
+                unsafe {
+                    (*player.client).ps.stats[4] = 0; // STAT_HEALTH
+                }
+                if !player.die.is_none() {
+                    // PORT-ESCALATION(fn-ptr): die function pointer call
+                }
+            }
+        }
+    }
 }
 
 /// Raven `NPC_PrintScore`.
@@ -1213,9 +1525,13 @@ pub fn NPC_PrintScore(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): needs trap_SendServerCommand /
-    // score-string helpers, not resolved here.
-    todo!("Port NPC_PrintScore — oracle/oracle/codemp/game/NPC_spawn.c:4172")
+    unsafe {
+        Com_Printf(
+            c"%s: %d\n".as_ptr() as *const c_char,
+            (*ent).targetname,
+            (*(*ent).client).ps.persistant[12], // PERS_SCORE
+        );
+    }
 }
 
 /// Raven `Cmd_NPC_f`.
@@ -1225,8 +1541,44 @@ pub fn Cmd_NPC_f(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): console-command dispatcher over
-    // NPC_Spawn_f/NPC_Kill_f/NPC_PrintScore (ctx, all parked) plus trap_Argv, not
-    // resolved here.
-    todo!("Port Cmd_NPC_f — oracle/oracle/codemp/game/NPC_spawn.c:4183")
+    let mut cmd: [u8; 1024] = [0; 1024];
+
+    trap::Argv(ctx.engine, 1, cmd.as_mut_ptr() as *mut c_char, 1024);
+
+    if cmd[0] == b'\0' as u8 {
+        Com_Printf(c"Valid NPC commands are:\n".as_ptr() as *const c_char);
+        Com_Printf(c" spawn [NPC type (from NCPCs.cfg)]\n".as_ptr() as *const c_char);
+        Com_Printf(c" kill [NPC targetname] or [all(kills all NPCs)] or 'team [teamname]'\n".as_ptr() as *const c_char);
+        Com_Printf(c" showbounds (draws exact bounding boxes of NPCs)\n".as_ptr() as *const c_char);
+        Com_Printf(c" score [NPC targetname] (prints number of kills per NPC)\n".as_ptr() as *const c_char);
+    } else if Q_stricmp(c"spawn".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
+        NPC_Spawn_f(ctx, ent);
+    } else if Q_stricmp(c"kill".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
+        NPC_Kill_f(ctx);
+    } else if Q_stricmp(c"showbounds".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
+        ctx.world.globals.showBBoxes = if ctx.world.globals.showBBoxes != 0 { 0 } else { 1 };
+    } else if Q_stricmp(c"score".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
+        let mut cmd2: [u8; 1024] = [0; 1024];
+        trap::Argv(ctx.engine, 2, cmd2.as_mut_ptr() as *mut c_char, 1024);
+
+        if cmd2[0] == b'\0' as u8 {
+            // Show the score for all NPCs
+            Com_Printf(c"SCORE LIST:\n".as_ptr() as *const c_char);
+            for i in 0..2048 {
+                let player = unsafe { ctx.world.entities.as_ref().unwrap().get(i) };
+                if player.is_none() || unsafe { player.unwrap().client.is_null() } {
+                    continue;
+                }
+                NPC_PrintScore(ctx, player.unwrap() as *const _ as *mut _);
+            }
+        } else {
+            // Find specific NPC
+            let found_ent = G_Find(ctx, std::ptr::null_mut(), 0, cmd2.as_ptr() as *const c_char);
+            if !found_ent.is_null() && !unsafe { (*found_ent).client.is_null() } {
+                NPC_PrintScore(ctx, found_ent);
+            } else {
+                Com_Printf(c"ERROR: NPC score - no such NPC %s\n".as_ptr() as *const c_char, cmd2.as_ptr() as *const c_char);
+            }
+        }
+    }
 }

@@ -49,7 +49,7 @@ use crate::trap;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
-use mp_bg::public::gametype::GT_POWERDUEL;
+use mp_bg::public::gametype::{GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL};
 use mp_bg::public::saberlock::{
     SABERLOCK_LOCK, SABERLOCK_LOSE, SABERLOCK_SUPERBREAK, SABERLOCK_TOP, SABERLOCK_WIN,
 };
@@ -58,6 +58,20 @@ use mp_qshared::common::mp::qcommon::usercmd_button::{
     BUTTON_FORCEPOWER, BUTTON_GESTURE,
 };
 use mp_qshared::shared::q_math_rand::RAND_MAX;
+// --- pass-2 shard-2 body-fill callee imports (resolved owning files per packet) ---
+use crate::bg_misc::BG_EvaluateTrajectory;
+use crate::bg_panimate::{
+    BG_InGrappleMove, BG_KickingAnim, BG_SaberInAttack, BG_SuperBreakWinAnim, PM_InSaberAnim,
+    PM_SaberInTransition,
+};
+use crate::bg_pmove::BG_SabersOff;
+use crate::bg_saber::PM_SaberInBrokenParry;
+use crate::g_client::{G_UpdateClientAnims, SetClientViewAngle};
+use crate::g_utils::{G_EntitySound, G_SetAnim, G_SetOrigin, G_TempEntity};
+use crate::q_math::{vectoangles, AngleDelta, AngleVectors, AnglesToAxis};
+use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
+use crate::NPC_senses::InFront;
+use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 
 // `saberBlockedType_t`/`weaponstate_t` are `#[repr(i32)]` enums, but the
 // playerState `saberBlocked`/`weaponstate` fields are stored as `c_int` — so
@@ -74,6 +88,8 @@ const BLOCKED_LOWER_RIGHT_PROJ: c_int = saberBlockedType_t::BLOCKED_LOWER_RIGHT_
 const BLOCKED_LOWER_LEFT_PROJ: c_int = saberBlockedType_t::BLOCKED_LOWER_LEFT_PROJ as c_int;
 const BLOCKED_TOP_PROJ: c_int = saberBlockedType_t::BLOCKED_TOP_PROJ as c_int;
 const WEAPON_FIRING: c_int = weaponstate_t::WEAPON_FIRING as c_int;
+const WEAPON_RAISING: c_int = weaponstate_t::WEAPON_RAISING as c_int;
+const WEAPON_DROPPING: c_int = weaponstate_t::WEAPON_DROPPING as c_int;
 
 // Raven `qboolean` is `c_int` (`qfalse == 0`, `qtrue == 1`); the lowercase
 // `qtrue`/`qfalse` spellings are not exported here, so the ported bodies below
@@ -1586,24 +1602,195 @@ pub fn G_PrettyCloseIGuess(
 /// Raven `G_GrabSomeMofos`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7969-8082`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_GrabSomeMofos(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port G_GrabSomeMofos — parked: engine-world-threading")
+    unsafe {
+        let client = (*self_).client as *mut gclient_t;
+        // `renderInfo_t *ri = &self->client->renderInfo;` — only `handRBolt` is read.
+        let handRBolt = (*client).renderInfo.handRBolt;
+
+        if (*self_).ghoul2.is_null() || handRBolt == -1 {
+            // no good
+            return;
+        }
+
+        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+        let flatAng: vec3_t = [0.0, (*client).ps.viewangles[1], 0.0];
+        trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                (*self_).ghoul2,
+                0,
+                handRBolt,
+                &mut boltMatrix as *mut mdxaBone_t,
+                &flatAng as *const vec3_t,
+                &(*client).ps.origin as *const vec3_t,
+                (*ctx.world).level.time,
+                core::ptr::null_mut(),
+                (*self_).modelScale,
+            ),
+        );
+        let mut pos: vec3_t = [0.0; 3];
+        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut pos);
+
+        let grabMins: vec3_t = [-4.0, -4.0, -4.0];
+        let grabMaxs: vec3_t = [4.0, 4.0, 4.0];
+
+        // trace from my origin to my hand, if we hit anyone then get 'em
+        let mut trace: trace_t = core::mem::zeroed();
+        trap::G2Trace(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs::new(
+                &mut trace as *mut trace_t,
+                &(*client).ps.origin as *const vec3_t,
+                &grabMins as *const vec3_t,
+                &grabMaxs as *const vec3_t,
+                &pos as *const vec3_t,
+                (*self_).s.number,
+                MASK_SHOT,
+                G2TRFLAG_DOGHOULTRACE | G2TRFLAG_GETSURFINDEX | G2TRFLAG_THICK | G2TRFLAG_HITCORPSES,
+                (*ctx.world).cvars.g_g2TraceLod.integer,
+            ),
+        );
+
+        if trace.fraction != 1.0 && trace.entityNum < ENTITYNUM_WORLD {
+            let grabbed = &mut (*ctx.world).entities[trace.entityNum as usize] as *mut gentity_t;
+            let gcl = (*grabbed).client as *mut gclient_t;
+
+            if (*grabbed).inuse != 0
+                && ((*grabbed).s.eType == ET_PLAYER as c_int
+                    || (*grabbed).s.eType == ET_NPC as c_int)
+                && !(*grabbed).client.is_null()
+                && (*grabbed).health > 0
+                && G_CanBeEnemy(self_, grabbed) != 0
+                && G_PrettyCloseIGuess(
+                    (*gcl).ps.origin[2],
+                    (*client).ps.origin[2],
+                    4.0,
+                ) != 0
+                && (BG_InGrappleMove((*gcl).ps.torsoAnim) == 0
+                    || (*gcl).ps.torsoAnim == animNumber_t::BOTH_KYLE_GRAB as c_int)
+                && (BG_InGrappleMove((*gcl).ps.legsAnim) == 0
+                    || (*gcl).ps.legsAnim == animNumber_t::BOTH_KYLE_GRAB as c_int)
+            {
+                // grabbed an active player/npc
+                let mut tortureAnim: c_int = -1;
+                let mut correspondingAnim: c_int = -1;
+
+                if (*client).pers.cmd.forwardmove > 0 {
+                    // punch grab
+                    tortureAnim = animNumber_t::BOTH_KYLE_PA_1 as c_int;
+                    correspondingAnim = animNumber_t::BOTH_PLAYER_PA_1 as c_int;
+                } else if (*client).pers.cmd.forwardmove < 0 {
+                    // knee-throw
+                    tortureAnim = animNumber_t::BOTH_KYLE_PA_2 as c_int;
+                    correspondingAnim = animNumber_t::BOTH_PLAYER_PA_2 as c_int;
+                }
+
+                if tortureAnim == -1 || correspondingAnim == -1 {
+                    if (*client).ps.torsoTimer < 300 && (*client).grappleState == 0 {
+                        // you failed to grab anyone, play the "failed to grab" anim
+                        G_SetAnim(
+                            self_,
+                            &mut (*client).pers.cmd,
+                            SETANIM_BOTH,
+                            animNumber_t::BOTH_KYLE_MISS as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            0,
+                        );
+                        if (*client).ps.torsoAnim == animNumber_t::BOTH_KYLE_MISS as c_int {
+                            // providing the anim set succeeded..
+                            (*client).ps.weaponTime = (*client).ps.torsoTimer;
+                        }
+                    }
+                    return;
+                }
+
+                (*client).grappleIndex = (*grabbed).s.number;
+                (*client).grappleState = 1;
+
+                (*gcl).grappleIndex = (*self_).s.number;
+                (*gcl).grappleState = 20;
+
+                // time to crack some heads
+                G_SetAnim(
+                    self_,
+                    &mut (*client).pers.cmd,
+                    SETANIM_BOTH,
+                    tortureAnim,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    0,
+                );
+                if (*client).ps.torsoAnim == tortureAnim {
+                    // providing the anim set succeeded..
+                    (*client).ps.weaponTime = (*client).ps.torsoTimer;
+                }
+
+                G_SetAnim(
+                    grabbed,
+                    &mut (*gcl).pers.cmd,
+                    SETANIM_BOTH,
+                    correspondingAnim,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    0,
+                );
+                if (*gcl).ps.torsoAnim == correspondingAnim {
+                    // providing the anim set succeeded..
+                    if (*gcl).ps.weapon == WP_SABER as c_int {
+                        // turn it off
+                        if (*gcl).ps.saberHolstered == 0 {
+                            (*gcl).ps.saberHolstered = 2;
+                            if (*gcl).saber[0].soundOff != 0 {
+                                G_Sound(ctx, grabbed, CHAN_AUTO as c_int, (*gcl).saber[0].soundOff);
+                            }
+                            if (*gcl).saber[1].soundOff != 0 && (*gcl).saber[1].model[0] != 0 {
+                                G_Sound(ctx, grabbed, CHAN_AUTO as c_int, (*gcl).saber[1].soundOff);
+                            }
+                        }
+                    }
+                    if (*gcl).ps.torsoTimer < (*client).ps.torsoTimer {
+                        // make sure they stay in the anim at least as long as the grabber
+                        (*gcl).ps.torsoTimer = (*client).ps.torsoTimer;
+                    }
+                    (*gcl).ps.weaponTime = (*gcl).ps.torsoTimer;
+                }
+            }
+        }
+
+        if (*client).ps.torsoTimer < 300 && (*client).grappleState == 0 {
+            // you failed to grab anyone, play the "failed to grab" anim
+            G_SetAnim(
+                self_,
+                &mut (*client).pers.cmd,
+                SETANIM_BOTH,
+                animNumber_t::BOTH_KYLE_MISS as c_int,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                0,
+            );
+            if (*client).ps.torsoAnim == animNumber_t::BOTH_KYLE_MISS as c_int {
+                // providing the anim set succeeded..
+                (*client).ps.weaponTime = (*client).ps.torsoTimer;
+            }
+        }
+    }
 }
 
 /// Raven `WP_SaberPositionUpdate`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:8084-9102`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(missing-global-field): the entry guard needs `if
+// (!g2SaberInstance) return;`, but `GameGlobals.g2SaberInstance` is an untyped
+// `()` placeholder (Raven `void **`, `g_client.c:1511`); the null-check cannot
+// be expressed and porters may not retype/add merged GameGlobals fields (fork 1,
+// same class as the WP_SaberApplyDamage/DoHit/DoClash parks in this file).
 pub fn WP_SaberPositionUpdate(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     ucmd: *mut usercmd_t,
 ) {
-    todo!("Port WP_SaberPositionUpdate — parked: engine-world-threading")
+    todo!("Port WP_SaberPositionUpdate — parked: missing-global-field (g2SaberInstance)")
 }
 
 /// Raven `WP_MissileBlockForBlock`.
@@ -1625,32 +1812,148 @@ pub fn WP_MissileBlockForBlock(
 /// Raven `WP_SaberBlockNonRandom`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9127-9198`
-// PORT-ESCALATION(vec3-outparam-convention): calls AngleVectors/VectorNormalize whose resolved signatures pass vec3_t by value (Copy) and cannot write outputs back — needs the out-param->return convention resolved.
+// fork-9: `hitloc` is a read-only input here (VectorSubtract source, `hitloc[2]`
+// read), never written — so it stays by-value `vec3_t`.
 pub fn WP_SaberBlockNonRandom(
     self_: *mut gentity_t,
     hitloc: vec3_t,
     missileBlock: qboolean,
 ) {
-    todo!("Port WP_SaberBlockNonRandom — parked: vec3-outparam-convention")
+    unsafe {
+        let client = (*self_).client as *mut gclient_t;
+
+        let mut clEye: vec3_t = (*client).ps.origin;
+        clEye[2] += (*client).ps.viewheight as f32;
+
+        let mut diff: vec3_t = [
+            hitloc[0] - clEye[0],
+            hitloc[1] - clEye[1],
+            hitloc[2] - clEye[2],
+        ];
+        diff[2] = 0.0;
+        VectorNormalize(&mut diff);
+
+        let mut fwdangles: vec3_t = [0.0, 0.0, 0.0];
+        fwdangles[1] = (*client).ps.viewangles[1];
+        // Ultimately we might care if the shot was ahead or behind, but for now,
+        // just quadrant is fine.
+        let mut right: vec3_t = [0.0; 3];
+        AngleVectors(fwdangles, None, Some(&mut right), None);
+
+        let rightdot = right[0] * diff[0] + right[1] * diff[1] + right[2] * diff[2];
+        let zdiff = hitloc[2] - clEye[2];
+
+        if zdiff > 0.0 {
+            if rightdot > 0.3 {
+                (*client).ps.saberBlocked = BLOCKED_UPPER_RIGHT;
+            } else if rightdot < -0.3 {
+                (*client).ps.saberBlocked = BLOCKED_UPPER_LEFT;
+            } else {
+                (*client).ps.saberBlocked = BLOCKED_TOP;
+            }
+        } else if zdiff > -20.0 {
+            if zdiff < -10.0 {
+                // hmm, pretty low, but not low enough to use the low block, so
+                // we need to duck
+            }
+            if rightdot > 0.1 {
+                (*client).ps.saberBlocked = BLOCKED_UPPER_RIGHT;
+            } else if rightdot < -0.1 {
+                (*client).ps.saberBlocked = BLOCKED_UPPER_LEFT;
+            } else {
+                (*client).ps.saberBlocked = BLOCKED_TOP;
+            }
+        } else if rightdot >= 0.0 {
+            (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT;
+        } else {
+            (*client).ps.saberBlocked = BLOCKED_LOWER_LEFT;
+        }
+
+        if missileBlock != 0 {
+            (*client).ps.saberBlocked = WP_MissileBlockForBlock((*client).ps.saberBlocked);
+        }
+    }
 }
 
 /// Raven `WP_SaberBlock`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9200-9274`
-// PORT-ESCALATION(vec3-outparam-convention): calls AngleVectors/VectorNormalize whose resolved signatures pass vec3_t by value (Copy) and cannot write outputs back — needs the out-param->return convention resolved.
+// fork-9: `hitloc` is a read-only input here (VectorSubtract source, `hitloc[2]`
+// read), never written — so it stays by-value `vec3_t`.
 pub fn WP_SaberBlock(
     ctx: GameContext<'_>,
     playerent: *mut gentity_t,
     hitloc: vec3_t,
     missileBlock: qboolean,
 ) {
-    todo!("Port WP_SaberBlock — parked: vec3-outparam-convention")
+    unsafe {
+        let client = (*playerent).client as *mut gclient_t;
+
+        let mut diff: vec3_t = [
+            hitloc[0] - (*client).ps.origin[0],
+            hitloc[1] - (*client).ps.origin[1],
+            hitloc[2] - (*client).ps.origin[2],
+        ];
+        VectorNormalize(&mut diff);
+
+        let mut fwdangles: vec3_t = [0.0, 0.0, 0.0];
+        fwdangles[1] = (*client).ps.viewangles[1];
+        // Ultimately we might care if the shot was ahead or behind, but for now,
+        // just quadrant is fine.
+        let mut right: vec3_t = [0.0; 3];
+        AngleVectors(fwdangles, None, Some(&mut right), None);
+
+        let rightdot = (right[0] * diff[0] + right[1] * diff[1] + right[2] * diff[2])
+            + RandFloat(ctx, -0.2, 0.2);
+        let zdiff = hitloc[2] - (*client).ps.origin[2] + Q_irand(-8, 8) as f32;
+
+        // Figure out what quadrant the block was in.
+        if zdiff > 24.0 {
+            // Attack from above
+            if Q_irand(0, 1) != 0 {
+                (*client).ps.saberBlocked = BLOCKED_TOP;
+            } else {
+                (*client).ps.saberBlocked = BLOCKED_UPPER_LEFT;
+            }
+        } else if zdiff > 13.0 {
+            // The upper half has three viable blocks...
+            if rightdot > 0.25 {
+                // In the right quadrant...
+                if Q_irand(0, 1) != 0 {
+                    (*client).ps.saberBlocked = BLOCKED_UPPER_LEFT;
+                } else {
+                    (*client).ps.saberBlocked = BLOCKED_LOWER_LEFT;
+                }
+            } else {
+                match Q_irand(0, 3) {
+                    0 => (*client).ps.saberBlocked = BLOCKED_UPPER_RIGHT,
+                    1 | 2 => (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT,
+                    3 => (*client).ps.saberBlocked = BLOCKED_TOP,
+                    _ => {}
+                }
+            }
+        } else {
+            // The lower half is a bit iffy as far as block coverage.  Pick one of
+            // the "low" ones at random.
+            if Q_irand(0, 1) != 0 {
+                (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT;
+            } else {
+                (*client).ps.saberBlocked = BLOCKED_LOWER_LEFT;
+            }
+        }
+
+        if missileBlock != 0 {
+            (*client).ps.saberBlocked = WP_MissileBlockForBlock((*client).ps.saberBlocked);
+        }
+    }
 }
 
 /// Raven `WP_SaberCanBlock`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9276-9451`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// fork-9: `point` is read-only (passed to InFront/WP_SaberBlockNonRandom, never
+// written) — stays by-value `vec3_t`. Raven's `!point` null-guard is vestigial
+// for a by-value array and is dropped.
 pub fn WP_SaberCanBlock(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -1658,15 +1961,150 @@ pub fn WP_SaberCanBlock(
     dflags: c_int,
     r#mod: c_int,
     projectile: qboolean,
-    attackStr: c_int,
+    mut attackStr: c_int,
 ) -> c_int {
-    todo!("Port WP_SaberCanBlock — parked: engine-world-threading")
+    unsafe {
+        let mut thrownSaber: qboolean = 0;
+        let mut blockFactor: f32 = 0.0;
+
+        if self_.is_null() || (*self_).client.is_null() {
+            return 0;
+        }
+        let client = (*self_).client as *mut gclient_t;
+
+        if attackStr == 999 {
+            attackStr = 0;
+            thrownSaber = 1;
+        }
+
+        if BG_SaberInAttack((*client).ps.saberMove) != 0 {
+            return 0;
+        }
+
+        if PM_InSaberAnim((*client).ps.torsoAnim) != 0
+            && (*client).ps.saberBlocked == 0
+            && (*client).ps.saberMove != LS_READY
+            && (*client).ps.saberMove != LS_NONE
+        {
+            if (*client).ps.saberMove < LS_PARRY_UP || (*client).ps.saberMove > LS_REFLECT_LL {
+                return 0;
+            }
+        }
+
+        if PM_SaberInBrokenParry((*client).ps.saberMove) != 0 {
+            return 0;
+        }
+
+        if (*client).ps.saberEntityNum == 0 {
+            // saber is knocked away
+            return 0;
+        }
+
+        if BG_SabersOff(&mut (*client).ps) != 0 {
+            return 0;
+        }
+
+        if (*client).ps.weapon != WP_SABER as c_int {
+            return 0;
+        }
+
+        if (*client).ps.weaponstate == WEAPON_RAISING {
+            return 0;
+        }
+
+        if (*client).ps.saberInFlight != 0 {
+            return 0;
+        }
+
+        if ((*client).pers.cmd.buttons & BUTTON_ATTACK) != 0 {
+            // don't block when the player is trying to slash, if it's a
+            // projectile or he's doing a very strong attack
+            return 0;
+        }
+
+        // Removed for now (pre-1.03 block-decision code); see oracle 9342-9384.
+
+        if SaberAttacking(self_) != 0 {
+            // attacking, can't block now
+            return 0;
+        }
+
+        if (*client).ps.saberMove != LS_READY && (*client).ps.saberBlocking == 0 {
+            return 0;
+        }
+
+        if (*client).ps.saberBlockTime >= (*ctx.world).level.time {
+            return 0;
+        }
+
+        if (*client).ps.forceHandExtend != HANDEXTEND_NONE as c_int {
+            return 0;
+        }
+
+        if (*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] == FORCE_LEVEL_3 {
+            if (*ctx.world).cvars.d_saberGhoul2Collision.integer != 0 {
+                blockFactor = 0.3;
+            } else {
+                blockFactor = 0.05;
+            }
+        } else if (*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] == FORCE_LEVEL_2 {
+            blockFactor = 0.6;
+        } else if (*client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] == FORCE_LEVEL_1 {
+            blockFactor = 0.9;
+        } else {
+            // for now we just don't get to autoblock with no def
+            return 0;
+        }
+
+        if thrownSaber != 0 {
+            blockFactor -= 0.25;
+        }
+
+        if attackStr != 0 {
+            // blocking a saber, not a projectile.
+            blockFactor -= 0.25;
+        }
+
+        if InFront(point, (*client).ps.origin, (*client).ps.viewangles, blockFactor) == 0 {
+            return 0;
+        }
+
+        if projectile != 0 {
+            WP_SaberBlockNonRandom(self_, point, projectile);
+        }
+        1
+    }
 }
 
 /// Raven `HasSetSaberOnly`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9453-9484`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn HasSetSaberOnly(ctx: GameContext<'_>) -> qboolean {
-    todo!("Port HasSetSaberOnly — parked: engine-world-threading")
+    unsafe {
+        let mut i: c_int = 0;
+        let mut wDisable: c_int = 0;
+
+        if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER {
+            // set to 0
+            return 0;
+        }
+
+        if (*ctx.world).cvars.g_gametype.integer == GT_DUEL
+            || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
+        {
+            wDisable = (*ctx.world).cvars.g_duelWeaponDisable.integer;
+        } else {
+            wDisable = (*ctx.world).cvars.g_weaponDisable.integer;
+        }
+
+        while i < WP_NUM_WEAPONS as c_int {
+            if (wDisable & (1 << i)) == 0 && i != WP_SABER as c_int && i != WP_NONE as c_int {
+                return 0;
+            }
+
+            i += 1;
+        }
+
+        1
+    }
 }

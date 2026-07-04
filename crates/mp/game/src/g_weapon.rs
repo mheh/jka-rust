@@ -13,9 +13,21 @@ use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 
+// Pass-2: entity fn-pointer dispatch as fn-ID enums (ruling 2) and the
+// `DAMAGE_*` dflag family (`g_local.h:1170-1190`).
+use crate::ent_fn_enums::EntThink;
+use crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
+use crate::q_math::Q_irand;
+
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
+
+// Raven `MASK_SHOT` (`CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE|CONTENTS_TERRAIN`);
+// the `CONTENTS_*` bits come from the prelude's `surface_flags` re-export. Local
+// `const` mirrors the same in-repo convention as `NPC_combat.rs`.
+// Source: `oracle/oracle/codemp/game/surfaceflags.h` (masks in `bg_public.h:1170`)
+const MASK_SHOT: c_int = CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE | CONTENTS_TERRAIN;
 
 /// Raven `touch_NULL`.
 ///
@@ -98,13 +110,41 @@ pub fn WP_FireBlasterMissile(
     todo!("Port WP_FireBlasterMissile — parked: bg-dep")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed for the anti-forever-flight think/nextthink assignment — how is state threaded in?
 /// Raven `WP_FireTurboLaserMissile`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:386-419`
 pub fn WP_FireTurboLaserMissile(
     ctx: GameContext<'_>,ent: *mut gentity_t, start: vec3_t, dir: vec3_t) {
-    todo!("Port WP_FireTurboLaserMissile — parked: seam-threading")
+    unsafe {
+        // FIXME (Raven): velocity/damage/splash externalized off the shooter ent.
+        let velocity: c_int = (*ent).mass as c_int;
+        let missile = crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, qfalse);
+
+        // use a custom shot effect / custom impact effect
+        (*missile).s.otherEntityNum2 = (*ent).genericValue14;
+        (*missile).s.emplacedOwner = (*ent).genericValue15;
+
+        (*missile).classname = c"turbo_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_TURRET;
+
+        (*missile).damage = (*ent).damage;
+        (*missile).splashDamage = (*ent).splashDamage;
+        (*missile).splashRadius = (*ent).splashRadius;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = MOD_TARGET_LASER as c_int; // MOD_TURBLAST; count as a heavy weap
+        (*missile).splashMethodOfDeath = MOD_TARGET_LASER as c_int;
+        (*missile).clipmask = MASK_SHOT;
+
+        // we don't want it to bounce forever
+        (*missile).bounceCount = 8;
+
+        // set veh as cgame side owner for purpose of fx overrides
+        (*missile).s.owner = (*ent).s.number;
+
+        // don't let them last forever (at 20000 speed, more than enough)
+        (*missile).think = Some(EntThink::G_FreeEntity);
+        (*missile).nextthink = (*ctx.world).level.time + 5000;
+    }
 }
 
 // PORT-ESCALATION(bg-dep): `MASK_SHOT`/`CONTENTS_LIGHTSABER` (q_shared.h content/trace mask flags) are not yet ported anywhere in the crate graph and are not in the packet's resolved call surface — where do these live once ported?
@@ -391,7 +431,6 @@ pub fn rocketThink(
     todo!("Port rocketThink — parked: seam-threading")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
 /// Raven `RocketDie`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1814-1823`
@@ -403,7 +442,15 @@ pub fn RocketDie(
     damage: c_int,
     r#mod: c_int,
 ) {
-    todo!("Port RocketDie — parked: seam-threading")
+    unsafe {
+        (*self_).die = None;
+        (*self_).r.contents = 0;
+
+        crate::g_missile::G_ExplodeMissile(ctx, self_);
+
+        (*self_).think = Some(EntThink::G_FreeEntity);
+        (*self_).nextthink = (*ctx.world).level.time;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities`/`g_gametype` globals and the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
@@ -424,13 +471,22 @@ pub fn thermalDetonatorExplode(
     todo!("Port thermalDetonatorExplode — parked: seam-threading")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
 /// Raven `thermalThinkStandard`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1972-1983`
 pub fn thermalThinkStandard(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port thermalThinkStandard — parked: seam-threading")
+    unsafe {
+        if (*ent).genericValue5 < (*ctx.world).level.time {
+            (*ent).think = Some(EntThink::thermalDetonatorExplode);
+            (*ent).nextthink = (*ctx.world).level.time;
+            return;
+        }
+    }
+    crate::g_object::G_RunObject(ctx, ent);
+    unsafe {
+        (*ent).nextthink = (*ctx.world).level.time;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
@@ -594,16 +650,18 @@ pub fn DetPackBlow(
     todo!("Port DetPackBlow — parked: seam-threading")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
 /// Raven `DetPackPain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2768-2773`
 pub fn DetPackPain(
     ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
-    todo!("Port DetPackPain — parked: seam-threading")
+    unsafe {
+        (*self_).think = Some(EntThink::DetPackBlow);
+        (*self_).nextthink = (*ctx.world).level.time + Q_irand(50, 100);
+        (*self_).takedamage = qfalse;
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
 /// Raven `DetPackDie`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2775-2780`
@@ -615,7 +673,11 @@ pub fn DetPackDie(
     damage: c_int,
     r#mod: c_int,
 ) {
-    todo!("Port DetPackDie — parked: seam-threading")
+    unsafe {
+        (*self_).think = Some(EntThink::DetPackBlow);
+        (*self_).nextthink = (*ctx.world).level.time + Q_irand(50, 100);
+        (*self_).takedamage = qfalse;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and `trap_Trace` (ruling 1) are needed — how is state threaded in?
@@ -870,72 +932,673 @@ pub fn G_EstimateCamPos(
     todo!("Port G_EstimateCamPos — parked: seam-threading")
 }
 
-// PORT-ESCALATION(bg-dep): `gentity_t.m_pVehicle` is a stale `*mut c_void` placeholder (predates `Vehicle_t`/`vehicleInfo_t` landing in `mp_bg`), and `MAX_STRAFE_TIME` is not in the resolved call surface — where do these live once ported?
+// PORT-ESCALATION(parked-dep): depends on G_EstimateCamPos (parked: seam-threading) and MAX_STRAFE_TIME (not ported)
 /// Raven `WP_GetVehicleCamPos`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3961-4020`
-pub fn WP_GetVehicleCamPos(ent: *mut gentity_t, pilot: *mut gentity_t, camPos: vec3_t) -> vec3_t {
-    todo!("Port WP_GetVehicleCamPos — parked: bg-dep")
+pub fn WP_GetVehicleCamPos(ent: *mut gentity_t, pilot: *mut gentity_t, camPos: &mut [f32; 3]) {
+    todo!("Port WP_GetVehicleCamPos — parked: parked-dep")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the `g_vehAutoAimLead` cvar handle (ruling 1: GameCvars) is needed — how is state threaded in?
 /// Raven `WP_VehLeadCrosshairVeh`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4022-4047`
 pub fn WP_VehLeadCrosshairVeh(
     ctx: GameContext<'_>,
     camTraceEnt: *mut gentity_t,
-    newEnd: vec3_t,
-    dir: vec3_t,
-    shotStart: vec3_t,
-    shotDir: vec3_t,
+    newEnd: &mut [f32; 3],
+    dir: [f32; 3],
+    shotStart: [f32; 3],
+    shotDir: &mut [f32; 3],
 ) {
-    todo!("Port WP_VehLeadCrosshairVeh — parked: seam-threading")
+    unsafe {
+        if ctx.world.cvars.g_vehAutoAimLead.integer != 0 {
+            if !camTraceEnt.is_null()
+                && !(*camTraceEnt).client.is_null()
+                && (*(*camTraceEnt).client).NPC_class == crate::shared::CLASS_VEHICLE
+            {
+                let dot = crate::q_math::DotProduct((*(*camTraceEnt).client).ps.velocity, dir);
+                let distAdjust = dot;
+                let mut predPos = [0.0f32; 3];
+                let mut predShotDir = [0.0f32; 3];
+
+                if distAdjust > 500.0f32
+                    || crate::NPC_AI_Rancor::DistanceSquared(
+                        (*(*camTraceEnt).client).ps.origin,
+                        shotStart,
+                    ) > 7000000.0f32
+                {
+                    crate::q_math::VectorMA(newEnd, distAdjust, &dir, &mut predPos);
+                    crate::q_math::VectorSubtract(&predPos, &shotStart, &mut predShotDir);
+                    crate::q_math::VectorNormalize(&mut predShotDir);
+                    let dot = crate::q_math::DotProduct(&predShotDir, shotDir);
+                    if dot >= 0.75f32 {
+                        crate::q_math::VectorCopy(&predPos, newEnd);
+                    }
+                }
+            }
+        }
+        crate::q_math::VectorSubtract(&newEnd, &shotStart, shotDir);
+        crate::q_math::VectorNormalize(shotDir);
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `g_entities`, the file-static `forward`/`muzzle` globals, and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-ESCALATION(parked-dep): depends on BG_VehTraceFromCamPos (parked)
 /// Raven `WP_VehCheckTraceFromCamPos`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4052-4113`
 pub fn WP_VehCheckTraceFromCamPos(
-    ctx: GameContext<'_>,ent: *mut gentity_t, shotStart: vec3_t, shotDir: vec3_t) -> qboolean {
-    todo!("Port WP_VehCheckTraceFromCamPos — parked: seam-threading")
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    shotStart: [f32; 3],
+    shotDir: &mut [f32; 3],
+) -> qboolean {
+    todo!("Port WP_VehCheckTraceFromCamPos — parked: parked-dep")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals, the file-static `muzzle` global, and `trap_Trace` (ruling 1) are needed — how is state threaded in?
 /// Raven `FireVehicleWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4116-4413`
-pub fn FireVehicleWeapon(
-    ctx: GameContext<'_>,ent: *mut gentity_t, alt_fire: qboolean) {
-    todo!("Port FireVehicleWeapon — parked: seam-threading")
+pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolean) {
+    unsafe {
+        let pVeh = (*ent).m_pVehicle;
+        if pVeh.is_null() {
+            return;
+        }
+
+        let pVeh = &mut *pVeh;
+
+        if pVeh.m_iRemovedSurfaces != 0 {
+            return;
+        }
+
+        if pVeh.m_pVehicleInfo.as_ref().unwrap().vtype == crate::shared::VH_WALKER
+            && (*(*ent).client).ps.electrifyTime > (*ctx.world).level.time
+        {
+            return;
+        }
+
+        if !pVeh.m_pVehicleInfo.is_null() &&
+            (pVeh.m_pVehicleInfo.as_ref().unwrap().vtype != crate::shared::VH_FIGHTER || (pVeh.m_ulFlags & crate::shared::VEH_WINGSOPEN) != 0)
+        {
+            let mut weaponNum: c_int = 0;
+            let mut vehWeaponIndex = crate::shared::VEH_WEAPON_NONE;
+            let mut delay: c_int = 1000;
+            let mut aimCorrect = qfalse;
+            let mut linkedFiring = qfalse;
+
+            if alt_fire == 0 {
+                weaponNum = 0;
+            } else {
+                weaponNum = 1;
+            }
+
+            vehWeaponIndex = pVeh.m_pVehicleInfo.as_ref().unwrap().weapon[weaponNum as usize].ID;
+
+            if pVeh.weaponStatus[weaponNum as usize].ammo <= 0 {
+                if !pVeh.m_pPilot.is_null()
+                    && (*pVeh.m_pPilot).s.number < crate::shared::MAX_CLIENTS as c_int
+                {
+                    let mut i = 0;
+                    while i < crate::shared::MAX_VEHICLE_MUZZLES as c_int {
+                        if pVeh.m_pVehicleInfo.as_ref().unwrap().weapMuzzle[i as usize] != vehWeaponIndex
+                        {
+                            i += 1;
+                            continue;
+                        }
+                        if pVeh.m_iMuzzleTag[i as usize] != -1
+                            && pVeh.m_iMuzzleWait[i as usize] < (*ctx.world).level.time
+                        {
+                            G_AddEvent(
+                                pVeh.m_pPilot as *mut gentity_t,
+                                crate::shared::EV_NOAMMO,
+                                weaponNum,
+                            );
+                            break;
+                        }
+                        i += 1;
+                    }
+                }
+                return;
+            }
+
+            delay = pVeh.m_pVehicleInfo.as_ref().unwrap().weapon[weaponNum as usize].delay;
+            aimCorrect = pVeh.m_pVehicleInfo.as_ref().unwrap().weapon[weaponNum as usize].aimCorrect as qboolean;
+            if pVeh.m_pVehicleInfo.as_ref().unwrap().weapon[weaponNum as usize].linkable == 2
+                || (pVeh.m_pVehicleInfo.as_ref().unwrap().weapon[weaponNum as usize].linkable == 1
+                    && pVeh.weaponStatus[weaponNum as usize].linked != 0)
+            {
+                linkedFiring = qtrue;
+            }
+
+            if vehWeaponIndex <= crate::shared::VEH_WEAPON_BASE
+                || vehWeaponIndex >= crate::shared::MAX_VEH_WEAPONS as c_int
+            {
+                return;
+            }
+
+            let mut numMuzzles: c_int = 0;
+            let mut numMuzzlesReady: c_int = 0;
+            let mut cumulativeDelay: c_int = 0;
+            let mut cumulativeAmmo: c_int = 0;
+            let mut sentAmmoWarning = qfalse;
+
+            let vehWeapon = &ctx.world.globals.g_vehWeaponInfo[vehWeaponIndex as usize];
+
+            if pVeh.m_pVehicleInfo.as_ref().unwrap().weapon[weaponNum as usize].linkable == 2 {
+                cumulativeDelay = delay;
+            }
+
+            let mut i = 0;
+            while i < crate::shared::MAX_VEHICLE_MUZZLES as c_int {
+                if pVeh.m_pVehicleInfo.as_ref().unwrap().weapMuzzle[i as usize] != vehWeaponIndex {
+                    i += 1;
+                    continue;
+                }
+                if pVeh.m_iMuzzleTag[i as usize] != -1 && pVeh.m_iMuzzleWait[i as usize] < (*ctx.world).level.time {
+                    numMuzzlesReady += 1;
+                }
+                if pVeh.m_pVehicleInfo.as_ref().unwrap().weapMuzzle[pVeh.weaponStatus[weaponNum as usize].nextMuzzle as usize]
+                    != vehWeaponIndex
+                {
+                    pVeh.weaponStatus[weaponNum as usize].nextMuzzle = i;
+                }
+                if linkedFiring != 0 {
+                    cumulativeAmmo += vehWeapon.iAmmoPerShot;
+                    if pVeh.m_pVehicleInfo.as_ref().unwrap().weapon[weaponNum as usize].linkable != 2 {
+                        cumulativeDelay += delay;
+                    }
+                }
+                numMuzzles += 1;
+                i += 1;
+            }
+
+            if linkedFiring != 0 {
+                if numMuzzlesReady != numMuzzles {
+                    return;
+                } else if pVeh.weaponStatus[weaponNum as usize].ammo < cumulativeAmmo {
+                    if !pVeh.m_pPilot.is_null() && (*pVeh.m_pPilot).s.number < crate::shared::MAX_CLIENTS as c_int {
+                        G_AddEvent(
+                            pVeh.m_pPilot as *mut gentity_t,
+                            crate::shared::EV_NOAMMO,
+                            weaponNum,
+                        );
+                    }
+                    return;
+                }
+            }
+
+            let mut muzzlesFired: c_int = 0;
+            let mut missile: *mut gentity_t = std::ptr::null_mut();
+            let mut clearRocketLockEntity = qfalse;
+
+            let mut i = 0;
+            while i < crate::shared::MAX_VEHICLE_MUZZLES as c_int {
+                if pVeh.m_pVehicleInfo.as_ref().unwrap().weapMuzzle[i as usize] != vehWeaponIndex {
+                    i += 1;
+                    continue;
+                }
+                if linkedFiring == 0
+                    && i != pVeh.weaponStatus[weaponNum as usize].nextMuzzle
+                {
+                    i += 1;
+                    continue;
+                }
+
+                if pVeh.m_iMuzzleTag[i as usize] != -1 && pVeh.m_iMuzzleWait[i as usize] < (*ctx.world).level.time {
+                    if pVeh.weaponStatus[weaponNum as usize].ammo < vehWeapon.iAmmoPerShot {
+                        if sentAmmoWarning == 0 {
+                            sentAmmoWarning = qtrue;
+                            if !pVeh.m_pPilot.is_null()
+                                && (*pVeh.m_pPilot).s.number < crate::shared::MAX_CLIENTS as c_int
+                            {
+                                G_AddEvent(
+                                    pVeh.m_pPilot as *mut gentity_t,
+                                    crate::shared::EV_NOAMMO,
+                                    weaponNum,
+                                );
+                            }
+                        }
+                    } else {
+                        WP_CalcVehMuzzle(ctx, ent, i);
+                        let mut start = pVeh.m_vMuzzlePos[i as usize];
+                        let mut dir = pVeh.m_vMuzzleDir[i as usize];
+                        if WP_VehCheckTraceFromCamPos(ctx, ent, start, &mut dir) != 0 {
+                        } else if aimCorrect != 0 {
+                            let mut trace: crate::shared::trace_t = std::mem::zeroed();
+                            let mut end = [0.0f32; 3];
+                            let mut ang = [0.0f32; 3];
+                            let mut fixedDir = [0.0f32; 3];
+
+                            if pVeh.m_pVehicleInfo.as_ref().unwrap().vtype == crate::shared::VH_SPEEDER {
+                                crate::q_math::VectorSet(&mut ang, 0.0f32, pVeh.m_vOrientation[1], 0.0f32);
+                            } else {
+                                crate::q_math::VectorCopy(&pVeh.m_vOrientation, &mut ang);
+                            }
+                            crate::q_math::AngleVectors(ang, Some(&mut fixedDir), None, None);
+                            crate::q_math::VectorMA(&(*ent).r.currentOrigin, 32768.0f32, &fixedDir, &mut end);
+                            trap::Trace(
+                                ctx.engine,
+                                &mut trace,
+                                (*ent).r.currentOrigin,
+                                crate::shared::vec3_origin,
+                                crate::shared::vec3_origin,
+                                end,
+                                (*ent).s.number,
+                                crate::shared::MASK_SHOT,
+                            );
+                            if trace.fraction < 1.0f32 && trace.allsolid == 0 && trace.startsolid == 0 {
+                                let mut newEnd = [0.0f32; 3];
+                                crate::q_math::VectorCopy(&trace.endpos, &mut newEnd);
+                                WP_VehLeadCrosshairVeh(
+                                    ctx,
+                                    &mut (*ctx.world).entities[trace.entityNum as usize].ent,
+                                    &mut newEnd,
+                                    fixedDir,
+                                    start,
+                                    &mut dir,
+                                );
+                            }
+                        }
+
+                        muzzlesFired |= 1 << i;
+
+                        missile = WP_FireVehicleWeapon(
+                            ctx,
+                            ent,
+                            start,
+                            dir,
+                            vehWeapon as *mut _,
+                            alt_fire,
+                            qfalse,
+                        );
+                        if vehWeapon.fHoming != 0 {
+                            clearRocketLockEntity = qtrue;
+                        }
+                    }
+
+                    if linkedFiring != 0 {
+                        i += 1;
+                        continue;
+                    }
+
+                    if numMuzzles > 1 {
+                        let mut nextMuzzle = pVeh.weaponStatus[weaponNum as usize].nextMuzzle;
+                        loop {
+                            nextMuzzle += 1;
+                            if nextMuzzle >= crate::shared::MAX_VEHICLE_MUZZLES as c_int {
+                                nextMuzzle = 0;
+                            }
+                            if nextMuzzle == pVeh.weaponStatus[weaponNum as usize].nextMuzzle {
+                                break;
+                            }
+                            if pVeh.m_pVehicleInfo.as_ref().unwrap().weapMuzzle[nextMuzzle as usize] == vehWeaponIndex {
+                                pVeh.weaponStatus[weaponNum as usize].nextMuzzle = nextMuzzle;
+                                break;
+                            }
+                        }
+                    }
+
+                    pVeh.m_iMuzzleWait[pVeh.weaponStatus[weaponNum as usize].nextMuzzle as usize] =
+                        (*ctx.world).level.time + delay;
+                    pVeh.weaponStatus[weaponNum as usize].ammo -= vehWeapon.iAmmoPerShot;
+                    if !pVeh.m_pParentEntity.is_null()
+                        && !(*pVeh.m_pParentEntity as *mut gentity_t).is_null()
+                        && !(*(*pVeh.m_pParentEntity as *mut gentity_t)).client.is_null()
+                    {
+                        (*(*(*pVeh.m_pParentEntity as *mut gentity_t)).client).ps.ammo[weaponNum as usize] =
+                            pVeh.weaponStatus[weaponNum as usize].ammo;
+                    }
+                    i += 1;
+                    continue;
+                }
+                i += 1;
+            }
+
+            if cumulativeAmmo != 0 {
+                pVeh.weaponStatus[weaponNum as usize].ammo -= cumulativeAmmo;
+                if !pVeh.m_pParentEntity.is_null()
+                    && !(*pVeh.m_pParentEntity as *mut gentity_t).is_null()
+                    && !(*(*pVeh.m_pParentEntity as *mut gentity_t)).client.is_null()
+                {
+                    (*(*(*pVeh.m_pParentEntity as *mut gentity_t)).client).ps.ammo[weaponNum as usize] =
+                        pVeh.weaponStatus[weaponNum as usize].ammo;
+                }
+            }
+            if cumulativeDelay != 0 {
+                let mut i = 0;
+                while i < crate::shared::MAX_VEHICLE_MUZZLES as c_int {
+                    if pVeh.m_pVehicleInfo.as_ref().unwrap().weapMuzzle[i as usize] != vehWeaponIndex {
+                        i += 1;
+                        continue;
+                    }
+                    pVeh.m_iMuzzleWait[i as usize] = (*ctx.world).level.time + cumulativeDelay;
+                    i += 1;
+                }
+            }
+
+            if clearRocketLockEntity != 0 {
+                (*(*ent).client).ps.rocketLockIndex = crate::shared::ENTITYNUM_NONE as c_int;
+                (*(*ent).client).ps.rocketLockTime = 0;
+                (*(*ent).client).ps.rocketTargetTime = 0;
+            }
+
+            if !vehWeapon.is_null() && muzzlesFired > 0 {
+                G_VehMuzzleFireFX(ctx, ent, missile, muzzlesFired);
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `g_entities`/`g_gametype` globals and the file-static `forward`/`vright`/`up`/`muzzle`/`s_quadFactor` globals (ruling 1) are needed — how is state threaded in?
 /// Raven `FireWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4424-4608`
-pub fn FireWeapon(
-    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
-    todo!("Port FireWeapon — parked: seam-threading")
+pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+    unsafe {
+        if (*(*ent).client).ps.powerups[crate::shared::PW_QUAD as usize] != 0 {
+            ctx.world.globals.s_quadFactor = ctx.world.cvars.g_quadfactor.value;
+        } else {
+            ctx.world.globals.s_quadFactor = 1.0f32;
+        }
+
+        if (*ent).s.weapon != crate::shared::WP_SABER
+            && (*ent).s.weapon != crate::shared::WP_STUN_BATON
+            && (*ent).s.weapon != crate::shared::WP_MELEE
+        {
+            if (*ent).s.weapon == crate::shared::WP_FLECHETTE {
+                (*(*ent).client).accuracy_shots += crate::shared::FLECHETTE_SHOTS;
+            } else {
+                (*(*ent).client).accuracy_shots += 1;
+            }
+        }
+
+        if !ent.is_null() && !(*ent).client.is_null()
+            && (*(*ent).client).NPC_class == crate::shared::CLASS_VEHICLE
+        {
+            FireVehicleWeapon(ctx, ent, altFire);
+            return;
+        }
+
+        let mut forward = [0.0f32; 3];
+        let mut vright = [0.0f32; 3];
+        let mut up = [0.0f32; 3];
+        let mut muzzle = [0.0f32; 3];
+
+        if (*ent).s.weapon == crate::shared::WP_EMPLACED_GUN
+            && (*(*ent).client).ps.emplacedIndex != 0
+        {
+            let emp = &mut (*ctx.world).entities[(*(*ent).client).ps.emplacedIndex as usize].ent;
+
+            if (*emp).inuse != 0 && (*emp).health > 0 {
+                let mut yaw = 0.0f32;
+                let mut viewAngCap = [0.0f32; 3];
+                let mut override_val = 0;
+
+                crate::q_math::VectorCopy(&(*(*ent).client).ps.viewangles, &mut viewAngCap);
+                if viewAngCap[0] > 40.0f32 {
+                    viewAngCap[0] = 40.0f32;
+                }
+
+                override_val = BG_EmplacedView(
+                    (*(*ent).client).ps.viewangles,
+                    (*emp).s.angles,
+                    &mut yaw,
+                    (*emp).s.origin2[0],
+                );
+
+                if override_val != 0 {
+                    viewAngCap[1] = yaw;
+                }
+
+                crate::q_math::AngleVectors(viewAngCap, Some(&mut forward), Some(&mut vright), Some(&mut up));
+            } else {
+                crate::q_math::AngleVectors(
+                    (*(*ent).client).ps.viewangles,
+                    Some(&mut forward),
+                    Some(&mut vright),
+                    Some(&mut up),
+                );
+            }
+        } else if (*ent).s.number < crate::shared::MAX_CLIENTS as c_int
+            && (*(*ent).client).ps.m_iVehicleNum != 0
+            && (*ent).s.weapon == crate::shared::WP_BLASTER
+        {
+            let mut vehTurnAngles = [0.0f32; 3];
+            let vehEnt = &mut (*ctx.world).entities[(*(*ent).client).ps.m_iVehicleNum as usize].ent;
+
+            if (*vehEnt).inuse != 0 && !(*vehEnt).client.is_null() && !(*vehEnt).m_pVehicle.is_null() {
+                crate::q_math::VectorCopy(&(*(&mut *(*vehEnt).m_pVehicle)).m_vOrientation, &mut vehTurnAngles);
+                vehTurnAngles[0] = (*(*ent).client).ps.viewangles[0];
+            } else {
+                crate::q_math::VectorCopy(&(*(*ent).client).ps.viewangles, &mut vehTurnAngles);
+            }
+            if (*(*ent).client).pers.cmd.rightmove > 0 {
+                vehTurnAngles[1] -= 90.0f32;
+            } else if (*(*ent).client).pers.cmd.rightmove < 0 {
+                vehTurnAngles[1] += 90.0f32;
+            }
+
+            crate::q_math::AngleVectors(vehTurnAngles, Some(&mut forward), Some(&mut vright), Some(&mut up));
+        } else {
+            crate::q_math::AngleVectors(
+                (*(*ent).client).ps.viewangles,
+                Some(&mut forward),
+                Some(&mut vright),
+                Some(&mut up),
+            );
+        }
+
+        CalcMuzzlePoint(ctx, ent, forward, vright, up, &mut muzzle);
+
+        match (*ent).s.weapon {
+            crate::shared::WP_STUN_BATON => {
+                WP_FireStunBaton(ctx, ent, altFire);
+            }
+            crate::shared::WP_MELEE => {
+                WP_FireMelee(ctx, ent, altFire);
+            }
+            crate::shared::WP_SABER => {}
+            crate::shared::WP_BRYAR_PISTOL => {
+                WP_FireBryarPistol(ctx, ent, altFire);
+            }
+            crate::shared::WP_CONCUSSION => {
+                if altFire != 0 {
+                    WP_FireConcussionAlt(ctx, ent);
+                } else {
+                    WP_FireConcussion(ctx, ent);
+                }
+            }
+            crate::shared::WP_BRYAR_OLD => {
+                WP_FireBryarPistol(ctx, ent, altFire);
+            }
+            crate::shared::WP_BLASTER => {
+                WP_FireBlaster(ctx, ent, altFire);
+            }
+            crate::shared::WP_DISRUPTOR => {
+                WP_FireDisruptor(ctx, ent, altFire);
+            }
+            crate::shared::WP_BOWCASTER => {
+                WP_FireBowcaster(ctx, ent, altFire);
+            }
+            crate::shared::WP_REPEATER => {
+                WP_FireRepeater(ctx, ent, altFire);
+            }
+            crate::shared::WP_DEMP2 => {
+                WP_FireDEMP2(ctx, ent, altFire);
+            }
+            crate::shared::WP_FLECHETTE => {
+                WP_FireFlechette(ctx, ent, altFire);
+            }
+            crate::shared::WP_ROCKET_LAUNCHER => {
+                WP_FireRocket(ctx, ent, altFire);
+            }
+            crate::shared::WP_THERMAL => {
+                WP_FireThermalDetonator(ctx, ent, altFire);
+            }
+            crate::shared::WP_TRIP_MINE => {
+                WP_PlaceLaserTrap(ctx, ent, altFire);
+            }
+            crate::shared::WP_DET_PACK => {
+                WP_DropDetPack(ctx, ent, altFire);
+            }
+            crate::shared::WP_EMPLACED_GUN => {
+                if !(*ent).client.is_null() && (*(*ent).client).ewebIndex != 0 {
+                } else {
+                    WP_FireEmplaced(ctx, ent, altFire);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    G_LogWeaponFire(ctx, (*ent).s.number, (*ent).s.weapon);
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `g_entities` and the file-static `forward` global (ruling 1) are needed — how is state threaded in?
 /// Raven `WP_FireEmplaced`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4611-4660`
-pub fn WP_FireEmplaced(
-    ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
-    todo!("Port WP_FireEmplaced — parked: seam-threading")
+pub fn WP_FireEmplaced(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) {
+    unsafe {
+        if (*ent).client.is_null() {
+            return;
+        }
+
+        if (*(*ent).client).ps.emplacedIndex == 0 {
+            return;
+        }
+
+        let gun = &mut (*ctx.world).entities[(*(*ent).client).ps.emplacedIndex as usize].ent;
+
+        if (*gun).inuse == 0 || (*gun).health <= 0 {
+            return;
+        }
+
+        let mut gunpoint = (*gun).s.origin;
+        gunpoint[2] += 46.0f32;
+
+        let mut right = [0.0f32; 3];
+        crate::q_math::AngleVectors((*(*ent).client).ps.viewangles, None, Some(&mut right), None);
+
+        let mut side = 0;
+        if (*gun).genericValue10 != 0 {
+            crate::q_math::VectorMA(&gunpoint, 10.0f32, &right, &mut gunpoint);
+            side = 0;
+        } else {
+            crate::q_math::VectorMA(&gunpoint, -10.0f32, &right, &mut gunpoint);
+            side = 1;
+        }
+
+        (*gun).genericValue10 = side;
+        G_AddEvent(gun, crate::shared::EV_FIRE_WEAPON, side);
+
+        let mut angs = [0.0f32; 3];
+        let mut dir = [0.0f32; 3];
+        let mut forward = [0.0f32; 3];
+        crate::q_math::AngleVectors((*(*ent).client).ps.viewangles, Some(&mut forward), None, None);
+        crate::q_math::vectoangles(&forward, &mut angs);
+        crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
+
+        WP_FireEmplacedMissile(ctx, gun, gunpoint, dir, altFire, ent);
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
 /// Raven `emplaced_gun_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4691-4802`
 pub fn emplaced_gun_use(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
-    todo!("Port emplaced_gun_use — parked: seam-threading")
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
+    unsafe {
+        if (*self_).health <= 0 {
+            return;
+        }
+
+        if !(*self_).activator.is_null() {
+            return;
+        }
+
+        let activator = other;
+
+        if (*activator).client.is_null() {
+            return;
+        }
+
+        if (*(*activator).client).ps.emplacedTime > (*ctx.world).level.time {
+            return;
+        }
+
+        if (*(*activator).client).ps.forceHandExtend != crate::shared::HANDEXTEND_NONE {
+            return;
+        }
+
+        let zoffset = 50.0f32;
+        if (*activator).client.as_ref().unwrap().ps.origin[2] > (*self_).s.origin[2] + zoffset - 8.0f32 {
+            return;
+        }
+
+        if ((*activator).client.as_ref().unwrap().ps.pm_flags & crate::shared::PMF_DUCKED) != 0 {
+            return;
+        }
+
+        if (*(*activator).client).ps.isJediMaster != 0 {
+            return;
+        }
+
+        let mut vLen = [0.0f32; 3];
+        crate::q_math::VectorSubtract(&(*self_).s.origin, &(*(*activator).client).ps.origin, &mut vLen);
+        let ownLen = crate::g_client::VectorLength(vLen);
+
+        if ownLen > 64.0f32 {
+            return;
+        }
+
+        let mut fwd1 = [0.0f32; 3];
+        let mut fwd2 = [0.0f32; 3];
+        crate::q_math::AngleVectors((*(*activator).client).ps.viewangles, Some(&mut fwd1), None, None);
+        crate::q_math::AngleVectors((*self_).pos1, Some(&mut fwd2), None, None);
+
+        let mut dot = crate::q_math::DotProduct(&fwd1, &fwd2);
+
+        if dot < -0.2f32 {
+            TryHeal(ctx, activator, self_);
+            return;
+        }
+
+        crate::q_math::VectorSubtract(&(*self_).s.origin, &(*(*activator).client).ps.origin, &mut fwd1);
+        crate::q_math::VectorNormalize(&mut fwd1);
+
+        dot = crate::q_math::DotProduct(&fwd1, &fwd2);
+
+        if dot < 0.6f32 {
+            TryHeal(ctx, activator, self_);
+            return;
+        }
+
+        (*self_).genericValue1 = 1;
+
+        let oldWeapon = (*activator).s.weapon;
+
+        (*(*activator).client).ps.weapon = (*self_).s.weapon;
+        (*(*activator).client).ps.weaponstate = crate::shared::WEAPON_READY;
+        (*(*activator).client).ps.stats[crate::shared::STAT_WEAPONS as usize] |= (1 << crate::shared::WP_EMPLACED_GUN);
+
+        (*(*activator).client).ps.emplacedIndex = (*self_).s.number;
+
+        (*self_).s.emplacedOwner = (*activator).s.number;
+        (*self_).s.activeForcePass = (crate::shared::NUM_FORCE_POWERS + 1) as i32;
+
+        (*self_).s.weapon = oldWeapon;
+
+        (*activator).r.ownerNum = (*self_).s.number;
+        (*self_).activator = activator;
+
+        let mut anglesToOwner = [0.0f32; 3];
+        crate::q_math::VectorSubtract(&(*self_).r.currentOrigin, &(*(*activator).client).ps.origin, &mut anglesToOwner);
+        crate::q_math::vectoangles(&anglesToOwner, &mut anglesToOwner);
+    }
 }
 
 /// Raven `emplaced_gun_realuse`.
@@ -963,16 +1626,125 @@ pub fn emplaced_gun_pain(
     }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
 /// Raven `emplaced_gun_update`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4828-4927`
-pub fn emplaced_gun_update(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
-    todo!("Port emplaced_gun_update — parked: seam-threading")
+pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
+    unsafe {
+        if (*self_).health < 1 && (*self_).genericValue5 == 0 {
+            if ((*self_).spawnflags & crate::shared::EMPLACED_CANRESPAWN as u32) != 0 {
+                (*self_).genericValue5 = (*ctx.world).level.time + 4000 + (*self_).count;
+            }
+        } else if (*self_).health < 1 && (*self_).genericValue5 < (*ctx.world).level.time {
+            (*self_).s.time = 0;
+            (*self_).genericValue4 = 0;
+            (*self_).genericValue3 = 0;
+            (*self_).health = (crate::shared::EMPLACED_GUN_HEALTH as f32 * 0.4f32) as c_int;
+            (*self_).s.health = (*self_).health;
+        }
+
+        if (*self_).genericValue4 != 0 && (*self_).genericValue4 < 2 && (*self_).s.time < (*ctx.world).level.time {
+            let mut puffAngle = [0.0f32; 3];
+            let mut explOrg = [0.0f32; 3];
+
+            crate::q_math::VectorSet(&mut puffAngle, 0.0f32, 0.0f32, 1.0f32);
+
+            crate::q_math::VectorCopy(&(*self_).r.currentOrigin, &mut explOrg);
+            explOrg[2] += 16.0f32;
+
+            G_PlayEffect(
+                crate::shared::EFFECT_EXPLOSION_DETPACK,
+                explOrg,
+                puffAngle,
+            );
+
+            (*self_).genericValue3 = (*ctx.world).level.time + Q_irand(2500, 3500);
+
+            G_RadiusDamage(
+                ctx,
+                (*self_).r.currentOrigin,
+                self_,
+                (*self_).splashDamage as f32,
+                (*self_).splashRadius as f32,
+                self_,
+                std::ptr::null_mut(),
+                crate::shared::MOD_UNKNOWN as c_int,
+            );
+
+            (*self_).s.time = -1;
+
+            (*self_).genericValue4 = 2;
+        }
+
+        if (*self_).genericValue3 > (*ctx.world).level.time {
+            if (*self_).genericValue2 < (*ctx.world).level.time {
+                let mut puffAngle = [0.0f32; 3];
+                let mut smokeOrg = [0.0f32; 3];
+
+                crate::q_math::VectorSet(&mut puffAngle, 0.0f32, 0.0f32, 1.0f32);
+                crate::q_math::VectorCopy(&(*self_).r.currentOrigin, &mut smokeOrg);
+
+                smokeOrg[2] += 60.0f32;
+
+                G_PlayEffect(crate::shared::EFFECT_SMOKE, smokeOrg, puffAngle);
+                (*self_).genericValue2 = (*ctx.world).level.time + Q_irand(250, 400);
+            }
+        }
+
+        if !(*self_).activator.is_null()
+            && !(*(*self_).activator).client.is_null()
+            && (*(*self_).activator).inuse != 0
+        {
+            let mut vLen = [0.0f32; 3];
+            crate::q_math::VectorSubtract(&(*self_).s.origin, &(*(*(*self_).activator).client).ps.origin, &mut vLen);
+            let ownLen = crate::g_client::VectorLength(vLen);
+
+            if ((*(*(*self_).activator).client).pers.cmd.buttons & crate::shared::BUTTON_USE) == 0
+                && (*self_).genericValue1 != 0
+            {
+                (*self_).genericValue1 = 0;
+            }
+
+            if (((*(*(*self_).activator).client).pers.cmd.buttons & crate::shared::BUTTON_USE) != 0)
+                && (*self_).genericValue1 == 0
+            {
+                (*(*(*self_).activator).client).ps.emplacedIndex = 0;
+                (*(*(*self_).activator).client).ps.saberHolstered = 0;
+                (*self_).nextthink = (*ctx.world).level.time + 50;
+                return;
+            }
+        }
+
+        if (!(*self_).activator.is_null() && !(*(*self_).activator).client.is_null())
+            && ((*(*self_).activator).inuse == 0
+                || (*(*(*self_).activator).client).ps.emplacedIndex != (*self_).s.number
+                || (*self_).genericValue4 != 0
+                || ownLen > 64.0f32)
+        {
+            (*(*(*self_).activator).client).ps.stats[crate::shared::STAT_WEAPONS as usize] &=
+                !(1 << crate::shared::WP_EMPLACED_GUN);
+
+            let oldWeap = (*(*(*self_).activator).client).ps.weapon;
+            (*(*(*self_).activator).client).ps.weapon = (*self_).s.weapon;
+            (*self_).s.weapon = oldWeap;
+            (*(*(*self_).activator).client).ps.emplacedTime = (*ctx.world).level.time + 1000;
+            (*(*(*self_).activator).client).ps.emplacedIndex = 0;
+            (*(*(*self_).activator).client).ps.saberHolstered = 0;
+            (*(*self_).activator).r.ownerNum = crate::shared::ENTITYNUM_NONE as u32;
+            (*self_).activator = std::ptr::null_mut();
+
+            (*self_).s.activeForcePass = 0;
+        } else if !(*self_).activator.is_null() && !(*(*self_).activator).client.is_null() {
+            (*(*(*self_).activator).client).ps.weapon = crate::shared::WP_EMPLACED_GUN;
+            (*(*(*self_).activator).client).ps.weaponstate = crate::shared::WEAPON_READY;
+        }
+        (*self_).nextthink = (*ctx.world).level.time + 50;
+
+        // Note: ownLen was declared earlier but only used in certain conditions
+        let ownLen = 0.0f32;
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
 /// Raven `emplaced_gun_die`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4930-4942`
@@ -984,14 +1756,116 @@ pub fn emplaced_gun_die(
     damage: c_int,
     r#mod: c_int,
 ) {
-    todo!("Port emplaced_gun_die — parked: seam-threading")
+    unsafe {
+        if (*self_).genericValue4 != 0 {
+            return;
+        }
+
+        (*self_).genericValue4 = 1;
+
+        (*self_).s.time = (*ctx.world).level.time + 3000;
+
+        (*self_).genericValue5 = 0;
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and `trap_LinkEntity` (ruling 1) are needed — how is state threaded in?
 /// Raven `SP_emplaced_gun`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4944-5027`
-pub fn SP_emplaced_gun(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port SP_emplaced_gun — parked: seam-threading")
+pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
+    unsafe {
+        let name = "models/map_objects/mp/turret_chair.glm";
+
+        let item = BG_FindItemForWeapon(crate::shared::WP_EMPLACED_GUN);
+        if !item.is_null() {
+            RegisterItem(ctx, item);
+        }
+
+        (*ent).r.contents = crate::shared::CONTENTS_SOLID;
+        (*ent).s.solid = crate::shared::SOLID_BBOX;
+
+        (*ent).genericValue5 = 0;
+
+        crate::q_math::VectorSet(&mut (*ent).r.mins, -30.0f32, -20.0f32, 8.0f32);
+        crate::q_math::VectorSet(&mut (*ent).r.maxs, 30.0f32, 20.0f32, 60.0f32);
+
+        let mut down = (*ent).s.origin;
+        down[2] -= 1024.0f32;
+
+        let mut tr: crate::shared::trace_t = std::mem::zeroed();
+        trap::Trace(
+            ctx.engine,
+            &mut tr,
+            (*ent).s.origin,
+            (*ent).r.mins,
+            (*ent).r.maxs,
+            down,
+            (*ent).s.number,
+            crate::shared::MASK_SOLID,
+        );
+
+        if tr.fraction != 1.0f32 && tr.allsolid == 0 && tr.startsolid == 0 {
+            crate::q_math::VectorCopy(&tr.endpos, &mut (*ent).s.origin);
+        }
+
+        (*ent).spawnflags |= 4; // deadsolid
+
+        (*ent).health = crate::shared::EMPLACED_GUN_HEALTH as c_int;
+
+        if ((*ent).spawnflags & crate::shared::EMPLACED_CANRESPAWN as u32) != 0 {
+            (*ent).health = ((*ent).health as f32 * 0.4f32) as c_int;
+        }
+
+        (*ent).maxHealth = (*ent).health;
+        G_ScaleNetHealth(ent);
+
+        (*ent).genericValue4 = 0;
+
+        (*ent).takedamage = qtrue;
+        (*ent).pain = Some(EntThink::emplaced_gun_pain);
+        (*ent).die = Some(EntThink::emplaced_gun_die);
+
+        (*ent).splashDamage = 80;
+        (*ent).splashRadius = 128;
+
+        G_SpawnInt(
+            ctx,
+            c"count".as_ptr() as *const c_char,
+            c"600".as_ptr() as *const c_char,
+            &mut (*ent).count,
+        );
+
+        G_SpawnFloat(
+            ctx,
+            c"constraint".as_ptr() as *const c_char,
+            c"60".as_ptr() as *const c_char,
+            &mut (*ent).s.origin2[0],
+        );
+
+        (*ent).s.modelindex = G_ModelIndex(name as *const c_char);
+        (*ent).s.modelGhoul2 = 1;
+        (*ent).s.g2radius = 110;
+
+        (*ent).s.weapon = crate::shared::WP_EMPLACED_GUN;
+
+        G_SetOrigin(ent, (*ent).s.origin);
+
+        crate::q_math::VectorCopy(&(*ent).s.angles, &mut (*ent).pos1);
+        crate::q_math::VectorCopy(&(*ent).s.angles, &mut (*ent).r.currentAngles);
+        crate::q_math::VectorCopy(&(*ent).s.angles, &mut (*ent).s.apos.trBase);
+
+        (*ent).think = Some(EntThink::emplaced_gun_update);
+        (*ent).nextthink = (*ctx.world).level.time + 50;
+
+        (*ent).use_ = Some(EntThink::emplaced_gun_realuse);
+
+        (*ent).r.svFlags |= crate::shared::SVF_PLAYER_USABLE as u32;
+
+        (*ent).s.pos.trType = crate::shared::TR_STATIONARY;
+
+        (*ent).s.owner = (crate::shared::MAX_CLIENTS + 1) as u32;
+        (*ent).s.shouldtarget = qtrue;
+
+        trap::LinkEntity(ctx.engine, ent);
+    }
 }

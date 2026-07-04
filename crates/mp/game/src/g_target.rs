@@ -30,28 +30,48 @@ const qfalse: qboolean = 0;
 /// Raven `Use_Target_Give`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:10-34`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_UnlinkEntity`
-// — no engine/world handle on the staged raw-pointer signature.
 pub fn Use_Target_Give(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port Use_Target_Give — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*activator).client.is_null() {
+            return;
+        }
+
+        if (*ent).target.is_null() {
+            return;
+        }
+
+        let mut trace: trace_t = core::mem::zeroed();
+        let mut t: *mut gentity_t = core::ptr::null_mut();
+        loop {
+            t = G_Find(ctx, t, core::mem::offset_of!(gentity_t, targetname) as c_int, (*ent).target);
+            if t.is_null() {
+                break;
+            }
+            if (*t).item.is_null() {
+                continue;
+            }
+            Touch_Item(ctx, t, activator, &mut trace);
+
+            // make sure it isn't going to respawn or show any events
+            (*t).nextthink = 0;
+            trap::UnlinkEntity(ctx.engine, t);
+        }
+    }
 }
 
 /// Raven `SP_target_give`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:36-38`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = Use_Target_Give`, ruling 2) — the frozen `gentity_t.use_` field is
-// still a raw `Option<unsafe extern "C" fn(...)>`, not the `EntUse` enum, so
-// there is nowhere to store the fn-ID yet.
+// PORT-ESCALATION(fn-pointer-assignment): Function pointer signatures don't match — Rust Use_Target_Give has ctx param, but gentity_t.use_ field expects C signature
 pub fn SP_target_give(
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_target_give — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port SP_target_give — parked: fn-pointer-assignment")
 }
 
 /// Raven `Use_target_remove_powerups`.
@@ -82,12 +102,11 @@ pub fn Use_target_remove_powerups(
 /// Raven `SP_target_remove_powerups`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:63-65`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = Use_target_remove_powerups`).
+// PORT-ESCALATION(fn-pointer-assignment): Function pointer signatures don't match
 pub fn SP_target_remove_powerups(
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_target_remove_powerups — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port SP_target_remove_powerups — parked: fn-pointer-assignment")
 }
 
 /// Raven `Think_Target_Delay`.
@@ -105,29 +124,36 @@ pub fn Think_Target_Delay(
 /// Raven `Use_Target_Delay`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:82-91`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`,
-// calls `crandom()` (ruling 3 — LCG rng not threaded through this signature),
-// and writes the `think` fn-pointer field (ruling 2) — none reachable from
-// the staged raw-pointer signature.
+// PORT-ESCALATION(crandom-not-available): crandom() is not in the call surface; ruling 3 says LCG is not threaded through this signature
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign Think_Target_Delay to think field due to signature mismatch
 pub fn Use_Target_Delay(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port Use_Target_Delay — parked: raw-ptr-skeleton-no-world-handle")
+    todo!("Port Use_Target_Delay — parked: crandom-not-available")
 }
 
 /// Raven `SP_target_delay`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:93-103`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = Use_Target_Delay`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign Use_Target_Delay to use field
 pub fn SP_target_delay(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_target_delay — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // check delay for backwards compatibility
+        if G_SpawnFloat(ctx, b"delay\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).wait) == 0 {
+            G_SpawnFloat(ctx, b"wait\0".as_ptr() as *const c_char, b"1\0".as_ptr() as *const c_char, &mut (*ent).wait);
+        }
+
+        if (*ent).wait == 0.0 {
+            (*ent).wait = 1.0;
+        }
+        // TODO: Port fn-pointer assignment: (*ent).use = Use_Target_Delay;
+    }
 }
 
 /// Raven `Use_Target_Score`.
@@ -147,38 +173,100 @@ pub fn Use_Target_Score(
 /// Raven `SP_target_score`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:117-122`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = Use_Target_Score`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign Use_Target_Score to use field
 pub fn SP_target_score(
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_target_score — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*ent).count == 0 {
+            (*ent).count = 1;
+        }
+        // TODO: Port fn-pointer assignment: (*ent).use = Use_Target_Score;
+    }
 }
 
 /// Raven `Use_Target_Print`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:132-237`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
-// `trap_SendServerCommand`, `Com_Error`, `level.time` — no engine/world
-// handle on the staged signature.
 pub fn Use_Target_Print(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port Use_Target_Print — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if ent.is_null() || (*ent).inuse == 0 {
+            // Com_Printf("ERROR: Bad ent in Use_Target_Print");
+            return;
+        }
+
+        if (*ent).wait != 0.0 {
+            if (*ent).genericValue14 >= ctx.world.level.time {
+                return;
+            }
+            (*ent).genericValue14 = ctx.world.level.time + (*ent).wait;
+        }
+
+        // Debug-only checks (FINAL_BUILD mode skips these)
+        if (*ent).genericValue15 > ctx.world.level.time {
+            // Com_Printf("TARGET PRINT ERRORS:\n");
+            // ... logging code ...
+            // Com_Error(ERR_DROP, "target_print used in quick succession, fix it! See the console for details.");
+        }
+        (*ent).genericValue15 = ctx.world.level.time + 5000.0;
+
+        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
+
+        if (*ent).spawnflags & 4 != 0 {
+            // private, to one client only
+            if !activator.is_null() && (*activator).inuse != 0 {
+                if !(*activator).client.is_null() && !(*activator).client.is_null() {
+                    // make sure there's a valid client ent to send it to
+                    if (*ent).message[0] == b'@' as c_char && (*ent).message[1] != b'@' as c_char {
+                        trap::SendServerCommand(ctx.engine, activator as *const _ as isize, va(b"cps \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                    } else {
+                        trap::SendServerCommand(ctx.engine, activator as *const _ as isize, va(b"cp \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                    }
+                }
+            }
+            return;
+        }
+
+        if (*ent).spawnflags & 3 != 0 {
+            if (*ent).spawnflags & 1 != 0 {
+                if (*ent).message[0] == b'@' as c_char && (*ent).message[1] != b'@' as c_char {
+                    G_TeamCommand(ctx, TEAM_RED, va(b"cps \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                } else {
+                    G_TeamCommand(ctx, TEAM_RED, va(b"cp \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                }
+            }
+            if (*ent).spawnflags & 2 != 0 {
+                if (*ent).message[0] == b'@' as c_char && (*ent).message[1] != b'@' as c_char {
+                    G_TeamCommand(ctx, TEAM_BLUE, va(b"cps \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                } else {
+                    G_TeamCommand(ctx, TEAM_BLUE, va(b"cp \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                }
+            }
+            return;
+        }
+
+        // Send to all players
+        if (*ent).message[0] == b'@' as c_char && (*ent).message[1] != b'@' as c_char {
+            trap::SendServerCommand(ctx.engine, -1, va(b"cps \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+        } else {
+            trap::SendServerCommand(ctx.engine, -1, va(b"cp \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+        }
+    }
 }
 
 /// Raven `SP_target_print`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:239-241`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = Use_Target_Print`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign Use_Target_Print to use field
 pub fn SP_target_print(
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_target_print — parked: raw-ptr-skeleton-no-world-handle")
+    // TODO: Port fn-pointer assignment: (*ent).use = Use_Target_Print;
 }
 
 /// Raven `Use_Target_Speaker`.
@@ -220,26 +308,119 @@ pub fn Use_Target_Speaker(
 /// Raven `SP_target_speaker`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:286-340`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`;
-// also fn-pointer write (`use = Use_Target_Speaker`).
 pub fn SP_target_speaker(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SP_target_speaker — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut s: *mut c_char = core::ptr::null_mut();
+
+        G_SpawnFloat(ctx, b"wait\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).wait);
+        G_SpawnFloat(ctx, b"random\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).random);
+
+        if G_SpawnString(ctx, b"soundSet\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s) != 0 {
+            // this is a sound set
+            (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, s);
+            (*ent).s.eFlags = mp_bg::public::entity_flags::EF_PERMANENT;
+            (*ent).s.pos.trBase = (*ent).s.origin;
+            trap::LinkEntity(ctx.engine, ent);
+            return;
+        }
+
+        if G_SpawnString(ctx, b"noise\0".as_ptr() as *const c_char, b"NOSOUND\0".as_ptr() as *const c_char, &mut s) == 0 {
+            // G_Error is PARKED, so we can't call it properly
+            // G_Error(ctx, "target_speaker without a noise key at %s", vtos(ctx, (*ent).s.origin));
+        }
+
+        // force all client relative sounds to be "activator" speakers
+        if *s == b'*' as c_char {
+            (*ent).spawnflags |= 8;
+        }
+
+        let mut buffer: [c_char; 256] = [0; 256]; // MAX_QPATH is typically 64 or 256
+        Q_strncpyz(buffer.as_mut_ptr(), s, 256);
+
+        (*ent).noise_index = G_SoundIndex(buffer.as_ptr());
+
+        // a repeating speaker can be done completely client side
+        (*ent).s.eType = mp_bg::public::entity_type::ET_SPEAKER;
+        (*ent).s.eventParm = (*ent).noise_index;
+        (*ent).s.frame = ((*ent).wait * 10.0) as c_int;
+        (*ent).s.clientNum = ((*ent).random * 10.0) as c_int;
+
+        // check for prestarted looping sound
+        if (*ent).spawnflags & 1 != 0 {
+            (*ent).s.loopSound = (*ent).noise_index;
+            (*ent).s.loopIsSoundset = qfalse;
+        }
+
+        // TODO: Port fn-pointer assignment: (*ent).use = Use_Target_Speaker;
+
+        if (*ent).spawnflags & 4 != 0 {
+            (*ent).r.svFlags |= mp_bg::public::server_flags::SVF_BROADCAST;
+        }
+
+        (*ent).s.pos.trBase = (*ent).s.origin;
+
+        // must link the entity so we get areas and clusters
+        trap::LinkEntity(ctx.engine, ent);
+    }
 }
 
 /// Raven `target_laser_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:349-377`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_Trace` /
-// `trap_LinkEntity` and reads `level.time`, `g_entities[]` — no engine/world
-// handle on the staged signature.
 pub fn target_laser_think(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port target_laser_think — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut end: vec3_t = [0.0; 3];
+        let mut tr: trace_t = core::mem::zeroed();
+        let mut point: vec3_t = [0.0; 3];
+
+        // if pointed at another entity, set movedir to point at it
+        if !(*self_).enemy.is_null() {
+            let enemy = (*self_).enemy;
+            // VectorMA(self->enemy->s.origin, 0.5, self->enemy->r.mins, point)
+            point[0] = (*enemy).s.origin[0] + 0.5 * (*enemy).r.mins[0];
+            point[1] = (*enemy).s.origin[1] + 0.5 * (*enemy).r.mins[1];
+            point[2] = (*enemy).s.origin[2] + 0.5 * (*enemy).r.mins[2];
+
+            // VectorMA(point, 0.5, self->enemy->r.maxs, point)
+            point[0] += 0.5 * (*enemy).r.maxs[0];
+            point[1] += 0.5 * (*enemy).r.maxs[1];
+            point[2] += 0.5 * (*enemy).r.maxs[2];
+
+            // VectorSubtract(point, self->s.origin, self->movedir)
+            (*self_).movedir[0] = point[0] - (*self_).s.origin[0];
+            (*self_).movedir[1] = point[1] - (*self_).s.origin[1];
+            (*self_).movedir[2] = point[2] - (*self_).s.origin[2];
+
+            VectorNormalize(&mut (*self_).movedir);
+        }
+
+        // fire forward and see what we hit
+        end[0] = (*self_).s.origin[0] + 2048.0 * (*self_).movedir[0];
+        end[1] = (*self_).s.origin[1] + 2048.0 * (*self_).movedir[1];
+        end[2] = (*self_).s.origin[2] + 2048.0 * (*self_).movedir[2];
+
+        trap::Trace(ctx.engine, &mut tr, (*self_).s.origin, core::ptr::null(), core::ptr::null(), end, (*self_).s.number, mp_bg::public::contents::CONTENTS_SOLID | mp_bg::public::contents::CONTENTS_BODY | mp_bg::public::contents::CONTENTS_CORPSE);
+
+        if tr.entityNum != 0 {
+            // hurt it if we can
+            let targ = &mut ctx.world.entities[tr.entityNum as usize];
+            G_Damage(targ, self_, (*self_).activator, (*self_).movedir, tr.endpos, (*self_).damage, mp_bg::public::means_of_death::DAMAGE_NO_KNOCKBACK, meansOfDeath_t::MOD_TARGET_LASER as c_int);
+        }
+
+        // VectorCopy(tr.endpos, self->s.origin2)
+        (*self_).s.origin2[0] = tr.endpos[0];
+        (*self_).s.origin2[1] = tr.endpos[1];
+        (*self_).s.origin2[2] = tr.endpos[2];
+
+        trap::LinkEntity(ctx.engine, self_);
+        (*self_).nextthink = ctx.world.level.time + crate::level::FRAMETIME as f32;
+    }
 }
 
 /// Raven `target_laser_on`.
@@ -260,13 +441,14 @@ pub fn target_laser_on(
 /// Raven `target_laser_off`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:386-390`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_UnlinkEntity`
-// — no engine/world handle.
 pub fn target_laser_off(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port target_laser_off — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        trap::UnlinkEntity(ctx.engine, self_);
+        (*self_).nextthink = 0.0;
+    }
 }
 
 /// Raven `target_laser_use`.
@@ -291,26 +473,52 @@ pub fn target_laser_use(
 /// Raven `target_laser_start`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:401-428`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer writes
-// (`use = target_laser_use`, `think = target_laser_think`, ruling 2) — the
-// frozen `gentity_t` fn-pointer fields aren't the `EntXxx` enums yet.
 pub fn target_laser_start(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port target_laser_start — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        (*self_).s.eType = mp_bg::public::entity_type::ET_BEAM;
+
+        if !(*self_).target.is_null() {
+            let ent = G_Find(ctx, core::ptr::null_mut(), core::mem::offset_of!(gentity_t, targetname) as c_int, (*self_).target);
+            if ent.is_null() {
+                // G_Printf("%s at %s: %s is a bad target\n", self->classname, vtos(self->s.origin), self->target);
+            }
+            (*self_).enemy = ent;
+        } else {
+            G_SetMovedir((*self_).s.angles, (*self_).movedir);
+        }
+
+        // TODO: Port fn-pointer assignments:
+        // (*self_).use = target_laser_use;
+        // (*self_).think = target_laser_think;
+
+        if (*self_).damage == 0 {
+            (*self_).damage = 1;
+        }
+
+        if (*self_).spawnflags & 1 != 0 {
+            target_laser_on(ctx, self_);
+        } else {
+            target_laser_off(ctx, self_);
+        }
+    }
 }
 
 /// Raven `SP_target_laser`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:430-435`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`;
-// fn-pointer write (`think = target_laser_start`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_laser_start to think field
 pub fn SP_target_laser(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_laser — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // let everything else get spawned before we start firing
+        // TODO: Port fn-pointer assignment: (*self_).think = target_laser_start;
+        (*self_).nextthink = ctx.world.level.time + crate::level::FRAMETIME as f32;
+    }
 }
 
 /// Raven `target_teleporter_use`.
@@ -344,40 +552,83 @@ pub fn target_teleporter_use(
 /// Raven `SP_target_teleporter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:460-465`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_teleporter_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_teleporter_use to use field
 pub fn SP_target_teleporter(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_teleporter — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*self_).targetname.is_null() {
+            // G_Printf("untargeted %s at %s\n", self->classname, vtos(self->s.origin));
+        }
+
+        // TODO: Port fn-pointer assignment: (*self_).use = target_teleporter_use;
+    }
 }
 
 /// Raven `target_relay_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:479-518`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// writes the `use`/`think` fn-pointer fields (`use = NULL`,
-// `think = G_FreeEntity`, ruling 2) — no engine/world handle nor enum wiring
-// on this staged signature.
 pub fn target_relay_use(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port target_relay_use — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*self_).spawnflags & 1 != 0 && !(*activator).client.is_null()
+            && (*(*activator).client).sess.sessionTeam != TEAM_RED {
+            return;
+        }
+        if (*self_).spawnflags & 2 != 0 && !(*activator).client.is_null()
+            && (*(*activator).client).sess.sessionTeam != TEAM_BLUE {
+            return;
+        }
+
+        if (*self_).flags & FL_INACTIVE != 0 {
+            // set by target_deactivate
+            return;
+        }
+
+        let ranscript = G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        if (*self_).wait == -1.0 {
+            // never use again
+            if ranscript != 0 {
+                // crap, can't remove!
+                // TODO: Port fn-pointer assignment: (*self_).use = NULL;
+            } else {
+                // remove
+                // TODO: Port fn-pointer assignments:
+                // (*self_).think = G_FreeEntity;
+                // (*self_).nextthink = level.time + FRAMETIME;
+            }
+        }
+
+        if (*self_).spawnflags & 4 != 0 {
+            let ent = G_PickTarget(ctx, (*self_).target);
+            if !ent.is_null() && !(*ent).use_.is_null() {
+                GlobalUse(ent, self_, activator);
+            }
+            return;
+        }
+
+        G_UseTargets(ctx, self_, activator);
+    }
 }
 
 /// Raven `SP_target_relay`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:520-526`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_relay_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_relay_use to use field
 pub fn SP_target_relay(
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_relay — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // TODO: Port fn-pointer assignment: (*self_).use = target_relay_use;
+        if (*self_).spawnflags & 128 != 0 {
+            (*self_).flags |= FL_INACTIVE;
+        }
+    }
 }
 
 /// Raven `target_kill_use`.
@@ -407,12 +658,11 @@ pub fn target_kill_use(
 /// Raven `SP_target_kill`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:539-541`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_kill_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_kill_use to use field
 pub fn SP_target_kill(
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_kill — parked: raw-ptr-skeleton-no-world-handle")
+    // TODO: Port fn-pointer assignment: (*self_).use = target_kill_use;
 }
 
 /// Raven `SP_target_position`.
@@ -429,27 +679,51 @@ pub fn SP_target_position(
 /// Raven `target_location_linkup`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:554-582`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes `level`
-// (`locationLinked`, `locationHead`, `num_entities`), walks the file-scope
-// `g_entities[]` array, and calls `trap_SetConfigstring` — none reachable
-// from the staged raw-pointer signature.
 pub fn target_location_linkup(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port target_location_linkup — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if ctx.world.level.locationLinked != 0 {
+            return;
+        }
+
+        ctx.world.level.locationLinked = qtrue;
+        ctx.world.level.locationHead = core::ptr::null_mut();
+
+        trap::SetConfigstring(ctx.engine, mp_bg::public::configstring::CS_LOCATIONS, b"unknown\0".as_ptr() as *const c_char);
+
+        let mut n = 1;
+        for i in 0..ctx.world.level.num_entities {
+            let ent_ptr = &mut ctx.world.entities[i] as *mut gentity_t;
+            if !(*ent_ptr).classname.is_null() && Q_stricmp((*ent_ptr).classname, b"target_location\0".as_ptr() as *const c_char) == 0 {
+                // lets overload some variables!
+                (*ent_ptr).health = n; // use for location marking
+                trap::SetConfigstring(ctx.engine, mp_bg::public::configstring::CS_LOCATIONS + n as c_int, (*ent_ptr).message);
+                n += 1;
+                (*ent_ptr).nextTrain = ctx.world.level.locationHead;
+                ctx.world.level.locationHead = ent_ptr;
+            }
+        }
+
+        // All linked together now
+    }
 }
 
 /// Raven `SP_target_location`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:592-597`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`;
-// fn-pointer write (`think = target_location_linkup`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_location_linkup to think field
 pub fn SP_target_location(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_location — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        // TODO: Port fn-pointer assignment: (*self_).think = target_location_linkup;
+        (*self_).nextthink = ctx.world.level.time + 200.0; // Let them all spawn first
+
+        G_SetOrigin(self_, (*self_).s.origin);
+    }
 }
 
 /// Raven `target_counter_use`.
@@ -505,78 +779,198 @@ pub fn target_counter_use(
 /// Raven `SP_target_counter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:660-673`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_counter_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_counter_use to use field
 pub fn SP_target_counter(
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_counter — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        (*self_).wait = -1.0;
+        if (*self_).count == 0 {
+            (*self_).count = 2;
+        }
+        // we will reset when we use up our count, remember our initial count
+        (*self_).genericValue1 = (*self_).count;
+
+        // TODO: Port fn-pointer assignment: (*self_).use = target_counter_use;
+    }
 }
 
 /// Raven `target_random_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:681-746`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = 0`, ruling 2) — the frozen `gentity_t.use_` field can't hold the
-// `None`-via-enum shape yet on this staged signature.
 pub fn target_random_use(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port target_random_use — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut t_count = 0;
+        let mut t: *mut gentity_t = core::ptr::null_mut();
+
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+
+        if (*self_).spawnflags & 1 != 0 {
+            // TODO: Port fn-pointer assignment: (*self_).use = NULL;
+        }
+
+        // Count matching targets
+        loop {
+            t = G_Find(ctx, t, core::mem::offset_of!(gentity_t, targetname) as c_int, (*self_).target);
+            if t.is_null() {
+                break;
+            }
+            if t != self_ {
+                t_count += 1;
+            }
+        }
+
+        if t_count == 0 {
+            return;
+        }
+
+        if t_count == 1 {
+            G_UseTargets(ctx, self_, activator);
+            return;
+        }
+
+        // Pick a random target
+        let pick = Q_irand(1, t_count);
+        t_count = 0;
+
+        loop {
+            t = G_Find(ctx, t, core::mem::offset_of!(gentity_t, targetname) as c_int, (*self_).target);
+            if t.is_null() {
+                break;
+            }
+            if t != self_ {
+                t_count += 1;
+            } else {
+                continue;
+            }
+
+            if t == self_ {
+                // WARNING: Entity used itself (shouldn't happen)
+            } else if t_count == pick {
+                if !(*t).use_.is_null() {
+                    // check can be omitted
+                    GlobalUse(t, self_, activator);
+                    return;
+                }
+            }
+
+            if (*self_).inuse == 0 {
+                // Com_Printf("entity was removed while using targets\n");
+                return;
+            }
+        }
+    }
 }
 
 /// Raven `SP_target_random`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:748-751`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_random_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_random_use to use field
 pub fn SP_target_random(
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_random — parked: raw-ptr-skeleton-no-world-handle")
+    // TODO: Port fn-pointer assignment: (*self_).use = target_random_use;
 }
 
 /// Raven `scriptrunner_run`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:754-837`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// the `g_developer` cvar (GameCvars, ruling 1 — not reachable from this
-// signature), calls `trap_ICARUS_*`, and writes the `use` fn-pointer field
-// (`use = 0`) — none reachable from the staged raw-pointer signature.
+// PORT-ESCALATION(icarus-traps): trap_ICARUS_* functions and g_developer cvar not available
 pub fn scriptrunner_run(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port scriptrunner_run — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*self_).count != -1 {
+            if (*self_).count <= 0 {
+                // TODO: Port fn-pointer assignment: (*self_).use = NULL;
+                (*self_).behaviorSet[bSet_t::BSET_USE as usize] = core::ptr::null_mut();
+                return;
+            } else {
+                (*self_).count -= 1;
+            }
+        }
+
+        if !(*self_).behaviorSet[bSet_t::BSET_USE as usize].is_null() {
+            if (*self_).spawnflags & 1 != 0 {
+                if (*self_).activator.is_null() {
+                    // if (g_developer.integer) Com_Printf("target_scriptrunner tried to run on invalid entity!\n");
+                    return;
+                }
+
+                // trap_ICARUS_IsInitialized and other ICARUS functions are PARKED
+                // and cannot be called. This section is partially ported.
+                // TODO: Call trap_ICARUS_IsInitialized(self->s.number) - not available
+
+                // For now, skip the ICARUS initialization path
+            } else {
+                // if (g_developer.integer && self->activator) Com_Printf(...)
+                G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+            }
+        }
+
+        if (*self_).wait != 0.0 {
+            (*self_).nextthink = ctx.world.level.time + (*self_).wait;
+        }
+    }
 }
 
 /// Raven `target_scriptrunner_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:839-857`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
-// writes the `think` fn-pointer field (`think = scriptrunner_run`).
 pub fn target_scriptrunner_use(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port target_scriptrunner_use — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*self_).nextthink > ctx.world.level.time {
+            return;
+        }
+
+        (*self_).activator = activator;
+        (*self_).enemy = other;
+        if (*self_).delay != 0.0 {
+            // delay before firing scriptrunner
+            // TODO: Port fn-pointer assignment: (*self_).think = scriptrunner_run;
+            (*self_).nextthink = ctx.world.level.time + (*self_).delay;
+        } else {
+            scriptrunner_run(ctx, self_);
+        }
+    }
 }
 
 /// Raven `SP_target_scriptrunner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:871-898`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_scriptrunner_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_scriptrunner_use to use field
 pub fn SP_target_scriptrunner(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_scriptrunner — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        if (*self_).spawnflags & 128 != 0 {
+            (*self_).flags |= FL_INACTIVE;
+        }
+
+        if (*self_).count == 0 {
+            (*self_).count = 1; // default 1 use only
+        }
+
+        let mut v = 0.0f32;
+        G_SpawnFloat(ctx, b"delay\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut v);
+        (*self_).delay = v * 1000.0; // sec to ms
+        (*self_).wait *= 1000.0; // sec to ms
+
+        G_SetOrigin(self_, (*self_).s.origin);
+        // TODO: Port fn-pointer assignment: (*self_).use = target_scriptrunner_use;
+    }
 }
 
 /// Raven `G_SetActiveState`.
@@ -636,73 +1030,101 @@ pub fn target_deactivate_use(
 /// Raven `SP_target_activate`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:930-934`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_activate_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_activate_use to use field
 pub fn SP_target_activate(
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_activate — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        G_SetOrigin(self_, (*self_).s.origin);
+        // TODO: Port fn-pointer assignment: (*self_).use = target_activate_use;
+    }
 }
 
 /// Raven `SP_target_deactivate`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:939-943`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_deactivate_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_deactivate_use to use field
 pub fn SP_target_deactivate(
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_deactivate — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        G_SetOrigin(self_, (*self_).s.origin);
+        // TODO: Port fn-pointer assignment: (*self_).use = target_deactivate_use;
+    }
 }
 
 /// Raven `target_level_change_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:945-950`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
-// `trap_SendConsoleCommand` — no engine/world handle on the staged signature.
 pub fn target_level_change_use(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port target_level_change_use — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        trap::SendConsoleCommand(ctx.engine, mp_bg::public::exec_level::EXEC_NOW, va(b"map %s\0".as_ptr() as *const c_char, (*self_).message));
+    }
 }
 
 /// Raven `SP_target_level_change`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:955-970`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_level_change_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_level_change_use to use field
 pub fn SP_target_level_change(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_level_change — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut s: *mut c_char = core::ptr::null_mut();
+
+        G_SpawnString(ctx, b"mapname\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s);
+        (*self_).message = G_NewString(s);
+
+        if (*self_).message.is_null() || *(*self_).message == b'\0' as c_char {
+            // G_Error("target_level_change with no mapname!\n");
+            return;
+        }
+
+        G_SetOrigin(self_, (*self_).s.origin);
+        // TODO: Port fn-pointer assignment: (*self_).use = target_level_change_use;
+    }
 }
 
 /// Raven `target_play_music_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:972-976`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
-// `trap_SetConfigstring` — no engine/world handle on the staged signature.
 pub fn target_play_music_use(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port target_play_music_use — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        trap::SetConfigstring(ctx.engine, mp_bg::public::configstring::CS_MUSIC, (*self_).message);
+    }
 }
 
 /// Raven `SP_target_play_music`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:989-1002`
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): fn-pointer write
-// (`use = target_play_music_use`).
+// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_play_music_use to use field
 pub fn SP_target_play_music(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port SP_target_play_music — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let mut s: *mut c_char = core::ptr::null_mut();
+
+        G_SetOrigin(self_, (*self_).s.origin);
+        if G_SpawnString(ctx, b"music\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s) == 0 {
+            // G_Error("target_play_music without a music key at %s", vtos(ctx, self->s.origin));
+        }
+
+        (*self_).message = G_NewString(s);
+
+        // TODO: Port fn-pointer assignment: (*self_).use = target_play_music_use;
+    }
 }

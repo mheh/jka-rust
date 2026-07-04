@@ -43,10 +43,6 @@ use crate::g_utils::G_SetAnim;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes `ucmd`,
-// `eventClearTime`, `g_dismember`, `g_saberRealisticCombat` file-scope
-// globals, none of which are reachable from the fixed `(*mut gentity_t)`
-// signature (no GameWorld/engine handle).
 /// Raven `CorpsePhysics`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:46-103`
@@ -54,12 +50,75 @@ pub fn CorpsePhysics(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port CorpsePhysics — parked: raw-ptr-skeleton-no-world-handle")
+    // Raven `bg_public.h:604`: `#define EF_DISINTEGRATION (1<<26)`.
+    const EF_DISINTEGRATION: c_int = 1 << 26;
+    // Raven `b_local.h:164`: `#define ALERT_CLEAR_TIME 200`.
+    const ALERT_CLEAR_TIME: c_int = 200;
+    // Raven `g_local.h` `CONTENTS_TRIGGER` (`g_items.rs`/`g_mover.rs` precedent).
+    const CONTENTS_TRIGGER: c_int = 0x0000_0400;
+
+    unsafe {
+        let world = &mut *ctx.world;
+        world.globals.ucmd = usercmd_t::default();
+        crate::g_active::ClientThink(ctx, (*self_).s.number, &mut world.globals.ucmd as *mut usercmd_t);
+
+        let client = (*self_).client as *mut gclient_t;
+        if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
+            crate::NPC_AI_GalakMech::GM_Dying(ctx, self_);
+        }
+
+        //FIXME: match my pitch and roll for the slope of my groundPlane
+        if (*self_).s.groundEntityNum != ENTITYNUM_NONE && ((*self_).s.eFlags & EF_DISINTEGRATION) == 0 {
+            //on the ground
+            //FIXME: check 4 corners
+            pitch_roll_for_slope(ctx, self_, None);
+        }
+
+        if world.globals.eventClearTime == world.level.time + ALERT_CLEAR_TIME {
+            //events were just cleared out so add me again
+            if !client.is_null() && ((*client).ps.eFlags & EF_NODRAW) == 0 {
+                crate::NPC_senses::AddSightEvent(
+                    ctx,
+                    (*self_).enemy,
+                    (*self_).r.currentOrigin,
+                    384.0,
+                    alertEventLevel_e::AEL_DISCOVERED,
+                    0.0,
+                );
+            }
+        }
+
+        if world.level.time - (*self_).s.time > 3000 {
+            //been dead for 3 seconds
+            if world.cvars.g_dismember.integer < 11381138 && world.cvars.g_saberRealisticCombat.integer == 0 {
+                //can't be dismembered once dead
+                if !client.is_null() && (*client).NPC_class != class_t::CLASS_PROTOCOL {
+                    //	self->client->dismembered = qtrue;
+                }
+            }
+        }
+
+        //if ( level.time - self->s.time > 500 )
+        if !client.is_null() && (*client).respawnTime < world.level.time + 500 {
+            //don't turn "nonsolid" until about 1 second after actual death
+            if !client.is_null() && ((*client).ps.eFlags & EF_DISINTEGRATION) != 0 {
+                (*self_).r.contents = 0;
+            } else if !client.is_null()
+                && (*client).NPC_class != class_t::CLASS_MARK1
+                && (*client).NPC_class != class_t::CLASS_INTERROGATOR
+            {
+                // The Mark1 & Interrogator stays solid.
+                (*self_).r.contents = CONTENTS_CORPSE;
+                //self->r.maxs[2] = -8;
+            }
+
+            if !(*self_).message.is_null() {
+                (*self_).r.contents |= CONTENTS_TRIGGER;
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`,
-// `level`, calls `trap_ICARUS_IsRunning`/`trap_ICARUS_MaintainTaskManager`
-// (need `&Engine`) — none reachable from the fixed signature.
 /// Raven `NPC_RemoveBody`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:115-223`
@@ -67,7 +126,125 @@ pub fn NPC_RemoveBody(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port NPC_RemoveBody — parked: raw-ptr-skeleton-no-world-handle")
+    // Raven `bg_public.h:604`: `#define EF_DISINTEGRATION (1<<26)`.
+    const EF_DISINTEGRATION: c_int = 1 << 26;
+    // Raven `g_local.h`: `#define FRAMETIME 100` (local per file-group, matching
+    // the `g_ICARUScb.rs` precedent).
+    const FRAMETIME: c_int = 100;
+    // Raven `entity_effects.rs` doesn't yet re-export `EF2_HELD_BY_MONSTER`
+    // through the prelude glob — imported explicitly below.
+    use mp_bg::public::entity_effects::EF2_HELD_BY_MONSTER;
+
+    unsafe {
+        CorpsePhysics(ctx, self_);
+
+        let world = &mut *ctx.world;
+        (*self_).nextthink = world.level.time + FRAMETIME;
+
+        let npc = (*self_).NPC as *mut gNPC_t;
+        if !npc.is_null() && (*npc).nextBStateThink <= world.level.time {
+            trap::ICARUS_MaintainTaskManager(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*self_).s.number),
+            );
+        }
+        if !npc.is_null() {
+            (*npc).nextBStateThink = world.level.time + FRAMETIME;
+        }
+
+        if !(*self_).message.is_null() {
+            //I still have a key
+            return;
+        }
+
+        let client = (*self_).client as *mut gclient_t;
+
+        // I don't consider this a hack, it's creative coding . . .
+        // I agree, very creative... need something like this for ATST and GALAKMECH too!
+        if !client.is_null() && (*client).NPC_class == class_t::CLASS_MARK1 {
+            crate::NPC_AI_Mark1::Mark1_dying(ctx, self_);
+        }
+
+        // Since these blow up, remove the bounding box.
+        if !client.is_null()
+            && ((*client).NPC_class == class_t::CLASS_REMOTE
+                || (*client).NPC_class == class_t::CLASS_SENTRY
+                || (*client).NPC_class == class_t::CLASS_PROBE
+                || (*client).NPC_class == class_t::CLASS_INTERROGATOR
+                || (*client).NPC_class == class_t::CLASS_MARK2)
+        {
+            //if ( !self->taskManager || !self->taskManager->IsRunning() )
+            if trap::ICARUS_IsRunning(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new((*self_).s.number),
+            ) == 0
+            {
+                let activator = (*self_).activator;
+                let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
+                if activator.is_null()
+                    || activator_client.is_null()
+                    || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
+                {
+                    //not being held by a Rancor
+                    crate::g_utils::G_FreeEntity(ctx, self_);
+                }
+            }
+            return;
+        }
+
+        //FIXME: don't ever inflate back up?
+        if !client.is_null() {
+            (*self_).r.maxs[2] = (*client).renderInfo.eyePoint[2] - (*self_).r.currentOrigin[2] + 4.0;
+        }
+        if (*self_).r.maxs[2] < -8.0 {
+            (*self_).r.maxs[2] = -8.0;
+        }
+
+        if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
+            //never disappears
+            return;
+        }
+        if !npc.is_null() && (*npc).timeOfDeath <= world.level.time {
+            (*npc).timeOfDeath = world.level.time + 1000;
+            // Only do all of this nonsense for Scav boys ( and girls )
+            // should I check NPC_class here instead of TEAM ? - dmv
+            if !client.is_null()
+                && ((*client).playerTeam == crate::teams::npcteam::NPCTEAM_ENEMY || (*client).NPC_class == class_t::CLASS_PROTOCOL)
+            {
+                (*self_).nextthink = world.level.time + FRAMETIME; // try back in a second
+                //Don't care about this for MP I guess.
+            }
+
+            //FIXME: there are some conditions - such as heavy combat - in which we want
+            //			to remove the bodies... but in other cases it's just weird, like
+            //			when they're right behind you in a closed room and when they've been
+            //			placed as dead NPCs by a designer...
+            //			For now we just assume that a corpse with no enemy was
+            //			placed in the map as a corpse
+            if !(*self_).enemy.is_null() {
+                //if ( !self->taskManager || !self->taskManager->IsRunning() )
+                if trap::ICARUS_IsRunning(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new((*self_).s.number),
+                ) == 0
+                {
+                    let activator = (*self_).activator;
+                    let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
+                    if activator.is_null()
+                        || activator_client.is_null()
+                        || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
+                    {
+                        //not being held by a Rancor
+                        if !client.is_null() && (*client).ps.saberEntityNum > 0 && (*client).ps.saberEntityNum < ENTITYNUM_WORLD {
+                            let saberent = world.entities.as_mut_ptr().add((*client).ps.saberEntityNum as usize);
+                            crate::g_utils::G_FreeEntity(ctx, saberent);
+                        }
+                        crate::g_utils::G_FreeEntity(ctx, self_);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Raven `BodyRemovalPadTime`.
@@ -111,7 +288,20 @@ pub fn BodyRemovalPadTime(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:323-378`
 pub fn NPC_RemoveBodyEffect(ctx: GameContext<'_>) {
-    todo!("Port NPC_RemoveBodyEffect — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let world = &*ctx.world;
+        let npc = world.globals.NPC;
+        if npc.is_null() {
+            return;
+        }
+        let client = (*npc).client as *mut gclient_t;
+        if client.is_null() || ((*npc).s.eFlags & EF_NODRAW) != 0 {
+            return;
+        }
+        // Raven: the per-class droid/species branches below are `stub code` —
+        // every arm is commented-out upstream (dead debug-effect scaffolding);
+        // the switch itself has no live behavior beyond the guard above.
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_Trace`/
@@ -119,13 +309,125 @@ pub fn NPC_RemoveBodyEffect(ctx: GameContext<'_>) {
 // carry.
 /// Raven `pitch_roll_for_slope`.
 ///
+/// fork-9: `pass_slope` is NULL-able at every oracle call site (`!pass_slope`
+/// guard) and never written through, so it takes the AngleVectors-idiom
+/// shape (`Option<&mut [f32;3]>`) per the mechanical out-param rule.
 /// Source: `oracle/oracle/codemp/game/NPC.c:395-470`
 pub fn pitch_roll_for_slope(
     ctx: GameContext<'_>,
     forwhom: *mut gentity_t,
-    pass_slope: vec3_t,
+    pass_slope: Option<&mut vec3_t>,
 ) {
-    todo!("Port pitch_roll_for_slope — parked: raw-ptr-skeleton-no-world-handle")
+    const PITCH: usize = 0;
+    const ROLL: usize = 2;
+
+    unsafe {
+        // if we don't have a slope, get one
+        let slope: vec3_t = match pass_slope {
+            None => {
+                let mut startspot = (*forwhom).r.currentOrigin;
+                startspot[2] += (*forwhom).r.mins[2] + 4.0;
+                let mut endspot = startspot;
+                endspot[2] -= 300.0;
+
+                let mut trace: trace_t = core::mem::zeroed();
+                trap::Trace(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                        &mut trace as *mut trace_t,
+                        &(*forwhom).r.currentOrigin as *const vec3_t,
+                        core::ptr::null(),
+                        core::ptr::null(),
+                        &endspot as *const vec3_t,
+                        (*forwhom).s.number,
+                        MASK_SOLID,
+                    ),
+                );
+                //		if(trace_fraction>0.05&&forwhom.movetype==MOVETYPE_STEP)
+                //			forwhom.flags(-)FL_ONGROUND;
+                if trace.fraction >= 1.0 {
+                    return;
+                }
+                // `!( &trace.plane )` is always false in the oracle (address of a
+                // struct member is never null) — dead condition, dropped.
+                if trace.plane.normal == VEC3_ORIGIN {
+                    return;
+                }
+                trace.plane.normal
+            }
+            Some(p) => {
+                if *p == VEC3_ORIGIN {
+                    // Raven falls through the `!pass_slope` branch (retracing) when
+                    // an all-zero slope is explicitly passed too.
+                    let mut startspot = (*forwhom).r.currentOrigin;
+                    startspot[2] += (*forwhom).r.mins[2] + 4.0;
+                    let mut endspot = startspot;
+                    endspot[2] -= 300.0;
+                    let mut trace: trace_t = core::mem::zeroed();
+                    trap::Trace(
+                        ctx.engine,
+                        mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                            &mut trace as *mut trace_t,
+                            &(*forwhom).r.currentOrigin as *const vec3_t,
+                            core::ptr::null(),
+                            core::ptr::null(),
+                            &endspot as *const vec3_t,
+                            (*forwhom).s.number,
+                            MASK_SOLID,
+                        ),
+                    );
+                    if trace.fraction >= 1.0 {
+                        return;
+                    }
+                    if trace.plane.normal == VEC3_ORIGIN {
+                        return;
+                    }
+                    trace.plane.normal
+                } else {
+                    *p
+                }
+            }
+        };
+
+        let mut ovf: vec3_t = [0.0; 3];
+        let mut ovr: vec3_t = [0.0; 3];
+        crate::q_math::AngleVectors((*forwhom).r.currentAngles, Some(&mut ovf), Some(&mut ovr), None);
+
+        let mut new_angles: vec3_t = [0.0, 0.0, 0.0];
+        crate::q_math::vectoangles(slope, &mut new_angles);
+        let pitch = new_angles[PITCH] + 90.0;
+        new_angles[ROLL] = 0.0;
+        new_angles[PITCH] = 0.0;
+
+        let mut nvf: vec3_t = [0.0; 3];
+        crate::q_math::AngleVectors(new_angles, Some(&mut nvf), None, None);
+
+        // Raven `DotProduct(a,b)` macro (`q_shared.h`) has no ported fn; inlined
+        // elementwise, matching the codebase's other unmacro'd C idioms.
+        let mut mod_ = nvf[0] * ovr[0] + nvf[1] * ovr[1] + nvf[2] * ovr[2];
+        mod_ = if mod_ < 0.0 { -1.0 } else { 1.0 };
+
+        let dot = nvf[0] * ovf[0] + nvf[1] * ovf[1] + nvf[2] * ovf[2];
+
+        let client = (*forwhom).client as *mut gclient_t;
+        if !client.is_null() {
+            (*client).ps.viewangles[PITCH] = dot * pitch;
+            (*client).ps.viewangles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * mod_;
+            let oldmins2 = (*forwhom).r.mins[2];
+            (*forwhom).r.mins[2] = -24.0 + 12.0 * (*client).ps.viewangles[PITCH].abs() / 180.0;
+            //FIXME: if it gets bigger, move up
+            if oldmins2 > (*forwhom).r.mins[2] {
+                //our mins is now lower, need to move up
+                //FIXME: trace?
+                (*client).ps.origin[2] += oldmins2 - (*forwhom).r.mins[2];
+                (*forwhom).r.currentOrigin[2] = (*client).ps.origin[2];
+                trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(forwhom));
+            }
+        } else {
+            (*forwhom).r.currentAngles[PITCH] = dot * pitch;
+            (*forwhom).r.currentAngles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * mod_;
+        }
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
@@ -136,7 +438,161 @@ pub fn pitch_roll_for_slope(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:478-607`
 pub fn DeadThink(ctx: GameContext<'_>) {
-    todo!("Port DeadThink — parked: raw-ptr-skeleton-no-world-handle")
+    const FRAMETIME: c_int = 100;
+    const CONTENTS_NODROP: c_int = 0x0000_0800;
+
+    unsafe {
+        let world = &mut *ctx.world;
+        let npc_ent = world.globals.NPC;
+        let npc_info = world.globals.NPCInfo;
+        let client = (*npc_ent).client as *mut gclient_t;
+
+        //HACKHACKHACKHACKHACK
+        //We should really have a seperate G2 bounding box (seperate from the physics bbox) for G2 collisions only
+        //FIXME: don't ever inflate back up?
+        (*npc_ent).r.maxs[2] = (*client).renderInfo.eyePoint[2] - (*npc_ent).r.currentOrigin[2] + 4.0;
+        if (*npc_ent).r.maxs[2] < -8.0 {
+            (*npc_ent).r.maxs[2] = -8.0;
+        }
+        if (*client).ps.velocity == VEC3_ORIGIN {
+            //not flying through the air
+            let mut trace: trace_t = core::mem::zeroed();
+            if (*npc_ent).r.mins[0] > -32.0 {
+                (*npc_ent).r.mins[0] -= 1.0;
+                trap::Trace(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                        &mut trace as *mut trace_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
+                        &(*npc_ent).r.mins as *const vec3_t,
+                        &(*npc_ent).r.maxs as *const vec3_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
+                        (*npc_ent).s.number,
+                        (*npc_ent).clipmask,
+                    ),
+                );
+                if trace.allsolid != 0 {
+                    (*npc_ent).r.mins[0] += 1.0;
+                }
+            }
+            if (*npc_ent).r.maxs[0] < 32.0 {
+                (*npc_ent).r.maxs[0] += 1.0;
+                trap::Trace(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                        &mut trace as *mut trace_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
+                        &(*npc_ent).r.mins as *const vec3_t,
+                        &(*npc_ent).r.maxs as *const vec3_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
+                        (*npc_ent).s.number,
+                        (*npc_ent).clipmask,
+                    ),
+                );
+                if trace.allsolid != 0 {
+                    (*npc_ent).r.maxs[0] -= 1.0;
+                }
+            }
+            if (*npc_ent).r.mins[1] > -32.0 {
+                (*npc_ent).r.mins[1] -= 1.0;
+                trap::Trace(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                        &mut trace as *mut trace_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
+                        &(*npc_ent).r.mins as *const vec3_t,
+                        &(*npc_ent).r.maxs as *const vec3_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
+                        (*npc_ent).s.number,
+                        (*npc_ent).clipmask,
+                    ),
+                );
+                if trace.allsolid != 0 {
+                    (*npc_ent).r.mins[1] += 1.0;
+                }
+            }
+            if (*npc_ent).r.maxs[1] < 32.0 {
+                (*npc_ent).r.maxs[1] += 1.0;
+                trap::Trace(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                        &mut trace as *mut trace_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
+                        &(*npc_ent).r.mins as *const vec3_t,
+                        &(*npc_ent).r.maxs as *const vec3_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
+                        (*npc_ent).s.number,
+                        (*npc_ent).clipmask,
+                    ),
+                );
+                if trace.allsolid != 0 {
+                    (*npc_ent).r.maxs[1] -= 1.0;
+                }
+            }
+        }
+        //HACKHACKHACKHACKHACK
+
+        //FIXME: tilt and fall off of ledges?
+        //NPC_PostDeathThink();
+
+        // Raven's commented-out `!NPCInfo->timeOfDeath` branch is dead code
+        // upstream (`/* ... */`); only the live `else` block runs.
+        if world.level.time >= (*npc_info).timeOfDeath + BodyRemovalPadTime(npc_ent) {
+            //death anim done (or were given a specific amount of time to wait before removal), wait the requisite amount of time them remove
+            if ((*client).ps.eFlags & EF_NODRAW) != 0 {
+                if trap::ICARUS_IsRunning(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new((*npc_ent).s.number),
+                ) == 0
+                {
+                    //if ( !NPC->taskManager || !NPC->taskManager->IsRunning() )
+                    (*npc_ent).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity);
+                    (*npc_ent).nextthink = world.level.time + FRAMETIME;
+                }
+            } else {
+                // Start the body effect first, then delay 400ms before ditching the corpse
+                NPC_RemoveBodyEffect(ctx);
+
+                //FIXME: keep it running through physics somehow?
+                (*npc_ent).think = Some(crate::ent_fn_enums::EntThink::NPC_RemoveBody);
+                (*npc_ent).nextthink = world.level.time + FRAMETIME;
+                let npc_class = (*client).NPC_class;
+                // check for droids
+                if npc_class == class_t::CLASS_SEEKER
+                    || npc_class == class_t::CLASS_REMOTE
+                    || npc_class == class_t::CLASS_PROBE
+                    || npc_class == class_t::CLASS_MOUSE
+                    || npc_class == class_t::CLASS_GONK
+                    || npc_class == class_t::CLASS_R2D2
+                    || npc_class == class_t::CLASS_R5D2
+                    || npc_class == class_t::CLASS_MARK2
+                    || npc_class == class_t::CLASS_SENTRY
+                {
+                    (*client).ps.eFlags |= EF_NODRAW;
+                    (*npc_info).timeOfDeath = world.level.time + FRAMETIME * 8;
+                } else {
+                    (*npc_info).timeOfDeath = world.level.time + FRAMETIME * 4;
+                }
+            }
+            return;
+        }
+
+        // If the player is on the ground and the resting position contents haven't been set yet...(BounceCount tracks the contents)
+        if (*npc_ent).bounceCount < 0 && (*npc_ent).s.groundEntityNum >= 0 {
+            // if client is in a nodrop area, make him/her nodraw
+            let contents = trap::PointContents(
+                ctx.engine,
+                mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(&(*npc_ent).r.currentOrigin as *const vec3_t, -1),
+            );
+            (*npc_ent).bounceCount = contents;
+
+            if (contents & CONTENTS_NODROP) != 0 {
+                (*client).ps.eFlags |= EF_NODRAW;
+            }
+        }
+
+        CorpsePhysics(ctx, npc_ent);
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): writes the file-scope
@@ -149,7 +605,13 @@ pub fn SetNPCGlobals(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SetNPCGlobals — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let world = &mut *ctx.world;
+        world.globals.NPC = ent;
+        world.globals.NPCInfo = (*ent).NPC as *mut gNPC_t;
+        world.globals.client = (*ent).client as *mut gclient_t;
+        world.globals.ucmd = usercmd_t::default();
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): same file-scope
@@ -158,7 +620,13 @@ pub fn SetNPCGlobals(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:630-636`
 pub fn SaveNPCGlobals(ctx: GameContext<'_>) {
-    todo!("Port SaveNPCGlobals — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let world = &mut *ctx.world;
+        world.globals._saved_NPC = world.globals.NPC;
+        world.globals._saved_NPCInfo = world.globals.NPCInfo;
+        world.globals._saved_client = world.globals.client;
+        world.globals._saved_ucmd = world.globals.ucmd;
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): see `SaveNPCGlobals`.
@@ -166,7 +634,13 @@ pub fn SaveNPCGlobals(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:638-644`
 pub fn RestoreNPCGlobals(ctx: GameContext<'_>) {
-    todo!("Port RestoreNPCGlobals — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let world = &mut *ctx.world;
+        world.globals.NPC = world.globals._saved_NPC;
+        world.globals.NPCInfo = world.globals._saved_NPCInfo;
+        world.globals.client = world.globals._saved_client;
+        world.globals.ucmd = world.globals._saved_ucmd;
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): see `SetNPCGlobals`.
@@ -176,7 +650,12 @@ pub fn RestoreNPCGlobals(ctx: GameContext<'_>) {
 /// 'self' wasn't the global NPC" (comment preserved from source).
 /// Source: `oracle/oracle/codemp/game/NPC.c:647-652`
 pub fn ClearNPCGlobals(ctx: GameContext<'_>) {
-    todo!("Port ClearNPCGlobals — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let world = &mut *ctx.world;
+        world.globals.NPC = core::ptr::null_mut();
+        world.globals.NPCInfo = core::ptr::null_mut();
+        world.globals.client = core::ptr::null_mut();
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `showBBoxes`/
@@ -186,7 +665,44 @@ pub fn ClearNPCGlobals(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:664-681`
 pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
-    todo!("Port NPC_ShowDebugInfo — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let world = &mut *ctx.world;
+        if world.globals.showBBoxes == 0 {
+            return;
+        }
+        // Raven `NPCDEBUG_RED` (`NPC.c:658`) — const color, not GameWorld state.
+        const NPCDEBUG_RED: vec3_t = [1.0, 0.0, 0.0];
+        // Raven `FOFS(classname)` macro.
+        let fieldofs = core::mem::offset_of!(gentity_t, classname) as c_int;
+
+        let mut found: *mut gentity_t = core::ptr::null_mut();
+        loop {
+            found = crate::g_utils::G_Find(ctx, found, fieldofs, c"NPC".as_ptr());
+            if found.is_null() {
+                break;
+            }
+            if trap::InPVS(
+                ctx.engine,
+                mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                    &(*found).r.currentOrigin as *const vec3_t,
+                    &world.entities[0].r.currentOrigin as *const vec3_t,
+                ),
+            ) != 0
+            {
+                let mins = [
+                    (*found).r.currentOrigin[0] + (*found).r.mins[0],
+                    (*found).r.currentOrigin[1] + (*found).r.mins[1],
+                    (*found).r.currentOrigin[2] + (*found).r.mins[2],
+                ];
+                let maxs = [
+                    (*found).r.currentOrigin[0] + (*found).r.maxs[0],
+                    (*found).r.currentOrigin[1] + (*found).r.maxs[1],
+                    (*found).r.currentOrigin[2] + (*found).r.maxs[2],
+                ];
+                crate::g_nav::G_Cube(mins, maxs, NPCDEBUG_RED, 0.25);
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
@@ -196,7 +712,57 @@ pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:683-735`
 pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
-    todo!("Port NPC_ApplyScriptFlags — parked: raw-ptr-skeleton-no-world-handle")
+    // Raven `b_public.h:27-43` scriptFlags bits.
+    const SCF_CROUCHED: c_int = 0x00000001;
+    const SCF_WALKING: c_int = 0x00000002;
+    const SCF_LEAN_RIGHT: c_int = 0x00000008;
+    const SCF_LEAN_LEFT: c_int = 0x00000010;
+    const SCF_RUNNING: c_int = 0x00000020;
+    const SCF_ALT_FIRE: c_int = 0x00000040;
+    use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_USE, BUTTON_WALKING};
+
+    unsafe {
+        let world = &mut *ctx.world;
+        let npc_info = world.globals.NPCInfo;
+        let scriptFlags = (*npc_info).scriptFlags;
+        let level_time = world.level.time;
+        let ucmd = &mut world.globals.ucmd;
+
+        if (scriptFlags & SCF_CROUCHED) != 0 {
+            if (*npc_info).charmedTime > level_time && (ucmd.forwardmove != 0 || ucmd.rightmove != 0) {
+                //ugh, if charmed and moving, ignore the crouched command
+            } else {
+                ucmd.upmove = -127;
+            }
+        }
+
+        if (scriptFlags & SCF_RUNNING) != 0 {
+            ucmd.buttons &= !BUTTON_WALKING;
+        } else if (scriptFlags & SCF_WALKING) != 0 {
+            if (*npc_info).charmedTime > level_time && (ucmd.forwardmove != 0 || ucmd.rightmove != 0) {
+                //ugh, if charmed and moving, ignore the walking command
+            } else {
+                ucmd.buttons |= BUTTON_WALKING;
+            }
+        }
+
+        if (scriptFlags & SCF_LEAN_RIGHT) != 0 {
+            ucmd.buttons |= BUTTON_USE;
+            ucmd.rightmove = 127;
+            ucmd.forwardmove = 0;
+            ucmd.upmove = 0;
+        } else if (scriptFlags & SCF_LEAN_LEFT) != 0 {
+            ucmd.buttons |= BUTTON_USE;
+            ucmd.rightmove = -127;
+            ucmd.forwardmove = 0;
+            ucmd.upmove = 0;
+        }
+
+        if (scriptFlags & SCF_ALT_FIRE) != 0 && (ucmd.buttons & BUTTON_ATTACK) != 0 {
+            //Use altfire instead
+            ucmd.buttons |= BUTTON_ALT_ATTACK;
+        }
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
@@ -206,7 +772,54 @@ pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:738-833`
 pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
-    todo!("Port NPC_HandleAIFlags — parked: raw-ptr-skeleton-no-world-handle")
+    // Raven `b_public.h:17`: `#define NPCAI_LOST 0x00002000`.
+    const NPCAI_LOST: c_int = 0x00002000;
+    use mp_bg::public::entity_event::entity_event_t;
+
+    unsafe {
+        let world = &mut *ctx.world;
+        let npc_ent = world.globals.NPC;
+        let npc_info = world.globals.NPCInfo;
+
+        //FIXME: make these flags checks a function call like NPC_CheckAIFlagsAndTimers
+        if ((*npc_info).aiFlags & NPCAI_LOST) != 0 {
+            //Print that you need help!
+            //FIXME: shouldn't remove this just yet if cg_draw needs it
+            (*npc_info).aiFlags &= !NPCAI_LOST;
+
+            if !(*npc_info).goalEntity.is_null() && (*npc_info).goalEntity == (*npc_ent).enemy {
+                //We can't nav to our enemy
+                //Drop enemy and see if we should search for him
+                crate::NPC_AI_Default::NPC_LostEnemyDecideChase(ctx);
+            }
+        }
+
+        //MRJ Request: greet-allies block is `/* ... */`'d out upstream — dead code, not ported.
+
+        //been told to play a victory sound after a delay
+        if (*npc_info).greetingDebounceTime != 0 && (*npc_info).greetingDebounceTime < world.level.time {
+            let ev = crate::q_math::Q_irand(
+                entity_event_t::EV_VICTORY1 as c_int,
+                entity_event_t::EV_VICTORY3 as c_int,
+            );
+            let debounce = crate::q_math::Q_irand(2000, 4000);
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, npc_ent, ev, debounce);
+            (*npc_info).greetingDebounceTime = 0;
+        }
+
+        if (*npc_info).ffireCount > 0 && (*npc_info).ffireFadeDebounce < world.level.time {
+            (*npc_info).ffireCount -= 1;
+            //Com_Printf( "drop: %d < %d\n", NPCInfo->ffireCount, 3+((2-g_spskill.integer)*2) );
+            (*npc_info).ffireFadeDebounce = world.level.time + 3000;
+        }
+        if world.cvars.d_patched.integer != 0 {
+            //use patch-style navigation
+            if (*npc_info).consecutiveBlockedMoves > 20 {
+                //been stuck for a while, try again?
+                (*npc_info).consecutiveBlockedMoves = 0;
+            }
+        }
+    }
 }
 
 /// Raven `NPC_AvoidWallsAndCliffs`.
@@ -223,7 +836,15 @@ pub fn NPC_AvoidWallsAndCliffs() {}
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:840-848`
 pub fn NPC_CheckAttackScript(ctx: GameContext<'_>) {
-    todo!("Port NPC_CheckAttackScript — parked: raw-ptr-skeleton-no-world-handle")
+    use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_ATTACK;
+
+    unsafe {
+        let world = &mut *ctx.world;
+        if (world.globals.ucmd.buttons & BUTTON_ATTACK) == 0 {
+            return;
+        }
+        crate::NPC_utils::G_ActivateBehavior(ctx, world.globals.NPC, bSet_t::BSET_ATTACK as c_int);
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
@@ -233,7 +854,38 @@ pub fn NPC_CheckAttackScript(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:851-913`
 pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
-    todo!("Port NPC_CheckAttackHold — parked: raw-ptr-skeleton-no-world-handle")
+    use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_ATTACK;
+
+    unsafe {
+        let world = &mut *ctx.world;
+        let npc_ent = world.globals.NPC;
+        let npc_info = world.globals.NPCInfo;
+
+        // If they don't have an enemy they shouldn't hold their attack anim.
+        if (*npc_ent).enemy.is_null() {
+            (*npc_info).attackHoldTime = 0;
+            return;
+        }
+
+        // Raven's borg-specific `/* ... */`'d branch is dead code upstream —
+        // only the live `else` block (everyone else) runs.
+        let enemy_origin = (*(*npc_ent).enemy).r.currentOrigin;
+        let self_origin = (*npc_ent).r.currentOrigin;
+        let vec: vec3_t = [
+            enemy_origin[0] - self_origin[0],
+            enemy_origin[1] - self_origin[1],
+            enemy_origin[2] - self_origin[2],
+        ];
+        if crate::NPC_AI_MineMonster::VectorLengthSquared(vec) > crate::NPC_combat::NPC_MaxDistSquaredForWeapon(ctx) {
+            (*npc_info).attackHoldTime = 0;
+        } else if (*npc_info).attackHoldTime != 0 && (*npc_info).attackHoldTime > world.level.time {
+            world.globals.ucmd.buttons |= BUTTON_ATTACK;
+        } else if (*npc_info).attackHold != 0 && (world.globals.ucmd.buttons & BUTTON_ATTACK) != 0 {
+            (*npc_info).attackHoldTime = world.level.time + (*npc_info).attackHold;
+        } else {
+            (*npc_info).attackHoldTime = 0;
+        }
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
@@ -243,7 +895,25 @@ pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:920-931`
 pub fn NPC_KeepCurrentFacing(ctx: GameContext<'_>) {
-    todo!("Port NPC_KeepCurrentFacing — parked: raw-ptr-skeleton-no-world-handle")
+    const PITCH: usize = 0;
+    const YAW: usize = 1;
+
+    unsafe {
+        let world = &mut *ctx.world;
+        let client = world.globals.client;
+        let ucmd = &mut world.globals.ucmd;
+
+        if ucmd.angles[YAW] == 0 {
+            // Raven `ANGLE2SHORT(x)` == `((int)((x)*65536/360) & 65535)`.
+            let angle2short = |x: f32| -> c_int { ((x * 65536.0 / 360.0) as c_int) & 65535 };
+            ucmd.angles[YAW] = angle2short((*client).ps.viewangles[YAW]) - (*client).ps.delta_angles[YAW];
+        }
+
+        if ucmd.angles[PITCH] == 0 {
+            let angle2short = |x: f32| -> c_int { ((x * 65536.0 / 360.0) as c_int) & 65535 };
+            ucmd.angles[PITCH] = angle2short((*client).ps.viewangles[PITCH]) - (*client).ps.delta_angles[PITCH];
+        }
+    }
 }
 
 /// Raven `NPC_BehaviorSet_Charmed`.
@@ -605,7 +1275,163 @@ pub fn NPC_RunBehavior(
     team: c_int,
     bState: c_int,
 ) {
-    todo!("Port NPC_RunBehavior — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let world = &mut *ctx.world;
+        let npc_ent = world.globals.NPC;
+        let npc_info = world.globals.NPCInfo;
+        let client = (*npc_ent).client as *mut gclient_t;
+
+        if (*npc_ent).s.NPC_class == class_t::CLASS_VEHICLE as c_int && !(*npc_ent).m_pVehicle.is_null() {
+            //vehicles don't do AI!
+            return;
+        }
+
+        if bState == bState_t::BS_CINEMATIC as c_int {
+            crate::NPC_behavior::NPC_BSCinematic(ctx);
+        } else if (*client).ps.weapon == WP_EMPLACED_GUN {
+            crate::NPC_behavior::NPC_BSEmplaced(ctx);
+            crate::NPC_utils::NPC_CheckCharmed(ctx);
+            return;
+        } else if (*client).ps.weapon == WP_SABER {
+            //jedi
+            NPC_BehaviorSet_Jedi(ctx, bState);
+        } else if (*client).NPC_class == class_t::CLASS_WAMPA {
+            //wampa
+            crate::NPC_AI_Wampa::NPC_BSWampa_Default(ctx);
+        } else if (*client).NPC_class == class_t::CLASS_RANCOR {
+            //rancor
+            NPC_BehaviorSet_Rancor(ctx, bState);
+        } else if (*client).NPC_class == class_t::CLASS_REMOTE {
+            NPC_BehaviorSet_Remote(ctx, bState);
+        } else if (*client).NPC_class == class_t::CLASS_SEEKER {
+            NPC_BehaviorSet_Seeker(ctx, bState);
+        } else if (*client).NPC_class == class_t::CLASS_BOBAFETT {
+            //bounty hunter
+            if crate::NPC_AI_Jedi::Boba_Flying(npc_ent) != 0 {
+                NPC_BehaviorSet_Seeker(ctx, bState);
+            } else {
+                NPC_BehaviorSet_Jedi(ctx, bState);
+            }
+        } else if ((*npc_info).scriptFlags & 0x00010000) != 0 {
+            //being forced to march (SCF_FORCED_MARCH)
+            crate::NPC_AI_Default::NPC_BSDefault(ctx);
+        } else {
+            match team {
+                x if x == crate::teams::npcteam::NPCTEAM_ENEMY => {
+                    // special cases for enemy droids
+                    match (*client).NPC_class {
+                        class_t::CLASS_ATST => {
+                            NPC_BehaviorSet_ATST(ctx, bState);
+                            return;
+                        }
+                        class_t::CLASS_PROBE => {
+                            NPC_BehaviorSet_ImperialProbe(ctx, bState);
+                            return;
+                        }
+                        class_t::CLASS_REMOTE => {
+                            NPC_BehaviorSet_Remote(ctx, bState);
+                            return;
+                        }
+                        class_t::CLASS_SENTRY => {
+                            NPC_BehaviorSet_Sentry(ctx, bState);
+                            return;
+                        }
+                        class_t::CLASS_INTERROGATOR => {
+                            NPC_BehaviorSet_Interrogator(ctx, bState);
+                            return;
+                        }
+                        class_t::CLASS_MINEMONSTER => {
+                            NPC_BehaviorSet_MineMonster(ctx, bState);
+                            return;
+                        }
+                        class_t::CLASS_HOWLER => {
+                            NPC_BehaviorSet_Howler(ctx, bState);
+                            return;
+                        }
+                        class_t::CLASS_MARK1 => {
+                            NPC_BehaviorSet_Mark1(ctx, bState);
+                            return;
+                        }
+                        class_t::CLASS_MARK2 => {
+                            NPC_BehaviorSet_Mark2(ctx, bState);
+                            return;
+                        }
+                        class_t::CLASS_GALAKMECH => {
+                            crate::NPC_AI_GalakMech::NPC_BSGM_Default(ctx);
+                            return;
+                        }
+                        _ => {}
+                    }
+
+                    if !(*npc_ent).enemy.is_null()
+                        && (*npc_ent).s.weapon == WP_NONE
+                        && bState != bState_t::BS_HUNT_AND_KILL as c_int
+                        && trap::ICARUS_TaskIDPending(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
+                                npc_ent,
+                                taskID_t::TID_MOVE_NAV as c_int,
+                            ),
+                        ) == 0
+                    {
+                        //if in battle and have no weapon, run away, fixme: when in BS_HUNT_AND_KILL, they just stand there
+                        if bState != bState_t::BS_FLEE as c_int {
+                            crate::NPC_behavior::NPC_StartFlee(ctx, (*npc_ent).enemy, (*(*npc_ent).enemy).r.currentOrigin, alertEventLevel_e::AEL_DANGER_GREAT as c_int, 5000, 10000);
+                        } else {
+                            crate::NPC_behavior::NPC_BSFlee(ctx);
+                        }
+                        return;
+                    }
+                    if (*client).ps.weapon == WP_SABER {
+                        //special melee exception
+                        NPC_BehaviorSet_Default(ctx, bState);
+                        return;
+                    }
+                    if (*client).ps.weapon == WP_DISRUPTOR && ((*npc_info).scriptFlags & 0x00000040) != 0 {
+                        //a sniper (SCF_ALT_FIRE)
+                        NPC_BehaviorSet_Sniper(ctx, bState);
+                        return;
+                    }
+                    if (*client).ps.weapon == WP_THERMAL || (*client).ps.weapon == WP_STUN_BATON {
+                        //a grenadier //FIXME: separate AI for melee fighters
+                        NPC_BehaviorSet_Grenadier(ctx, bState);
+                        return;
+                    }
+                    if crate::NPC_behavior::NPC_CheckSurrender(ctx) != 0 {
+                        return;
+                    }
+                    NPC_BehaviorSet_Stormtrooper(ctx, bState);
+                }
+                x if x == crate::teams::npcteam::NPCTEAM_NEUTRAL => {
+                    // special cases for enemy droids
+                    if (*client).NPC_class == class_t::CLASS_PROTOCOL
+                        || (*client).NPC_class == class_t::CLASS_UGNAUGHT
+                        || (*client).NPC_class == class_t::CLASS_JAWA
+                    {
+                        NPC_BehaviorSet_Default(ctx, bState);
+                    } else if (*client).NPC_class == class_t::CLASS_VEHICLE {
+                        // TODO: Add vehicle behaviors here.
+                        crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1); //just face our spawn angles for now
+                    } else {
+                        // Just one of the average droids
+                        NPC_BehaviorSet_Droid(ctx, bState);
+                    }
+                }
+                _ => {
+                    if (*client).NPC_class == class_t::CLASS_SEEKER {
+                        NPC_BehaviorSet_Seeker(ctx, bState);
+                    } else {
+                        if (*npc_info).charmedTime > world.level.time {
+                            NPC_BehaviorSet_Charmed(ctx, bState);
+                        } else {
+                            NPC_BehaviorSet_Default(ctx, bState);
+                        }
+                        crate::NPC_utils::NPC_CheckCharmed(ctx);
+                    }
+                }
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
@@ -618,7 +1444,128 @@ pub fn NPC_ExecuteBState(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port NPC_ExecuteBState — parked: raw-ptr-skeleton-no-world-handle")
+    use mp_bg::public::anim_number::animNumber_t;
+    use mp_bg::public::weaponstate::{WEAPON_IDLE, WEAPON_READY};
+    use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK};
+
+    unsafe {
+        let world = &mut *ctx.world;
+        let npc_ent = world.globals.NPC;
+        let npc_info = world.globals.NPCInfo;
+        let client = world.globals.client;
+
+        NPC_HandleAIFlags(ctx);
+
+        //FIXME: these next three bits could be a function call, some sort of setup/cleanup func
+        //Lookmode must be reset every think cycle
+        if (*npc_ent).delayScriptTime != 0 && (*npc_ent).delayScriptTime <= world.level.time {
+            crate::NPC_utils::G_ActivateBehavior(ctx, npc_ent, bSet_t::BSET_DELAYED as c_int);
+            (*npc_ent).delayScriptTime = 0;
+        }
+
+        //Clear this and let bState set it itself, so it automatically handles changing bStates... but we need a set bState wrapper func
+        (*npc_info).combatMove = 0;
+
+        //Execute our bState
+        let bState = if (*npc_info).tempBehavior as c_int != 0 {
+            //Overrides normal behavior until cleared
+            (*npc_info).tempBehavior
+        } else {
+            if (*npc_info).behaviorState as c_int == 0 {
+                (*npc_info).behaviorState = (*npc_info).defaultBehavior;
+            }
+            (*npc_info).behaviorState
+        };
+
+        //Pick the proper bstate for us and run it
+        NPC_RunBehavior(ctx, (*client).playerTeam as c_int, bState as c_int);
+
+        if !(*npc_ent).enemy.is_null() && (*(*npc_ent).enemy).inuse == 0 {
+            //just in case bState doesn't catch this
+            crate::NPC_combat::G_ClearEnemy(ctx, npc_ent);
+        }
+
+        if (*client).ps.saberLockTime != 0 && (*client).ps.saberLockEnemy != ENTITYNUM_NONE {
+            crate::NPC_utils::NPC_SetLookTarget(npc_ent, (*client).ps.saberLockEnemy, world.level.time + 1000);
+        } else if crate::NPC_utils::NPC_CheckLookTarget(ctx, npc_ent) == 0 {
+            if !(*npc_ent).enemy.is_null() {
+                crate::NPC_utils::NPC_SetLookTarget(npc_ent, (*(*npc_ent).enemy).s.number, 0);
+            }
+        }
+
+        if !(*npc_ent).enemy.is_null() {
+            let enemy = (*npc_ent).enemy;
+            if ((*enemy).flags & FL_DONT_SHOOT) != 0 {
+                world.globals.ucmd.buttons &= !BUTTON_ATTACK;
+                world.globals.ucmd.buttons &= !BUTTON_ALT_ATTACK;
+            } else if (*client).playerTeam != crate::teams::npcteam::NPCTEAM_ENEMY {
+                let enemy_npc = (*enemy).NPC as *mut gNPC_t;
+                if !enemy_npc.is_null()
+                    && ((*enemy_npc).surrenderTime > world.level.time || ((*enemy_npc).scriptFlags & 0x00010000) != 0)
+                {
+                    //don't shoot someone who's surrendering if you're a good guy (SCF_FORCED_MARCH)
+                    world.globals.ucmd.buttons &= !BUTTON_ATTACK;
+                    world.globals.ucmd.buttons &= !BUTTON_ALT_ATTACK;
+                }
+            }
+
+            if (*client).ps.weaponstate == WEAPON_IDLE as c_int {
+                (*client).ps.weaponstate = WEAPON_READY as c_int;
+            }
+        } else if (*client).ps.weaponstate == WEAPON_READY as c_int {
+            (*client).ps.weaponstate = WEAPON_IDLE as c_int;
+        }
+
+        if (world.globals.ucmd.buttons & BUTTON_ATTACK) == 0 && (*npc_ent).attackDebounceTime > world.level.time {
+            //We just shot but aren't still shooting, so hold the gun up for a while
+            if (*client).ps.weapon == WP_SABER {
+                //One-handed
+                NPC_SetAnim(npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONREADY1 as c_int, SETANIM_FLAG_NORMAL);
+            } else if (*client).ps.weapon == WP_BRYAR_PISTOL {
+                //Sniper pose
+                NPC_SetAnim(npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONREADY3 as c_int, SETANIM_FLAG_NORMAL);
+            }
+        } else if (*npc_ent).enemy.is_null() {
+            //HACK!
+            if (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY1 as c_int
+                || (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY3 as c_int
+            {
+                //we look ready for action, using one of the first 2 weapon, let's rest our weapon on our shoulder
+                NPC_SetAnim(npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONIDLE3 as c_int, SETANIM_FLAG_NORMAL);
+            }
+        }
+
+        NPC_CheckAttackHold(ctx);
+        NPC_ApplyScriptFlags(ctx);
+
+        //cliff and wall avoidance
+        NPC_AvoidWallsAndCliffs();
+
+        // run the bot through the server like it was a real client
+        //=== Save the ucmd for the second no-think Pmove ============================
+        world.globals.ucmd.serverTime = world.level.time - 50;
+        (*npc_info).last_ucmd = world.globals.ucmd;
+        if (*npc_info).attackHoldTime == 0 {
+            (*npc_info).last_ucmd.buttons &= !(BUTTON_ATTACK | BUTTON_ALT_ATTACK); //so we don't fire twice in one think
+        }
+        //============================================================================
+        NPC_CheckAttackScript(ctx);
+        NPC_KeepCurrentFacing(ctx);
+
+        if (*npc_ent).next_roff_time == 0 || (*npc_ent).next_roff_time < world.level.time {
+            //If we were following a roff, we don't do normal pmoves.
+            let mut ucmd = world.globals.ucmd;
+            crate::g_active::ClientThink(ctx, (*npc_ent).s.number, &mut ucmd as *mut usercmd_t);
+        } else {
+            crate::NPC_move::NPC_ApplyRoff(ctx);
+        }
+
+        // end of thinking cleanup
+        (*npc_info).touchedByPlayer = core::ptr::null_mut();
+
+        crate::NPC_reactions::NPC_CheckPlayerAim();
+        crate::NPC_reactions::NPC_CheckAllClear();
+    }
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
@@ -629,7 +1576,35 @@ pub fn NPC_ExecuteBState(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1764-1785`
 pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
-    todo!("Port NPC_CheckInSolid — parked: raw-ptr-skeleton-no-world-handle")
+    unsafe {
+        let world = &mut *ctx.world;
+        let npc_ent = world.globals.NPC;
+        let npc_info = world.globals.NPCInfo;
+
+        let mut point = (*npc_ent).r.currentOrigin;
+        point[2] -= 0.25;
+
+        let mut trace: trace_t = core::mem::zeroed();
+        trap::Trace(
+            ctx.engine,
+            mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                &mut trace as *mut trace_t,
+                &(*npc_ent).r.currentOrigin as *const vec3_t,
+                &(*npc_ent).r.mins as *const vec3_t,
+                &(*npc_ent).r.maxs as *const vec3_t,
+                &point as *const vec3_t,
+                (*npc_ent).s.number,
+                (*npc_ent).clipmask,
+            ),
+        );
+        if trace.startsolid == 0 && trace.allsolid == 0 {
+            (*npc_info).lastClearOrigin = (*npc_ent).r.currentOrigin;
+        } else if crate::NPC_AI_MineMonster::VectorLengthSquared((*npc_info).lastClearOrigin) != 0.0 {
+            //			Com_Printf("%s stuck in solid at %s: fixing...\n", NPC->script_targetname, vtos(NPC->r.currentOrigin));
+            crate::g_utils::G_SetOrigin(npc_ent, (*npc_info).lastClearOrigin);
+            trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_ent));
+        }
+    }
 }
 
 // PORT-ESCALATION(va-variadic-seam): every branch formats a sound path
@@ -658,7 +1633,148 @@ pub fn NPC_Think(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port NPC_Think — parked: raw-ptr-skeleton-no-world-handle")
+    const FRAMETIME: c_int = 100;
+    // Raven `w_force.rs:98` precedent — `playerState_t::pm_flags` bit, not yet
+    // centrally ported.
+    const PMF_FOLLOW: c_int = 4096;
+    // Raven `ai.h:36` `rank_e`: CIVILIAN=0, CREWMAN=1, ENSIGN=2, LT_JG=3
+    // (`NPC_stats.rs:51` precedent comment).
+    const RANK_LT_JG: c_int = 3;
+    use mp_bg::vehicles::vehicle_s::Vehicle_t;
+
+    unsafe {
+        let world = &mut *ctx.world;
+        (*self_).nextthink = world.level.time + FRAMETIME;
+
+        SetNPCGlobals(ctx, self_);
+
+        world.globals.ucmd = usercmd_t::default();
+
+        // Raven reads `self->client->ps.moveDir` unconditionally before the
+        // null check below (`self->client` is always valid by the time
+        // `NPC_Think` is wired as an entity think — matching the oracle's
+        // implicit non-null assumption here).
+        let client = (*self_).client as *mut gclient_t;
+        let oldMoveDir = (*client).ps.moveDir;
+        if (*self_).s.NPC_class != class_t::CLASS_VEHICLE as c_int {
+            //YOU ARE BREAKING MY PREDICTION. Bad clear.
+            (*client).ps.moveDir = VEC3_ORIGIN;
+        }
+
+        if self_.is_null() || (*self_).NPC.is_null() || (*self_).client.is_null() {
+            return;
+        }
+
+        let npc = (*self_).NPC as *mut gNPC_t;
+
+        // dead NPCs have a special think, don't run scripts (for now)
+        //FIXME: this breaks deathscripts
+        if (*self_).health <= 0 {
+            DeadThink(ctx);
+            if (*npc).nextBStateThink <= world.level.time {
+                trap::ICARUS_MaintainTaskManager(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*self_).s.number),
+                );
+            }
+            (*client).ps.origin = (*self_).r.currentOrigin;
+            return;
+        }
+
+        // see if NPC ai is frozen
+        // Raven `svFlags` bit `SVF_ICARUS_FREEZE` (`g_local.h`) — not yet
+        // centrally ported; local const per the codebase's per-file precedent.
+        const SVF_ICARUS_FREEZE: c_int = 0x00000400;
+        if world.cvars.debugNPCFreeze.value != 0.0 || ((*self_).r.svFlags & SVF_ICARUS_FREEZE) != 0 {
+            crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1);
+            let mut ucmd = world.globals.ucmd;
+            crate::g_active::ClientThink(ctx, (*self_).s.number, &mut ucmd as *mut usercmd_t);
+            (*client).ps.origin = (*self_).r.currentOrigin;
+            return;
+        }
+
+        (*self_).nextthink = world.level.time + FRAMETIME / 2;
+
+        for i in 0..MAX_CLIENTS {
+            let player = world.entities.as_mut_ptr().add(i as usize);
+            if (*player).inuse != 0
+                && !(*player).client.is_null()
+                && (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
+                && (((*((*player).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW) == 0)
+            {
+                // Raven `if (0) //rwwFIXMEFIXME: Allow controlling ents` — this
+                // whole arm is dead in the shipped oracle (condition always
+                // false); dropped per porting-rules §20 (preserve emergent
+                // quirks, drop dead surface) with this note.
+            }
+        }
+
+        if (*client).NPC_class == class_t::CLASS_VEHICLE {
+            if (*client).ps.m_iVehicleNum != 0 {
+                //we don't think on our own
+                //well, run scripts, though...
+                trap::ICARUS_MaintainTaskManager(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*self_).s.number),
+                );
+                return;
+            } else {
+                (*client).ps.moveDir = VEC3_ORIGIN;
+                (*client).pers.cmd.forwardmove = 0;
+                (*client).pers.cmd.rightmove = 0;
+                (*client).pers.cmd.upmove = 0;
+                (*client).pers.cmd.buttons = 0;
+                if !(*self_).m_pVehicle.is_null() {
+                    (*((*self_).m_pVehicle as *mut Vehicle_t)).m_ucmd = (*client).pers.cmd;
+                }
+            }
+        } else if (*self_).s.m_iVehicleNum != 0 {
+            //droid in a vehicle?
+            G_DroidSounds(ctx, self_);
+        }
+
+        if (*npc).nextBStateThink <= world.level.time && (*self_).s.m_iVehicleNum == 0 {
+            //NPCs sitting in Vehicles do NOTHING
+            if (*self_).s.eType != entityType_t::ET_NPC as c_int {
+                //Something drastic happened in our script
+                return;
+            }
+
+            if (*self_).s.weapon == WP_SABER && world.cvars.g_spskill.integer >= 2 && (*npc).rank > RANK_LT_JG {
+                //Jedi think faster on hard difficulty, except low-rank (reborn)
+                (*npc).nextBStateThink = world.level.time + FRAMETIME / 2;
+            } else {
+                //Maybe even 200 ms?
+                (*npc).nextBStateThink = world.level.time + FRAMETIME;
+            }
+
+            //nextthink is set before this so something in here can override it
+            if (*self_).s.NPC_class != class_t::CLASS_VEHICLE as c_int || (*self_).m_pVehicle.is_null() {
+                //ok, let's not do this at all for vehicles.
+                NPC_ExecuteBState(ctx, self_);
+            }
+        } else {
+            (*client).ps.moveDir = oldMoveDir;
+            //or use client->pers.lastCommand?
+            (*npc).last_ucmd.serverTime = world.level.time - 50;
+            if (*self_).next_roff_time == 0 || (*self_).next_roff_time < world.level.time {
+                //If we were following a roff, we don't do normal pmoves.
+                //FIXME: firing angles (no aim offset) or regular angles?
+                crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1);
+                world.globals.ucmd = (*npc).last_ucmd;
+                let mut ucmd = world.globals.ucmd;
+                crate::g_active::ClientThink(ctx, (*self_).s.number, &mut ucmd as *mut usercmd_t);
+            } else {
+                crate::NPC_move::NPC_ApplyRoff(ctx);
+            }
+        }
+        //must update icarus *every* frame because of certain animation completions in the pmove stuff that can leave a 50ms gap between ICARUS animation commands
+        trap::ICARUS_MaintainTaskManager(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*self_).s.number),
+        );
+        (*client).ps.origin = (*self_).r.currentOrigin;
+    }
 }
 
 /// Raven `NPC_InitAI`.

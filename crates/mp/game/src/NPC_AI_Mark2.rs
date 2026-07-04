@@ -49,7 +49,7 @@ const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 /// Extract a vector from a bolt matrix based on flags.
 /// Source: `oracle/oracle/codemp/game/bg_public.h:1524-1564`
 #[inline]
-fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, vec: &mut vec3_t) {
+pub fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, vec: &mut vec3_t) {
     // `flags` (the faithful C `int`) is matched against `Eorientations`
     // (`q_shared.h:3086-3095`); local `c_int`-typed aliases let the match
     // patterns below compare directly against the scrutinee's type.

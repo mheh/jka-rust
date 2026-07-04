@@ -23,6 +23,14 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use std::ffi::CString;
+
+use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
+use crate::client::spectator_state::spectatorState_t::{SPECTATOR_FOLLOW, SPECTATOR_SCOREBOARD};
+use crate::g_cmds::{DeathmatchScoreboardMessage, SetTeam, StopFollowing};
+use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_FREE, DUELTEAM_LONE};
+use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
+use mp_qshared::shared::MAX_CLIENTS;
 
 // The QVM entry (`vmMain`) and `G_InitGame` / `G_ShutdownGame` are the
 // slice-0 live code, kept as-is: `vmMain` is the shell + the
@@ -169,29 +177,82 @@ pub fn Com_Printf(
     todo!("Port Com_Printf — parked (variadic-c-abi): oracle/oracle/codemp/game/g_main.c:1219")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`
-// building the tournament queue (`level.sortedClients`); the zero-param
-// skeleton signature has no GameWorld handle to reach `level`/`g_clients`
-// through.
 /// Raven `AddTournamentPlayer`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1248-1295`
 pub fn AddTournamentPlayer(ctx: GameContext<'_>) {
-    todo!("Port AddTournamentPlayer — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1248")
+    unsafe {
+        if (*ctx.world).level.numPlayingClients >= 2 {
+            return;
+        }
+
+        let mut next_in_line: *mut gclient_t = std::ptr::null_mut();
+        let maxclients = (*ctx.world).level.maxclients;
+        let clients = (*ctx.world).clients.as_mut_ptr();
+        let mut i: c_int = 0;
+        while i < maxclients {
+            let client = clients.add(i as usize);
+            if (*client).pers.connected != CON_CONNECTED {
+                i += 1;
+                continue;
+            }
+            if (*ctx.world).cvars.g_allowHighPingDuelist.integer == 0 && (*client).ps.ping >= 999 {
+                // don't add people who are lagging out if cvar is not set to allow it.
+                i += 1;
+                continue;
+            }
+            if (*client).sess.sessionTeam != TEAM_SPECTATOR {
+                i += 1;
+                continue;
+            }
+            // never select the dedicated follow or scoreboard clients
+            if (*client).sess.spectatorState == SPECTATOR_SCOREBOARD || (*client).sess.spectatorClient < 0 {
+                i += 1;
+                continue;
+            }
+
+            if next_in_line.is_null() || (*client).sess.spectatorTime < (*next_in_line).sess.spectatorTime {
+                next_in_line = client;
+            }
+            i += 1;
+        }
+
+        if next_in_line.is_null() {
+            return;
+        }
+
+        (*ctx.world).level.warmupTime = -1;
+
+        // set them to free-for-all team
+        let idx = next_in_line.offset_from(clients) as usize;
+        let ent = (*ctx.world).entities.as_mut_ptr().add(idx);
+        let s = CString::new("f").unwrap();
+        SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): same as
-// AddTournamentPlayer — walks `level.clients`/`SetTeam` with no world handle.
 /// Raven `RemoveTournamentLoser`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1304-1319`
 pub fn RemoveTournamentLoser(ctx: GameContext<'_>) {
-    todo!("Port RemoveTournamentLoser — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1304")
+    unsafe {
+        if (*ctx.world).level.numPlayingClients != 2 {
+            return;
+        }
+
+        let clientNum = (*ctx.world).level.sortedClients[1];
+
+        if (*ctx.world).clients[clientNum as usize].pers.connected != CON_CONNECTED {
+            return;
+        }
+
+        // make them a spectator
+        let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+        let s = CString::new("s").unwrap();
+        SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`
-// counting power-duel participants; out-params are fine (`*mut c_int`) but
-// there is no GameWorld handle to reach `level` through.
 /// Raven `G_PowerDuelCount`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1321-1343`
@@ -201,60 +262,247 @@ pub fn G_PowerDuelCount(
     doubles: *mut c_int,
     countSpec: qboolean,
 ) {
-    todo!("Port G_PowerDuelCount — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1321")
+    unsafe {
+        let mut i: c_int = 0;
+        while (i as usize) < MAX_CLIENTS {
+            let ent = (*ctx.world).entities.as_mut_ptr().add(i as usize);
+            let cl = (*ent).client as *mut gclient_t;
+
+            if (*ent).inuse != QFALSE
+                && !cl.is_null()
+                && (countSpec != QFALSE || (*cl).sess.sessionTeam != TEAM_SPECTATOR)
+            {
+                if (*cl).sess.duelTeam == DUELTEAM_LONE as c_int {
+                    *loners += 1;
+                } else if (*cl).sess.duelTeam == DUELTEAM_DOUBLE as c_int {
+                    *doubles += 1;
+                }
+            }
+            i += 1;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`
-// building power-duel pairs; no world handle.
 /// Raven `AddPowerDuelPlayers`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1346-1425`
 pub fn AddPowerDuelPlayers(ctx: GameContext<'_>) {
-    todo!("Port AddPowerDuelPlayers — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1346")
+    unsafe {
+        if (*ctx.world).level.numPlayingClients >= 3 {
+            return;
+        }
+
+        let mut next_in_line: *mut gclient_t = std::ptr::null_mut();
+
+        let mut nonspec_loners: c_int = 0;
+        let mut nonspec_doubles: c_int = 0;
+        G_PowerDuelCount(ctx, &mut nonspec_loners, &mut nonspec_doubles, QFALSE);
+        if nonspec_loners >= 1 && nonspec_doubles >= 2 {
+            // we have enough people, stop
+            return;
+        }
+
+        // Could be written faster, but it's not enough to care I suppose.
+        let mut loners: c_int = 0;
+        let mut doubles: c_int = 0;
+        G_PowerDuelCount(ctx, &mut loners, &mut doubles, QTRUE);
+
+        if loners < 1 || doubles < 2 {
+            // don't bother trying to spawn anyone yet if the balance is not
+            // even set up between spectators
+            return;
+        }
+
+        // Count again, with only in-game clients in mind.
+        loners = nonspec_loners;
+        doubles = nonspec_doubles;
+
+        let maxclients = (*ctx.world).level.maxclients;
+        let clients = (*ctx.world).clients.as_mut_ptr();
+        let mut i: c_int = 0;
+        while i < maxclients {
+            let client = clients.add(i as usize);
+            if (*client).pers.connected != CON_CONNECTED {
+                i += 1;
+                continue;
+            }
+            if (*client).sess.sessionTeam != TEAM_SPECTATOR {
+                i += 1;
+                continue;
+            }
+            if (*client).sess.duelTeam == DUELTEAM_FREE as c_int {
+                i += 1;
+                continue;
+            }
+            if (*client).sess.duelTeam == DUELTEAM_LONE as c_int && loners >= 1 {
+                i += 1;
+                continue;
+            }
+            if (*client).sess.duelTeam == DUELTEAM_DOUBLE as c_int && doubles >= 2 {
+                i += 1;
+                continue;
+            }
+
+            // never select the dedicated follow or scoreboard clients
+            if (*client).sess.spectatorState == SPECTATOR_SCOREBOARD || (*client).sess.spectatorClient < 0 {
+                i += 1;
+                continue;
+            }
+
+            if next_in_line.is_null() || (*client).sess.spectatorTime < (*next_in_line).sess.spectatorTime {
+                next_in_line = client;
+            }
+            i += 1;
+        }
+
+        if next_in_line.is_null() {
+            return;
+        }
+
+        (*ctx.world).level.warmupTime = -1;
+
+        // set them to free-for-all team
+        let idx = next_in_line.offset_from(clients) as usize;
+        let ent = (*ctx.world).entities.as_mut_ptr().add(idx);
+        let s = CString::new("f").unwrap();
+        SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+
+        // Call recursively until everyone is in
+        AddPowerDuelPlayers(ctx);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`; no
-// world handle.
 /// Raven `RemovePowerDuelLosers`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1429-1471`
 pub fn RemovePowerDuelLosers(ctx: GameContext<'_>) {
-    todo!("Port RemovePowerDuelLosers — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1429")
+    unsafe {
+        let mut remClients: [c_int; 3] = [0; 3];
+        let mut remNum: usize = 0;
+        let mut i: usize = 0;
+        let clients = (*ctx.world).clients.as_mut_ptr();
+
+        while i < MAX_CLIENTS && remNum < 3 {
+            let cl = clients.add(i);
+
+            if (*cl).pers.connected == CON_CONNECTED
+                && ((*cl).ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0 || (*cl).iAmALoser != QFALSE)
+                && ((*cl).sess.sessionTeam != TEAM_SPECTATOR || (*cl).iAmALoser != QFALSE)
+            {
+                // he was dead or he was spectating as a loser
+                remClients[remNum] = (*cl).ps.clientNum;
+                remNum += 1;
+            }
+
+            i += 1;
+        }
+
+        if remNum == 0 {
+            // Time ran out or something? Oh well, just remove the main guy.
+            remClients[remNum] = (*ctx.world).level.sortedClients[0];
+            remNum += 1;
+        }
+
+        let mut j = 0;
+        while j < remNum {
+            // set them all to spectator
+            let ent = (*ctx.world).entities.as_mut_ptr().add(remClients[j] as usize);
+            let s = CString::new("s").unwrap();
+            SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+            j += 1;
+        }
+
+        (*ctx.world).globals.g_dontFrickinCheck = QFALSE;
+
+        // recalculate stuff now that we have reset teams.
+        CalculateRanks(ctx);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`; no
-// world handle.
 /// Raven `RemoveDuelDrawLoser`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1473-1512`
 pub fn RemoveDuelDrawLoser(ctx: GameContext<'_>) {
-    todo!("Port RemoveDuelDrawLoser — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1473")
+    unsafe {
+        let sorted0 = (*ctx.world).level.sortedClients[0];
+        let sorted1 = (*ctx.world).level.sortedClients[1];
+
+        if (*ctx.world).clients[sorted0 as usize].pers.connected != CON_CONNECTED {
+            return;
+        }
+        if (*ctx.world).clients[sorted1 as usize].pers.connected != CON_CONNECTED {
+            return;
+        }
+
+        let cl_first = (*ctx.world).clients[sorted0 as usize].ps.stats[statIndex_t::STAT_HEALTH as usize]
+            + (*ctx.world).clients[sorted0 as usize].ps.stats[statIndex_t::STAT_ARMOR as usize];
+        let cl_sec = (*ctx.world).clients[sorted1 as usize].ps.stats[statIndex_t::STAT_HEALTH as usize]
+            + (*ctx.world).clients[sorted1 as usize].ps.stats[statIndex_t::STAT_ARMOR as usize];
+
+        let cl_failure: c_int;
+        if cl_first > cl_sec {
+            cl_failure = 1;
+        } else if cl_sec > cl_first {
+            cl_failure = 0;
+        } else {
+            cl_failure = 2;
+        }
+
+        let s = CString::new("s").unwrap();
+        if cl_failure != 2 {
+            let clientNum = (*ctx.world).level.sortedClients[cl_failure as usize];
+            let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+            SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+        } else {
+            // we could be more elegant about this, but oh well.
+            let clientNum = (*ctx.world).level.sortedClients[1];
+            let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+            SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`; no
-// world handle.
 /// Raven `RemoveTournamentWinner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1519-1534`
 pub fn RemoveTournamentWinner(ctx: GameContext<'_>) {
-    todo!("Port RemoveTournamentWinner — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1519")
+    unsafe {
+        if (*ctx.world).level.numPlayingClients != 2 {
+            return;
+        }
+
+        let clientNum = (*ctx.world).level.sortedClients[0];
+
+        if (*ctx.world).clients[clientNum as usize].pers.connected != CON_CONNECTED {
+            return;
+        }
+
+        // make them a spectator
+        let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+        let s = CString::new("s").unwrap();
+        SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`
-// adjusting tournament scores; no world handle.
+// PORT-ESCALATION(unported-dep): calls `ClientUserinfoChanged` (no ported
+// definition anywhere in the crate — g_client.c is not yet a landed module)
+// and writes `CS_CLIENT_DUELWINNER` through `trap_SetConfigstring`, but the
+// `CS_*` configstring-index constants (`bg_public.h`) have no ported table —
+// fabricating either would be inventing behavior (porting-rules §A2/unported
+// markers).
 /// Raven `AdjustTournamentScores`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1541-1616`
 pub fn AdjustTournamentScores(ctx: GameContext<'_>) {
-    todo!("Port AdjustTournamentScores — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1541")
+    todo!("Port AdjustTournamentScores — parked (unported-dep: ClientUserinfoChanged, CS_CLIENT_DUELWINNER): oracle/oracle/codemp/game/g_main.c:1541")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): qsort comparator over
-// `level.clients` reached through opaque `*const c_void` indices; needs
-// `level` to resolve the comparison and there is no world handle in scope
-// (also fn-pointer-param: this is the qsort callback itself, address-compared
-// / registered as a C function pointer, which the trait-table ruling doesn't
-// cover for bare comparator callbacks).
+// PORT-ESCALATION(qsort-fn-pointer-registration): the *body* below is fully
+// ported; the remaining open question is `CalculateRanks`' `qsort(...,
+// SortRanks)` registration itself — a bare C comparator callback, which the
+// fork-2 `EntThink`/… trait-table ruling doesn't cover (that's an
+// entity-fn-pointer-field ruling, not a qsort-callback one). `CalculateRanks`
+// is separately parked; this fn is portable standalone.
 /// Raven `SortRanks`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1624-1689`
@@ -263,49 +511,139 @@ pub fn SortRanks(
     a: *const c_void,
     b: *const c_void,
 ) -> c_int {
-    todo!("Port SortRanks — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1624")
+    unsafe {
+        let ia = *(a as *const c_int);
+        let ib = *(b as *const c_int);
+        let ca = (*ctx.world).clients.as_mut_ptr().add(ia as usize);
+        let cb = (*ctx.world).clients.as_mut_ptr().add(ib as usize);
+
+        if (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL {
+            // sort single duelists first
+            if (*ca).sess.duelTeam == DUELTEAM_LONE as c_int && (*ca).sess.sessionTeam != TEAM_SPECTATOR {
+                return -1;
+            }
+            if (*cb).sess.duelTeam == DUELTEAM_LONE as c_int && (*cb).sess.sessionTeam != TEAM_SPECTATOR {
+                return 1;
+            }
+            // others will be auto-sorted below but above spectators.
+        }
+
+        // sort special clients last
+        if (*ca).sess.spectatorState == SPECTATOR_SCOREBOARD || (*ca).sess.spectatorClient < 0 {
+            return 1;
+        }
+        if (*cb).sess.spectatorState == SPECTATOR_SCOREBOARD || (*cb).sess.spectatorClient < 0 {
+            return -1;
+        }
+
+        // then connecting clients
+        if (*ca).pers.connected == CON_CONNECTING {
+            return 1;
+        }
+        if (*cb).pers.connected == CON_CONNECTING {
+            return -1;
+        }
+
+        // then spectators
+        if (*ca).sess.sessionTeam == TEAM_SPECTATOR && (*cb).sess.sessionTeam == TEAM_SPECTATOR {
+            if (*ca).sess.spectatorTime < (*cb).sess.spectatorTime {
+                return -1;
+            }
+            if (*ca).sess.spectatorTime > (*cb).sess.spectatorTime {
+                return 1;
+            }
+            return 0;
+        }
+        if (*ca).sess.sessionTeam == TEAM_SPECTATOR {
+            return 1;
+        }
+        if (*cb).sess.sessionTeam == TEAM_SPECTATOR {
+            return -1;
+        }
+
+        // then sort by score
+        if (*ca).ps.persistant[persEnum_t::PERS_SCORE as usize]
+            > (*cb).ps.persistant[persEnum_t::PERS_SCORE as usize]
+        {
+            return -1;
+        }
+        if (*ca).ps.persistant[persEnum_t::PERS_SCORE as usize]
+            < (*cb).ps.persistant[persEnum_t::PERS_SCORE as usize]
+        {
+            return 1;
+        }
+        0
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.clients`; no
-// world handle.
 /// Raven `G_CanResetDuelists`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1695-1715`
 pub fn G_CanResetDuelists(ctx: GameContext<'_>) -> qboolean {
-    todo!("Port G_CanResetDuelists — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1695")
+    unsafe {
+        let mut i: usize = 0;
+        while i < 3 {
+            // precheck to make sure they are all respawnable
+            let clientNum = (*ctx.world).level.sortedClients[i];
+            let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+            let cl = (*ent).client as *mut gclient_t;
+
+            if (*ent).inuse == QFALSE
+                || cl.is_null()
+                || (*ent).health <= 0
+                || (*cl).sess.sessionTeam == TEAM_SPECTATOR
+                || (*cl).sess.duelTeam <= DUELTEAM_FREE as c_int
+            {
+                return QFALSE;
+            }
+            i += 1;
+        }
+
+        QTRUE
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `g_entities`/
-// `level.clients`; no world handle.
+// PORT-ESCALATION(unported-dep): `ClientSpawn` has no ported definition
+// anywhere in the crate (g_client.c is not yet a landed module) — the fn
+// cannot be transcribed without inventing that call.
 /// Raven `G_ResetDuelists`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1718-1740`
 pub fn G_ResetDuelists(ctx: GameContext<'_>) {
-    todo!("Port G_ResetDuelists — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1718")
+    todo!("Port G_ResetDuelists — parked (unported-dep: ClientSpawn): oracle/oracle/codemp/game/g_main.c:1718")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): the central ranking pass
-// over `level.clients`/`g_entities`, plus the `qsort`/`SortRanks` fn-pointer
-// dependency above; no world handle.
+// PORT-ESCALATION(unported-const): needs the `CS_SCORES1`/`CS_SCORES2`/
+// `CS_CLIENT_DUELWINNER`/`SCORE_NOT_PRESENT` configstring-index constants
+// (`bg_public.h`) — no ported table anywhere in the crate — plus
+// `qsort(level.sortedClients, …, SortRanks)`'s bare-comparator registration
+// (SortRanks itself is fully ported above). Fabricating the CS_* indices
+// would be inventing behavior (porting-rules §A2).
 /// Raven `CalculateRanks`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1751-1906`
 pub fn CalculateRanks(ctx: GameContext<'_>) {
-    todo!("Port CalculateRanks — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1751")
+    todo!("Port CalculateRanks — parked (unported-const: CS_SCORES1/2, CS_CLIENT_DUELWINNER, SCORE_NOT_PRESENT; qsort registration): oracle/oracle/codemp/game/g_main.c:1751")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`; no
-// world handle.
 /// Raven `SendScoreboardMessageToAllClients`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1925-1933`
 pub fn SendScoreboardMessageToAllClients(ctx: GameContext<'_>) {
-    todo!("Port SendScoreboardMessageToAllClients — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1925")
+    unsafe {
+        let maxclients = (*ctx.world).level.maxclients;
+        let clients = (*ctx.world).clients.as_mut_ptr();
+        let entities = (*ctx.world).entities.as_mut_ptr();
+        let mut i: c_int = 0;
+        while i < maxclients {
+            if (*clients.add(i as usize)).pers.connected == CON_CONNECTED {
+                DeathmatchScoreboardMessage(ctx, entities.add(i as usize));
+            }
+            i += 1;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.intermission_origin`
-// / calls `FindIntermissionPoint`/`trap_LinkEntity`; the raw `*mut gentity_t`
-// param covers `ent` but there is still no handle to reach `level` through.
 /// Raven `MoveClientToIntermission`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1943-1967`
@@ -313,53 +651,117 @@ pub fn MoveClientToIntermission(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port MoveClientToIntermission — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1943")
+    unsafe {
+        let client = (*ent).client as *mut gclient_t;
+
+        // take out of follow mode if needed
+        if (*client).sess.spectatorState == SPECTATOR_FOLLOW {
+            StopFollowing(ctx, ent);
+        }
+
+        // move to the spot
+        let intermission_origin = (*ctx.world).level.intermission_origin;
+        let intermission_angle = (*ctx.world).level.intermission_angle;
+        (*ent).s.origin = intermission_origin;
+        (*client).ps.origin = intermission_origin;
+        (*client).ps.viewangles = intermission_angle;
+        (*client).ps.pm_type = pmtype_t::PM_INTERMISSION as c_int;
+
+        // clean up powerup info
+        (*client).ps.powerups = [0; mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS];
+
+        (*client).ps.eFlags = 0;
+        (*ent).s.eFlags = 0;
+        (*ent).s.eType = entityType_t::ET_GENERAL as c_int;
+        (*ent).s.modelindex = 0;
+        (*ent).s.loopSound = 0;
+        (*ent).s.loopIsSoundset = QFALSE;
+        (*ent).s.event = 0;
+        (*ent).r.contents = 0;
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `g_entities`
-// looking for `info_player_intermission`/deathmatch spots and writes
-// `level.intermission_origin/angle`; no world handle.
+// PORT-ESCALATION(unported-dep): `SelectSpawnPoint` has no ported definition
+// anywhere in the crate (g_client.c is not yet a landed module) — the
+// map-forgot-an-intermission-point fallback branch cannot be transcribed
+// without inventing that call. `SIEGETEAM_TEAM1`/`SIEGETEAM_TEAM2` (siege
+// team enum) are also not yet ported anywhere.
 /// Raven `FindIntermissionPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:1979-2026`
 pub fn FindIntermissionPoint(ctx: GameContext<'_>) {
-    todo!("Port FindIntermissionPoint — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:1979")
+    todo!("Port FindIntermissionPoint — parked (unported-dep: SelectSpawnPoint, SIEGETEAM_TEAM1/2): oracle/oracle/codemp/game/g_main.c:1979")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): sets
-// `level.intermissiontime`, walks `g_entities`; no world handle.
+// PORT-ESCALATION(unported-const): needs `CS_CLIENT_DUELWINNER` (no ported
+// CS_* table) and calls the unported `respawn`/`FindIntermissionPoint`
+// (itself parked on `SelectSpawnPoint`).
 /// Raven `BeginIntermission`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2035-2092`
 pub fn BeginIntermission(ctx: GameContext<'_>) {
-    todo!("Port BeginIntermission — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2035")
+    todo!("Port BeginIntermission — parked (unported-const: CS_CLIENT_DUELWINNER; unported-dep: respawn): oracle/oracle/codemp/game/g_main.c:2035")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `GameCvars`
-// (`g_duel_fraglimit`) and `level` duel win/loss counters; no world handle.
 /// Raven `DuelLimitHit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2094-2112`
 pub fn DuelLimitHit(ctx: GameContext<'_>) -> qboolean {
-    todo!("Port DuelLimitHit — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2094")
+    unsafe {
+        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let clients = (*ctx.world).clients.as_mut_ptr();
+        let mut i: c_int = 0;
+        while i < maxclients {
+            let cl = clients.add(i as usize);
+            if (*cl).pers.connected != CON_CONNECTED {
+                i += 1;
+                continue;
+            }
+
+            if (*ctx.world).cvars.g_duel_fraglimit.integer != 0
+                && (*cl).sess.wins >= (*ctx.world).cvars.g_duel_fraglimit.integer
+            {
+                return QTRUE;
+            }
+            i += 1;
+        }
+
+        QFALSE
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`
-// resetting duel win/loss counters; no world handle.
 /// Raven `DuelResetWinsLosses`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2114-2128`
 pub fn DuelResetWinsLosses(ctx: GameContext<'_>) {
-    todo!("Port DuelResetWinsLosses — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2114")
+    unsafe {
+        let maxclients = (*ctx.world).cvars.g_maxclients.integer;
+        let clients = (*ctx.world).clients.as_mut_ptr();
+        let mut i: c_int = 0;
+        while i < maxclients {
+            let cl = clients.add(i as usize);
+            if (*cl).pers.connected != CON_CONNECTED {
+                i += 1;
+                continue;
+            }
+
+            (*cl).sess.wins = 0;
+            (*cl).sess.losses = 0;
+            i += 1;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): the map-exit/`level.changemap`
-// logic reads and writes `level` and `GameCvars`; no world handle.
+// PORT-ESCALATION(unported-dep): `trap_SendConsoleCommand`'s `EXEC_APPEND`
+// engine constant and `g_siegePersistant.beatingTime` (siege-persistent
+// struct — `GameGlobals::g_siegePersistant` is still a `()` placeholder, no
+// backfilled type) block this fn; `G_WriteSessionData`/`SiegeDoTeamAssign`/
+// `DuelLimitHit`/`DuelResetWinsLosses` are all available.
 /// Raven `ExitLevel`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2141-2204`
 pub fn ExitLevel(ctx: GameContext<'_>) {
-    todo!("Port ExitLevel — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2141")
+    todo!("Port ExitLevel — parked (unported-const: EXEC_APPEND; unported-type: siegePers_t/g_siegePersistant): oracle/oracle/codemp/game/g_main.c:2141")
 }
 
 // PORT-ESCALATION(variadic-c-abi): variadic + no world handle to reach the
@@ -375,8 +777,8 @@ pub fn G_LogPrintf(
     todo!("Port G_LogPrintf — parked (variadic-c-abi): oracle/oracle/codemp/game/g_main.c:2213")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level`/`g_clients`
-// building an exit-reason log line; no world handle.
+// PORT-ESCALATION(unported-const): `CS_INTERMISSION` (no ported CS_* table)
+// blocks `trap_SetConfigstring( CS_INTERMISSION, "1" )`.
 /// Raven `LogExit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2249-2303`
@@ -384,39 +786,54 @@ pub fn LogExit(
     ctx: GameContext<'_>,
     string: *const c_char,
 ) {
-    todo!("Port LogExit — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2249")
+    todo!("Port LogExit — parked (unported-const: CS_INTERMISSION): oracle/oracle/codemp/game/g_main.c:2249")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): the intermission-exit
-// vote/ready-check pass over `level.clients`; no world handle.
+// PORT-ESCALATION(unported-const): `d_powerDuelPrint`-gated `Com_Printf`
+// diagnostics are fine (parked stubs), but `CS_CLIENT_DUELISTS`/
+// `CS_CLIENT_DUELWINNER` (no ported CS_* table) and `ExitLevel` (itself
+// parked on `EXEC_APPEND`) block this fn.
 /// Raven `CheckIntermissionExit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2317-2554`
 pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
-    todo!("Port CheckIntermissionExit — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2317")
+    todo!("Port CheckIntermissionExit — parked (unported-const: CS_CLIENT_DUELISTS/DUELWINNER; unported-dep: ExitLevel): oracle/oracle/codemp/game/g_main.c:2317")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.teamScores`;
-// no world handle.
 /// Raven `ScoreIsTied`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2561-2576`
 pub fn ScoreIsTied(ctx: GameContext<'_>) -> qboolean {
-    todo!("Port ScoreIsTied — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2561")
+    unsafe {
+        if (*ctx.world).level.numPlayingClients < 2 {
+            return QFALSE;
+        }
+
+        if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
+            return ((*ctx.world).level.teamScores[TEAM_RED as usize]
+                == (*ctx.world).level.teamScores[TEAM_BLUE as usize]) as qboolean;
+        }
+
+        let sorted0 = (*ctx.world).level.sortedClients[0];
+        let sorted1 = (*ctx.world).level.sortedClients[1];
+        let a = (*ctx.world).clients[sorted0 as usize].ps.persistant[persEnum_t::PERS_SCORE as usize];
+        let b = (*ctx.world).clients[sorted1 as usize].ps.persistant[persEnum_t::PERS_SCORE as usize];
+
+        (a == b) as qboolean
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): the fraglimit/timelimit/
-// capturelimit end-of-match decision reads `level`/`GameCvars` extensively; no
-// world handle.
+// PORT-ESCALATION(unported-dep): `LogExit` (parked on `CS_INTERMISSION`) and
+// `G_GetStringEdString` (parked in this same file on its `va`/`Com_sprintf`
+// dependency) are called throughout; `CS_CLIENT_DUELISTS`/`CS_CAPTURELIMIT`-
+// adjacent `CS_*` indices are also unported.
 /// Raven `CheckExitRules`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2588-2911`
 pub fn CheckExitRules(ctx: GameContext<'_>) {
-    todo!("Port CheckExitRules — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2588")
+    todo!("Port CheckExitRules — parked (unported-dep: LogExit, G_GetStringEdString; unported-const: CS_*): oracle/oracle/codemp/game/g_main.c:2588")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `level.clients`; no
-// world handle.
 /// Raven `G_RemoveDuelist`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2923-2938`
@@ -424,16 +841,37 @@ pub fn G_RemoveDuelist(
     ctx: GameContext<'_>,
     team: c_int,
 ) {
-    todo!("Port G_RemoveDuelist — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2923")
+    unsafe {
+        let mut i: usize = 0;
+        let entities = (*ctx.world).entities.as_mut_ptr();
+        while i < MAX_CLIENTS {
+            let ent = entities.add(i);
+            let cl = (*ent).client as *mut gclient_t;
+
+            if (*ent).inuse != QFALSE
+                && !cl.is_null()
+                && (*cl).sess.sessionTeam != TEAM_SPECTATOR
+                && (*cl).sess.duelTeam == team
+            {
+                let s = CString::new("s").unwrap();
+                SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
+            }
+            i += 1;
+        }
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): the tournament-restart
-// state machine over `level`/`GameCvars`; no world handle.
+// PORT-ESCALATION(unported-const): `CS_CLIENT_DUELISTS`/`CS_CLIENT_DUELHEALTHS`/
+// `CS_WARMUP` (no ported CS_* table) and `EV_GLOBAL_DUEL` (entity-event enum,
+// not yet ported) block this fn; `G_PowerDuelCount`/`G_RemoveDuelist`/
+// `AddTournamentPlayer`/`AddPowerDuelPlayers`/`G_CanResetDuelists`/
+// `G_ResetDuelists` are all otherwise available (the latter itself parked on
+// `ClientSpawn`).
 /// Raven `CheckTournament`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:2948-3216`
 pub fn CheckTournament(ctx: GameContext<'_>) {
-    todo!("Port CheckTournament — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:2948")
+    todo!("Port CheckTournament — parked (unported-const: CS_CLIENT_DUELISTS/DUELHEALTHS/WARMUP, EV_GLOBAL_DUEL): oracle/oracle/codemp/game/g_main.c:2948")
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `g_entities`/
