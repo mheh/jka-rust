@@ -99,7 +99,7 @@ impl PmoveContext<'_> {
                     );
                     return;
                 } else if (*trace).plane.normal != [0.0, 0.0, 0.0]
-                    && ((*trace).entityNum >= ENTITYNUM_WORLD as c_int
+                    && ((*trace).entityNum == ENTITYNUM_WORLD as c_int
                         || (*hitEnt).r.bmodel != 0)
                 {
                     // have a valid hit plane and we hit a solid brush
@@ -165,7 +165,7 @@ impl PmoveContext<'_> {
                         let l0 = (*ps).speed * 0.5;
                         let mut bounceDir: vec3_t = [0.0; 3];
 
-                        if ((*trace).entityNum >= ENTITYNUM_WORLD as c_int
+                        if ((*trace).entityNum == ENTITYNUM_WORLD as c_int
                             || (*hitEnt).s.solid == SOLID_BMODEL as c_int)
                             && (*trace).plane.normal != [0.0, 0.0, 0.0]
                         {
@@ -223,13 +223,12 @@ impl PmoveContext<'_> {
                                 } else {
                                     (*hitEnt).s.speed
                                 };
+                                // QAGAME side (bg_slidemove.c:221-231): all three VectorScales
+                                // write pushDir; bounceDir stays intact for bounceDot below.
                                 let scale1 = ((*ps).speed + hitSpeed) * 0.5;
-                                for i in 0..3 {
-                                    bounceDir[i] *= scale1;
-                                }
                                 let scale2 = l0 / (*pSelfVehInfo).mass as f32;
                                 for i in 0..3 {
-                                    pushDir[i] = bounceDir[i] * scale2 * 0.1;
+                                    pushDir[i] = bounceDir[i] * scale1 * scale2 * 0.1;
                                 }
                             }
                             VectorNormalize2((*ps).velocity, &mut moveDir);
@@ -416,9 +415,11 @@ impl PmoveContext<'_> {
                                 MOD_FALLING as c_int
                             };
                             let attacker = if haveKiller { killerNum } else { (*hitEnt).s.number };
+                            // Oracle bg_slidemove.c:466: targ = pEnt (the vehicle damages
+                            // ITSELF on impact); inflictor = hitEnt.
                             self.callbacks.damage(
-                                (*hitEnt).s.number,
                                 (*pEnt).s.number,
+                                (*hitEnt).s.number,
                                 attacker,
                                 core::ptr::null(),
                                 core::ptr::addr_of!((*ps).origin) as *const vec3_t,
