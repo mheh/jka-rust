@@ -380,7 +380,7 @@ pub fn target_laser_think(
         let mut point: vec3_t = [0.0; 3];
 
         // if pointed at another entity, set movedir to point at it
-        if !(*self_).enemy.is_null() {
+        if !(*self_).enemy.is_none() {
             let enemy = (*self_).enemy;
             // VectorMA(self->enemy->s.origin, 0.5, self->enemy->r.mins, point)
             point[0] = (*enemy).s.origin[0] + 0.5 * (*enemy).r.mins[0];
@@ -431,7 +431,7 @@ pub fn target_laser_on(
     self_: *mut gentity_t,
 ) {
     unsafe {
-        if (*self_).activator.is_null() {
+        if (*self_).activator.is_none() {
             (*self_).activator = self_;
         }
         target_laser_think(ctx, self_);
@@ -898,7 +898,7 @@ pub fn scriptrunner_run(
 
         if !(*self_).behaviorSet[bSet_t::BSET_USE as usize].is_null() {
             if (*self_).spawnflags & 1 != 0 {
-                if (*self_).activator.is_null() {
+                if (*self_).activator.is_none() {
                     // if (g_developer.integer) Com_Printf("target_scriptrunner tried to run on invalid entity!\n");
                     return;
                 }

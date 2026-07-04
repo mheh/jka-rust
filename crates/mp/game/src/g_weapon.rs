@@ -1516,7 +1516,7 @@ pub fn emplaced_gun_use(
             return;
         }
 
-        if !(*self_).activator.is_null() {
+        if !(*self_).activator.is_none() {
             return;
         }
 
@@ -1691,7 +1691,7 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
             }
         }
 
-        if !(*self_).activator.is_null()
+        if !(*self_).activator.is_none()
             && !(*(*self_).activator).client.is_null()
             && (*(*self_).activator).inuse != 0
         {
@@ -1715,7 +1715,7 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
             }
         }
 
-        if (!(*self_).activator.is_null() && !(*(*self_).activator).client.is_null())
+        if (!(*self_).activator.is_none() && !(*(*self_).activator).client.is_null())
             && ((*(*self_).activator).inuse == 0
                 || (*(*(*self_).activator).client).ps.emplacedIndex != (*self_).s.number
                 || (*self_).genericValue4 != 0
@@ -1731,10 +1731,10 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*(*(*self_).activator).client).ps.emplacedIndex = 0;
             (*(*(*self_).activator).client).ps.saberHolstered = 0;
             (*(*self_).activator).r.ownerNum = crate::shared::ENTITYNUM_NONE as u32;
-            (*self_).activator = std::ptr::null_mut();
+            (*self_).activator = None;
 
             (*self_).s.activeForcePass = 0;
-        } else if !(*self_).activator.is_null() && !(*(*self_).activator).client.is_null() {
+        } else if !(*self_).activator.is_none() && !(*(*self_).activator).client.is_null() {
             (*(*(*self_).activator).client).ps.weapon = crate::shared::WP_EMPLACED_GUN;
             (*(*(*self_).activator).client).ps.weaponstate = crate::shared::WEAPON_READY;
         }

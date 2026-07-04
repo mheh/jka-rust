@@ -412,9 +412,9 @@ pub fn BotDoChat(
 
                 let mut cobject: *mut gentity_t = core::ptr::null_mut();
 
-                if *chatgroup_b.offset(inc_1) == b's' as u8 && !bs_ref.chatObject.is_null() {
+                if *chatgroup_b.offset(inc_1) == b's' as u8 && !bs_ref.chatObject.is_none() {
                     cobject = bs_ref.chatObject;
-                } else if *chatgroup_b.offset(inc_1) == b'a' as u8 && !bs_ref.chatAltObject.is_null() {
+                } else if *chatgroup_b.offset(inc_1) == b'a' as u8 && !bs_ref.chatAltObject.is_none() {
                     cobject = bs_ref.chatAltObject;
                 }
 

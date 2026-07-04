@@ -131,7 +131,11 @@ pub use crate::world::GameContext;
 // - `pml_t` (ruling 21): bg pmove local working-set type.
 pub use crate::bg_channel::{BgState, BgTraps, GameCallbacks, PmoveContext};
 pub use crate::ent_fn_enums::EntSpawn;
-pub use crate::world::EntityId;
+// `EntityId` + the `ent - g_entities` seam helpers (ruling 22): `Some(ent_id(base,
+// p))` / `ent_id_opt(base, p)` fill the `Option<EntityId>` stored fields at
+// pointer-assignment sites; `field.is_none()` / id-equality replace NULL/address
+// compares.
+pub use crate::world::{ent_id, ent_id_opt, EntityId};
 pub use mp_bg::local::pml_t::pml_t;
 
 // Pass-3 prep C1 (agenda B10 porter-instruction rider): the `crate::trap` seam
@@ -159,7 +163,6 @@ pub use crate::teams::class::class_t;
 pub use crate::teams::class::class_t::*;
 
 pub use mp_bg::public::animation::animation_t;
-pub use mp_bg::public::bg_entity::bgEntity_t;
 pub use mp_bg::public::bg_field::BG_field_t;
 pub use mp_bg::public::holdable::holdable_t;
 pub use mp_bg::public::pmove_t::pmove_t;
@@ -185,6 +188,14 @@ pub use mp_qshared::common::mp::gentity::{
     MAT_METAL, MAT_METAL2, MAT_METAL3, MAT_NONE, MAT_ROPE, MAT_SNOWY_ROCK, MAT_WHITE_METAL,
     MOVER_1TO2, MOVER_2TO1, MOVER_POS1, MOVER_POS2, NUM_MATERIALS,
 };
+
+// Raven `#define bgEntity_t gentity_t` in jampgame source files (g_vehicles.c, FighterNPC.c, etc).
+// In the oracle, this macro makes bgEntity_t and gentity_t interchangeable at call sites that
+// need to access server-side fields like spawnflags. For game-code bodies that have gentity_t
+// parameters cast through bgEntity_t, we re-export gentity_t under the bgEntity_t name to allow
+// those accesses (e.g. `(*bgEntity).spawnflags`).
+// Source: oracle/oracle/codemp/game/g_vehicles.c, FighterNPC.c, etc. (local macro)
+pub use mp_qshared::common::mp::gentity::gentity_t as bgEntity_t;
 pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 pub use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 pub use mp_qshared::common::mp::qcommon::failed_edge::failedEdge_t;
@@ -259,6 +270,6 @@ pub use crate::g_spawn::{G_NewString, G_SpawnFloat, G_SpawnInt, G_SpawnString, G
 pub use crate::g_timer::TIMER_Done;
 pub use crate::g_utils::{G_AddEvent, G_Find, G_FreeEntity, G_ModelIndex, G_PlayEffect, G_ScaleNetHealth, G_SetAnim, G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_SoundSetIndex, G_Spawn, G_TeamCommand, G_TempEntity, G_UseTargets2, TryHeal};
 pub use crate::g_weapon::{LogAccuracyHit, laserTrapStick};
-pub use crate::q_math::{AddPointToBounds, AngleSubtract, AngleVectors, CrossProduct, DirToByte, Distance, DistanceHorizontalSquared, G_FindClosestPointOnLineSegment, Q_fabs, VectorLength, VectorLengthSquared, VectorNormalize};
+pub use crate::q_math::{AddPointToBounds, AngleSubtract, AngleVectors, CrossProduct, DirToByte, Distance, DistanceHorizontalSquared, G_FindClosestPointOnLineSegment, Q_fabs, VectorCompare, VectorLength, VectorLengthSquared, VectorNormalize};
 pub use crate::q_shared::{COM_StripExtension, GetIDForString, Q_stricmp, Q_strncmp, Q_strncpyz, Q_strupr, va};
 pub use crate::w_saber::WP_SaberCanBlock;

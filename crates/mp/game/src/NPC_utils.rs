@@ -299,7 +299,7 @@ pub fn NPC_UpdateAngles(
 
         // if angle changes are locked; just keep the current angles
         // aimTime isn't even set anymore... so this code was never reached, but I need a way to lock NPC's yaw, so instead of making a new SCF_ flag, just use the existing render flag... - dmv
-        if (*npc).enemy.is_null() && (*ctx.world).level.time < (*npc_info).aimTime {
+        if (*npc).enemy.is_none() && (*ctx.world).level.time < (*npc_info).aimTime {
             if doPitch != QFALSE {
                 target_pitch = (*npc_info).lockedDesiredPitch;
             }
@@ -998,11 +998,11 @@ pub fn NPC_ValidEnemy(
         //if haven't seen him in a while, give up
         if ent_team == (*npc_client).enemyTeam as c_int //simplest case: they're on my enemy team
             || ((*npc_client).enemyTeam as c_int == NPCTEAM_FREE && (*ent_client).NPC_class != (*npc_client).NPC_class) //I get mad at anyone and this guy isn't the same class as me
-            || ((*ent_client).NPC_class == CLASS_WAMPA && !(*ent).enemy.is_null()) //a rampaging wampa
-            || ((*ent_client).NPC_class == CLASS_RANCOR && !(*ent).enemy.is_null()) //a rampaging rancor
+            || ((*ent_client).NPC_class == CLASS_WAMPA && !(*ent).enemy.is_none()) //a rampaging wampa
+            || ((*ent_client).NPC_class == CLASS_RANCOR && !(*ent).enemy.is_none()) //a rampaging rancor
             || (ent_team == NPCTEAM_FREE
                 && (*ent_client).enemyTeam as c_int == NPCTEAM_FREE
-                && !(*ent).enemy.is_null()
+                && !(*ent).enemy.is_none()
                 && !(*(*ent).enemy).client.is_null()
                 && ({
                     let enemy_client = (*(*ent).enemy).client as *mut gclient_t;
@@ -1306,7 +1306,7 @@ pub fn NPC_FacePosition(
         (*npc_info).desiredPitch = AngleNormalize360(angles[PITCH]);
 
         let enemy = (*npc).enemy;
-        if !enemy.is_null() && !(*enemy).client.is_null() {
+        if !enemy.is_none() && !(*enemy).client.is_null() {
             let enemy_client = (*enemy).client as *mut gclient_t;
             if (*enemy_client).NPC_class == CLASS_ATST {
                 // FIXME: this is kind of dumb, but it was the easiest way to get it to look sort of ok
@@ -1372,7 +1372,7 @@ pub fn NPC_FaceEnemy(
             return QFALSE;
         }
 
-        if (*npc).enemy.is_null() {
+        if (*npc).enemy.is_none() {
             return QFALSE;
         }
 
@@ -1479,7 +1479,7 @@ pub fn NPC_CheckLookTarget(
                     //Time to clear lookTarget
                     NPC_ClearLookTarget(self_);
                 } else if !(*target).client.is_null()
-                    && !(*self_).enemy.is_null()
+                    && !(*self_).enemy.is_none()
                     && target != (*self_).enemy
                 {
                     //should always look at current enemy if engaged in
@@ -1514,7 +1514,7 @@ pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
             (*client).enemyTeam = (*npc).genericValue2;
             (*npc).s.teamowner = (*npc).genericValue3;
 
-            (*client).leader = core::ptr::null_mut();
+            (*client).leader = None;
             if (*npc_info).tempBehavior == bState_t::BS_FOLLOW_LEADER {
                 (*npc_info).tempBehavior = bState_t::BS_DEFAULT;
             }

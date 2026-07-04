@@ -18,6 +18,26 @@ use crate::prelude::*;
 use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_TempEntity};
 use crate::trap;
 
+// Ruling 22 seam helpers (local to this file): `gentity_t*` stored fields
+// (`parent`/`target_ent`/`activator`/`hook`) are `Option<EntityId>`; these
+// resolve an id back to the live pointer needed at raw-pointer call sites
+// (`G_RadiusDamage`, `G_Damage`, …) and build the id at assignment sites.
+#[inline]
+unsafe fn ent_resolve(ctx: GameContext<'_>, id: EntityId) -> *mut gentity_t {
+    unsafe { &mut (*ctx.world).entities[id.index()] as *mut gentity_t }
+}
+#[inline]
+unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
+    match id {
+        Some(i) => unsafe { ent_resolve(ctx, i) },
+        None => core::ptr::null_mut(),
+    }
+}
+#[inline]
+unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
+    unsafe { (*ctx.world).entities.as_ptr() }
+}
+
 use mp_bg::public::entity_event::entity_event_t::EV_SABER_BLOCK;
 use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};
 
@@ -232,17 +252,17 @@ pub fn G_ExplodeMissile(
         if (*ent).splashDamage != 0 {
             // Check if we need to set parent for damage credit
             if (*ent).s.eType == ET_MISSILE && (((*ent).s.eFlags & EF_JETPACK_ACTIVE) != 0) && ((*ent).r.ownerNum as usize) < MAX_CLIENTS {
-                (*ent).parent = &mut (*ctx.world).entities[(*ent).r.ownerNum as usize];
+                (*ent).parent = Some(ent_id(ent_base(ctx), &(*ctx.world).entities[(*ent).r.ownerNum as usize]));
             }
 
-            if G_RadiusDamage(ctx, (*ent).r.currentOrigin, (*ent).parent, (*ent).splashDamage as f32, (*ent).splashRadius as f32, ent, ent, (*ent).splashMethodOfDeath) != 0 {
-                if !(*ent).parent.is_null() {
-                    let parent_num = (*(*ent).parent).s.number as usize;
+            if G_RadiusDamage(ctx, (*ent).r.currentOrigin, ent_resolve_opt(ctx, (*ent).parent), (*ent).splashDamage as f32, (*ent).splashRadius as f32, ent, ent, (*ent).splashMethodOfDeath) != 0 {
+                if let Some(parent_id) = (*ent).parent {
+                    let parent_num = parent_id.index();
                     if !(*ctx.world).entities[parent_num].client.is_null() {
                         (*(*ctx.world).entities[parent_num].client).accuracy_hits += 1;
                     }
-                } else if !(*ent).activator.is_null() {
-                    let activator_num = (*(*ent).activator).s.number as usize;
+                } else if let Some(activator_id) = (*ent).activator {
+                    let activator_num = activator_id.index();
                     if !(*ctx.world).entities[activator_num].client.is_null() {
                         (*(*ctx.world).entities[activator_num].client).accuracy_hits += 1;
                     }
@@ -324,7 +344,7 @@ pub fn CreateMissile(
         (*missile).think = Some(EntThink::G_FreeEntity);
         (*missile).s.eType = ET_MISSILE;
         (*missile).r.svFlags = SVF_USE_CURRENT_ORIGIN;
-        (*missile).parent = owner;
+        (*missile).parent = Some(ent_id(ent_base(ctx), owner));
         (*missile).r.ownerNum = (*owner).s.number;
 
         if altFire != 0 {
@@ -333,7 +353,7 @@ pub fn CreateMissile(
 
         (*missile).s.pos.trType = TR_LINEAR;
         (*missile).s.pos.trTime = (*ctx.world).level.time;
-        (*missile).target_ent = core::ptr::null_mut();
+        (*missile).target_ent = None;
 
         let mut snapped_org = org;
         trap::SnapVector(ctx.engine, crate::trap::GSnapvector::new(&mut snapped_org));
@@ -434,7 +454,7 @@ pub fn G_MissileImpact(
                 G_SetOrigin(ent, tr.endpos);
                 (*ent).takedamage = qfalse;
                 if (*ent).splashDamage != 0 {
-                    if G_RadiusDamage(ctx, tr.endpos, (*ent).parent, (*ent).splashDamage as f32, (*ent).splashRadius as f32, other, ent, (*ent).splashMethodOfDeath) != 0 {
+                    if G_RadiusDamage(ctx, tr.endpos, ent_resolve_opt(ctx, (*ent).parent), (*ent).splashDamage as f32, (*ent).splashRadius as f32, other, ent, (*ent).splashMethodOfDeath) != 0 {
                         if hitClient == 0 && !(*ctx.world).entities[(*ent).r.ownerNum as usize].client.is_null() {
                             (*(*ctx.world).entities[(*ent).r.ownerNum as usize].client).accuracy_hits += 1;
                         }
@@ -466,7 +486,7 @@ pub fn G_MissileImpact(
                 G_SetOrigin(ent, tr.endpos);
                 (*ent).takedamage = qfalse;
                 if (*ent).splashDamage != 0 {
-                    if G_RadiusDamage(ctx, tr.endpos, (*ent).parent, (*ent).splashDamage as f32, (*ent).splashRadius as f32, other, ent, (*ent).splashMethodOfDeath) != 0 {
+                    if G_RadiusDamage(ctx, tr.endpos, ent_resolve_opt(ctx, (*ent).parent), (*ent).splashDamage as f32, (*ent).splashRadius as f32, other, ent, (*ent).splashMethodOfDeath) != 0 {
                         if hitClient == 0 && !(*ctx.world).entities[(*ent).r.ownerNum as usize].client.is_null() {
                             (*(*ctx.world).entities[(*ent).r.ownerNum as usize].client).accuracy_hits += 1;
                         }
@@ -684,7 +704,7 @@ pub fn G_MissileImpact(
         (*ent).takedamage = qfalse;
         // Splash damage
         if (*ent).splashDamage != 0 {
-            if G_RadiusDamage(ctx, tr.endpos, (*ent).parent, (*ent).splashDamage as f32, (*ent).splashRadius as f32, other, ent, (*ent).splashMethodOfDeath) != 0 {
+            if G_RadiusDamage(ctx, tr.endpos, ent_resolve_opt(ctx, (*ent).parent), (*ent).splashDamage as f32, (*ent).splashRadius as f32, other, ent, (*ent).splashMethodOfDeath) != 0 {
                 if hitClient == 0 && !(*ctx.world).entities[(*ent).r.ownerNum as usize].client.is_null() {
                     (*(*ctx.world).entities[(*ent).r.ownerNum as usize].client).accuracy_hits += 1;
                 }
@@ -723,8 +743,8 @@ pub fn G_RunMissile(
         crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos, (*ctx.world).level.time, &mut origin);
 
         // Determine entity to pass (not collide with)
-        if !(*ent).target_ent.is_null() {
-            passent = (*(*ent).target_ent).s.number;
+        if let Some(target_id) = (*ent).target_ent {
+            passent = (*ctx.world).entities[target_id.index()].s.number;
         } else if ((*ent).r.svFlags & SVF_OWNERNOTSHARED) != 0 && (((*ent).s.eFlags & EF_JETPACK_ACTIVE) != 0) {
             // Vehicle missile that should be solid to owner
             passent = (*ent).s.number;
@@ -832,8 +852,17 @@ pub fn G_RunMissile(
                 // Never explode or bounce on sky
                 if (tr.surfaceFlags & SURF_NOIMPACT) != 0 {
                     // If grapple, reset owner
-                    if !(*ent).parent.is_null() && !(*(*ent).parent).client.is_null() && (*(*ent).parent).client.hook == ent {
-                        (*(*ent).parent).client.hook = core::ptr::null_mut();
+                    // PORT-NOTE(gclient_t): `client` is currently typed `*mut c_void`
+                    // (gclient_t/MP not yet ported) — cast through per the field map
+                    // ruling (gclient_t.hook is Option<EntityId>); see missing_symbols.
+                    if let Some(parent_id) = (*ent).parent {
+                        let parent_ptr = ent_resolve(ctx, parent_id);
+                        if !(*parent_ptr).client.is_null() {
+                            let client_ptr = (*parent_ptr).client as *mut gclient_t;
+                            if (*client_ptr).hook == Some(ent_id(ent_base(ctx), ent)) {
+                                (*client_ptr).hook = None;
+                            }
+                        }
                     }
 
                     if ((*ent).s.weapon == WP_SABER && (*ent).isSaberEntity != 0) || isKnockedSaber != 0 {

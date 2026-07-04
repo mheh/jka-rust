@@ -102,7 +102,7 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
         crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
 
         // If we have an enemy, we should try to hover at or a little below enemy eye level
-        if !(*NPC).enemy.is_null() {
+        if !(*NPC).enemy.is_none() {
             if crate::g_timer::TIMER_Done(ctx, NPC, c"heightChange".as_ptr()) != 0 {
                 let mut difFactor: f32 = 1.0f32;
 
@@ -138,7 +138,7 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
         } else {
             let mut goal: *mut gentity_t = core::ptr::null_mut();
 
-            if !(*NPCInfo).goalEntity.is_null() {
+            if !(*NPCInfo).goalEntity.is_none() {
                 // Is there a goal?
                 goal = (*NPCInfo).goalEntity;
             } else {
@@ -195,7 +195,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
         let mut dir: vec3_t = [0.0f32; 3];
         let mut tr: trace_t = core::mem::zeroed();
 
-        if crate::bg_lib::random() > 0.7f32 || (*NPC).enemy.is_null() || (*(*NPC).enemy).client.is_null() {
+        if crate::bg_lib::random() > 0.7f32 || (*NPC).enemy.is_none() || (*(*NPC).enemy).client.is_null() {
             // Do a regular style strafe
             crate::q_math::AngleVectors(
                 (*(*NPC).client).renderInfo.eyeAngles,
@@ -656,10 +656,10 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
             (*NPC).random = crate::bg_lib::random() * 6.3f32; // roughly 2pi
         }
 
-        if !(*NPC).enemy.is_null() && (*(*NPC).enemy).health > 0 && (*(*NPC).enemy).inuse != 0 {
+        if !(*NPC).enemy.is_none() && (*(*NPC).enemy).health > 0 && (*(*NPC).enemy).inuse != 0 {
             if (*(*NPC).client).NPC_class != CLASS_BOBAFETT && ((*(*NPC).enemy).s.number == 0 || (!(*(*NPC).enemy).client.is_null() && (*(*(*NPC).enemy).client).NPC_class == CLASS_SEEKER)) {
                 //hacked to never take the player as an enemy, even if the player shoots at it
-                (*NPC).enemy = core::ptr::null_mut();
+                (*NPC).enemy = None;
             } else {
                 Seeker_Attack(ctx);
                 if (*(*NPC).client).NPC_class == CLASS_BOBAFETT {

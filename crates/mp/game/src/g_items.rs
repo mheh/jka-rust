@@ -378,14 +378,14 @@ pub fn ShieldTouch(
         if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
             // let teammates through
             // compare the parent's team to the "other's" team
-            if !(*self_).parent.is_null() && !(*(*self_).parent).client.is_null() && !(*other).client.is_null() {
+            if !(*self_).parent.is_none() && !(*(*self_).parent).client.is_null() && !(*other).client.is_null() {
                 if OnSameTeam(ctx, (*self_).parent, other) != 0 {
                     ShieldGoNotSolid(ctx, self_);
                 }
             }
         } else {
             // let the person who dropped the shield through
-            if !(*self_).parent.is_null() && (*(*self_).parent).s.number == (*other).s.number {
+            if !(*self_).parent.is_none() && (*(*self_).parent).s.number == (*other).s.number {
                 ShieldGoNotSolid(ctx, self_);
             }
         }
@@ -884,9 +884,9 @@ pub fn pas_adjust_enemy(
 
         if keep != 0 {
             //ent->bounceCount = level.time + 500 + random() * 150;
-        } else if (*ent).bounceCount < (*ctx.world).level.time && !(*ent).enemy.is_null() {
+        } else if (*ent).bounceCount < (*ctx.world).level.time && !(*ent).enemy.is_none() {
             // don't ping pong on and off
-            (*ent).enemy = core::ptr::null_mut();
+            (*ent).enemy = None;
             // shut-down sound
             G_Sound(ctx, ent, CHAN_BODY, G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()));
 
@@ -1011,26 +1011,26 @@ pub fn pas_think(
 
         (*ent).nextthink = (*ctx.world).level.time + FRAMETIME;
 
-        if !(*ent).enemy.is_null() {
+        if !(*ent).enemy.is_none() {
             // make sure that the enemy is still valid
             pas_adjust_enemy(ctx, ent);
         }
 
-        if !(*ent).enemy.is_null() {
+        if !(*ent).enemy.is_none() {
             if (*(*ent).enemy).client.is_null() {
-                (*ent).enemy = core::ptr::null_mut();
+                (*ent).enemy = None;
             } else if (*(*ent).enemy).s.number == (*ent).s.number {
-                (*ent).enemy = core::ptr::null_mut();
+                (*ent).enemy = None;
             } else if (*(*ent).enemy).health < 1 {
-                (*ent).enemy = core::ptr::null_mut();
+                (*ent).enemy = None;
             }
         }
 
-        if (*ent).enemy.is_null() {
+        if (*ent).enemy.is_none() {
             pas_find_enemies(ctx, ent);
         }
 
-        if !(*ent).enemy.is_null() {
+        if !(*ent).enemy.is_none() {
             (*ent).s.bolt2 = (*(*ent).enemy).s.number;
         } else {
             (*ent).s.bolt2 = ENTITYNUM_NONE;
@@ -1043,7 +1043,7 @@ pub fn pas_think(
         (*ent).speed = AngleNormalize360((*ent).speed);
         (*ent).random = AngleNormalize360((*ent).random);
 
-        if !(*ent).enemy.is_null() {
+        if !(*ent).enemy.is_none() {
             // ...then we'll calculate what new aim adjustments we should attempt to make this frame
             // Aim at enemy
             let org = if !(*(*ent).enemy).client.is_null() {
@@ -1098,7 +1098,7 @@ pub fn pas_think(
             (*ent).s.loopIsSoundset = qfalse;
         }
 
-        if !(*ent).enemy.is_null() && (*ent).attackDebounceTime < (*ctx.world).level.time {
+        if !(*ent).enemy.is_none() && (*ent).attackDebounceTime < (*ctx.world).level.time {
             (*ent).count -= 1;
 
             if (*ent).count != 0 {
@@ -2648,14 +2648,14 @@ pub fn RespawnItem(
         let mut ent = ent;
         // randomly select from teamed entities
         if !(*ent).team.is_null() {
-            if (*ent).teammaster.is_null() {
+            if (*ent).teammaster.is_none() {
                 G_Error(ctx, c"RespawnItem: bad teammaster".as_ptr());
             }
             let master = (*ent).teammaster;
 
             let mut count = 0;
             let mut e = master;
-            while !e.is_null() {
+            while !e.is_none() {
                 e = (*e).teamchain;
                 count += 1;
             }
@@ -2717,7 +2717,7 @@ pub fn CheckItemCanBePickedUpByNPC(
             && (*item).activator != &mut (*ctx.world).entities[0] as *mut gentity_t
             && (*pickerupper).s.number != 0
             && (*pickerupper).s.weapon == WP_NONE as c_int
-            && !(*pickerupper).enemy.is_null()
+            && !(*pickerupper).enemy.is_none()
             && (*pickerupper).painDebounceTime < (*ctx.world).level.time
             && !npc.is_null()
             && (*npc).surrenderTime < (*ctx.world).level.time // not surrendering
@@ -2812,9 +2812,9 @@ pub fn Touch_Item(
 
         if CheckItemCanBePickedUpByNPC(ctx, ent, other) != 0 {
             let npc = (*other).NPC as *mut gNPC_t;
-            if !npc.is_null() && !(*npc).goalEntity.is_null() && (*(*npc).goalEntity).enemy == ent {
+            if !npc.is_null() && !(*npc).goalEntity.is_none() && (*(*npc).goalEntity).enemy == ent {
                 // they were running to pick me up, they did, so clear goal
-                (*npc).goalEntity = core::ptr::null_mut();
+                (*npc).goalEntity = None;
                 (*npc).squadState = SQUAD_STAND_AND_SHOOT;
             }
         } else if ((*ent).spawnflags & ITMSF_ALLOWNPC) == 0 {

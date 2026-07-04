@@ -110,7 +110,7 @@ pub fn NPC_Sniper_PlayConfusionSound(
 
         // Clear the enemy
         // Note: Using G_ClearEnemy parked, so we null the field directly
-        (*self_).enemy = core::ptr::null_mut();
+        (*self_).enemy = None;
 
         (*npc).investigateCount = 0;
     }
@@ -146,7 +146,7 @@ pub fn Sniper_HoldPosition(ctx: GameContext<'_>) {
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
         NPC_FreeCombatPoint(ctx, (*NPCInfo).combatPoint, QTRUE);
-        (*NPCInfo).goalEntity = core::ptr::null_mut();
+        (*NPCInfo).goalEntity = None;
     }
 }
 
@@ -178,7 +178,7 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
         // If our move failed, then reset
         if moved == QFALSE {
             // couldn't get to enemy
-            if ((*NPCInfo).scriptFlags & 1) != 0 && (*NPCInfo).goalEntity != core::ptr::null_mut()
+            if ((*NPCInfo).scriptFlags & 1) != 0 && (*NPCInfo).goalEntity != None
                 && (*NPCInfo).goalEntity == (*NPC).enemy
             {
                 // SCF_CHASE_ENEMIES = 1, we were running after enemy
@@ -362,14 +362,14 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
                 world.globals.faceEnemy2 = QFALSE;
             }
         } else if (*NPCInfo).squadState == SQUAD_IDLE {
-            if (*NPCInfo).goalEntity == core::ptr::null_mut() {
+            if (*NPCInfo).goalEntity == None {
                 world.globals.move2 = QFALSE;
                 return;
             }
         }
 
         // See if we're moving towards a goal, not the enemy
-        if ((*NPCInfo).goalEntity != (*NPC).enemy) && ((*NPCInfo).goalEntity != core::ptr::null_mut()) {
+        if ((*NPCInfo).goalEntity != (*NPC).enemy) && ((*NPCInfo).goalEntity != None) {
             // Did we make it?
             let flying = FlyingCreature(NPC);
             if NAV_HitNavGoal(
@@ -446,7 +446,7 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                 // not roaming
                 // FIXME: try to find another spot from which to hit the enemy
                 if ((*NPCInfo).scriptFlags & 1) != 0
-                    && ((*NPCInfo).goalEntity == core::ptr::null_mut()
+                    && ((*NPCInfo).goalEntity == None
                         || (*NPCInfo).goalEntity == (*NPC).enemy)
                 {
                     // SCF_CHASE_ENEMIES = 1
@@ -590,7 +590,7 @@ pub fn Sniper_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
         let world = &mut *ctx.world;
         let NPC = world.globals.NPC as *mut gentity_t;
 
-        if (*NPC).enemy == core::ptr::null_mut() {
+        if (*NPC).enemy == None {
             return QFALSE;
         }
 
@@ -620,7 +620,7 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
         let NPC = world.globals.NPC as *mut gentity_t;
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
-        if (*NPC).enemy == core::ptr::null_mut() {
+        if (*NPC).enemy == None {
             return;
         }
 
@@ -767,7 +767,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
 
         // If we don't have an enemy, just idle
         if NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
-            (*NPC).enemy = core::ptr::null_mut();
+            (*NPC).enemy = None;
             NPC_BSSniper_Patrol(ctx);
             return;
         }
@@ -780,7 +780,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             return;
         }
 
-        if (*NPC).enemy == core::ptr::null_mut() {
+        if (*NPC).enemy == None {
             // WTF? somehow we lost our enemy?
             NPC_BSSniper_Patrol(ctx);
             return;
@@ -884,7 +884,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
 
         if world.globals.move2 != 0 {
             // move toward goal
-            if (*NPCInfo).goalEntity != core::ptr::null_mut() {
+            if (*NPCInfo).goalEntity != None {
                 world.globals.move2 = Sniper_Move(ctx);
             } else {
                 world.globals.move2 = QFALSE;
@@ -968,7 +968,7 @@ pub fn NPC_BSSniper_Default(ctx: GameContext<'_>) {
         let world = &mut *ctx.world;
         let NPC = world.globals.NPC as *mut gentity_t;
 
-        if (*NPC).enemy == core::ptr::null_mut() {
+        if (*NPC).enemy == None {
             // don't have an enemy, look for one
             NPC_BSSniper_Patrol(ctx);
         } else {

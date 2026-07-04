@@ -4,11 +4,10 @@
 
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::c_int;
-use core::ffi::c_void;
+use core::ffi::{c_char, c_int, c_void};
 
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
-use mp_qshared::shared::vec3_t;
+use mp_qshared::shared::{vec3_t, entityShared_t};
 
 use crate::vehicles::vehicle_s::Vehicle_t;
 
@@ -39,10 +38,18 @@ pub struct bgEntity_t {
     /// Needed for g2 collision.
     /// Raven field source: `oracle/oracle/codemp/game/bg_public.h:430`
     pub modelScale: vec3_t,
+    /// Shared entity state: linked, bmodel, mins/maxs, absmin/absmax, ownerNum, etc.
+    ///
+    /// Raven field source: `oracle/oracle/codemp/game/g_local.h:144`
+    pub r: entityShared_t,
+    /// Set in QuakeEd.
+    ///
+    /// Raven field source: `oracle/oracle/codemp/game/g_local.h:156`
+    pub classname: *mut c_char,
 }
 
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<bgEntity_t>() == 576);
+const _: () = assert!(core::mem::size_of::<bgEntity_t>() == 696);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(bgEntity_t, s) == 0);
 #[cfg(target_pointer_width = "64")]
@@ -55,3 +62,7 @@ const _: () = assert!(core::mem::offset_of!(bgEntity_t, ghoul2) == 552);
 const _: () = assert!(core::mem::offset_of!(bgEntity_t, localAnimIndex) == 560);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(bgEntity_t, modelScale) == 564);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(bgEntity_t, r) == 576);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(bgEntity_t, classname) == 688);

@@ -536,7 +536,7 @@ pub fn hurt_use(
         if !activator.is_null() && (*activator).inuse != 0 && !(*activator).client.is_null() {
             (*self_).activator = activator;
         } else {
-            (*self_).activator = core::ptr::null_mut();
+            (*self_).activator = None;
         }
 
         G_ActivateBehavior(ctx, self_, BSET_USE);

@@ -159,7 +159,7 @@ pub fn Rancor_DropVictim(
     //FIXME: if Rancor dies, it should drop its victim.
     //FIXME: if Rancor is removed, it must remove its victim.
     unsafe {
-        if !(*self_).activator.is_null() {
+        if !(*self_).activator.is_none() {
             if !(*(*self_).activator).client.is_null() {
                 (*(*(*self_).activator).client).ps.eFlags2 &= !EF2_HELD_BY_MONSTER;
                 (*(*(*self_).activator).client).ps.hasLookTarget = qfalse;
@@ -197,9 +197,9 @@ pub fn Rancor_DropVictim(
                 (*(*(*self_).activator).client).ps.torsoTimer = 0;
             }
             if (*self_).enemy == (*self_).activator {
-                (*self_).enemy = core::ptr::null_mut();
+                (*self_).enemy = None;
             }
-            (*self_).activator = core::ptr::null_mut();
+            (*self_).activator = None;
         }
         (*self_).count = 0;//drop him
     }
@@ -440,8 +440,8 @@ pub fn Rancor_Attack(
         let npc = (*ctx.world).globals.NPC;
 
         if !crate::g_timer::TIMER_Exists(ctx, npc, c"attacking".as_ptr()) {
-            if (*npc).count == 2 && !(*npc).activator.is_null() {
-            } else if (*npc).count == 1 && !(*npc).activator.is_null() {
+            if (*npc).count == 2 && !(*npc).activator.is_none() {
+            } else if (*npc).count == 1 && !(*npc).activator.is_none() {
                 //holding enemy
                 if (*(*npc).activator).health > 0 && crate::q_math::Q_irand(0, 1) != 0 {
                     //quick bite
@@ -502,7 +502,7 @@ pub fn Rancor_Attack(
                 crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg2".as_ptr(), 450);
             },
             BOTH_ATTACK1 => {
-                if (*npc).count == 1 && !(*npc).activator.is_null() {
+                if (*npc).count == 1 && !(*npc).activator.is_none() {
                     crate::g_combat::G_Damage((*npc).activator, npc, npc, [0.0; 3], (*(*npc).activator).r.currentOrigin, crate::q_math::Q_irand(25, 40), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE);
                     if (*(*npc).activator).health <= 0 {
                         //killed him
@@ -522,7 +522,7 @@ pub fn Rancor_Attack(
                 Rancor_Swing(ctx, qtrue);
             },
             BOTH_ATTACK3 => {
-                if (*npc).count == 1 && !(*npc).activator.is_null() {
+                if (*npc).count == 1 && !(*npc).activator.is_none() {
                     //cut in half
                     if !(*(*npc).activator).client.is_null() {
                         //NPC->activator->client->dismembered = qfalse;
@@ -555,7 +555,7 @@ pub fn Rancor_Attack(
             BOTH_ATTACK2 => {
             },
             BOTH_ATTACK3 => {
-                if (*npc).count == 1 && !(*npc).activator.is_null() {
+                if (*npc).count == 1 && !(*npc).activator.is_none() {
                     //swallow victim
                     crate::g_utils::G_Sound(ctx, (*npc).activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()));
                     //FIXME: sometimes end up with a live one in our mouths?
@@ -685,7 +685,7 @@ pub fn NPC_Rancor_Pain(
             && ((*attacker).flags & FL_NOTARGET) == 0 {
             if (*self_).count == 0 {
                 if ((*attacker).s.number == 0 && !crate::q_math::Q_irand(0,3) != 0)
-                    || (*self_).enemy.is_null()
+                    || (*self_).enemy.is_none()
                     || (*(*self_).enemy).health == 0
                     || (!(*(*self_).enemy).client.is_null() && (*(*(*self_).enemy).client).NPC_class == CLASS_RANCOR)
                     || (!(*self_).NPC.is_null() && (*(*self_).NPC).consecutiveBlockedMoves>=10 && DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < DistanceSquared((*(*self_).enemy).r.currentOrigin, (*self_).r.currentOrigin)) {
@@ -700,7 +700,7 @@ pub fn NPC_Rancor_Pain(
                 }
             }
         }
-        if (hitByRancor != 0 || ((*self_).count == 1 && !(*self_).activator.is_null() && !crate::q_math::Q_irand(0,4) != 0) || crate::q_math::Q_irand(0, 200) < damage)
+        if (hitByRancor != 0 || ((*self_).count == 1 && !(*self_).activator.is_none() && !crate::q_math::Q_irand(0,4) != 0) || crate::q_math::Q_irand(0, 200) < damage)
             && (*(*self_).client).ps.legsAnim != BOTH_STAND1TO2
             && crate::g_timer::TIMER_Done(ctx, self_, c"takingPain".as_ptr()) != 0 {
             if !Rancor_CheckRoar(ctx, self_) {
@@ -806,7 +806,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             Rancor_DropVictim(ctx, npc);
         } else if (*(*npc).client).ps.legsAnim == BOTH_PAIN2
             && (*npc).count == 1
-            && !(*npc).activator.is_null() {
+            && !(*npc).activator.is_none() {
             if crate::q_math::Q_irand(0, 3) == 0 {
                 Rancor_CheckDropVictim(ctx);
             }
@@ -817,7 +817,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
             return;
         }
-        if !(*npc).enemy.is_null() {
+        if !(*npc).enemy.is_none() {
             /*
             if ( NPC->enemy->client //enemy is a client
                 && (NPC->enemy->client->NPC_class == CLASS_UGNAUGHT || NPC->enemy->client->NPC_class == CLASS_JAWA )//enemy is a lowly jawa or ugnaught
@@ -852,7 +852,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
                     crate::g_timer::TIMER_Remove(ctx, npc, c"lookForNewEnemy".as_ptr());//make them look again right now
                     if (*(*npc).enemy).inuse == 0 || (*ctx.world).level.time - (*(*npc).enemy).s.time > crate::q_math::Q_irand(10000, 15000) {
                         //it's been a while since the enemy died, or enemy is completely gone, get bored with him
-                        (*npc).enemy = core::ptr::null_mut();
+                        (*npc).enemy = None;
                         Rancor_Patrol(ctx);
                         crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
                         return;
@@ -861,7 +861,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
                 if crate::g_timer::TIMER_Done(ctx, npc, c"lookForNewEnemy".as_ptr()) != 0 {
                     let newEnemy = crate::NPC_combat::NPC_CheckEnemy(ctx, ((*npc_info).confusionTime < (*ctx.world).level.time) as c_int, qfalse, qfalse);
                     let sav_enemy = (*npc).enemy;
-                    (*npc).enemy = core::ptr::null_mut();
+                    (*npc).enemy = None;
                     let newEnemy = newEnemy;
                     (*npc).enemy = sav_enemy;
                     if !newEnemy.is_null() && newEnemy != sav_enemy {

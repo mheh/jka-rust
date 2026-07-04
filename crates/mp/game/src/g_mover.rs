@@ -715,7 +715,7 @@ pub fn CalcTeamDoorCenter(
             center[i] = ((*ent).r.mins[i] + (*ent).r.maxs[i]) * 0.5;
         }
         let mut slave = (*ent).teamchain;
-        while !slave.is_null() {
+        while !slave.is_none() {
             // find slave's center
             let mut slave_center = [0.0f32; 3];
             for i in 0..3 {
@@ -874,7 +874,7 @@ pub fn Reached_BinaryMover(
             }
 
             // fire targets
-            if (*ent).activator.is_null() {
+            if (*ent).activator.is_none() {
                 (*ent).activator = ent;
             }
             G_UseTargets2(ctx, ent, (*ent).activator, (*ent).opentarget);
@@ -887,7 +887,7 @@ pub fn Reached_BinaryMover(
             G_PlayDoorSound(ctx, ent, BMS_END);
 
             // close areaportals
-            if (*ent).teammaster == ent || (*ent).teammaster.is_null() {
+            if (*ent).teammaster == ent || (*ent).teammaster.is_none() {
                 trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qfalse));
             }
             G_UseTargets2(ctx, ent, (*ent).activator, (*ent).closetarget);
@@ -922,7 +922,7 @@ pub fn Use_BinaryMover_Go(
             (*ent).s.time = (*ctx.world).level.time;
 
             // open areaportal
-            if (*ent).teammaster == ent || (*ent).teammaster.is_null() {
+            if (*ent).teammaster == ent || (*ent).teammaster.is_none() {
                 trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qtrue));
             }
             G_UseTargets(ctx, ent, (*ent).activator);
@@ -1216,7 +1216,7 @@ pub fn Touch_DoorTrigger(
             return;
         }
 
-        if (*ent).genericValue14 == 0 && ((*ent).parent.is_null() || (*(*ent).parent).genericValue14 == 0) {
+        if (*ent).genericValue14 == 0 && ((*ent).parent.is_none() || (*(*ent).parent).genericValue14 == 0) {
             if !(*other).client.is_null()
                 && (*other).s.number >= MAX_CLIENTS as c_int
                 && (*other).s.eType == entityType_t::ET_NPC as c_int
@@ -1295,7 +1295,7 @@ pub fn Think_SpawnNewDoorTrigger(
         let mut maxs = (*ent).r.absmax;
 
         let mut other = (*ent).teamchain;
-        while !other.is_null() {
+        while !other.is_none() {
             AddPointToBounds((*other).r.absmin, &mut mins, &mut maxs);
             AddPointToBounds((*other).r.absmax, &mut mins, &mut maxs);
             other = (*other).teamchain;
@@ -1372,7 +1372,7 @@ pub fn G_FindDoorTrigger(
         let mut door = ent;
         if (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
             // not the master door, get the master door
-            while !(*door).teammaster.is_null() && (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+            while !(*door).teammaster.is_none() && (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
                 door = (*door).teammaster;
             }
         }
@@ -1431,7 +1431,7 @@ pub fn G_EntIsUnlockedDoor(
             let mut owner: *mut gentity_t;
             if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
                 // not the master door, get the master door
-                while !(*ent).teammaster.is_null() && (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+                while !(*ent).teammaster.is_none() && (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
                     ent = (*ent).teammaster;
                 }
             }
@@ -1829,7 +1829,7 @@ pub fn Reached_Train(
     unsafe {
         // copy the appropriate values
         let next = (*ent).nextTrain;
-        if next.is_null() || (*next).nextTrain.is_null() {
+        if next.is_none() || (*next).nextTrain.is_null() {
             return; // just stop
         }
 
@@ -1888,7 +1888,7 @@ pub fn Think_SetupTrainTargets(
             core::mem::offset_of!(gentity_t, targetname) as c_int,
             (*ent).target,
         );
-        if (*ent).nextTrain.is_null() {
+        if (*ent).nextTrain.is_none() {
             Com_Printf(c"func_train at %s with an unfound target\n".as_ptr());
             // Free me?`
             return;
@@ -2405,7 +2405,7 @@ pub fn funcBBrushDieGo(
 
         let up = [0.0f32, 0.0, 1.0];
 
-        if !(*self_).target.is_null() && !attacker.is_null() {
+        if !(*self_).target.is_null() && !attacker.is_none() {
             G_UseTargets(ctx, self_, attacker);
         }
 
@@ -2453,7 +2453,7 @@ pub fn funcBBrushDieGo(
             *c *= 0.5;
         }
 
-        let dir = if !attacker.is_null() && !(*attacker).client.is_null() {
+        let dir = if !attacker.is_none() && !(*attacker).client.is_null() {
             let mut d = [
                 org[0] - (*attacker).r.currentOrigin[0],
                 org[1] - (*attacker).r.currentOrigin[1],
@@ -2561,7 +2561,7 @@ pub fn funcBBrushPain(
         }
 
         if !(*self_).paintarget.is_null() && *(*self_).paintarget != 0 {
-            if (*self_).activator.is_null() {
+            if (*self_).activator.is_none() {
                 if !attacker.is_null() && (*attacker).inuse != 0 && !(*attacker).client.is_null() {
                     G_UseTargets2(ctx, self_, attacker, (*self_).paintarget);
                 }

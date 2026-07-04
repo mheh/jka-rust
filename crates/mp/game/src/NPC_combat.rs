@@ -61,7 +61,7 @@ pub fn G_ClearEnemy(
     unsafe {
         NPC_CheckLookTarget(ctx, self_);
 
-        if !(*self_).enemy.is_null() {
+        if !(*self_).enemy.is_none() {
             let client = (*self_).client as *mut gclient_t;
             if !client.is_null()
                 && (*client).renderInfo.lookTarget == (*(*self_).enemy).s.number
@@ -71,12 +71,12 @@ pub fn G_ClearEnemy(
 
             let npc = (*self_).NPC as *mut gNPC_t;
             if !npc.is_null() && (*self_).enemy == (*npc).goalEntity {
-                (*npc).goalEntity = std::ptr::null_mut();
+                (*npc).goalEntity = None;
             }
             //FIXME: set last enemy?
         }
 
-        (*self_).enemy = std::ptr::null_mut();
+        (*self_).enemy = None;
     }
 }
 
@@ -144,7 +144,7 @@ pub fn G_TeamEnemy(
                 //ent is not on my team
                 continue;
             }
-            if !(*ent).enemy.is_null() {
+            if !(*ent).enemy.is_none() {
                 //they have an enemy
                 let enemy_client = (*(*ent).enemy).client as *mut gclient_t;
                 if enemy_client.is_null() || (*enemy_client).playerTeam != (*self_client).playerTeam {
@@ -429,7 +429,7 @@ pub fn G_SetEnemy(
         //NOTE: this is not necessarily true!
         //self->NPC->enemyLastSeenTime = level.time;
 
-        if (*self_).enemy.is_null() {
+        if (*self_).enemy.is_none() {
             //TEMP HACK: turn on our saber
             if (*self_).health > 0 {
                 G_ForceSaberOn(ctx, self_);
@@ -695,7 +695,7 @@ pub fn CanShoot(
 
         // point blank, baby!
         let shooter_npc = (*shooter).NPC as *mut gNPC_t;
-        if tr.startsolid != 0 && !shooter_npc.is_null() && !(*shooter_npc).touchedByPlayer.is_null()
+        if tr.startsolid != 0 && !shooter_npc.is_null() && !(*shooter_npc).touchedByPlayer.is_none()
         {
             traceEnt = (*shooter_npc).touchedByPlayer;
         }

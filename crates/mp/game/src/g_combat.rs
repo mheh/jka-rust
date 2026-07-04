@@ -248,7 +248,7 @@ pub fn ExplodeDeath(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         if (*self_).splashDamage > 0 && (*self_).splashRadius > 0 {
             let mut attacker = self_;
-            if !(*self_).parent.is_null() {
+            if !(*self_).parent.is_none() {
                 attacker = (*self_).parent;
             }
             G_RadiusDamage(

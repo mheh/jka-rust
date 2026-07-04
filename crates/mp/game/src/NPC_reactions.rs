@@ -90,7 +90,7 @@ pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_reactions.c:157-196`
 pub fn NPC_GetPainChance(ctx: GameContext<'_>, self_: *mut gentity_t, damage: c_int) -> f32 {
     unsafe {
-        if (*self_).enemy.is_null() {
+        if (*self_).enemy.is_none() {
             //surprised, always take pain
             return 1.0f32;
         }

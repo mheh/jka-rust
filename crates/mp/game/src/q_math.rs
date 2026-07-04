@@ -254,6 +254,16 @@ pub fn Distance(p1: vec3_t, p2: vec3_t) -> vec_t {
     VectorLength(vec_sub(p2, p1))
 }
 
+/// Raven `VectorCompare` (header-inline helper).
+/// Returns 1 if vectors are equal, 0 otherwise.
+/// Source: `oracle/oracle/codemp/game/q_shared.h:1527-1532`
+pub fn VectorCompare(v1: vec3_t, v2: vec3_t) -> qboolean {
+    if v1[0] != v2[0] || v1[1] != v2[1] || v1[2] != v2[2] {
+        return 0;
+    }
+    1
+}
+
 /// Raven `Q_rand`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_math.c:126-129`

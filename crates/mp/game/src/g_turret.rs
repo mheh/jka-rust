@@ -70,7 +70,7 @@ pub fn TurretPain(
 ) {
     unsafe {
         let target = (*self_).target_ent;
-        if !target.is_null() {
+        if !target.is_none() {
             (*target).health = (*self_).health;
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(target);
@@ -87,7 +87,7 @@ pub fn TurretPain(
             }
         }
 
-        if (*self_).enemy.is_null() {
+        if (*self_).enemy.is_none() {
             G_SetEnemy(ctx, self_, attacker);
         }
     }
@@ -104,7 +104,7 @@ pub fn TurretBasePain(
 ) {
     unsafe {
         let target = (*self_).target_ent;
-        if !target.is_null() {
+        if !target.is_none() {
             (*target).health = (*self_).health;
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(target);
@@ -172,7 +172,7 @@ pub fn auto_turret_die(
             (*self_).s.modelindex = (*self_).s.modelindex2;
 
             let target = (*self_).target_ent;
-            if !target.is_null() && (*target).s.modelindex2 != 0 {
+            if !target.is_none() && (*target).s.modelindex2 != 0 {
                 (*target).s.modelindex = (*target).s.modelindex2;
             }
 
@@ -208,7 +208,7 @@ pub fn bottom_die(
 ) {
     unsafe {
         let target = (*self_).target_ent;
-        if !target.is_null() && (*target).health > 0 {
+        if !target.is_none() && (*target).health > 0 {
             (*target).health = (*self_).health;
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(target);
@@ -322,7 +322,7 @@ pub fn turret_head_think(
             }
         }
 
-        if !(*self_).enemy.is_null() && (*self_).setTime < ctx.world.level.time && (*self_).attackDebounceTime < ctx.world.level.time {
+        if !(*self_).enemy.is_none() && (*self_).setTime < ctx.world.level.time && (*self_).attackDebounceTime < ctx.world.level.time {
             let mut fwd = [0.0; 3];
             let mut org = [0.0; 3];
 
@@ -403,7 +403,7 @@ pub fn turret_aim(
             diffYaw = AngleSubtract(desiredAngles[YAW], top.r.currentAngles[YAW]);
             diffPitch = AngleSubtract(desiredAngles[PITCH], top.r.currentAngles[PITCH]);
             turnSpeed = ctx.world.rng.next_float() * 10.0 - 5.0;
-        } else if !(*self_).enemy.is_null() {
+        } else if !(*self_).enemy.is_none() {
             // Aim at enemy
             let enemy = (*self_).enemy;
             org[0] = (*enemy).r.currentOrigin[0];
@@ -517,7 +517,7 @@ pub fn turret_turnoff(
         }
 
         (*self_).s.loopSound = 0;
-        (*self_).enemy = std::ptr::null_mut();
+        (*self_).enemy = None;
     }
 }
 
@@ -529,12 +529,12 @@ pub fn turret_sleep(
     self_: *mut gentity_t,
 ) {
     unsafe {
-        if (*self_).enemy.is_null() {
+        if (*self_).enemy.is_none() {
             return;
         }
 
         (*self_).aimDebounceTime = ctx.world.level.time + 5000;
-        (*self_).enemy = std::ptr::null_mut();
+        (*self_).enemy = None;
     }
 }
 
@@ -659,14 +659,14 @@ pub fn turret_base_think(
             (*self_).nextthink = ctx.world.level.time + FRAMETIME;
         }
 
-        if (*self_).enemy.is_null() {
+        if (*self_).enemy.is_none() {
             if turret_find_enemies(ctx, self_) {
                 turnOff = qfalse;
             }
-        } else if !(*self_).enemy.is_null() && !(*(*self_).enemy).client.is_null() && (*(*(*self_).enemy).client).sess.sessionTeam == TEAM_SPECTATOR {
+        } else if !(*self_).enemy.is_none() && !(*(*self_).enemy).client.is_null() && (*(*(*self_).enemy).client).sess.sessionTeam == TEAM_SPECTATOR {
             // Don't keep going after spectators
-            (*self_).enemy = std::ptr::null_mut();
-        } else if !(*self_).enemy.is_null() && (*(*self_).enemy).health > 0 {
+            (*self_).enemy = None;
+        } else if !(*self_).enemy.is_none() && (*(*self_).enemy).health > 0 {
             // Enemy is alive
             let mut enemyDir = [0.0; 3];
             enemyDir[0] = (*(*self_).enemy).r.currentOrigin[0] - (*self_).r.currentOrigin[0];
@@ -712,7 +712,7 @@ pub fn turret_base_think(
             }
         }
 
-        if !(*self_).enemy.is_null() {
+        if !(*self_).enemy.is_none() {
             turret_head_think(ctx, self_);
         }
 

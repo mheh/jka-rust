@@ -152,7 +152,7 @@ pub fn Grenadier_HoldPosition(ctx: GameContext<'_>) {
 
         if !npc_info_ptr.is_null() {
             NPC_FreeCombatPoint(ctx, (*npc_info_ptr).combatPoint, QTRUE);
-            (*npc_info_ptr).goalEntity = core::ptr::null_mut();
+            (*npc_info_ptr).goalEntity = None;
         }
     }
 }
@@ -189,7 +189,7 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
             // couldn't get to enemy
             if ((*npc_info_ptr).scriptFlags & SCF_CHASE_ENEMIES) != 0
                 && (*(*npc_ptr).client).ps.weapon == WP_THERMAL
-                && !(*npc_info_ptr).goalEntity.is_null()
+                && !(*npc_info_ptr).goalEntity.is_none()
                 && (*npc_info_ptr).goalEntity == (*npc_ptr).enemy
             {
                 // we were running after enemy
@@ -367,7 +367,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
         }
 
         // See if we're moving towards a goal, not the enemy
-        if (*npc_info_ptr).goalEntity != (*npc_ptr).enemy && !(*npc_info_ptr).goalEntity.is_null() {
+        if (*npc_info_ptr).goalEntity != (*npc_ptr).enemy && !(*npc_info_ptr).goalEntity.is_none() {
             // Did we make it?
             if NAV_HitNavGoal(
                 (*npc_ptr).r.currentOrigin,
@@ -423,7 +423,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
             TIMER_Set(ctx, npc_ptr, c"roamTime".as_ptr() as *const c_char, Q_irand(4000, 8000));
         }
 
-        if (*npc_info_ptr).goalEntity.is_null() {
+        if (*npc_info_ptr).goalEntity.is_none() {
             if ((*npc_info_ptr).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
                 (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
             }
@@ -473,7 +473,7 @@ pub fn Grenadier_EvaluateShot(
         let world = &*ctx.world;
         let npc_ptr = world.globals.NPC;
 
-        if npc_ptr.is_null() || (*npc_ptr).enemy.is_null() {
+        if npc_ptr.is_null() || (*npc_ptr).enemy.is_none() {
             return QFALSE;
         }
 
@@ -515,7 +515,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
 
         // If we don't have an enemy, just idle
         if NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
-            (*npc_ptr).enemy = core::ptr::null_mut();
+            (*npc_ptr).enemy = None;
             NPC_BSGrenadier_Patrol(ctx);
             return;
         }
@@ -528,7 +528,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             return;
         }
 
-        if (*npc_ptr).enemy.is_null() {
+        if (*npc_ptr).enemy.is_none() {
             // WTF?  somehow we lost our enemy?
             NPC_BSGrenadier_Patrol(ctx);
             return;
@@ -651,7 +651,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
 
         if world.globals.move3 != QFALSE {
             // move toward goal
-            if !(*npc_info_ptr).goalEntity.is_null() {
+            if !(*npc_info_ptr).goalEntity.is_none() {
                 world.globals.move3 = Grenadier_Move(ctx);
             } else {
                 world.globals.move3 = QFALSE;
@@ -716,7 +716,7 @@ pub fn NPC_BSGrenadier_Default(ctx: GameContext<'_>) {
             WeaponThink(ctx, QTRUE);
         }
 
-        if (*npc_ptr).enemy.is_null() {
+        if (*npc_ptr).enemy.is_none() {
             // don't have an enemy, look for one
             NPC_BSGrenadier_Patrol(ctx);
         } else {

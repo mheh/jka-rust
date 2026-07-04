@@ -526,7 +526,7 @@ pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
             Q3_RemoveEnt(ctx, ent);
         } else if Q_stricmp(b"enemy\0".as_ptr() as *const c_char, name) == 0 {
             let victim = (*ent).enemy;
-            if victim.is_null() {
+            if victim.is_none() {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -777,7 +777,7 @@ pub fn Q3_SetEnemy(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
             if !(*ent).NPC.is_null() {
                 G_ClearEnemy(ctx, ent);
             } else {
-                (*ent).enemy = std::ptr::null_mut();
+                (*ent).enemy = None;
             }
         } else {
             let enemy = G_Find(

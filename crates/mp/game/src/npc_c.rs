@@ -180,8 +180,8 @@ pub fn NPC_RemoveBody(
             ) == 0
             {
                 let activator = (*self_).activator;
-                let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
-                if activator.is_null()
+                let activator_client = if activator.is_none() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
+                if activator.is_none()
                     || activator_client.is_null()
                     || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
                 {
@@ -221,7 +221,7 @@ pub fn NPC_RemoveBody(
             //			placed as dead NPCs by a designer...
             //			For now we just assume that a corpse with no enemy was
             //			placed in the map as a corpse
-            if !(*self_).enemy.is_null() {
+            if !(*self_).enemy.is_none() {
                 //if ( !self->taskManager || !self->taskManager->IsRunning() )
                 if trap::ICARUS_IsRunning(
                     ctx.engine,
@@ -229,8 +229,8 @@ pub fn NPC_RemoveBody(
                 ) == 0
                 {
                     let activator = (*self_).activator;
-                    let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
-                    if activator.is_null()
+                    let activator_client = if activator.is_none() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
+                    if activator.is_none()
                         || activator_client.is_null()
                         || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
                     {
@@ -787,7 +787,7 @@ pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
             //FIXME: shouldn't remove this just yet if cg_draw needs it
             (*npc_info).aiFlags &= !NPCAI_LOST;
 
-            if !(*npc_info).goalEntity.is_null() && (*npc_info).goalEntity == (*npc_ent).enemy {
+            if !(*npc_info).goalEntity.is_none() && (*npc_info).goalEntity == (*npc_ent).enemy {
                 //We can't nav to our enemy
                 //Drop enemy and see if we should search for him
                 crate::NPC_AI_Default::NPC_LostEnemyDecideChase(ctx);
@@ -862,7 +862,7 @@ pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
         let npc_info = world.globals.NPCInfo;
 
         // If they don't have an enemy they shouldn't hold their attack anim.
-        if (*npc_ent).enemy.is_null() {
+        if (*npc_ent).enemy.is_none() {
             (*npc_info).attackHoldTime = 0;
             return;
         }
@@ -1363,7 +1363,7 @@ pub fn NPC_RunBehavior(
                         _ => {}
                     }
 
-                    if !(*npc_ent).enemy.is_null()
+                    if !(*npc_ent).enemy.is_none()
                         && (*npc_ent).s.weapon == WP_NONE
                         && bState != bState_t::BS_HUNT_AND_KILL as c_int
                         && trap::ICARUS_TaskIDPending(
@@ -1480,7 +1480,7 @@ pub fn NPC_ExecuteBState(
         //Pick the proper bstate for us and run it
         NPC_RunBehavior(ctx, (*client).playerTeam as c_int, bState as c_int);
 
-        if !(*npc_ent).enemy.is_null() && (*(*npc_ent).enemy).inuse == 0 {
+        if !(*npc_ent).enemy.is_none() && (*(*npc_ent).enemy).inuse == 0 {
             //just in case bState doesn't catch this
             crate::NPC_combat::G_ClearEnemy(ctx, npc_ent);
         }
@@ -1488,12 +1488,12 @@ pub fn NPC_ExecuteBState(
         if (*client).ps.saberLockTime != 0 && (*client).ps.saberLockEnemy != ENTITYNUM_NONE {
             crate::NPC_utils::NPC_SetLookTarget(npc_ent, (*client).ps.saberLockEnemy, world.level.time + 1000);
         } else if crate::NPC_utils::NPC_CheckLookTarget(ctx, npc_ent) == 0 {
-            if !(*npc_ent).enemy.is_null() {
+            if !(*npc_ent).enemy.is_none() {
                 crate::NPC_utils::NPC_SetLookTarget(npc_ent, (*(*npc_ent).enemy).s.number, 0);
             }
         }
 
-        if !(*npc_ent).enemy.is_null() {
+        if !(*npc_ent).enemy.is_none() {
             let enemy = (*npc_ent).enemy;
             if ((*enemy).flags & FL_DONT_SHOOT) != 0 {
                 world.globals.ucmd.buttons &= !BUTTON_ATTACK;
@@ -1525,7 +1525,7 @@ pub fn NPC_ExecuteBState(
                 //Sniper pose
                 NPC_SetAnim(npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONREADY3 as c_int, SETANIM_FLAG_NORMAL);
             }
-        } else if (*npc_ent).enemy.is_null() {
+        } else if (*npc_ent).enemy.is_none() {
             //HACK!
             if (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY1 as c_int
                 || (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY3 as c_int
@@ -1561,7 +1561,7 @@ pub fn NPC_ExecuteBState(
         }
 
         // end of thinking cleanup
-        (*npc_info).touchedByPlayer = core::ptr::null_mut();
+        (*npc_info).touchedByPlayer = None;
 
         crate::NPC_reactions::NPC_CheckPlayerAim();
         crate::NPC_reactions::NPC_CheckAllClear();

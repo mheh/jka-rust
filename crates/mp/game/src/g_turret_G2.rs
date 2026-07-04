@@ -312,7 +312,7 @@ pub fn TurretG2Pain(
                 (*ctx.world).level.time + 2000 + (random_() * 500.0) as c_int;
             (*self_).painDebounceTime = (*self_).attackDebounceTime;
         }
-        if (*self_).enemy.is_null() {
+        if (*self_).enemy.is_none() {
             // react to being hit
             G_SetEnemy(ctx, self_, attacker);
         }
@@ -504,7 +504,7 @@ pub fn turretG2_head_think(
     unsafe {
         // if it's time to fire and we have an enemy, then gun 'em down!
         // pushDebounce time controls next fire time
-        if !(*self_).enemy.is_null()
+        if !(*self_).enemy.is_none()
             && (*self_).setTime < (*ctx.world).level.time
             && (*self_).attackDebounceTime < (*ctx.world).level.time
         {
@@ -588,7 +588,7 @@ pub fn turretG2_aim(
         (*self_).r.currentAngles[YAW as usize] = AngleNormalize360((*self_).r.currentAngles[YAW as usize]);
         (*self_).speed = AngleNormalize360((*self_).speed);
 
-        if !(*self_).enemy.is_null() {
+        if !(*self_).enemy.is_none() {
             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
             // ...then we'll calculate what new aim adjustments we should attempt to make this frame
             // Aim at enemy
@@ -721,7 +721,7 @@ pub fn turretG2_turnoff(
     self_: *mut gentity_t,
 ) {
     unsafe {
-        if (*self_).enemy.is_null() {
+        if (*self_).enemy.is_none() {
             // we don't need to turnoff
             return;
         }
@@ -737,7 +737,7 @@ pub fn turretG2_turnoff(
         (*self_).aimDebounceTime = (*ctx.world).level.time + 5000;
 
         // Clear enemy
-        (*self_).enemy = core::ptr::null_mut();
+        (*self_).enemy = None;
     }
 }
 
@@ -911,9 +911,9 @@ pub fn turretG2_base_think(
             (*self_).flags &= !FL_NOTARGET;
         }
 
-        if !(*self_).enemy.is_null() {
+        if !(*self_).enemy.is_none() {
             if (*(*self_).enemy).health < 0 || (*(*self_).enemy).inuse == 0 {
-                (*self_).enemy = core::ptr::null_mut();
+                (*self_).enemy = None;
             }
         }
 
@@ -932,12 +932,12 @@ pub fn turretG2_base_think(
             }
         }
 
-        if !(*self_).enemy.is_null() {
+        if !(*self_).enemy.is_none() {
             if !(*(*self_).enemy).client.is_null()
                 && (*((*(*self_).enemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR as c_int
             {
                 // don't keep going after spectators
-                (*self_).enemy = core::ptr::null_mut();
+                (*self_).enemy = None;
             } else {
                 // FIXME: remain single-minded or look for a new enemy every now and then?
                 // enemy is alive

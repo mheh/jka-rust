@@ -7,6 +7,7 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use crate::common::mp::entity_id::EntityId;
 use crate::common::mp::qcommon::{entityState_t, gitem_t, parms_t, playerState_t};
 use crate::common::mp::trace_t::trace_t;
 use crate::shared::{entityShared_t, qboolean, vec3_t};
@@ -268,11 +269,14 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:240`
     pub soundLoop: c_int,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:241`
-    pub parent: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub parent: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:242`
-    pub nextTrain: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub nextTrain: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:243`
-    pub prevTrain: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub prevTrain: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:244`
     pub pos1: vec3_t,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:244`
@@ -309,7 +313,8 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:263`
     pub targetShaderNewName: *mut c_char,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:264`
-    pub target_ent: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub target_ent: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:266`
     pub closetarget: *mut c_char,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:267`
@@ -404,19 +409,25 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:312`
     pub alt_fire: qboolean,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:314`
-    pub chain: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub chain: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:315`
-    pub enemy: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub enemy: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:316`
-    pub lastEnemy: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub lastEnemy: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:317`
-    pub activator: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub activator: Option<EntityId>,
     /// Next entity in team.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:318`
-    pub teamchain: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub teamchain: Option<EntityId>,
     /// Master of the team.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:319`
-    pub teammaster: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+    pub teammaster: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:321`
     pub watertype: c_int,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:322`
@@ -485,8 +496,16 @@ pub struct gentity_t {
 // `m_pVehicle`/`client`/`NPC` occupy the same 8 bytes as their real pointee
 // pointers, so these offsets hold regardless of those types being ported.
 // Source: `oracle/oracle/codemp/game/g_local.h:133-359`
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<gentity_t>() == 1832);
+//
+// RULING 22 (`docs/handoffs/jampgame-fork-discovery.md`): the fork-4 flip turned
+// 10 stored `gentity_t*` fields (`parent`..`teammaster`, all after `moverState`)
+// into `Option<EntityId>`. Those pointers were never ABI-visible — the engine
+// only pins the SHARED PREFIX (`s`, then `r`/`entityShared_t`, up through
+// `next_roff_time`, per the "DO NOT MODIFY ANYTHING ABOVE THIS" comment) and
+// learns the full stride at runtime via `trap_LocateGameData`. So the private
+// tail (`size_of` and every offset at/after the first flipped field `parent`)
+// is free and its literal asserts are dropped; only the fixed-prefix asserts
+// below (all BEFORE `parent`) are kept.
 const _: () = assert!(core::mem::offset_of!(gentity_t, s) == 0); // arch-independent anchor
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, r) == 576);
@@ -496,14 +515,6 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, taskID) == 688);
 const _: () = assert!(core::mem::offset_of!(gentity_t, client) == 976);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, moverState) == 1176);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gentity_t, think) == 1440);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gentity_t, material) == 1516);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gentity_t, locationDamage) == 1544);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gentity_t, item) == 1824);
 
 // The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
 // all-zero bytes are a valid gentity_t — the same property the layout asserts above

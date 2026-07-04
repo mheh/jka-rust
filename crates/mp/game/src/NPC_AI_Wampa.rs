@@ -158,7 +158,7 @@ pub fn Wampa_Move(
         if !npc_info.is_null() && (*npc_info).localState != LSTATE_WAITING {
             (*npc_info).goalEntity = (*npc).enemy;
 
-            if !(*npc).enemy.is_null() {
+            if !(*npc).enemy.is_none() {
                 // pick correct movement speed and anim
                 // run by default
                 (*ctx.world).globals.ucmd.buttons &= !BUTTON_WALKING;
@@ -461,9 +461,9 @@ pub fn NPC_Wampa_Pain(
             && ((*attacker).flags & crate::prelude::FL_NOTARGET) == 0
         {
             if ((*attacker).s.number == 0 && !crate::q_math::Q_irand(0, 3) != 0)
-                || (*self_).enemy.is_null()
+                || (*self_).enemy.is_none()
                 || (*(*self_).enemy).health == 0
-                || (!(*self_).enemy.is_null() && !(*(*self_).enemy).client.is_null() && (*(*(*self_).enemy).client).NPC_class == crate::prelude::CLASS_WAMPA)
+                || (!(*self_).enemy.is_none() && !(*(*self_).enemy).client.is_null() && (*(*(*self_).enemy).client).NPC_class == crate::prelude::CLASS_WAMPA)
                 || (!crate::q_math::Q_irand(0, 4) != 0 && crate::NPC_AI_Rancor::DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < crate::NPC_AI_Rancor::DistanceSquared((*(*self_).enemy).r.currentOrigin, (*self_).r.currentOrigin))
             {
                 // if my enemy is dead (or attacked by player) and I'm not still holding/eating someone, turn on the attacker
@@ -539,7 +539,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
             crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
             return;
         }
-        if !(*npc).enemy.is_null() {
+        if !(*npc).enemy.is_none() {
             if !crate::g_timer::TIMER_Done(ctx, npc, c"attacking".as_ptr()) != 0 {
                 // in middle of attack
                 // face enemy
@@ -555,7 +555,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                     crate::g_timer::TIMER_Set(ctx, npc, c"angrynoise".as_ptr(), crate::q_math::Q_irand(5000, 10000));
                 }
                 // else, if he's in our hand, we eat, else if he's on the ground, we keep attacking his dead body for a while
-                if !(*npc).enemy.is_null() && !(*(*npc).enemy).client.is_null() && (*(*(*npc).enemy).client).NPC_class == crate::prelude::CLASS_WAMPA {
+                if !(*npc).enemy.is_none() && !(*(*npc).enemy).client.is_null() && (*(*(*npc).enemy).client).NPC_class == crate::prelude::CLASS_WAMPA {
                     // got mad at another Wampa, look for a valid enemy
                     if !crate::g_timer::TIMER_Done(ctx, npc, c"wampaInfight".as_ptr()) != 0 {
                         crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue);
@@ -565,7 +565,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                         crate::g_timer::TIMER_Remove(ctx, npc, c"lookForNewEnemy".as_ptr()); // make them look again right now
                         if !(*(*npc).enemy).inuse != 0 || (*ctx.world).level.time - (*(*npc).enemy).s.time > crate::q_math::Q_irand(10000, 15000) {
                             // it's been a while since the enemy died, or enemy is completely gone, get bored with him
-                            (*npc).enemy = core::ptr::null_mut();
+                            (*npc).enemy = None;
                             Wampa_Patrol(ctx);
                             crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
                             // just lost my enemy
@@ -584,7 +584,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                     if !crate::g_timer::TIMER_Done(ctx, npc, c"lookForNewEnemy".as_ptr()) != 0 {
                         let newEnemy;
                         let sav_enemy = (*npc).enemy; // FIXME: what about NPC->lastEnemy?
-                        (*npc).enemy = core::ptr::null_mut();
+                        (*npc).enemy = None;
                         newEnemy = crate::NPC_combat::NPC_CheckEnemy(ctx, if (*npc_info).confusionTime < (*ctx.world).level.time { qtrue } else { qfalse }, qfalse, qfalse);
                         (*npc).enemy = sav_enemy;
                         if !newEnemy.is_null() && newEnemy != sav_enemy {

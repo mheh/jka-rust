@@ -373,7 +373,7 @@ pub fn AI_ValidateGroupMember(
 
         //should have same enemy
         if (*member).enemy != (*group).enemy {
-            if !(*member).enemy.is_null() {
+            if !(*member).enemy.is_none() {
                 //he's fighting someone else, leave him out
                 return 0;
             }
@@ -429,7 +429,7 @@ pub fn AI_GetGroup(ctx: GameContext<'_>, self_: *mut gentity_t) {
             return;
         }
 
-        if !(*self_).enemy.is_null() {
+        if !(*self_).enemy.is_none() {
             let enemyClient = (*(*self_).enemy).client;
             if enemyClient.is_null()
                 || ((*ctx.world).level.time - (*npc).enemyLastSeenTime > 7000)

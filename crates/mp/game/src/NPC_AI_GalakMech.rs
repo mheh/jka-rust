@@ -570,7 +570,7 @@ pub fn GM_HoldPosition(ctx: GameContext<'_>) {
         );
         if pending == 0 {
             // don't have a script waiting for me to get to my point, okay to stop trying and stand
-            (*npc_info).goalEntity = core::ptr::null_mut();
+            (*npc_info).goalEntity = None;
         }
     }
 }
@@ -628,7 +628,7 @@ pub fn GM_CheckMoveState(ctx: GameContext<'_>) {
         }
 
         // See if we're moving towards a goal, not the enemy
-        if (*npc_info).goalEntity != (*npc_ent).enemy && !(*npc_info).goalEntity.is_null() {
+        if (*npc_info).goalEntity != (*npc_ent).enemy && !(*npc_info).goalEntity.is_none() {
             // Did we make it?
             let hit_goal = crate::g_nav::NAV_HitNavGoal(
                 (*npc_ent).r.currentOrigin,

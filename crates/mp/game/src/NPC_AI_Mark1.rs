@@ -527,7 +527,7 @@ pub fn Mark1_Hunt(ctx: GameContext<'_>) {
         let npc_info = (*ctx.world).globals.NPCInfo;
 
         if !npc_info.is_null() {
-            if (*npc_info).goalEntity.is_null() {
+            if (*npc_info).goalEntity.is_none() {
                 (*npc_info).goalEntity = (*npc).enemy;
             }
         }
@@ -807,7 +807,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
 
         // Enemy is dead or he has no enemy.
         if (*(*npc).enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
-            (*npc).enemy = core::ptr::null_mut();
+            (*npc).enemy = None;
             return;
         }
 
@@ -878,7 +878,7 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
         }
 
         // If we have somewhere to go, then do that
-        if (*npc).enemy.is_null() {
+        if (*npc).enemy.is_none() {
             let goal = crate::NPC_goal::UpdateGoal(ctx);
             if !goal.is_null() {
                 (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
@@ -903,7 +903,7 @@ pub fn NPC_BSMark1_Default(ctx: GameContext<'_>) {
             return;
         }
 
-        if !(*npc).enemy.is_null() {
+        if !(*npc).enemy.is_none() {
             (*npc_info).goalEntity = (*npc).enemy;
             Mark1_AttackDecision(ctx);
         } else if (*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES != 0 {

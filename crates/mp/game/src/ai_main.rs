@@ -63,7 +63,7 @@ pub fn BotStraightTPOrderCheck(
             0 => {
                 if (*bs).squadLeader == ent {
                     (*bs).teamplayState = 0;
-                    (*bs).squadLeader = core::ptr::null_mut();
+                    (*bs).squadLeader = None;
                 }
             }
             x if x == bot_teamplay_state_t::TEAMPLAYSTATE_FOLLOWING as c_int => {
@@ -332,7 +332,7 @@ pub fn BotChangeViewAngles(
         }
 
         let mut factor: f32;
-        if !bs.currentEnemy.is_null() && bs.frame_Enemy_Vis != 0 {
+        if !bs.currentEnemy.is_none() && bs.frame_Enemy_Vis != 0 {
             if bs.settings.skill <= 1.0 {
                 factor = (bs.skills.turnspeed_combat * 0.4) * bs.settings.skill;
             } else if bs.settings.skill <= 2.0 {
@@ -1292,7 +1292,7 @@ pub fn BotDoTeamplayAI(
         }
         if bs.teamplayState == bot_teamplay_state_t::TEAMPLAYSTATE_REGROUP as c_int {
             // force to find a new leader
-            bs.squadLeader = core::ptr::null_mut();
+            bs.squadLeader = None;
             bs.isSquadLeader = 0;
         }
     }
@@ -1390,7 +1390,7 @@ pub fn BotAimLeading(
 ) {
     unsafe {
         let bs = &mut *bs;
-        if bs.currentEnemy.is_null() || (*bs.currentEnemy).client.is_null() {
+        if bs.currentEnemy.is_none() || (*bs.currentEnemy).client.is_null() {
             return;
         }
         if bs.frame_Enemy_Len == 0.0 {

@@ -3,6 +3,7 @@
 use core::ffi::c_schar;
 
 use mp_qshared::common::mp::gentity::gentity_t;
+use mp_qshared::common::mp::entity_id::EntityId;
 use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::shared::{qboolean, vec3_t};
@@ -36,7 +37,8 @@ pub struct gNPC_t {
 	//FIXME: Put in playerInfo or something
 	/// FIXME do we really need both of these
 	pub timeOfDeath: i32,
-	pub touchedByPlayer: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub touchedByPlayer: Option<EntityId>,
 
 	pub enemyLastVisibility: visibility_t,
 
@@ -46,7 +48,8 @@ pub struct gNPC_t {
 	pub lockedDesiredYaw: f32,
 	pub lockedDesiredPitch: f32,
 	/// debugging aid
-	pub aimingBeam: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub aimingBeam: Option<EntityId>,
 
 	pub enemyLastSeenLocation: vec3_t,
 	pub enemyLastSeenTime: i32,
@@ -98,25 +101,34 @@ pub struct gNPC_t {
 	pub investigateSoundDebounceTime: i32,
 	/// when we can greet someone next
 	pub greetingDebounceTime: i32,
-	pub eventOwner: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub eventOwner: Option<EntityId>,
 
 	//bState-specific fields
-	pub coverTarg: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub coverTarg: Option<EntityId>,
 	pub jumpState: jumpState_t,
 	pub followDist: f32,
 
 	// goal, navigation & pathfinding
 	/// used for locational goals (player's last seen/heard position)
-	pub tempGoal: *mut gentity_t,
-	pub goalEntity: *mut gentity_t,
-	pub lastGoalEntity: *mut gentity_t,
-	pub eventualGoal: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub tempGoal: Option<EntityId>,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub goalEntity: Option<EntityId>,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub lastGoalEntity: Option<EntityId>,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub eventualGoal: Option<EntityId>,
 	/// Where we should try to capture
-	pub captureGoal: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub captureGoal: Option<EntityId>,
 	/// Who we're trying to protect
-	pub defendEnt: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub defendEnt: Option<EntityId>,
 	/// Who we're greeting
-	pub greetEnt: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub greetEnt: Option<EntityId>,
 	/// FIXME: This is never actually used
 	pub goalTime: i32,
 	/// move straight at navgoals
@@ -205,7 +217,8 @@ pub struct gNPC_t {
 	pub enemyLaggedPos: [vec3_t; ENEMY_POS_LAG_STEPS],
 
 	/// for BS_CINEMATIC, keeps facing this ent
-	pub watchTarget: *mut gentity_t,
+    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
+	pub watchTarget: Option<EntityId>,
 
 	/// sigh... you'd think I'd be able to find a way to do this without having to use 3 int fields, but...
 	pub ffireCount: i32,
@@ -213,103 +226,11 @@ pub struct gNPC_t {
 	pub ffireFadeDebounce: i32,
 }
 
-const _: () = assert!(core::mem::size_of::<gNPC_t>() == 896);
 const _: () = assert!(core::mem::offset_of!(gNPC_t, timeOfDeath) == 0);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, touchedByPlayer) == 8);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, enemyLastVisibility) == 16);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, aimTime) == 20);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, desiredYaw) == 24);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, desiredPitch) == 28);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lockedDesiredYaw) == 32);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lockedDesiredPitch) == 36);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, aimingBeam) == 40);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, enemyLastSeenLocation) == 48);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, enemyLastSeenTime) == 60);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, enemyLastHeardLocation) == 64);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, enemyLastHeardTime) == 76);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lastAlertID) == 80);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, eFlags) == 84);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, aiFlags) == 88);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, currentAmmo) == 92);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, shotTime) == 96);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, burstCount) == 100);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, burstMin) == 104);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, burstMean) == 108);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, burstMax) == 112);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, burstSpacing) == 116);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, attackHold) == 120);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, attackHoldTime) == 124);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, shootAngles) == 128);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, rank) == 140);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, behaviorState) == 144);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, defaultBehavior) == 148);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, tempBehavior) == 152);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, ignorePain) == 156);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, duckDebounceTime) == 160);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, walkDebounceTime) == 164);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, enemyCheckDebounceTime) == 168);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, investigateDebounceTime) == 172);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, investigateCount) == 176);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, investigateGoal) == 180);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, investigateSoundDebounceTime) == 192);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, greetingDebounceTime) == 196);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, eventOwner) == 200);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, coverTarg) == 208);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, jumpState) == 216);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, followDist) == 220);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, tempGoal) == 224);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, goalEntity) == 232);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lastGoalEntity) == 240);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, eventualGoal) == 248);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, captureGoal) == 256);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, defendEnt) == 264);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, greetEnt) == 272);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, goalTime) == 280);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, straightToGoal) == 284);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, distToGoal) == 288);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, navTime) == 292);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, blockingEntNum) == 296);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, blockedSpeechDebounceTime) == 300);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lastSideStepSide) == 304);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, sideStepHoldTime) == 308);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, homeWp) == 312);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, group) == 320);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lastPathAngles) == 328);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, stats) == 340);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, aimErrorDebounceTime) == 408);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lastAimErrorYaw) == 412);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lastAimErrorPitch) == 416);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, aimOfs) == 420);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, currentAim) == 432);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, currentAggression) == 436);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, scriptFlags) == 440);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, desiredSpeed) == 444);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, currentSpeed) == 448);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, last_forwardmove) == 452);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, last_rightmove) == 453);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lastClearOrigin) == 456);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, consecutiveBlockedMoves) == 468);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, blockedDebounceTime) == 472);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, shoveCount) == 476);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, blockedDest) == 480);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, combatPoint) == 492);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, lastFailedCombatPoint) == 496);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, movementSpeech) == 500);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, movementSpeechChance) == 504);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, nextBStateThink) == 508);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, last_ucmd) == 512);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, combatMove) == 540);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, goalRadius) == 544);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, pauseTime) == 548);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, standTime) == 552);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, localState) == 556);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, squadState) == 560);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, confusionTime) == 564);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, charmedTime) == 568);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, controlledTime) == 572);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, surrenderTime) == 576);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, enemyLaggedPos) == 580);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, watchTarget) == 872);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, ffireCount) == 880);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, ffireDebounce) == 884);
-const _: () = assert!(core::mem::offset_of!(gNPC_t, ffireFadeDebounce) == 888);
+// RULING 22 (`docs/handoffs/jampgame-fork-discovery.md`): the fork-4 flip turned
+// this struct's stored `gentity_t*` fields into `Option<EntityId>` (align 4 vs a
+// pointer's align 8), so the private tail's byte offsets shift. This struct is
+// game-internal / not ABI-fixed beyond its prefix — the engine learns the full
+// stride at runtime via `trap_LocateGameData`. The `size_of` assert and every
+// `offset_of` assert at/after the first flipped field are therefore dropped;
+// only the fixed-prefix asserts above (declared before the first flip) remain.
