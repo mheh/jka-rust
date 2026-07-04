@@ -148,6 +148,35 @@ def action_kind(fa):
     return prefix + "single-item re-export"
 
 
+# ------------------------------------------------------ prelude leaf names
+
+USE_ITEM_SPLIT_RE = re.compile(r"[{},]")
+
+
+def prelude_leaf_names(prelude_text: str):
+    """Every name the game prelude already re-exports as an explicit leaf
+    (`pub use path::{a, b as c};` -> a, c) or defines itself (`pub const`/
+    `pub type`/`pub fn`). Globs (`::*`) are skipped — conservative: only an
+    exact leaf proves bare-name reachability. Catches symbols defined OUTSIDE
+    the scanned crates (e.g. `MAX_QPATH`, native tier re-exported through
+    qshared) that the decl scan cannot see."""
+    text = SS.blank_comments(prelude_text)
+    leaves = set()
+    for m in re.finditer(r"(?ms)^\s*pub\s+use\s+(.*?);", text):
+        for item in USE_ITEM_SPLIT_RE.split(m.group(1)):
+            item = item.strip()
+            if not item or item.endswith("*"):
+                continue
+            if " as " in item:
+                item = item.split(" as ", 1)[1].strip()
+            leaf = item.rsplit("::", 1)[-1].strip()
+            if re.fullmatch(r"[A-Za-z_]\w*", leaf) and leaf != "self":
+                leaves.add(leaf)
+    for m in re.finditer(r"(?m)^\s*pub\s+(?:const|type|fn)\s+([A-Za-z_]\w*)", text):
+        leaves.add(m.group(1))
+    return leaves
+
+
 # ------------------------------------------------------------ apply
 
 def normalize(line: str):
@@ -271,6 +300,12 @@ def main():
           file=sys.stderr)
     decls, file_texts = SS.scan_worktree_decls()
 
+    # names the game prelude already re-exports explicitly (covers defs living
+    # below the scanned crates, e.g. native-tier consts routed through qshared).
+    prelude_path = SS.RUST_ROOTS["game"] / "prelude.rs"
+    prelude_leaves = (prelude_leaf_names(prelude_path.read_text(errors="replace"))
+                      if prelude_path.exists() else set())
+
     # ---- classify each candidate live, shape file-level actions
     file_actions = {}       # defining_file (repo-rel) -> action dict
     residue = defaultdict(list)
@@ -278,6 +313,9 @@ def main():
     n_reexport = n_makepub = 0
 
     for name, c in sorted(candidates.items()):
+        if name in prelude_leaves:
+            resolved_now += 1
+            continue
         ds = decls.get(name, [])
         status, _reason = SS.classify(name, ds, file_texts)
         if status == "ok":

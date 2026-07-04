@@ -169,8 +169,24 @@ def split_top_level(s):
 VARIANT_NAME_RE = re.compile(
     r'(?:#\[[^\]]*\]\s*|//[^\n]*\n\s*)*([A-Za-z_]\w*)')
 
+_LINE_COMMENT_RE = re.compile(r'//[^\n]*')
+_BLOCK_COMMENT_RE = re.compile(r'/\*.*?\*/', re.S)
+
+
+def blank_comments(text):
+    """Replace comment bodies with same-length whitespace (newlines kept), so
+    structural scans (brace matching, top-level comma splitting) never see
+    brackets/commas inside comments. Offset-preserving: positions in the
+    blanked text match the original. (Real bug: an unbalanced `)` in a Raven
+    `//#` doc tag — a `:)` smiley in anim_number.rs — drove split_top_level's
+    depth negative and silently dropped the last ~500 animNumber_t variants.)"""
+    def _blank(m):
+        return "".join(c if c == "\n" else " " for c in m.group(0))
+    return _LINE_COMMENT_RE.sub(_blank, _BLOCK_COMMENT_RE.sub(_blank, text))
+
 
 def find_enum_variants(text):
+    text = blank_comments(text)
     out = []  # (enum_name, enum_pub, variant_name)
     for m in ENUM_RE.finditer(text):
         vis, ename = m.group(1), m.group(2)
