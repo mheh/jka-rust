@@ -26,6 +26,39 @@ use mp_qshared::common::mp::qcommon::saber::saber_info::MAX_SABERS;
 use mp_qshared::shared::saber_blocked_type::saberBlockedType_t;
 use mp_qshared::shared::CHAN_WEAPON;
 
+// --- pass-2 body-fill callee/const imports (jampgame shard 1/2) ---
+// SPINE (fork rulings 1/4/8 + `engine-seam.md`): stateful fns thread
+// `GameContext` (`.world: *mut GameWorld`, `.engine`); `level` →
+// `(*ctx.world).level`, cvars → `(*ctx.world).cvars`, `g_entities[i]` →
+// `(*ctx.world).entities[i]`, traps → `trap::X(ctx.engine, …)`. Cross-file
+// callees use their resolved raw-pointer signatures verbatim.
+//
+// NOTE (integration-deferred, mirroring `w_force.rs`): a few Raven constants
+// this shard needs are not yet surfaced by the prelude nor an owning enum
+// (`DAMAGE_NO_KNOCKBACK`, `FL_NO_KNOCKBACK`). Per porting-rules the port
+// preserves the Raven spelling; their exact enum-qualification / module path is
+// resolved at integration (the mega-pass tree is not compiled per porter).
+use crate::bg_lib::rand;
+use crate::bg_pmove::{BG_InKnockDown, BG_KnockDownable};
+use crate::bg_saberLoad::WP_SaberBladeUseSecondBladeStyle;
+use crate::g_combat::{G_Damage, G_Knockdown};
+use crate::g_mover::G_EntIsBreakable;
+use crate::g_utils::{G_Sound, G_SoundIndex, G_Throw};
+use crate::q_math::{vec3_origin, Q_irand, VectorLength, VectorNormalize, PITCH};
+use crate::trap;
+use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
+use mp_bg::public::anim_number::animNumber_t;
+use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
+use mp_bg::public::gametype::GT_POWERDUEL;
+use mp_bg::public::saberlock::{
+    SABERLOCK_LOCK, SABERLOCK_LOSE, SABERLOCK_SUPERBREAK, SABERLOCK_TOP, SABERLOCK_WIN,
+};
+use mp_qshared::common::mp::qcommon::usercmd_button::{
+    BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_FORCE_DRAIN, BUTTON_FORCE_LIGHTNING, BUTTON_FORCEGRIP,
+    BUTTON_FORCEPOWER, BUTTON_GESTURE,
+};
+use mp_qshared::shared::q_math_rand::RAND_MAX;
+
 // `saberBlockedType_t`/`weaponstate_t` are `#[repr(i32)]` enums, but the
 // playerState `saberBlocked`/`weaponstate` fields are stored as `c_int` — so
 // surface the variants used by the ported switch bodies as `c_int` consts.
@@ -53,49 +86,129 @@ const WEAPON_FIRING: c_int = weaponstate_t::WEAPON_FIRING as c_int;
 /// Raven `RandFloat`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:39-43`
-// PORT-ESCALATION(rng-threading): rand()/RAND_MAX resolved as argless + RAND_MAX unported; ruling 3 wants an owned+threaded LCG — how does it thread into a raw-pointer signature?
 pub fn RandFloat(
     ctx: GameContext<'_>,
     min: f32,
     max: f32,
 ) -> f32 {
-    todo!("Port RandFloat — parked: rng-threading")
+    let _ = ctx;
+    // Raven (linux path): `((rand() * (max - min)) / (float)RAND_MAX) + min`.
+    // The LCG lives behind the resolved `rand()` callee (fork ruling 3).
+    ((rand() as f32 * (max - min)) / RAND_MAX as f32) + min
 }
 
 /// Raven `G_DebugBoxLines`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:46-78`
-// PORT-ESCALATION(debug-only-ifdef): body is under #ifdef DEBUG_SABER_BOX (compiled out of the shipping build) — port behind a cfg, or drop?
+///
+/// Debug-only visualization: the oracle body compiles only under
+/// `DEBUG_SABER_BOX`, and every call site sits under the same guard. Per fork
+/// ruling 11 (#ifdef-only debug fns dropped) and porting-rules §20 (drop dead
+/// surface with a note), this ships as a no-op — `mins`/`maxs` are never
+/// written, so the fork-9 out-param reshape does not apply.
 pub fn G_DebugBoxLines(
     ctx: GameContext<'_>,
     mins: vec3_t,
     maxs: vec3_t,
     duration: c_int,
 ) {
-    todo!("Port G_DebugBoxLines — parked: debug-only-ifdef")
+    let _ = (ctx, mins, maxs, duration);
 }
 
 /// Raven `G_CanBeEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:82-115`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(bg-boundary): body reads `g_gametype`/`g_friendlyFire` cvars
+// and calls `OnSameTeam(ctx, …)`, but the retrofitted signature carries no
+// `ctx: GameContext` (fork 8a ctx-free boundary) — cannot reach world state.
 pub fn G_CanBeEnemy(
     self_: *mut gentity_t,
     enemy: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port G_CanBeEnemy — parked: engine-world-threading")
+    todo!("Port G_CanBeEnemy — parked: bg-boundary (no ctx, needs cvars/OnSameTeam)")
 }
 
 /// Raven `G_SaberAttackPower`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:120-217`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_SaberAttackPower(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
     attacking: qboolean,
 ) -> c_int {
-    todo!("Port G_SaberAttackPower — parked: engine-world-threading")
+    unsafe {
+        debug_assert!(!ent.is_null() && !(*ent).client.is_null());
+        let client = (*ent).client as *mut gclient_t;
+
+        let mut baseLevel: c_int = (*client).ps.fd.saberAnimLevel;
+
+        // Give "medium" strength for the two special stances.
+        if baseLevel == saber_styles_t::SS_DUAL as c_int {
+            baseLevel = 2;
+        } else if baseLevel == saber_styles_t::SS_STAFF as c_int {
+            baseLevel = 2;
+        }
+
+        if attacking != 0 {
+            // The attacker gets a boost to help penetrate defense; general boost
+            // up so the individual levels make a bigger difference.
+            baseLevel *= 2;
+            baseLevel += 1;
+
+            // Get the "speed" of the swing, roughly, and add more power based on it.
+            if (*client).lastSaberStorageTime >= ((*ctx.world).level.time - 50)
+                && (*client).olderIsValid != 0
+            {
+                // Different "tolerance" per stance, else fast would have more
+                // advantage than it should (its anims are much faster).
+                let toleranceAmt: c_int = match (*client).ps.fd.saberAnimLevel {
+                    x if x == saber_styles_t::SS_STRONG as c_int => 8,
+                    x if x == saber_styles_t::SS_MEDIUM as c_int => 16,
+                    x if x == saber_styles_t::SS_FAST as c_int => 24,
+                    _ => 16, // dual, staff, etc.
+                };
+
+                let a = (*client).lastSaberBase_Always;
+                let b = (*client).olderSaberBase;
+                let vSub: vec3_t = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+                let mut swingDist = VectorLength(vSub) as c_int;
+
+                while swingDist > 0 {
+                    baseLevel += 1;
+                    swingDist -= toleranceAmt;
+                }
+            }
+
+            // (Oracle's `#ifndef FINAL_BUILD` `g_saberDebugPrint` Com_Printf is
+            // dropped — variadic Com_Printf seam pending; no behavioral effect.)
+        }
+
+        if ((*client).ps.brokenLimbs & (1 << (BROKENLIMB_RARM as c_int))) != 0
+            || ((*client).ps.brokenLimbs & (1 << (BROKENLIMB_LARM as c_int))) != 0
+        {
+            // We're very weak when one of our arms is broken.
+            baseLevel = (baseLevel as f64 * 0.3) as c_int;
+        }
+
+        // Cap at reasonable values now.
+        if baseLevel < 1 {
+            baseLevel = 1;
+        } else if baseLevel > 16 {
+            baseLevel = 16;
+        }
+
+        if (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
+            && (*client).sess.duelTeam == DUELTEAM_LONE as c_int
+        {
+            // Get more power then.
+            return baseLevel * 2;
+        } else if attacking != 0 && (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
+            // In siege, saber battles should be quicker and biased to the attacker.
+            return baseLevel * 3;
+        }
+
+        baseLevel
+    }
 }
 
 /// Raven `WP_DeactivateSaber`.
@@ -130,36 +243,77 @@ pub fn WP_DeactivateSaber(
 /// Raven `WP_ActivateSaber`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:250-282`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_ActivateSaber(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port WP_ActivateSaber — parked: engine-world-threading")
+    unsafe {
+        if self_.is_null() || (*self_).client.is_null() {
+            return;
+        }
+        let client = (*self_).client as *mut gclient_t;
+        let level_time = (*ctx.world).level.time;
+
+        if !(*self_).NPC.is_null()
+            && (*client).ps.forceHandExtend == HANDEXTEND_JEDITAUNT as c_int
+            && ((*client).ps.forceHandExtendTime - level_time) > 200
+        {
+            // if we're an NPC and in the middle of a taunt then stop it
+            (*client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
+            (*client).ps.forceHandExtendTime = 0;
+        } else if (*client).ps.fd.forceGripCripple != 0 {
+            // can't activate saber while being gripped
+            return;
+        }
+
+        if (*client).ps.saberHolstered != 0 {
+            (*client).ps.saberHolstered = 0;
+            if (*client).saber[0].soundOn != 0 {
+                G_Sound(ctx, self_, CHAN_WEAPON as c_int, (*client).saber[0].soundOn);
+            }
+
+            if (*client).saber[1].soundOn != 0 {
+                G_Sound(ctx, self_, CHAN_WEAPON as c_int, (*client).saber[1].soundOn);
+            }
+        }
+    }
 }
 
 /// Raven `SaberUpdateSelf`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:286-358`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(fn-pointer-dispatch): assigns `ent->think = G_FreeEntity`,
+// but `gentity_t.think` is still a raw ABI fn-pointer
+// (`Option<unsafe extern "C" fn(*mut gentity_t)>`) incompatible with the
+// ctx-threaded `G_FreeEntity`, and the fork-2 `EntThink` fn-ID enum is not yet
+// implemented on `gentity_t`. Also needs `PROPER_THROWN_VALUE`/
+// `CONTENTS_LIGHTSABER`/`MASK_PLAYERSOLID`/`PMF_FOLLOW` (unported consts).
 pub fn SaberUpdateSelf(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port SaberUpdateSelf — parked: engine-world-threading")
+    todo!("Port SaberUpdateSelf — parked: fn-pointer-dispatch (think = G_FreeEntity)")
 }
 
 /// Raven `SaberGotHit`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:360-370`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn SaberGotHit(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
 ) {
-    todo!("Port SaberGotHit — parked: engine-world-threading")
+    let _ = (other, trace);
+    unsafe {
+        // `own = &g_entities[self->r.ownerNum]` — an array slot, never null; the
+        // oracle's `!own` guard is vacuous in Rust, only the client check bites.
+        let own = &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+        if (*own).client.is_null() {
+            return;
+        }
+        // Raven no-op: projectiles are now handled in their own functions.
+    }
 }
 
 /// Raven `SetSaberBoxSize`.
@@ -266,7 +420,6 @@ pub fn SaberAttacking(
 /// Raven `G_SaberLockAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:1094-1211`
-// PORT-ESCALATION(unported-const): required constants are unported (G_SaberLockAnim: animNumber_t/BOTH_LK_*/SABERLOCK_*; G_ClientIdleInWorld: BUTTON_*).
 pub fn G_SaberLockAnim(
     attackerSaberStyle: c_int,
     defenderSaberStyle: c_int,
@@ -274,7 +427,93 @@ pub fn G_SaberLockAnim(
     lockOrBreakOrSuperBreak: c_int,
     winOrLose: c_int,
 ) -> c_int {
-    todo!("Port G_SaberLockAnim — parked: unported-const")
+    // `BOTH_LK_*` are `animNumber_t` enum variants; `baseAnim` is arithmetic
+    // `int` in Raven, so each seed is taken as its `c_int` discriminant.
+    let ss_fast = saber_styles_t::SS_FAST as c_int;
+    let ss_tavion = saber_styles_t::SS_TAVION as c_int;
+    let ss_dual = saber_styles_t::SS_DUAL as c_int;
+    let ss_staff = saber_styles_t::SS_STAFF as c_int;
+
+    let mut baseAnim: c_int = -1;
+    if lockOrBreakOrSuperBreak == SABERLOCK_LOCK {
+        // special case: if we're using the same style and locking
+        if attackerSaberStyle == defenderSaberStyle
+            || (attackerSaberStyle >= ss_fast
+                && attackerSaberStyle <= ss_tavion
+                && defenderSaberStyle >= ss_fast
+                && defenderSaberStyle <= ss_tavion)
+        {
+            // using same style
+            if winOrLose == SABERLOCK_LOSE {
+                // you want the defender's stance...
+                if defenderSaberStyle == ss_dual {
+                    baseAnim = if topOrSide == SABERLOCK_TOP {
+                        animNumber_t::BOTH_LK_DL_DL_T_L_2 as c_int
+                    } else {
+                        animNumber_t::BOTH_LK_DL_DL_S_L_2 as c_int
+                    };
+                } else if defenderSaberStyle == ss_staff {
+                    baseAnim = if topOrSide == SABERLOCK_TOP {
+                        animNumber_t::BOTH_LK_ST_ST_T_L_2 as c_int
+                    } else {
+                        animNumber_t::BOTH_LK_ST_ST_S_L_2 as c_int
+                    };
+                } else {
+                    baseAnim = if topOrSide == SABERLOCK_TOP {
+                        animNumber_t::BOTH_LK_S_S_T_L_2 as c_int
+                    } else {
+                        animNumber_t::BOTH_LK_S_S_S_L_2 as c_int
+                    };
+                }
+            }
+        }
+    }
+    if baseAnim == -1 {
+        if attackerSaberStyle == ss_dual {
+            baseAnim = if defenderSaberStyle == ss_dual {
+                animNumber_t::BOTH_LK_DL_DL_S_B_1_L as c_int
+            } else if defenderSaberStyle == ss_staff {
+                animNumber_t::BOTH_LK_DL_ST_S_B_1_L as c_int
+            } else {
+                animNumber_t::BOTH_LK_DL_S_S_B_1_L as c_int // single
+            };
+        } else if attackerSaberStyle == ss_staff {
+            baseAnim = if defenderSaberStyle == ss_dual {
+                animNumber_t::BOTH_LK_ST_DL_S_B_1_L as c_int
+            } else if defenderSaberStyle == ss_staff {
+                animNumber_t::BOTH_LK_ST_ST_S_B_1_L as c_int
+            } else {
+                animNumber_t::BOTH_LK_ST_S_S_B_1_L as c_int // single
+            };
+        } else {
+            // single
+            baseAnim = if defenderSaberStyle == ss_dual {
+                animNumber_t::BOTH_LK_S_DL_S_B_1_L as c_int
+            } else if defenderSaberStyle == ss_staff {
+                animNumber_t::BOTH_LK_S_ST_S_B_1_L as c_int
+            } else {
+                animNumber_t::BOTH_LK_S_S_S_B_1_L as c_int // single
+            };
+        }
+        // side lock or top lock?
+        if topOrSide == SABERLOCK_TOP {
+            baseAnim += 5;
+        }
+        // lock, break or superbreak?
+        if lockOrBreakOrSuperBreak == SABERLOCK_LOCK {
+            baseAnim += 2;
+        } else {
+            // a break or superbreak
+            if lockOrBreakOrSuperBreak == SABERLOCK_SUPERBREAK {
+                baseAnim += 3;
+            }
+            // winner or loser?
+            if winOrLose == SABERLOCK_WIN {
+                baseAnim += 1;
+            }
+        }
+    }
+    baseAnim
 }
 
 /// Raven `WP_SabersCheckLock2`.
@@ -384,11 +623,29 @@ pub fn G_GetAnimPoint(
 /// Raven `G_ClientIdleInWorld`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2312-2334`
-// PORT-ESCALATION(unported-const): required constants are unported (G_SaberLockAnim: animNumber_t/BOTH_LK_*/SABERLOCK_*; G_ClientIdleInWorld: BUTTON_*).
 pub fn G_ClientIdleInWorld(
     ent: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port G_ClientIdleInWorld — parked: unported-const")
+    unsafe {
+        if (*ent).s.eType == ET_NPC as c_int {
+            return 0;
+        }
+        let cmd = &(*((*ent).client as *mut gclient_t)).pers.cmd;
+        if cmd.upmove == 0
+            && cmd.forwardmove == 0
+            && cmd.rightmove == 0
+            && (cmd.buttons & BUTTON_GESTURE) == 0
+            && (cmd.buttons & BUTTON_FORCEGRIP) == 0
+            && (cmd.buttons & BUTTON_ALT_ATTACK) == 0
+            && (cmd.buttons & BUTTON_FORCEPOWER) == 0
+            && (cmd.buttons & BUTTON_FORCE_LIGHTNING) == 0
+            && (cmd.buttons & BUTTON_FORCE_DRAIN) == 0
+            && (cmd.buttons & BUTTON_ATTACK) == 0
+        {
+            return 1;
+        }
+        0
+    }
 }
 
 /// Raven `G_G2TraceCollide`.
@@ -602,15 +859,22 @@ pub fn G_PowerLevelForSaberAnim(
 /// Raven `WP_SaberClearDamage`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3512-3526`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(missing-global-field): clears the `dmgDir`/`dmgSpot`
+// (`vec3_t[MAX_SABER_VICTIMS]`) file-scope accumulators, but those are absent
+// from the pre-merged `GameGlobals` (only dismemberDmg/saberKnockbackFlags/
+// totalDmg/victimEntityNum/victimHitEffectDone placeholders exist) and porters
+// may not add fields. Same for all WP_Saber*Damage* fns below.
 pub fn WP_SaberClearDamage(ctx: GameContext<'_>) {
-    todo!("Port WP_SaberClearDamage — parked: engine-world-threading")
+    todo!("Port WP_SaberClearDamage — parked: missing-global-field (dmgDir/dmgSpot)")
 }
 
 /// Raven `WP_SaberDamageAdd`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3528-3575`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(missing-global-field): copies into `dmgDir`/`dmgSpot`
+// (`vec3_t[MAX_SABER_VICTIMS]`) accumulators absent from the pre-merged
+// `GameGlobals`; porters may not add fields. (fork-9: `trDmgDir`/`trDmgSpot`
+// are read-only VectorCopy sources → would stay by-value.)
 pub fn WP_SaberDamageAdd(
     ctx: GameContext<'_>,
     trVictimEntityNum: c_int,
@@ -620,37 +884,40 @@ pub fn WP_SaberDamageAdd(
     doDismemberment: qboolean,
     knockBackFlags: c_int,
 ) {
-    todo!("Port WP_SaberDamageAdd — parked: engine-world-threading")
+    todo!("Port WP_SaberDamageAdd — parked: missing-global-field (dmgDir/dmgSpot)")
 }
 
 /// Raven `WP_SaberApplyDamage`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3577-3605`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(missing-global-field): reads `dmgDir[i]`/`dmgSpot[i]`
+// (`vec3_t[MAX_SABER_VICTIMS]`) accumulators absent from the pre-merged
+// `GameGlobals`; porters may not add fields.
 pub fn WP_SaberApplyDamage(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port WP_SaberApplyDamage — parked: engine-world-threading")
+    todo!("Port WP_SaberApplyDamage — parked: missing-global-field (dmgDir/dmgSpot)")
 }
 
 /// Raven `WP_SaberDoHit`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3608-3697`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(missing-global-field): reads `dmgSpot[i]`/`dmgDir[i]`
+// (`vec3_t[MAX_SABER_VICTIMS]`) accumulators absent from the pre-merged
+// `GameGlobals`; porters may not add fields.
 pub fn WP_SaberDoHit(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     saberNum: c_int,
     bladeNum: c_int,
 ) {
-    todo!("Port WP_SaberDoHit — parked: engine-world-threading")
+    todo!("Port WP_SaberDoHit — parked: missing-global-field (dmgDir/dmgSpot)")
 }
 
 /// Raven `WP_SaberRadiusDamage`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3701-3792`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberRadiusDamage(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -659,33 +926,196 @@ pub fn WP_SaberRadiusDamage(
     damage: c_int,
     knockBack: f32,
 ) {
-    todo!("Port WP_SaberRadiusDamage — parked: engine-world-threading")
+    unsafe {
+        if ent.is_null() || (*ent).client.is_null() {
+            return;
+        }
+        if radius <= 0.0 || (damage <= 0 && knockBack <= 0.0) {
+            return;
+        }
+
+        // Setup the bbox to search in.
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        for i in 0..3 {
+            mins[i] = point[i] - radius;
+            maxs[i] = point[i] + radius;
+        }
+
+        let mut radiusEnts: [c_int; 128] = [0; 128];
+        let numEnts = trap::EntitiesInBox(
+            ctx.engine,
+            GEntitiesInBoxArgs::new(
+                &mins as *const vec3_t,
+                &maxs as *const vec3_t,
+                radiusEnts.as_mut_ptr(),
+                128,
+            ),
+        );
+
+        for i in 0..numEnts {
+            let radiusEnt = &mut (*ctx.world).entities[radiusEnts[i as usize] as usize]
+                as *mut gentity_t;
+            if (*radiusEnt).inuse == 0 {
+                continue;
+            }
+            if radiusEnt == ent {
+                // Skip myself.
+                continue;
+            }
+
+            if (*radiusEnt).client.is_null() {
+                // must be a client
+                if G_EntIsBreakable(ctx, (*radiusEnt).s.number) != 0 {
+                    // damage breakables within range, but not as much
+                    G_Damage(
+                        radiusEnt,
+                        ent,
+                        ent,
+                        vec3_origin,
+                        (*radiusEnt).r.currentOrigin,
+                        10,
+                        0,
+                        MOD_MELEE as c_int,
+                    );
+                }
+                continue;
+            }
+
+            let rClient = (*radiusEnt).client as *mut gclient_t;
+            if ((*rClient).ps.eFlags2 & EF2_HELD_BY_MONSTER) != 0 {
+                // can't be one being held
+                continue;
+            }
+
+            let ro = (*radiusEnt).r.currentOrigin;
+            let mut entDir: vec3_t = [ro[0] - point[0], ro[1] - point[1], ro[2] - point[2]];
+            let dist = VectorNormalize(&mut entDir);
+            if dist <= radius {
+                // in range
+                if damage > 0 {
+                    // do damage
+                    let points = (damage as f32 * dist / radius).ceil() as c_int;
+                    G_Damage(
+                        radiusEnt,
+                        ent,
+                        ent,
+                        vec3_origin,
+                        (*radiusEnt).r.currentOrigin,
+                        points,
+                        DAMAGE_NO_KNOCKBACK,
+                        MOD_MELEE as c_int,
+                    );
+                }
+                if knockBack > 0.0 {
+                    // do knockback
+                    if !(*radiusEnt).client.is_null()
+                        && (*rClient).NPC_class != CLASS_RANCOR
+                        && (*rClient).NPC_class != CLASS_ATST
+                        && ((*radiusEnt).flags & FL_NO_KNOCKBACK) == 0
+                    {
+                        // don't throw them back
+                        let knockbackStr = knockBack * dist / radius;
+                        entDir[2] += 0.1;
+                        VectorNormalize(&mut entDir);
+                        G_Throw(ctx, radiusEnt, entDir, knockbackStr);
+                        if (*radiusEnt).health > 0 {
+                            // still alive
+                            if knockbackStr > 50.0 {
+                                // close enough / knockback high enough to knock down
+                                if dist < (radius * 0.5)
+                                    || (*rClient).ps.groundEntityNum != ENTITYNUM_NONE
+                                {
+                                    G_Knockdown(ctx, radiusEnt);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Raven `WP_SaberDoClash`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3798-3810`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(missing-global-field): reads `saberClashPos`/`saberClashNorm`
+// (`vec3_t`) file-scope globals absent from the pre-merged `GameGlobals` (only
+// saberClashEventParm/saberDoClashEffect placeholders exist); porters may not
+// add fields.
 pub fn WP_SaberDoClash(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     saberNum: c_int,
     bladeNum: c_int,
 ) {
-    todo!("Port WP_SaberDoClash — parked: engine-world-threading")
+    todo!("Port WP_SaberDoClash — parked: missing-global-field (saberClashPos/Norm)")
 }
 
 /// Raven `WP_SaberBounceSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3812-3844`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn WP_SaberBounceSound(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
     saberNum: c_int,
     bladeNum: c_int,
 ) {
-    todo!("Port WP_SaberBounceSound — parked: engine-world-threading")
+    unsafe {
+        let mut index = 1;
+        if ent.is_null() || (*ent).client.is_null() {
+            return;
+        }
+        index = Q_irand(1, 9);
+        let client = (*ent).client as *mut gclient_t;
+        let saber = &mut (*client).saber[saberNum as usize] as *mut saberInfo_t;
+
+        if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == 0 && (*saber).bounceSound[0] != 0 {
+            G_Sound(
+                ctx,
+                ent,
+                CHAN_AUTO as c_int,
+                (*saber).bounceSound[Q_irand(0, 2) as usize],
+            );
+        } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != 0
+            && (*saber).bounce2Sound[0] != 0
+        {
+            G_Sound(
+                ctx,
+                ent,
+                CHAN_AUTO as c_int,
+                (*saber).bounce2Sound[Q_irand(0, 2) as usize],
+            );
+        } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == 0
+            && (*saber).blockSound[0] != 0
+        {
+            G_Sound(
+                ctx,
+                ent,
+                CHAN_AUTO as c_int,
+                (*saber).blockSound[Q_irand(0, 2) as usize],
+            );
+        } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != 0
+            && (*saber).block2Sound[0] != 0
+        {
+            G_Sound(
+                ctx,
+                ent,
+                CHAN_AUTO as c_int,
+                (*saber).block2Sound[Q_irand(0, 2) as usize],
+            );
+        } else {
+            // `va("sound/weapons/saber/saberblock%d.wav", index)` — rendered as an
+            // owned NUL-terminated string (appendix ruling: va -> owned String).
+            let path = std::ffi::CString::new(format!(
+                "sound/weapons/saber/saberblock{}.wav",
+                index
+            ))
+            .unwrap();
+            G_Sound(ctx, ent, CHAN_AUTO as c_int, G_SoundIndex(path.as_ptr()));
+        }
+    }
 }
 
 /// Raven `CheckSaberDamage`.
@@ -796,35 +1226,43 @@ pub fn saberMoveBack(
 /// Raven `SaberBounceSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6229-6233`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn SaberBounceSound(
     self_: *mut gentity_t,
     other: *mut gentity_t,
     trace: *mut trace_t,
 ) {
-    todo!("Port SaberBounceSound — parked: engine-world-threading")
+    let _ = (other, trace);
+    unsafe {
+        (*self_).s.apos.trBase = (*self_).r.currentAngles; // VectorCopy
+        (*self_).s.apos.trBase[PITCH] = 90.0;
+    }
 }
 
 /// Raven `DeadSaberThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6235-6245`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(fn-pointer-dispatch): assigns `saberent->think = G_FreeEntity`,
+// but `gentity_t.think` is still a raw ABI fn-pointer incompatible with the
+// ctx-threaded `G_FreeEntity`, and the fork-2 `EntThink` fn-ID enum is not yet
+// implemented on `gentity_t`.
 pub fn DeadSaberThink(
     ctx: GameContext<'_>,
     saberent: *mut gentity_t,
 ) {
-    todo!("Port DeadSaberThink — parked: engine-world-threading")
+    todo!("Port DeadSaberThink — parked: fn-pointer-dispatch (think = G_FreeEntity)")
 }
 
 /// Raven `MakeDeadSaber`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6247-6335`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(fn-pointer-dispatch): assigns `saberent->touch =
+// SaberBounceSound` and `->think = DeadSaberThink` — raw ABI fn-pointer fields,
+// no fork-2 `EntTouch`/`EntThink` enum on `gentity_t` yet.
 pub fn MakeDeadSaber(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port MakeDeadSaber — parked: engine-world-threading")
+    todo!("Port MakeDeadSaber — parked: fn-pointer-dispatch (touch/think assign)")
 }
 
 /// Raven `DownedSaberThink`.
@@ -841,50 +1279,59 @@ pub fn DownedSaberThink(
 /// Raven `saberReactivate`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6482-6508`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(fn-pointer-dispatch): assigns `saberent->touch =
+// thrownSaberTouch` — raw ABI fn-pointer field, no fork-2 `EntTouch` enum on
+// `gentity_t` yet. (Also stores `parent = saberOwner` — fork-4 EntityId reshape.)
 pub fn saberReactivate(
     ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
 ) {
-    todo!("Port saberReactivate — parked: engine-world-threading")
+    todo!("Port saberReactivate — parked: fn-pointer-dispatch (touch = thrownSaberTouch)")
 }
 
 /// Raven `saberKnockDown`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6512-6584`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(fn-pointer-dispatch): assigns `saberent->touch =
+// SaberBounceSound` and `->think = DownedSaberThink` — raw ABI fn-pointer
+// fields, no fork-2 `EntTouch`/`EntThink` enum on `gentity_t` yet.
 pub fn saberKnockDown(
     ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
     other: *mut gentity_t,
 ) {
-    todo!("Port saberKnockDown — parked: engine-world-threading")
+    todo!("Port saberKnockDown — parked: fn-pointer-dispatch (touch/think assign)")
 }
 
 /// Raven `WP_SaberRemoveG2Model`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6589-6595`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(g2-seam-argshape): oracle passes `&saberent->ghoul2` (void**)
+// to trap_G2API_RemoveGhoul2Models, but the resolved `GG2Removeghoul2ModelsArgs`
+// takes a single `*mut c_void` — need the void*/void** seam convention pinned.
 pub fn WP_SaberRemoveG2Model(
     ctx: GameContext<'_>,
     saberent: *mut gentity_t,
 ) {
-    todo!("Port WP_SaberRemoveG2Model — parked: engine-world-threading")
+    todo!("Port WP_SaberRemoveG2Model — parked: g2-seam-argshape")
 }
 
 /// Raven `WP_SaberAddG2Model`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6597-6610`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(g2-seam-argshape): resolved `GG2Initghoul2ModelArgs::new`
+// wants an owned `CString` for the `*const c_char` model param, and
+// `WP_SaberRemoveG2Model` has the void*/void** ghoul2-handle ambiguity — the G2
+// seam arg-shape conversion is undecided.
 pub fn WP_SaberAddG2Model(
     ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberModel: *const c_char,
     saberSkin: qhandle_t,
 ) {
-    todo!("Port WP_SaberAddG2Model — parked: engine-world-threading")
+    todo!("Port WP_SaberAddG2Model — parked: g2-seam-argshape")
 }
 
 /// Raven `saberKnockOutOfHand`.
@@ -943,14 +1390,17 @@ pub fn saberCheckKnockdown_Smashed(
 /// Raven `saberCheckKnockdown_Thrown`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6884-6915`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// PORT-ESCALATION(unresolved-macro): guards on the `SABERINVALID` macro, which
+// is not surfaced by the packet (a w_saber.c #define) — its expansion is
+// undecidable here. (Same macro blocks the other saberCheckKnockdown_* fns and
+// CheckThrownSaberDamaged.) Also calls the fn-pointer-parked `saberKnockDown`.
 pub fn saberCheckKnockdown_Thrown(
     ctx: GameContext<'_>,
     saberent: *mut gentity_t,
     saberOwner: *mut gentity_t,
     other: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port saberCheckKnockdown_Thrown — parked: engine-world-threading")
+    todo!("Port saberCheckKnockdown_Thrown — parked: unresolved-macro (SABERINVALID)")
 }
 
 /// Raven `saberBackToOwner`.
@@ -1017,25 +1467,79 @@ pub fn UpdateClientRenderinfo(
 /// Raven `G_KickDownable`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7474-7500`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
 pub fn G_KickDownable(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port G_KickDownable — parked: engine-world-threading")
+    unsafe {
+        if (*ctx.world).cvars.d_saberKickTweak.integer == 0 {
+            return 1;
+        }
+
+        if ent.is_null() || (*ent).inuse == 0 || (*ent).client.is_null() {
+            return 0;
+        }
+        let client = (*ent).client as *mut gclient_t;
+
+        if BG_InKnockDown((*client).ps.legsAnim) != 0
+            || BG_InKnockDown((*client).ps.torsoAnim) != 0
+        {
+            return 0;
+        }
+
+        if (*client).ps.weaponTime <= 0
+            && (*client).ps.weapon == WP_SABER as c_int
+            && (*client).ps.groundEntityNum != ENTITYNUM_NONE
+        {
+            return 0;
+        }
+
+        1
+    }
 }
 
 /// Raven `G_TossTheMofo`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7502-7525`
-// PORT-ESCALATION(engine-world-threading): fnskel signature is raw *mut gentity_t with no ctx: GameContext; how does this fn reach engine (traps) + world (level/cvars/g_entities)? g_init_game threads GameContext — should these signatures too?
+// fork-9: `tossDir` is read-only here (`VectorMA` input only, never written),
+// so it stays by-value.
 pub fn G_TossTheMofo(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
     tossDir: vec3_t,
     tossStr: f32,
 ) {
-    todo!("Port G_TossTheMofo — parked: engine-world-threading")
+    unsafe {
+        if (*ent).inuse == 0 || (*ent).client.is_null() {
+            // no good
+            return;
+        }
+
+        if (*ent).s.eType == ET_NPC as c_int && (*ent).s.NPC_class == CLASS_VEHICLE as c_int {
+            // no, silly
+            return;
+        }
+        let client = (*ent).client as *mut gclient_t;
+
+        // VectorMA(velocity, tossStr, tossDir, velocity)
+        let v = (*client).ps.velocity;
+        (*client).ps.velocity = [
+            v[0] + tossStr * tossDir[0],
+            v[1] + tossStr * tossDir[1],
+            v[2] + tossStr * tossDir[2],
+        ];
+        (*client).ps.velocity[2] = 200.0;
+        if (*ent).health > 0
+            && (*client).ps.forceHandExtend != HANDEXTEND_KNOCKDOWN as c_int
+            && BG_KnockDownable(&mut (*client).ps) != 0
+            && G_KickDownable(ctx, ent) != 0
+        {
+            // if they are alive, knock them down I suppose
+            (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
+            (*client).ps.forceHandExtendTime = (*ctx.world).level.time + 700;
+            (*client).ps.forceDodgeAnim = 0; // toggles 1/0; 1 means play the get-up anim
+        }
+    }
 }
 
 /// Raven `G_KickTrace`.

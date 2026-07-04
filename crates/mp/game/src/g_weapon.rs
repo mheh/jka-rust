@@ -535,13 +535,16 @@ pub fn laserTrapStick(
     todo!("Port laserTrapStick — parked: seam-threading")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
 /// Raven `TrapThink`.
 ///
+/// Raven: "laser trap think".
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2471-2475`
-pub fn TrapThink(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port TrapThink — parked: seam-threading")
+pub fn TrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
+    // laser trap think
+    unsafe {
+        (*ent).nextthink = (*ctx.world).level.time + 50;
+    }
+    crate::g_object::G_RunObject(ctx, ent);
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and `trap_LinkEntity`-adjacent globals (ruling 1) are needed — how is state threaded in?
@@ -633,12 +636,16 @@ pub fn BlowDetpacks(
     todo!("Port BlowDetpacks — parked: seam-threading")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the `g_cheats` cvar handle (ruling 1: GameCvars) is needed — how is state threaded in?
 /// Raven `CheatsOn`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2871-2878`
 pub fn CheatsOn(ctx: GameContext<'_>) -> qboolean {
-    todo!("Port CheatsOn — parked: seam-threading")
+    unsafe {
+        if (*ctx.world).cvars.g_cheats.integer == 0 {
+            return qfalse;
+        }
+    }
+    qtrue
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and the file-static `forward`/`vright`/`up`/`muzzle` globals (ruling 1) are needed — how is state threaded in?

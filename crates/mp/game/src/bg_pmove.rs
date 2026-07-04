@@ -21,7 +21,10 @@ const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 use crate::g_strap::strap_G2API_SetBoneAngles;
 use crate::q_math::{AngleMod, AngleSubtract};
+use crate::q_math::{AngleVectors, Q_fabs, vectoangles};
 use crate::q_math::{PITCH, ROLL, YAW};
+use mp_bg::public::anim_number::animNumber_t;
+use mp_bg::vehicles::MIN_LANDING_SLOPE;
 
 // Unported types referenced in this file (need porting before this compiles):
 // void ()(trace_t , vec_t , vec_t , vec_t , vec_t , int, int)
@@ -157,15 +160,36 @@ pub fn BG_ExternThisSoICanRecompileInDebug(
 /// Raven `BG_VehicleTurnRateForSpeed`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:676-706`
-// PORT-ESCALATION(missing-const): `MIN_LANDING_SLOPE` (#define, bg_vehicles.h) is not
-// resolved in the packet; the slope compare needs its value — no invention allowed.
 pub fn BG_VehicleTurnRateForSpeed(
     pVeh: *mut Vehicle_t,
     speed: f32,
     mPitchOverride: *mut f32,
     mYawOverride: *mut f32,
 ) {
-    todo!("Port BG_VehicleTurnRateForSpeed — parked: missing-const")
+    unsafe {
+        if !pVeh.is_null() && !(*pVeh).m_pVehicleInfo.is_null() {
+            let info = (*pVeh).m_pVehicleInfo;
+            let mut speedFrac: f32 = 1.0;
+            if (*info).speedDependantTurning != 0 {
+                if (*pVeh).m_LandTrace.fraction >= 1.0
+                    || (*pVeh).m_LandTrace.plane.normal[2] < MIN_LANDING_SLOPE
+                {
+                    speedFrac = speed / ((*info).speedMax * 0.75);
+                    if speedFrac < 0.25 {
+                        speedFrac = 0.25;
+                    } else if speedFrac > 1.0 {
+                        speedFrac = 1.0;
+                    }
+                }
+            }
+            if (*info).mousePitch != 0.0 {
+                *mPitchOverride = (*info).mousePitch * speedFrac;
+            }
+            if (*info).mouseYaw != 0.0 {
+                *mYawOverride = (*info).mouseYaw * speedFrac;
+            }
+        }
+    }
 }
 
 /// Raven `PM_HoverTrace`.
@@ -329,10 +353,11 @@ pub fn PM_AdjustAngleForWallRunUp(
 /// Raven `BG_ForceWallJumpStrength`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1602-1605`
-// PORT-ESCALATION(missing-const): needs the `forceJumpStrength` table whose element 0 is
-// the #define `JUMP_VELOCITY` (not resolved in packet) — can't define the table without it.
+// PORT-ESCALATION(missing-global-table): returns `forceJumpStrength[FORCE_LEVEL_3]/2.5f`. The
+// backfill supplies only `JUMP_VELOCITY` (element 0); the full `forceJumpStrength` file-scope
+// table (a bg_pmove.c global, also parked in NPC_AI_Jedi.rs) is unresolved — no invention allowed.
 pub fn BG_ForceWallJumpStrength() -> f32 {
-    todo!("Port BG_ForceWallJumpStrength — parked: missing-const")
+    todo!("Port BG_ForceWallJumpStrength — parked: missing-global-table")
 }
 
 /// Raven `PM_AdjustAngleForWallJump`.
@@ -548,54 +573,139 @@ pub fn PM_Use() {
 /// Raven `PM_WalkingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4579-4598`
-// PORT-ESCALATION(animNumber_t): switches on `BOTH_*` anim constants; `animNumber_t` is unported per packet.
 pub fn PM_WalkingAnim(
     anim: c_int,
 ) -> qboolean {
-    todo!("Port PM_WalkingAnim — parked: animNumber_t")
+    use animNumber_t::*;
+    const ANIMS: &[animNumber_t] = &[
+        BOTH_WALK1,          //# Normal walk
+        BOTH_WALK2,          //# Normal walk with saber
+        BOTH_WALK_STAFF,     //# Normal walk with staff
+        BOTH_WALK_DUAL,      //# Normal walk with staff
+        BOTH_WALK5,          //# Tavion taunting Kyle (cin 22)
+        BOTH_WALK6,          //# Slow walk for Luke (cin 12)
+        BOTH_WALK7,          //# Fast walk
+        BOTH_WALKBACK1,      //# Walk1 backwards
+        BOTH_WALKBACK2,      //# Walk2 backwards
+        BOTH_WALKBACK_STAFF, //# Walk backwards with staff
+        BOTH_WALKBACK_DUAL,  //# Walk backwards with dual
+    ];
+    if ANIMS.iter().any(|&a| a as c_int == anim) {
+        qtrue
+    } else {
+        qfalse
+    }
 }
 
 /// Raven `PM_RunningAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4600-4620`
-// PORT-ESCALATION(animNumber_t): switches on `BOTH_*` anim constants; `animNumber_t` is unported per packet.
 pub fn PM_RunningAnim(
     anim: c_int,
 ) -> qboolean {
-    todo!("Port PM_RunningAnim — parked: animNumber_t")
+    use animNumber_t::*;
+    const ANIMS: &[animNumber_t] = &[
+        BOTH_RUN1,
+        BOTH_RUN2,
+        BOTH_RUN_STAFF,
+        BOTH_RUN_DUAL,
+        BOTH_RUNBACK1,
+        BOTH_RUNBACK2,
+        BOTH_RUNBACK_STAFF,
+        BOTH_RUNBACK_DUAL,
+        BOTH_RUN1START,        //# Start into full run1
+        BOTH_RUN1STOP,         //# Stop from full run1
+        BOTH_RUNSTRAFE_LEFT1,  //# Sidestep left: should loop
+        BOTH_RUNSTRAFE_RIGHT1, //# Sidestep right: should loop
+    ];
+    if ANIMS.iter().any(|&a| a as c_int == anim) {
+        qtrue
+    } else {
+        qfalse
+    }
 }
 
 /// Raven `PM_SwimmingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4622-4633`
-// PORT-ESCALATION(animNumber_t): switches on `BOTH_*` anim constants; `animNumber_t` is unported per packet.
 pub fn PM_SwimmingAnim(
     anim: c_int,
 ) -> qboolean {
-    todo!("Port PM_SwimmingAnim — parked: animNumber_t")
+    use animNumber_t::*;
+    const ANIMS: &[animNumber_t] = &[
+        BOTH_SWIM_IDLE1, //# Swimming Idle 1
+        BOTH_SWIMFORWARD,  //# Swim forward loop
+        BOTH_SWIMBACKWARD, //# Swim backward loop
+    ];
+    if ANIMS.iter().any(|&a| a as c_int == anim) {
+        qtrue
+    } else {
+        qfalse
+    }
 }
 
 /// Raven `PM_RollingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4635-4647`
-// PORT-ESCALATION(animNumber_t): switches on `BOTH_*` anim constants; `animNumber_t` is unported per packet.
 pub fn PM_RollingAnim(
     anim: c_int,
 ) -> qboolean {
-    todo!("Port PM_RollingAnim — parked: animNumber_t")
+    use animNumber_t::*;
+    const ANIMS: &[animNumber_t] = &[
+        BOTH_ROLL_F, //# Roll forward
+        BOTH_ROLL_B, //# Roll backward
+        BOTH_ROLL_L, //# Roll left
+        BOTH_ROLL_R, //# Roll right
+    ];
+    if ANIMS.iter().any(|&a| a as c_int == anim) {
+        qtrue
+    } else {
+        qfalse
+    }
 }
 
 /// Raven `PM_AnglesForSlope`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4649-4675`
-// PORT-ESCALATION(vec3-outparam-signature): `angles` is written in place but the skeleton passes
-// vec3_t ([f32;3], Copy) by value, so the result cannot propagate to the caller.
+// fork-9: `angles` is a written-through out-param → `&mut [f32;3]`; `slope` stays a
+// read-only by-value input. Cross-file callers are updated by the fixer.
 pub fn PM_AnglesForSlope(
     yaw: f32,
     slope: vec3_t,
-    angles: vec3_t,
+    angles: &mut [f32; 3],
 ) {
-    todo!("Port PM_AnglesForSlope — parked: vec3-outparam-signature")
+    let mut nvf: vec3_t = [0.0; 3];
+    let mut ovf: vec3_t = [0.0; 3];
+    let mut ovr: vec3_t = [0.0; 3];
+    let mut new_angles: vec3_t = [0.0; 3];
+
+    // VectorSet( angles, 0, yaw, 0 )
+    angles[0] = 0.0;
+    angles[1] = yaw;
+    angles[2] = 0.0;
+    AngleVectors(*angles, Some(&mut ovf), Some(&mut ovr), None);
+
+    vectoangles(slope, &mut new_angles);
+    let pitch = new_angles[PITCH] + 90.0;
+    new_angles[ROLL] = 0.0;
+    new_angles[PITCH] = 0.0;
+
+    AngleVectors(new_angles, Some(&mut nvf), None, None);
+
+    // mod = DotProduct( nvf, ovr )
+    let mut r#mod = nvf[0] * ovr[0] + nvf[1] * ovr[1] + nvf[2] * ovr[2];
+    if r#mod < 0.0 {
+        r#mod = -1.0;
+    } else {
+        r#mod = 1.0;
+    }
+
+    // dot = DotProduct( nvf, ovf )
+    let dot = nvf[0] * ovf[0] + nvf[1] * ovf[1] + nvf[2] * ovf[2];
+
+    angles[YAW] = 0.0;
+    angles[PITCH] = dot * pitch;
+    angles[ROLL] = (1.0 - Q_fabs(dot)) * pitch * r#mod;
 }
 
 /// Raven `PM_FootSlopeTrace`.
@@ -612,11 +722,35 @@ pub fn PM_FootSlopeTrace(
 /// Raven `BG_InSlopeAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4742-4800`
-// PORT-ESCALATION(animNumber_t): switches on `LEGS_*` anim constants; `animNumber_t` is unported per packet.
 pub fn BG_InSlopeAnim(
     anim: c_int,
 ) -> qboolean {
-    todo!("Port BG_InSlopeAnim — parked: animNumber_t")
+    use animNumber_t::*;
+    const ANIMS: &[animNumber_t] = &[
+        LEGS_LEFTUP1,  //# On a slope with left foot 4 higher than right
+        LEGS_LEFTUP2,  //# On a slope with left foot 8 higher than right
+        LEGS_LEFTUP3,  //# On a slope with left foot 12 higher than right
+        LEGS_LEFTUP4,  //# On a slope with left foot 16 higher than right
+        LEGS_LEFTUP5,  //# On a slope with left foot 20 higher than right
+        LEGS_RIGHTUP1, //# On a slope with RIGHT foot 4 higher than left
+        LEGS_RIGHTUP2, //# On a slope with RIGHT foot 8 higher than left
+        LEGS_RIGHTUP3, //# On a slope with RIGHT foot 12 higher than left
+        LEGS_RIGHTUP4, //# On a slope with RIGHT foot 16 higher than left
+        LEGS_RIGHTUP5, //# On a slope with RIGHT foot 20 higher than left
+        LEGS_S1_LUP1, LEGS_S1_LUP2, LEGS_S1_LUP3, LEGS_S1_LUP4, LEGS_S1_LUP5,
+        LEGS_S1_RUP1, LEGS_S1_RUP2, LEGS_S1_RUP3, LEGS_S1_RUP4, LEGS_S1_RUP5,
+        LEGS_S3_LUP1, LEGS_S3_LUP2, LEGS_S3_LUP3, LEGS_S3_LUP4, LEGS_S3_LUP5,
+        LEGS_S3_RUP1, LEGS_S3_RUP2, LEGS_S3_RUP3, LEGS_S3_RUP4, LEGS_S3_RUP5,
+        LEGS_S4_LUP1, LEGS_S4_LUP2, LEGS_S4_LUP3, LEGS_S4_LUP4, LEGS_S4_LUP5,
+        LEGS_S4_RUP1, LEGS_S4_RUP2, LEGS_S4_RUP3, LEGS_S4_RUP4, LEGS_S4_RUP5,
+        LEGS_S5_LUP1, LEGS_S5_LUP2, LEGS_S5_LUP3, LEGS_S5_LUP4, LEGS_S5_LUP5,
+        LEGS_S5_RUP1, LEGS_S5_RUP2, LEGS_S5_RUP3, LEGS_S5_RUP4, LEGS_S5_RUP5,
+    ];
+    if ANIMS.iter().any(|&a| a as c_int == anim) {
+        qtrue
+    } else {
+        qfalse
+    }
 }
 
 /// Raven `PM_AdjustStandAnimForSlope`.
@@ -814,13 +948,96 @@ pub fn PM_AdjustAttackStates(
 /// Raven `BG_CmdForRoll`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8201-8327`
-// PORT-ESCALATION(animNumber_t): switches on `BOTH_*` roll anim constants; `animNumber_t` is unported per packet.
 pub fn BG_CmdForRoll(
     ps: *mut playerState_t,
     anim: c_int,
     pCmd: *mut usercmd_t,
 ) {
-    todo!("Port BG_CmdForRoll — parked: animNumber_t")
+    use animNumber_t::*;
+    use crate::bg_panimate::PM_AnimLength;
+    unsafe {
+        if anim == BOTH_ROLL_F as c_int {
+            (*pCmd).forwardmove = 127;
+            (*pCmd).rightmove = 0;
+        } else if anim == BOTH_ROLL_B as c_int {
+            (*pCmd).forwardmove = -127;
+            (*pCmd).rightmove = 0;
+        } else if anim == BOTH_ROLL_R as c_int {
+            (*pCmd).forwardmove = 0;
+            (*pCmd).rightmove = 127;
+        } else if anim == BOTH_ROLL_L as c_int {
+            (*pCmd).forwardmove = 0;
+            (*pCmd).rightmove = -127;
+        } else if anim == BOTH_GETUP_BROLL_R as c_int {
+            (*pCmd).forwardmove = 0;
+            (*pCmd).rightmove = 48;
+            //NOTE: speed is 400
+        } else if anim == BOTH_GETUP_FROLL_R as c_int {
+            if (*ps).legsTimer <= 250 {
+                //end of anim
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 0;
+            } else {
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 48;
+            }
+        } else if anim == BOTH_GETUP_BROLL_L as c_int {
+            (*pCmd).forwardmove = 0;
+            (*pCmd).rightmove = -48;
+        } else if anim == BOTH_GETUP_FROLL_L as c_int {
+            if (*ps).legsTimer <= 250 {
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 0;
+            } else {
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = -48;
+            }
+        } else if anim == BOTH_GETUP_BROLL_B as c_int {
+            if (*ps).torsoTimer <= 250 {
+                //end of anim
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 0;
+            } else if PM_AnimLength(0, (*ps).legsAnim) - (*ps).torsoTimer < 350 {
+                //beginning of anim
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 0;
+            } else {
+                (*pCmd).forwardmove = -64;
+                (*pCmd).rightmove = 0;
+            }
+        } else if anim == BOTH_GETUP_FROLL_B as c_int {
+            if (*ps).torsoTimer <= 100 {
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 0;
+            } else if PM_AnimLength(0, (*ps).legsAnim) - (*ps).torsoTimer < 200 {
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 0;
+            } else {
+                (*pCmd).forwardmove = -64;
+                (*pCmd).rightmove = 0;
+            }
+        } else if anim == BOTH_GETUP_BROLL_F as c_int {
+            if (*ps).torsoTimer <= 550 {
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 0;
+            } else if PM_AnimLength(0, (*ps).legsAnim) - (*ps).torsoTimer < 150 {
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 0;
+            } else {
+                (*pCmd).forwardmove = 64;
+                (*pCmd).rightmove = 0;
+            }
+        } else if anim == BOTH_GETUP_FROLL_F as c_int {
+            if (*ps).torsoTimer <= 100 {
+                (*pCmd).forwardmove = 0;
+                (*pCmd).rightmove = 0;
+            } else {
+                (*pCmd).forwardmove = 64;
+                (*pCmd).rightmove = 0;
+            }
+        }
+        (*pCmd).upmove = 0;
+    }
 }
 
 /// Raven `BG_AdjustClientSpeed`.
@@ -838,32 +1055,82 @@ pub fn BG_AdjustClientSpeed(
 /// Raven `BG_InRollAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8512-8523`
-// PORT-ESCALATION(animNumber_t): switches on `BOTH_ROLL_*` anim constants; `animNumber_t` is unported per packet.
 pub fn BG_InRollAnim(
     cent: *mut entityState_t,
 ) -> qboolean {
-    todo!("Port BG_InRollAnim — parked: animNumber_t")
+    use animNumber_t::*;
+    unsafe {
+        let a = (*cent).legsAnim;
+        if a == BOTH_ROLL_F as c_int
+            || a == BOTH_ROLL_B as c_int
+            || a == BOTH_ROLL_R as c_int
+            || a == BOTH_ROLL_L as c_int
+        {
+            return qtrue;
+        }
+        qfalse
+    }
 }
 
 /// Raven `BG_InKnockDown`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8525-8560`
-// PORT-ESCALATION(animNumber_t): switches on `BOTH_KNOCKDOWN*`/`BOTH_GETUP*` constants; `animNumber_t` unported.
 pub fn BG_InKnockDown(
     anim: c_int,
 ) -> qboolean {
-    todo!("Port BG_InKnockDown — parked: animNumber_t")
+    use animNumber_t::*;
+    if anim == BOTH_KNOCKDOWN1 as c_int
+        || anim == BOTH_KNOCKDOWN2 as c_int
+        || anim == BOTH_KNOCKDOWN3 as c_int
+        || anim == BOTH_KNOCKDOWN4 as c_int
+        || anim == BOTH_KNOCKDOWN5 as c_int
+    {
+        return qtrue;
+    }
+    if anim == BOTH_GETUP1 as c_int
+        || anim == BOTH_GETUP2 as c_int
+        || anim == BOTH_GETUP3 as c_int
+        || anim == BOTH_GETUP4 as c_int
+        || anim == BOTH_GETUP5 as c_int
+        || anim == BOTH_FORCE_GETUP_F1 as c_int
+        || anim == BOTH_FORCE_GETUP_F2 as c_int
+        || anim == BOTH_FORCE_GETUP_B1 as c_int
+        || anim == BOTH_FORCE_GETUP_B2 as c_int
+        || anim == BOTH_FORCE_GETUP_B3 as c_int
+        || anim == BOTH_FORCE_GETUP_B4 as c_int
+        || anim == BOTH_FORCE_GETUP_B5 as c_int
+        || anim == BOTH_GETUP_BROLL_B as c_int
+        || anim == BOTH_GETUP_BROLL_F as c_int
+        || anim == BOTH_GETUP_BROLL_L as c_int
+        || anim == BOTH_GETUP_BROLL_R as c_int
+        || anim == BOTH_GETUP_FROLL_B as c_int
+        || anim == BOTH_GETUP_FROLL_F as c_int
+        || anim == BOTH_GETUP_FROLL_L as c_int
+        || anim == BOTH_GETUP_FROLL_R as c_int
+    {
+        return qtrue;
+    }
+    qfalse
 }
 
 /// Raven `BG_InRollES`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8562-8574`
-// PORT-ESCALATION(animNumber_t): switches on `BOTH_ROLL_*` anim constants; `animNumber_t` is unported per packet.
 pub fn BG_InRollES(
     ps: *mut entityState_t,
     anim: c_int,
 ) -> qboolean {
-    todo!("Port BG_InRollES — parked: animNumber_t")
+    use animNumber_t::*;
+    // Raven's `ps` param is unreferenced; the switch keys off `anim`.
+    let _ = ps;
+    if anim == BOTH_ROLL_F as c_int
+        || anim == BOTH_ROLL_B as c_int
+        || anim == BOTH_ROLL_R as c_int
+        || anim == BOTH_ROLL_L as c_int
+    {
+        return qtrue;
+    }
+    qfalse
 }
 
 /// Raven `BG_IK_MoveArm`.
@@ -891,13 +1158,13 @@ pub fn BG_IK_MoveArm(
 /// Raven `BG_UpdateLookAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8733-8787`
-// PORT-ESCALATION(vec3-outparam-signature): `lookAngles`/`lastHeadAngles` are clamped/written in
-// place, but the skeleton passes vec3_t ([f32;3], Copy) by value so the writes cannot propagate.
+// fork-9: `lastHeadAngles`/`lookAngles` are written in place → `&mut vec3_t`
+// (never NULL in the oracle callers).
 pub fn BG_UpdateLookAngles(
     lookingDebounceTime: c_int,
-    lastHeadAngles: vec3_t,
+    lastHeadAngles: &mut vec3_t,
     time: c_int,
-    lookAngles: vec3_t,
+    lookAngles: &mut vec3_t,
     lookSpeed: f32,
     minPitch: f32,
     maxPitch: f32,
@@ -906,32 +1173,165 @@ pub fn BG_UpdateLookAngles(
     minRoll: f32,
     maxRoll: f32,
 ) {
-    todo!("Port BG_UpdateLookAngles — parked: vec3-outparam-signature")
+    let fFrameInter: f32 = 0.1;
+    // Raven's function-scope `static` scratch (oldLookAngles/lookAnglesDiff/ang)
+    // are single-call temporaries (ruling 5) → plain locals.
+    let mut oldLookAngles: vec3_t = [0.0; 3];
+    let mut lookAnglesDiff: vec3_t = [0.0; 3];
+
+    if lookingDebounceTime > time {
+        //clamp so don't get "Exorcist" effect
+        if lookAngles[PITCH] > maxPitch {
+            lookAngles[PITCH] = maxPitch;
+        } else if lookAngles[PITCH] < minPitch {
+            lookAngles[PITCH] = minPitch;
+        }
+        if lookAngles[YAW] > maxYaw {
+            lookAngles[YAW] = maxYaw;
+        } else if lookAngles[YAW] < minYaw {
+            lookAngles[YAW] = minYaw;
+        }
+        if lookAngles[ROLL] > maxRoll {
+            lookAngles[ROLL] = maxRoll;
+        } else if lookAngles[ROLL] < minRoll {
+            lookAngles[ROLL] = minRoll;
+        }
+
+        //slowly lerp to this new value; remember last headAngles
+        oldLookAngles = *lastHeadAngles;
+        for i in 0..3 {
+            lookAnglesDiff[i] = lookAngles[i] - oldLookAngles[i];
+        }
+
+        for ang in 0..3 {
+            lookAnglesDiff[ang] = crate::q_math::AngleNormalize180(lookAnglesDiff[ang]);
+        }
+
+        if crate::q_math::VectorLengthSquared(lookAnglesDiff) != 0.0 {
+            lookAngles[PITCH] = crate::q_math::AngleNormalize180(
+                oldLookAngles[PITCH] + (lookAnglesDiff[PITCH] * fFrameInter * lookSpeed),
+            );
+            lookAngles[YAW] = crate::q_math::AngleNormalize180(
+                oldLookAngles[YAW] + (lookAnglesDiff[YAW] * fFrameInter * lookSpeed),
+            );
+            lookAngles[ROLL] = crate::q_math::AngleNormalize180(
+                oldLookAngles[ROLL] + (lookAnglesDiff[ROLL] * fFrameInter * lookSpeed),
+            );
+        }
+    }
+    //Remember current lookAngles next time
+    *lastHeadAngles = *lookAngles;
 }
 
 /// Raven `BG_G2ClientNeckAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8790-8866`
-// PORT-ESCALATION(vec3-outparam-signature): `headAngles`/`neckAngles`/`thoracicAngles` are written
-// in place, but the skeleton passes vec3_t ([f32;3], Copy) by value so the writes cannot propagate.
+// fork-9: `headAngles`/`neckAngles`/`thoracicAngles` are written in place → `&mut vec3_t`;
+// `lookAngles`/`headClampMin/MaxAngles` are read-only → keep by-value `vec3_t`.
 pub fn BG_G2ClientNeckAngles(
     ghoul2: *mut c_void,
     time: c_int,
     lookAngles: vec3_t,
-    headAngles: vec3_t,
-    neckAngles: vec3_t,
-    thoracicAngles: vec3_t,
+    headAngles: &mut vec3_t,
+    neckAngles: &mut vec3_t,
+    thoracicAngles: &mut vec3_t,
     headClampMinAngles: vec3_t,
     headClampMaxAngles: vec3_t,
 ) {
-    todo!("Port BG_G2ClientNeckAngles — parked: vec3-outparam-signature")
+    let mut lA: vec3_t = lookAngles;
+    //clamp the headangles (which should now be relative to the cervical (neck) angles
+    if lA[PITCH] < headClampMinAngles[PITCH] {
+        lA[PITCH] = headClampMinAngles[PITCH];
+    } else if lA[PITCH] > headClampMaxAngles[PITCH] {
+        lA[PITCH] = headClampMaxAngles[PITCH];
+    }
+    if lA[YAW] < headClampMinAngles[YAW] {
+        lA[YAW] = headClampMinAngles[YAW];
+    } else if lA[YAW] > headClampMaxAngles[YAW] {
+        lA[YAW] = headClampMaxAngles[YAW];
+    }
+    if lA[ROLL] < headClampMinAngles[ROLL] {
+        lA[ROLL] = headClampMinAngles[ROLL];
+    } else if lA[ROLL] > headClampMaxAngles[ROLL] {
+        lA[ROLL] = headClampMaxAngles[ROLL];
+    }
+
+    //split it up between the neck and cranium
+    if thoracicAngles[PITCH] != 0.0 {
+        //already been set above, blend them
+        thoracicAngles[PITCH] = (thoracicAngles[PITCH] + (lA[PITCH] * 0.4)) * 0.5;
+    } else {
+        thoracicAngles[PITCH] = lA[PITCH] * 0.4;
+    }
+    if thoracicAngles[YAW] != 0.0 {
+        thoracicAngles[YAW] = (thoracicAngles[YAW] + (lA[YAW] * 0.1)) * 0.5;
+    } else {
+        thoracicAngles[YAW] = lA[YAW] * 0.1;
+    }
+    if thoracicAngles[ROLL] != 0.0 {
+        thoracicAngles[ROLL] = (thoracicAngles[ROLL] + (lA[ROLL] * 0.1)) * 0.5;
+    } else {
+        thoracicAngles[ROLL] = lA[ROLL] * 0.1;
+    }
+
+    neckAngles[PITCH] = lA[PITCH] * 0.2;
+    neckAngles[YAW] = lA[YAW] * 0.3;
+    neckAngles[ROLL] = lA[ROLL] * 0.3;
+
+    headAngles[PITCH] = lA[PITCH] * 0.4;
+    headAngles[YAW] = lA[YAW] * 0.6;
+    headAngles[ROLL] = lA[ROLL] * 0.6;
+
+    unsafe {
+        strap_G2API_SetBoneAngles(
+            ghoul2,
+            0,
+            b"cranium\0".as_ptr() as *const c_char,
+            *headAngles,
+            BONE_ANGLES_POSTMULT,
+            POSITIVE_X as c_int,
+            NEGATIVE_Y as c_int,
+            NEGATIVE_Z as c_int,
+            core::ptr::null_mut(),
+            0,
+            time,
+        );
+        strap_G2API_SetBoneAngles(
+            ghoul2,
+            0,
+            b"cervical\0".as_ptr() as *const c_char,
+            *neckAngles,
+            BONE_ANGLES_POSTMULT,
+            POSITIVE_X as c_int,
+            NEGATIVE_Y as c_int,
+            NEGATIVE_Z as c_int,
+            core::ptr::null_mut(),
+            0,
+            time,
+        );
+        strap_G2API_SetBoneAngles(
+            ghoul2,
+            0,
+            b"thoracic\0".as_ptr() as *const c_char,
+            *thoracicAngles,
+            BONE_ANGLES_POSTMULT,
+            POSITIVE_X as c_int,
+            NEGATIVE_Y as c_int,
+            NEGATIVE_Z as c_int,
+            core::ptr::null_mut(),
+            0,
+            time,
+        );
+    }
 }
 
 /// Raven `BG_G2ClientSpineAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8869-8990`
-// PORT-ESCALATION(vec3-outparam-signature): `thoracicAngles`/`ulAngles`/`llAngles`/`viewAngles` are
-// written in place, but the skeleton passes vec3_t ([f32;3], Copy) by value — writes cannot propagate.
+// fork-9: `viewAngles`/`thoracicAngles`/`ulAngles`/`llAngles` are written in place → `&mut vec3_t`;
+// `cent_lerpOrigin`/`cent_lerpAngles`/`angles`/`modelScale` are read-only → keep by-value `vec3_t`.
+// Only Raven's active `#if 1` correction path is ported (the `#else` branch is dead); with `#if 1`,
+// `tPitchAngle`/`tYawAngle`/`corrTime` are unreferenced.
 pub fn BG_G2ClientSpineAngles(
     ghoul2: *mut c_void,
     motionBolt: c_int,
@@ -939,19 +1339,119 @@ pub fn BG_G2ClientSpineAngles(
     cent_lerpAngles: vec3_t,
     cent: *mut entityState_t,
     time: c_int,
-    viewAngles: vec3_t,
+    viewAngles: &mut vec3_t,
     ciLegs: c_int,
     ciTorso: c_int,
     angles: vec3_t,
-    thoracicAngles: vec3_t,
-    ulAngles: vec3_t,
-    llAngles: vec3_t,
+    thoracicAngles: &mut vec3_t,
+    ulAngles: &mut vec3_t,
+    llAngles: &mut vec3_t,
     modelScale: vec3_t,
     tPitchAngle: *mut f32,
     tYawAngle: *mut f32,
     corrTime: *mut c_int,
 ) {
-    todo!("Port BG_G2ClientSpineAngles — parked: vec3-outparam-signature")
+    use crate::bg_panimate::{
+        BG_FlippingAnim, BG_InDeathAnim, BG_InSpecialJump, BG_SaberInSpecial,
+        BG_SaberInSpecialAttack, BG_SpinningSaberAnim,
+    };
+    use crate::g_strap::strap_G2API_GetBoltMatrix_NoRecNoRot;
+    unsafe {
+        let mut doCorr = qfalse;
+
+        //*tPitchAngle = viewAngles[PITCH];
+        viewAngles[YAW] = crate::q_math::AngleDelta(cent_lerpAngles[YAW], angles[YAW]);
+        //*tYawAngle = viewAngles[YAW];
+
+        if BG_FlippingAnim((*cent).legsAnim) == qfalse
+            && BG_SpinningSaberAnim((*cent).legsAnim) == qfalse
+            && BG_SpinningSaberAnim((*cent).torsoAnim) == qfalse
+            && BG_InSpecialJump((*cent).legsAnim) == qfalse
+            && BG_InSpecialJump((*cent).torsoAnim) == qfalse
+            && BG_InDeathAnim((*cent).legsAnim) == qfalse
+            && BG_InDeathAnim((*cent).torsoAnim) == qfalse
+            && BG_InRollES(cent, (*cent).legsAnim) == qfalse
+            && BG_InRollAnim(cent) == qfalse
+            && BG_SaberInSpecial((*cent).saberMove) == qfalse
+            && BG_SaberInSpecialAttack((*cent).torsoAnim) == qfalse
+            && BG_SaberInSpecialAttack((*cent).legsAnim) == qfalse
+            && BG_InKnockDown((*cent).torsoAnim) == qfalse
+            && BG_InKnockDown((*cent).legsAnim) == qfalse
+            && BG_InKnockDown(ciTorso) == qfalse
+            && BG_InKnockDown(ciLegs) == qfalse
+            && BG_FlippingAnim(ciLegs) == qfalse
+            && BG_SpinningSaberAnim(ciLegs) == qfalse
+            && BG_SpinningSaberAnim(ciTorso) == qfalse
+            && BG_InSpecialJump(ciLegs) == qfalse
+            && BG_InSpecialJump(ciTorso) == qfalse
+            && BG_InDeathAnim(ciLegs) == qfalse
+            && BG_InDeathAnim(ciTorso) == qfalse
+            && BG_SaberInSpecialAttack(ciTorso) == qfalse
+            && BG_SaberInSpecialAttack(ciLegs) == qfalse
+            && ((*cent).eFlags & EF_DEAD) == 0
+            && (*cent).legsAnim != (*cent).torsoAnim
+            && ciLegs != ciTorso
+            && (*cent).m_iVehicleNum == 0
+        {
+            doCorr = qtrue;
+        }
+
+        if doCorr == qtrue {
+            //FIXME: no need to do this if legs and torso on are same frame
+            //adjust for motion offset
+            let mut boltMatrix = mdxaBone_t { matrix: [[0.0; 4]; 3] };
+            let mut motionFwd: vec3_t = [0.0; 3];
+            let mut motionAngles: vec3_t = [0.0; 3];
+            let mut motionRt: vec3_t = [0.0; 3];
+            let mut tempAng: vec3_t = [0.0; 3];
+
+            strap_G2API_GetBoltMatrix_NoRecNoRot(
+                ghoul2,
+                0,
+                motionBolt,
+                &mut boltMatrix,
+                crate::q_math::vec3_origin,
+                cent_lerpOrigin,
+                time,
+                core::ptr::null_mut(),
+                modelScale,
+            );
+            //BG_GiveMeVectorFromMatrix( &boltMatrix, NEGATIVE_Y, motionFwd );
+            motionFwd[0] = -boltMatrix.matrix[0][1];
+            motionFwd[1] = -boltMatrix.matrix[1][1];
+            motionFwd[2] = -boltMatrix.matrix[2][1];
+
+            vectoangles(motionFwd, &mut motionAngles);
+
+            //BG_GiveMeVectorFromMatrix( &boltMatrix, NEGATIVE_X, motionRt );
+            motionRt[0] = -boltMatrix.matrix[0][0];
+            motionRt[1] = -boltMatrix.matrix[1][0];
+            motionRt[2] = -boltMatrix.matrix[2][0];
+
+            vectoangles(motionRt, &mut tempAng);
+            motionAngles[ROLL] = -tempAng[PITCH];
+
+            for ang in 0..3 {
+                viewAngles[ang] = crate::q_math::AngleNormalize180(
+                    viewAngles[ang] - crate::q_math::AngleNormalize180(motionAngles[ang]),
+                );
+            }
+        }
+
+        //distribute the angles differently up the spine
+        //NOTE: each of these distributions must add up to 1.0f
+        thoracicAngles[PITCH] = viewAngles[PITCH] * 0.20;
+        llAngles[PITCH] = viewAngles[PITCH] * 0.40;
+        ulAngles[PITCH] = viewAngles[PITCH] * 0.40;
+
+        thoracicAngles[YAW] = viewAngles[YAW] * 0.20;
+        ulAngles[YAW] = viewAngles[YAW] * 0.35;
+        llAngles[YAW] = viewAngles[YAW] * 0.45;
+
+        thoracicAngles[ROLL] = viewAngles[ROLL] * 0.20;
+        ulAngles[ROLL] = viewAngles[ROLL] * 0.35;
+        llAngles[ROLL] = viewAngles[ROLL] * 0.45;
+    }
 }
 
 /// Raven `BG_SwingAngles`.
@@ -1028,18 +1528,37 @@ pub fn BG_SwingAngles(
 /// Raven `BG_InRoll2`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9058-9078`
-// PORT-ESCALATION(animNumber_t): switches on `BOTH_GETUP_*ROLL_*`/`BOTH_ROLL_*` constants; `animNumber_t` unported.
 pub fn BG_InRoll2(
     es: *mut entityState_t,
 ) -> qboolean {
-    todo!("Port BG_InRoll2 — parked: animNumber_t")
+    use animNumber_t::*;
+    unsafe {
+        let a = (*es).legsAnim;
+        if a == BOTH_GETUP_BROLL_B as c_int
+            || a == BOTH_GETUP_BROLL_F as c_int
+            || a == BOTH_GETUP_BROLL_L as c_int
+            || a == BOTH_GETUP_BROLL_R as c_int
+            || a == BOTH_GETUP_FROLL_B as c_int
+            || a == BOTH_GETUP_FROLL_F as c_int
+            || a == BOTH_GETUP_FROLL_L as c_int
+            || a == BOTH_GETUP_FROLL_R as c_int
+            || a == BOTH_ROLL_F as c_int
+            || a == BOTH_ROLL_B as c_int
+            || a == BOTH_ROLL_R as c_int
+            || a == BOTH_ROLL_L as c_int
+        {
+            return qtrue;
+        }
+        qfalse
+    }
 }
 
 /// Raven `BG_G2PlayerAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9082-9457`
-// PORT-ESCALATION(vec3-outparam-signature): writes many vec3_t out-params (`legsAngles`, `turAngles`, …)
-// passed by value ([f32;3], Copy); also indexes the unresolved extern `WeaponReadyAnim` table.
+// PORT-ESCALATION(bg-boundary): indexes the bg-owned runtime `WeaponReadyAnim[cent->weapon]` table
+// (ruling 11: bg-owned state threaded per 8a), but this bg-tier C signature carries no threading
+// channel (no `ctx`/`PmoveContext`). fork-9 out-param reshape is otherwise settled.
 pub fn BG_G2PlayerAngles(
     ghoul2: *mut c_void,
     motionBolt: c_int,
@@ -1067,7 +1586,7 @@ pub fn BG_G2PlayerAngles(
     emplaced: *mut entityState_t,
     crazySmoothFactor: *mut c_int,
 ) {
-    todo!("Port BG_G2PlayerAngles — parked: vec3-outparam-signature")
+    todo!("Port BG_G2PlayerAngles — parked: bg-boundary")
 }
 
 /// Raven `BG_G2ATSTAngles`.

@@ -11,6 +11,22 @@
 
 use crate::prelude::*;
 
+// Raven `#define MAX_ITEMS 256`.
+// Source: `oracle/oracle/codemp/game/bg_public.h:31`
+const MAX_ITEMS: usize = 256;
+
+/// `itemRegistered[MAX_ITEMS]` (`g_items.c:2966`). A thin wrapper because
+/// `[qboolean; 256]` has no library `Default` impl (only arrays up to 32
+/// elements do in stable Rust).
+#[derive(Clone, Copy)]
+pub struct ItemRegistered(pub [qboolean; MAX_ITEMS]);
+
+impl Default for ItemRegistered {
+    fn default() -> Self {
+        ItemRegistered([0; MAX_ITEMS])
+    }
+}
+
 /// Raven game-tier mutable file-scope globals (fork ruling 1).
 #[derive(Default)]
 pub struct GameGlobals {
@@ -122,12 +138,13 @@ pub struct GameGlobals {
     //TODO: Port bot_state_t *[MAX_CLIENTS]*
     // Source: oracle/oracle/codemp/game/ai_main.c:46
     pub botstates: (),
-    //TODO: Port gentity_t **
-    // Source: oracle/oracle/codemp/game/ai_main.c:94
-    pub droppedBlueFlag: (),
-    //TODO: Port gentity_t **
-    // Source: oracle/oracle/codemp/game/ai_main.c:92
-    pub droppedRedFlag: (),
+    /// `droppedBlueFlag` (`gentity_t *`; raw pointer, matches the
+    /// raw-pointer entity signatures used throughout the pass-2 shards).
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:94`
+    pub droppedBlueFlag: *mut gentity_t,
+    /// `droppedRedFlag` (`gentity_t *`).
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:92`
+    pub droppedRedFlag: *mut gentity_t,
     //TODO: Port gentity_t **
     // Source: oracle/oracle/codemp/game/ai_main.c:93
     pub eFlagBlue: (),
@@ -216,24 +233,26 @@ pub struct GameGlobals {
     /// `gPainMOD`. Source: `oracle/oracle/codemp/game/g_combat.c:4573`
     pub gPainMOD: c_int,
     // --- `g_items.c` file-scope globals ---
-    //TODO: Port qboolean[MAX_ITEMS]
-    // Source: oracle/oracle/codemp/game/g_items.c:2966
-    pub itemRegistered: (),
-    //TODO: Port qhandle_t
-    // Source: oracle/oracle/codemp/game/g_items.c:103
-    pub shieldActivateSound: (),
-    //TODO: Port qhandle_t
-    // Source: oracle/oracle/codemp/game/g_items.c:102
-    pub shieldAttachSound: (),
-    //TODO: Port qhandle_t
-    // Source: oracle/oracle/codemp/game/g_items.c:105
-    pub shieldDamageSound: (),
-    //TODO: Port qhandle_t
-    // Source: oracle/oracle/codemp/game/g_items.c:104
-    pub shieldDeactivateSound: (),
-    //TODO: Port qhandle_t
-    // Source: oracle/oracle/codemp/game/g_items.c:101
-    pub shieldLoopSound: (),
+    /// `itemRegistered[MAX_ITEMS]` (`MAX_ITEMS` = 256, `bg_public.h:31`).
+    /// Array `Default` isn't derivable past 32 elements in stable Rust, so
+    /// this is a thin newtype with its own `Default` impl (below).
+    /// Source: `oracle/oracle/codemp/game/g_items.c:2966`
+    pub itemRegistered: ItemRegistered,
+    /// `shieldActivateSound` (`qhandle_t` = `c_int`).
+    /// Source: `oracle/oracle/codemp/game/g_items.c:103`
+    pub shieldActivateSound: qhandle_t,
+    /// `shieldAttachSound` (`qhandle_t` = `c_int`).
+    /// Source: `oracle/oracle/codemp/game/g_items.c:102`
+    pub shieldAttachSound: qhandle_t,
+    /// `shieldDamageSound` (`qhandle_t` = `c_int`).
+    /// Source: `oracle/oracle/codemp/game/g_items.c:105`
+    pub shieldDamageSound: qhandle_t,
+    /// `shieldDeactivateSound` (`qhandle_t` = `c_int`).
+    /// Source: `oracle/oracle/codemp/game/g_items.c:104`
+    pub shieldDeactivateSound: qhandle_t,
+    /// `shieldLoopSound` (`qhandle_t` = `c_int`).
+    /// Source: `oracle/oracle/codemp/game/g_items.c:101`
+    pub shieldLoopSound: qhandle_t,
     // --- `g_log.c` file-scope globals ---
     //TODO: Port qboolean[MAX_CLIENTS]
     // Source: oracle/oracle/codemp/game/g_log.c:27

@@ -9,12 +9,31 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::NPC_utils::{NPC_CheckLookTarget, NPC_ClearLookTarget};
+use crate::NPC_utils::{CalcEntitySpot, NPC_CheckLookTarget, NPC_ClearLookTarget};
 use crate::g_combat::G_AlertTeam;
-use crate::g_timer::TIMER_Done;
+use crate::g_timer::{TIMER_Done, TIMER_Set};
 use crate::g_utils::G_Sound;
+use crate::q_math::{vec3_origin, AngleVectors, Q_irand, VectorLength, VectorNormalize};
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_qshared::common::mp::trace_t::trace_t;
+use crate::NPC_AI_Jedi::NPC_Jedi_RateNewEnemy;
+use crate::NPC_utils::G_ActivateBehavior;
+use crate::NPC_sounds::G_AddVoiceEvent;
 use crate::q_shared::Q_stricmp;
-use mp_bg::weapons::weapon_t::WP_SABER;
+use crate::teams::class::*;
+use crate::teams::npcteam::{NPCTEAM_ENEMY, NPCTEAM_FREE, NPCTEAM_NEUTRAL, NPCTEAM_PLAYER};
+use crate::entity::flags::FL_NOTARGET;
+use crate::g_utils::{G_CheckInSolid, G_FreeEntity, G_SetOrigin};
+use crate::g_nav::NAV_FindClosestWaypointForPoint2;
+use crate::level::combat_point::MAX_COMBAT_POINTS;
+use mp_bg::public::entity_event::entity_event_t::{EV_ANGER1, EV_ANGER3};
+use mp_bg::weapons::weapon_t::*;
+
+// Raven `RANK_CREWMAN` (from the anonymous `rank_t` enum) — value pinned by
+// `NPC_stats.rs`'s `TranslateRankName` comment ("crewman" -> 1), precedent
+// `NPC_AI_Utils.rs`'s `RANK_ENSIGN`.
+// Source: `oracle/oracle/codemp/game/NPC_stats.c:287-330`
+const RANK_CREWMAN: c_int = 1;
 
 // Unported types referenced in this file (need porting before this compiles):
 // combatPt_t
@@ -24,16 +43,41 @@ use mp_bg::weapons::weapon_t::WP_SABER;
 // Source: `oracle/oracle/codemp/game/b_public.h:44`
 const SCF_NO_GROUPS: i32 = 0x00020000;
 
+// Raven `SCF_ALT_FIRE` (`gNPC_t::scriptFlags` bit) — not yet ported as a
+// central const; inlined here from the header value.
+// Source: `oracle/oracle/codemp/game/b_public.h:33`
+const SCF_ALT_FIRE: i32 = 0x00000040;
+
+// Raven `SCF_DONT_FIRE` (`gNPC_t::scriptFlags` bit) — not yet ported as a
+// central const; inlined here from the header value.
+// Source: `oracle/oracle/codemp/game/b_public.h:41`
+const SCF_DONT_FIRE: i32 = 0x00004000;
+
 /// Raven `G_ClearEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:17-36`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
-// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
-// `g_weapon.rs`) — how is state threaded in?
 pub fn G_ClearEnemy(
     ctx: GameContext<'_>,self_: *mut gentity_t) {
-    todo!("Port G_ClearEnemy — parked: seam-threading")
+    unsafe {
+        NPC_CheckLookTarget(ctx, self_);
+
+        if !(*self_).enemy.is_null() {
+            let client = (*self_).client as *mut gclient_t;
+            if !client.is_null()
+                && (*client).renderInfo.lookTarget == (*(*self_).enemy).s.number
+            {
+                NPC_ClearLookTarget(self_);
+            }
+
+            let npc = (*self_).NPC as *mut gNPC_t;
+            if !npc.is_null() && (*self_).enemy == (*npc).goalEntity {
+                (*npc).goalEntity = std::ptr::null_mut();
+            }
+            //FIXME: set last enemy?
+        }
+
+        (*self_).enemy = std::ptr::null_mut();
+    }
 }
 
 /// Raven `G_AngerAlert`.
@@ -65,26 +109,229 @@ pub fn G_AngerAlert(
     }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &mut GameWorld, but the body walks `g_entities[1..level.num_entities]`
-// (ruling 1: GameWorld owns level/entities) — how is state threaded in?
 /// Raven `G_TeamEnemy`.
 ///
+/// Raven: FIXME - Probably a better way to do this, is a linked list of your
+/// teammates already available?
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:67-115`
 pub fn G_TeamEnemy(
     ctx: GameContext<'_>,self_: *mut gentity_t) -> qboolean {
-    todo!("Port G_TeamEnemy — parked: seam-threading")
+    unsafe {
+        let self_client = (*self_).client as *mut gclient_t;
+        if self_client.is_null() || (*self_client).playerTeam == NPCTEAM_FREE {
+            return 0;
+        }
+        let self_npc = (*self_).NPC as *mut gNPC_t;
+        if !self_npc.is_null() && ((*self_npc).scriptFlags & SCF_NO_GROUPS) != 0 {
+            //I'm not a team playa...
+            return 0;
+        }
+
+        let num_entities = (*ctx.world).level.num_entities;
+        for i in 1..num_entities {
+            let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            if ent == self_ {
+                continue;
+            }
+            if (*ent).health <= 0 {
+                continue;
+            }
+            let ent_client = (*ent).client as *mut gclient_t;
+            if ent_client.is_null() {
+                continue;
+            }
+            if (*ent_client).playerTeam != (*self_client).playerTeam {
+                //ent is not on my team
+                continue;
+            }
+            if !(*ent).enemy.is_null() {
+                //they have an enemy
+                let enemy_client = (*(*ent).enemy).client as *mut gclient_t;
+                if enemy_client.is_null() || (*enemy_client).playerTeam != (*self_client).playerTeam {
+                    //the ent's enemy is either a normal ent or is a player/NPC that is not on my team
+                    return 1;
+                }
+            }
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &GameWorld/GameCvars, but the body reads `g_spskill.integer` (ruling 1) —
-// how is state threaded in?
+// Raven `RANK_LT` (from the anonymous `rank_t` enum) — value pinned by
+// `NPC_stats.rs`'s `TranslateRankName` comment ("lt" -> 4), precedent
+// `NPC_AI_Utils.rs`'s `RANK_ENSIGN`.
+// Source: `oracle/oracle/codemp/game/NPC_stats.c:287-330`
+const RANK_LT: c_int = 4;
+
 /// Raven `G_AttackDelay`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:117-310`
 pub fn G_AttackDelay(
     ctx: GameContext<'_>,self_: *mut gentity_t, enemy: *mut gentity_t) {
-    todo!("Port G_AttackDelay — parked: seam-threading")
+    unsafe {
+        if enemy.is_null() || (*self_).client.is_null() || (*self_).NPC.is_null() {
+            return;
+        }
+        //delay their attack based on how far away they're facing from enemy
+        let client = (*self_).client as *mut gclient_t;
+        let npc = (*self_).NPC as *mut gNPC_t;
+
+        // VectorSubtract( self->client->renderInfo.eyePoint, enemy->r.currentOrigin, dir );//purposely backwards
+        let eye = (*client).renderInfo.eyePoint;
+        let enemy_org = (*enemy).r.currentOrigin;
+        let mut dir = [eye[0] - enemy_org[0], eye[1] - enemy_org[1], eye[2] - enemy_org[2]];
+        VectorNormalize(&mut dir);
+        let mut fwd = [0.0f32; 3];
+        AngleVectors((*client).renderInfo.eyeAngles, Some(&mut fwd), None, None);
+        //dir[2] = fwd[2] = 0;//ignore z diff?
+
+        let g_spskill = (*ctx.world).cvars.g_spskill.integer;
+        let mut attDelay = (4 - g_spskill) * 500; //initial: from 1000ms delay on hard to 2000ms delay on easy
+        if (*client).playerTeam == NPCTEAM_PLAYER {
+            //invert
+            attDelay = 2000 - attDelay;
+        }
+        let dot = fwd[0] * dir[0] + fwd[1] * dir[1] + fwd[2] * dir[2];
+        attDelay += ((dot + 1.0) * 2000.0).floor() as c_int; //add up to 4000ms delay if they're facing away
+
+        //FIXME: should distance matter, too?
+
+        //Now modify the delay based on NPC_class, weapon, and team
+        //NOTE: attDelay should be somewhere between 1000 to 6000 milliseconds
+        match (*client).NPC_class {
+            class_t::CLASS_IMPERIAL => {
+                //they give orders and hang back
+                attDelay += Q_irand(500, 1500);
+            }
+            class_t::CLASS_STORMTROOPER => {
+                //stormtroopers shoot sooner
+                if (*npc).rank >= RANK_LT {
+                    //officers shoot even sooner
+                    attDelay -= Q_irand(500, 1500);
+                } else {
+                    //normal stormtroopers don't have as fast reflexes as officers
+                    attDelay -= Q_irand(0, 1000);
+                }
+            }
+            class_t::CLASS_SWAMPTROOPER => {
+                //shoot very quickly?  What about guys in water?
+                attDelay -= Q_irand(1000, 2000);
+            }
+            class_t::CLASS_IMPWORKER => {
+                //they panic, don't fire right away
+                attDelay += Q_irand(1000, 2500);
+            }
+            class_t::CLASS_TRANDOSHAN => {
+                attDelay -= Q_irand(500, 1500);
+            }
+            class_t::CLASS_JAN
+            | class_t::CLASS_LANDO
+            | class_t::CLASS_PRISONER
+            | class_t::CLASS_REBEL => {
+                attDelay -= Q_irand(500, 1500);
+            }
+            class_t::CLASS_GALAKMECH | class_t::CLASS_ATST => {
+                attDelay -= Q_irand(1000, 2000);
+            }
+            class_t::CLASS_REELO | class_t::CLASS_UGNAUGHT | class_t::CLASS_JAWA => {
+                return;
+            }
+            class_t::CLASS_MINEMONSTER | class_t::CLASS_MURJJ => {
+                return;
+            }
+            class_t::CLASS_INTERROGATOR
+            | class_t::CLASS_PROBE
+            | class_t::CLASS_MARK1
+            | class_t::CLASS_MARK2
+            | class_t::CLASS_SENTRY => {
+                return;
+            }
+            class_t::CLASS_REMOTE | class_t::CLASS_SEEKER => {
+                return;
+            }
+            /*
+            CLASS_GRAN, CLASS_RODIAN, CLASS_WEEQUAY,
+            CLASS_JEDI, CLASS_SHADOWTROOPER, CLASS_TAVION, CLASS_REBORN,
+            CLASS_LUKE, CLASS_DESANN,
+            */
+            _ => {}
+        }
+
+        match (*self_).s.weapon {
+            w if w == WP_NONE as c_int || w == WP_SABER as c_int => {
+                return;
+            }
+            w if w == WP_BRYAR_PISTOL as c_int => {}
+            w if w == WP_BLASTER as c_int => {
+                if ((*npc).scriptFlags & SCF_ALT_FIRE) != 0 {
+                    //rapid-fire blasters
+                    attDelay += Q_irand(0, 500);
+                } else {
+                    //regular blaster
+                    attDelay -= Q_irand(0, 500);
+                }
+            }
+            w if w == WP_BOWCASTER as c_int => {
+                attDelay += Q_irand(0, 500);
+            }
+            w if w == WP_REPEATER as c_int => {
+                if ((*npc).scriptFlags & SCF_ALT_FIRE) == 0 {
+                    //rapid-fire blasters
+                    attDelay += Q_irand(0, 500);
+                }
+            }
+            w if w == WP_FLECHETTE as c_int => {
+                attDelay += Q_irand(500, 1500);
+            }
+            w if w == WP_ROCKET_LAUNCHER as c_int => {
+                attDelay += Q_irand(500, 1500);
+            }
+            //rwwFIXMEFIXME: Have this weapon for NPCs?
+            w if w == WP_DISRUPTOR as c_int => {
+                //sniper's don't delay?
+                return;
+            }
+            w if w == WP_THERMAL as c_int => {
+                //grenade-throwing has a built-in delay
+                return;
+            }
+            w if w == WP_STUN_BATON as c_int => {
+                // Any ol' melee attack
+                return;
+            }
+            w if w == WP_EMPLACED_GUN as c_int => {
+                return;
+            }
+            w if w == WP_TURRET as c_int => {
+                // turret guns
+                return;
+            }
+            _ => {}
+        }
+
+        if (*client).playerTeam == NPCTEAM_PLAYER {
+            //clamp it
+            if attDelay > 2000 {
+                attDelay = 2000;
+            }
+        }
+
+        //don't shoot right away
+        let cap = 4000 + ((2 - g_spskill) * 3000);
+        if attDelay > cap {
+            attDelay = cap;
+        }
+        TIMER_Set(ctx, self_, c"attackDelay".as_ptr() as *const c_char, attDelay); //Q_irand( 1500, 4500 ) );
+        //don't move right away either
+        if attDelay > 4000 {
+            attDelay = 4000 - Q_irand(500, 1500);
+        } else {
+            attDelay -= Q_irand(500, 1500);
+        }
+
+        TIMER_Set(ctx, self_, c"roamTime".as_ptr() as *const c_char, attDelay); //was Q_irand( 1000, 3500 );
+    }
 }
 
 /// Raven `G_ForceSaberOn`.
@@ -119,15 +366,183 @@ pub fn G_ForceSaberOn(
     }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &GameWorld/GameCvars, but the body reads `g_spskill.integer` and
-// `level.time` (ruling 1) — how is state threaded in?
 /// Raven `G_SetEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:349-523`
 pub fn G_SetEnemy(
     ctx: GameContext<'_>,self_: *mut gentity_t, enemy: *mut gentity_t) {
-    todo!("Port G_SetEnemy — parked: seam-threading")
+    unsafe {
+        let mut event: c_int = 0;
+
+        //Must be valid
+        if enemy.is_null() {
+            return;
+        }
+
+        //Must be valid
+        if (*enemy).inuse == 0 {
+            return;
+        }
+
+        //Don't take the enemy if in notarget
+        if ((*enemy).flags & FL_NOTARGET) != 0 {
+            return;
+        }
+
+        let npc = (*self_).NPC as *mut gNPC_t;
+        if npc.is_null() {
+            (*self_).enemy = enemy;
+            return;
+        }
+
+        let level_time = (*ctx.world).level.time;
+        if (*npc).confusionTime > level_time {
+            //can't pick up enemies if confused
+            return;
+        }
+
+        // (debug assert( enemy != self ) omitted — release build)
+
+        //	if ( enemy->client && enemy->client->playerTeam == TEAM_DISGUISE )
+        //	{//unmask the player
+        //		enemy->client->playerTeam = TEAM_PLAYER;
+        //	}
+
+        let client = (*self_).client as *mut gclient_t;
+        let enemy_client = (*enemy).client as *mut gclient_t;
+        if !client.is_null()
+            && !enemy_client.is_null()
+            && (*enemy_client).playerTeam == (*client).playerTeam
+        {
+            //Probably a damn script!
+            if (*npc).charmedTime > level_time {
+                //Probably a damn script!
+                return;
+            }
+        }
+
+        if !client.is_null() && (*client).ps.weapon == WP_SABER {
+            //when get new enemy, set a base aggression based on what that enemy is using, how far they are, etc.
+            NPC_Jedi_RateNewEnemy(ctx, self_, enemy);
+        }
+
+        //NOTE: this is not necessarily true!
+        //self->NPC->enemyLastSeenTime = level.time;
+
+        if (*self_).enemy.is_null() {
+            //TEMP HACK: turn on our saber
+            if (*self_).health > 0 {
+                G_ForceSaberOn(ctx, self_);
+            }
+
+            //FIXME: Have to do this to prevent alert cascading
+            G_ClearEnemy(ctx, self_);
+            (*self_).enemy = enemy;
+
+            //Special case- if player is being hunted by his own people, set their enemy team correctly
+            if (*client).playerTeam == NPCTEAM_PLAYER && (*enemy).s.number == 0 {
+                (*client).enemyTeam = NPCTEAM_PLAYER;
+            }
+
+            //If have an anger script, run that instead of yelling
+            if G_ActivateBehavior(ctx, self_, BSET_ANGER as c_int) != 0 {
+                // handled by the script
+            } else if !client.is_null()
+                && !enemy_client.is_null()
+                && (*client).playerTeam != (*enemy_client).playerTeam
+            {
+                //FIXME: Use anger when entire team has no enemy.
+                //		 Basically, you're first one to notice enemies
+                //if ( self->forcePushTime < level.time ) // not currently being pushed
+                //rwwFIXMEFIXME: Set forcePushTime
+                if G_TeamEnemy(ctx, self_) == 0 {
+                    //team did not have an enemy previously
+                    event = Q_irand(EV_ANGER1 as c_int, EV_ANGER3 as c_int);
+                }
+
+                if event != 0 {
+                    //yell
+                    G_AddVoiceEvent(ctx, self_, event, 2000);
+                }
+            }
+
+            if (*self_).s.weapon == WP_BLASTER
+                || (*self_).s.weapon == WP_REPEATER
+                || (*self_).s.weapon == WP_THERMAL
+                /*|| self->s.weapon == WP_BLASTER_PISTOL */
+                //rwwFIXMEFIXME: Blaster pistol useable by npcs?
+                || (*self_).s.weapon == WP_BOWCASTER
+            {
+                //Hmm, how about sniper and bowcaster?
+                //When first get mad, aim is bad
+                //Hmm, base on game difficulty, too?  Rank?
+                let g_spskill = (*ctx.world).cvars.g_spskill.integer;
+                if (*client).playerTeam == NPCTEAM_PLAYER {
+                    G_AimSet(
+                        ctx,
+                        self_,
+                        Q_irand(
+                            (*npc).stats.aim - (5 * g_spskill),
+                            (*npc).stats.aim - g_spskill,
+                        ),
+                    );
+                } else {
+                    let mut minErr = 3;
+                    let mut maxErr = 12;
+                    if (*client).NPC_class == class_t::CLASS_IMPWORKER {
+                        minErr = 15;
+                        maxErr = 30;
+                    } else if (*client).NPC_class == class_t::CLASS_STORMTROOPER
+                        && !npc.is_null()
+                        && (*npc).rank <= RANK_CREWMAN
+                    {
+                        minErr = 5;
+                        maxErr = 15;
+                    }
+
+                    G_AimSet(
+                        ctx,
+                        self_,
+                        Q_irand(
+                            (*npc).stats.aim - (maxErr * (3 - g_spskill)),
+                            (*npc).stats.aim - (minErr * (3 - g_spskill)),
+                        ),
+                    );
+                }
+            }
+
+            //Alert anyone else in the area
+            if Q_stricmp(c"desperado".as_ptr(), (*self_).NPC_type as *const c_char) != 0
+                && Q_stricmp(c"paladin".as_ptr(), (*self_).NPC_type as *const c_char) != 0
+            {
+                //special holodeck enemies exception
+                if (*client).ps.fd.forceGripBeingGripped < level_time as f32 {
+                    //gripped people can't call for help
+                    G_AngerAlert(ctx, self_);
+                }
+            }
+
+            //Stormtroopers don't fire right away!
+            G_AttackDelay(ctx, self_, enemy);
+
+            //rwwFIXMEFIXME: Deal with this some other way.
+            /*
+            //FIXME: this is a disgusting hack that is supposed to make the Imperials start with their weapon holstered- need a better way
+            (dead code, oracle-commented-out)
+            */
+            return;
+        }
+
+        //Otherwise, just picking up another enemy
+
+        if event != 0 {
+            G_AddVoiceEvent(ctx, self_, event, 2000);
+        }
+
+        //Take the enemy
+        G_ClearEnemy(ctx, self_);
+        (*self_).enemy = enemy;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
@@ -210,9 +625,6 @@ pub fn EntIsGlass(check: *mut gentity_t) -> qboolean {
     }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &GameWorld, but the body indexes `g_entities[tr->entityNum]` (ruling 1) —
-// how is state threaded in?
 /// Raven `ShotThroughGlass`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1126-1140`
@@ -223,18 +635,139 @@ pub fn ShotThroughGlass(
     spot: vec3_t,
     mask: c_int,
 ) -> qboolean {
-    todo!("Port ShotThroughGlass — parked: seam-threading")
+    unsafe {
+        let hit = &mut (*ctx.world).entities[(*tr).entityNum as usize] as *mut gentity_t;
+        if hit != target && EntIsGlass(hit) != 0 {
+            //ok to shoot through breakable glass
+            let skip = (*hit).s.number;
+            let muzzle = (*tr).endpos;
+
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(
+                    tr,
+                    &muzzle as *const vec3_t,
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    &spot as *const vec3_t,
+                    skip,
+                    mask,
+                ),
+            );
+            return 1;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &GameWorld, but the body indexes `g_entities[]` (ruling 1) — how is state
-// threaded in?
+// Raven `MASK_SHOT` (`CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE|CONTENTS_TERRAIN`)
+// — not yet ported as a central const; inlined here from the header value.
+// Source: `oracle/oracle/codemp/game/bg_public.h:1177`
+const MASK_SHOT: c_int = 0x1 | 0x100 | 0x200 | 0x1000;
+
 /// Raven `CanShoot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:1150-1221`
 pub fn CanShoot(
     ctx: GameContext<'_>,ent: *mut gentity_t, shooter: *mut gentity_t) -> qboolean {
-    todo!("Port CanShoot — parked: seam-threading")
+    unsafe {
+        let mut tr: trace_t = std::mem::zeroed();
+        let mut muzzle: vec3_t = [0.0; 3];
+        let mut spot: vec3_t = [0.0; 3];
+
+        CalcEntitySpot(ctx, shooter, spot_t::SPOT_WEAPON, muzzle);
+        CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, spot); //FIXME preferred target locations for some weapons (feet for R/L)
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &muzzle as *const vec3_t,
+                std::ptr::null(),
+                std::ptr::null(),
+                &spot as *const vec3_t,
+                (*shooter).s.number,
+                MASK_SHOT,
+            ),
+        );
+        let mut traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+
+        // point blank, baby!
+        let shooter_npc = (*shooter).NPC as *mut gNPC_t;
+        if tr.startsolid != 0 && !shooter_npc.is_null() && !(*shooter_npc).touchedByPlayer.is_null()
+        {
+            traceEnt = (*shooter_npc).touchedByPlayer;
+        }
+
+        if ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_SHOT) != 0 {
+            traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+        }
+
+        // shot is dead on
+        if traceEnt == ent {
+            return 1;
+        }
+        //MCG - Begin
+        //ok, can't hit them in center, try their head
+        CalcEntitySpot(ctx, ent, spot_t::SPOT_HEAD, spot);
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &muzzle as *const vec3_t,
+                std::ptr::null(),
+                std::ptr::null(),
+                &spot as *const vec3_t,
+                (*shooter).s.number,
+                MASK_SHOT,
+            ),
+        );
+        traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+        if traceEnt == ent {
+            return 1;
+        }
+
+        //Actually, we should just check to fire in dir we're facing and if it's close enough,
+        //and we didn't hit someone on our own team, shoot
+        let diff = [
+            spot[0] - tr.endpos[0],
+            spot[1] - tr.endpos[1],
+            spot[2] - tr.endpos[2],
+        ];
+        // Raven `random()` (`q_shared.h:1591`, `(rand()&0x7fff)/32767.0`) —
+        // `bg_lib::rand` (distinct from the game's own `Q_flrand`/`Q_irand`
+        // LCG, ruling 3), inlined here per that macro.
+        let random = ((crate::bg_lib::rand() & 0x7fff) as f32) / (0x7fff as f32);
+        if VectorLength(diff) < random * 32.0 {
+            return 1;
+        }
+        //MCG - End
+        // shot would hit a non-client
+        if (*traceEnt).client.is_null() {
+            return 0;
+        }
+
+        // shot is blocked by another player
+
+        // he's already dead, so go ahead
+        if (*traceEnt).health <= 0 {
+            return 1;
+        }
+
+        // don't deliberately shoot a teammate
+        let traceEnt_client = (*traceEnt).client as *mut gclient_t;
+        let shooter_client = (*shooter).client as *mut gclient_t;
+        if !traceEnt_client.is_null()
+            && !shooter_client.is_null()
+            && (*traceEnt_client).playerTeam == (*shooter_client).playerTeam
+        {
+            return 0;
+        }
+
+        // he's just in the wrong place, go ahead
+        1
+    }
 }
 
 // PORT-ESCALATION(ai-context): faithful skeleton signature takes no self_
@@ -403,25 +936,57 @@ pub fn IdealDistance(
     todo!("Port IdealDistance — parked: ai-context")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &mut GameWorld, but the body writes `level.combatPoints[]`/registers the
-// point via a trap (ruling 1) — how is state threaded in?
 /// Raven `SP_point_combat`.
 ///
+/// Raven: the `#ifndef FINAL_BUILD` debug `Com_Printf` diagnostics are
+/// release-dead (no `va`/C-varargs seam is resolved yet either) — dropped
+/// per house ruling on debug-only prints (porting-rules §20).
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2516-2546`
 pub fn SP_point_combat(
     ctx: GameContext<'_>,self_: *mut gentity_t) {
-    todo!("Port SP_point_combat — parked: seam-threading")
+    unsafe {
+        let numCombatPoints = (*ctx.world).level.numCombatPoints as usize;
+        if numCombatPoints >= MAX_COMBAT_POINTS {
+            G_FreeEntity(ctx, self_);
+            return;
+        }
+
+        (*self_).s.origin[2] += 0.125;
+        G_SetOrigin(self_, (*self_).s.origin);
+        trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(self_),
+        );
+
+        if G_CheckInSolid(ctx, self_, 1) != 0 {
+            //ERROR: combat point at %s in solid! — debug-only, dropped
+        }
+
+        (*ctx.world).level.combatPoints[numCombatPoints].origin = (*self_).r.currentOrigin;
+        (*ctx.world).level.combatPoints[numCombatPoints].flags = (*self_).spawnflags;
+        (*ctx.world).level.combatPoints[numCombatPoints].occupied = 0;
+
+        (*ctx.world).level.numCombatPoints += 1;
+
+        G_FreeEntity(ctx, self_);
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &mut GameWorld, but the body iterates `level.combatPoints[]` (ruling 1) —
-// how is state threaded in?
 /// Raven `CP_FindCombatPointWaypoints`.
 ///
+/// Raven: the `#ifndef FINAL_BUILD` debug `Com_Printf` diagnostic is
+/// release-dead — dropped per house ruling on debug-only prints
+/// (porting-rules §20).
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2548-2562`
 pub fn CP_FindCombatPointWaypoints(ctx: GameContext<'_>) {
-    todo!("Port CP_FindCombatPointWaypoints — parked: seam-threading")
+    unsafe {
+        let numCombatPoints = (*ctx.world).level.numCombatPoints as usize;
+        for i in 0..numCombatPoints {
+            let origin = (*ctx.world).level.combatPoints[i].origin;
+            (*ctx.world).level.combatPoints[i].waypoint =
+                NAV_FindClosestWaypointForPoint2(ctx, origin);
+        }
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
@@ -459,26 +1024,86 @@ pub fn NPC_FindCombatPoint(
     todo!("Port NPC_FindCombatPoint — parked: ai-context")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &GameWorld, but the body iterates `level.combatPoints[]` (ruling 1) — how
-// is state threaded in?
+// Raven `CPF_SQUAD` (`combatPoint_t::flags` bit) — not yet ported as a
+// central const; inlined here from the header value.
+// Source: `oracle/oracle/codemp/game/b_local.h:267`
+const CPF_SQUAD: c_int = 0x00000008;
+
+/// `DistanceSquared` — header-inline helper (`static ID_INLINE`), precedent
+/// `NPC_AI_Utils.rs`/`NPC_AI_Rancor.rs` per-file copies.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:1527-1532`
+fn DistanceSquared(p1: vec3_t, p2: vec3_t) -> f32 {
+    let v = [p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]];
+    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
+}
+
+// Raven `WORLD_SIZE` (`MAX_WORLD_COORD - MIN_WORLD_COORD`, `64*1024 -
+// (-64*1024)`) — not yet ported as a central const.
+// Source: `oracle/oracle/codemp/game/q_shared.h:18-20`
+const WORLD_SIZE: f32 = 131072.0;
+
 /// Raven `NPC_FindSquadPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2882-2915`
 pub fn NPC_FindSquadPoint(
     ctx: GameContext<'_>,position: vec3_t) -> c_int {
-    todo!("Port NPC_FindSquadPoint — parked: seam-threading")
+    unsafe {
+        let mut nearestDist = WORLD_SIZE * WORLD_SIZE;
+        let mut nearestPoint: c_int = -1;
+
+        //float			playerDist = DistanceSquared( g_entities[0].currentOrigin, NPC->r.currentOrigin );
+
+        let numCombatPoints = (*ctx.world).level.numCombatPoints as usize;
+        for i in 0..numCombatPoints {
+            let cp = (*ctx.world).level.combatPoints[i];
+            //Squad points are only valid if we're looking for them
+            if (cp.flags & CPF_SQUAD) == 0 {
+                continue;
+            }
+
+            //Must be vacant
+            if cp.occupied != 0 {
+                continue;
+            }
+
+            let dist = DistanceSquared(position, cp.origin);
+
+            //The point cannot take us past the player
+            //if ( dist > ( playerDist * DotProduct( dirToPlayer, playerDir ) ) )	//FIXME: Retain this
+
+            //See if this is closer than the others
+            if dist < nearestDist {
+                nearestPoint = i as c_int;
+                nearestDist = dist;
+            }
+        }
+
+        nearestPoint
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &mut GameWorld, but the body writes `level.combatPoints[combatPointID]`
-// (ruling 1) — how is state threaded in?
 /// Raven `NPC_ReserveCombatPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2923-2937`
 pub fn NPC_ReserveCombatPoint(
     ctx: GameContext<'_>,combatPointID: c_int) -> qboolean {
-    todo!("Port NPC_ReserveCombatPoint — parked: seam-threading")
+    unsafe {
+        //Make sure it's valid
+        if combatPointID > (*ctx.world).level.numCombatPoints {
+            return 0;
+        }
+
+        //Make sure it's not already occupied
+        if (*ctx.world).level.combatPoints[combatPointID as usize].occupied != 0 {
+            return 0;
+        }
+
+        //Reserve it
+        (*ctx.world).level.combatPoints[combatPointID as usize].occupied = 1;
+
+        1
+    }
 }
 
 // PORT-ESCALATION(ai-context): the body writes the ambient `NPCInfo` global
@@ -541,13 +1166,27 @@ pub fn NPC_AimAdjust(
     todo!("Port NPC_AimAdjust — parked: ai-context")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// &GameCvars, but the body reads `g_spskill.integer` (ruling 1) — how is
-// state threaded in?
 /// Raven `G_AimSet`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:3131-3145`
 pub fn G_AimSet(
     ctx: GameContext<'_>,self_: *mut gentity_t, aim: c_int) {
-    todo!("Port G_AimSet — parked: seam-threading")
+    unsafe {
+        let npc = (*self_).NPC as *mut gNPC_t;
+        if !npc.is_null() {
+            (*npc).currentAim = aim;
+            //Com_Printf( "%s new aim = %d\n", self->NPC_type, self->NPC->currentAim );
+
+            let g_spskill = (*ctx.world).cvars.g_spskill.integer;
+            let debounce = 500 + (3 - g_spskill) * 100;
+            TIMER_Set(
+                ctx,
+                self_,
+                c"aimDebounce".as_ptr() as *const c_char,
+                Q_irand(debounce, debounce + 1000),
+            );
+            //	int debounce = 1000+(3-g_spskill.integer)*500;
+            //	TIMER_Set( self, "aimDebounce", Q_irand( debounce,debounce+2000 ) );
+        }
+    }
 }

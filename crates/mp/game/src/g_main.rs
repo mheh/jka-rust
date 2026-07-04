@@ -61,44 +61,87 @@ pub fn G_Error(
     todo!("Port G_Error — parked (variadic-c-abi): oracle/oracle/codemp/game/g_main.c:714")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): builds `level.teamScores`
-// per-entity from `g_entities`/`g_clients`; the staged raw-pointer signature
-// (no params at all) gives the body no GameWorld handle to reach either
-// through.
 /// Raven `G_FindTeams`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:736-781`
 pub fn G_FindTeams(ctx: GameContext<'_>) {
-    todo!("Port G_FindTeams — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:736")
+    use std::ffi::CStr;
+    // Raw-pointer walk (fork ruling 4: audited unsafe seam helper for the
+    // disjoint-but-aliasing-shaped `e`/`e2` double loop over the same array).
+    unsafe {
+        let world = &mut *ctx.world;
+        let num_entities = world.level.num_entities;
+        let base: *mut gentity_t = world.entities.as_mut_ptr();
+        let mut i: c_int = 1;
+        while i < num_entities {
+            let e = &mut *base.add(i as usize);
+            if e.inuse != QFALSE && !e.team.is_null() && e.flags & FL_TEAMSLAVE == 0 {
+                // CONTENTS_TRIGGER not yet ported as a const anywhere in this
+                // crate graph (precedent: g_mover.rs `G_FindDoorTrigger`,
+                // g_nav.rs) — the "triggers never link up in teams" skip is
+                // therefore omitted.
+                //TODO: Port CONTENTS_TRIGGER
+                // Source: oracle/oracle/codemp/game/q_shared.h (CONTENTS_* bitmask)
+                e.teammaster = e as *mut gentity_t;
+                let mut j = i + 1;
+                while j < num_entities {
+                    let e2 = &mut *base.add(j as usize);
+                    if e2.inuse != QFALSE
+                        && !e2.team.is_null()
+                        && e2.flags & FL_TEAMSLAVE == 0
+                        && CStr::from_ptr(e.team).to_bytes() == CStr::from_ptr(e2.team).to_bytes()
+                    {
+                        e2.teamchain = e.teamchain;
+                        e.teamchain = e2 as *mut gentity_t;
+                        e2.teammaster = e as *mut gentity_t;
+                        e2.flags |= FL_TEAMSLAVE;
+                        // make sure that targets only point at the master
+                        if !e2.targetname.is_null() {
+                            e.targetname = e2.targetname;
+                            e2.targetname = std::ptr::null_mut();
+                        }
+                    }
+                    j += 1;
+                }
+            }
+            i += 1;
+        }
+    }
+    // G_Printf ("%i teams with %i entities\n", c, c2); — commented out in oracle.
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): walks `g_clients`
-// (`remappedShaders` fork-1 global) with no GameWorld handle.
 /// Raven `G_RemapTeamShaders`.
 ///
+/// Raven's whole body is `#if 0`-guarded dead code (team-shader remap via
+/// `AddRemap`/`BuildShaderStateConfig`, neither ported) — the live function
+/// faithfully does nothing.
+///
 /// Source: `oracle/oracle/codemp/game/g_main.c:783-795`
-pub fn G_RemapTeamShaders() {
-    todo!("Port G_RemapTeamShaders — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:783")
-}
+pub fn G_RemapTeamShaders() {}
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): registers every
-// `GameCvars` handle via `trap_Cvar_Register` against `gameCvarTable`; no
-// GameWorld/engine handle reaches either from this signature.
+// PORT-ESCALATION(unresolved-cvar-flags): `GAME_CVAR_TABLE` (game_cvars.rs)
+// carries each row's `CVAR_*` registration flags as a symbolic expression
+// string ("CVAR_SERVERINFO | CVAR_LATCH", …) — the `CVAR_*` bit constants
+// themselves are not yet ported anywhere in the crate graph, so the
+// per-field `vmCvar_t` pointer + numeric-flags call this loop needs to make
+// to `trap::Cvar_Register` cannot be built without inventing flag values.
 /// Raven `G_RegisterCvars`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:803-845`
 pub fn G_RegisterCvars(ctx: GameContext<'_>) {
-    todo!("Port G_RegisterCvars — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:803")
+    todo!("Port G_RegisterCvars — parked (unresolved-cvar-flags: CVAR_* consts): oracle/oracle/codemp/game/g_main.c:803")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/updates every
-// `GameCvars` handle's `modificationCount` plus several other g_main.c
-// globals (teamgame, etc.); no GameWorld handle reaches them.
+// PORT-ESCALATION(unresolved-cvar-flags): same table dependency as
+// `G_RegisterCvars` — `cv->vmCvar` field dispatch needs a per-row typed
+// accessor into `GameCvars` (the table's `field: Option<&'static str>` is a
+// name, not a `&mut vmCvar_t` — no reflection in Rust) plus the unported
+// `CVAR_*` flags for the `teamShader`/`trackChange` branches' downstream use.
 /// Raven `G_UpdateCvars`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_main.c:852-879`
 pub fn G_UpdateCvars(ctx: GameContext<'_>) {
-    todo!("Port G_UpdateCvars — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_main.c:852")
+    todo!("Port G_UpdateCvars — parked (unresolved-cvar-flags / no-field-reflection): oracle/oracle/codemp/game/g_main.c:852")
 }
 
 // PORT-ESCALATION(variadic-c-abi): variadic + no world/engine handle to route

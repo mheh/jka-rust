@@ -1,4 +1,4 @@
-// PORT-COMPLETE: NPC_AI_Jedi.c 6/62
+// PORT-COMPLETE: NPC_AI_Jedi.c 13/62
 //! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Jedi.c`.
 //!
 //! Landed from the `fnskel.py` signature skeleton. Six leaf functions are
@@ -22,6 +22,14 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+
+// Pass-2: constants this file needs that the prelude does not glob. `entity_event_t`
+// (voice/entity events) and `animNumber_t` (anim ids) are `#[repr(i32)] enum`s —
+// used as `<Type>::<VARIANT> as c_int` at the `c_int`-typed call sites. `FL_NOTARGET`
+// is a `g_local.h` entity flag.
+use crate::entity::flags::FL_NOTARGET;
+use mp_bg::public::anim_number::animNumber_t;
+use mp_bg::public::entity_event::entity_event_t;
 
 
 /// Raven `G_StartMatrixEffect`.
@@ -74,7 +82,6 @@ pub fn Jedi_ClearTimers(
     crate::g_timer::TIMER_Set(ctx, ent, c"noturn".as_ptr(), 0);
 }
 
-// PORT-ESCALATION(ambient-state): reads `level.time`; no channel to reach the ai_main globals / Engine from this context-free faithful signature (rule B forbids static mut; resolved cross-file sigs are context-free).
 /// Raven `Jedi_PlayBlockedPushSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:137-148`
@@ -82,10 +89,20 @@ pub fn Jedi_PlayBlockedPushSound(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port Jedi_PlayBlockedPushSound — parked: ambient-state")
+    unsafe {
+        let level_time = (*ctx.world).level.time;
+        if (*self_).s.number == 0 {
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, entity_event_t::EV_PUSHFAIL as c_int, 3000);
+        } else {
+            let npc = (*self_).NPC as *mut gNPC_t;
+            if (*self_).health > 0 && !npc.is_null() && (*npc).blockedSpeechDebounceTime < level_time {
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, entity_event_t::EV_PUSHFAIL as c_int, 3000);
+                (*npc).blockedSpeechDebounceTime = level_time + 3000;
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(ambient-state): reads `level.time`; no channel to reach the ai_main globals / Engine from this context-free faithful signature (rule B forbids static mut; resolved cross-file sigs are context-free).
 /// Raven `Jedi_PlayDeflectSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:150-161`
@@ -93,10 +110,30 @@ pub fn Jedi_PlayDeflectSound(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port Jedi_PlayDeflectSound — parked: ambient-state")
+    unsafe {
+        // Q_irand is drawn inside each emitting branch (as in Raven) so the LCG
+        // sequence matches: no draw occurs when nothing is emitted.
+        let level_time = (*ctx.world).level.time;
+        if (*self_).s.number == 0 {
+            let ev = crate::q_math::Q_irand(
+                entity_event_t::EV_DEFLECT1 as c_int,
+                entity_event_t::EV_DEFLECT3 as c_int,
+            );
+            crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 3000);
+        } else {
+            let npc = (*self_).NPC as *mut gNPC_t;
+            if (*self_).health > 0 && !npc.is_null() && (*npc).blockedSpeechDebounceTime < level_time {
+                let ev = crate::q_math::Q_irand(
+                    entity_event_t::EV_DEFLECT1 as c_int,
+                    entity_event_t::EV_DEFLECT3 as c_int,
+                );
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 3000);
+                (*npc).blockedSpeechDebounceTime = level_time + 3000;
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(constants-in-scope): needs event constants EV_CONFUSE1..3/EV_TAUNT1..3/EV_GLOAT1..3 not re-exported by prelude; no import path resolved in packet.
 /// Raven `NPC_Jedi_PlayConfusionSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:163-180`
@@ -104,7 +141,32 @@ pub fn NPC_Jedi_PlayConfusionSound(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port NPC_Jedi_PlayConfusionSound — parked: constants-in-scope")
+    unsafe {
+        if (*self_).health > 0 {
+            let client = (*self_).client as *mut gclient_t;
+            if !client.is_null()
+                && ((*client).NPC_class == CLASS_TAVION || (*client).NPC_class == CLASS_DESANN)
+            {
+                let ev = crate::q_math::Q_irand(
+                    entity_event_t::EV_CONFUSE1 as c_int,
+                    entity_event_t::EV_CONFUSE3 as c_int,
+                );
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
+            } else if crate::q_math::Q_irand(0, 1) != 0 {
+                let ev = crate::q_math::Q_irand(
+                    entity_event_t::EV_TAUNT1 as c_int,
+                    entity_event_t::EV_TAUNT3 as c_int,
+                );
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
+            } else {
+                let ev = crate::q_math::Q_irand(
+                    entity_event_t::EV_GLOAT1 as c_int,
+                    entity_event_t::EV_GLOAT3 as c_int,
+                );
+                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
+            }
+        }
+    }
 }
 
 /// Raven `Boba_Precache`.
@@ -142,8 +204,9 @@ pub fn WP_ResistForcePush(
     todo!("Port WP_ResistForcePush — parked: ambient-state")
 }
 
-// PORT-ESCALATION(constants-in-scope): needs EF2_FLYING, YAW, EV_JUMP, and roll/flip anim constants not re-exported by prelude; no import path resolved in packet.
 /// Raven `Boba_StopKnockdown`.
+///
+/// `pushDir` is read-only here (fork-9: never written), so it stays by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:272-343`
 pub fn Boba_StopKnockdown(
@@ -153,7 +216,68 @@ pub fn Boba_StopKnockdown(
     pushDir: vec3_t,
     forceKnockdown: qboolean,
 ) -> qboolean {
-    todo!("Port Boba_StopKnockdown — parked: constants-in-scope")
+    unsafe {
+        let client = (*self_).client as *mut gclient_t;
+        if (*client).NPC_class != CLASS_BOBAFETT {
+            return qfalse;
+        }
+
+        if ((*client).ps.eFlags2 & EF2_FLYING) != 0 {
+            //can't knock me down when I'm flying
+            return qtrue;
+        }
+
+        let ang: vec3_t = [0.0, (*self_).r.currentAngles[YAW], 0.0];
+        let strafeTime = crate::q_math::Q_irand(1000, 2000);
+
+        let mut fwd: vec3_t = [0.0; 3];
+        let mut right: vec3_t = [0.0; 3];
+        crate::q_math::AngleVectors(ang, Some(&mut fwd), Some(&mut right), None);
+        let mut pDir: vec3_t = [0.0; 3];
+        crate::q_math::VectorNormalize2(pushDir, &mut pDir);
+        let fDot = pDir[0] * fwd[0] + pDir[1] * fwd[1] + pDir[2] * fwd[2];
+        let rDot = pDir[0] * right[0] + pDir[1] * right[1] + pDir[2] * right[2];
+
+        if crate::q_math::Q_irand(0, 2) != 0 {
+            //flip or roll with it
+            // C leaves tempCmd's other fields uninitialized (UB read in ForceJump);
+            // zero-initialize as the one defined behavior (porting-rules §19).
+            let mut tempCmd: usercmd_t = core::mem::zeroed();
+            if fDot >= 0.4 {
+                tempCmd.forwardmove = 127;
+                crate::g_timer::TIMER_Set(ctx, self_, c"moveforward".as_ptr(), strafeTime);
+            } else if fDot <= -0.4 {
+                tempCmd.forwardmove = -127;
+                crate::g_timer::TIMER_Set(ctx, self_, c"moveback".as_ptr(), strafeTime);
+            } else if rDot > 0.0 {
+                tempCmd.rightmove = 127;
+                crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), strafeTime);
+                crate::g_timer::TIMER_Set(ctx, self_, c"strafeLeft".as_ptr(), -1);
+            } else {
+                tempCmd.rightmove = -127;
+                crate::g_timer::TIMER_Set(ctx, self_, c"strafeLeft".as_ptr(), strafeTime);
+                crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), -1);
+            }
+            crate::g_utils::G_AddEvent(self_, entity_event_t::EV_JUMP as c_int, 0);
+            if crate::q_math::Q_irand(0, 1) == 0 {
+                //flip
+                (*client).ps.fd.forceJumpCharge = 280.0; //FIXME: calc this intelligently?
+                crate::w_force::ForceJump(ctx, self_, &mut tempCmd);
+            } else {
+                //roll
+                crate::g_timer::TIMER_Set(ctx, self_, c"duck".as_ptr(), strafeTime);
+            }
+            (*self_).painDebounceTime = 0; //so we do something
+        } else if crate::q_math::Q_irand(0, 1) == 0 && forceKnockdown != qfalse {
+            //resist
+            WP_ResistForcePush(ctx, self_, pusher, qtrue);
+        } else {
+            //fall down
+            return qfalse;
+        }
+
+        qtrue
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads `level.time`; no channel to reach the ai_main globals / Engine from this context-free faithful signature.
@@ -178,14 +302,20 @@ pub fn Boba_FlyStop(
     todo!("Port Boba_FlyStop — parked: ambient-state")
 }
 
-// PORT-ESCALATION(constants-in-scope): needs EF2_FLYING not re-exported by prelude; no import path resolved in packet.
 /// Raven `Boba_Flying`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:386-389`
 pub fn Boba_Flying(
     self_: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port Boba_Flying — parked: constants-in-scope")
+    unsafe {
+        let client = (*self_).client as *mut gclient_t;
+        if ((*client).ps.eFlags2 & EF2_FLYING) != 0 {
+            qtrue
+        } else {
+            qfalse
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads `g_entities`/`level.time` and calls trap_G2API_GetBoltMatrix/trap_Trace (needs &Engine); no channel from this context-free faithful signature.
@@ -210,7 +340,6 @@ pub fn Boba_StartFlameThrower(
     todo!("Port Boba_StartFlameThrower — parked: ambient-state")
 }
 
-// PORT-ESCALATION(constants-in-scope): needs NPC_SetAnim torso anim constants (BOTH_*/SETANIM_*) not re-exported by prelude; no import path resolved in packet.
 /// Raven `Boba_DoFlameThrower`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:471-479`
@@ -218,7 +347,20 @@ pub fn Boba_DoFlameThrower(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port Boba_DoFlameThrower — parked: constants-in-scope")
+    unsafe {
+        crate::npc_c::NPC_SetAnim(
+            self_,
+            SETANIM_TORSO,
+            animNumber_t::BOTH_FORCELIGHTNING_HOLD as c_int,
+            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+        );
+        if crate::g_timer::TIMER_Done(ctx, self_, c"nextAttackDelay".as_ptr()) != qfalse
+            && crate::g_timer::TIMER_Done(ctx, self_, c"flameTime".as_ptr()) != qfalse
+        {
+            Boba_StartFlameThrower(ctx, self_);
+        }
+        Boba_FireFlameThrower(ctx, self_);
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads/writes `NPC`/`NPCInfo`/`ucmd`/`g_entities`/`level` and calls trap_InPVS/trap_Trace (needs &Engine); no channel from this context-free faithful signature.
@@ -240,7 +382,6 @@ pub fn Jedi_Cloak(
     todo!("Port Jedi_Cloak — parked: constants-in-scope")
 }
 
-// PORT-ESCALATION(constants-in-scope): needs cloak power/effect constants (PW_*/EF_*) not re-exported by prelude; no import path resolved in packet.
 /// Raven `Jedi_Decloak`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:818-833`
@@ -248,7 +389,27 @@ pub fn Jedi_Decloak(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port Jedi_Decloak — parked: constants-in-scope")
+    unsafe {
+        if !self_.is_null() {
+            (*self_).flags &= !FL_NOTARGET;
+            let client = (*self_).client as *mut gclient_t;
+            if !client.is_null() {
+                if (*client).ps.powerups[PW_CLOAKED as usize] != 0 {
+                    //Uncloak
+                    (*client).ps.powerups[PW_CLOAKED as usize] = 0;
+
+                    crate::g_utils::G_Sound(
+                        ctx,
+                        self_,
+                        CHAN_ITEM as c_int,
+                        crate::g_utils::G_SoundIndex(
+                            c"sound/chars/shadowtrooper/decloak.wav".as_ptr(),
+                        ),
+                    );
+                }
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(ambient-state): reads `NPC`/`level`; no channel to reach the ai_main globals / Engine from this context-free faithful signature.

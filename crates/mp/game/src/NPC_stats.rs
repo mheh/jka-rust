@@ -16,13 +16,15 @@ use crate::prelude::*;
 /// Raven `NPC_ReactionTime`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:220-223`
-// PORT-ESCALATION(ambient-global): NPC_ReactionTime reads the file-scope
-// `NPCInfo` global (current NPC's info pointer) but the resolved skeleton
-// signature takes no parameters to thread it through (fork-1 GameWorld
-// placement expects a `&GameWorld`/similar param, absent here). Parking
-// rather than inventing a threading shape.
+// PORT-ESCALATION(ambient-ai-state): `ctx.world.globals.NPCInfo` (GameGlobals,
+// `NPC.c:35`) is still a `()` placeholder — its real type (`gNPC_t **` in
+// oracle) needs the same "current NPC" AI-context design decision flagged
+// across the other `NPC_AI_*` files (does `gNPC_t` live in an arena addressed
+// by `EntityId`, or behind a raw-pointer seam?) before this body can deref
+// `NPCInfo->stats.reactions`. Not decidable from this packet's rulings alone;
+// parking rather than inventing the representation.
 pub fn NPC_ReactionTime(ctx: GameContext<'_>) -> c_int {
-    todo!("Port NPC_ReactionTime — parked: ambient-global NPCInfo has no threading param in this signature")
+    todo!("Port NPC_ReactionTime — parked: ambient-ai-state NPCInfo field is an unresolved () placeholder (needs gNPC_t representation decision)")
 }
 
 /// Raven `TranslateRankName`.
@@ -144,16 +146,19 @@ pub fn NPC_PrecacheWeapons(
 /// Raven `NPC_Precache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:599-873`
-// PORT-ESCALATION(ambient-global): reads/parses the file-scope `NPCParms`
-// buffer and `NPCFile` name (fork-1 GameWorld fields) plus the `TeamTable`/
-// `WPTable` string-ID tables, but the resolved skeleton signature is the bare
-// C signature `(spawner: *mut gentity_t)` with no GameWorld/table param.
-// Parking rather than inventing where these ambient globals live/thread from.
+// PORT-ESCALATION(unported-const-table): body parses the `NPCParms`/`NPCFile`
+// buffers and looks up `TeamTable`/`WPTable` (string-ID const tables). None of
+// these exist anywhere in `crates/mp/{game,bg,qshared}` yet (confirmed by
+// grep — not even a `()` placeholder in `GameGlobals`), matching the same
+// unresolved dependency other porters parked on (e.g. `g_misc.rs`'s
+// `WPTable` escalation). `ctx: GameContext` is available now, but there is
+// nowhere to reach these tables from it; parking rather than inventing their
+// placement/shape.
 pub fn NPC_Precache(
     ctx: GameContext<'_>,
     spawner: *mut gentity_t,
 ) {
-    todo!("Port NPC_Precache — parked: ambient-global NPCParms/NPCFile/TeamTable/WPTable have no threading param in this signature")
+    todo!("Port NPC_Precache — parked: unported-const-table NPCParms/NPCFile/TeamTable/WPTable not present anywhere in the worktree")
 }
 
 /// Raven `NPC_ParseParms`.
