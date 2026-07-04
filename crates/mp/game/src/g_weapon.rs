@@ -16,7 +16,7 @@ use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 // Pass-2: entity fn-pointer dispatch as fn-ID enums (ruling 2) and the
 // `DAMAGE_*` dflag family (`g_local.h:1170-1190`).
 use crate::ent_fn_enums::EntThink;
-use crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
+use crate::level::damage_flags::{DAMAGE_DEATH_KNOCKBACK, DAMAGE_HEAVY_WEAP_CLASS, DAMAGE_NO_KNOCKBACK, DAMAGE_NORMAL};
 use crate::q_math::Q_irand;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
@@ -28,6 +28,12 @@ const qfalse: qboolean = 0;
 // `const` mirrors the same in-repo convention as `NPC_combat.rs`.
 // Source: `oracle/oracle/codemp/game/surfaceflags.h` (masks in `bg_public.h:1170`)
 const MASK_SHOT: c_int = CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE | CONTENTS_TERRAIN;
+
+// Local mirrors of the same `surfaceflags.h` masks used across this file
+// (`g_items.rs`/`g_turret_G2.rs` precedent).
+const CONTENTS_LIGHTSABER: c_int = 0x0004_0000;
+const CONTENTS_SHOTCLIP: c_int = 0x0000_0080;
+const MASK_SOLID: c_int = CONTENTS_SOLID;
 
 /// Raven `touch_NULL`.
 ///
@@ -51,7 +57,37 @@ pub fn WP_SpeedOfMissileForWeapon(wp: c_int, alt_fire: qboolean) -> f32 {
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:182-218`
 pub fn W_TraceSetStart(
     ctx: GameContext<'_>,ent: *mut gentity_t, start: vec3_t, mins: vec3_t, maxs: vec3_t) {
-    todo!("Port W_TraceSetStart — parked: seam-threading")
+    let mut start = start;
+    unsafe {
+        let mut entMins: vec3_t = [0.0; 3];
+        let mut entMaxs: vec3_t = [0.0; 3];
+        for i in 0..3 {
+            entMins[i] = (*ent).r.currentOrigin[i] + (*ent).r.mins[i];
+            entMaxs[i] = (*ent).r.currentOrigin[i] + (*ent).r.maxs[i];
+        }
+
+        if crate::g_utils::G_BoxInBounds(start, mins, maxs, entMins, entMaxs) != qfalse {
+            return;
+        }
+
+        if (*ent).client.is_null() {
+            return;
+        }
+
+        let mut eyePoint = (*ent).s.pos.trBase;
+        eyePoint[2] += (*(*ent).client).ps.viewheight as f32;
+
+        let mut tr: trace_t = std::mem::zeroed();
+        trap::Trace(ctx.engine, &mut tr, eyePoint, mins, maxs, start, (*ent).s.number, MASK_SOLID | CONTENTS_SHOTCLIP);
+
+        if tr.startsolid != 0 || tr.allsolid != 0 {
+            return;
+        }
+
+        if tr.fraction < 1.0 {
+            start = tr.endpos;
+        }
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `muzzle`/`forward` globals (ruling 1) need it — how is state threaded in?
@@ -60,7 +96,56 @@ pub fn W_TraceSetStart(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:236-293`
 pub fn WP_FireBryarPistol(
     ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
-    todo!("Port WP_FireBryarPistol — parked: seam-threading")
+    // PORT-NOTE(file-static-globals): Raven's `forward`/`muzzle` are file-static
+    // globals computed by the (unported) `WP_FireWeapon` dispatcher before
+    // calling into this fn; no ctx-threaded home exists yet, so they're
+    // referenced bare here (reported as missing symbols).
+    unsafe {
+        let mut damage: c_int = BRYAR_PISTOL_DAMAGE;
+        let mut count: c_int;
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, BRYAR_PISTOL_VEL as f32, 10000, ent, altFire);
+
+        (*missile).classname = c"bryar_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_BRYAR_PISTOL;
+
+        if altFire != qfalse {
+            let mut boxSize: f32 = 0.0;
+
+            count = ((*ctx.world).level.time - (*(*ent).client).ps.weaponChargeTime) / BRYAR_CHARGE_UNIT;
+
+            if count < 1 {
+                count = 1;
+            } else if count > 5 {
+                count = 5;
+            }
+
+            if count > 1 {
+                damage = (damage as f32 * (count as f32 * 1.7)) as c_int;
+            } else {
+                damage = (damage as f32 * (count as f32 * 1.5)) as c_int;
+            }
+
+            (*missile).s.generic1 = count; // The missile will then render according to the charge level.
+
+            boxSize = BRYAR_ALT_SIZE * (count as f32 * 0.5);
+
+            (*missile).r.maxs = [boxSize, boxSize, boxSize];
+            (*missile).r.mins = [-boxSize, -boxSize, -boxSize];
+        }
+
+        (*missile).damage = damage;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        if altFire != qfalse {
+            (*missile).methodOfDeath = MOD_BRYAR_PISTOL_ALT as c_int;
+        } else {
+            (*missile).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
+        }
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+        // we don't want it to bounce forever
+        (*missile).bounceCount = 8;
+    }
 }
 
 // PORT-ESCALATION(bg-dep): `MASK_SHOT`/`CONTENTS_LIGHTSABER` (q_shared.h content/trace mask flags) are not yet ported anywhere in the crate graph and are not in the packet's resolved call surface — where do these live once ported?
@@ -78,7 +163,24 @@ pub fn WP_FireTurretMissile(
     r#mod: c_int,
     ignore: *mut gentity_t,
 ) {
-    todo!("Port WP_FireTurretMissile — parked: bg-dep")
+    unsafe {
+        let missile = crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+
+        (*missile).classname = c"generic_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_TURRET;
+
+        (*missile).damage = damage;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = r#mod;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+        if !ignore.is_null() {
+            (*missile).passThroughNum = (*ignore).s.number + 1;
+        }
+
+        // we don't want it to bounce forever
+        (*missile).bounceCount = 8;
+    }
 }
 
 // PORT-ESCALATION(bg-dep): `MASK_SHOT`/`CONTENTS_LIGHTSABER` (q_shared.h content/trace mask flags) are not yet ported anywhere in the crate graph and are not in the packet's resolved call surface — where do these live once ported?
@@ -98,7 +200,20 @@ pub fn WP_FireGenericBlasterMissile(
     velocity: c_int,
     r#mod: c_int,
 ) {
-    todo!("Port WP_FireGenericBlasterMissile — parked: bg-dep")
+    unsafe {
+        let missile = crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+
+        (*missile).classname = c"generic_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_BRYAR_PISTOL;
+
+        (*missile).damage = damage;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = r#mod;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+        // we don't want it to bounce forever
+        (*missile).bounceCount = 8;
+    }
 }
 
 // PORT-ESCALATION(bg-dep): `MASK_SHOT`/`CONTENTS_LIGHTSABER` (q_shared.h content/trace mask flags) are not yet ported anywhere in the crate graph and are not in the packet's resolved call surface — where do these live once ported?
@@ -107,7 +222,28 @@ pub fn WP_FireGenericBlasterMissile(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:359-383`
 pub fn WP_FireBlasterMissile(
     ctx: GameContext<'_>,ent: *mut gentity_t, start: vec3_t, dir: vec3_t, altFire: qboolean) {
-    todo!("Port WP_FireBlasterMissile — parked: bg-dep")
+    unsafe {
+        let velocity: c_int = BLASTER_VELOCITY;
+        let mut damage: c_int = BLASTER_DAMAGE;
+
+        if (*ent).s.eType == entityType_t::ET_NPC as c_int {
+            // animent
+            damage = 10;
+        }
+
+        let missile = crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+
+        (*missile).classname = c"blaster_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_BLASTER;
+
+        (*missile).damage = damage;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = MOD_BLASTER as c_int;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+        // we don't want it to bounce forever
+        (*missile).bounceCount = 8;
+    }
 }
 
 /// Raven `WP_FireTurboLaserMissile`.
@@ -159,7 +295,33 @@ pub fn WP_FireEmplacedMissile(
     altFire: qboolean,
     ignore: *mut gentity_t,
 ) {
-    todo!("Port WP_FireEmplacedMissile — parked: bg-dep")
+    unsafe {
+        let velocity: c_int = BLASTER_VELOCITY;
+        let damage: c_int = BLASTER_DAMAGE;
+
+        let missile = crate::g_missile::CreateMissile(ctx, start, dir, velocity as f32, 10000, ent, altFire);
+
+        (*missile).classname = c"emplaced_gun_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_TURRET; //WP_EMPLACED_GUN;
+
+        (*missile).activator = if ignore.is_null() {
+            None
+        } else {
+            Some(ent_id((*ctx.world).entities.as_mut_ptr(), ignore))
+        };
+
+        (*missile).damage = damage;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK | DAMAGE_HEAVY_WEAP_CLASS;
+        (*missile).methodOfDeath = MOD_VEHICLE as c_int;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+        if !ignore.is_null() {
+            (*missile).passThroughNum = (*ignore).s.number + 1;
+        }
+
+        // we don't want it to bounce forever
+        (*missile).bounceCount = 8;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals (ruling 1) plus `crandom()` (RNG, ruling 3) are needed — how is state threaded in?
@@ -168,7 +330,23 @@ pub fn WP_FireEmplacedMissile(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:451-469`
 pub fn WP_FireBlaster(
     ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
-    todo!("Port WP_FireBlaster — parked: seam-threading")
+    unsafe {
+        let mut dir: vec3_t = [0.0; 3];
+        let mut angs: vec3_t = [0.0; 3];
+
+        crate::q_math::vectoangles(forward, &mut angs);
+
+        if altFire != qfalse {
+            // add some slop to the alt-fire direction
+            angs[PITCH] += (*ctx.world).bg_state.rng.crandom() * BLASTER_SPREAD;
+            angs[YAW] += (*ctx.world).bg_state.rng.crandom() * BLASTER_SPREAD;
+        }
+
+        crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
+
+        // FIXME: if temp_org does not have clear trace to inside the bbox, don't shoot!
+        WP_FireBlasterMissile(ctx, ent, muzzle, dir, altFire);
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities`/`g_gametype`/`d_projectileGhoul2Collision`/`g_g2TraceLod` globals and `trap_G2Trace`/`trap_Trace` (ruling 1) are needed — how is state threaded in?
@@ -177,7 +355,139 @@ pub fn WP_FireBlaster(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:483-621`
 pub fn WP_DisruptorMainFire(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port WP_DisruptorMainFire — parked: seam-threading")
+    unsafe {
+        let mut damage: c_int = DISRUPTOR_MAIN_DAMAGE;
+        let mut render_impact = qtrue;
+        let mut start: vec3_t;
+        let mut end: vec3_t = [0.0; 3];
+        let mut tr: trace_t = std::mem::zeroed();
+        let mut traceEnt: *mut gentity_t;
+        let mut tent: *mut gentity_t;
+        let shotRange: f32 = 8192.0;
+        let mut ignore: c_int;
+        let mut traces: c_int = 0;
+
+        if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
+            damage = DISRUPTOR_MAIN_DAMAGE_SIEGE;
+        }
+
+        start = (*(*ent).client).ps.origin;
+        start[2] += (*(*ent).client).ps.viewheight as f32; // By eyes
+
+        for i in 0..3 {
+            end[i] = start[i] + shotRange * forward[i];
+        }
+
+        ignore = (*ent).s.number;
+        traces = 0;
+        loop {
+            if traces >= 10 {
+                break;
+            }
+            // need to loop this in case we hit a Jedi who dodges the shot
+            if (*ctx.world).cvars.d_projectileGhoul2Collision.integer != 0 {
+                trap::G2Trace(
+                    ctx.engine, &mut tr, start, [0.0; 3], [0.0; 3], end, ignore,
+                    MASK_SHOT, G2TRFLAG_DOGHOULTRACE | G2TRFLAG_GETSURFINDEX | G2TRFLAG_THICK | G2TRFLAG_HITCORPSES,
+                    (*ctx.world).cvars.g_g2TraceLod.integer,
+                );
+            } else {
+                trap::Trace(ctx.engine, &mut tr, start, std::ptr::null(), std::ptr::null(), end, ignore, MASK_SHOT);
+            }
+
+            traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+
+            if (*ctx.world).cvars.d_projectileGhoul2Collision.integer != 0 && (*traceEnt).inuse != 0 && !(*traceEnt).client.is_null() {
+                // g2 collision checks -rww
+                if (*traceEnt).inuse != 0 && !(*traceEnt).client.is_null() && !(*traceEnt).ghoul2.is_null() {
+                    (*(*traceEnt).client).g2LastSurfaceHit = tr.surfaceFlags;
+                    (*(*traceEnt).client).g2LastSurfaceTime = (*ctx.world).level.time;
+                }
+
+                if !(*traceEnt).ghoul2.is_null() {
+                    tr.surfaceFlags = 0;
+                }
+            }
+
+            if !traceEnt.is_null()
+                && !(*traceEnt).client.is_null()
+                && (*(*traceEnt).client).ps.duelInProgress != 0
+                && (*(*traceEnt).client).ps.duelIndex != (*ent).s.number
+            {
+                start = tr.endpos;
+                ignore = tr.entityNum;
+                traces += 1;
+                continue;
+            }
+
+            if crate::w_force::Jedi_DodgeEvasion(ctx, traceEnt, ent, &mut tr, crate::g_combat::G_GetHitLocation(ctx, traceEnt, tr.endpos)) != qfalse {
+                // act like we didn't even hit him
+                start = tr.endpos;
+                ignore = tr.entityNum;
+                traces += 1;
+                continue;
+            } else if !traceEnt.is_null()
+                && !(*traceEnt).client.is_null()
+                && (*(*traceEnt).client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] >= FORCE_LEVEL_3
+            {
+                if crate::w_saber::WP_SaberCanBlock(ctx, traceEnt, tr.endpos, 0, MOD_DISRUPTOR as c_int, qtrue, 0) != 0 {
+                    // broadcast and stop the shot because it was blocked
+                    tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_MAIN_SHOT);
+                    (*tent).s.origin2 = muzzle;
+                    (*tent).s.eventParm = (*ent).s.number;
+
+                    let te = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK);
+                    (*te).s.origin = tr.endpos;
+                    (*te).s.angles = tr.plane.normal;
+                    if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0 {
+                        (*te).s.angles[1] = 1.0;
+                    }
+                    (*te).s.eventParm = 0;
+                    (*te).s.weapon = 0; // saberNum
+                    (*te).s.legsAnim = 0; // bladeNum
+
+                    return;
+                }
+            } else if ((*traceEnt).flags & FL_SHIELDED) != 0 {
+                // stopped cold
+                return;
+            }
+            // a Jedi is not dodging this shot
+            break;
+        }
+
+        if (tr.surfaceFlags & SURF_NOIMPACT) != 0 {
+            render_impact = qfalse;
+        }
+
+        // always render a shot beam, doing this the old way because I don't much feel like overriding the effect.
+        tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_MAIN_SHOT);
+        (*tent).s.origin2 = muzzle;
+        (*tent).s.eventParm = (*ent).s.number;
+
+        traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+
+        if render_impact != qfalse {
+            if tr.entityNum < ENTITYNUM_WORLD as i16 && (*traceEnt).takedamage != 0 {
+                if !(*traceEnt).client.is_null() && LogAccuracyHit(ctx, traceEnt, ent) != qfalse {
+                    (*(*ent).client).accuracy_hits += 1;
+                }
+
+                crate::g_combat::G_Damage(traceEnt, ent, ent, forward, tr.endpos, damage, DAMAGE_NORMAL, MOD_DISRUPTOR as c_int);
+
+                tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_HIT);
+                (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
+                if !(*traceEnt).client.is_null() {
+                    (*tent).s.weapon = 1;
+                }
+            } else {
+                // Hmmm, maybe don't make any marks on things that could break
+                tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_SNIPER_MISS);
+                (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
+                (*tent).s.weapon = 1;
+            }
+        }
+    }
 }
 
 // PORT-ESCALATION(bg-dep): `gentity_t.m_pVehicle` is a stale `*mut c_void` placeholder (its doc comment predates `Vehicle_t` landing in `mp_bg`) — is the cast to `*mut Vehicle_t` sanctioned yet, or does the gentity_t field need updating first?
@@ -185,7 +495,33 @@ pub fn WP_DisruptorMainFire(
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:624-639`
 pub fn G_CanDisruptify(ent: *mut gentity_t) -> qboolean {
-    todo!("Port G_CanDisruptify — parked: bg-dep")
+    unsafe {
+        if ent.is_null()
+            || (*ent).inuse == 0
+            || (*ent).client.is_null()
+            || (*ent).s.eType != entityType_t::ET_NPC as c_int
+            || (*ent).s.NPC_class != CLASS_VEHICLE
+            || (*ent).m_pVehicle.is_null()
+        {
+            // not vehicle
+            return qtrue;
+        }
+
+        // PORT-NOTE(bg-dep): `Vehicle_t::m_pVehicleInfo` is still an unported
+        // `*mut c_void` (`vehicleInfo_t` not ported yet — same open item as
+        // `bg_pmove.rs`/`AnimalNPC.rs`); `.type` can't be read through it yet.
+        // Referenced exactly as the oracle cites it; flagged as a missing symbol.
+        let veh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+        //TODO: Port vehicleInfo_t (Vehicle_t::m_pVehicleInfo is still *mut c_void)
+        // Source: oracle/oracle/codemp/game/g_weapon.c:632
+        if (*(*veh).m_pVehicleInfo).r#type == mp_bg::vehicles::vehicleType_t::VH_ANIMAL as c_int {
+            // animal is only type that can be disintigeiteigerated
+            return qtrue;
+        }
+
+        // don't do it to any other veh
+        qfalse
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities`/`g_gametype`/`d_projectileGhoul2Collision`/`g_g2TraceLod` globals and `trap_G2Trace`/`trap_Trace` (ruling 1) are needed — how is state threaded in?
@@ -194,7 +530,210 @@ pub fn G_CanDisruptify(ent: *mut gentity_t) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:642-886`
 pub fn WP_DisruptorAltFire(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port WP_DisruptorAltFire — parked: seam-threading")
+    // PORT-NOTE(file-static-globals): `forward`/`muzzle` are the unported
+    // file-static globals set by `FireWeapon` before dispatch (ruling 1);
+    // referenced bare, reported as missing symbols.
+    unsafe {
+        let mut damage: c_int = DISRUPTOR_ALT_DAMAGE - 30;
+        let mut render_impact = qtrue;
+        let mut start: vec3_t;
+        let mut end: vec3_t = [0.0; 3];
+        let mut muzzle2 = muzzle;
+        let mut tr: trace_t = std::mem::zeroed();
+        let mut traceEnt: *mut gentity_t;
+        let mut tent: *mut gentity_t;
+        let shotRange: f32 = 8192.0;
+        let mut count: c_int;
+        let mut maxCount: c_int = 60;
+        let mut traces: c_int = DISRUPTOR_ALT_TRACES;
+        let mut fullCharge = qfalse;
+
+        if !(*ent).client.is_null() {
+            start = (*(*ent).client).ps.origin;
+            start[2] += (*(*ent).client).ps.viewheight as f32;
+
+            count = ((*ctx.world).level.time - (*(*ent).client).ps.weaponChargeTime) / DISRUPTOR_CHARGE_UNIT;
+            if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
+                maxCount = 200;
+            }
+        } else {
+            start = (*ent).r.currentOrigin;
+            start[2] += 24.0;
+            count = 100 / DISRUPTOR_CHARGE_UNIT;
+        }
+
+        count *= 2;
+
+        if count < 1 {
+            count = 1;
+        } else if count >= maxCount {
+            count = maxCount;
+            fullCharge = qtrue;
+        }
+
+        if count < 10 {
+            traces = 1;
+        } else if count < 20 {
+            traces = 2;
+        }
+
+        damage += count;
+
+        let mut skip: c_int = (*ent).s.number;
+
+        for _i in 0..traces {
+            for k in 0..3 {
+                end[k] = start[k] + shotRange * forward[k];
+            }
+
+            if (*ctx.world).cvars.d_projectileGhoul2Collision.integer != 0 {
+                trap::G2Trace(
+                    ctx.engine, &mut tr, start, [0.0; 3], [0.0; 3], end, skip,
+                    MASK_SHOT, G2TRFLAG_DOGHOULTRACE | G2TRFLAG_GETSURFINDEX | G2TRFLAG_THICK | G2TRFLAG_HITCORPSES,
+                    (*ctx.world).cvars.g_g2TraceLod.integer,
+                );
+            } else {
+                trap::Trace(ctx.engine, &mut tr, start, std::ptr::null(), std::ptr::null(), end, skip, MASK_SHOT);
+            }
+
+            traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+
+            if (*ctx.world).cvars.d_projectileGhoul2Collision.integer != 0 && (*traceEnt).inuse != 0 && !(*traceEnt).client.is_null() {
+                if (*traceEnt).inuse != 0 && !(*traceEnt).client.is_null() && !(*traceEnt).ghoul2.is_null() {
+                    (*(*traceEnt).client).g2LastSurfaceHit = tr.surfaceFlags;
+                    (*(*traceEnt).client).g2LastSurfaceTime = (*ctx.world).level.time;
+                }
+                if !(*traceEnt).ghoul2.is_null() {
+                    tr.surfaceFlags = 0;
+                }
+            }
+
+            if (tr.surfaceFlags & SURF_NOIMPACT) != 0 {
+                render_impact = qfalse;
+            }
+
+            if !traceEnt.is_null()
+                && !(*traceEnt).client.is_null()
+                && (*(*traceEnt).client).ps.duelInProgress != 0
+                && (*(*traceEnt).client).ps.duelIndex != (*ent).s.number
+            {
+                skip = tr.entityNum;
+                start = tr.endpos;
+                continue;
+            }
+
+            if crate::w_force::Jedi_DodgeEvasion(ctx, traceEnt, ent, &mut tr, crate::g_combat::G_GetHitLocation(ctx, traceEnt, tr.endpos)) != qfalse {
+                skip = tr.entityNum;
+                start = tr.endpos;
+                continue;
+            } else if !traceEnt.is_null()
+                && !(*traceEnt).client.is_null()
+                && (*(*traceEnt).client).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] >= FORCE_LEVEL_3
+            {
+                if crate::w_saber::WP_SaberCanBlock(ctx, traceEnt, tr.endpos, 0, MOD_DISRUPTOR_SNIPER as c_int, qtrue, 0) != 0 {
+                    tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_SNIPER_SHOT);
+                    (*tent).s.origin2 = muzzle;
+                    (*tent).s.shouldtarget = fullCharge;
+                    (*tent).s.eventParm = (*ent).s.number;
+
+                    let te = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK);
+                    (*te).s.origin = tr.endpos;
+                    (*te).s.angles = tr.plane.normal;
+                    if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0 {
+                        (*te).s.angles[1] = 1.0;
+                    }
+                    (*te).s.eventParm = 0;
+                    (*te).s.weapon = 0;
+                    (*te).s.legsAnim = 0;
+
+                    return;
+                }
+            }
+
+            // always render a shot beam, doing this the old way because I don't much feel like overriding the effect.
+            tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_SNIPER_SHOT);
+            (*tent).s.origin2 = muzzle;
+            (*tent).s.shouldtarget = fullCharge;
+            (*tent).s.eventParm = (*ent).s.number;
+
+            // If the beam hits a skybox, etc. it would look foolish to add impact effects
+            if render_impact != qfalse {
+                if (*traceEnt).takedamage != 0 && !(*traceEnt).client.is_null() {
+                    (*tent).s.otherEntityNum = (*traceEnt).s.number;
+
+                    tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_MISSILE_MISS);
+                    (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
+                    (*tent).s.eFlags |= EF_ALT_FIRING;
+
+                    if LogAccuracyHit(ctx, traceEnt, ent) != qfalse && !(*ent).client.is_null() {
+                        (*(*ent).client).accuracy_hits += 1;
+                    }
+                } else {
+                    if (*traceEnt).r.svFlags & SVF_GLASS_BRUSH != 0
+                        || (*traceEnt).takedamage != 0
+                        || (*traceEnt).s.eType == entityType_t::ET_MOVER as c_int
+                    {
+                        if (*traceEnt).takedamage != 0 {
+                            crate::g_combat::G_Damage(traceEnt, ent, ent, forward, tr.endpos, damage, DAMAGE_NO_KNOCKBACK, MOD_DISRUPTOR_SNIPER as c_int);
+
+                            tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_HIT);
+                            (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
+                        }
+                    } else {
+                        tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_SNIPER_MISS);
+                        (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
+                    }
+                    break; // and don't try any more traces
+                }
+
+                if ((*traceEnt).flags & FL_SHIELDED) != 0 {
+                    break;
+                }
+
+                if (*traceEnt).takedamage != 0 {
+                    let mut preAng: vec3_t = [0.0; 3];
+                    let preHealth = (*traceEnt).health;
+                    let mut preLegs: c_int = 0;
+                    let mut preTorso: c_int = 0;
+
+                    if !(*traceEnt).client.is_null() {
+                        preLegs = (*(*traceEnt).client).ps.legsAnim;
+                        preTorso = (*(*traceEnt).client).ps.torsoAnim;
+                        preAng = (*(*traceEnt).client).ps.viewangles;
+                    }
+
+                    crate::g_combat::G_Damage(traceEnt, ent, ent, forward, tr.endpos, damage, DAMAGE_NO_KNOCKBACK, MOD_DISRUPTOR_SNIPER as c_int);
+
+                    if !(*traceEnt).client.is_null()
+                        && preHealth > 0
+                        && (*traceEnt).health <= 0
+                        && fullCharge != qfalse
+                        && G_CanDisruptify(traceEnt) != qfalse
+                    {
+                        (*(*traceEnt).client).ps.viewangles = preAng;
+                        (*(*traceEnt).client).ps.eFlags |= EF_DISINTEGRATION;
+                        (*(*traceEnt).client).ps.lastHitLoc = tr.endpos;
+                        (*(*traceEnt).client).ps.legsAnim = preLegs;
+                        (*(*traceEnt).client).ps.torsoAnim = preTorso;
+                        (*traceEnt).r.contents = 0;
+                        (*(*traceEnt).client).ps.velocity = [0.0; 3];
+                    }
+
+                    tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_HIT);
+                    (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
+                    if !(*traceEnt).client.is_null() {
+                        (*tent).s.weapon = 1;
+                    }
+                }
+            } else {
+                break;
+            }
+
+            muzzle2 = tr.endpos;
+            start = tr.endpos;
+            skip = tr.entityNum;
+        }
+    }
 }
 
 /// Raven `WP_FireDisruptor`.
@@ -237,7 +776,27 @@ pub fn WP_FireDisruptor(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:923-942`
 pub fn WP_BowcasterAltFire(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port WP_BowcasterAltFire — parked: seam-threading")
+    unsafe {
+        let damage: c_int = BOWCASTER_DAMAGE;
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, BOWCASTER_VELOCITY as f32, 10000, ent, qfalse);
+
+        (*missile).classname = c"bowcaster_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_BOWCASTER;
+
+        (*missile).r.maxs = [BOWCASTER_SIZE, BOWCASTER_SIZE, BOWCASTER_SIZE];
+        for i in 0..3 {
+            (*missile).r.mins[i] = -(*missile).r.maxs[i];
+        }
+
+        (*missile).damage = damage;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = MOD_BOWCASTER as c_int;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+        (*missile).flags |= FL_BOUNCE;
+        (*missile).bounceCount = 3;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
@@ -246,7 +805,71 @@ pub fn WP_BowcasterAltFire(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:945-1029`
 pub fn WP_BowcasterMainFire(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port WP_BowcasterMainFire — parked: seam-threading")
+    unsafe {
+        let mut damage: c_int = BOWCASTER_DAMAGE;
+        let mut count: c_int;
+        let mut vel: f32;
+        let mut angs: vec3_t = [0.0; 3];
+        let mut dir: vec3_t = [0.0; 3];
+        let mut missile: *mut gentity_t;
+
+        if (*ent).client.is_null() {
+            count = 1;
+        } else {
+            count = ((*ctx.world).level.time - (*(*ent).client).ps.weaponChargeTime) / BOWCASTER_CHARGE_UNIT;
+        }
+
+        if count < 1 {
+            count = 1;
+        } else if count > 5 {
+            count = 5;
+        }
+
+        if count & 1 == 0 {
+            count -= 1;
+        }
+
+        if count <= 1 {
+            damage = 50;
+        } else if count == 2 {
+            damage = 45;
+        } else if count == 3 {
+            damage = 40;
+        } else if count == 4 {
+            damage = 35;
+        } else {
+            damage = 30;
+        }
+
+        for i in 0..count {
+            vel = BOWCASTER_VELOCITY as f32 * ((*ctx.world).bg_state.rng.crandom() * BOWCASTER_VEL_RANGE + 1.0);
+
+            crate::q_math::vectoangles(forward, &mut angs);
+
+            angs[PITCH] += (*ctx.world).bg_state.rng.crandom() * BOWCASTER_ALT_SPREAD * 0.2;
+            angs[YAW] += (i as f32 + 0.5) * BOWCASTER_ALT_SPREAD - count as f32 * 0.5 * BOWCASTER_ALT_SPREAD;
+
+            crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
+
+            missile = crate::g_missile::CreateMissile(ctx, muzzle, dir, vel, 10000, ent, qtrue);
+
+            (*missile).classname = c"bowcaster_alt_proj".as_ptr() as *mut c_char;
+            (*missile).s.weapon = WP_BOWCASTER;
+
+            (*missile).r.maxs = [BOWCASTER_SIZE, BOWCASTER_SIZE, BOWCASTER_SIZE];
+            for k in 0..3 {
+                (*missile).r.mins[k] = -(*missile).r.maxs[k];
+            }
+
+            (*missile).damage = damage;
+            (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+            (*missile).methodOfDeath = MOD_BOWCASTER as c_int;
+            (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+            // we don't want it to bounce
+            (*missile).bounceCount = 0;
+        }
+    }
 }
 
 /// Raven `WP_FireBowcaster`.
@@ -267,7 +890,22 @@ pub fn WP_FireBowcaster(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1056-1073`
 pub fn WP_RepeaterMainFire(
     ctx: GameContext<'_>,ent: *mut gentity_t, dir: vec3_t) {
-    todo!("Port WP_RepeaterMainFire — parked: seam-threading")
+    unsafe {
+        let damage: c_int = REPEATER_DAMAGE;
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle, dir, REPEATER_VELOCITY as f32, 10000, ent, qfalse);
+
+        (*missile).classname = c"repeater_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_REPEATER;
+
+        (*missile).damage = damage;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = MOD_REPEATER as c_int;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+        // we don't want it to bounce forever
+        (*missile).bounceCount = 8;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals and `g_gametype` cvar (ruling 1) are needed — how is state threaded in?
@@ -276,7 +914,36 @@ pub fn WP_RepeaterMainFire(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1076-1107`
 pub fn WP_RepeaterAltFire(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port WP_RepeaterAltFire — parked: seam-threading")
+    unsafe {
+        let damage: c_int = REPEATER_ALT_DAMAGE;
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, REPEATER_ALT_VELOCITY as f32, 10000, ent, qtrue);
+
+        (*missile).classname = c"repeater_alt_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_REPEATER;
+
+        (*missile).r.maxs = [REPEATER_ALT_SIZE, REPEATER_ALT_SIZE, REPEATER_ALT_SIZE];
+        for i in 0..3 {
+            (*missile).r.mins[i] = -(*missile).r.maxs[i];
+        }
+        (*missile).s.pos.trType = TR_GRAVITY;
+        (*missile).s.pos.trDelta[2] += 40.0; // give a slight boost in the upward direction
+        (*missile).damage = damage;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = MOD_REPEATER_ALT as c_int;
+        (*missile).splashMethodOfDeath = MOD_REPEATER_ALT_SPLASH as c_int;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+        (*missile).splashDamage = REPEATER_ALT_SPLASH_DAMAGE;
+        if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
+            // we've been having problems with this being too hyper-potent because of it's radius
+            (*missile).splashRadius = REPEATER_ALT_SPLASH_RAD_SIEGE;
+        } else {
+            (*missile).splashRadius = REPEATER_ALT_SPLASH_RADIUS;
+        }
+
+        // we don't want it to bounce forever
+        (*missile).bounceCount = 8;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward` global (ruling 1) is needed (via WP_RepeaterMainFire) — how is state threaded in?
@@ -285,7 +952,24 @@ pub fn WP_RepeaterAltFire(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1110-1131`
 pub fn WP_FireRepeater(
     ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) {
-    todo!("Port WP_FireRepeater — parked: seam-threading")
+    unsafe {
+        let mut dir: vec3_t = [0.0; 3];
+        let mut angs: vec3_t = [0.0; 3];
+
+        crate::q_math::vectoangles(forward, &mut angs);
+
+        if altFire != qfalse {
+            WP_RepeaterAltFire(ctx, ent);
+        } else {
+            // add some slop to the alt-fire direction
+            angs[PITCH] += (*ctx.world).bg_state.rng.crandom() * REPEATER_SPREAD;
+            angs[YAW] += (*ctx.world).bg_state.rng.crandom() * REPEATER_SPREAD;
+
+            crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
+
+            WP_RepeaterMainFire(ctx, ent, dir);
+        }
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
@@ -294,7 +978,26 @@ pub fn WP_FireRepeater(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1142-1160`
 pub fn WP_DEMP2_MainFire(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port WP_DEMP2_MainFire — parked: seam-threading")
+    unsafe {
+        let damage: c_int = DEMP2_DAMAGE;
+
+        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, DEMP2_VELOCITY as f32, 10000, ent, qfalse);
+
+        (*missile).classname = c"demp2_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_DEMP2;
+
+        (*missile).r.maxs = [DEMP2_SIZE, DEMP2_SIZE, DEMP2_SIZE];
+        for i in 0..3 {
+            (*missile).r.mins[i] = -(*missile).r.maxs[i];
+        }
+        (*missile).damage = damage;
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = MOD_DEMP2 as c_int;
+        (*missile).clipmask = MASK_SHOT;
+
+        // we don't want it to ever bounce
+        (*missile).bounceCount = 0;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and `trap_Trace` (ruling 1) are needed — how is state threaded in?
@@ -303,7 +1006,137 @@ pub fn WP_DEMP2_MainFire(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1164-1307`
 pub fn DEMP2_AltRadiusDamage(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port DEMP2_AltRadiusDamage — parked: seam-threading")
+    unsafe {
+        let mut frac: f32 = ((*ctx.world).level.time - (*ent).genericValue5) as f32 / 800.0;
+        let mut dist: f32;
+        let mut radius: f32;
+        let mut fact: f32;
+        let mut gent: *mut gentity_t;
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        let mut v: vec3_t = [0.0; 3];
+        let mut dir: vec3_t = [0.0; 3];
+        let mut myOwner: *mut gentity_t = std::ptr::null_mut();
+
+        if (*ent).r.ownerNum >= 0 && ((*ent).r.ownerNum as usize) < MAX_GENTITIES {
+            myOwner = &mut (*ctx.world).entities[(*ent).r.ownerNum as usize] as *mut gentity_t;
+        }
+
+        if myOwner.is_null() || (*myOwner).inuse == 0 || (*myOwner).client.is_null() {
+            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).nextthink = (*ctx.world).level.time;
+            return;
+        }
+
+        frac *= frac * frac; // yes, this is completely ridiculous...but it causes the shell to grow slowly then "explode" at the end
+
+        radius = frac * 200.0; // 200 is max radius...the model is aprox. 100 units tall...the fx draw code mults. this by 2.
+
+        fact = (*ent).count as f32 * 0.6;
+
+        if fact < 1.0 {
+            fact = 1.0;
+        }
+
+        radius *= fact;
+
+        for i in 0..3 {
+            mins[i] = (*ent).r.currentOrigin[i] - radius;
+            maxs[i] = (*ent).r.currentOrigin[i] + radius;
+        }
+
+        let mut iEntityList: [c_int; MAX_GENTITIES] = [0; MAX_GENTITIES];
+        let numListedEntities = trap::EntitiesInBox(ctx.engine, mins, maxs, iEntityList.as_mut_ptr(), MAX_GENTITIES as c_int);
+
+        for e in 0..numListedEntities {
+            gent = &mut (*ctx.world).entities[iEntityList[e as usize] as usize] as *mut gentity_t;
+
+            if gent.is_null() || (*gent).takedamage == 0 || (*gent).r.contents == 0 {
+                continue;
+            }
+
+            // find the distance from the edge of the bounding box
+            for i in 0..3 {
+                if (*ent).r.currentOrigin[i] < (*gent).r.absmin[i] {
+                    v[i] = (*gent).r.absmin[i] - (*ent).r.currentOrigin[i];
+                } else if (*ent).r.currentOrigin[i] > (*gent).r.absmax[i] {
+                    v[i] = (*ent).r.currentOrigin[i] - (*gent).r.absmax[i];
+                } else {
+                    v[i] = 0.0;
+                }
+            }
+
+            // shape is an ellipsoid, so cut vertical distance in half
+            v[2] *= 0.5;
+
+            dist = crate::q_math::VectorLength(v);
+
+            if dist >= radius {
+                // shockwave hasn't hit them yet
+                continue;
+            }
+
+            if dist + (16.0 * (*ent).count as f32) < (*ent).genericValue6 as f32 {
+                // shockwave has already hit this thing...
+                continue;
+            }
+
+            v = (*gent).r.currentOrigin;
+            for i in 0..3 {
+                dir[i] = v[i] - (*ent).r.currentOrigin[i];
+            }
+
+            // push the center of mass higher than the origin so players get knocked into the air more
+            dir[2] += 12.0;
+
+            if gent != myOwner {
+                crate::g_combat::G_Damage(gent, myOwner, myOwner, dir, (*ent).r.currentOrigin, (*ent).damage, DAMAGE_DEATH_KNOCKBACK, (*ent).splashMethodOfDeath);
+                if (*gent).takedamage != 0 && !(*gent).client.is_null() {
+                    if (*(*gent).client).ps.electrifyTime < (*ctx.world).level.time {
+                        // electrocution effect
+                        if (*gent).s.eType == entityType_t::ET_NPC as c_int
+                            && (*gent).s.NPC_class == CLASS_VEHICLE
+                            && !(*gent).m_pVehicle.is_null()
+                            && {
+                                let veh = (*gent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+                                let vtype = (*(*veh).m_pVehicleInfo).r#type;
+                                vtype == mp_bg::vehicles::vehicleType_t::VH_SPEEDER as c_int
+                                    || vtype == mp_bg::vehicles::vehicleType_t::VH_WALKER as c_int
+                            }
+                        {
+                            // do some extra stuff to speeders/walkers
+                            (*(*gent).client).ps.electrifyTime = (*ctx.world).level.time + Q_irand(3000, 4000);
+                        } else if (*gent).s.NPC_class != CLASS_VEHICLE
+                            || (!(*gent).m_pVehicle.is_null() && {
+                                let veh = (*gent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+                                (*(*veh).m_pVehicleInfo).r#type != mp_bg::vehicles::vehicleType_t::VH_FIGHTER as c_int
+                            })
+                        {
+                            // don't do this to fighters
+                            (*(*gent).client).ps.electrifyTime = (*ctx.world).level.time + Q_irand(300, 800);
+                        }
+                    }
+                    if (*(*gent).client).ps.powerups[PW_CLOAKED as usize] != 0 {
+                        // disable cloak temporarily
+                        crate::w_force::Jedi_Decloak(ctx, gent);
+                        (*(*gent).client).cloakToggleTime = (*ctx.world).level.time + Q_irand(3000, 10000);
+                    }
+                }
+            }
+        }
+
+        // store the last fraction so that next time around we can test against those things that fall between that last point and where the current shockwave edge is
+        (*ent).genericValue6 = radius as c_int;
+
+        if frac < 1.0 {
+            // shock is still happening so continue letting it expand
+            (*ent).nextthink = (*ctx.world).level.time + 50;
+        } else {
+            // don't just leave the entity around
+            (*ent).think = Some(EntThink::G_FreeEntity);
+            (*ent).nextthink = (*ctx.world).level.time;
+        }
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
@@ -312,7 +1145,25 @@ pub fn DEMP2_AltRadiusDamage(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1310-1333`
 pub fn DEMP2_AltDetonate(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port DEMP2_AltDetonate — parked: seam-threading")
+    unsafe {
+        crate::g_utils::G_SetOrigin(ent, (*ent).r.currentOrigin);
+        if (*ent).pos1[0] == 0.0 && (*ent).pos1[1] == 0.0 && (*ent).pos1[2] == 0.0 {
+            // don't play effect with a 0'd out directional vector
+            (*ent).pos1[1] = 1.0;
+        }
+        // Let's just save ourself some bandwidth and play both the effect and sphere spawn in 1 event
+        let efEnt = crate::g_utils::G_PlayEffect(EFFECT_EXPLOSION_DEMP2ALT, (*ent).r.currentOrigin, (*ent).pos1);
+
+        if !efEnt.is_null() {
+            (*efEnt).s.weapon = (*ent).count * 2;
+        }
+
+        (*ent).genericValue5 = (*ctx.world).level.time;
+        (*ent).genericValue6 = 0;
+        (*ent).nextthink = (*ctx.world).level.time + 50;
+        (*ent).think = Some(EntThink::DEMP2_AltRadiusDamage);
+        (*ent).s.eType = entityType_t::ET_GENERAL as c_int; // make us a missile no longer
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time`, the file-static `forward`/`muzzle` globals, and `trap_Trace` (ruling 1) are needed — how is state threaded in?
@@ -321,7 +1172,71 @@ pub fn DEMP2_AltDetonate(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1336-1403`
 pub fn WP_DEMP2_AltFire(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port WP_DEMP2_AltFire — parked: seam-threading")
+    unsafe {
+        let mut damage: c_int = DEMP2_ALT_DAMAGE;
+        let mut count: c_int;
+        let origcount: c_int;
+        let mut fact: f32;
+        let mut start: vec3_t = muzzle;
+        let mut end: vec3_t = [0.0; 3];
+        let mut tr: trace_t = std::mem::zeroed();
+
+        for i in 0..3 {
+            end[i] = start[i] + DEMP2_ALT_RANGE * forward[i];
+        }
+
+        count = ((*ctx.world).level.time - (*(*ent).client).ps.weaponChargeTime) / DEMP2_CHARGE_UNIT;
+
+        origcount = count;
+
+        if count < 1 {
+            count = 1;
+        } else if count > 3 {
+            count = 3;
+        }
+
+        fact = count as f32 * 0.8;
+        if fact < 1.0 {
+            fact = 1.0;
+        }
+        damage = (damage as f32 * fact) as c_int;
+
+        if origcount == 0 {
+            // this was just a tap-fire
+            damage = 1;
+        }
+
+        trap::Trace(ctx.engine, &mut tr, start, std::ptr::null(), std::ptr::null(), end, (*ent).s.number, MASK_SHOT);
+
+        let missile = crate::g_utils::G_Spawn(ctx);
+        crate::g_utils::G_SetOrigin(missile, tr.endpos);
+        // In SP the impact actually travels as a missile based on the trace fraction, but we're
+        // just going to be instant. -rww
+
+        (*missile).pos1 = tr.plane.normal;
+
+        (*missile).count = count;
+
+        (*missile).classname = c"demp2_alt_proj".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_DEMP2;
+
+        (*missile).think = Some(EntThink::DEMP2_AltDetonate);
+        (*missile).nextthink = (*ctx.world).level.time;
+
+        (*missile).splashDamage = damage;
+        (*missile).damage = damage;
+        (*missile).splashMethodOfDeath = MOD_DEMP2 as c_int;
+        (*missile).methodOfDeath = MOD_DEMP2 as c_int;
+        (*missile).splashRadius = DEMP2_ALT_SPLASHRADIUS;
+
+        (*missile).r.ownerNum = (*ent).s.number;
+
+        (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+        // we don't want it to ever bounce
+        (*missile).bounceCount = 0;
+    }
 }
 
 /// Raven `WP_FireDEMP2`.
@@ -342,7 +1257,43 @@ pub fn WP_FireDEMP2(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1430-1467`
 pub fn WP_FlechetteMainFire(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port WP_FlechetteMainFire — parked: seam-threading")
+    unsafe {
+        let mut fwd: vec3_t = [0.0; 3];
+        let mut angs: vec3_t = [0.0; 3];
+        let mut missile: *mut gentity_t;
+
+        for i in 0..FLECHETTE_SHOTS {
+            crate::q_math::vectoangles(forward, &mut angs);
+
+            if i != 0 {
+                // do nothing on the first shot, it will hit the crosshairs
+                angs[PITCH] += (*ctx.world).bg_state.rng.crandom() * FLECHETTE_SPREAD;
+                angs[YAW] += (*ctx.world).bg_state.rng.crandom() * FLECHETTE_SPREAD;
+            }
+
+            crate::q_math::AngleVectors(angs, Some(&mut fwd), None, None);
+
+            missile = crate::g_missile::CreateMissile(ctx, muzzle, fwd, FLECHETTE_VEL as f32, 10000, ent, qfalse);
+
+            (*missile).classname = c"flech_proj".as_ptr() as *mut c_char;
+            (*missile).s.weapon = WP_FLECHETTE;
+
+            (*missile).r.maxs = [FLECHETTE_SIZE, FLECHETTE_SIZE, FLECHETTE_SIZE];
+            for k in 0..3 {
+                (*missile).r.mins[k] = -(*missile).r.maxs[k];
+            }
+
+            (*missile).damage = FLECHETTE_DAMAGE;
+            (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
+            (*missile).methodOfDeath = MOD_FLECHETTE as c_int;
+            (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+            // we don't want it to bounce forever
+            (*missile).bounceCount = Q_irand(5, 8);
+
+            (*missile).flags |= FL_BOUNCE_SHRAPNEL;
+        }
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
@@ -351,7 +1302,38 @@ pub fn WP_FlechetteMainFire(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1470-1506`
 pub fn prox_mine_think(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
-    todo!("Port prox_mine_think — parked: seam-threading")
+    unsafe {
+        let mut blow = qfalse;
+
+        // if it isn't time to auto-explode, do a small proximity check
+        if (*ent).delay > (*ctx.world).level.time {
+            let mut ent_list: [*mut gentity_t; MAX_GENTITIES] = [std::ptr::null_mut(); MAX_GENTITIES];
+            let count = crate::g_utils::G_RadiusList(ctx, (*ent).r.currentOrigin, FLECHETTE_MINE_RADIUS_CHECK, ent, qtrue, ent_list.as_mut_ptr());
+
+            for i in 0..count {
+                let e = ent_list[i as usize];
+                if !(*e).client.is_null()
+                    && (*e).health > 0
+                    && !(*ent).activator.is_none()
+                    && (*e).s.number != (*ctx.world).entities[(*ent).activator.unwrap().index()].s.number
+                {
+                    blow = qtrue;
+                    break;
+                }
+            }
+        } else {
+            // well, we must die now
+            blow = qtrue;
+        }
+
+        if blow != qfalse {
+            (*ent).think = Some(EntThink::laserTrapExplode);
+            (*ent).nextthink = (*ctx.world).level.time + 200;
+        } else {
+            // we probably don't need to do this thinking logic very often...maybe this is fast enough?
+            (*ent).nextthink = (*ctx.world).level.time + 500;
+        }
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `trap_Trace` (ruling 1) is needed — how is state threaded in?
@@ -360,7 +1342,34 @@ pub fn prox_mine_think(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1509-1541`
 pub fn WP_TraceSetStart(
     ctx: GameContext<'_>,ent: *mut gentity_t, start: vec3_t, mins: vec3_t, maxs: vec3_t) {
-    todo!("Port WP_TraceSetStart — parked: seam-threading")
+    let mut start = start;
+    unsafe {
+        let mut entMins: vec3_t = [0.0; 3];
+        let mut entMaxs: vec3_t = [0.0; 3];
+        for i in 0..3 {
+            entMins[i] = (*ent).r.currentOrigin[i] + (*ent).r.mins[i];
+            entMaxs[i] = (*ent).r.currentOrigin[i] + (*ent).r.maxs[i];
+        }
+
+        if crate::g_utils::G_BoxInBounds(start, mins, maxs, entMins, entMaxs) != qfalse {
+            return;
+        }
+
+        if (*ent).client.is_null() {
+            return;
+        }
+
+        let mut tr: trace_t = std::mem::zeroed();
+        trap::Trace(ctx.engine, &mut tr, (*(*ent).client).ps.origin, mins, maxs, start, (*ent).s.number, MASK_SOLID | CONTENTS_SHOTCLIP);
+
+        if tr.startsolid != 0 || tr.allsolid != 0 {
+            return;
+        }
+
+        if tr.fraction < 1.0 {
+            start = tr.endpos;
+        }
+    }
 }
 
 /// Raven `WP_ExplosiveDie`.
@@ -397,7 +1406,46 @@ pub fn WP_flechette_alt_blow(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1560-1599`
 pub fn WP_CreateFlechetteBouncyThing(
     ctx: GameContext<'_>,start: vec3_t, fwd: vec3_t, self_: *mut gentity_t) {
-    todo!("Port WP_CreateFlechetteBouncyThing — parked: rng-threading")
+    unsafe {
+        let vel = 700.0 + (*ctx.world).bg_state.rng.random() * 700.0;
+        let life = 1500.0 + (*ctx.world).bg_state.rng.random() * 2000.0;
+        let missile = crate::g_missile::CreateMissile(ctx, start, fwd, vel, life as c_int, self_, qtrue);
+
+        (*missile).think = Some(EntThink::WP_flechette_alt_blow);
+
+        (*missile).activator = Some(ent_id((*ctx.world).entities.as_mut_ptr(), self_));
+
+        (*missile).s.weapon = WP_FLECHETTE;
+        (*missile).classname = c"flech_alt".as_ptr() as *mut c_char;
+        (*missile).mass = 4;
+
+        // How 'bout we give this thing a size...
+        (*missile).r.mins = [-3.0, -3.0, -3.0];
+        (*missile).r.maxs = [3.0, 3.0, 3.0];
+        (*missile).clipmask = MASK_SHOT;
+
+        (*missile).touch = Some(EntTouch::touch_NULL);
+
+        // normal ones bounce, alt ones explode on impact
+        (*missile).s.pos.trType = TR_GRAVITY;
+
+        (*missile).flags |= FL_BOUNCE_HALF;
+        (*missile).s.eFlags |= EF_ALT_FIRING;
+
+        (*missile).bounceCount = 50;
+
+        (*missile).damage = FLECHETTE_ALT_DAMAGE;
+        (*missile).dflags = 0;
+        (*missile).splashDamage = FLECHETTE_ALT_SPLASH_DAM;
+        (*missile).splashRadius = FLECHETTE_ALT_SPLASH_RAD;
+
+        (*missile).r.svFlags = SVF_USE_CURRENT_ORIGIN;
+
+        (*missile).methodOfDeath = MOD_FLECHETTE_ALT_SPLASH as c_int;
+        (*missile).splashMethodOfDeath = MOD_FLECHETTE_ALT_SPLASH as c_int;
+
+        (*missile).pos2 = start;
+    }
 }
 
 // PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
@@ -406,7 +1454,26 @@ pub fn WP_CreateFlechetteBouncyThing(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1602-1623`
 pub fn WP_FlechetteAltFire(
     ctx: GameContext<'_>,self_: *mut gentity_t) {
-    todo!("Port WP_FlechetteAltFire — parked: seam-threading")
+    unsafe {
+        let mut dir: vec3_t;
+        let mut fwd: vec3_t = [0.0; 3];
+        let mut start: vec3_t = muzzle;
+        let mut angs: vec3_t = [0.0; 3];
+
+        crate::q_math::vectoangles(forward, &mut angs);
+
+        WP_TraceSetStart(ctx, self_, start, vec3_origin, vec3_origin); // make sure our start point isn't on the other side of a wall
+
+        for _i in 0..2 {
+            dir = angs;
+
+            dir[PITCH] -= (*ctx.world).bg_state.rng.random() * 4.0 + 8.0; // make it fly upwards
+            dir[YAW] += (*ctx.world).bg_state.rng.crandom() * 2.0;
+            crate::q_math::AngleVectors(dir, Some(&mut fwd), None, None);
+
+            WP_CreateFlechetteBouncyThing(ctx, start, fwd, self_);
+        }
+    }
 }
 
 /// Raven `WP_FireFlechette`.

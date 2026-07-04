@@ -165,7 +165,7 @@ pub use crate::level::alert_event::{alertEventLevel_e, alertEventLevel_e::*};
 pub use crate::level::reference_tag::reference_tag_t;
 pub use crate::npc::g_npc_t::gNPC_t;
 pub use crate::npc::nav_info_s::navInfo_t;
-pub use crate::npc::spot_t::spot_t;
+pub use crate::npc::spot_t::{spot_t, spot_t::*};
 pub use crate::npc::visibility_t::visibility_t;
 pub use crate::saber::evasion_type_t::evasionType_t;
 pub use crate::teams::class::class_t;
