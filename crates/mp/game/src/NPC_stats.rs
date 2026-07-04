@@ -19,8 +19,30 @@ const DEFAULT_MINS_2: f32 = -24.0;
 const DEFAULT_MAXS_2: f32 = 40.0;
 const CROUCH_MAXS_2: f32 = 16.0;
 
+/// Raven `MAX_NPC_DATA_SIZE` — maximum size for NPC stat loading buffer.
+/// Source: `oracle/oracle/codemp/game/NPC_stats.c:236`
+const MAX_NPC_DATA_SIZE: c_int = 0x20000;
+
 // Unported types referenced in this file (need porting before this compiles):
 // rank_t
+
+/// Raven `BSTable` — `bState_t` name/id lookup table (internal-only bStates
+/// past `BS_CINEMATIC` are not name-lookupable, per the oracle table).
+///
+/// Source: `oracle/oracle/codemp/game/NPC_stats.c:88-99`
+pub static BSTable: [stringID_table_t; 11] = [
+    stringID_table_t { name: c"BS_DEFAULT".as_ptr() as *mut c_char, id: bState_t::BS_DEFAULT as c_int },
+    stringID_table_t { name: c"BS_ADVANCE_FIGHT".as_ptr() as *mut c_char, id: bState_t::BS_ADVANCE_FIGHT as c_int },
+    stringID_table_t { name: c"BS_SLEEP".as_ptr() as *mut c_char, id: bState_t::BS_SLEEP as c_int },
+    stringID_table_t { name: c"BS_FOLLOW_LEADER".as_ptr() as *mut c_char, id: bState_t::BS_FOLLOW_LEADER as c_int },
+    stringID_table_t { name: c"BS_JUMP".as_ptr() as *mut c_char, id: bState_t::BS_JUMP as c_int },
+    stringID_table_t { name: c"BS_SEARCH".as_ptr() as *mut c_char, id: bState_t::BS_SEARCH as c_int },
+    stringID_table_t { name: c"BS_WANDER".as_ptr() as *mut c_char, id: bState_t::BS_WANDER as c_int },
+    stringID_table_t { name: c"BS_NOCLIP".as_ptr() as *mut c_char, id: bState_t::BS_NOCLIP as c_int },
+    stringID_table_t { name: c"BS_REMOVE".as_ptr() as *mut c_char, id: bState_t::BS_REMOVE as c_int },
+    stringID_table_t { name: c"BS_CINEMATIC".as_ptr() as *mut c_char, id: bState_t::BS_CINEMATIC as c_int },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+];
 
 /// Raven `NPC_ReactionTime`.
 ///

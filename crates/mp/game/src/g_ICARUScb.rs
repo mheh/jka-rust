@@ -4007,6 +4007,21 @@ pub fn Q3_SetCleanDamagingEnts(ctx: GameContext<'_>) {
 /// Raven: `textcolor` is only ever read (never written) in this NOT-SUPPORTED
 /// stub body, so it stays by-value `vec4_t` per fork-9 ("keep by-value only
 /// if never written").
+/// Raven `textcolor_caption` — file-scope static for caption text color.
+///
+/// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4933`
+static textcolor_caption: vec4_t = [0.0, 0.0, 0.0, 0.0];
+
+/// Raven `textcolor_center` — file-scope static for center text color.
+///
+/// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4934`
+static textcolor_center: vec4_t = [0.0, 0.0, 0.0, 0.0];
+
+/// Raven `textcolor_scroll` — file-scope static for scroll text color.
+///
+/// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4935`
+static textcolor_scroll: vec4_t = [0.0, 0.0, 0.0, 0.0];
+
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4942-4946`
 pub fn SetTextColor(ctx: GameContext<'_>, textcolor: vec4_t, color: *const c_char) {
     G_DebugPrint(
@@ -4016,9 +4031,6 @@ pub fn SetTextColor(ctx: GameContext<'_>, textcolor: vec4_t, color: *const c_cha
     );
 }
 
-// PORT-NOTE(unported-global): `textcolor_caption` (the file-scope `vec4_t`
-// this forwards to `SetTextColor`) is not ported anywhere in the worktree —
-// same class of gap as `setTable`/`BSTable` above; missing_symbols.
 /// Raven `Q3_SetCaptionTextColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4955-4958`
@@ -4026,8 +4038,6 @@ pub fn Q3_SetCaptionTextColor(ctx: GameContext<'_>, color: *const c_char) {
     SetTextColor(ctx, textcolor_caption, color);
 }
 
-// PORT-NOTE(unported-global): `textcolor_center` is not ported anywhere in
-// the worktree; missing_symbols.
 /// Raven `Q3_SetCenterTextColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4967-4970`
@@ -4035,8 +4045,6 @@ pub fn Q3_SetCenterTextColor(ctx: GameContext<'_>, color: *const c_char) {
     SetTextColor(ctx, textcolor_center, color);
 }
 
-// PORT-NOTE(unported-global): `textcolor_scroll` is not ported anywhere in
-// the worktree; missing_symbols.
 /// Raven `Q3_SetScrollTextColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4979-4982`

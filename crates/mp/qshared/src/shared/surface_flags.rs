@@ -46,6 +46,18 @@ pub const SURF_NOSTEPS: c_int = 0x0040_0000; // no footstep sounds
 pub const SURF_NODLIGHT: c_int = 0x0080_0000; // don't dlight even if solid (solid lava, skies)
 pub const SURF_NOMISCENTS: c_int = 0x0100_0000; // no client models allowed on this surface
 
+// --- `surfaceflags.h` `MATERIAL_*` ground-material bits (surface type, packed
+// into `groundTrace.surfaceFlags` and masked out via `MATERIAL_MASK`). Only the
+// subset referenced by `bg_pmove.c`'s footstep/material handling is ported here;
+// add more `MATERIAL_*` values as they gain call sites.
+// Source: `oracle/oracle/codemp/game/surfaceflags.h:51-86`
+pub const MATERIAL_MASK: c_int = 0x1f;
+pub const MATERIAL_DIRT: c_int = 7;
+pub const MATERIAL_SAND: c_int = 8;
+pub const MATERIAL_GRAVEL: c_int = 9;
+pub const MATERIAL_SNOW: c_int = 14;
+pub const MATERIAL_MUD: c_int = 17;
+
 /// Raven `MASK_ALL`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_public.h:1170`

@@ -8,6 +8,7 @@ pub mod interest_point;
 pub mod level_locals;
 pub mod reference_tag;
 pub mod spawn_flags;
+pub mod tag_owner;
 pub mod waypoint_data;
 
 pub use alert_event::{alertEvent_t, alertEventLevel_e, alertEventType_e, MAX_ALERT_EVENTS};
@@ -16,4 +17,5 @@ pub use combat_point::{combatPoint_t, MAX_COMBAT_POINTS};
 pub use interest_point::{interestPoint_t, MAX_INTEREST_POINTS};
 pub use level_locals::{level_locals_t, BODY_QUEUE_SIZE};
 pub use reference_tag::{reference_tag_t, MAX_REFNAME, RTF_NAVGOAL, RTF_NONE};
+pub use tag_owner::{tagOwner_t, MAX_TAGS, MAX_TAG_OWNERS, TAG_GENERIC_NAME};
 pub use waypoint_data::waypointData_t;

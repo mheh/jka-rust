@@ -75,6 +75,29 @@ pub const SHIPSURF_BACK: c_int = 1;
 pub const SHIPSURF_RIGHT: c_int = 2;
 pub const SHIPSURF_LEFT: c_int = 3;
 
+/// Raven vehicle-surface damage-level indices (`bg_vehicles.h:432-439`).
+pub const SHIPSURF_DAMAGE_FRONT_LIGHT: c_int = 0;
+pub const SHIPSURF_DAMAGE_BACK_LIGHT: c_int = 1;
+pub const SHIPSURF_DAMAGE_RIGHT_LIGHT: c_int = 2;
+pub const SHIPSURF_DAMAGE_LEFT_LIGHT: c_int = 3;
+pub const SHIPSURF_DAMAGE_FRONT_HEAVY: c_int = 4;
+pub const SHIPSURF_DAMAGE_BACK_HEAVY: c_int = 5;
+pub const SHIPSURF_DAMAGE_RIGHT_HEAVY: c_int = 6;
+pub const SHIPSURF_DAMAGE_LEFT_HEAVY: c_int = 7;
+
+/// Raven vehicle-surface "broken" bitflags (`bg_vehicles.h:442-448`).
+pub const SHIPSURF_BROKEN_A: c_int = 1 << 0; // gear 1
+pub const SHIPSURF_BROKEN_B: c_int = 1 << 1; // gear 1
+pub const SHIPSURF_BROKEN_C: c_int = 1 << 2; // wing 1
+pub const SHIPSURF_BROKEN_D: c_int = 1 << 3; // wing 2
+pub const SHIPSURF_BROKEN_E: c_int = 1 << 4; // wing 3
+pub const SHIPSURF_BROKEN_F: c_int = 1 << 5; // wing 4
+pub const SHIPSURF_BROKEN_G: c_int = 1 << 6; // front
+
+/// Raven `TURN_OFF` — `NPC_SetSurfaceOnOff` flag; this TU's local `#define`.
+/// Source: `oracle/oracle/codemp/game/g_vehicles.c:2928`
+const TURN_OFF: c_int = 0x0000_0100;
+
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
 const qtrue: qboolean = 1;
@@ -2383,6 +2406,35 @@ pub fn Inhabited(
         }
     }
 }
+
+//TODO: Port Eject
+// Source: oracle/oracle/codemp/game/g_vehicles.c:1018-1119
+/// Raven `Eject` — eject the pilot from the vehicle. Excluded from this shard's
+/// manifest; stubbed so the `Eject` vtable slot / bare-name call sites resolve
+/// without speculating on the body.
+pub unsafe extern "C" fn Eject(
+    pVeh: *mut Vehicle_t,
+    pEnt: *mut bgEntity_t,
+    forceEject: qboolean,
+) -> qboolean {
+    todo!("Port Eject — oracle/oracle/codemp/game/g_vehicles.c:1018-1119")
+}
+
+//TODO: Port DeathUpdate
+// Source: oracle/oracle/codemp/game/g_vehicles.c:1485
+/// Raven `DeathUpdate` — update the death sequence for a generic vehicle.
+/// Excluded from this shard's manifest; stubbed so the `DeathUpdate` vtable
+/// slot resolves without speculating on the body.
+pub unsafe extern "C" fn DeathUpdate(pVeh: *mut Vehicle_t) {
+    todo!("Port DeathUpdate — oracle/oracle/codemp/game/g_vehicles.c:1485")
+}
+
+//TODO: Port RegisterAssets
+// Source: oracle/oracle/codemp/game/g_vehicles.c:1618-1620
+/// Raven `RegisterAssets` — register all the assets used by this vehicle. The
+/// base implementation is an empty function body in Raven (see cite); this
+/// stub matches that faithfully rather than panicking.
+pub unsafe extern "C" fn RegisterAssets(pVeh: *mut Vehicle_t) {}
 
 /// Raven `G_SetSharedVehicleFunctions`.
 ///

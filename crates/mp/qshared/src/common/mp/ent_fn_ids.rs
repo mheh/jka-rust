@@ -265,6 +265,9 @@ pub enum EntTouch {
     hurt_touch,
     /// `oracle/oracle/codemp/game/g_trigger.c:1597`
     hyperspace_touch,
+    /// `NPC_TouchFunc`'s universal NPC touch handler assign.
+    /// `oracle/oracle/codemp/game/NPC_spawn.c:199-206`
+    NPC_Touch,
     /// `oracle/oracle/codemp/game/g_trigger.c:1494`
     shipboundary_touch,
     /// `oracle/oracle/codemp/game/g_trigger.c:1442`
@@ -395,8 +398,9 @@ pub enum EntUse {
     use_wall,
 }
 
-/// Raven `pain` fn-pointer targets (14 distinct assigns
-/// in game/*.c bodies).
+/// Raven `pain` fn-pointer targets (14 distinct assigns in game/*.c bodies,
+/// plus the 16 `NPC_PainFunc` dispatch targets assigned by NPC class/weapon
+/// switch — `oracle/oracle/codemp/game/NPC_spawn.c:103-189`).
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h:285-291`
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -409,8 +413,47 @@ pub enum EntPain {
     GlassPain,
     /// `oracle/oracle/codemp/game/NPC_AI_Atst.c:119`
     NPC_ATST_Pain,
+    /// CLASS_GONK/R2D2/R5D2/MOUSE/PROTOCOL/INTERROGATOR.
+    /// `oracle/oracle/codemp/game/NPC_AI_Droid.c` (assigned NPC_spawn.c:145-151)
+    NPC_Droid_Pain,
+    /// CLASS_GALAKMECH. `oracle/oracle/codemp/game/NPC_AI_GalakMech.c`
+    /// (assigned NPC_spawn.c:167)
+    NPC_GM_Pain,
+    /// CLASS_HOWLER. `oracle/oracle/codemp/game/NPC_AI_Howler.c`
+    /// (assigned NPC_spawn.c:142)
+    NPC_Howler_Pain,
+    /// `ps.weapon == WP_SABER` universal jedi pain. `oracle/oracle/codemp/game/NPC_AI_Jedi.c`
+    /// (assigned NPC_spawn.c:108)
+    NPC_Jedi_Pain,
+    /// CLASS_MARK1. `oracle/oracle/codemp/game/NPC_AI_Mark1.c`
+    /// (assigned NPC_spawn.c:161)
+    NPC_Mark1_Pain,
+    /// CLASS_MARK2. `oracle/oracle/codemp/game/NPC_AI_Mark2.c`
+    /// (assigned NPC_spawn.c:164)
+    NPC_Mark2_Pain,
+    /// CLASS_MINEMONSTER. `oracle/oracle/codemp/game/NPC_AI_MineMonster.c`
+    /// (assigned NPC_spawn.c:136)
+    NPC_MineMonster_Pain,
+    /// Default-case generic NPC pain. `oracle/oracle/codemp/game/NPC_AI_Default.c`
+    /// (assigned NPC_spawn.c:177)
+    NPC_Pain,
+    /// CLASS_PROBE. `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c`
+    /// (assigned NPC_spawn.c:154)
+    NPC_Probe_Pain,
     /// `oracle/oracle/codemp/game/NPC_AI_Rancor.c:703`
     NPC_Rancor_Pain,
+    /// CLASS_REMOTE. `oracle/oracle/codemp/game/NPC_AI_Remote.c`
+    /// (assigned NPC_spawn.c:133)
+    NPC_Remote_Pain,
+    /// CLASS_SEEKER. `oracle/oracle/codemp/game/NPC_AI_Seeker.c`
+    /// (assigned NPC_spawn.c:130)
+    NPC_Seeker_Pain,
+    /// CLASS_SENTRY. `oracle/oracle/codemp/game/NPC_AI_Sentry.c`
+    /// (assigned NPC_spawn.c:158)
+    NPC_Sentry_Pain,
+    /// CLASS_STORMTROOPER/SWAMPTROOPER. `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c`
+    /// (assigned NPC_spawn.c:126)
+    NPC_ST_Pain,
     /// `oracle/oracle/codemp/game/NPC_AI_Wampa.c:433`
     NPC_Wampa_Pain,
     /// `oracle/oracle/codemp/game/g_items.c:155`

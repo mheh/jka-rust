@@ -9,6 +9,8 @@
 pub mod e_weapon_pose;
 pub mod min_landing_slope;
 pub mod turret_stats_t;
+pub mod veh_field_t;
+pub mod veh_field_type_t;
 pub mod veh_flags_t;
 pub mod veh_turret_status_t;
 pub mod veh_weapon_info_t;
@@ -21,6 +23,8 @@ pub mod vehicle_type_t;
 pub use e_weapon_pose::EWeaponPose;
 pub use min_landing_slope::MIN_LANDING_SLOPE;
 pub use turret_stats_t::{turretStats_t, MAX_VEHICLE_TURRET_MUZZLES};
+pub use veh_field_t::vehField_t;
+pub use veh_field_type_t::vehFieldType_t;
 pub use veh_flags_t::vehFlags_t;
 pub use veh_turret_status_t::vehTurretStatus_t;
 pub use veh_weapon_info_t::vehWeaponInfo_t;

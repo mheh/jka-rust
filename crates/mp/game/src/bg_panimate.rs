@@ -1590,6 +1590,28 @@ impl PmoveContext<'_> {
     }
 }
 
+/// Raven `BG_AnimLength` — free-function form for game-tier callers.
+///
+/// Get the "length" of an anim given the local anim index (which skeleton)
+/// and anim number. Obviously does not take things like the length of the
+/// anim while force speeding (as an example) and whatnot into account.
+///
+/// Game-tier callers without a PmoveContext receiver call this form, passing
+/// a reference to the BgState that owns the bgAllAnims table.
+///
+/// Source: `oracle/oracle/codemp/game/bg_panimate.c:1573-1581`
+pub fn BG_AnimLength(bg_state: &crate::bg_channel::BgState, index: c_int, anim: c_int) -> c_int {
+    if anim >= MAX_ANIMATIONS {
+        return -1;
+    }
+    if (index as usize) >= bg_state.bgAllAnims.len() {
+        return -1;
+    }
+    (bg_state.bgAllAnims[index as usize].anims[anim as usize].numFrames as f32
+        * (bg_state.bgAllAnims[index as usize].anims[anim as usize].frameLerp as f32).abs())
+        as c_int
+}
+
 /// Raven `PM_AnimLength`.
 ///
 /// Raven: just use whatever pm->animations is.

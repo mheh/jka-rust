@@ -50,8 +50,14 @@ pub use mp_bg::public::dm_flags::*;
 pub use mp_bg::public::entity_effects::*;
 pub use mp_bg::public::item_type::*;
 pub use mp_bg::public::set_anim::*;
-pub use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_TURRETS, VEHICLE_BASE, VEHICLE_NONE};
+pub use mp_bg::public::configstring::*;
+pub use mp_bg::public::{JUMP_VELOCITY, bg_parryDebounce};
+pub use mp_bg::public::{CROUCH_VIEWHEIGHT, DEAD_VIEWHEIGHT, DEFAULT_VIEWHEIGHT};
+pub use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_TURRETS, MAX_VEHICLE_WEAPONS, VEHICLE_BASE, VEHICLE_NONE};
 pub use mp_bg::vehicles::vehicle_type_t::vehicleType_t::*;
+pub use mp_bg::vehicles::e_weapon_pose::EWeaponPose;
+pub use mp_bg::vehicles::e_weapon_pose::EWeaponPose::*;
+pub use mp_bg::vehicles::veh_flags_t::vehFlags_t::*;
 pub use mp_bg::weapons::weapon_t::*;
 pub use mp_bg::weapons::weaponData;
 pub use mp_bg::weapons::WP_MuzzlePoint;
@@ -74,6 +80,7 @@ pub use crate::g_client::{playerMaxs, playerMins};
 pub use crate::g_items::FRAMETIME;
 pub use crate::g_mover::{BMS_END, BMS_MID, BMS_START};
 pub use crate::ai_main_consts::*;
+pub use crate::g_local_consts::*;
 pub use crate::g_nav_consts::*;
 pub use crate::g_public_consts::*;
 pub use crate::g_target::Q3_SCRIPT_DIR;
@@ -83,6 +90,9 @@ pub use crate::npc::ai_flags::*;
 pub use crate::npc::check_flags::*;
 pub use crate::npc::script_flags::*;
 pub use crate::npc::squad_state::*;
+pub use crate::anim_table::animTable;
+pub use crate::bg_vehicleLoad_tables::*;
+pub use mp_bg::vehicles::{vehField_t, vehFieldType_t, vehFieldType_t::*};
 pub use crate::q_math::{
     vec3_origin, vectoangles, RadiusFromBounds, PITCH, ROLL, VEC3_ORIGIN, YAW,
 };
@@ -146,6 +156,9 @@ pub use crate::ent_fn_enums::EntSpawn;
 // pointer-assignment sites; `field.is_none()` / id-equality replace NULL/address
 // compares.
 pub use crate::world::{ent_id, ent_id_opt, EntityId};
+// Index->pointer counterpart (ruling 22): `crate::ent_id::resolve` re-derives a
+// live `gentity_t*` from a stored `Option<EntityId>` field.
+pub use crate::ent_id;
 pub use mp_bg::local::pml_t::pml_t;
 
 // Pass-3 prep C1 (agenda B10 porter-instruction rider): the `crate::trap` seam
@@ -173,6 +186,7 @@ pub use crate::level::alert_event::{alertEventLevel_e, alertEventLevel_e::*};
 pub use crate::level::reference_tag::reference_tag_t;
 pub use crate::level::waypoint_data::waypointData_t;
 pub use crate::npc::g_npc_t::gNPC_t;
+pub use crate::npc::jump_state_t::{jumpState_t, jumpState_t::*};
 pub use crate::npc::nav_info_s::{navInfo_t, NIF_NONE, NIF_FAILED, NIF_MACRO_NAV, NIF_COLLISION, NIF_BLOCKED};
 pub use crate::npc::spot_t::{spot_t, spot_t::*};
 pub use crate::npc::visibility_t::{visibility_t, visibility_t::*};
@@ -189,7 +203,11 @@ pub use mp_bg::public::saber_move_name::saberMoveName_t;
 pub use mp_bg::public::team::team_t;
 pub use mp_bg::saga::siege_class_desc_t::{siegeClassDesc_t, SIEGE_CLASS_DESC_LEN};
 pub use mp_bg::saga::siege_class_t::{siegeClass_t, MAX_SIEGE_CLASSES};
-pub use mp_bg::saga::siege_team_t::{siegeTeam_t, SIEGETEAM_TEAM1, SIEGETEAM_TEAM2};
+pub use mp_bg::saga::siege_team_t::{
+    siegeTeam_t, MAX_EXDATA_ENTS_TO_SEND, MAX_SIEGE_INFO_SIZE, SIEGETEAM_TEAM1, SIEGETEAM_TEAM2,
+    SIEGE_POINTS_FINALOBJECTIVECOMPLETED, SIEGE_POINTS_OBJECTIVECOMPLETED,
+    SIEGE_POINTS_TEAMWONROUND, SIEGE_ROUND_BEGIN_TIME,
+};
 pub use mp_bg::saga::siege_class_flags_t::siegeClassFlags_t::*;
 pub use mp_bg::saga::siege_player_class_flags_t::siegePlayerClassFlags_t::{self, *};
 pub use mp_bg::vehicles::turret_stats_t::turretStats_t;
@@ -352,6 +370,7 @@ pub use crate::NPC_AI_Howler::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/c
 pub use crate::g_spawn::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_spawn.rs
 pub use crate::g_cmds::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_cmds.rs
 pub use crate::level::reference_tag::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/level/reference_tag.rs
+pub use crate::level::tag_owner::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/level/tag_owner.rs
 pub use mp_bg::public::spawn::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/spawn.rs
 pub use crate::npc_c::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/npc_c.rs
 pub use crate::NPC_spawn::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_spawn.rs
@@ -373,13 +392,17 @@ pub use crate::NPC_AI_Utils::{MAX_RADIUS_ENTS};  // .claude/worktrees/agent-a43c
 pub use mp_bg::vehicles::turret_stats_t::{MAX_VEHICLE_TURRET_MUZZLES};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/turret_stats_t.rs
 pub use mp_qshared::shared::q_color::{Q_COLOR_ESCAPE};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/q_color.rs
 pub use crate::saber::saber_flags::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/saber/saber_flags.rs
-pub use crate::bg_saga::{SIEGECHAR_TAB};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saga.rs
+pub use crate::bg_saga::{SIEGECHAR_TAB, WPTable};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_saga.rs
+pub use crate::NPC_stats::BSTable;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_stats.rs
+pub use crate::g_icarus_set_type::{setType_t, setType_t::*, setTable};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_icarus_set_type.rs
 pub use mp_bg::weapons::ammo_data::{ammoData};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/weapons/ammo_data.rs
 pub use mp_bg::local::bg_toggleable_surfaces::{bgToggleableSurfaces};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/bg_toggleable_surfaces.rs
 pub use mp_bg::local::force_power_needed::{forcePowerNeeded};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_power_needed.rs
+pub use mp_bg::local::force_levels::{forceJumpStrength};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/local/force_levels.rs
 pub use crate::g_spawn::MAX_AMBIENT_SETS;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_spawn.rs
 pub use crate::g_cmds::{MAX_TOKEN_CHARS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_cmds.rs
 pub use crate::bg_pmove::{MIN_WALK_NORMAL};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_pmove.rs
 pub use mp_qshared::common::mp::gentity::{NUM_BSETS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/gentity.rs
 pub use mp_qshared::common::mp::qcommon::player_state::{NUM_FORCE_POWERS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/player_state.rs
 pub use mp_bg::public::saber_move_data_table::{saberMoveData};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_move_data_table.rs
+pub use crate::bg_vehicleLoad::{BG_VehicleGetIndex};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_vehicleLoad.rs

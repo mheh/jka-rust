@@ -36,3 +36,19 @@ use core::ffi::c_int;
 pub const ENTITYNUM_NONE: c_int = MAX_GENTITIES as c_int - 1;
 pub const ENTITYNUM_WORLD: c_int = MAX_GENTITIES as c_int - 2;
 pub const ENTITYNUM_MAX_NORMAL: c_int = MAX_GENTITIES as c_int - 2;
+
+/// Raven `MAX_VEH_WEAPONS` — max distinct vehicle-weapon types loadable
+/// (`g_vehWeaponInfo` table size). Placed alongside the other per-level
+/// limits (rather than `mp_bg::vehicles`) because existing call sites
+/// (`g_weapon.rs`, `bg_vehicleLoad.rs`) already spell it `crate::shared::…`.
+///
+/// Source: `oracle/oracle/codemp/game/bg_vehicles.h:70`
+pub const MAX_VEH_WEAPONS: usize = 16;
+/// Raven `VEH_WEAPON_BASE` — first real vehicle-weapon index (0 is null/default).
+///
+/// Source: `oracle/oracle/codemp/game/bg_vehicles.h:71`
+pub const VEH_WEAPON_BASE: c_int = 0;
+/// Raven `VEH_WEAPON_NONE` — sentinel "no vehicle weapon" index.
+///
+/// Source: `oracle/oracle/codemp/game/bg_vehicles.h:72`
+pub const VEH_WEAPON_NONE: c_int = -1;

@@ -30,6 +30,7 @@ const qfalse: qboolean = 0;
 // Raven color escape `#define`s (porting-rules §C8: `#define` -> `const`).
 // Source: `oracle/oracle/codemp/game/q_shared.h:1145-1167`
 pub const S_COLOR_RED: &CStr = c"^1";
+pub const S_COLOR_GREEN: &CStr = c"^2";
 pub const S_COLOR_YELLOW: &CStr = c"^3";
 pub const S_COLOR_BLUE: &CStr = c"^4";
 pub const S_COLOR_WHITE: &CStr = c"^7";

@@ -40,6 +40,31 @@ use mp_bg::public::entity_type::entity_type_t;
 // Unported types referenced in this file (need porting before this compiles):
 // tagOwner_t
 
+/// Raven `HOLOCRON_RESPAWN_TIME`.
+///
+/// Source: `oracle/oracle/codemp/game/g_misc.c:10`
+pub const HOLOCRON_RESPAWN_TIME: c_int = 30000;
+
+/// Raven `MAX_AMMO_GIVE`.
+///
+/// Source: `oracle/oracle/codemp/game/g_misc.c:11`
+pub const MAX_AMMO_GIVE: c_int = 2;
+
+/// Raven `STATION_RECHARGE_TIME`.
+///
+/// Source: `oracle/oracle/codemp/game/g_misc.c:12`
+pub const STATION_RECHARGE_TIME: c_int = 100;
+
+/// Raven `FX_ENT_RADIUS`.
+///
+/// Source: `oracle/oracle/codemp/game/g_misc.c:2261`
+pub const FX_ENT_RADIUS: c_float = 32.0;
+
+/// Raven `MAX_SHOOTERS`.
+///
+/// Source: `oracle/oracle/codemp/game/g_misc.c:3345`
+pub const MAX_SHOOTERS: c_int = 16;
+
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
 const qtrue: qboolean = 1;

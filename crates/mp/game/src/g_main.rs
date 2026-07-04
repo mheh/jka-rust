@@ -2836,6 +2836,22 @@ pub fn BG_GetTime() -> c_int {
     0
 }
 
+// PORT-NOTE(ctx-free-boundary): same shape as `BG_GetTime` above — callers
+// (vehicle/NPC think code) reach `level.time` from a ctx-free fn-pointer
+// boundary with no `GameContext`/`BgState` handle threaded through yet.
+// Returns 0 until GameCallbacks/BgState (ruling 16) wiring reaches this call
+// site; matches `BG_GetTime`'s placeholder behavior rather than inventing a
+// different fallback.
+/// Raven `level.time` accessor (no standalone Raven symbol; mirrors the many
+/// `level.time` reads inlined at call sites).
+///
+/// Source: `oracle/oracle/codemp/game/g_local.h` (`level_locals_t::time`)
+pub fn level_time() -> c_int {
+    //TODO: Port level.time reach-through
+    // Source: oracle/oracle/codemp/game/g_local.h (needs GameCallbacks/BgState wiring)
+    0
+}
+
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): the whole-frame driver —
 // walks `g_entities`, dispatches `ent->think`/`ent->s.eType`-keyed subsystem
 // calls, updates `level`/`GameCvars`/several g_main.c file-scope globals

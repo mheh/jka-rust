@@ -12,7 +12,7 @@
 //! (`rng`); see [`Rng`].
 #![allow(non_snake_case, non_upper_case_globals)]
 
-use core::ffi::c_int;
+use core::ffi::{c_char, c_int};
 
 use crate::prelude::*;
 
@@ -85,6 +85,14 @@ pub struct BgState {
     /// Raven `int numVehicles = 0` (first one is null/default).
     /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:107`
     pub numVehicles: c_int,
+    /// Raven `char VehWeaponParms[MAX_VEH_WEAPON_DATA_SIZE]` — accumulated
+    /// `.vwp` text scratch buffer (§B3: file-scope static -> owned field).
+    /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:69`
+    pub VehWeaponParms: Vec<c_char>,
+    /// Raven `char VehicleParms[MAX_VEHICLE_DATA_SIZE]` — accumulated `.veh`
+    /// text scratch buffer.
+    /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:70`
+    pub VehicleParms: Vec<c_char>,
 
     // --- `bg_saga.c` siege class tables ---
     /// Raven `siegeClass_t bgSiegeClasses[MAX_SIEGE_CLASSES]` — siege gametype
@@ -135,6 +143,11 @@ impl BgState {
             numVehicleWeapons: 1,
             g_vehicleInfo: Vec::new(),
             numVehicles: 0,
+            // Sized like Raven's fixed `char[MAX_VEH_WEAPON_DATA_SIZE/
+            // MAX_VEHICLE_DATA_SIZE]` scratch buffers (loaders index them
+            // directly rather than push/grow).
+            VehWeaponParms: vec![0; crate::bg_vehicleLoad_tables::MAX_VEH_WEAPON_DATA_SIZE],
+            VehicleParms: vec![0; crate::bg_vehicleLoad_tables::MAX_VEHICLE_DATA_SIZE],
             bgSiegeClasses: Vec::new(),
             bgNumSiegeClasses: 0,
             bg_pool: Vec::new(),

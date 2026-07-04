@@ -92,6 +92,16 @@ impl BgTraps for GameBgTraps<'_> {
         todo!("Port BgTraps::fs_getfilelist delegation — crate::trap::FS_GetFileList")
     }
 
+    fn g2api_add_bolt(&self, ghoul2: *mut c_void, modelIndex: c_int, boneName: *const c_char) -> c_int {
+        // Real delegation to the already-wired `trap_G2API_AddBolt` seam
+        // (`G_G2_ADDBOLT`); bg-visible callers (e.g. `AttachRidersGeneric`)
+        // only carry `&dyn BgTraps`, not `&Engine`.
+        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
+        crate::trap::G2API_AddBolt(
+            self.ctx.engine,
+            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, modelIndex, bone_name),
+        )
+    }
     fn g2api_get_bolt_matrix(
         &self,
         ghoul2: *mut c_void,

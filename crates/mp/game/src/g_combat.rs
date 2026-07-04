@@ -46,6 +46,93 @@ const ROLL: usize = 2;
 // convention (`g_team.rs`). Source: `oracle/oracle/codemp/game/g_local.h`.
 const SVF_BROADCAST: c_int = 0x00000020;
 
+/// Raven `#define ARMOR_PROTECTION 0.50` — shields only stop 50% of
+/// armor-piercing damage.
+/// Source: `oracle/oracle/codemp/game/bg_public.h:26`
+const ARMOR_PROTECTION: f32 = 0.50;
+
+/// Raven `#define ARMOR_REDUCTION_FACTOR 0.50` — certain damage doesn't take
+/// off armor as efficiently.
+/// Source: `oracle/oracle/codemp/game/bg_public.h:27`
+const ARMOR_REDUCTION_FACTOR: f32 = 0.50;
+
+/// Raven `modNames` — obituary name table indexed by `meansOfDeath_t`.
+///
+/// Source: `oracle/oracle/codemp/game/g_combat.c:755-797`
+const modNames: [*const c_char; 41] = [
+    c"MOD_UNKNOWN".as_ptr(),
+    c"MOD_STUN_BATON".as_ptr(),
+    c"MOD_MELEE".as_ptr(),
+    c"MOD_SABER".as_ptr(),
+    c"MOD_BRYAR_PISTOL".as_ptr(),
+    c"MOD_BRYAR_PISTOL_ALT".as_ptr(),
+    c"MOD_BLASTER".as_ptr(),
+    c"MOD_TURBLAST".as_ptr(),
+    c"MOD_DISRUPTOR".as_ptr(),
+    c"MOD_DISRUPTOR_SPLASH".as_ptr(),
+    c"MOD_DISRUPTOR_SNIPER".as_ptr(),
+    c"MOD_BOWCASTER".as_ptr(),
+    c"MOD_REPEATER".as_ptr(),
+    c"MOD_REPEATER_ALT".as_ptr(),
+    c"MOD_REPEATER_ALT_SPLASH".as_ptr(),
+    c"MOD_DEMP2".as_ptr(),
+    c"MOD_DEMP2_ALT".as_ptr(),
+    c"MOD_FLECHETTE".as_ptr(),
+    c"MOD_FLECHETTE_ALT_SPLASH".as_ptr(),
+    c"MOD_ROCKET".as_ptr(),
+    c"MOD_ROCKET_SPLASH".as_ptr(),
+    c"MOD_ROCKET_HOMING".as_ptr(),
+    c"MOD_ROCKET_HOMING_SPLASH".as_ptr(),
+    c"MOD_THERMAL".as_ptr(),
+    c"MOD_THERMAL_SPLASH".as_ptr(),
+    c"MOD_TRIP_MINE_SPLASH".as_ptr(),
+    c"MOD_TIMED_MINE_SPLASH".as_ptr(),
+    c"MOD_DET_PACK_SPLASH".as_ptr(),
+    c"MOD_VEHICLE".as_ptr(),
+    c"MOD_CONC".as_ptr(),
+    c"MOD_CONC_ALT".as_ptr(),
+    c"MOD_FORCE_DARK".as_ptr(),
+    c"MOD_SENTRY".as_ptr(),
+    c"MOD_WATER".as_ptr(),
+    c"MOD_SLIME".as_ptr(),
+    c"MOD_LAVA".as_ptr(),
+    c"MOD_CRUSH".as_ptr(),
+    c"MOD_TELEFRAG".as_ptr(),
+    c"MOD_FALLING".as_ptr(),
+    c"MOD_SUICIDE".as_ptr(),
+    c"MOD_TARGET_LASER".as_ptr(),
+    c"MOD_TRIGGER_HURT".as_ptr(),
+];
+
+/// Raven `hitLocName` — hit-location display-name table indexed by `hitLoc`.
+///
+/// Source: `oracle/oracle/codemp/game/g_combat.c:3165-3189`
+const hitLocName: [&core::ffi::CStr; 23] = [
+    c"none",
+    c"right foot",
+    c"left foot",
+    c"right leg",
+    c"left leg",
+    c"waist",
+    c"back right shoulder",
+    c"back left shoulder",
+    c"back",
+    c"front right shouler",
+    c"front left shoulder",
+    c"chest",
+    c"right arm",
+    c"left arm",
+    c"right hand",
+    c"left hand",
+    c"head",
+    c"generic1",
+    c"generic2",
+    c"generic3",
+    c"generic4",
+    c"generic5",
+    c"generic6",
+];
+
 /// Raven `ObjectDie`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:22-31`

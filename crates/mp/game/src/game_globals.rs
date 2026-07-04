@@ -37,6 +37,100 @@ pub(crate) const MAX_VEHICLES_AT_A_TIME: usize = 128;
 // Source: `oracle/oracle/codemp/game/ai_main.h:15-18`
 pub(crate) const MAX_CHAT_BUFFER_SIZE: usize = 8192;
 
+// Raven `#define MAX_ARENAS 1024` / `MAX_BOTS 1024` / `BOT_SPAWN_QUEUE_DEPTH 16`
+// (`g_bot.c:9,13,19`).
+// Source: `oracle/oracle/codemp/game/bg_public.h:1022,1024`
+//         `oracle/oracle/codemp/game/g_bot.c:19`
+const MAX_ARENAS: usize = 1024;
+const MAX_BOTS: usize = 1024;
+const BOT_SPAWN_QUEUE_DEPTH: usize = 16;
+
+/// `botSpawnQueue_t` — bot spawn queue entry (`g_bot.c:21-24`).
+///
+/// Source: `oracle/oracle/codemp/game/g_bot.c:21-24`
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct botSpawnQueue_t {
+    pub clientNum: c_int,
+    pub spawnTime: c_int,
+}
+
+/// `char *g_botInfos[MAX_BOTS]` — bot info strings (`g_bot.c:9`). Newtype because
+/// a 1024-element array has no library `Default` impl (only arrays up to 32 elements do).
+/// Source: `oracle/oracle/codemp/game/g_bot.c:9`
+pub struct BotInfos(pub [*mut c_char; MAX_BOTS]);
+
+impl Default for BotInfos {
+    fn default() -> Self {
+        BotInfos([core::ptr::null_mut(); MAX_BOTS])
+    }
+}
+
+// Transparent indexing (`globals.g_botInfos[i]`) so call sites written
+// against a plain `[*mut c_char; MAX_BOTS]` need no change.
+impl core::ops::Index<usize> for BotInfos {
+    type Output = *mut c_char;
+    fn index(&self, i: usize) -> &*mut c_char {
+        &self.0[i]
+    }
+}
+impl core::ops::IndexMut<usize> for BotInfos {
+    fn index_mut(&mut self, i: usize) -> &mut *mut c_char {
+        &mut self.0[i]
+    }
+}
+
+/// `char *g_arenaInfos[MAX_ARENAS]` — arena info strings (`g_bot.c:13`). Newtype because
+/// a 1024-element array has no library `Default` impl (only arrays up to 32 elements do).
+/// Source: `oracle/oracle/codemp/game/g_bot.c:13`
+pub struct ArenaInfos(pub [*mut c_char; MAX_ARENAS]);
+
+impl Default for ArenaInfos {
+    fn default() -> Self {
+        ArenaInfos([core::ptr::null_mut(); MAX_ARENAS])
+    }
+}
+
+// Transparent indexing (`globals.g_arenaInfos[i]`) so call sites written
+// against a plain `[*mut c_char; MAX_ARENAS]` need no change.
+impl core::ops::Index<usize> for ArenaInfos {
+    type Output = *mut c_char;
+    fn index(&self, i: usize) -> &*mut c_char {
+        &self.0[i]
+    }
+}
+impl core::ops::IndexMut<usize> for ArenaInfos {
+    fn index_mut(&mut self, i: usize) -> &mut *mut c_char {
+        &mut self.0[i]
+    }
+}
+
+/// `botSpawnQueue_t botSpawnQueue[BOT_SPAWN_QUEUE_DEPTH]` — spawn queue array (`g_bot.c:27`).
+/// Newtype for consistent interface with other large arrays.
+/// Source: `oracle/oracle/codemp/game/g_bot.c:27`
+#[derive(Clone, Copy)]
+pub struct BotSpawnQueue(pub [botSpawnQueue_t; BOT_SPAWN_QUEUE_DEPTH]);
+
+impl Default for BotSpawnQueue {
+    fn default() -> Self {
+        BotSpawnQueue([botSpawnQueue_t::default(); BOT_SPAWN_QUEUE_DEPTH])
+    }
+}
+
+// Transparent indexing (`globals.botSpawnQueue[i]`) so call sites written
+// against a plain `[botSpawnQueue_t; BOT_SPAWN_QUEUE_DEPTH]` need no change.
+impl core::ops::Index<usize> for BotSpawnQueue {
+    type Output = botSpawnQueue_t;
+    fn index(&self, i: usize) -> &botSpawnQueue_t {
+        &self.0[i]
+    }
+}
+impl core::ops::IndexMut<usize> for BotSpawnQueue {
+    fn index_mut(&mut self, i: usize) -> &mut botSpawnQueue_t {
+        &mut self.0[i]
+    }
+}
+
 /// `itemRegistered[MAX_ITEMS]` (`g_items.c:2966`). A thin wrapper because
 /// `[qboolean; 256]` has no library `Default` impl (only arrays up to 32
 /// elements do in stable Rust).
@@ -419,17 +513,30 @@ pub struct GameGlobals {
     /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:19`
     pub nodetable: NodeTable,
     // --- `g_bot.c` file-scope globals ---
-    //TODO: Port botSpawnQueue_t[BOT_SPAWN_QUEUE_DEPTH]
-    // Source: oracle/oracle/codemp/game/g_bot.c:27
-    pub botSpawnQueue: (),
+    /// `botSpawnQueue_t botSpawnQueue[BOT_SPAWN_QUEUE_DEPTH]`.
+    /// Source: `oracle/oracle/codemp/game/g_bot.c:27`
+    pub botSpawnQueue: BotSpawnQueue,
+    /// `char *g_botInfos[MAX_BOTS]` — bot info strings.
+    /// Source: `oracle/oracle/codemp/game/g_bot.c:9`
+    pub g_botInfos: BotInfos,
+    /// `char *g_arenaInfos[MAX_ARENAS]` — arena info strings.
+    /// Source: `oracle/oracle/codemp/game/g_bot.c:13`
+    pub g_arenaInfos: ArenaInfos,
     /// `g_numArenas`. Source: `oracle/oracle/codemp/game/g_bot.c:12`
     pub g_numArenas: c_int,
     /// `g_numBots`. Source: `oracle/oracle/codemp/game/g_bot.c:8`
     pub g_numBots: c_int,
+    /// `vmCvar_t bot_minplayers` — minimum players cvar.
+    /// Source: `oracle/oracle/codemp/game/g_bot.c:1226`
+    pub bot_minplayers: vmCvar_t,
+    /// `static int checkminimumplayers_time` — function-static debounce timer
+    /// (folded into GameGlobals per threading pattern).
+    /// Source: `oracle/oracle/codemp/game/g_bot.c:572`
+    pub checkminimumplayers_time: c_int,
     // --- `g_client.c` file-scope globals ---
-    //TODO: Port void **
-    // Source: oracle/oracle/codemp/game/g_client.c:1511
-    pub g2SaberInstance: (),
+    /// `void *g2SaberInstance` — the server's shared template ghoul2 saber instance handle.
+    /// Source: `oracle/oracle/codemp/game/g_client.c:1414`
+    pub g2SaberInstance: *mut c_void,
     /// Raven `gentity_t *gJMSaberEnt` — the current Jedi-Master saber entity.
     /// Source: `oracle/oracle/codemp/game/g_client.c:471`
     //
@@ -636,9 +743,9 @@ pub struct GameGlobals {
     /// `rebel_time_limit`. Source: `oracle/oracle/codemp/game/g_saga.c:28`
     pub rebel_time_limit: c_int,
     // --- `g_spawn.c` file-scope globals ---
-    //TODO: Port void **
-    // Source: oracle/oracle/codemp/game/g_spawn.c:1234
-    pub precachedKyle: (),
+    /// `void *precachedKyle` — the server's precached Kyle template ghoul2 instance handle.
+    /// Source: `oracle/oracle/codemp/game/g_spawn.c:1226`
+    pub precachedKyle: *mut c_void,
     // --- `g_svcmds.c` file-scope globals ---
     //TODO: Port ipFilter_t[MAX_IPFILTERS]
     // Source: oracle/oracle/codemp/game/g_svcmds.c:54

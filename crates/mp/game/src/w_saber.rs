@@ -76,6 +76,34 @@ use crate::q_math::{
 use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
 use crate::NPC_senses::InFront;
 use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
+use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri};
+use crate::bg_panimate::{BG_InExtraDefenseSaberMove, BG_SuperBreakLoseAnim};
+use crate::saber::saber_flags::{SFL_NOT_DISARMABLE, SFL_RETURN_DAMAGE};
+
+// Raven `#define`s local to `w_saber.c` itself (not `w_saber.h`), so they are
+// not part of the `saber::w_saber_consts` header-const family; named here at
+// their one call site, matching the oracle's file-local scoping.
+/// Source: `oracle/oracle/codemp/game/w_saber.c:7`
+const SABER_BOX_SIZE: f32 = 16.0;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:284`
+const PROPER_THROWN_VALUE: c_int = 999;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:2235`
+const SABER_NONATTACK_DAMAGE: c_int = 1;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:3503`
+const MAX_SABER_VICTIMS: c_int = 16;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:5885`
+const MIN_SABER_SLICE_DISTANCE: f32 = 50.0;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:5887`
+const MIN_SABER_SLICE_RETURN_DISTANCE: f32 = 30.0;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:5889`
+const SABER_THROWN_HIT_DAMAGE: c_int = 30;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:6337`
+const MAX_LEAVE_TIME: c_int = 20000;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:6510`
+// 3 seconds for now. This will leave you nice and open if you lose your saber.
+const SABER_RETRIEVE_DELAY: c_int = 3000;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:7115`
+const SABER_MAX_THROW_DISTANCE: f32 = 700.0;
 
 // `saberBlockedType_t`/`weaponstate_t` are `#[repr(i32)]` enums, but the
 // playerState `saberBlocked`/`weaponstate` fields are stored as `c_int` — so

@@ -39,3 +39,15 @@ pub static forceJumpStrength: [f32; 4] = [
     590.0,
     840.0,
 ];
+
+/// Raven `forceJumpHeightMax[NUM_FORCE_POWER_LEVELS]` — force-jump max height
+/// per level including stepheight/crouchdiff (used by `PM_CheckJump`'s
+/// max-height clamp, distinct from `forceJumpHeight`).
+///
+/// Definition source: `oracle/oracle/codemp/game/bg_pmove.c:1768-1774`
+pub static forceJumpHeightMax: [f32; 4] = [
+    66.0,  //normal jump (32+stepheight(18)+crouchdiff(24) = 74)
+    130.0, //(96+stepheight(18)+crouchdiff(24) = 138)
+    226.0, //(192+stepheight(18)+crouchdiff(24) = 234)
+    418.0, //(384+stepheight(18)+crouchdiff(24) = 426)
+];

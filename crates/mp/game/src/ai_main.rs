@@ -43,7 +43,11 @@ use std::ffi::CString;
 use crate::ai_wpnav::{
     WPFLAG_BLUE_FLAG, WPFLAG_NOMOVEFUNC, WPFLAG_NOVIS, WPFLAG_RED_FLAG, WPFLAG_WAITFORFUNC,
 };
-use crate::ai_main_consts::LEVELFLAG_NOPOINTPREDICTION;
+use crate::ai_main_consts::{
+    BOT_FLAG_GET_DISTANCE, BOT_PLANT_BLOW_DISTANCE, BOT_PLANT_DISTANCE, BOT_PLANT_INTERVAL,
+    BOT_SABER_THROW_RANGE, BOT_THINK_TIME, BOT_WPTOUCH_DISTANCE, LEVELFLAG_NOPOINTPREDICTION,
+    MELEE_ATTACK_RANGE, SABER_ATTACK_RANGE,
+};
 use crate::entity::flags::FL_DROPPED_ITEM;
 use mp_qshared::shared::connstate::connstate_t;
 use mp_qshared::shared::cvar::vmCvar_t;
@@ -4010,7 +4014,7 @@ pub fn StandardBotAI(
 // PORT-NOTE(fn-statics): Raven's function-local `static int local_time`/
 // `lastbotthink_time`/`botlib_residual` persist across calls; per ruling 1 they
 // home on GameGlobals (`local_time`/`lastbotthink_time`; `botlib_residual` is
-// dead in Raven and dropped). `BOT_THINK_TIME` is an unported ai_main.h const.
+// dead in Raven and dropped).
 pub fn BotAIStartFrame(
     ctx: GameContext<'_>,
     time: c_int,

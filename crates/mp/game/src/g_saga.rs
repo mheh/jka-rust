@@ -51,6 +51,19 @@ use mp_bg::weapons::weapon_t::WP_NUM_WEAPONS;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
+/// Raven `SIEGEITEM_STARTOFFRADAR` — spawnflag: siege item starts off the
+/// team radar.
+///
+/// Raven: file-local `#define` in `g_saga.c`, not a `bg_saga.h` header const.
+/// Source: `oracle/oracle/codemp/game/g_saga.c:15`
+const SIEGEITEM_STARTOFFRADAR: c_int = 8;
+
+/// Raven `SIEGE_ITEM_RESPAWN_TIME`.
+///
+/// Raven: file-local `#define` in `g_saga.c`, not a `bg_saga.h` header const.
+/// Source: `oracle/oracle/codemp/game/g_saga.c:1336`
+const SIEGE_ITEM_RESPAWN_TIME: c_int = 20000;
+
 /// Raven `G_SiegeRegisterWeaponsAndHoldables` — go through all classes on a
 /// team and register their weapons/items for precaching.
 ///

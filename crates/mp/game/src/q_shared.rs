@@ -20,6 +20,12 @@
 use crate::prelude::*;
 use mp_qshared::shared::{QFALSE, QTRUE};
 
+/// Raven `FOFS(targetname)` — `#define FOFS(x) ((int)&(((gentity_t *)0)->x))`,
+/// specialized to the `targetname` field for `G_Find` call sites.
+///
+/// Source: `oracle/oracle/codemp/game/g_local.h:1511`
+pub const FOFS_targetname: c_int = core::mem::offset_of!(gentity_t, targetname) as c_int;
+
 // ---------------------------------------------------------------------
 // Local helpers mirroring libc, faithful to the unchecked C semantics used
 // throughout this file (`strlen`/`strchr`/`strcmp`/`tolower`/`toupper`/
@@ -790,6 +796,17 @@ pub fn Q_strncmp(s1: *const c_char, s2: *const c_char, n: c_int) -> c_int {
             }
         }
     }
+}
+
+/// C standard-library `strlen`, as called bare (not a Raven `Q_*` wrapper) at
+/// the `NPC_VehiclePrecache` GLA-name/animation.cfg path-splice site. Housed
+/// alongside the other `q_shared.c` string helpers per the file's existing
+/// string-fn family.
+///
+/// Source: `oracle/oracle/codemp/game/NPC_spawn.c` (`NPC_VehiclePrecache`,
+/// literal `strlen("/animation.cfg")` call).
+pub fn Q_strlen(string: *const c_char) -> usize {
+    unsafe { std::ffi::CStr::from_ptr(string).to_bytes().len() }
 }
 
 /// Raven `Q_stricmp`.

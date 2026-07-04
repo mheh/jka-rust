@@ -56,3 +56,6 @@ impl DecodeSysCallReturn for GPointContents {
         word as c_int
     }
 }
+
+/// Public alias for `GPointContentsArgs` supporting lowercase 'c' naming convention.
+pub type GPointcontentsArgs = GPointContentsArgs;

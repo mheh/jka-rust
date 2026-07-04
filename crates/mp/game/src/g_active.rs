@@ -53,7 +53,7 @@ const MASK_PLAYERSOLID: c_int = CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_
 
 // Raven `#define FALL_FADE_TIME 3000` (q_shared.h).
 // Source: `oracle/oracle/codemp/game/q_shared.h:2148`
-const FALL_FADE_TIME: c_int = 3000;
+pub const FALL_FADE_TIME: c_int = 3000;
 
 
 // MAT_*/SVF_*/PMF_SCOREBOARD now resolve via the crate prelude (pass-3 symbol

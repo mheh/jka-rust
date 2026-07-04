@@ -66,6 +66,13 @@ pub struct GameWorld {
     /// `PmoveContext` each call.
     /// Source: `crate::bg_channel::BgState`
     pub bg_state: crate::bg_channel::BgState,
+
+    /// `g_misc.c` file-scope `refTagOwnerMap[MAX_TAG_OWNERS]` (fork ruling 1:
+    /// file-scope mutable globals become GameWorld fields, grouped by owning
+    /// .c file).
+    /// Source: `oracle/oracle/codemp/game/g_misc.c:2886`
+    pub refTagOwnerMap:
+        Box<[crate::level::tag_owner::tagOwner_t; crate::level::tag_owner::MAX_TAG_OWNERS]>,
 }
 
 impl GameWorld {
@@ -84,6 +91,9 @@ impl GameWorld {
         let clients = native_platform::zeroed_box::<[gclient_t; MAX_CLIENTS]>();
         let level = *native_platform::zeroed_box::<level_locals_t>();
         let memoryPool = native_platform::zeroed_box::<[u8; 262144]>();
+        let refTagOwnerMap = native_platform::zeroed_box::<
+            [crate::level::tag_owner::tagOwner_t; crate::level::tag_owner::MAX_TAG_OWNERS],
+        >();
         GameWorld {
             level,
             entities,
@@ -103,6 +113,7 @@ impl GameWorld {
             allocPoint: 0,
             // Zeroed session state with the LCG seeded to Raven's `holdrand`.
             bg_state: crate::bg_channel::BgState::new(),
+            refTagOwnerMap,
         }
     }
 }

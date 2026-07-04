@@ -1170,7 +1170,7 @@ pub fn NPC_Spawn_Do(
         (*newent).alliedTeam = (*ent).alliedTeam;
         (*newent).teamnodmg = (*ent).teamnodmg;
         if !(*ent).team.is_null() && *(*ent).team != 0 {
-            (*(*newent).client).sess.sessionTeam = crate::q_shared::atoi((*ent).team as *const c_char);
+            (*(*newent).client).sess.sessionTeam = crate::bg_lib::atoi((*ent).team as *const c_char);
         } else if (*newent).s.teamowner != TEAM_FREE {
             (*(*newent).client).sess.sessionTeam = (*newent).s.teamowner;
         } else if (*newent).alliedTeam != TEAM_FREE {

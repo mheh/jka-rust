@@ -65,6 +65,13 @@ use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 // "the pm_* float constants can stay consts").
 // Source: `oracle/oracle/codemp/game/bg_pmove.c:41-55`
 pub const pm_stopspeed: f32 = 100.0;
+pub const pm_duckScale: f32 = 0.50;
+pub const pm_swimScale: f32 = 0.50;
+pub const pm_vehicleaccelerate: f32 = 36.0;
+pub const pm_accelerate: f32 = 10.0;
+pub const pm_airaccelerate: f32 = 1.0;
+pub const pm_wateraccelerate: f32 = 4.0;
+pub const pm_flyaccelerate: f32 = 8.0;
 pub const pm_friction: f32 = 6.0;
 pub const pm_waterfriction: f32 = 1.0;
 pub const pm_spectatorfriction: f32 = 5.0;
@@ -83,6 +90,19 @@ pub const FLY_HOVER: c_int = 3;
 pub const MINS_Z: c_int = -24;
 /// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
 pub const MIN_WALK_NORMAL: f32 = 0.7;
+/// `TIMER_LAND`. Source: `oracle/oracle/codemp/game/bg_local.h:7`
+pub const TIMER_LAND: c_int = 130;
+/// `USE_DELAY` — local `#define` at its single call site in `PM_Use`.
+/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4557`
+pub const USE_DELAY: c_int = 2000;
+/// `JUMP_OFF_WALL_SPEED` — local `#define` at its single call site in
+/// `PM_AdjustAngleForWallJump`.
+/// Source: `oracle/oracle/codemp/game/bg_pmove.c:1600`
+pub const JUMP_OFF_WALL_SPEED: f32 = 200.0;
+/// `SLOPE_RECALC_INT` — local `#define` at its single call site in
+/// `PM_AdjustStandAnimForSlope`.
+/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4802`
+pub const SLOPE_RECALC_INT: c_int = 100;
 /// `SURF_SLICK`. Source: `oracle/oracle/codemp/game/surfaceflags.h:39`
 const SURF_SLICK: c_int = 0x0000_4000;
 /// `CONTENTS_LAVA|WATER|SLIME`. Source: `oracle/oracle/codemp/game/surfaceflags.h:11,12,30`

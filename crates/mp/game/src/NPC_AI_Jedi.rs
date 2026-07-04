@@ -2309,10 +2309,10 @@ pub fn Jedi_CheckFlipEvasions(
             let fwdAngles: vec3_t = [0.0, (*client).ps.viewangles[YAW as usize], 0.0];
             crate::q_math::AngleVectors(fwdAngles, None, Some(&mut right), None);
 
-            // PORT-NOTE(BG_AnimLength): resolved as a PmoveContext method; no
-            // game-tier PmoveContext receiver available here — transcribed as a
-            // free-fn call for the fixer to reconcile.
+            // PORT-NOTE(BG_AnimLength): resolved as a free-function that takes
+            // a reference to the BgState from GameWorld.
             animLength = crate::bg_panimate::BG_AnimLength(
+                &(*world).bg_state,
                 (*self_).localAnimIndex,
                 (*client).ps.legsAnim as c_int,
             ) as f32;
