@@ -332,6 +332,13 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
         o.append("- entity access stays the faithful `baseEnt`/`entSize` overlay "
                  "(`PM_BGEntForNum`, ruling 14); the confined `unsafe` deref lives in the "
                  "pmove methods.")
+        o.append("- **gentity-only fields from bg** (`inuse`, `takedamage`, `classname`, "
+                 "`r.*`, `client`, …): the overlay pointer is the HEAD of the real "
+                 "`gentity_t` — cast it, exactly as Raven does: "
+                 "`let g = self.bg_ent_for_num(n) as *mut gentity_t;` then "
+                 "`(*g).inuse` etc. inside the existing unsafe. This is the NORMAL "
+                 "ruling-14 idiom, not a gap: such fields are NEVER missing_symbols "
+                 "and never PORT-NOTEs unless the cast target type itself is in doubt.")
     else:  # qshared
         o.append("qshared-tier helpers are below the bg channel. The only stateful one is "
                  "the fork-3 LCG: it lives in `BgState.rng` (ruling 15) and is reached by "

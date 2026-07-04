@@ -24,7 +24,7 @@ const STYLE = `HOUSE RULES: doc-comment + Source cite on every item (oracle/orac
 
 // Zero-park: nothing stops a porter. Rulings 1-20 are all settled (docs/handoffs/jampgame-fork-discovery.md).
 const ZERO_PARK = `ZERO-PARK POLICY (supersedes the pass-1/2 park protocol): every fn in your packet gets a real body. NOTHING blocks you:
-- Symbol/type/const does not exist yet -> write the call/reference EXACTLY as the packet cites it anyway, and report it in missing_symbols. A fixer ports the symbol; you do not wait, do not stub, do not invent an alternative.
+- Symbol/type/const does not exist yet -> write the call/reference EXACTLY as the packet cites it anyway, and report it in missing_symbols. A fixer ports the symbol; you do not wait, do not stub, do not invent an alternative. ONLY free-standing consts/types/fns qualify as missing symbols — STRUCT FIELDS NEVER DO (a field you cannot reach means you are on the wrong receiver type: use the packet's overlay/cast idiom, e.g. bgEntity_t -> *mut gentity_t per ruling 14, and note it with PORT-NOTE if unsure). File paths are never symbols.
 - Genuinely ambiguous logic site -> transcribe the most LITERAL faithful reading and tag the line above with // PORT-NOTE(<topic>): <one line>. Notes are audited later; todo!() is FORBIDDEN in your output except where the packet itself says a fn is deferred-by-ruling (ICARUS internals etc.).
 - Cross-file signature looks wrong -> the packet's resolved signature is LAW; write your call site to match it and report the discrepancy in shape_mismatches. Never re-declare, never adjust a callee.`
 
@@ -54,6 +54,9 @@ const symbolFixers = new Map()   // symbol name -> promise; N reporters share ON
 const symbolsFixed = []
 let symChain = Promise.resolve()
 function fixSymbol(sym) {
+  // Input discipline (trial finding): fields, paths, and member-access shapes
+  // are not symbols — log and skip instead of spawning a no-op fixer.
+  if (sym.kind === 'file' || /[./\\]/.test(sym.name)) { log(`sym-skip (not a symbol): ${sym.name}`); return Promise.resolve(null) }
   if (!symbolFixers.has(sym.name)) {
     const run = () => agent(
       `SYMBOL FIXER (resolver contract — you resolve symbols, never logic). Worktree ${WT}, branch skeleton. The symbol \`${sym.name}\` (${sym.kind || 'unknown kind'}${sym.source ? ', oracle: ' + sym.source : ''}) is referenced by freshly-ported jampgame bodies but does not resolve.
@@ -88,9 +91,11 @@ const reports = [], anomalies = []
 const results = await parallel(files.map(p => async () => {
   if (budget.total && budget.remaining() < 150_000) { log(`BUDGET GUARD: skipping ${p.packet}`); return null }
   const model = tierFor(p)
+  // Manifest packet field may already carry the packets/ prefix — normalize (trial finding).
+  const pktFile = `${PKT}/${String(p.packet).replace(/^packets\//, '')}`
   const prompt =
 `Pass-3 BLIND PORTER for ${p.packet} (${p.fns} fns, ${p.loc} LOC of ${p.file}). Worktree ${WT}, branch skeleton.
-YOUR ENTIRE INPUT: (1) packet ${PKT}/${p.packet} — rulings digest (LAW: forks 1-20 all settled), cited oracle source for your fns, final resolved Rust signatures of everything you call, threading digest (ctx/PmoveContext/BgTraps/GameCallbacks per fn), state field map, va/printf mapping table; (2) your module under ${WT}/crates/mp/game/src/. Read nothing else, explore nothing, never run cargo.
+YOUR ENTIRE INPUT: (1) packet ${pktFile} — rulings digest (LAW: forks 1-20 all settled), cited oracle source for your fns, final resolved Rust signatures of everything you call, threading digest (ctx/PmoveContext/BgTraps/GameCallbacks per fn), state field map, va/printf mapping table; (2) your module under ${WT}/crates/mp/game/src/. Read nothing else, explore nothing, never run cargo.
 ${ZERO_PARK}
 ${DISCIPLINE}
 ${STYLE}
