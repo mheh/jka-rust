@@ -101,6 +101,79 @@ TRAP_MAP = {
 
 VEC = {"vec3_t", "vec5_t", "vec4_t", "vec2_t"}
 
+# ---- vec3 macro out-slots (fork 9): a param written ONLY through one of these
+# macros is still a WRITTEN out-param (`&mut`), not a read-only by-value input.
+# Slot = 0-based index of the macro argument the macro ASSIGNS INTO. Verified
+# against oracle/oracle/codemp/game/q_shared.h:1358-1365 (Subtract/Add/Scale/
+# Copy/MA), 1397-1399 (Clear/Set), 1578-1579 (VectorNormalize mutates its one
+# arg in place and returns the length; VectorNormalize2 writes arg 1).
+VEC_MACRO_OUT = {
+    "VectorCopy": 1,        # VectorCopy(a, OUT)          q_shared.h:1363
+    "VectorSubtract": 2,    # VectorSubtract(a, b, OUT)   q_shared.h:1359
+    "VectorAdd": 2,         # VectorAdd(a, b, OUT)        q_shared.h:1360
+    "VectorScale": 2,       # VectorScale(v, s, OUT)      q_shared.h:1361
+    "VectorMA": 3,          # VectorMA(v, s, b, OUT)      q_shared.h:1365
+    "VectorSet": 0,         # VectorSet(OUT, x, y, z)     q_shared.h:1399
+    "VectorClear": 0,       # VectorClear(OUT)            q_shared.h:1397
+    "VectorNormalize": 0,   # VectorNormalize(INOUT)      q_shared.h:1578
+    "VectorNormalize2": 1,  # VectorNormalize2(in, OUT)   q_shared.h:1579
+}
+VEC_MACRO_RE = re.compile(
+    r"\b(" + "|".join(sorted(VEC_MACRO_OUT, key=len, reverse=True)) + r")\s*\(")
+
+
+def _macro_args(text, lparen):
+    """Split the top-level comma-separated args of the call whose '(' is at
+    `lparen`. Returns None on an unterminated call (sliced-off body tail)."""
+    depth = 0
+    args, start = [], lparen + 1
+    for i in range(lparen, len(text)):
+        c = text[i]
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                args.append(text[start:i])
+                return args
+        elif c == "," and depth == 1:
+            args.append(text[start:i])
+            start = i + 1
+    return None
+
+
+def written_vec3_params(cfile, f):
+    """Names of this fn's non-const vec-family params that the oracle body
+    writes through a vec3 macro's out-slot (the repeated misclassification:
+    such a param IS written — `&mut` — even with no direct `p[i] =` store)."""
+    cand = {p["name"] for p in f["params"]
+            if "const" not in p["type"]
+            and p["type"].replace("const", "").strip() in VEC}
+    if not cand:
+        return set()
+    body = strip_comments(body_text(cfile, f))
+    written = set()
+    for m in VEC_MACRO_RE.finditer(body):
+        args = _macro_args(body, m.end() - 1)
+        slot = VEC_MACRO_OUT[m.group(1)]
+        if args is None or slot >= len(args):
+            continue
+        a = args[slot].strip()
+        a = re.sub(r"^\(\s*|\s*\)$", "", a).strip()   # unwrap `(name)`
+        if a in cand:
+            written.add(a)
+    return written
+
+
+def flip_vec3_out_params(params_text, written):
+    """Rewrite a parked stub's by-value `name: vecN_t` to `name: &mut vecN_t`
+    for macro-out-written params. Only OPEN (todo!()) stubs are rewritten —
+    a filled body's actual shape still outranks the classifier."""
+    for n in sorted(written):
+        params_text = re.sub(rf"\b{re.escape(n)}\s*:\s*(vec[2-5]_t)\b",
+                             rf"{n}: &mut \1", params_text)
+    return params_text
+
 
 # --------------------------------------------------------- open-fn scanner
 def scan_open():
@@ -138,8 +211,14 @@ def extract_rulings():
 
 
 # ------------------------------------------------------ per-fn analysis bits
+_SRC_LINES = {}
+
+
 def body_text(cfile, f):
-    lines = (GAME / cfile).read_text(errors="replace").splitlines()
+    lines = _SRC_LINES.get(cfile)
+    if lines is None:
+        lines = (GAME / cfile).read_text(errors="replace").splitlines()
+        _SRC_LINES[cfile] = lines
     return "\n".join(lines[f["line"] - 1:f["end_line"]])
 
 
@@ -166,7 +245,7 @@ def entid_fields_in(body):
     return hit
 
 
-def vec3_notes(f):
+def vec3_notes(cfile, f):
     outs = []
     for p in f["params"]:
         t = p["type"]; base = t.replace("const", "").strip()
@@ -174,11 +253,18 @@ def vec3_notes(f):
             outs.append((p["name"], t, "const" in t))
     if not outs:
         return None
+    written = written_vec3_params(cfile, f)
     lines = []
     for n, t, ro in outs:
         if ro:
             lines.append(f"    - `{n}: {t}` — `const` in the oracle → read-only, keep "
                          f"`[f32;3]` by value.")
+        elif n in written:
+            lines.append(f"    - `{n}: {t}` — **WRITTEN** through a vec3 macro out-slot "
+                         f"(VectorCopy/Subtract/Add/Scale/MA/Set/Clear/Normalize) → "
+                         f"fork-9 out-param: `&mut [f32;3]` (the resolved signature "
+                         f"carries `&mut`) — write through it; a VectorNormalize-style "
+                         f"mutate+return is `&mut` + scalar return.")
         else:
             lines.append(f"    - `{n}: {t}` — C array (decays to a pointer). **The "
                          f"resolved signature above is LAW**: if it kept `{n}` by value "
@@ -229,11 +315,25 @@ def main():
     for v in byfile.values():
         v.sort(key=lambda f: f["line"])
 
+    # per-name macro-out-written vec params (first manifest def wins, matching
+    # the `wt` first-record-wins convention). Drives the parked-stub sig flip.
+    written_by_name = {}
+    for f in F:
+        written_by_name.setdefault(f["name"], written_vec3_params(f["file"], f))
+
+    def open_params(name, r):
+        """Collapsed param text; a parked stub's by-value vec params flip to
+        `&mut` when the oracle body writes them via a vec3 macro out-slot."""
+        params = re.sub(r"\s+", " ", r["params"]).strip()
+        if r["parked"]:
+            params = flip_vec3_out_params(params, written_by_name.get(name, ()))
+        return params
+
     def wt_sig(name):
         r = wt.get(name)
         if r is None:
             return None
-        params = re.sub(r"\s+", " ", r["params"]).strip()
+        params = open_params(name, r)
         ret = r["ret"].strip()
         return f"pub fn {name}({params}){(' ' + ret) if ret else ''}".rstrip()
 
@@ -244,7 +344,7 @@ def main():
         r = wt.get(name)
         if r is None:
             return None
-        params = re.sub(r"\s+", " ", r["params"]).strip()
+        params = open_params(name, r)
         ret = r["ret"].strip()
         selfp = "&mut self" + (", " + params if params else "")
         return f"pub fn {name}({selfp}){(' ' + ret) if ret else ''}".rstrip()
@@ -290,7 +390,7 @@ def main():
             return None
         info = ctx_by_name.get(name, {})
         # drop any trailing comma so appending the bg param never doubles it
-        params = re.sub(r"\s+", " ", r["params"]).strip().rstrip(",").strip()
+        params = open_params(name, r).rstrip(",").strip()
         # `&mut` when the fn (or a bg/qshared callee, e.g. BG_TempAlloc) writes
         # state; `&BgState` only when the whole reachable effect is read-only.
         bgref = "&mut BgState" if info.get("state_mut") else "&BgState"
@@ -593,7 +693,7 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
             o.append(f"- **fn-ptr dispatch writes:** {fps} — assign the matching "
                      "`EntThink`/`EntUse`/`EntTouch`/`EntDie`/`EntPain`/`EntReached`/"
                      "`EntBlocked` enum variant (see `ent_fn_enums.rs`), not a raw fn ptr.")
-        vn = vec3_notes(f)
+        vn = vec3_notes(cfile, f)
         if vn:
             o.append("- **fork-9 vec3 params:**")
             o.append(vn)
