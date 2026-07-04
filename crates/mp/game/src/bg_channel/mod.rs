@@ -19,6 +19,9 @@ pub mod game_callbacks;
 pub mod game_impl;
 pub mod pmove_context;
 pub mod rng;
+pub mod traps {
+    pub use super::game_impl::GameBgTraps;
+}
 
 pub use bg_state::BgState;
 pub use bg_traps::BgTraps;

@@ -1,15 +1,17 @@
-// PORT-COMPLETE: NPC_AI_Interrogator.c 9/10
+// PORT-COMPLETE: NPC_AI_Interrogator.c 10/10
 //! Faithful port of `oracle/oracle/codemp/game/NPC_AI_Interrogator.c` (jampgame mega-pass).
 //!
 //! Interrogator droid NPC AI behavior: idle, patrol, hunt, strafe, melee attack.
 //!
-//! One function (`Interrogator_Strafe`) is parked due to trap_Trace requiring
-//! an `&Engine` handle which these context-free AI functions don't have access to.
+//! All functions are now filled per pass-3 rulings: ai-context globals (NPC, NPCInfo, ucmd, level)
+//! are threaded via GameContext; stored enemy/goalEntity fields use Option<EntityId>; traps via
+//! ctx.engine; RNG via BgState; vec3 helpers use reshaped q_math signatures.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
 use crate::g_utils::{G_EffectIndex, G_SoundIndex};
 use crate::q_math::Q_irand;
+use crate::trap;
 
 /// Local state enums for Interrogator blade movement.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:8-13`
@@ -251,80 +253,320 @@ pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(trap-no-engine): `Interrogator_Strafe` calls `trap_Trace`
-// which requires an `&Engine` handle; faithful context-free signature carries
-// no threading mechanism to reach it (see NPC_utils.rs precedent).
 /// Raven `Interrogator_Strafe`.
 ///
 /// Perform a strafe movement away from the target.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:238-279`
 pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
-    todo!("Port Interrogator_Strafe — parked: trap-no-engine")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        let base = (*ctx.world).entities.as_mut_ptr();
+
+        let mut end: vec3_t = [0.0; 3];
+        let mut right: vec3_t = [0.0; 3];
+        let mut tr: trace_t = core::mem::zeroed();
+
+        crate::q_math::AngleVectors(
+            (*(*npc).client).renderInfo.eyeAngles,
+            None,
+            Some(&mut right),
+            None,
+        );
+
+        // Pick a random strafe direction, then check to see if doing a strafe would be
+        // reasonable valid
+        let dir = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 { -1 } else { 1 };
+        crate::q_math::_VectorMA((*npc).r.currentOrigin, (HUNTER_STRAFE_DIS * dir) as f32, right, &mut end);
+
+        trap::Trace(
+            ctx.engine,
+            mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &(*npc).r.currentOrigin as *const vec3_t,
+                core::ptr::null(),
+                core::ptr::null(),
+                &end as *const vec3_t,
+                (*npc).s.number,
+                MASK_SOLID,
+            ),
+        );
+
+        // Close enough
+        if tr.fraction > 0.9f32 {
+            crate::q_math::_VectorMA(
+                (*(*npc).client).ps.velocity,
+                (HUNTER_STRAFE_VEL * dir) as f32,
+                right,
+                &mut (*(*npc).client).ps.velocity,
+            );
+
+            // Add a slight upward push
+            if (*npc).enemy.is_some() {
+                let enemy_ptr = match (*npc).enemy {
+                    Some(id) => base.add(id.index()),
+                    None => core::ptr::null_mut(),
+                };
+
+                if !enemy_ptr.is_null() {
+                    // Find the height difference
+                    let mut dif = ((*enemy_ptr).r.currentOrigin[2] + 32.0) - (*npc).r.currentOrigin[2];
+
+                    // cap to prevent dramatic height shifts
+                    if dif.abs() > 8.0 {
+                        dif = if dif < 0.0 { -(HUNTER_UPWARD_PUSH as f32) } else { HUNTER_UPWARD_PUSH as f32 };
+                    }
+
+                    (*(*npc).client).ps.velocity[2] += dif;
+                }
+            }
+
+            // Set the strafe start time
+            (*npc_info).standTime = (*ctx.world).level.time + 3000 + ((*ctx.world).bg_state.rng.random() * 500.0) as c_int;
+        }
+    }
 }
 
 /// Raven `Interrogator_Hunt`.
 ///
 /// Hunt the enemy, using strafe and movement.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:290-336`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
-pub fn Interrogator_Hunt(
-    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
-    todo!("Port Interrogator_Hunt — parked: ai-context")
+pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        let base = (*ctx.world).entities.as_mut_ptr();
+
+        Interrogator_PartsMove(ctx);
+
+        crate::NPC_utils::NPC_FaceEnemy(ctx, 0);
+
+        // If we're not supposed to stand still, pursue the player
+        if (*npc_info).standTime < (*ctx.world).level.time {
+            // Only strafe when we can see the player
+            if visible != 0 {
+                Interrogator_Strafe(ctx);
+                if (*npc_info).standTime > (*ctx.world).level.time {
+                    // successfully strafed
+                    return;
+                }
+            }
+        }
+
+        // If we don't want to advance, stop here
+        if advance == 0 {
+            return;
+        }
+
+        let mut forward: vec3_t = [0.0; 3];
+        let mut distance: f32 = 0.0;
+
+        // Only try and navigate if the player is visible
+        if visible == 0 {
+            // Move towards our goal
+            (*npc_info).goalEntity = match (*npc).enemy {
+                Some(id) => Some(id),
+                None => None,
+            };
+            (*npc_info).goalRadius = 12;
+
+            // Get our direction from the navigator if we can't see our target
+            if crate::NPC_move::NPC_GetMoveDirection(ctx, forward, &mut distance as *mut f32) == 0 {
+                return;
+            }
+        } else {
+            crate::q_math::_VectorSubtract(
+                match (*npc).enemy {
+                    Some(id) => (*base.add(id.index())).r.currentOrigin,
+                    None => (*npc).r.currentOrigin,
+                },
+                (*npc).r.currentOrigin,
+                &mut forward,
+            );
+            distance = crate::q_math::VectorNormalize(&mut forward);
+        }
+
+        let speed = HUNTER_FORWARD_BASE_SPEED as f32 + (HUNTER_FORWARD_MULTIPLIER as f32) * (*ctx.world).cvars.g_spskill.integer as f32;
+        crate::q_math::_VectorMA(
+            (*(*npc).client).ps.velocity,
+            speed,
+            forward,
+            &mut (*(*npc).client).ps.velocity,
+        );
+    }
 }
 
 /// Raven `Interrogator_Melee`.
 ///
 /// Perform melee attack if close enough and within height range.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:345-374`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
-pub fn Interrogator_Melee(
-    ctx: GameContext<'_>,visible: qboolean, advance: qboolean) {
-    todo!("Port Interrogator_Melee — parked: ai-context")
+pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        let base = (*ctx.world).entities.as_mut_ptr();
+
+        if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
+            let enemy_ptr = match (*npc).enemy {
+                Some(id) => base.add(id.index()),
+                None => core::ptr::null_mut(),
+            };
+
+            if !enemy_ptr.is_null() {
+                // Make sure that we are within the height range before we allow any damage to happen
+                if (*npc).r.currentOrigin[2] >= (*enemy_ptr).r.currentOrigin[2] + (*enemy_ptr).r.mins[2]
+                    && (*npc).r.currentOrigin[2] + (*npc).r.mins[2] + 8.0
+                        < (*enemy_ptr).r.currentOrigin[2] + (*enemy_ptr).r.maxs[2]
+                {
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        npc,
+                        c"attackDelay".as_ptr(),
+                        (*ctx.world).bg_state.rng.Q_irand(500, 3000),
+                    );
+                    let mut dir = [0.0f32; 3];
+                    crate::g_combat::G_Damage(
+                        ctx,
+                        enemy_ptr,
+                        npc,
+                        npc,
+                        &mut dir,
+                        [0.0f32; 3],
+                        2,
+                        DAMAGE_NO_KNOCKBACK,
+                        MOD_MELEE,
+                    );
+
+                    crate::g_utils::G_Sound(
+                        ctx,
+                        npc,
+                        CHAN_AUTO,
+                        crate::g_utils::G_SoundIndex(
+                            c"sound/chars/interrogator/misc/torture_droid_inject.mp3".as_ptr(),
+                        ),
+                    );
+                }
+            }
+        }
+
+        if (*npc_info).scriptFlags & SCF_CHASE_ENEMIES != 0 {
+            Interrogator_Hunt(ctx, visible, advance);
+        }
+    }
 }
 
 /// Raven `Interrogator_Attack`.
 ///
 /// Main attack function - handles distance, visibility, and attack selection.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:381-428`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Interrogator_Attack(ctx: GameContext<'_>) {
-    todo!("Port Interrogator_Attack — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        // Always keep a good height off the ground
+        Interrogator_MaintainHeight(ctx);
+
+        // randomly talk
+        if crate::g_timer::TIMER_Done(ctx, npc, c"patrolNoise".as_ptr()) != 0 {
+            if crate::g_timer::TIMER_Done(ctx, npc, c"angerNoise".as_ptr()) != 0 {
+                crate::g_utils::G_SoundOnEnt(
+                    ctx,
+                    npc,
+                    CHAN_AUTO,
+                    c"sound/chars/probe/misc/talk.wav".as_ptr(),
+                );
+
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    npc,
+                    c"patrolNoise".as_ptr(),
+                    (*ctx.world).bg_state.rng.Q_irand(4000, 10000),
+                );
+            }
+        }
+
+        // If we don't have an enemy, just idle
+        if crate::NPC_utils::NPC_CheckEnemyExt(ctx, 0) == 0 {
+            Interrogator_Idle(ctx);
+            return;
+        }
+
+        // Rate our distance to the target, and our visibility
+        let distance = (crate::q_math::DistanceHorizontalSquared(
+            (*npc).r.currentOrigin,
+            match (*npc).enemy {
+                Some(id) => {
+                    let base = (*ctx.world).entities.as_mut_ptr();
+                    (*base.add(id.index())).r.currentOrigin
+                }
+                None => (*npc).r.currentOrigin,
+            },
+        )) as c_int;
+
+        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, match (*npc).enemy {
+            Some(id) => {
+                let base = (*ctx.world).entities.as_mut_ptr();
+                base.add(id.index())
+            }
+            None => core::ptr::null_mut(),
+        });
+
+        let mut advance = if distance > MIN_DISTANCE * MIN_DISTANCE { 1 } else { 0 };
+
+        if visible == 0 {
+            advance = 1;
+        }
+
+        if (*npc_info).scriptFlags & SCF_CHASE_ENEMIES != 0 {
+            Interrogator_Hunt(ctx, visible, advance);
+        }
+
+        crate::NPC_utils::NPC_FaceEnemy(ctx, 1);
+
+        if advance == 0 {
+            Interrogator_Melee(ctx, visible, advance);
+        }
+    }
 }
 
 /// Raven `Interrogator_Idle`.
 ///
 /// Idle behavior - check for stealth enemies and maintain height.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:435-447`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Interrogator_Idle(ctx: GameContext<'_>) {
-    todo!("Port Interrogator_Idle — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+
+        if crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth(ctx) != 0 {
+            crate::g_utils::G_SoundOnEnt(
+                ctx,
+                npc,
+                CHAN_AUTO,
+                c"sound/chars/mark1/misc/anger.wav".as_ptr(),
+            );
+            crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1);
+            return;
+        }
+
+        Interrogator_MaintainHeight(ctx);
+
+        crate::NPC_AI_Default::NPC_BSIdle(ctx);
+    }
 }
 
 /// Raven `NPC_BSInterrogator_Default`.
 ///
 /// Default behavior state selector - attacks if enemy present, otherwise idles.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:454-467`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn NPC_BSInterrogator_Default(ctx: GameContext<'_>) {
-    todo!("Port NPC_BSInterrogator_Default — parked: ai-context")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+
+        if (*npc).enemy.is_some() {
+            Interrogator_Attack(ctx);
+        } else {
+            Interrogator_Idle(ctx);
+        }
+    }
 }

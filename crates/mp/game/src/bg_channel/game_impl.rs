@@ -21,15 +21,22 @@ use crate::prelude::*;
 use super::bg_traps::BgTraps;
 use super::game_callbacks::GameCallbacks;
 
-/// The game-side `BgTraps` implementation: a thin borrow of the one `Engine`
-/// handle, over which the `crate::trap` wrappers issue syscalls.
+/// The game-side `BgTraps` implementation: holds the `GameContext` from which
+/// engine syscalls are issued via `crate::trap` wrappers.
 pub struct GameBgTraps<'a> {
-    pub engine: &'a Engine,
+    pub ctx: GameContext<'a>,
 }
 
 impl<'a> GameBgTraps<'a> {
     pub fn new(engine: &'a Engine) -> Self {
-        Self { engine }
+        // Create a temporary GameContext just for the engine; world is unreachable
+        // from BgTraps methods (ruling 13 seam boundary).
+        Self {
+            ctx: GameContext {
+                world: std::ptr::null_mut(),
+                engine,
+            },
+        }
     }
 }
 
@@ -53,7 +60,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Real delegation — the pmove slice's PM_SetWaterLevel drives this.
         // Raven: `trap_PointContents` (`G_POINT_CONTENTS`).
         use mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs;
-        crate::trap::PointContents(self.engine, GPointContentsArgs::new(point, passEntityNum))
+        crate::trap::PointContents(self.ctx.engine, GPointContentsArgs::new(point, passEntityNum))
     }
 
     fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
@@ -63,17 +70,17 @@ impl BgTraps for GameBgTraps<'_> {
         // Mechanical delegation (ruling 13) — matches the proven `pointcontents`
         // shape. Raven: `trap_FS_Read` (`G_FS_READ`).
         use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
-        crate::trap::FS_Read(self.engine, GFsReadArgs::new(buffer as *mut u8, len, f))
+        crate::trap::FS_Read(self.ctx.engine, GFsReadArgs::new(buffer as *mut u8, len, f))
     }
     fn fs_write(&self, buffer: *const c_void, len: c_int, f: fileHandle_t) {
         // Raven: `trap_FS_Write` (`G_FS_WRITE`).
         use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
-        crate::trap::FS_Write(self.engine, GFsWriteArgs::new(buffer as *const u8, len, f))
+        crate::trap::FS_Write(self.ctx.engine, GFsWriteArgs::new(buffer as *const u8, len, f))
     }
     fn fs_fclose(&self, f: fileHandle_t) {
         // Raven: `trap_FS_FCloseFile` (`G_FS_FCLOSE_FILE`).
         use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
-        crate::trap::FS_FCloseFile(self.engine, GFsFcloseFileArgs::new(f as c_int))
+        crate::trap::FS_FCloseFile(self.ctx.engine, GFsFcloseFileArgs::new(f as c_int))
     }
     fn fs_getfilelist(
         &self,
@@ -217,7 +224,7 @@ impl BgTraps for GameBgTraps<'_> {
         // Raven: `trap_SnapVector` (`G_SNAPVECTOR`); the `vec3_t*` is the caller's
         // 3-float buffer (`*mut f32` head == `*mut [f32;3]`).
         use mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs;
-        crate::trap::SnapVector(self.engine, GSnapvectorArgs::new(v as *mut vec3_t))
+        crate::trap::SnapVector(self.ctx.engine, GSnapvectorArgs::new(v as *mut vec3_t))
     }
     fn cvar_register(
         &self,

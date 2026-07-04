@@ -306,13 +306,10 @@ pub fn VEH_TurretFindEnemies(
                         && Q_stricmp((*target).NPC_targetname, (*parent).targetname) != 0)
                 {
                     // not in invicible bbrush, but can only be broken by an NPC that is not me
+                    let s = cstr("misc_turret");
                     if (*target).s.weapon == crate::constants::WP_TURRET
                         && !(*target).classname.is_null()
-                        && Q_strncmp(
-                            (*target).classname,
-                            cstr("misc_turret").as_ptr(),
-                            11,
-                        ) == 0
+                        && Q_strncmp((*target).classname, s.as_ptr(), 11) == 0
                     {
                         // these guys we want to shoot at
                     } else {
@@ -332,7 +329,7 @@ pub fn VEH_TurretFindEnemies(
                 i += 1;
                 continue;
             }
-            if !(*parent).client.is_null() && !(*(*parent).client).sess.sessionTeam.is_null() {
+            if !(*parent).client.is_null() && (*(*parent).client).sess.sessionTeam != 0 {
                 if !(*target).client.is_null() {
                     if (*(*target).client).sess.sessionTeam == (*(*parent).client).sess.sessionTeam {
                         // A bot/client/NPC we don't want to shoot
@@ -462,10 +459,163 @@ pub fn VEH_TurretThink(
     parent: *mut gentity_t,
     turretNum: c_int,
 ) {
-    // PORT-ESCALATION(level-access): requires level.time for enemy hold time checks
-    // PORT-ESCALATION(trap-engine-access): requires Engine context to call trap::InPVS and trap::Trace syscalls
-    // PORT-ESCALATION(global-g-entities): g_entities global array access
-    // PORT-ESCALATION(global-g-gametype): g_gametype global cvar access
-    // PORT-ESCALATION(undefined-constants): ENTITYNUM_WORLD, ENTITYNUM_NONE, GT_TEAM, MASK_SHOT constants
-    todo!("Port VEH_TurretThink — parked: level-access + trap-engine-access + global-g-entities + global-g-gametype + undefined-constants")
+    unsafe {
+        let mut doAim: qboolean = qfalse;
+        let mut enemyDist: f32;
+        let mut rangeSq: f32;
+        let mut enemyDir = [0f32; 3];
+        let turretStats: *mut turretStats_t =
+            &mut (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize];
+        let mut vehWeapon: *mut vehWeaponInfo_t = core::ptr::null_mut();
+        let mut turretEnemy: *mut gentity_t = core::ptr::null_mut();
+        let mut curMuzzle: c_int = 0; // ?
+
+        if turretStats.is_null() || (*turretStats).iAmmoMax == 0 {
+            // not a valid turret
+            return;
+        }
+
+        if (*turretStats).passengerNum != 0
+            && (*pVeh).m_iNumPassengers >= (*turretStats).passengerNum
+        {
+            // the passenger that has control of this turret is on the ship
+            VEH_TurretObeyPassengerControl(ctx, pVeh, parent, turretNum);
+            return;
+        } else if (*turretStats).bAI == qfalse {
+            // try AI
+            // this turret does not think on its own.
+            return;
+        }
+        // okay, so it has AI, but still don't think if there's no pilot!
+        if (*pVeh).m_pPilot.is_null() {
+            return;
+        }
+
+        vehWeapon = &mut (*ctx.world).bg_state.g_vehWeaponInfo[(*turretStats).iWeapon as usize];
+        rangeSq = (*turretStats).fAIRange * (*turretStats).fAIRange;
+        curMuzzle = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
+
+        if (*pVeh).turretStatus[turretNum as usize].enemyEntNum < crate::constants::ENTITYNUM_WORLD {
+            turretEnemy = &mut (*(*ctx.world).entities.as_mut_ptr().add(
+                (*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize,
+            ));
+            if (*turretEnemy).health < 0
+                || (*turretEnemy).inuse == qfalse
+                || turretEnemy == (*pVeh).m_pPilot as *mut gentity_t
+                // enemy became my pilot///?
+                || turretEnemy == parent
+                || (*turretEnemy).r.ownerNum == (*parent).s.number // a passenger?
+                || (!(*turretEnemy).client.is_null()
+                    && (*(*turretEnemy).client).sess.sessionTeam == crate::constants::TEAM_SPECTATOR)
+            {
+                // don't keep going after spectators, pilot, self, dead people, etc.
+                turretEnemy = core::ptr::null_mut();
+                (*pVeh).turretStatus[turretNum as usize].enemyEntNum = crate::constants::ENTITYNUM_NONE;
+            }
+        }
+
+        if (*pVeh).turretStatus[turretNum as usize].enemyHoldTime < (*ctx.world).level.time {
+            if VEH_TurretFindEnemies(ctx, pVeh, parent, turretStats, turretNum, curMuzzle) != qfalse
+            {
+                turretEnemy = &mut (*(*ctx.world).entities.as_mut_ptr().add(
+                    (*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize,
+                ));
+                doAim = qtrue;
+            } else if !(*parent).enemy.is_none() {
+                if let Some(enemy_id) = (*parent).enemy {
+                    let enemy_ptr = (*ctx.world)
+                        .entities
+                        .as_mut_ptr()
+                        .add(enemy_id.0 as usize);
+                    if (*enemy_ptr).s.number < crate::constants::ENTITYNUM_WORLD {
+                        if (*ctx.world).cvars.g_gametype.integer < crate::constants::GT_TEAM
+                            || OnSameTeam(ctx, enemy_ptr, parent) == qfalse
+                        {
+                            // either not in a team game or the enemy isn't on the same team
+                            turretEnemy = enemy_ptr;
+                            doAim = qtrue;
+                        }
+                    }
+                }
+            }
+            if !turretEnemy.is_null() {
+                // found one
+                if !(*turretEnemy).client.is_null() {
+                    // hold on to clients for a min of 3 seconds
+                    (*pVeh).turretStatus[turretNum as usize].enemyHoldTime =
+                        (*ctx.world).level.time + 3000;
+                } else {
+                    // hold less
+                    (*pVeh).turretStatus[turretNum as usize].enemyHoldTime =
+                        (*ctx.world).level.time + 500;
+                }
+            }
+        }
+        if !turretEnemy.is_null() {
+            if (*turretEnemy).health > 0 {
+                // enemy is alive
+                WP_CalcVehMuzzle(ctx, parent, curMuzzle);
+                _VectorSubtract(
+                    (*turretEnemy).r.currentOrigin,
+                    (*pVeh).m_vMuzzlePos[curMuzzle as usize],
+                    &mut enemyDir,
+                );
+                enemyDist = VectorLengthSquared(enemyDir);
+
+                if enemyDist < rangeSq {
+                    // was in valid radius
+                    if trap::InPVS(
+                        ctx.engine,
+                        (*pVeh).m_vMuzzlePos[curMuzzle as usize],
+                        (*turretEnemy).r.currentOrigin,
+                    ) != qfalse
+                    {
+                        // Every now and again, check to see if we can even trace to the enemy
+                        let mut tr: trace_t = core::mem::zeroed();
+                        let mut start = [0f32; 3];
+                        let mut end = [0f32; 3];
+                        _VectorCopy((*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut start);
+
+                        _VectorCopy((*turretEnemy).r.currentOrigin, &mut end);
+                        trap::Trace(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                                &mut tr as *mut trace_t,
+                                &start as *const vec3_t,
+                                core::ptr::null(),
+                                core::ptr::null(),
+                                &end as *const vec3_t,
+                                (*parent).s.number,
+                                crate::constants::MASK_SHOT,
+                            ),
+                        );
+
+                        if tr.entityNum == (*turretEnemy).s.number
+                            || (!tr.allsolid && !tr.startsolid)
+                        {
+                            doAim = qtrue; // Can see our enemy
+                        }
+                    }
+                }
+            }
+        }
+
+        if doAim != qfalse {
+            let mut aimAngles = [0f32; 3];
+            if VEH_TurretAim(
+                ctx,
+                pVeh,
+                parent,
+                turretEnemy,
+                turretStats,
+                vehWeapon,
+                turretNum,
+                curMuzzle,
+                &mut aimAngles,
+            ) != qfalse
+            {
+                VEH_TurretCheckFire(ctx, pVeh, parent, turretStats, vehWeapon, turretNum, curMuzzle);
+            }
+        }
+    }
 }

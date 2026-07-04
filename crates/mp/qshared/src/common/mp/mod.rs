@@ -7,6 +7,7 @@ pub mod ent_fn_ids;
 pub mod entity_id;
 pub mod game;
 pub mod gentity;
+pub mod playerstate;
 pub mod qcommon;
 pub mod trace_t;
 pub mod ui;
