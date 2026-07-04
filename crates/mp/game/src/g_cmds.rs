@@ -50,8 +50,10 @@ const qfalse: qboolean = 0;
 /// A small owned `CString` for a `trap_SendServerCommand` literal-command path
 /// (mirrors `g_active`'s helper). Used where Raven passes a plain string
 /// literal — the format-string `va(...)` callers stay parked on `variadic-c-abi`.
+///
+/// Source: `oracle/oracle/codemp/game/g_cmds.c`
 #[inline]
-fn cstr(s: &str) -> std::ffi::CString {
+pub fn cstr(s: &str) -> std::ffi::CString {
     std::ffi::CString::new(s).unwrap()
 }
 

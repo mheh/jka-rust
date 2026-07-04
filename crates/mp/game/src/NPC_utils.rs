@@ -66,10 +66,6 @@ const VALID_ATTACK_CONE: f32 = 2.0;
 // Source: `oracle/oracle/codemp/game/b_local.h:29`
 const MIN_ANGLE_ERROR: f32 = 0.01;
 
-// Raven `#define Q3_SCRIPT_DIR "scripts"` (`q_shared.h`).
-// Source: `oracle/oracle/codemp/game/q_shared.h:10`
-const Q3_SCRIPT_DIR: &str = "scripts";
-
 // Raven `#define Q3_INFINITE 16777216` (`g_public.h`).
 // Source: `oracle/oracle/codemp/game/g_public.h:9`
 const Q3_INFINITE: f32 = 16777216.0;

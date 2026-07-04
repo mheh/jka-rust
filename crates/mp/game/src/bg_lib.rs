@@ -8,6 +8,10 @@
 
 use crate::prelude::*;
 
+// Re-export `random` and `crandom` from q_math so callers using
+// `crate::bg_lib::random()` can resolve through this module.
+pub use crate::q_math::{crandom, random};
+
 /// `cmp_t` — comparison function pointer.
 ///
 /// Signature: `int (*)(const void *, const void *)`

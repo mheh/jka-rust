@@ -52,6 +52,7 @@ pub use mp_bg::public::set_anim::*;
 pub use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_TURRETS, VEHICLE_BASE, VEHICLE_NONE};
 pub use mp_bg::vehicles::vehicle_type_t::vehicleType_t::*;
 pub use mp_bg::weapons::weapon_t::*;
+pub use mp_bg::weapons::weaponData;
 pub use mp_qshared::shared::force_powers::*;
 pub use mp_qshared::shared::limits::*;
 pub use mp_qshared::shared::sound_channel::*;
@@ -61,8 +62,8 @@ pub use mp_qshared::common::mp::qcommon::pm_flags::*;
 // Pass-3 symbol backfill: game-crate-local const families that were ported
 // but never wired into the prelude glob (see `docs/porting-rules.md` §E13).
 pub use crate::bg_misc::{
-    bgForcePowerCost, bgForcePowerCostSaberThrow, forceMasteryPoints, forcePowerDarkLight,
-    forcePowerSorted,
+    bgForcePowerCost, bgForcePowerCostSaberThrow, cstr_to_str, forceMasteryPoints,
+    forcePowerDarkLight, forcePowerSorted,
 };
 pub use crate::entity::flags::*;
 pub use crate::g_client::{playerMaxs, playerMins};
@@ -70,12 +71,13 @@ pub use crate::g_items::FRAMETIME;
 pub use crate::g_mover::{BMS_END, BMS_MID, BMS_START};
 pub use crate::g_nav_consts::*;
 pub use crate::g_public_consts::*;
+pub use crate::g_target::Q3_SCRIPT_DIR;
 pub use crate::level::damage_flags::*;
 pub use crate::npc::ai_flags::*;
 pub use crate::npc::script_flags::*;
 pub use crate::npc::squad_state::*;
 pub use crate::q_math::{
-    vec3_origin, vectoangles, RadiusFromBounds, PITCH, ROLL, VEC3_ORIGIN, YAW,
+    crandom, random, vec3_origin, vectoangles, RadiusFromBounds, PITCH, ROLL, VEC3_ORIGIN, YAW,
 };
 pub use crate::w_force::mindTrickTime;
 pub use mp_qshared::shared::q_math_rand::RAND_MAX;
@@ -84,9 +86,8 @@ pub use mp_qshared::shared::q_math_rand::RAND_MAX;
 // the only one already `pub` and is the canonical export for bare-use sites.
 pub use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
 // `rand` exists (parked on the randSeed-storage escalation — see
-// `bg_lib.rs`); re-exported bare so callers resolve, same TODO-panic
-// contract as its `todo!()` body. `random`/`crandom` (`q_math.c`/`bg_lib.c`)
-// are not ported yet (real RNG logic, not a const) — left as call-site gaps.
+// `bg_lib.rs`); re-exported bare so callers resolve. `random()`/`crandom()`
+// are now ported: macro-based random distributions over `[0..1)` and `[-1..1)`.
 pub use crate::bg_lib::rand;
 pub use crate::saber::w_saber_consts::*;
 pub use crate::teams::npcteam::*;
@@ -273,3 +274,4 @@ pub use crate::g_weapon::{LogAccuracyHit, laserTrapStick};
 pub use crate::q_math::{AddPointToBounds, AngleSubtract, AngleVectors, CrossProduct, DirToByte, Distance, DistanceHorizontalSquared, G_FindClosestPointOnLineSegment, Q_fabs, VectorCompare, VectorLength, VectorLengthSquared, VectorNormalize};
 pub use crate::q_shared::{COM_StripExtension, GetIDForString, Q_stricmp, Q_strncmp, Q_strncpyz, Q_strupr, va};
 pub use crate::w_saber::WP_SaberCanBlock;
+pub use crate::g_cmds::cstr;

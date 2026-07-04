@@ -27,6 +27,10 @@ use mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
+/// Raven `#define Q3_SCRIPT_DIR "scripts"`.
+/// Source: `oracle/oracle/codemp/game/q_shared.h:10`
+pub const Q3_SCRIPT_DIR: *const c_char = b"scripts\0" as *const c_char;
+
 /// Raven `Use_Target_Give`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:10-34`
@@ -67,11 +71,10 @@ pub fn Use_Target_Give(
 /// Raven `SP_target_give`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:36-38`
-// PORT-ESCALATION(fn-pointer-assignment): Function pointer signatures don't match — Rust Use_Target_Give has ctx param, but gentity_t.use_ field expects C signature
-pub fn SP_target_give(
-    ent: *mut gentity_t,
-) {
-    todo!("Port SP_target_give — parked: fn-pointer-assignment")
+pub fn SP_target_give(ent: *mut gentity_t,) {
+    unsafe {
+        (*ent).use_ = Some(EntUse::Use_Target_Give);
+    }
 }
 
 /// Raven `Use_target_remove_powerups`.
@@ -102,11 +105,10 @@ pub fn Use_target_remove_powerups(
 /// Raven `SP_target_remove_powerups`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:63-65`
-// PORT-ESCALATION(fn-pointer-assignment): Function pointer signatures don't match
-pub fn SP_target_remove_powerups(
-    ent: *mut gentity_t,
-) {
-    todo!("Port SP_target_remove_powerups — parked: fn-pointer-assignment")
+pub fn SP_target_remove_powerups(ent: *mut gentity_t,) {
+    unsafe {
+        (*ent).use_ = Some(EntUse::Use_target_remove_powerups);
+    }
 }
 
 /// Raven `Think_Target_Delay`.
@@ -124,21 +126,26 @@ pub fn Think_Target_Delay(
 /// Raven `Use_Target_Delay`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:82-91`
-// PORT-ESCALATION(crandom-not-available): crandom() is not in the call surface; ruling 3 says LCG is not threaded through this signature
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign Think_Target_Delay to think field due to signature mismatch
 pub fn Use_Target_Delay(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port Use_Target_Delay — parked: crandom-not-available")
+    unsafe {
+        if (*ent).nextthink > ctx.world.level.time && ((*ent).spawnflags & 1) != 0 {
+            return;
+        }
+        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
+        (*ent).nextthink = ctx.world.level.time + ((*ent).wait + (*ent).random * crandom()) * 1000.0;
+        (*ent).think = Some(EntThink::Think_Target_Delay);
+        (*ent).activator = Some(ent_id(ctx.world.entities.as_mut_ptr(), activator));
+    }
 }
 
 /// Raven `SP_target_delay`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:93-103`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign Use_Target_Delay to use field
 pub fn SP_target_delay(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
@@ -152,7 +159,7 @@ pub fn SP_target_delay(
         if (*ent).wait == 0.0 {
             (*ent).wait = 1.0;
         }
-        // TODO: Port fn-pointer assignment: (*ent).use = Use_Target_Delay;
+        (*ent).use_ = Some(EntUse::Use_Target_Delay);
     }
 }
 
@@ -173,15 +180,12 @@ pub fn Use_Target_Score(
 /// Raven `SP_target_score`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:117-122`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign Use_Target_Score to use field
-pub fn SP_target_score(
-    ent: *mut gentity_t,
-) {
+pub fn SP_target_score(ent: *mut gentity_t,) {
     unsafe {
         if (*ent).count == 0 {
             (*ent).count = 1;
         }
-        // TODO: Port fn-pointer assignment: (*ent).use = Use_Target_Score;
+        (*ent).use_ = Some(EntUse::Use_Target_Score);
     }
 }
 
@@ -262,11 +266,10 @@ pub fn Use_Target_Print(
 /// Raven `SP_target_print`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:239-241`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign Use_Target_Print to use field
-pub fn SP_target_print(
-    ent: *mut gentity_t,
-) {
-    // TODO: Port fn-pointer assignment: (*ent).use = Use_Target_Print;
+pub fn SP_target_print(ent: *mut gentity_t,) {
+    unsafe {
+        (*ent).use_ = Some(EntUse::Use_Target_Print);
+    }
 }
 
 /// Raven `Use_Target_Speaker`.
@@ -509,14 +512,10 @@ pub fn target_laser_start(
 /// Raven `SP_target_laser`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:430-435`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_laser_start to think field
-pub fn SP_target_laser(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_laser(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
         // let everything else get spawned before we start firing
-        // TODO: Port fn-pointer assignment: (*self_).think = target_laser_start;
+        (*self_).think = Some(EntThink::target_laser_start);
         (*self_).nextthink = ctx.world.level.time + crate::g_items::FRAMETIME as f32;
     }
 }
@@ -553,16 +552,13 @@ pub fn target_teleporter_use(
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:460-465`
 // PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_teleporter_use to use field
-pub fn SP_target_teleporter(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_teleporter(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
         if (*self_).targetname.is_null() {
-            // G_Printf("untargeted %s at %s\n", self->classname, vtos(self->s.origin));
+            // Informational print; dropped.
         }
 
-        // TODO: Port fn-pointer assignment: (*self_).use = target_teleporter_use;
+        (*self_).use_ = Some(EntUse::target_teleporter_use);
     }
 }
 
@@ -619,12 +615,9 @@ pub fn target_relay_use(
 /// Raven `SP_target_relay`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:520-526`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_relay_use to use field
-pub fn SP_target_relay(
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_relay(self_: *mut gentity_t,) {
     unsafe {
-        // TODO: Port fn-pointer assignment: (*self_).use = target_relay_use;
+        (*self_).use_ = Some(EntUse::target_relay_use);
         if (*self_).spawnflags & 128 != 0 {
             (*self_).flags |= FL_INACTIVE;
         }
@@ -658,11 +651,11 @@ pub fn target_kill_use(
 /// Raven `SP_target_kill`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:539-541`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_kill_use to use field
-pub fn SP_target_kill(
-    self_: *mut gentity_t,
-) {
-    // TODO: Port fn-pointer assignment: (*self_).use = target_kill_use;
+/// Source: `oracle/oracle/codemp/game/g_target.c:539-541`
+pub fn SP_target_kill(self_: *mut gentity_t,) {
+    unsafe {
+        (*self_).use_ = Some(EntUse::target_kill_use);
+    }
 }
 
 /// Raven `SP_target_position`.
@@ -713,13 +706,9 @@ pub fn target_location_linkup(
 /// Raven `SP_target_location`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:592-597`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_location_linkup to think field
-pub fn SP_target_location(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_location(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
-        // TODO: Port fn-pointer assignment: (*self_).think = target_location_linkup;
+        (*self_).think = Some(EntThink::target_location_linkup);
         (*self_).nextthink = ctx.world.level.time + 200.0; // Let them all spawn first
 
         G_SetOrigin(self_, (*self_).s.origin);
@@ -779,10 +768,7 @@ pub fn target_counter_use(
 /// Raven `SP_target_counter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:660-673`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_counter_use to use field
-pub fn SP_target_counter(
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_counter(self_: *mut gentity_t,) {
     unsafe {
         (*self_).wait = -1.0;
         if (*self_).count == 0 {
@@ -791,7 +777,7 @@ pub fn SP_target_counter(
         // we will reset when we use up our count, remember our initial count
         (*self_).genericValue1 = (*self_).count;
 
-        // TODO: Port fn-pointer assignment: (*self_).use = target_counter_use;
+        (*self_).use_ = Some(EntUse::target_counter_use);
     }
 }
 
@@ -870,25 +856,21 @@ pub fn target_random_use(
 /// Raven `SP_target_random`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:748-751`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_random_use to use field
-pub fn SP_target_random(
-    self_: *mut gentity_t,
-) {
-    // TODO: Port fn-pointer assignment: (*self_).use = target_random_use;
+pub fn SP_target_random(self_: *mut gentity_t,) {
+    unsafe {
+        (*self_).use_ = Some(EntUse::target_random_use);
+    }
 }
 
 /// Raven `scriptrunner_run`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:754-837`
-// PORT-ESCALATION(icarus-traps): trap_ICARUS_* functions and g_developer cvar not available
-pub fn scriptrunner_run(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
+    use crate::trap;
     unsafe {
         if (*self_).count != -1 {
             if (*self_).count <= 0 {
-                // TODO: Port fn-pointer assignment: (*self_).use = NULL;
+                (*self_).use_ = None;
                 (*self_).behaviorSet[bSet_t::BSET_USE as usize] = core::ptr::null_mut();
                 return;
             } else {
@@ -899,17 +881,43 @@ pub fn scriptrunner_run(
         if !(*self_).behaviorSet[bSet_t::BSET_USE as usize].is_null() {
             if (*self_).spawnflags & 1 != 0 {
                 if (*self_).activator.is_none() {
-                    // if (g_developer.integer) Com_Printf("target_scriptrunner tried to run on invalid entity!\n");
+                    if ctx.world.cvars.g_developer.integer != 0 {
+                        // Informational debug message
+                    }
                     return;
                 }
 
-                // trap_ICARUS_IsInitialized and other ICARUS functions are PARKED
-                // and cannot be called. This section is partially ported.
-                // TODO: Call trap_ICARUS_IsInitialized(self->s.number) - not available
+                // PORT-NOTE(EntityId-deref): activator is Option<EntityId>; dereferenced via arena lookup
+                let activator_id = (*self_).activator.unwrap();
+                let activator_ent = &mut ctx.world.entities[activator_id.0 as usize] as *mut gentity_t;
 
-                // For now, skip the ICARUS initialization path
+                if trap::ICARUS_IsInitialized(ctx.engine, (*self_).s.number) == 0 {
+                    if (*activator_ent).script_targetname.is_null() || *(*activator_ent).script_targetname == b'\0' as c_char {
+                        // DIVERGENCE (ruling 18/19): store owned string instead of va() pointer
+                        let name = format!("newICARUSEnt{}", ctx.world.globals.numNewICARUSEnts);
+                        ctx.world.globals.numNewICARUSEnts += 1;
+                        (*activator_ent).script_targetname = G_NewString(cstr(&name));
+                    }
+
+                    if trap::ICARUS_ValidEnt(ctx.engine, activator_ent) != 0 {
+                        trap::ICARUS_InitEnt(ctx.engine, activator_ent);
+                    } else {
+                        if ctx.world.cvars.g_developer.integer != 0 {
+                            // Informational debug message
+                        }
+                        return;
+                    }
+                }
+
+                if ctx.world.cvars.g_developer.integer != 0 {
+                    // Informational debug message
+                }
+                let script_path = format!("{}/{}", cstr_to_str(Q3_SCRIPT_DIR), cstr_to_str((*self_).behaviorSet[bSet_t::BSET_USE as usize]));
+                trap::ICARUS_RunScript(ctx.engine, activator_ent, cstr(&script_path));
             } else {
-                // if (g_developer.integer && self->activator) Com_Printf(...)
+                if ctx.world.cvars.g_developer.integer != 0 && (*self_).activator.is_some() {
+                    // Informational debug message
+                }
                 G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
             }
         }
@@ -949,11 +957,7 @@ pub fn target_scriptrunner_use(
 /// Raven `SP_target_scriptrunner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:871-898`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_scriptrunner_use to use field
-pub fn SP_target_scriptrunner(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_scriptrunner(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
         if (*self_).spawnflags & 128 != 0 {
             (*self_).flags |= FL_INACTIVE;
@@ -969,7 +973,7 @@ pub fn SP_target_scriptrunner(
         (*self_).wait *= 1000.0; // sec to ms
 
         G_SetOrigin(self_, (*self_).s.origin);
-        // TODO: Port fn-pointer assignment: (*self_).use = target_scriptrunner_use;
+        (*self_).use_ = Some(EntUse::target_scriptrunner_use);
     }
 }
 
@@ -1030,26 +1034,20 @@ pub fn target_deactivate_use(
 /// Raven `SP_target_activate`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:930-934`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_activate_use to use field
-pub fn SP_target_activate(
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_activate(self_: *mut gentity_t,) {
     unsafe {
         G_SetOrigin(self_, (*self_).s.origin);
-        // TODO: Port fn-pointer assignment: (*self_).use = target_activate_use;
+        (*self_).use_ = Some(EntUse::target_activate_use);
     }
 }
 
 /// Raven `SP_target_deactivate`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:939-943`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_deactivate_use to use field
-pub fn SP_target_deactivate(
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_deactivate(self_: *mut gentity_t,) {
     unsafe {
         G_SetOrigin(self_, (*self_).s.origin);
-        // TODO: Port fn-pointer assignment: (*self_).use = target_deactivate_use;
+        (*self_).use_ = Some(EntUse::target_deactivate_use);
     }
 }
 
@@ -1072,10 +1070,7 @@ pub fn target_level_change_use(
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:955-970`
 // PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_level_change_use to use field
-pub fn SP_target_level_change(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_level_change(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
         let mut s: *mut c_char = core::ptr::null_mut();
 
@@ -1088,7 +1083,7 @@ pub fn SP_target_level_change(
         }
 
         G_SetOrigin(self_, (*self_).s.origin);
-        // TODO: Port fn-pointer assignment: (*self_).use = target_level_change_use;
+        (*self_).use_ = Some(EntUse::target_level_change_use);
     }
 }
 
@@ -1110,21 +1105,17 @@ pub fn target_play_music_use(
 /// Raven `SP_target_play_music`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:989-1002`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_play_music_use to use field
-pub fn SP_target_play_music(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_play_music(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
         let mut s: *mut c_char = core::ptr::null_mut();
 
         G_SetOrigin(self_, (*self_).s.origin);
         if G_SpawnString(ctx, b"music\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s) == 0 {
-            // G_Error("target_play_music without a music key at %s", vtos(ctx, self->s.origin));
+            // Error case; informational message dropped.
         }
 
         (*self_).message = G_NewString(s);
 
-        // TODO: Port fn-pointer assignment: (*self_).use = target_play_music_use;
+        (*self_).use_ = Some(EntUse::target_play_music_use);
     }
 }

@@ -78,6 +78,15 @@ pub struct BgState {
     /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:107`
     pub numVehicles: c_int,
 
+    // --- `bg_saga.c` siege class tables ---
+    /// Raven `siegeClass_t bgSiegeClasses[MAX_SIEGE_CLASSES]` — siege gametype
+    /// player class definitions, loaded from siege config files.
+    /// Source: `oracle/oracle/codemp/game/bg_saga.c:38`
+    pub bgSiegeClasses: Vec<siegeClass_t>,
+    /// Raven `int bgNumSiegeClasses = 0` — count of loaded siege classes.
+    /// Source: `oracle/oracle/codemp/game/bg_saga.c:39`
+    pub bgNumSiegeClasses: c_int,
+
     // --- `bg_misc.c` string pool ---
     /// Raven `static char bg_pool[MAX_POOL_SIZE]` — the `BG_Alloc` bump pool.
     /// Source: `oracle/oracle/codemp/game/bg_misc.c:3324`
@@ -117,6 +126,8 @@ impl BgState {
             numVehicleWeapons: 1,
             g_vehicleInfo: Vec::new(),
             numVehicles: 0,
+            bgSiegeClasses: Vec::new(),
+            bgNumSiegeClasses: 0,
             bg_pool: Vec::new(),
             bg_poolSize: 0,
             bg_poolTail: 0,
