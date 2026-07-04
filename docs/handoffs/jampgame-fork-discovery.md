@@ -142,6 +142,25 @@ parks trace to the generated signatures not carrying already-settled rulings.
 20. Pass-2 remainder (32 unfinished porters + never-run integration) is
     **folded into pass 3** — no pass-2 resume; files fill once against final
     signatures. (Recommendation accepted with this session.)
+21. **Ruling-12 amendment (hand-slice finding, user 2026-07-04):** bg_state
+    stays a GameWorld field; the bg_state/GameCallbacks aliasing conflict at
+    Pmove call sites is resolved by **blessing the audited raw reborrow** —
+    GameCallbacksImpl holds `*mut GameWorld` and reborrows per call (STATE-D8
+    precedent, unsafe confined to the one named impl). Safe-borrow cleanup
+    rides the post-parity EntityId migration. **RULING: BLESSED**
+    Slice riders (mechanical, fold into prep C): `MAX_CLIENTS` needs a c_int
+    dual (hundreds of `< MAX_CLIENTS` compares); pml_t + PmoveContext-adjacent
+    types join the game prelude; RNG LCG is bit-exact for 32-bit unsigned
+    long only — document + assert at the boot target; pmove_t's trace/
+    pointcontents fn-ptr fields stay for layout but bg logic uses BgTraps
+    (two-channel situation is intended).
+22. **Fork-4 execution shape (stated 2026-07-04):** the 38 stored fields
+    become `Option<EntityId>` (Raven NULL → None; entity 0 is valid so no
+    sentinel niche); conversion is compiler-driven (change field types, fix
+    every resulting type error before porters launch); gentity_t/gclient_t
+    private-tail layout is free (engine learns stride via
+    trap_LocateGameData, only s/r/ps prefixes are fixed) — regenerate
+    tail asserts.
 
 ## Already covered — no decision (bless-the-rule appendix)
 
