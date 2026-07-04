@@ -12,6 +12,7 @@ pub mod bg_loaded_anim;
 pub mod bg_loaded_events;
 pub mod broken_limb;
 pub mod ctf_msg;
+pub mod dm_flags;
 pub mod duel_team;
 pub mod effect_types;
 pub mod entity_effects;

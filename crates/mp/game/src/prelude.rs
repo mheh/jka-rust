@@ -24,43 +24,96 @@ pub use core::ffi::{
 // Source: `oracle/oracle/codemp/game/q_shared.h:349`
 pub type byte = c_uchar;
 
+// Raven `qtrue`/`qfalse` bare spellings (`q_shared.h` `qboolean` enum values,
+// pass-3 symbol backfill). The canonical port lives as `QTRUE`/`QFALSE` in
+// `native_types`; skeleton bodies transcribe Raven's exact lowercase macro
+// names, so both spellings are provided.
+pub const qtrue: qboolean = QTRUE;
+pub const qfalse: qboolean = QFALSE;
+
 // Integration round-1 addendum: the fnskel packets transcribe Raven constant
 // spellings verbatim (per each file's own "integration-deferred" note) without
 // enumerating their owning module's `use`; these glob-imports resolve them
 // against the same crates already named above. Explicit single-item imports
 // below (e.g. `holdable_t`) are unaffected — Rust lets an explicit import
 // shadow a glob without ambiguity.
-pub use mp_bg::public::gametype::{gametype_t, GT_CTF, GT_CTY, GT_HOLOCRON, GT_SIEGE, GT_TEAM};
+pub use mp_bg::public::gametype::{
+    gametype_t, GT_CTF, GT_CTY, GT_DUEL, GT_FFA, GT_HOLOCRON, GT_JEDIMASTER, GT_MAX_GAME_TYPE,
+    GT_POWERDUEL, GT_SIEGE, GT_SINGLE_PLAYER, GT_TEAM,
+};
 pub use mp_bg::public::holdable::*;
 pub use mp_bg::public::powerup::*;
 pub use mp_bg::public::saber_move_name::*;
 pub use mp_bg::public::team::*;
+pub use mp_bg::public::dm_flags::*;
 pub use mp_bg::public::entity_effects::*;
 pub use mp_bg::public::item_type::*;
 pub use mp_bg::public::set_anim::*;
 pub use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_TURRETS, VEHICLE_BASE, VEHICLE_NONE};
+pub use mp_bg::vehicles::vehicle_type_t::vehicleType_t::*;
 pub use mp_bg::weapons::weapon_t::*;
 pub use mp_qshared::shared::force_powers::*;
 pub use mp_qshared::shared::limits::*;
 pub use mp_qshared::shared::sound_channel::*;
 pub use mp_qshared::shared::surface_flags::*;
+pub use mp_qshared::common::mp::qcommon::pm_flags::*;
+
+// Pass-3 symbol backfill: game-crate-local const families that were ported
+// but never wired into the prelude glob (see `docs/porting-rules.md` §E13).
+pub use crate::bg_misc::{
+    bgForcePowerCost, bgForcePowerCostSaberThrow, forceMasteryPoints, forcePowerDarkLight,
+    forcePowerSorted,
+};
+pub use crate::entity::flags::*;
+pub use crate::g_client::{playerMaxs, playerMins};
+pub use crate::g_items::FRAMETIME;
+pub use crate::g_mover::{BMS_END, BMS_MID, BMS_START};
+pub use crate::g_nav_consts::*;
+pub use crate::g_public_consts::*;
+pub use crate::level::damage_flags::*;
+pub use crate::npc::ai_flags::*;
+pub use crate::npc::script_flags::*;
+pub use crate::npc::squad_state::*;
+pub use crate::q_math::{
+    vec3_origin, vectoangles, RadiusFromBounds, PITCH, ROLL, VEC3_ORIGIN, YAW,
+};
+pub use crate::w_force::mindTrickTime;
+pub use mp_qshared::shared::q_math_rand::RAND_MAX;
+// `BG_GiveMeVectorFromMatrix` has independent per-NPC-file transcriptions
+// (Raven copy-paste convention, porting-rules §F20); `NPC_AI_Mark2`'s copy is
+// the only one already `pub` and is the canonical export for bare-use sites.
+pub use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
+// `rand` exists (parked on the randSeed-storage escalation — see
+// `bg_lib.rs`); re-exported bare so callers resolve, same TODO-panic
+// contract as its `todo!()` body. `random`/`crandom` (`q_math.c`/`bg_lib.c`)
+// are not ported yet (real RNG logic, not a const) — left as call-site gaps.
+pub use crate::bg_lib::rand;
+pub use crate::saber::w_saber_consts::*;
+pub use crate::teams::npcteam::*;
 
 // Enum types transcribed as `#[repr(i32)] enum` per porting-rules'
 // enum-vs-alias fidelity rule; the fnskel packets carry their bare Raven
 // variant spellings (e.g. `STAT_MAX_HEALTH`, not `statIndex_t::STAT_MAX_HEALTH`),
 // so both the type name (for sites that do qualify) and a variant glob (for
 // the far more common bare spelling) are re-exported here.
+pub use mp_bg::public::anim_number::{animNumber_t, animNumber_t::*};
 pub use mp_bg::public::broken_limb::{brokenLimb_t, brokenLimb_t::*};
+pub use mp_bg::public::effect_types::{effectTypes_t, effectTypes_t::*};
+pub use mp_bg::public::entity_event::{entity_event_t, entity_event_t::*};
 pub use mp_bg::public::entity_type::{entityType_t, entityType_t::*};
 pub use mp_bg::public::force_hand_anims::{forceHandAnims_t, forceHandAnims_t::*};
+pub use mp_bg::public::g2_model_parts::{g2ModelParts_t, g2ModelParts_t::*, G2_MODEL_PART};
 pub use mp_bg::public::means_of_death::{meansOfDeath_t, meansOfDeath_t::*};
 pub use mp_bg::public::pd_sounds::{pdSounds_t, pdSounds_t::*};
 pub use mp_bg::public::pers_enum::{persEnum_t, persEnum_t::*};
 pub use mp_bg::public::pmtype::{pmtype_t, pmtype_t::*};
 pub use mp_bg::public::stat_index::{statIndex_t, statIndex_t::*};
 pub use mp_qshared::common::mp::qcommon::b_set_t::{bSet_t, bSet_t::*};
+pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t::*;
 pub use mp_qshared::common::mp::qcommon::task_id_t::{taskID_t, taskID_t::*};
+pub use mp_qshared::common::mp::qcommon::usercmd_button::*;
 pub use mp_qshared::shared::trackchan::{trackchan_t, trackchan_t::*};
+pub use mp_qshared::shared::trajectory::trType_t::*;
 pub use mp_qshared::shared::wl_e::{WL_e, WL_e::*};
 
 // Pass-2 ctx threading (fork 8): the module-island dispatch receiver, injected
@@ -71,7 +124,7 @@ pub use crate::world::GameContext;
 pub use crate::ai::group_info::AIGroupInfo_t;
 pub use crate::botai::bot_state_s::bot_state_t;
 pub use crate::client::gclient::gclient_t;
-pub use crate::level::alert_event::alertEventLevel_e;
+pub use crate::level::alert_event::{alertEventLevel_e, alertEventLevel_e::*};
 pub use crate::level::reference_tag::reference_tag_t;
 pub use crate::npc::g_npc_t::gNPC_t;
 pub use crate::npc::nav_info_s::navInfo_t;
@@ -103,17 +156,22 @@ pub use mp_bg::weapons::weapon_t::weapon_t;
 pub use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
 pub use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
 pub use mp_qshared::common::mp::gentity::{
-    gentity_t, material_t, moverState_t, MOVER_1TO2, MOVER_2TO1, MOVER_POS1, MOVER_POS2,
+    gentity_t, material_t, moverState_t, MAT_CRATE1, MAT_CRATE2, MAT_DRK_STONE, MAT_ELECTRICAL,
+    MAT_ELEC_METAL, MAT_GLASS, MAT_GLASS_METAL, MAT_GRATE1, MAT_GREY_STONE, MAT_LT_STONE,
+    MAT_METAL, MAT_METAL2, MAT_METAL3, MAT_NONE, MAT_ROPE, MAT_SNOWY_ROCK, MAT_WHITE_METAL,
+    MOVER_1TO2, MOVER_2TO1, MOVER_POS1, MOVER_POS2, NUM_MATERIALS,
 };
 pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 pub use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 pub use mp_qshared::common::mp::qcommon::failed_edge::failedEdge_t;
 pub use mp_qshared::common::mp::qcommon::game_item::gitem_t;
-pub use mp_qshared::common::mp::qcommon::player_state::{forcedata_t, playerState_t};
+pub use mp_qshared::common::mp::qcommon::player_state::{
+    forcedata_t, playerState_t, MAX_POWERUPS, MAX_PS_EVENTS,
+};
 pub use mp_qshared::common::mp::qcommon::qtime::qtime_t;
 pub use mp_qshared::common::mp::qcommon::saber::blade_info::bladeInfo_t;
 pub use mp_qshared::common::mp::qcommon::saber::saber_colors::saber_colors_t;
-pub use mp_qshared::common::mp::qcommon::saber::saber_info::saberInfo_t;
+pub use mp_qshared::common::mp::qcommon::saber::saber_info::{saberInfo_t, MAX_SABERS};
 pub use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t;
 pub use mp_qshared::common::mp::qcommon::shared_ragdoll_params::sharedRagDollParams_t;
 pub use mp_qshared::common::mp::qcommon::shared_ragdoll_update_params::sharedRagDollUpdateParams_t;

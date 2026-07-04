@@ -105,7 +105,7 @@ pub fn Wampa_CheckRoar(
         let level_time = (*ctx.world).level.time;
         if (*self_).wait < level_time {
             (*self_).wait = level_time + crate::q_math::Q_irand(5000, 20000);
-            crate::npc_c::NPC_SetAnim(self_, SETANIM_BOTH, crate::q_math::Q_irand(mp_bg::public::anim_number::BOTH_GESTURE1 as c_int, mp_bg::public::anim_number::BOTH_GESTURE2 as c_int), (SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD));
+            crate::npc_c::NPC_SetAnim(self_, SETANIM_BOTH, crate::q_math::Q_irand(crate::prelude::BOTH_GESTURE1 as c_int, crate::prelude::BOTH_GESTURE2 as c_int), (SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD));
             crate::g_timer::TIMER_Set(ctx, self_, c"rageTime".as_ptr(), (*(*self_).client).ps.legsTimer);
             return qtrue;
         }
@@ -187,7 +187,7 @@ pub fn Wampa_Move(
 
             if (*npc_info).stats.runSpeed == 300 {
                 // need to use the alternate run - hunched over on all fours
-                (*(*npc).client).ps.eFlags2 |= crate::entity::flags::EF2_USE_ALT_ANIM;
+                (*(*npc).client).ps.eFlags2 |= mp_bg::public::entity_effects::EF2_USE_ALT_ANIM;
             }
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
             (*npc_info).goalRadius = MAX_DISTANCE; // just get us within combat range
@@ -521,7 +521,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = (*ctx.world).globals.NPCInfo;
 
-        (*(*npc).client).ps.eFlags2 &= !crate::entity::flags::EF2_USE_ALT_ANIM;
+        (*(*npc).client).ps.eFlags2 &= !mp_bg::public::entity_effects::EF2_USE_ALT_ANIM;
         // NORMAL ANIMS
         // stand1 = normal stand
         // walk1 = normal, non-angry walk

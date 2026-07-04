@@ -252,7 +252,8 @@ pub fn turretG2_set_models(
                 (*self_).s.g2radius = 80;
             }
 
-            let vec3_origin: vec3_t = [0.0, 0.0, 0.0];
+            // Raven `vec3_origin` — resolved via the crate prelude (pass-3
+            // symbol backfill).
             if (*self_).spawnflags & SPF_TURRETG2_TURBO != 0 {
                 // different pitch bone and muzzle flash points
                 G2Tur_SetBoneAngles(ctx, self_, c"pitch".as_ptr() as *mut c_char, vec3_origin);

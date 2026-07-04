@@ -46,6 +46,29 @@ pub const MOVER_2TO1: moverState_t = 3;
 /// Type definition source: `oracle/oracle/codemp/game/q_shared.h:990`
 pub type material_t = c_int;
 
+/// Raven `material_e` variants (`//# material_e`, anonymous-enum + `typedef int
+/// material_t` per enum-vs-alias fidelity).
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:967-987`
+pub const MAT_METAL: material_t = 0; // scorched blue-grey metal
+pub const MAT_GLASS: material_t = 1; // not a real chunk type, just plays an effect with glass sprites
+pub const MAT_ELECTRICAL: material_t = 2; // sparks only
+pub const MAT_ELEC_METAL: material_t = 3; // sparks/electrical type metal
+pub const MAT_DRK_STONE: material_t = 4; // brown
+pub const MAT_LT_STONE: material_t = 5; // tan
+pub const MAT_GLASS_METAL: material_t = 6; // glass sprites and METAl chunk
+pub const MAT_METAL2: material_t = 7; // electrical metal type
+pub const MAT_NONE: material_t = 8; // no chunks
+pub const MAT_GREY_STONE: material_t = 9; // grey
+pub const MAT_METAL3: material_t = 10; // METAL and METAL2 chunks
+pub const MAT_CRATE1: material_t = 11; // yellow multi-colored crate chunks
+pub const MAT_GRATE1: material_t = 12; // grate chunks
+pub const MAT_ROPE: material_t = 13; // for yavin trial...no chunks, just wispy bits
+pub const MAT_CRATE2: material_t = 14; // read multi-colored crate chunks
+pub const MAT_WHITE_METAL: material_t = 15; // white angular chunks
+pub const MAT_SNOWY_ROCK: material_t = 16; // gray & brown chunks
+pub const NUM_MATERIALS: material_t = 17;
+
 /// Raven MP `gentity_t`.
 ///
 /// Type declaration source: `oracle/oracle/codemp/game/g_local.h:16`

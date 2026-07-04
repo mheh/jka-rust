@@ -51,12 +51,12 @@ const ROLL: usize = 2;
 /// Raven `forceMasteryPoints` (`NUM_FORCE_MASTERY_LEVELS`-sized).
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:162-172`
-const forceMasteryPoints: [c_int; 8] = [0, 5, 10, 20, 30, 50, 75, 100];
+pub const forceMasteryPoints: [c_int; 8] = [0, 5, 10, 20, 30, 50, 75, 100];
 
 /// Raven `bgForcePowerCost[NUM_FORCE_POWERS][NUM_FORCE_POWER_LEVELS]`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:174-195`
-const bgForcePowerCost: [[c_int; 4]; 17] = [
+pub const bgForcePowerCost: [[c_int; 4]; 17] = [
     [0, 2, 4, 6],  // FP_HEAL
     [0, 0, 2, 6],  // FP_LEVITATION
     [0, 2, 4, 6],  // FP_SPEED
@@ -82,12 +82,12 @@ const bgForcePowerCost: [[c_int; 4]; 17] = [
 ];
 /// Raven `bgForcePowerCost[FP_SABERTHROW]` (`{0,4,6,8}`), row 17 — appended
 /// separately; see note on `bgForcePowerCost` above.
-const bgForcePowerCostSaberThrow: [c_int; 4] = [0, 4, 6, 8];
+pub const bgForcePowerCostSaberThrow: [c_int; 4] = [0, 4, 6, 8];
 
 /// Raven `forcePowerSorted[NUM_FORCE_POWERS]`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:197-217`
-const forcePowerSorted: [c_int; 18] = [
+pub const forcePowerSorted: [c_int; 18] = [
     FP_TELEPATHY,
     FP_HEAL,
     FP_ABSORB,
@@ -111,7 +111,7 @@ const forcePowerSorted: [c_int; 18] = [
 /// Raven `forcePowerDarkLight[NUM_FORCE_POWERS]`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:219-240`
-const forcePowerDarkLight: [c_int; 18] = [
+pub const forcePowerDarkLight: [c_int; 18] = [
     FORCE_LIGHTSIDE, // FP_HEAL
     0,               // FP_LEVITATION
     0,               // FP_SPEED

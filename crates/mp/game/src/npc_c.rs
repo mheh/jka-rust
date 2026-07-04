@@ -1445,7 +1445,7 @@ pub fn NPC_ExecuteBState(
     self_: *mut gentity_t,
 ) {
     use mp_bg::public::anim_number::animNumber_t;
-    use mp_bg::public::weaponstate::{WEAPON_IDLE, WEAPON_READY};
+    use mp_bg::public::weaponstate::weaponstate_t::{WEAPON_IDLE, WEAPON_READY};
     use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK};
 
     unsafe {

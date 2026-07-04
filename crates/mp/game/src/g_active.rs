@@ -44,25 +44,29 @@ const ROLL: usize = 2;
 // Source: `oracle/oracle/codemp/game/bg_public.h:415`
 const PMF_FOLLOW: c_int = 4096;
 
-// Constants whose numeric values live in the un-ported Raven headers
-// (`q_shared.h`, `g_local.h`), not in this packet — resolved at integration
-// (same convention as `w_force.rs`). Spelled bare at the use sites below.
-//TODO: Port MAT_GLASS               // Source: oracle/oracle/codemp/game/q_shared.h
-//TODO: Port MAT_GLASS_METAL         // Source: oracle/oracle/codemp/game/q_shared.h
-//TODO: Port MAT_GRATE1              // Source: oracle/oracle/codemp/game/q_shared.h
-//TODO: Port SVF_BOT                 // Source: oracle/oracle/codemp/game/q_shared.h
-//TODO: Port SVF_GLASS_BRUSH         // Source: oracle/oracle/codemp/game/q_shared.h
-//TODO: Port SVF_NOTSINGLECLIENT     // Source: oracle/oracle/codemp/game/q_shared.h
-//TODO: Port PMF_SCOREBOARD          // Source: oracle/oracle/codemp/game/bg_public.h
-//TODO: Port MAX_SIGHT_DISTANCE      // Source: oracle/oracle/codemp/game/g_local.h
-//TODO: Port MAX_SIGHT_FOV           // Source: oracle/oracle/codemp/game/g_local.h
-//TODO: Port MAX_JEDIMASTER_DISTANCE // Source: oracle/oracle/codemp/game/g_local.h
-//TODO: Port MAX_JEDIMASTER_FOV      // Source: oracle/oracle/codemp/game/g_local.h
-//TODO: Port TAUNT_TAUNT             // Source: oracle/oracle/codemp/game/g_local.h
-//TODO: Port TAUNT_BOW               // Source: oracle/oracle/codemp/game/g_local.h
-//TODO: Port TAUNT_MEDITATE          // Source: oracle/oracle/codemp/game/g_local.h
-//TODO: Port TAUNT_FLOURISH          // Source: oracle/oracle/codemp/game/g_local.h
-//TODO: Port TAUNT_GLOAT             // Source: oracle/oracle/codemp/game/g_local.h
+// MAT_*/SVF_*/PMF_SCOREBOARD now resolve via the crate prelude (pass-3 symbol
+// backfill: `mp_qshared::common::mp::gentity`, `crate::g_public_consts`,
+// `mp_qshared::common::mp::qcommon::pm_flags`).
+
+// Raven `#define MAX_SIGHT_DISTANCE`/`MAX_SIGHT_FOV`/`MAX_JEDIMASTER_DISTANCE`/
+// `MAX_JEDIMASTER_FOV` — file-scope in `g_active.c` (not referenced elsewhere).
+// Source: `oracle/oracle/codemp/game/g_active.c:1097-1101`
+const MAX_SIGHT_DISTANCE: c_float = 1500.0;
+const MAX_SIGHT_FOV: c_float = 100.0;
+const MAX_JEDIMASTER_DISTANCE: c_float = 2500.0;
+const MAX_JEDIMASTER_FOV: c_float = 100.0;
+
+// Raven's taunt selector is a file-scope anonymous `enum { TAUNT_TAUNT = 0,
+// TAUNT_BOW, TAUNT_MEDITATE, TAUNT_FLOURISH, TAUNT_GLOAT };` in `g_active.c`
+// (no typedef name), so per enum-vs-alias fidelity these are plain `c_int`
+// consts, private to this file like the Raven original.
+// Source: `oracle/oracle/codemp/game/g_active.c:1652-1659`
+const TAUNT_TAUNT: c_int = 0;
+const TAUNT_BOW: c_int = 1;
+const TAUNT_MEDITATE: c_int = 2;
+const TAUNT_FLOURISH: c_int = 3;
+const TAUNT_GLOAT: c_int = 4;
+
 //TODO: Port VectorCompare           // Source: oracle/oracle/codemp/game/q_shared.h
 
 use crate::g_active::helpers::*;

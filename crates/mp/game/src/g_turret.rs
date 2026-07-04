@@ -18,17 +18,18 @@ use crate::g_combat::{G_RadiusDamage, ObjectDie};
 use crate::NPC_combat::G_SetEnemy;
 use crate::q_math::{
     AngleVectors, AngleNormalize180, AngleSubtract, vectoangles, VectorLengthSquared,
-    Q_irand, YAW, PITCH, FRAMETIME,
+    Q_irand, YAW, PITCH,
 };
+use crate::g_items::FRAMETIME;
 use crate::q_shared::Q_stricmp;
 use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
 use crate::g_items::RegisterItem;
 use crate::trap;
 use crate::entity::ent_fn_enums::{EntThink, EntUse, EntDie, EntPain};
 use crate::entity::flags::FL_NOTARGET;
-use mp_bg::public::effect_types::{EFFECT_EXPLOSION_TURRET, EFFECT_SPARKS};
-use mp_bg::public::means_of_death::{MOD_TARGET_LASER, MOD_UNKNOWN};
-use mp_qshared::shared::trajectory::{TR_LINEAR, TR_LINEAR_STOP, TR_STATIONARY};
+use mp_bg::public::effect_types::effectTypes_t::{EFFECT_EXPLOSION_TURRET, EFFECT_SPARKS};
+use mp_bg::public::means_of_death::meansOfDeath_t::{MOD_TARGET_LASER, MOD_UNKNOWN};
+use mp_qshared::shared::trajectory::trType_t::{TR_LINEAR, TR_LINEAR_STOP, TR_STATIONARY};
 use std::ffi::c_char;
 
 /// Raven `q_shared.h:30` `VALIDSTRING(a)` macro.

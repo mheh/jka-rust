@@ -343,7 +343,7 @@ pub fn SP_target_speaker(
         (*ent).noise_index = G_SoundIndex(buffer.as_ptr());
 
         // a repeating speaker can be done completely client side
-        (*ent).s.eType = mp_bg::public::entity_type::ET_SPEAKER;
+        (*ent).s.eType = mp_bg::public::entity_type::entityType_t::ET_SPEAKER;
         (*ent).s.eventParm = (*ent).noise_index;
         (*ent).s.frame = ((*ent).wait * 10.0) as c_int;
         (*ent).s.clientNum = ((*ent).random * 10.0) as c_int;
@@ -405,12 +405,12 @@ pub fn target_laser_think(
         end[1] = (*self_).s.origin[1] + 2048.0 * (*self_).movedir[1];
         end[2] = (*self_).s.origin[2] + 2048.0 * (*self_).movedir[2];
 
-        trap::Trace(ctx.engine, &mut tr, (*self_).s.origin, core::ptr::null(), core::ptr::null(), end, (*self_).s.number, mp_bg::public::contents::CONTENTS_SOLID | mp_bg::public::contents::CONTENTS_BODY | mp_bg::public::contents::CONTENTS_CORPSE);
+        trap::Trace(ctx.engine, &mut tr, (*self_).s.origin, core::ptr::null(), core::ptr::null(), end, (*self_).s.number, CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE);
 
         if tr.entityNum != 0 {
             // hurt it if we can
             let targ = &mut ctx.world.entities[tr.entityNum as usize];
-            G_Damage(targ, self_, (*self_).activator, (*self_).movedir, tr.endpos, (*self_).damage, mp_bg::public::means_of_death::DAMAGE_NO_KNOCKBACK, meansOfDeath_t::MOD_TARGET_LASER as c_int);
+            G_Damage(targ, self_, (*self_).activator, (*self_).movedir, tr.endpos, (*self_).damage, DAMAGE_NO_KNOCKBACK, meansOfDeath_t::MOD_TARGET_LASER as c_int);
         }
 
         // VectorCopy(tr.endpos, self->s.origin2)
@@ -419,7 +419,7 @@ pub fn target_laser_think(
         (*self_).s.origin2[2] = tr.endpos[2];
 
         trap::LinkEntity(ctx.engine, self_);
-        (*self_).nextthink = ctx.world.level.time + crate::level::FRAMETIME as f32;
+        (*self_).nextthink = ctx.world.level.time + crate::g_items::FRAMETIME as f32;
     }
 }
 
@@ -478,7 +478,7 @@ pub fn target_laser_start(
     self_: *mut gentity_t,
 ) {
     unsafe {
-        (*self_).s.eType = mp_bg::public::entity_type::ET_BEAM;
+        (*self_).s.eType = mp_bg::public::entity_type::entityType_t::ET_BEAM;
 
         if !(*self_).target.is_null() {
             let ent = G_Find(ctx, core::ptr::null_mut(), core::mem::offset_of!(gentity_t, targetname) as c_int, (*self_).target);
@@ -517,7 +517,7 @@ pub fn SP_target_laser(
     unsafe {
         // let everything else get spawned before we start firing
         // TODO: Port fn-pointer assignment: (*self_).think = target_laser_start;
-        (*self_).nextthink = ctx.world.level.time + crate::level::FRAMETIME as f32;
+        (*self_).nextthink = ctx.world.level.time + crate::g_items::FRAMETIME as f32;
     }
 }
 

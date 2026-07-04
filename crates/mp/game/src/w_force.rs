@@ -108,7 +108,7 @@ use mp_bg::public::entity_event::entity_event_t::{EV_FORCE_DRAINED, EV_PREDEFSOU
 /// Raven `mindTrickTime` per force-mastery level (ms).
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:139-145`
-const mindTrickTime: [c_int; 4] = [0 /*none*/, 5000, 10000, 15000];
+pub const mindTrickTime: [c_int; 4] = [0 /*none*/, 5000, 10000, 15000];
 
 /// Raven `G_PreDefSound` — spawn a predefined-sound temp entity at `org`.
 ///

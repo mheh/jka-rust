@@ -59,6 +59,13 @@ pub struct GameWorld {
     /// Source: `oracle/oracle/codemp/game/g_mem.c:13-14`
     pub memoryPool: Box<[u8; 262144]>, // 256 * 1024
     pub allocPoint: c_int,
+
+    /// The bg tier's session-lifetime state (pass-3 ruling 12): the anim/saber/
+    /// vehicle tables, the `BG_Alloc` pool, and the fork-3 RNG. Game reaches the
+    /// LCG as `world.bg_state.rng` (ruling 15); `Pmove` borrows this to build a
+    /// `PmoveContext` each call.
+    /// Source: `crate::bg_channel::BgState`
+    pub bg_state: crate::bg_channel::BgState,
 }
 
 impl GameWorld {
@@ -94,6 +101,8 @@ impl GameWorld {
             teamCounter: [0; 4],
             memoryPool,
             allocPoint: 0,
+            // Zeroed session state with the LCG seeded to Raven's `holdrand`.
+            bg_state: crate::bg_channel::BgState::new(),
         }
     }
 }

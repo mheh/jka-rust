@@ -33,7 +33,6 @@ use crate::q_math::{AngleNormalize360, AngleVectors, Q_irand, VectorNormalize, f
 use crate::NPC_AI_Rancor::DistanceSquared;
 use mp_bg::public::entity_event::entity_event_t::{EV_CONFUSE1, EV_CONFUSE3, EV_PUSHED1, EV_PUSHED3};
 use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ATTACK, BUTTON_ALT_ATTACK, BUTTON_WALKING};
-use mp_qshared::shared::collision::{CONTENTS_BODY, CONTENTS_CORPSE, CONTENTS_SOLID, CONTENTS_TERRAIN};
 
 // Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }`
 // (file-scope local state, `gNPC_t::localState`) — not a central type, ported
@@ -69,12 +68,8 @@ const MAX_ENEMY_POS_LAG: i32 = 2400;
 const ENEMY_POS_LAG_INTERVAL: i32 = 100;
 const ENEMY_POS_LAG_STEPS: i32 = MAX_ENEMY_POS_LAG / ENEMY_POS_LAG_INTERVAL;  // 24
 
-// Trace mask for weapon shots (from oracle/oracle/codemp/game/bg_public.h:1177)
-// Source: `oracle/oracle/codemp/game/bg_public.h:1177`
-const MASK_SHOT: c_int = mp_qshared::shared::collision::CONTENTS_SOLID
-    | mp_qshared::shared::collision::CONTENTS_BODY
-    | mp_qshared::shared::collision::CONTENTS_CORPSE
-    | mp_qshared::shared::collision::CONTENTS_TERRAIN;
+// `MASK_SHOT` (`bg_public.h:1177`) now resolves via the crate prelude
+// (pass-3 symbol backfill, `mp_qshared::shared::surface_flags`).
 
 /// Raven `Sniper_ClearTimers`.
 ///

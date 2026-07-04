@@ -92,9 +92,9 @@ const MOVER_INACTIVE: c_int = 128;
 // Raven file-scope `int BMS_START/BMS_MID/BMS_END` (g_mover.c:35-37) — never
 // reassigned at runtime (fork ruling 5: const tables -> const).
 // Source: `oracle/oracle/codemp/game/g_mover.c:35-37`
-const BMS_START: c_int = 0;
-const BMS_MID: c_int = 1;
-const BMS_END: c_int = 2;
+pub const BMS_START: c_int = 0;
+pub const BMS_MID: c_int = 1;
+pub const BMS_END: c_int = 2;
 
 /// Raven `G_PlayDoorLoopSound`.
 ///

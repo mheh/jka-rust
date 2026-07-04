@@ -13,6 +13,7 @@ pub mod game_item;
 pub mod parms;
 pub mod platform;
 pub mod player_state;
+pub mod pm_flags;
 pub mod qtime;
 pub mod saber;
 pub mod shared_entity_t;
@@ -49,6 +50,11 @@ pub use failed_edge::failedEdge_t;
 pub use game_item::{gitem_t, itemType_t, MAX_ITEM_MODELS};
 pub use parms::{parms_t, MAX_PARMS, MAX_PARM_STRING_LENGTH};
 pub use player_state::playerState_t;
+pub use pm_flags::{
+    PMF_ALL_TIMES, PMF_BACKWARDS_JUMP, PMF_BACKWARDS_RUN, PMF_DUCKED, PMF_FIX_MINS, PMF_FOLLOW,
+    PMF_JUMP_HELD, PMF_RESPAWNED, PMF_ROLLING, PMF_SCOREBOARD, PMF_STUCK_TO_WALL,
+    PMF_TIME_KNOCKBACK, PMF_TIME_LAND, PMF_TIME_WATERJUMP, PMF_UPDATE_ANIM, PMF_USE_ITEM_HELD,
+};
 pub use qtime::qtime_t;
 pub use saber::{
     bladeInfo_t, saberInfo_t, saberTrail_t, saberType_t, saber_colors_t, saber_styles_t,

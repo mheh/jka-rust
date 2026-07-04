@@ -205,7 +205,8 @@ pub fn GM_CreateExplosion(
 pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let level_time = (*ctx.world).level.time;
-        let vec3_origin: vec3_t = [0.0, 0.0, 0.0];
+        // Raven `vec3_origin` — resolved via the crate prelude (pass-3 symbol
+        // backfill).
         if level_time - (*self_).s.time < 4000 {
             // FIXME: need a real effect
             // self->s.powerups |= ( 1 << PW_SHOCKED );
@@ -699,8 +700,8 @@ pub fn NPC_GM_StartLaser(ctx: GameContext<'_>) {
             crate::g_timer::TIMER_Set(ctx, npc_ent, c"beamDelay".as_ptr(), torso_timer);
             crate::g_timer::TIMER_Set(ctx, npc_ent, c"attackDelay".as_ptr(), torso_timer + 3000);
             (*npc_ent).lockCount = 1;
-            // turn on warmup effect
-            let vec3_origin: vec3_t = [0.0, 0.0, 0.0];
+            // turn on warmup effect (Raven `vec3_origin` — resolved via the
+            // crate prelude, pass-3 symbol backfill).
             crate::g_utils::G_PlayEffectID(
                 crate::g_utils::G_EffectIndex(c"galak/beam_warmup".as_ptr()),
                 (*npc_ent).r.currentOrigin,

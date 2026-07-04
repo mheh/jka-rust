@@ -68,7 +68,7 @@ pub fn NPC_Seeker_Pain(
     damage: c_int,
 ) {
     unsafe {
-        if !((*(*self_).NPC).aiFlags & crate::npc::g_npc_t::NPCAI_CUSTOM_GRAVITY) {
+        if !((*(*self_).NPC).aiFlags & crate::npc::ai_flags::NPCAI_CUSTOM_GRAVITY) {
             crate::g_combat::G_Damage(
                 self_,
                 core::ptr::null_mut(),

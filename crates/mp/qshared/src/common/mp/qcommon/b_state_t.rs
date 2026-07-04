@@ -5,6 +5,7 @@
 /// Raven: These take over only if script allows them to be autonomous.
 /// Type definition source: `oracle/oracle/codemp/game/g_public.h:584-606`
 #[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum bState_t {
 	BS_DEFAULT = 0,       // default behavior for that NPC
 	BS_ADVANCE_FIGHT,     // Advance to captureGoal and shoot enemies if you can

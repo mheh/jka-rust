@@ -26,8 +26,52 @@ use crate::q_math::{PITCH, ROLL, YAW};
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::vehicles::MIN_LANDING_SLOPE;
 
-// Unported types referenced in this file (need porting before this compiles):
-// void ()(trace_t , vec_t , vec_t , vec_t , vec_t , int, int)
+// Pass-3 bg state channel (fork rulings 12-16): the per-call working set + the
+// two seam traits + the session state. `PmoveContext` replaces the file-static
+// pmove working set the skeletons parked on.
+use crate::bg_channel::{BgState, BgTraps, GameCallbacks, PmoveContext};
+// Vehicle-type discriminants for the `PM_Friction` vehicle-friction branch.
+use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
+
+// --- `bg_pmove.c` file-scope movement parameters (globals 41-55). These are
+// read-only tunables, so they stay module `const`s (post-mega-pass ruling 15:
+// "the pm_* float constants can stay consts").
+// Source: `oracle/oracle/codemp/game/bg_pmove.c:41-55`
+const pm_stopspeed: f32 = 100.0;
+const pm_friction: f32 = 6.0;
+const pm_waterfriction: f32 = 1.0;
+const pm_spectatorfriction: f32 = 5.0;
+
+// --- `bg_pmove.c` local `FLY_*` enum (bg_pmove.c:441-444). Mirrors `pm_flying`.
+// Source: `oracle/oracle/codemp/game/bg_pmove.c:441-444`
+const FLY_NONE: c_int = 0;
+const FLY_NORMAL: c_int = 1;
+const FLY_VEHICLE: c_int = 2;
+const FLY_HOVER: c_int = 3;
+
+// --- Constants the pmove slice reads that are not (yet) centrally exported;
+// defined here per the codebase's per-file `#define` convention (cf. w_force.rs
+// defining its own `PMF_STUCK_TO_WALL`). Each cites its Raven `#define`.
+/// `MINS_Z`. Source: `oracle/oracle/codemp/game/bg_public.h:46`
+const MINS_Z: c_int = -24;
+/// `MIN_WALK_NORMAL`. Source: `oracle/oracle/codemp/game/bg_local.h:5`
+const MIN_WALK_NORMAL: f32 = 0.7;
+/// `SURF_SLICK`. Source: `oracle/oracle/codemp/game/surfaceflags.h:39`
+const SURF_SLICK: c_int = 0x0000_4000;
+/// `CONTENTS_LAVA|WATER|SLIME`. Source: `oracle/oracle/codemp/game/surfaceflags.h:11,12,30`
+const MASK_WATER: c_int = 0x0000_0002 | 0x0000_0004 | 0x0002_0000;
+/// `PMF_STUCK_TO_WALL`. Source: `oracle/oracle/codemp/game/bg_public.h:417`
+const PMF_STUCK_TO_WALL: c_int = 16384;
+/// `PMF_TIME_KNOCKBACK`. Source: `oracle/oracle/codemp/game/bg_public.h:409`
+const PMF_TIME_KNOCKBACK: c_int = 64;
+/// `PMF_JUMP_HELD`. Source: `oracle/oracle/codemp/game/bg_public.h:404`
+const PMF_JUMP_HELD: c_int = 2;
+/// `PS_PMOVEFRAMECOUNTBITS`. Source: `oracle/oracle/codemp/game/q_shared.h:2141`
+const PS_PMOVEFRAMECOUNTBITS: c_int = 6;
+/// `BUTTON_ATTACK`. Source: `oracle/oracle/codemp/game/q_shared.h:2451`
+const BUTTON_ATTACK: c_int = 1;
+/// `BUTTON_ALT_ATTACK`. Source: `oracle/oracle/codemp/game/q_shared.h:2462`
+const BUTTON_ALT_ATTACK: c_int = 128;
 
 /// Raven `BONE_ANGLES_POSTMULT` (ghoul2 bone-angle apply mode).
 /// Source: `oracle/oracle/code/game/ghoul2_shared.h:54`
@@ -231,25 +275,287 @@ pub fn PM_AddTouchEnt(
     todo!("Port PM_AddTouchEnt — parked: pmove-working-state")
 }
 
-/// Raven `PM_ClipVelocity`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:954-988`
-// PORT-ESCALATION(pmove-working-state): reads `pm`; `out` is also a by-value vec3_t out-param.
-pub fn PM_ClipVelocity(
-    r#in: vec3_t,
-    normal: vec3_t,
-    out: vec3_t,
-    overbounce: f32,
-) {
-    todo!("Port PM_ClipVelocity — parked: pmove-working-state")
-}
+// The pmove pipeline as `PmoveContext` methods (pass-3 rulings 12/8a). Each was
+// a no-arg C function reaching the file-static working set; the set now lives in
+// `self` (`self.pm`/`self.pml`/`self.pm_entSelf`/… + `self.bg`/`self.traps`).
+// The `unsafe` that dereferences the faithful `pm`/entity pointers is confined
+// to these bodies (porting-rules §D11; ruling 14).
+impl PmoveContext<'_> {
+    /// Raven `PM_BGEntForNum` — the faithful `baseEnt`/`entSize` head-overlay
+    /// (ruling 14). Returns the `bgEntity_t` at index `num` in the base array
+    /// the engine handed us. Raven's `assert`s become defensive null/zero
+    /// returns (out-of-pmove calls / unset base are the UB cases §19 covers).
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:172-199`
+    pub fn PM_BGEntForNum(&self, num: c_int) -> *mut bgEntity_t {
+        unsafe {
+            if self.pm.is_null() {
+                // "You cannot call PM_BGEntForNum outside of pm functions!"
+                return core::ptr::null_mut();
+            }
+            let pm = &*self.pm;
+            if pm.baseEnt.is_null() {
+                // "Base entity address not set"
+                return core::ptr::null_mut();
+            }
+            if pm.entSize == 0 {
+                // "sizeof(ent) is 0, impossible (not set?)"
+                return core::ptr::null_mut();
+            }
+            debug_assert!(num >= 0 && num < MAX_GENTITIES as c_int);
+            // ent = (bgEntity_t *)((byte *)pm->baseEnt + pm->entSize*(num));
+            (pm.baseEnt as *mut byte).offset((pm.entSize * num) as isize) as *mut bgEntity_t
+        }
+    }
 
-/// Raven `PM_Friction`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:998-1123`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`pm_entSelf`/`pm_flying`/`pml` + movement-param globals.
-pub fn PM_Friction() {
-    todo!("Port PM_Friction — parked: pmove-working-state")
+    /// Raven `PM_ClipVelocity` — slide `in` off the impacting surface `normal`
+    /// into `out` (§C7 out-param shape; `in`/`normal` by value permit the
+    /// `PM_ClipVelocity(pml.forward, …, pml.forward, …)` self-aliasing callers).
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:954-988`
+    pub fn PM_ClipVelocity(
+        &self,
+        r#in: vec3_t,
+        normal: vec3_t,
+        out: &mut vec3_t,
+        overbounce: f32,
+    ) {
+        unsafe {
+            let ps = &*(*self.pm).ps;
+            if ps.pm_flags & PMF_STUCK_TO_WALL != 0 {
+                // no sliding!
+                *out = r#in; // VectorCopy( in, out )
+                return;
+            }
+            let oldInZ = r#in[2];
+
+            // backoff = DotProduct (in, normal);
+            let mut backoff = r#in[0] * normal[0] + r#in[1] * normal[1] + r#in[2] * normal[2];
+
+            if backoff < 0.0 {
+                backoff *= overbounce;
+            } else {
+                backoff /= overbounce;
+            }
+
+            for i in 0..3 {
+                let change = normal[i] * backoff;
+                out[i] = r#in[i] - change;
+            }
+            if (*self.pm).stepSlideFix != 0
+                && ps.clientNum < MAX_CLIENTS as c_int// normal player
+                && ps.groundEntityNum != ENTITYNUM_NONE // on the ground
+                && normal[2] < MIN_WALK_NORMAL
+            {
+                // sliding against a steep slope: don't slide up slopes too steep to walk on
+                out[2] = oldInZ;
+            }
+        }
+    }
+
+    /// Raven `PM_Friction` — ground + water friction on `pm->ps->velocity`.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:998-1123`
+    pub fn PM_Friction(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+
+            // vec = velocity, ignoring slope movement while walking.
+            let mut vec = (*ps).velocity;
+            if self.pml.walking != 0 {
+                vec[2] = 0.0;
+            }
+
+            // speed = VectorLength(vec);
+            let speed = (vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]).sqrt();
+            if speed < 1.0 {
+                (*ps).velocity[0] = 0.0;
+                (*ps).velocity[1] = 0.0; // allow sinking underwater
+                if (*ps).pm_type == PM_SPECTATOR as c_int {
+                    (*ps).velocity[2] = 0.0;
+                }
+                return;
+            }
+
+            let mut drop: f32 = 0.0;
+
+            let mut pEnt: *mut bgEntity_t = core::ptr::null_mut();
+            if (*ps).clientNum >= MAX_CLIENTS as c_int{
+                pEnt = self.pm_entSelf;
+            }
+
+            // apply ground friction, even if on ladder
+            if self.pm_flying != FLY_VEHICLE
+                && !pEnt.is_null()
+                && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int
+                && !(*pEnt).m_pVehicle.is_null()
+                && (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).r#type as c_int
+                    != vehicleType_t::VH_ANIMAL as c_int
+                && (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).r#type as c_int
+                    != vehicleType_t::VH_WALKER as c_int
+                && (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).friction != 0.0
+            {
+                let friction = (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).friction;
+                if (*ps).pm_flags & PMF_TIME_KNOCKBACK == 0 {
+                    let control = if speed < pm_stopspeed { pm_stopspeed } else { speed };
+                    drop += control * friction * self.pml.frametime;
+                }
+            } else if self.pm_flying != FLY_NORMAL && self.pm_flying != FLY_VEHICLE {
+                // apply ground friction
+                if (*pm).waterlevel <= 1
+                    && self.pml.walking != 0
+                    && self.pml.groundTrace.surfaceFlags & SURF_SLICK == 0
+                    && (*ps).pm_flags & PMF_TIME_KNOCKBACK == 0
+                {
+                    // if getting knocked back, no friction
+                    let control = if speed < pm_stopspeed { pm_stopspeed } else { speed };
+                    drop += control * pm_friction * self.pml.frametime;
+                }
+            }
+
+            if self.pm_flying == FLY_VEHICLE && (*ps).pm_flags & PMF_TIME_KNOCKBACK == 0 {
+                let control = speed;
+                drop += control * pm_friction * self.pml.frametime;
+            }
+
+            // apply water friction even if just wading
+            if (*pm).waterlevel != 0 {
+                drop += speed * pm_waterfriction * (*pm).waterlevel as f32 * self.pml.frametime;
+            }
+            // If on a client then there is no friction
+            else if (*ps).groundEntityNum < MAX_CLIENTS as c_int{
+                drop = 0.0;
+            }
+
+            if (*ps).pm_type == PM_SPECTATOR as c_int || (*ps).pm_type == PM_FLOAT as c_int {
+                if (*ps).pm_type == PM_FLOAT as c_int {
+                    // almost no friction while floating (Raven's `0.1` is a
+                    // `double` literal; compute in f64 to preserve parity).
+                    drop = (drop as f64
+                        + speed as f64 * 0.1 * self.pml.frametime as f64)
+                        as f32;
+                } else {
+                    drop += speed * pm_spectatorfriction * self.pml.frametime;
+                }
+            }
+
+            // scale the velocity
+            let mut newspeed = speed - drop;
+            if newspeed < 0.0 {
+                newspeed = 0.0;
+            }
+            newspeed /= speed;
+
+            (*ps).velocity[0] *= newspeed;
+            (*ps).velocity[1] *= newspeed;
+            (*ps).velocity[2] *= newspeed;
+        }
+    }
+
+    /// Raven `PM_SetWaterLevel` — set `pm->waterlevel`/`watertype` by sampling
+    /// point contents at three heights (accounting for ducking). Exercises the
+    /// `BgTraps::pointcontents` seam (ruling 13).
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4285-4320`
+    pub fn PM_SetWaterLevel(&mut self) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+
+            // get waterlevel, accounting for ducking
+            (*pm).waterlevel = 0;
+            (*pm).watertype = 0;
+
+            let mut point: vec3_t = [
+                (*ps).origin[0],
+                (*ps).origin[1],
+                (*ps).origin[2] + MINS_Z as f32 + 1.0,
+            ];
+            let mut cont = self
+                .traps
+                .pointcontents(core::ptr::addr_of!(point), (*ps).clientNum);
+
+            if cont & MASK_WATER != 0 {
+                let sample2 = (*ps).viewheight - MINS_Z;
+                let sample1 = sample2 / 2;
+
+                (*pm).watertype = cont;
+                (*pm).waterlevel = 1;
+                point[2] = (*ps).origin[2] + MINS_Z as f32 + sample1 as f32;
+                cont = self
+                    .traps
+                    .pointcontents(core::ptr::addr_of!(point), (*ps).clientNum);
+                if cont & MASK_WATER != 0 {
+                    (*pm).waterlevel = 2;
+                    point[2] = (*ps).origin[2] + MINS_Z as f32 + sample2 as f32;
+                    cont = self
+                        .traps
+                        .pointcontents(core::ptr::addr_of!(point), (*ps).clientNum);
+                    if cont & MASK_WATER != 0 {
+                        (*pm).waterlevel = 3;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Raven `PM_DoSlowFall` — reads `pm->ps`; ported in the pass-3 remainder.
+    //TODO: Port PM_DoSlowFall
+    // Source: oracle/oracle/codemp/game/bg_pmove.c:321-329
+    pub fn PM_DoSlowFall(&mut self) -> qboolean {
+        todo!("Port PM_DoSlowFall — pass 3 (bg_pmove.c:321-329)")
+    }
+
+    /// Raven `PmoveSingle` — one fixed-timestep move. The opening (proxy button
+    /// fix-up, working-set entity setup, slow-fall latch, result clear, rocket-
+    /// trooper crouch clamp) is ported faithfully; the ~930-line move pipeline
+    /// remainder is the pass-3 target (single `todo!` per task).
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:10174-11157`
+    pub fn PmoveSingle(&mut self, pmove: *mut pmove_t) {
+        unsafe {
+            self.pm = pmove;
+            let pm = self.pm;
+
+            if (*(*pm).ps).emplacedIndex != 0 && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                // hackerrific.
+                (*pm).cmd.buttons &= !BUTTON_ALT_ATTACK;
+                (*pm).cmd.buttons |= BUTTON_ATTACK;
+            }
+
+            // set up these "global" bg ents
+            self.pm_entSelf = self.PM_BGEntForNum((*(*pm).ps).clientNum);
+            if (*(*pm).ps).m_iVehicleNum != 0 {
+                if (*(*pm).ps).clientNum < MAX_CLIENTS as c_int{
+                    // player riding vehicle
+                    self.pm_entVeh = self.PM_BGEntForNum((*(*pm).ps).m_iVehicleNum);
+                } else {
+                    // vehicle with player pilot
+                    self.pm_entVeh = self.PM_BGEntForNum((*(*pm).ps).m_iVehicleNum - 1);
+                }
+            } else {
+                // no vehicle ent
+                self.pm_entVeh = core::ptr::null_mut();
+            }
+
+            self.gPMDoSlowFall = self.PM_DoSlowFall();
+
+            // this counter lets us debug movement problems with a journal
+            self.bg.c_pmove += 1;
+
+            // clear results
+            (*pm).numtouch = 0;
+            (*pm).watertype = 0;
+            (*pm).waterlevel = 0;
+
+            if PM_IsRocketTrooper() != 0 {
+                // don't let a nonhumanoid (probably a rockettrooper) crouch
+                if (*pm).cmd.upmove < 0 {
+                    (*pm).cmd.upmove = 0;
+                }
+            }
+
+            //TODO: Port PmoveSingle remainder
+            // Source: oracle/oracle/codemp/game/bg_pmove.c:10228-11157
+            todo!("Port PmoveSingle remainder — pass 3")
+        }
+    }
 }
 
 /// Raven `PM_Accelerate`.
@@ -530,13 +836,8 @@ pub fn PM_GroundTrace() {
     todo!("Port PM_GroundTrace — parked: pmove-working-state")
 }
 
-/// Raven `PM_SetWaterLevel`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:4285-4320`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_SetWaterLevel() {
-    todo!("Port PM_SetWaterLevel — parked: pmove-working-state")
-}
+// `PM_SetWaterLevel` is a `PmoveContext` method above (it reads the pmove
+// working set and drives `BgTraps::pointcontents`).
 
 /// Raven `PM_CheckDualForwardJumpDuck`.
 ///
@@ -1775,25 +2076,61 @@ pub fn PM_MoveForKata(
     todo!("Port PM_MoveForKata — parked: pmove-working-state")
 }
 
-/// Raven `PmoveSingle`.
-///
-/// Source: `oracle/oracle/codemp/game/bg_pmove.c:10174-11157`
-// PORT-ESCALATION(pmove-working-state): the pmove driver — sets `pm`/`pm_entSelf`/`pm_entVeh`/`pml`
-// and every working-set global, then dispatches the whole move pipeline. Blocked on the working-set
-// threading decision (and `trap_SnapVector`, which needs an engine handle).
-pub fn PmoveSingle(
-    pmove: *mut pmove_t,
-) {
-    todo!("Port PmoveSingle — parked: pmove-working-state")
-}
+// `PmoveSingle` is a `PmoveContext` method above (it owns the per-call working
+// set the C file-statics used to hold).
 
-/// Raven `Pmove`.
-///
+/// Raven `Pmove` — the public pmove entrypoint. Constructs one `PmoveContext`
+/// per call (ruling 12) from the bg channel handles the game tier supplies,
+/// then chops the move into fixed timesteps and runs `PmoveSingle` for each.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:11167-11215`
-// PORT-ESCALATION(pmove-working-state): the public entrypoint — loops PmoveSingle; blocked on the
-// same working-set threading decision.
 pub fn Pmove(
     pmove: *mut pmove_t,
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+    callbacks: &mut dyn GameCallbacks,
 ) {
-    todo!("Port Pmove — parked: pmove-working-state")
+    unsafe {
+        let finalTime = (*pmove).cmd.serverTime;
+
+        if finalTime < (*(*pmove).ps).commandTime {
+            return; // should not happen
+        }
+
+        if finalTime > (*(*pmove).ps).commandTime + 1000 {
+            (*(*pmove).ps).commandTime = finalTime - 1000;
+        }
+
+        if (*(*pmove).ps).fallingToDeath != 0 {
+            (*pmove).cmd.forwardmove = 0;
+            (*pmove).cmd.rightmove = 0;
+            (*pmove).cmd.upmove = 0;
+            (*pmove).cmd.buttons = 0;
+        }
+
+        (*(*pmove).ps).pmove_framecount =
+            ((*(*pmove).ps).pmove_framecount + 1) & ((1 << PS_PMOVEFRAMECOUNTBITS) - 1);
+
+        // One working-set context for the whole (possibly multi-step) move.
+        let mut pmc = PmoveContext::new(bg, traps, callbacks);
+
+        // chop the move up if it is too long, to prevent framerate-dependent behavior
+        while (*(*pmove).ps).commandTime != finalTime {
+            let mut msec = finalTime - (*(*pmove).ps).commandTime;
+
+            if (*pmove).pmove_fixed != 0 {
+                if msec > (*pmove).pmove_msec {
+                    msec = (*pmove).pmove_msec;
+                }
+            } else if msec > 66 {
+                msec = 66;
+            }
+            (*pmove).cmd.serverTime = (*(*pmove).ps).commandTime + msec;
+
+            pmc.PmoveSingle(pmove);
+
+            if (*(*pmove).ps).pm_flags & PMF_JUMP_HELD != 0 {
+                (*pmove).cmd.upmove = 20;
+            }
+        }
+    }
 }

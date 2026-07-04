@@ -20,7 +20,8 @@ use crate::q_math::{
     vectoangles,
 };
 use crate::level::alert_event::{
-    alertEvent_t, alertEventLevel_e, alertEventType_e, AEL_DANGER, MAX_ALERT_EVENTS,
+    alertEvent_t, alertEventLevel_e, alertEventLevel_e::AEL_DANGER, alertEventType_e,
+    MAX_ALERT_EVENTS,
 };
 use crate::level::interest_point::MAX_INTEREST_POINTS;
 use mp_qshared::common::trace_t;

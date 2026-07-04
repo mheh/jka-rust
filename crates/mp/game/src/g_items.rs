@@ -64,6 +64,12 @@ const PITCH: usize = 0;
 const YAW: usize = 1;
 const ROLL: usize = 2;
 
+/// Raven `ITMSF_ALLOWNPC` — file-scope in `g_items.c` (item spawnflag: NPCs
+/// may pick this item up).
+///
+/// Source: `oracle/oracle/codemp/game/g_items.c:32`
+const ITMSF_ALLOWNPC: c_int = 4;
+
 // Raven `g_items.c:42-44` medpack heal caps.
 const MAX_MEDPACK_HEAL_AMOUNT: c_int = 25;
 const MAX_MEDPACK_BIG_HEAL_AMOUNT: c_int = 50;
@@ -109,8 +115,11 @@ use mp_bg::public::entity_event::entity_event_t;
 // Raven `ITEM_RADIUS` (`bg_public.h:35`).
 const ITEM_RADIUS: f32 = 15.0;
 
-// Raven `FRAMETIME` (`g_local.h:37`) — not yet ported elsewhere.
-const FRAMETIME: c_int = 100;
+// Raven `FRAMETIME` (`g_local.h:37`). `pub` + prelude re-export (pass-3
+// symbol backfill) — sibling files (`NPC_AI_GalakMech.rs`, `g_mover.rs`, …)
+// carry their own private copy of this same value; this is the one exported
+// for bare-use sites without a local copy.
+pub const FRAMETIME: c_int = 100;
 
 // Raven `#define TURRET_DEATH_DELAY 2000` / `TURRET_LIFETIME 60000` (`g_items.c:697-698`).
 const TURRET_DEATH_DELAY: c_int = 2000;
@@ -2291,8 +2300,8 @@ pub fn EWeb_Create(
             return core::ptr::null_mut();
         }
 
-        // initialize bone angles
-        let vec3_origin: vec3_t = [0.0, 0.0, 0.0];
+        // initialize bone angles (Raven `vec3_origin` — now resolved via the
+        // crate prelude, pass-3 symbol backfill).
         EWeb_SetBoneAngles(ctx, ent, c"cannon_Yrot".as_ptr() as *mut c_char, vec3_origin);
         EWeb_SetBoneAngles(ctx, ent, c"cannon_Xrot".as_ptr() as *mut c_char, vec3_origin);
 

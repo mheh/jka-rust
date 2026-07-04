@@ -457,7 +457,7 @@ pub fn Grenadier_CheckFireState(ctx: GameContext<'_>) {
             return;
         }
 
-        if mp_qshared::shared::VectorCompare((*(*npc_ptr).client).ps.velocity, mp_qshared::shared::vec3_origin) == QFALSE {
+        if mp_qshared::shared::VectorCompare((*(*npc_ptr).client).ps.velocity, crate::q_math::vec3_origin) == QFALSE {
             // if moving at all, don't do this
             return;
         }
