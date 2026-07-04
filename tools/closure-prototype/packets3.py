@@ -382,7 +382,9 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
     o.append("")
 
     # ---- RNG mapping (ruling 15 — the LCG lives on BgState.rng)
-    rng_path = ("`ctx.world.bg_state.rng`" if tier == "game"
+    # ctx.world is *mut GameWorld — field access needs the explicit deref
+    # (raw-pointer projection sugar is not valid Rust; unsafe per §D11 seam rules).
+    rng_path = ("`(*ctx.world).bg_state.rng`" if tier == "game"
                 else "`self.bg.rng`" if tier == "bg"
                 else "the caller's `bg_state.rng`")
     o.append("## RNG (ruling 15) — Raven `rand`/`srand`/`random`/`crandom`/`*rand` → `BgState.rng`")
@@ -481,7 +483,8 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
             note = " (via `self.callbacks`)" if tier == "bg" else " (ported game bodies)"
             o.append(f"- **GameCallbacks upcalls:** {', '.join('`'+g+'`' for g in gc_calls)}{note}")
         stbits = []
-        wprefix = "ctx.world" if tier == "game" else "world (bg: via overlay/callbacks)"
+        # ctx.world is *mut GameWorld — explicit deref, never field-projection sugar.
+        wprefix = "(*ctx.world)" if tier == "game" else "world (bg: via overlay/callbacks)"
         if ms:
             if tier == "bg":
                 stbits.append("entities/level (bg: `g_entities` via `PM_BGEntForNum` "
@@ -491,7 +494,7 @@ def render_packet(cfile, tier, is_icarus, chunk, shard, n_shards, rulings,
                 stbits.append(f"master `{wprefix}`: " + ", ".join('`'+n+'`' for n in ms))
         if cv: stbits.append(f"cvars `{wprefix}.cvars.*`: " + ", ".join('`'+n+'`' for n in cv))
         if gv: stbits.append(f"globals `{wprefix}.globals.*`: " + ", ".join('`'+n+'`' for n in gv))
-        if bs: stbits.append("`BgState` (`self.bg` bg / `ctx.world.bg_state` game): "
+        if bs: stbits.append("`BgState` (`self.bg` bg / `(*ctx.world).bg_state` game): "
                              + ", ".join('`'+n+'`' for n in bs))
         if stbits:
             o.append("- **state fields:** " + "  ·  ".join(stbits))
