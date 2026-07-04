@@ -12,8 +12,8 @@
 
 use mp_qshared::shared::cvar::vmCvar_t;
 
-//TODO: Port CVAR_ARCHIVE (and sibling CVAR_* flag consts)
-// Source: oracle/oracle/codemp/game/q_shared.h:1782-1800
+// CVAR_* flag consts ported: crate::q_shared_cvar_flags (re-exported via
+// crate::prelude).
 
 /// Raven `gameCvarTable` cvar handles (one field per non-NULL `vmCvar`).
 ///
@@ -292,6 +292,32 @@ pub struct GameCvars {
     pub g_powerDuelStartHealth: vmCvar_t,
     /// `"g_powerDuelEndHealth"` — default `"90"`.
     pub g_powerDuelEndHealth: vmCvar_t,
+    /// Raven `bot_wp_info` — file-scope `vmCvar_t` (not in `gameCvarTable`;
+    /// registered ad hoc by `G_InitGame`). `"bot_wp_info"` — default `"1"`, flags `0`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.h:377`, registration `ai_main.c:7593`.
+    pub bot_wp_info: vmCvar_t,
+    /// Raven `bot_wp_edit` — file-scope `vmCvar_t` (not in `gameCvarTable`).
+    /// `"bot_wp_edit"` — default `"0"`, flags `CVAR_CHEAT`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.h:378`, registration `ai_main.c:7594`.
+    pub bot_wp_edit: vmCvar_t,
+    /// Raven `bot_wp_clearweight` — file-scope `vmCvar_t` (not in `gameCvarTable`).
+    /// `"bot_wp_clearweight"` — default `"1"`, flags `0`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.h:379`, registration `ai_main.c:7595`.
+    pub bot_wp_clearweight: vmCvar_t,
+    /// Raven `bot_wp_distconnect` — file-scope `vmCvar_t` (not in `gameCvarTable`).
+    /// `"bot_wp_distconnect"` — default `"1"`, flags `0`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.h:380`, registration `ai_main.c:7596`.
+    pub bot_wp_distconnect: vmCvar_t,
+    /// Raven `bot_wp_visconnect` — file-scope `vmCvar_t` (not in `gameCvarTable`).
+    /// `"bot_wp_visconnect"` — default `"1"`, flags `0`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.h:381`, registration `ai_main.c:7597`.
+    pub bot_wp_visconnect: vmCvar_t,
+    /// Raven `bot_normgpath` — file-scope `vmCvar_t` declared in `ai_main.c`,
+    /// `extern`'d locally in `ai_wpnav.c` (not in `gameCvarTable`; registered
+    /// ad hoc on first use in `ai_wpnav.c`).
+    /// `"bot_normgpath"` — default `"1"`, flags `CVAR_CHEAT`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:66`, registration `ai_wpnav.c:3360`.
+    pub bot_normgpath: vmCvar_t,
 }
 
 /// One `gameCvarTable` row: registration data for `G_RegisterCvars`
