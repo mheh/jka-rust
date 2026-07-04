@@ -551,7 +551,6 @@ pub fn target_teleporter_use(
 /// Raven `SP_target_teleporter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:460-465`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_teleporter_use to use field
 pub fn SP_target_teleporter(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
         if (*self_).targetname.is_null() {
@@ -1069,7 +1068,6 @@ pub fn target_level_change_use(
 /// Raven `SP_target_level_change`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_target.c:955-970`
-// PORT-ESCALATION(fn-pointer-assignment): Cannot assign target_level_change_use to use field
 pub fn SP_target_level_change(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
         let mut s: *mut c_char = core::ptr::null_mut();
