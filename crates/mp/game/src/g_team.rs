@@ -40,6 +40,13 @@ const TEAM_RED: c_int = 1;
 const TEAM_BLUE: c_int = 2;
 const TEAM_SPECTATOR: c_int = 3;
 
+// Siege team indices (oracle/oracle/codemp/game/g_team.c)
+const SIEGETEAM_TEAM1: c_int = 0;
+const SIEGETEAM_TEAM2: c_int = 1;
+
+// Game state constant (oracle/oracle/codemp/game/g_team.c:974)
+const TEAM_BEGIN: c_int = 0;
+
 // `SVF_BROADCAST` (svflags #define) is not yet ported anywhere in the crate
 // graph; defined locally, verbatim, following the `ai_wpnav.rs` precedent.
 // Source: `oracle/oracle/codemp/game/g_public.h:20`
@@ -1037,9 +1044,6 @@ pub fn Team_GetLocation(
 
 /// Raven `Team_GetLocationMsg`.
 ///
-// PORT-ESCALATION(unresolved-varargs): `Com_sprintf`'s resolved skeleton
-// signature is `/* ... C varargs */`-only; the formatting call
-// (`"%c%c%s" S_COLOR_WHITE` / `"%s"`) can't be expressed against it.
 /// Source: `oracle/oracle/codemp/game/g_team.c:919-938`
 pub fn Team_GetLocationMsg(
     ctx: GameContext<'_>,
@@ -1047,13 +1051,38 @@ pub fn Team_GetLocationMsg(
     loc: *mut c_char,
     loclen: c_int,
 ) -> qboolean {
-    todo!("Port Team_GetLocationMsg — parked: unresolved-varargs (Com_sprintf varargs)")
+    unsafe {
+        let best = Team_GetLocation(ctx, ent);
+
+        if best.is_null() {
+            return qfalse;
+        }
+
+        let mut count = (*best).count;
+        if count < 0 {
+            count = 0;
+        }
+        if count > 7 {
+            count = 7;
+        }
+
+        let message = CStr::from_ptr((*best).message).to_string_lossy();
+
+        let formatted = if count > 0 {
+            format!("^{}{}{}", (count as u8 + b'0') as char, message, "^7")
+        } else {
+            message.to_string()
+        };
+
+        let loc_slice = core::slice::from_raw_parts_mut(loc, loclen as usize);
+        write_cstr_field(loc_slice, &formatted);
+
+        qtrue
+    }
 }
 
 /// Raven `SelectRandomTeamSpawnPoint`.
 ///
-// PORT-ESCALATION(unported-bg-const): needs `bgSiegeClasses` array from bg crate
-// (not yet ported as public constant) and `g_gametype` cvar.
 /// Source: `oracle/oracle/codemp/game/g_team.c:951-1040`
 pub fn SelectRandomTeamSpawnPoint(
     ctx: GameContext<'_>,
@@ -1061,38 +1090,147 @@ pub fn SelectRandomTeamSpawnPoint(
     team: team_t,
     siegeClass: c_int,
 ) -> *mut gentity_t {
-    todo!("Port SelectRandomTeamSpawnPoint — parked: unported-bg-const (bgSiegeClasses)")
+    unsafe {
+        let world = &mut *ctx.world;
+
+        let classname: &CStr = if world.cvars.g_gametype.integer == GT_SIEGE as c_int {
+            if team == SIEGETEAM_TEAM1 as team_t {
+                c"info_player_siegeteam1"
+            } else {
+                c"info_player_siegeteam2"
+            }
+        } else {
+            if teamstate == TEAM_BEGIN {
+                if team == TEAM_RED as team_t {
+                    c"team_CTF_redplayer"
+                } else if team == TEAM_BLUE as team_t {
+                    c"team_CTF_blueplayer"
+                } else {
+                    return core::ptr::null_mut();
+                }
+            } else {
+                if team == TEAM_RED as team_t {
+                    c"team_CTF_redspawn"
+                } else if team == TEAM_BLUE as team_t {
+                    c"team_CTF_bluespawn"
+                } else {
+                    return core::ptr::null_mut();
+                }
+            }
+        };
+
+        let mustBeEnabled = world.cvars.g_gametype.integer == GT_SIEGE as c_int;
+
+        let mut count: c_int = 0;
+        let mut spots: [*mut gentity_t; 16] = [core::ptr::null_mut(); 16];
+        let mut spot: *mut gentity_t = core::ptr::null_mut();
+
+        loop {
+            spot = G_Find(ctx, spot, fofs_classname(), classname.as_ptr());
+            if spot.is_null() {
+                break;
+            }
+
+            if SpotWouldTelefrag(ctx, spot) != 0 {
+                continue;
+            }
+
+            if mustBeEnabled && (*spot).genericValue1 == 0 {
+                continue;
+            }
+
+            spots[count as usize] = spot;
+            count += 1;
+            if count == 16 {
+                break;
+            }
+        }
+
+        if count == 0 {
+            return G_Find(ctx, core::ptr::null_mut(), fofs_classname(), classname.as_ptr());
+        }
+
+        if world.cvars.g_gametype.integer == GT_SIEGE as c_int && siegeClass >= 0 {
+            let mut class_spots: [*mut gentity_t; 16] = [core::ptr::null_mut(); 16];
+            let mut class_count: c_int = 0;
+            let mut i: c_int = 0;
+
+            while i < count {
+                if !spots[i as usize].is_null()
+                    && !(*spots[i as usize]).idealclass.is_null()
+                    && *(*spots[i as usize]).idealclass != 0
+                {
+                    let bg_classes = &(*ctx.world).bg_state.bgSiegeClasses;
+                    let class_name = CStr::from_ptr(bg_classes[siegeClass as usize].name);
+                    let spot_class = CStr::from_ptr((*spots[i as usize]).idealclass);
+                    if Q_stricmp(class_name.as_ptr(), spot_class.as_ptr()) == 0 {
+                        class_spots[class_count as usize] = spots[i as usize];
+                        class_count += 1;
+                    }
+                }
+                i += 1;
+            }
+
+            if class_count > 0 {
+                let selection = ((*ctx.world).bg_state.rng.rand() % class_count) as usize;
+                return class_spots[selection];
+            }
+        }
+
+        let selection = ((*ctx.world).bg_state.rng.rand() % count) as usize;
+        spots[selection]
+    }
 }
 
 /// Raven `SelectCTFSpawnPoint`.
 ///
-// PORT-ESCALATION(parked-dependency): calls `SelectRandomTeamSpawnPoint` which
-// is parked due to unported-bg-const (bgSiegeClasses).
 /// Source: `oracle/oracle/codemp/game/g_team.c:1049-1063`
 pub fn SelectCTFSpawnPoint(
     ctx: GameContext<'_>,
     team: team_t,
     teamstate: c_int,
-    origin: vec3_t,
-    angles: vec3_t,
+    origin: &mut vec3_t,
+    angles: &mut vec3_t,
 ) -> *mut gentity_t {
-    todo!("Port SelectCTFSpawnPoint — parked: parked-dependency (SelectRandomTeamSpawnPoint)")
+    unsafe {
+        let spot = SelectRandomTeamSpawnPoint(ctx, teamstate, team, -1);
+
+        if spot.is_null() {
+            return SelectSpawnPoint(ctx, [0.0, 0.0, 0.0], origin, angles, team);
+        }
+
+        crate::q_math::_VectorCopy((*spot).s.origin, origin);
+        (*origin)[2] += 9.0;
+        crate::q_math::_VectorCopy((*spot).s.angles, angles);
+
+        spot
+    }
 }
 
 /// Raven `SelectSiegeSpawnPoint`.
 ///
-// PORT-ESCALATION(parked-dependency): calls `SelectRandomTeamSpawnPoint` which
-// is parked due to unported-bg-const (bgSiegeClasses).
 /// Source: `oracle/oracle/codemp/game/g_team.c:1071-1085`
 pub fn SelectSiegeSpawnPoint(
     ctx: GameContext<'_>,
     siegeClass: c_int,
     team: team_t,
     teamstate: c_int,
-    origin: vec3_t,
-    angles: vec3_t,
+    origin: &mut vec3_t,
+    angles: &mut vec3_t,
 ) -> *mut gentity_t {
-    todo!("Port SelectSiegeSpawnPoint — parked: parked-dependency (SelectRandomTeamSpawnPoint)")
+    unsafe {
+        let spot = SelectRandomTeamSpawnPoint(ctx, teamstate, team, siegeClass);
+
+        if spot.is_null() {
+            return SelectSpawnPoint(ctx, [0.0, 0.0, 0.0], origin, angles, team);
+        }
+
+        crate::q_math::_VectorCopy((*spot).s.origin, origin);
+        (*origin)[2] += 9.0;
+        crate::q_math::_VectorCopy((*spot).s.angles, angles);
+
+        spot
+    }
 }
 
 /// Raven `SortClients`.
@@ -1107,23 +1245,144 @@ pub fn SortClients(
 
 /// Raven `TeamplayInfoMessage`.
 ///
-// PORT-ESCALATION(unresolved-varargs): `va` and `trap_SendServerCommand` call
-// uses variadic formatting that cannot be expressed in current skeleton.
 /// Source: `oracle/oracle/codemp/game/g_team.c:1103-1159`
 pub fn TeamplayInfoMessage(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port TeamplayInfoMessage — parked: unresolved-varargs (va + trap_SendServerCommand)")
+    unsafe {
+        let world = &mut *ctx.world;
+
+        if (*(*ent).client).pers.teamInfo == 0 {
+            return;
+        }
+
+        let mut clients: [c_int; 8] = [0; 8];
+        let mut cnt: c_int = 0;
+        let max_clients = world.cvars.g_maxclients.integer;
+
+        for i in 0..max_clients {
+            if cnt >= 8 {
+                break;
+            }
+            let player = &mut world.entities[i as usize];
+            if (*player).inuse != 0
+                && (*(*player).client).sess.sessionTeam as c_int == (*(*ent).client).sess.sessionTeam as c_int
+            {
+                clients[cnt as usize] = world.level.sortedClients[i as usize];
+                cnt += 1;
+            }
+        }
+
+        qsort(
+            clients.as_mut_ptr() as *mut c_void,
+            cnt as usize,
+            core::mem::size_of::<c_int>(),
+            SortClients as *mut c_void,
+        );
+
+        let mut string: [c_char; 8192] = [0; 8192];
+        let mut stringlength: usize = 0;
+
+        for i in 0..max_clients {
+            if cnt >= 8 {
+                break;
+            }
+            let player = &mut world.entities[i as usize];
+            if (*player).inuse != 0
+                && (*(*player).client).sess.sessionTeam as c_int == (*(*ent).client).sess.sessionTeam as c_int
+            {
+                let h = (*(*player).client).ps.stats[STAT_HEALTH as usize];
+                let a = (*(*player).client).ps.stats[STAT_ARMOR as usize];
+                let h = if h < 0 { 0 } else { h };
+                let a = if a < 0 { 0 } else { a };
+
+                let entry = format!(
+                    " {} {} {} {} {} {}",
+                    i,
+                    (*(*player).client).pers.teamState.location,
+                    h,
+                    a,
+                    (*(*player).client).ps.weapon,
+                    (*player).s.powerups
+                );
+                let entry_bytes = entry.as_bytes();
+                let entry_len = entry_bytes.len();
+
+                if stringlength + entry_len > 8192 {
+                    break;
+                }
+
+                for j in 0..entry_len {
+                    string[stringlength + j] = entry_bytes[j] as c_char;
+                }
+                stringlength += entry_len;
+                cnt += 1;
+            }
+        }
+
+        let ent_idx = ((ent as usize) - ((*ctx.world).entities.as_ptr() as usize)) / core::mem::size_of::<gentity_t>();
+        let cmd = format!("tinfo {} {}", cnt,
+            String::from_iter(string[0..stringlength].iter().map(|&c| c as u8 as char)));
+        trap::SendServerCommand(ctx.engine, ent_idx as c_int, cstr(&cmd).as_ptr());
+    }
 }
 
 /// Raven `CheckTeamStatus`.
 ///
-// PORT-ESCALATION(parked-dependency): calls `TeamplayInfoMessage` which is
-// parked due to unresolved-varargs (va + trap_SendServerCommand).
 /// Source: `oracle/oracle/codemp/game/g_team.c:1161-1202`
 pub fn CheckTeamStatus(ctx: GameContext<'_>) {
-    todo!("Port CheckTeamStatus — parked: parked-dependency (TeamplayInfoMessage)")
+    unsafe {
+        let world = &mut *ctx.world;
+
+        const TEAM_LOCATION_UPDATE_TIME: c_int = 1000;
+
+        if world.level.time - world.level.lastTeamLocationTime <= TEAM_LOCATION_UPDATE_TIME {
+            return;
+        }
+
+        world.level.lastTeamLocationTime = world.level.time;
+
+        let max_clients = world.cvars.g_maxclients.integer;
+        for i in 0..max_clients {
+            let ent = &mut world.entities[i as usize];
+
+            if (*ent).client.is_null() {
+                continue;
+            }
+
+            if (*(*ent).client).pers.connected != CON_CONNECTED as c_int {
+                continue;
+            }
+
+            if (*ent).inuse != 0
+                && ((*(*ent).client).sess.sessionTeam as c_int == TEAM_RED
+                    || (*(*ent).client).sess.sessionTeam as c_int == TEAM_BLUE)
+            {
+                let loc = Team_GetLocation(ctx, ent);
+                if !loc.is_null() {
+                    (*(*ent).client).pers.teamState.location = (*loc).health;
+                } else {
+                    (*(*ent).client).pers.teamState.location = 0;
+                }
+            }
+        }
+
+        for i in 0..max_clients {
+            let ent = &mut world.entities[i as usize];
+
+            if (*(*ent).client).pers.connected != CON_CONNECTED as c_int {
+                continue;
+            }
+
+            if (*ent).inuse != 0
+                && ((*(*ent).client).sess.sessionTeam as c_int == TEAM_RED
+                    || (*(*ent).client).sess.sessionTeam as c_int == TEAM_BLUE)
+            {
+                TeamplayInfoMessage(ctx, ent);
+            }
+        }
+    }
 }
 
 /// Raven `SP_team_CTF_redplayer`.

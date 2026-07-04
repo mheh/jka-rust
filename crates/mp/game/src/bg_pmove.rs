@@ -20,11 +20,26 @@ use crate::prelude::*;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 use crate::g_strap::strap_G2API_SetBoneAngles;
+use crate::g_strap::{
+    strap_G2API_AnimateG2Models, strap_G2API_GetBoltMatrix, strap_G2API_GetBoneAnim,
+    strap_G2API_IKMove, strap_G2API_SetBoneAnim, strap_G2API_SetBoneIKState,
+};
 use crate::q_math::{AngleMod, AngleSubtract};
 use crate::q_math::{AngleVectors, Q_fabs, vectoangles};
 use crate::q_math::{PITCH, ROLL, YAW};
+use crate::q_math::{
+    AngleNormalize180, AngleNormalize360, AnglesSubtract, AnglesToAxis, VectorClear, VectorCompare,
+    VectorNormalize, VectorSet, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract,
+};
+use crate::bg_panimate::{
+    BG_InRoll, BG_SaberInAttack, BG_SaberInSpecial, BG_SaberLockBreakAnim, BG_SpinningSaberAnim,
+    PM_CanRollFromSoulCal, PM_SaberInTransition,
+};
+use crate::bg_saber::BG_MySaber;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::vehicles::MIN_LANDING_SLOPE;
+use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
+use mp_qshared::shared::shared_eik_move_state::sharedEIKMoveState::{IKS_DYNAMIC, IKS_NONE};
 
 // Pass-3 bg state channel (fork rulings 12-16): the per-call working set + the
 // two seam traits + the session state. `PmoveContext` replaces the file-static
@@ -1225,25 +1240,194 @@ pub fn BG_UnrestrainedPitchRoll(
     todo!("Port BG_UnrestrainedPitchRoll — parked: bg-global")
 }
 
-/// Raven `PM_UpdateViewAngles`.
+/// Raven `PM_UpdateViewAngles` — circularly clamp view angles with deltas.
 ///
+/// `VEH_CONTROL_SCHEME_4` is undefined, so the `#else` branch (the
+/// `BG_UnrestrainedPitchRoll` fighter test whose body is dead code, otherwise
+/// the ±16000 short pitch clamp) is the compiled one.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:7813-7894`
-// PORT-ESCALATION(pmove-working-state): reads `pm_entVeh`.
-pub fn PM_UpdateViewAngles(
-    ps: *mut playerState_t,
-    cmd: *const usercmd_t,
-) {
-    todo!("Port PM_UpdateViewAngles — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_UpdateViewAngles(&mut self, ps: *mut playerState_t, cmd: *const usercmd_t) {
+        unsafe {
+            if (*ps).pm_type == PM_INTERMISSION as c_int
+                || (*ps).pm_type == PM_SPINTERMISSION as c_int
+            {
+                return; // no view changes at all
+            }
+
+            if (*ps).pm_type != PM_SPECTATOR as c_int
+                && (*ps).stats[statIndex_t::STAT_HEALTH as usize] <= 0
+            {
+                return; // no view changes at all
+            }
+
+            // circularly clamp the angles with deltas
+            for i in 0..3usize {
+                let mut temp: i16 = ((*cmd).angles[i] + (*ps).delta_angles[i]) as i16;
+                if !self.pm_entVeh.is_null()
+                    && BG_UnrestrainedPitchRoll(
+                        ps,
+                        (*self.pm_entVeh).m_pVehicle as *mut Vehicle_t,
+                        self.bg,
+                    ) == qtrue
+                {
+                    // in a fighter (Raven's ROLL passthrough here is commented out — nothing)
+                } else {
+                    if i == PITCH as usize {
+                        // don't let the player look up or down more than 90 degrees
+                        if temp > 16000 {
+                            (*ps).delta_angles[i] = 16000 - (*cmd).angles[i];
+                            temp = 16000;
+                        } else if temp < -16000 {
+                            (*ps).delta_angles[i] = -16000 - (*cmd).angles[i];
+                            temp = -16000;
+                        }
+                    }
+                }
+                // SHORT2ANGLE(temp) == temp * (360.0/65536)
+                (*ps).viewangles[i] = (temp as f64 * (360.0 / 65536.0)) as f32;
+            }
+        }
+    }
 }
 
-/// Raven `PM_AdjustAttackStates`.
-///
+/// Raven `PM_AdjustAttackStates` — set the firing eFlags + disruptor zoom state
+/// from the current buttons/ammo.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8031-8199`
-// PORT-ESCALATION(pmove-working-state): reads `pm_entSelf`/`pm_entVeh`/`weaponData` globals.
-pub fn PM_AdjustAttackStates(
-    pm: *mut pmove_t,
-) {
-    todo!("Port PM_AdjustAttackStates — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_AdjustAttackStates(&mut self, pm: *mut pmove_t) {
+        unsafe {
+            let mut amount: c_int;
+
+            if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int
+                && (*(*pm).ps).m_iVehicleNum != 0
+            {
+                // riding a vehicle
+                let veh = self.pm_entVeh;
+                if !veh.is_null() && {
+                    let pv = (*veh).m_pVehicle as *mut Vehicle_t;
+                    !pv.is_null()
+                        && ((*(*pv).m_pVehicleInfo).r#type as c_int
+                            == vehicleType_t::VH_WALKER as c_int
+                            || (*(*pv).m_pVehicleInfo).r#type as c_int
+                                == vehicleType_t::VH_FIGHTER as c_int)
+                } {
+                    // riding a walker/fighter — not firing, ever
+                    (*(*pm).ps).eFlags &= !(EF_FIRING | EF_ALT_FIRING);
+                    return;
+                }
+            }
+
+            // get ammo usage
+            if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                amount = (*(*pm).ps).ammo
+                    [weaponData[(*(*pm).ps).weapon as usize].ammoIndex as usize]
+                    - weaponData[(*(*pm).ps).weapon as usize].altEnergyPerShot;
+            } else {
+                amount = (*(*pm).ps).ammo
+                    [weaponData[(*(*pm).ps).weapon as usize].ammoIndex as usize]
+                    - weaponData[(*(*pm).ps).weapon as usize].energyPerShot;
+            }
+
+            // disruptor alt-fire should toggle the zoom mode
+            if (*(*pm).ps).weapon == WP_DISRUPTOR as c_int
+                && (*(*pm).ps).weaponstate == WEAPON_READY as c_int
+            {
+                if (*(*pm).ps).eFlags & EF_ALT_FIRING == 0
+                    && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+                {
+                    // We just pressed the alt-fire key
+                    if (*(*pm).ps).zoomMode == 0 && (*(*pm).ps).pm_type != PM_DEAD as c_int {
+                        // not already zooming, so do it now
+                        (*(*pm).ps).zoomMode = 1;
+                        (*(*pm).ps).zoomLocked = qfalse;
+                        (*(*pm).ps).zoomFov = 80.0; //cg_fov.value;
+                        (*(*pm).ps).zoomLockTime = (*pm).cmd.serverTime + 50;
+                        self.PM_AddEvent(EV_DISRUPTOR_ZOOMSOUND as c_int);
+                    } else if (*(*pm).ps).zoomMode == 1
+                        && (*(*pm).ps).zoomLockTime < (*pm).cmd.serverTime
+                    {
+                        // check for == 1 so we can't turn binoculars off with disruptor alt fire
+                        // already zooming, so must be wanting to turn it off
+                        (*(*pm).ps).zoomMode = 0;
+                        (*(*pm).ps).zoomTime = (*(*pm).ps).commandTime;
+                        (*(*pm).ps).zoomLocked = qfalse;
+                        self.PM_AddEvent(EV_DISRUPTOR_ZOOMSOUND as c_int);
+                        (*(*pm).ps).weaponTime = 1000;
+                    }
+                } else if (*pm).cmd.buttons & BUTTON_ALT_ATTACK == 0
+                    && (*(*pm).ps).zoomLockTime < (*pm).cmd.serverTime
+                {
+                    // Not pressing zoom any more
+                    if (*(*pm).ps).zoomMode != 0 {
+                        if (*(*pm).ps).zoomMode == 1 && (*(*pm).ps).zoomLocked == qfalse {
+                            // approximate what level the client should be zoomed at based on how long zoom was held
+                            (*(*pm).ps).zoomFov =
+                                (((*pm).cmd.serverTime + 50) - (*(*pm).ps).zoomLockTime) as f32
+                                    * 0.035;
+                            if (*(*pm).ps).zoomFov > 50.0 {
+                                (*(*pm).ps).zoomFov = 50.0;
+                            }
+                            if (*(*pm).ps).zoomFov < 1.0 {
+                                (*(*pm).ps).zoomFov = 1.0;
+                            }
+                        }
+                        // were zooming in, so now lock the zoom
+                        (*(*pm).ps).zoomLocked = qtrue;
+                    }
+                }
+
+                if (*pm).cmd.buttons & BUTTON_ATTACK != 0 {
+                    // If we are zoomed, switch the ammo usage to the alt-fire
+                    if (*(*pm).ps).zoomMode != 0 {
+                        amount = (*(*pm).ps).ammo
+                            [weaponData[(*(*pm).ps).weapon as usize].ammoIndex as usize]
+                            - weaponData[(*(*pm).ps).weapon as usize].altEnergyPerShot;
+                    }
+                } else {
+                    // alt-fire button pressing doesn't use any ammo
+                    amount = 0;
+                }
+            }
+
+            // set the firing flag for continuous beam weapons, saber fires even if out of ammo
+            if (*(*pm).ps).pm_flags & PMF_RESPAWNED == 0
+                && (*(*pm).ps).pm_type != PM_INTERMISSION as c_int
+                && (*pm).cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK) != 0
+                && (amount >= 0 || (*(*pm).ps).weapon == WP_SABER as c_int)
+            {
+                if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+                    (*(*pm).ps).eFlags |= EF_ALT_FIRING;
+                } else {
+                    (*(*pm).ps).eFlags &= !EF_ALT_FIRING;
+                }
+
+                // This flag should always get set, even when alt-firing
+                (*(*pm).ps).eFlags |= EF_FIRING;
+            } else {
+                // Clear 'em out
+                (*(*pm).ps).eFlags &= !(EF_FIRING | EF_ALT_FIRING);
+            }
+
+            // disruptor should convert a main fire to an alt-fire if currently zoomed
+            if (*(*pm).ps).weapon == WP_DISRUPTOR as c_int {
+                if (*pm).cmd.buttons & BUTTON_ATTACK != 0
+                    && (*(*pm).ps).zoomMode == 1
+                    && (*(*pm).ps).zoomLocked == qtrue
+                {
+                    // converting the main fire to an alt-fire
+                    (*pm).cmd.buttons |= BUTTON_ALT_ATTACK;
+                    (*(*pm).ps).eFlags |= EF_ALT_FIRING;
+                } else if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+                    && (*(*pm).ps).zoomMode == 1
+                    && (*(*pm).ps).zoomLocked == qtrue
+                {
+                    (*pm).cmd.buttons &= !BUTTON_ALT_ATTACK;
+                    (*(*pm).ps).eFlags &= !EF_ALT_FIRING;
+                }
+            }
+        }
+    }
 }
 
 /// Raven `BG_CmdForRoll`.
@@ -1341,16 +1525,156 @@ pub fn BG_CmdForRoll(
     }
 }
 
-/// Raven `BG_AdjustClientSpeed`.
+/// Raven `BG_AdjustClientSpeed` — reset `ps->speed` to base and apply the force
+/// power / saber-move / roll / grip modifiers.
 ///
+/// Note: Raven's `float *= <double literal>` promotes to double then narrows;
+/// the `f64` casts below preserve that rounding. `<float>f` literals compute in
+/// f32.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8331-8510`
-// PORT-ESCALATION(pmove-working-state): reads `pm`/`pm_entSelf`.
-pub fn BG_AdjustClientSpeed(
-    ps: *mut playerState_t,
-    cmd: *mut usercmd_t,
-    svTime: c_int,
-) {
-    todo!("Port BG_AdjustClientSpeed — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn BG_AdjustClientSpeed(
+        &mut self,
+        ps: *mut playerState_t,
+        cmd: *mut usercmd_t,
+        svTime: c_int,
+    ) {
+        unsafe {
+            if (*ps).clientNum >= MAX_CLIENTS as c_int {
+                let bgEnt = self.pm_entSelf;
+                if !bgEnt.is_null() && (*bgEnt).s.NPC_class == CLASS_VEHICLE as c_int {
+                    // vehicles manage their own speed
+                    return;
+                }
+            }
+
+            // For prediction, always reset speed back to the last known server base speed
+            (*ps).speed = (*ps).basespeed as f32;
+
+            if (*ps).forceHandExtend == HANDEXTEND_DODGE as c_int {
+                (*ps).speed = 0.0;
+            }
+
+            if (*ps).forceHandExtend == HANDEXTEND_KNOCKDOWN as c_int
+                || (*ps).forceHandExtend == HANDEXTEND_PRETHROWN as c_int
+                || (*ps).forceHandExtend == HANDEXTEND_POSTTHROWN as c_int
+            {
+                (*ps).speed = 0.0;
+            }
+
+            if (*cmd).forwardmove < 0
+                && (*cmd).buttons & BUTTON_WALKING == 0
+                && (*(*self.pm).ps).groundEntityNum != ENTITYNUM_NONE
+            {
+                // running backwards is slower than running forwards (like SP)
+                (*ps).speed = ((*ps).speed as f64 * 0.75) as f32;
+            }
+
+            if (*ps).fd.forcePowersActive & (1 << FP_GRIP) != 0 {
+                (*ps).speed = ((*ps).speed as f64 * 0.4) as f32;
+            }
+
+            if (*ps).fd.forcePowersActive & (1 << FP_SPEED) != 0 {
+                (*ps).speed = ((*ps).speed as f64 * 1.7) as f32;
+            } else if (*ps).fd.forcePowersActive & (1 << FP_RAGE) != 0 {
+                (*ps).speed = ((*ps).speed as f64 * 1.3) as f32;
+            } else if (*ps).fd.forceRageRecoveryTime > svTime {
+                (*ps).speed = ((*ps).speed as f64 * 0.75) as f32;
+            }
+
+            if (*(*self.pm).ps).weapon == WP_DISRUPTOR as c_int
+                && (*(*self.pm).ps).zoomMode == 1
+                && (*(*self.pm).ps).zoomLockTime < (*self.pm).cmd.serverTime
+            {
+                (*ps).speed *= 0.5;
+            }
+
+            if (*ps).fd.forceGripCripple != 0 {
+                if (*ps).fd.forcePowersActive & (1 << FP_RAGE) != 0 {
+                    (*ps).speed = ((*ps).speed as f64 * 0.9) as f32;
+                } else if (*ps).fd.forcePowersActive & (1 << FP_SPEED) != 0 {
+                    // force speed will help us escape
+                    (*ps).speed = ((*ps).speed as f64 * 0.8) as f32;
+                } else {
+                    (*ps).speed = ((*ps).speed as f64 * 0.2) as f32;
+                }
+            }
+
+            if BG_SaberInAttack((*ps).saberMove) == qtrue && (*cmd).forwardmove < 0 {
+                // if running backwards while attacking, don't run as fast.
+                let lvl = (*ps).fd.saberAnimLevel;
+                if lvl == FORCE_LEVEL_1 {
+                    (*ps).speed *= 0.75;
+                } else if lvl == FORCE_LEVEL_2
+                    || lvl == saber_styles_t::SS_DUAL as c_int
+                    || lvl == saber_styles_t::SS_STAFF as c_int
+                {
+                    (*ps).speed *= 0.60;
+                } else if lvl == FORCE_LEVEL_3 {
+                    (*ps).speed *= 0.45;
+                }
+            } else if BG_SpinningSaberAnim((*ps).legsAnim) == qtrue {
+                if (*ps).fd.saberAnimLevel == FORCE_LEVEL_3 {
+                    (*ps).speed *= 0.3;
+                } else {
+                    (*ps).speed *= 0.5;
+                }
+            } else if (*ps).weapon == WP_SABER as c_int && BG_SaberInAttack((*ps).saberMove) == qtrue
+            {
+                // if attacking with saber while running, drop your speed
+                let lvl = (*ps).fd.saberAnimLevel;
+                if lvl == FORCE_LEVEL_2
+                    || lvl == saber_styles_t::SS_DUAL as c_int
+                    || lvl == saber_styles_t::SS_STAFF as c_int
+                {
+                    (*ps).speed *= 0.85;
+                } else if lvl == FORCE_LEVEL_3 {
+                    (*ps).speed *= 0.55;
+                }
+            } else if (*ps).weapon == WP_SABER as c_int
+                && (*ps).fd.saberAnimLevel == FORCE_LEVEL_3
+                && PM_SaberInTransition((*ps).saberMove) == qtrue
+            {
+                // slow down in transitions for level 3 (it has chains now)
+                if (*cmd).forwardmove < 0 {
+                    (*ps).speed *= 0.4;
+                } else {
+                    (*ps).speed *= 0.6;
+                }
+            }
+
+            if BG_InRoll(ps, (*ps).legsAnim) == qtrue && (*ps).speed > 50.0 {
+                // can't roll unless you're able to move normally
+                if (*ps).legsAnim == BOTH_ROLL_B as c_int {
+                    // backwards roll is pretty fast, should also be slower
+                    if (*ps).legsTimer > 800 {
+                        (*ps).speed = ((*ps).legsTimer as f64 / 2.5) as f32;
+                    } else {
+                        (*ps).speed = ((*ps).legsTimer as f64 / 6.0) as f32; //450;
+                    }
+                } else {
+                    if (*ps).legsTimer > 800 {
+                        (*ps).speed = ((*ps).legsTimer as f64 / 1.5) as f32; //450;
+                    } else {
+                        (*ps).speed = ((*ps).legsTimer as f64 / 5.0) as f32; //450;
+                    }
+                }
+                if (*ps).speed > 600.0 {
+                    (*ps).speed = 600.0;
+                }
+                // Automatically slow down as the roll ends.
+            }
+
+            let mut saber = BG_MySaber((*ps).clientNum, 0, self.bg);
+            if !saber.is_null() && (*saber).moveSpeedScale != 1.0 {
+                (*ps).speed *= (*saber).moveSpeedScale;
+            }
+            saber = BG_MySaber((*ps).clientNum, 1, self.bg);
+            if !saber.is_null() && (*saber).moveSpeedScale != 1.0 {
+                (*ps).speed *= (*saber).moveSpeedScale;
+            }
+        }
+    }
 }
 
 /// Raven `BG_InRollAnim`.
@@ -1434,11 +1758,10 @@ pub fn BG_InRollES(
     qfalse
 }
 
-/// Raven `BG_IK_MoveArm`.
-///
+/// Raven `BG_IK_MoveArm` — drive the left-arm inverse-kinematics bone chain
+/// toward `desiredPos` (used to fling people in throws). `bgHumanoidAnimations`
+/// is threaded via `bg: &BgState` (ruling 11/15).
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8576-8730`
-// PORT-ESCALATION(bg-global): indexes the extern `bgHumanoidAnimations[basePose]` table, which is
-// not resolved in the packet (a bg_panimate.c global).
 pub fn BG_IK_MoveArm(
     ghoul2: *mut c_void,
     lHandBolt: c_int,
@@ -1452,8 +1775,247 @@ pub fn BG_IK_MoveArm(
     scale: vec3_t,
     blendTime: c_int,
     forceHalt: qboolean,
+    bg: &BgState,
 ) {
-    todo!("Port BG_IK_MoveArm — parked: bg-global")
+    unsafe {
+        let mut lHandMatrix: mdxaBone_t = core::mem::zeroed();
+        let mut lHand: vec3_t = [0.0; 3];
+        let mut torg: vec3_t = [0.0; 3];
+        let distToDest: f32;
+
+        if ghoul2.is_null() {
+            return;
+        }
+
+        debug_assert!(bg.bgHumanoidAnimations[basePose as usize].firstFrame > 0);
+
+        if *ikInProgress == qfalse && forceHalt == qfalse {
+            let baseposeAnim = basePose;
+            let mut ikP: sharedSetBoneIKStateParams_t = core::mem::zeroed();
+
+            // leaving the shoulder unrestricted, but restricting the elbow joint.
+            VectorSet(&mut ikP.pcj_mins, 0.0, 0.0, 0.0);
+            VectorSet(&mut ikP.pcj_maxs, 0.0, 0.0, 0.0);
+
+            // give the info on our entity.
+            ikP.blend_time = blendTime;
+            _VectorCopy(origin, &mut ikP.origin);
+            _VectorCopy(angles, &mut ikP.angles);
+            ikP.angles[PITCH] = 0.0;
+            ikP.pcj_overrides = 0;
+            ikP.radius = 10.0;
+            _VectorCopy(scale, &mut ikP.scale);
+
+            // base pose frames for the limb
+            ikP.start_frame = bg.bgHumanoidAnimations[baseposeAnim as usize].firstFrame as c_int
+                + bg.bgHumanoidAnimations[baseposeAnim as usize].numFrames as c_int;
+            ikP.end_frame = bg.bgHumanoidAnimations[baseposeAnim as usize].firstFrame as c_int
+                + bg.bgHumanoidAnimations[baseposeAnim as usize].numFrames as c_int;
+
+            ikP.force_anim_on_bone = qfalse; // let it use existing anim if same as this one
+
+            // call with a null bone name first to init the ik system on the g2 instance
+            if strap_G2API_SetBoneIKState(
+                ghoul2,
+                time,
+                core::ptr::null(),
+                IKS_DYNAMIC as c_int,
+                &mut ikP,
+            ) == qfalse
+            {
+                debug_assert!(false, "Failed to init IK system for g2 instance!");
+            }
+
+            // Now create our IK bone state.
+            if strap_G2API_SetBoneIKState(
+                ghoul2,
+                time,
+                b"lhumerus\0".as_ptr() as *const c_char,
+                IKS_DYNAMIC as c_int,
+                &mut ikP,
+            ) != qfalse
+            {
+                // restrict the elbow joint
+                VectorSet(&mut ikP.pcj_mins, -90.0, -20.0, -20.0);
+                VectorSet(&mut ikP.pcj_maxs, 30.0, 20.0, -20.0);
+
+                if strap_G2API_SetBoneIKState(
+                    ghoul2,
+                    time,
+                    b"lradius\0".as_ptr() as *const c_char,
+                    IKS_DYNAMIC as c_int,
+                    &mut ikP,
+                ) != qfalse
+                {
+                    // everything went alright.
+                    *ikInProgress = qtrue;
+                }
+            }
+        }
+
+        if *ikInProgress != qfalse && forceHalt == qfalse {
+            // actively update our ik state.
+            let mut ikM: sharedIKMoveParams_t = core::mem::zeroed();
+            let mut tuParms: sharedRagDollUpdateParams_t = core::mem::zeroed();
+            let mut tAngles: vec3_t = [0.0; 3];
+
+            // set the argument struct up
+            _VectorCopy(desiredPos, &mut ikM.desired_origin); // move the bone here if possible
+
+            _VectorCopy(angles, &mut tAngles);
+            tAngles[PITCH] = 0.0;
+            tAngles[ROLL] = 0.0;
+
+            strap_G2API_GetBoltMatrix(
+                ghoul2,
+                0,
+                lHandBolt,
+                &mut lHandMatrix,
+                tAngles,
+                origin,
+                time,
+                core::ptr::null_mut(),
+                scale,
+            );
+            // Get the point position from the matrix.
+            lHand[0] = lHandMatrix.matrix[0][3];
+            lHand[1] = lHandMatrix.matrix[1][3];
+            lHand[2] = lHandMatrix.matrix[2][3];
+
+            _VectorSubtract(lHand, desiredPos, &mut torg);
+            distToDest = (torg[0] * torg[0] + torg[1] * torg[1] + torg[2] * torg[2]).sqrt();
+
+            // closer we are, more we want to keep updated.
+            if distToDest < 2.0 {
+                ikM.movement_speed = 0.4;
+            } else if distToDest < 16.0 {
+                ikM.movement_speed = 0.9;
+            } else if distToDest < 32.0 {
+                ikM.movement_speed = 0.8;
+            } else if distToDest < 64.0 {
+                ikM.movement_speed = 0.7;
+            } else {
+                ikM.movement_speed = 0.6;
+            }
+            _VectorCopy(origin, &mut ikM.origin); // our position in the world.
+
+            ikM.bone_name[0] = 0;
+            if strap_G2API_IKMove(ghoul2, time, &mut ikM) != qfalse {
+                // now do the standard model animate stuff with ragdoll update params.
+                _VectorCopy(angles, &mut tuParms.angles);
+                tuParms.angles[PITCH] = 0.0;
+
+                _VectorCopy(origin, &mut tuParms.position);
+                _VectorCopy(scale, &mut tuParms.scale);
+
+                tuParms.me = (*ent).number;
+                VectorClear(&mut tuParms.velocity);
+
+                strap_G2API_AnimateG2Models(ghoul2, time, &mut tuParms);
+            } else {
+                *ikInProgress = qfalse;
+            }
+        } else if *ikInProgress != qfalse {
+            // kill it
+            let mut cFrame: f32 = 0.0;
+            let mut animSpeed: f32 = 0.0;
+            let mut sFrame: c_int = 0;
+            let mut eFrame: c_int = 0;
+            let mut flags: c_int = 0;
+
+            strap_G2API_SetBoneIKState(
+                ghoul2,
+                time,
+                b"lhumerus\0".as_ptr() as *const c_char,
+                IKS_NONE as c_int,
+                core::ptr::null_mut(),
+            );
+            strap_G2API_SetBoneIKState(
+                ghoul2,
+                time,
+                b"lradius\0".as_ptr() as *const c_char,
+                IKS_NONE as c_int,
+                core::ptr::null_mut(),
+            );
+
+            // then reset the angles/anims on these PCJs
+            strap_G2API_SetBoneAngles(
+                ghoul2,
+                0,
+                b"lhumerus\0".as_ptr() as *const c_char,
+                crate::q_math::vec3_origin,
+                BONE_ANGLES_POSTMULT,
+                POSITIVE_X as c_int,
+                NEGATIVE_Y as c_int,
+                NEGATIVE_Z as c_int,
+                core::ptr::null_mut(),
+                0,
+                time,
+            );
+            strap_G2API_SetBoneAngles(
+                ghoul2,
+                0,
+                b"lradius\0".as_ptr() as *const c_char,
+                crate::q_math::vec3_origin,
+                BONE_ANGLES_POSTMULT,
+                POSITIVE_X as c_int,
+                NEGATIVE_Y as c_int,
+                NEGATIVE_Z as c_int,
+                core::ptr::null_mut(),
+                0,
+                time,
+            );
+
+            // Match the left arm back up with the pelvis anim/frames again.
+            strap_G2API_GetBoneAnim(
+                ghoul2,
+                b"pelvis\0".as_ptr() as *const c_char,
+                time,
+                &mut cFrame,
+                &mut sFrame,
+                &mut eFrame,
+                &mut flags,
+                &mut animSpeed,
+                core::ptr::null_mut(),
+                0,
+            );
+            strap_G2API_SetBoneAnim(
+                ghoul2,
+                0,
+                b"lhumerus\0".as_ptr() as *const c_char,
+                sFrame,
+                eFrame,
+                flags,
+                animSpeed,
+                time,
+                sFrame as f32,
+                300,
+            );
+            strap_G2API_SetBoneAnim(
+                ghoul2,
+                0,
+                b"lradius\0".as_ptr() as *const c_char,
+                sFrame,
+                eFrame,
+                flags,
+                animSpeed,
+                time,
+                sFrame as f32,
+                300,
+            );
+
+            // finally, get rid of all the ik state effector data (null bone name).
+            strap_G2API_SetBoneIKState(
+                ghoul2,
+                time,
+                core::ptr::null(),
+                IKS_NONE as c_int,
+                core::ptr::null_mut(),
+            );
+
+            *ikInProgress = qfalse;
+        }
+    }
 }
 
 /// Raven `BG_UpdateLookAngles`.
@@ -1854,12 +2416,15 @@ pub fn BG_InRoll2(
     }
 }
 
-/// Raven `BG_G2PlayerAngles`.
+/// Raven `BG_G2PlayerAngles` — compute the torso/legs/neck bone angles for a
+/// player skeleton and drive them into the g2 instance.
 ///
+/// `WeaponReadyAnim` is the bg const weapon-ready-anim table (ruling 12). Raven's
+/// function-scope `static` scratch is single-call temporaries (ruling 5) → plain
+/// locals. `VEH_CONTROL_SCHEME_4`/`BONE_BASED_LEG_ANGLES` are undefined.
+/// fork-9: `legsAngles`/`turAngles` are written out-params (`&mut`); `legs` is
+/// the axis matrix out (`*mut vec3_t`).
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9082-9457`
-// PORT-ESCALATION(bg-boundary): indexes the bg-owned runtime `WeaponReadyAnim[cent->weapon]` table
-// (ruling 11: bg-owned state threaded per 8a), but this bg-tier C signature carries no threading
-// channel (no `ctx`/`PmoveContext`). fork-9 out-param reshape is otherwise settled.
 pub fn BG_G2PlayerAngles(
     ghoul2: *mut c_void,
     motionBolt: c_int,
@@ -1868,7 +2433,7 @@ pub fn BG_G2PlayerAngles(
     cent_lerpOrigin: vec3_t,
     cent_lerpAngles: vec3_t,
     legs: *mut vec3_t,
-    legsAngles: vec3_t,
+    legsAngles: &mut vec3_t,
     tYawing: *mut qboolean,
     tPitching: *mut qboolean,
     lYawing: *mut qboolean,
@@ -1876,7 +2441,7 @@ pub fn BG_G2PlayerAngles(
     tPitchAngle: *mut f32,
     lYawAngle: *mut f32,
     frametime: c_int,
-    turAngles: vec3_t,
+    turAngles: &mut vec3_t,
     modelScale: vec3_t,
     ciLegs: c_int,
     ciTorso: c_int,
@@ -1887,7 +2452,522 @@ pub fn BG_G2PlayerAngles(
     emplaced: *mut entityState_t,
     crazySmoothFactor: *mut c_int,
 ) {
-    todo!("Port BG_G2PlayerAngles — parked: bg-boundary")
+    // by-value angle params the body mutates in place (LAW keeps them by value —
+    // the caller does not read the write-back).
+    let mut lookAngles: vec3_t = lookAngles;
+    let mut lastHeadAngles: vec3_t = lastHeadAngles;
+
+    let mut adddir: c_int = 0;
+    let dir: c_int;
+    let mut degrees_negative: f32 = 0.0;
+    let mut degrees_positive: f32 = 0.0;
+    let mut dif: f32;
+    let dest: f32;
+    let mut speed: f32;
+    let lookSpeed: f32 = 1.5;
+    let mut eyeAngles: vec3_t = [0.0; 3];
+    let mut neckAngles: vec3_t = [0.0; 3];
+    let mut velocity: vec3_t = [0.0; 3];
+    let mut torsoAngles: vec3_t = [0.0; 3];
+    let mut headAngles: vec3_t = [0.0; 3];
+    let mut velPos: vec3_t = [0.0; 3];
+    let mut velAng: vec3_t = [0.0; 3];
+    let mut ulAngles: vec3_t = [0.0; 3];
+    let mut llAngles: vec3_t = [0.0; 3];
+    let mut viewAngles: vec3_t = [0.0; 3];
+    let mut angles: vec3_t = [0.0; 3];
+    let mut thoracicAngles: vec3_t = [0.0, 0.0, 0.0];
+    let headClampMinAngles: vec3_t = [-25.0, -55.0, -10.0];
+    let headClampMaxAngles: vec3_t = [50.0, 50.0, 10.0];
+
+    unsafe {
+        if (*cent).m_iVehicleNum != 0
+            || (*cent).forceFrame != 0
+            || BG_SaberLockBreakAnim((*cent).legsAnim) == qtrue
+            || BG_SaberLockBreakAnim((*cent).torsoAnim) == qtrue
+        {
+            // a vehicle or riding a vehicle - we don't need to be in here
+            let mut forcedAngles: vec3_t = [0.0; 3];
+
+            VectorClear(&mut forcedAngles);
+            forcedAngles[YAW] = cent_lerpAngles[YAW];
+            forcedAngles[ROLL] = cent_lerpAngles[ROLL];
+            AnglesToAxis(forcedAngles, legs);
+            _VectorCopy(forcedAngles, legsAngles);
+
+            if (*cent).number < MAX_CLIENTS as c_int {
+                for bone in [
+                    b"lower_lumbar\0".as_ptr() as *const c_char,
+                    b"upper_lumbar\0".as_ptr() as *const c_char,
+                    b"cranium\0".as_ptr() as *const c_char,
+                    b"thoracic\0".as_ptr() as *const c_char,
+                    b"cervical\0".as_ptr() as *const c_char,
+                ] {
+                    strap_G2API_SetBoneAngles(
+                        ghoul2,
+                        0,
+                        bone,
+                        crate::q_math::vec3_origin,
+                        BONE_ANGLES_POSTMULT,
+                        POSITIVE_X as c_int,
+                        NEGATIVE_Y as c_int,
+                        NEGATIVE_Z as c_int,
+                        core::ptr::null_mut(),
+                        0,
+                        time,
+                    );
+                }
+            }
+            return;
+        }
+
+        if (time + 2000) < *corrTime {
+            *corrTime = 0;
+        }
+
+        _VectorCopy(cent_lerpAngles, &mut headAngles);
+        headAngles[YAW] = AngleMod(headAngles[YAW]);
+        VectorClear(legsAngles);
+        VectorClear(&mut torsoAngles);
+        // --------- yaw -------------
+
+        // allow yaw to drift a bit
+        if ((*cent).legsAnim) != BOTH_STAND1 as c_int
+            || ((*cent).torsoAnim) != WeaponReadyAnim[(*cent).weapon as usize]
+        {
+            // if not standing still, always point all in the same direction
+            *tYawing = qtrue; // always center
+            *tPitching = qtrue; // always center
+            *lYawing = qtrue; // always center
+        }
+
+        // adjust legs for movement dir
+        if (*cent).eFlags & EF_DEAD != 0 {
+            // don't let dead bodies twitch
+            dir = 0;
+        } else {
+            dir = (*cent).angles2[YAW] as c_int;
+            if dir < 0 || dir > 7 {
+                let e = cstr(&format!("Bad player movement angle ({})", dir));
+                crate::g_main::Com_Error(ERR_DROP as c_int, e.as_ptr());
+            }
+        }
+
+        torsoAngles[YAW] = headAngles[YAW];
+
+        // for now, turn torso instantly and let the legs swing to follow
+        *tYawAngle = torsoAngles[YAW];
+
+        // --------- pitch -------------
+
+        _VectorCopy((*cent).pos.trDelta, &mut velocity);
+
+        if BG_InRoll2(cent) == qtrue {
+            // don't affect angles based on vel then
+            VectorClear(&mut velocity);
+        } else if (*cent).weapon == WP_SABER as c_int
+            && BG_SaberInSpecial((*cent).saberMove) == qtrue
+        {
+            VectorClear(&mut velocity);
+        }
+
+        speed = VectorNormalize(&mut velocity);
+
+        if speed == 0.0 {
+            torsoAngles[YAW] = headAngles[YAW];
+        }
+
+        // only show a fraction of the pitch angle in the torso
+        if headAngles[PITCH] > 180.0 {
+            dest = (((-360.0f32 + headAngles[PITCH]) as f64) * 0.75) as f32;
+        } else {
+            dest = (headAngles[PITCH] as f64 * 0.75) as f32;
+        }
+
+        if (*cent).m_iVehicleNum != 0 {
+            // swing instantly on vehicles
+            *tPitchAngle = dest;
+        } else {
+            BG_SwingAngles(dest, 15.0, 30.0, 0.1, tPitchAngle, tPitching, frametime);
+        }
+        torsoAngles[PITCH] = *tPitchAngle;
+
+        // --------- roll -------------
+
+        if speed != 0.0 {
+            let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+            let mut side: f32;
+
+            speed = (speed as f64 * 0.05) as f32;
+
+            AnglesToAxis(*legsAngles, axis.as_mut_ptr());
+            side = speed * _DotProduct(velocity, axis[1]);
+            legsAngles[ROLL] -= side;
+
+            side = speed * _DotProduct(velocity, axis[0]);
+            legsAngles[PITCH] += side;
+        }
+
+        // rww - crazy velocity-based leg angle calculation
+        legsAngles[YAW] = headAngles[YAW];
+        velPos[0] = cent_lerpOrigin[0] + velocity[0];
+        velPos[1] = cent_lerpOrigin[1] + velocity[1];
+        velPos[2] = cent_lerpOrigin[2]; // + velocity[2];
+
+        if (*cent).groundEntityNum == ENTITYNUM_NONE
+            || (*cent).forceFrame != 0
+            || ((*cent).weapon == WP_EMPLACED_GUN as c_int && !emplaced.is_null())
+        {
+            // off the ground, no direction-based leg angles (same if in saberlock)
+            _VectorCopy(cent_lerpOrigin, &mut velPos);
+        }
+
+        _VectorSubtract(cent_lerpOrigin, velPos, &mut velAng);
+
+        if VectorCompare(velAng, crate::q_math::vec3_origin) == qfalse {
+            vectoangles(velAng, &mut velAng);
+
+            if velAng[YAW] <= legsAngles[YAW] {
+                degrees_negative = legsAngles[YAW] - velAng[YAW];
+                degrees_positive = (360.0 - legsAngles[YAW]) + velAng[YAW];
+            } else {
+                degrees_negative = legsAngles[YAW] + (360.0 - velAng[YAW]);
+                degrees_positive = velAng[YAW] - legsAngles[YAW];
+            }
+
+            if degrees_negative < degrees_positive {
+                dif = degrees_negative;
+                adddir = 0;
+            } else {
+                dif = degrees_positive;
+                adddir = 1;
+            }
+
+            if dif > 90.0 {
+                dif = 180.0 - dif;
+            }
+
+            if dif > 60.0 {
+                dif = 60.0;
+            }
+
+            // Slight hack for when playing is running backward
+            if dir == 3 || dir == 5 {
+                dif = -dif;
+            }
+
+            if adddir != 0 {
+                legsAngles[YAW] -= dif;
+            } else {
+                legsAngles[YAW] += dif;
+            }
+        }
+
+        if (*cent).m_iVehicleNum != 0 {
+            // swing instantly on vehicles
+            *lYawAngle = legsAngles[YAW];
+        } else {
+            BG_SwingAngles(legsAngles[YAW], 0.0, 90.0, 0.65, lYawAngle, lYawing, frametime);
+        }
+        legsAngles[YAW] = *lYawAngle;
+
+        legsAngles[ROLL] = 0.0;
+        torsoAngles[ROLL] = 0.0;
+
+        // pull the angles back out of the hierarchial chain
+        AnglesSubtract(headAngles, torsoAngles, &mut headAngles);
+        AnglesSubtract(torsoAngles, *legsAngles, &mut torsoAngles);
+
+        legsAngles[PITCH] = 0.0;
+
+        if (*cent).heldByClient != 0 {
+            // keep the base angles clear when doing the IK stuff
+            VectorClear(legsAngles);
+            legsAngles[YAW] = cent_lerpAngles[YAW];
+        }
+
+        _VectorCopy(*legsAngles, turAngles);
+
+        AnglesToAxis(*legsAngles, legs);
+
+        _VectorCopy(cent_lerpAngles, &mut viewAngles);
+        viewAngles[YAW] = 0.0;
+        viewAngles[ROLL] = 0.0;
+        viewAngles[PITCH] = (viewAngles[PITCH] as f64 * 0.5) as f32;
+
+        VectorSet(&mut angles, 0.0, legsAngles[1], 0.0);
+
+        angles[0] = legsAngles[0];
+        if angles[0] > 30.0 {
+            angles[0] = 30.0;
+        } else if angles[0] < -30.0 {
+            angles[0] = -30.0;
+        }
+
+        if (*cent).weapon == WP_EMPLACED_GUN as c_int && !emplaced.is_null() {
+            // if using an emplaced gun, make sure we're angled to "hold" it right
+            let mut facingAngles: vec3_t = [0.0; 3];
+
+            _VectorSubtract((*emplaced).pos.trBase, cent_lerpOrigin, &mut facingAngles);
+            vectoangles(facingAngles, &mut facingAngles);
+
+            if (*emplaced).weapon == WP_NONE as c_int {
+                // e-web
+                _VectorCopy(facingAngles, legsAngles);
+                AnglesToAxis(*legsAngles, legs);
+            } else {
+                // misc emplaced
+                let dif2 = AngleSubtract(cent_lerpAngles[YAW], facingAngles[YAW]);
+
+                VectorSet(&mut facingAngles, -16.0, -dif2, 0.0);
+
+                if (*cent).legsAnim == BOTH_STRAFE_LEFT1 as c_int
+                    || (*cent).legsAnim == BOTH_STRAFE_RIGHT1 as c_int
+                {
+                    // try to adjust so it doesn't look wrong
+                    if !crazySmoothFactor.is_null() {
+                        // want to smooth a lot during this because it chops around
+                        *crazySmoothFactor = time + 1000;
+                    }
+
+                    BG_G2ClientSpineAngles(
+                        ghoul2,
+                        motionBolt,
+                        cent_lerpOrigin,
+                        cent_lerpAngles,
+                        cent,
+                        time,
+                        &mut viewAngles,
+                        ciLegs,
+                        ciTorso,
+                        angles,
+                        &mut thoracicAngles,
+                        &mut ulAngles,
+                        &mut llAngles,
+                        modelScale,
+                        tPitchAngle,
+                        tYawAngle,
+                        corrTime,
+                    );
+                    strap_G2API_SetBoneAngles(
+                        ghoul2,
+                        0,
+                        b"lower_lumbar\0".as_ptr() as *const c_char,
+                        llAngles,
+                        BONE_ANGLES_POSTMULT,
+                        POSITIVE_X as c_int,
+                        NEGATIVE_Y as c_int,
+                        NEGATIVE_Z as c_int,
+                        core::ptr::null_mut(),
+                        0,
+                        time,
+                    );
+                    strap_G2API_SetBoneAngles(
+                        ghoul2,
+                        0,
+                        b"upper_lumbar\0".as_ptr() as *const c_char,
+                        ulAngles,
+                        BONE_ANGLES_POSTMULT,
+                        POSITIVE_X as c_int,
+                        NEGATIVE_Y as c_int,
+                        NEGATIVE_Z as c_int,
+                        core::ptr::null_mut(),
+                        0,
+                        time,
+                    );
+                    strap_G2API_SetBoneAngles(
+                        ghoul2,
+                        0,
+                        b"cranium\0".as_ptr() as *const c_char,
+                        crate::q_math::vec3_origin,
+                        BONE_ANGLES_POSTMULT,
+                        POSITIVE_X as c_int,
+                        NEGATIVE_Y as c_int,
+                        NEGATIVE_Z as c_int,
+                        core::ptr::null_mut(),
+                        0,
+                        time,
+                    );
+
+                    _VectorAdd(facingAngles, thoracicAngles, &mut facingAngles);
+
+                    if (*cent).legsAnim == BOTH_STRAFE_LEFT1 as c_int {
+                        // this one needs some further correction
+                        facingAngles[YAW] -= 32.0;
+                    }
+                } else {
+                    strap_G2API_SetBoneAngles(
+                        ghoul2,
+                        0,
+                        b"cranium\0".as_ptr() as *const c_char,
+                        crate::q_math::vec3_origin,
+                        BONE_ANGLES_POSTMULT,
+                        POSITIVE_X as c_int,
+                        NEGATIVE_Y as c_int,
+                        NEGATIVE_Z as c_int,
+                        core::ptr::null_mut(),
+                        0,
+                        time,
+                    );
+                }
+
+                _VectorScale(facingAngles, 0.6, &mut facingAngles);
+                strap_G2API_SetBoneAngles(
+                    ghoul2,
+                    0,
+                    b"lower_lumbar\0".as_ptr() as *const c_char,
+                    crate::q_math::vec3_origin,
+                    BONE_ANGLES_POSTMULT,
+                    POSITIVE_X as c_int,
+                    NEGATIVE_Y as c_int,
+                    NEGATIVE_Z as c_int,
+                    core::ptr::null_mut(),
+                    0,
+                    time,
+                );
+                _VectorScale(facingAngles, 0.8, &mut facingAngles);
+                strap_G2API_SetBoneAngles(
+                    ghoul2,
+                    0,
+                    b"upper_lumbar\0".as_ptr() as *const c_char,
+                    facingAngles,
+                    BONE_ANGLES_POSTMULT,
+                    POSITIVE_X as c_int,
+                    NEGATIVE_Y as c_int,
+                    NEGATIVE_Z as c_int,
+                    core::ptr::null_mut(),
+                    0,
+                    time,
+                );
+                _VectorScale(facingAngles, 0.8, &mut facingAngles);
+                strap_G2API_SetBoneAngles(
+                    ghoul2,
+                    0,
+                    b"thoracic\0".as_ptr() as *const c_char,
+                    facingAngles,
+                    BONE_ANGLES_POSTMULT,
+                    POSITIVE_X as c_int,
+                    NEGATIVE_Y as c_int,
+                    NEGATIVE_Z as c_int,
+                    core::ptr::null_mut(),
+                    0,
+                    time,
+                );
+
+                // Now we want the head angled toward where we are facing
+                VectorSet(&mut facingAngles, 0.0, dif2, 0.0);
+                _VectorScale(facingAngles, 0.6, &mut facingAngles);
+                strap_G2API_SetBoneAngles(
+                    ghoul2,
+                    0,
+                    b"cervical\0".as_ptr() as *const c_char,
+                    facingAngles,
+                    BONE_ANGLES_POSTMULT,
+                    POSITIVE_X as c_int,
+                    NEGATIVE_Y as c_int,
+                    NEGATIVE_Z as c_int,
+                    core::ptr::null_mut(),
+                    0,
+                    time,
+                );
+
+                return; // don't have to bother with the rest then
+            }
+        }
+
+        BG_G2ClientSpineAngles(
+            ghoul2,
+            motionBolt,
+            cent_lerpOrigin,
+            cent_lerpAngles,
+            cent,
+            time,
+            &mut viewAngles,
+            ciLegs,
+            ciTorso,
+            angles,
+            &mut thoracicAngles,
+            &mut ulAngles,
+            &mut llAngles,
+            modelScale,
+            tPitchAngle,
+            tYawAngle,
+            corrTime,
+        );
+
+        _VectorCopy(cent_lerpAngles, &mut eyeAngles);
+
+        for i in 0..3usize {
+            lookAngles[i] = AngleNormalize180(lookAngles[i]);
+            eyeAngles[i] = AngleNormalize180(eyeAngles[i]);
+        }
+        AnglesSubtract(lookAngles, eyeAngles, &mut lookAngles);
+
+        BG_UpdateLookAngles(
+            lookTime,
+            &mut lastHeadAngles,
+            time,
+            &mut lookAngles,
+            lookSpeed,
+            -50.0,
+            50.0,
+            -70.0,
+            70.0,
+            -30.0,
+            30.0,
+        );
+
+        BG_G2ClientNeckAngles(
+            ghoul2,
+            time,
+            lookAngles,
+            &mut headAngles,
+            &mut neckAngles,
+            &mut thoracicAngles,
+            headClampMinAngles,
+            headClampMaxAngles,
+        );
+
+        strap_G2API_SetBoneAngles(
+            ghoul2,
+            0,
+            b"lower_lumbar\0".as_ptr() as *const c_char,
+            llAngles,
+            BONE_ANGLES_POSTMULT,
+            POSITIVE_X as c_int,
+            NEGATIVE_Y as c_int,
+            NEGATIVE_Z as c_int,
+            core::ptr::null_mut(),
+            0,
+            time,
+        );
+        strap_G2API_SetBoneAngles(
+            ghoul2,
+            0,
+            b"upper_lumbar\0".as_ptr() as *const c_char,
+            ulAngles,
+            BONE_ANGLES_POSTMULT,
+            POSITIVE_X as c_int,
+            NEGATIVE_Y as c_int,
+            NEGATIVE_Z as c_int,
+            core::ptr::null_mut(),
+            0,
+            time,
+        );
+        strap_G2API_SetBoneAngles(
+            ghoul2,
+            0,
+            b"thoracic\0".as_ptr() as *const c_char,
+            thoracicAngles,
+            BONE_ANGLES_POSTMULT,
+            POSITIVE_X as c_int,
+            NEGATIVE_Y as c_int,
+            NEGATIVE_Z as c_int,
+            core::ptr::null_mut(),
+            0,
+            time,
+        );
+    }
 }
 
 /// Raven `BG_G2ATSTAngles`.
@@ -1928,14 +3008,150 @@ pub fn PM_AdjustAnglesForDualJumpAttack(
     qtrue
 }
 
-/// Raven `PM_CmdForSaberMoves`.
-///
+/// Raven `PM_CmdForSaberMoves` — force movement/jump commands for the special
+/// dual/staff jump/spin saber attacks.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9474-9639`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_CmdForSaberMoves(
-    ucmd: *mut usercmd_t,
-) {
-    todo!("Port PM_CmdForSaberMoves — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_CmdForSaberMoves(&mut self, ucmd: *mut usercmd_t) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+
+            // DUAL FORWARD+JUMP+ATTACK
+            if ((*ps).legsAnim == BOTH_JUMPATTACK6 as c_int
+                && (*ps).saberMove == LS_JUMPATTACK_DUAL)
+                || ((*ps).legsAnim == BOTH_BUTTERFLY_FL1 as c_int
+                    && (*ps).saberMove == LS_JUMPATTACK_STAFF_LEFT)
+                || ((*ps).legsAnim == BOTH_BUTTERFLY_FR1 as c_int
+                    && (*ps).saberMove == LS_JUMPATTACK_STAFF_RIGHT)
+                || ((*ps).legsAnim == BOTH_BUTTERFLY_RIGHT as c_int
+                    && (*ps).saberMove == LS_BUTTERFLY_RIGHT)
+                || ((*ps).legsAnim == BOTH_BUTTERFLY_LEFT as c_int
+                    && (*ps).saberMove == LS_BUTTERFLY_LEFT)
+            {
+                let aLen = self.PM_AnimLength(0, BOTH_JUMPATTACK6 as c_int);
+
+                (*ucmd).forwardmove = 0;
+                (*ucmd).rightmove = 0;
+                (*ucmd).upmove = 0;
+
+                if (*ps).legsAnim == BOTH_JUMPATTACK6 as c_int {
+                    // dual stance attack
+                    if (*ps).legsTimer >= 100 // not at end
+                        && (aLen - (*ps).legsTimer) >= 250
+                    {
+                        // middle of anim — push forward
+                        (*ucmd).forwardmove = 127;
+                    }
+
+                    if ((*ps).legsTimer >= 900 && aLen - (*ps).legsTimer >= 950)
+                        || ((*ps).legsTimer >= 1600 && aLen - (*ps).legsTimer >= 400)
+                    {
+                        // one of the two jumps
+                        if (*ps).groundEntityNum != ENTITYNUM_NONE {
+                            // still on ground?
+                            if (*ps).groundEntityNum >= MAX_CLIENTS as c_int {
+                                // jump!
+                                (*ps).velocity[2] = 250.0; //400;
+                                (*ps).fd.forceJumpZStart = (*ps).origin[2]; //so we don't take damage if we land at same height
+                                self.PM_AddEvent(EV_JUMP as c_int);
+                            }
+                        }
+                    }
+                } else {
+                    // saberstaff attacks
+                    let aLen = self.PM_AnimLength(0, (*ps).legsAnim);
+                    let mut lenMin: f32 = 1700.0;
+                    let mut lenMax: f32 = 1800.0;
+
+                    if (*ps).legsAnim == BOTH_BUTTERFLY_LEFT as c_int {
+                        lenMin = 1200.0;
+                        lenMax = 1400.0;
+                    }
+
+                    if (*ps).legsAnim == BOTH_BUTTERFLY_RIGHT as c_int
+                        || (*ps).legsAnim == BOTH_BUTTERFLY_LEFT as c_int
+                    {
+                        if (*ps).legsTimer > 450 {
+                            if (*ps).legsAnim == BOTH_BUTTERFLY_LEFT as c_int {
+                                (*ucmd).rightmove = -127;
+                            } else if (*ps).legsAnim == BOTH_BUTTERFLY_RIGHT as c_int {
+                                (*ucmd).rightmove = 127;
+                            }
+                        }
+                    } else {
+                        if (*ps).legsTimer >= 100 // not at end
+                            && aLen - (*ps).legsTimer >= 250
+                        {
+                            // middle of anim — push forward
+                            (*ucmd).forwardmove = 127;
+                        }
+                    }
+
+                    if (*ps).legsTimer >= lenMin as c_int && (*ps).legsTimer < lenMax as c_int {
+                        // one of the two jumps
+                        if (*ps).groundEntityNum != ENTITYNUM_NONE {
+                            // still on ground? jump!
+                            if (*ps).legsAnim == BOTH_BUTTERFLY_LEFT as c_int {
+                                (*ps).velocity[2] = 350.0;
+                            } else {
+                                (*ps).velocity[2] = 250.0;
+                            }
+                            (*ps).fd.forceJumpZStart = (*ps).origin[2]; //so we don't take damage if we land at same height
+                            self.PM_AddEvent(EV_JUMP as c_int);
+                        }
+                    }
+                }
+
+                if (*ps).groundEntityNum == ENTITYNUM_NONE {
+                    // can only turn when your feet hit the ground
+                    if PM_AdjustAnglesForDualJumpAttack(ps, ucmd) == qtrue {
+                        PM_SetPMViewAngle(ps, (*ps).viewangles, ucmd);
+                    }
+                }
+            }
+            // STAFF BACK+JUMP+ATTACK
+            else if (*ps).saberMove == LS_A_BACKFLIP_ATK
+                && (*ps).legsAnim == BOTH_JUMPATTACK7 as c_int
+            {
+                let aLen = self.PM_AnimLength(0, BOTH_JUMPATTACK7 as c_int);
+
+                if (*ps).legsTimer > 800 // not at end
+                    && aLen - (*ps).legsTimer >= 400
+                {
+                    // middle of anim
+                    if (*ps).groundEntityNum != ENTITYNUM_NONE {
+                        // still on ground?
+                        let mut yawAngles: vec3_t = [0.0; 3];
+                        let mut backDir: vec3_t = [0.0; 3];
+
+                        // push backwards some?
+                        VectorSet(&mut yawAngles, 0.0, (*ps).viewangles[YAW] + 180.0, 0.0);
+                        AngleVectors(yawAngles, Some(&mut backDir), None, None);
+                        _VectorScale(backDir, 100.0, &mut (*ps).velocity);
+
+                        // jump!
+                        (*ps).velocity[2] = 300.0;
+                        (*ps).fd.forceJumpZStart = (*ps).origin[2]; //so we don't take damage if we land at same height
+
+                        self.PM_AddEvent(EV_JUMP as c_int);
+                        (*ucmd).upmove = 0; // clear any actual jump command
+                    }
+                }
+                (*ucmd).forwardmove = 0;
+                (*ucmd).rightmove = 0;
+                (*ucmd).upmove = 0;
+            }
+            // STAFF/DUAL SPIN ATTACK
+            else if (*ps).saberMove == LS_SPINATTACK || (*ps).saberMove == LS_SPINATTACK_DUAL {
+                (*ucmd).forwardmove = 0;
+                (*ucmd).rightmove = 0;
+                (*ucmd).upmove = 0;
+                // lock their viewangles during these attacks.
+                PM_SetPMViewAngle(ps, (*ps).viewangles, ucmd);
+            }
+        }
+    }
 }
 
 /// Raven `PM_VehicleViewAngles`.
@@ -2019,61 +3235,369 @@ pub fn PM_WeaponOkOnVehicle(
     qfalse
 }
 
-/// Raven `PM_GetOkWeaponForVehicle`.
-///
+/// Raven `PM_GetOkWeaponForVehicle` — first weapon the client owns that is
+/// usable on a vehicle, or -1.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9762-9780`
-// PORT-ESCALATION(pmove-working-state): reads `pm`.
-pub fn PM_GetOkWeaponForVehicle() -> c_int {
-    todo!("Port PM_GetOkWeaponForVehicle — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_GetOkWeaponForVehicle(&mut self) -> c_int {
+        unsafe {
+            let ps = (*self.pm).ps;
+            let mut i: c_int = 0;
+
+            while i < WP_NUM_WEAPONS as c_int {
+                if (*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << i) != 0
+                    && PM_WeaponOkOnVehicle(i) == qtrue
+                {
+                    // this one's good
+                    return i;
+                }
+                i += 1;
+            }
+
+            // oh dear!
+            -1
+        }
+    }
 }
 
-/// Raven `PM_VehForcedTurning`.
-///
+/// Raven `PM_VehForcedTurning` — steer a vehicle to face its turnaround target.
+/// `VEH_CONTROL_SCHEME_4` is undefined, so the `#else` branch is compiled.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9783-9830`
-// PORT-ESCALATION(pmove-working-state): reads `pml`, writes `pm`.
-pub fn PM_VehForcedTurning(
-    veh: *mut bgEntity_t,
-) {
-    todo!("Port PM_VehForcedTurning — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_VehForcedTurning(&mut self, veh: *mut bgEntity_t) {
+        unsafe {
+            let dst = self.PM_BGEntForNum((*(*veh).playerState).vehTurnaroundIndex);
+            let mut pitchD: f32;
+            let mut yawD: f32;
+            let mut dir: vec3_t = [0.0; 3];
+
+            if veh.is_null() || (*veh).m_pVehicle.is_null() {
+                return;
+            }
+
+            if dst.is_null() {
+                // can't find dest ent?
+                return;
+            }
+
+            let pv = (*veh).m_pVehicle as *mut Vehicle_t;
+            (*pv).m_ucmd.upmove = 127;
+            (*self.pm).cmd.upmove = 127;
+            (*pv).m_ucmd.forwardmove = 0;
+            (*self.pm).cmd.forwardmove = 0;
+            (*pv).m_ucmd.rightmove = 0;
+            (*self.pm).cmd.rightmove = 0;
+
+            _VectorSubtract((*dst).s.origin, (*(*veh).playerState).origin, &mut dir);
+            vectoangles(dir, &mut dir);
+
+            yawD = AngleSubtract((*(*self.pm).ps).viewangles[YAW], dir[YAW]);
+            pitchD = AngleSubtract((*(*self.pm).ps).viewangles[PITCH], dir[PITCH]);
+
+            yawD *= 0.6 * self.pml.frametime;
+            pitchD *= 0.6 * self.pml.frametime;
+
+            (*(*self.pm).ps).viewangles[YAW] =
+                AngleSubtract((*(*self.pm).ps).viewangles[YAW], yawD);
+            (*(*self.pm).ps).viewangles[PITCH] =
+                AngleSubtract((*(*self.pm).ps).viewangles[PITCH], pitchD);
+
+            PM_SetPMViewAngle(
+                (*self.pm).ps,
+                (*(*self.pm).ps).viewangles,
+                core::ptr::addr_of_mut!((*self.pm).cmd),
+            );
+        }
+    }
 }
 
-/// Raven `PM_VehFaceHyperspacePoint`.
-///
+/// Raven `PM_VehFaceHyperspacePoint` — rotate a vehicle to face its hyperspace
+/// angles, flagging it ready to jump once aligned.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9916-9989`
-// PORT-ESCALATION(pmove-working-state): reads `pml`, writes `pm`.
-pub fn PM_VehFaceHyperspacePoint(
-    veh: *mut bgEntity_t,
-) {
-    todo!("Port PM_VehFaceHyperspacePoint — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_VehFaceHyperspacePoint(&mut self, veh: *mut bgEntity_t) {
+        unsafe {
+            if veh.is_null() || (*veh).m_pVehicle.is_null() {
+                return;
+            } else {
+                let pv = (*veh).m_pVehicle as *mut Vehicle_t;
+                let timeFrac = ((*self.pm).cmd.serverTime - (*(*veh).playerState).hyperSpaceTime)
+                    as f32
+                    / HYPERSPACE_TIME as f32;
+                let turnRate: f32;
+                let mut aDelta: f32;
+                let mut matchedAxes: c_int = 0;
+
+                (*pv).m_ucmd.upmove = 127;
+                (*self.pm).cmd.upmove = 127;
+                (*pv).m_ucmd.forwardmove = 0;
+                (*self.pm).cmd.forwardmove = 0;
+                (*pv).m_ucmd.rightmove = 0;
+                (*self.pm).cmd.rightmove = 0;
+
+                turnRate = 90.0 * self.pml.frametime;
+                for i in 0..3usize {
+                    aDelta = AngleSubtract(
+                        (*(*veh).playerState).hyperSpaceAngles[i],
+                        *(*pv).m_vOrientation.add(i),
+                    );
+                    if Q_fabs(aDelta) < turnRate {
+                        // all is good
+                        (*(*self.pm).ps).viewangles[i] =
+                            (*(*veh).playerState).hyperSpaceAngles[i];
+                        matchedAxes += 1;
+                    } else {
+                        aDelta = AngleSubtract(
+                            (*(*veh).playerState).hyperSpaceAngles[i],
+                            (*(*self.pm).ps).viewangles[i],
+                        );
+                        if Q_fabs(aDelta) < turnRate {
+                            (*(*self.pm).ps).viewangles[i] =
+                                (*(*veh).playerState).hyperSpaceAngles[i];
+                        } else if aDelta > 0.0 {
+                            if i == YAW as usize {
+                                (*(*self.pm).ps).viewangles[i] =
+                                    AngleNormalize360((*(*self.pm).ps).viewangles[i] + turnRate);
+                            } else {
+                                (*(*self.pm).ps).viewangles[i] =
+                                    AngleNormalize180((*(*self.pm).ps).viewangles[i] + turnRate);
+                            }
+                        } else {
+                            if i == YAW as usize {
+                                (*(*self.pm).ps).viewangles[i] =
+                                    AngleNormalize360((*(*self.pm).ps).viewangles[i] - turnRate);
+                            } else {
+                                (*(*self.pm).ps).viewangles[i] =
+                                    AngleNormalize180((*(*self.pm).ps).viewangles[i] - turnRate);
+                            }
+                        }
+                    }
+                }
+
+                PM_SetPMViewAngle(
+                    (*self.pm).ps,
+                    (*(*self.pm).ps).viewangles,
+                    core::ptr::addr_of_mut!((*self.pm).cmd),
+                );
+
+                if timeFrac < HYPERSPACE_TELEPORT_FRAC {
+                    // haven't gone through yet
+                    if matchedAxes < 3 {
+                        // not facing the right dir yet — keep hyperspace time up to date
+                        (*(*veh).playerState).hyperSpaceTime += self.pml.msec;
+                    } else if (*(*veh).playerState).eFlags2 & EF2_HYPERSPACE == 0 {
+                        // flag us as ready to hyperspace!
+                        (*(*veh).playerState).eFlags2 |= EF2_HYPERSPACE;
+                    }
+                }
+            }
+        }
+    }
 }
 
-/// Raven `BG_VehicleAdjustBBoxForOrientation`.
+/// Raven `BG_VehicleAdjustBBoxForOrientation` — resize a fighter/flier vehicle's
+/// bbox to its oriented extents, tracing to confirm the new box is valid.
 ///
+/// `localTrace` is Raven's `void (*)(trace_t*, const vec3_t start, mins, maxs,
+/// end, int, int)` callback; the resolved signature keeps it as `*mut c_void`
+/// (ruling 11 fn-ptr param unsettled) so we transmute at the call site.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9993-10076`
-// PORT-ESCALATION(fn-pointer-param): `localTrace` is a raw C function-pointer param whose type is
-// unported (`void (*)(trace_t*, const vec_t*, const vec_t*, const vec_t*, const vec_t*, int, int)`);
-// the body invokes it, so it needs the trap/dispatch shape settled first.
 pub fn BG_VehicleAdjustBBoxForOrientation(
     veh: *mut Vehicle_t,
     origin: vec3_t,
-    mins: vec3_t,
-    maxs: vec3_t,
+    mins: &mut vec3_t,
+    maxs: &mut vec3_t,
     clientNum: c_int,
     tracemask: c_int,
-    //TODO: Port void ()(trace_t , vec_t , vec_t , vec_t , vec_t , int, int)  (C: `void (*)(trace_t *, const vec_t *, const vec_t *, const vec_t *, const vec_t *, int, int)`)
     localTrace: *mut c_void,
 ) {
-    todo!("Port BG_VehicleAdjustBBoxForOrientation — parked: fn-pointer-param")
+    /// `DEFAULT_MINS_2`. Source: `oracle/oracle/codemp/game/bg_public.h`
+    const DEFAULT_MINS_2: f32 = -24.0;
+    // PORT-NOTE(fn-pointer-param): `localTrace` arrives as `*mut c_void` (LAW
+    // signature); transmute to Raven's callback type to invoke it.
+    type LocalTraceFn = unsafe extern "C" fn(
+        *mut trace_t,
+        *const vec3_t,
+        *const vec3_t,
+        *const vec3_t,
+        *const vec3_t,
+        c_int,
+        c_int,
+    );
+
+    unsafe {
+        if veh.is_null() {
+            return;
+        }
+        let vi = (*veh).m_pVehicleInfo;
+        if (*vi).length == 0.0 || (*vi).width == 0.0 || (*vi).height == 0.0 {
+            return;
+        } else if (*vi).r#type as c_int != vehicleType_t::VH_FIGHTER as c_int
+            && (*vi).r#type as c_int != vehicleType_t::VH_FLIER as c_int
+        {
+            // only those types have dynamic bboxes, the rest use a static bbox
+            VectorSet(
+                maxs,
+                (*vi).width / 2.0,
+                (*vi).width / 2.0,
+                (*vi).height + DEFAULT_MINS_2,
+            );
+            VectorSet(
+                mins,
+                (*vi).width / -2.0,
+                (*vi).width / -2.0,
+                DEFAULT_MINS_2,
+            );
+            return;
+        } else {
+            let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+            let mut point: [vec3_t; 8] = [[0.0; 3]; 8];
+            let mut newMins: vec3_t = [0.0; 3];
+            let mut newMaxs: vec3_t = [0.0; 3];
+            let mut trace: trace_t = core::mem::zeroed();
+
+            let len = (*vi).length;
+            let wid = (*vi).width;
+            let hgt = (*vi).height;
+
+            // m_vOrientation is a `vec3_t*` into the owner; read the 3 floats.
+            let orient: vec3_t = [
+                *(*veh).m_vOrientation.add(0),
+                *(*veh).m_vOrientation.add(1),
+                *(*veh).m_vOrientation.add(2),
+            ];
+            AnglesToAxis(orient, axis.as_mut_ptr());
+            _VectorMA(origin, len / 2.0, axis[0], &mut point[0]);
+            _VectorMA(origin, -len / 2.0, axis[0], &mut point[1]);
+            // extrapolate each side up and down
+            let p0 = point[0];
+            _VectorMA(p0, hgt / 2.0, axis[2], &mut point[0]);
+            let p0 = point[0];
+            _VectorMA(p0, -hgt, axis[2], &mut point[2]);
+            let p1 = point[1];
+            _VectorMA(p1, hgt / 2.0, axis[2], &mut point[1]);
+            let p1 = point[1];
+            _VectorMA(p1, -hgt, axis[2], &mut point[3]);
+
+            _VectorMA(origin, wid / 2.0, axis[1], &mut point[4]);
+            _VectorMA(origin, -wid / 2.0, axis[1], &mut point[5]);
+            // extrapolate each side up and down
+            let p4 = point[4];
+            _VectorMA(p4, hgt / 2.0, axis[2], &mut point[4]);
+            let p4 = point[4];
+            _VectorMA(p4, -hgt, axis[2], &mut point[6]);
+            let p5 = point[5];
+            _VectorMA(p5, hgt / 2.0, axis[2], &mut point[5]);
+            let p5 = point[5];
+            _VectorMA(p5, -hgt, axis[2], &mut point[7]);
+
+            // Now inflate a bbox around these points
+            _VectorCopy(origin, &mut newMins);
+            _VectorCopy(origin, &mut newMaxs);
+            for curAxis in 0..3usize {
+                for i in 0..8usize {
+                    if point[i][curAxis] > newMaxs[curAxis] {
+                        newMaxs[curAxis] = point[i][curAxis];
+                    } else if point[i][curAxis] < newMins[curAxis] {
+                        newMins[curAxis] = point[i][curAxis];
+                    }
+                }
+            }
+            let nmn = newMins;
+            _VectorSubtract(nmn, origin, &mut newMins);
+            let nmx = newMaxs;
+            _VectorSubtract(nmx, origin, &mut newMaxs);
+            // now see if that's a valid way to be
+            if !localTrace.is_null() {
+                let f: LocalTraceFn = core::mem::transmute(localTrace);
+                f(
+                    &mut trace,
+                    &origin as *const vec3_t,
+                    &newMins as *const vec3_t,
+                    &newMaxs as *const vec3_t,
+                    &origin as *const vec3_t,
+                    clientNum,
+                    tracemask,
+                );
+            } else {
+                // don't care about solid stuff then
+                trace.startsolid = 0;
+                trace.allsolid = 0;
+            }
+            if trace.startsolid == 0 && trace.allsolid == 0 {
+                // let's use it!
+                _VectorCopy(newMins, mins);
+                _VectorCopy(newMaxs, maxs);
+            }
+            // else: just use the last one
+        }
+    }
 }
 
-/// Raven `PM_MoveForKata`.
-///
+/// Raven `PM_MoveForKata` — force movement/jump commands during the soulcal and
+/// medium/strong kata special attacks.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:10092-10172`
-// PORT-ESCALATION(pmove-working-state): writes `pm`.
-pub fn PM_MoveForKata(
-    ucmd: *mut usercmd_t,
-) {
-    todo!("Port PM_MoveForKata — parked: pmove-working-state")
+impl PmoveContext<'_> {
+    pub fn PM_MoveForKata(&mut self, ucmd: *mut usercmd_t) {
+        unsafe {
+            let pm = self.pm;
+            let ps = (*pm).ps;
+
+            if (*ps).legsAnim == BOTH_A7_SOULCAL as c_int && (*ps).saberMove == LS_STAFF_SOULCAL {
+                // forward spinning staff attack
+                (*ucmd).upmove = 0;
+
+                if PM_CanRollFromSoulCal(ps) == qtrue {
+                    (*ucmd).upmove = -127;
+                    (*ucmd).rightmove = 0;
+                    if (*ucmd).forwardmove < 0 {
+                        (*ucmd).forwardmove = 0;
+                    }
+                } else {
+                    (*ucmd).rightmove = 0;
+                    if (*ps).legsTimer >= 2750 {
+                        // not at end — push forward
+                        (*ucmd).forwardmove = 64;
+                    } else {
+                        (*ucmd).forwardmove = 0;
+                    }
+                }
+                if (*ps).legsTimer >= 2650 && (*ps).legsTimer < 2850 {
+                    // the jump
+                    if (*ps).groundEntityNum != ENTITYNUM_NONE {
+                        // still on ground? jump!
+                        (*ps).velocity[2] = 250.0;
+                        (*ps).fd.forceJumpZStart = (*ps).origin[2]; //so we don't take damage if we land at same height
+                        self.PM_AddEvent(EV_JUMP as c_int);
+                    }
+                }
+            } else if (*ps).legsAnim == BOTH_A2_SPECIAL as c_int {
+                // medium kata
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+                if (*ps).legsTimer < 2700 && (*ps).legsTimer > 2300 {
+                    (*pm).cmd.forwardmove = 127;
+                } else if (*ps).legsTimer < 900 && (*ps).legsTimer > 500 {
+                    (*pm).cmd.forwardmove = 127;
+                } else {
+                    (*pm).cmd.forwardmove = 0;
+                }
+            } else if (*ps).legsAnim == BOTH_A3_SPECIAL as c_int {
+                // strong kata
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+                if (*ps).legsTimer < 1700 && (*ps).legsTimer > 1000 {
+                    (*pm).cmd.forwardmove = 127;
+                } else {
+                    (*pm).cmd.forwardmove = 0;
+                }
+            } else {
+                (*pm).cmd.forwardmove = 0;
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+            }
+        }
+    }
 }
 
 // `PmoveSingle` is a `PmoveContext` method above (it owns the per-call working

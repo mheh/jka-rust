@@ -10,6 +10,7 @@ pub mod failed_edge;
 pub mod game_export_t;
 pub mod game_import_t;
 pub mod game_item;
+pub mod nav_debug_draw;
 pub mod parms;
 pub mod platform;
 pub mod player_state;

@@ -123,6 +123,48 @@ impl Default for NodeTable {
     }
 }
 
+/// `waypointData_t tempWaypointList[MAX_STORED_WAYPOINTS]` (`g_nav.c:1660`).
+/// Same >32-array `Default` gap as `NodeTable`; `waypointData_t` is
+/// `#[repr(C)]` POD so an all-zero image is valid.
+/// Source: `oracle/oracle/codemp/game/g_nav.c:1660`
+#[derive(Clone, Copy)]
+pub struct TempWaypointList(pub [waypointData_t; MAX_STORED_WAYPOINTS]);
+
+impl Default for TempWaypointList {
+    fn default() -> Self {
+        // SAFETY: `waypointData_t` is `#[repr(C)]` POD (`c_char`/`c_int`
+        // fields only); an all-zero bit pattern is a valid inhabitant.
+        TempWaypointList(unsafe { core::mem::zeroed() })
+    }
+}
+
+// Transparent indexing (`globals.tempWaypointList[i]`) so call sites written
+// against a plain `[waypointData_t; MAX_STORED_WAYPOINTS]` need no change.
+impl core::ops::Index<usize> for TempWaypointList {
+    type Output = waypointData_t;
+    fn index(&self, i: usize) -> &waypointData_t {
+        &self.0[i]
+    }
+}
+impl core::ops::IndexMut<usize> for TempWaypointList {
+    fn index_mut(&mut self, i: usize) -> &mut waypointData_t {
+        &mut self.0[i]
+    }
+}
+
+/// `char fatalErrorString[4096]` — newtype because a 4096-byte array has no
+/// library `Default` impl (only arrays up to 32 elements do in stable Rust),
+/// same gap as `BotChatBuffer`.
+/// Source: `oracle/oracle/codemp/game/g_nav.c:1617`
+#[derive(Clone, Copy)]
+pub struct FatalErrorString(pub [c_char; 4096]);
+
+impl Default for FatalErrorString {
+    fn default() -> Self {
+        FatalErrorString([0; 4096])
+    }
+}
+
 /// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH];
 /// char newShader[MAX_QPATH]; float timeOffset; }`.
 /// Source: `oracle/oracle/codemp/game/g_utils.c:8-13`
@@ -539,18 +581,25 @@ pub struct GameGlobals {
     pub NAVDEBUG_showRadius: qboolean,
     /// `NAVDEBUG_showTestPath`. Source: `oracle/oracle/codemp/game/g_nav.c:1602`
     pub NAVDEBUG_showTestPath: qboolean,
-    //TODO: Port char **
-    // Source: oracle/oracle/codemp/game/g_nav.c:1616
-    pub fatalErrorPointer: (),
+    /// Raven `char *fatalErrorPointer` — rolling write cursor into
+    /// `fatalErrorString`. Modeled as a byte offset (not a raw pointer) per
+    /// the no-aliasing-pointers-into-owned-arrays convention (porting-rules
+    /// §B5); `fatalErrorPointer - fatalErrorString` in the oracle is this
+    /// value directly.
+    /// Source: `oracle/oracle/codemp/game/g_nav.c:1616`
+    pub fatalErrorPointer: usize,
+    /// Raven `char fatalErrorString[4096]`.
+    /// Source: `oracle/oracle/codemp/game/g_nav.c:1617`
+    pub fatalErrorString: FatalErrorString,
     /// `fatalErrors`. Source: `oracle/oracle/codemp/game/g_nav.c:1615`
     pub fatalErrors: c_int,
     /// `navCalculatePaths`. Source: `oracle/oracle/codemp/game/g_nav.c:1597`
     pub navCalculatePaths: qboolean,
     /// `numStoredWaypoints`. Source: `oracle/oracle/codemp/game/g_nav.c:1658`
     pub numStoredWaypoints: c_int,
-    //TODO: Port waypointData_t[MAX_STORED_WAYPOINTS]
-    // Source: oracle/oracle/codemp/game/g_nav.c:1660
-    pub tempWaypointList: (),
+    /// `waypointData_t tempWaypointList[MAX_STORED_WAYPOINTS]`.
+    /// Source: `oracle/oracle/codemp/game/g_nav.c:1660`
+    pub tempWaypointList: TempWaypointList,
     // --- `g_saga.c` file-scope globals ---
     /// `gImperialCountdown`. Source: `oracle/oracle/codemp/game/g_saga.c:30`
     pub gImperialCountdown: c_int,

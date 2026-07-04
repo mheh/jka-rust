@@ -132,6 +132,31 @@ pub const forcePowerDarkLight: [c_int; 18] = [
     0,               // FP_SABERTHROW
 ];
 
+/// Raven `WeaponReadyAnim[WP_NUM_WEAPONS]` — weapon-ready animation per weapon type.
+///
+/// Source: `oracle/oracle/codemp/game/bg_misc.c:242-266`
+pub const WeaponReadyAnim: [c_int; 19] = [
+    TORSO_DROPWEAP1 as c_int,     // WP_NONE
+    TORSO_WEAPONREADY3 as c_int,  // WP_STUN_BATON
+    TORSO_WEAPONREADY3 as c_int,  // WP_MELEE
+    BOTH_STAND2 as c_int,         // WP_SABER
+    TORSO_WEAPONREADY2 as c_int,  // WP_BRYAR_PISTOL
+    TORSO_WEAPONREADY3 as c_int,  // WP_BLASTER
+    TORSO_WEAPONREADY3 as c_int,  // WP_DISRUPTOR
+    TORSO_WEAPONREADY3 as c_int,  // WP_BOWCASTER
+    TORSO_WEAPONREADY3 as c_int,  // WP_REPEATER
+    TORSO_WEAPONREADY3 as c_int,  // WP_DEMP2
+    TORSO_WEAPONREADY3 as c_int,  // WP_FLECHETTE
+    TORSO_WEAPONREADY3 as c_int,  // WP_ROCKET_LAUNCHER
+    TORSO_WEAPONREADY10 as c_int, // WP_THERMAL
+    TORSO_WEAPONREADY10 as c_int, // WP_TRIP_MINE
+    TORSO_WEAPONREADY10 as c_int, // WP_DET_PACK
+    TORSO_WEAPONREADY3 as c_int,  // WP_CONCUSSION
+    TORSO_WEAPONREADY2 as c_int,  // WP_BRYAR_OLD
+    BOTH_STAND1 as c_int,         // WP_EMPLACED_GUN
+    TORSO_WEAPONREADY1 as c_int,  // WP_TURRET
+];
+
 /// Cost lookup helper folding `bgForcePowerCostSaberThrow` back into the
 /// `[fp index][fp level]` shape the Raven source indexes directly. See the
 /// note on `bgForcePowerCost` above.
