@@ -3739,7 +3739,9 @@ pub fn G_VehMuzzleFireFX(
 pub fn G_EstimateCamPos(
     ctx: GameContext<'_>,
     viewAngles: vec3_t,
-    cameraFocusLoc: vec3_t,
+    // Read AND written (Raven bumps the caller's buffer by viewheight at
+    // g_weapon.c:3918) — `&mut` per the settled vec3 out-param rule.
+    cameraFocusLoc: &mut vec3_t,
     viewheight: f32,
     thirdPersonRange: f32,
     thirdPersonHorzOffset: f32,
@@ -3755,7 +3757,6 @@ pub fn G_EstimateCamPos(
         let CAMERA_SIZE: f32 = 4.0;
         let cameramins: vec3_t = [-CAMERA_SIZE, -CAMERA_SIZE, -CAMERA_SIZE];
         let cameramaxs: vec3_t = [CAMERA_SIZE, CAMERA_SIZE, CAMERA_SIZE];
-        let mut cameraFocusLoc = cameraFocusLoc;
 
         let mut cameraFocusAngles = viewAngles;
         cameraFocusAngles[PITCH] += pitchOffset;
@@ -3774,13 +3775,13 @@ pub fn G_EstimateCamPos(
 
         cameraFocusLoc[2] += viewheight;
 
-        let mut cameraIdealTarget = cameraFocusLoc;
+        let mut cameraIdealTarget = *cameraFocusLoc;
         cameraIdealTarget[2] += vertOffset;
 
         // NOTE: on cgame, this uses the thirdpersontargetdamp value, we ignore that here
         let mut cameraCurTarget = cameraIdealTarget;
         let mut trace: trace_t = std::mem::zeroed();
-        trap::Trace(ctx.engine, &mut trace, cameraFocusLoc, cameramins, cameramaxs, cameraCurTarget, ignoreEntNum, MASK_CAMERACLIP);
+        trap::Trace(ctx.engine, &mut trace, *cameraFocusLoc, cameramins, cameramaxs, cameraCurTarget, ignoreEntNum, MASK_CAMERACLIP);
         if trace.fraction < 1.0 {
             cameraCurTarget = trace.endpos;
         }
@@ -3867,8 +3868,10 @@ pub fn WP_GetVehicleCamPos(ent: *mut gentity_t, pilot: *mut gentity_t, camPos: &
         }
 
         // Control Scheme 3 Method:
+        // Raven passes `pilot->client->ps.origin` directly, so the viewheight
+        // bump inside G_EstimateCamPos lands in the pilot's ps.origin buffer.
         G_EstimateCamPos(
-            ctx, (*(*ent).client).ps.viewangles, (*(*pilot).client).ps.origin, (*(*pilot).client).ps.viewheight as f32,
+            ctx, (*(*ent).client).ps.viewangles, &mut (*(*pilot).client).ps.origin, (*(*pilot).client).ps.viewheight as f32,
             thirdPersonRange, thirdPersonHorzOffset, vertOffset, pitchOffset, (*pilot).s.number, camPos,
         );
     }
