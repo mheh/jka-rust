@@ -20,7 +20,8 @@ Each packet carries, per the pass-3 prep agenda:
  (g) EntThink/EntUse/EntSpawn fn-ptr dispatch guidance (enums in ent_fn_enums.rs);
  (h) deferred-by-ruling markers for ICARUS-internal fns (fork 6).
 
-Files with >60 open fns shard by contiguous fn range. Emits out/pass3/packets/
+Files with >35 open fns or >3,000 open LOC shard by contiguous fn range,
+LOC-balanced across shards. Emits out/pass3/packets/
 + out/pass3/manifest.json (+ trial-manifest.json when --trial passed).
 
 Usage:
@@ -42,7 +43,8 @@ RULINGS = REPO / "docs" / "handoffs" / "jampgame-fork-discovery.md"
 VA_DOC = L.WT / "docs" / "porting" / "va-printf-mapping.md"
 ROSETTA_DOC = L.WT / "docs" / "porting" / "rosetta.md"
 OUT = L.HERE / "out" / "pass3"
-SHARD_MAX = 60
+SHARD_MAX_FNS = 35
+SHARD_MAX_LOC = 3000
 
 # ---- the 38 stored gentity_t* fields flipped to Option<EntityId> (ruling 22).
 # Names verified against the oracle headers (read-only): g_local.h (gentity_t /
@@ -275,6 +277,52 @@ def vec3_notes(cfile, f):
     return "\n".join(lines)
 
 
+def shard_chunks(open_fns):
+    """Split a file's open fns into contiguous, LOC-balanced shards.
+
+    A file shards when it exceeds SHARD_MAX_FNS open fns or SHARD_MAX_LOC
+    oracle LOC; the shard count satisfies both caps, and cut points chase
+    even cumulative-LOC boundaries (with a hard fn-count cap per shard).
+    Fn order (= file order) is preserved."""
+    tot = sum(f["loc"] for f in open_fns)
+    n_shards = max(
+        (len(open_fns) + SHARD_MAX_FNS - 1) // SHARD_MAX_FNS,
+        (tot + SHARD_MAX_LOC - 1) // SHARD_MAX_LOC,
+    )
+    n_shards = min(n_shards, len(open_fns))
+    if n_shards <= 1:
+        return [open_fns]
+    while True:
+        chunks = _split(open_fns, tot, n_shards)
+        if n_shards == len(open_fns) or all(
+            len(c) <= SHARD_MAX_FNS and sum(f["loc"] for f in c) <= SHARD_MAX_LOC
+            for c in chunks
+        ):
+            return chunks
+        n_shards += 1
+
+
+def _split(open_fns, tot, n_shards):
+    """One contiguous LOC-balanced split into exactly n_shards chunks."""
+    chunks, cur, acc = [], [], 0
+    for i, f in enumerate(open_fns):
+        if cur and len(chunks) < n_shards - 1:
+            # Cut before f when: fn cap hit; f would overshoot the even-LOC
+            # boundary farther than stopping short of it; or every remaining
+            # fn is needed to keep the remaining shards non-empty.
+            boundary = (len(chunks) + 1) * tot / n_shards
+            over = (acc + f["loc"]) - boundary
+            if (len(cur) >= SHARD_MAX_FNS
+                    or (over > 0 and over >= boundary - acc)
+                    or len(open_fns) - i == n_shards - len(chunks) - 1):
+                chunks.append(cur)
+                cur, acc = [], 0
+        cur.append(f)
+        acc += f["loc"]
+    chunks.append(cur)
+    return chunks
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--only", nargs="*", default=None,
@@ -437,9 +485,9 @@ def main():
             continue
         tier = L.tier(cfile)
         is_icarus = cfile == "g_ICARUScb.c"
-        n_shards = (len(open_fns) + SHARD_MAX - 1) // SHARD_MAX
-        for si in range(n_shards):
-            chunk = open_fns[si * SHARD_MAX:(si + 1) * SHARD_MAX]
+        chunks = shard_chunks(open_fns)
+        n_shards = len(chunks)
+        for si, chunk in enumerate(chunks):
             shard = (si + 1) if n_shards > 1 else None
             base = cfile[:-2]
             o = render_packet(cfile, tier, is_icarus, chunk, shard, n_shards,
