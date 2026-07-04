@@ -325,16 +325,11 @@ pub fn check_recharge(ent: *mut gentity_t) {
 /// Raven `EnergyShieldStationSettings`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1213-1223`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
+// how is state threaded in?
 pub fn EnergyShieldStationSettings(ent: *mut gentity_t) {
-    // Raven `STATION_RECHARGE_TIME` (`g_misc.c:12`).
-    const STATION_RECHARGE_TIME: c_int = 100;
-    unsafe {
-        G_SpawnInt_local(b"count\0", b"200\0", &mut (*ent).count);
-        G_SpawnInt_local(b"chargerate\0", b"0\0", &mut (*ent).genericValue5);
-        if (*ent).genericValue5 == 0 {
-            (*ent).genericValue5 = STATION_RECHARGE_TIME;
-        }
-    }
+    todo!("Port EnergyShieldStationSettings — parked: seam-threading")
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `bgSiegeClasses`/
@@ -396,10 +391,11 @@ pub fn SP_misc_model_shield_power_converter(ent: *mut gentity_t) {
 /// Raven `EnergyAmmoStationSettings`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1743-1746`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
+// how is state threaded in?
 pub fn EnergyAmmoStationSettings(ent: *mut gentity_t) {
-    unsafe {
-        G_SpawnInt_local(b"count\0", b"200\0", &mut (*ent).count);
-    }
+    todo!("Port EnergyAmmoStationSettings — parked: seam-threading")
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `ammoData`/`level.time`.
@@ -427,10 +423,11 @@ pub fn SP_misc_model_ammo_power_converter(ent: *mut gentity_t) {
 /// Raven `EnergyHealthStationSettings`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1911-1914`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
+// how is state threaded in?
 pub fn EnergyHealthStationSettings(ent: *mut gentity_t) {
-    unsafe {
-        G_SpawnInt_local(b"count\0", b"200\0", &mut (*ent).count);
-    }
+    todo!("Port EnergyHealthStationSettings — parked: seam-threading")
 }
 
 // PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
@@ -834,19 +831,16 @@ pub fn SP_misc_weapon_shooter(self_: *mut gentity_t) {
 /// Raven `SP_misc_weather_zone`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3491-3494`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
+// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
+// `g_weapon.rs`) — how is state threaded in?
 pub fn SP_misc_weather_zone(ent: *mut gentity_t) {
-    G_FreeEntity(ent);
+    todo!("Port SP_misc_weather_zone — parked: seam-threading")
 }
 
-// Local `G_SpawnInt` shim: the packet's resolved signature is
-// `G_SpawnInt(key: *const c_char, defaultString: *const c_char, out: *mut c_int) -> qboolean`;
-// this helper just adapts byte-string literals to `*const c_char` at call
-// sites above without repeating the cast everywhere.
-#[inline]
-unsafe fn G_SpawnInt_local(key: &'static [u8], default_string: &'static [u8], out: *mut c_int) {
-    crate::g_spawn::G_SpawnInt(
-        key.as_ptr() as *const c_char,
-        default_string.as_ptr() as *const c_char,
-        out,
-    );
-}
+// The local `G_SpawnInt` shim formerly here (adapting byte-string literals to
+// `*const c_char`) is dropped: its only callers (`EnergyShieldStationSettings`/
+// `EnergyAmmoStationSettings`/`EnergyHealthStationSettings`) are parked
+// (`seam-threading` — `G_SpawnInt` needs a `GameContext` this shim had no way
+// to supply), so it has zero live callers (porting-rules §20).

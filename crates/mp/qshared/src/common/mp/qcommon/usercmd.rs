@@ -14,7 +14,7 @@ use crate::shared::platform::BYTE;
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct usercmd_t {
-    pub server_time: c_int,
+    pub serverTime: c_int,
     pub angles: [c_int; 3],
     pub buttons: c_int,
     /// Raven `weapon`: weapon
@@ -28,7 +28,7 @@ pub struct usercmd_t {
 }
 
 const _: () = assert!(core::mem::size_of::<usercmd_t>() == 28);
-const _: () = assert!(core::mem::offset_of!(usercmd_t, server_time) == 0);
+const _: () = assert!(core::mem::offset_of!(usercmd_t, serverTime) == 0);
 const _: () = assert!(core::mem::offset_of!(usercmd_t, angles) == 4);
 const _: () = assert!(core::mem::offset_of!(usercmd_t, buttons) == 16);
 const _: () = assert!(core::mem::offset_of!(usercmd_t, weapon) == 20);

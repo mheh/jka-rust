@@ -9,6 +9,11 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::NPC_combat::G_ClearEnemy;
+use crate::NPC_reactions::NPC_Pain;
+use crate::NPC_sounds::G_AddVoiceEvent;
+use crate::g_timer::TIMER_Set;
+use crate::q_math::Q_irand;
 use mp_bg::public::entity_event::entity_event_t::{EV_CONFUSE1, EV_CONFUSE3, EV_PUSHED1, EV_PUSHED3};
 use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 
@@ -68,7 +73,7 @@ pub fn NPC_Grenadier_PlayConfusionSound(self_: *mut gentity_t) {
         TIMER_Set(self_, c"flee".as_ptr() as *const c_char, 0);
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).squadState = SQUAD_IDLE;
-        (*npc).tempBehavior = bState_t::BS_DEFAULT as i32;
+        (*npc).tempBehavior = bState_t::BS_DEFAULT;
         G_ClearEnemy(self_); // FIXME: or just self->enemy = NULL;? (Raven comment).
         (*npc).investigateCount = 0;
     }

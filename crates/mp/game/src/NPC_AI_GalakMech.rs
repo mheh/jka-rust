@@ -50,45 +50,12 @@ pub fn NPC_GalakMech_Precache() {
 /// Raven `NPC_GalakMech_Init`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:59-98`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
+// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
+// `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_GalakMech_Init(ent: *mut gentity_t) {
-    unsafe {
-        let npc = (*ent).NPC as *mut gNPC_t;
-        let client = (*ent).client as *mut gclient_t;
-        if (*npc).behaviorState != bState_t::BS_CINEMATIC {
-            (*client).ps.stats[statIndex_t::STAT_ARMOR as usize] = GALAK_SHIELD_HEALTH;
-            (*npc).investigateCount = 0;
-            (*npc).investigateDebounceTime = 0;
-            (*ent).flags |= crate::entity::flags::FL_SHIELDED; //reflect normal shots
-            //rwwFIXMEFIXME: Support PW_GALAK_SHIELD
-            //ent->client->ps.powerups[PW_GALAK_SHIELD] = Q3_INFINITE;//temp, for effect
-            //ent->fx_time = level.time;
-            (*ent).r.mins = [-60.0, -60.0, -24.0];
-            (*ent).r.maxs = [60.0, 60.0, 80.0];
-            (*ent).flags |= crate::entity::flags::FL_NO_KNOCKBACK; //don't get pushed
-            crate::g_timer::TIMER_Set(ent, c"attackDelay".as_ptr(), 0); //FIXME: Slant for difficulty levels
-            crate::g_timer::TIMER_Set(ent, c"flee".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ent, c"smackTime".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ent, c"beamDelay".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ent, c"noLob".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ent, c"noRapid".as_ptr(), 0);
-            crate::g_timer::TIMER_Set(ent, c"talkDebounce".as_ptr(), 0);
-
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_shield".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_galakface".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_galakhead".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_eyes_mouth".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_collar".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_galaktorso".as_ptr(), TURN_OFF);
-        } else {
-            //		NPC_SetSurfaceOnOff( ent, "helmet", TURN_OFF );
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_shield".as_ptr(), TURN_OFF);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_galakface".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_galakhead".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_eyes_mouth".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_collar".as_ptr(), TURN_ON);
-            crate::NPC_utils::NPC_SetSurfaceOnOff(ent, c"torso_galaktorso".as_ptr(), TURN_ON);
-        }
-    }
+    todo!("Port NPC_GalakMech_Init — parked: seam-threading")
 }
 
 // PORT-ESCALATION(ambient-state): reads `level.time` and calls

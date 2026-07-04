@@ -23,6 +23,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::q_shared::Q_stricmp;
 
 /// Raven's `#define SIEGECHAR_TAB 9` (tab literal used by the hand-rolled
 /// siege-file parser instead of `'\t'`).

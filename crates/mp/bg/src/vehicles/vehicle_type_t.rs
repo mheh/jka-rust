@@ -7,6 +7,7 @@
 /// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:9-18`
 #[allow(non_camel_case_types)]
 #[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum vehicleType_t {
     /// No vehicle.
     VH_NONE = 0,

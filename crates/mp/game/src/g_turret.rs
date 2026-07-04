@@ -9,6 +9,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_utils::G_ScaleNetHealth;
 
 /// Raven `TurretPain`.
 ///

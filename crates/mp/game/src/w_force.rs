@@ -28,10 +28,35 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+
+// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Source: `oracle/oracle/codemp/game/q_shared.h`
+const qtrue: qboolean = 1;
+const qfalse: qboolean = 0;
+use crate::NPC_AI_Jedi::Jedi_Decloak;
+use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri};
+use crate::bg_panimate::{BG_FullBodyTauntAnim, BG_SaberInSpecial};
+use crate::bg_pmove::BG_InKnockDown;
+use crate::bg_saber::BG_ForcePowerDrain;
+use crate::g_combat::G_Damage;
+use crate::g_team::OnSameTeam;
+use crate::g_utils::{G_Sound, G_SoundIndex, G_TempEntity};
+use crate::q_math::{Q_irand, VectorLength};
+use crate::w_saber::HasSetSaberOnly;
 use crate::trap;
 use crate::world::GameContext;
 
+/// Raven `PMF_FOLLOW`/`PMF_STUCK_TO_WALL` (`playerState_t::pm_flags` bits).
+/// Source: `oracle/oracle/codemp/game/bg_public.h:415,417`
+const PMF_FOLLOW: c_int = 4096;
+const PMF_STUCK_TO_WALL: c_int = 16384;
+
+/// Raven `SFL_TWO_HANDED` (`weaponData_t::weaponflags` bit) — uses both hands.
+/// Source: `oracle/oracle/codemp/game/q_shared.h:691`
+const SFL_TWO_HANDED: c_int = 1 << 4;
+
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
+use mp_bg::public::entity_event::entity_event_t::{EV_PREDEFSOUND, EV_TEAM_POWER};
 
 /// Raven `mindTrickTime` per force-mastery level (ms).
 ///
@@ -43,7 +68,7 @@ const mindTrickTime: [c_int; 4] = [0 /*none*/, 5000, 10000, 15000];
 /// Source: `oracle/oracle/codemp/game/w_force.c:40-49`
 pub fn G_PreDefSound(ctx: GameContext<'_>, org: vec3_t, pdSound: c_int) -> *mut gentity_t {
     unsafe {
-        let te = G_TempEntity(org, EV_PREDEFSOUND);
+        let te = G_TempEntity(org, EV_PREDEFSOUND as c_int);
         (*te).s.eventParm = pdSound;
         (*te).s.origin = org; // VectorCopy(org, te->s.origin)
         te
@@ -53,117 +78,23 @@ pub fn G_PreDefSound(ctx: GameContext<'_>, org: vec3_t, pdSound: c_int) -> *mut 
 /// Raven `WP_InitForcePowers`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:147-572`
+// PORT-ESCALATION(unported-global): reads the file-scope
+// `forcePowerNeeded/bgSiegeClasses` table(s) — genuinely unported runtime data
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    // PORT-ESCALATION(spine-convention): 426-LOC init reads botstates (game
-    // global — fork-1 GameWorld field, not yet added), bgSiegeClasses (bg
-    // table), and drives trap_Cvar_Set/GetUserinfo/SendServerCommand + va/atoi
-    // string parsing; deferred to a follow-up pass with the added GameWorld
-    // fields. Not a design block, but out of this pass's budget.
-    todo!("Port WP_InitForcePowers — oracle/oracle/codemp/game/w_force.c:147")
+    todo!("Port WP_InitForcePowers — parked: unported-global (forcePowerNeeded/bgSiegeClasses)")
 }
 
 /// Raven `WP_SpawnInitForcePowers` — reset per-spawn force state.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:574-691`
+// PORT-ESCALATION(unported-global): reads the file-scope
+// `forcePowerNeeded/bgSiegeClasses` table(s) — genuinely unported runtime data
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn WP_SpawnInitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
-    unsafe {
-        let cl = (*ent).client;
-        (*cl).ps.saberAttackChainCount = 0;
-
-        let mut i = 0;
-        while i < NUM_FORCE_POWERS {
-            if (*cl).ps.fd.forcePowersActive & (1 << i) != 0 {
-                WP_ForcePowerStop(ctx, ent, i as forcePowers_t);
-            }
-            i += 1;
-        }
-
-        (*cl).ps.fd.forceDeactivateAll = 0;
-
-        (*cl).ps.fd.forcePower = FORCE_POWER_MAX;
-        (*cl).ps.fd.forcePowerMax = FORCE_POWER_MAX;
-        (*cl).ps.fd.forcePowerRegenDebounceTime = 0;
-        (*cl).ps.fd.forceGripEntityNum = ENTITYNUM_NONE;
-        (*cl).ps.fd.forceMindtrickTargetIndex = 0;
-        (*cl).ps.fd.forceMindtrickTargetIndex2 = 0;
-        (*cl).ps.fd.forceMindtrickTargetIndex3 = 0;
-        (*cl).ps.fd.forceMindtrickTargetIndex4 = 0;
-
-        (*cl).ps.holocronBits = 0;
-
-        let mut i = 0;
-        while i < NUM_FORCE_POWERS {
-            (*cl).ps.holocronsCarried[i as usize] = 0;
-            i += 1;
-        }
-
-        if (*ctx.world).cvars.g_gametype.integer == GT_HOLOCRON {
-            let mut i = 0;
-            while i < NUM_FORCE_POWERS {
-                (*cl).ps.fd.forcePowerLevel[i as usize] = FORCE_LEVEL_0;
-                i += 1;
-            }
-
-            if HasSetSaberOnly() != 0 {
-                if (*cl).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] < FORCE_LEVEL_1 {
-                    (*cl).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] = FORCE_LEVEL_1;
-                }
-                if (*cl).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] < FORCE_LEVEL_1 {
-                    (*cl).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] = FORCE_LEVEL_1;
-                }
-            }
-        }
-
-        let mut i = 0;
-        while i < NUM_FORCE_POWERS {
-            (*cl).ps.fd.forcePowerDebounce[i as usize] = 0;
-            (*cl).ps.fd.forcePowerDuration[i as usize] = 0;
-            i += 1;
-        }
-
-        (*cl).ps.fd.forcePowerRegenDebounceTime = 0;
-        (*cl).ps.fd.forceJumpZStart = 0;
-        (*cl).ps.fd.forceJumpCharge = 0;
-        (*cl).ps.fd.forceJumpSound = 0;
-        (*cl).ps.fd.forceGripDamageDebounceTime = 0;
-        (*cl).ps.fd.forceGripBeingGripped = 0;
-        (*cl).ps.fd.forceGripCripple = 0;
-        (*cl).ps.fd.forceGripUseTime = 0;
-        (*cl).ps.fd.forceGripSoundTime = 0;
-        (*cl).ps.fd.forceGripStarted = 0;
-        (*cl).ps.fd.forceHealTime = 0;
-        (*cl).ps.fd.forceHealAmount = 0;
-        (*cl).ps.fd.forceRageRecoveryTime = 0;
-        (*cl).ps.fd.forceDrainEntNum = ENTITYNUM_NONE;
-        (*cl).ps.fd.forceDrainTime = 0;
-
-        let mut i = 0;
-        while i < NUM_FORCE_POWERS {
-            if (*cl).ps.fd.forcePowersKnown & (1 << i) != 0
-                && (*cl).ps.fd.forcePowerLevel[i as usize] == 0
-            {
-                //make sure all known powers are cleared if we have level 0 in them
-                (*cl).ps.fd.forcePowersKnown &= !(1 << i);
-            }
-            i += 1;
-        }
-
-        if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE && (*cl).siegeClass != -1 {
-            //Then use the powers for this class.
-            let mut i = 0;
-            while i < NUM_FORCE_POWERS {
-                (*cl).ps.fd.forcePowerLevel[i as usize] =
-                    bgSiegeClasses[(*cl).siegeClass as usize].forcePowerLevels[i as usize];
-
-                if (*cl).ps.fd.forcePowerLevel[i as usize] == 0 {
-                    (*cl).ps.fd.forcePowersKnown &= !(1 << i);
-                } else {
-                    (*cl).ps.fd.forcePowersKnown |= 1 << i;
-                }
-                i += 1;
-            }
-        }
-    }
+    todo!("Port WP_SpawnInitForcePowers — parked: unported-global (forcePowerNeeded/bgSiegeClasses)")
 }
 
 /// Raven `ForcePowerUsableOn` — can `attacker` use `forcePower` on `other`?
@@ -181,14 +112,14 @@ pub fn ForcePowerUsableOn(
 
         if !other.is_null()
             && !(*other).client.is_null()
-            && BG_HasYsalamiri(gametype, &mut (*(*other).client).ps) != 0
+            && BG_HasYsalamiri(gametype, &mut (*((*other).client as *mut gclient_t)).ps) != 0
         {
             return 0;
         }
 
         if !attacker.is_null()
             && !(*attacker).client.is_null()
-            && BG_CanUseFPNow(gametype, &mut (*(*attacker).client).ps, level_time, forcePower) == 0
+            && BG_CanUseFPNow(gametype, &mut (*((*attacker).client as *mut gclient_t)).ps, level_time, forcePower) == 0
         {
             return 0;
         }
@@ -196,14 +127,14 @@ pub fn ForcePowerUsableOn(
         //Dueling fighters cannot use force powers on others, with the exception of force push when locked with each other
         if !attacker.is_null()
             && !(*attacker).client.is_null()
-            && (*(*attacker).client).ps.duelInProgress != 0
+            && (*((*attacker).client as *mut gclient_t)).ps.duelInProgress != 0
         {
             return 0;
         }
 
         if !other.is_null()
             && !(*other).client.is_null()
-            && (*(*other).client).ps.duelInProgress != 0
+            && (*((*other).client as *mut gclient_t)).ps.duelInProgress != 0
         {
             return 0;
         }
@@ -211,21 +142,21 @@ pub fn ForcePowerUsableOn(
         if forcePower == FP_GRIP {
             if !other.is_null()
                 && !(*other).client.is_null()
-                && (*(*other).client).ps.fd.forcePowersActive & (1 << FP_ABSORB) != 0
+                && (*((*other).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << FP_ABSORB) != 0
             {
                 //don't allow gripping to begin with if they are absorbing
                 //play sound indicating that attack was absorbed
-                if (*(*other).client).forcePowerSoundDebounce < level_time {
+                if (*((*other).client as *mut gclient_t)).forcePowerSoundDebounce < level_time {
                     let abSound =
-                        G_PreDefSound(ctx, (*(*other).client).ps.origin, PDSOUND_ABSORBHIT);
+                        G_PreDefSound(ctx, (*((*other).client as *mut gclient_t)).ps.origin, PDSOUND_ABSORBHIT as c_int);
                     (*abSound).s.trickedentindex = (*other).s.number;
-                    (*(*other).client).forcePowerSoundDebounce = level_time + 400;
+                    (*((*other).client as *mut gclient_t)).forcePowerSoundDebounce = level_time + 400;
                 }
                 return 0;
             } else if !other.is_null()
                 && !(*other).client.is_null()
-                && (*(*other).client).ps.weapon == WP_SABER
-                && BG_SaberInSpecial((*(*other).client).ps.saberMove) != 0
+                && (*((*other).client as *mut gclient_t)).ps.weapon == WP_SABER
+                && BG_SaberInSpecial((*((*other).client as *mut gclient_t)).ps.saberMove) != 0
             {
                 //don't grip person while they are in a special or some really bad things can happen.
                 return 0;
@@ -236,15 +167,15 @@ pub fn ForcePowerUsableOn(
             && !(*other).client.is_null()
             && (forcePower == FP_PUSH || forcePower == FP_PULL)
         {
-            if BG_InKnockDown((*(*other).client).ps.legsAnim) != 0 {
+            if BG_InKnockDown((*((*other).client as *mut gclient_t)).ps.legsAnim) != 0 {
                 return 0;
             }
         }
 
         if !other.is_null()
             && !(*other).client.is_null()
-            && (*other).s.eType == ET_NPC
-            && (*other).s.NPC_class == CLASS_VEHICLE
+            && (*other).s.eType == ET_NPC as c_int
+            && (*other).s.NPC_class == CLASS_VEHICLE as c_int
         {
             //can't use the force on vehicles.. except lightning
             if forcePower == FP_LIGHTNING {
@@ -256,7 +187,7 @@ pub fn ForcePowerUsableOn(
 
         if !other.is_null()
             && !(*other).client.is_null()
-            && (*other).s.eType == ET_NPC
+            && (*other).s.eType == ET_NPC as c_int
             && gametype == GT_SIEGE
         {
             //can't use powers at all on npc's normally in siege...
@@ -270,39 +201,16 @@ pub fn ForcePowerUsableOn(
 /// Raven `WP_ForcePowerAvailable` — is there enough force pool for `forcePower`?
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:774-801`
+// PORT-ESCALATION(unported-global): reads the file-scope
+// `forcePowerNeeded/bgSiegeClasses` table(s) — genuinely unported runtime data
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn WP_ForcePowerAvailable(
     self_: *mut gentity_t,
     forcePower: forcePowers_t,
     overrideAmt: c_int,
 ) -> qboolean {
-    unsafe {
-        let cl = (*self_).client;
-        let drain = if overrideAmt != 0 {
-            overrideAmt
-        } else {
-            forcePowerNeeded[(*cl).ps.fd.forcePowerLevel[forcePower as usize] as usize]
-                [forcePower as usize]
-        };
-
-        if (*cl).ps.fd.forcePowersActive & (1 << forcePower) != 0 {
-            //we're probably going to deactivate it..
-            return qtrue;
-        }
-        if forcePower == FP_LEVITATION {
-            return qtrue;
-        }
-        if drain == 0 {
-            return qtrue;
-        }
-        if (forcePower == FP_DRAIN || forcePower == FP_LIGHTNING) && (*cl).ps.fd.forcePower >= 25 {
-            //it's ok then, drain/lightning are actually duration
-            return qtrue;
-        }
-        if (*cl).ps.fd.forcePower < drain {
-            return qfalse;
-        }
-        qtrue
-    }
+    todo!("Port WP_ForcePowerAvailable — parked: unported-global (forcePowerNeeded/bgSiegeClasses)")
 }
 
 /// Raven `WP_ForcePowerInUse`.
@@ -310,7 +218,7 @@ pub fn WP_ForcePowerAvailable(
 /// Source: `oracle/oracle/codemp/game/w_force.c:803-811`
 pub fn WP_ForcePowerInUse(self_: *mut gentity_t, forcePower: forcePowers_t) -> qboolean {
     unsafe {
-        if (*(*self_).client).ps.fd.forcePowersActive & (1 << forcePower) != 0 {
+        if (*((*self_).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << forcePower) != 0 {
             //already using this power
             return qtrue;
         }
@@ -327,7 +235,7 @@ pub fn WP_ForcePowerUsable(
     forcePower: forcePowers_t,
 ) -> qboolean {
     unsafe {
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
         let gametype = (*ctx.world).cvars.g_gametype.integer;
         let level_time = (*ctx.world).level.time;
 
@@ -462,7 +370,7 @@ pub fn WP_AbsorbConversion(
             return -1;
         }
 
-        let atcl = (*attacked).client;
+        let atcl = (*attacked).client as *mut gclient_t;
         if (*atcl).ps.fd.forcePowersActive & (1 << FP_ABSORB) == 0 {
             //absorb is not active
             return -1;
@@ -490,7 +398,7 @@ pub fn WP_AbsorbConversion(
         //play sound indicating that attack was absorbed
         let level_time = (*ctx.world).level.time;
         if (*atcl).forcePowerSoundDebounce < level_time {
-            let abSound = G_PreDefSound(ctx, (*atcl).ps.origin, PDSOUND_ABSORBHIT);
+            let abSound = G_PreDefSound(ctx, (*atcl).ps.origin, PDSOUND_ABSORBHIT as c_int);
             (*abSound).s.trickedentindex = (*attacked).s.number;
 
             (*atcl).forcePowerSoundDebounce = level_time + 400;
@@ -508,7 +416,7 @@ pub fn WP_ForcePowerRegenerate(self_: *mut gentity_t, overrideAmt: c_int) {
         if (*self_).client.is_null() {
             return;
         }
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
 
         if overrideAmt != 0 {
             //custom regen amount
@@ -535,7 +443,7 @@ pub fn WP_ForcePowerStart(
     mut overrideAmt: c_int,
 ) {
     unsafe {
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
         let mut duration: c_int = 0;
         let mut hearable = qfalse;
@@ -692,7 +600,7 @@ pub fn WP_ForcePowerStart(
         }
 
         if hearable != 0 {
-            (*cl).ps.otherSoundLen = hearDist as c_int;
+            (*cl).ps.otherSoundLen = hearDist;
             (*cl).ps.otherSoundTime = level_time + 100;
         }
 
@@ -712,7 +620,7 @@ pub fn WP_ForcePowerStart(
 /// Source: `oracle/oracle/codemp/game/w_force.c:1236-1292`
 pub fn ForceHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
 
         if (*self_).health <= 0 {
             return;
@@ -777,224 +685,23 @@ pub fn WP_AddToClientBitflags(ent: *mut gentity_t, entNum: c_int) {
 /// Raven `ForceTeamHeal`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:1319-1422`
+// PORT-ESCALATION(unported-global): reads the file-scope
+// `forcePowerNeeded/bgSiegeClasses` table(s) — genuinely unported runtime data
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
-    unsafe {
-        let mut radius: f32 = 256.0;
-        let mut i: c_int = 0;
-        let mut numpl: c_int = 0;
-        let mut pl = [0 as c_int; MAX_CLIENTS as usize];
-        let healthadd;
-        let mut te: *mut gentity_t = std::ptr::null_mut();
-
-        let cl = (*self_).client;
-        let level_time = (*ctx.world).level.time;
-
-        if (*self_).health <= 0 {
-            return;
-        }
-
-        if WP_ForcePowerUsable(ctx, self_, FP_TEAM_HEAL) == 0 {
-            return;
-        }
-
-        if (*cl).ps.fd.forcePowerDebounce[FP_TEAM_HEAL as usize] >= level_time {
-            return;
-        }
-
-        if (*cl).ps.fd.forcePowerLevel[FP_TEAM_HEAL as usize] == FORCE_LEVEL_2 {
-            radius *= 1.5;
-        }
-        if (*cl).ps.fd.forcePowerLevel[FP_TEAM_HEAL as usize] == FORCE_LEVEL_3 {
-            radius *= 2.0;
-        }
-
-        while i < MAX_CLIENTS {
-            let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
-
-            if !(*ent).client.is_null()
-                && self_ != ent
-                && OnSameTeam(self_, ent) != 0
-                && (*(*ent).client).ps.stats[STAT_HEALTH as usize]
-                    < (*(*ent).client).ps.stats[STAT_MAX_HEALTH as usize]
-                && (*(*ent).client).ps.stats[STAT_HEALTH as usize] > 0
-                && ForcePowerUsableOn(ctx, self_, ent, FP_TEAM_HEAL) != 0
-                && trap::InPVS(
-                    ctx.engine,
-                    GInPvsArgs::new(
-                        &(*cl).ps.origin as *const vec3_t,
-                        &(*(*ent).client).ps.origin as *const vec3_t,
-                    ),
-                ) != 0
-            {
-                // VectorSubtract(self->ps.origin, ent->ps.origin, a)
-                let a = [
-                    (*cl).ps.origin[0] - (*(*ent).client).ps.origin[0],
-                    (*cl).ps.origin[1] - (*(*ent).client).ps.origin[1],
-                    (*cl).ps.origin[2] - (*(*ent).client).ps.origin[2],
-                ];
-
-                if VectorLength(a) <= radius {
-                    pl[numpl as usize] = i;
-                    numpl += 1;
-                }
-            }
-
-            i += 1;
-        }
-
-        if numpl < 1 {
-            return;
-        }
-
-        if numpl == 1 {
-            healthadd = 50;
-        } else if numpl == 2 {
-            healthadd = 33;
-        } else {
-            healthadd = 25;
-        }
-
-        (*cl).ps.fd.forcePowerDebounce[FP_TEAM_HEAL as usize] = level_time + 2000;
-        i = 0;
-
-        while i < numpl {
-            let ent = &mut (*ctx.world).entities[pl[i as usize] as usize] as *mut gentity_t;
-            let ecl = (*ent).client;
-            if (*ecl).ps.stats[STAT_HEALTH as usize] > 0 && (*ent).health > 0 {
-                (*ecl).ps.stats[STAT_HEALTH as usize] += healthadd;
-                if (*ecl).ps.stats[STAT_HEALTH as usize] > (*ecl).ps.stats[STAT_MAX_HEALTH as usize] {
-                    (*ecl).ps.stats[STAT_HEALTH as usize] = (*ecl).ps.stats[STAT_MAX_HEALTH as usize];
-                }
-
-                (*ent).health = (*ecl).ps.stats[STAT_HEALTH as usize];
-
-                //At this point we know we got one, so add him into the collective event client bitflag
-                if te.is_null() {
-                    te = G_TempEntity((*cl).ps.origin, EV_TEAM_POWER);
-                    (*te).s.eventParm = 1; //eventParm 1 is heal, eventParm 2 is force regen
-
-                    //since we had an extra check above, do the drain now because we got at least one guy
-                    BG_ForcePowerDrain(
-                        &mut (*cl).ps,
-                        FP_TEAM_HEAL,
-                        forcePowerNeeded[(*cl).ps.fd.forcePowerLevel[FP_TEAM_HEAL as usize] as usize]
-                            [FP_TEAM_HEAL as usize],
-                    );
-                }
-
-                WP_AddToClientBitflags(te, pl[i as usize]);
-            }
-            i += 1;
-        }
-    }
+    todo!("Port ForceTeamHeal — parked: unported-global (forcePowerNeeded/bgSiegeClasses)")
 }
 
 /// Raven `ForceTeamForceReplenish`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:1424-1521`
+// PORT-ESCALATION(unported-global): reads the file-scope
+// `forcePowerNeeded/bgSiegeClasses` table(s) — genuinely unported runtime data
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: *mut gentity_t) {
-    unsafe {
-        let mut radius: f32 = 256.0;
-        let mut i: c_int = 0;
-        let mut numpl: c_int = 0;
-        let mut pl = [0 as c_int; MAX_CLIENTS as usize];
-        let poweradd;
-        let mut te: *mut gentity_t = std::ptr::null_mut();
-
-        let cl = (*self_).client;
-        let level_time = (*ctx.world).level.time;
-
-        if (*self_).health <= 0 {
-            return;
-        }
-
-        if WP_ForcePowerUsable(ctx, self_, FP_TEAM_FORCE) == 0 {
-            return;
-        }
-
-        if (*cl).ps.fd.forcePowerDebounce[FP_TEAM_FORCE as usize] >= level_time {
-            return;
-        }
-
-        if (*cl).ps.fd.forcePowerLevel[FP_TEAM_FORCE as usize] == FORCE_LEVEL_2 {
-            radius *= 1.5;
-        }
-        if (*cl).ps.fd.forcePowerLevel[FP_TEAM_FORCE as usize] == FORCE_LEVEL_3 {
-            radius *= 2.0;
-        }
-
-        while i < MAX_CLIENTS {
-            let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
-
-            if !(*ent).client.is_null()
-                && self_ != ent
-                && OnSameTeam(self_, ent) != 0
-                && (*(*ent).client).ps.fd.forcePower < 100
-                && ForcePowerUsableOn(ctx, self_, ent, FP_TEAM_FORCE) != 0
-                && trap::InPVS(
-                    ctx.engine,
-                    GInPvsArgs::new(
-                        &(*cl).ps.origin as *const vec3_t,
-                        &(*(*ent).client).ps.origin as *const vec3_t,
-                    ),
-                ) != 0
-            {
-                let a = [
-                    (*cl).ps.origin[0] - (*(*ent).client).ps.origin[0],
-                    (*cl).ps.origin[1] - (*(*ent).client).ps.origin[1],
-                    (*cl).ps.origin[2] - (*(*ent).client).ps.origin[2],
-                ];
-
-                if VectorLength(a) <= radius {
-                    pl[numpl as usize] = i;
-                    numpl += 1;
-                }
-            }
-
-            i += 1;
-        }
-
-        if numpl < 1 {
-            return;
-        }
-
-        if numpl == 1 {
-            poweradd = 50;
-        } else if numpl == 2 {
-            poweradd = 33;
-        } else {
-            poweradd = 25;
-        }
-        (*cl).ps.fd.forcePowerDebounce[FP_TEAM_FORCE as usize] = level_time + 2000;
-
-        BG_ForcePowerDrain(
-            &mut (*cl).ps,
-            FP_TEAM_FORCE,
-            forcePowerNeeded[(*cl).ps.fd.forcePowerLevel[FP_TEAM_FORCE as usize] as usize]
-                [FP_TEAM_FORCE as usize],
-        );
-
-        i = 0;
-
-        while i < numpl {
-            let ent = &mut (*ctx.world).entities[pl[i as usize] as usize] as *mut gentity_t;
-            let ecl = (*ent).client;
-            (*ecl).ps.fd.forcePower += poweradd;
-            if (*ecl).ps.fd.forcePower > 100 {
-                (*ecl).ps.fd.forcePower = 100;
-            }
-
-            //At this point we know we got one, so add him into the collective event client bitflag
-            if te.is_null() {
-                te = G_TempEntity((*cl).ps.origin, EV_TEAM_POWER);
-                (*te).s.eventParm = 2; //eventParm 1 is heal, eventParm 2 is force regen
-            }
-
-            WP_AddToClientBitflags(te, pl[i as usize]);
-
-            i += 1;
-        }
-    }
+    todo!("Port ForceTeamForceReplenish — parked: unported-global (forcePowerNeeded/bgSiegeClasses)")
 }
 
 /// Raven `ForceGrip`.
@@ -1015,7 +722,7 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/w_force.c:1596-1629`
 pub fn ForceSpeed(ctx: GameContext<'_>, self_: *mut gentity_t, forceDuration: c_int) {
     unsafe {
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
 
         if (*self_).health <= 0 {
@@ -1033,7 +740,7 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: *mut gentity_t, forceDuration: c_
             return;
         }
 
-        if (*cl).holdingObjectiveItem >= MAX_CLIENTS
+        if (*cl).holdingObjectiveItem >= MAX_CLIENTS as c_int
             && (*cl).holdingObjectiveItem < ENTITYNUM_WORLD
         {
             //holding Siege item
@@ -1048,7 +755,7 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: *mut gentity_t, forceDuration: c_
         WP_ForcePowerStart(ctx, self_, FP_SPEED, forceDuration);
         let snd = std::ffi::CString::new("sound/weapons/force/speed.wav").unwrap();
         G_Sound(self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
-        G_Sound(self_, TRACK_CHANNEL_2, (*ctx.world).speedLoopSound);
+        G_Sound(self_, TRACK_CHANNEL_2 as c_int, (*ctx.world).speedLoopSound);
     }
 }
 
@@ -1057,7 +764,7 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: *mut gentity_t, forceDuration: c_
 /// Source: `oracle/oracle/codemp/game/w_force.c:1631-1656`
 pub fn ForceSeeing(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
 
         if (*self_).health <= 0 {
@@ -1081,7 +788,7 @@ pub fn ForceSeeing(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         let snd = std::ffi::CString::new("sound/weapons/force/see.wav").unwrap();
         G_Sound(self_, CHAN_AUTO, G_SoundIndex(snd.as_ptr()));
-        G_Sound(self_, TRACK_CHANNEL_5, (*ctx.world).seeLoopSound);
+        G_Sound(self_, TRACK_CHANNEL_5 as c_int, (*ctx.world).seeLoopSound);
     }
 }
 
@@ -1090,7 +797,7 @@ pub fn ForceSeeing(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/w_force.c:1658-1692`
 pub fn ForceProtect(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
 
         if (*self_).health <= 0 {
@@ -1119,8 +826,8 @@ pub fn ForceProtect(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*cl).ps.forceAllowDeactivateTime = level_time + 1500;
 
         WP_ForcePowerStart(ctx, self_, FP_PROTECT, 0);
-        G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_PROTECT);
-        G_Sound(self_, TRACK_CHANNEL_3, (*ctx.world).protectLoopSound);
+        G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_PROTECT as c_int);
+        G_Sound(self_, TRACK_CHANNEL_3 as c_int, (*ctx.world).protectLoopSound);
     }
 }
 
@@ -1129,7 +836,7 @@ pub fn ForceProtect(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/w_force.c:1694-1728`
 pub fn ForceAbsorb(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
 
         if (*self_).health <= 0 {
@@ -1158,8 +865,8 @@ pub fn ForceAbsorb(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*cl).ps.forceAllowDeactivateTime = level_time + 1500;
 
         WP_ForcePowerStart(ctx, self_, FP_ABSORB, 0);
-        G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_ABSORB);
-        G_Sound(self_, TRACK_CHANNEL_3, (*ctx.world).absorbLoopSound);
+        G_PreDefSound(ctx, (*cl).ps.origin, PDSOUND_ABSORB as c_int);
+        G_Sound(self_, TRACK_CHANNEL_3 as c_int, (*ctx.world).absorbLoopSound);
     }
 }
 
@@ -1168,7 +875,7 @@ pub fn ForceAbsorb(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/w_force.c:1730-1775`
 pub fn ForceRage(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
 
         if (*self_).health <= 0 {
@@ -1207,8 +914,8 @@ pub fn ForceRage(ctx: GameContext<'_>, self_: *mut gentity_t) {
         WP_ForcePowerStart(ctx, self_, FP_RAGE, 0);
 
         let snd = std::ffi::CString::new("sound/weapons/force/rage.wav").unwrap();
-        G_Sound(self_, TRACK_CHANNEL_4, G_SoundIndex(snd.as_ptr()));
-        G_Sound(self_, TRACK_CHANNEL_3, (*ctx.world).rageLoopSound);
+        G_Sound(self_, TRACK_CHANNEL_4 as c_int, G_SoundIndex(snd.as_ptr()));
+        G_Sound(self_, TRACK_CHANNEL_3 as c_int, (*ctx.world).rageLoopSound);
     }
 }
 
@@ -1217,7 +924,7 @@ pub fn ForceRage(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/w_force.c:1777-1810`
 pub fn ForceLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        let cl = (*self_).client;
+        let cl = (*self_).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
 
         if (*self_).health <= 0 {
@@ -1231,7 +938,7 @@ pub fn ForceLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
             return;
         }
 
-        if (*cl).ps.forceHandExtend != HANDEXTEND_NONE {
+        if (*cl).ps.forceHandExtend != HANDEXTEND_NONE as c_int {
             return;
         }
 
@@ -1241,7 +948,7 @@ pub fn ForceLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         //Shoot lightning from hand
         //using grip anim now, to extend the burst time
-        (*cl).ps.forceHandExtend = HANDEXTEND_FORCE_HOLD;
+        (*cl).ps.forceHandExtend = HANDEXTEND_FORCE_HOLD as c_int;
         (*cl).ps.forceHandExtendTime = level_time + 20000;
 
         let snd = std::ffi::CString::new("sound/weapons/force/lightning").unwrap();
@@ -1262,7 +969,7 @@ pub fn ForceLightningDamage(
     impactPoint: vec3_t,
 ) {
     unsafe {
-        let scl = (*self_).client;
+        let scl = (*self_).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
 
         (*scl).dangerTime = level_time;
@@ -1270,7 +977,7 @@ pub fn ForceLightningDamage(
         (*scl).invulnerableTimer = 0;
 
         if !traceEnt.is_null() && (*traceEnt).takedamage != 0 {
-            if (*traceEnt).client.is_null() && (*traceEnt).s.eType == ET_NPC {
+            if (*traceEnt).client.is_null() && (*traceEnt).s.eType == ET_NPC as c_int {
                 //g2animent
                 if (*traceEnt).s.genericenemyindex < level_time {
                     (*traceEnt).s.genericenemyindex = level_time + 2000;
@@ -1278,7 +985,7 @@ pub fn ForceLightningDamage(
             }
             if !(*traceEnt).client.is_null() {
                 //an enemy or object
-                let tcl = (*traceEnt).client;
+                let tcl = (*traceEnt).client as *mut gclient_t;
                 if (*tcl).noLightningTime >= level_time {
                     //give them power and don't hurt them.
                     (*tcl).ps.fd.forcePower += 1;
@@ -1327,7 +1034,7 @@ pub fn ForceLightningDamage(
 
                     if dmg != 0 {
                         //rww - Shields can now absorb lightning too.
-                        G_Damage(traceEnt, self_, self_, dir, impactPoint, dmg, 0, MOD_FORCE_DARK);
+                        G_Damage(traceEnt, self_, self_, dir, impactPoint, dmg, 0, MOD_FORCE_DARK as c_int);
                     }
                     if !(*traceEnt).client.is_null() {
                         if Q_irand(0, 2) == 0 {

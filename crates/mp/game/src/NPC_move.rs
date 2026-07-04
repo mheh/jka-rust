@@ -9,6 +9,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::q_math::{AngleVectors, VectorNormalize};
 
 /// File-scope static for `NPC_move.c` navigation state (oracle/oracle/codemp/game/NPC_move.c:14).
 /// Zeroed initially, written by NPC_GetMoveDirection and similar functions (all parked).
@@ -27,9 +28,9 @@ static mut FRAME_NAV_INFO: navInfo_t = navInfo_t {
         plane: cplane_t {
             normal: [0.0; 3],
             dist: 0.0,
-            type_: 0,
+            r#type: 0,
             signbits: 0,
-            pad: [0; 4],
+            pad: [0; 2],
         },
         surfaceFlags: 0,
         contents: 0,
@@ -154,7 +155,7 @@ pub fn G_UcmdMoveForDir(
 
         // Store the movement direction in playerstate for NPC cheating
         // (preserves precision lost in ucmd conversion).
-        (*(*self_).client).ps.moveDir = move_dir;
+        (*((*self_).client as *mut gclient_t)).ps.moveDir = move_dir;
 
         // Compute dot products with forward and right vectors, scaled to [-127, 127].
         let mut fDot = (forward[0] * move_dir[0] + forward[1] * move_dir[1] + forward[2] * move_dir[2]) * 127.0f32;
@@ -176,8 +177,8 @@ pub fn G_UcmdMoveForDir(
         }
 
         // Store in usercmd as signed bytes.
-        (*cmd).forwardmove = fDot.floor() as c_int;
-        (*cmd).rightmove = rDot.floor() as c_int;
+        (*cmd).forwardmove = fDot.floor() as c_schar;
+        (*cmd).rightmove = rDot.floor() as c_schar;
     }
 }
 

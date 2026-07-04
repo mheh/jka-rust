@@ -16,6 +16,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_utils::G_SoundIndex;
 
 // These define the working combat range for these suckers
 // Source: `oracle/oracle/codemp/game/NPC_AI_Wampa.c:5-9`

@@ -15,8 +15,20 @@
 
 use crate::prelude::*;
 
+// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Source: `oracle/oracle/codemp/game/q_shared.h`
+const qtrue: qboolean = 1;
+const qfalse: qboolean = 0;
+use crate::g_strap::strap_G2API_SetBoneAngles;
+use crate::q_math::{AngleMod, AngleSubtract};
+use crate::q_math::{PITCH, ROLL, YAW};
+
 // Unported types referenced in this file (need porting before this compiles):
 // void ()(trace_t , vec_t , vec_t , vec_t , vec_t , int, int)
+
+/// Raven `BONE_ANGLES_POSTMULT` (ghoul2 bone-angle apply mode).
+/// Source: `oracle/oracle/code/game/ghoul2_shared.h:54`
+const BONE_ANGLES_POSTMULT: c_int = 0x0002;
 
 
 /// Raven `PM_BGEntForNum`.
@@ -650,9 +662,9 @@ pub fn BG_ClearRocketLock(
     unsafe {
         if !ps.is_null() {
             (*ps).rocketLockIndex = ENTITYNUM_NONE;
-            (*ps).rocketLastValidTime = 0;
-            (*ps).rocketLockTime = -1;
-            (*ps).rocketTargetTime = 0;
+            (*ps).rocketLastValidTime = 0.0;
+            (*ps).rocketLockTime = -1.0;
+            (*ps).rocketTargetTime = 0.0;
         }
     }
 }
@@ -1074,9 +1086,9 @@ pub fn BG_G2ATSTAngles(
             b"thoracic\0".as_ptr() as *const c_char,
             cent_lerpAngles,
             BONE_ANGLES_POSTMULT,
-            POSITIVE_X,
-            NEGATIVE_Y,
-            NEGATIVE_Z,
+            POSITIVE_X as c_int,
+            NEGATIVE_Y as c_int,
+            NEGATIVE_Z as c_int,
             core::ptr::null_mut(),
             0,
             time,
@@ -1178,9 +1190,9 @@ pub fn PM_WeaponOkOnVehicle(
     weapon: c_int,
 ) -> qboolean {
     // FIXME (Raven): check g_vehicleInfo for our vehicle?
-    if weapon == weapon_t::WP_MELEE as c_int
-        || weapon == weapon_t::WP_SABER as c_int
-        || weapon == weapon_t::WP_BLASTER as c_int
+    if weapon == WP_MELEE as c_int
+        || weapon == WP_SABER as c_int
+        || weapon == WP_BLASTER as c_int
     {
         return qtrue;
     }

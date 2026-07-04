@@ -10,6 +10,8 @@ use core::ffi::c_void;
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
 use mp_qshared::shared::vec3_t;
 
+use crate::vehicles::vehicle_s::Vehicle_t;
+
 /// Raven `bgEntity_t` — the shared bg-side view of an entity (matches the head
 /// of `gentity_t`/`centity_t`).
 ///
@@ -23,13 +25,11 @@ pub struct bgEntity_t {
     pub s: entityState_t,
     /// Raven field source: `oracle/oracle/codemp/game/bg_public.h:426`
     pub playerState: *mut playerState_t,
-    //TODO: Port Vehicle_t
-    // Source: oracle/oracle/codemp/game/bg_public.h:427 (used *mut only)
-    /// Placeholder for `Vehicle_t *m_pVehicle` until `Vehicle_t` is ported.
+    /// Raven `Vehicle_t *m_pVehicle`.
     ///
     /// Raven: vehicle data.
     /// Raven field source: `oracle/oracle/codemp/game/bg_public.h:427`
-    pub m_pVehicle: *mut c_void,
+    pub m_pVehicle: *mut Vehicle_t,
     /// G2 instance.
     /// Raven field source: `oracle/oracle/codemp/game/bg_public.h:428`
     pub ghoul2: *mut c_void,

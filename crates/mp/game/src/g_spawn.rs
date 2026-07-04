@@ -501,7 +501,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
         }
 
         // move editor origin to pos
-        (*ent).s.pos.tr_base = (*ent).s.origin;
+        (*ent).s.pos.trBase = (*ent).s.origin;
         (*ent).r.currentOrigin = (*ent).s.origin;
 
         // if we didn't get a classname, don't bother spawning anything

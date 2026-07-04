@@ -9,6 +9,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_main::G_Printf;
 
 // IP filter type: holds mask and compare value for IP filtering.
 // Source: oracle/oracle/codemp/game/g_svcmds.c:41-45
@@ -40,61 +41,12 @@ static mut NUM_IP_FILTERS: c_int = 0;
 /// Parse an IP address string into mask and compare values for IP filtering.
 ///
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:62-102`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
+// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
+// `g_weapon.rs`) — how is state threaded in?
 pub fn StringToFilter(s: *mut c_char, f: *mut c_void) -> qboolean {
-    let f = f as *mut ipFilter_t;
-
-    unsafe {
-        let mut b: [u8; 4] = [0; 4];
-        let mut m: [u8; 4] = [0; 4];
-
-        let mut i = 0;
-        let mut s_ptr = s;
-
-        // Parse up to 4 octets
-        while i < 4 {
-            // Check first character is a digit
-            if *s_ptr < b'0' as c_char || *s_ptr > b'9' as c_char {
-                G_Printf(
-                    b"Bad filter address: %s\n\0".as_ptr() as *const c_char,
-                    s,
-                );
-                return qfalse;
-            }
-
-            // Parse the number: accumulate decimal digits
-            let mut num: u32 = 0;
-            while *s_ptr >= b'0' as c_char && *s_ptr <= b'9' as c_char {
-                num = num * 10 + ((*s_ptr as u8 - b'0') as u32);
-                s_ptr = s_ptr.add(1);
-            }
-            b[i] = (num & 0xff) as u8;
-            if b[i] != 0 {
-                m[i] = 255;
-            }
-
-            // Check for end or next octet
-            if *s_ptr == 0 {
-                break;
-            }
-            if *s_ptr == b':' as c_char {
-                break;
-            }
-            s_ptr = s_ptr.add(1); // skip the dot
-            i += 1;
-        }
-
-        // Set mask and compare from bytes
-        (*f).mask = (m[0] as c_uint)
-            | ((m[1] as c_uint) << 8)
-            | ((m[2] as c_uint) << 16)
-            | ((m[3] as c_uint) << 24);
-        (*f).compare = (b[0] as c_uint)
-            | ((b[1] as c_uint) << 8)
-            | ((b[2] as c_uint) << 16)
-            | ((b[3] as c_uint) << 24);
-
-        return qtrue;
-    }
+    todo!("Port StringToFilter — parked: seam-threading")
 }
 
 // PORT-ESCALATION(file-scope-globals-ip-filters): reads/writes `ipFilters`,

@@ -31,7 +31,7 @@ pub fn VEH_StartStrafeRam(pVeh: *mut Vehicle_t, Right: qboolean, Duration: c_int
 // `#ifndef _JK2MP` movement-direction/strafe-ram/exhaust-FX/armor-FX tail
 // (lines 163-264) is dead code in the `_JK2MP` build and is dropped, not
 // parked (unreachable per porting-rules §10).
-pub fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+pub extern "C" fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     todo!("Port Update — parked: ambient-global (g_vehicleInfo) — oracle/oracle/codemp/game/SpeederNPC.c:149")
 }
 
@@ -48,7 +48,7 @@ pub fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
 // pVeh->m_pParentEntity->s.number < MAX_CLIENTS` — so no live dependency
 // there). Needs the ambient-global placement + missing bg consts settled
 // before transcription.
-pub fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
+pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
     todo!("Port ProcessMoveCommands — parked: ambient-global (level.time) + bg-dep (BUTTON_ALT_ATTACK/EF_JETPACK_ACTIVE/WP_MELEE/WP_SABER) — oracle/oracle/codemp/game/SpeederNPC.c:278")
 }
 
@@ -61,7 +61,7 @@ pub fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 // dropped, not parked) reads the file-static `pm` (current `pmove_t*`) at
 // `pm->cmd.serverTime`, which isn't threaded through the faithful skeleton
 // signature (`pVeh` only). Needs that ambient global's placement settled.
-pub fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
+pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
     todo!("Port ProcessOrientCommands — parked: ambient-global (pm) — oracle/oracle/codemp/game/SpeederNPC.c:505")
 }
 
@@ -70,7 +70,7 @@ pub fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
 /// Raven: "This function makes sure that the vehicle is properly animated."
 /// The body is empty in the oracle (SpeederNPC.c:609) — a deliberate no-op.
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:608-610`
-pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {}
+pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {}
 
 /// Raven `AnimateRiders`.
 ///
@@ -85,7 +85,7 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {}
 // the `VEH_MOUNT_THROW_LEFT`/`VEH_MOUNT_THROW_RIGHT` boarding-flag constants,
 // and the file-static `bgAllAnims` table read by `BG_SetAnim`'s
 // `animations` argument. None of these exist yet in `mp_bg`/`mp_qshared`.
-pub fn AnimateRiders(pVeh: *mut Vehicle_t) {
+pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
     todo!("Port AnimateRiders — parked: bg-dep (animNumber_t/BOTH_VS_*/bgAllAnims) — oracle/oracle/codemp/game/SpeederNPC.c:630")
 }
 

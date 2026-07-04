@@ -18,7 +18,7 @@ use crate::g_items::RespawnItem;
 use crate::g_utils::{G_Find, G_FreeEntity, G_TempEntity};
 use mp_bg::public::ctf_msg::ctfMsg_t;
 use mp_bg::public::entity_event::entity_event_t;
-use mp_bg::public::global_team_sound::globalTeamSound_t;
+use mp_bg::public::global_team_sound::global_team_sound_t;
 use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
 use mp_qshared::shared::flag_status::{FLAG_ATBASE, FLAG_DROPPED};
 
@@ -311,11 +311,11 @@ pub fn Team_ReturnFlagSound(
     }
 
     unsafe {
-        let te = G_TempEntity((*ent).s.pos.tr_base, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+        let te = G_TempEntity((*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
         (*te).s.eventParm = if team == TEAM_BLUE {
-            globalTeamSound_t::GTS_RED_RETURN as c_int
+            global_team_sound_t::GTS_RED_RETURN as c_int
         } else {
-            globalTeamSound_t::GTS_BLUE_RETURN as c_int
+            global_team_sound_t::GTS_BLUE_RETURN as c_int
         };
         (*te).r.svFlags |= SVF_BROADCAST;
     }
@@ -347,11 +347,11 @@ pub fn Team_CaptureFlagSound(
     }
 
     unsafe {
-        let te = G_TempEntity((*ent).s.pos.tr_base, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
+        let te = G_TempEntity((*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_TEAM_SOUND as c_int);
         (*te).s.eventParm = if team == TEAM_BLUE {
-            globalTeamSound_t::GTS_BLUE_CAPTURE as c_int
+            global_team_sound_t::GTS_BLUE_CAPTURE as c_int
         } else {
-            globalTeamSound_t::GTS_RED_CAPTURE as c_int
+            global_team_sound_t::GTS_RED_CAPTURE as c_int
         };
         (*te).r.svFlags |= SVF_BROADCAST;
     }

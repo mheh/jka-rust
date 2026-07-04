@@ -15,6 +15,8 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_utils::G_SoundIndex;
+use crate::q_shared::va;
 use mp_bg::public::entity_event::entity_event_t;
 
 // Raven's working combat range defines (NPC_AI_MineMonster.c:3-8):
@@ -41,17 +43,12 @@ fn VectorLengthSquared(v: vec3_t) -> vec_t {
 ///
 /// Precaches the MineMonster's sound effects.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:18-27`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
+// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
+// `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_MineMonster_Precache() {
-    for i in 0..4 {
-        G_SoundIndex(va(
-            c"sound/chars/mine/misc/bite%i.wav".as_ptr() as *const c_char,
-            i + 1,
-        ));
-        G_SoundIndex(va(
-            c"sound/chars/mine/misc/miss%i.wav".as_ptr() as *const c_char,
-            i + 1,
-        ));
-    }
+    todo!("Port NPC_MineMonster_Precache — parked: seam-threading")
 }
 
 // PORT-ESCALATION(ai-context): reads ambient globals `NPC`, `NPCInfo`, `ucmd`,

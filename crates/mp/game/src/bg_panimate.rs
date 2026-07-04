@@ -18,6 +18,9 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};
+use crate::bg_saber::BG_MySaber;
+use crate::q_math::Q_irand;
 
 // Raven `qboolean` is `c_int` (`qfalse == 0`, `qtrue == 1`); the lowercase
 // `qtrue`/`qfalse` spellings are not exported here (see `bg_saber.rs`), so the
@@ -29,121 +32,118 @@ use crate::prelude::*;
 /// Raven `BG_SaberStanceAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:33-47`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_SaberStanceAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_STAND1 | BOTH_STAND2 | BOTH_SABERFAST_STANCE | BOTH_SABERSLOW_STANCE
-        | BOTH_SABERSTAFF_STANCE | BOTH_SABERDUAL_STANCE => 1,
-        _ => 0,
-    }
+    todo!("Port BG_SaberStanceAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_CrouchAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:49-69`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_CrouchAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_SIT1 | BOTH_SIT2 | BOTH_SIT3 | BOTH_CROUCH1 | BOTH_CROUCH1IDLE
-        | BOTH_CROUCH1WALK | BOTH_CROUCH1WALKBACK | BOTH_CROUCH2TOSTAND1 | BOTH_CROUCH3
-        | BOTH_KNEES1 | BOTH_CROUCHATTACKBACK1 | BOTH_ROLL_STAB => 1,
-        _ => 0,
-    }
+    todo!("Port BG_CrouchAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InSpecialJump`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:71-132`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InSpecialJump(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_WALL_RUN_RIGHT | BOTH_WALL_RUN_RIGHT_STOP | BOTH_WALL_RUN_RIGHT_FLIP
-        | BOTH_WALL_RUN_LEFT | BOTH_WALL_RUN_LEFT_STOP | BOTH_WALL_RUN_LEFT_FLIP
-        | BOTH_WALL_FLIP_RIGHT | BOTH_WALL_FLIP_LEFT | BOTH_FLIP_BACK1 | BOTH_FLIP_BACK2
-        | BOTH_FLIP_BACK3 | BOTH_WALL_FLIP_BACK1 | BOTH_BUTTERFLY_LEFT | BOTH_BUTTERFLY_RIGHT
-        | BOTH_BUTTERFLY_FL1 | BOTH_BUTTERFLY_FR1 | BOTH_FJSS_TR_BL | BOTH_FJSS_TL_BR
-        | BOTH_FORCELEAP2_T__B_ | BOTH_JUMPFLIPSLASHDOWN1 | BOTH_JUMPFLIPSTABDOWN
-        | BOTH_JUMPATTACK6 | BOTH_JUMPATTACK7 | BOTH_ARIAL_LEFT | BOTH_ARIAL_RIGHT
-        | BOTH_ARIAL_F1 | BOTH_CARTWHEEL_LEFT | BOTH_CARTWHEEL_RIGHT
-        | BOTH_FORCELONGLEAP_START | BOTH_FORCELONGLEAP_ATTACK | BOTH_FORCEWALLRUNFLIP_START
-        | BOTH_FORCEWALLRUNFLIP_END | BOTH_FORCEWALLRUNFLIP_ALT | BOTH_FLIP_ATTACK7
-        | BOTH_FLIP_HOLD7 | BOTH_FLIP_LAND | BOTH_A7_SOULCAL => return 1,
-        _ => {}
-    }
-    if BG_InReboundJump(anim) != 0 {
-        return 1;
-    }
-    if BG_InReboundHold(anim) != 0 {
-        return 1;
-    }
-    if BG_InReboundRelease(anim) != 0 {
-        return 1;
-    }
-    if BG_InBackFlip(anim) != 0 {
-        return 1;
-    }
-    0
+    todo!("Port BG_InSpecialJump — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InSaberStandAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:134-147`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InSaberStandAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_SABERFAST_STANCE | BOTH_STAND2 | BOTH_SABERSLOW_STANCE | BOTH_SABERDUAL_STANCE
-        | BOTH_SABERSTAFF_STANCE => 1,
-        _ => 0,
-    }
+    todo!("Port BG_InSaberStandAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InReboundJump`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:149-161`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InReboundJump(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_FORCEWALLREBOUND_FORWARD | BOTH_FORCEWALLREBOUND_LEFT
-        | BOTH_FORCEWALLREBOUND_BACK | BOTH_FORCEWALLREBOUND_RIGHT => 1,
-        _ => 0,
-    }
+    todo!("Port BG_InReboundJump — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InReboundHold`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:163-175`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InReboundHold(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_FORCEWALLHOLD_FORWARD | BOTH_FORCEWALLHOLD_LEFT | BOTH_FORCEWALLHOLD_BACK
-        | BOTH_FORCEWALLHOLD_RIGHT => 1,
-        _ => 0,
-    }
+    todo!("Port BG_InReboundHold — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InReboundRelease`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:177-189`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InReboundRelease(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_FORCEWALLRELEASE_FORWARD | BOTH_FORCEWALLRELEASE_LEFT
-        | BOTH_FORCEWALLRELEASE_BACK | BOTH_FORCEWALLRELEASE_RIGHT => 1,
-        _ => 0,
-    }
+    todo!("Port BG_InReboundRelease — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InBackFlip`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:191-202`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InBackFlip(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_FLIP_BACK1 | BOTH_FLIP_BACK2 | BOTH_FLIP_BACK3 => 1,
-        _ => 0,
-    }
+    todo!("Port BG_InBackFlip — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_DirectFlippingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:204-217`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_DirectFlippingAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_FLIP_F | BOTH_FLIP_B | BOTH_FLIP_L | BOTH_FLIP_R => 1,
-        _ => 0,
-    }
+    todo!("Port BG_DirectFlippingAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_SaberInAttackPure`.
@@ -195,12 +195,14 @@ pub fn BG_SaberInKata(saberMove: c_int) -> qboolean {
 /// Raven `BG_InKataAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:306-318`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InKataAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_A6_SABERPROTECT | BOTH_A7_SOULCAL | BOTH_A1_SPECIAL | BOTH_A2_SPECIAL
-        | BOTH_A3_SPECIAL => 1,
-        _ => 0,
-    }
+    todo!("Port BG_InKataAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_SaberInSpecial`.
@@ -260,95 +262,66 @@ pub fn BG_InExtraDefenseSaberMove(r#move: c_int) -> qboolean {
 /// Raven `BG_FlippingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:433-477`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_FlippingAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_FLIP_F | BOTH_FLIP_B | BOTH_FLIP_L | BOTH_FLIP_R | BOTH_WALL_RUN_RIGHT_FLIP
-        | BOTH_WALL_RUN_LEFT_FLIP | BOTH_WALL_FLIP_RIGHT | BOTH_WALL_FLIP_LEFT
-        | BOTH_FLIP_BACK1 | BOTH_FLIP_BACK2 | BOTH_FLIP_BACK3 | BOTH_WALL_FLIP_BACK1
-        | BOTH_WALL_RUN_RIGHT | BOTH_WALL_RUN_LEFT | BOTH_WALL_RUN_RIGHT_STOP
-        | BOTH_WALL_RUN_LEFT_STOP | BOTH_BUTTERFLY_LEFT | BOTH_BUTTERFLY_RIGHT
-        | BOTH_BUTTERFLY_FL1 | BOTH_BUTTERFLY_FR1 | BOTH_ARIAL_LEFT | BOTH_ARIAL_RIGHT
-        | BOTH_ARIAL_F1 | BOTH_CARTWHEEL_LEFT | BOTH_CARTWHEEL_RIGHT
-        | BOTH_JUMPFLIPSLASHDOWN1 | BOTH_JUMPFLIPSTABDOWN | BOTH_JUMPATTACK6
-        | BOTH_JUMPATTACK7 | BOTH_FORCEWALLRUNFLIP_END | BOTH_FORCEWALLRUNFLIP_ALT
-        | BOTH_FLIP_ATTACK7 | BOTH_A7_SOULCAL => 1,
-        _ => 0,
-    }
+    todo!("Port BG_FlippingAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_SpinningSaberAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:479-585`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_SpinningSaberAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_T1_BR_BL | BOTH_T1__R__L | BOTH_T1__R_BL | BOTH_T1_TR_BL | BOTH_T1_BR_TL
-        | BOTH_T1_BR__L | BOTH_T1_TL_BR | BOTH_T1__L_BR | BOTH_T1__L__R | BOTH_T1_BL_BR
-        | BOTH_T1_BL__R | BOTH_T1_BL_TR | BOTH_T2_BR__L | BOTH_T2_BR_BL | BOTH_T2__R_BL
-        | BOTH_T2__L_BR | BOTH_T2_BL_BR | BOTH_T2_BL__R | BOTH_T3_BR__L | BOTH_T3_BR_BL
-        | BOTH_T3__R_BL | BOTH_T3__L_BR | BOTH_T3_BL_BR | BOTH_T3_BL__R | BOTH_T4_BR__L
-        | BOTH_T4_BR_BL | BOTH_T4__R_BL | BOTH_T4__L_BR | BOTH_T4_BL_BR | BOTH_T4_BL__R
-        | BOTH_T5_BR_BL | BOTH_T5__R__L | BOTH_T5__R_BL | BOTH_T5_TR_BL | BOTH_T5_BR_TL
-        | BOTH_T5_BR__L | BOTH_T5_TL_BR | BOTH_T5__L_BR | BOTH_T5__L__R | BOTH_T5_BL_BR
-        | BOTH_T5_BL__R | BOTH_T5_BL_TR | BOTH_T6_BR_TL | BOTH_T6__R_TL | BOTH_T6__R__L
-        | BOTH_T6__R_BL | BOTH_T6_TR_TL | BOTH_T6_TR__L | BOTH_T6_TR_BL | BOTH_T6_T__TL
-        | BOTH_T6_T__BL | BOTH_T6_TL_BR | BOTH_T6__L_BR | BOTH_T6__L__R | BOTH_T6_TL__R
-        | BOTH_T6_TL_TR | BOTH_T6__L_TR | BOTH_T6__L_T_ | BOTH_T6_BL_T_ | BOTH_T6_BR__L
-        | BOTH_T6_BR_BL | BOTH_T6_BL_BR | BOTH_T6_BL__R | BOTH_T6_BL_TR | BOTH_T7_BR_TL
-        | BOTH_T7_BR__L | BOTH_T7_BR_BL | BOTH_T7__R__L | BOTH_T7__R_BL | BOTH_T7_TR__L
-        | BOTH_T7_T___R | BOTH_T7_TL_BR | BOTH_T7__L_BR | BOTH_T7__L__R | BOTH_T7_BL_BR
-        | BOTH_T7_BL__R | BOTH_T7_BL_TR | BOTH_T7_TL_TR | BOTH_T7_T__BR | BOTH_T7__L_TR
-        | BOTH_V7_BL_S7 | BOTH_ATTACK_BACK | BOTH_CROUCHATTACKBACK1 | BOTH_BUTTERFLY_LEFT
-        | BOTH_BUTTERFLY_RIGHT | BOTH_FJSS_TR_BL | BOTH_FJSS_TL_BR | BOTH_JUMPFLIPSLASHDOWN1
-        | BOTH_JUMPFLIPSTABDOWN => 1,
-        _ => 0,
-    }
+    todo!("Port BG_SpinningSaberAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_SaberInSpecialAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:587-643`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_SaberInSpecialAttack(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_A2_STABBACK1 | BOTH_ATTACK_BACK | BOTH_CROUCHATTACKBACK1 | BOTH_ROLL_STAB
-        | BOTH_BUTTERFLY_LEFT | BOTH_BUTTERFLY_RIGHT | BOTH_BUTTERFLY_FL1
-        | BOTH_BUTTERFLY_FR1 | BOTH_FJSS_TR_BL | BOTH_FJSS_TL_BR | BOTH_LUNGE2_B__T_
-        | BOTH_FORCELEAP2_T__B_ | BOTH_JUMPFLIPSLASHDOWN1 | BOTH_JUMPFLIPSTABDOWN
-        | BOTH_JUMPATTACK6 | BOTH_JUMPATTACK7 | BOTH_SPINATTACK6 | BOTH_SPINATTACK7
-        | BOTH_FORCELONGLEAP_ATTACK | BOTH_VS_ATR_S | BOTH_VS_ATL_S | BOTH_VT_ATR_S
-        | BOTH_VT_ATL_S | BOTH_A7_KICK_F | BOTH_A7_KICK_B | BOTH_A7_KICK_R | BOTH_A7_KICK_L
-        | BOTH_A7_KICK_S | BOTH_A7_KICK_BF | BOTH_A7_KICK_RL | BOTH_A7_KICK_F_AIR
-        | BOTH_A7_KICK_B_AIR | BOTH_A7_KICK_R_AIR | BOTH_A7_KICK_L_AIR | BOTH_STABDOWN
-        | BOTH_STABDOWN_STAFF | BOTH_STABDOWN_DUAL | BOTH_A6_SABERPROTECT | BOTH_A7_SOULCAL
-        | BOTH_A1_SPECIAL | BOTH_A2_SPECIAL | BOTH_A3_SPECIAL | BOTH_FLIP_ATTACK7
-        | BOTH_PULL_IMPALE_STAB | BOTH_PULL_IMPALE_SWING | BOTH_ALORA_SPIN_SLASH
-        | BOTH_A6_FB | BOTH_A6_LR | BOTH_A7_HILT => 1,
-        _ => 0,
-    }
+    todo!("Port BG_SaberInSpecialAttack — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_KickingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:645-670`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_KickingAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_A7_KICK_F | BOTH_A7_KICK_B | BOTH_A7_KICK_R | BOTH_A7_KICK_L | BOTH_A7_KICK_S
-        | BOTH_A7_KICK_BF | BOTH_A7_KICK_RL | BOTH_A7_KICK_F_AIR | BOTH_A7_KICK_B_AIR
-        | BOTH_A7_KICK_R_AIR | BOTH_A7_KICK_L_AIR | BOTH_A7_HILT | BOTH_GETUP_BROLL_B
-        | BOTH_GETUP_BROLL_F | BOTH_GETUP_FROLL_B | BOTH_GETUP_FROLL_F => 1,
-        _ => 0,
-    }
+    todo!("Port BG_KickingAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InGrappleMove`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:672-690`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InGrappleMove(anim: c_int) -> c_int {
-    match anim {
-        BOTH_KYLE_GRAB | BOTH_KYLE_MISS => 1, //grabbing at someone
-        BOTH_KYLE_PA_1 | BOTH_KYLE_PA_2 => 2, //beating the shit out of someone
-        BOTH_PLAYER_PA_1 | BOTH_PLAYER_PA_2 | BOTH_PLAYER_PA_FLY => 3, //getting the shit beaten out of you
-        _ => 0,
-    }
+    todo!("Port BG_InGrappleMove — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_BrokenParryForAttack`.
@@ -409,30 +382,27 @@ pub fn BG_KnockawayForParry(r#move: c_int) -> c_int {
 /// Raven `BG_InRoll`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:789-812`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InRoll(ps: *mut playerState_t, anim: c_int) -> qboolean {
-    match anim {
-        BOTH_GETUP_BROLL_B | BOTH_GETUP_BROLL_F | BOTH_GETUP_BROLL_L | BOTH_GETUP_BROLL_R
-        | BOTH_GETUP_FROLL_B | BOTH_GETUP_FROLL_F | BOTH_GETUP_FROLL_L | BOTH_GETUP_FROLL_R
-        | BOTH_ROLL_F | BOTH_ROLL_B | BOTH_ROLL_R | BOTH_ROLL_L => {
-            if unsafe { (*ps).legsTimer } > 0 {
-                return 1;
-            }
-        }
-        _ => {}
-    }
-    0
+    todo!("Port BG_InRoll — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InSpecialDeathAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:814-834`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InSpecialDeathAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_DEATH_ROLL | BOTH_DEATH_FLIP | BOTH_DEATH_SPIN_90_R | BOTH_DEATH_SPIN_90_L
-        | BOTH_DEATH_SPIN_180 | BOTH_DEATH_LYING_UP | BOTH_DEATH_LYING_DN
-        | BOTH_DEATH_FALLING_DN | BOTH_DEATH_FALLING_UP | BOTH_DEATH_CROUCHED => 1,
-        _ => 0,
-    }
+    todo!("Port BG_InSpecialDeathAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InDeathAnim`.
@@ -440,65 +410,53 @@ pub fn BG_InSpecialDeathAnim(anim: c_int) -> qboolean {
 /// Raven: purposely does not cover stumbledeath and falldeath...
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:836-928`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InDeathAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_DEATH1 | BOTH_DEATH2 | BOTH_DEATH3 | BOTH_DEATH4 | BOTH_DEATH5 | BOTH_DEATH6
-        | BOTH_DEATH7 | BOTH_DEATH8 | BOTH_DEATH9 | BOTH_DEATH10 | BOTH_DEATH11
-        | BOTH_DEATH12 | BOTH_DEATH13 | BOTH_DEATH14 | BOTH_DEATH14_UNGRIP
-        | BOTH_DEATH14_SITUP | BOTH_DEATH15 | BOTH_DEATH16 | BOTH_DEATH17 | BOTH_DEATH18
-        | BOTH_DEATH19 | BOTH_DEATH20 | BOTH_DEATH21 | BOTH_DEATH22 | BOTH_DEATH23
-        | BOTH_DEATH24 | BOTH_DEATH25 | BOTH_DEATHFORWARD1 | BOTH_DEATHFORWARD2
-        | BOTH_DEATHFORWARD3 | BOTH_DEATHBACKWARD1 | BOTH_DEATHBACKWARD2 | BOTH_DEATH1IDLE
-        | BOTH_LYINGDEATH1 | BOTH_STUMBLEDEATH1 | BOTH_FALLDEATH1 | BOTH_FALLDEATH1INAIR
-        | BOTH_FALLDEATH1LAND | BOTH_DEAD1 | BOTH_DEAD2 | BOTH_DEAD3 | BOTH_DEAD4
-        | BOTH_DEAD5 | BOTH_DEAD6 | BOTH_DEAD7 | BOTH_DEAD8 | BOTH_DEAD9 | BOTH_DEAD10
-        | BOTH_DEAD11 | BOTH_DEAD12 | BOTH_DEAD13 | BOTH_DEAD14 | BOTH_DEAD15
-        | BOTH_DEAD16 | BOTH_DEAD17 | BOTH_DEAD18 | BOTH_DEAD19 | BOTH_DEAD20
-        | BOTH_DEAD21 | BOTH_DEAD22 | BOTH_DEAD23 | BOTH_DEAD24 | BOTH_DEAD25
-        | BOTH_DEADFORWARD1 | BOTH_DEADFORWARD2 | BOTH_DEADBACKWARD1 | BOTH_DEADBACKWARD2
-        | BOTH_LYINGDEAD1 | BOTH_STUMBLEDEAD1 | BOTH_FALLDEAD1LAND | BOTH_DEADFLOP1
-        | BOTH_DEADFLOP2 | BOTH_DISMEMBER_HEAD1 | BOTH_DISMEMBER_TORSO1
-        | BOTH_DISMEMBER_LLEG | BOTH_DISMEMBER_RLEG | BOTH_DISMEMBER_RARM
-        | BOTH_DISMEMBER_LARM => 1,
-        _ => BG_InSpecialDeathAnim(anim),
-    }
+    todo!("Port BG_InDeathAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InKnockDownOnly`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:930-942`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InKnockDownOnly(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_KNOCKDOWN1 | BOTH_KNOCKDOWN2 | BOTH_KNOCKDOWN3 | BOTH_KNOCKDOWN4
-        | BOTH_KNOCKDOWN5 => 1,
-        _ => 0,
-    }
+    todo!("Port BG_InKnockDownOnly — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InSaberLockOld`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:944-955`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InSaberLockOld(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_BF2LOCK | BOTH_BF1LOCK | BOTH_CWCIRCLELOCK | BOTH_CCWCIRCLELOCK => 1,
-        _ => 0,
-    }
+    todo!("Port BG_InSaberLockOld — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InSaberLock`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:957-992`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InSaberLock(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_LK_S_DL_S_L_1 | BOTH_LK_S_DL_T_L_1 | BOTH_LK_S_ST_S_L_1 | BOTH_LK_S_ST_T_L_1
-        | BOTH_LK_S_S_S_L_1 | BOTH_LK_S_S_T_L_1 | BOTH_LK_DL_DL_S_L_1 | BOTH_LK_DL_DL_T_L_1
-        | BOTH_LK_DL_ST_S_L_1 | BOTH_LK_DL_ST_T_L_1 | BOTH_LK_DL_S_S_L_1
-        | BOTH_LK_DL_S_T_L_1 | BOTH_LK_ST_DL_S_L_1 | BOTH_LK_ST_DL_T_L_1
-        | BOTH_LK_ST_ST_S_L_1 | BOTH_LK_ST_ST_T_L_1 | BOTH_LK_ST_S_S_L_1
-        | BOTH_LK_ST_S_T_L_1 | BOTH_LK_S_S_S_L_2 | BOTH_LK_S_S_T_L_2 | BOTH_LK_DL_DL_S_L_2
-        | BOTH_LK_DL_DL_T_L_2 | BOTH_LK_ST_ST_S_L_2 | BOTH_LK_ST_ST_T_L_2 => 1,
-        _ => BG_InSaberLockOld(anim),
-    }
+    todo!("Port BG_InSaberLock — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `PM_InCartwheel`.
@@ -506,66 +464,40 @@ pub fn BG_InSaberLock(anim: c_int) -> qboolean {
 /// Called only where pm is valid (not all require pm, but some do).
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:995-1008`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn PM_InCartwheel(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_ARIAL_LEFT | BOTH_ARIAL_RIGHT | BOTH_ARIAL_F1 | BOTH_CARTWHEEL_LEFT
-        | BOTH_CARTWHEEL_RIGHT => 1,
-        _ => 0,
-    }
+    todo!("Port PM_InCartwheel — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_InKnockDownOnGround`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1010-1072`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_InKnockDownOnGround(ps: *mut playerState_t) -> qboolean {
-    let legsAnim = unsafe { (*ps).legsAnim };
-    match legsAnim {
-        BOTH_KNOCKDOWN1 | BOTH_KNOCKDOWN2 | BOTH_KNOCKDOWN3 | BOTH_KNOCKDOWN4
-        | BOTH_KNOCKDOWN5 | BOTH_RELEASED => {
-            //at end of fall down anim
-            return 1;
-        }
-        BOTH_GETUP1 | BOTH_GETUP2 | BOTH_GETUP3 | BOTH_GETUP4 | BOTH_GETUP5
-        | BOTH_GETUP_CROUCH_F1 | BOTH_GETUP_CROUCH_B1 | BOTH_FORCE_GETUP_F1
-        | BOTH_FORCE_GETUP_F2 | BOTH_FORCE_GETUP_B1 | BOTH_FORCE_GETUP_B2
-        | BOTH_FORCE_GETUP_B3 | BOTH_FORCE_GETUP_B4 | BOTH_FORCE_GETUP_B5
-        | BOTH_FORCE_GETUP_B6 => {
-            //at beginning of getup anim
-            if BG_AnimLength(0, legsAnim) - unsafe { (*ps).legsTimer } < 500 {
-                return 1;
-            }
-        }
-        BOTH_GETUP_BROLL_B | BOTH_GETUP_BROLL_F | BOTH_GETUP_BROLL_L | BOTH_GETUP_BROLL_R
-        | BOTH_GETUP_FROLL_B | BOTH_GETUP_FROLL_F | BOTH_GETUP_FROLL_L
-        | BOTH_GETUP_FROLL_R => {
-            //at beginning of getup anim
-            if BG_AnimLength(0, legsAnim) - unsafe { (*ps).legsTimer } < 500 {
-                return 1;
-            }
-        }
-        BOTH_LK_DL_ST_T_SB_1_L => {
-            if unsafe { (*ps).legsTimer } < 1000 {
-                return 1;
-            }
-        }
-        BOTH_PLAYER_PA_3_FLY => {
-            if unsafe { (*ps).legsTimer } < 300 {
-                return 1;
-            }
-        }
-        _ => {}
-    }
-    0
+    todo!("Port BG_InKnockDownOnGround — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_StabDownAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1074-1084`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_StabDownAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_STABDOWN | BOTH_STABDOWN_STAFF | BOTH_STABDOWN_DUAL => 1,
-        _ => 0,
-    }
+    todo!("Port BG_StabDownAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `PM_SaberBounceForAttack`.
@@ -664,74 +596,66 @@ pub fn BG_SaberInReturn(r#move: c_int) -> qboolean {
 /// Raven `PM_InSaberAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1207-1214`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn PM_InSaberAnim(anim: c_int) -> qboolean {
-    if anim >= BOTH_A1_T__B_ && anim <= BOTH_H1_S1_BR {
-        return 1;
-    }
-    0
+    todo!("Port PM_InSaberAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `PM_InKnockDown`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1216-1254`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn PM_InKnockDown(ps: *mut playerState_t) -> qboolean {
-    match unsafe { (*ps).legsAnim } {
-        BOTH_KNOCKDOWN1 | BOTH_KNOCKDOWN2 | BOTH_KNOCKDOWN3 | BOTH_KNOCKDOWN4
-        | BOTH_KNOCKDOWN5 => return 1,
-        BOTH_GETUP1 | BOTH_GETUP2 | BOTH_GETUP3 | BOTH_GETUP4 | BOTH_GETUP5
-        | BOTH_FORCE_GETUP_F1 | BOTH_FORCE_GETUP_F2 | BOTH_FORCE_GETUP_B1
-        | BOTH_FORCE_GETUP_B2 | BOTH_FORCE_GETUP_B3 | BOTH_FORCE_GETUP_B4
-        | BOTH_FORCE_GETUP_B5 | BOTH_GETUP_BROLL_B | BOTH_GETUP_BROLL_F
-        | BOTH_GETUP_BROLL_L | BOTH_GETUP_BROLL_R | BOTH_GETUP_FROLL_B
-        | BOTH_GETUP_FROLL_F | BOTH_GETUP_FROLL_L | BOTH_GETUP_FROLL_R => {
-            if unsafe { (*ps).legsTimer } != 0 {
-                return 1;
-            }
-        }
-        _ => {}
-    }
-    0
+    todo!("Port PM_InKnockDown — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `PM_PainAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1256-1282`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn PM_PainAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_PAIN1 | BOTH_PAIN2 | BOTH_PAIN3 | BOTH_PAIN4 | BOTH_PAIN5 | BOTH_PAIN6
-        | BOTH_PAIN7 | BOTH_PAIN8 | BOTH_PAIN9 | BOTH_PAIN10 | BOTH_PAIN11 | BOTH_PAIN12
-        | BOTH_PAIN13 | BOTH_PAIN14 | BOTH_PAIN15 | BOTH_PAIN16 | BOTH_PAIN17
-        | BOTH_PAIN18 => 1,
-        _ => 0,
-    }
+    todo!("Port PM_PainAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `PM_JumpingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1284-1317`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn PM_JumpingAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_JUMP1 | BOTH_INAIR1 | BOTH_LAND1 | BOTH_LAND2 | BOTH_JUMPBACK1
-        | BOTH_INAIRBACK1 | BOTH_LANDBACK1 | BOTH_JUMPLEFT1 | BOTH_INAIRLEFT1
-        | BOTH_LANDLEFT1 | BOTH_JUMPRIGHT1 | BOTH_INAIRRIGHT1 | BOTH_LANDRIGHT1
-        | BOTH_FORCEJUMP1 | BOTH_FORCEINAIR1 | BOTH_FORCELAND1 | BOTH_FORCEJUMPBACK1
-        | BOTH_FORCEINAIRBACK1 | BOTH_FORCELANDBACK1 | BOTH_FORCEJUMPLEFT1
-        | BOTH_FORCEINAIRLEFT1 | BOTH_FORCELANDLEFT1 | BOTH_FORCEJUMPRIGHT1
-        | BOTH_FORCEINAIRRIGHT1 | BOTH_FORCELANDRIGHT1 => 1,
-        _ => 0,
-    }
+    todo!("Port PM_JumpingAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `PM_LandingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1319-1336`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn PM_LandingAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_LAND1 | BOTH_LAND2 | BOTH_LANDBACK1 | BOTH_LANDLEFT1 | BOTH_LANDRIGHT1
-        | BOTH_FORCELAND1 | BOTH_FORCELANDBACK1 | BOTH_FORCELANDLEFT1
-        | BOTH_FORCELANDRIGHT1 => 1,
-        _ => 0,
-    }
+    todo!("Port PM_LandingAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `PM_SpinningAnim`.
@@ -745,119 +669,92 @@ pub fn PM_SpinningAnim(anim: c_int) -> qboolean {
 /// Raven `PM_InOnGroundAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1351-1400`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn PM_InOnGroundAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_DEAD1 | BOTH_DEAD2 | BOTH_DEAD3 | BOTH_DEAD4 | BOTH_DEAD5 | BOTH_DEADFORWARD1
-        | BOTH_DEADBACKWARD1 | BOTH_DEADFORWARD2 | BOTH_DEADBACKWARD2 | BOTH_LYINGDEATH1
-        | BOTH_LYINGDEAD1 | BOTH_SLEEP1 | BOTH_KNOCKDOWN1 | BOTH_KNOCKDOWN2
-        | BOTH_KNOCKDOWN3 | BOTH_KNOCKDOWN4 | BOTH_KNOCKDOWN5 | BOTH_GETUP1 | BOTH_GETUP2
-        | BOTH_GETUP3 | BOTH_GETUP4 | BOTH_GETUP5 | BOTH_GETUP_CROUCH_F1
-        | BOTH_GETUP_CROUCH_B1 | BOTH_FORCE_GETUP_F1 | BOTH_FORCE_GETUP_F2
-        | BOTH_FORCE_GETUP_B1 | BOTH_FORCE_GETUP_B2 | BOTH_FORCE_GETUP_B3
-        | BOTH_FORCE_GETUP_B4 | BOTH_FORCE_GETUP_B5 | BOTH_FORCE_GETUP_B6
-        | BOTH_GETUP_BROLL_B | BOTH_GETUP_BROLL_F | BOTH_GETUP_BROLL_L
-        | BOTH_GETUP_BROLL_R | BOTH_GETUP_FROLL_B | BOTH_GETUP_FROLL_F
-        | BOTH_GETUP_FROLL_L | BOTH_GETUP_FROLL_R => 1,
-        _ => 0,
-    }
+    todo!("Port PM_InOnGroundAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `PM_InRollComplete`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1402-1417`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn PM_InRollComplete(ps: *mut playerState_t, anim: c_int) -> qboolean {
-    match anim {
-        BOTH_ROLL_F | BOTH_ROLL_B | BOTH_ROLL_R | BOTH_ROLL_L => {
-            if unsafe { (*ps).legsTimer } < 1 {
-                return 1;
-            }
-        }
-        _ => {}
-    }
-    0
+    todo!("Port PM_InRollComplete — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `PM_CanRollFromSoulCal`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1419-1428`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn PM_CanRollFromSoulCal(ps: *mut playerState_t) -> qboolean {
-    let (legsAnim, legsTimer) = unsafe { ((*ps).legsAnim, (*ps).legsTimer) };
-    if legsAnim == BOTH_A7_SOULCAL && legsTimer < 700 && legsTimer > 250 {
-        return 1;
-    }
-    0
+    todo!("Port PM_CanRollFromSoulCal — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_SuperBreakLoseAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1430-1456`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_SuperBreakLoseAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_LK_S_DL_S_SB_1_L | BOTH_LK_S_DL_T_SB_1_L | BOTH_LK_S_ST_S_SB_1_L
-        | BOTH_LK_S_ST_T_SB_1_L | BOTH_LK_S_S_S_SB_1_L | BOTH_LK_S_S_T_SB_1_L
-        | BOTH_LK_DL_DL_S_SB_1_L | BOTH_LK_DL_DL_T_SB_1_L | BOTH_LK_DL_ST_S_SB_1_L
-        | BOTH_LK_DL_ST_T_SB_1_L | BOTH_LK_DL_S_S_SB_1_L | BOTH_LK_DL_S_T_SB_1_L
-        | BOTH_LK_ST_DL_S_SB_1_L | BOTH_LK_ST_DL_T_SB_1_L | BOTH_LK_ST_ST_S_SB_1_L
-        | BOTH_LK_ST_ST_T_SB_1_L | BOTH_LK_ST_S_S_SB_1_L | BOTH_LK_ST_S_T_SB_1_L => 1,
-        _ => 0,
-    }
+    todo!("Port BG_SuperBreakLoseAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_SuperBreakWinAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1458-1484`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_SuperBreakWinAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_LK_S_DL_S_SB_1_W | BOTH_LK_S_DL_T_SB_1_W | BOTH_LK_S_ST_S_SB_1_W
-        | BOTH_LK_S_ST_T_SB_1_W | BOTH_LK_S_S_S_SB_1_W | BOTH_LK_S_S_T_SB_1_W
-        | BOTH_LK_DL_DL_S_SB_1_W | BOTH_LK_DL_DL_T_SB_1_W | BOTH_LK_DL_ST_S_SB_1_W
-        | BOTH_LK_DL_ST_T_SB_1_W | BOTH_LK_DL_S_S_SB_1_W | BOTH_LK_DL_S_T_SB_1_W
-        | BOTH_LK_ST_DL_S_SB_1_W | BOTH_LK_ST_DL_T_SB_1_W | BOTH_LK_ST_ST_S_SB_1_W
-        | BOTH_LK_ST_ST_T_SB_1_W | BOTH_LK_ST_S_S_SB_1_W | BOTH_LK_ST_S_T_SB_1_W => 1,
-        _ => 0,
-    }
+    todo!("Port BG_SuperBreakWinAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_SaberLockBreakAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1487-1535`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_SaberLockBreakAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_BF1BREAK | BOTH_BF2BREAK | BOTH_CWCIRCLEBREAK | BOTH_CCWCIRCLEBREAK
-        | BOTH_LK_S_DL_S_B_1_L | BOTH_LK_S_DL_S_B_1_W | BOTH_LK_S_DL_T_B_1_L
-        | BOTH_LK_S_DL_T_B_1_W | BOTH_LK_S_ST_S_B_1_L | BOTH_LK_S_ST_S_B_1_W
-        | BOTH_LK_S_ST_T_B_1_L | BOTH_LK_S_ST_T_B_1_W | BOTH_LK_S_S_S_B_1_L
-        | BOTH_LK_S_S_S_B_1_W | BOTH_LK_S_S_T_B_1_L | BOTH_LK_S_S_T_B_1_W
-        | BOTH_LK_DL_DL_S_B_1_L | BOTH_LK_DL_DL_S_B_1_W | BOTH_LK_DL_DL_T_B_1_L
-        | BOTH_LK_DL_DL_T_B_1_W | BOTH_LK_DL_ST_S_B_1_L | BOTH_LK_DL_ST_S_B_1_W
-        | BOTH_LK_DL_ST_T_B_1_L | BOTH_LK_DL_ST_T_B_1_W | BOTH_LK_DL_S_S_B_1_L
-        | BOTH_LK_DL_S_S_B_1_W | BOTH_LK_DL_S_T_B_1_L | BOTH_LK_DL_S_T_B_1_W
-        | BOTH_LK_ST_DL_S_B_1_L | BOTH_LK_ST_DL_S_B_1_W | BOTH_LK_ST_DL_T_B_1_L
-        | BOTH_LK_ST_DL_T_B_1_W | BOTH_LK_ST_ST_S_B_1_L | BOTH_LK_ST_ST_S_B_1_W
-        | BOTH_LK_ST_ST_T_B_1_L | BOTH_LK_ST_ST_T_B_1_W | BOTH_LK_ST_S_S_B_1_L
-        | BOTH_LK_ST_S_S_B_1_W | BOTH_LK_ST_S_T_B_1_L | BOTH_LK_ST_S_T_B_1_W => 1,
-        _ => {
-            if BG_SuperBreakLoseAnim(anim) != 0 || BG_SuperBreakWinAnim(anim) != 0 {
-                1
-            } else {
-                0
-            }
-        }
-    }
+    todo!("Port BG_SaberLockBreakAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_FullBodyTauntAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1538-1561`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_FullBodyTauntAnim(anim: c_int) -> qboolean {
-    match anim {
-        BOTH_GESTURE1 | BOTH_DUAL_TAUNT | BOTH_STAFF_TAUNT | BOTH_BOW | BOTH_MEDITATE
-        | BOTH_SHOWOFF_FAST | BOTH_SHOWOFF_MEDIUM | BOTH_SHOWOFF_STRONG
-        | BOTH_SHOWOFF_DUAL | BOTH_SHOWOFF_STAFF | BOTH_VICTORY_FAST
-        | BOTH_VICTORY_MEDIUM | BOTH_VICTORY_STRONG | BOTH_VICTORY_DUAL
-        | BOTH_VICTORY_STAFF => 1,
-        _ => 0,
-    }
+    todo!("Port BG_FullBodyTauntAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_AnimLength`.
@@ -1093,6 +990,12 @@ pub fn PM_SetTorsoAnimTimer(time: c_int) {
 /// Raven `BG_SaberStartTransAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2733-2790`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn BG_SaberStartTransAnim(
     clientNum: c_int,
     saberAnimLevel: c_int,
@@ -1101,43 +1004,7 @@ pub fn BG_SaberStartTransAnim(
     animSpeed: *mut f32,
     broken: c_int,
 ) {
-    unsafe {
-        if anim >= BOTH_A1_T__B_ && anim <= BOTH_ROLL_STAB {
-            if weapon == WP_SABER {
-                let mut saber = BG_MySaber(clientNum, 0);
-                if !saber.is_null() && (*saber).animSpeedScale != 1.0 {
-                    *animSpeed *= (*saber).animSpeedScale;
-                }
-                saber = BG_MySaber(clientNum, 1);
-                if !saber.is_null() && (*saber).animSpeedScale != 1.0 {
-                    *animSpeed *= (*saber).animSpeedScale;
-                }
-            }
-        }
-
-        if (anim >= BOTH_T1_BR__R && anim <= BOTH_T1_BL_TL)
-            || (anim >= BOTH_T2_BR__R && anim <= BOTH_T2_BL_TL)
-            || (anim >= BOTH_T3_BR__R && anim <= BOTH_T3_BL_TL)
-        {
-            if saberAnimLevel == FORCE_LEVEL_1 {
-                *animSpeed *= 1.5;
-            } else if saberAnimLevel == FORCE_LEVEL_3 {
-                *animSpeed *= 0.75;
-            }
-
-            if broken & (1 << BROKENLIMB_RARM) != 0 {
-                *animSpeed *= 0.5;
-            } else if broken & (1 << BROKENLIMB_LARM) != 0 {
-                *animSpeed *= 0.65;
-            }
-        } else if broken != 0 && PM_InSaberAnim(anim) != 0 {
-            if broken & (1 << BROKENLIMB_RARM) != 0 {
-                *animSpeed *= 0.5;
-            } else if broken & (1 << BROKENLIMB_LARM) != 0 {
-                *animSpeed *= 0.65;
-            }
-        }
-    }
+    todo!("Port BG_SaberStartTransAnim — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `BG_SetAnimFinal`.

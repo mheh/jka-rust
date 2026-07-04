@@ -36,6 +36,11 @@ pub const HL_MAX: usize = 23;
 /// Type definition source: `oracle/oracle/codemp/game/g_local.h:89-94`
 pub type moverState_t = c_int;
 
+pub const MOVER_POS1: moverState_t = 0;
+pub const MOVER_POS2: moverState_t = 1;
+pub const MOVER_1TO2: moverState_t = 2;
+pub const MOVER_2TO1: moverState_t = 3;
+
 /// Raven MP `material_t`.
 ///
 /// Type definition source: `oracle/oracle/codemp/game/q_shared.h:990`

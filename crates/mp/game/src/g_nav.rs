@@ -17,6 +17,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::NPC_utils::NPC_FaceEntity;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
@@ -322,23 +323,16 @@ pub fn NAV_MoveBlocker(
 /// Raven `NAV_ResolveBlock`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:696-707`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
+// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
+// `g_weapon.rs`) — how is state threaded in?
 pub fn NAV_ResolveBlock(
     self_: *mut gentity_t,
     blocker: *mut gentity_t,
     blocked_dir: vec3_t,
 ) -> qboolean {
-    unsafe {
-        let blockerNPC = (*blocker).NPC as *mut gNPC_t;
-        if !blockerNPC.is_null() && (*blockerNPC).blockingEntNum == (*self_).s.number {
-            return qtrue;
-        }
-
-        // For now, just complain about it
-        NPC_Blocked(self_, blocker);
-        NPC_FaceEntity(blocker, qtrue);
-
-        qfalse
-    }
+    todo!("Port NAV_ResolveBlock — parked: seam-threading")
 }
 
 // PORT-ESCALATION(unported-consts): needs `FRAMETIME`, not yet ported

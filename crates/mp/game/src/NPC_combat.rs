@@ -9,6 +9,11 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::NPC_utils::{NPC_CheckLookTarget, NPC_ClearLookTarget};
+use crate::g_combat::G_AlertTeam;
+use crate::g_timer::TIMER_Done;
+use crate::g_utils::G_Sound;
+use crate::q_shared::Q_stricmp;
 use mp_bg::weapons::weapon_t::WP_SABER;
 
 // Unported types referenced in this file (need porting before this compiles):
@@ -22,27 +27,12 @@ const SCF_NO_GROUPS: i32 = 0x00020000;
 /// Raven `G_ClearEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:17-36`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
+// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
+// `g_weapon.rs`) — how is state threaded in?
 pub fn G_ClearEnemy(self_: *mut gentity_t) {
-    unsafe {
-        NPC_CheckLookTarget(self_);
-
-        if !(*self_).enemy.is_null() {
-            let client = (*self_).client as *mut gclient_t;
-            if !client.is_null()
-                && (*client).renderInfo.lookTarget == (*(*self_).enemy).s.number
-            {
-                NPC_ClearLookTarget(self_);
-            }
-
-            let npc = (*self_).NPC as *mut gNPC_t;
-            if !npc.is_null() && (*self_).enemy == (*npc).goalEntity {
-                (*npc).goalEntity = core::ptr::null_mut();
-            }
-            //FIXME: set last enemy?
-        }
-
-        (*self_).enemy = core::ptr::null_mut();
-    }
+    todo!("Port G_ClearEnemy — parked: seam-threading")
 }
 
 /// Raven `G_AngerAlert`.

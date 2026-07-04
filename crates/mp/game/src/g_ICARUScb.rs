@@ -15,6 +15,15 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::q_math::vec3_origin;
+
+// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Source: `oracle/oracle/codemp/game/q_shared.h`
+const qtrue: qboolean = 1;
+const qfalse: qboolean = 0;
+use crate::g_combat::G_Damage;
+use crate::g_mover::{G_PlayDoorSound, MatchTeam};
+use crate::g_utils::G_FreeEntity;
 
 
 /// Raven `Q3_TaskIDClear`.
@@ -51,7 +60,7 @@ pub fn Q3_GetAnimLower(ent: *mut gentity_t) -> *mut c_char {
             //TODO: Port g_entities[].client (still `*mut c_void`; legsAnim read needs the typed gclient_t)
             // Source: oracle/oracle/codemp/game/g_ICARUScb.c:335-339
             G_DebugPrint(
-                WL_WARNING,
+                WL_WARNING as c_int,
                 b"Q3_GetAnimLower: attempted to read animation state off non-client!\n\0".as_ptr()
                     as *const c_char,
             );
@@ -73,7 +82,7 @@ pub fn Q3_GetAnimUpper(ent: *mut gentity_t) -> *mut c_char {
             //TODO: Port g_entities[].client (still `*mut c_void`; torsoAnim read needs the typed gclient_t)
             // Source: oracle/oracle/codemp/game/g_ICARUScb.c:355-359
             G_DebugPrint(
-                WL_WARNING,
+                WL_WARNING as c_int,
                 b"Q3_GetAnimUpper: attempted to read animation state off non-client!\n\0".as_ptr()
                     as *const c_char,
             );
@@ -96,7 +105,7 @@ pub fn Q3_GetAnimBoth(ent: *mut gentity_t) -> *mut c_char {
 
         if lower_name.is_null() || *lower_name == 0 {
             G_DebugPrint(
-                WL_WARNING,
+                WL_WARNING as c_int,
                 b"Q3_GetAnimBoth: NULL legs animation string found!\n\0".as_ptr() as *const c_char,
             );
             return std::ptr::null_mut();
@@ -104,7 +113,7 @@ pub fn Q3_GetAnimBoth(ent: *mut gentity_t) -> *mut c_char {
 
         if upper_name.is_null() || *upper_name == 0 {
             G_DebugPrint(
-                WL_WARNING,
+                WL_WARNING as c_int,
                 b"Q3_GetAnimBoth: NULL torso animation string found!\n\0".as_ptr() as *const c_char,
             );
             return std::ptr::null_mut();
@@ -142,70 +151,31 @@ pub fn Q3_Play(
     todo!("Port Q3_Play — parked (entid-lookup): oracle/oracle/codemp/game/g_ICARUScb.c:527")
 }
 
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but this body needs `trap::ICARUS_TaskIDComplete`/
+// `trap::LinkEntity` (ruling 1) and `level.time` (GameWorld field) — how is
+// state threaded in? `VectorMA`/`VectorCopy`/`VectorClear` also need
+// transcribing as plain array arithmetic (bless-the-rule appendix) instead of
+// bare function calls once the receiver lands.
 /// Raven `anglerCallback`.
 ///
 /// Utility function.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:569-591`
 pub fn anglerCallback(ent: *mut gentity_t) {
-    unsafe {
-        //Complete the task
-        trap_ICARUS_TaskIDComplete(ent, TID_ANGLE_FACE);
-
-        //Set the currentAngles, clear all movement
-        let apos = &mut (*ent).s.apos;
-        VectorMA(
-            apos.trBase,
-            apos.trDuration as f32 * 0.001,
-            apos.trDelta,
-            &mut (*ent).r.currentAngles,
-        );
-        VectorCopy((*ent).r.currentAngles, &mut apos.trBase);
-        VectorClear(&mut apos.trDelta);
-        apos.trDuration = 1;
-        apos.trType = trType_t::TR_STATIONARY;
-        apos.trTime = level().time;
-
-        //Stop thinking
-        (*ent).reached = None;
-        //TODO: Port fn-ptr identity compare `ent->think == anglerCallback` (ruling
-        // #2: fn-ID enums not yet applied to gentity_t.think — this field is still
-        // a raw `Option<unsafe extern "C" fn>`).
-        // Source: oracle/oracle/codemp/game/g_ICARUScb.c:584-587
-        (*ent).think = None;
-
-        //link
-        trap_LinkEntity(ent);
-    }
+    todo!("Port anglerCallback — parked: seam-threading")
 }
 
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but this body needs `trap::ICARUS_TaskIDComplete`
+// and `level.time` (ruling 1); also reads the unported `extern int BMS_END`
+// global (`g_local.h:1216`, unported-global) and calls `G_PlayDoorSound`/
+// `MatchTeam` which need the same receiver.
 /// Raven `moverCallback`.
 ///
 /// Utility function.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:603-633`
 pub fn moverCallback(ent: *mut gentity_t) {
-    unsafe {
-        //complete the task
-        trap_ICARUS_TaskIDComplete(ent, TID_MOVE_NAV);
-
-        // play sound
-        (*ent).s.loopSound = 0; //stop looping sound
-        (*ent).s.loopIsSoundset = qfalse;
-        G_PlayDoorSound(ent, BMS_END); //play end sound
-
-        if (*ent).moverState == moverState_t::MOVER_1TO2 {
-            //reached open
-            // reached pos2
-            MatchTeam(ent, moverState_t::MOVER_POS2, level().time);
-        } else if (*ent).moverState == moverState_t::MOVER_2TO1 {
-            //reached closed
-            MatchTeam(ent, moverState_t::MOVER_POS1, level().time);
-        }
-
-        //TODO: Port fn-ptr identity compare `ent->blocked == Blocked_Mover` (ruling
-        // #2: fn-ID enums not yet applied to gentity_t.blocked).
-        // Source: oracle/oracle/codemp/game/g_ICARUScb.c:624-627
-        (*ent).blocked = None;
-    }
+    todo!("Port moverCallback — parked: seam-threading")
 }
 
 /// Raven `Blocked_Mover`.
@@ -216,7 +186,7 @@ pub fn Blocked_Mover(ent: *mut gentity_t, other: *mut gentity_t) {
         // remove anything other than a client -- no longer the case
 
         // don't remove security keys or goodie keys
-        if (*other).s.eType == entityType_t::ET_ITEM {
+        if (*other).s.eType == entityType_t::ET_ITEM as c_int {
             // should we be doing anything special if a key blocks it... move it somehow..?
         } else if (*other).s.number != 0
             && ((*other).client.is_null()
@@ -232,15 +202,18 @@ pub fn Blocked_Mover(ent: *mut gentity_t, other: *mut gentity_t) {
         }
 
         if (*ent).damage != 0 {
+            // Raven passes `NULL` for `dir`/`point`; `vec3_t` is a by-value
+            // array here (no null representation), so the zero vector
+            // (`vec3_origin`) is the faithful stand-in.
             G_Damage(
                 other,
                 ent,
                 ent,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
+                vec3_origin,
+                vec3_origin,
                 (*ent).damage,
                 0,
-                MOD_CRUSH,
+                MOD_CRUSH as c_int,
             );
         }
     }

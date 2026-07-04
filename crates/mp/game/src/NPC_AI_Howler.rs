@@ -21,6 +21,8 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_timer::{TIMER_Remove, TIMER_Set};
+use crate::npc_c::NPC_SetAnim;
 
 // Raven `#define LSTATE_*` — file-scope local state for Howler NPC
 // (stored in `gNPC_t::localState`).
@@ -111,34 +113,18 @@ pub fn Howler_Combat() {
 /// Raven: pain handler when Howler takes damage >= 10. Sets pain animation
 /// and waiting state, cancels current attack.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:178-194`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn NPC_Howler_Pain(
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
 ) {
-    if damage >= 10 {
-        unsafe {
-            TIMER_Remove(self_, c"attacking".as_ptr() as *const c_char);
-            TIMER_Set(self_, c"takingPain".as_ptr() as *const c_char, 2900);
-
-            // Copy lastPathAngles to current angles.
-            let npc = (*self_).NPC as *mut gNPC_t;
-            if !npc.is_null() {
-                (*self_).s.angles = (*npc).lastPathAngles;
-            }
-
-            NPC_SetAnim(
-                self_,
-                SETANIM_BOTH,
-                BOTH_PAIN1,
-                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-            );
-
-            if !npc.is_null() {
-                (*npc).localState = LSTATE_WAITING;
-            }
-        }
-    }
+    todo!("Port NPC_Howler_Pain — parked: unported-type (animNumber_t)")
 }
 
 // PORT-ESCALATION(ambient-ai-state): reads the ambient `NPC` and `NPCInfo`

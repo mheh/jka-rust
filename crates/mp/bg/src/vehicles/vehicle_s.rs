@@ -11,6 +11,7 @@ use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::{qboolean, vec3_t};
 
 use crate::public::bg_entity::bgEntity_t;
+use crate::vehicles::vehicle_info_t::vehicleInfo_t;
 use crate::vehicles::{vehTurretStatus_t, vehWeaponStatus_t};
 
 /// Raven `VEH_MAX_PASSENGERS` — max passengers a vehicle can carry.
@@ -37,6 +38,17 @@ pub const MAX_VEHICLE_TURRETS: usize = 2;
 ///
 /// Source: `oracle/oracle/codemp/game/bg_vehicles.h:617` (array bound).
 pub const MAX_VEHICLE_WEAPONS: usize = 2;
+
+/// Raven `MAX_VEHICLES` — size of the `g_vehicleInfo` table.
+///
+/// Source: `oracle/oracle/codemp/game/bg_vehicles.h:365`
+pub const MAX_VEHICLES: usize = 16;
+
+/// Raven `VEHICLE_BASE`/`VEHICLE_NONE` — `g_vehicleInfo[]` index sentinels.
+///
+/// Source: `oracle/oracle/codemp/game/bg_vehicles.h:366-367`
+pub const VEHICLE_BASE: c_int = 0;
+pub const VEHICLE_NONE: c_int = -1;
 
 /// Raven `Vehicle_t` — per-vehicle runtime state shared by SP-derived vehicle
 /// code running in MP.
@@ -216,17 +228,14 @@ pub struct Vehicle_t {
     /// Raven field source: `oracle/oracle/codemp/game/bg_vehicles.h:581`
     pub m_iDieTime: c_int,
 
-    //TODO: Port vehicleInfo_t
-    // Source: oracle/oracle/codemp/game/bg_vehicles.h:586 (used *mut only)
-    /// Placeholder for `vehicleInfo_t *m_pVehicleInfo` until `vehicleInfo_t`
-    /// is ported.
+    /// Raven `vehicleInfo_t *m_pVehicleInfo`.
     ///
     /// Raven: This pointer is to a valid VehicleInfo (which could be an
     /// animal, speeder, fighter, whatever). This contains the functions
     /// actually used to do things to this specific kind of vehicle as well
     /// as shared information (max speed, type, etc...).
     /// Raven field source: `oracle/oracle/codemp/game/bg_vehicles.h:586`
-    pub m_pVehicleInfo: *mut c_void,
+    pub m_pVehicleInfo: *mut vehicleInfo_t,
 
     /// This trace tells us if we're within landing height.
     /// Raven field source: `oracle/oracle/codemp/game/bg_vehicles.h:589`

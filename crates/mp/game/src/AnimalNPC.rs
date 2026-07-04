@@ -30,7 +30,7 @@ const YAW: usize = 1;
 // `level` lives on `GameWorld`). Also dereferences
 // `pVeh->m_pVehicleInfo->Inhabited`/`EjectAll`, still a `*mut c_void`
 // placeholder (bg-dep: vehicleInfo_t).
-pub fn DeathUpdate(pVeh: *mut Vehicle_t) {
+pub extern "C" fn DeathUpdate(pVeh: *mut Vehicle_t) {
     todo!("Port DeathUpdate — parked: raw-ptr-skeleton-no-world-handle (level.time) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:97")
 }
 
@@ -43,7 +43,7 @@ pub fn DeathUpdate(pVeh: *mut Vehicle_t) {
 // vehicle-type vtable — same ambient global already parked (unresolved) in
 // `bg_vehicleLoad.rs`/`SpeederNPC.rs`. Needs that global placed on
 // `GameWorld` (fork 1) before this can thread it.
-pub fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+pub extern "C" fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     todo!("Port Update — parked: ambient-global (g_vehicleInfo) — oracle/oracle/codemp/game/AnimalNPC.c:151")
 }
 
@@ -62,7 +62,7 @@ pub fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
 // `vehicleInfo_t` (bg-dep). The `#ifndef _JK2MP`/SP-only bucking-flag early
 // return (lines 195-205) is dead in the `_JK2MP` build and is dropped, not
 // parked (unreachable per porting-rules §10).
-pub fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
+pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
     todo!("Port ProcessMoveCommands — parked: ambient-global (level.time) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:168")
 }
 
@@ -80,7 +80,7 @@ pub fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 // `vehicleInfo_t` (`Vehicle_t::m_pVehicleInfo` is a `*mut c_void`
 // placeholder, `bg_vehicles.h:586`). Needs that type's pointer-field port
 // settled before transcription.
-pub fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
+pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
     todo!("Port ProcessOrientCommands — parked: bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:338")
 }
 
@@ -102,7 +102,7 @@ pub fn AnimalProcessOri(pVeh: *mut Vehicle_t) {
 // (bg-dep), and casts `pVeh->m_pParentEntity`/`m_pPilot` to the game-side
 // `gentity_t` (client/health/legsAnim fields) rather than the MP-restricted
 // `bgEntity_t` this skeleton carries.
-pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
+pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
     todo!("Port AnimateVehicle — parked: raw-ptr-skeleton-no-world-handle (level.time) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:474")
 }
 
@@ -119,7 +119,7 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
 // (bg-dep), and casts `pVeh->m_pPilot`/`m_pParentEntity` to the game-side
 // `gentity_t` (client/ghoul2/enemy fields) rather than the MP-restricted
 // `bgEntity_t` this skeleton carries.
-pub fn AnimateRiders(pVeh: *mut Vehicle_t) {
+pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
     todo!("Port AnimateRiders — parked: raw-ptr-skeleton-no-world-handle (level.time) + bg-dep (vehicleInfo_t) — oracle/oracle/codemp/game/AnimalNPC.c:620")
 }
 

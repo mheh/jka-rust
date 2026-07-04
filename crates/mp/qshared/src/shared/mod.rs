@@ -38,6 +38,7 @@ pub mod shared_erag_effector;
 pub mod shared_erag_phase;
 pub mod sound_channel;
 pub mod string_id_table;
+pub mod surface_flags;
 pub mod trackchan;
 pub mod vec3struct;
 pub mod wl_e;
@@ -118,3 +119,5 @@ pub use native_types::{
     clipHandle_t, fileHandle_t, fxHandle_t, mdxaBone_t, qboolean, qhandle_t, sfxHandle_t,
     MAX_QPATH, QFALSE, QTRUE,
 };
+
+pub use native_math::eorientations::Eorientations;

@@ -27,18 +27,18 @@ pub enum trType_t {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct trajectory_t {
-    pub tr_type: trType_t,
-    pub tr_time: c_int,
-    /// Raven `trDuration`: if non 0, trTime + trDuration = stop time
-    pub tr_duration: c_int,
-    pub tr_base: vec3_t,
-    /// Raven `trDelta`: velocity, etc
-    pub tr_delta: vec3_t,
+    pub trType: trType_t,
+    pub trTime: c_int,
+    /// if non 0, trTime + trDuration = stop time
+    pub trDuration: c_int,
+    pub trBase: vec3_t,
+    /// velocity, etc
+    pub trDelta: vec3_t,
 }
 
 const _: () = assert!(core::mem::size_of::<trajectory_t>() == 36);
-const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_type) == 0);
-const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_time) == 4);
-const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_duration) == 8);
-const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_base) == 12);
-const _: () = assert!(core::mem::offset_of!(trajectory_t, tr_delta) == 24);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, trType) == 0);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, trTime) == 4);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, trDuration) == 8);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, trBase) == 12);
+const _: () = assert!(core::mem::offset_of!(trajectory_t, trDelta) == 24);

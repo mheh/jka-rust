@@ -13,6 +13,11 @@ use crate::prelude::*;
 // Unported types referenced in this file (need porting before this compiles):
 // PAIN_FUNC, TOUCH_FUNC
 
+/// Raven `b_local.h` sound-flag bits (`SFB_*`).
+/// Source: `oracle/oracle/codemp/game/b_local.h:139-141`
+const SFB_RIFLEMAN: c_int = 2;
+const SFB_PHASER: c_int = 4;
+
 // PORT-ESCALATION(packet-contract): this packet's manifest rows list callee
 // names (in-module callees / bg_ callees / traps / globals) but never give the
 // resolved Rust signature of any out-of-file symbol (no `## RESOLVED` /

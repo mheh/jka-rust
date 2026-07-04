@@ -310,7 +310,7 @@ pub fn MedPackGive(
             return;
         }
 
-        let cl = (*ent).client;
+        let cl = (*ent).client as *mut gclient_t;
         if (*ent).health <= 0
             || (*cl).ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0
             || ((*cl).ps.eFlags & EF_DEAD) != 0
@@ -357,12 +357,12 @@ pub fn Jetpack_Off(
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
-        if (*(*ent).client).jetPackOn == qfalse {
+        if (*((*ent).client as *mut gclient_t)).jetPackOn == qfalse {
             // already off
             return;
         }
 
-        (*(*ent).client).jetPackOn = qfalse;
+        (*((*ent).client as *mut gclient_t)).jetPackOn = qfalse;
     }
 }
 
@@ -569,7 +569,7 @@ pub fn EWebUpdateBoneAngles(
 
         let mut yAng: vec3_t = [0.0, 0.0, 0.0];
         let ideal = AngleSubtract(
-            (*(*owner).client).ps.viewangles[YAW],
+            (*((*owner).client as *mut gclient_t)).ps.viewangles[YAW],
             (*eweb).s.angles[YAW],
         );
         let mut incr = AngleSubtract(ideal, (*eweb).angle);
@@ -586,14 +586,14 @@ pub fn EWebUpdateBoneAngles(
         EWeb_SetBoneAngles(eweb, c"cannon_Yrot".as_ptr() as *mut c_char, yAng);
 
         EWebPositionUser(owner, eweb);
-        if (*(*owner).client).ewebIndex == 0 {
+        if (*((*owner).client as *mut gclient_t)).ewebIndex == 0 {
             // was removed during position function
             return;
         }
 
         let mut yAng2: vec3_t = [0.0, 0.0, 0.0];
         yAng2[2] = AngleSubtract(
-            (*(*owner).client).ps.viewangles[PITCH],
+            (*((*owner).client as *mut gclient_t)).ps.viewangles[PITCH],
             (*eweb).s.angles[PITCH],
         ) * 0.8;
         EWeb_SetBoneAngles(eweb, c"cannon_Xrot".as_ptr() as *mut c_char, yAng2);
@@ -713,9 +713,9 @@ pub fn Pickup_Health(
 
         // small and mega healths will go over the max
         let max = if (*item).quantity != 5 && (*item).quantity != 100 {
-            (*(*other).client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize]
+            (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize]
         } else {
-            (*(*other).client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] * 2
+            (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] * 2
         };
 
         let quantity = if (*ent).count != 0 {
@@ -729,7 +729,7 @@ pub fn Pickup_Health(
         if (*other).health > max {
             (*other).health = max;
         }
-        (*(*other).client).ps.stats[statIndex_t::STAT_HEALTH as usize] = (*other).health;
+        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HEALTH as usize] = (*other).health;
 
         if (*item).quantity == 100 {
             // mega health respawns slow
@@ -752,7 +752,7 @@ pub fn Pickup_Armor(
 
     unsafe {
         let item = (*ent).item;
-        let cl = (*other).client;
+        let cl = (*other).client as *mut gclient_t;
 
         (*cl).ps.stats[statIndex_t::STAT_ARMOR as usize] += (*item).quantity;
         let cap = (*cl).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] * (*item).giTag;

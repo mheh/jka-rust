@@ -28,6 +28,16 @@
 use crate::prelude::*;
 use crate::q_shared::Q_strncmp;
 
+/// Raven `SVF_NOCLIENT` — don't send entity to clients, even if it has effects.
+/// Source: `oracle/oracle/codemp/game/g_public.h:17`
+const SVF_NOCLIENT: c_int = 0x0000_0001;
+
+/// Raven vehicle-surface indices (`bg_vehicles.h:427-430`).
+const SHIPSURF_FRONT: c_int = 0;
+const SHIPSURF_BACK: c_int = 1;
+const SHIPSURF_RIGHT: c_int = 2;
+const SHIPSURF_LEFT: c_int = 3;
+
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
 const qtrue: qboolean = 1;

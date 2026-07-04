@@ -8,8 +8,14 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::q_shared::Q_stricmp;
 use core::ffi::c_char;
 use mp_qshared::shared::MAX_GENTITIES;
+
+// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Source: `oracle/oracle/codemp/game/q_shared.h`
+const qtrue: qboolean = 1;
+const qfalse: qboolean = 0;
 
 // PORT-COMPLETE: g_timer.c 12/0
 
@@ -199,19 +205,19 @@ pub fn TIMER_Get(ent: *mut gentity_t, identifier: *const c_char) -> c_int {
 pub fn TIMER_Done(ent: *mut gentity_t, identifier: *const c_char) -> qboolean {
     unsafe {
         if ent.is_null() {
-            return qboolean::qtrue;
+            return qtrue;
         }
         let ent_ref = &*ent;
         let timer = TIMER_GetExisting(ent_ref.s.number, identifier) as *mut gtimer_t;
 
         if timer.is_null() {
-            return qboolean::qtrue;
+            return qtrue;
         }
 
         if (*timer).time < g_level_time {
-            qboolean::qtrue
+            qtrue
         } else {
-            qboolean::qfalse
+            qfalse
         }
     }
 }
@@ -266,26 +272,26 @@ pub fn TIMER_Done2(
 ) -> qboolean {
     unsafe {
         if ent.is_null() {
-            return qboolean::qfalse;
+            return qfalse;
         }
         let ent_ref = &*ent;
         let timer = TIMER_GetExisting(ent_ref.s.number, identifier) as *mut gtimer_t;
 
         if timer.is_null() {
-            return qboolean::qfalse;
+            return qfalse;
         }
 
         let res = (*timer).time < g_level_time;
 
-        if res && remove == qboolean::qtrue {
+        if res && remove == qtrue {
             // Put it back on the free list
             TIMER_RemoveHelper(ent_ref.s.number, timer as *mut c_void);
         }
 
         if res {
-            qboolean::qtrue
+            qtrue
         } else {
-            qboolean::qfalse
+            qfalse
         }
     }
 }
@@ -296,15 +302,15 @@ pub fn TIMER_Done2(
 pub fn TIMER_Exists(ent: *mut gentity_t, identifier: *const c_char) -> qboolean {
     unsafe {
         if ent.is_null() {
-            return qboolean::qfalse;
+            return qfalse;
         }
         let ent_ref = &*ent;
         let timer = TIMER_GetExisting(ent_ref.s.number, identifier) as *mut gtimer_t;
 
         if timer.is_null() {
-            qboolean::qfalse
+            qfalse
         } else {
-            qboolean::qtrue
+            qtrue
         }
     }
 }
@@ -335,10 +341,10 @@ pub fn TIMER_Remove(ent: *mut gentity_t, identifier: *const c_char) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_timer.c:286-294`
 pub fn TIMER_Start(self_: *mut gentity_t, identifier: *const c_char, duration: c_int) -> qboolean {
-    if TIMER_Done(self_, identifier) == qboolean::qtrue {
+    if TIMER_Done(self_, identifier) == qtrue {
         TIMER_Set(self_, identifier, duration);
-        qboolean::qtrue
+        qtrue
     } else {
-        qboolean::qfalse
+        qfalse
     }
 }

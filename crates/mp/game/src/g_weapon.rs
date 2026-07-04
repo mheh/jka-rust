@@ -316,9 +316,9 @@ pub fn WP_ExplosiveDie(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1549-1557`
 pub fn WP_flechette_alt_blow(ent: *mut gentity_t) {
     unsafe {
-        (*ent).s.pos.tr_delta[0] = 1.0;
-        (*ent).s.pos.tr_delta[1] = 0.0;
-        (*ent).s.pos.tr_delta[2] = 0.0;
+        (*ent).s.pos.trDelta[0] = 1.0;
+        (*ent).s.pos.trDelta[1] = 0.0;
+        (*ent).s.pos.trDelta[2] = 0.0;
     }
 
     laserTrapExplode(ent);
@@ -710,7 +710,7 @@ pub fn CalcMuzzlePointOrigin(
 ) -> vec3_t {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
-        let mut muzzlePoint = (*ent).s.pos.tr_base;
+        let mut muzzlePoint = (*ent).s.pos.trBase;
         muzzlePoint[2] += (*client).ps.viewheight as f32;
         // VectorMA( muzzlePoint, 14, forward, muzzlePoint )
         muzzlePoint[0] += 14.0 * forward[0];
@@ -734,7 +734,7 @@ pub fn WP_TouchVehMissile(ent: *mut gentity_t, other: *mut gentity_t, trace: *mu
     unsafe {
         let mut myTrace: trace_t = *trace;
         if !other.is_null() {
-            myTrace.entityNum = (*other).s.number;
+            myTrace.entityNum = (*other).s.number as i16;
         }
         crate::g_missile::G_MissileImpact(ent, &mut myTrace);
     }

@@ -982,7 +982,7 @@ pub fn Info_NextPair(head: *mut *const c_char, key: *mut c_char, value: *mut c_c
 /// Raven `Info_RemoveKey`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1147-1195`
-pub fn Info_RemoveKey(s: *mut c_char, key: *const c_char) {
+pub fn Info_RemoveKey(mut s: *mut c_char, key: *const c_char) {
     unsafe {
         // MAX_INFO_STRING/MAX_INFO_KEY/MAX_INFO_VALUE oversize checks
         // (`strlen(s) >= MAX_INFO_STRING`) are omitted: those consts are not

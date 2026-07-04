@@ -18,6 +18,10 @@ pub unsafe trait ZeroValid {}
 // rule; the GameWorld `[gentity_t; MAX_GENTITIES]` boxes build through this).
 unsafe impl<T: ZeroValid, const N: usize> ZeroValid for [T; N] {}
 
+// Primitive integer byte-patterns: all-zero is a valid value. `u8` backs
+// `GameWorld`'s raw scratch `memoryPool` byte array.
+unsafe impl ZeroValid for u8 {}
+
 /// THE sanctioned construction idiom for large `#[repr(C)]` all-zeroes-valid
 /// types: `alloc_zeroed` the storage and `Box::from_raw` it, so a large array is
 /// built directly on the heap and never transits the stack (naive

@@ -21,6 +21,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::q_math::Q_irand;
 
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
@@ -131,7 +132,7 @@ pub fn TranslateSaberColor(name: *const c_char) -> saber_colors_t {
             return SABER_PURPLE;
         }
         if qstricmp_eq(name, c"random") {
-            return crate::q_shared::Q_irand(SABER_ORANGE, SABER_PURPLE);
+            return crate::q_math::Q_irand(SABER_ORANGE, SABER_PURPLE);
         }
     }
     SABER_BLUE

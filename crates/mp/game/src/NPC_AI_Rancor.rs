@@ -69,40 +69,14 @@ pub fn Rancor_Idle() {
 /// Raven `Rancor_CheckRoar`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:66-77`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn Rancor_CheckRoar(self_: *mut gentity_t) -> qboolean {
-    // Raven `BOTH_STAND1TO2` / `SETANIM_BOTH` / `SETANIM_FLAG_OVERRIDE` /
-    // `SETANIM_FLAG_HOLD` (`bg_public.h`/`anims.h`); no landed const in this
-    // crate yet, so the literal values are transcribed at the call site per
-    // house style for resolved-elsewhere anim/flag constants.
-    //TODO: Port BOTH_STAND1TO2
-    // Source: oracle/oracle/codemp/game/anims.h
-    const BOTH_STAND1TO2: c_int = 0;
-    const SETANIM_BOTH: c_int = 2;
-    const SETANIM_FLAG_OVERRIDE: c_int = 1;
-    const SETANIM_FLAG_HOLD: c_int = 2;
-    // Raven `EF2_ALERTED` (`bg_public.h`); no landed const in this crate yet.
-    //TODO: Port EF2_ALERTED
-    // Source: oracle/oracle/codemp/game/bg_public.h
-    const EF2_ALERTED: c_int = 0x00000002;
-
-    unsafe {
-        if (*self_).wait == 0.0 {
-            //haven't ever gotten mad yet
-            (*self_).wait = 1.0; //do this only once
-            let client = (*self_).client as *mut gclient_t;
-            (*client).ps.eFlags2 |= EF2_ALERTED;
-            crate::npc_c::NPC_SetAnim(
-                self_,
-                SETANIM_BOTH,
-                BOTH_STAND1TO2,
-                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-            );
-            let legs_timer = (*client).ps.legsTimer;
-            crate::g_timer::TIMER_Set(self_, c"rageTime".as_ptr(), legs_timer);
-            return QTRUE;
-        }
-        QFALSE
-    }
+    todo!("Port Rancor_CheckRoar — parked: unported-type (animNumber_t)")
 }
 
 // PORT-ESCALATION(ambient-state): reads/writes the `NPC`/`NPCInfo`/`ucmd`
@@ -182,136 +156,14 @@ pub fn Rancor_Combat() {
 /// Raven `NPC_Rancor_Pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Rancor.c:703-782`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn NPC_Rancor_Pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
-    // Raven anim/flag consts (`bg_public.h`/`anims.h`); no landed const in this
-    // crate yet, so the literal values are transcribed at the call site per
-    // house style for resolved-elsewhere anim/flag constants.
-    //TODO: Port BOTH_STAND1TO2, BOTH_MELEE1, BOTH_MELEE2, BOTH_ATTACK2, BOTH_PAIN1, BOTH_PAIN2
-    // Source: oracle/oracle/codemp/game/anims.h
-    const BOTH_STAND1TO2: c_int = 0;
-    const BOTH_MELEE1: c_int = 1;
-    const BOTH_MELEE2: c_int = 2;
-    const BOTH_ATTACK2: c_int = 3;
-    const BOTH_PAIN1: c_int = 4;
-    const BOTH_PAIN2: c_int = 5;
-    const SETANIM_BOTH: c_int = 2;
-    const SETANIM_FLAG_OVERRIDE: c_int = 1;
-    const SETANIM_FLAG_HOLD: c_int = 2;
-    //TODO: Port CLASS_RANCOR
-    // Source: oracle/oracle/codemp/game/g_local.h (class_t already landed as
-    // `crate::teams::class::class_t`; using the landed enum value here).
-    use crate::teams::class::class_t::CLASS_RANCOR;
-    //TODO: Port FL_NOTARGET
-    use crate::entity::flags::FL_NOTARGET;
-
-    unsafe {
-        let mut hit_by_rancor = QFALSE;
-        if !attacker.is_null()
-            && !(*attacker).client.is_null()
-            && (*((*attacker).client as *mut gclient_t)).NPC_class == CLASS_RANCOR
-        {
-            hit_by_rancor = QTRUE;
-        }
-
-        if !attacker.is_null()
-            && (*attacker).inuse != QFALSE
-            && attacker != (*self_).enemy
-            && ((*attacker).flags & FL_NOTARGET) == 0
-        {
-            if (*self_).count == 0 {
-                let enemy = (*self_).enemy;
-                let self_npc = (*self_).NPC as *mut gNPC_t;
-                let take_attacker = ((*attacker).s.number == 0 && crate::q_math::Q_irand(0, 3) == 0)
-                    || enemy.is_null()
-                    || (!enemy.is_null() && (*enemy).health == 0)
-                    || (!enemy.is_null()
-                        && !(*enemy).client.is_null()
-                        && (*((*enemy).client as *mut gclient_t)).NPC_class == CLASS_RANCOR)
-                    || (!self_npc.is_null()
-                        && (*self_npc).consecutiveBlockedMoves >= 10
-                        && !enemy.is_null()
-                        && DistanceSquared(
-                            (*attacker).r.currentOrigin,
-                            (*self_).r.currentOrigin,
-                        ) < DistanceSquared(
-                            (*enemy).r.currentOrigin,
-                            (*self_).r.currentOrigin,
-                        ));
-                if take_attacker {
-                    //if my enemy is dead (or attacked by player) and I'm not
-                    //still holding/eating someone, turn on the attacker
-                    //FIXME: if can't nav to my enemy, take this guy if I can
-                    //nav to him
-                    crate::NPC_combat::G_SetEnemy(self_, attacker);
-                    crate::g_timer::TIMER_Set(
-                        self_,
-                        c"lookForNewEnemy".as_ptr(),
-                        crate::q_math::Q_irand(5000, 15000),
-                    );
-                    if hit_by_rancor != QFALSE {
-                        //stay mad at this Rancor for 2-5 secs before looking
-                        //for attacker enemies
-                        crate::g_timer::TIMER_Set(
-                            self_,
-                            c"rancorInfight".as_ptr(),
-                            crate::q_math::Q_irand(2000, 5000),
-                        );
-                    }
-                }
-            }
-        }
-
-        let client = (*self_).client as *mut gclient_t;
-        //hit by rancor, hit while holding live victim, or took a lot of damage
-        if (hit_by_rancor != QFALSE
-            || ((*self_).count == 1 && !(*self_).activator.is_null() && crate::q_math::Q_irand(0, 4) == 0)
-            || crate::q_math::Q_irand(0, 200) < damage)
-            && (*client).ps.legsAnim != BOTH_STAND1TO2
-            && crate::g_timer::TIMER_Done(self_, c"takingPain".as_ptr()) != QFALSE
-        {
-            if Rancor_CheckRoar(self_) == QFALSE {
-                if (*client).ps.legsAnim != BOTH_MELEE1
-                    && (*client).ps.legsAnim != BOTH_MELEE2
-                    && (*client).ps.legsAnim != BOTH_ATTACK2
-                {
-                    //cant interrupt one of the big attack anims
-                    //if going to bite our victim, only victim can interrupt that anim
-                    if (*self_).health > 100 || hit_by_rancor != QFALSE {
-                        crate::g_timer::TIMER_Remove(self_, c"attacking".as_ptr());
-
-                        let self_npc = (*self_).NPC as *mut gNPC_t;
-                        (*self_).s.angles = (*self_npc).lastPathAngles;
-
-                        if (*self_).count == 1 {
-                            crate::npc_c::NPC_SetAnim(
-                                self_,
-                                SETANIM_BOTH,
-                                BOTH_PAIN2,
-                                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                            );
-                        } else {
-                            crate::npc_c::NPC_SetAnim(
-                                self_,
-                                SETANIM_BOTH,
-                                BOTH_PAIN1,
-                                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-                            );
-                        }
-                        let legs_timer = (*client).ps.legsTimer;
-                        crate::g_timer::TIMER_Set(
-                            self_,
-                            c"takingPain".as_ptr(),
-                            legs_timer + crate::q_math::Q_irand(0, 500),
-                        );
-
-                        if !self_npc.is_null() {
-                            (*self_npc).localState = LSTATE_WAITING;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    todo!("Port NPC_Rancor_Pain — parked: unported-type (animNumber_t)")
 }
 
 // PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and calls

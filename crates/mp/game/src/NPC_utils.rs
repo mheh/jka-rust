@@ -38,8 +38,23 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::NPC_senses::InFOV;
+use crate::g_utils::G_BoneIndex;
+use crate::q_shared::Q_stricmp;
 use crate::trap;
 use crate::world::GameContext;
+
+/// Raven `BONE_ANGLES_POSTMULT` (ghoul2 bone-angle apply mode).
+/// Source: `oracle/oracle/code/game/ghoul2_shared.h:54`
+const BONE_ANGLES_POSTMULT: c_int = 0x0002;
+
+/// Raven `BG_NUM_TOGGLEABLE_SURFACES`.
+/// Source: `oracle/oracle/codemp/game/bg_public.h:138`
+const BG_NUM_TOGGLEABLE_SURFACES: c_int = 31;
+
+/// Raven `PMF_FOLLOW` — spectate following another player.
+/// Source: `oracle/oracle/codemp/game/bg_public.h:415`
+const PMF_FOLLOW: c_int = 4096;
 
 use mp_bg::public::team::TEAM_SPECTATOR;
 use mp_qshared::shared::MAX_CLIENTS;
@@ -260,9 +275,9 @@ pub fn NPC_SetBoneAngles(
         }
 
         let flags = BONE_ANGLES_POSTMULT;
-        let up = POSITIVE_X;
-        let right = NEGATIVE_Y;
-        let forward = NEGATIVE_Z;
+        let up = POSITIVE_X as c_int;
+        let right = NEGATIVE_Y as c_int;
+        let forward = NEGATIVE_Z as c_int;
 
         //first 3 bits is forward, second 3 bits is right, third 3 bits is up
         (*ent).s.boneOrient = forward | (right << 3) | (up << 6);
@@ -287,6 +302,9 @@ pub fn NPC_SetBoneAngles(
     }
 }
 
+// PORT-ESCALATION(unported-global): reads `bgToggleableSurfaces` (bg-shared
+// lookup table, `NPC_utils.c:1006`) — a genuinely unported file-scope global
+// (fork-discovery ruling 1), not just a missing `use`.
 /// Raven `NPC_SetSurfaceOnOff`.
 ///
 /// Raven: rww - and another method of automatically managing surface status
@@ -299,52 +317,7 @@ pub fn NPC_SetSurfaceOnOff(
     surfaceName: *const c_char,
     surfaceFlags: c_int,
 ) {
-    // Raven's `TURN_ON`/`TURN_OFF` file-scope `#define`s (`NPC_utils.c:998-999`).
-    const TURN_ON: c_int = 0x0000_0000;
-    const TURN_OFF: c_int = 0x0000_0100;
-
-    unsafe {
-        let mut i: usize = 0;
-        let mut foundIt = false;
-        //TODO: Port bgToggleableSurfaces / BG_NUM_TOGGLEABLE_SURFACES
-        // Source: oracle/oracle/codemp/game/NPC_utils.c:1006 (bg-shared table,
-        // not resolved in this packet — transcribed by its faithful Raven
-        // name per house convention).
-        while i < BG_NUM_TOGGLEABLE_SURFACES && !bgToggleableSurfaces[i].is_null() {
-            if Q_stricmp(surfaceName, bgToggleableSurfaces[i]) == 0 {
-                foundIt = true;
-                break;
-            }
-            i += 1;
-        }
-
-        if !foundIt {
-            let msg = std::ffi::CString::new(format!(
-                "WARNING: Tried to toggle NPC surface that isn't in toggleable surface list ({})\n",
-                std::ffi::CStr::from_ptr(surfaceName).to_string_lossy()
-            ))
-            .unwrap();
-            crate::g_main::Com_Printf(msg.as_ptr());
-            return;
-        }
-
-        if surfaceFlags == TURN_ON {
-            (*ent).s.surfacesOn |= 1 << i;
-            (*ent).s.surfacesOff &= !(1 << i);
-        } else {
-            (*ent).s.surfacesOn &= !(1 << i);
-            (*ent).s.surfacesOff |= 1 << i;
-        }
-
-        if (*ent).ghoul2.is_null() {
-            return;
-        }
-
-        trap::G2API_SetSurfaceOnOff(
-            ctx.engine,
-            GG2SetsurfaceonoffArgs::new((*ent).ghoul2, surfaceName, surfaceFlags),
-        );
-    }
+    todo!("Port NPC_SetSurfaceOnOff — parked: unported-global (bgToggleableSurfaces)")
 }
 
 /// Raven `NPC_SomeoneLookingAtMe`.

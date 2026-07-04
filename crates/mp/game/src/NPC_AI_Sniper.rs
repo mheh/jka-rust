@@ -16,6 +16,10 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::NPC_reactions::NPC_Pain;
+use crate::NPC_sounds::G_AddVoiceEvent;
+use crate::g_timer::TIMER_Set;
+use crate::q_math::Q_irand;
 use mp_bg::public::entity_event::entity_event_t::{EV_PUSHED1, EV_PUSHED3};
 
 // Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }`

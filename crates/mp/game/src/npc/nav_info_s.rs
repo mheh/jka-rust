@@ -8,6 +8,7 @@ use mp_qshared::shared::vec3_t;
 ///
 /// Type definition source: `oracle/oracle/codemp/game/b_local.h:314-322`
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct navInfo_t {
 	pub blocker: *mut gentity_t,
 	pub direction: vec3_t,

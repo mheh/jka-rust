@@ -24,6 +24,45 @@ pub use core::ffi::{
 // Source: `oracle/oracle/codemp/game/q_shared.h:349`
 pub type byte = c_uchar;
 
+// Integration round-1 addendum: the fnskel packets transcribe Raven constant
+// spellings verbatim (per each file's own "integration-deferred" note) without
+// enumerating their owning module's `use`; these glob-imports resolve them
+// against the same crates already named above. Explicit single-item imports
+// below (e.g. `holdable_t`) are unaffected — Rust lets an explicit import
+// shadow a glob without ambiguity.
+pub use mp_bg::public::gametype::{gametype_t, GT_CTF, GT_CTY, GT_HOLOCRON, GT_SIEGE, GT_TEAM};
+pub use mp_bg::public::holdable::*;
+pub use mp_bg::public::powerup::*;
+pub use mp_bg::public::saber_move_name::*;
+pub use mp_bg::public::team::*;
+pub use mp_bg::public::entity_effects::*;
+pub use mp_bg::public::item_type::*;
+pub use mp_bg::public::set_anim::*;
+pub use mp_bg::vehicles::vehicle_s::{MAX_VEHICLE_TURRETS, VEHICLE_BASE, VEHICLE_NONE};
+pub use mp_bg::weapons::weapon_t::*;
+pub use mp_qshared::shared::force_powers::*;
+pub use mp_qshared::shared::limits::*;
+pub use mp_qshared::shared::sound_channel::*;
+pub use mp_qshared::shared::surface_flags::*;
+
+// Enum types transcribed as `#[repr(i32)] enum` per porting-rules'
+// enum-vs-alias fidelity rule; the fnskel packets carry their bare Raven
+// variant spellings (e.g. `STAT_MAX_HEALTH`, not `statIndex_t::STAT_MAX_HEALTH`),
+// so both the type name (for sites that do qualify) and a variant glob (for
+// the far more common bare spelling) are re-exported here.
+pub use mp_bg::public::broken_limb::{brokenLimb_t, brokenLimb_t::*};
+pub use mp_bg::public::entity_type::{entityType_t, entityType_t::*};
+pub use mp_bg::public::force_hand_anims::{forceHandAnims_t, forceHandAnims_t::*};
+pub use mp_bg::public::means_of_death::{meansOfDeath_t, meansOfDeath_t::*};
+pub use mp_bg::public::pd_sounds::{pdSounds_t, pdSounds_t::*};
+pub use mp_bg::public::pers_enum::{persEnum_t, persEnum_t::*};
+pub use mp_bg::public::pmtype::{pmtype_t, pmtype_t::*};
+pub use mp_bg::public::stat_index::{statIndex_t, statIndex_t::*};
+pub use mp_qshared::common::mp::qcommon::b_set_t::{bSet_t, bSet_t::*};
+pub use mp_qshared::common::mp::qcommon::task_id_t::{taskID_t, taskID_t::*};
+pub use mp_qshared::shared::trackchan::{trackchan_t, trackchan_t::*};
+pub use mp_qshared::shared::wl_e::{WL_e, WL_e::*};
+
 pub use crate::ai::group_info::AIGroupInfo_t;
 pub use crate::botai::bot_state_s::bot_state_t;
 pub use crate::client::gclient::gclient_t;
@@ -35,6 +74,7 @@ pub use crate::npc::spot_t::spot_t;
 pub use crate::npc::visibility_t::visibility_t;
 pub use crate::saber::evasion_type_t::evasionType_t;
 pub use crate::teams::class::class_t;
+pub use crate::teams::class::class_t::*;
 
 pub use mp_bg::public::animation::animation_t;
 pub use mp_bg::public::bg_entity::bgEntity_t;
@@ -52,11 +92,14 @@ pub use mp_bg::vehicles::veh_weapon_info_t::vehWeaponInfo_t;
 pub use mp_bg::vehicles::vehicle_info_t::vehicleInfo_t;
 pub use mp_bg::vehicles::vehicle_s::Vehicle_t;
 pub use mp_bg::weapons::ammo_t::ammo_t;
+pub use mp_bg::weapons::ammo_t::ammo_t::*;
 pub use mp_bg::weapons::weapon_t::weapon_t;
 
 pub use mp_qshared::common::mp::botlib::aas_entityinfo_s::aas_entityinfo_t;
 pub use mp_qshared::common::mp::botlib::bot_input_s::bot_input_t;
-pub use mp_qshared::common::mp::gentity::{gentity_t, material_t, moverState_t};
+pub use mp_qshared::common::mp::gentity::{
+    gentity_t, material_t, moverState_t, MOVER_1TO2, MOVER_2TO1, MOVER_POS1, MOVER_POS2,
+};
 pub use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 pub use mp_qshared::common::mp::qcommon::entity_state::entityState_t;
 pub use mp_qshared::common::mp::qcommon::failed_edge::failedEdge_t;
@@ -85,5 +128,7 @@ pub use mp_qshared::shared::string_id_table::stringID_table_t;
 pub use mp_qshared::shared::trajectory::{trajectory_t, trType_t};
 pub use mp_qshared::shared::wpobject::wpobject_t;
 pub use mp_qshared::shared::{
-    fileHandle_t, mdxaBone_t, qboolean, qhandle_t, vec3_t, vec4_t, vec_t,
+    fileHandle_t, mdxaBone_t, qboolean, qhandle_t, vec3_t, vec4_t, vec_t, Eorientations, MAX_QPATH,
+    QFALSE, QTRUE,
 };
+pub use mp_qshared::shared::Eorientations::*;

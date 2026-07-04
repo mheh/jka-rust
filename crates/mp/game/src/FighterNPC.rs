@@ -10,9 +10,32 @@
 
 use crate::prelude::*;
 
+// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Source: `oracle/oracle/codemp/game/q_shared.h`
+const qtrue: qboolean = 1;
+const qfalse: qboolean = 0;
+
 // Unported types referenced in this file (need porting before this compiles):
 // void ()(trace_t , vec_t , vec_t , vec_t , vec_t , int, int)
 
+// Integration round-1: these cross-file callees already exist in-crate; the
+// staged skeleton had faithfully transcribed them as an `extern "C" { .. }`
+// block (as if resolved at link time), which cannot work for plain-Rust
+// intra-crate functions. Wired via ordinary `use` instead.
+use crate::bg_pmove::{BG_UnrestrainedPitchRoll, BG_VehicleTurnRateForSpeed};
+use crate::bg_vehicleLoad::BG_VehicleGetIndex;
+use crate::g_combat::G_DamageFromKiller;
+use crate::g_main::Com_Error;
+use crate::g_utils::G_AllocateVehicleObject;
+use crate::q_math::{AngleNormalize180, AngleNormalize360, AngleSubtract};
+
+// PORT-ESCALATION(global-placement): reads the file-scope global
+// `g_vehicleInfo` (`vehicleInfo_t g_vehicleInfo[MAX_VEHICLES]`,
+// `bg_vehicleLoad.c:106`) to dispatch through the base vehicle's `Board`
+// vtable slot — fork-discovery ruling 1 places file-scope globals as
+// `GameWorld` fields, but this table's placement/threading channel hasn't
+// landed yet (same gap as `G_CreateFighterNPC`); also ruling 2 (fn-ID enum
+// dispatch) isn't wired into `vehicleInfo_t`'s function-pointer fields yet.
 /// Raven `Board`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:212-221`
@@ -20,17 +43,7 @@ pub fn Board(
     pVeh: *mut Vehicle_t,
     pEnt: *mut bgEntity_t,
 ) -> qboolean {
-    unsafe {
-        // Call base vehicle's Board method
-        // This dispatches through the vehicleInfo vtable
-        // For Fighter, we delegate to VEHICLE_BASE (Fighter base class)
-        let vehicle_base = &g_vehicleInfo[0];  // VEHICLE_BASE = 0
-
-        // The Board function pointer would be called as:
-        // if vehicle_base.Board exists and returns true, then:
-        // PORT-ESCALATION(vtable-dispatch): Need resolved vehicleInfo_t.Board function ptr signature
-        return qfalse;  // parked: can't call base Board without vtable resolution
-    }
+    todo!("Port Board — parked: global-placement (g_vehicleInfo) / fn-enum-dispatch")
 }
 
 /// Raven `Eject`.
@@ -84,14 +97,14 @@ pub fn BG_FighterUpdate(
 
         // If we have a pilot, take out gravity (flying craft).
         if !(*pVeh).m_pPilot.is_null() {
-            (*parentPS).gravity = 0.0;
+            (*parentPS).gravity = 0;
         } else {
             // No pilot: set gravity appropriately
             if let Some(vi) = (*pVeh).m_pVehicleInfo.as_ref() {
-                if vi.gravity != 0.0 {
+                if vi.gravity != 0 {
                     (*parentPS).gravity = vi.gravity;
                 } else {
-                    (*parentPS).gravity = gravity;
+                    (*parentPS).gravity = gravity as c_int;
                 }
             }
         }
@@ -99,8 +112,10 @@ pub fn BG_FighterUpdate(
         // Check if dead
         isDead = if (*parentPS).eFlags & (1 << 7) != 0 { qtrue } else { qfalse };  // EF_DEAD
 
-        // Check landing surface
-        VectorCopy(&(*parentPS).origin, &mut bottom);
+        // Check landing surface. `vec3_t` (`[f32;3]`) is `Copy`, so `VectorCopy`
+        // transcribes as plain array assignment per the bless-the-rule appendix
+        // (not a function call) — see `g_navnew.rs`'s header note.
+        bottom = (*parentPS).origin;
         if let Some(vi) = (*pVeh).m_pVehicleInfo.as_ref() {
             bottom[2] -= vi.landingHeight;
         }
@@ -172,7 +187,7 @@ pub fn FighterIsInSpace(
         if !gParent.is_null() {
             let ent = &*gParent;
             if !ent.client.is_null() {
-                let client = &*ent.client;
+                let client = &*(ent.client as *mut gclient_t);
                 if client.inSpaceIndex != 0 && client.inSpaceIndex < 2047 {  // ENTITYNUM_WORLD
                     return qtrue;
                 }
@@ -296,15 +311,15 @@ pub fn FighterWingMalfunctionCheck(
         // Check right wing damage
         if ((*parentPS).brokenLimbs & (1 << 4)) != 0 {
             // SHIPSURF_DAMAGE_RIGHT_HEAVY
-            (*pVeh).m_vOrientation[2] +=
-                (libm::sin((*pVeh).m_ucmd.serverTime as f32 * 0.001) + 1.0f32)
+            *(*pVeh).m_vOrientation.add(2) +=
+                (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
                     * (*pVeh).m_fTimeModifier
                     * mYawOverride
                     * 50.0f32;
         } else if ((*parentPS).brokenLimbs & (1 << 3)) != 0 {
             // SHIPSURF_DAMAGE_RIGHT_LIGHT
-            (*pVeh).m_vOrientation[2] +=
-                (libm::sin((*pVeh).m_ucmd.serverTime as f32 * 0.001) + 1.0f32)
+            *(*pVeh).m_vOrientation.add(2) +=
+                (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
                     * (*pVeh).m_fTimeModifier
                     * mYawOverride
                     * 12.5f32;
@@ -313,15 +328,15 @@ pub fn FighterWingMalfunctionCheck(
         // Check left wing damage
         if ((*parentPS).brokenLimbs & (1 << 2)) != 0 {
             // SHIPSURF_DAMAGE_LEFT_HEAVY
-            (*pVeh).m_vOrientation[2] -=
-                (libm::sin((*pVeh).m_ucmd.serverTime as f32 * 0.001) + 1.0f32)
+            *(*pVeh).m_vOrientation.add(2) -=
+                (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
                     * (*pVeh).m_fTimeModifier
                     * mYawOverride
                     * 50.0f32;
         } else if ((*parentPS).brokenLimbs & (1 << 1)) != 0 {
             // SHIPSURF_DAMAGE_LEFT_LIGHT
-            (*pVeh).m_vOrientation[2] -=
-                (libm::sin((*pVeh).m_ucmd.serverTime as f32 * 0.001) + 1.0f32)
+            *(*pVeh).m_vOrientation.add(2) -=
+                (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
                     * (*pVeh).m_fTimeModifier
                     * mYawOverride
                     * 12.5f32;
@@ -349,13 +364,13 @@ pub fn FighterNoseMalfunctionCheck(
         // Check nose damage
         if ((*parentPS).brokenLimbs & (1 << 0)) != 0 {
             // SHIPSURF_DAMAGE_FRONT_HEAVY
-            (*pVeh).m_vOrientation[0] += libm::sin((*pVeh).m_ucmd.serverTime as f32 * 0.001)
+            *(*pVeh).m_vOrientation.add(0) += ((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
                 * (*pVeh).m_fTimeModifier
                 * mPitchOverride
                 * 50.0f32;
         } else if ((*parentPS).brokenLimbs & (1 << 5)) != 0 {
             // SHIPSURF_DAMAGE_FRONT_LIGHT
-            (*pVeh).m_vOrientation[0] += libm::sin((*pVeh).m_ucmd.serverTime as f32 * 0.001)
+            *(*pVeh).m_vOrientation.add(0) += ((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
                 * (*pVeh).m_fTimeModifier
                 * mPitchOverride
                 * 20.0f32;
@@ -385,27 +400,27 @@ pub fn FighterDamageRoutine(
 
                 if num % 3 != 0 {
                     // NOT everyone should do this
-                    (*pVeh).m_vOrientation[0] += (*pVeh).m_fTimeModifier;
+                    *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
                     if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
-                        if (*pVeh).m_vOrientation[0] > 60.0f32 {
-                            (*pVeh).m_vOrientation[0] = 60.0f32;
+                        if *(*pVeh).m_vOrientation.add(0) > 60.0f32 {
+                            *(*pVeh).m_vOrientation.add(0) = 60.0f32;
                         }
                     }
                 } else if num % 2 == 0 {
-                    (*pVeh).m_vOrientation[0] -= (*pVeh).m_fTimeModifier;
+                    *(*pVeh).m_vOrientation.add(0) -= (*pVeh).m_fTimeModifier;
                     if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
-                        if (*pVeh).m_vOrientation[0] < -60.0f32 {
-                            (*pVeh).m_vOrientation[0] = -60.0f32;
+                        if *(*pVeh).m_vOrientation.add(0) < -60.0f32 {
+                            *(*pVeh).m_vOrientation.add(0) = -60.0f32;
                         }
                     }
                 }
 
                 if num % 2 != 0 {
-                    (*pVeh).m_vOrientation[1] += (*pVeh).m_fTimeModifier;
-                    (*pVeh).m_vOrientation[2] += (*pVeh).m_fTimeModifier * 4.0f32;
+                    *(*pVeh).m_vOrientation.add(1) += (*pVeh).m_fTimeModifier;
+                    *(*pVeh).m_vOrientation.add(2) += (*pVeh).m_fTimeModifier * 4.0f32;
                 } else {
-                    (*pVeh).m_vOrientation[1] -= (*pVeh).m_fTimeModifier;
-                    (*pVeh).m_vOrientation[2] -= (*pVeh).m_fTimeModifier * 4.0f32;
+                    *(*pVeh).m_vOrientation.add(1) -= (*pVeh).m_fTimeModifier;
+                    *(*pVeh).m_vOrientation.add(2) -= (*pVeh).m_fTimeModifier * 4.0f32;
                 }
             }
             return;
@@ -421,17 +436,17 @@ pub fn FighterDamageRoutine(
                 let num = (*parent_ent).s.number;
 
                 if num % 3 != 0 {
-                    (*pVeh).m_vOrientation[0] += (*pVeh).m_fTimeModifier;
+                    *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
                     if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
-                        if (*pVeh).m_vOrientation[0] > 60.0f32 {
-                            (*pVeh).m_vOrientation[0] = 60.0f32;
+                        if *(*pVeh).m_vOrientation.add(0) > 60.0f32 {
+                            *(*pVeh).m_vOrientation.add(0) = 60.0f32;
                         }
                     }
                 } else if num % 4 == 0 {
-                    (*pVeh).m_vOrientation[0] -= (*pVeh).m_fTimeModifier;
+                    *(*pVeh).m_vOrientation.add(0) -= (*pVeh).m_fTimeModifier;
                     if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
-                        if (*pVeh).m_vOrientation[0] < -60.0f32 {
-                            (*pVeh).m_vOrientation[0] = -60.0f32;
+                        if *(*pVeh).m_vOrientation.add(0) < -60.0f32 {
+                            *(*pVeh).m_vOrientation.add(0) = -60.0f32;
                         }
                     }
                 }
@@ -463,7 +478,7 @@ pub fn FighterDamageRoutine(
                 factor *= 4.0f32;
             }
 
-            (*pVeh).m_vOrientation[2] += (*pVeh).m_fTimeModifier * factor;
+            *(*pVeh).m_vOrientation.add(2) += (*pVeh).m_fTimeModifier * factor;
         } else if ((*pVeh).m_iRemovedSurfaces & c) != 0
             || ((*pVeh).m_iRemovedSurfaces & d) != 0
         {
@@ -479,7 +494,7 @@ pub fn FighterDamageRoutine(
                 factor *= 4.0f32;
             }
 
-            (*pVeh).m_vOrientation[2] += factor * (*pVeh).m_fTimeModifier;
+            *(*pVeh).m_vOrientation.add(2) += factor * (*pVeh).m_fTimeModifier;
         } else if ((*pVeh).m_iRemovedSurfaces & e) != 0
             || ((*pVeh).m_iRemovedSurfaces & f) != 0
         {
@@ -495,7 +510,7 @@ pub fn FighterDamageRoutine(
                 factor *= 4.0f32;
             }
 
-            (*pVeh).m_vOrientation[2] -= factor * (*pVeh).m_fTimeModifier;
+            *(*pVeh).m_vOrientation.add(2) -= factor * (*pVeh).m_fTimeModifier;
         }
     }
 }
@@ -510,7 +525,7 @@ pub fn FighterYawAdjust(
 ) {
     unsafe {
         let angDif = AngleSubtract(
-            (*pVeh).m_vOrientation[1],
+            *(*pVeh).m_vOrientation.add(1),
             (*riderPS).viewangles[1],
         );
 
@@ -527,8 +542,8 @@ pub fn FighterYawAdjust(
             } else if scaled < -maxDif {
                 scaled = -maxDif;
             }
-            (*pVeh).m_vOrientation[1] =
-                AngleNormalize180((*pVeh).m_vOrientation[1] - scaled * ((*pVeh).m_fTimeModifier * 0.2f32));
+            *(*pVeh).m_vOrientation.add(1) =
+                AngleNormalize180(*(*pVeh).m_vOrientation.add(1) - scaled * ((*pVeh).m_fTimeModifier * 0.2f32));
         }
     }
 }
@@ -543,7 +558,7 @@ pub fn FighterPitchAdjust(
 ) {
     unsafe {
         let angDif = AngleSubtract(
-            (*pVeh).m_vOrientation[0],
+            *(*pVeh).m_vOrientation.add(0),
             (*riderPS).viewangles[0],
         );
 
@@ -560,8 +575,8 @@ pub fn FighterPitchAdjust(
             } else if scaled < -maxDif {
                 scaled = -maxDif;
             }
-            (*pVeh).m_vOrientation[0] =
-                AngleNormalize360((*pVeh).m_vOrientation[0] - scaled * ((*pVeh).m_fTimeModifier * 0.2f32));
+            *(*pVeh).m_vOrientation.add(0) =
+                AngleNormalize360(*(*pVeh).m_vOrientation.add(0) - scaled * ((*pVeh).m_fTimeModifier * 0.2f32));
         }
     }
 }
@@ -579,14 +594,14 @@ pub fn FighterPitchClamp(
         if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
             // Cap pitch reasonably
             if let Some(vi) = (*pVeh).m_pVehicleInfo.as_ref() {
-                if vi.pitchLimit != -1
+                if vi.pitchLimit != -1.0
                     && (*pVeh).m_iRemovedSurfaces == 0
-                    && (*parentPS).electrifyTime < curTime as u32
+                    && (*parentPS).electrifyTime < curTime
                 {
-                    if (*pVeh).m_vOrientation[0] > vi.pitchLimit {
-                        (*pVeh).m_vOrientation[0] = vi.pitchLimit;
-                    } else if (*pVeh).m_vOrientation[0] < -vi.pitchLimit {
-                        (*pVeh).m_vOrientation[0] = -vi.pitchLimit;
+                    if *(*pVeh).m_vOrientation.add(0) > vi.pitchLimit {
+                        *(*pVeh).m_vOrientation.add(0) = vi.pitchLimit;
+                    } else if *(*pVeh).m_vOrientation.add(0) < -vi.pitchLimit {
+                        *(*pVeh).m_vOrientation.add(0) = -vi.pitchLimit;
                     }
                 }
             }
@@ -614,6 +629,11 @@ pub fn G_SetFighterVehicleFunctions(
     }
 }
 
+// PORT-ESCALATION(global-placement): reads the file-scope global
+// `g_vehicleInfo` (`vehicleInfo_t g_vehicleInfo[MAX_VEHICLES]`,
+// `bg_vehicleLoad.c:106`) — fork-discovery ruling 1 places file-scope globals
+// as `GameWorld` fields, but this table's placement/threading channel hasn't
+// landed yet.
 /// Raven `G_CreateFighterNPC`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:1994-2014`
@@ -621,56 +641,6 @@ pub fn G_CreateFighterNPC(
     pVeh: *mut *mut Vehicle_t,
     strType: *const c_char,
 ) {
-    unsafe {
-        if pVeh.is_null() {
-            return;
-        }
-
-        // Allocate vehicle object
-        // In QAGAME, this would call G_AllocateVehicleObject
-        // In cgame, it would call BG_Alloc
-        // For SP, it would call gi.Malloc
-
-        // Zero out memory
-        if !(*pVeh).is_null() {
-            std::ptr::write_bytes(*pVeh, 0, std::mem::size_of::<Vehicle_t>());
-        }
-
-        // Set vehicle info
-        let idx = BG_VehicleGetIndex(strType);
-        if let Some(veh) = (*pVeh).as_mut() {
-            veh.m_pVehicleInfo = &g_vehicleInfo[idx as usize];
-        }
-    }
+    todo!("Port G_CreateFighterNPC — parked: global-placement (g_vehicleInfo)")
 }
 
-// External function declarations (resolved from other modules)
-extern "C" {
-    pub fn AngleNormalize180(angle: f32) -> f32;
-    pub fn AngleNormalize360(angle: f32) -> f32;
-    pub fn AngleSubtract(a1: f32, a2: f32) -> f32;
-    pub fn Com_Error(level: c_int, error: *const c_char, ...);
-    pub fn G_AllocateVehicleObject(pVeh: *mut *mut Vehicle_t);
-    pub fn G_DamageFromKiller(
-        pEnt: *mut gentity_t,
-        pVehEnt: *mut gentity_t,
-        attacker: *mut gentity_t,
-        org: vec3_t,
-        damage: c_int,
-        dflags: c_int,
-        r#mod: c_int,
-    );
-    pub fn BG_UnrestrainedPitchRoll(ps: *mut playerState_t, pVeh: *mut Vehicle_t) -> qboolean;
-    pub fn BG_VehicleGetIndex(vehicleName: *const c_char) -> c_int;
-    pub fn BG_VehicleTurnRateForSpeed(
-        pVeh: *mut Vehicle_t,
-        speed: f32,
-        mPitchOverride: *mut f32,
-        mYawOverride: *mut f32,
-    );
-    pub fn VectorCopy(src: *const f32, dst: *mut f32);
-}
-
-extern "C" {
-    pub static g_vehicleInfo: [vehicleInfo_t; 4];
-}

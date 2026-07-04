@@ -37,7 +37,7 @@ use crate::trap;
 use crate::world::GameContext;
 
 use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::{GIcarusTaskidpending, GIcarusTaskidpendingArgs};
-use mp_qshared::common::mp::qcommon::task_id_t::TID_CHAN_VOICE;
+use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_bg::public::entity_event::entity_event_t;
@@ -73,7 +73,7 @@ pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: *mut gentity_t) {
             let client = (*self_).client as *mut gclient_t;
             let pending = trap::ICARUS_TaskIDPending(
                 ctx.engine,
-                GIcarusTaskidpendingArgs::new(self_, TID_CHAN_VOICE as c_int),
+                GIcarusTaskidpendingArgs::new(self_, taskID_t::TID_CHAN_VOICE as c_int),
             );
             if pending == 0 && !client.is_null() {
                 let stat_max_health = (*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize];
@@ -212,7 +212,7 @@ pub fn NPC_TempLookTarget(
             maxLookTime = 1000;
         }
 
-        if NPC_CheckLookTarget(self_) == 0 {
+        if NPC_CheckLookTarget(ctx, self_) == 0 {
             //Not already looking at something else
             //Look at him for 1 to 3 seconds
             let level_time = (*ctx.world).level.time;

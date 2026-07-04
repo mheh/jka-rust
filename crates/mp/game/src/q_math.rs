@@ -18,14 +18,20 @@
 use crate::prelude::*;
 
 /// Raven angle-vector indices (`PITCH`/`YAW`/`ROLL`).
-/// Source: `oracle/oracle/codemp/game/q_shared.h` (PITCH/YAW/ROLL defines).
-const PITCH: usize = 0;
-const YAW: usize = 1;
-const ROLL: usize = 2;
+/// Source: `oracle/oracle/codemp/game/q_shared.h:374-376`
+pub const PITCH: usize = 0;
+pub const YAW: usize = 1;
+pub const ROLL: usize = 2;
 
 /// Raven `vec3_origin`.
 /// Source: `oracle/oracle/codemp/game/q_math.c:7`
 pub const VEC3_ORIGIN: vec3_t = [0.0, 0.0, 0.0];
+
+// Integration round-1: the mega-pass fnskel packets transcribe this constant
+// under its exact Raven (lowercase) spelling; kept as an alias rather than
+// renaming the established `VEC3_ORIGIN` (in use throughout this file).
+#[allow(non_upper_case_globals)]
+pub const vec3_origin: vec3_t = VEC3_ORIGIN;
 
 /// Raven `bytedirs[NUMVERTEXNORMALS]` — precomputed icosahedron-subdivision
 /// unit normals used by `DirToByte`/`ByteToDir`.

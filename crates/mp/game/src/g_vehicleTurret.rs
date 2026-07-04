@@ -11,6 +11,14 @@
 
 use crate::prelude::*;
 
+// Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
+// Source: `oracle/oracle/codemp/game/q_shared.h`
+const qtrue: qboolean = 1;
+const qfalse: qboolean = 0;
+use crate::NPC_utils::NPC_SetBoneAngles;
+use crate::g_weapon::WP_CalcVehMuzzle;
+use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorNormalize, _VectorCopy, _VectorMA, _VectorSubtract, vectoangles};
+
 // Helper: Raven angle-vector indices
 const PITCH: usize = 0;
 const YAW: usize = 1;
@@ -54,7 +62,7 @@ pub fn VEH_TurretAnglesToEnemy(
             _VectorSubtract(org, (*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut diff);
             let dist = VectorNormalize(&mut diff);
             if !(*turretEnemy).client.is_null() {
-                _VectorCopy((*(*turretEnemy).client).ps.velocity, &mut velocity);
+                _VectorCopy((*((*turretEnemy).client as *mut gclient_t)).ps.velocity, &mut velocity);
             } else {
                 _VectorCopy((*turretEnemy).s.pos.trDelta, &mut velocity);
             }
@@ -71,6 +79,10 @@ pub fn VEH_TurretAnglesToEnemy(
 /// Raven `VEH_TurretAim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicleTurret.c:89-190`
+// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
+// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
+// `g_weapon.rs`) — how is state threaded in?
 pub fn VEH_TurretAim(
     pVeh: *mut Vehicle_t,
     parent: *mut gentity_t,
@@ -81,96 +93,7 @@ pub fn VEH_TurretAim(
     curMuzzle: c_int,
     desiredAngles: &mut vec3_t,
 ) -> qboolean {
-    unsafe {
-        let mut curAngles = [0f32; 3];
-        let mut addAngles = [0f32; 3];
-        let mut newAngles = [0f32; 3];
-        let mut yawAngles = [0f32; 3];
-        let mut pitchAngles = [0f32; 3];
-        let mut aimCorrect: qboolean = qfalse;
-
-        WP_CalcVehMuzzle(parent, curMuzzle);
-        //get the current absolute angles of the turret right now
-        vectoangles((*pVeh).m_vMuzzleDir[curMuzzle as usize], &mut curAngles);
-        //subtract out the vehicle's angles to get the relative alignment
-        AnglesSubtract(curAngles, (*pVeh).m_vOrientation, &mut curAngles);
-
-        if !turretEnemy.is_null() {
-            aimCorrect = qtrue;
-            // ...then we'll calculate what new aim adjustments we should attempt to make this frame
-            // Aim at enemy
-            VEH_TurretAnglesToEnemy(pVeh, curMuzzle, (*vehWeapon).fSpeed, turretEnemy, (*turretStats).bAILead, desiredAngles);
-        }
-        //subtract out the vehicle's angles to get the relative desired alignment
-        AnglesSubtract(*desiredAngles, (*pVeh).m_vOrientation, desiredAngles);
-        //Now clamp the desired relative angles
-        //clamp yaw
-        desiredAngles[YAW] = AngleNormalize180(desiredAngles[YAW]);
-        if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft != 0.0
-            && desiredAngles[YAW] > (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft
-        {
-            aimCorrect = qfalse;
-            desiredAngles[YAW] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft;
-        }
-        if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight != 0.0
-            && desiredAngles[YAW] < (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight
-        {
-            aimCorrect = qfalse;
-            desiredAngles[YAW] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight;
-        }
-        //clamp pitch
-        desiredAngles[PITCH] = AngleNormalize180(desiredAngles[PITCH]);
-        if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown != 0.0
-            && desiredAngles[PITCH] > (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown
-        {
-            aimCorrect = qfalse;
-            desiredAngles[PITCH] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown;
-        }
-        if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp != 0.0
-            && desiredAngles[PITCH] < (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp
-        {
-            aimCorrect = qfalse;
-            desiredAngles[PITCH] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp;
-        }
-        //Now get the offset we want from our current relative angles
-        AnglesSubtract(*desiredAngles, curAngles, &mut addAngles);
-        //Now cap the addAngles for our fTurnSpeed
-        if addAngles[PITCH] > (*turretStats).fTurnSpeed {
-            //aimCorrect = qfalse;//???
-            addAngles[PITCH] = (*turretStats).fTurnSpeed;
-        } else if addAngles[PITCH] < -(*turretStats).fTurnSpeed {
-            //aimCorrect = qfalse;//???
-            addAngles[PITCH] = -(*turretStats).fTurnSpeed;
-        }
-        if addAngles[YAW] > (*turretStats).fTurnSpeed {
-            //aimCorrect = qfalse;//???
-            addAngles[YAW] = (*turretStats).fTurnSpeed;
-        } else if addAngles[YAW] < -(*turretStats).fTurnSpeed {
-            //aimCorrect = qfalse;//???
-            addAngles[YAW] = -(*turretStats).fTurnSpeed;
-        }
-        //Now add the additional angles back in to our current relative angles
-        //FIXME: add some AI aim error randomness...?
-        newAngles[PITCH] = AngleNormalize180(curAngles[PITCH] + addAngles[PITCH]);
-        newAngles[YAW] = AngleNormalize180(curAngles[YAW] + addAngles[YAW]);
-        //Now set the bone angles to the new angles
-        //set yaw
-        if (*turretStats).yawBone != std::ptr::null_mut() {
-            yawAngles = [0f32; 3];
-            yawAngles[(*turretStats).yawAxis as usize] = newAngles[YAW];
-            NPC_SetBoneAngles(parent, (*turretStats).yawBone, yawAngles);
-        }
-        //set pitch
-        if (*turretStats).pitchBone != std::ptr::null_mut() {
-            pitchAngles = [0f32; 3];
-            pitchAngles[(*turretStats).pitchAxis as usize] = newAngles[PITCH];
-            NPC_SetBoneAngles(parent, (*turretStats).pitchBone, pitchAngles);
-        }
-        //force muzzle to recalc next check
-        (*pVeh).m_iMuzzleTime[curMuzzle as usize] = 0;
-
-        return aimCorrect;
-    }
+    todo!("Port VEH_TurretAim — parked: seam-threading")
 }
 
 /// Raven `VEH_TurretFindEnemies`.

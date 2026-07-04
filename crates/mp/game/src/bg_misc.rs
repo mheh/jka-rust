@@ -32,6 +32,10 @@ use crate::g_spawn::G_NewString;
 use crate::q_math::{AngleNormalize180, AngleSubtract, vectoangles};
 use crate::q_shared::Q_stricmp;
 
+/// Raven `GIB_HEALTH` — health threshold below which a corpse gibs.
+/// Source: `oracle/oracle/codemp/game/bg_public.h:25`
+const GIB_HEALTH: c_int = -40;
+
 use mp_bg::public::fieldtype::fieldtype_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::player_state::{MAX_POWERUPS, MAX_PS_EVENTS};
@@ -563,8 +567,8 @@ pub fn BG_CanUseFPNow(
             return qfalse;
         }
 
-        if ((*ps).brokenLimbs & (1 << BROKENLIMB_RARM)) != 0
-            || ((*ps).brokenLimbs & (1 << BROKENLIMB_LARM)) != 0
+        if ((*ps).brokenLimbs & (1 << BROKENLIMB_RARM as c_int)) != 0
+            || ((*ps).brokenLimbs & (1 << BROKENLIMB_LARM as c_int)) != 0
         {
             // powers we can't use with a broken arm. (`if`/`==` chain, not a
             // `match` on unresolved bare `FP_*` names — see the note on
@@ -582,90 +586,71 @@ pub fn BG_CanUseFPNow(
 /// Raven `BG_FindItemForPowerup`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1881-1893`
+// PORT-ESCALATION(unported-global): reads/writes the file-scope
+// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
+// (`bg_misc.c`) — these are genuinely unported runtime data tables
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn BG_FindItemForPowerup(
     pw: powerup_t,
 ) -> *mut gitem_t {
-    unsafe {
-        for i in 0..bg_numItems {
-            let it = &mut bg_itemlist[i as usize];
-            if (it.giType == IT_POWERUP || it.giType == IT_TEAM) && it.giTag == pw as c_int {
-                return it as *mut gitem_t;
-            }
-        }
-        std::ptr::null_mut()
-    }
+    todo!("Port BG_FindItemForPowerup — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
 /// Raven `BG_FindItemForHoldable`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1901-1913`
+// PORT-ESCALATION(unported-global): reads/writes the file-scope
+// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
+// (`bg_misc.c`) — these are genuinely unported runtime data tables
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn BG_FindItemForHoldable(
     pw: holdable_t,
 ) -> *mut gitem_t {
-    unsafe {
-        for i in 0..bg_numItems {
-            let it = &mut bg_itemlist[i as usize];
-            if it.giType == IT_HOLDABLE && it.giTag == pw as c_int {
-                return it as *mut gitem_t;
-            }
-        }
-        // Com_Error(ERR_DROP, ...) → panic (frozen Group A).
-        panic!("HoldableItem not found");
-    }
+    todo!("Port BG_FindItemForHoldable — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
 /// Raven `BG_FindItemForWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1922-1933`
+// PORT-ESCALATION(unported-global): reads/writes the file-scope
+// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
+// (`bg_misc.c`) — these are genuinely unported runtime data tables
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn BG_FindItemForWeapon(
     weapon: weapon_t,
 ) -> *mut gitem_t {
-    unsafe {
-        let mut it = bg_itemlist.as_mut_ptr().add(1);
-        while !(*it).classname.is_null() {
-            if (*it).giType == IT_WEAPON && (*it).giTag == weapon as c_int {
-                return it;
-            }
-            it = it.add(1);
-        }
-        panic!("Couldn't find item for weapon {}", weapon as c_int);
-    }
+    todo!("Port BG_FindItemForWeapon — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
 /// Raven `BG_FindItemForAmmo`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1941-1952`
+// PORT-ESCALATION(unported-global): reads/writes the file-scope
+// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
+// (`bg_misc.c`) — these are genuinely unported runtime data tables
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn BG_FindItemForAmmo(
     ammo: ammo_t,
 ) -> *mut gitem_t {
-    unsafe {
-        let mut it = bg_itemlist.as_mut_ptr().add(1);
-        while !(*it).classname.is_null() {
-            if (*it).giType == IT_AMMO && (*it).giTag == ammo as c_int {
-                return it;
-            }
-            it = it.add(1);
-        }
-        panic!("Couldn't find item for ammo {}", ammo as c_int);
-    }
+    todo!("Port BG_FindItemForAmmo — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
 /// Raven `BG_FindItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1960-1969`
+// PORT-ESCALATION(unported-global): reads/writes the file-scope
+// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
+// (`bg_misc.c`) — these are genuinely unported runtime data tables
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn BG_FindItem(
     classname: *const c_char,
 ) -> *mut gitem_t {
-    unsafe {
-        let mut it = bg_itemlist.as_mut_ptr().add(1);
-        while !(*it).classname.is_null() {
-            if Q_stricmp((*it).classname, classname) == 0 {
-                return it;
-            }
-            it = it.add(1);
-        }
-        std::ptr::null_mut()
-    }
+    todo!("Port BG_FindItem — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
 // PORT-ESCALATION(vec3-outparam-seam): needs `BG_EvaluateTrajectory`'s result,
@@ -781,18 +766,16 @@ pub fn BG_CycleForce(
 /// type.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2092-2108`
+// PORT-ESCALATION(unported-global): reads/writes the file-scope
+// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
+// (`bg_misc.c`) — these are genuinely unported runtime data tables
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn BG_GetItemIndexByTag(
     tag: c_int,
     r#type: c_int,
 ) -> c_int {
-    unsafe {
-        for i in 0..bg_numItems {
-            if bg_itemlist[i as usize].giTag == tag && bg_itemlist[i as usize].giType == r#type {
-                return i;
-            }
-        }
-        0
-    }
+    todo!("Port BG_GetItemIndexByTag — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
 /// Raven `BG_IsItemSelectable`.
@@ -811,59 +794,16 @@ pub fn BG_IsItemSelectable(
 /// Raven `BG_CycleInven`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2121-2182`
+// PORT-ESCALATION(unported-global): reads/writes the file-scope
+// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
+// (`bg_misc.c`) — these are genuinely unported runtime data tables
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn BG_CycleInven(
     ps: *mut playerState_t,
     direction: c_int,
 ) {
-    unsafe {
-        let mut dont_freeze = 0;
-
-        let mut i = bg_itemlist[(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize].giTag;
-        let original = i;
-
-        if direction == 1 {
-            i += 1;
-            if i == HI_NUM_HOLDABLE {
-                i = 1;
-            }
-        } else {
-            i -= 1;
-            if i == 0 {
-                i = HI_NUM_HOLDABLE - 1;
-            }
-        }
-
-        while i != original {
-            // go in a full loop until hitting something, if hit nothing then
-            // select nothing
-            if (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << i) != 0 {
-                // we have it, select it.
-                if BG_IsItemSelectable(ps, i) != 0 {
-                    (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] =
-                        BG_GetItemIndexByTag(i, IT_HOLDABLE);
-                    break;
-                }
-            }
-
-            if direction == 1 {
-                i += 1;
-            } else {
-                i -= 1;
-            }
-
-            if i <= 0 {
-                i = HI_NUM_HOLDABLE - 1;
-            } else if i >= HI_NUM_HOLDABLE {
-                i = 1;
-            }
-
-            dont_freeze += 1;
-            if dont_freeze >= 32 {
-                // yeah, sure, whatever
-                break;
-            }
-        }
-    }
+    todo!("Port BG_CycleInven — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
 /// Raven `BG_CanItemBeGrabbed`.
@@ -872,158 +812,17 @@ pub fn BG_CycleInven(
 /// same for client side prediction and server use.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2192-2343`
+// PORT-ESCALATION(unported-global): reads/writes the file-scope
+// `bg_itemlist`/`bg_numItems`/`ammoData`/`weaponData` tables
+// (`bg_misc.c`) — these are genuinely unported runtime data tables
+// (fork-discovery ruling 1: globals -> GameWorld fields), not just a
+// missing `use`.
 pub fn BG_CanItemBeGrabbed(
     gametype: c_int,
     ent: *const entityState_t,
     ps: *const playerState_t,
 ) -> qboolean {
-    unsafe {
-        if (*ent).modelindex < 1 || (*ent).modelindex >= bg_numItems {
-            panic!("BG_CanItemBeGrabbed: index out of range");
-        }
-
-        let item = &bg_itemlist[(*ent).modelindex as usize];
-
-        if !ps.is_null() {
-            if (*ps).trueJedi != 0 {
-                // force powers and saber only
-                if item.giType != IT_TEAM
-                    && item.giType != IT_ARMOR
-                    && (item.giType != IT_WEAPON || item.giTag != WP_SABER)
-                    && (item.giType != IT_HOLDABLE || item.giTag != HI_SEEKER)
-                    && (item.giType != IT_POWERUP || item.giTag == PW_YSALAMIRI)
-                {
-                    return qfalse;
-                }
-            } else if (*ps).trueNonJedi != 0 {
-                // can't pick up force powerups
-                if (item.giType == IT_POWERUP && item.giTag != PW_YSALAMIRI)
-                    || (item.giType == IT_HOLDABLE && item.giTag == HI_SEEKER)
-                    || (item.giType == IT_WEAPON && item.giTag == WP_SABER)
-                {
-                    return qfalse;
-                }
-            }
-            if (*ps).isJediMaster != 0 && (item.giType == IT_WEAPON || item.giType == IT_AMMO) {
-                // jedi master cannot pick up weapons
-                return qfalse;
-            }
-            if (*ps).duelInProgress != 0 {
-                // no picking stuff up while in a duel, no matter what the
-                // type is
-                return qfalse;
-            }
-        } else {
-            // safety return since below code assumes a non-null ps
-            return qfalse;
-        }
-
-        // NOTE: written as an if/else-if chain over `==` comparisons rather
-        // than a `match` on bare `IT_*` names — those constants are not
-        // resolved to real paths yet (integration-deferred per this file's
-        // header note), and an unqualified identifier in a match pattern
-        // silently becomes a catch-all binding instead of a compile error,
-        // so `match` would be an unsafe choice here until they resolve.
-        if item.giType == IT_WEAPON {
-                if (*ent).generic1 == (*ps).clientNum && (*ent).powerups != 0 {
-                    return qfalse;
-                }
-                if ((*ent).eFlags & EF_DROPPEDWEAPON) == 0
-                    && ((*ps).stats[statIndex_t::STAT_WEAPONS as usize] & (1 << item.giTag)) != 0
-                    && item.giTag != WP_THERMAL
-                    && item.giTag != WP_TRIP_MINE
-                    && item.giTag != WP_DET_PACK
-                {
-                    // weaponstay stuff.. if this isn't dropped, and you
-                    // already have it, you don't get it.
-                    return qfalse;
-                }
-                if item.giTag == WP_THERMAL || item.giTag == WP_TRIP_MINE || item.giTag == WP_DET_PACK
-                {
-                    let ammo_index = weaponData[item.giTag as usize].ammoIndex;
-                    if (*ps).ammo[ammo_index as usize] >= ammoData[ammo_index as usize].max {
-                        return qfalse;
-                    }
-                }
-                qtrue // weapons are always picked up
-            } else if item.giType == IT_AMMO {
-                if item.giTag == -1 {
-                    // special case for "all ammo" packs
-                    return qtrue;
-                }
-                if (*ps).ammo[item.giTag as usize] >= ammoData[item.giTag as usize].max {
-                    return qfalse; // can't hold any more
-                }
-                qtrue
-            } else if item.giType == IT_ARMOR {
-                if (*ps).stats[statIndex_t::STAT_ARMOR as usize]
-                    >= (*ps).stats[statIndex_t::STAT_MAX_HEALTH as usize]
-                {
-                    return qfalse;
-                }
-                qtrue
-            } else if item.giType == IT_HEALTH {
-                // small and mega healths will go over the max, otherwise
-                // don't pick up if already at max
-                if ((*ps).fd.forcePowersActive & (1 << FP_RAGE)) != 0 {
-                    return qfalse;
-                }
-
-                if item.quantity == 5 || item.quantity == 100 {
-                    if (*ps).stats[statIndex_t::STAT_HEALTH as usize]
-                        >= (*ps).stats[statIndex_t::STAT_MAX_HEALTH as usize] * 2
-                    {
-                        return qfalse;
-                    }
-                    return qtrue;
-                }
-
-                if (*ps).stats[statIndex_t::STAT_HEALTH as usize]
-                    >= (*ps).stats[statIndex_t::STAT_MAX_HEALTH as usize]
-                {
-                    return qfalse;
-                }
-                qtrue
-            } else if item.giType == IT_POWERUP {
-                if (*ps).powerups[PW_YSALAMIRI as usize] != 0 && item.giTag != PW_YSALAMIRI {
-                    return qfalse;
-                }
-                qtrue // powerups are always picked up
-            } else if item.giType == IT_TEAM {
-                // team items, such as flags
-                if gametype == GT_CTF || gametype == GT_CTY {
-                    // ent->modelindex2 is non-zero on items if they are
-                    // dropped; we need to know this because we can pick up
-                    // our dropped flag (and return it) but we can't pick up
-                    // our flag at base
-                    if (*ps).persistant[PERS_TEAM as usize] == TEAM_RED {
-                        if item.giTag == PW_BLUEFLAG
-                            || (item.giTag == PW_REDFLAG && (*ent).modelindex2 != 0)
-                            || (item.giTag == PW_REDFLAG && (*ps).powerups[PW_BLUEFLAG as usize] != 0)
-                        {
-                            return qtrue;
-                        }
-                    } else if (*ps).persistant[PERS_TEAM as usize] == TEAM_BLUE {
-                        if item.giTag == PW_REDFLAG
-                            || (item.giTag == PW_BLUEFLAG && (*ent).modelindex2 != 0)
-                            || (item.giTag == PW_BLUEFLAG && (*ps).powerups[PW_REDFLAG as usize] != 0)
-                        {
-                            return qtrue;
-                        }
-                    }
-                }
-                qfalse
-            } else if item.giType == IT_HOLDABLE {
-                if (*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << item.giTag) != 0 {
-                    return qfalse;
-                }
-                qtrue
-            } else if item.giType == IT_BAD {
-                panic!("BG_CanItemBeGrabbed: IT_BAD");
-            } else {
-                qfalse
-            }
-    }
+    todo!("Port BG_CanItemBeGrabbed — parked: unported-global (bg_itemlist/ammoData/weaponData)")
 }
 
 // PORT-ESCALATION(vec3-outparam-seam): Raven's `result` is a `vec3_t` (float*)
@@ -1310,28 +1109,28 @@ pub fn BG_PlayerStateToEntityState(
     snap: qboolean,
 ) {
     unsafe {
-        if (*ps).pm_type == PM_INTERMISSION || (*ps).pm_type == PM_SPECTATOR {
-            (*s).eType = ET_INVISIBLE;
+        if (*ps).pm_type == PM_INTERMISSION as c_int || (*ps).pm_type == PM_SPECTATOR as c_int {
+            (*s).eType = ET_INVISIBLE as c_int;
         } else if (*ps).stats[statIndex_t::STAT_HEALTH as usize] <= GIB_HEALTH {
-            (*s).eType = ET_INVISIBLE;
+            (*s).eType = ET_INVISIBLE as c_int;
         } else {
-            (*s).eType = ET_PLAYER;
+            (*s).eType = ET_PLAYER as c_int;
         }
 
         (*s).number = (*ps).clientNum;
 
-        (*s).pos.tr_type = trType_t::TR_INTERPOLATE;
-        (*s).pos.tr_base = (*ps).origin;
+        (*s).pos.trType = trType_t::TR_INTERPOLATE;
+        (*s).pos.trBase = (*ps).origin;
         if snap != 0 {
-            snap_vector(&mut (*s).pos.tr_base);
+            snap_vector(&mut (*s).pos.trBase);
         }
         // set the trDelta for flag direction
-        (*s).pos.tr_delta = (*ps).velocity;
+        (*s).pos.trDelta = (*ps).velocity;
 
-        (*s).apos.tr_type = trType_t::TR_INTERPOLATE;
-        (*s).apos.tr_base = (*ps).viewangles;
+        (*s).apos.trType = trType_t::TR_INTERPOLATE;
+        (*s).apos.trBase = (*ps).viewangles;
         if snap != 0 {
-            snap_vector(&mut (*s).apos.tr_base);
+            snap_vector(&mut (*s).apos.trBase);
         }
 
         (*s).trickedentindex = (*ps).fd.forceMindtrickTargetIndex;
@@ -1449,32 +1248,32 @@ pub fn BG_PlayerStateToEntityStateExtraPolate(
     snap: qboolean,
 ) {
     unsafe {
-        if (*ps).pm_type == PM_INTERMISSION || (*ps).pm_type == PM_SPECTATOR {
-            (*s).eType = ET_INVISIBLE;
+        if (*ps).pm_type == PM_INTERMISSION as c_int || (*ps).pm_type == PM_SPECTATOR as c_int {
+            (*s).eType = ET_INVISIBLE as c_int;
         } else if (*ps).stats[statIndex_t::STAT_HEALTH as usize] <= GIB_HEALTH {
-            (*s).eType = ET_INVISIBLE;
+            (*s).eType = ET_INVISIBLE as c_int;
         } else {
-            (*s).eType = ET_PLAYER;
+            (*s).eType = ET_PLAYER as c_int;
         }
 
         (*s).number = (*ps).clientNum;
 
-        (*s).pos.tr_type = trType_t::TR_LINEAR_STOP;
-        (*s).pos.tr_base = (*ps).origin;
+        (*s).pos.trType = trType_t::TR_LINEAR_STOP;
+        (*s).pos.trBase = (*ps).origin;
         if snap != 0 {
-            snap_vector(&mut (*s).pos.tr_base);
+            snap_vector(&mut (*s).pos.trBase);
         }
         // set the trDelta for flag direction and linear prediction
-        (*s).pos.tr_delta = (*ps).velocity;
+        (*s).pos.trDelta = (*ps).velocity;
         // set the time for linear prediction
-        (*s).pos.tr_time = time;
+        (*s).pos.trTime = time;
         // set maximum extra polation time (1000 / sv_fps, default sv_fps = 20)
-        (*s).pos.tr_duration = 50;
+        (*s).pos.trDuration = 50;
 
-        (*s).apos.tr_type = trType_t::TR_INTERPOLATE;
-        (*s).apos.tr_base = (*ps).viewangles;
+        (*s).apos.trType = trType_t::TR_INTERPOLATE;
+        (*s).apos.trBase = (*ps).viewangles;
         if snap != 0 {
-            snap_vector(&mut (*s).apos.tr_base);
+            snap_vector(&mut (*s).apos.trBase);
         }
 
         (*s).trickedentindex = (*ps).fd.forceMindtrickTargetIndex;

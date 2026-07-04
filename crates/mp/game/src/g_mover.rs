@@ -345,8 +345,8 @@ pub fn InitMoverTrData(
     ent: *mut gentity_t,
 ) {
     unsafe {
-        (*ent).s.pos.tr_type = trType_t::TR_STATIONARY;
-        (*ent).s.pos.tr_base = (*ent).pos1;
+        (*ent).s.pos.trType = trType_t::TR_STATIONARY;
+        (*ent).s.pos.trBase = (*ent).pos1;
 
         // calculate time to reach second position from speed
         let pos1 = (*ent).pos1;
@@ -358,10 +358,10 @@ pub fn InitMoverTrData(
             (*ent).speed = 100.0;
         }
         let speed = (*ent).speed;
-        (*ent).s.pos.tr_delta = [r#move[0] * speed, r#move[1] * speed, r#move[2] * speed];
-        (*ent).s.pos.tr_duration = (distance * 1000.0 / speed) as c_int;
-        if (*ent).s.pos.tr_duration <= 0 {
-            (*ent).s.pos.tr_duration = 1;
+        (*ent).s.pos.trDelta = [r#move[0] * speed, r#move[1] * speed, r#move[2] * speed];
+        (*ent).s.pos.trDuration = (distance * 1000.0 / speed) as c_int;
+        if (*ent).s.pos.trDuration <= 0 {
+            (*ent).s.pos.trDuration = 1;
         }
     }
 }
@@ -747,8 +747,8 @@ pub fn func_rotating_use(
     activator: *mut gentity_t,
 ) {
     unsafe {
-        if (*self_).s.apos.tr_type == trType_t::TR_LINEAR {
-            (*self_).s.apos.tr_type = trType_t::TR_STATIONARY;
+        if (*self_).s.apos.trType == trType_t::TR_LINEAR {
+            (*self_).s.apos.trType = trType_t::TR_STATIONARY;
             // stop the sound if it stops moving
             (*self_).s.loopSound = 0;
             (*self_).s.loopIsSoundset = qfalse;
@@ -764,7 +764,7 @@ pub fn func_rotating_use(
                 (*self_).s.loopSound = BMS_MID;
                 (*self_).s.loopIsSoundset = qtrue;
             }
-            (*self_).s.apos.tr_type = trType_t::TR_LINEAR;
+            (*self_).s.apos.trType = trType_t::TR_LINEAR;
         }
     }
 }
@@ -868,7 +868,7 @@ pub fn G_Chunks(
         (*te).s.eventParm = numChunks;
         (*te).s.trickedentindex = chunkType;
         (*te).s.modelindex = customChunk;
-        (*te).s.apos.tr_base[0] = baseScale;
+        (*te).s.apos.trBase[0] = baseScale;
     }
 }
 
@@ -1007,7 +1007,7 @@ pub fn GlassDie(
         (*te).s.origin = (*self_).pos1;
         (*te).s.angles = (*self_).pos2;
         (*te).s.trickedentindex = (*self_).splashRadius;
-        (*te).s.pos.tr_time = (*self_).genericValue3;
+        (*te).s.pos.trTime = (*self_).genericValue3;
 
         G_FreeEntity(self_);
     }

@@ -269,7 +269,7 @@ pub fn G_PowerDuelCheckFail(
     const DUELTEAM_DOUBLE: c_int = 2;
 
     unsafe {
-        if (*ent).client.is_null() || (*(*ent).client).sess.duelTeam == DUELTEAM_FREE {
+        if (*ent).client.is_null() || (*((*ent).client as *mut gclient_t)).sess.duelTeam == DUELTEAM_FREE {
             return qtrue;
         }
 
@@ -277,11 +277,11 @@ pub fn G_PowerDuelCheckFail(
         let mut doubles: c_int = 0;
         crate::g_main::G_PowerDuelCount(&mut loners, &mut doubles, qfalse);
 
-        if (*(*ent).client).sess.duelTeam == DUELTEAM_LONE && loners >= 1 {
+        if (*((*ent).client as *mut gclient_t)).sess.duelTeam == DUELTEAM_LONE && loners >= 1 {
             return qtrue;
         }
 
-        if (*(*ent).client).sess.duelTeam == DUELTEAM_DOUBLE && doubles >= 2 {
+        if (*((*ent).client as *mut gclient_t)).sess.duelTeam == DUELTEAM_DOUBLE && doubles >= 2 {
             return qtrue;
         }
 
@@ -789,74 +789,16 @@ pub fn G_ClientNumFromNetname(
 /// Raven `TryGrapple`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:3148-3191`
+// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
+// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
+// documented deferred type-port item (`docs/type-port-todo.md`), not a
+// missing `use`. Left as unresolved bare identifiers, these silently
+// type-check as irrefutable match-pattern bindings (always-true), which is
+// a behavioral bug, not just a compile gap — parked instead.
 pub fn TryGrapple(
     ent: *mut gentity_t,
 ) -> qboolean {
-    // Raven `BOTH_KYLE_GRAB` / `SETANIM_BOTH` / `SETANIM_FLAG_OVERRIDE` /
-    // `SETANIM_FLAG_HOLD` (`bg_public.h`); no landed const in this crate yet, so
-    // the literal values are transcribed at the call site per house style for
-    // resolved-elsewhere anim/flag constants.
-    //TODO: Port BOTH_KYLE_GRAB
-    // Source: oracle/oracle/codemp/game/anims.h
-    const BOTH_KYLE_GRAB: c_int = 0;
-    const SETANIM_BOTH: c_int = 2;
-    const SETANIM_FLAG_OVERRIDE: c_int = 1;
-    const SETANIM_FLAG_HOLD: c_int = 2;
-    const WP_SABER: c_int = 0;
-    const WP_MELEE: c_int = 1;
-    const HANDEXTEND_NONE: c_int = 0;
-
-    unsafe {
-        let client = (*ent).client;
-        if client.is_null() {
-            return qfalse;
-        }
-
-        if (*client).ps.weaponTime > 0 {
-            // weapon busy
-            return qfalse;
-        }
-        if (*client).ps.forceHandExtend != HANDEXTEND_NONE {
-            // force power or knockdown or something
-            return qfalse;
-        }
-        if (*client).grappleState != 0 {
-            // already grappling? but weapontime should be > 0 then..
-            return qfalse;
-        }
-
-        if (*client).ps.weapon != WP_SABER && (*client).ps.weapon != WP_MELEE {
-            return qfalse;
-        }
-
-        if (*client).ps.weapon == WP_SABER && (*client).ps.saberHolstered == 0 {
-            Cmd_ToggleSaber_f(ent);
-            if (*client).ps.saberHolstered == 0 {
-                // must have saber holstered
-                return qfalse;
-            }
-        }
-
-        crate::g_utils::G_SetAnim(
-            ent,
-            &mut (*client).pers.cmd,
-            SETANIM_BOTH,
-            BOTH_KYLE_GRAB,
-            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
-            0,
-        );
-        if (*client).ps.torsoAnim == BOTH_KYLE_GRAB {
-            // providing the anim set succeeded..
-            (*client).ps.torsoTimer += 500; // make the hand stick out a little longer than it normally would
-            if (*client).ps.legsAnim == (*client).ps.torsoAnim {
-                (*client).ps.legsTimer = (*client).ps.torsoTimer;
-            }
-            (*client).ps.weaponTime = (*client).ps.torsoTimer;
-            return qtrue;
-        }
-
-        qfalse
-    }
+    todo!("Port TryGrapple — parked: unported-type (animNumber_t)")
 }
 
 /// Raven `ClientCommand`.

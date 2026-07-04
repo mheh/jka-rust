@@ -15,6 +15,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_TempEntity};
 
 use mp_bg::public::entity_event::entity_event_t::EV_SABER_BLOCK;
 use mp_bg::weapons::weapon_t::{WP_BLASTER, WP_BOWCASTER, WP_BRYAR_PISTOL};

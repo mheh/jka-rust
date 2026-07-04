@@ -20,3 +20,12 @@ pub const MAX_GENTITIES: usize = 1024;
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.h:380`
 pub const MAX_STRING_CHARS: usize = 1024;
+
+use core::ffi::c_int;
+
+/// Raven `ENTITYNUM_NONE`/`ENTITYNUM_WORLD`/`ENTITYNUM_MAX_NORMAL`.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:2014-2016`
+pub const ENTITYNUM_NONE: c_int = MAX_GENTITIES as c_int - 1;
+pub const ENTITYNUM_WORLD: c_int = MAX_GENTITIES as c_int - 2;
+pub const ENTITYNUM_MAX_NORMAL: c_int = MAX_GENTITIES as c_int - 2;

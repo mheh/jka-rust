@@ -279,11 +279,11 @@ pub fn NPC_Jedi_RateNewEnemy(
 
     unsafe {
         match (*enemy).s.weapon {
-            w if w == weapon_t::WP_SABER as c_int => {
+            w if w == WP_SABER as c_int => {
                 healthAggression = (*self_).health as f32 / 200.0 * 6.0;
                 weaponAggression = 7.0; //go after him
             }
-            w if w == weapon_t::WP_BLASTER as c_int => {
+            w if w == WP_BLASTER as c_int => {
                 // DistanceSquared( self->r.currentOrigin, enemy->r.currentOrigin )
                 let s = (*self_).r.currentOrigin;
                 let e = (*enemy).r.currentOrigin;
@@ -307,9 +307,9 @@ pub fn NPC_Jedi_RateNewEnemy(
         }
         //Average these with current aggression
         newAggression =
-            ((healthAggression + weaponAggression + (*(*self_).NPC).stats.aggression as f32) / 3.0)
+            ((healthAggression + weaponAggression + (*((*self_).NPC as *mut gNPC_t)).stats.aggression as f32) / 3.0)
                 .ceil() as c_int;
-        Jedi_Aggression(self_, newAggression - (*(*self_).NPC).stats.aggression);
+        Jedi_Aggression(self_, newAggression - (*((*self_).NPC as *mut gNPC_t)).stats.aggression);
 
         //don't taunt right away
         crate::g_timer::TIMER_Set(self_, c"chatter".as_ptr(), crate::q_math::Q_irand(4000, 7000));
