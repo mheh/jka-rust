@@ -35,7 +35,7 @@ const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 use crate::NPC_AI_Jedi::Jedi_Decloak;
 use crate::ai_main::{InFieldOfVision, OrgVisible};
-use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri};
+use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri, BG_LegalizedForcePowers};
 use crate::bg_panimate::{BG_InReboundHold, BG_InReboundJump, BG_FullBodyTauntAnim, BG_SaberInSpecial};
 use crate::bg_pmove::BG_InKnockDown;
 use crate::bg_saber::BG_ForcePowerDrain;
@@ -230,11 +230,15 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         let mut userinfo: [c_char; 1024] = [0; 1024];
-        let mut forcePowers: String;
+        // Raven `char forcePowers[256]` — an IN/OUT C buffer: `BG_LegalizedForcePowers`
+        // legalizes it in place below, and the parse loop that follows reads the
+        // legalized contents back out of this same buffer, not a stale copy.
+        // Source: `oracle/oracle/codemp/game/w_force.c:155` (`char forcePowers[256];`)
+        let mut forcePowers: [c_char; 256] = [0; 256];
 
         if (*ent).s.eType == ET_NPC as c_int && (*ent).s.number >= MAX_CLIENTS as c_int {
             //rwwFIXMEFIXME: Temp
-            forcePowers = "forcepowers\\7-1-333003000313003120".to_string();
+            write_cstr_field(&mut forcePowers, "forcepowers\\7-1-333003000313003120");
         } else {
             trap::GetUserinfo(
                 ctx.engine,
@@ -247,7 +251,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
             let userinfo_str = cstr_to_str(userinfo.as_ptr());
             let key = cstr("forcepowers");
             let val = Info_ValueForKey(cstr(&userinfo_str).as_ptr(), key.as_ptr());
-            forcePowers = cstr_to_str(val);
+            write_cstr_field(&mut forcePowers, &cstr_to_str(val));
         }
 
         // PORT-NOTE(bot-forcepowers): `(*ent).r.svFlags & SVF_BOT` + `botstates`
@@ -256,24 +260,29 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // branch is transcribed against the faithful indexing shape below.
         if (*ent).r.svFlags & SVF_BOT != 0 && !botstates[(*ent).s.number as usize].is_null() {
             //if it's a bot just copy the info directly from its personality
-            forcePowers = cstr_to_str((*botstates[(*ent).s.number as usize]).forceinfo.as_ptr());
+            let bot_forceinfo = cstr_to_str((*botstates[(*ent).s.number as usize]).forceinfo.as_ptr());
+            write_cstr_field(&mut forcePowers, &bot_forceinfo);
         }
 
         //rww - parse through the string manually and eat out all the appropriate data
-        let fp_bytes = forcePowers.as_bytes().to_vec();
         let mut i: usize = 0;
 
         if (*ctx.world).cvars.g_forceBasedTeams.integer != 0 {
             if (*cl).sess.sessionTeam == TEAM_RED {
-                warnClient = (BG_LegalizedForcePowers_stub(ctx, &forcePowers, maxRank, HasSetSaberOnly(ctx), FORCE_DARKSIDE as c_int, gametype, (*ctx.world).cvars.g_forcePowerDisable.integer) == 0) as qboolean;
+                warnClient = (BG_LegalizedForcePowers(forcePowers.as_mut_ptr(), maxRank, HasSetSaberOnly(ctx), FORCE_DARKSIDE as c_int, gametype, (*ctx.world).cvars.g_forcePowerDisable.integer) == 0) as qboolean;
             } else if (*cl).sess.sessionTeam == TEAM_BLUE {
-                warnClient = (BG_LegalizedForcePowers_stub(ctx, &forcePowers, maxRank, HasSetSaberOnly(ctx), FORCE_LIGHTSIDE as c_int, gametype, (*ctx.world).cvars.g_forcePowerDisable.integer) == 0) as qboolean;
+                warnClient = (BG_LegalizedForcePowers(forcePowers.as_mut_ptr(), maxRank, HasSetSaberOnly(ctx), FORCE_LIGHTSIDE as c_int, gametype, (*ctx.world).cvars.g_forcePowerDisable.integer) == 0) as qboolean;
             } else {
-                warnClient = (BG_LegalizedForcePowers_stub(ctx, &forcePowers, maxRank, HasSetSaberOnly(ctx), 0, gametype, (*ctx.world).cvars.g_forcePowerDisable.integer) == 0) as qboolean;
+                warnClient = (BG_LegalizedForcePowers(forcePowers.as_mut_ptr(), maxRank, HasSetSaberOnly(ctx), 0, gametype, (*ctx.world).cvars.g_forcePowerDisable.integer) == 0) as qboolean;
             }
         } else {
-            warnClient = (BG_LegalizedForcePowers_stub(ctx, &forcePowers, maxRank, HasSetSaberOnly(ctx), 0, gametype, (*ctx.world).cvars.g_forcePowerDisable.integer) == 0) as qboolean;
+            warnClient = (BG_LegalizedForcePowers(forcePowers.as_mut_ptr(), maxRank, HasSetSaberOnly(ctx), 0, gametype, (*ctx.world).cvars.g_forcePowerDisable.integer) == 0) as qboolean;
         }
+
+        // Read the buffer back out post-legalize (Raven re-reads `forcePowers[i]`
+        // in the parse loop below — the same array `BG_LegalizedForcePowers` just
+        // wrote into), not the pre-call string.
+        let fp_bytes = cstr_to_str(forcePowers.as_ptr()).into_bytes();
 
         let mut i_r: usize;
         let mut readBuf: [u8; 256] = [0; 256];
@@ -475,33 +484,6 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
         (*cl).ps.fd.forceUsingAdded = 0;
     }
-}
-
-/// Local helper transcribing the `BG_LegalizedForcePowers(char*, ...)` call for
-/// `WP_InitForcePowers` — the resolved cross-file signature takes a raw
-/// `*mut c_char`, but this porter builds the intermediate string in a Rust
-/// `String`; bridge with a scratch `CString` so the call site matches the
-/// packet-resolved `PmoveContext` method signature.
-///
-/// PORT-NOTE(bg-legalize-bridge): `BG_LegalizedForcePowers` is a
-/// `PmoveContext` method (`self.BG_LegalizedForcePowers(...)`) per the
-/// resolved call surface; `ctx: GameContext` does not carry a `PmoveContext`
-/// here (this fn runs outside a Pmove call), so there is no `self.bg` to call
-/// through. Transcribed as a direct call through the not-yet-resolved bridge
-/// below pending the real seam.
-fn BG_LegalizedForcePowers_stub(
-    ctx: GameContext<'_>,
-    forcePowers: &str,
-    maxRank: c_int,
-    freeSaber: qboolean,
-    teamForce: c_int,
-    gametype: c_int,
-    fpDisabled: c_int,
-) -> qboolean {
-    // MISSING-SYMBOL: no `PmoveContext` is available at this call site to
-    // reach the ported `BG_LegalizedForcePowers` method; faithful transcription
-    // deferred to integration once the bridge is resolved.
-    qtrue
 }
 
 /// Raven `WP_SpawnInitForcePowers` — reset per-spawn force state.
