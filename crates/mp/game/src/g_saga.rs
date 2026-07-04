@@ -271,7 +271,7 @@ pub fn AddSiegeWinningTeamPoints(
     todo!("Port AddSiegeWinningTeamPoints — parked: unported-const (SIEGE_POINTS_TEAMWONROUND/SIEGE_POINTS_FINALOBJECTIVECOMPLETED)")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): memsets the file-scope
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): memsets the file-scope
 // `g_siegePersistant` global and calls `trap_SiegePersSet` — both need the
 // GameWorld/engine handle.
 /// Raven `SiegeClearSwitchData`.

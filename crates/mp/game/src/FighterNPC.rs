@@ -58,7 +58,7 @@ pub fn Eject(
 ) -> qboolean {
     unsafe {
         // Delegate to base vehicle's Eject method through vehicleInfo vtable
-        // PORT-ESCALATION(vtable-dispatch): Need resolved vehicleInfo_t.Eject function ptr signature
+        // PORT-NOTE(vtable-dispatch): Need resolved vehicleInfo_t.Eject function ptr signature
         qfalse  // parked: can't call base Eject without vtable resolution
     }
 }

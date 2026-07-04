@@ -9,7 +9,7 @@
 //! signatures (no `GameWorld`/engine handle) and are parked; likewise
 //! functions whose vec3 out-param helpers (`AngleVectors`/`vectoangles`)
 //! resolve to by-value `vec3_t` signatures that cannot express the C
-//! out-param mutation. See PORT-ESCALATION markers.
+//! out-param mutation. See PORT-NOTE markers.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -141,7 +141,7 @@ pub const FRAMETIME: c_int = 100;
 pub const TURRET_DEATH_DELAY: c_int = 2000;
 pub const TURRET_LIFETIME: c_int = 60000;
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_adaptRespawn`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_adaptRespawn`
 // (cvar) and `level.numPlayingClients` — no world handle on the staged
 // raw-pointer signature.
 /// Raven `adjustRespawnTime`.
@@ -196,7 +196,7 @@ pub fn adjustRespawnTime(
     respawnTime as c_int
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` and
 // the file-static `shieldDeactivateSound` — no world handle.
 /// Raven `ShieldRemove`.
 ///
@@ -216,7 +216,7 @@ pub fn ShieldRemove(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype` and
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` and
 // `level.time` — no world handle.
 /// Raven `ShieldThink`.
 ///
@@ -244,7 +244,7 @@ pub fn ShieldThink(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the file-static
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the file-static
 // `shieldDamageSound` — no world handle.
 /// Raven `ShieldDie`.
 ///
@@ -265,7 +265,7 @@ pub fn ShieldDie(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` and
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` and
 // the file-static `shieldDamageSound` — no world handle.
 /// Raven `ShieldPain`.
 ///
@@ -288,7 +288,7 @@ pub fn ShieldPain(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`/
 // `trap_Trace` (need `&Engine`) and reads `level`/sound statics — no world
 // or engine handle on the staged raw-pointer signature.
 /// Raven `ShieldGoSolid`.
@@ -343,7 +343,7 @@ pub fn ShieldGoSolid(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
 // and reads `level.time`/`shieldDeactivateSound` — no world/engine handle.
 /// Raven `ShieldGoNotSolid`.
 ///
@@ -369,7 +369,7 @@ pub fn ShieldGoNotSolid(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
 // world handle.
 /// Raven `ShieldTouch`.
 ///
@@ -398,7 +398,7 @@ pub fn ShieldTouch(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`/
 // `trap_Trace`, reads `g_gametype`/`level`/sound statics, and holds the
 // `shieldID` fn-scope static (ruling 5) — no world/engine handle to host it.
 /// Raven `CreateShield`.
@@ -552,7 +552,7 @@ pub fn CreateShield(
     }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): resolved `AngleVectors(angles,
+// PORT-NOTE(vec3-outparam-seam): resolved `AngleVectors(angles,
 // forward, right, up)` takes each `vec3_t` by value, so the out-params it
 // must write cannot be received; also calls `trap_LinkEntity`/`trap_Trace`
 // and reads `g_gametype`/`level`, none reachable from this signature.
@@ -672,7 +672,7 @@ pub fn PlaceShield(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
 // world handle.
 /// Raven `ItemUse_Binoculars`.
 ///
@@ -724,7 +724,7 @@ pub fn SentryTouch(
     return;
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): indexes `g_entities` —
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): indexes `g_entities` —
 // no world handle.
 /// Raven `pas_fire`.
 ///
@@ -754,7 +754,7 @@ pub fn pas_fire(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_InPVS`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_InPVS`/
 // `trap_Trace` and reads `level` — no world/engine handle.
 /// Raven `pas_find_enemies`.
 ///
@@ -850,7 +850,7 @@ pub fn pas_find_enemies(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_Trace` and
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Trace` and
 // reads `level` — no world/engine handle.
 /// Raven `pas_adjust_enemy`.
 ///
@@ -904,7 +904,7 @@ pub fn pas_adjust_enemy(
     }
 }
 
-// PORT-ESCALATION(missing-const): calls `turret_die(self, self, self, 1000,
+// PORT-NOTE(missing-const): calls `turret_die(self, self, self, 1000,
 // MOD_UNKNOWN)` — `MOD_UNKNOWN` (meansOfDeath_t) is not yet ported anywhere
 // in the crate graph and its value is not in the packet.
 /// Raven `sentryExpire`.
@@ -917,7 +917,7 @@ pub fn sentryExpire(
     turret_die(ctx, self_, self_, self_, 1000, MOD_UNKNOWN as c_int);
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
 // `trap_EntitiesInBox` and reads `g_entities`/`level` — no world/engine
 // handle.
 /// Raven `pas_think`.
@@ -1124,7 +1124,7 @@ pub fn pas_think(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): writes `g_entities` —
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): writes `g_entities` —
 // no world handle.
 /// Raven `turret_die`.
 ///
@@ -1170,7 +1170,7 @@ pub fn turret_die(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
 // world handle.
 /// Raven `SP_PAS`.
 ///
@@ -1214,7 +1214,7 @@ pub fn SP_PAS(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
 // and reads `g_gametype`/`level` — no world/engine handle.
 /// Raven `ItemUse_Sentry`.
 ///
@@ -1297,7 +1297,7 @@ pub fn ItemUse_Sentry(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads
 // `d_siegeSeekerNPC`/`g_gametype`/`level` — no world handle.
 /// Raven `ItemUse_Seeker`.
 ///
@@ -1399,7 +1399,7 @@ pub fn Jetpack_Off(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
 // world handle.
 /// Raven `Jetpack_On`.
 ///
@@ -1432,7 +1432,7 @@ pub fn Jetpack_On(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
 // world handle.
 /// Raven `ItemUse_Jetpack`.
 ///
@@ -1475,7 +1475,7 @@ pub fn ItemUse_Jetpack(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
 // world handle.
 /// Raven `ItemUse_UseCloak`.
 ///
@@ -1520,7 +1520,7 @@ pub fn ItemUse_UseCloak(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
 // world handle.
 /// Raven `SpecialItemThink`.
 ///
@@ -1546,12 +1546,12 @@ pub fn SpecialItemThink(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
 // `level` — no world handle.
 /// Raven `G_SpecialSpawnItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1295-1331`
-// PORT-ESCALATION(unported-global): `item - bg_itemlist` needs the
+// PORT-NOTE(unported-global): `item - bg_itemlist` needs the
 // bg-owned `bg_itemlist` table (not ported anywhere in the crate graph —
 // even `BG_FindItem`/`BG_FindItemForWeapon` etc. are themselves parked on
 // it; see `bg_misc.rs`). Not decidable from this packet.
@@ -1603,7 +1603,7 @@ pub fn G_SpecialSpawnItem(
     }
 }
 
-// PORT-ESCALATION(missing-const): `TOSSED_ITEM_STAY_PERIOD`/
+// PORT-NOTE(missing-const): `TOSSED_ITEM_STAY_PERIOD`/
 // `TOSSED_ITEM_OWNER_NOTOUCH_DUR` (`g_items.c` #defines) are not in this
 // packet's cited source slice/call surface — referenced above by name,
 // undefined here; reported as missing symbols rather than guessed.
@@ -1625,7 +1625,7 @@ pub fn G_PrecacheDispensers(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): resolved `AngleVectors` takes
+// PORT-NOTE(vec3-outparam-seam): resolved `AngleVectors` takes
 // `vec3_t` by value, so its out-params cannot be received; also calls
 // `trap_LinkEntity` and reads `level` — no world/engine handle.
 /// Raven `ItemUse_UseDisp`.
@@ -1687,7 +1687,7 @@ pub fn ItemUse_UseDisp(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time` — no
 // world handle.
 /// Raven `EWebDisattach`.
 ///
@@ -1721,7 +1721,7 @@ pub fn EWebPrecache(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
 // `g_entities` — no world handle.
 /// Raven `EWebDie`.
 ///
@@ -1766,7 +1766,7 @@ pub fn EWebDie(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities` — no
 // world handle.
 /// Raven `EWebPain`.
 ///
@@ -1789,7 +1789,7 @@ pub fn EWebPain(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
 // `trap_G2API_SetBoneAngles` and reads `level.time` — no world/engine
 // handle.
 /// Raven `EWeb_SetBoneAngles`.
@@ -1889,7 +1889,7 @@ pub fn EWeb_SetBoneAngles(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
 // `trap_G2API_SetBoneAnim` and reads `level.time` — no world/engine handle.
 /// Raven `EWeb_SetBoneAnim`.
 ///
@@ -1937,7 +1937,7 @@ pub fn EWeb_SetBoneAnim(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
 // `trap_G2API_GetBoltMatrix` and reads `level.time` — no world/engine
 // handle.
 /// Raven `EWebFire`.
@@ -2008,7 +2008,7 @@ pub fn EWebFire(
     }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): resolved `vectoangles`/
+// PORT-NOTE(vec3-outparam-seam): resolved `vectoangles`/
 // `BG_GiveMeVectorFromMatrix` write out-param `vec3_t`s taken by value here;
 // also calls `trap_G2API_GetBoltMatrix`/`trap_Trace` and reads `level` — no
 // world/engine handle.
@@ -2156,7 +2156,7 @@ pub fn EWebUpdateBoneAngles(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `BG_EmplacedView`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `BG_EmplacedView`
 // / `trap_*` transitively via callees and reads `g_entities`/`level` — no
 // world/engine handle.
 /// Raven `EWebThink`.
@@ -2241,7 +2241,7 @@ pub fn EWebThink(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level`/
 // `vec3_origin`, calls `trap_G2API_AddBolt`/`trap_G2API_InitGhoul2Model`/
 // `trap_LinkEntity`/`trap_Trace` — no world/engine handle.
 /// Raven `EWeb_Create`.
@@ -2385,7 +2385,7 @@ pub fn EWeb_Create(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities`/
 // `level` — no world handle.
 /// Raven `ItemUse_UseEWeb`.
 ///
@@ -2432,7 +2432,7 @@ pub fn ItemUse_UseEWeb(
     }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): resolved `AngleVectors` takes
+// PORT-NOTE(vec3-outparam-seam): resolved `AngleVectors` takes
 // `vec3_t` by value; also calls `trap_Trace` and reads `g_gametype`/`level`
 // — no world/engine handle.
 /// Raven `Pickup_Powerup`.
@@ -2523,7 +2523,7 @@ pub fn Pickup_Powerup(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist` —
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist` —
 // no world handle.
 /// Raven `Pickup_Holdable`.
 ///
@@ -2548,10 +2548,10 @@ pub fn Pickup_Holdable(
     }
 }
 
-// PORT-ESCALATION(missing-const): `RESPAWN_HOLDABLE` (`g_items.c` #define) is
+// PORT-NOTE(missing-const): `RESPAWN_HOLDABLE` (`g_items.c` #define) is
 // not in this packet's cited source slice; referenced above, undefined here.
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the `ammoData`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `ammoData`
 // table — no world handle.
 /// Raven `Add_Ammo`.
 ///
@@ -2575,7 +2575,7 @@ pub fn Add_Ammo(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` — no
 // world handle.
 /// Raven `Pickup_Ammo`.
 ///
@@ -2622,7 +2622,7 @@ pub fn Pickup_Ammo(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
 // `g_weaponRespawn`/`weaponData` — no world handle.
 /// Raven `Pickup_Weapon`.
 ///
@@ -2674,7 +2674,7 @@ pub fn Pickup_Weapon(
     }
 }
 
-// PORT-ESCALATION(missing-const): `RESPAWN_TEAM_WEAPON` (`g_items.c` #define)
+// PORT-NOTE(missing-const): `RESPAWN_TEAM_WEAPON` (`g_items.c` #define)
 // is not in this packet's cited source slice; referenced above, undefined here.
 
 /// Raven `Pickup_Health`.
@@ -2746,7 +2746,7 @@ pub fn Pickup_Armor(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
 // (needs `&Engine`) and calls `G_Error`/`G_AddEvent`/`rand` — no world/
 // engine handle to host the trap.
 /// Raven `RespawnItem`.
@@ -2810,7 +2810,7 @@ pub fn RespawnItem(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities`/
 // `level` — no world handle.
 /// Raven `CheckItemCanBePickedUpByNPC`.
 ///
@@ -2847,7 +2847,7 @@ pub fn CheckItemCanBePickedUpByNPC(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
 // and reads `g_gametype`/`level`/`weaponData` — no world/engine handle.
 /// Raven `Touch_Item`.
 ///
@@ -3096,7 +3096,7 @@ pub fn Touch_Item(
     }
 }
 
-// PORT-ESCALATION(vec3-outparam-seam): resolved `vectoangles` writes an
+// PORT-NOTE(vec3-outparam-seam): resolved `vectoangles` writes an
 // out-param `vec3_t` taken by value; also calls `trap_LinkEntity` and reads
 // `bg_itemlist`/`g_gametype`/`level` — no world/engine handle.
 /// Raven `LaunchItem`.
@@ -3181,11 +3181,11 @@ pub fn LaunchItem(
     }
 }
 
-// PORT-ESCALATION(missing-const): `EF_DROPPEDWEAPON`/`FL_BOUNCE_HALF`
+// PORT-NOTE(missing-const): `EF_DROPPEDWEAPON`/`FL_BOUNCE_HALF`
 // (`bg_public.h`/`g_local.h` #defines) are not in this packet's cited source
 // slice; referenced above, undefined here.
 
-// PORT-ESCALATION(vec3-outparam-seam): resolved `AngleVectors` takes
+// PORT-NOTE(vec3-outparam-seam): resolved `AngleVectors` takes
 // `vec3_t` by value, so its `forward`/`right` out-params (used to compute
 // the drop velocity) cannot be received.
 /// Raven `Drop_Item`.
@@ -3225,7 +3225,7 @@ pub fn Use_Item(
     RespawnItem(ctx, ent);
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
 // / `trap_Trace` and reads `bg_itemlist`/`g_forcePowerDisable`/`g_gametype`
 // — no world/engine handle.
 /// Raven `FinishSpawningItem`.
@@ -3370,7 +3370,7 @@ pub fn FinishSpawningItem(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `bg_itemlist`/
 // `g_gametype`/`itemRegistered` — no world handle.
 /// Raven `G_CheckTeamItems`.
 ///
@@ -3398,7 +3398,7 @@ pub fn G_CheckTeamItems(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
 // `itemRegistered` (fork-1 cross-frame global) — no world handle to host
 // `itemRegistered`.
 /// Raven `ClearRegisteredItems`.
@@ -3421,7 +3421,7 @@ pub fn ClearRegisteredItems(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): writes the
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): writes the
 // `itemRegistered` fork-1 cross-frame global and reads `bg_itemlist` — no
 // world handle.
 /// Raven `RegisterItem`.
@@ -3443,7 +3443,7 @@ pub fn RegisterItem(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
 // `trap_SetConfigstring` and reads `bg_numItems`/`itemRegistered` — no
 // world/engine handle.
 /// Raven `SaveRegisteredItems`.
@@ -3472,7 +3472,7 @@ pub fn SaveRegisteredItems(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls
 // `trap_Cvar_VariableIntegerValue` (needs `&Engine`) — no engine handle.
 /// Raven `G_ItemDisabled`.
 ///
@@ -3488,7 +3488,7 @@ pub fn G_ItemDisabled(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads
 // `g_duelWeaponDisable`/`g_gametype`/`g_weaponDisable`/`level` — no world
 // handle.
 /// Raven `G_SpawnItem`.
@@ -3536,7 +3536,7 @@ pub fn G_SpawnItem(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_entities`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities`/
 // `level` — no world handle.
 /// Raven `G_BounceItem`.
 ///
@@ -3603,7 +3603,7 @@ pub fn G_BounceItem(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`
 // / `trap_PointContents` / `trap_Trace` and reads `level` — no world/engine
 // handle.
 /// Raven `G_RunItem`.

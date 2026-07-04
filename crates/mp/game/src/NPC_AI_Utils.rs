@@ -820,7 +820,7 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
             } else {
                 (*group).morale += (*npc).rank;
             }
-            // PORT-ESCALATION(unported-consts): the debug draw
+            // PORT-NOTE(unported-consts): the debug draw
             // `G_TestLine(ctx, ..., FRAMETIME)` needs `FRAMETIME`, not yet ported
             // anywhere in the crate graph (precedent: `g_nav.rs` parks the
             // same const). This is a debug-visualization side effect only —

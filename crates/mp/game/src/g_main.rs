@@ -497,7 +497,7 @@ pub fn AdjustTournamentScores(ctx: GameContext<'_>) {
     todo!("Port AdjustTournamentScores — parked (unported-dep: ClientUserinfoChanged, CS_CLIENT_DUELWINNER): oracle/oracle/codemp/game/g_main.c:1541")
 }
 
-// PORT-ESCALATION(qsort-fn-pointer-registration): the *body* below is fully
+// PORT-NOTE(qsort-fn-pointer-registration): the *body* below is fully
 // ported; the remaining open question is `CalculateRanks`' `qsort(...,
 // SortRanks)` registration itself — a bare C comparator callback, which the
 // fork-2 `EntThink`/… trait-table ruling doesn't cover (that's an

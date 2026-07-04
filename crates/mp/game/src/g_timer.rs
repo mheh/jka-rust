@@ -46,7 +46,7 @@ pub static mut g_timers: [*mut gtimer_t; MAX_GENTITIES as usize] =
     [core::ptr::null_mut(); MAX_GENTITIES as usize];
 pub static mut g_timerFreeList: *mut gtimer_t = core::ptr::null_mut();
 
-// PORT-ESCALATION(level-global-access): Timer functions need level.time from GameWorld but
+// PORT-NOTE(level-global-access): Timer functions need level.time from GameWorld but
 // have no GameWorld parameter. Temporarily using a global-scope reference passed from engine init.
 // This should be refactored to thread GameWorld through the ABI once the full architecture is designed.
 // For now, engine code will set this before game logic runs.

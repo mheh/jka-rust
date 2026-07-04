@@ -3099,7 +3099,7 @@ pub fn G_LetGoOfWall(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `ForceThrow`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:3054-3820`
-// PORT-ESCALATION(unported-global-and-vehicle-vtable): reads the un-ported
+// PORT-NOTE(unported-global-and-vehicle-vtable): reads the un-ported
 // `forcePowerNeeded` table (fork-5), calls the fork-7 vehicle vtable
 // (`vehEnt->m_pVehicle->m_pVehicleInfo->Eject`, not in the resolved call surface),
 // and uses `VectorCompare` (marked unresolved in the packet). Multiple genuinely
@@ -4016,7 +4016,7 @@ pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower
 /// Raven `DoGripAction`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:3948-4162`
-// PORT-ESCALATION(unported-global-table): reads `forcePowerNeeded[level][power]`
+// PORT-NOTE(unported-global-table): reads `forcePowerNeeded[level][power]`
 // (fork-5 const table not yet ported; values absent from packet). Parked like
 // the other `forcePowerNeeded` consumers.
 // MISSING-SYMBOL: `forcePowerNeeded`.
@@ -5170,7 +5170,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
 /// Raven `WP_ForcePowersUpdate`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:5094-5671`
-// PORT-ESCALATION(unported-global-table): the siege force-regen branch reads
+// PORT-NOTE(unported-global-table): the siege force-regen branch reads
 // `bgSiegeClasses[...].classflags` (fork-5 saga class data, not yet ported;
 // values absent from packet) and `forcePowerDarkLight` (currently a private
 // `const` in `bg_misc.rs`, not exported). Faithful port of those two branches is

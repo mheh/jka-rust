@@ -186,7 +186,7 @@ pub fn SP_misc_portal_surface(
     todo!("Port SP_misc_portal_surface — parked: raw-ptr-skeleton-no-world-handle")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`.
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`.
 /// Raven `SP_misc_portal_camera`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:375-385`
@@ -226,7 +226,7 @@ pub fn SP_terrain(
     todo!("Port SP_terrain — parked: raw-ptr-skeleton-no-world-handle")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): indexes `g_entities`,
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): indexes `g_entities`,
 // calls `trap_InPVS`/`trap_Trace`; also a fn-pointer write
 // (`think = G_FreeEntity`).
 /// Raven `G_PortalifyEntities`.
@@ -400,7 +400,7 @@ pub fn SP_shooter_blaster(
     InitShooter(ctx, ent, mp_bg::weapons::weapon_t::WP_BLASTER);
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `check_recharge`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1176-1206`
@@ -511,7 +511,7 @@ pub fn SP_misc_model_shield_power_converter(
 /// Raven `EnergyAmmoStationSettings`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1743-1746`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no
 // `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
 // how is state threaded in?
 pub fn EnergyAmmoStationSettings(
@@ -548,7 +548,7 @@ pub fn SP_misc_model_ammo_power_converter(
 /// Raven `EnergyHealthStationSettings`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1911-1914`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no
 // `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
 // how is state threaded in?
 pub fn EnergyHealthStationSettings(
@@ -558,7 +558,7 @@ pub fn EnergyHealthStationSettings(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `health_power_converter_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1921-1972`
@@ -700,7 +700,7 @@ pub fn Use_Target_Screenshake(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): faithful body has no
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): faithful body has no
 // trap/level dependency itself, but is a fn-pointer write
 // (`use_ = Use_Target_Screenshake`, ruling 2) the `gentity_t` field type
 // cannot yet express.
@@ -730,7 +730,7 @@ pub fn Use_Target_Escapetrig(
     todo!("Port Use_Target_Escapetrig — parked: unported-const (PMF_FOLLOW)")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `g_gametype`; also
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`; also
 // a fn-pointer write (`use_ = Use_Target_Escapetrig`).
 /// Raven `SP_target_escapetrig`.
 ///
@@ -799,7 +799,7 @@ pub fn maglock_link(
     todo!("Port maglock_link — parked: raw-ptr-skeleton-no-world-handle")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `faller_touch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2730-2756`
@@ -827,7 +827,7 @@ pub fn faller_touch(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`; also
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`; also
 // a fn-pointer write (`think = G_FreeEntity`).
 /// Raven `faller_think`.
 ///
@@ -876,7 +876,7 @@ pub fn misc_faller_create(
     todo!("Port misc_faller_create — parked: raw-ptr-skeleton-no-world-handle")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`.
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`.
 /// Raven `misc_faller_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2830-2834`
@@ -889,7 +889,7 @@ pub fn misc_faller_think(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`; also
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`; also
 // fn-pointer writes (`think = misc_faller_think`, `use_ = misc_faller_create`).
 /// Raven `SP_misc_faller`.
 ///
@@ -1041,7 +1041,7 @@ pub fn TAG_GetAngles(
     1
 }
 
-// PORT-ESCALATION(bg-dep): depends on `TAG_Find`/`tagOwner_t` (unported).
+// PORT-NOTE(bg-dep): depends on `TAG_Find`/`tagOwner_t` (unported).
 /// Raven `TAG_GetRadius`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3174-3185`
@@ -1056,7 +1056,7 @@ pub fn TAG_GetRadius(
     unsafe { (*tag).radius }
 }
 
-// PORT-ESCALATION(bg-dep): depends on `TAG_Find`/`tagOwner_t` (unported).
+// PORT-NOTE(bg-dep): depends on `TAG_Find`/`tagOwner_t` (unported).
 /// Raven `TAG_GetFlags`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3193-3204`
@@ -1112,7 +1112,7 @@ pub fn G_FreeClientForShooter(
     todo!("Port G_FreeClientForShooter — parked: raw-ptr-skeleton-no-world-handle")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level.time`; also
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.time`; also
 // a fn-pointer write (`think = misc_weapon_shooter_fire`).
 /// Raven `misc_weapon_shooter_fire`.
 ///

@@ -218,7 +218,7 @@ pub fn BotAI_GetEntityState(
     todo!("Port BotAI_GetEntityState — parked: unported-const")
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `BotAI_GetSnapshotEntity`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:388-400`

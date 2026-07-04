@@ -3,7 +3,7 @@
 //!
 //! Landed from the `fnskel.py` signature skeleton. One function is
 //! transcribed faithfully from packet + prelude alone; the remaining 15 are
-//! parked (see the `PORT-ESCALATION` topics below), because this file is
+//! parked (see the `PORT-NOTE` topics below), because this file is
 //! almost entirely ambient-state driven and the faithful context-free
 //! signatures have no channel to reach it, matching the precedent set in
 //! `NPC_AI_GalakMech.rs`/`NPC_AI_Jedi.rs`/`NPC_AI_Stormtrooper.rs`:
@@ -63,7 +63,7 @@ pub const LSTATE_FIRED4: c_int = 7;
 pub(crate) const MASK_SHOT: c_int = 0x00000001 | 0x00000100 | 0x00000200 | 0x00040000; // CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE|CONTENTS_TERRAIN
 pub(crate) const CONTENTS_LIGHTSABER: c_int = 0x00040000;
 
-// PORT-ESCALATION(ambient-state): needs `level.time` (via
+// PORT-NOTE(ambient-state): needs `level.time` (via
 // `trap_G2API_GetBoltMatrix`); no channel from this context-free faithful
 // signature.
 /// Raven `NPC_Mark1_Precache`.
@@ -98,7 +98,7 @@ pub fn NPC_Mark1_Precache(ctx: GameContext<'_>) {
     ));
 }
 
-// PORT-ESCALATION(ambient-state): reads `level.time` (via
+// PORT-NOTE(ambient-state): reads `level.time` (via
 // `trap_G2API_GetBoltMatrix`); no channel from this context-free faithful
 // signature.
 /// Raven `NPC_Mark1_Part_Explode`.
@@ -143,7 +143,7 @@ pub fn NPC_Mark1_Part_Explode(
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
+// PORT-NOTE(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
 // globals; no channel from this context-free faithful signature.
 /// Raven `Mark1_Idle`.
 ///
@@ -158,7 +158,7 @@ pub fn Mark1_Idle(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and
+// PORT-NOTE(ambient-state): reads the `NPC` ambient global and
 // `level.time` (via `trap_G2API_AddBolt`/`trap_G2API_GetBoltMatrix`); no
 // channel from this context-free faithful signature.
 /// Raven `Mark1Dead_FireRocket`.
@@ -227,7 +227,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and
+// PORT-NOTE(ambient-state): reads the `NPC` ambient global and
 // `level.time` (via `trap_G2API_AddBolt`/`trap_G2API_GetBoltMatrix`); no
 // channel from this context-free faithful signature.
 /// Raven `Mark1Dead_FireBlaster`.
@@ -284,7 +284,7 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(variadic-c-abi): the live body's only non-trivial call is
+// PORT-NOTE(variadic-c-abi): the live body's only non-trivial call is
 // `G_SoundIndex(va("...death%d.wav", Q_irand(1,2)))` — `va`'s packet-resolved
 // signature is the parked `fn va(format: *const c_char) -> *mut c_char`
 // stub with C varargs dropped (seam decision pending, see `q_shared.rs`), so
@@ -337,7 +337,7 @@ pub fn Mark1_die(
     }
 }
 
-// PORT-ESCALATION(client-cast): reads `self->client->ps.torsoTimer`; `client`
+// PORT-NOTE(client-cast): reads `self->client->ps.torsoTimer`; `client`
 // is untyped `*mut c_void` on `gentity_t` (unported field) with no resolved
 // accessor to `gclient_t` fields in this packet — casting it here would
 // invent a shape the packet doesn't sanction.
@@ -409,7 +409,7 @@ pub fn Mark1_dying(
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads the `gPainHitLoc` ambient global; no
+// PORT-NOTE(ambient-state): reads the `gPainHitLoc` ambient global; no
 // channel from this context-free faithful signature. Also stored as a fn
 // pointer (needs an EntXxx enum variant per ruling 2).
 /// Raven `NPC_Mark1_Pain`.
@@ -516,7 +516,7 @@ pub fn NPC_Mark1_Pain(
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and
+// PORT-NOTE(ambient-state): reads the `NPC` ambient global and
 // writes `NPCInfo`; no channel from this context-free faithful signature.
 /// Raven `Mark1_Hunt`.
 ///
@@ -541,7 +541,7 @@ pub fn Mark1_Hunt(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
+// PORT-NOTE(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
 // globals, `level.time`, and this file's own fn-scope statics
 // (`forward`/`vright`/`up`/`muzzle` — fork ruling 5: genuine cross-frame
 // state -> GameWorld field); no channel from this context-free faithful
@@ -630,7 +630,7 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
+// PORT-NOTE(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
 // globals; no channel from this context-free faithful signature.
 /// Raven `Mark1_BlasterAttack`.
 ///
@@ -686,7 +686,7 @@ pub fn Mark1_BlasterAttack(
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads the `NPC` ambient global, `level.time`,
+// PORT-NOTE(ambient-state): reads the `NPC` ambient global, `level.time`,
 // and this file's own fn-scope statics (`forward`/`vright`/`up` — fork
 // ruling 5); no channel from this context-free faithful signature.
 /// Raven `Mark1_FireRocket`.
@@ -760,7 +760,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads the `NPC` ambient global; no channel
+// PORT-NOTE(ambient-state): reads the `NPC` ambient global; no channel
 // from this context-free faithful signature.
 /// Raven `Mark1_RocketAttack`.
 ///
@@ -783,7 +783,7 @@ pub fn Mark1_RocketAttack(
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads/writes the `NPC` ambient global and
+// PORT-NOTE(ambient-state): reads/writes the `NPC` ambient global and
 // calls `trap_G2API_GetSurfaceRenderStatus` (needs `&Engine`); no channel
 // from this context-free faithful signature.
 /// Raven `Mark1_AttackDecision`.
@@ -859,7 +859,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and writes
+// PORT-NOTE(ambient-state): reads the `NPC` ambient global and writes
 // `ucmd`; no channel from this context-free faithful signature.
 /// Raven `Mark1_Patrol`.
 ///
@@ -889,7 +889,7 @@ pub fn Mark1_Patrol(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(ambient-state): reads the `NPC` ambient global and
+// PORT-NOTE(ambient-state): reads the `NPC` ambient global and
 // writes `NPCInfo`; no channel from this context-free faithful signature.
 /// Raven `NPC_BSMark1_Default`.
 ///

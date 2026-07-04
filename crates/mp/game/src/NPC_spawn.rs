@@ -1435,7 +1435,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
             Com_Printf(c"NPC_Kill Error: 'npc kill team' requires a team name!\n".as_ptr() as *const c_char);
             Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
             for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
-                // PORT-ESCALATION(unresolved): TeamNames array access
+                // PORT-NOTE(unresolved): TeamNames array access
                 // Com_Printf(c"%s\n".as_ptr() as *const c_char, TeamNames[n]);
             }
             Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
@@ -1451,7 +1451,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 Com_Printf(c"NPC_Kill Error: team '%s' not recognized\n".as_ptr() as *const c_char, name.as_ptr() as *const c_char);
                 Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
                 for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
-                    // PORT-ESCALATION(unresolved): TeamNames array access
+                    // PORT-NOTE(unresolved): TeamNames array access
                 }
                 Com_Printf(c"nonally - kills all but your teammates\n".as_ptr() as *const c_char);
                 return;
@@ -1477,7 +1477,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                     player.health = 0;
 
                     if !player.die.is_none() && !player.client.is_null() {
-                        // PORT-ESCALATION(fn-ptr): die function pointer call with MOD_UNKNOWN
+                        // PORT-NOTE(fn-ptr): die function pointer call with MOD_UNKNOWN
                         // player.die(player, player, player, unsafe { (*player.client).pers.maxHealth }, MOD_UNKNOWN);
                     }
                 }
@@ -1497,7 +1497,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                     Com_Printf(c"Killing NPC %s named %s\n".as_ptr() as *const c_char, player.NPC_type, player.targetname);
                     player.health = 0;
                     if !player.die.is_none() {
-                        // PORT-ESCALATION(fn-ptr): die function pointer call
+                        // PORT-NOTE(fn-ptr): die function pointer call
                     }
                 }
             } else if (!player.targetname.is_null()
@@ -1511,7 +1511,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                     (*player.client).ps.stats[4] = 0; // STAT_HEALTH
                 }
                 if !player.die.is_none() {
-                    // PORT-ESCALATION(fn-ptr): die function pointer call
+                    // PORT-NOTE(fn-ptr): die function pointer call
                 }
             }
         }

@@ -11,7 +11,7 @@
 //! Functions that touch this file's own file-static globals
 //! (`bgAllAnims`, `bgNumAllAnims`, `BGPAFtextLoaded`, `bgHumanoidAnimations`)
 //! with no world handle in the staged skeleton signature are parked with
-//! `PORT-ESCALATION(own-file-static-no-world-handle)`, matching the
+//! `PORT-NOTE(own-file-static-no-world-handle)`, matching the
 //! `pmove-working-state` / `raw-ptr-skeleton-no-world-handle` precedent
 //! already established in `bg_saber.rs` / `g_combat.rs` for the file-static
 //! `pmove_t *pm` and the bare `g_entities` global respectively.

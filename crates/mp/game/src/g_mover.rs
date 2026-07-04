@@ -589,7 +589,7 @@ pub fn G_MoverPush(
     }
 }
 
-// PORT-ESCALATION(bg-boundary): `BG_EvaluateTrajectory` (`bg_misc.rs`) is
+// PORT-NOTE(bg-boundary): `BG_EvaluateTrajectory` (`bg_misc.rs`) is
 // itself still parked (call surface: PARKED); called faithfully here and
 // will panic until that lands.
 /// Raven `G_MoverTeam`.
@@ -2018,7 +2018,7 @@ pub fn SP_func_train(
     }
 }
 
-// PORT-ESCALATION(unported-consts): `EF_SHADER_ANIM`/`SVF_BROADCAST`-adjacent
+// PORT-NOTE(unported-consts): `EF_SHADER_ANIM`/`SVF_BROADCAST`-adjacent
 // `EF2_HYPERSPACE` bit values (`q_shared.h`) are not type-ported anywhere in
 // the crate graph yet — the `model2scale`/`hyperspace` tail (g_mover.c:1988-
 // 2018) needs them; the rest of the spawn body is faithfully ported below it
@@ -2141,7 +2141,7 @@ pub fn func_rotating_use(
     }
 }
 
-// PORT-ESCALATION(unported-consts): the `IMPACT`/`RADAR` spawnflag branches
+// PORT-NOTE(unported-consts): the `IMPACT`/`RADAR` spawnflag branches
 // need `EF_RADAROBJECT`'s bit value (`bg_public.h`), not type-ported
 // anywhere in the crate graph yet; left as an explicit `//TODO: Port` no-op.
 /// Raven `SP_func_rotating`.
@@ -2539,7 +2539,7 @@ pub fn funcBBrushUse(
     }
 }
 
-// PORT-ESCALATION(unported-consts): the stone-chunk branch compares
+// PORT-NOTE(unported-consts): the stone-chunk branch compares
 // `material` against `MAT_DRK_STONE`/`MAT_LT_STONE`/`MAT_GREY_STONE`/
 // `MAT_SNOWY_ROCK` (`material_t`'s anonymous enum, `q_shared.h`) — not
 // type-ported anywhere in the crate graph yet (same blocker as
@@ -2742,7 +2742,7 @@ pub fn SP_func_breakable(
     }
 }
 
-// PORT-ESCALATION(unported-consts): the first branch (`SVF_GLASS_BRUSH`)
+// PORT-NOTE(unported-consts): the first branch (`SVF_GLASS_BRUSH`)
 // needs that bit value (`q_shared.h`), not type-ported anywhere in the
 // crate graph yet; skipped with an explicit `//TODO: Port` — the remaining
 // classname checks are faithfully ported.
@@ -2901,7 +2901,7 @@ pub fn GlassUse(
     }
 }
 
-// PORT-ESCALATION(unported-consts): `ent->r.svFlags = SVF_GLASS_BRUSH` needs
+// PORT-NOTE(unported-consts): `ent->r.svFlags = SVF_GLASS_BRUSH` needs
 // that bit value (`q_shared.h`), not type-ported anywhere in the crate graph
 // yet — the rest of the spawn body is faithfully ported below it.
 /// Raven `SP_func_glass`.
@@ -2979,7 +2979,7 @@ pub fn func_wait_return_solid(
     }
 }
 
-// PORT-ESCALATION(unported-consts): `self->r.svFlags |= SVF_PLAYER_USABLE`
+// PORT-NOTE(unported-consts): `self->r.svFlags |= SVF_PLAYER_USABLE`
 // needs that bit value (`q_shared.h`), not type-ported anywhere in the crate
 // graph yet.
 /// Raven `func_usable_think`.
@@ -3059,7 +3059,7 @@ pub fn func_usable_die(
     }
 }
 
-// PORT-ESCALATION(unported-consts): the `spawnflags & 1` branch and the
+// PORT-NOTE(unported-consts): the `spawnflags & 1` branch and the
 // `genericValue5 > 0` tail need `SVF_NOCLIENT`/`EF_NODRAW`/`EF_SHADER_ANIM`;
 // `SVF_NOCLIENT`/`EF_NODRAW` are available (reused above) but
 // `EF_SHADER_ANIM` is not type-ported anywhere in the crate graph yet —

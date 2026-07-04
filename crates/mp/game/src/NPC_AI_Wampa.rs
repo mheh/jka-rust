@@ -10,7 +10,7 @@
 //! `NPC_AI_Jedi.rs` — parked pending resolution of how NPC-frame state is
 //! threaded to these helpers (topic: `ai-context-threading`).
 //!
-//! PARKED (see PORT-ESCALATION markers): 10 functions. Only `NPC_Wampa_Precache`
+//! PARKED (see PORT-NOTE markers): 10 functions. Only `NPC_Wampa_Precache`
 //! is ported (accesses no implicit globals, only calls G_SoundIndex with a
 //! string literal).
 #![allow(non_snake_case, unused, clippy::all)]

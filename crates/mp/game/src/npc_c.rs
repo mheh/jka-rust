@@ -281,7 +281,7 @@ pub fn BodyRemovalPadTime(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the file-scope
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the file-scope
 // `NPC` global directly (function is `void` with zero params in the
 // oracle); no GameWorld/engine handle to reach it from.
 /// Raven `NPC_RemoveBodyEffect`.
@@ -304,7 +304,7 @@ pub fn NPC_RemoveBodyEffect(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): calls `trap_Trace`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Trace`/
 // `trap_LinkEntity`, which need an `&Engine` the fixed signature doesn't
 // carry.
 /// Raven `pitch_roll_for_slope`.
@@ -430,7 +430,7 @@ pub fn pitch_roll_for_slope(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
 // file-scope `NPC`/`NPCInfo` globals and `level`, calls
 // `trap_ICARUS_IsRunning`/`trap_PointContents`/`trap_Trace` — none
 // reachable from the zero-param signature.
@@ -595,7 +595,7 @@ pub fn DeadThink(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): writes the file-scope
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): writes the file-scope
 // `NPC`/`NPCInfo`/`client`/`ucmd` globals — the skeleton has no
 // GameWorld/engine handle through which to reach them.
 /// Raven `SetNPCGlobals`.
@@ -614,7 +614,7 @@ pub fn SetNPCGlobals(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): same file-scope
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): same file-scope
 // globals as `SetNPCGlobals`, plus the `_saved_*` shadow globals.
 /// Raven `SaveNPCGlobals`.
 ///
@@ -629,7 +629,7 @@ pub fn SaveNPCGlobals(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): see `SaveNPCGlobals`.
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): see `SaveNPCGlobals`.
 /// Raven `RestoreNPCGlobals`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:638-644`
@@ -643,7 +643,7 @@ pub fn RestoreNPCGlobals(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): see `SetNPCGlobals`.
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): see `SetNPCGlobals`.
 /// Raven `ClearNPCGlobals`.
 ///
 /// Raven: "We MUST do this, other funcs were using NPC illegally when
@@ -658,7 +658,7 @@ pub fn ClearNPCGlobals(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `showBBoxes`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `showBBoxes`/
 // `g_entities` globals and calls `trap_InPVS` (needs `&Engine`) — none
 // reachable from the zero-param signature.
 /// Raven `NPC_ShowDebugInfo`.
@@ -705,7 +705,7 @@ pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
 // `NPCInfo`/`level`/`ucmd` file-scope globals — none reachable from the
 // zero-param signature.
 /// Raven `NPC_ApplyScriptFlags`.
@@ -765,7 +765,7 @@ pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
 // `NPC`/`NPCInfo`/`d_patched`/`level` file-scope globals — none reachable
 // from the zero-param signature.
 /// Raven `NPC_HandleAIFlags`.
@@ -829,7 +829,7 @@ pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/NPC.c:835-838`
 pub fn NPC_AvoidWallsAndCliffs() {}
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the `NPC`/`ucmd`
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `NPC`/`ucmd`
 // file-scope globals and calls `G_ActivateBehavior(NPC, ...)` — `NPC`
 // itself isn't reachable from the zero-param signature.
 /// Raven `NPC_CheckAttackScript`.
@@ -847,7 +847,7 @@ pub fn NPC_CheckAttackScript(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
 // `NPC`/`NPCInfo`/`level`/`ucmd` file-scope globals — none reachable from
 // the zero-param signature.
 /// Raven `NPC_CheckAttackHold`.
@@ -888,7 +888,7 @@ pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
 // `client`/`ucmd` file-scope globals — none reachable from the zero-param
 // signature.
 /// Raven `NPC_KeepCurrentFacing`.
@@ -1263,7 +1263,7 @@ pub fn NPC_BehaviorSet_Rancor(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads the `NPC`/
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `NPC`/
 // `NPCInfo`/`level` file-scope globals and calls `trap_ICARUS_TaskIDPending`
 // (needs `&Engine`) — `NPC` itself is what drives the whole dispatch and
 // isn't reachable from the `(team, bState)` signature.
@@ -1434,7 +1434,7 @@ pub fn NPC_RunBehavior(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
 // `NPC`/`NPCInfo`/`client`/`ucmd`/`level` file-scope globals throughout —
 // none reachable from the fixed `(*mut gentity_t)` signature.
 /// Raven `NPC_ExecuteBState`.
@@ -1568,7 +1568,7 @@ pub fn NPC_ExecuteBState(
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
 // `NPC`/`NPCInfo` file-scope globals and calls `trap_Trace`/
 // `trap_LinkEntity` (need `&Engine`) — none reachable from the zero-param
 // signature.
@@ -1622,7 +1622,7 @@ pub fn G_DroidSounds(
     todo!("Port G_DroidSounds — parked: va-variadic-seam")
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads/writes the
+// PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the
 // `NPC`/`NPCInfo`/`ucmd`/`level`/`debugNPCFreeze`/`g_spskill`/`g_entities`
 // file-scope globals and calls `trap_ICARUS_MaintainTaskManager` (needs
 // `&Engine`) — none reachable from the fixed `(*mut gentity_t)` signature.

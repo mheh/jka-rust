@@ -611,7 +611,7 @@ pub fn G_UseTargets2(
 ///
 /// Thin wrapper: null-checks `ent` then forwards to `G_UseTargets2` with
 /// `ent->target` as the search string (itself parked pending a GameWorld
-/// handle — see its PORT-ESCALATION note).
+/// handle — see its PORT-NOTE note).
 /// Source: `oracle/oracle/codemp/game/g_utils.c:609-616`
 pub fn G_UseTargets(
     ctx: GameContext<'_>,
@@ -1694,7 +1694,7 @@ pub fn G_ROFF_NotetrackCallback(
     }
 }
 
-// PORT-ESCALATION(unported-callee): `G_AddEvent` (its only call) is itself
+// PORT-NOTE(unported-callee): `G_AddEvent` (its only call) is itself
 // parked (bg-boundary — no `ctx` in its own signature).
 /// Raven `G_SpeechEvent`.
 ///

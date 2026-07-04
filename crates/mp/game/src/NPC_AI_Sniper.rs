@@ -3,7 +3,7 @@
 //!
 //! Landed from the `fnskel.py` signature skeleton. 2 functions are
 //! transcribed faithfully from packet + prelude alone; the remaining 13 are
-//! parked (see the `PORT-ESCALATION` topics below), matching the precedent
+//! parked (see the `PORT-NOTE` topics below), matching the precedent
 //! set in `NPC_AI_Jedi.rs`/`NPC_AI_Stormtrooper.rs`/`NPC_AI_GalakMech.rs`/
 //! `NPC_AI_Rancor.rs`: almost every body in this file reaches the file-scope
 //! AI globals (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) or this
