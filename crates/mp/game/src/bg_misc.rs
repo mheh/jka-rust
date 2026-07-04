@@ -1098,21 +1098,6 @@ pub fn BG_IsValidCharacterModel(
     }
 }
 
-/// Read a NUL-terminated `*const c_char` into an owned `String` (lossy).
-#[inline]
-unsafe fn cstr_to_string(p: *const c_char) -> String {
-    std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
-}
-
-/// Read a NUL-terminated `*const c_char` into an owned `String` (lossy).
-/// Public variant used by pass-3 ported bodies.
-///
-/// Source: pattern used throughout `oracle/oracle/codemp/game/` for string conversion.
-#[inline]
-pub unsafe fn cstr_to_str(p: *const c_char) -> String {
-    std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
-}
-
 /// Write `s` into the caller's fixed C buffer at `dst` (capacity `cap`
 /// bytes), NUL-terminated and truncated to fit — mirrors `Q_strncpyz`'s
 /// truncate-and-terminate contract.

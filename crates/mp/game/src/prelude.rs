@@ -62,9 +62,11 @@ pub use mp_qshared::common::mp::qcommon::pm_flags::*;
 // Pass-3 symbol backfill: game-crate-local const families that were ported
 // but never wired into the prelude glob (see `docs/porting-rules.md` §E13).
 pub use crate::bg_misc::{
-    bgForcePowerCost, bgForcePowerCostSaberThrow, cstr_to_str, forceMasteryPoints,
+    bgForcePowerCost, bgForcePowerCostSaberThrow, forceMasteryPoints,
     forcePowerDarkLight, forcePowerSorted,
 };
+// Canonical seam string helpers (porting-rules pass-3 packet primer contract).
+pub use crate::cstr_util::{cstr, cstr_to_str, cstr_to_string, write_cstr_field};
 pub use crate::entity::flags::*;
 pub use crate::g_client::{playerMaxs, playerMins};
 pub use crate::g_items::FRAMETIME;
@@ -270,4 +272,3 @@ pub use crate::g_weapon::{LogAccuracyHit, laserTrapStick};
 pub use crate::q_math::{AddPointToBounds, AngleSubtract, AngleVectors, CrossProduct, DirToByte, Distance, DistanceHorizontalSquared, G_FindClosestPointOnLineSegment, Q_fabs, VectorCompare, VectorLength, VectorLengthSquared, VectorNormalize};
 pub use crate::q_shared::{COM_StripExtension, GetIDForString, Q_stricmp, Q_strncmp, Q_strncpyz, Q_strupr, va};
 pub use crate::w_saber::WP_SaberCanBlock;
-pub use crate::g_cmds::cstr;

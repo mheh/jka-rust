@@ -70,6 +70,7 @@ pub mod bg_saberLoad;
 pub mod bg_saga;
 pub mod bg_slidemove;
 pub mod bg_vehicleLoad;
+pub mod cstr_util;
 pub mod ent_fn_enums;
 pub mod g_ICARUScb;
 pub mod g_active;

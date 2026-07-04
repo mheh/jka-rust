@@ -69,16 +69,6 @@ const TAUNT_GLOAT: c_int = 4;
 
 //TODO: Port VectorCompare           // Source: oracle/oracle/codemp/game/q_shared.h
 
-use crate::g_active::helpers::*;
-mod helpers {
-    use super::*;
-    /// A small owned CString for a trap/`G_SoundIndex` literal path.
-    #[inline]
-    pub fn cstr(s: &str) -> std::ffi::CString {
-        std::ffi::CString::new(s).unwrap()
-    }
-}
-
 // Resolved cross-module fns (verbatim post-retrofit signatures — call surface).
 use crate::bg_misc::{BG_PlayerStateToEntityState, BG_PlayerStateToEntityStateExtraPolate, vectoyaw};
 use crate::bg_panimate::BG_AnimLength;
