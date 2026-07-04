@@ -48,29 +48,42 @@ log(`Pass 3: ${files.length} packets, zero-park blind transcription`)
 const OPUS_FILES = new Set(['ai_main.c', 'w_saber.c', 'NPC_AI_Jedi.c', 'bg_pmove.c', 'g_vehicles.c', 'g_combat.c'])
 const tierFor = p => OPUS_FILES.has(p.file) || (p.loc || 0) > 3500 ? 'opus' : (p.loc || 0) < 900 ? 'haiku' : 'sonnet'
 
-// ---- non-blocking, memoized symbol fixers (fixer = symbol resolver, never logic) ----
+// ---- non-blocking, BATCHED symbol fixers (fixer = symbol resolver, never logic) ----
+// One agent per porter REPORT (not per symbol): symbols sharing a defining
+// file/enum family get one consistent resolution instead of N serialized
+// no-op confirmations (trial-3 finding: 12 agents for one enum glob).
 // SERIALIZED through one chain: fixers share prelude.rs/mod.rs files — parallel edits would race.
-const symbolFixers = new Map()   // symbol name -> promise; N reporters share ONE fixer
+// Cross-porter dedupe via symSeen (claimed at enqueue time, before the agent runs).
+const symSeen = new Set()
 const symbolsFixed = []
 let symChain = Promise.resolve()
-function fixSymbol(sym) {
-  // Input discipline (trial finding): fields, paths, and member-access shapes
-  // are not symbols — log and skip instead of spawning a no-op fixer.
-  if (sym.kind === 'file' || /[./\\]/.test(sym.name)) { log(`sym-skip (not a symbol): ${sym.name}`); return Promise.resolve(null) }
-  if (!symbolFixers.has(sym.name)) {
-    const run = () => agent(
-      `SYMBOL FIXER (resolver contract — you resolve symbols, never logic). Worktree ${WT}, branch skeleton. The symbol \`${sym.name}\` (${sym.kind || 'unknown kind'}${sym.source ? ', oracle: ' + sym.source : ''}) is referenced by freshly-ported jampgame bodies but does not resolve.
+function fixSymbols(syms) {
+  const fresh = []
+  for (const s of (syms || [])) {
+    // Input discipline (trial finding): fields, paths, and member-access shapes
+    // are not symbols — log and skip instead of feeding a no-op to the fixer.
+    if (s.kind === 'file' || /[./\\]/.test(s.name)) { log(`sym-skip (not a symbol): ${s.name}`); continue }
+    if (symSeen.has(s.name)) continue
+    symSeen.add(s.name)
+    fresh.push(s)
+  }
+  if (!fresh.length) return Promise.resolve(null)
+  const list = fresh.map(s => `- \`${s.name}\` (${s.kind || 'unknown kind'}${s.source ? ', oracle: ' + s.source : ''})`).join('\n')
+  const label = fresh.length === 1 ? `sym:${fresh[0].name}` : `sym:${fresh[0].name}+${fresh.length - 1}`
+  const run = () => agent(
+    `SYMBOL FIXER (batched resolver contract — you resolve symbols, never logic). Worktree ${WT}, branch skeleton. These ${fresh.length} symbols are referenced by freshly-ported jampgame bodies but do not resolve:
+${list}
+For EACH symbol, in order:
 1. grep the worktree crates/mp/ first: if it EXISTS but is private/unimported -> make it pub and add the re-export where bare references resolve (prelude.rs pattern).
 2. If it does not exist -> port it faithfully from the oracle (find it; single const/enum/type/table/helper-fn; house style: doc-comment + Source cite, Raven name, enum-vs-alias fidelity, one type per file beside its subsystem siblings; wire mod decls).
-3. NEVER modify a fn body or an existing signature. Call sites bend toward declarations, never the reverse — and you touch neither.
-${STYLE} Return JSON {name: "${sym.name}", action: "exported"|"ported"|"already-ok"|"is-state-not-const", path: "<rust file>"}.`,
-      { label: `sym:${sym.name}`, phase: 'Port', model: 'haiku', effort: 'low', schema: { type: 'object', properties: { name: { type: 'string' }, action: { type: 'string' }, path: { type: 'string' } }, required: ['name', 'action'] } }
-    ).then(r => { if (r) symbolsFixed.push(r); return r })
-    const p = symChain.then(run)
-    symChain = p.catch(() => {})
-    symbolFixers.set(sym.name, p)
-  }
-  return symbolFixers.get(sym.name)
+3. FAMILY RULE: symbols sharing one defining file or enum resolve TOGETHER with ONE strategy (one module/enum glob re-export, or one const block ported) — never mix per-name strategies for the same family, never re-add a name a glob already covers.
+4. NEVER modify a fn body or an existing signature. Call sites bend toward declarations, never the reverse — and you touch neither.
+${STYLE} Return JSON {results:[{name, action: "exported"|"ported"|"already-ok"|"is-state-not-const", path: "<rust file>"}]} — one entry per symbol above.`,
+    { label, phase: 'Port', model: fresh.length > 6 ? 'sonnet' : 'haiku', effort: 'low', schema: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, action: { type: 'string' }, path: { type: 'string' } }, required: ['name', 'action'] } } }, required: ['results'] } }
+  ).then(r => { if (r && r.results) symbolsFixed.push(...r.results); return r })
+  const p = symChain.then(run)
+  symChain = p.catch(() => {})
+  return p
 }
 
 // ---- serialized WIP committer (no parallel git races) ----
@@ -112,8 +125,8 @@ Return JSON: {file, fns_filled, fns_deferred_by_ruling, port_notes:[{fn,topic,no
   }
   if (r) {
     reports.push(r)
-    // fire-and-share symbol fixers; do NOT await — porters never pause
-    for (const s of (r.missing_symbols || [])) fixSymbol(s)
+    // fire one batched fixer per report; do NOT await — porters never pause
+    fixSymbols(r.missing_symbols)
     const topics = {}
     for (const n of (r.port_notes || [])) topics[n.topic] = (topics[n.topic] || 0) + 1
     for (const t in topics) if (topics[t] >= 8) log(`NOTE-CLUSTER ${p.packet}: PORT-NOTE(${t}) x${topics[t]} — audit candidate`)
@@ -121,7 +134,7 @@ Return JSON: {file, fns_filled, fns_deferred_by_ruling, port_notes:[{fn,topic,no
   }
   return r
 }))
-await Promise.all([...symbolFixers.values()])
+await symChain
 maybeCommit(true)
 await commitChain
 const done = results.filter(Boolean)
