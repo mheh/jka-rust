@@ -9,7 +9,11 @@ export const meta = {
   ],
 }
 
-// args: { worktree?, packetsDir?, manifestPath?, maxFiles? }
+// args: { worktree?, packetsDir?, manifestPath?, maxFiles?, trial? }
+// trial: true -> Port phase runs identically, but Integrate stops after triage
+// (no fixers, no finisher) — the trial's deliverable is porter-output quality
+// + the triage error profile, not a green tree.
+const TRIAL = !!(args && args.trial)
 const WT = (args && args.worktree) || '/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54'
 const MAIN = '/Users/milohehmsoth/Developer/Milo/jka-rust'
 const PKT = (args && args.packetsDir) || `${MAIN}/tools/closure-prototype/out/pass3/packets`
@@ -125,6 +129,27 @@ const triage = await agent(
   { phase: 'Integrate', label: 'triage', model: 'sonnet', effort: 'low', schema: { type: 'object', properties: { total_errors: { type: 'number' }, groups: { type: 'array', items: { type: 'object', properties: { files: { type: 'array', items: { type: 'string' } }, errors: { type: 'number' } }, required: ['files'] } } }, required: ['total_errors', 'groups'] } }
 )
 log(`Triage: ${triage.total_errors} errors, ${triage.groups.length} groups`)
+
+if (TRIAL) {
+  log('TRIAL MODE: stopping after triage — no fixers, no finisher')
+  const notesT = reports.flatMap(r => (r.port_notes || []).map(n => ({ ...n, file: r.file })))
+  return {
+    trial: true,
+    totals: {
+      packets: done.length,
+      fns_filled: reports.reduce((a, r) => a + (r.fns_filled || 0), 0),
+      fns_deferred_by_ruling: reports.reduce((a, r) => a + (r.fns_deferred_by_ruling || 0), 0),
+      symbols_resolved: symbolsFixed.length,
+      port_notes: notesT.length,
+      anomalies_retried: anomalies.length,
+      triage_errors: triage.total_errors,
+    },
+    triage_groups: triage.groups,
+    port_notes: notesT,
+    shape_mismatches: reports.flatMap(r => (r.shape_mismatches || []).map(m => ({ ...m, file: r.file }))),
+    symbols_fixed: symbolsFixed,
+  }
+}
 
 const FIXER_CONTRACT = `FIXER CONTRACT: you resolve SYMBOLS and mechanics, never logic. (1) missing symbol -> port/re-export it. (2) call-shape mismatch -> call sites bend toward declarations, NEVER edit a declared signature or fn body's logic. (3) mechanical: use lines, derefs ((*p).f), turbofish, &mut adjustments. Anything semantic -> add // PORT-NOTE(<topic>) and leave it compiling-wrong is NOT allowed — if you cannot fix mechanically, leave the error and list it in your return. ${STYLE}`
 
