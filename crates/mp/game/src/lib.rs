@@ -118,6 +118,14 @@ pub mod world;
 
 pub use world::{EntityId, GameContext, GameWorld};
 
+// Pass-3 prep C1 (agenda B6 prelude/re-export fix): crate-root re-exports of the
+// qshared subsystems that pass-2 porter bodies spell as `crate::shared::…` /
+// `crate::trajectory::…` (the module lives in `mp_qshared`, but the game tier is
+// its logical home in those transcriptions). Re-homing under `crate::` resolves
+// the absolute-path references without touching each call site.
+pub use mp_qshared::shared;
+pub use mp_qshared::shared::trajectory;
+
 // The export-command enum, re-exported so the jampgame shell names it through
 // its existing two edges (round-7 item 25; SEAM-D10's exactly-two-edges shell
 // property stays intact — the shell sees the seam through the logic crate).

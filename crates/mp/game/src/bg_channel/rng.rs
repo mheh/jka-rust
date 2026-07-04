@@ -82,3 +82,15 @@ impl Default for Rng {
         Self::new()
     }
 }
+
+// Fork-3 parity is bit-exact ONLY for a 32-bit `unsigned long` (the shipping
+// `jampded`/i686 target). `holdrand` is modelled as `u32` and every step uses
+// wrapping arithmetic to reproduce the truncation; this assert pins that the
+// state width has not silently widened. On an LP64 host `unsigned long` is
+// 64-bit, so the faithful `>> 17` masking would diverge — the `u32` model is
+// what keeps host `cargo check` and the boot target in agreement.
+// Source: `oracle/oracle/codemp/game/q_math.c:1432` (holdrand*214013+2531011 >>17)
+const _: () = assert!(
+    core::mem::size_of::<u32>() == 4,
+    "fork-3 LCG parity requires a 32-bit holdrand state"
+);

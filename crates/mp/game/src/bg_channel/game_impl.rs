@@ -60,13 +60,20 @@ impl BgTraps for GameBgTraps<'_> {
         todo!("Port BgTraps::fs_fopen delegation — crate::trap::FS_FOpenFile")
     }
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
-        todo!("Port BgTraps::fs_read delegation — crate::trap::FS_Read")
+        // Mechanical delegation (ruling 13) — matches the proven `pointcontents`
+        // shape. Raven: `trap_FS_Read` (`G_FS_READ`).
+        use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
+        crate::trap::FS_Read(self.engine, GFsReadArgs::new(buffer as *mut u8, len, f))
     }
     fn fs_write(&self, buffer: *const c_void, len: c_int, f: fileHandle_t) {
-        todo!("Port BgTraps::fs_write delegation — crate::trap::FS_Write")
+        // Raven: `trap_FS_Write` (`G_FS_WRITE`).
+        use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
+        crate::trap::FS_Write(self.engine, GFsWriteArgs::new(buffer as *const u8, len, f))
     }
     fn fs_fclose(&self, f: fileHandle_t) {
-        todo!("Port BgTraps::fs_fclose delegation — crate::trap::FS_FCloseFile")
+        // Raven: `trap_FS_FCloseFile` (`G_FS_FCLOSE_FILE`).
+        use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFileArgs;
+        crate::trap::FS_FCloseFile(self.engine, GFsFcloseFileArgs::new(f as c_int))
     }
     fn fs_getfilelist(
         &self,
@@ -207,7 +214,10 @@ impl BgTraps for GameBgTraps<'_> {
         todo!("Port BgTraps::fx_play_effect_id — crate::trap::FX_PlayEffectID")
     }
     fn snap_vector(&self, v: *mut f32) {
-        todo!("Port BgTraps::snap_vector — crate::trap::SnapVector")
+        // Raven: `trap_SnapVector` (`G_SNAPVECTOR`); the `vec3_t*` is the caller's
+        // 3-float buffer (`*mut f32` head == `*mut [f32;3]`).
+        use mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs;
+        crate::trap::SnapVector(self.engine, GSnapvectorArgs::new(v as *mut vec3_t))
     }
     fn cvar_register(
         &self,

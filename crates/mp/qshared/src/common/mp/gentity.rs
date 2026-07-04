@@ -84,8 +84,13 @@ pub struct gentity_t {
     pub playerState: *mut playerState_t,
     //TODO: Port Vehicle_t
     // Source: oracle/oracle/codemp/game/bg_vehicles.h:477 (used *mut only via g_local.h:137)
-    // pub m_pVehicle: *mut Vehicle_t,
-    /// Placeholder for `Vehicle_t *m_pVehicle` until `Vehicle_t` is ported.
+    // `Vehicle_t` IS ported (`mp_bg::vehicles::vehicle_s::Vehicle_t`), but it
+    // cannot be named here: `gentity_t` lives in `mp_qshared` (the abi seam names
+    // `*mut gentity_t`) and `mp_qshared` sits below `mp_bg` in the tier graph
+    // (native < qshared < bg < game), so it may not depend on `mp_bg`. `*mut
+    // c_void` is ABI-identical to `*mut Vehicle_t` (pointer-sized). Restoring the
+    // real type needs the abi-seam refactor that moves `gentity_t` to a tier that
+    // can see `mp_bg` (same blocker as the `client: *mut c_void` field below).
     pub m_pVehicle: *mut c_void,
     /// G2 instance.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:138`

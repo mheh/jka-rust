@@ -121,6 +121,30 @@ pub use mp_qshared::shared::wl_e::{WL_e, WL_e::*};
 // Source: `docs/handoffs/jampgame-fork-discovery.md` fork 8; `world/game_context.rs`
 pub use crate::world::GameContext;
 
+// Pass-3 prep C1 riders (ruling 21 / rulings 12-16, 22): the entity handle, the
+// spawn fn-ID enum, and the bg-channel state/trait set — hoisted into the
+// prelude so the pass-3 porter bodies name them unqualified.
+// - `EntityId` (ruling 22): the `Option<EntityId>` stored-field handle.
+// - `EntSpawn` (agenda C13): the `spawns[]` classname->fn dispatch enum.
+// - `BgState`/`PmoveContext`/`BgTraps`/`GameCallbacks` (rulings 12-16): the bg
+//   session/per-call state + the two seam traits.
+// - `pml_t` (ruling 21): bg pmove local working-set type.
+pub use crate::bg_channel::{BgState, BgTraps, GameCallbacks, PmoveContext};
+pub use crate::ent_fn_enums::EntSpawn;
+pub use crate::world::EntityId;
+pub use mp_bg::local::pml_t::pml_t;
+
+// Pass-3 prep C1 (agenda B10 porter-instruction rider): the `crate::trap` seam
+// module, spelled bare `trap::X` throughout the pass-2 bodies. Re-exported so the
+// `use crate::prelude::*` glob resolves those call sites.
+pub use crate::trap;
+
+// The entity fn-ID dispatch enums (ruling 2 / `ent_fn_enums`), named bare in the
+// spawn/think/touch/… assignment sites.
+pub use crate::ent_fn_enums::{
+    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse,
+};
+
 pub use crate::ai::group_info::AIGroupInfo_t;
 pub use crate::botai::bot_state_s::bot_state_t;
 pub use crate::client::gclient::gclient_t;
@@ -195,3 +219,46 @@ pub use mp_qshared::shared::{
     QFALSE, QTRUE,
 };
 pub use mp_qshared::shared::Eorientations::*;
+
+// Pass-3 prep C1 (agenda B6/B10): batch re-export of game-crate-local fns
+// spelled bare in pass-2 porter bodies but never wired into the prelude.
+// Each resolves to a single `pub fn`/`const` definition (scripted).
+pub use crate::FighterNPC::FighterIsLanded;
+pub use crate::NPC_AI_Atst::NPC_ATST_Precache;
+pub use crate::NPC_AI_Droid::{NPC_Gonk_Precache, NPC_Mouse_Precache, NPC_Protocol_Precache, NPC_R2D2_Precache, NPC_R5D2_Precache};
+pub use crate::NPC_AI_GalakMech::NPC_GalakMech_Precache;
+pub use crate::NPC_AI_Howler::NPC_Howler_Precache;
+pub use crate::NPC_AI_ImperialProbe::NPC_Probe_Precache;
+pub use crate::NPC_AI_Interrogator::NPC_Interrogator_Precache;
+pub use crate::NPC_AI_Jedi::{Jedi_Decloak, NPC_ShadowTrooper_Precache};
+pub use crate::NPC_AI_Mark1::NPC_Mark1_Precache;
+pub use crate::NPC_AI_Mark2::NPC_Mark2_Precache;
+pub use crate::NPC_AI_MineMonster::NPC_MineMonster_Precache;
+pub use crate::NPC_AI_Remote::NPC_Remote_Precache;
+pub use crate::NPC_AI_Seeker::NPC_Seeker_Precache;
+pub use crate::NPC_AI_Sentry::NPC_Sentry_Precache;
+pub use crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth;
+pub use crate::NPC_AI_Wampa::NPC_Wampa_Precache;
+pub use crate::NPC_behavior::NPC_StartFlee;
+pub use crate::NPC_combat::{CanShoot, EntIsGlass, G_ClearEnemy, G_SetEnemy, NPC_AimAdjust, NPC_ChangeWeapon, NPC_FindCombatPoint, NPC_FreeCombatPoint, NPC_SetCombatPoint, NPC_ShotEntity, ShotThroughGlass, WeaponThink};
+pub use crate::NPC_goal::{NPC_ReachedGoal, UpdateGoal};
+pub use crate::NPC_move::{NAV_GetLastMove, NPC_MoveToGoal};
+pub use crate::NPC_senses::{InFOV3, NPC_CheckAlertEvents, NPC_CheckForDanger};
+pub use crate::NPC_utils::{CalcEntitySpot, NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_FaceEnemy, NPC_UpdateAngles};
+pub use crate::bg_lib::atof;
+pub use crate::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
+pub use crate::bg_panimate::BG_InKnockDownOnly;
+pub use crate::bg_pmove::BG_SabersOff;
+pub use crate::g_client::SpotWouldTelefrag2;
+pub use crate::g_combat::{G_CheckVehicleNPCTeamDamage, G_Damage, G_RadiusDamage};
+pub use crate::g_items::{RegisterItem, Touch_Item};
+pub use crate::g_log::G_LogWeaponFire;
+pub use crate::g_main::{Com_Printf, G_RunThink};
+pub use crate::g_nav::{FlyingCreature, NAV_HitNavGoal, NPC_SetMoveGoal};
+pub use crate::g_spawn::{G_NewString, G_SpawnFloat, G_SpawnInt, G_SpawnString, G_SpawnVector};
+pub use crate::g_timer::TIMER_Done;
+pub use crate::g_utils::{G_AddEvent, G_Find, G_FreeEntity, G_ModelIndex, G_PlayEffect, G_ScaleNetHealth, G_SetAnim, G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_SoundSetIndex, G_Spawn, G_TeamCommand, G_TempEntity, G_UseTargets2, TryHeal};
+pub use crate::g_weapon::{LogAccuracyHit, laserTrapStick};
+pub use crate::q_math::{AddPointToBounds, AngleSubtract, AngleVectors, CrossProduct, DirToByte, Distance, DistanceHorizontalSquared, G_FindClosestPointOnLineSegment, Q_fabs, VectorLength, VectorLengthSquared, VectorNormalize};
+pub use crate::q_shared::{COM_StripExtension, GetIDForString, Q_stricmp, Q_strncmp, Q_strncpyz, Q_strupr, va};
+pub use crate::w_saber::WP_SaberCanBlock;

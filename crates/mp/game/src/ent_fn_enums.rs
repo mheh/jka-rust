@@ -825,3 +825,756 @@ pub fn dispatch_die(
         EntDie::turret_die => turret_die(ctx, self_, inflictor, attacker, damage, r#mod),
     }
 }
+
+// ==== EntSpawn (agenda C13 / fork-2): classname->SP_ dispatch ====
+// GENERATED addendum (pass-3 prep C1). The spawns[] table dual from
+// oracle g_spawn.c:435-673 (190 entries). Fork-2 ruling: classname strcmp
+// becomes an EntSpawn lookup + central match dispatch (EntThink pattern).
+// Source: `oracle/oracle/codemp/game/g_spawn.c:435-673` (G_CallSpawn)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum EntSpawn {
+    /// `SP_info_player_start`
+    info_player_start,
+    /// `SP_info_player_duel`
+    info_player_duel,
+    /// `SP_info_player_duel1`
+    info_player_duel1,
+    /// `SP_info_player_duel2`
+    info_player_duel2,
+    /// `SP_info_player_deathmatch`
+    info_player_deathmatch,
+    /// `SP_info_player_siegeteam1`
+    info_player_siegeteam1,
+    /// `SP_info_player_siegeteam2`
+    info_player_siegeteam2,
+    /// `SP_info_player_intermission`
+    info_player_intermission,
+    /// `SP_info_player_intermission_red`
+    info_player_intermission_red,
+    /// `SP_info_player_intermission_blue`
+    info_player_intermission_blue,
+    /// `SP_info_jedimaster_start`
+    info_jedimaster_start,
+    /// `SP_info_player_start_red`
+    info_player_start_red,
+    /// `SP_info_player_start_blue`
+    info_player_start_blue,
+    /// `SP_info_null`
+    info_null,
+    /// `SP_info_notnull`
+    info_notnull,
+    /// `SP_info_camp`
+    info_camp,
+    /// `SP_info_siege_objective`
+    info_siege_objective,
+    /// `SP_info_siege_radaricon`
+    info_siege_radaricon,
+    /// `SP_info_siege_decomplete`
+    info_siege_decomplete,
+    /// `SP_target_siege_end`
+    target_siege_end,
+    /// `SP_misc_siege_item`
+    misc_siege_item,
+    /// `SP_func_plat`
+    func_plat,
+    /// `SP_func_button`
+    func_button,
+    /// `SP_func_door`
+    func_door,
+    /// `SP_func_static`
+    func_static,
+    /// `SP_func_rotating`
+    func_rotating,
+    /// `SP_func_bobbing`
+    func_bobbing,
+    /// `SP_func_pendulum`
+    func_pendulum,
+    /// `SP_func_train`
+    func_train,
+    /// `SP_func_timer`
+    func_timer,
+    /// `SP_func_breakable`
+    func_breakable,
+    /// `SP_func_glass`
+    func_glass,
+    /// `SP_func_usable`
+    func_usable,
+    /// `SP_func_wall`
+    func_wall,
+    /// `SP_trigger_lightningstrike`
+    trigger_lightningstrike,
+    /// `SP_trigger_always`
+    trigger_always,
+    /// `SP_trigger_multiple`
+    trigger_multiple,
+    /// `SP_trigger_once`
+    trigger_once,
+    /// `SP_trigger_push`
+    trigger_push,
+    /// `SP_trigger_teleport`
+    trigger_teleport,
+    /// `SP_trigger_hurt`
+    trigger_hurt,
+    /// `SP_trigger_space`
+    trigger_space,
+    /// `SP_trigger_shipboundary`
+    trigger_shipboundary,
+    /// `SP_trigger_hyperspace`
+    trigger_hyperspace,
+    /// `SP_trigger_asteroid_field`
+    trigger_asteroid_field,
+    /// `SP_target_give`
+    target_give,
+    /// `SP_target_remove_powerups`
+    target_remove_powerups,
+    /// `SP_target_delay`
+    target_delay,
+    /// `SP_target_speaker`
+    target_speaker,
+    /// `SP_target_print`
+    target_print,
+    /// `SP_target_laser`
+    target_laser,
+    /// `SP_target_score`
+    target_score,
+    /// `SP_target_teleporter`
+    target_teleporter,
+    /// `SP_target_relay`
+    target_relay,
+    /// `SP_target_kill`
+    target_kill,
+    /// `SP_target_position`
+    target_position,
+    /// `SP_target_location`
+    target_location,
+    /// `SP_target_counter`
+    target_counter,
+    /// `SP_target_random`
+    target_random,
+    /// `SP_target_scriptrunner`
+    target_scriptrunner,
+    /// `SP_target_interest`
+    target_interest,
+    /// `SP_target_activate`
+    target_activate,
+    /// `SP_target_deactivate`
+    target_deactivate,
+    /// `SP_target_level_change`
+    target_level_change,
+    /// `SP_target_play_music`
+    target_play_music,
+    /// `SP_target_push`
+    target_push,
+    /// `SP_light`
+    light,
+    /// `SP_path_corner`
+    path_corner,
+    /// `SP_misc_teleporter_dest`
+    misc_teleporter_dest,
+    /// `SP_misc_model`
+    misc_model,
+    /// `SP_misc_model_static`
+    misc_model_static,
+    /// `SP_misc_G2model`
+    misc_G2model,
+    /// `SP_misc_portal_surface`
+    misc_portal_surface,
+    /// `SP_misc_portal_camera`
+    misc_portal_camera,
+    /// `SP_misc_weather_zone`
+    misc_weather_zone,
+    /// `SP_misc_bsp`
+    misc_bsp,
+    /// `SP_terrain`
+    terrain,
+    /// `SP_misc_skyportal_orient`
+    misc_skyportal_orient,
+    /// `SP_misc_skyportal`
+    misc_skyportal,
+    /// `SP_gametype_item`
+    gametype_item,
+    /// `SP_misc_ammo_floor_unit`
+    misc_ammo_floor_unit,
+    /// `SP_misc_shield_floor_unit`
+    misc_shield_floor_unit,
+    /// `SP_misc_model_shield_power_converter`
+    misc_model_shield_power_converter,
+    /// `SP_misc_model_ammo_power_converter`
+    misc_model_ammo_power_converter,
+    /// `SP_misc_model_health_power_converter`
+    misc_model_health_power_converter,
+    /// `SP_fx_runner`
+    fx_runner,
+    /// `SP_target_screenshake`
+    target_screenshake,
+    /// `SP_target_escapetrig`
+    target_escapetrig,
+    /// `SP_misc_maglock`
+    misc_maglock,
+    /// `SP_misc_faller`
+    misc_faller,
+    /// `SP_reference_tag`
+    reference_tag,
+    /// `SP_misc_weapon_shooter`
+    misc_weapon_shooter,
+    /// `SP_NPC_spawner`
+    NPC_spawner,
+    /// `SP_NPC_Vehicle`
+    NPC_Vehicle,
+    /// `SP_NPC_Kyle`
+    NPC_Kyle,
+    /// `SP_NPC_Lando`
+    NPC_Lando,
+    /// `SP_NPC_Jan`
+    NPC_Jan,
+    /// `SP_NPC_Luke`
+    NPC_Luke,
+    /// `SP_NPC_MonMothma`
+    NPC_MonMothma,
+    /// `SP_NPC_Tavion`
+    NPC_Tavion,
+    /// `SP_NPC_Tavion_New`
+    NPC_Tavion_New,
+    /// `SP_NPC_Alora`
+    NPC_Alora,
+    /// `SP_NPC_Reelo`
+    NPC_Reelo,
+    /// `SP_NPC_Galak`
+    NPC_Galak,
+    /// `SP_NPC_Desann`
+    NPC_Desann,
+    /// `SP_NPC_Bartender`
+    NPC_Bartender,
+    /// `SP_NPC_MorganKatarn`
+    NPC_MorganKatarn,
+    /// `SP_NPC_Jedi`
+    NPC_Jedi,
+    /// `SP_NPC_Prisoner`
+    NPC_Prisoner,
+    /// `SP_NPC_Rebel`
+    NPC_Rebel,
+    /// `SP_NPC_Stormtrooper`
+    NPC_Stormtrooper,
+    /// `SP_NPC_StormtrooperOfficer`
+    NPC_StormtrooperOfficer,
+    /// `SP_NPC_Snowtrooper`
+    NPC_Snowtrooper,
+    /// `SP_NPC_Tie_Pilot`
+    NPC_Tie_Pilot,
+    /// `SP_NPC_Ugnaught`
+    NPC_Ugnaught,
+    /// `SP_NPC_Jawa`
+    NPC_Jawa,
+    /// `SP_NPC_Gran`
+    NPC_Gran,
+    /// `SP_NPC_Rodian`
+    NPC_Rodian,
+    /// `SP_NPC_Weequay`
+    NPC_Weequay,
+    /// `SP_NPC_Trandoshan`
+    NPC_Trandoshan,
+    /// `SP_NPC_Tusken`
+    NPC_Tusken,
+    /// `SP_NPC_Noghri`
+    NPC_Noghri,
+    /// `SP_NPC_SwampTrooper`
+    NPC_SwampTrooper,
+    /// `SP_NPC_Imperial`
+    NPC_Imperial,
+    /// `SP_NPC_ImpWorker`
+    NPC_ImpWorker,
+    /// `SP_NPC_BespinCop`
+    NPC_BespinCop,
+    /// `SP_NPC_Reborn`
+    NPC_Reborn,
+    /// `SP_NPC_ShadowTrooper`
+    NPC_ShadowTrooper,
+    /// `SP_NPC_Monster_Murjj`
+    NPC_Monster_Murjj,
+    /// `SP_NPC_Monster_Swamp`
+    NPC_Monster_Swamp,
+    /// `SP_NPC_Monster_Howler`
+    NPC_Monster_Howler,
+    /// `SP_NPC_MineMonster`
+    NPC_MineMonster,
+    /// `SP_NPC_Monster_Claw`
+    NPC_Monster_Claw,
+    /// `SP_NPC_Monster_Glider`
+    NPC_Monster_Glider,
+    /// `SP_NPC_Monster_Flier2`
+    NPC_Monster_Flier2,
+    /// `SP_NPC_Monster_Lizard`
+    NPC_Monster_Lizard,
+    /// `SP_NPC_Monster_Fish`
+    NPC_Monster_Fish,
+    /// `SP_NPC_Monster_Wampa`
+    NPC_Monster_Wampa,
+    /// `SP_NPC_Monster_Rancor`
+    NPC_Monster_Rancor,
+    /// `SP_NPC_Droid_Interrogator`
+    NPC_Droid_Interrogator,
+    /// `SP_NPC_Droid_Probe`
+    NPC_Droid_Probe,
+    /// `SP_NPC_Droid_Mark1`
+    NPC_Droid_Mark1,
+    /// `SP_NPC_Droid_Mark2`
+    NPC_Droid_Mark2,
+    /// `SP_NPC_Droid_ATST`
+    NPC_Droid_ATST,
+    /// `SP_NPC_Droid_Seeker`
+    NPC_Droid_Seeker,
+    /// `SP_NPC_Droid_Remote`
+    NPC_Droid_Remote,
+    /// `SP_NPC_Droid_Sentry`
+    NPC_Droid_Sentry,
+    /// `SP_NPC_Droid_Gonk`
+    NPC_Droid_Gonk,
+    /// `SP_NPC_Droid_Mouse`
+    NPC_Droid_Mouse,
+    /// `SP_NPC_Droid_R2D2`
+    NPC_Droid_R2D2,
+    /// `SP_NPC_Droid_R5D2`
+    NPC_Droid_R5D2,
+    /// `SP_NPC_Droid_Protocol`
+    NPC_Droid_Protocol,
+    /// `SP_NPC_Reborn_New`
+    NPC_Reborn_New,
+    /// `SP_NPC_Cultist`
+    NPC_Cultist,
+    /// `SP_NPC_Cultist_Saber`
+    NPC_Cultist_Saber,
+    /// `SP_NPC_Cultist_Saber_Powers`
+    NPC_Cultist_Saber_Powers,
+    /// `SP_NPC_Cultist_Destroyer`
+    NPC_Cultist_Destroyer,
+    /// `SP_NPC_Cultist_Commando`
+    NPC_Cultist_Commando,
+    /// `SP_waypoint`
+    waypoint,
+    /// `SP_waypoint_small`
+    waypoint_small,
+    /// `SP_waypoint_navgoal`
+    waypoint_navgoal,
+    /// `SP_waypoint_navgoal_8`
+    waypoint_navgoal_8,
+    /// `SP_waypoint_navgoal_4`
+    waypoint_navgoal_4,
+    /// `SP_waypoint_navgoal_2`
+    waypoint_navgoal_2,
+    /// `SP_waypoint_navgoal_1`
+    waypoint_navgoal_1,
+    /// `SP_CreateSpaceDust`
+    CreateSpaceDust,
+    /// `SP_CreateRain`
+    CreateRain,
+    /// `SP_CreateSnow`
+    CreateSnow,
+    /// `SP_point_combat`
+    point_combat,
+    /// `SP_misc_holocron`
+    misc_holocron,
+    /// `SP_shooter_blaster`
+    shooter_blaster,
+    /// `SP_team_CTF_redplayer`
+    team_CTF_redplayer,
+    /// `SP_team_CTF_blueplayer`
+    team_CTF_blueplayer,
+    /// `SP_team_CTF_redspawn`
+    team_CTF_redspawn,
+    /// `SP_team_CTF_bluespawn`
+    team_CTF_bluespawn,
+    /// `SP_item_botroam`
+    item_botroam,
+    /// `SP_emplaced_gun`
+    emplaced_gun,
+    /// `SP_misc_turret`
+    misc_turret,
+    /// `SP_misc_turretG2`
+    misc_turretG2,
+}
+
+/// The `spawns[]` classname->`EntSpawn` table (190 rows, oracle order).
+/// Raven `G_CallSpawn` walks this with a case-sensitive strcmp on
+/// `ent->classname`; `spawn_for_classname` is that lookup.
+/// Source: `oracle/oracle/codemp/game/g_spawn.c:435-673`
+pub static SPAWNS: &[(&str, EntSpawn)] = &[
+    ("info_player_start", EntSpawn::info_player_start),
+    ("info_player_duel", EntSpawn::info_player_duel),
+    ("info_player_duel1", EntSpawn::info_player_duel1),
+    ("info_player_duel2", EntSpawn::info_player_duel2),
+    ("info_player_deathmatch", EntSpawn::info_player_deathmatch),
+    ("info_player_siegeteam1", EntSpawn::info_player_siegeteam1),
+    ("info_player_siegeteam2", EntSpawn::info_player_siegeteam2),
+    ("info_player_intermission", EntSpawn::info_player_intermission),
+    ("info_player_intermission_red", EntSpawn::info_player_intermission_red),
+    ("info_player_intermission_blue", EntSpawn::info_player_intermission_blue),
+    ("info_jedimaster_start", EntSpawn::info_jedimaster_start),
+    ("info_player_start_red", EntSpawn::info_player_start_red),
+    ("info_player_start_blue", EntSpawn::info_player_start_blue),
+    ("info_null", EntSpawn::info_null),
+    ("info_notnull", EntSpawn::info_notnull),
+    ("info_camp", EntSpawn::info_camp),
+    ("info_siege_objective", EntSpawn::info_siege_objective),
+    ("info_siege_radaricon", EntSpawn::info_siege_radaricon),
+    ("info_siege_decomplete", EntSpawn::info_siege_decomplete),
+    ("target_siege_end", EntSpawn::target_siege_end),
+    ("misc_siege_item", EntSpawn::misc_siege_item),
+    ("func_plat", EntSpawn::func_plat),
+    ("func_button", EntSpawn::func_button),
+    ("func_door", EntSpawn::func_door),
+    ("func_static", EntSpawn::func_static),
+    ("func_rotating", EntSpawn::func_rotating),
+    ("func_bobbing", EntSpawn::func_bobbing),
+    ("func_pendulum", EntSpawn::func_pendulum),
+    ("func_train", EntSpawn::func_train),
+    ("func_group", EntSpawn::info_null),
+    ("func_timer", EntSpawn::func_timer),
+    ("func_breakable", EntSpawn::func_breakable),
+    ("func_glass", EntSpawn::func_glass),
+    ("func_usable", EntSpawn::func_usable),
+    ("func_wall", EntSpawn::func_wall),
+    ("trigger_lightningstrike", EntSpawn::trigger_lightningstrike),
+    ("trigger_always", EntSpawn::trigger_always),
+    ("trigger_multiple", EntSpawn::trigger_multiple),
+    ("trigger_once", EntSpawn::trigger_once),
+    ("trigger_push", EntSpawn::trigger_push),
+    ("trigger_teleport", EntSpawn::trigger_teleport),
+    ("trigger_hurt", EntSpawn::trigger_hurt),
+    ("trigger_space", EntSpawn::trigger_space),
+    ("trigger_shipboundary", EntSpawn::trigger_shipboundary),
+    ("trigger_hyperspace", EntSpawn::trigger_hyperspace),
+    ("trigger_asteroid_field", EntSpawn::trigger_asteroid_field),
+    ("target_give", EntSpawn::target_give),
+    ("target_remove_powerups", EntSpawn::target_remove_powerups),
+    ("target_delay", EntSpawn::target_delay),
+    ("target_speaker", EntSpawn::target_speaker),
+    ("target_print", EntSpawn::target_print),
+    ("target_laser", EntSpawn::target_laser),
+    ("target_score", EntSpawn::target_score),
+    ("target_teleporter", EntSpawn::target_teleporter),
+    ("target_relay", EntSpawn::target_relay),
+    ("target_kill", EntSpawn::target_kill),
+    ("target_position", EntSpawn::target_position),
+    ("target_location", EntSpawn::target_location),
+    ("target_counter", EntSpawn::target_counter),
+    ("target_random", EntSpawn::target_random),
+    ("target_scriptrunner", EntSpawn::target_scriptrunner),
+    ("target_interest", EntSpawn::target_interest),
+    ("target_activate", EntSpawn::target_activate),
+    ("target_deactivate", EntSpawn::target_deactivate),
+    ("target_level_change", EntSpawn::target_level_change),
+    ("target_play_music", EntSpawn::target_play_music),
+    ("target_push", EntSpawn::target_push),
+    ("light", EntSpawn::light),
+    ("path_corner", EntSpawn::path_corner),
+    ("misc_teleporter_dest", EntSpawn::misc_teleporter_dest),
+    ("misc_model", EntSpawn::misc_model),
+    ("misc_model_static", EntSpawn::misc_model_static),
+    ("misc_G2model", EntSpawn::misc_G2model),
+    ("misc_portal_surface", EntSpawn::misc_portal_surface),
+    ("misc_portal_camera", EntSpawn::misc_portal_camera),
+    ("misc_weather_zone", EntSpawn::misc_weather_zone),
+    ("misc_bsp", EntSpawn::misc_bsp),
+    ("terrain", EntSpawn::terrain),
+    ("misc_skyportal_orient", EntSpawn::misc_skyportal_orient),
+    ("misc_skyportal", EntSpawn::misc_skyportal),
+    ("gametype_item", EntSpawn::gametype_item),
+    ("misc_ammo_floor_unit", EntSpawn::misc_ammo_floor_unit),
+    ("misc_shield_floor_unit", EntSpawn::misc_shield_floor_unit),
+    ("misc_model_shield_power_converter", EntSpawn::misc_model_shield_power_converter),
+    ("misc_model_ammo_power_converter", EntSpawn::misc_model_ammo_power_converter),
+    ("misc_model_health_power_converter", EntSpawn::misc_model_health_power_converter),
+    ("fx_runner", EntSpawn::fx_runner),
+    ("target_screenshake", EntSpawn::target_screenshake),
+    ("target_escapetrig", EntSpawn::target_escapetrig),
+    ("misc_maglock", EntSpawn::misc_maglock),
+    ("misc_faller", EntSpawn::misc_faller),
+    ("ref_tag", EntSpawn::reference_tag),
+    ("ref_tag_huge", EntSpawn::reference_tag),
+    ("misc_weapon_shooter", EntSpawn::misc_weapon_shooter),
+    ("NPC_spawner", EntSpawn::NPC_spawner),
+    ("NPC_Vehicle", EntSpawn::NPC_Vehicle),
+    ("NPC_Kyle", EntSpawn::NPC_Kyle),
+    ("NPC_Lando", EntSpawn::NPC_Lando),
+    ("NPC_Jan", EntSpawn::NPC_Jan),
+    ("NPC_Luke", EntSpawn::NPC_Luke),
+    ("NPC_MonMothma", EntSpawn::NPC_MonMothma),
+    ("NPC_Tavion", EntSpawn::NPC_Tavion),
+    ("NPC_Tavion_New", EntSpawn::NPC_Tavion_New),
+    ("NPC_Alora", EntSpawn::NPC_Alora),
+    ("NPC_Reelo", EntSpawn::NPC_Reelo),
+    ("NPC_Galak", EntSpawn::NPC_Galak),
+    ("NPC_Desann", EntSpawn::NPC_Desann),
+    ("NPC_Bartender", EntSpawn::NPC_Bartender),
+    ("NPC_MorganKatarn", EntSpawn::NPC_MorganKatarn),
+    ("NPC_Jedi", EntSpawn::NPC_Jedi),
+    ("NPC_Prisoner", EntSpawn::NPC_Prisoner),
+    ("NPC_Rebel", EntSpawn::NPC_Rebel),
+    ("NPC_Stormtrooper", EntSpawn::NPC_Stormtrooper),
+    ("NPC_StormtrooperOfficer", EntSpawn::NPC_StormtrooperOfficer),
+    ("NPC_Snowtrooper", EntSpawn::NPC_Snowtrooper),
+    ("NPC_Tie_Pilot", EntSpawn::NPC_Tie_Pilot),
+    ("NPC_Ugnaught", EntSpawn::NPC_Ugnaught),
+    ("NPC_Jawa", EntSpawn::NPC_Jawa),
+    ("NPC_Gran", EntSpawn::NPC_Gran),
+    ("NPC_Rodian", EntSpawn::NPC_Rodian),
+    ("NPC_Weequay", EntSpawn::NPC_Weequay),
+    ("NPC_Trandoshan", EntSpawn::NPC_Trandoshan),
+    ("NPC_Tusken", EntSpawn::NPC_Tusken),
+    ("NPC_Noghri", EntSpawn::NPC_Noghri),
+    ("NPC_SwampTrooper", EntSpawn::NPC_SwampTrooper),
+    ("NPC_Imperial", EntSpawn::NPC_Imperial),
+    ("NPC_ImpWorker", EntSpawn::NPC_ImpWorker),
+    ("NPC_BespinCop", EntSpawn::NPC_BespinCop),
+    ("NPC_Reborn", EntSpawn::NPC_Reborn),
+    ("NPC_ShadowTrooper", EntSpawn::NPC_ShadowTrooper),
+    ("NPC_Monster_Murjj", EntSpawn::NPC_Monster_Murjj),
+    ("NPC_Monster_Swamp", EntSpawn::NPC_Monster_Swamp),
+    ("NPC_Monster_Howler", EntSpawn::NPC_Monster_Howler),
+    ("NPC_MineMonster", EntSpawn::NPC_MineMonster),
+    ("NPC_Monster_Claw", EntSpawn::NPC_Monster_Claw),
+    ("NPC_Monster_Glider", EntSpawn::NPC_Monster_Glider),
+    ("NPC_Monster_Flier2", EntSpawn::NPC_Monster_Flier2),
+    ("NPC_Monster_Lizard", EntSpawn::NPC_Monster_Lizard),
+    ("NPC_Monster_Fish", EntSpawn::NPC_Monster_Fish),
+    ("NPC_Monster_Wampa", EntSpawn::NPC_Monster_Wampa),
+    ("NPC_Monster_Rancor", EntSpawn::NPC_Monster_Rancor),
+    ("NPC_Droid_Interrogator", EntSpawn::NPC_Droid_Interrogator),
+    ("NPC_Droid_Probe", EntSpawn::NPC_Droid_Probe),
+    ("NPC_Droid_Mark1", EntSpawn::NPC_Droid_Mark1),
+    ("NPC_Droid_Mark2", EntSpawn::NPC_Droid_Mark2),
+    ("NPC_Droid_ATST", EntSpawn::NPC_Droid_ATST),
+    ("NPC_Droid_Seeker", EntSpawn::NPC_Droid_Seeker),
+    ("NPC_Droid_Remote", EntSpawn::NPC_Droid_Remote),
+    ("NPC_Droid_Sentry", EntSpawn::NPC_Droid_Sentry),
+    ("NPC_Droid_Gonk", EntSpawn::NPC_Droid_Gonk),
+    ("NPC_Droid_Mouse", EntSpawn::NPC_Droid_Mouse),
+    ("NPC_Droid_R2D2", EntSpawn::NPC_Droid_R2D2),
+    ("NPC_Droid_R5D2", EntSpawn::NPC_Droid_R5D2),
+    ("NPC_Droid_Protocol", EntSpawn::NPC_Droid_Protocol),
+    ("NPC_Reborn_New", EntSpawn::NPC_Reborn_New),
+    ("NPC_Cultist", EntSpawn::NPC_Cultist),
+    ("NPC_Cultist_Saber", EntSpawn::NPC_Cultist_Saber),
+    ("NPC_Cultist_Saber_Powers", EntSpawn::NPC_Cultist_Saber_Powers),
+    ("NPC_Cultist_Destroyer", EntSpawn::NPC_Cultist_Destroyer),
+    ("NPC_Cultist_Commando", EntSpawn::NPC_Cultist_Commando),
+    ("NPC_Colombian_Soldier", EntSpawn::NPC_Reborn),
+    ("NPC_Colombian_Rebel", EntSpawn::NPC_Reborn),
+    ("NPC_Colombian_EmplacedGunner", EntSpawn::NPC_ShadowTrooper),
+    ("NPC_Manuel_Vergara_RMG", EntSpawn::NPC_Desann),
+    ("waypoint", EntSpawn::waypoint),
+    ("waypoint_small", EntSpawn::waypoint_small),
+    ("waypoint_navgoal", EntSpawn::waypoint_navgoal),
+    ("waypoint_navgoal_8", EntSpawn::waypoint_navgoal_8),
+    ("waypoint_navgoal_4", EntSpawn::waypoint_navgoal_4),
+    ("waypoint_navgoal_2", EntSpawn::waypoint_navgoal_2),
+    ("waypoint_navgoal_1", EntSpawn::waypoint_navgoal_1),
+    ("fx_spacedust", EntSpawn::CreateSpaceDust),
+    ("fx_rain", EntSpawn::CreateRain),
+    ("fx_snow", EntSpawn::CreateSnow),
+    ("point_combat", EntSpawn::point_combat),
+    ("misc_holocron", EntSpawn::misc_holocron),
+    ("shooter_blaster", EntSpawn::shooter_blaster),
+    ("team_CTF_redplayer", EntSpawn::team_CTF_redplayer),
+    ("team_CTF_blueplayer", EntSpawn::team_CTF_blueplayer),
+    ("team_CTF_redspawn", EntSpawn::team_CTF_redspawn),
+    ("team_CTF_bluespawn", EntSpawn::team_CTF_bluespawn),
+    ("item_botroam", EntSpawn::item_botroam),
+    ("emplaced_gun", EntSpawn::emplaced_gun),
+    ("misc_turret", EntSpawn::misc_turret),
+    ("misc_turretG2", EntSpawn::misc_turretG2),
+];
+
+/// Classname -> `EntSpawn` lookup (the `G_CallSpawn` strcmp loop).
+/// Returns `None` when no classname matches (Raven's fall-through).
+pub fn spawn_for_classname(classname: &str) -> Option<EntSpawn> {
+    SPAWNS.iter().find(|(name, _)| *name == classname).map(|(_, sp)| *sp)
+}
+
+/// Central spawn dispatch (replaces the `spawns[].spawn(ent)` call in
+/// `G_CallSpawn`). Faithful raw-pointer `ent` param for staging; the Land
+/// phase re-shapes to `(world, EntityId)` per ruling 4.
+/// Source: `oracle/oracle/codemp/game/g_spawn.c:435-673`
+pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
+    match id {
+        EntSpawn::info_player_start => SP_info_player_start(ctx, ent),
+        EntSpawn::info_player_duel => SP_info_player_duel(ctx, ent),
+        EntSpawn::info_player_duel1 => SP_info_player_duel1(ctx, ent),
+        EntSpawn::info_player_duel2 => SP_info_player_duel2(ctx, ent),
+        EntSpawn::info_player_deathmatch => SP_info_player_deathmatch(ctx, ent),
+        EntSpawn::info_player_siegeteam1 => SP_info_player_siegeteam1(ctx, ent),
+        EntSpawn::info_player_siegeteam2 => SP_info_player_siegeteam2(ctx, ent),
+        EntSpawn::info_player_intermission => SP_info_player_intermission(ent),
+        EntSpawn::info_player_intermission_red => SP_info_player_intermission_red(ent),
+        EntSpawn::info_player_intermission_blue => SP_info_player_intermission_blue(ent),
+        EntSpawn::info_jedimaster_start => SP_info_jedimaster_start(ctx, ent),
+        EntSpawn::info_player_start_red => SP_info_player_start_red(ctx, ent),
+        EntSpawn::info_player_start_blue => SP_info_player_start_blue(ctx, ent),
+        EntSpawn::info_null => SP_info_null(ctx, ent),
+        EntSpawn::info_notnull => SP_info_notnull(ent),
+        EntSpawn::info_camp => SP_info_camp(ent),
+        EntSpawn::info_siege_objective => SP_info_siege_objective(ctx, ent),
+        EntSpawn::info_siege_radaricon => SP_info_siege_radaricon(ctx, ent),
+        EntSpawn::info_siege_decomplete => SP_info_siege_decomplete(ctx, ent),
+        EntSpawn::target_siege_end => SP_target_siege_end(ctx, ent),
+        EntSpawn::misc_siege_item => SP_misc_siege_item(ctx, ent),
+        EntSpawn::func_plat => SP_func_plat(ctx, ent),
+        EntSpawn::func_button => SP_func_button(ctx, ent),
+        EntSpawn::func_door => SP_func_door(ctx, ent),
+        EntSpawn::func_static => SP_func_static(ctx, ent),
+        EntSpawn::func_rotating => SP_func_rotating(ctx, ent),
+        EntSpawn::func_bobbing => SP_func_bobbing(ctx, ent),
+        EntSpawn::func_pendulum => SP_func_pendulum(ctx, ent),
+        EntSpawn::func_train => SP_func_train(ctx, ent),
+        EntSpawn::func_timer => SP_func_timer(ctx, ent),
+        EntSpawn::func_breakable => SP_func_breakable(ctx, ent),
+        EntSpawn::func_glass => SP_func_glass(ctx, ent),
+        EntSpawn::func_usable => SP_func_usable(ctx, ent),
+        EntSpawn::func_wall => SP_func_wall(ctx, ent),
+        EntSpawn::trigger_lightningstrike => SP_trigger_lightningstrike(ctx, ent),
+        EntSpawn::trigger_always => SP_trigger_always(ctx, ent),
+        EntSpawn::trigger_multiple => SP_trigger_multiple(ctx, ent),
+        EntSpawn::trigger_once => SP_trigger_once(ctx, ent),
+        EntSpawn::trigger_push => SP_trigger_push(ctx, ent),
+        EntSpawn::trigger_teleport => SP_trigger_teleport(ctx, ent),
+        EntSpawn::trigger_hurt => SP_trigger_hurt(ctx, ent),
+        EntSpawn::trigger_space => SP_trigger_space(ctx, ent),
+        EntSpawn::trigger_shipboundary => SP_trigger_shipboundary(ctx, ent),
+        EntSpawn::trigger_hyperspace => SP_trigger_hyperspace(ctx, ent),
+        EntSpawn::trigger_asteroid_field => SP_trigger_asteroid_field(ctx, ent),
+        EntSpawn::target_give => SP_target_give(ent),
+        EntSpawn::target_remove_powerups => SP_target_remove_powerups(ent),
+        EntSpawn::target_delay => SP_target_delay(ctx, ent),
+        EntSpawn::target_speaker => SP_target_speaker(ctx, ent),
+        EntSpawn::target_print => SP_target_print(ent),
+        EntSpawn::target_laser => SP_target_laser(ctx, ent),
+        EntSpawn::target_score => SP_target_score(ent),
+        EntSpawn::target_teleporter => SP_target_teleporter(ctx, ent),
+        EntSpawn::target_relay => SP_target_relay(ent),
+        EntSpawn::target_kill => SP_target_kill(ent),
+        EntSpawn::target_position => SP_target_position(ent),
+        EntSpawn::target_location => SP_target_location(ctx, ent),
+        EntSpawn::target_counter => SP_target_counter(ent),
+        EntSpawn::target_random => SP_target_random(ent),
+        EntSpawn::target_scriptrunner => SP_target_scriptrunner(ctx, ent),
+        EntSpawn::target_interest => SP_target_interest(ctx, ent),
+        EntSpawn::target_activate => SP_target_activate(ent),
+        EntSpawn::target_deactivate => SP_target_deactivate(ent),
+        EntSpawn::target_level_change => SP_target_level_change(ctx, ent),
+        EntSpawn::target_play_music => SP_target_play_music(ctx, ent),
+        EntSpawn::target_push => SP_target_push(ctx, ent),
+        EntSpawn::light => SP_light(ctx, ent),
+        EntSpawn::path_corner => SP_path_corner(ctx, ent),
+        EntSpawn::misc_teleporter_dest => SP_misc_teleporter_dest(ent),
+        EntSpawn::misc_model => SP_misc_model(ctx, ent),
+        EntSpawn::misc_model_static => SP_misc_model_static(ctx, ent),
+        EntSpawn::misc_G2model => SP_misc_G2model(ctx, ent),
+        EntSpawn::misc_portal_surface => SP_misc_portal_surface(ctx, ent),
+        EntSpawn::misc_portal_camera => SP_misc_portal_camera(ctx, ent),
+        EntSpawn::misc_weather_zone => SP_misc_weather_zone(ctx, ent),
+        EntSpawn::misc_bsp => SP_misc_bsp(ctx, ent),
+        EntSpawn::terrain => SP_terrain(ctx, ent),
+        EntSpawn::misc_skyportal_orient => SP_misc_skyportal_orient(ctx, ent),
+        EntSpawn::misc_skyportal => SP_misc_skyportal(ctx, ent),
+        EntSpawn::gametype_item => SP_gametype_item(ctx, ent),
+        EntSpawn::misc_ammo_floor_unit => SP_misc_ammo_floor_unit(ctx, ent),
+        EntSpawn::misc_shield_floor_unit => SP_misc_shield_floor_unit(ctx, ent),
+        EntSpawn::misc_model_shield_power_converter => SP_misc_model_shield_power_converter(ctx, ent),
+        EntSpawn::misc_model_ammo_power_converter => SP_misc_model_ammo_power_converter(ctx, ent),
+        EntSpawn::misc_model_health_power_converter => SP_misc_model_health_power_converter(ctx, ent),
+        EntSpawn::fx_runner => SP_fx_runner(ctx, ent),
+        EntSpawn::target_screenshake => SP_target_screenshake(ctx, ent),
+        EntSpawn::target_escapetrig => SP_target_escapetrig(ctx, ent),
+        EntSpawn::misc_maglock => SP_misc_maglock(ctx, ent),
+        EntSpawn::misc_faller => SP_misc_faller(ctx, ent),
+        EntSpawn::reference_tag => SP_reference_tag(ctx, ent),
+        EntSpawn::misc_weapon_shooter => SP_misc_weapon_shooter(ctx, ent),
+        EntSpawn::NPC_spawner => SP_NPC_spawner(ctx, ent),
+        EntSpawn::NPC_Vehicle => SP_NPC_Vehicle(ctx, ent),
+        EntSpawn::NPC_Kyle => SP_NPC_Kyle(ctx, ent),
+        EntSpawn::NPC_Lando => SP_NPC_Lando(ctx, ent),
+        EntSpawn::NPC_Jan => SP_NPC_Jan(ctx, ent),
+        EntSpawn::NPC_Luke => SP_NPC_Luke(ctx, ent),
+        EntSpawn::NPC_MonMothma => SP_NPC_MonMothma(ctx, ent),
+        EntSpawn::NPC_Tavion => SP_NPC_Tavion(ctx, ent),
+        EntSpawn::NPC_Tavion_New => SP_NPC_Tavion_New(ctx, ent),
+        EntSpawn::NPC_Alora => SP_NPC_Alora(ctx, ent),
+        EntSpawn::NPC_Reelo => SP_NPC_Reelo(ctx, ent),
+        EntSpawn::NPC_Galak => SP_NPC_Galak(ctx, ent),
+        EntSpawn::NPC_Desann => SP_NPC_Desann(ctx, ent),
+        EntSpawn::NPC_Bartender => SP_NPC_Bartender(ctx, ent),
+        EntSpawn::NPC_MorganKatarn => SP_NPC_MorganKatarn(ctx, ent),
+        EntSpawn::NPC_Jedi => SP_NPC_Jedi(ctx, ent),
+        EntSpawn::NPC_Prisoner => SP_NPC_Prisoner(ctx, ent),
+        EntSpawn::NPC_Rebel => SP_NPC_Rebel(ctx, ent),
+        EntSpawn::NPC_Stormtrooper => SP_NPC_Stormtrooper(ctx, ent),
+        EntSpawn::NPC_StormtrooperOfficer => SP_NPC_StormtrooperOfficer(ctx, ent),
+        EntSpawn::NPC_Snowtrooper => SP_NPC_Snowtrooper(ctx, ent),
+        EntSpawn::NPC_Tie_Pilot => SP_NPC_Tie_Pilot(ctx, ent),
+        EntSpawn::NPC_Ugnaught => SP_NPC_Ugnaught(ctx, ent),
+        EntSpawn::NPC_Jawa => SP_NPC_Jawa(ctx, ent),
+        EntSpawn::NPC_Gran => SP_NPC_Gran(ctx, ent),
+        EntSpawn::NPC_Rodian => SP_NPC_Rodian(ctx, ent),
+        EntSpawn::NPC_Weequay => SP_NPC_Weequay(ctx, ent),
+        EntSpawn::NPC_Trandoshan => SP_NPC_Trandoshan(ctx, ent),
+        EntSpawn::NPC_Tusken => SP_NPC_Tusken(ctx, ent),
+        EntSpawn::NPC_Noghri => SP_NPC_Noghri(ctx, ent),
+        EntSpawn::NPC_SwampTrooper => SP_NPC_SwampTrooper(ctx, ent),
+        EntSpawn::NPC_Imperial => SP_NPC_Imperial(ctx, ent),
+        EntSpawn::NPC_ImpWorker => SP_NPC_ImpWorker(ctx, ent),
+        EntSpawn::NPC_BespinCop => SP_NPC_BespinCop(ctx, ent),
+        EntSpawn::NPC_Reborn => SP_NPC_Reborn(ctx, ent),
+        EntSpawn::NPC_ShadowTrooper => SP_NPC_ShadowTrooper(ctx, ent),
+        EntSpawn::NPC_Monster_Murjj => SP_NPC_Monster_Murjj(ctx, ent),
+        EntSpawn::NPC_Monster_Swamp => SP_NPC_Monster_Swamp(ctx, ent),
+        EntSpawn::NPC_Monster_Howler => SP_NPC_Monster_Howler(ctx, ent),
+        EntSpawn::NPC_MineMonster => SP_NPC_MineMonster(ctx, ent),
+        EntSpawn::NPC_Monster_Claw => SP_NPC_Monster_Claw(ctx, ent),
+        EntSpawn::NPC_Monster_Glider => SP_NPC_Monster_Glider(ctx, ent),
+        EntSpawn::NPC_Monster_Flier2 => SP_NPC_Monster_Flier2(ctx, ent),
+        EntSpawn::NPC_Monster_Lizard => SP_NPC_Monster_Lizard(ctx, ent),
+        EntSpawn::NPC_Monster_Fish => SP_NPC_Monster_Fish(ctx, ent),
+        EntSpawn::NPC_Monster_Wampa => SP_NPC_Monster_Wampa(ctx, ent),
+        EntSpawn::NPC_Monster_Rancor => SP_NPC_Monster_Rancor(ctx, ent),
+        EntSpawn::NPC_Droid_Interrogator => SP_NPC_Droid_Interrogator(ctx, ent),
+        EntSpawn::NPC_Droid_Probe => SP_NPC_Droid_Probe(ctx, ent),
+        EntSpawn::NPC_Droid_Mark1 => SP_NPC_Droid_Mark1(ctx, ent),
+        EntSpawn::NPC_Droid_Mark2 => SP_NPC_Droid_Mark2(ctx, ent),
+        EntSpawn::NPC_Droid_ATST => SP_NPC_Droid_ATST(ctx, ent),
+        EntSpawn::NPC_Droid_Seeker => SP_NPC_Droid_Seeker(ctx, ent),
+        EntSpawn::NPC_Droid_Remote => SP_NPC_Droid_Remote(ctx, ent),
+        EntSpawn::NPC_Droid_Sentry => SP_NPC_Droid_Sentry(ctx, ent),
+        EntSpawn::NPC_Droid_Gonk => SP_NPC_Droid_Gonk(ctx, ent),
+        EntSpawn::NPC_Droid_Mouse => SP_NPC_Droid_Mouse(ctx, ent),
+        EntSpawn::NPC_Droid_R2D2 => SP_NPC_Droid_R2D2(ctx, ent),
+        EntSpawn::NPC_Droid_R5D2 => SP_NPC_Droid_R5D2(ctx, ent),
+        EntSpawn::NPC_Droid_Protocol => SP_NPC_Droid_Protocol(ctx, ent),
+        EntSpawn::NPC_Reborn_New => SP_NPC_Reborn_New(ctx, ent),
+        EntSpawn::NPC_Cultist => SP_NPC_Cultist(ctx, ent),
+        EntSpawn::NPC_Cultist_Saber => SP_NPC_Cultist_Saber(ctx, ent),
+        EntSpawn::NPC_Cultist_Saber_Powers => SP_NPC_Cultist_Saber_Powers(ctx, ent),
+        EntSpawn::NPC_Cultist_Destroyer => SP_NPC_Cultist_Destroyer(ctx, ent),
+        EntSpawn::NPC_Cultist_Commando => SP_NPC_Cultist_Commando(ctx, ent),
+        EntSpawn::waypoint => SP_waypoint(ctx, ent),
+        EntSpawn::waypoint_small => SP_waypoint_small(ctx, ent),
+        EntSpawn::waypoint_navgoal => SP_waypoint_navgoal(ctx, ent),
+        EntSpawn::waypoint_navgoal_8 => SP_waypoint_navgoal_8(ctx, ent),
+        EntSpawn::waypoint_navgoal_4 => SP_waypoint_navgoal_4(ctx, ent),
+        EntSpawn::waypoint_navgoal_2 => SP_waypoint_navgoal_2(ctx, ent),
+        EntSpawn::waypoint_navgoal_1 => SP_waypoint_navgoal_1(ctx, ent),
+        EntSpawn::CreateSpaceDust => SP_CreateSpaceDust(ctx, ent),
+        EntSpawn::CreateRain => SP_CreateRain(ctx, ent),
+        EntSpawn::CreateSnow => SP_CreateSnow(ctx, ent),
+        EntSpawn::point_combat => SP_point_combat(ctx, ent),
+        EntSpawn::misc_holocron => SP_misc_holocron(ctx, ent),
+        EntSpawn::shooter_blaster => SP_shooter_blaster(ctx, ent),
+        EntSpawn::team_CTF_redplayer => SP_team_CTF_redplayer(ent),
+        EntSpawn::team_CTF_blueplayer => SP_team_CTF_blueplayer(ent),
+        EntSpawn::team_CTF_redspawn => SP_team_CTF_redspawn(ent),
+        EntSpawn::team_CTF_bluespawn => SP_team_CTF_bluespawn(ent),
+        EntSpawn::item_botroam => SP_item_botroam(ent),
+        EntSpawn::emplaced_gun => SP_emplaced_gun(ctx, ent),
+        EntSpawn::misc_turret => SP_misc_turret(ctx, ent),
+        EntSpawn::misc_turretG2 => SP_misc_turretG2(ctx, ent),
+    }
+}

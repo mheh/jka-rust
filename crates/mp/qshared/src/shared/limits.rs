@@ -7,6 +7,13 @@
 /// Source: `oracle/oracle/codemp/game/q_shared.h:1985`
 pub const MAX_CLIENTS: usize = 32;
 
+/// `c_int`-typed dual of [`MAX_CLIENTS`] (ruling-21 rider). Raven compares
+/// `int` client numbers against `MAX_CLIENTS` in hundreds of `< MAX_CLIENTS`
+/// sites; this spelling drops the `as c_int` noise at those comparisons.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:1985`
+pub const MAX_CLIENTS_I32: core::ffi::c_int = MAX_CLIENTS as core::ffi::c_int;
+
 /// Raven `MAX_GENTITIES` — the entity-array size.
 ///
 /// Relocated to `mp_qshared` per its oracle home + workspace-architecture Tier-0
