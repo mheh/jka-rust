@@ -45,6 +45,16 @@ const MAX_ARENAS: usize = 1024;
 const MAX_BOTS: usize = 1024;
 const BOT_SPAWN_QUEUE_DEPTH: usize = 16;
 
+// Raven `#define MAX_SABER_VICTIMS 16` (`w_saber.c:3503`) — the per-swing
+// victim-tracking array bound shared by the `w_saber.c` file-statics.
+// Source: `oracle/oracle/codemp/game/w_saber.c:3503`
+const MAX_SABER_VICTIMS: usize = 16;
+
+// Raven `#define MAX_SIEGE_INFO_SIZE 16384` (`bg_saga.h:1`) — sizes the
+// `gParseObjectives` siege-config parse buffer.
+// Source: `oracle/oracle/codemp/game/bg_saga.h:1`
+const MAX_SIEGE_INFO_SIZE: usize = 16384;
+
 /// `botSpawnQueue_t` — bot spawn queue entry (`g_bot.c:21-24`).
 ///
 /// Source: `oracle/oracle/codemp/game/g_bot.c:21-24`
@@ -277,6 +287,70 @@ impl Default for FatalErrorString {
     }
 }
 
+/// Raven `char NPCFile[MAX_QPATH]` (`NPC_stats.c:238`) — the currently-loading
+/// NPC-config file name. `#[repr(transparent)]` keeps the porter idiom
+/// `&globals.NPCFile as *const _ as *const c_char` valid (same treatment as
+/// `NpcDataBuffer`); newtype so `GameGlobals` keeps `#[derive(Default)]`
+/// (`MAX_QPATH` = 64 > 32 has no library `Default`).
+/// Source: `oracle/oracle/codemp/game/NPC_stats.c:238`
+#[repr(transparent)]
+pub struct NpcFileBuffer(pub [c_char; MAX_QPATH]);
+
+impl Default for NpcFileBuffer {
+    fn default() -> Self {
+        NpcFileBuffer([0; MAX_QPATH])
+    }
+}
+
+/// Raven `char gObjectiveCfgStr[1024]` (`g_saga.c:47`). Newtype (>32 array has
+/// no library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter
+/// idioms `.as_ptr()`/`.as_mut_ptr()` and `write_cstr_field(&mut field, …)`
+/// valid.
+/// Source: `oracle/oracle/codemp/game/g_saga.c:47`
+pub struct ObjectiveCfgStr(pub [c_char; 1024]);
+
+impl Default for ObjectiveCfgStr {
+    fn default() -> Self {
+        ObjectiveCfgStr([0; 1024])
+    }
+}
+
+impl core::ops::Deref for ObjectiveCfgStr {
+    type Target = [c_char];
+    fn deref(&self) -> &[c_char] {
+        &self.0
+    }
+}
+impl core::ops::DerefMut for ObjectiveCfgStr {
+    fn deref_mut(&mut self) -> &mut [c_char] {
+        &mut self.0
+    }
+}
+
+/// Raven `char gParseObjectives[MAX_SIEGE_INFO_SIZE]` (`g_saga.c:46`). Newtype
+/// (>32 array has no library `Default`); `Deref`/`DerefMut` to `[c_char]` keep
+/// the porter idiom `.as_mut_ptr()` valid.
+/// Source: `oracle/oracle/codemp/game/g_saga.c:46`
+pub struct ParseObjectivesBuffer(pub [c_char; MAX_SIEGE_INFO_SIZE]);
+
+impl Default for ParseObjectivesBuffer {
+    fn default() -> Self {
+        ParseObjectivesBuffer([0; MAX_SIEGE_INFO_SIZE])
+    }
+}
+
+impl core::ops::Deref for ParseObjectivesBuffer {
+    type Target = [c_char];
+    fn deref(&self) -> &[c_char] {
+        &self.0
+    }
+}
+impl core::ops::DerefMut for ParseObjectivesBuffer {
+    fn deref_mut(&mut self) -> &mut [c_char] {
+        &mut self.0
+    }
+}
+
 /// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH];
 /// char newShader[MAX_QPATH]; float timeOffset; }`.
 /// Source: `oracle/oracle/codemp/game/g_utils.c:8-13`
@@ -447,6 +521,9 @@ pub struct GameGlobals {
     pub r#move: qboolean,
     /// `shoot`. Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:46`
     pub shoot: qboolean,
+    /// `static vec3_t impactPos` — last shot impact point (Stormtrooper aim).
+    /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:48`
+    pub impactPos: vec3_t,
     // --- `NPC_move.c` file-scope globals ---
     //TODO: Port navInfo_t
     // Source: oracle/oracle/codemp/game/NPC_move.c:14
@@ -464,6 +541,10 @@ pub struct GameGlobals {
     /// Raven `char npcParseBuffer[MAX_NPC_DATA_SIZE]` — scratch parse buffer.
     /// Source: `oracle/oracle/codemp/game/NPC_stats.c:3238`
     pub npcParseBuffer: NpcDataBuffer,
+    /// Raven `char NPCFile[MAX_QPATH]` — the currently-loading NPC-config file
+    /// name (parse cursor state).
+    /// Source: `oracle/oracle/codemp/game/NPC_stats.c:238`
+    pub NPCFile: NpcFileBuffer,
     // --- `ai_main.c` file-scope globals ---
     //TODO: Port bot_state_t *[MAX_CLIENTS]*
     // Source: oracle/oracle/codemp/game/ai_main.c:46
@@ -490,6 +571,14 @@ pub struct GameGlobals {
     pub gBotEventTracker: (),
     /// `gUpdateVars`. Source: `oracle/oracle/codemp/game/ai_main.c:7485`
     pub gUpdateVars: c_int,
+    /// `static int lastbotthink_time` — bot-think cadence latch (function-scope
+    /// static in `BotAIStartFrame`; genuine cross-frame state per ruling 5).
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:7497`
+    pub lastbotthink_time: c_int,
+    /// `static int local_time` — bot-frame elapsed-time cursor (function-scope
+    /// static in `BotAIStartFrame`; genuine cross-frame state per ruling 5).
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:7495`
+    pub local_time: c_int,
     /// `numbots`. Source: `oracle/oracle/codemp/game/ai_main.c:48`
     pub numbots: c_int,
     /// `oFlagBlue` (`wpobject_t *`). Source: `oracle/oracle/codemp/game/ai_main.c:89`
@@ -578,6 +667,9 @@ pub struct GameGlobals {
     pub gPainHitLoc: c_int,
     /// `gPainMOD`. Source: `oracle/oracle/codemp/game/g_combat.c:4573`
     pub gPainMOD: c_int,
+    /// `vec3_t gPainPoint` — location of the last registered pain hit.
+    /// Source: `oracle/oracle/codemp/game/g_combat.c:4575`
+    pub gPainPoint: vec3_t,
     // --- `g_items.c` file-scope globals ---
     /// `itemRegistered[MAX_ITEMS]` (`MAX_ITEMS` = 256, `bg_public.h:31`).
     /// Array `Default` isn't derivable past 32 elements in stable Rust, so
@@ -731,6 +823,13 @@ pub struct GameGlobals {
     // --- `g_saga.c` file-scope globals ---
     /// `gImperialCountdown`. Source: `oracle/oracle/codemp/game/g_saga.c:30`
     pub gImperialCountdown: c_int,
+    /// `static char gObjectiveCfgStr[1024]` — assembled objective config string.
+    /// Source: `oracle/oracle/codemp/game/g_saga.c:47`
+    pub gObjectiveCfgStr: ObjectiveCfgStr,
+    /// `static char gParseObjectives[MAX_SIEGE_INFO_SIZE]` — siege-config parse
+    /// buffer.
+    /// Source: `oracle/oracle/codemp/game/g_saga.c:46`
+    pub gParseObjectives: ParseObjectivesBuffer,
     /// `gRebelCountdown`. Source: `oracle/oracle/codemp/game/g_saga.c:31`
     pub gRebelCountdown: c_int,
     /// `gSiegeBeginTime`. Source: `oracle/oracle/codemp/game/g_saga.c:39`
@@ -821,6 +920,14 @@ pub struct GameGlobals {
     /// `s_quadFactor`. Source: `oracle/oracle/codemp/game/g_weapon.c:12`
     pub s_quadFactor: f32,
     // --- `w_saber.c` file-scope globals ---
+    /// `static vec3_t dmgDir[MAX_SABER_VICTIMS]` — per-victim saber damage
+    /// direction.
+    /// Source: `oracle/oracle/codemp/game/w_saber.c:3507`
+    pub dmgDir: [vec3_t; MAX_SABER_VICTIMS],
+    /// `static vec3_t dmgSpot[MAX_SABER_VICTIMS]` — per-victim saber impact
+    /// point.
+    /// Source: `oracle/oracle/codemp/game/w_saber.c:3508`
+    pub dmgSpot: [vec3_t; MAX_SABER_VICTIMS],
     //TODO: Port qboolean[MAX_SABER_VICTIMS]
     // Source: oracle/oracle/codemp/game/w_saber.c:3509
     pub dismemberDmg: (),
@@ -828,6 +935,12 @@ pub struct GameGlobals {
     pub numVictims: c_int,
     /// `saberClashEventParm`. Source: `oracle/oracle/codemp/game/w_saber.c:3797`
     pub saberClashEventParm: c_int,
+    /// `static vec3_t saberClashNorm` — surface normal at the last saber clash.
+    /// Source: `oracle/oracle/codemp/game/w_saber.c:3796`
+    pub saberClashNorm: vec3_t,
+    /// `static vec3_t saberClashPos` — world position of the last saber clash.
+    /// Source: `oracle/oracle/codemp/game/w_saber.c:3795`
+    pub saberClashPos: vec3_t,
     /// `saberDoClashEffect`. Source: `oracle/oracle/codemp/game/w_saber.c:3794`
     pub saberDoClashEffect: qboolean,
     /// `saberHitFraction`. Source: `oracle/oracle/codemp/game/w_saber.c:3848`
