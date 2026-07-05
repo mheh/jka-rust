@@ -349,22 +349,22 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
 // `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
 // `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
 
-/// Shim for RegisterAssets matching the C callback signature.
-/// RegisterAssets needs GameContext to access g_vehicleInfo, but vehicleInfo_t callbacks
-/// don't receive ctx. This wrapper is a PORT-NOTE: post-parity, RegisterAssets should be
-/// called through GameCallbacks or a wrapper that provides ctx.
-unsafe extern "C" fn RegisterAssets_extern(pVeh: *mut Vehicle_t) {
-    // PORT-NOTE(ctx-shim): vehicleInfo_t callbacks lack GameContext; RegisterAssets call deferred.
-}
-
 /// Raven `Board`.
 ///
-/// Board the Walker vehicle (internal static, assigned to vehicleInfo_t.Board).
+/// Board the Walker vehicle (fork-7: reached via `crate::veh_dispatch::board`).
 /// Source: `oracle/oracle/codemp/game/WalkerNPC.c:106-115`
-pub fn Board(
-    ctx: GameContext<'_>,pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
-    // PORT-ESCALATION(level-global): oracle line 188 accesses `level.time` global for boarding delay
-    todo!("Port Board — parked: level.time not yet accessible in vehicle context")
+pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
+    unsafe {
+        // Fork-7: `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
+        if crate::g_vehicles::Board(ctx, pVeh, pEnt) == qfalse {
+            return false;
+        }
+
+        // Set the board wait time (they won't be able to do anything, including getting off, for this amount of time).
+        (*pVeh).m_iBoarding = (*ctx.world).level.time + 1500;
+
+        true
+    }
 }
 
 /// Raven `G_CreateWalkerNPC`.
