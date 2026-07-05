@@ -100,6 +100,7 @@ use crate::npc::g_npc_t::gNPC_t;
 use crate::npc::look_mode::lookMode_t;
 use crate::saber::saber_flags::SFL_NOT_LOCKABLE;
 use mp_qshared::shared::saber_block_type::saberBlockType_t;
+use mp_qshared::common::mp::qcommon::collision_record::{G2Trace_t, MAX_G2_COLLISIONS};
 
 // w_saber.c file-local `#define`s used by this shard (matching the file's
 // existing file-local const scoping, e.g. `SABER_NONATTACK_DAMAGE` above).
@@ -109,6 +110,8 @@ const SABER_HITDAMAGE: c_int = 35;
 const SABER_EXTRAPOLATE_DIST: f32 = 16.0;
 /// Source: `oracle/oracle/codemp/game/w_saber.c:5284`
 const MAX_SABER_SWING_INC: f32 = 0.33;
+/// Source: `oracle/oracle/codemp/game/w_saber.c:639`
+const LOOK_DEFAULT_SPEED: f32 = 0.15;
 // `saberBlockedType_t` variants used by this shard's bodies (stored as `c_int`
 // in playerState), surfaced like the file's existing `BLOCKED_*` consts.
 const BLOCKED_BOUNCE_MOVE: c_int = saberBlockedType_t::BLOCKED_BOUNCE_MOVE as c_int;

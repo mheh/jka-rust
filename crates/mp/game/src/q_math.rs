@@ -975,6 +975,15 @@ pub fn _VectorScale(r#in: vec3_t, scale: vec_t, out: &mut vec3_t) {
     out[2] = r#in[2] * scale;
 }
 
+/// Raven `VectorInverse`.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:1547-1550`
+pub fn VectorInverse(v: &mut vec3_t) {
+    v[0] = -v[0];
+    v[1] = -v[1];
+    v[2] = -v[2];
+}
+
 /// Raven `Vector4Scale`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_math.c:1249-1254`

@@ -10,6 +10,10 @@
 
 use crate::prelude::*;
 
+/// Raven `MAX_GRAVITY_PULL`.
+///
+/// Source: `oracle/oracle/codemp/game/g_exphysics.c:16`
+pub const MAX_GRAVITY_PULL: f32 = 512.0;
 
 /// Raven `G_RunExPhys`.
 ///
