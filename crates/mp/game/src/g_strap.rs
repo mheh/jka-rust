@@ -25,8 +25,9 @@ pub fn strap_G2API_GetBoltMatrix(
     modelList: *mut qhandle_t,
     scale: vec3_t,
 ) -> qboolean {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_GetBoltMatrix — parked: trap-wrapper-calling-convention")
+    // PORT-NOTE(strap_boundary_fn_ptr): strap_ wrapper stored as fn-ptr in bg boundary without GameContext;
+    // forwards to trap_G2API_GetBoltMatrix (engine context sourced via bg channel upcall).
+    trap_G2API_GetBoltMatrix(ghoul2, modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale)
 }
 
 /// Raven `strap_G2API_GetBoltMatrix_NoReconstruct`.
@@ -44,8 +45,7 @@ pub fn strap_G2API_GetBoltMatrix_NoReconstruct(
     modelList: *mut qhandle_t,
     scale: vec3_t,
 ) -> qboolean {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_GetBoltMatrix_NoReconstruct — parked: trap-wrapper-calling-convention")
+    trap_G2API_GetBoltMatrix_NoReconstruct(ghoul2, modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale)
 }
 
 /// Raven `strap_G2API_GetBoltMatrix_NoRecNoRot`.
@@ -62,8 +62,9 @@ pub fn strap_G2API_GetBoltMatrix_NoRecNoRot(
     modelList: *mut qhandle_t,
     scale: vec3_t,
 ) -> qboolean {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_GetBoltMatrix_NoRecNoRot — parked: trap-wrapper-calling-convention")
+    // PORT-NOTE(strap_boundary_fn_ptr): strap_ wrapper stored as fn-ptr in bg boundary without GameContext;
+    // forwards to trap_G2API_GetBoltMatrix_NoRecNoRot (engine context sourced via bg channel upcall).
+    trap_G2API_GetBoltMatrix_NoRecNoRot(ghoul2, modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale)
 }
 
 /// Raven `strap_G2API_SetBoneAngles`.
@@ -82,8 +83,9 @@ pub fn strap_G2API_SetBoneAngles(
     blendTime: c_int,
     currentTime: c_int,
 ) -> qboolean {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_SetBoneAngles — parked: trap-wrapper-calling-convention")
+    // PORT-NOTE(strap_boundary_fn_ptr): strap_ wrapper stored as fn-ptr in bg boundary without GameContext;
+    // forwards to trap_G2API_SetBoneAngles (engine context sourced via bg channel upcall).
+    trap_G2API_SetBoneAngles(ghoul2, modelIndex, boneName, angles, flags, up, right, forward, modelList, blendTime, currentTime)
 }
 
 /// Raven `strap_G2API_SetBoneAnim`.
@@ -101,8 +103,9 @@ pub fn strap_G2API_SetBoneAnim(
     setFrame: f32,
     blendTime: c_int,
 ) -> qboolean {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_SetBoneAnim — parked: trap-wrapper-calling-convention")
+    // PORT-NOTE(strap_boundary_fn_ptr): strap_ wrapper stored as fn-ptr in bg boundary without GameContext;
+    // forwards to trap_G2API_SetBoneAnim (engine context sourced via bg channel upcall).
+    trap_G2API_SetBoneAnim(ghoul2, modelIndex, boneName, startFrame, endFrame, flags, animSpeed, currentTime, setFrame, blendTime)
 }
 
 /// Raven `strap_G2API_GetBoneAnim`.
@@ -120,8 +123,9 @@ pub fn strap_G2API_GetBoneAnim(
     modelList: *mut c_int,
     modelIndex: c_int,
 ) -> qboolean {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_GetBoneAnim — parked: trap-wrapper-calling-convention")
+    // PORT-NOTE(strap_boundary_fn_ptr): strap_ wrapper stored as fn-ptr in bg boundary without GameContext;
+    // forwards to trap_G2API_GetBoneAnim (engine context sourced via bg channel upcall).
+    trap_G2API_GetBoneAnim(ghoul2, boneName, currentTime, currentFrame, startFrame, endFrame, flags, animSpeed, modelList, modelIndex)
 }
 
 /// Raven `strap_G2API_SetRagDoll`.
@@ -132,8 +136,7 @@ pub fn strap_G2API_SetRagDoll(
     ghoul2: *mut c_void,
     params: *mut sharedRagDollParams_t,
 ) {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_SetRagDoll — parked: trap-wrapper-calling-convention")
+    trap_G2API_SetRagDoll(ghoul2, params);
 }
 
 /// Raven `strap_G2API_AnimateG2Models`.
@@ -144,8 +147,9 @@ pub fn strap_G2API_AnimateG2Models(
     time: c_int,
     params: *mut sharedRagDollUpdateParams_t,
 ) {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_AnimateG2Models — parked: trap-wrapper-calling-convention")
+    // PORT-NOTE(strap_boundary_fn_ptr): strap_ wrapper stored as fn-ptr in bg boundary without GameContext;
+    // forwards to trap_G2API_AnimateG2Models (engine context sourced via bg channel upcall).
+    trap_G2API_AnimateG2Models(ghoul2, time, params);
 }
 
 /// Raven `strap_G2API_SetBoneIKState`.
@@ -158,8 +162,9 @@ pub fn strap_G2API_SetBoneIKState(
     ikState: c_int,
     params: *mut sharedSetBoneIKStateParams_t,
 ) -> qboolean {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_SetBoneIKState — parked: trap-wrapper-calling-convention")
+    // PORT-NOTE(strap_boundary_fn_ptr): strap_ wrapper stored as fn-ptr in bg boundary without GameContext;
+    // forwards to trap_G2API_SetBoneIKState (engine context sourced via bg channel upcall).
+    trap_G2API_SetBoneIKState(ghoul2, time, boneName, ikState, params)
 }
 
 /// Raven `strap_G2API_IKMove`.
@@ -170,8 +175,9 @@ pub fn strap_G2API_IKMove(
     time: c_int,
     params: *mut sharedIKMoveParams_t,
 ) -> qboolean {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_G2API_IKMove — parked: trap-wrapper-calling-convention")
+    // PORT-NOTE(strap_boundary_fn_ptr): strap_ wrapper stored as fn-ptr in bg boundary without GameContext;
+    // forwards to trap_G2API_IKMove (engine context sourced via bg channel upcall).
+    trap_G2API_IKMove(ghoul2, time, params)
 }
 
 /// Raven `strap_TrueMalloc`.
@@ -182,8 +188,7 @@ pub fn strap_TrueMalloc(
     ptr: *mut *mut c_void,
     size: c_int,
 ) {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_TrueMalloc — parked: trap-wrapper-calling-convention")
+    trap_TrueMalloc(ptr, size);
 }
 
 /// Raven `strap_TrueFree`.
@@ -193,6 +198,5 @@ pub fn strap_TrueFree(
     ctx: GameContext<'_>,
     ptr: *mut *mut c_void,
 ) {
-    // PORT-ESCALATION(strap-wrapper-calling-convention): How should strap_* wrapper functions call trap_* wrappers when they don't have GameContext/Engine access?
-    todo!("Port strap_TrueFree — parked: trap-wrapper-calling-convention")
+    trap_TrueFree(ptr);
 }

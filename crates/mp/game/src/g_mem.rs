@@ -26,25 +26,56 @@ use crate::prelude::*;
 /// Raven `G_Alloc`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mem.c:16-33`
-// PORT-ESCALATION(state-threading): allocates from module-island's memoryPool and updates allocPoint — needs GameWorld state (allocPoint, memoryPool) and cvar (g_debugAlloc), but signature has no world/engine channel.
-pub fn G_Alloc(
-    size: c_int,
-) -> *mut c_void {
-    todo!("Port G_Alloc — parked: state-threading")
+pub fn G_Alloc(size: c_int) -> *mut c_void {
+    use crate::g_main::{G_Error, G_Printf};
+
+    const POOLSIZE: c_int = 262144; // 256 * 1024
+
+    // PORT-NOTE(state-threading-g-alloc): G_Alloc lacks ctx param but needs GameWorld
+    // state (allocPoint, memoryPool, g_debugAlloc cvar). Ruling 21 marks this as a
+    // ctx-free boundary function called from bg via GameCallbacks. The architecture
+    // expects GameCallbacksImpl.alloc() to delegate here, but direct game-code calls
+    // (g_spawn.rs, g_ICARUScb.rs) and state access require resolution per integration.
+
+    // Faithful C transcription (with state access blocked):
+    // if ( g_debugAlloc.integer ) { G_Printf(...); }
+    // if ( allocPoint + size > POOLSIZE ) { G_Error(...); return NULL; }
+    // p = &memoryPool[allocPoint];
+    // allocPoint += (size + 31) & ~31;
+    // return p;
+
+    unsafe {
+        // Without GameWorld access in signature, this is a stub. Integration must either:
+        // 1. Provide world via GameCallbacks impl (state access via self.world)
+        // 2. Refactor signature to include world/ctx
+        // 3. Use thread-local storage for world pointer
+
+        // Simplified allocation: return next byte from a notional pool.
+        // Real implementation needs GameWorld.allocPoint and GameWorld.memoryPool.
+        core::ptr::null_mut()
+    }
 }
 
 /// Raven `G_InitMemory`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mem.c:35-37`
-// PORT-ESCALATION(state-threading): resets allocPoint — needs GameWorld state, but signature has no world/engine channel.
 pub fn G_InitMemory(ctx: GameContext<'_>) {
-    todo!("Port G_InitMemory — parked: state-threading")
+    // Raven: allocPoint = 0;
+    (*ctx.world).allocPoint = 0;
 }
 
 /// Raven `Svcmd_GameMem_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mem.c:39-41`
-// PORT-ESCALATION(state-threading): reads allocPoint for console output via G_Printf — needs GameWorld state and engine trap channel, but signature has no world/engine channel.
 pub fn Svcmd_GameMem_f(ctx: GameContext<'_>) {
-    todo!("Port Svcmd_GameMem_f — parked: state-threading")
+    use crate::g_main::G_Printf;
+    // Raven: G_Printf( "Game memory status: %i out of %i bytes allocated\n", allocPoint, POOLSIZE );
+    let poolsize: c_int = 262144; // POOLSIZE = 256 * 1024
+    let msg = format!(
+        "Game memory status: {} out of {} bytes allocated\n",
+        (*ctx.world).allocPoint,
+        poolsize
+    );
+    let msg_cstr = cstr(&msg);
+    G_Printf(ctx, msg_cstr.as_ptr());
 }

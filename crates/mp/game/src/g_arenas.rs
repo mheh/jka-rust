@@ -12,12 +12,134 @@
 use crate::prelude::*;
 
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `level` (maxclients,
-// clients[], numNonSpectatorClients, sortedClients[], teamScores[], time),
-// `g_entities`, `g_gametype`, and calls `trap_SendConsoleCommand` — no GameWorld/engine handle.
 /// Raven `UpdateTournamentInfo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_arenas.c:20-101`
 pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
-    todo!("Port UpdateTournamentInfo — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/g_arenas.c:20")
+    let mut i: c_int;
+    let mut player: *mut gentity_t;
+    let mut playerClientNum: c_int;
+    let mut n: c_int;
+    let mut accuracy: c_int;
+    let mut perfect: c_int;
+    let mut msglen: c_int;
+    let mut buflen: c_int;
+    let mut score1: c_int;
+    let mut score2: c_int;
+    let mut won: bool;
+    let mut buf = [0 as c_char; 32];
+    let mut msg = [0 as c_char; MAX_STRING_CHARS as usize];
+
+    // find the real player
+    player = std::ptr::null_mut();
+    i = 0;
+    while i < (*ctx.world).level.maxclients {
+        player = (*ctx.world).entities.as_mut_ptr().add(i as usize);
+        if (*player).inuse == 0 {
+            i += 1;
+            continue;
+        }
+        if (*player).r.svFlags & SVF_BOT as c_uint == 0 {
+            break;
+        }
+        i += 1;
+    }
+    // this should never happen!
+    if player.is_null() || i == (*ctx.world).level.maxclients {
+        return;
+    }
+    playerClientNum = i;
+
+    CalculateRanks(ctx);
+
+    if (*ctx.world).level.clients[playerClientNum as usize].sess.sessionTeam == TEAM_SPECTATOR as c_int {
+        let formatted = format!(
+            "postgame {} {} 0 0 0 0 0 0 0 0 0 0 0",
+            (*ctx.world).level.numNonSpectatorClients, playerClientNum
+        );
+        write_cstr_field(&mut msg, &formatted);
+    } else {
+        if (*player).client.is_null() {
+            return;
+        }
+        let client = unsafe { &mut *(*player).client };
+        if client.accuracy_shots != 0 {
+            accuracy = client.accuracy_hits * 100 / client.accuracy_shots;
+        } else {
+            accuracy = 0;
+        }
+        won = false;
+        if (*ctx.world).cvars.g_gametype.integer >= GT_CTF as c_int {
+            score1 = (*ctx.world).level.teamScores[TEAM_RED as usize];
+            score2 = (*ctx.world).level.teamScores[TEAM_BLUE as usize];
+            if (*ctx.world).level.clients[playerClientNum as usize].sess.sessionTeam == TEAM_RED as c_int {
+                won = (*ctx.world).level.teamScores[TEAM_RED as usize] > (*ctx.world).level.teamScores[TEAM_BLUE as usize];
+            } else {
+                won = (*ctx.world).level.teamScores[TEAM_BLUE as usize] > (*ctx.world).level.teamScores[TEAM_RED as usize];
+            }
+        } else {
+            if core::ptr::addr_of!((*ctx.world).level.clients[playerClientNum as usize])
+                == core::ptr::addr_of!((*ctx.world).level.clients[(*ctx.world).level.sortedClients[0] as usize])
+            {
+                won = true;
+                score1 = (*ctx.world).level.clients[(*ctx.world).level.sortedClients[0] as usize].ps.persistant[PERS_SCORE as usize];
+                score2 = (*ctx.world).level.clients[(*ctx.world).level.sortedClients[1] as usize].ps.persistant[PERS_SCORE as usize];
+            } else {
+                score2 = (*ctx.world).level.clients[(*ctx.world).level.sortedClients[0] as usize].ps.persistant[PERS_SCORE as usize];
+                score1 = (*ctx.world).level.clients[(*ctx.world).level.sortedClients[1] as usize].ps.persistant[PERS_SCORE as usize];
+            }
+        }
+        if won && client.ps.persistant[PERS_KILLED as usize] == 0 {
+            perfect = 1;
+        } else {
+            perfect = 0;
+        }
+        let formatted = format!(
+            "postgame {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+            (*ctx.world).level.numNonSpectatorClients,
+            playerClientNum,
+            accuracy,
+            client.ps.persistant[PERS_IMPRESSIVE_COUNT as usize],
+            client.ps.persistant[PERS_EXCELLENT_COUNT as usize],
+            client.ps.persistant[PERS_DEFEND_COUNT as usize],
+            client.ps.persistant[PERS_ASSIST_COUNT as usize],
+            client.ps.persistant[PERS_GAUNTLET_FRAG_COUNT as usize],
+            client.ps.persistant[PERS_SCORE as usize],
+            perfect,
+            score1,
+            score2,
+            (*ctx.world).level.time,
+            client.ps.persistant[PERS_CAPTURES as usize]
+        );
+        write_cstr_field(&mut msg, &formatted);
+    }
+
+    msglen = msg.iter().position(|&c| c == 0).unwrap_or(0) as c_int;
+    i = 0;
+    while i < (*ctx.world).level.numNonSpectatorClients {
+        n = (*ctx.world).level.sortedClients[i as usize];
+        let buf_str = format!(
+            " {} {} {}",
+            n,
+            (*ctx.world).level.clients[n as usize].ps.persistant[PERS_RANK as usize],
+            (*ctx.world).level.clients[n as usize].ps.persistant[PERS_SCORE as usize]
+        );
+        write_cstr_field(&mut buf, &buf_str);
+        buflen = buf.iter().position(|&c| c == 0).unwrap_or(0) as c_int;
+        if msglen + buflen + 1 >= MAX_STRING_CHARS {
+            break;
+        }
+        // strcat(msg, buf)
+        let msg_len = msg.iter().position(|&c| c == 0).unwrap_or(0);
+        let buf_len = buf.iter().position(|&c| c == 0).unwrap_or(0);
+        for j in 0..buf_len {
+            msg[msg_len + j] = buf[j];
+        }
+        msg[msg_len + buf_len] = 0;
+        msglen += buflen;
+        i += 1;
+    }
+
+    let msg_str = unsafe { cstr_to_str(msg.as_ptr()) };
+    trap::SendConsoleCommand(ctx.engine, GSendconsolecommandArgs::new(EXEC_APPEND, cstr(&msg_str).as_ptr()));
 }

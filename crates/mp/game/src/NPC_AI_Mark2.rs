@@ -128,120 +128,340 @@ pub fn NPC_Mark2_Precache(ctx: GameContext<'_>) {
 /// Raven `NPC_Mark2_Part_Explode`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:50-72`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
-// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
-// `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_Mark2_Part_Explode(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     bolt: c_int,
 ) {
-    todo!("Port NPC_Mark2_Part_Explode — parked: seam-threading")
+    if bolt >= 0 {
+        let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
+        let mut org: vec3_t = [0.0; 3];
+        let mut dir: vec3_t = [0.0; 3];
+
+        trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                (*self_).ghoul2,
+                0,
+                bolt,
+                &mut boltMatrix as *mut mdxaBone_t,
+                &(*self_).r.currentAngles as *const vec3_t,
+                &(*self_).r.currentOrigin as *const vec3_t,
+                (*ctx.world).level.time,
+                core::ptr::null_mut(),
+                &(*self_).modelScale as *const vec3_t,
+            ),
+        );
+
+        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut org);
+        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
+
+        G_PlayEffectID(G_EffectIndex(b"env/med_explode2\0".as_ptr() as *const c_char), org, dir);
+        G_PlayEffectID(G_EffectIndex(b"blaster/smoke_bolton\0".as_ptr() as *const c_char), org, dir);
+    }
+
+    (*self_).count += 1;
 }
 
 /// Raven `NPC_Mark2_Pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:80-111`
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but this body calls a callee (or reads a
-// file-scope global) that needs one (ruling 1/precedent `ai_main.rs`/
-// `g_weapon.rs`) — how is state threaded in?
 pub fn NPC_Mark2_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
 ) {
-    todo!("Port NPC_Mark2_Pain — parked: seam-threading")
+    let hit_loc = (*ctx.world).globals.gPainHitLoc;
+
+    NPC_Pain(ctx, self_, attacker, damage);
+
+    for i in 0..3 {
+        if hit_loc == HL_GENERIC1 + i && (*self_).locationDamage[(HL_GENERIC1 + i) as usize] > AMMO_POD_HEALTH {
+            if (*self_).locationDamage[hit_loc as usize] >= AMMO_POD_HEALTH {
+                let surface_name = va(b"torso_canister%d\0".as_ptr() as *const c_char, (i + 1) as c_int);
+                let new_bolt = trap::G2API_AddBolt(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                        (*self_).ghoul2,
+                        0,
+                        surface_name,
+                    ),
+                );
+                if new_bolt != -1 {
+                    NPC_Mark2_Part_Explode(ctx, self_, new_bolt);
+                }
+                NPC_SetSurfaceOnOff(ctx, self_, surface_name, TURN_OFF);
+                break;
+            }
+        }
+    }
+
+    G_Sound(
+        ctx,
+        self_,
+        crate::g_defines::CHAN_AUTO,
+        G_SoundIndex(b"sound/chars/mark2/misc/mark2_pain\0".as_ptr() as *const c_char),
+    );
+
+    if (*self_).count > 0 {
+        G_Damage(
+            ctx,
+            self_,
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+            [0.0; 3],
+            (*self_).health,
+            crate::level::damage_flags::DAMAGE_NO_PROTECTION,
+            crate::level::mod_types::MOD_UNKNOWN,
+        );
+    }
 }
 
 /// Raven `Mark2_Hunt`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:118-130`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Mark2_Hunt(ctx: GameContext<'_>) {
-    todo!("Port Mark2_Hunt — parked: ai-context")
+    let npc_ptr = (*ctx.world).globals.NPC;
+    let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+
+    if (*npc_info_ptr).goalEntity.is_none() {
+        (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
+    }
+
+    NPC_FaceEnemy(ctx, qtrue);
+
+    (*npc_info_ptr).combatMove = qtrue;
+    NPC_MoveToGoal(ctx, qtrue);
 }
 
 /// Raven `Mark2_FireBlaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:137-179`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Mark2_FireBlaster(
     ctx: GameContext<'_>,
     advance: qboolean,
 ) {
-    todo!("Port Mark2_FireBlaster — parked: ai-context")
+    let mut muzzle1: vec3_t = [0.0; 3];
+    let mut enemy_org1: vec3_t = [0.0; 3];
+    let mut delta1: vec3_t = [0.0; 3];
+    let mut angleToEnemy1: vec3_t = [0.0; 3];
+    let mut forward: vec3_t = [0.0; 3];
+    let mut vright: vec3_t = [0.0; 3];
+    let mut up: vec3_t = [0.0; 3];
+
+    let npc_ptr = (*ctx.world).globals.NPC;
+    let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
+
+    let bolt = trap::G2API_AddBolt(
+        ctx.engine,
+        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+            (*npc_ptr).ghoul2,
+            0,
+            b"*flash\0".as_ptr() as *const c_char,
+        ),
+    );
+
+    trap::G2API_GetBoltMatrix(
+        ctx.engine,
+        mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+            (*npc_ptr).ghoul2,
+            0,
+            bolt,
+            &mut boltMatrix as *mut mdxaBone_t,
+            &(*npc_ptr).r.currentAngles as *const vec3_t,
+            &(*npc_ptr).r.currentOrigin as *const vec3_t,
+            (*ctx.world).level.time,
+            core::ptr::null_mut(),
+            &(*npc_ptr).modelScale as *const vec3_t,
+        ),
+    );
+
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
+
+    if (*npc_ptr).health != 0 {
+        let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
+            &(*ctx.world).entities[eid.0 as usize] as *const gentity_t
+        } else {
+            core::ptr::null()
+        };
+        CalcEntitySpot(ctx, enemy_ptr, crate::entity::spot_type::SPOT_HEAD, &mut enemy_org1);
+        crate::q_math::_VectorSubtract(enemy_org1, muzzle1, &mut delta1);
+        vectoangles(delta1, &mut angleToEnemy1);
+        AngleVectors(angleToEnemy1, Some(&mut forward), Some(&mut vright), Some(&mut up));
+    } else {
+        AngleVectors((*npc_ptr).r.currentAngles, Some(&mut forward), Some(&mut vright), Some(&mut up));
+    }
+
+    G_PlayEffectID(G_EffectIndex(b"bryar/muzzle_flash\0".as_ptr() as *const c_char), muzzle1, forward);
+
+    G_Sound(
+        ctx,
+        npc_ptr,
+        crate::g_defines::CHAN_AUTO,
+        G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char),
+    );
+
+    let missile = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_ptr, qfalse);
+
+    (*missile).classname = b"bryar_proj\0".as_ptr() as *const c_char;
+    (*missile).s.weapon = crate::g_defines::WP_BRYAR_PISTOL;
+
+    (*missile).damage = 1;
+    (*missile).dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
+    (*missile).methodOfDeath = crate::level::mod_types::MOD_BRYAR_PISTOL;
+    (*missile).clipmask = crate::g_defines::MASK_SHOT | crate::g_defines::CONTENTS_LIGHTSABER;
 }
 
 /// Raven `Mark2_BlasterAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:186-205`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Mark2_BlasterAttack(
     ctx: GameContext<'_>,
     advance: qboolean,
 ) {
-    todo!("Port Mark2_BlasterAttack — parked: ai-context")
+    let npc_ptr = (*ctx.world).globals.NPC;
+    let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+
+    if TIMER_Done(ctx, npc_ptr, b"attackDelay\0".as_ptr() as *const c_char) == qtrue {
+        if (*npc_info_ptr).localState == LSTATE_NONE {
+            TIMER_Set(
+                ctx,
+                npc_ptr,
+                b"attackDelay\0".as_ptr() as *const c_char,
+                (*ctx.world).bg_state.rng.Q_irand(500, 2000),
+            );
+        } else {
+            TIMER_Set(
+                ctx,
+                npc_ptr,
+                b"attackDelay\0".as_ptr() as *const c_char,
+                (*ctx.world).bg_state.rng.Q_irand(100, 500),
+            );
+        }
+        Mark2_FireBlaster(ctx, advance);
+        return;
+    } else if advance == qtrue {
+        Mark2_Hunt(ctx);
+    }
 }
 
 /// Raven `Mark2_AttackDecision`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:212-295`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
-    todo!("Port Mark2_AttackDecision — parked: ai-context")
+    let npc_ptr = (*ctx.world).globals.NPC;
+    let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+
+    NPC_FaceEnemy(ctx, qtrue);
+
+    let distance = {
+        let d = crate::q_math::DistanceHorizontalSquared((*npc_ptr).r.currentOrigin, (*npc_ptr).enemy.map(|eid| {
+            (*ctx.world).entities[eid.0 as usize].r.currentOrigin
+        }).unwrap_or([0.0; 3]));
+        d as c_int
+    } as i64;
+    let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
+        &mut (*ctx.world).entities[eid.0 as usize] as *mut gentity_t
+    } else {
+        core::ptr::null_mut()
+    };
+    let visible = NPC_ClearLOS4(ctx, enemy_ptr);
+    let advance = (distance > MIN_DISTANCE_SQR as i64) as qboolean;
+
+    if (*npc_info_ptr).localState == LSTATE_RISINGUP {
+        (*npc_ptr).flags &= !crate::g_defines::FL_SHIELDED;
+        NPC_SetAnim(npc_ptr, crate::anim::SETANIM_BOTH, crate::anim::BOTH_RUN1START, crate::anim::SETANIM_FLAG_HOLD | crate::anim::SETANIM_FLAG_OVERRIDE);
+        if (*(*npc_ptr).client).ps.legsTimer <= 0 && (*(*npc_ptr).client).ps.torsoAnim == crate::anim::BOTH_RUN1START {
+            (*npc_info_ptr).localState = LSTATE_NONE;
+        }
+        return;
+    }
+
+    if visible == qfalse || NPC_FaceEnemy(ctx, qtrue) == qfalse {
+        if (*npc_info_ptr).localState == LSTATE_DOWN || (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN {
+            if TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue {
+                (*npc_info_ptr).localState = LSTATE_RISINGUP;
+                NPC_SetAnim(npc_ptr, crate::anim::SETANIM_BOTH, crate::anim::BOTH_RUN1STOP, crate::anim::SETANIM_FLAG_HOLD | crate::anim::SETANIM_FLAG_OVERRIDE);
+                TIMER_Set(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 8000));
+            }
+        } else {
+            Mark2_Hunt(ctx);
+        }
+        return;
+    }
+
+    if advance == qtrue && TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue && (*npc_info_ptr).localState == LSTATE_DOWN {
+        (*npc_info_ptr).localState = LSTATE_RISINGUP;
+        NPC_SetAnim(npc_ptr, crate::anim::SETANIM_BOTH, crate::anim::BOTH_RUN1STOP, crate::anim::SETANIM_FLAG_HOLD | crate::anim::SETANIM_FLAG_OVERRIDE);
+        TIMER_Set(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 8000));
+    }
+
+    NPC_FaceEnemy(ctx, qtrue);
+
+    if (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN {
+        NPC_SetAnim(npc_ptr, crate::anim::SETANIM_BOTH, crate::anim::BOTH_RUN1STOP, crate::anim::SETANIM_FLAG_HOLD | crate::anim::SETANIM_FLAG_OVERRIDE);
+        TIMER_Set(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 9000));
+
+        if (*(*npc_ptr).client).ps.legsTimer <= 0 && (*(*npc_ptr).client).ps.torsoAnim == crate::anim::BOTH_RUN1STOP {
+            (*npc_ptr).flags |= crate::g_defines::FL_SHIELDED;
+            (*npc_info_ptr).localState = LSTATE_DOWN;
+        }
+    } else if (*npc_info_ptr).localState == LSTATE_DOWN {
+        (*npc_ptr).flags |= crate::g_defines::FL_SHIELDED;
+        Mark2_BlasterAttack(ctx, qfalse);
+    } else if TIMER_Done(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char) == qtrue {
+        (*npc_info_ptr).localState = LSTATE_DROPPINGDOWN;
+    } else if advance == qtrue {
+        Mark2_BlasterAttack(ctx, advance);
+    }
 }
 
 /// Raven `Mark2_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:303-330`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Mark2_Patrol(ctx: GameContext<'_>) {
-    todo!("Port Mark2_Patrol — parked: ai-context")
+    let npc_ptr = (*ctx.world).globals.NPC;
+
+    if NPC_CheckPlayerTeamStealth(ctx) == qtrue {
+        NPC_UpdateAngles(ctx, qtrue, qtrue);
+        return;
+    }
+
+    if (*npc_ptr).enemy.is_none() {
+        if UpdateGoal(ctx) != core::ptr::null_mut() {
+            (*ctx.world).globals.ucmd.buttons |= crate::g_defines::BUTTON_WALKING;
+            NPC_MoveToGoal(ctx, qtrue);
+            NPC_UpdateAngles(ctx, qtrue, qtrue);
+        }
+
+        if TIMER_Done(ctx, npc_ptr, b"patrolNoise\0".as_ptr() as *const c_char) == qtrue {
+            TIMER_Set(ctx, npc_ptr, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+        }
+    }
 }
 
 /// Raven `Mark2_Idle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:337-340`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn Mark2_Idle(ctx: GameContext<'_>) {
-    todo!("Port Mark2_Idle — parked: ai-context")
+    NPC_BSIdle(ctx);
 }
 
 /// Raven `NPC_BSMark2_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:347-362`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn NPC_BSMark2_Default(ctx: GameContext<'_>) {
-    todo!("Port NPC_BSMark2_Default — parked: ai-context")
+    let npc_ptr = (*ctx.world).globals.NPC;
+    let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+
+    if (*npc_ptr).enemy.is_some() {
+        (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
+        Mark2_AttackDecision(ctx);
+    } else if ((*npc_info_ptr).scriptFlags & crate::npc_defs::SCF_LOOK_FOR_ENEMIES) != 0 {
+        Mark2_Patrol(ctx);
+    } else {
+        Mark2_Idle(ctx);
+    }
 }

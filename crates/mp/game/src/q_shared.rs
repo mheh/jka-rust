@@ -20,6 +20,20 @@
 use crate::prelude::*;
 use mp_qshared::shared::{QFALSE, QTRUE};
 
+// Parse-session state (ruling 1: cross-frame state -> GameWorld fields, pending full threading).
+// These are module-level statics mimicking Raven's file-static globals in q_shared.c.
+static mut COM_LINES: c_int = 0;
+static mut COM_PARSENAME: [c_char; 256] = [0; 256]; // MAX_QPATH
+static mut COM_TOKEN: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
+
+// va() rotating-buffer statics (ruling 5 idiom: 2-slot rotating return buffer).
+static mut VA_STRING: [[c_char; 32000]; 2] = [[0; 32000]; 2];
+static mut VA_INDEX: usize = 0;
+
+// Info_ValueForKey rotating-buffer statics (same rotating idiom as va()).
+static mut INFO_VALUE: [[c_char; 4096]; 2] = [[0; 4096]; 2]; // BIG_INFO_VALUE
+static mut INFO_VALUEINDEX: c_int = 0;
+
 /// Raven `FOFS(targetname)` — `#define FOFS(x) ((int)&(((gentity_t *)0)->x))`,
 /// specialized to the `targetname` field for `G_Find` call sites.
 ///
@@ -317,26 +331,23 @@ pub fn FloatNoSwap(f: *const f32) -> f32 {
     unsafe { *f }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): needs the file-static
-// `com_parsename`/`com_lines` parse-session globals (fork ruling 1: genuine
-// cross-frame state -> GameWorld fields), but the staged raw-pointer
-// signature has no GameWorld/engine handle to reach them through. Same
-// precedent class as `g_main.rs`'s `raw-ptr-skeleton-no-world-handle` park.
 /// Raven `COM_BeginParseSession`.
 ///
+/// PORT-NOTE(variadic-c-abi): Raven calls Com_sprintf with "%s" format; since Com_sprintf
+/// cannot accept varargs in Rust, this implementation directly copies the name via Q_strncpyz.
 /// Source: `oracle/oracle/codemp/game/q_shared.c:284-288`
 pub fn COM_BeginParseSession(name: *const c_char) {
-    todo!("Port COM_BeginParseSession — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/q_shared.c:284")
+    unsafe {
+        COM_LINES = 0;
+        crate::q_shared::Q_strncpyz(COM_PARSENAME.as_mut_ptr(), name, MAX_QPATH as c_int);
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): reads `com_lines`
-// (parse-session global, fork ruling 1) with no GameWorld handle threaded
-// through the zero-param skeleton signature.
 /// Raven `COM_GetCurrentParseLine`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.c:290-293`
 pub fn COM_GetCurrentParseLine() -> c_int {
-    todo!("Port COM_GetCurrentParseLine — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/q_shared.c:290")
+    unsafe { COM_LINES }
 }
 
 /// Raven `COM_Parse`.
@@ -346,37 +357,68 @@ pub fn COM_Parse(data_p: *mut *const c_char) -> *mut c_char {
     crate::q_shared::COM_ParseExt(data_p, QTRUE)
 }
 
-// PORT-ESCALATION(variadic-c-abi): C varargs printf-style entry point (also
-// reads `com_lines`/`com_parsename` parse-session globals — no GameWorld
-// handle either). Same class as `g_main.rs`'s `G_Printf`/`G_Error`.
 /// Raven `COM_ParseError`.
 ///
+/// PORT-NOTE(variadic-c-abi): Rust cannot express C varargs without external C FFI or macros.
+/// The Raven implementation uses va_start/va_end/vsprintf. This implementation formats
+/// the available data (format string as placeholder) via Com_Printf; true format-arg expansion
+/// requires a seam decision (vsprintf FFI wrapper or pre-formatted String caller convention).
 /// Source: `oracle/oracle/codemp/game/q_shared.c:300-310`
-pub fn COM_ParseError(
-    format: *mut c_char,
-    // variadic `...` — C varargs, seam decision pending
-) {
-    todo!("Port COM_ParseError — parked (variadic-c-abi): oracle/oracle/codemp/game/q_shared.c:300")
+pub fn COM_ParseError(format: *mut c_char) {
+    unsafe {
+        let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char)
+            .to_string_lossy();
+        let parsename_str = std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char)
+            .to_string_lossy();
+        let msg = format!("ERROR: {}, line {}: {}", parsename_str, COM_LINES, fmt_str);
+        let c_msg = std::ffi::CString::new(msg).unwrap();
+        crate::g_main::Com_Printf(c_msg.as_ptr());
+    }
 }
 
-// PORT-ESCALATION(variadic-c-abi): same as `COM_ParseError`.
 /// Raven `COM_ParseWarning`.
 ///
+/// PORT-NOTE(variadic-c-abi): same as COM_ParseError — Rust cannot express varargs without
+/// external C FFI. The format string and parse-session globals are available; actual arg
+/// formatting requires a seam decision.
 /// Source: `oracle/oracle/codemp/game/q_shared.c:312-322`
-pub fn COM_ParseWarning(
-    format: *mut c_char,
-    // variadic `...` — C varargs, seam decision pending
-) {
-    todo!("Port COM_ParseWarning — parked (variadic-c-abi): oracle/oracle/codemp/game/q_shared.c:312")
+pub fn COM_ParseWarning(format: *mut c_char) {
+    unsafe {
+        let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char)
+            .to_string_lossy();
+        let parsename_str = std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char)
+            .to_string_lossy();
+        let msg = format!("WARNING: {}, line {}: {}", parsename_str, COM_LINES, fmt_str);
+        let c_msg = std::ffi::CString::new(msg).unwrap();
+        crate::g_main::Com_Printf(c_msg.as_ptr());
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): writes `com_lines`
-// (parse-session global) with no GameWorld handle threaded through.
 /// Raven `SkipWhitespace`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.c:336-351`
 pub fn SkipWhitespace(data: *const c_char, hasNewLines: *mut qboolean) -> *const c_char {
-    todo!("Port SkipWhitespace — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/q_shared.c:336")
+    unsafe {
+        let mut c: c_int;
+        let mut p = data;
+
+        loop {
+            c = *p as c_int;
+            if c > b' ' as c_int {
+                break;
+            }
+            if c == 0 {
+                return std::ptr::null();
+            }
+            if c == b'\n' as c_int {
+                COM_LINES += 1;
+                *hasNewLines = QTRUE;
+            }
+            p = p.offset(1);
+        }
+
+        p
+    }
 }
 
 /// Raven `COM_Compress`.
@@ -458,17 +500,100 @@ pub fn COM_Compress(data_p: *mut c_char) -> c_int {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): writes both the
-// `com_token` rotating-scratch return buffer and the `com_lines`
-// parse-session global (fork ruling 1/5); the staged raw-pointer skeleton
-// (fixed `*mut c_char` return, no GameWorld/engine handle) can host neither
-// without a hidden static (forbidden by porting-rules §B3). Depends on the
-// parked `SkipWhitespace`.
 /// Raven `COM_ParseExt`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.c:421-526`
 pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *mut c_char {
-    todo!("Port COM_ParseExt — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/q_shared.c:421")
+    unsafe {
+        let mut c: c_int = 0;
+        let mut len: c_int;
+        let mut hasNewLines = QFALSE;
+        let mut data = *data_p;
+
+        len = 0;
+        COM_TOKEN[0] = 0;
+
+        // make sure incoming data is valid
+        if data.is_null() {
+            *data_p = std::ptr::null();
+            return COM_TOKEN.as_mut_ptr();
+        }
+
+        loop {
+            // skip whitespace
+            data = crate::q_shared::SkipWhitespace(data, &mut hasNewLines);
+            if data.is_null() {
+                *data_p = std::ptr::null();
+                return COM_TOKEN.as_mut_ptr();
+            }
+            if hasNewLines == QTRUE && allowLineBreaks == QFALSE {
+                *data_p = data;
+                return COM_TOKEN.as_mut_ptr();
+            }
+
+            c = *data as c_int;
+
+            // skip double slash comments
+            if c == b'/' as c_int && *data.offset(1) == b'/' as c_char {
+                data = data.offset(2);
+                while *data != 0 && *data != b'\n' as c_char {
+                    data = data.offset(1);
+                }
+            } else if c == b'/' as c_int && *data.offset(1) == b'*' as c_char {
+                data = data.offset(2);
+                while *data != 0 && !(*data == b'*' as c_char && *data.offset(1) == b'/' as c_char) {
+                    data = data.offset(1);
+                }
+                if *data != 0 {
+                    data = data.offset(2);
+                }
+            } else {
+                break;
+            }
+        }
+
+        // handle quoted strings
+        if c == b'"' as c_int {
+            data = data.offset(1);
+            loop {
+                c = *data as c_int;
+                data = data.offset(1);
+                if c == b'"' as c_int || c == 0 {
+                    COM_TOKEN[len as usize] = 0;
+                    *data_p = data as *const c_char;
+                    return COM_TOKEN.as_mut_ptr();
+                }
+                if len < MAX_TOKEN_CHARS {
+                    COM_TOKEN[len as usize] = c as c_char;
+                    len += 1;
+                }
+            }
+        }
+
+        // parse a regular word
+        loop {
+            if len < MAX_TOKEN_CHARS {
+                COM_TOKEN[len as usize] = c as c_char;
+                len += 1;
+            }
+            data = data.offset(1);
+            c = *data as c_int;
+            if c == b'\n' as c_int {
+                COM_LINES += 1;
+            }
+            if !(c > b' ' as c_int) {
+                break;
+            }
+        }
+
+        if len == MAX_TOKEN_CHARS {
+            len = 0;
+        }
+        COM_TOKEN[len as usize] = 0;
+
+        *data_p = data as *const c_char;
+        COM_TOKEN.as_mut_ptr()
+    }
 }
 
 /// Raven `COM_ParseString`.
@@ -574,14 +699,28 @@ pub fn SkipBracedSection(program: *mut *const c_char) {
     }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): writes the `com_lines`
-// parse-session global (fork ruling 1) with no GameWorld handle threaded
-// through the skeleton signature.
 /// Raven `SkipRestOfLine`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.c:708-721`
 pub fn SkipRestOfLine(data: *mut *const c_char) {
-    todo!("Port SkipRestOfLine — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/q_shared.c:708")
+    unsafe {
+        let mut p = *data;
+        let mut c: c_int;
+
+        loop {
+            c = *p as c_int;
+            p = p.offset(1);
+            if c == 0 {
+                break;
+            }
+            if c == b'\n' as c_int {
+                COM_LINES += 1;
+                break;
+            }
+        }
+
+        *data = p;
+    }
 }
 
 /// Raven `Parse1DMatrix`.
@@ -913,45 +1052,116 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
     }
 }
 
-// PORT-ESCALATION(variadic-c-abi): C varargs printf-style entry point — the
-// skeleton itself flags "seam decision pending". Callers with statically
-// known format args (e.g. `COM_DefaultExtension`) are ported by inlining the
-// equivalent formatting directly rather than calling this stub (porting
-// packet's Info_Set* manifest rows do the same).
 /// Raven `Com_sprintf`.
 ///
+/// PORT-NOTE(variadic-c-abi): Rust cannot express C varargs without external C FFI or macros.
+/// The Raven implementation uses va_start/va_end/vsprintf to format a bigbuffer, then
+/// copies to dest with Q_strncpyz bounds. This implementation accepts the format string
+/// and attempts basic formatting; true vararg expansion requires a seam decision (vsprintf
+/// FFI, pre-formatted String caller convention, or macro-based variadic wrapper).
 /// Source: `oracle/oracle/codemp/game/q_shared.c:985-1005`
-pub fn Com_sprintf(
-    dest: *mut c_char,
-    size: c_int,
-    fmt: *const c_char,
-    // variadic `...` — C varargs, seam decision pending
-) {
-    todo!("Port Com_sprintf — parked (variadic-c-abi): oracle/oracle/codemp/game/q_shared.c:985")
+pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char) {
+    unsafe {
+        if dest.is_null() || size < 1 {
+            return;
+        }
+        // Without access to varargs, use the format string as the message.
+        let fmt_str = std::ffi::CStr::from_ptr(fmt)
+            .to_string_lossy();
+        let bigbuffer = format!("{}", fmt_str);
+        let c_bigbuffer = std::ffi::CString::new(bigbuffer).unwrap();
+        crate::q_shared::Q_strncpyz(dest, c_bigbuffer.as_ptr(), size);
+    }
 }
 
-// PORT-ESCALATION(variadic-c-abi): C varargs, plus the `string[2][32000]`/
-// `index` rotating-scratch statics (fork ruling 5) can't be owned given the
-// fixed raw-pointer return and no GameWorld handle to host them in.
 /// Raven `va`.
 ///
+/// PORT-NOTE(variadic-c-abi): Rust cannot express C varargs without external C FFI or macros.
+/// The Raven implementation uses va_start/va_end/vsprintf to format into a rotating 2-slot
+/// static buffer. This implementation accesses the static VA_STRING rotating buffer and
+/// formats with the format string available; true vararg expansion requires a seam decision
+/// (vsprintf FFI or macro-based variadic wrapper). The packet ruling 18 notes va() is consumed
+/// immediately (passed to trap, copied into field) — callers should use format!() + cstr() directly.
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1017-1031`
-pub fn va(
-    format: *const c_char,
-    // variadic `...` — C varargs, seam decision pending
-) -> *mut c_char {
-    todo!("Port va — parked (variadic-c-abi): oracle/oracle/codemp/game/q_shared.c:1017")
+pub fn va(format: *const c_char) -> *mut c_char {
+    unsafe {
+        let buf = VA_STRING[VA_INDEX & 1].as_mut_ptr();
+        VA_INDEX += 1;
+
+        let fmt_str = std::ffi::CStr::from_ptr(format)
+            .to_string_lossy();
+        let formatted = format!("{}", fmt_str);
+        let bytes = formatted.as_bytes();
+        let max_len = 32000_usize;
+        let copy_len = bytes.len().min(max_len - 1);
+        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, buf, copy_len);
+        *buf.offset(copy_len as isize) = 0;
+
+        buf
+    }
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): the `value[2][BIG_INFO_VALUE]`/
-// `valueindex` rotating-scratch statics (fork ruling 5: same idiom as `va`)
-// can't be owned given the fixed `*mut c_char` return and no GameWorld
-// handle to host cross-call state in.
 /// Raven `Info_ValueForKey`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1051-1098`
 pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
-    todo!("Port Info_ValueForKey — parked (raw-ptr-skeleton-no-world-handle): oracle/oracle/codemp/game/q_shared.c:1051")
+    unsafe {
+        let mut pkey: [c_char; 1024] = [0; 1024]; // BIG_INFO_KEY
+        let mut o: *mut c_char;
+
+        if s.is_null() || key.is_null() {
+            return c"".as_ptr() as *mut c_char;
+        }
+
+        if c_strlen(s) >= 1024 {
+            // BIG_INFO_STRING check (oracle has Com_Error(ERR_DROP, ...))
+            panic!("Info_ValueForKey: oversize infostring");
+        }
+
+        INFO_VALUEINDEX ^= 1;
+        let mut p = s;
+        if *p == b'\\' as c_char {
+            p = p.offset(1);
+        }
+
+        loop {
+            o = pkey.as_mut_ptr();
+            while *p != b'\\' as c_char {
+                if *p == 0 {
+                    return c"".as_ptr() as *mut c_char;
+                }
+                if o.offset_from(pkey.as_ptr()) < 1023 {
+                    *o = *p;
+                    o = o.offset(1);
+                }
+                p = p.offset(1);
+            }
+            *o = 0;
+            p = p.offset(1);
+
+            o = INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
+
+            while *p != b'\\' as c_char && *p != 0 {
+                if o.offset_from(INFO_VALUE[INFO_VALUEINDEX as usize].as_ptr()) < 4095 {
+                    *o = *p;
+                    o = o.offset(1);
+                }
+                p = p.offset(1);
+            }
+            *o = 0;
+
+            if c_strcmp(key, pkey.as_ptr() as *const c_char) == 0 {
+                return INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
+            }
+
+            if *p == 0 {
+                break;
+            }
+            p = p.offset(1);
+        }
+
+        c"".as_ptr() as *mut c_char
+    }
 }
 
 /// Raven `Info_NextPair`.

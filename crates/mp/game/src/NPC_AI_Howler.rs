@@ -21,8 +21,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::g_timer::{TIMER_Remove, TIMER_Set};
-use crate::npc_c::NPC_SetAnim;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
 // Raven `#define LSTATE_*` — file-scope local state for Howler NPC
 // (stored in `gNPC_t::localState`).
@@ -30,12 +29,22 @@ use crate::npc_c::NPC_SetAnim;
 pub const LSTATE_CLEAR: i32 = 0;
 pub const LSTATE_WAITING: i32 = 1;
 
+// Combat distance constants for Howler melee attacks.
+// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:12-14`
+const MIN_DISTANCE: c_int = 64;
+const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
+const MAX_DISTANCE: c_int = 256;
+
 // Animation constants (bg_public.h) — Howler pain response anim.
 // Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:187`
 const SETANIM_BOTH: c_int = 2;
 const BOTH_PAIN1: c_int = 4;
 const SETANIM_FLAG_OVERRIDE: c_int = 1;
 const SETANIM_FLAG_HOLD: c_int = 2;
+
+// Attack animation constants
+// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:118`
+const BOTH_ATTACK1: c_int = 5;
 
 /// Raven `NPC_Howler_Precache`.
 ///
@@ -53,18 +62,54 @@ pub fn Howler_Idle() {
     // Empty in oracle (faithfully ported as no-op).
 }
 
-// PORT-ESCALATION(ambient-ai-state): reads/writes the ambient `NPC`,
-// `NPCInfo`, `ucmd`, and `g_entities` globals (b_local.h); no threading
-// mechanism resolved.
 /// Raven `Howler_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:38-71`
 pub fn Howler_Patrol(ctx: GameContext<'_>) {
-    todo!("Port Howler_Patrol — parked: ambient-ai-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        (*npc_info).localState = LSTATE_CLEAR;
+
+        // If we have somewhere to go, then do that
+        if !crate::NPC_goal::UpdateGoal(ctx).is_null() {
+            (*ctx.world).globals.ucmd.buttons &= !BUTTON_WALKING;
+            crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
+        } else {
+            if crate::g_timer::TIMER_Done(ctx, npc, c"patrolTime".as_ptr()) != 0 {
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    npc,
+                    c"patrolTime".as_ptr(),
+                    ((*ctx.world).bg_state.rng.crandom() * 5000.0 + 5000.0) as c_int,
+                );
+            }
+        }
+
+        // rwwFIXMEFIXME: Care about all clients, not just client 0
+        let mut dif: vec3_t = [0.0; 3];
+        crate::q_math::_VectorSubtract(
+            (*ctx.world).entities[0].r.currentOrigin,
+            (*npc).r.currentOrigin,
+            &mut dif,
+        );
+
+        if crate::q_math::VectorLengthSquared(dif) < 256.0 * 256.0 {
+            crate::NPC_combat::G_SetEnemy(
+                ctx,
+                npc,
+                &mut (*ctx.world).entities[0] as *mut gentity_t,
+            );
+        }
+
+        if crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue) == qfalse {
+            Howler_Idle();
+            return;
+        }
+    }
 }
 
-// PORT-ESCALATION(ambient-ai-state): reads/writes the ambient `NPC` and
-// `NPCInfo` globals; no threading mechanism resolved.
 /// Raven `Howler_Move`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:78-86`
@@ -72,15 +117,18 @@ pub fn Howler_Move(
     ctx: GameContext<'_>,
     visible: qboolean,
 ) {
-    todo!("Port Howler_Move — parked: ambient-ai-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        if (*npc_info).localState != LSTATE_WAITING {
+            (*npc_info).goalEntity = (*npc).enemy;
+            crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
+            (*npc_info).goalRadius = MAX_DISTANCE;
+        }
+    }
 }
 
-// PORT-ESCALATION(ambient-ai-state): reads the ambient `NPC` global
-// (specifically NPC->client->ps.viewangles, NPC->r.currentOrigin,
-// NPC->s.number) and calls trap_Trace (needs &Engine); also reads
-// `g_entities[]` array and ambient constants like vec3_origin, MASK_SHOT,
-// ENTITYNUM_WORLD, DAMAGE_NO_KNOCKBACK, MOD_MELEE. No threading mechanism
-// resolved.
 /// Raven `Howler_TryDamage`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:89-109`
@@ -89,25 +137,132 @@ pub fn Howler_TryDamage(
     enemy: *mut gentity_t,
     damage: c_int,
 ) {
-    todo!("Port Howler_TryDamage — parked: ambient-ai-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+
+        if enemy.is_null() {
+            return;
+        }
+
+        let mut end: vec3_t = [0.0; 3];
+        let mut dir: vec3_t = [0.0; 3];
+        let mut tr: trace_t = std::mem::zeroed();
+
+        crate::q_math::AngleVectors((*(*npc).client).ps.viewangles, Some(&mut dir), None, None);
+        crate::q_math::_VectorMA((*npc).r.currentOrigin, MIN_DISTANCE as f32, dir, &mut end);
+
+        // Should probably trace from the mouth, but, ah well.
+        crate::trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &(*npc).r.currentOrigin as *const vec3_t,
+                &vec3_origin as *const vec3_t,
+                &vec3_origin as *const vec3_t,
+                &end as *const vec3_t,
+                (*npc).s.number,
+                MASK_SHOT,
+            ),
+        );
+
+        if tr.entityNum != ENTITYNUM_WORLD {
+            crate::g_combat::G_Damage(
+                ctx,
+                &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t,
+                npc,
+                npc,
+                &mut dir,
+                tr.endpos,
+                damage,
+                DAMAGE_NO_KNOCKBACK,
+                MOD_MELEE,
+            );
+        }
+    }
 }
 
-// PORT-ESCALATION(ambient-ai-state): reads the ambient `NPC` and `NPCInfo`
-// globals; no threading mechanism resolved.
 /// Raven `Howler_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:112-131`
 pub fn Howler_Attack(ctx: GameContext<'_>) {
-    todo!("Port Howler_Attack — parked: ambient-ai-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+
+        if crate::g_timer::TIMER_Exists(ctx, npc, c"attacking".as_ptr()) == qfalse {
+            // Going to do ATTACK1
+            crate::g_timer::TIMER_Set(
+                ctx,
+                npc,
+                c"attacking".as_ptr(),
+                (1700.0 + ((*ctx.world).bg_state.rng.random() as f32 * 200.0)) as c_int,
+            );
+            crate::npc_c::NPC_SetAnim(
+                npc,
+                SETANIM_BOTH,
+                BOTH_ATTACK1,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
+
+            crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 200);
+        }
+
+        // Need to do delayed damage since the attack animations encapsulate multiple mini-attacks
+        if crate::g_timer::TIMER_Done2(ctx, npc, c"attack_dmg".as_ptr(), qtrue) != 0 {
+            let enemy_ptr = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*npc).enemy);
+            Howler_TryDamage(ctx, enemy_ptr, 5);
+        }
+
+        // Just using this to remove the attacking flag at the right time
+        crate::g_timer::TIMER_Done2(ctx, npc, c"attacking".as_ptr(), qtrue);
+    }
 }
 
-// PORT-ESCALATION(ambient-ai-state): reads the ambient `NPC` and `NPCInfo`
-// globals; no threading mechanism resolved.
 /// Raven `Howler_Combat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:134-171`
 pub fn Howler_Combat(ctx: GameContext<'_>) {
-    todo!("Port Howler_Combat — parked: ambient-ai-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        let distance: f32;
+        let advance: qboolean;
+
+        // If we cannot see our target or we have somewhere to go, then do that
+        let enemy_ptr = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*npc).enemy);
+        if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy_ptr) == qfalse
+            || !crate::NPC_goal::UpdateGoal(ctx).is_null()
+        {
+            (*npc_info).combatMove = qtrue;
+            (*npc_info).goalEntity = (*npc).enemy;
+            (*npc_info).goalRadius = MAX_DISTANCE; // just get us within combat range
+
+            crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
+            return;
+        }
+
+        // Sometimes I have problems with facing the enemy I'm attacking, so force the issue so I don't look dumb
+        crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
+
+        distance = crate::q_math::DistanceHorizontalSquared(
+            (*npc).r.currentOrigin,
+            (*enemy_ptr).r.currentOrigin,
+        );
+        advance = (distance > MIN_DISTANCE_SQR as f32) as qboolean;
+
+        if (advance != 0 || (*npc_info).localState == LSTATE_WAITING)
+            && crate::g_timer::TIMER_Done(ctx, npc, c"attacking".as_ptr()) != 0
+        {
+            // waiting monsters can't attack
+            if crate::g_timer::TIMER_Done2(ctx, npc, c"takingPain".as_ptr(), qtrue) != 0 {
+                (*npc_info).localState = LSTATE_CLEAR;
+            } else {
+                Howler_Move(ctx, 1 as qboolean);
+            }
+        } else {
+            Howler_Attack(ctx);
+        }
+    }
 }
 
 /// Raven `NPC_Howler_Pain`.
@@ -115,28 +270,55 @@ pub fn Howler_Combat(ctx: GameContext<'_>) {
 /// Raven: pain handler when Howler takes damage >= 10. Sets pain animation
 /// and waiting state, cancels current attack.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:178-194`
-// PORT-ESCALATION(unported-type): reads/returns Raven `animNumber_t`
-// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
-// documented deferred type-port item (`docs/type-port-todo.md`), not a
-// missing `use`. Left as unresolved bare identifiers, these silently
-// type-check as irrefutable match-pattern bindings (always-true), which is
-// a behavioral bug, not just a compile gap — parked instead.
 pub fn NPC_Howler_Pain(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
 ) {
-    todo!("Port NPC_Howler_Pain — parked: unported-type (animNumber_t)")
+    unsafe {
+        if damage >= 10 {
+            crate::g_timer::TIMER_Remove(ctx, self_, c"attacking".as_ptr());
+            crate::g_timer::TIMER_Set(ctx, self_, c"takingPain".as_ptr(), 2900);
+
+            let npc = (*self_).NPC as *mut crate::npc::gNPC_t;
+            if !npc.is_null() {
+                crate::q_math::_VectorCopy((*npc).lastPathAngles, &mut (*self_).s.angles);
+            }
+
+            crate::npc_c::NPC_SetAnim(
+                self_,
+                SETANIM_BOTH,
+                BOTH_PAIN1,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
+
+            if !(*self_).NPC.is_null() {
+                let npc_mut = (*self_).NPC as *mut crate::npc::gNPC_t;
+                (*npc_mut).localState = LSTATE_WAITING;
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(ambient-ai-state): reads the ambient `NPC` and `NPCInfo`
-// globals; no threading mechanism resolved.
 /// Raven `NPC_BSHowler_Default`.
 ///
 /// Default behavior state for Howler NPC — dispatch based on whether the
 /// Howler has an enemy target or is in patrol/idle mode.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:202-218`
 pub fn NPC_BSHowler_Default(ctx: GameContext<'_>) {
-    todo!("Port NPC_BSHowler_Default — parked: ambient-ai-state")
+    unsafe {
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        if (*npc).enemy.is_some() {
+            Howler_Combat(ctx);
+        } else if ((*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
+            Howler_Patrol(ctx);
+        } else {
+            Howler_Idle();
+        }
+
+        crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
+    }
 }

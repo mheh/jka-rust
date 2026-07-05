@@ -35,6 +35,7 @@ use crate::NPC_move::NAV_GetLastMove;
 use crate::ai_wpnav::G_TestLine;
 use crate::g_timer::TIMER_Done;
 use crate::q_math::Q_irand;
+use crate::g_nav::{NAV_FindClosestWaypointForEnt, NAV_FindClosestWaypointForPoint};
 
 pub const MAX_RADIUS_ENTS: usize = 128;
 
@@ -121,34 +122,152 @@ pub fn AI_GetGroupSize2(ctx: GameContext<'_>, ent: *mut gentity_t, radius: c_int
 /// Raven `AI_ClosestGroupEntityNumToPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Utils.c:80-110`
-// PORT-ESCALATION(unported-consts): needs `WAYPOINT_NONE`, `Q3_INFINITE`, and
-// `ENTITYNUM_NONE`, none ported anywhere in the crate graph (precedent:
-// `g_nav.rs` parks on the same trio). Porting-rules SA2 forbids inventing
-// those sentinel values.
 pub fn AI_ClosestGroupEntityNumToPoint(
     ctx: GameContext<'_>,
     group: *mut AIGroupInfo_t,
     point: vec3_t,
 ) -> c_int {
-    todo!("Port AI_ClosestGroupEntityNumToPoint — parked: unported-consts (WAYPOINT_NONE, Q3_INFINITE, ENTITYNUM_NONE)")
+    unsafe {
+        let mut markerWP = WAYPOINT_NONE;
+        let mut cost: c_int;
+        let mut bestCost = Q3_INFINITE;
+        let mut closest = ENTITYNUM_NONE;
+
+        if group.is_null() || (*group).numGroup <= 0 {
+            return ENTITYNUM_NONE;
+        }
+
+        markerWP = NAV_FindClosestWaypointForPoint(
+            ctx,
+            &mut (*ctx.world).entities[(*group).member[0].number as usize] as *mut gentity_t,
+            point,
+        );
+
+        if markerWP == WAYPOINT_NONE {
+            return ENTITYNUM_NONE;
+        }
+
+        for i in 0..(*group).numGroup {
+            cost = trap::Nav_GetPathCost(
+                ctx.engine,
+                GNavGetpathcostArgs::new((*group).member[i as usize].waypoint, markerWP),
+            );
+            if cost < bestCost {
+                bestCost = cost;
+                closest = (*group).member[i as usize].number;
+            }
+        }
+
+        closest
+    }
 }
 
 /// Raven `AI_SetClosestBuddy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Utils.c:112-132`
-// PORT-ESCALATION(unported-consts): needs `ENTITYNUM_NONE` and `Q3_INFINITE`,
-// none ported anywhere in the crate graph.
 pub fn AI_SetClosestBuddy(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) {
-    todo!("Port AI_SetClosestBuddy — parked: unported-consts (ENTITYNUM_NONE, Q3_INFINITE)")
+    unsafe {
+        for i in 0..(*group).numGroup {
+            (*group).member[i as usize].closestBuddy = ENTITYNUM_NONE;
+
+            let mut bestDist = Q3_INFINITE;
+            for j in 0..(*group).numGroup {
+                let dist = DistanceSquared(
+                    (*ctx.world).entities[(*group).member[i as usize].number as usize].r.currentOrigin,
+                    (*ctx.world).entities[(*group).member[j as usize].number as usize].r.currentOrigin,
+                );
+                if dist < bestDist {
+                    bestDist = dist;
+                    (*group).member[i as usize].closestBuddy = (*group).member[j as usize].number;
+                }
+            }
+        }
+    }
 }
 
 /// Raven `AI_SortGroupByPathCostToEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Utils.c:134-210`
-// PORT-ESCALATION(unported-consts): needs `WAYPOINT_NONE` and `Q3_INFINITE`,
-// none ported anywhere in the crate graph.
 pub fn AI_SortGroupByPathCostToEnemy(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) {
-    todo!("Port AI_SortGroupByPathCostToEnemy — parked: unported-consts (WAYPOINT_NONE, Q3_INFINITE)")
+    unsafe {
+        let mut bestMembers: [AIGroupMember_t; MAX_GROUP_MEMBERS] =
+            [core::mem::zeroed(); MAX_GROUP_MEMBERS];
+        let mut sort = false;
+
+        if !(*group).enemy.is_none() {
+            // FIXME: just use enemy->waypoint?
+            let enemy_id = (*group).enemy.unwrap();
+            let enemy_ent = &mut (*ctx.world).entities[enemy_id.0 as usize] as *mut gentity_t;
+            (*group).enemyWP = NAV_FindClosestWaypointForEnt(ctx, enemy_ent, WAYPOINT_NONE);
+        } else {
+            (*group).enemyWP = WAYPOINT_NONE;
+        }
+
+        for i in 0..(*group).numGroup {
+            if (*group).enemyWP == WAYPOINT_NONE {
+                // FIXME: just use member->waypoint?
+                (*group).member[i as usize].waypoint = WAYPOINT_NONE;
+                (*group).member[i as usize].pathCostToEnemy = Q3_INFINITE;
+            } else {
+                // FIXME: just use member->waypoint?
+                let enemy_id = (*group).enemy.unwrap();
+                let enemy_ent = &mut (*ctx.world).entities[enemy_id.0 as usize] as *mut gentity_t;
+                (*group).member[i as usize].waypoint =
+                    NAV_FindClosestWaypointForEnt(ctx, enemy_ent, WAYPOINT_NONE);
+                if (*group).member[i as usize].waypoint != WAYPOINT_NONE {
+                    (*group).member[i as usize].pathCostToEnemy = trap::Nav_GetPathCost(
+                        ctx.engine,
+                        GNavGetpathcostArgs::new(
+                            (*group).member[i as usize].waypoint,
+                            (*group).enemyWP,
+                        ),
+                    );
+                    // at least one of us has a path, so do sorting
+                    sort = true;
+                } else {
+                    (*group).member[i as usize].pathCostToEnemy = Q3_INFINITE;
+                }
+            }
+        }
+
+        // Now sort
+        if sort {
+            // initialize bestMembers data
+            for j in 0..(*group).numGroup {
+                bestMembers[j as usize].number = ENTITYNUM_NONE;
+            }
+
+            for i in 0..(*group).numGroup {
+                for j in 0..(*group).numGroup {
+                    if bestMembers[j as usize].number != ENTITYNUM_NONE {
+                        // slot occupied
+                        if (*group).member[i as usize].pathCostToEnemy
+                            < bestMembers[j as usize].pathCostToEnemy
+                        {
+                            // this guy has a shorter path than the one currently in this spot,
+                            // bump him and put myself in here
+                            let mut k = (*group).numGroup;
+                            while k > j {
+                                bestMembers[k as usize] = bestMembers[(k - 1) as usize];
+                                k -= 1;
+                            }
+                            bestMembers[j as usize] = (*group).member[i as usize];
+                            break;
+                        }
+                    } else {
+                        // slot unoccupied, reached end of list, throw self in here
+                        bestMembers[j as usize] = (*group).member[i as usize];
+                        break;
+                    }
+                }
+            }
+
+            // Okay, now bestMembers is a sorted list, just copy it into group->members
+            for i in 0..(*group).numGroup {
+                (*group).member[i as usize] = bestMembers[i as usize];
+            }
+        }
+    }
 }
 
 /// Raven `AI_FindSelfInPreviousGroup`.
@@ -273,14 +392,47 @@ pub fn AI_GetNextEmptyGroup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboo
 /// Raven `AI_ValidateNoEnemyGroupMember`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Utils.c:310-340`
-// PORT-ESCALATION(unported-consts): needs `ENTITYNUM_WORLD`, not yet ported
-// anywhere in the crate graph.
 pub fn AI_ValidateNoEnemyGroupMember(
     ctx: GameContext<'_>,
     group: *mut AIGroupInfo_t,
     member: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port AI_ValidateNoEnemyGroupMember — parked: unported-consts (ENTITYNUM_WORLD)")
+    unsafe {
+        let mut center: vec3_t = [0.0; 3];
+
+        if group.is_null() {
+            return 0;
+        }
+        if !(*group).commander.is_null() {
+            crate::q_math::_VectorCopy((*(*group).commander).r.currentOrigin, &mut center);
+        } else {
+            // hmm, just pick the first member
+            if (*group).member[0].number < 0 || (*group).member[0].number >= ENTITYNUM_WORLD {
+                return 0;
+            }
+            crate::q_math::_VectorCopy(
+                (*ctx.world).entities[(*group).member[0].number as usize].r.currentOrigin,
+                &mut center,
+            );
+        }
+        // FIXME: maybe it should be based on the center of the mass of the group, not the commander?
+        if DistanceSquared(center, (*member).r.currentOrigin) > 147456.0 {
+            // 384*384
+            return 0;
+        }
+        if trap::InPVS(
+            ctx.engine,
+            GInPvsArgs::new(
+                &(*member).r.currentOrigin as *const vec3_t,
+                &center as *const vec3_t,
+            ),
+        ) == 0
+        {
+            // not within PVS of the group enemy
+            return 0;
+        }
+        1
+    }
 }
 
 /// Raven `AI_ValidateGroupMember`.

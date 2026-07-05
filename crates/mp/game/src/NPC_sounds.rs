@@ -12,9 +12,6 @@
 use crate::prelude::*;
 
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): `G_AddVoiceEvent`
-// calls `trap_ICARUS_TaskIDPending` and reads `level.time`, but this fn's
-// staged skeleton has no world or engine handle in its signature.
 /// Raven `G_AddVoiceEvent`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_sounds.c:23-64`
@@ -24,18 +21,75 @@ pub fn G_AddVoiceEvent(
     event: c_int,
     speakDebounceTime: c_int,
 ) {
-    todo!("Port G_AddVoiceEvent — parked: raw-ptr-skeleton-no-world-handle")
+    if (*self_).NPC.is_null() {
+        return;
+    }
+
+    if (*self_).client.is_null() || (*(*self_).client).ps.pm_type >= PM_DEAD {
+        return;
+    }
+
+    if (*(*self_).NPC).blockedSpeechDebounceTime > (*ctx.world).level.time {
+        return;
+    }
+
+    if trap::ICARUS_TaskIDPending(ctx.engine, GICARUSTaskIDPendingArgs::new(self_, TID_CHAN_VOICE)) {
+        return;
+    }
+
+    if ((*(*self_).NPC).scriptFlags & SCF_NO_COMBAT_TALK) != 0
+        && ((event >= EV_ANGER1 && event <= EV_VICTORY3)
+            || (event >= EV_CHASE1 && event <= EV_SUSPICIOUS5))
+    {
+        return;
+    }
+
+    if ((*(*self_).NPC).scriptFlags & SCF_NO_ALERT_TALK) != 0
+        && (event >= EV_GIVEUP1 && event <= EV_SUSPICIOUS5)
+    {
+        return;
+    }
+
+    G_SpeechEvent(ctx, self_, event);
+
+    let new_time = (*ctx.world).level.time
+        + if speakDebounceTime == 0 {
+            5000
+        } else {
+            speakDebounceTime
+        };
+    (*(*self_).NPC).blockedSpeechDebounceTime = new_time;
 }
 
-// PORT-ESCALATION(raw-ptr-skeleton-no-world-handle): `NPC_PlayConfusionSound`
-// reads `level.time` but this fn's staged skeleton has no world handle in
-// its signature.
 /// Raven `NPC_PlayConfusionSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_sounds.c:66-93`
-pub fn NPC_PlayConfusionSound(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    todo!("Port NPC_PlayConfusionSound — parked: raw-ptr-skeleton-no-world-handle")
+pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
+    if (*self_).health > 0 {
+        if (*self_).enemy.is_some()
+            || !TIMER_Done(ctx, self_, cstr("enemyLastVisible").as_ptr())
+            || (*(*self_).client).renderInfo.lookTarget == 0
+        {
+            (*(*self_).NPC).blockedSpeechDebounceTime = 0;
+            G_AddVoiceEvent(
+                ctx,
+                self_,
+                (*ctx.world).bg_state.rng.Q_irand(EV_CONFUSE2, EV_CONFUSE3),
+                2000,
+            );
+        } else if !(*self_).NPC.is_null()
+            && (*(*self_).NPC).investigateDebounceTime + (*(*self_).NPC).pauseTime
+                > (*ctx.world).level.time
+        {
+            (*(*self_).NPC).blockedSpeechDebounceTime = 0;
+            G_AddVoiceEvent(ctx, self_, EV_CONFUSE1, 2000);
+        }
+    }
+
+    TIMER_Set(ctx, self_, cstr("enemyLastVisible").as_ptr(), 0);
+    (*(*self_).NPC).tempBehavior = BS_DEFAULT;
+
+    G_ClearEnemy(ctx, self_);
+
+    (*(*self_).NPC).investigateCount = 0;
 }

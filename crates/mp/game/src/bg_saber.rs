@@ -375,17 +375,54 @@ pub fn PM_CheckPullAttack() -> saberMoveName_t {
 
 /// Raven `BG_MySaber`.
 ///
+/// Returns a pointer to the requested saber for a client, or NULL if the client
+/// doesn't have that saber equipped.
+///
+/// Raven: returns a pointer to the requested saberNum.
+///
 /// Source: `oracle/oracle/codemp/game/bg_saber.c:4100-4141`
-// NOTE: a real body exists as the `PmoveContext::BG_MySaber` method below
-// (ruling 12/8a); this free-fn stub is kept solely because `bg_panimate.rs`
-// (out of scope for this cleanup) still calls the free-fn form directly.
-// Deleting it broke that build; retire together when bg_panimate.rs is
-// threaded onto `PmoveContext`/`GameContext`.
-pub fn BG_MySaber(
-    clientNum: c_int,
-    saberNum: c_int,
-) -> *mut saberInfo_t {
-    todo!("Port BG_MySaber — kept as free-fn stub for bg_panimate.rs caller")
+pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, bg: &BgState) -> *mut saberInfo_t {
+    unsafe {
+        // Per oracle C code (QAGAME branch):
+        // gentity_t *ent = &g_entities[clientNum];
+        // if ( ent->inuse && ent->client ) {
+        //   if ( !ent->client->saber[saberNum].model || !ent->client->saber[saberNum].model[0] )
+        //       return NULL;
+        //   return &ent->client->saber[saberNum];
+        // }
+        // return NULL;
+
+        // PORT-NOTE(entity-access-arena): BG_MySaber needs to access g_entities[clientNum].
+        // Per ruling 14, entity access is normally through PM_BGEntForNum (PmoveContext method).
+        // In this free-fn context, the entity array is accessed through an arena pattern.
+        // Assuming the g_entities array is accessible via a module-level or prelude mechanism,
+        // we dereference it as a contiguous array of gentity_t pointers and index by clientNum.
+
+        // Use the gentity arena accessor pattern (entities stored as pointers in an array)
+        // This accesses the global g_entities arena, casting appropriately
+        let entities_arena_ptr: *mut gentity_t = *(core::ptr::from_ref(&g_entities) as *const *mut gentity_t);
+
+        if entities_arena_ptr.is_null() || clientNum < 0 {
+            return core::ptr::null_mut();
+        }
+
+        let ent: *mut gentity_t = entities_arena_ptr.add(clientNum as usize);
+
+        // Check inuse and client existence
+        if (*ent).inuse == 0 || (*ent).client.is_null() {
+            return core::ptr::null_mut();
+        }
+
+        // Check if the saber has a model
+        if (*(*ent).client).saber[saberNum as usize].model.is_null()
+            || (*(*ent).client).saber[saberNum as usize].model[0] as c_int == 0
+        {
+            return core::ptr::null_mut();
+        }
+
+        // Return mutable pointer to the saber
+        &mut (*(*ent).client).saber[saberNum as usize]
+    }
 }
 
 // ============================================================================

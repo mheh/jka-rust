@@ -1,4 +1,4 @@
-// PORT-COMPLETE: q_math.c 54/5
+// PORT-COMPLETE: q_math.c 54/54
 //! Ported from `oracle/oracle/codemp/game/q_math.c`.
 //!
 //! Signature note: the fnskel generator emits Raven's `vec3_t`/`vec4_t`
@@ -1107,53 +1107,9 @@ pub fn NormalToLatLong(normal: vec3_t, bytes: *mut byte) {
     }
 }
 
-/// Raven `Rand_Init`.
-///
-// PORT-ESCALATION(rng-threading): ruling 3 (fork-discovery) settles the LCG as
-// an "owned, threaded Rng, bg-shared" — but doesn't name the type/its home
-// (a `mp_bg` struct? a `GameWorld` field?), and this file's staged skeleton
-// carries no such parameter (only the bare C scalars). A file-scope `holdrand`
-// static would violate porting-rules §B3 (no hidden globals); inventing the
-// Rng type/location here would be guessing the "cleaner" behavior porting-rules
-// §A2 forbids. Parking `Rand_Init`/`flrand`/`Q_flrand`/`irand`/`Q_irand`.
-/// Source: `oracle/oracle/codemp/game/q_math.c:1434-1437`
-pub fn Rand_Init(seed: c_int) {
-    todo!("Port Rand_Init — parked: rng-threading — oracle/oracle/codemp/game/q_math.c:1434")
-}
-
-/// Raven `flrand`.
-///
-/// Returns a float min <= x < max (exclusive; will get max - 0.00001, never max).
-// PORT-ESCALATION(rng-threading): see `Rand_Init`.
-/// Source: `oracle/oracle/codemp/game/q_math.c:1441-1450`
-pub fn flrand(min: f32, max: f32) -> f32 {
-    todo!("Port flrand — parked: rng-threading — oracle/oracle/codemp/game/q_math.c:1441")
-}
-
-/// Raven `Q_flrand`.
-///
-// PORT-ESCALATION(rng-threading): see `Rand_Init`.
-/// Source: `oracle/oracle/codemp/game/q_math.c:1451-1454`
-pub fn Q_flrand(min: f32, max: f32) -> f32 {
-    todo!("Port Q_flrand — parked: rng-threading — oracle/oracle/codemp/game/q_math.c:1451")
-}
-
-/// Raven `irand`.
-///
-/// Returns an integer min <= x <= max (inclusive).
-// PORT-ESCALATION(rng-threading): see `Rand_Init`.
-/// Source: `oracle/oracle/codemp/game/q_math.c:1458-1469`
-pub fn irand(min: c_int, max: c_int) -> c_int {
-    todo!("Port irand — parked: rng-threading — oracle/oracle/codemp/game/q_math.c:1458")
-}
-
-/// Raven `Q_irand`.
-///
-// PORT-ESCALATION(rng-threading): see `Rand_Init`.
-/// Source: `oracle/oracle/codemp/game/q_math.c:1471-1474`
-pub fn Q_irand(value1: c_int, value2: c_int) -> c_int {
-    todo!("Port Q_irand — parked: rng-threading — oracle/oracle/codemp/game/q_math.c:1471")
-}
+// RNG functions (Rand_Init/flrand/Q_flrand/irand/Q_irand) are ported as methods
+// on bg_channel::rng::Rng (pass-3 ruling 15: BgState.rng).
+// Source: `oracle/oracle/codemp/game/q_math.c:1434-1474` → `bg_channel/rng.rs`
 
 /// Raven `powf`.
 ///

@@ -449,12 +449,6 @@ pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
     }
 }
 
-// PORT-ESCALATION(missing-const): `TEAM_MVP`/`TEAM_DEFENDER`/`TEAM_WARRIOR`/
-// `TEAM_CARRIER`/`TEAM_INTERCEPTOR`/`TEAM_BRAVERY` (the teamAward bit-index
-// enum, distinct from the `team_t` red/blue/spectator enum already ported)
-// has no backfilled definition anywhere in the crate graph and isn't in the
-// pass-2 BACKFILLED TYPES list; can't invent the bit assignments without
-// exploring the oracle header, which this pass is scoped not to do.
 /// Raven `CalculateTeamAward`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1451-1484`
@@ -462,7 +456,34 @@ pub fn CalculateTeamAward(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> c_int {
-    todo!("Port CalculateTeamAward — parked: missing-const (TEAM_MVP/TEAM_DEFENDER/TEAM_WARRIOR/TEAM_CARRIER/TEAM_INTERCEPTOR/TEAM_BRAVERY bit-index enum)")
+    unsafe {
+        let mut team_awards: c_int = 0;
+
+        if CalculateTeamMVP(ctx, ent) != QFALSE {
+            team_awards |= 1 << TEAM_MVP;
+        }
+        if (*ctx.world).cvars.g_gametype.integer == GT_CTF
+            || (*ctx.world).cvars.g_gametype.integer == GT_CTY
+        {
+            if CalculateTeamDefender(ctx, ent) != QFALSE {
+                team_awards |= 1 << TEAM_DEFENDER;
+            }
+            if CalculateTeamWarrior(ctx, ent) != QFALSE {
+                team_awards |= 1 << TEAM_WARRIOR;
+            }
+            if CalculateTeamCarrier(ctx, ent) != QFALSE {
+                team_awards |= 1 << TEAM_CARRIER;
+            }
+            if CalculateTeamInterceptor(ctx, ent) != QFALSE {
+                team_awards |= 1 << TEAM_INTERCEPTOR;
+            }
+        }
+        if team_awards == 0 && CalculateTeamRedShirt(ctx, ent) != QFALSE {
+            // if you got nothing else and died a lot, at least get bravery
+            team_awards |= 1 << TEAM_BRAVERY;
+        }
+        team_awards
+    }
 }
 
 /// Raven `CalculateSection31Award`.
@@ -594,11 +615,6 @@ pub fn GetWorstEnemyForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
     }
 }
 
-// PORT-ESCALATION(missing-const): the `weaponFromMOD[MOD_MAX]` const table
-// (`bg_misc.c`) has no backfilled definition anywhere in the crate graph
-// and isn't in the pass-2 BACKFILLED TYPES list; can't invent its 45
-// MOD->weapon mappings without exploring the oracle source, which this
-// pass is scoped not to do.
 /// Raven `GetFavoriteWeaponForClient`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1668-1702`
@@ -606,7 +622,43 @@ pub fn GetFavoriteWeaponForClient(
     ctx: GameContext<'_>,
     nClient: c_int,
 ) -> c_int {
-    todo!("Port GetFavoriteWeaponForClient — parked: missing-const (weaponFromMOD table)")
+    let mut i: c_int = 0;
+    let mut n_most_kills: c_int = 0;
+    let mut fav: c_int = 0;
+    let mut weapon: c_int;
+    let mut kills_with_weapon: [c_int; WP_NUM_WEAPONS as usize] = [0; WP_NUM_WEAPONS as usize];
+
+    // First thing we need to do is cycle through all the MOD types and convert
+    // number of kills to a single weapon.
+    // ----------------------------------------------------------------
+    for weapon_idx in 0..WP_NUM_WEAPONS as usize {
+        kills_with_weapon[weapon_idx] = 0; // CLEAR
+    }
+
+    unsafe {
+        for i in MOD_STUN_BATON as c_int..=MOD_FORCE_DARK as c_int {
+            weapon = weaponFromMOD[i as usize]; // Select Weapon
+
+            if weapon != WP_NONE as c_int {
+                kills_with_weapon[weapon as usize] +=
+                    (*ctx.world).globals.G_WeaponLogKills.0[nClient as usize][i as usize]; // Store Num Kills With Weapon
+            }
+        }
+    }
+
+    // now look through our list of kills per weapon and pick the biggest
+    // ----------------------------------------------------------------
+    n_most_kills = 0;
+    fav = WP_STUN_BATON as c_int;
+    weapon = WP_STUN_BATON as c_int;
+    while weapon < WP_NUM_WEAPONS as c_int {
+        if kills_with_weapon[weapon as usize] > n_most_kills {
+            n_most_kills = kills_with_weapon[weapon as usize];
+            fav = weapon;
+        }
+        weapon += 1;
+    }
+    fav
 }
 
 /// Raven `G_ClearClientLog`.

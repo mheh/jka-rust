@@ -29,13 +29,6 @@ use crate::g_main::Com_Error;
 use crate::g_utils::G_AllocateVehicleObject;
 use crate::q_math::{AngleNormalize180, AngleNormalize360, AngleSubtract};
 
-// PORT-ESCALATION(global-placement): reads the file-scope global
-// `g_vehicleInfo` (`vehicleInfo_t g_vehicleInfo[MAX_VEHICLES]`,
-// `bg_vehicleLoad.c:106`) to dispatch through the base vehicle's `Board`
-// vtable slot — fork-discovery ruling 1 places file-scope globals as
-// `GameWorld` fields, but this table's placement/threading channel hasn't
-// landed yet (same gap as `G_CreateFighterNPC`); also ruling 2 (fn-ID enum
-// dispatch) isn't wired into `vehicleInfo_t`'s function-pointer fields yet.
 /// Raven `Board`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:212-221`
@@ -44,7 +37,17 @@ pub fn Board(
     pVeh: *mut Vehicle_t,
     pEnt: *mut bgEntity_t,
 ) -> qboolean {
-    todo!("Port Board — parked: global-placement (g_vehicleInfo) / fn-enum-dispatch")
+    unsafe {
+        // PORT-NOTE(vehicleInfo-Board): Calls Board method on base vehicle info; exact function-ptr signature depends on vehicleInfo_t field type
+        if !(*ctx.world).bg_state.g_vehicleInfo[VEHICLE_BASE as usize].Board(pVeh, pEnt) {
+            return qfalse;
+        }
+
+        // Set the board wait time (they won't be able to do anything, including getting off, for this amount of time).
+        (*pVeh).m_iBoarding = (*ctx.world).level.time + 1500;
+
+        qtrue
+    }
 }
 
 /// Raven `Eject`.
@@ -634,11 +637,6 @@ pub fn G_SetFighterVehicleFunctions(
     }
 }
 
-// PORT-ESCALATION(global-placement): reads the file-scope global
-// `g_vehicleInfo` (`vehicleInfo_t g_vehicleInfo[MAX_VEHICLES]`,
-// `bg_vehicleLoad.c:106`) — fork-discovery ruling 1 places file-scope globals
-// as `GameWorld` fields, but this table's placement/threading channel hasn't
-// landed yet.
 /// Raven `G_CreateFighterNPC`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:1994-2014`
@@ -647,6 +645,16 @@ pub fn G_CreateFighterNPC(
     pVeh: *mut *mut Vehicle_t,
     strType: *const c_char,
 ) {
-    todo!("Port G_CreateFighterNPC — parked: global-placement (g_vehicleInfo)")
+    unsafe {
+        // Allocate the Vehicle (MP QAGAME path).
+        G_AllocateVehicleObject(ctx, pVeh);
+
+        // Zero out the Vehicle structure.
+        std::ptr::write_bytes(*pVeh, 0, 1);
+
+        // Set the vehicle info pointer based on vehicle type name.
+        let veh_index = BG_VehicleGetIndex(strType);
+        (*(*pVeh)).m_pVehicleInfo = &(*ctx.world).bg_state.g_vehicleInfo[veh_index as usize];
+    }
 }
 

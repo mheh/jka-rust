@@ -1131,11 +1131,6 @@ pub fn InitMoverTrData(
     }
 }
 
-// PORT-ESCALATION(unported-consts): `ent->r.svFlags = SVF_USE_CURRENT_ORIGIN`
-// needs `SVF_USE_CURRENT_ORIGIN`'s bit value (`q_shared.h`), not type-ported
-// anywhere in the crate graph yet (`entity_effects.rs`/`surface_flags.rs`
-// only transcribe the subset already referenced elsewhere — porting-rules
-// rule 2 forbids guessing a fresh bit pattern).
 /// Raven `InitMover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:936-999`
@@ -1143,7 +1138,67 @@ pub fn InitMover(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) {
-    todo!("Port InitMover — parked: unported-consts (SVF_USE_CURRENT_ORIGIN, SVF_PLAYER_USABLE)")
+    unsafe {
+        // if the "model2" key is set, use a seperate model
+        // for drawing, but clip against the brushes
+        if !(*ent).model2.is_null() && *(*ent).model2 != 0 {
+            // Raven `strstr(ent->model2, ".glm")` — use Rust string contains check
+            if std::ffi::CStr::from_ptr((*ent).model2)
+                .to_string_lossy()
+                .contains(".glm")
+            {
+                // for now, not supported in MP.
+                (*ent).s.modelindex2 = 0;
+            } else {
+                (*ent).s.modelindex2 = G_ModelIndex((*ent).model2);
+            }
+        }
+
+        // if the "color" or "light" keys are set, setup constantLight
+        let mut light = 0.0f32;
+        let mut color: vec3_t = [0.0; 3];
+        let light_set = G_SpawnFloat(ctx, c"light".as_ptr(), c"100".as_ptr(), &mut light as *mut f32);
+        let color_set =
+            G_SpawnVector(ctx, c"color".as_ptr(), c"1 1 1".as_ptr(), color.as_mut_ptr());
+        if light_set != 0 || color_set != 0 {
+            let mut r = (color[0] * 255.0) as c_int;
+            if r > 255 {
+                r = 255;
+            }
+            let mut g = (color[1] * 255.0) as c_int;
+            if g > 255 {
+                g = 255;
+            }
+            let mut b = (color[2] * 255.0) as c_int;
+            if b > 255 {
+                b = 255;
+            }
+            let mut i = (light / 4.0) as c_int;
+            if i > 255 {
+                i = 255;
+            }
+            (*ent).s.constantLight = r | (g << 8) | (b << 16) | (i << 24);
+        }
+
+        (*ent).use_ = Some(EntUse::Use_BinaryMover);
+        (*ent).reached = Some(EntReached::Reached_BinaryMover);
+
+        (*ent).moverState = MOVER_POS1;
+        (*ent).r.svFlags = SVF_USE_CURRENT_ORIGIN;
+        if (*ent).spawnflags & MOVER_INACTIVE != 0 {
+            // Make it inactive
+            (*ent).flags |= crate::entity::flags::FL_INACTIVE;
+        }
+        if (*ent).spawnflags & MOVER_PLAYER_USE != 0 {
+            // Can be used by the player's BUTTON_USE
+            (*ent).r.svFlags |= SVF_PLAYER_USABLE;
+        }
+        (*ent).s.eType = entityType_t::ET_MOVER as c_int;
+        crate::q_math::_VectorCopy((*ent).pos1, &mut (*ent).r.currentOrigin);
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
+
+        InitMoverTrData(ent);
+    }
 }
 
 /// Raven `Blocked_Door`.
@@ -1179,9 +1234,6 @@ pub fn Blocked_Door(
     }
 }
 
-// PORT-ESCALATION(unported-consts): `DEFAULT_MINS_2`/`DEFAULT_MAXS_2` bit/
-// value constants (`g_local.h`) are not type-ported anywhere in the crate
-// graph yet — no sourceable value to transcribe without guessing (rule 2).
 /// Raven `Touch_DoorTriggerSpectator`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1037-1071`
@@ -1189,9 +1241,57 @@ pub fn Touch_DoorTriggerSpectator(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
     other: *mut gentity_t,
-    trace: *mut trace_t,
+    _trace: *mut trace_t,
 ) {
-    todo!("Port Touch_DoorTriggerSpectator — parked: unported-consts (DEFAULT_MINS_2, DEFAULT_MAXS_2)")
+    unsafe {
+        const DEFAULT_MINS_2: f32 = -24.0;
+        const DEFAULT_MAXS_2: f32 = 40.0;
+
+        let axis = (*ent).count as usize;
+        let mut dir: vec3_t = [0.0; 3];
+        let mut origin: vec3_t = [0.0; 3];
+
+        if ((*other).s.origin[axis] - (*ent).r.absmax[axis]).abs()
+            < ((*other).s.origin[axis] - (*ent).r.absmin[axis]).abs()
+        {
+            origin[axis] = (*ent).r.absmin[axis] - 10.0;
+            dir[axis] = -1.0;
+        } else {
+            origin[axis] = (*ent).r.absmax[axis] + 10.0;
+            dir[axis] = 1.0;
+        }
+
+        for i in 0..3 {
+            if i == axis {
+                continue;
+            }
+            origin[i] = ((*ent).r.absmin[i] + (*ent).r.absmax[i]) * 0.5;
+        }
+
+        let mut angles: vec3_t = [0.0; 3];
+        crate::q_math::vectoangles(dir, &mut angles);
+
+        let p_mins = [-15.0f32, -15.0, DEFAULT_MINS_2];
+        let p_maxs = [15.0f32, 15.0, DEFAULT_MAXS_2];
+
+        let mut tr = core::mem::zeroed::<trace_t>();
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &origin as *const vec3_t,
+                &p_mins as *const vec3_t,
+                &p_maxs as *const vec3_t,
+                &origin as *const vec3_t,
+                (*other).s.number,
+                (*other).clipmask,
+            ),
+        );
+
+        if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction == 1.0f32 && tr.entityNum == ENTITYNUM_NONE {
+            TeleportPlayer(ctx, other, origin, angles);
+        }
+    }
 }
 
 /// Raven `Touch_DoorTrigger`.
@@ -2299,9 +2399,6 @@ pub fn SP_func_pendulum(
     }
 }
 
-// PORT-ESCALATION(bg-dep): `material_t` (`MAT_GLASS`, `MAT_METAL`, …) is a
-// `type material_t = c_int` alias with its anonymous enum constants not
-// type-ported anywhere in the crate graph yet — no values to match on.
 /// Raven `CacheChunkEffects`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2323-2361`
@@ -2309,7 +2406,32 @@ pub fn CacheChunkEffects(
     ctx: GameContext<'_>,
     material: material_t,
 ) {
-    todo!("Port CacheChunkEffects — parked: bg-dep (material_t MAT_* constants unported)")
+    match material {
+        MAT_GLASS => {
+            G_EffectIndex(c"chunks/glassbreak".as_ptr());
+        }
+        MAT_GLASS_METAL => {
+            G_EffectIndex(c"chunks/glassbreak".as_ptr());
+            G_EffectIndex(c"chunks/metalexplode".as_ptr());
+        }
+        MAT_ELECTRICAL | MAT_ELEC_METAL => {
+            G_EffectIndex(c"chunks/sparkexplode".as_ptr());
+        }
+        MAT_METAL | MAT_METAL2 | MAT_METAL3 | MAT_CRATE1 | MAT_CRATE2 => {
+            G_EffectIndex(c"chunks/metalexplode".as_ptr());
+        }
+        MAT_GRATE1 => {
+            G_EffectIndex(c"chunks/grateexplode".as_ptr());
+        }
+        MAT_DRK_STONE | MAT_LT_STONE | MAT_GREY_STONE | MAT_WHITE_METAL | MAT_SNOWY_ROCK => {
+            G_EffectIndex(c"chunks/rockbreaklg".as_ptr());
+            G_EffectIndex(c"chunks/rockbreakmed".as_ptr());
+        }
+        MAT_ROPE => {
+            G_EffectIndex(c"chunks/ropebreak".as_ptr());
+        }
+        _ => {}
+    }
 }
 
 /// Raven `G_MiscModelExplosion`.
@@ -3000,10 +3122,6 @@ pub fn func_usable_think(
     }
 }
 
-// PORT-ESCALATION(unported-consts): the central condition needs
-// `EF_SHADER_ANIM`'s bit value (`bg_public.h`), which is not type-ported
-// anywhere in the crate graph yet, and is load-bearing for the branch
-// (not a side-effect-only assignment) — parked rather than guessed (rule 2).
 /// Raven `G_EntIsRemovableUsable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3037-3048`
@@ -3011,23 +3129,81 @@ pub fn G_EntIsRemovableUsable(
     ctx: GameContext<'_>,
     entNum: c_int,
 ) -> qboolean {
-    todo!("Port G_EntIsRemovableUsable — parked: unported-consts (EF_SHADER_ANIM)")
+    unsafe {
+        let ent = &mut (*ctx.world).entities[entNum as usize] as *mut gentity_t;
+        if !(*ent).classname.is_null()
+            && crate::q_shared::Q_stricmp((*ent).classname, c"func_usable".as_ptr()) == 0
+        {
+            if ((*ent).s.eFlags & EF_SHADER_ANIM) == 0
+                && ((*ent).spawnflags & 8) == 0
+                && !(*ent).targetname.is_null()
+            {
+                // not just a shader-animator and not ALWAYS_ON, so it must be removable somehow
+                return qtrue;
+            }
+        }
+        qfalse
+    }
 }
 
-// PORT-ESCALATION(unported-consts): the first branch dispatches on
-// `self->s.eFlags & EF_SHADER_ANIM`, which is not type-ported anywhere in
-// the crate graph yet and is load-bearing control flow (not a side-effect-
-// only assignment) — parked rather than guessed (rule 2).
 /// Raven `func_usable_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3050-3106`
 pub fn func_usable_use(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
-    other: *mut gentity_t,
+    _other: *mut gentity_t,
     activator: *mut gentity_t,
 ) {
-    todo!("Port func_usable_use — parked: unported-consts (EF_SHADER_ANIM)")
+    unsafe {
+        // Toggle on and off
+        G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
+        if (*self_).s.eFlags & EF_SHADER_ANIM != 0 {
+            // animate shader when used
+            (*self_).s.frame += 1; // inc frame
+            if (*self_).s.frame > (*self_).genericValue5 {
+                // wrap around
+                (*self_).s.frame = 0;
+            }
+            if !(*self_).target.is_null() && *(*self_).target != 0 {
+                G_UseTargets(ctx, self_, activator);
+            }
+        } else if (*self_).spawnflags & 8 != 0 {
+            // ALWAYS_ON
+            // Remove the ability to use the entity directly
+            (*self_).r.svFlags &= !SVF_PLAYER_USABLE;
+            // also remove ability to call any use func at all!
+            (*self_).use_ = None;
+
+            if !(*self_).target.is_null() && *(*self_).target != 0 {
+                G_UseTargets(ctx, self_, activator);
+            }
+
+            if (*self_).wait != 0.0 {
+                (*self_).think = Some(EntThink::func_usable_think);
+                (*self_).nextthink = (*ctx.world).level.time + ((*self_).wait * 1000.0) as c_int;
+            }
+
+            return;
+        } else if (*self_).count == 0 {
+            // become solid again
+            (*self_).count = 1;
+            func_wait_return_solid(ctx, self_);
+        } else {
+            (*self_).s.solid = 0;
+            (*self_).r.contents = 0;
+            (*self_).clipmask = 0;
+            (*self_).r.svFlags |= SVF_NOCLIENT;
+            (*self_).s.eFlags |= EF_NODRAW;
+            (*self_).count = 0;
+
+            if !(*self_).target.is_null() && *(*self_).target != 0 {
+                G_UseTargets(ctx, self_, activator);
+            }
+            (*self_).think = None;
+            (*self_).nextthink = -1;
+        }
+    }
 }
 
 /// Raven `func_usable_pain`.

@@ -43,8 +43,9 @@ use crate::NPC_senses::{InFOV, G_ClearLOS, G_ClearLOS2, G_ClearLOS3, G_ClearLOS4
 use crate::NPC_combat::{G_ClearEnemy, G_SetEnemy, NPC_ClearShot};
 use crate::NPC_sounds::G_AddVoiceEvent;
 use crate::g_utils::{G_BoneIndex, GetAnglesForDirection};
-use crate::q_shared::{Q_stricmp, GetIDForString, GetStringForID};
-use crate::q_math::{AngleDelta, AngleNormalize360, AngleVectors, Distance, flrand, Q_irand, vec3_origin, PITCH, YAW, ROLL};
+use crate::q_shared::{Q_stricmp, GetIDForString, GetStringForID, va};
+use crate::q_math::{AngleDelta, AngleNormalize360, AngleVectors, Distance, flrand, Q_irand, vec3_origin, PITCH, YAW, ROLL, _VectorCopy};
+use crate::g_target::Q3_SCRIPT_DIR;
 use crate::teams::npcteam::{NPCTEAM_PLAYER, NPCTEAM_ENEMY, NPCTEAM_NEUTRAL, NPCTEAM_FREE};
 use crate::level::alert_event::{alertEvent_t, alertEventLevel_e::AEL_DISCOVERED};
 use crate::bg_lib::atof;
@@ -57,6 +58,8 @@ use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
+use mp_abi::game::syscalls::G_ICARUS_RUNSCRIPT::GIcarusRunscriptArgs;
+use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
 
 // Raven `#define VALID_ATTACK_CONE 2.0f` (this file's own macro).
 // Source: `oracle/oracle/codemp/game/NPC_utils.c:11`
@@ -106,6 +109,20 @@ fn SHORT2ANGLE(x: c_int) -> f32 {
 /// Raven `BONE_ANGLES_POSTMULT` (ghoul2 bone-angle apply mode).
 /// Source: `oracle/oracle/code/game/ghoul2_shared.h:54`
 pub const BONE_ANGLES_POSTMULT: c_int = 0x0002;
+
+/// Raven `TURN_ON` flag for surface toggling.
+/// Source: `oracle/oracle/codemp/game/NPC_utils.c:1022`
+const TURN_ON: c_int = 0x00000000;
+
+/// Raven `ORIGIN` — extract the origin vector from a bolt matrix.
+/// Source: `oracle/oracle/codemp/game/ghoul2_shared.h` (Eorientations enum)
+const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
+
+/// Raven `q_shared.h:30` `VALIDSTRING(a)` macro.
+/// Source: `oracle/oracle/codemp/game/q_shared.h:30`
+unsafe fn VALIDSTRING(a: *const c_char) -> bool {
+    !a.is_null() && *a as c_int != 0
+}
 
 /// Raven `BG_NUM_TOGGLEABLE_SURFACES`.
 /// Source: `oracle/oracle/codemp/game/bg_public.h:138`
@@ -657,13 +674,6 @@ pub fn SetTeamNumbers(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(va-varargs): calls `va( "%s/%s", Q3_SCRIPT_DIR, bs_name )`
-// with real variadic arguments to build the ICARUS script path — the
-// resolved `va` signature drops the C varargs (same fork as `g_client.rs`/
-// `w_force.rs`'s parked `va(fmt, …)` call sites), so this call cannot be
-// transcribed faithfully yet. (The `if (0) G_DebugPrint(...)` branch is dead
-// code in the oracle — not itself a blocker — but the trailing `va()`/
-// `trap_ICARUS_RunScript` path is live.)
 /// Raven `G_ActivateBehavior`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:851-894`
@@ -672,7 +682,36 @@ pub fn G_ActivateBehavior(
     self_: *mut gentity_t,
     bset: c_int,
 ) -> qboolean {
-    todo!("Port G_ActivateBehavior — parked: va-varargs")
+    unsafe {
+        if self_.is_null() {
+            return QFALSE;
+        }
+
+        let bs_name = (*self_).behaviorSet[bset as usize];
+
+        if !VALIDSTRING(bs_name) {
+            return QFALSE;
+        }
+
+        let mut bSID: c_int = -1;
+        if !(*self_).NPC.is_null() {
+            bSID = GetIDForString(&mut BSTable, bs_name);
+        }
+
+        if bSID > -1 {
+            (*(*self_).NPC).tempBehavior = bState_t::BS_DEFAULT;
+            (*(*self_).NPC).behaviorState = bSID;
+        } else {
+            // if (0) branch is dead code in oracle
+            let script_path = format!(
+                "{}/{}",
+                cstr_to_str(Q3_SCRIPT_DIR),
+                cstr_to_str(bs_name)
+            );
+            trap::ICARUS_RunScript(ctx.engine, GIcarusRunscriptArgs::new(self_, cstr(&script_path)));
+        }
+        QTRUE
+    }
 }
 
 /// Raven `NPC_SetBoneAngles`.
@@ -785,9 +824,6 @@ pub fn NPC_SetBoneAngles(
     }
 }
 
-// PORT-ESCALATION(unported-global): reads `bgToggleableSurfaces` (bg-shared
-// lookup table, `NPC_utils.c:1006`) — a genuinely unported file-scope global
-// (fork-discovery ruling 1), not just a missing `use`.
 /// Raven `NPC_SetSurfaceOnOff`.
 ///
 /// Raven: rww - and another method of automatically managing surface status
@@ -800,7 +836,48 @@ pub fn NPC_SetSurfaceOnOff(
     surfaceName: *const c_char,
     surfaceFlags: c_int,
 ) {
-    todo!("Port NPC_SetSurfaceOnOff — parked: unported-global (bgToggleableSurfaces)")
+    unsafe {
+        let mut i: c_int = 0;
+        let mut foundIt = QFALSE;
+
+        while i < BG_NUM_TOGGLEABLE_SURFACES {
+            if let Some(surf_name) = bgToggleableSurfaces[i as usize] {
+                if Q_stricmp(surfaceName, surf_name.as_ptr()) == 0 {
+                    foundIt = QTRUE;
+                    break;
+                }
+            } else {
+                break;
+            }
+            i += 1;
+        }
+
+        if foundIt == QFALSE {
+            let msg = format!(
+                "WARNING: Tried to toggle NPC surface that isn't in toggleable surface list ({})\n",
+                cstr_to_str(surfaceName)
+            );
+            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+            return;
+        }
+
+        if surfaceFlags == TURN_ON {
+            (*ent).s.surfacesOn |= 1 << i;
+            (*ent).s.surfacesOff &= !(1 << i);
+        } else {
+            (*ent).s.surfacesOn &= !(1 << i);
+            (*ent).s.surfacesOff |= 1 << i;
+        }
+
+        if (*ent).ghoul2.is_null() {
+            return;
+        }
+
+        trap::G2API_SetSurfaceOnOff(
+            ctx.engine,
+            GG2SetsurfaceonoffArgs::new((*ent).ghoul2, surfaceName, surfaceFlags),
+        );
+    }
 }
 
 /// Raven `NPC_SomeoneLookingAtMe`.
@@ -1517,11 +1594,6 @@ pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(cross-crate-visibility): needs `BG_GiveMeVectorFromMatrix`
-// (`NPC_AI_Mark2.rs:52`) to extract the origin vector from the bolt matrix —
-// that helper is a private (non-`pub`) fn in its owning file, not reachable
-// from here. Not a design fork this porter can resolve; the fix belongs to
-// whoever next touches `NPC_AI_Mark2.rs`.
 /// Raven `G_GetBoltPosition`.
 ///
 /// Fork-9 reshape: `pos` is guarded by `if (pos)` in the oracle (the
@@ -1535,7 +1607,48 @@ pub fn G_GetBoltPosition(
     pos: Option<&mut vec3_t>,
     modelIndex: c_int,
 ) {
-    todo!("Port G_GetBoltPosition — parked: cross-crate-visibility (BG_GiveMeVectorFromMatrix is private in NPC_AI_Mark2.rs)")
+    unsafe {
+        if self_.is_null() || (*self_).inuse == QFALSE {
+            return;
+        }
+
+        let mut angles: vec3_t = [0.0; 3];
+        if !(*self_).client.is_null() {
+            angles[0] = 0.0;
+            angles[1] = (*(*self_).client).ps.viewangles[YAW];
+            angles[2] = 0.0;
+        } else {
+            angles[0] = 0.0;
+            angles[1] = (*self_).r.currentAngles[YAW];
+            angles[2] = 0.0;
+        }
+
+        if (*self_).ghoul2.is_null() {
+            return;
+        }
+
+        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
+        trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            GG2GetboltArgs::new(
+                (*self_).ghoul2,
+                modelIndex,
+                boltIndex,
+                &mut boltMatrix as *mut mdxaBone_t,
+                &angles as *const vec3_t,
+                &(*self_).r.currentOrigin as *const vec3_t,
+                (*ctx.world).level.time,
+                core::ptr::null_mut(),
+                &(*self_).modelScale as *const vec3_t,
+            ),
+        );
+
+        if let Some(pos_ref) = pos {
+            let mut result: vec3_t = [0.0; 3];
+            BG_GiveMeVectorFromMatrix(&boltMatrix as *const mdxaBone_t, ORIGIN, &mut result);
+            _VectorCopy(result, pos_ref);
+        }
+    }
 }
 
 /// Raven `NPC_EntRangeFromBolt`.

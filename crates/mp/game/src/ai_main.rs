@@ -41,8 +41,30 @@ use mp_qshared::shared::q_color::Q_IsColorString;
 // Pass-3 shard-2 body imports (StandardBotAI + the bot-AI frame entrypoints).
 use std::ffi::CString;
 use crate::ai_wpnav::{
-    WPFLAG_BLUE_FLAG, WPFLAG_NOMOVEFUNC, WPFLAG_NOVIS, WPFLAG_RED_FLAG, WPFLAG_WAITFORFUNC,
+    WPFLAG_BLUE_FLAG, WPFLAG_DUCK, WPFLAG_JUMP, WPFLAG_NOMOVEFUNC, WPFLAG_NOVIS, WPFLAG_ONEWAY_BACK,
+    WPFLAG_ONEWAY_FWD, WPFLAG_RED_FLAG, WPFLAG_SNIPEORCAMP, WPFLAG_SNIPEORCAMPSTAND,
+    WPFLAG_WAITFORFUNC,
 };
+
+// Pass-3 shard-1 body imports.
+use crate::botai::bot_siege_state_t::bot_siege_state_t;
+use crate::client::client_connected::CON_DISCONNECTED;
+use crate::level::bot_settings::bot_settings_t;
+use mp_bg::public::entity_event::entity_event_t::{
+    EV_ALT_FIRE, EV_FIRE_WEAPON, EV_FOOTSTEP, EV_FOOTSTEP_METAL, EV_FOOTWADE, EV_GLOBAL_SOUND,
+    EV_JUMP, EV_ROLL, EV_SABER_ATTACK, EV_STEP_12, EV_STEP_16, EV_STEP_4, EV_STEP_8,
+};
+use mp_abi::game::syscalls::BOTLIB_AI_ALLOC_GOAL_STATE::BotlibAiAllocGoalStateArgs;
+use mp_abi::game::syscalls::BOTLIB_AI_ALLOC_MOVE_STATE::BotlibAiAllocMoveStateArgs;
+use mp_abi::game::syscalls::BOTLIB_AI_ALLOC_WEAPON_STATE::BotlibAiAllocWeaponStateArgs;
+use mp_abi::game::syscalls::BOTLIB_AI_FREE_GOAL_STATE::BotlibAiFreeGoalStateArgs;
+use mp_abi::game::syscalls::BOTLIB_AI_FREE_MOVE_STATE::BotlibAiFreeMoveStateArgs;
+use mp_abi::game::syscalls::BOTLIB_AI_FREE_WEAPON_STATE::BotlibAiFreeWeaponStateArgs;
+use mp_abi::game::syscalls::BOTLIB_AI_UPDATE_ENTITY_ITEMS::BotlibAiUpdateEntityItemsArgs;
+use mp_abi::game::syscalls::BOTLIB_EA_GET_INPUT::BotlibEaGetInputArgs;
+use mp_abi::game::syscalls::BOTLIB_EA_RESET_INPUT::BotlibEaResetInputArgs;
+use mp_abi::game::syscalls::BOTLIB_GET_CONSOLE_MESSAGE::BotlibGetConsoleMessageArgs;
+use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use crate::ai_main_consts::{
     BOT_FLAG_GET_DISTANCE, BOT_PLANT_BLOW_DISTANCE, BOT_PLANT_DISTANCE, BOT_PLANT_INTERVAL,
     BOT_SABER_THROW_RANGE, BOT_THINK_TIME, BOT_WPTOUCH_DISTANCE, LEVELFLAG_NOPOINTPREDICTION,
@@ -132,7 +154,6 @@ pub fn BotSelectWeapon(
     trap::EA_SelectWeapon(ctx.engine, BotlibEaSelectWeaponArgs::new(client, weapon));
 }
 
-// PORT-ESCALATION(bg-boundary): the {teamplay,siege,ctf}StateDescriptions const string tables have no home in GameGlobals/GameCvars (state list marks them bg-owned/const) — where do the description tables live for game-tier access?
 /// Raven `BotReportStatus`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:167-181`
@@ -140,10 +161,24 @@ pub fn BotReportStatus(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port BotReportStatus — parked: bg-boundary")
+    unsafe {
+        let gt = (*ctx.world).cvars.g_gametype.integer;
+        if gt == GT_TEAM {
+            // PORT-NOTE(StateDescriptions): the {teamplay,siege,ctf}StateDescriptions
+            // C string tables have no ported home yet; referenced as cited and
+            // reported as missing symbols.
+            let s = cstr_to_str(teamplayStateDescriptions[(*bs).teamplayState as usize]);
+            trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
+        } else if gt == GT_SIEGE {
+            let s = cstr_to_str(siegeStateDescriptions[(*bs).siegeState as usize]);
+            trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
+        } else if gt == GT_CTF || gt == GT_CTY {
+            let s = cstr_to_str(ctfStateDescriptions[(*bs).ctfState as usize]);
+            trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
+        }
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): `GameGlobals.botstates` is still a `()` placeholder; needs its real type `[*mut bot_state_t; MAX_CLIENTS]`, but that breaks `#[derive(Default)]` on GameGlobals (raw ptr is not Default) — how is the botstates table typed/initialized?
 /// Raven `BotOrder`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:184-276`
@@ -153,7 +188,89 @@ pub fn BotOrder(
     clientnum: c_int,
     ordernum: c_int,
 ) {
-    todo!("Port BotOrder — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        // PORT-NOTE(botstates): `globals.botstates` is still a `()` placeholder;
+        // indexed as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
+        let botstates = &(*world).globals.botstates;
+
+        let mut stateMin: c_int = 0;
+        let mut stateMax: c_int = 0;
+
+        if ent.is_null()
+            || (*ent).client.is_null()
+            || (*((*ent).client as *mut gclient_t)).sess.teamLeader == qfalse
+        {
+            return;
+        }
+
+        if clientnum != -1 && botstates[clientnum as usize].is_null() {
+            return;
+        }
+
+        if clientnum != -1
+            && OnSameTeam(ctx, ent, base.add(clientnum as usize)) == qfalse
+        {
+            return;
+        }
+
+        let gt = (*world).cvars.g_gametype.integer;
+        if gt != GT_CTF && gt != GT_CTY && gt != GT_SIEGE && gt != GT_TEAM {
+            return;
+        }
+
+        if gt == GT_CTF || gt == GT_CTY {
+            stateMin = bot_ctf_state_t::CTFSTATE_NONE as c_int;
+            stateMax = bot_ctf_state_t::CTFSTATE_MAXCTFSTATES as c_int;
+        } else if gt == GT_SIEGE {
+            stateMin = bot_siege_state_t::SIEGESTATE_NONE as c_int;
+            stateMax = bot_siege_state_t::SIEGESTATE_MAXSIEGESTATES as c_int;
+        } else if gt == GT_TEAM {
+            stateMin = bot_teamplay_state_t::TEAMPLAYSTATE_NONE as c_int;
+            stateMax = bot_teamplay_state_t::TEAMPLAYSTATE_MAXTPSTATES as c_int;
+        }
+
+        if (ordernum < stateMin && ordernum != -1) || ordernum >= stateMax {
+            return;
+        }
+
+        if clientnum != -1 {
+            let bi = botstates[clientnum as usize];
+            if ordernum == -1 {
+                BotReportStatus(ctx, bi);
+            } else {
+                BotStraightTPOrderCheck(ent, ordernum, bi);
+                (*bi).state_Forced = ordernum;
+                (*bi).chatObject = Some(ent_id(base, ent));
+                (*bi).chatAltObject = None;
+                let sect = cstr("OrderAccepted");
+                if BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 1) != 0 {
+                    (*bi).chatTeam = 1;
+                }
+            }
+        } else {
+            let mut i: usize = 0;
+            while i < MAX_CLIENTS {
+                let bi = botstates[i];
+                if !bi.is_null() && OnSameTeam(ctx, ent, base.add(i)) != qfalse {
+                    if ordernum == -1 {
+                        BotReportStatus(ctx, bi);
+                    } else {
+                        BotStraightTPOrderCheck(ent, ordernum, bi);
+                        (*bi).state_Forced = ordernum;
+                        (*bi).chatObject = Some(ent_id(base, ent));
+                        (*bi).chatAltObject = None;
+                        let sect = cstr("OrderAccepted");
+                        if BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 0) != 0 {
+                            (*bi).chatTeam = 1;
+                        }
+                    }
+                }
+                i += 1;
+            }
+        }
+    }
 }
 
 /// Raven `BotMindTricked`.
@@ -238,7 +355,6 @@ pub fn BotAI_GetClientState(
     }
 }
 
-// PORT-ESCALATION(unported-const): `SVF_NOCLIENT` (r.svFlags mask) has no ported home — only a file-local `const SVF_NOCLIENT` exists in g_vehicles.rs; needs a shared svflags const module before this body can gate on it.
 /// Raven `BotAI_GetEntityState`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:371-381`
@@ -247,7 +363,24 @@ pub fn BotAI_GetEntityState(
     entityNum: c_int,
     state: *mut entityState_t,
 ) -> c_int {
-    todo!("Port BotAI_GetEntityState — parked: unported-const")
+    unsafe {
+        let base = (*ctx.world).entities.as_mut_ptr();
+        let ent = base.add(entityNum as usize);
+        core::ptr::write_bytes(state, 0, 1);
+        if (*ent).inuse == qfalse {
+            return qfalse;
+        }
+        if (*ent).r.linked == qfalse {
+            return qfalse;
+        }
+        // SVF_NOCLIENT: only a file-local const exists (g_items.rs); referenced
+        // as cited and reported as a missing symbol pending a shared home.
+        if (*ent).r.svFlags & SVF_NOCLIENT != 0 {
+            return qfalse;
+        }
+        core::ptr::copy_nonoverlapping(&(*ent).s as *const entityState_t, state, 1);
+        qtrue
+    }
 }
 
 // PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
@@ -420,7 +553,6 @@ pub fn BotChangeViewAngles(
     }
 }
 
-// PORT-ESCALATION(unported-const): the `ACTION_*` bot-input flag family and `ANGLE2SHORT` are not ported (no shared const home found) — needs the be_ai_goal.h ACTION_* family + ANGLE2SHORT helper.
 /// Raven `BotInputToUserCommand`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:537-626`
@@ -432,10 +564,110 @@ pub fn BotInputToUserCommand(
     time: c_int,
     useTime: c_int,
 ) {
-    todo!("Port BotInputToUserCommand — parked: unported-const")
+    // PORT-NOTE(ACTION_*/ANGLE2SHORT): the `ACTION_*` bot-input flag family
+    // (be_ai_goal.h) and the `ANGLE2SHORT` macro have no ported home yet;
+    // referenced as cited and reported as missing symbols.
+    unsafe {
+        let bi = &mut *bi;
+        let ucmd = &mut *ucmd;
+
+        // clear the whole structure
+        core::ptr::write_bytes(ucmd as *mut usercmd_t, 0, 1);
+        // the duration for the user command in milli seconds
+        ucmd.serverTime = time;
+
+        if bi.actionflags & ACTION_DELAYEDJUMP != 0 {
+            bi.actionflags |= ACTION_JUMP;
+            bi.actionflags &= !ACTION_DELAYEDJUMP;
+        }
+        // set the buttons
+        if bi.actionflags & ACTION_RESPAWN != 0 {
+            ucmd.buttons = BUTTON_ATTACK;
+        }
+        if bi.actionflags & ACTION_ATTACK != 0 {
+            ucmd.buttons |= BUTTON_ATTACK;
+        }
+        if bi.actionflags & ACTION_ALT_ATTACK != 0 {
+            ucmd.buttons |= BUTTON_ALT_ATTACK;
+        }
+        if bi.actionflags & ACTION_GESTURE != 0 {
+            ucmd.buttons |= BUTTON_GESTURE;
+        }
+        if bi.actionflags & ACTION_USE != 0 {
+            ucmd.buttons |= BUTTON_USE_HOLDABLE;
+        }
+        if bi.actionflags & ACTION_WALK != 0 {
+            ucmd.buttons |= BUTTON_WALKING;
+        }
+        if bi.actionflags & ACTION_FORCEPOWER != 0 {
+            ucmd.buttons |= BUTTON_FORCEPOWER;
+        }
+
+        if useTime < (*ctx.world).level.time && (*ctx.world).bg_state.rng.Q_irand(1, 10) < 5 {
+            // for now just hit use randomly in case there's something useable around
+            ucmd.buttons |= BUTTON_USE;
+        }
+
+        if bi.weapon == WP_NONE {
+            bi.weapon = WP_BRYAR_PISTOL;
+        }
+
+        ucmd.weapon = bi.weapon as u8;
+        // set the view angles (WITHOUT the delta angles)
+        ucmd.angles[PITCH] = ANGLE2SHORT(bi.viewangles[PITCH]);
+        ucmd.angles[YAW] = ANGLE2SHORT(bi.viewangles[YAW]);
+        ucmd.angles[ROLL] = ANGLE2SHORT(bi.viewangles[ROLL]);
+        // subtract the delta angles
+        for j in 0..3usize {
+            let temp: c_short = (ucmd.angles[j] - *delta_angles.add(j)) as c_short;
+            ucmd.angles[j] = temp as c_int;
+        }
+
+        // movement is relative to the REAL view angles
+        let mut angles: vec3_t = [0.0; 3];
+        let mut forward: vec3_t = [0.0; 3];
+        let mut right: vec3_t = [0.0; 3];
+        if bi.dir[2] != 0.0 {
+            angles[PITCH] = bi.viewangles[PITCH];
+        } else {
+            angles[PITCH] = 0.0;
+        }
+        angles[YAW] = bi.viewangles[YAW];
+        angles[ROLL] = 0.0;
+        crate::q_math::AngleVectors(angles, Some(&mut forward), Some(&mut right), None);
+        // bot input speed is in the range [0, 400]
+        bi.speed = bi.speed * 127.0 / 400.0;
+        // set the view independent movement
+        ucmd.forwardmove =
+            (crate::q_math::_DotProduct(forward, bi.dir) * bi.speed) as c_int as c_schar;
+        ucmd.rightmove =
+            (crate::q_math::_DotProduct(right, bi.dir) * bi.speed) as c_int as c_schar;
+        ucmd.upmove =
+            ((forward[2] as c_int).abs() as f32 * bi.dir[2] * bi.speed) as c_int as c_schar;
+        // normal keyboard movement
+        if bi.actionflags & ACTION_MOVEFORWARD != 0 {
+            ucmd.forwardmove = (ucmd.forwardmove as c_int + 127) as c_schar;
+        }
+        if bi.actionflags & ACTION_MOVEBACK != 0 {
+            ucmd.forwardmove = (ucmd.forwardmove as c_int - 127) as c_schar;
+        }
+        if bi.actionflags & ACTION_MOVELEFT != 0 {
+            ucmd.rightmove = (ucmd.rightmove as c_int - 127) as c_schar;
+        }
+        if bi.actionflags & ACTION_MOVERIGHT != 0 {
+            ucmd.rightmove = (ucmd.rightmove as c_int + 127) as c_schar;
+        }
+        // jump/moveup
+        if bi.actionflags & ACTION_JUMP != 0 {
+            ucmd.upmove = (ucmd.upmove as c_int + 127) as c_schar;
+        }
+        // crouch/movedown
+        if bi.actionflags & ACTION_CROUCH != 0 {
+            ucmd.upmove = (ucmd.upmove as c_int - 127) as c_schar;
+        }
+    }
 }
 
-// PORT-ESCALATION(unported-const): calls `BotInputToUserCommand` and gates on `ACTION_RESPAWN`/`ACTION_ATTACK` (be_ai_goal.h ACTION_* family), which are not ported.
 /// Raven `BotUpdateInput`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:633-655`
@@ -445,15 +677,65 @@ pub fn BotUpdateInput(
     time: c_int,
     elapsed_time: c_int,
 ) {
-    todo!("Port BotUpdateInput — parked: unported-const")
+    // PORT-NOTE(SHORT2ANGLE/ACTION_*): `SHORT2ANGLE` and the `ACTION_*` flags
+    // have no ported home yet; referenced as cited and reported as missing.
+    unsafe {
+        let mut bi: bot_input_t = core::mem::zeroed();
+
+        // add the delta angles to the bot's current view angles
+        for j in 0..3usize {
+            (*bs).viewangles[j] = crate::q_math::AngleMod(
+                (*bs).viewangles[j] + SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
+            );
+        }
+        // change the bot view angles
+        BotChangeViewAngles(ctx, bs, elapsed_time as f32 / 1000.0);
+        // retrieve the bot input
+        trap::EA_GetInput(
+            ctx.engine,
+            BotlibEaGetInputArgs::new(
+                (*bs).client,
+                time as f32 / 1000.0,
+                &mut bi as *mut bot_input_t as *mut c_void,
+            ),
+        );
+        // respawn hack
+        if bi.actionflags & ACTION_RESPAWN != 0 {
+            if (*bs).lastucmd.buttons & BUTTON_ATTACK != 0 {
+                bi.actionflags &= !(ACTION_RESPAWN | ACTION_ATTACK);
+            }
+        }
+        // convert the bot input to a usercmd
+        BotInputToUserCommand(
+            ctx,
+            &mut bi,
+            &mut (*bs).lastucmd,
+            (*bs).cur_ps.delta_angles.as_mut_ptr(),
+            time,
+            (*bs).noUseTime,
+        );
+        // subtract the delta angles
+        for j in 0..3usize {
+            (*bs).viewangles[j] = crate::q_math::AngleMod(
+                (*bs).viewangles[j] - SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
+            );
+        }
+    }
 }
 
-// PORT-ESCALATION(unported-fn): `FloatTime()` (be_aas_main / the bot floattime clock) is not ported and not in the call surface — needs the floattime accessor before the residual-time gate can be written.
 /// Raven `BotAIRegularUpdate`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:662-667`
 pub fn BotAIRegularUpdate(ctx: GameContext<'_>) {
-    todo!("Port BotAIRegularUpdate — parked: unported-fn")
+    // PORT-NOTE(FloatTime): the bot floattime clock `FloatTime()` is not ported
+    // and not in the call surface; referenced as cited and reported as missing.
+    unsafe {
+        let world = ctx.world;
+        if (*world).globals.regularupdate_time < FloatTime() {
+            trap::BotUpdateEntityItems(ctx.engine, BotlibAiUpdateEntityItemsArgs::new());
+            (*world).globals.regularupdate_time = (FloatTime() as f64 + 0.3) as f32;
+        }
+    }
 }
 
 /// Raven `RemoveColorEscapeSequences`.
@@ -492,7 +774,6 @@ pub fn RemoveColorEscapeSequences(
     }
 }
 
-// PORT-ESCALATION(placeholder-global): body indexes `GameGlobals.botstates` (still `()`); needs the `[*mut bot_state_t; MAX_CLIENTS]` typing that conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `BotAI`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:696-771`
@@ -501,15 +782,96 @@ pub fn BotAI(
     client: c_int,
     thinktime: f32,
 ) -> c_int {
-    todo!("Port BotAI — parked: placeholder-global")
+    // PORT-NOTE(botstates/PRT_FATAL/SHORT2ANGLE): `globals.botstates` is a `()`
+    // placeholder (indexed as intended); `PRT_FATAL` and `SHORT2ANGLE` have no
+    // ported home yet; the `_DEBUG` timing block is dropped (undefined here).
+    unsafe {
+        trap::EA_ResetInput(ctx.engine, BotlibEaResetInputArgs::new(client));
+        let world = ctx.world;
+        let bs = (*world).globals.botstates[client as usize];
+        if bs.is_null() || (*bs).inuse == qfalse {
+            let msg = format!("BotAI: client {} is not setup\n", client);
+            BotAI_Print(PRT_FATAL, cstr(&msg).as_ptr() as *mut c_char);
+            return qfalse;
+        }
+
+        // retrieve the current client state
+        BotAI_GetClientState(ctx, client, &mut (*bs).cur_ps);
+
+        // retrieve any waiting server commands
+        let mut buf: [c_char; 1024] = [0; 1024];
+        while trap::BotGetServerCommand(
+            ctx.engine,
+            BotlibGetConsoleMessageArgs::new(client, buf.as_mut_ptr(), 1024),
+        ) != 0
+        {
+            // have buf point to the command and args to the command arguments
+            let sp = b' ' as c_char;
+            let mut k = 0usize;
+            let mut args_ptr: *mut c_char = core::ptr::null_mut();
+            while buf[k] != 0 {
+                if buf[k] == sp {
+                    args_ptr = buf.as_mut_ptr().add(k);
+                    break;
+                }
+                k += 1;
+            }
+            if args_ptr.is_null() {
+                continue;
+            }
+            *args_ptr = 0;
+            let args = args_ptr.add(1);
+            // remove color escape sequences from the arguments
+            RemoveColorEscapeSequences(args);
+            // Raven's Q_stricmp dispatch over "cp "/"cs"/"scores"/"clientLevelShot"
+            // has empty bodies in MP — no observable effect, dropped.
+        }
+        // add the delta angles to the bot's current view angles
+        for j in 0..3usize {
+            (*bs).viewangles[j] = crate::q_math::AngleMod(
+                (*bs).viewangles[j] + SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
+            );
+        }
+        // increase the local time of the bot
+        (*bs).ltime += thinktime;
+        (*bs).thinktime = thinktime;
+        // origin of the bot
+        crate::q_math::_VectorCopy((*bs).cur_ps.origin, &mut (*bs).origin);
+        // eye coordinates of the bot
+        crate::q_math::_VectorCopy((*bs).cur_ps.origin, &mut (*bs).eye);
+        (*bs).eye[2] += (*bs).cur_ps.viewheight as f32;
+
+        StandardBotAI(ctx, bs, thinktime);
+
+        // subtract the delta angles
+        for j in 0..3usize {
+            (*bs).viewangles[j] = crate::q_math::AngleMod(
+                (*bs).viewangles[j] - SHORT2ANGLE((*bs).cur_ps.delta_angles[j]),
+            );
+        }
+        qtrue
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): iterates `GameGlobals.botstates` (still `()`) — same botstates typing/Default blocker as BotAI.
 /// Raven `BotScheduleBotThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:778-791`
 pub fn BotScheduleBotThink(ctx: GameContext<'_>) {
-    todo!("Port BotScheduleBotThink — parked: placeholder-global")
+    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder; indexed
+    // as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
+    unsafe {
+        let world = ctx.world;
+        let mut botnum: c_int = 0;
+        for i in 0..MAX_CLIENTS {
+            let bi = (*world).globals.botstates[i];
+            if bi.is_null() || (*bi).inuse == qfalse {
+                continue;
+            }
+            // initialize the bot think residual time
+            (*bi).botthink_residual = BOT_THINK_TIME * botnum / (*world).globals.numbots;
+            botnum += 1;
+        }
+    }
 }
 
 /// Raven `PlayersInGame`.
@@ -533,7 +895,6 @@ pub fn PlayersInGame(ctx: GameContext<'_>) -> c_int {
     }
 }
 
-// PORT-ESCALATION(placeholder-global): allocates into `GameGlobals.botstates` (still `()`) — same botstates typing/Default blocker as BotAI.
 /// Raven `BotAISetupClient`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:819-884`
@@ -544,10 +905,84 @@ pub fn BotAISetupClient(
     settings: *mut c_void,
     restart: qboolean,
 ) -> c_int {
-    todo!("Port BotAISetupClient — parked: placeholder-global")
+    // PORT-NOTE(botstates/FloatTime/PRT_FATAL): `globals.botstates` is a `()`
+    // placeholder (indexed as intended); `FloatTime` and `PRT_FATAL` have no
+    // ported home yet; `settings` kept as `*mut c_void` (bot_settings_s cast).
+    unsafe {
+        let world = ctx.world;
+        if (*world).globals.botstates[client as usize].is_null() {
+            (*world).globals.botstates[client as usize] =
+                B_Alloc(ctx, core::mem::size_of::<bot_state_t>() as c_int) as *mut bot_state_t;
+        }
+
+        core::ptr::write_bytes((*world).globals.botstates[client as usize], 0, 1);
+
+        let bs = (*world).globals.botstates[client as usize];
+
+        if !bs.is_null() && (*bs).inuse != qfalse {
+            let msg = format!("BotAISetupClient: client {} already setup\n", client);
+            BotAI_Print(PRT_FATAL, cstr(&msg).as_ptr() as *mut c_char);
+            return qfalse;
+        }
+
+        core::ptr::copy_nonoverlapping(
+            settings as *const bot_settings_t,
+            &mut (*bs).settings,
+            1,
+        );
+
+        (*bs).client = client; // need the client number before personality stuff
+
+        // initialize weapon weight defaults..
+        (*bs).botWeaponWeights[WP_NONE as usize] = 0.0;
+        (*bs).botWeaponWeights[WP_STUN_BATON as usize] = 1.0;
+        (*bs).botWeaponWeights[WP_SABER as usize] = 10.0;
+        (*bs).botWeaponWeights[WP_BRYAR_PISTOL as usize] = 11.0;
+        (*bs).botWeaponWeights[WP_BLASTER as usize] = 12.0;
+        (*bs).botWeaponWeights[WP_DISRUPTOR as usize] = 13.0;
+        (*bs).botWeaponWeights[WP_BOWCASTER as usize] = 14.0;
+        (*bs).botWeaponWeights[WP_REPEATER as usize] = 15.0;
+        (*bs).botWeaponWeights[WP_DEMP2 as usize] = 16.0;
+        (*bs).botWeaponWeights[WP_FLECHETTE as usize] = 17.0;
+        (*bs).botWeaponWeights[WP_ROCKET_LAUNCHER as usize] = 18.0;
+        (*bs).botWeaponWeights[WP_THERMAL as usize] = 14.0;
+        (*bs).botWeaponWeights[WP_TRIP_MINE as usize] = 0.0;
+        (*bs).botWeaponWeights[WP_DET_PACK as usize] = 0.0;
+        (*bs).botWeaponWeights[WP_MELEE as usize] = 1.0;
+
+        BotUtilizePersonality(ctx, bs);
+
+        let gt = (*world).cvars.g_gametype.integer;
+        if gt == GT_DUEL || gt == GT_POWERDUEL {
+            (*bs).botWeaponWeights[WP_SABER as usize] = 13.0;
+        }
+
+        // allocate a goal state
+        (*bs).gs = trap::BotAllocGoalState(ctx.engine, BotlibAiAllocGoalStateArgs::new(client));
+
+        // allocate a weapon state
+        (*bs).ws = trap::BotAllocWeaponState(ctx.engine, BotlibAiAllocWeaponStateArgs::new());
+
+        (*bs).inuse = qtrue;
+        (*bs).entitynum = client;
+        (*bs).setupcount = 4;
+        (*bs).entergame_time = FloatTime();
+        (*bs).ms = trap::BotAllocMoveState(ctx.engine, BotlibAiAllocMoveStateArgs::new());
+        (*world).globals.numbots += 1;
+
+        // NOTE: reschedule the bot thinking
+        BotScheduleBotThink(ctx);
+
+        if PlayersInGame(ctx) != 0 {
+            // don't talk to yourself
+            let sect = cstr("GeneralGreetings");
+            BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
+        }
+
+        qtrue
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): reads/clears `GameGlobals.botstates` (still `()`) — same botstates typing/Default blocker as BotAI.
 /// Raven `BotAIShutdownClient`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:891-914`
@@ -556,7 +991,28 @@ pub fn BotAIShutdownClient(
     client: c_int,
     restart: qboolean,
 ) -> c_int {
-    todo!("Port BotAIShutdownClient — parked: placeholder-global")
+    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder; indexed
+    // as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
+    unsafe {
+        let world = ctx.world;
+        let bs = (*world).globals.botstates[client as usize];
+        if bs.is_null() || (*bs).inuse == qfalse {
+            return qfalse;
+        }
+
+        trap::BotFreeMoveState(ctx.engine, BotlibAiFreeMoveStateArgs::new((*bs).ms));
+        // free the goal state
+        trap::BotFreeGoalState(ctx.engine, BotlibAiFreeGoalStateArgs::new((*bs).gs));
+        // free the weapon weights
+        trap::BotFreeWeaponState(ctx.engine, BotlibAiFreeWeaponStateArgs::new((*bs).ws));
+        // clear the bot state
+        core::ptr::write_bytes(bs, 0, 1);
+        // set the inuse flag to qfalse
+        (*bs).inuse = qfalse;
+        // there's one bot less
+        (*world).globals.numbots -= 1;
+        qtrue
+    }
 }
 
 /// Raven `BotResetState`.
@@ -611,7 +1067,6 @@ pub fn BotResetState(
     }
 }
 
-// PORT-ESCALATION(placeholder-global): iterates `GameGlobals.botstates` (still `()`) — same botstates typing/Default blocker as BotAI.
 /// Raven `BotAILoadMap`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:966-977`
@@ -619,7 +1074,19 @@ pub fn BotAILoadMap(
     ctx: GameContext<'_>,
     restart: c_int,
 ) -> c_int {
-    todo!("Port BotAILoadMap — parked: placeholder-global")
+    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder; indexed
+    // as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
+    unsafe {
+        let world = ctx.world;
+        for i in 0..MAX_CLIENTS {
+            let bi = (*world).globals.botstates[i];
+            if !bi.is_null() && (*bi).inuse != qfalse {
+                BotResetState(ctx, bi);
+                (*bi).setupcount = 4;
+            }
+        }
+        qtrue
+    }
 }
 
 /// Raven `OrgVisible`.
@@ -655,7 +1122,6 @@ pub fn OrgVisible(
     0
 }
 
-// PORT-ESCALATION(unported-const): `MASK_PLAYERSOLID` has no ported home (w_saber.rs notes it unported); the second solid trace here needs it.
 /// Raven `WPOrgVisible`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:997-1026`
@@ -666,7 +1132,62 @@ pub fn WPOrgVisible(
     org2: vec3_t,
     ignore: c_int,
 ) -> c_int {
-    todo!("Port WPOrgVisible — parked: unported-const")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut tr: trace_t = core::mem::zeroed();
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr,
+                &org1,
+                core::ptr::null(),
+                core::ptr::null(),
+                &org2,
+                ignore,
+                MASK_SOLID,
+            ),
+        );
+
+        if tr.fraction == 1.0 {
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(
+                    &mut tr,
+                    &org1,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &org2,
+                    ignore,
+                    MASK_PLAYERSOLID,
+                ),
+            );
+
+            if tr.fraction != 1.0
+                && (tr.entityNum as c_int) != ENTITYNUM_NONE
+                && (*base.add(tr.entityNum as usize)).s.eType == ET_SPECIAL as c_int
+            {
+                let hitent = base.add(tr.entityNum as usize);
+                if (*hitent).parent.is_some()
+                    && !(*crate::ent_id::resolve(base, (*hitent).parent)).client.is_null()
+                {
+                    let ownent = crate::ent_id::resolve(base, (*hitent).parent);
+
+                    if OnSameTeam(ctx, bot, ownent) != qfalse
+                        || (*bot).s.number == (*ownent).s.number
+                    {
+                        return 1;
+                    }
+                }
+                return 2;
+            }
+
+            return 1;
+        }
+
+        0
+    }
 }
 
 /// Raven `OrgVisibleBox`.
@@ -753,7 +1274,6 @@ pub fn CheckForFunc(
     0
 }
 
-// PORT-ESCALATION(bg-boundary): `bot_pvstype` is not in GameCvars (state list marks it bg-owned/ungrouped, alongside bot_camp/bot_attachments) — where do these ungrouped bot cvars live for game-tier access?
 /// Raven `BotPVSCheck`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1086-1101`
@@ -762,10 +1282,23 @@ pub fn BotPVSCheck(
     p1: vec3_t,
     p2: vec3_t,
 ) -> qboolean {
-    todo!("Port BotPVSCheck — parked: bg-boundary")
+    // PORT-NOTE(bot_pvstype): the `bot_pvstype` cvar has no ported home yet
+    // (ungrouped bot cvar); referenced as cited and reported as missing.
+    unsafe {
+        if (*ctx.world).cvars.g_RMG.integer != 0 && bot_pvstype.integer != 0 {
+            let mut subPoint: vec3_t = [0.0; 3];
+            crate::q_math::_VectorSubtract(p1, p2, &mut subPoint);
+
+            if crate::q_math::VectorLength(subPoint) > 5000.0 {
+                return qfalse;
+            }
+            return qtrue;
+        }
+
+        trap::InPVS(ctx.engine, GInPvsArgs::new(&p1, &p2))
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): iterates `GameGlobals.gWPArray` (still `()`) — needs the `[*mut wpobject_t; MAX_WPARRAY_SIZE]` typing (Default-derive conflict, same class as botstates).
 /// Raven `GetNearestVisibleWP`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1104-1149`
@@ -774,10 +1307,44 @@ pub fn GetNearestVisibleWP(
     org: vec3_t,
     ignore: c_int,
 ) -> c_int {
-    todo!("Port GetNearestVisibleWP — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let mut i: c_int = 0;
+        let mut bestdist: f32 = if (*world).cvars.g_RMG.integer != 0 {
+            300.0
+        } else {
+            // don't trace over 800 units away to avoid GIANT HORRIBLE SPEED HITS
+            800.0
+        };
+        let mut bestindex: c_int = -1;
+
+        let mins: vec3_t = [-15.0, -15.0, -1.0];
+        let maxs: vec3_t = [15.0, 15.0, 1.0];
+
+        while i < (*world).globals.gWPNum {
+            let wp = (*world).globals.gWPArray.0[i as usize];
+            if !wp.is_null() && (*wp).inuse != 0 {
+                let mut a: vec3_t = [0.0; 3];
+                crate::q_math::_VectorSubtract(org, (*wp).origin, &mut a);
+                let flLen = crate::q_math::VectorLength(a);
+
+                if flLen < bestdist
+                    && ((*world).cvars.g_RMG.integer != 0
+                        || BotPVSCheck(ctx, org, (*wp).origin) != qfalse)
+                    && OrgVisibleBox(ctx, org, mins, maxs, (*wp).origin, ignore) != 0
+                {
+                    bestdist = flLen;
+                    bestindex = i;
+                }
+            }
+
+            i += 1;
+        }
+
+        bestindex
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): indexes `GameGlobals.gWPArray` (still `()`) and uses the `WPFLAG_*` family (only a file-local const in ai_wpnav.rs) — needs both the gWPArray typing and a shared WPFLAG const home.
 /// Raven `PassWayCheck`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1157-1190`
@@ -786,10 +1353,40 @@ pub fn PassWayCheck(
     bs: *mut bot_state_t,
     windex: c_int,
 ) -> c_int {
-    todo!("Port PassWayCheck — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let wp = (*world).globals.gWPArray.0[windex as usize];
+        if wp.is_null() || (*wp).inuse == 0 {
+            // bad point index
+            return 0;
+        }
+
+        if (*world).cvars.g_RMG.integer != 0 {
+            if (*wp).flags & WPFLAG_RED_FLAG != 0 || (*wp).flags & WPFLAG_BLUE_FLAG != 0 {
+                // red or blue flag, we'd like to get here
+                return 1;
+            }
+        }
+
+        if (*bs).wpDirection != 0 && (*wp).flags & WPFLAG_ONEWAY_FWD != 0 {
+            return 0;
+        } else if (*bs).wpDirection == 0 && (*wp).flags & WPFLAG_ONEWAY_BACK != 0 {
+            return 0;
+        }
+
+        if !(*bs).wpCurrent.is_null()
+            && (*wp).forceJumpTo != 0
+            && (*wp).origin[2] > ((*(*bs).wpCurrent).origin[2] + 64.0)
+            && (*bs).cur_ps.fd.forcePowerLevel[FP_LEVITATION as usize] < (*wp).forceJumpTo
+        {
+            // waypoint requires force jump level greater than our current one to pass
+            return 0;
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `TotalTrailDistance`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1193-1259`
@@ -799,10 +1396,46 @@ pub fn TotalTrailDistance(
     end: c_int,
     bs: *mut bot_state_t,
 ) -> f32 {
-    todo!("Port TotalTrailDistance — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let mut distancetotal: f32 = 0.0;
+
+        let beginat: c_int;
+        let endat: c_int;
+        if start > end {
+            beginat = end;
+            endat = start;
+        } else {
+            beginat = start;
+            endat = end;
+        }
+
+        let mut b = beginat;
+        while b < endat {
+            let p = (*world).globals.gWPArray.0[b as usize];
+            if b >= (*world).globals.gWPNum || p.is_null() || (*p).inuse == 0 {
+                // invalid waypoint index
+                return -1.0;
+            }
+
+            if (*world).cvars.g_RMG.integer == 0 {
+                if (end > start && (*p).flags & WPFLAG_ONEWAY_BACK != 0)
+                    || (start > end && (*p).flags & WPFLAG_ONEWAY_FWD != 0)
+                {
+                    // a one-way point, this path cannot be travelled to the final point
+                    return -1.0;
+                }
+            }
+
+            distancetotal += (*p).disttonext;
+
+            b += 1;
+        }
+
+        distancetotal
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `CheckForShorterRoutes`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1263-1349`
@@ -811,10 +1444,78 @@ pub fn CheckForShorterRoutes(
     bs: *mut bot_state_t,
     newwpindex: c_int,
 ) {
-    todo!("Port CheckForShorterRoutes — parked: placeholder-global")
+    // PORT-NOTE(FORCEJUMP_INSTANTMETHOD): undefined in this build; the
+    // non-instant force-jump branch is ported.
+    unsafe {
+        let world = ctx.world;
+        let mut i: c_int = 0;
+        let mut fj: c_int = 0;
+
+        if (*bs).wpDestination.is_null() {
+            return;
+        }
+
+        // set our traversal direction based on the index of the point
+        if newwpindex < (*(*bs).wpDestination).index {
+            (*bs).wpDirection = 0;
+        } else if newwpindex > (*(*bs).wpDestination).index {
+            (*bs).wpDirection = 1;
+        }
+
+        // can't switch again yet
+        if (*bs).wpSwitchTime > (*world).level.time as f32 {
+            return;
+        }
+
+        let cur = (*world).globals.gWPArray.0[newwpindex as usize];
+        // no neighboring points to check off of
+        if (*cur).neighbornum == 0 {
+            return;
+        }
+
+        // get the trail distance for our wp
+        let mut bestindex = newwpindex;
+        let mut bestlen = TotalTrailDistance(ctx, newwpindex, (*(*bs).wpDestination).index, bs);
+
+        while i < (*cur).neighbornum {
+            // now go through the neighbors and check the distance to the desired point
+            let checklen =
+                TotalTrailDistance(ctx, (*cur).neighbors[i as usize].num, (*(*bs).wpDestination).index, bs);
+
+            if checklen < bestlen - 64.0 || bestlen == -1.0 {
+                // this path covers less distance, let's take it instead
+                if (*bs).cur_ps.fd.forcePowerLevel[FP_LEVITATION as usize]
+                    >= (*cur).neighbors[i as usize].forceJumpTo
+                {
+                    bestlen = checklen;
+                    bestindex = (*cur).neighbors[i as usize].num;
+
+                    if (*cur).neighbors[i as usize].forceJumpTo != 0 {
+                        fj = (*cur).neighbors[i as usize].forceJumpTo;
+                    } else {
+                        fj = 0;
+                    }
+                }
+            }
+
+            i += 1;
+        }
+
+        if bestindex != newwpindex && bestindex != -1 {
+            // we found a path we want to switch to, let's do it
+            (*bs).wpCurrent = (*world).globals.gWPArray.0[bestindex as usize];
+            (*bs).wpSwitchTime = ((*world).level.time + 3000) as f32;
+
+            if fj != 0 {
+                // do we have to force jump to get to this neighbor?
+                (*bs).forceJumpChargeTime = (*world).level.time + 1000;
+                (*bs).beStill = ((*world).level.time + 1000) as f32;
+                (*bs).forceJumping = (*bs).forceJumpChargeTime as f32;
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(unported-const): a constant this body needs (WPFLAG_*/MASK_PLAYERSOLID/LEVELFLAG_*/ENEMY_FORGET_MS/BASE_*/STRAFEAROUND_*/DEFAULT_MAXS_2 family) has no ported home yet.
 /// Raven `WPConstantRoutine`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1353-1429`
@@ -822,7 +1523,86 @@ pub fn WPConstantRoutine(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port WPConstantRoutine — parked: unported-const")
+    // PORT-NOTE(forceJumpStrength/FORCEJUMP_INSTANTMETHOD): `forceJumpStrength`
+    // has no ported home yet (reported missing); the instant-method macro is
+    // undefined here, so the non-instant branches are ported.
+    unsafe {
+        let world = ctx.world;
+        let lt = (*world).level.time;
+        if (*bs).wpCurrent.is_null() {
+            return;
+        }
+
+        if (*(*bs).wpCurrent).flags & WPFLAG_DUCK != 0 {
+            // duck while travelling to this point
+            (*bs).duckTime = (lt + 100) as f32;
+        }
+
+        // #ifndef FORCEJUMP_INSTANTMETHOD
+        if (*(*bs).wpCurrent).flags & WPFLAG_JUMP != 0 {
+            // jump while travelling to this point
+            let mut heightDif: f32 = (*(*bs).wpCurrent).origin[2] - (*bs).origin[2] + 16.0;
+
+            if (*bs).origin[2] + 16.0 >= (*(*bs).wpCurrent).origin[2] {
+                // don't need to jump, we're already higher than this point
+                heightDif = 0.0;
+            }
+
+            if heightDif > 40.0
+                && ((*bs).cur_ps.fd.forcePowersKnown & (1 << (FP_LEVITATION as c_int))) != 0
+                && ((*bs).cur_ps.fd.forceJumpCharge
+                    < (forceJumpStrength
+                        [(*bs).cur_ps.fd.forcePowerLevel[FP_LEVITATION as usize] as usize]
+                        - 100) as f32
+                    || (*bs).cur_ps.groundEntityNum == ENTITYNUM_NONE)
+            {
+                // alright, let's jump
+                (*bs).forceJumpChargeTime = lt + 1000;
+                if (*bs).cur_ps.groundEntityNum != ENTITYNUM_NONE
+                    && (*bs).jumpPrep < (lt - 300) as f32
+                {
+                    (*bs).jumpPrep = (lt + 700) as f32;
+                }
+                (*bs).beStill = (lt + 300) as f32;
+                (*bs).jumpTime = 0.0;
+
+                if (*bs).wpSeenTime < (lt + 600) as f32 {
+                    (*bs).wpSeenTime = (lt + 600) as f32;
+                }
+            } else if heightDif > 64.0
+                && ((*bs).cur_ps.fd.forcePowersKnown & (1 << (FP_LEVITATION as c_int))) == 0
+            {
+                // this point needs force jump to reach and we don't have it
+                // Kill the current point and turn around
+                (*bs).wpCurrent = core::ptr::null_mut();
+                if (*bs).wpDirection != 0 {
+                    (*bs).wpDirection = 0;
+                } else {
+                    (*bs).wpDirection = 1;
+                }
+
+                return;
+            }
+        }
+        // #endif
+
+        if (*(*bs).wpCurrent).forceJumpTo != 0 {
+            // #else branch (FORCEJUMP_INSTANTMETHOD undefined)
+            let mut heightDif: f32 = (*(*bs).wpCurrent).origin[2] - (*bs).origin[2] + 16.0;
+
+            if (*bs).origin[2] + 16.0 >= (*(*bs).wpCurrent).origin[2] {
+                heightDif = 0.0;
+            }
+
+            if (*bs).cur_ps.fd.forceJumpCharge
+                < (forceJumpStrength
+                    [(*bs).cur_ps.fd.forcePowerLevel[FP_LEVITATION as usize] as usize]
+                    - 100) as f32
+            {
+                (*bs).forceJumpChargeTime = lt + 200;
+            }
+        }
+    }
 }
 
 /// Raven `BotCTFGuardDuty`.
@@ -844,7 +1624,6 @@ pub fn BotCTFGuardDuty(
     qfalse
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `WPTouchRoutine`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1452-1539`
@@ -852,7 +1631,86 @@ pub fn WPTouchRoutine(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port WPTouchRoutine — parked: placeholder-global")
+    // PORT-NOTE(bot_camp/FORCEJUMP_INSTANTMETHOD): the `bot_camp` cvar has no
+    // ported home (reported missing); instant-method macro undefined here.
+    unsafe {
+        let world = ctx.world;
+        let lt = (*world).level.time;
+
+        if (*bs).wpCurrent.is_null() {
+            return;
+        }
+
+        (*bs).wpTravelTime = (lt + 10000) as f32;
+
+        if (*(*bs).wpCurrent).flags & WPFLAG_NOMOVEFUNC != 0 {
+            // don't try to use any nearby map objects for a little while
+            (*bs).noUseTime = lt + 4000;
+        }
+
+        // #ifndef FORCEJUMP_INSTANTMETHOD
+        if (*(*bs).wpCurrent).flags & WPFLAG_JUMP != 0 && (*(*bs).wpCurrent).forceJumpTo == 0 {
+            // jump if we're flagged to but not if this indicates a force jump point
+            (*bs).jumpTime = (lt + 100) as f32;
+        }
+        // #endif
+
+        if (*bs).isCamper != 0
+            && bot_camp.integer != 0
+            && (BotIsAChickenWuss(ctx, bs) != 0
+                || BotCTFGuardDuty(ctx, bs) != qfalse
+                || (*bs).isCamper == 2)
+            && ((*(*bs).wpCurrent).flags & WPFLAG_SNIPEORCAMP != 0
+                || (*(*bs).wpCurrent).flags & WPFLAG_SNIPEORCAMPSTAND != 0)
+            && (*bs).cur_ps.weapon != WP_SABER
+            && (*bs).cur_ps.weapon != WP_MELEE
+            && (*bs).cur_ps.weapon != WP_STUN_BATON
+        {
+            // if we're a camper and a chicken then camp
+            let lastNum: c_int = if (*bs).wpDirection != 0 {
+                (*(*bs).wpCurrent).index + 1
+            } else {
+                (*(*bs).wpCurrent).index - 1
+            };
+
+            let lp = (*world).globals.gWPArray.0[lastNum as usize];
+            if !lp.is_null() && (*lp).inuse != 0 && (*lp).index != 0 && (*bs).isCamping < lt as f32 {
+                (*bs).isCamping = (lt + (*world).bg_state.rng.rand() % 15000 + 30000) as f32;
+                (*bs).wpCamping = (*bs).wpCurrent;
+                (*bs).wpCampingTo = lp;
+
+                if (*(*bs).wpCurrent).flags & WPFLAG_SNIPEORCAMPSTAND != 0 {
+                    (*bs).campStanding = qtrue;
+                } else {
+                    (*bs).campStanding = qfalse;
+                }
+            }
+        } else if ((*bs).cur_ps.weapon == WP_SABER
+            || (*bs).cur_ps.weapon == WP_STUN_BATON
+            || (*bs).cur_ps.weapon == WP_MELEE)
+            && (*bs).isCamping > lt as f32
+        {
+            // don't snipe/camp with a melee weapon, that would be silly
+            (*bs).isCamping = 0.0;
+            (*bs).wpCampingTo = core::ptr::null_mut();
+            (*bs).wpCamping = core::ptr::null_mut();
+        }
+
+        if !(*bs).wpDestination.is_null() {
+            if (*(*bs).wpCurrent).index == (*(*bs).wpDestination).index {
+                (*bs).wpDestination = core::ptr::null_mut();
+
+                if (*bs).runningLikeASissy != 0 {
+                    // scared and running, keep navigational priorities less delayed
+                    (*bs).destinationGrabTime = (lt + 500) as f32;
+                } else {
+                    (*bs).destinationGrabTime = (lt + 3500) as f32;
+                }
+            } else {
+                CheckForShorterRoutes(ctx, bs, (*(*bs).wpCurrent).index);
+            }
+        }
+    }
 }
 
 /// Raven `MoveTowardIdealAngles`.
@@ -867,7 +1725,6 @@ pub fn MoveTowardIdealAngles(
     }
 }
 
-// PORT-ESCALATION(unported-const): a constant this body needs (WPFLAG_*/MASK_PLAYERSOLID/LEVELFLAG_*/ENEMY_FORGET_MS/BASE_*/STRAFEAROUND_*/DEFAULT_MAXS_2 family) has no ported home yet.
 /// Raven `BotTrace_Strafe`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1556-1633`
@@ -876,10 +1733,121 @@ pub fn BotTrace_Strafe(
     bs: *mut bot_state_t,
     traceto: vec3_t,
 ) -> c_int {
-    todo!("Port BotTrace_Strafe — parked: unported-const")
+    // PORT-NOTE(DEFAULT_MAXS_2/STRAFEAROUND_*): these consts have no shared
+    // ported home yet; referenced as cited and reported as missing.
+    unsafe {
+        let playerMins: vec3_t = [-15.0, -15.0, /*DEFAULT_MINS_2*/ -8.0];
+        let playerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];
+
+        if (*bs).cur_ps.groundEntityNum == ENTITYNUM_NONE {
+            // don't do this in the air, it can be.. dangerous.
+            return 0;
+        }
+
+        let mut dirAng: vec3_t = [0.0; 3];
+        crate::q_math::_VectorSubtract(traceto, (*bs).origin, &mut dirAng);
+        crate::q_math::VectorNormalize(&mut dirAng);
+        crate::q_math::vectoangles(dirAng, &mut dirAng);
+
+        if AngleDifference((*bs).viewangles[YAW], dirAng[YAW]) > 60.0
+            || AngleDifference((*bs).viewangles[YAW], dirAng[YAW]) < -60.0
+        {
+            // not facing the direction we're going; too stupid to strafe around
+            return 0;
+        }
+
+        let mut from: vec3_t = [0.0; 3];
+        let mut to: vec3_t = [0.0; 3];
+        crate::q_math::_VectorCopy((*bs).origin, &mut from);
+        crate::q_math::_VectorCopy(traceto, &mut to);
+
+        let mut dirDif: vec3_t = [0.0; 3];
+        crate::q_math::_VectorSubtract(to, from, &mut dirDif);
+        crate::q_math::VectorNormalize(&mut dirDif);
+        crate::q_math::vectoangles(dirDif, &mut dirDif);
+
+        let mut forward: vec3_t = [0.0; 3];
+        crate::q_math::AngleVectors(dirDif, Some(&mut forward), None, None);
+
+        to[0] = from[0] + forward[0] * 32.0;
+        to[1] = from[1] + forward[1] * 32.0;
+        to[2] = from[2] + forward[2] * 32.0;
+
+        let mut tr: trace_t = core::mem::zeroed();
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr,
+                &from,
+                &playerMins,
+                &playerMaxs,
+                &to,
+                (*bs).client,
+                MASK_PLAYERSOLID,
+            ),
+        );
+
+        if tr.fraction == 1.0 {
+            return 0;
+        }
+
+        let mut right: vec3_t = [0.0; 3];
+        crate::q_math::AngleVectors(dirAng, None, Some(&mut right), None);
+
+        from[0] += right[0] * 32.0;
+        from[1] += right[1] * 32.0;
+        from[2] += right[2] * 16.0;
+
+        to[0] += right[0] * 32.0;
+        to[1] += right[1] * 32.0;
+        to[2] += right[2] * 32.0;
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr,
+                &from,
+                &playerMins,
+                &playerMaxs,
+                &to,
+                (*bs).client,
+                MASK_PLAYERSOLID,
+            ),
+        );
+
+        if tr.fraction == 1.0 {
+            return STRAFEAROUND_RIGHT;
+        }
+
+        from[0] -= right[0] * 64.0;
+        from[1] -= right[1] * 64.0;
+        from[2] -= right[2] * 64.0;
+
+        to[0] -= right[0] * 64.0;
+        to[1] -= right[1] * 64.0;
+        to[2] -= right[2] * 64.0;
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr,
+                &from,
+                &playerMins,
+                &playerMaxs,
+                &to,
+                (*bs).client,
+                MASK_PLAYERSOLID,
+            ),
+        );
+
+        if tr.fraction == 1.0 {
+            return STRAFEAROUND_LEFT;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `BotTrace_Jump`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1638-1699`
@@ -888,10 +1856,99 @@ pub fn BotTrace_Jump(
     bs: *mut bot_state_t,
     traceto: vec3_t,
 ) -> c_int {
-    todo!("Port BotTrace_Jump — parked: placeholder-global")
+    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder; indexed
+    // as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        let mut a: vec3_t = [0.0; 3];
+        let mut fwd: vec3_t = [0.0; 3];
+        let mut traceto_mod: vec3_t = [0.0; 3];
+        let mut tracefrom_mod: vec3_t = [0.0; 3];
+
+        crate::q_math::_VectorSubtract(traceto, (*bs).origin, &mut a);
+        crate::q_math::vectoangles(a, &mut a);
+
+        crate::q_math::AngleVectors(a, Some(&mut fwd), None, None);
+
+        traceto_mod[0] = (*bs).origin[0] + fwd[0] * 4.0;
+        traceto_mod[1] = (*bs).origin[1] + fwd[1] * 4.0;
+        traceto_mod[2] = (*bs).origin[2] + fwd[2] * 4.0;
+
+        mins = [-15.0, -15.0, -18.0];
+        maxs = [15.0, 15.0, 32.0];
+
+        let mut tr: trace_t = core::mem::zeroed();
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr,
+                &(*bs).origin,
+                &mins,
+                &maxs,
+                &traceto_mod,
+                (*bs).client,
+                MASK_PLAYERSOLID,
+            ),
+        );
+
+        if tr.fraction == 1.0 {
+            return 0;
+        }
+
+        let orTr = tr.entityNum as c_int;
+
+        crate::q_math::_VectorCopy((*bs).origin, &mut tracefrom_mod);
+
+        tracefrom_mod[2] += 41.0;
+        traceto_mod[2] += 41.0;
+
+        mins = [-15.0, -15.0, 0.0];
+        maxs = [15.0, 15.0, 8.0];
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr,
+                &tracefrom_mod,
+                &mins,
+                &maxs,
+                &traceto_mod,
+                (*bs).client,
+                MASK_PLAYERSOLID,
+            ),
+        );
+
+        if tr.fraction == 1.0 {
+            if orTr >= 0
+                && orTr < MAX_CLIENTS as c_int
+                && !(*world).globals.botstates[orTr as usize].is_null()
+                && (*(*world).globals.botstates[orTr as usize]).jumpTime
+                    > (*world).level.time as f32
+            {
+                // so bots don't try to jump over each other at the same time
+                return 0;
+            }
+
+            let currentEnemy = crate::ent_id::resolve(base, (*bs).currentEnemy);
+            if !currentEnemy.is_null()
+                && (*currentEnemy).s.number == orTr
+                && (BotGetWeaponRange(bs) == BWEAPONRANGE_SABER
+                    || BotGetWeaponRange(bs) == BWEAPONRANGE_MELEE)
+            {
+                return 0;
+            }
+
+            return 1;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(unported-const): a constant this body needs (WPFLAG_*/MASK_PLAYERSOLID/LEVELFLAG_*/ENEMY_FORGET_MS/BASE_*/STRAFEAROUND_*/DEFAULT_MAXS_2 family) has no ported home yet.
 /// Raven `BotTrace_Duck`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1702-1750`
@@ -900,10 +1957,73 @@ pub fn BotTrace_Duck(
     bs: *mut bot_state_t,
     traceto: vec3_t,
 ) -> c_int {
-    todo!("Port BotTrace_Duck — parked: unported-const")
+    unsafe {
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        let mut a: vec3_t = [0.0; 3];
+        let mut fwd: vec3_t = [0.0; 3];
+        let mut traceto_mod: vec3_t = [0.0; 3];
+        let mut tracefrom_mod: vec3_t = [0.0; 3];
+
+        crate::q_math::_VectorSubtract(traceto, (*bs).origin, &mut a);
+        crate::q_math::vectoangles(a, &mut a);
+
+        crate::q_math::AngleVectors(a, Some(&mut fwd), None, None);
+
+        traceto_mod[0] = (*bs).origin[0] + fwd[0] * 4.0;
+        traceto_mod[1] = (*bs).origin[1] + fwd[1] * 4.0;
+        traceto_mod[2] = (*bs).origin[2] + fwd[2] * 4.0;
+
+        mins = [-15.0, -15.0, -23.0];
+        maxs = [15.0, 15.0, 8.0];
+
+        let mut tr: trace_t = core::mem::zeroed();
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr,
+                &(*bs).origin,
+                &mins,
+                &maxs,
+                &traceto_mod,
+                (*bs).client,
+                MASK_PLAYERSOLID,
+            ),
+        );
+
+        if tr.fraction != 1.0 {
+            return 0;
+        }
+
+        crate::q_math::_VectorCopy((*bs).origin, &mut tracefrom_mod);
+
+        tracefrom_mod[2] += 31.0; //33;
+        traceto_mod[2] += 31.0; //33;
+
+        mins = [-15.0, -15.0, 0.0];
+        maxs = [15.0, 15.0, 32.0];
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr,
+                &tracefrom_mod,
+                &mins,
+                &maxs,
+                &traceto_mod,
+                (*bs).client,
+                MASK_PLAYERSOLID,
+            ),
+        );
+
+        if tr.fraction != 1.0 {
+            return 1;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(unported-const): a constant this body needs (WPFLAG_*/MASK_PLAYERSOLID/LEVELFLAG_*/ENEMY_FORGET_MS/BASE_*/STRAFEAROUND_*/DEFAULT_MAXS_2 family) has no ported home yet.
 /// Raven `PassStandardEnemyChecks`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1753-1858`
@@ -912,10 +2032,113 @@ pub fn PassStandardEnemyChecks(
     bs: *mut bot_state_t,
     en: *mut gentity_t,
 ) -> c_int {
-    todo!("Port PassStandardEnemyChecks — parked: unported-const")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+
+        if bs.is_null() || en.is_null() {
+            // shouldn't happen
+            return 0;
+        }
+
+        if (*en).client.is_null() {
+            // not a client, don't care about him
+            return 0;
+        }
+
+        if (*en).health < 1 {
+            // he's already dead
+            return 0;
+        }
+
+        if (*en).takedamage == qfalse {
+            // a client that can't take damage?
+            return 0;
+        }
+
+        if (*bs).doingFallback != qfalse && ((*world).globals.gLevelFlags & LEVELFLAG_IGNOREINFALLBACK) != 0
+        {
+            // fallback state and the level says to ignore enemies in it
+            return 0;
+        }
+
+        let en_cl = (*en).client as *mut gclient_t;
+
+        if (*en_cl).ps.pm_type == PM_INTERMISSION as c_int
+            || (*en_cl).ps.pm_type == PM_SPECTATOR as c_int
+            || (*en_cl).sess.sessionTeam == TEAM_SPECTATOR
+        {
+            // don't attack spectators
+            return 0;
+        }
+
+        if (*en_cl).pers.connected == CON_DISCONNECTED {
+            // a "zombie" client?
+            return 0;
+        }
+
+        if (*en).s.solid == 0 {
+            // shouldn't happen
+            return 0;
+        }
+
+        if (*bs).client == (*en).s.number {
+            // don't attack yourself
+            return 0;
+        }
+
+        if OnSameTeam(ctx, base.add((*bs).client as usize), en) != qfalse {
+            // don't attack teammates
+            return 0;
+        }
+
+        if BotMindTricked(ctx, (*bs).client, (*en).s.number) != 0 {
+            let currentEnemy = crate::ent_id::resolve(base, (*bs).currentEnemy);
+            if !currentEnemy.is_null() && (*currentEnemy).s.number == (*en).s.number {
+                // if mindtricked by this enemy, be less "aware" of them
+                let mut vs: vec3_t = [0.0; 3];
+                crate::q_math::_VectorSubtract((*bs).origin, (*en_cl).ps.origin, &mut vs);
+                let vLen = crate::q_math::VectorLength(vs);
+
+                if vLen > 64.0 {
+                    return 0;
+                }
+            }
+        }
+
+        if (*en_cl).ps.duelInProgress != qfalse && (*en_cl).ps.duelIndex != (*bs).client {
+            // don't attack duelists unless you're dueling them
+            return 0;
+        }
+
+        if (*bs).cur_ps.duelInProgress != qfalse && (*en).s.number != (*bs).cur_ps.duelIndex {
+            // ditto, the other way around
+            return 0;
+        }
+
+        if (*world).cvars.g_gametype.integer == GT_JEDIMASTER
+            && (*en_cl).ps.isJediMaster == qfalse
+            && (*bs).cur_ps.isJediMaster == qfalse
+        {
+            // rules for attacking non-JM in JM mode
+            if (*world).cvars.g_friendlyFire.integer == 0 {
+                // can't harm non-JM in JM mode if FF is off
+                return 0;
+            }
+
+            let mut vs: vec3_t = [0.0; 3];
+            crate::q_math::_VectorSubtract((*bs).origin, (*en_cl).ps.origin, &mut vs);
+            let vLen = crate::q_math::VectorLength(vs);
+
+            if vLen > 350.0 {
+                return 0;
+            }
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `BotDamageNotification`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1861-1941`
@@ -924,10 +2147,83 @@ pub fn BotDamageNotification(
     bot: *mut gclient_t,
     attacker: *mut gentity_t,
 ) {
-    todo!("Port BotDamageNotification — parked: placeholder-global")
+    // PORT-NOTE(botstates/ENEMY_FORGET_MS): `globals.botstates` is a `()`
+    // placeholder (indexed as intended); `ENEMY_FORGET_MS` has no ported home.
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+
+        if bot.is_null() || attacker.is_null() || (*attacker).client.is_null() {
+            return;
+        }
+
+        if (*bot).ps.clientNum >= MAX_CLIENTS as c_int {
+            // an NPC.. do nothing for them.
+            return;
+        }
+
+        if (*attacker).s.number >= MAX_CLIENTS as c_int {
+            // if attacker is an npc also don't care I suppose.
+            return;
+        }
+
+        let bot_ent_id = Some(ent_id(base, base.add((*bot).ps.clientNum as usize)));
+        let bs_a = (*world).globals.botstates[(*attacker).s.number as usize];
+
+        if !bs_a.is_null() {
+            // if the client attacking us is a bot as well
+            (*bs_a).lastAttacked = bot_ent_id;
+            let mut i: usize = 0;
+
+            while i < MAX_CLIENTS {
+                let bi = (*world).globals.botstates[i];
+                if !bi.is_null() && i as c_int != (*bs_a).client && (*bi).lastAttacked == bot_ent_id
+                {
+                    (*bi).lastAttacked = None;
+                }
+
+                i += 1;
+            }
+        } else {
+            // got attacked by a real client, so no one gets rights to lastAttacked
+            let mut i: usize = 0;
+
+            while i < MAX_CLIENTS {
+                let bi = (*world).globals.botstates[i];
+                if !bi.is_null() && (*bi).lastAttacked == bot_ent_id {
+                    (*bi).lastAttacked = None;
+                }
+
+                i += 1;
+            }
+        }
+
+        let bs = (*world).globals.botstates[(*bot).ps.clientNum as usize];
+
+        if bs.is_null() {
+            return;
+        }
+
+        (*bs).lastHurt = Some(ent_id(base, attacker));
+
+        if (*bs).currentEnemy.is_some() {
+            // we don't care about the guy attacking us if we have an enemy already
+            return;
+        }
+
+        if PassStandardEnemyChecks(ctx, bs, attacker) == 0 {
+            // the person that hurt us is not a valid enemy
+            return;
+        }
+
+        if PassLovedOneCheck(ctx, bs, attacker) != 0 {
+            // the person that hurt us is the one we love!
+            (*bs).currentEnemy = Some(ent_id(base, attacker));
+            (*bs).enemySeenTime = ((*world).level.time + ENEMY_FORGET_MS) as f32;
+        }
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `BotCanHear`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:1945-2010`
@@ -937,15 +2233,100 @@ pub fn BotCanHear(
     en: *mut gentity_t,
     endist: f32,
 ) -> c_int {
-    todo!("Port BotCanHear — parked: placeholder-global")
+    // PORT-NOTE(gBotEventTracker): `globals.gBotEventTracker` is a `()`
+    // placeholder; indexed as the intended `[boteventtracker_t; MAX_CLIENTS]`.
+    unsafe {
+        let world = ctx.world;
+
+        if en.is_null() || (*en).client.is_null() {
+            return 0;
+        }
+
+        let en_cl = (*en).client as *mut gclient_t;
+        let lt = (*world).level.time;
+
+        let mut minlen: f32 = 'compute: {
+            if (*en_cl).ps.otherSoundTime > lt {
+                // they made a noise in recent time
+                break 'compute (*en_cl).ps.otherSoundLen;
+            }
+
+            if (*en_cl).ps.footstepTime > lt {
+                // they made a footstep
+                break 'compute 256.0;
+            }
+
+            let et = &(*world).globals.gBotEventTracker[(*en).s.number as usize];
+            if et.eventTime < lt as f32 {
+                // no recent events to check
+                return 0;
+            }
+
+            // did the last event contain a sound?
+            let ev = et.events[(et.eventSequence & (MAX_PS_EVENTS as c_int - 1)) as usize];
+            if ev == EV_GLOBAL_SOUND as c_int {
+                256.0
+            } else if ev == EV_FIRE_WEAPON as c_int
+                || ev == EV_ALT_FIRE as c_int
+                || ev == EV_SABER_ATTACK as c_int
+            {
+                512.0
+            } else if ev == EV_STEP_4 as c_int
+                || ev == EV_STEP_8 as c_int
+                || ev == EV_STEP_12 as c_int
+                || ev == EV_STEP_16 as c_int
+                || ev == EV_FOOTSTEP as c_int
+                || ev == EV_FOOTSTEP_METAL as c_int
+                || ev == EV_FOOTWADE as c_int
+            {
+                256.0
+            } else if ev == EV_JUMP as c_int || ev == EV_ROLL as c_int {
+                256.0
+            } else {
+                999999.0
+            }
+        };
+
+        if BotMindTricked(ctx, (*bs).client, (*en).s.number) != 0 {
+            // if mindtricked by this person, cut down on minlen
+            minlen /= 4.0;
+        }
+
+        if endist <= minlen {
+            // we heard it
+            return 1;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `UpdateEventTracker`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2013-2031`
 pub fn UpdateEventTracker(ctx: GameContext<'_>) {
-    todo!("Port UpdateEventTracker — parked: placeholder-global")
+    // PORT-NOTE(gBotEventTracker): `globals.gBotEventTracker` is a `()`
+    // placeholder; indexed as the intended `[boteventtracker_t; MAX_CLIENTS]`.
+    unsafe {
+        let world = ctx.world;
+        let clients = (*world).level.clients;
+        let lt = (*world).level.time;
+        let mut i: usize = 0;
+
+        while i < MAX_CLIENTS {
+            let cl = clients.add(i);
+            let et = &mut (*world).globals.gBotEventTracker[i];
+            if et.eventSequence != (*cl).ps.eventSequence {
+                // updated event
+                et.eventSequence = (*cl).ps.eventSequence;
+                et.events[0] = (*cl).ps.events[0];
+                et.events[1] = (*cl).ps.events[1];
+                et.eventTime = (lt as f64 + 0.5) as f32;
+            }
+
+            i += 1;
+        }
+    }
 }
 
 /// Raven `InFieldOfVision`.
@@ -979,7 +2360,6 @@ pub fn InFieldOfVision(
     1
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `PassLovedOneCheck`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2078-2129`
@@ -988,10 +2368,66 @@ pub fn PassLovedOneCheck(
     bs: *mut bot_state_t,
     ent: *mut gentity_t,
 ) -> c_int {
-    todo!("Port PassLovedOneCheck — parked: placeholder-global")
+    // PORT-NOTE(botstates/bot_attachments): `globals.botstates` is a `()`
+    // placeholder (indexed as intended); the `bot_attachments` cvar has no
+    // ported home yet (reported missing).
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let clients = (*world).level.clients;
+
+        if (*bs).lovednum == 0 {
+            return 1;
+        }
+
+        let gt = (*world).cvars.g_gametype.integer;
+        if gt == GT_DUEL || gt == GT_POWERDUEL {
+            // There is no love in 1-on-1
+            return 1;
+        }
+
+        let mut i: c_int = 0;
+
+        if (*world).globals.botstates[(*ent).s.number as usize].is_null() {
+            // not a bot
+            return 1;
+        }
+
+        if bot_attachments.integer == 0 {
+            return 1;
+        }
+
+        let loved = (*world).globals.botstates[(*ent).s.number as usize];
+
+        while i < (*bs).lovednum {
+            let netname = (*clients.add((*loved).client as usize)).pers.netname.as_ptr();
+            let lovedname = (*bs).loved[i as usize].name.as_ptr() as *const c_char;
+            if core::ffi::CStr::from_ptr(netname) == core::ffi::CStr::from_ptr(lovedname) {
+                if IsTeamplay(ctx) == 0 && (*bs).loved[i as usize].level < 2 {
+                    // if FFA and level of love is not greater than 1, just don't care
+                    return 1;
+                } else if IsTeamplay(ctx) != 0
+                    && OnSameTeam(
+                        ctx,
+                        base.add((*bs).client as usize),
+                        base.add((*loved).client as usize),
+                    ) == qfalse
+                    && (*bs).loved[i as usize].level < 2
+                {
+                    // is teamplay, but not on same team and level < 2
+                    return 1;
+                } else {
+                    return 0;
+                }
+            }
+
+            i += 1;
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(unported-const): a constant this body needs (WPFLAG_*/MASK_PLAYERSOLID/LEVELFLAG_*/ENEMY_FORGET_MS/BASE_*/STRAFEAROUND_*/DEFAULT_MAXS_2 family) has no ported home yet.
 /// Raven `ScanForEnemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2134-2220`
@@ -999,10 +2435,101 @@ pub fn ScanForEnemies(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port ScanForEnemies — parked: unported-const")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+
+        let mut a: vec3_t = [0.0; 3];
+        let mut distcheck: f32;
+        let mut closest: f32 = 999999.0;
+        let mut i: c_int = 0;
+        let mut bestindex: c_int = -1;
+        let mut hasEnemyDist: f32 = 0.0;
+        let mut noAttackNonJM: qboolean = qfalse;
+
+        if (*bs).currentEnemy.is_some() {
+            // only switch to a new enemy if he's significantly closer
+            hasEnemyDist = (*bs).frame_Enemy_Len;
+        }
+
+        let ce = crate::ent_id::resolve(base, (*bs).currentEnemy);
+        if !ce.is_null()
+            && !(*ce).client.is_null()
+            && (*((*ce).client as *mut gclient_t)).ps.isJediMaster != qfalse
+        {
+            // The Jedi Master must die.
+            return -1;
+        }
+
+        if (*world).cvars.g_gametype.integer == GT_JEDIMASTER {
+            if G_ThereIsAMaster(ctx) != qfalse && (*bs).cur_ps.isJediMaster == qfalse {
+                // if friendly fire is on in jedi master we can attack people that bug us
+                if (*world).cvars.g_friendlyFire.integer == 0 {
+                    noAttackNonJM = qtrue;
+                } else {
+                    // only get mad if they get close enough to anger you, or hurt you
+                    closest = 128.0;
+                }
+            }
+        }
+
+        while i <= MAX_CLIENTS as c_int {
+            let ent = base.add(i as usize);
+            if i != (*bs).client
+                && !(*ent).client.is_null()
+                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) == qfalse
+                && PassStandardEnemyChecks(ctx, bs, ent) != 0
+                && BotPVSCheck(
+                    ctx,
+                    (*((*ent).client as *mut gclient_t)).ps.origin,
+                    (*bs).eye,
+                ) != qfalse
+                && PassLovedOneCheck(ctx, bs, ent) != 0
+            {
+                let ent_cl = (*ent).client as *mut gclient_t;
+                crate::q_math::_VectorSubtract((*ent_cl).ps.origin, (*bs).eye, &mut a);
+                distcheck = crate::q_math::VectorLength(a);
+                crate::q_math::vectoangles(a, &mut a);
+
+                if (*ent_cl).ps.isJediMaster != qfalse {
+                    // make us think the Jedi Master is close so we'll attack him
+                    distcheck = 1.0;
+                }
+
+                if distcheck < closest
+                    && ((InFieldOfVision((*bs).viewangles, 90.0, a) != 0
+                        && BotMindTricked(ctx, (*bs).client, i) == 0)
+                        || BotCanHear(ctx, bs, ent, distcheck) != 0)
+                    && OrgVisible(ctx, (*bs).eye, (*ent_cl).ps.origin, -1) != 0
+                {
+                    if BotMindTricked(ctx, (*bs).client, i) != 0 {
+                        if distcheck < 256.0
+                            || ((*world).level.time - (*ent_cl).dangerTime) < 100
+                        {
+                            if hasEnemyDist == 0.0 || distcheck < (hasEnemyDist - 128.0) {
+                                if noAttackNonJM == qfalse || (*ent_cl).ps.isJediMaster != qfalse {
+                                    closest = distcheck;
+                                    bestindex = i;
+                                }
+                            }
+                        }
+                    } else {
+                        if hasEnemyDist == 0.0 || distcheck < (hasEnemyDist - 128.0) {
+                            if noAttackNonJM == qfalse || (*ent_cl).ps.isJediMaster != qfalse {
+                                closest = distcheck;
+                                bestindex = i;
+                            }
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+
+        bestindex
+    }
 }
 
-// PORT-ESCALATION(unported-type): a struct type this body dereferences (wpobject_t) has no fields ported yet.
 /// Raven `WaitingForNow`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2222-2260`
@@ -1011,7 +2538,46 @@ pub fn WaitingForNow(
     bs: *mut bot_state_t,
     goalpos: vec3_t,
 ) -> c_int {
-    todo!("Port WaitingForNow — parked: unported-type")
+    // checks if the bot is doing something like waiting for an elevator to raise
+    unsafe {
+        let world = ctx.world;
+
+        if (*bs).wpCurrent.is_null() {
+            return 0;
+        }
+
+        if (goalpos[0] as c_int) != ((*(*bs).wpCurrent).origin[0] as c_int)
+            || (goalpos[1] as c_int) != ((*(*bs).wpCurrent).origin[1] as c_int)
+            || (goalpos[2] as c_int) != ((*(*bs).wpCurrent).origin[2] as c_int)
+        {
+            return 0;
+        }
+
+        let mut xybot: vec3_t = [0.0; 3];
+        let mut xywp: vec3_t = [0.0; 3];
+        let mut a: vec3_t = [0.0; 3];
+        crate::q_math::_VectorCopy((*bs).origin, &mut xybot);
+        crate::q_math::_VectorCopy((*(*bs).wpCurrent).origin, &mut xywp);
+
+        xybot[2] = 0.0;
+        xywp[2] = 0.0;
+
+        crate::q_math::_VectorSubtract(xybot, xywp, &mut a);
+
+        if crate::q_math::VectorLength(a) < 16.0 && (*bs).frame_Waypoint_Len > 100.0 {
+            if CheckForFunc(ctx, (*bs).origin, (*bs).client) != 0 {
+                // probably standing on an elevator and riding up/down.
+                return 1;
+            }
+        } else if crate::q_math::VectorLength(a) < 64.0
+            && (*bs).frame_Waypoint_Len > 64.0
+            && CheckForFunc(ctx, (*bs).origin, (*bs).client) != 0
+        {
+            (*bs).noUseTime = (*world).level.time + 2000;
+        }
+
+        0
+    }
 }
 
 /// Raven `BotGetWeaponRange`.
@@ -1040,7 +2606,6 @@ pub fn BotGetWeaponRange(
     }
 }
 
-// PORT-ESCALATION(unported-const): gates on `MAX_CHICKENWUSS_TIME`/`BOT_RUN_HEALTH` (ai_main.h) which are not ported; also reads gLevelFlags with the unported `LEVELFLAG_IMUSTNTRUNAWAY` mask.
 /// Raven `BotIsAChickenWuss`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2301-2391`
@@ -1048,10 +2613,115 @@ pub fn BotIsAChickenWuss(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port BotIsAChickenWuss — parked: unported-const")
+    // PORT-NOTE(MAX_CHICKENWUSS_TIME/BOT_RUN_HEALTH): these consts have no
+    // ported home yet; referenced as cited and reported as missing.
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let lt = (*world).level.time;
+        let gt = (*world).cvars.g_gametype.integer;
+
+        if (*world).globals.gLevelFlags & LEVELFLAG_IMUSTNTRUNAWAY != 0 {
+            // The level says we mustn't run away!
+            return 0;
+        }
+
+        if gt == GT_SINGLE_PLAYER {
+            // "coop" (not really)
+            return 0;
+        }
+
+        // Raven's `goto jmPass` skips the pre-block; a labeled block emulates it.
+        'pre: {
+            if gt == GT_JEDIMASTER && (*bs).cur_ps.isJediMaster == qfalse {
+                // Then you may know no fear. Well, unless he's strong.
+                let ce = crate::ent_id::resolve(base, (*bs).currentEnemy);
+                if !ce.is_null()
+                    && !(*ce).client.is_null()
+                    && (*((*ce).client as *mut gclient_t)).ps.isJediMaster != qfalse
+                    && (*ce).health > 40
+                    && (*bs).cur_ps.weapon < WP_ROCKET_LAUNCHER
+                {
+                    // explosive weapons are most effective against the Jedi Master
+                    break 'pre;
+                }
+                return 0;
+            }
+
+            if gt == GT_CTF {
+                let ce = crate::ent_id::resolve(base, (*bs).currentEnemy);
+                if !ce.is_null() && !(*ce).client.is_null() {
+                    let ce_cl = (*ce).client as *mut gclient_t;
+                    if (*ce_cl).ps.powerups[PW_REDFLAG as usize] != 0
+                        || (*ce_cl).ps.powerups[PW_BLUEFLAG as usize] != 0
+                    {
+                        // don't be afraid of flag carriers, they must die!
+                        return 0;
+                    }
+                }
+            }
+        }
+
+        // jmPass:
+        if (*bs).chickenWussCalculationTime > lt as f32 {
+            // don't want to keep going between two points...
+            return 2;
+        }
+
+        if (*bs).cur_ps.fd.forcePowersActive & (1 << (FP_RAGE as c_int)) != 0 {
+            // don't run while raging
+            return 0;
+        }
+
+        if gt == GT_JEDIMASTER && (*bs).cur_ps.isJediMaster == qfalse {
+            // be frightened of the jedi master? I guess in this case.
+            return 1;
+        }
+
+        (*bs).chickenWussCalculationTime = (lt + MAX_CHICKENWUSS_TIME) as f32;
+
+        if (*base.add((*bs).client as usize)).health < BOT_RUN_HEALTH {
+            // we're low on health, let's get away
+            return 1;
+        }
+
+        let bWRange = BotGetWeaponRange(bs);
+
+        if bWRange == BWEAPONRANGE_MELEE || bWRange == BWEAPONRANGE_SABER {
+            if bWRange != BWEAPONRANGE_SABER || (*bs).saberSpecialist == 0 {
+                // run away if using melee, or a saber and not a "saber specialist"
+                return 1;
+            }
+        }
+
+        if (*bs).cur_ps.weapon == WP_BRYAR_PISTOL {
+            // the bryar is a weak weapon, try to find a new one
+            return 1;
+        }
+
+        let ce = crate::ent_id::resolve(base, (*bs).currentEnemy);
+        if !ce.is_null()
+            && !(*ce).client.is_null()
+            && (*((*ce).client as *mut gclient_t)).ps.weapon == WP_SABER
+            && (*bs).frame_Enemy_Len < 512.0
+            && (*bs).cur_ps.weapon != WP_SABER
+        {
+            // close to a saber enemy and not using a saber, try to back off
+            return 1;
+        }
+
+        if (lt - (*bs).cur_ps.electrifyTime) < 16000 {
+            // lightning is dangerous.
+            return 1;
+        }
+
+        // didn't run, reset the timer
+        (*bs).chickenWussCalculationTime = 0.0;
+
+        0
+    }
 }
 
-// PORT-ESCALATION(unported-const): a constant this body needs (WPFLAG_*/MASK_PLAYERSOLID/LEVELFLAG_*/ENEMY_FORGET_MS/BASE_*/STRAFEAROUND_*/DEFAULT_MAXS_2 family) has no ported home yet.
 /// Raven `GetNearestBadThing`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2395-2504`
@@ -1059,10 +2729,141 @@ pub fn GetNearestBadThing(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> *mut gentity_t {
-    todo!("Port GetNearestBadThing — parked: unported-const")
+    // PORT-NOTE(ENEMY_FORGET_MS): the `ENEMY_FORGET_MS` const has no ported
+    // home yet; referenced as cited and reported as missing.
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut i: c_int = 0;
+        let mut glen: f32;
+        let mut hold: vec3_t = [0.0; 3];
+        let mut bestindex: c_int = 0;
+        let mut bestdist: f32 = 800.0; // if not within a radius of 800, no threat anyway
+        let mut foundindex: c_int = 0;
+        let mut factor: f32 = 0.0;
+        let mut tr: trace_t = core::mem::zeroed();
+
+        while i < (*world).level.num_entities {
+            let ent = base.add(i as usize);
+
+            if ((*ent).client.is_null()
+                && (*ent).inuse != qfalse
+                && (*ent).damage != 0
+                && (*ent).s.weapon != 0
+                && (*ent).splashDamage != 0)
+                || ((*ent).genericValue5 == 1000
+                    && (*ent).inuse != qfalse
+                    && (*ent).health > 0
+                    && (*ent).genericValue3 != (*bs).client
+                    && !(*base.add((*ent).genericValue3 as usize)).client.is_null()
+                    && OnSameTeam(
+                        ctx,
+                        base.add((*bs).client as usize),
+                        base.add((*ent).genericValue3 as usize),
+                    ) == qfalse)
+            {
+                // try to escape from dangerous projectiles, or a sentry gun.
+                crate::q_math::_VectorSubtract((*bs).origin, (*ent).r.currentOrigin, &mut hold);
+                glen = crate::q_math::VectorLength(hold);
+
+                if (*ent).s.weapon != WP_THERMAL
+                    && (*ent).s.weapon != WP_FLECHETTE
+                    && (*ent).s.weapon != WP_DET_PACK
+                    && (*ent).s.weapon != WP_TRIP_MINE
+                {
+                    factor = 0.5;
+
+                    if (*ent).s.weapon != 0 && glen <= 256.0 && (*bs).settings.skill > 2.0 {
+                        // it's a projectile so push it away
+                        (*bs).doForcePush = (*world).level.time + 700;
+                    }
+                } else {
+                    factor = 1.0;
+                }
+
+                if (*ent).s.weapon == WP_ROCKET_LAUNCHER
+                    && ((*ent).r.ownerNum == (*bs).client
+                        || ((*ent).r.ownerNum > 0
+                            && (*ent).r.ownerNum < MAX_CLIENTS as c_int
+                            && !(*base.add((*ent).r.ownerNum as usize)).client.is_null()
+                            && OnSameTeam(
+                                ctx,
+                                base.add((*bs).client as usize),
+                                base.add((*ent).r.ownerNum as usize),
+                            ) != qfalse))
+                {
+                    // don't be afraid of your own rockets or your teammates' rockets
+                    factor = 0.0;
+                }
+
+                if glen < bestdist * factor
+                    && BotPVSCheck(ctx, (*bs).origin, (*ent).s.pos.trBase) != qfalse
+                {
+                    trap::Trace(
+                        ctx.engine,
+                        GTraceArgs::new(
+                            &mut tr,
+                            &(*bs).origin,
+                            core::ptr::null(),
+                            core::ptr::null(),
+                            &(*ent).s.pos.trBase,
+                            (*bs).client,
+                            MASK_SOLID,
+                        ),
+                    );
+
+                    if tr.fraction == 1.0 || tr.entityNum as c_int == (*ent).s.number {
+                        bestindex = i;
+                        bestdist = glen;
+                        foundindex = 1;
+                    }
+                }
+            }
+
+            if (*ent).client.is_null()
+                && (*ent).inuse != qfalse
+                && (*ent).damage != 0
+                && (*ent).s.weapon != 0
+                && (*ent).r.ownerNum < MAX_CLIENTS as c_int
+                && (*ent).r.ownerNum >= 0
+            {
+                // in danger of someone's projectile and no enemy -> set enemy to them
+                let projOwner = base.add((*ent).r.ownerNum as usize);
+
+                if (*projOwner).inuse != qfalse && !(*projOwner).client.is_null() {
+                    if (*bs).currentEnemy.is_none() {
+                        if PassStandardEnemyChecks(ctx, bs, projOwner) != 0 {
+                            if PassLovedOneCheck(ctx, bs, projOwner) != 0 {
+                                crate::q_math::_VectorSubtract(
+                                    (*bs).origin,
+                                    (*ent).r.currentOrigin,
+                                    &mut hold,
+                                );
+                                glen = crate::q_math::VectorLength(hold);
+
+                                if glen < 512.0 {
+                                    (*bs).currentEnemy = Some(ent_id(base, projOwner));
+                                    (*bs).enemySeenTime =
+                                        ((*world).level.time + ENEMY_FORGET_MS) as f32;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            i += 1;
+        }
+
+        if foundindex != 0 {
+            (*bs).dontGoBack = ((*world).level.time + 1500) as f32;
+            base.add(bestindex as usize)
+        } else {
+            core::ptr::null_mut()
+        }
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `BotDefendFlag`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2507-2538`
@@ -1070,10 +2871,37 @@ pub fn BotDefendFlag(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port BotDefendFlag — parked: placeholder-global")
+    // PORT-NOTE(BASE_GUARD_DISTANCE): the const has no ported home yet;
+    // referenced as cited and reported as missing.
+    unsafe {
+        let world = ctx.world;
+        let clients = (*world).level.clients;
+        let flagPoint: *mut wpobject_t;
+
+        let st = (*clients.add((*bs).client as usize)).sess.sessionTeam;
+        if st == TEAM_RED {
+            flagPoint = (*world).globals.flagRed;
+        } else if st == TEAM_BLUE {
+            flagPoint = (*world).globals.flagBlue;
+        } else {
+            return 0;
+        }
+
+        if flagPoint.is_null() {
+            return 0;
+        }
+
+        let mut a: vec3_t = [0.0; 3];
+        crate::q_math::_VectorSubtract((*bs).origin, (*flagPoint).origin, &mut a);
+
+        if crate::q_math::VectorLength(a) > BASE_GUARD_DISTANCE as f32 {
+            (*bs).wpDestination = flagPoint;
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `BotGetEnemyFlag`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2541-2572`
@@ -1081,10 +2909,37 @@ pub fn BotGetEnemyFlag(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port BotGetEnemyFlag — parked: placeholder-global")
+    // PORT-NOTE(BASE_GETENEMYFLAG_DISTANCE): the const has no ported home yet;
+    // referenced as cited and reported as missing.
+    unsafe {
+        let world = ctx.world;
+        let clients = (*world).level.clients;
+        let flagPoint: *mut wpobject_t;
+
+        let st = (*clients.add((*bs).client as usize)).sess.sessionTeam;
+        if st == TEAM_RED {
+            flagPoint = (*world).globals.flagBlue;
+        } else if st == TEAM_BLUE {
+            flagPoint = (*world).globals.flagRed;
+        } else {
+            return 0;
+        }
+
+        if flagPoint.is_null() {
+            return 0;
+        }
+
+        let mut a: vec3_t = [0.0; 3];
+        crate::q_math::_VectorSubtract((*bs).origin, (*flagPoint).origin, &mut a);
+
+        if crate::q_math::VectorLength(a) > BASE_GETENEMYFLAG_DISTANCE as f32 {
+            (*bs).wpDestination = flagPoint;
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `BotGetFlagBack`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2575-2637`
@@ -1092,10 +2947,68 @@ pub fn BotGetFlagBack(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port BotGetFlagBack — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let clients = (*world).level.clients;
+        let mut i: c_int = 0;
+        let mut foundCarrier: c_int = 0;
+
+        let myFlag: c_int = if (*clients.add((*bs).client as usize)).sess.sessionTeam == TEAM_RED {
+            PW_REDFLAG
+        } else {
+            PW_BLUEFLAG
+        };
+
+        let mut ent: *mut gentity_t = core::ptr::null_mut();
+        while i < MAX_CLIENTS as c_int {
+            ent = base.add(i as usize);
+
+            if !(*ent).client.is_null()
+                && (*((*ent).client as *mut gclient_t)).ps.powerups[myFlag as usize] != 0
+                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) == qfalse
+            {
+                foundCarrier = 1;
+                break;
+            }
+
+            i += 1;
+        }
+
+        if foundCarrier == 0 {
+            return 0;
+        }
+
+        if ent.is_null() {
+            return 0;
+        }
+
+        if (*bs).wpDestSwitchTime < (*world).level.time as f32 {
+            let mut usethisvec: vec3_t = [0.0; 3];
+            if !(*ent).client.is_null() {
+                crate::q_math::_VectorCopy(
+                    (*((*ent).client as *mut gclient_t)).ps.origin,
+                    &mut usethisvec,
+                );
+            } else {
+                crate::q_math::_VectorCopy((*ent).s.origin, &mut usethisvec);
+            }
+
+            let tempInt = GetNearestVisibleWP(ctx, usethisvec, 0);
+
+            if tempInt != -1
+                && TotalTrailDistance(ctx, (*(*bs).wpCurrent).index, tempInt, bs) != -1.0
+            {
+                (*bs).wpDestination = (*world).globals.gWPArray.0[tempInt as usize];
+                (*bs).wpDestSwitchTime =
+                    ((*world).level.time + (*world).bg_state.rng.Q_irand(1000, 5000)) as f32;
+            }
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `BotGuardFlagCarrier`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2641-2703`
@@ -1103,10 +3016,69 @@ pub fn BotGuardFlagCarrier(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port BotGuardFlagCarrier — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let clients = (*world).level.clients;
+        let mut i: c_int = 0;
+        let mut foundCarrier: c_int = 0;
+
+        let enemyFlag: c_int = if (*clients.add((*bs).client as usize)).sess.sessionTeam == TEAM_RED
+        {
+            PW_BLUEFLAG
+        } else {
+            PW_REDFLAG
+        };
+
+        let mut ent: *mut gentity_t = core::ptr::null_mut();
+        while i < MAX_CLIENTS as c_int {
+            ent = base.add(i as usize);
+
+            if !(*ent).client.is_null()
+                && (*((*ent).client as *mut gclient_t)).ps.powerups[enemyFlag as usize] != 0
+                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != qfalse
+            {
+                foundCarrier = 1;
+                break;
+            }
+
+            i += 1;
+        }
+
+        if foundCarrier == 0 {
+            return 0;
+        }
+
+        if ent.is_null() {
+            return 0;
+        }
+
+        if (*bs).wpDestSwitchTime < (*world).level.time as f32 {
+            let mut usethisvec: vec3_t = [0.0; 3];
+            if !(*ent).client.is_null() {
+                crate::q_math::_VectorCopy(
+                    (*((*ent).client as *mut gclient_t)).ps.origin,
+                    &mut usethisvec,
+                );
+            } else {
+                crate::q_math::_VectorCopy((*ent).s.origin, &mut usethisvec);
+            }
+
+            let tempInt = GetNearestVisibleWP(ctx, usethisvec, 0);
+
+            if tempInt != -1
+                && TotalTrailDistance(ctx, (*(*bs).wpCurrent).index, tempInt, bs) != -1.0
+            {
+                (*bs).wpDestination = (*world).globals.gWPArray.0[tempInt as usize];
+                (*bs).wpDestSwitchTime =
+                    ((*world).level.time + (*world).bg_state.rng.Q_irand(1000, 5000)) as f32;
+            }
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `BotGetFlagHome`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2706-2737`
@@ -1114,11 +3086,36 @@ pub fn BotGetFlagHome(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port BotGetFlagHome — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let flagPoint: *mut wpobject_t;
+
+        let sessTeam = (*world).clients[(*bs).client as usize].sess.sessionTeam;
+        if sessTeam == TEAM_RED {
+            flagPoint = (*world).globals.flagRed;
+        } else if sessTeam == TEAM_BLUE {
+            flagPoint = (*world).globals.flagBlue;
+        } else {
+            return 0;
+        }
+
+        if flagPoint.is_null() {
+            return 0;
+        }
+
+        let mut a: vec3_t = [0.0; 3];
+        _VectorSubtract((*bs).origin, (*flagPoint).origin, &mut a);
+
+        if VectorLength(a) > BASE_FLAGWAIT_DISTANCE as f32 {
+            (*bs).wpDestination = flagPoint;
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
-/// Raven `GetNewFlagPoint`.
+/// Raven `GetNewFlagPoint` — get the nearest possible waypoint to the flag
+/// since it's not in its original position.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2739-2801`
 pub fn GetNewFlagPoint(
@@ -1127,18 +3124,308 @@ pub fn GetNewFlagPoint(
     flagEnt: *mut gentity_t,
     team: c_int,
 ) {
-    todo!("Port GetNewFlagPoint — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let mut i: c_int = 0;
+        let mut a: vec3_t = [0.0; 3];
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        let mut bestdist: f32;
+        let mut testdist: f32;
+        let mut bestindex: c_int = 0;
+        let mut foundindex: c_int = 0;
+        let mut tr: trace_t = core::mem::zeroed();
+
+        mins[0] = -15.0;
+        mins[1] = -15.0;
+        mins[2] = -5.0;
+        maxs[0] = 15.0;
+        maxs[1] = 15.0;
+        maxs[2] = 5.0;
+
+        _VectorSubtract((*wp).origin, (*flagEnt).s.pos.trBase, &mut a);
+
+        bestdist = VectorLength(a);
+
+        if bestdist <= WP_KEEP_FLAG_DIST as f32 {
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(
+                    &mut tr,
+                    &(*wp).origin,
+                    &mins,
+                    &maxs,
+                    &(*flagEnt).s.pos.trBase,
+                    (*flagEnt).s.number,
+                    MASK_SOLID,
+                ),
+            );
+
+            if tr.fraction == 1.0 {
+                // this point is good
+                return;
+            }
+        }
+
+        while i < (*world).globals.gWPNum {
+            _VectorSubtract(
+                (*(*world).globals.gWPArray.0[i as usize]).origin,
+                (*flagEnt).s.pos.trBase,
+                &mut a,
+            );
+            testdist = VectorLength(a);
+
+            if testdist < bestdist {
+                trap::Trace(
+                    ctx.engine,
+                    GTraceArgs::new(
+                        &mut tr,
+                        &(*(*world).globals.gWPArray.0[i as usize]).origin,
+                        &mins,
+                        &maxs,
+                        &(*flagEnt).s.pos.trBase,
+                        (*flagEnt).s.number,
+                        MASK_SOLID,
+                    ),
+                );
+
+                if tr.fraction == 1.0 {
+                    foundindex = 1;
+                    bestindex = i;
+                    bestdist = testdist;
+                }
+            }
+
+            i += 1;
+        }
+
+        if foundindex != 0 {
+            if team == TEAM_RED {
+                (*world).globals.flagRed = (*world).globals.gWPArray.0[bestindex as usize];
+            } else {
+                (*world).globals.flagBlue = (*world).globals.gWPArray.0[bestindex as usize];
+            }
+        }
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `CTFTakesPriority`.
+///
+/// The `#ifdef BOT_CTF_DEBUG` debug print/test-line blocks are dropped (§20,
+/// debug-only, undefined in this build). Raven's `goto success` tail is a
+/// labeled block yielding whether a CTF sub-goal succeeded.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2804-3034`
 pub fn CTFTakesPriority(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port CTFTakesPriority — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut ent: *mut gentity_t;
+        let enemyFlag: c_int;
+        let myFlag: c_int;
+        let mut enemyHasOurFlag: c_int = 0;
+        let mut weHaveEnemyFlag: c_int = 0;
+        let mut numOnMyTeam: c_int = 0;
+        let mut numOnEnemyTeam: c_int = 0;
+        let mut numAttackers: c_int = 0;
+        let mut numDefenders: c_int = 0;
+        let mut i: usize;
+        let idleWP: c_int;
+        let mut dosw: c_int = 0;
+        let mut dest_sw: *mut wpobject_t = core::ptr::null_mut();
+        let _ = &mut numOnEnemyTeam;
+        let _ = &mut numDefenders;
+
+        if (*world).cvars.g_gametype.integer != GT_CTF
+            && (*world).cvars.g_gametype.integer != GT_CTY
+        {
+            return 0;
+        }
+
+        if (*bs).cur_ps.weapon == WP_BRYAR_PISTOL
+            && ((*world).level.time - (*bs).lastDeadTime) < BOT_MAX_WEAPON_GATHER_TIME
+        {
+            // get the nearest weapon laying around base before heading off for battle
+            idleWP = GetBestIdleGoal(ctx, bs);
+
+            if idleWP != -1
+                && !(*world).globals.gWPArray.0[idleWP as usize].is_null()
+                && (*(*world).globals.gWPArray.0[idleWP as usize]).inuse != 0
+            {
+                if (*bs).wpDestSwitchTime < (*world).level.time as f32 {
+                    (*bs).wpDestination = (*world).globals.gWPArray.0[idleWP as usize];
+                }
+                return 1;
+            }
+        } else if (*bs).cur_ps.weapon == WP_BRYAR_PISTOL
+            && ((*world).level.time - (*bs).lastDeadTime) < BOT_MAX_WEAPON_CHASE_CTF
+            && !(*bs).wpDestination.is_null()
+            && (*(*bs).wpDestination).weight != 0.0
+        {
+            dest_sw = (*bs).wpDestination;
+            dosw = 1;
+        }
+
+        if (*world).clients[(*bs).client as usize].sess.sessionTeam == TEAM_RED {
+            myFlag = PW_REDFLAG;
+        } else {
+            myFlag = PW_BLUEFLAG;
+        }
+
+        if (*world).clients[(*bs).client as usize].sess.sessionTeam == TEAM_RED {
+            enemyFlag = PW_BLUEFLAG;
+        } else {
+            enemyFlag = PW_REDFLAG;
+        }
+
+        if (*world).globals.flagRed.is_null()
+            || (*world).globals.flagBlue.is_null()
+            || (*(*world).globals.flagRed).inuse == 0
+            || (*(*world).globals.flagBlue).inuse == 0
+            || (*world).globals.eFlagRed.is_null()
+            || (*world).globals.eFlagBlue.is_null()
+        {
+            return 0;
+        }
+
+        if !(*world).globals.droppedRedFlag.is_null()
+            && ((*(*world).globals.droppedRedFlag).flags & FL_DROPPED_ITEM) != 0
+        {
+            GetNewFlagPoint(
+                ctx,
+                (*world).globals.flagRed,
+                (*world).globals.droppedRedFlag,
+                TEAM_RED,
+            );
+        } else {
+            (*world).globals.flagRed = (*world).globals.oFlagRed;
+        }
+
+        if !(*world).globals.droppedBlueFlag.is_null()
+            && ((*(*world).globals.droppedBlueFlag).flags & FL_DROPPED_ITEM) != 0
+        {
+            GetNewFlagPoint(
+                ctx,
+                (*world).globals.flagBlue,
+                (*world).globals.droppedBlueFlag,
+                TEAM_BLUE,
+            );
+        } else {
+            (*world).globals.flagBlue = (*world).globals.oFlagBlue;
+        }
+
+        if (*bs).ctfState == 0 {
+            return 0;
+        }
+
+        i = 0;
+        while i < MAX_CLIENTS {
+            ent = base.add(i);
+
+            if !ent.is_null() && !(*ent).client.is_null() {
+                let cl = (*ent).client as *mut gclient_t;
+                if (*cl).ps.powerups[enemyFlag as usize] != 0
+                    && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                {
+                    weHaveEnemyFlag = 1;
+                } else if (*cl).ps.powerups[myFlag as usize] != 0
+                    && OnSameTeam(ctx, base.add((*bs).client as usize), ent) == 0
+                {
+                    enemyHasOurFlag = 1;
+                }
+
+                if OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0 {
+                    numOnMyTeam += 1;
+                } else {
+                    numOnEnemyTeam += 1;
+                }
+
+                if !(*world).globals.botstates[(*ent).s.number as usize].is_null() {
+                    let bst = (*world).globals.botstates[(*ent).s.number as usize];
+                    if (*bst).ctfState == bot_ctf_state_t::CTFSTATE_ATTACKER as c_int
+                        || (*bst).ctfState == bot_ctf_state_t::CTFSTATE_RETRIEVAL as c_int
+                    {
+                        numAttackers += 1;
+                    } else {
+                        numDefenders += 1;
+                    }
+                } else {
+                    // assume real players to be attackers in our logic
+                    numAttackers += 1;
+                }
+            }
+            i += 1;
+        }
+
+        if (*bs).cur_ps.powerups[enemyFlag as usize] != 0 {
+            if (numOnMyTeam < 2 || numAttackers == 0) && enemyHasOurFlag != 0 {
+                (*bs).ctfState = bot_ctf_state_t::CTFSTATE_RETRIEVAL as c_int;
+            } else {
+                (*bs).ctfState = bot_ctf_state_t::CTFSTATE_GETFLAGHOME as c_int;
+            }
+        } else if (*bs).ctfState == bot_ctf_state_t::CTFSTATE_GETFLAGHOME as c_int {
+            (*bs).ctfState = 0;
+        }
+
+        if (*bs).state_Forced != 0 {
+            (*bs).ctfState = (*bs).state_Forced;
+        }
+
+        let hit_success = 'success: {
+            if (*bs).ctfState == bot_ctf_state_t::CTFSTATE_DEFENDER as c_int {
+                if BotDefendFlag(ctx, bs) != 0 {
+                    break 'success true;
+                }
+            }
+
+            if (*bs).ctfState == bot_ctf_state_t::CTFSTATE_ATTACKER as c_int {
+                if BotGetEnemyFlag(ctx, bs) != 0 {
+                    break 'success true;
+                }
+            }
+
+            if (*bs).ctfState == bot_ctf_state_t::CTFSTATE_RETRIEVAL as c_int {
+                if BotGetFlagBack(ctx, bs) != 0 {
+                    break 'success true;
+                } else {
+                    // can't find anyone on another team being a carrier, so ignore this priority
+                    (*bs).ctfState = 0;
+                }
+            }
+
+            if (*bs).ctfState == bot_ctf_state_t::CTFSTATE_GUARDCARRIER as c_int {
+                if BotGuardFlagCarrier(ctx, bs) != 0 {
+                    break 'success true;
+                } else {
+                    // can't find anyone on our team being a carrier, so ignore this priority
+                    (*bs).ctfState = 0;
+                }
+            }
+
+            if (*bs).ctfState == bot_ctf_state_t::CTFSTATE_GETFLAGHOME as c_int {
+                if BotGetFlagHome(ctx, bs) != 0 {
+                    break 'success true;
+                }
+            }
+
+            false
+        };
+
+        if !hit_success {
+            return 0;
+        }
+
+        // success:
+        if dosw != 0 {
+            // allow ctf code to run, but if after a particular item then keep going after it
+            (*bs).wpDestination = dest_sw;
+        }
+
+        1
+    }
 }
 
 /// Raven `EntityVisibleBox`.
@@ -1168,8 +3455,12 @@ pub fn EntityVisibleBox(
     0
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `Siege_TargetClosestObjective`.
+///
+/// Raven's `goto hasPoint` (skip the search when the current destination is
+/// already a valid objective) is a guarded `if !skip_search { … }`. The
+/// `&g_entities[i]` sub-checks are trivially non-null (address-of), so only the
+/// `.use` presence check survives.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3055-3152`
 pub fn Siege_TargetClosestObjective(
@@ -1177,21 +3468,184 @@ pub fn Siege_TargetClosestObjective(
     bs: *mut bot_state_t,
     flag: c_int,
 ) -> c_int {
-    todo!("Port Siege_TargetClosestObjective — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut i: c_int = 0;
+        let mut bestindex: c_int = -1;
+        let mut testdistance: f32;
+        let mut bestdistance: f32 = 999999999.0;
+        let goalent: *mut gentity_t;
+        let mut a: vec3_t = [0.0; 3];
+        let mut dif: vec3_t = [0.0; 3];
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+
+        mins[0] = -1.0;
+        mins[1] = -1.0;
+        mins[2] = -1.0;
+
+        maxs[0] = 1.0;
+        maxs[1] = 1.0;
+        maxs[2] = 1.0;
+
+        let skip_search = !(*bs).wpDestination.is_null()
+            && ((*(*bs).wpDestination).flags & flag) != 0
+            && (*(*bs).wpDestination).associated_entity != ENTITYNUM_NONE
+            && (*base.add((*(*bs).wpDestination).associated_entity as usize))
+                .use_
+                .is_some();
+
+        if !skip_search {
+            while i < (*world).globals.gWPNum {
+                if !(*world).globals.gWPArray.0[i as usize].is_null()
+                    && (*(*world).globals.gWPArray.0[i as usize]).inuse != 0
+                    && ((*(*world).globals.gWPArray.0[i as usize]).flags & flag) != 0
+                    && (*(*world).globals.gWPArray.0[i as usize]).associated_entity != ENTITYNUM_NONE
+                    && (*base.add(
+                        (*(*world).globals.gWPArray.0[i as usize]).associated_entity as usize,
+                    ))
+                    .use_
+                    .is_some()
+                {
+                    _VectorSubtract(
+                        (*(*world).globals.gWPArray.0[i as usize]).origin,
+                        (*bs).origin,
+                        &mut a,
+                    );
+                    testdistance = VectorLength(a);
+
+                    if testdistance < bestdistance {
+                        bestdistance = testdistance;
+                        bestindex = i;
+                    }
+                }
+
+                i += 1;
+            }
+
+            if bestindex != -1 {
+                (*bs).wpDestination = (*world).globals.gWPArray.0[bestindex as usize];
+            } else {
+                return 0;
+            }
+        }
+
+        // hasPoint:
+        goalent = base.add((*(*bs).wpDestination).associated_entity as usize);
+
+        if goalent.is_null() {
+            return 0;
+        }
+
+        _VectorSubtract((*bs).origin, (*(*bs).wpDestination).origin, &mut a);
+
+        testdistance = VectorLength(a);
+
+        // brush models can have tricky origins, so this is our hacky method of getting the center point
+        dif[0] = ((*goalent).r.absmax[0] + (*goalent).r.absmin[0]) / 2.0;
+        dif[1] = ((*goalent).r.absmax[1] + (*goalent).r.absmin[1]) / 2.0;
+        dif[2] = ((*goalent).r.absmax[2] + (*goalent).r.absmin[2]) / 2.0;
+
+        if (*goalent).takedamage != 0
+            && testdistance < BOT_MIN_SIEGE_GOAL_SHOOT as f32
+            && EntityVisibleBox(ctx, (*bs).origin, mins, maxs, dif, (*bs).client, (*goalent).s.number)
+                != 0
+        {
+            (*bs).shootGoal = Some(ent_id(base, goalent));
+            (*bs).touchGoal = None;
+        } else if (*goalent).use_.is_some() && testdistance < BOT_MIN_SIEGE_GOAL_TRAVEL as f32 {
+            (*bs).shootGoal = None;
+            (*bs).touchGoal = Some(ent_id(base, goalent));
+        } else {
+            // don't know how to handle this goal object!
+            (*bs).shootGoal = None;
+            (*bs).touchGoal = None;
+        }
+
+        if BotGetWeaponRange(bs) == BWEAPONRANGE_MELEE
+            || BotGetWeaponRange(bs) == BWEAPONRANGE_SABER
+        {
+            (*bs).shootGoal = None; // too risky
+        }
+
+        if (*bs).touchGoal.is_some() {
+            _VectorCopy(dif, &mut (*bs).goalPosition);
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
-/// Raven `Siege_DefendFromAttackers`.
+/// Raven `Siege_DefendFromAttackers` — find our defending point by finding the
+/// nearest person on the opposing team (they'll most likely be on offense).
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3154-3199`
 pub fn Siege_DefendFromAttackers(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port Siege_DefendFromAttackers — parked: placeholder-global")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let wpClose: c_int;
+        let mut i: usize = 0;
+        let mut testdist: f32;
+        let mut bestindex: c_int = -1;
+        let mut bestdist: f32 = 999999.0;
+        let mut ent: *mut gentity_t;
+        let mut a: vec3_t = [0.0; 3];
+
+        let myteam = (*((*base.add((*bs).client as usize)).client as *mut gclient_t))
+            .sess
+            .sessionTeam;
+
+        while i < MAX_CLIENTS {
+            ent = base.add(i);
+
+            if !ent.is_null()
+                && !(*ent).client.is_null()
+                && (*((*ent).client as *mut gclient_t)).sess.sessionTeam != myteam
+                && (*ent).health > 0
+                && (*((*ent).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
+            {
+                _VectorSubtract(
+                    (*((*ent).client as *mut gclient_t)).ps.origin,
+                    (*bs).origin,
+                    &mut a,
+                );
+
+                testdist = VectorLength(a);
+
+                if testdist < bestdist {
+                    bestindex = i as c_int;
+                    bestdist = testdist;
+                }
+            }
+
+            i += 1;
+        }
+
+        if bestindex == -1 {
+            return;
+        }
+
+        wpClose = GetNearestVisibleWP(
+            ctx,
+            (*((*base.add(bestindex as usize)).client as *mut gclient_t)).ps.origin,
+            -1,
+        );
+
+        if wpClose != -1
+            && !(*world).globals.gWPArray.0[wpClose as usize].is_null()
+            && (*(*world).globals.gWPArray.0[wpClose as usize]).inuse != 0
+        {
+            (*bs).wpDestination = (*world).globals.gWPArray.0[wpClose as usize];
+            (*bs).destinationGrabTime = ((*world).level.time + 10000) as f32;
+        }
+    }
 }
 
-// PORT-ESCALATION(placeholder-global): a `GameGlobals` field this body touches is still a `()` placeholder; typing it as the real raw-pointer array conflicts with `#[derive(Default)]` on GameGlobals.
 /// Raven `Siege_CountDefenders`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3202-3227`
@@ -1199,7 +3653,36 @@ pub fn Siege_CountDefenders(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port Siege_CountDefenders — parked: placeholder-global")
+    use crate::botai::bot_siege_state_t::bot_siege_state_t;
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut i: usize = 0;
+        let mut num: c_int = 0;
+        let mut ent: *mut gentity_t;
+        let mut bot: *mut bot_state_t;
+
+        let myteam = (*((*base.add((*bs).client as usize)).client as *mut gclient_t))
+            .sess
+            .sessionTeam;
+
+        while i < MAX_CLIENTS {
+            ent = base.add(i);
+            bot = (*world).globals.botstates[i];
+
+            if !ent.is_null() && !(*ent).client.is_null() && !bot.is_null() {
+                if (*bot).siegeState == bot_siege_state_t::SIEGESTATE_DEFENDER as c_int
+                    && (*((*ent).client as *mut gclient_t)).sess.sessionTeam == myteam
+                {
+                    num += 1;
+                }
+            }
+
+            i += 1;
+        }
+
+        num
+    }
 }
 
 /// Raven `Siege_CountTeammates`.
@@ -1232,7 +3715,6 @@ pub fn Siege_CountTeammates(
     }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `SiegeTakesPriority`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3256-3420`
@@ -1240,21 +3722,265 @@ pub fn SiegeTakesPriority(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port SiegeTakesPriority — parked: seam-threading")
+    use crate::botai::bot_siege_state_t::bot_siege_state_t;
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let attacker: c_int;
+        let flagForDefendableObjective: c_int;
+        let flagForAttackableObjective: c_int;
+        let defenders: c_int;
+        let teammates: c_int;
+        let idleWP: c_int;
+        let mut dest_sw: *mut wpobject_t = core::ptr::null_mut();
+        let mut dosw: c_int = 0;
+        let bcl: *mut gclient_t;
+        let mut dif: vec3_t = [0.0; 3];
+        let mut tr: trace_t = core::mem::zeroed();
+        let _ = &flagForDefendableObjective;
+
+        if (*world).cvars.g_gametype.integer != GT_SIEGE {
+            return 0;
+        }
+
+        bcl = (*base.add((*bs).client as usize)).client as *mut gclient_t;
+
+        if bcl.is_null() {
+            return 0;
+        }
+
+        if (*bs).cur_ps.weapon == WP_BRYAR_PISTOL
+            && ((*world).level.time - (*bs).lastDeadTime) < BOT_MAX_WEAPON_GATHER_TIME
+        {
+            // get the nearest weapon laying around base before heading off for battle
+            idleWP = GetBestIdleGoal(ctx, bs);
+
+            if idleWP != -1
+                && !(*world).globals.gWPArray.0[idleWP as usize].is_null()
+                && (*(*world).globals.gWPArray.0[idleWP as usize]).inuse != 0
+            {
+                if (*bs).wpDestSwitchTime < (*world).level.time as f32 {
+                    (*bs).wpDestination = (*world).globals.gWPArray.0[idleWP as usize];
+                }
+                return 1;
+            }
+        } else if (*bs).cur_ps.weapon == WP_BRYAR_PISTOL
+            && ((*world).level.time - (*bs).lastDeadTime) < BOT_MAX_WEAPON_CHASE_TIME
+            && !(*bs).wpDestination.is_null()
+            && (*(*bs).wpDestination).weight != 0.0
+        {
+            dest_sw = (*bs).wpDestination;
+            dosw = 1;
+        }
+
+        if (*bcl).sess.sessionTeam == SIEGETEAM_TEAM1 {
+            attacker = (*world).globals.imperial_attackers;
+            flagForDefendableObjective = crate::ai_wpnav::WPFLAG_SIEGE_REBELOBJ;
+            flagForAttackableObjective = crate::ai_wpnav::WPFLAG_SIEGE_IMPERIALOBJ;
+        } else {
+            attacker = (*world).globals.rebel_attackers;
+            flagForDefendableObjective = crate::ai_wpnav::WPFLAG_SIEGE_IMPERIALOBJ;
+            flagForAttackableObjective = crate::ai_wpnav::WPFLAG_SIEGE_REBELOBJ;
+        }
+
+        if attacker != 0 {
+            (*bs).siegeState = bot_siege_state_t::SIEGESTATE_ATTACKER as c_int;
+        } else {
+            (*bs).siegeState = bot_siege_state_t::SIEGESTATE_DEFENDER as c_int;
+            defenders = Siege_CountDefenders(ctx, bs);
+            teammates = Siege_CountTeammates(ctx, bs);
+
+            if defenders > teammates / 3 && teammates > 1 {
+                // devote around 1/4 of our team to completing our own side goals even if we're a
+                // defender. If we have no side goals we will realize that later on and join the defenders
+                (*bs).siegeState = bot_siege_state_t::SIEGESTATE_ATTACKER as c_int;
+            }
+        }
+
+        if (*bs).state_Forced != 0 {
+            (*bs).siegeState = (*bs).state_Forced;
+        }
+
+        if (*bs).siegeState == bot_siege_state_t::SIEGESTATE_ATTACKER as c_int {
+            if Siege_TargetClosestObjective(ctx, bs, flagForAttackableObjective) == 0 {
+                // looks like we have no goals other than to keep the other team from completing objectives
+                Siege_DefendFromAttackers(ctx, bs);
+                if (*bs).shootGoal.is_some() {
+                    let sg = base.add((*bs).shootGoal.unwrap().index());
+                    dif[0] = ((*sg).r.absmax[0] + (*sg).r.absmin[0]) / 2.0;
+                    dif[1] = ((*sg).r.absmax[1] + (*sg).r.absmin[1]) / 2.0;
+                    dif[2] = ((*sg).r.absmax[2] + (*sg).r.absmin[2]) / 2.0;
+
+                    if BotPVSCheck(ctx, (*bs).origin, dif) == 0 {
+                        (*bs).shootGoal = None;
+                    } else {
+                        trap::Trace(
+                            ctx.engine,
+                            GTraceArgs::new(
+                                &mut tr,
+                                &(*bs).origin,
+                                core::ptr::null(),
+                                core::ptr::null(),
+                                &dif,
+                                (*bs).client,
+                                MASK_SOLID,
+                            ),
+                        );
+
+                        if tr.fraction != 1.0 && tr.entityNum as c_int != (*sg).s.number {
+                            (*bs).shootGoal = None;
+                        }
+                    }
+                }
+            }
+        } else if (*bs).siegeState == bot_siege_state_t::SIEGESTATE_DEFENDER as c_int {
+            Siege_DefendFromAttackers(ctx, bs);
+            if (*bs).shootGoal.is_some() {
+                let sg = base.add((*bs).shootGoal.unwrap().index());
+                dif[0] = ((*sg).r.absmax[0] + (*sg).r.absmin[0]) / 2.0;
+                dif[1] = ((*sg).r.absmax[1] + (*sg).r.absmin[1]) / 2.0;
+                dif[2] = ((*sg).r.absmax[2] + (*sg).r.absmin[2]) / 2.0;
+
+                if BotPVSCheck(ctx, (*bs).origin, dif) == 0 {
+                    (*bs).shootGoal = None;
+                } else {
+                    trap::Trace(
+                        ctx.engine,
+                        GTraceArgs::new(
+                            &mut tr,
+                            &(*bs).origin,
+                            core::ptr::null(),
+                            core::ptr::null(),
+                            &dif,
+                            (*bs).client,
+                            MASK_SOLID,
+                        ),
+                    );
+
+                    if tr.fraction != 1.0 && tr.entityNum as c_int != (*sg).s.number {
+                        (*bs).shootGoal = None;
+                    }
+                }
+            }
+        } else {
+            // get busy!
+            Siege_TargetClosestObjective(ctx, bs, flagForAttackableObjective);
+            if (*bs).shootGoal.is_some() {
+                let sg = base.add((*bs).shootGoal.unwrap().index());
+                dif[0] = ((*sg).r.absmax[0] + (*sg).r.absmin[0]) / 2.0;
+                dif[1] = ((*sg).r.absmax[1] + (*sg).r.absmin[1]) / 2.0;
+                dif[2] = ((*sg).r.absmax[2] + (*sg).r.absmin[2]) / 2.0;
+
+                if BotPVSCheck(ctx, (*bs).origin, dif) == 0 {
+                    (*bs).shootGoal = None;
+                } else {
+                    trap::Trace(
+                        ctx.engine,
+                        GTraceArgs::new(
+                            &mut tr,
+                            &(*bs).origin,
+                            core::ptr::null(),
+                            core::ptr::null(),
+                            &dif,
+                            (*bs).client,
+                            MASK_SOLID,
+                        ),
+                    );
+
+                    if tr.fraction != 1.0 && tr.entityNum as c_int != (*sg).s.number {
+                        (*bs).shootGoal = None;
+                    }
+                }
+            }
+        }
+
+        if dosw != 0 {
+            // allow siege objective code to run, but if after a particular item then keep going after it
+            (*bs).wpDestination = dest_sw;
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `JMTakesPriority`.
+///
+/// `jmState` becomes the index for the one who carries the saber; -1 means the
+/// saber is currently without an owner. The commented `Com_Printf` debug block
+/// is dropped.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3424-3496`
 pub fn JMTakesPriority(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port JMTakesPriority — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut i: usize = 0;
+        let wpClose: c_int;
+        let theImportantEntity: *mut gentity_t;
+
+        if (*world).cvars.g_gametype.integer != GT_JEDIMASTER {
+            return 0;
+        }
+
+        if (*bs).cur_ps.isJediMaster != 0 {
+            return 0;
+        }
+
+        (*bs).jmState = -1;
+
+        while i < MAX_CLIENTS {
+            let ge = base.add(i);
+            if !(*ge).client.is_null()
+                && (*ge).inuse != 0
+                && (*((*ge).client as *mut gclient_t)).ps.isJediMaster != 0
+            {
+                (*bs).jmState = i as c_int;
+                break;
+            }
+
+            i += 1;
+        }
+
+        if (*bs).jmState != -1 {
+            theImportantEntity = base.add((*bs).jmState as usize);
+        } else {
+            theImportantEntity = (*world).globals.gJMSaberEnt.unwrap_or(core::ptr::null_mut());
+        }
+
+        if !theImportantEntity.is_null()
+            && (*theImportantEntity).inuse != 0
+            && (*bs).destinationGrabTime < (*world).level.time as f32
+        {
+            if !(*theImportantEntity).client.is_null() {
+                wpClose = GetNearestVisibleWP(
+                    ctx,
+                    (*((*theImportantEntity).client as *mut gclient_t)).ps.origin,
+                    (*theImportantEntity).s.number,
+                );
+            } else {
+                wpClose = GetNearestVisibleWP(
+                    ctx,
+                    (*theImportantEntity).r.currentOrigin,
+                    (*theImportantEntity).s.number,
+                );
+            }
+
+            if wpClose != -1
+                && !(*world).globals.gWPArray.0[wpClose as usize].is_null()
+                && (*(*world).globals.gWPArray.0[wpClose as usize]).inuse != 0
+            {
+                (*bs).wpDestination = (*world).globals.gWPArray.0[wpClose as usize];
+                (*bs).destinationGrabTime = ((*world).level.time + 4000) as f32;
+            }
+        }
+
+        1
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `BotHasAssociated`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3500-3554`
@@ -1263,10 +3989,55 @@ pub fn BotHasAssociated(
     bs: *mut bot_state_t,
     wp: *mut wpobject_t,
 ) -> c_int {
-    todo!("Port BotHasAssociated — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let as_ent: *mut gentity_t;
+
+        if (*wp).associated_entity == ENTITYNUM_NONE {
+            // make it think this is an item we have so we don't go after nothing
+            return 1;
+        }
+
+        as_ent = base.add((*wp).associated_entity as usize);
+
+        if as_ent.is_null() || (*as_ent).item.is_null() {
+            return 0;
+        }
+
+        if (*(*as_ent).item).giType == IT_WEAPON {
+            if (*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << (*(*as_ent).item).giTag) != 0 {
+                return 1;
+            }
+
+            return 0;
+        } else if (*(*as_ent).item).giType == IT_HOLDABLE {
+            if (*bs).cur_ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << (*(*as_ent).item).giTag)
+                != 0
+            {
+                return 1;
+            }
+
+            return 0;
+        } else if (*(*as_ent).item).giType == IT_POWERUP {
+            if (*bs).cur_ps.powerups[(*(*as_ent).item).giTag as usize] != 0 {
+                return 1;
+            }
+
+            return 0;
+        } else if (*(*as_ent).item).giType == IT_AMMO {
+            if (*bs).cur_ps.ammo[(*(*as_ent).item).giTag as usize] > 10 {
+                // hack
+                return 1;
+            }
+
+            return 0;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `GetBestIdleGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3559-3621`
@@ -1274,21 +4045,368 @@ pub fn GetBestIdleGoal(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port GetBestIdleGoal — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let mut i: c_int = 0;
+        let mut highestweight: c_int = 0;
+        let mut desiredindex: c_int = -1;
+        let mut dist_to_weight: c_int;
+        let mut traildist: c_int;
+
+        if (*bs).wpCurrent.is_null() {
+            return -1;
+        }
+
+        if (*bs).isCamper != 2 {
+            if (*bs).randomNavTime < (*world).level.time {
+                if (*world).bg_state.rng.Q_irand(1, 10) < 5 {
+                    (*bs).randomNav = 1;
+                } else {
+                    (*bs).randomNav = 0;
+                }
+
+                (*bs).randomNavTime = (*world).level.time + (*world).bg_state.rng.Q_irand(5000, 15000);
+            }
+        }
+
+        if (*bs).randomNav != 0 {
+            // stop looking for items and/or camping on them
+            return -1;
+        }
+
+        while i < (*world).globals.gWPNum {
+            if !(*world).globals.gWPArray.0[i as usize].is_null()
+                && (*(*world).globals.gWPArray.0[i as usize]).inuse != 0
+                && ((*(*world).globals.gWPArray.0[i as usize]).flags & crate::ai_wpnav::WPFLAG_GOALPOINT)
+                    != 0
+                && (*(*world).globals.gWPArray.0[i as usize]).weight > highestweight as f32
+                && BotHasAssociated(ctx, bs, (*world).globals.gWPArray.0[i as usize]) == 0
+            {
+                traildist = TotalTrailDistance(ctx, (*(*bs).wpCurrent).index, i, bs) as c_int;
+
+                if traildist != -1 {
+                    dist_to_weight = traildist / 10000;
+                    dist_to_weight = ((*(*world).globals.gWPArray.0[i as usize]).weight
+                        - dist_to_weight as f32) as c_int;
+
+                    if dist_to_weight > highestweight {
+                        highestweight = dist_to_weight;
+                        desiredindex = i;
+                    }
+                }
+            }
+
+            i += 1;
+        }
+
+        desiredindex
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `GetIdealDestination`.
+///
+/// The `#ifdef _DEBUG` `bot_nogoals` cvar-update/early-out is dropped (§20,
+/// debug-only). Raven indexes `gWPArray[tempInt]`/`gWPArray[cWPIndex±1]` before
+/// any bounds check (tempInt/cWPIndex may be -1 or past the end); guarded here
+/// per §S19.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3625-3907`
 pub fn GetIdealDestination(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port GetIdealDestination — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut tempInt: c_int;
+        let cWPIndex: c_int;
+        let bChicken: c_int;
+        let idleWP: c_int;
+        let mut distChange: f32;
+        let mut plusLen: f32;
+        let mut minusLen: f32;
+        let mut usethisvec: vec3_t = [0.0; 3];
+        let mut a: vec3_t = [0.0; 3];
+        let badthing: *mut gentity_t;
+
+        if (*bs).wpCurrent.is_null() {
+            return;
+        }
+
+        if ((*world).level.time as f32 - (*bs).escapeDirTime) > 4000.0 {
+            badthing = GetNearestBadThing(ctx, bs);
+        } else {
+            badthing = core::ptr::null_mut();
+        }
+
+        if !badthing.is_null()
+            && (*badthing).inuse != 0
+            && (*badthing).health > 0
+            && (*badthing).takedamage != 0
+        {
+            (*bs).dangerousObject = Some(ent_id(base, badthing));
+        } else {
+            (*bs).dangerousObject = None;
+        }
+
+        if badthing.is_null() && (*bs).wpDestIgnoreTime > (*world).level.time as f32 {
+            return;
+        }
+
+        if badthing.is_null() && (*bs).dontGoBack > (*world).level.time as f32 {
+            if !(*bs).wpDestination.is_null() {
+                (*bs).wpStoreDest = (*bs).wpDestination;
+            }
+            (*bs).wpDestination = core::ptr::null_mut();
+            return;
+        } else if badthing.is_null() && !(*bs).wpStoreDest.is_null() {
+            // after we finish running away, switch back to our original destination
+            (*bs).wpDestination = (*bs).wpStoreDest;
+            (*bs).wpStoreDest = core::ptr::null_mut();
+        }
+
+        if !badthing.is_null() && !(*bs).wpCamping.is_null() {
+            (*bs).wpCamping = core::ptr::null_mut();
+        }
+
+        if !(*bs).wpCamping.is_null() {
+            (*bs).wpDestination = (*bs).wpCamping;
+            return;
+        }
+
+        if badthing.is_null() && CTFTakesPriority(ctx, bs) != 0 {
+            if (*bs).ctfState != 0 {
+                (*bs).runningToEscapeThreat = 1;
+            }
+            return;
+        } else if badthing.is_null() && SiegeTakesPriority(ctx, bs) != 0 {
+            if (*bs).siegeState != 0 {
+                (*bs).runningToEscapeThreat = 1;
+            }
+            return;
+        } else if badthing.is_null() && JMTakesPriority(ctx, bs) != 0 {
+            (*bs).runningToEscapeThreat = 1;
+        }
+
+        if !badthing.is_null() {
+            (*bs).runningLikeASissy = (*world).level.time + 100;
+
+            if !(*bs).wpDestination.is_null() {
+                (*bs).wpStoreDest = (*bs).wpDestination;
+            }
+            (*bs).wpDestination = core::ptr::null_mut();
+
+            if (*bs).wpDirection != 0 {
+                tempInt = (*(*bs).wpCurrent).index + 1;
+            } else {
+                tempInt = (*(*bs).wpCurrent).index - 1;
+            }
+
+            if tempInt >= 0
+                && (tempInt as usize) < (*world).globals.gWPArray.0.len()
+                && !(*world).globals.gWPArray.0[tempInt as usize].is_null()
+                && (*(*world).globals.gWPArray.0[tempInt as usize]).inuse != 0
+                && (*bs).escapeDirTime < (*world).level.time as f32
+            {
+                _VectorSubtract((*badthing).s.pos.trBase, (*(*bs).wpCurrent).origin, &mut a);
+                plusLen = VectorLength(a);
+                _VectorSubtract(
+                    (*badthing).s.pos.trBase,
+                    (*(*world).globals.gWPArray.0[tempInt as usize]).origin,
+                    &mut a,
+                );
+                minusLen = VectorLength(a);
+
+                if plusLen < minusLen {
+                    if (*bs).wpDirection != 0 {
+                        (*bs).wpDirection = 0;
+                    } else {
+                        (*bs).wpDirection = 1;
+                    }
+
+                    (*bs).wpCurrent = (*world).globals.gWPArray.0[tempInt as usize];
+
+                    (*bs).escapeDirTime =
+                        ((*world).level.time + (*world).bg_state.rng.Q_irand(500, 1000)) as f32;
+                }
+            }
+            return;
+        }
+
+        distChange = 0.0; // keep the compiler from complaining
+
+        tempInt = BotGetWeaponRange(bs);
+
+        if tempInt == BWEAPONRANGE_MELEE {
+            distChange = 1.0;
+        } else if tempInt == BWEAPONRANGE_SABER {
+            distChange = 1.0;
+        } else if tempInt == BWEAPONRANGE_MID {
+            distChange = 128.0;
+        } else if tempInt == BWEAPONRANGE_LONG {
+            distChange = 300.0;
+        }
+
+        // bs->revengeEnemy / squadLeader / currentEnemy resolved to gentity pointers.
+        let revengeEnemy: *mut gentity_t = match (*bs).revengeEnemy {
+            Some(id) => base.add(id.index()),
+            None => core::ptr::null_mut(),
+        };
+        let squadLeader: *mut gentity_t = match (*bs).squadLeader {
+            Some(id) => base.add(id.index()),
+            None => core::ptr::null_mut(),
+        };
+        let currentEnemy: *mut gentity_t = match (*bs).currentEnemy {
+            Some(id) => base.add(id.index()),
+            None => core::ptr::null_mut(),
+        };
+
+        if !revengeEnemy.is_null()
+            && (*revengeEnemy).health > 0
+            && !(*revengeEnemy).client.is_null()
+            && ((*((*revengeEnemy).client as *mut gclient_t)).pers.connected
+                == connstate_t::CA_ACTIVE as c_int
+                || (*((*revengeEnemy).client as *mut gclient_t)).pers.connected
+                    == connstate_t::CA_AUTHORIZING as c_int)
+        {
+            // if we hate someone, always try to get to them
+            if (*bs).wpDestSwitchTime < (*world).level.time as f32 {
+                if !(*revengeEnemy).client.is_null() {
+                    _VectorCopy(
+                        (*((*revengeEnemy).client as *mut gclient_t)).ps.origin,
+                        &mut usethisvec,
+                    );
+                } else {
+                    _VectorCopy((*revengeEnemy).s.origin, &mut usethisvec);
+                }
+
+                tempInt = GetNearestVisibleWP(ctx, usethisvec, 0);
+
+                if tempInt != -1
+                    && TotalTrailDistance(ctx, (*(*bs).wpCurrent).index, tempInt, bs) != -1.0
+                {
+                    (*bs).wpDestination = (*world).globals.gWPArray.0[tempInt as usize];
+                    (*bs).wpDestSwitchTime =
+                        ((*world).level.time + (*world).bg_state.rng.Q_irand(5000, 10000)) as f32;
+                }
+            }
+        } else if !squadLeader.is_null()
+            && (*squadLeader).health > 0
+            && !(*squadLeader).client.is_null()
+            && ((*((*squadLeader).client as *mut gclient_t)).pers.connected
+                == connstate_t::CA_ACTIVE as c_int
+                || (*((*squadLeader).client as *mut gclient_t)).pers.connected
+                    == connstate_t::CA_AUTHORIZING as c_int)
+        {
+            if (*bs).wpDestSwitchTime < (*world).level.time as f32 {
+                if !(*squadLeader).client.is_null() {
+                    _VectorCopy(
+                        (*((*squadLeader).client as *mut gclient_t)).ps.origin,
+                        &mut usethisvec,
+                    );
+                } else {
+                    _VectorCopy((*squadLeader).s.origin, &mut usethisvec);
+                }
+
+                tempInt = GetNearestVisibleWP(ctx, usethisvec, 0);
+
+                if tempInt != -1
+                    && TotalTrailDistance(ctx, (*(*bs).wpCurrent).index, tempInt, bs) != -1.0
+                {
+                    (*bs).wpDestination = (*world).globals.gWPArray.0[tempInt as usize];
+                    (*bs).wpDestSwitchTime =
+                        ((*world).level.time + (*world).bg_state.rng.Q_irand(5000, 10000)) as f32;
+                }
+            }
+        } else if !currentEnemy.is_null() {
+            if !(*currentEnemy).client.is_null() {
+                _VectorCopy(
+                    (*((*currentEnemy).client as *mut gclient_t)).ps.origin,
+                    &mut usethisvec,
+                );
+            } else {
+                _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
+            }
+
+            bChicken = BotIsAChickenWuss(ctx, bs);
+            (*bs).runningToEscapeThreat = bChicken;
+
+            if (*bs).frame_Enemy_Len < distChange || (bChicken != 0 && bChicken != 2) {
+                cWPIndex = (*(*bs).wpCurrent).index;
+
+                if (*bs).frame_Enemy_Len > 400.0 {
+                    // good distance away, start running toward a good place for an item or powerup
+                    idleWP = GetBestIdleGoal(ctx, bs);
+
+                    if idleWP != -1
+                        && !(*world).globals.gWPArray.0[idleWP as usize].is_null()
+                        && (*(*world).globals.gWPArray.0[idleWP as usize]).inuse != 0
+                    {
+                        (*bs).wpDestination = (*world).globals.gWPArray.0[idleWP as usize];
+                    }
+                } else if cWPIndex - 1 >= 0
+                    && ((cWPIndex - 1) as usize) < (*world).globals.gWPArray.0.len()
+                    && !(*world).globals.gWPArray.0[(cWPIndex - 1) as usize].is_null()
+                    && (*(*world).globals.gWPArray.0[(cWPIndex - 1) as usize]).inuse != 0
+                    && cWPIndex + 1 >= 0
+                    && ((cWPIndex + 1) as usize) < (*world).globals.gWPArray.0.len()
+                    && !(*world).globals.gWPArray.0[(cWPIndex + 1) as usize].is_null()
+                    && (*(*world).globals.gWPArray.0[(cWPIndex + 1) as usize]).inuse != 0
+                {
+                    _VectorSubtract(
+                        (*(*world).globals.gWPArray.0[(cWPIndex + 1) as usize]).origin,
+                        usethisvec,
+                        &mut a,
+                    );
+                    plusLen = VectorLength(a);
+                    _VectorSubtract(
+                        (*(*world).globals.gWPArray.0[(cWPIndex - 1) as usize]).origin,
+                        usethisvec,
+                        &mut a,
+                    );
+                    minusLen = VectorLength(a);
+
+                    if minusLen > plusLen {
+                        (*bs).wpDestination = (*world).globals.gWPArray.0[(cWPIndex - 1) as usize];
+                    } else {
+                        (*bs).wpDestination = (*world).globals.gWPArray.0[(cWPIndex + 1) as usize];
+                    }
+                }
+            } else if bChicken != 2 && (*bs).wpDestSwitchTime < (*world).level.time as f32 {
+                tempInt = GetNearestVisibleWP(ctx, usethisvec, 0);
+
+                if tempInt != -1
+                    && TotalTrailDistance(ctx, (*(*bs).wpCurrent).index, tempInt, bs) != -1.0
+                {
+                    (*bs).wpDestination = (*world).globals.gWPArray.0[tempInt as usize];
+
+                    if (*world).cvars.g_gametype.integer == GT_SINGLE_PLAYER {
+                        // be more aggressive
+                        (*bs).wpDestSwitchTime =
+                            ((*world).level.time + (*world).bg_state.rng.Q_irand(300, 1000)) as f32;
+                    } else {
+                        (*bs).wpDestSwitchTime =
+                            ((*world).level.time + (*world).bg_state.rng.Q_irand(1000, 5000)) as f32;
+                    }
+                }
+            }
+        }
+
+        if (*bs).wpDestination.is_null() && (*bs).wpDestSwitchTime < (*world).level.time as f32 {
+            idleWP = GetBestIdleGoal(ctx, bs);
+
+            if idleWP != -1
+                && !(*world).globals.gWPArray.0[idleWP as usize].is_null()
+                && (*(*world).globals.gWPArray.0[idleWP as usize]).inuse != 0
+            {
+                (*bs).wpDestination = (*world).globals.gWPArray.0[idleWP as usize];
+            }
+        }
+
+        let _ = distChange;
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `CommanderBotCTFAI`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:3911-4074`
@@ -1296,18 +4414,231 @@ pub fn CommanderBotCTFAI(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port CommanderBotCTFAI — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut i: usize = 0;
+        let mut ent: *mut gentity_t;
+        let mut squadmates: c_int = 0;
+        let mut squad: [*mut gentity_t; MAX_CLIENTS] = [core::ptr::null_mut(); MAX_CLIENTS];
+        let mut defendAttackPriority: c_int = 0; // 0 == attack, 1 == defend
+        let mut guardDefendPriority: c_int = 0; // 0 == defend, 1 == guard
+        let mut attackRetrievePriority: c_int = 0; // 0 == retrieve, 1 == attack
+        let myFlag: c_int;
+        let enemyFlag: c_int;
+        let mut enemyHasOurFlag: c_int = 0;
+        let mut weHaveEnemyFlag: c_int = 0;
+        let mut numOnMyTeam: c_int = 0;
+        let mut numOnEnemyTeam: c_int = 0;
+        let mut numAttackers: c_int = 0;
+        let mut numDefenders: c_int = 0;
+        let _ = &mut numOnEnemyTeam;
+        let _ = &mut numDefenders;
+
+        if (*world).clients[(*bs).client as usize].sess.sessionTeam == TEAM_RED {
+            myFlag = PW_REDFLAG;
+        } else {
+            myFlag = PW_BLUEFLAG;
+        }
+
+        if (*world).clients[(*bs).client as usize].sess.sessionTeam == TEAM_RED {
+            enemyFlag = PW_BLUEFLAG;
+        } else {
+            enemyFlag = PW_REDFLAG;
+        }
+
+        while i < MAX_CLIENTS {
+            ent = base.add(i);
+
+            if !ent.is_null() && !(*ent).client.is_null() {
+                let cl = (*ent).client as *mut gclient_t;
+                if (*cl).ps.powerups[enemyFlag as usize] != 0
+                    && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                {
+                    weHaveEnemyFlag = 1;
+                } else if (*cl).ps.powerups[myFlag as usize] != 0
+                    && OnSameTeam(ctx, base.add((*bs).client as usize), ent) == 0
+                {
+                    enemyHasOurFlag = 1;
+                }
+
+                if OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0 {
+                    numOnMyTeam += 1;
+                } else {
+                    numOnEnemyTeam += 1;
+                }
+
+                if !(*world).globals.botstates[(*ent).s.number as usize].is_null() {
+                    let bst = (*world).globals.botstates[(*ent).s.number as usize];
+                    if (*bst).ctfState == bot_ctf_state_t::CTFSTATE_ATTACKER as c_int
+                        || (*bst).ctfState == bot_ctf_state_t::CTFSTATE_RETRIEVAL as c_int
+                    {
+                        numAttackers += 1;
+                    } else {
+                        numDefenders += 1;
+                    }
+                } else {
+                    // assume real players to be attackers in our logic
+                    numAttackers += 1;
+                }
+            }
+            i += 1;
+        }
+
+        i = 0;
+
+        while i < MAX_CLIENTS {
+            ent = base.add(i);
+
+            if !ent.is_null()
+                && !(*ent).client.is_null()
+                && !(*world).globals.botstates[i].is_null()
+                && (*(*world).globals.botstates[i]).squadLeader.is_some()
+                && (*base.add(
+                    (*(*world).globals.botstates[i]).squadLeader.unwrap().index(),
+                ))
+                .s
+                .number
+                    == (*bs).client
+                && i as c_int != (*bs).client
+            {
+                squad[squadmates as usize] = ent;
+                squadmates += 1;
+            }
+
+            i += 1;
+        }
+
+        squad[squadmates as usize] = base.add((*bs).client as usize);
+        squadmates += 1;
+
+        let mut i: c_int = 0;
+
+        if enemyHasOurFlag != 0 && weHaveEnemyFlag == 0 {
+            // start off with an attacker instead of a retriever if we don't have the enemy flag yet
+            // so that they can't capture it first. after that we focus on getting our flag back.
+            attackRetrievePriority = 1;
+        }
+
+        while i < squadmates {
+            if !squad[i as usize].is_null()
+                && !(*squad[i as usize]).client.is_null()
+                && !(*world).globals.botstates[(*squad[i as usize]).s.number as usize].is_null()
+            {
+                let sbst = (*world).globals.botstates[(*squad[i as usize]).s.number as usize];
+                if (*sbst).ctfState != bot_ctf_state_t::CTFSTATE_GETFLAGHOME as c_int {
+                    // never tell a bot to stop trying to bring the flag to the base
+                    if defendAttackPriority != 0 {
+                        if weHaveEnemyFlag != 0 {
+                            if guardDefendPriority != 0 {
+                                (*sbst).ctfState =
+                                    bot_ctf_state_t::CTFSTATE_GUARDCARRIER as c_int;
+                                guardDefendPriority = 0;
+                            } else {
+                                (*sbst).ctfState = bot_ctf_state_t::CTFSTATE_DEFENDER as c_int;
+                                guardDefendPriority = 1;
+                            }
+                        } else {
+                            (*sbst).ctfState = bot_ctf_state_t::CTFSTATE_DEFENDER as c_int;
+                        }
+                        defendAttackPriority = 0;
+                    } else {
+                        if enemyHasOurFlag != 0 {
+                            if attackRetrievePriority != 0 {
+                                (*sbst).ctfState = bot_ctf_state_t::CTFSTATE_ATTACKER as c_int;
+                                attackRetrievePriority = 0;
+                            } else {
+                                (*sbst).ctfState = bot_ctf_state_t::CTFSTATE_RETRIEVAL as c_int;
+                                attackRetrievePriority = 1;
+                            }
+                        } else {
+                            (*sbst).ctfState = bot_ctf_state_t::CTFSTATE_ATTACKER as c_int;
+                        }
+                        defendAttackPriority = 1;
+                    }
+                } else if (numOnMyTeam < 2 || numAttackers == 0) && enemyHasOurFlag != 0 {
+                    // I'm the only one on my team who will attack and the enemy has my flag,
+                    // I have to go after him
+                    (*sbst).ctfState = bot_ctf_state_t::CTFSTATE_RETRIEVAL as c_int;
+                }
+            }
+
+            i += 1;
+        }
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
-/// Raven `CommanderBotSiegeAI`.
+/// Raven `CommanderBotSiegeAI` — tell squad mates to do what I'm doing, up to
+/// half of team, let the other half make their own decisions.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4077-4140`
 pub fn CommanderBotSiegeAI(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port CommanderBotSiegeAI — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut i: usize = 0;
+        let mut squadmates: c_int = 0;
+        let mut commanded: c_int = 0;
+        let mut teammates: c_int = 0;
+        let mut squad: [*mut gentity_t; MAX_CLIENTS] = [core::ptr::null_mut(); MAX_CLIENTS];
+        let mut ent: *mut gentity_t;
+        let mut bst: *mut bot_state_t;
+
+        while i < MAX_CLIENTS {
+            ent = base.add(i);
+
+            if !ent.is_null()
+                && !(*ent).client.is_null()
+                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                && !(*world).globals.botstates[(*ent).s.number as usize].is_null()
+            {
+                bst = (*world).globals.botstates[(*ent).s.number as usize];
+
+                if !bst.is_null() && (*bst).isSquadLeader == 0 && (*bst).state_Forced == 0 {
+                    squad[squadmates as usize] = ent;
+                    squadmates += 1;
+                } else if !bst.is_null() && (*bst).isSquadLeader == 0 && (*bst).state_Forced != 0 {
+                    // count them as commanded
+                    commanded += 1;
+                }
+            }
+
+            if !ent.is_null()
+                && !(*ent).client.is_null()
+                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+            {
+                teammates += 1;
+            }
+
+            i += 1;
+        }
+
+        if squadmates == 0 {
+            return;
+        }
+
+        // tell squad mates to do what I'm doing, up to half of team, let the other half decide
+        let mut i: c_int = 0;
+
+        while i < squadmates && !squad[i as usize].is_null() {
+            bst = (*world).globals.botstates[(*squad[i as usize]).s.number as usize];
+
+            if commanded > teammates / 2 {
+                break;
+            }
+
+            if !bst.is_null() {
+                (*bst).state_Forced = (*bs).siegeState;
+                (*bst).siegeState = (*bs).siegeState;
+                commanded += 1;
+            }
+
+            i += 1;
+        }
+    }
 }
 
 /// Raven `BotDoTeamplayAI`.
@@ -1330,7 +4661,6 @@ pub fn BotDoTeamplayAI(
     }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `CommanderBotTeamplayAI`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4158-4249`
@@ -1338,7 +4668,107 @@ pub fn CommanderBotTeamplayAI(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port CommanderBotTeamplayAI — parked: seam-threading")
+    use crate::botai::bot_teamplay_state_t::bot_teamplay_state_t;
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut i: usize = 0;
+        let mut squadmates: c_int = 0;
+        let mut teammates: c_int = 0;
+        let mut teammate_indanger: c_int = -1;
+        let mut teammate_helped: c_int = 0;
+        let mut foundsquadleader: c_int = 0;
+        let mut worsthealth: c_int = 50;
+        let mut squad: [*mut gentity_t; MAX_CLIENTS] = [core::ptr::null_mut(); MAX_CLIENTS];
+        let mut ent: *mut gentity_t;
+        let mut bst: *mut bot_state_t;
+        let _ = &mut teammates;
+
+        while i < MAX_CLIENTS {
+            ent = base.add(i);
+
+            if !ent.is_null()
+                && !(*ent).client.is_null()
+                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+                && !(*world).globals.botstates[(*ent).s.number as usize].is_null()
+            {
+                bst = (*world).globals.botstates[(*ent).s.number as usize];
+
+                if foundsquadleader != 0 && !bst.is_null() && (*bst).isSquadLeader != 0 {
+                    // never more than one squad leader
+                    (*bst).isSquadLeader = 0;
+                }
+
+                if !bst.is_null() && (*bst).isSquadLeader == 0 {
+                    squad[squadmates as usize] = ent;
+                    squadmates += 1;
+                } else if !bst.is_null() {
+                    foundsquadleader = 1;
+                }
+            }
+
+            if !ent.is_null()
+                && !(*ent).client.is_null()
+                && OnSameTeam(ctx, base.add((*bs).client as usize), ent) != 0
+            {
+                teammates += 1;
+
+                if (*ent).health < worsthealth {
+                    teammate_indanger = (*ent).s.number;
+                    worsthealth = (*ent).health;
+                }
+            }
+
+            i += 1;
+        }
+
+        if squadmates == 0 {
+            return;
+        }
+
+        let mut i: c_int = 0;
+
+        while i < squadmates && !squad[i as usize].is_null() {
+            bst = (*world).globals.botstates[(*squad[i as usize]).s.number as usize];
+
+            if !bst.is_null() && (*bst).state_Forced == 0 {
+                // only order if this guy is not being ordered directly by the real player team leader
+                if teammate_indanger >= 0 && teammate_helped == 0 {
+                    // send someone out to help whoever needs help most at the moment
+                    (*bst).teamplayState = bot_teamplay_state_t::TEAMPLAYSTATE_ASSISTING as c_int;
+                    (*bst).squadLeader =
+                        Some(ent_id(base, base.add(teammate_indanger as usize)));
+                    teammate_helped = 1;
+                } else if (teammate_indanger == -1 || teammate_helped != 0)
+                    && (*bst).teamplayState
+                        == bot_teamplay_state_t::TEAMPLAYSTATE_ASSISTING as c_int
+                {
+                    // no teammates need help badly, but this guy is trying to help them anyway, so stop
+                    (*bst).teamplayState = bot_teamplay_state_t::TEAMPLAYSTATE_FOLLOWING as c_int;
+                    (*bst).squadLeader = Some(ent_id(base, base.add((*bs).client as usize)));
+                }
+
+                if (*bs).squadRegroupInterval < (*world).level.time
+                    && (*world).bg_state.rng.Q_irand(1, 10) < 5
+                {
+                    // every so often tell the squad to regroup for the sake of variation
+                    if (*bst).teamplayState
+                        == bot_teamplay_state_t::TEAMPLAYSTATE_FOLLOWING as c_int
+                    {
+                        (*bst).teamplayState =
+                            bot_teamplay_state_t::TEAMPLAYSTATE_REGROUP as c_int;
+                    }
+
+                    (*bs).isSquadLeader = 0;
+                    (*bs).squadCannotLead = (*world).level.time + 500;
+                    (*bs).squadRegroupInterval =
+                        (*world).level.time + (*world).bg_state.rng.Q_irand(45000, 65000);
+                }
+            }
+
+            i += 1;
+        }
+    }
 }
 
 /// Raven `CommanderBotAI`.
@@ -1359,7 +4789,6 @@ pub fn CommanderBotAI(
     }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `MeleeCombatHandling`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4269-4351`
@@ -1367,18 +4796,323 @@ pub fn MeleeCombatHandling(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port MeleeCombatHandling — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut usethisvec: vec3_t = [0.0; 3];
+        let mut downvec: vec3_t = [0.0; 3];
+        let mut midorg: vec3_t = [0.0; 3];
+        let mut a: vec3_t = [0.0; 3];
+        let mut fwd: vec3_t = [0.0; 3];
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        let mut tr: trace_t = core::mem::zeroed();
+        let en_down: c_int;
+        let me_down: c_int;
+        let mid_down: c_int;
+
+        if (*bs).currentEnemy.is_none() {
+            return;
+        }
+        let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
+
+        if !(*currentEnemy).client.is_null() {
+            _VectorCopy(
+                (*((*currentEnemy).client as *mut gclient_t)).ps.origin,
+                &mut usethisvec,
+            );
+        } else {
+            _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
+        }
+
+        if (*bs).meleeStrafeTime < (*world).level.time as f32 {
+            if (*bs).meleeStrafeDir != 0 {
+                (*bs).meleeStrafeDir = 0;
+            } else {
+                (*bs).meleeStrafeDir = 1;
+            }
+
+            (*bs).meleeStrafeTime =
+                ((*world).level.time + (*world).bg_state.rng.Q_irand(500, 1800)) as f32;
+        }
+
+        mins[0] = -15.0;
+        mins[1] = -15.0;
+        mins[2] = -24.0;
+        maxs[0] = 15.0;
+        maxs[1] = 15.0;
+        maxs[2] = 32.0;
+
+        _VectorCopy(usethisvec, &mut downvec);
+        downvec[2] -= 4096.0;
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(&mut tr, &usethisvec, &mins, &maxs, &downvec, -1, MASK_SOLID),
+        );
+
+        en_down = tr.endpos[2] as c_int;
+
+        _VectorCopy((*bs).origin, &mut downvec);
+        downvec[2] -= 4096.0;
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(&mut tr, &(*bs).origin, &mins, &maxs, &downvec, -1, MASK_SOLID),
+        );
+
+        me_down = tr.endpos[2] as c_int;
+
+        _VectorSubtract(usethisvec, (*bs).origin, &mut a);
+        let atmp = a;
+        vectoangles(atmp, &mut a);
+        crate::q_math::AngleVectors(a, Some(&mut fwd), None, None);
+
+        midorg[0] = (*bs).origin[0] + fwd[0] * (*bs).frame_Enemy_Len / 2.0;
+        midorg[1] = (*bs).origin[1] + fwd[1] * (*bs).frame_Enemy_Len / 2.0;
+        midorg[2] = (*bs).origin[2] + fwd[2] * (*bs).frame_Enemy_Len / 2.0;
+
+        _VectorCopy(midorg, &mut downvec);
+        downvec[2] -= 4096.0;
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(&mut tr, &midorg, &mins, &maxs, &downvec, -1, MASK_SOLID),
+        );
+
+        mid_down = tr.endpos[2] as c_int;
+
+        if me_down == en_down && en_down == mid_down {
+            _VectorCopy(usethisvec, &mut (*bs).goalPosition);
+        }
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `SaberCombatHandling`.
+///
+/// The commented-out `AngleVectors`/strafe block near the tail is omitted.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4354-4566`
 pub fn SaberCombatHandling(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port SaberCombatHandling — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut usethisvec: vec3_t = [0.0; 3];
+        let mut downvec: vec3_t = [0.0; 3];
+        let mut midorg: vec3_t = [0.0; 3];
+        let mut a: vec3_t = [0.0; 3];
+        let mut fwd: vec3_t = [0.0; 3];
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        let mut tr: trace_t = core::mem::zeroed();
+        let mut en_down: c_int;
+        let mut me_down: c_int;
+        let mid_down: c_int;
+
+        if (*bs).currentEnemy.is_none() {
+            return;
+        }
+        let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
+
+        if !(*currentEnemy).client.is_null() {
+            _VectorCopy(
+                (*((*currentEnemy).client as *mut gclient_t)).ps.origin,
+                &mut usethisvec,
+            );
+        } else {
+            _VectorCopy((*currentEnemy).s.origin, &mut usethisvec);
+        }
+
+        if (*bs).meleeStrafeTime < (*world).level.time as f32 {
+            if (*bs).meleeStrafeDir != 0 {
+                (*bs).meleeStrafeDir = 0;
+            } else {
+                (*bs).meleeStrafeDir = 1;
+            }
+
+            (*bs).meleeStrafeTime =
+                ((*world).level.time + (*world).bg_state.rng.Q_irand(500, 1800)) as f32;
+        }
+
+        mins[0] = -15.0;
+        mins[1] = -15.0;
+        mins[2] = -24.0;
+        maxs[0] = 15.0;
+        maxs[1] = 15.0;
+        maxs[2] = 32.0;
+
+        _VectorCopy(usethisvec, &mut downvec);
+        downvec[2] -= 4096.0;
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(&mut tr, &usethisvec, &mins, &maxs, &downvec, -1, MASK_SOLID),
+        );
+
+        en_down = tr.endpos[2] as c_int;
+
+        if tr.startsolid != 0 || tr.allsolid != 0 {
+            en_down = 1;
+            me_down = 2;
+        } else {
+            _VectorCopy((*bs).origin, &mut downvec);
+            downvec[2] -= 4096.0;
+
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(&mut tr, &(*bs).origin, &mins, &maxs, &downvec, -1, MASK_SOLID),
+            );
+
+            me_down = tr.endpos[2] as c_int;
+
+            if tr.startsolid != 0 || tr.allsolid != 0 {
+                en_down = 1;
+                me_down = 2;
+            }
+        }
+
+        _VectorSubtract(usethisvec, (*bs).origin, &mut a);
+        let atmp = a;
+        vectoangles(atmp, &mut a);
+        crate::q_math::AngleVectors(a, Some(&mut fwd), None, None);
+
+        midorg[0] = (*bs).origin[0] + fwd[0] * (*bs).frame_Enemy_Len / 2.0;
+        midorg[1] = (*bs).origin[1] + fwd[1] * (*bs).frame_Enemy_Len / 2.0;
+        midorg[2] = (*bs).origin[2] + fwd[2] * (*bs).frame_Enemy_Len / 2.0;
+
+        _VectorCopy(midorg, &mut downvec);
+        downvec[2] -= 4096.0;
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(&mut tr, &midorg, &mins, &maxs, &downvec, -1, MASK_SOLID),
+        );
+
+        mid_down = tr.endpos[2] as c_int;
+
+        if me_down == en_down && en_down == mid_down {
+            if usethisvec[2] > ((*bs).origin[2] + 32.0)
+                && !(*currentEnemy).client.is_null()
+                && (*((*currentEnemy).client as *mut gclient_t)).ps.groundEntityNum
+                    == ENTITYNUM_NONE
+            {
+                (*bs).jumpTime = ((*world).level.time + 100) as f32;
+            }
+
+            if (*bs).frame_Enemy_Len > 128.0 {
+                // be ready to attack
+                (*bs).saberDefending = 0;
+                (*bs).saberDefendDecideTime =
+                    (*world).level.time + (*world).bg_state.rng.Q_irand(1000, 2000);
+            } else {
+                if (*bs).saberDefendDecideTime < (*world).level.time {
+                    if (*bs).saberDefending != 0 {
+                        (*bs).saberDefending = 0;
+                    } else {
+                        (*bs).saberDefending = 1;
+                    }
+
+                    (*bs).saberDefendDecideTime =
+                        (*world).level.time + (*world).bg_state.rng.Q_irand(500, 2000);
+                }
+            }
+
+            if (*bs).frame_Enemy_Len < 54.0 {
+                _VectorCopy((*bs).origin, &mut (*bs).goalPosition);
+                (*bs).saberBFTime = 0;
+            } else {
+                _VectorCopy(usethisvec, &mut (*bs).goalPosition);
+            }
+
+            if !currentEnemy.is_null() && !(*currentEnemy).client.is_null() {
+                let cecl = (*currentEnemy).client as *mut gclient_t;
+                if BG_SaberInSpecial((*cecl).ps.saberMove) == 0
+                    && (*bs).frame_Enemy_Len > 90.0
+                    && (*bs).saberBFTime > (*world).level.time
+                    && (*bs).saberBTime > (*world).level.time
+                    && (*bs).beStill < (*world).level.time as f32
+                    && (*bs).saberSTime < (*world).level.time
+                {
+                    (*bs).beStill =
+                        ((*world).level.time + (*world).bg_state.rng.Q_irand(500, 1000)) as f32;
+                    (*bs).saberSTime =
+                        (*world).level.time + (*world).bg_state.rng.Q_irand(1200, 1800);
+                } else if (*cecl).ps.weapon == WP_SABER
+                    && (*bs).frame_Enemy_Len < 80.0
+                    && ((*world).bg_state.rng.Q_irand(1, 10) < 8
+                        && (*bs).saberBFTime < (*world).level.time)
+                    || (*bs).saberBTime > (*world).level.time
+                    || BG_SaberInKata((*cecl).ps.saberMove) != 0
+                    || (*cecl).ps.saberMove == LS_SPINATTACK
+                    || (*cecl).ps.saberMove == LS_SPINATTACK_DUAL
+                {
+                    let mut vs: vec3_t = [0.0; 3];
+                    let mut groundcheck: vec3_t = [0.0; 3];
+                    let idealDist: c_int;
+                    let mut checkIncr: c_int = 0;
+
+                    _VectorSubtract((*bs).origin, usethisvec, &mut vs);
+                    VectorNormalize(&mut vs);
+
+                    if BG_SaberInKata((*cecl).ps.saberMove) != 0
+                        || (*cecl).ps.saberMove == LS_SPINATTACK
+                        || (*cecl).ps.saberMove == LS_SPINATTACK_DUAL
+                    {
+                        idealDist = 256;
+                    } else {
+                        idealDist = 64;
+                    }
+
+                    while checkIncr < idealDist {
+                        (*bs).goalPosition[0] = (*bs).origin[0] + vs[0] * checkIncr as f32;
+                        (*bs).goalPosition[1] = (*bs).origin[1] + vs[1] * checkIncr as f32;
+                        (*bs).goalPosition[2] = (*bs).origin[2] + vs[2] * checkIncr as f32;
+
+                        if (*bs).saberBTime < (*world).level.time {
+                            (*bs).saberBFTime =
+                                (*world).level.time + (*world).bg_state.rng.Q_irand(900, 1300);
+                            (*bs).saberBTime =
+                                (*world).level.time + (*world).bg_state.rng.Q_irand(300, 700);
+                        }
+
+                        _VectorCopy((*bs).goalPosition, &mut groundcheck);
+
+                        groundcheck[2] -= 64.0;
+
+                        trap::Trace(
+                            ctx.engine,
+                            GTraceArgs::new(
+                                &mut tr,
+                                &(*bs).goalPosition,
+                                core::ptr::null(),
+                                core::ptr::null(),
+                                &groundcheck,
+                                (*bs).client,
+                                MASK_SOLID,
+                            ),
+                        );
+
+                        if tr.fraction == 1.0f32 {
+                            // don't back off of a ledge
+                            _VectorCopy(usethisvec, &mut (*bs).goalPosition);
+                            break;
+                        }
+                        checkIncr += 64;
+                    }
+                } else if (*cecl).ps.weapon == WP_SABER && (*bs).frame_Enemy_Len >= 75.0 {
+                    (*bs).saberBFTime =
+                        (*world).level.time + (*world).bg_state.rng.Q_irand(700, 1300);
+                    (*bs).saberBTime = 0;
+                }
+            }
+        } else if (*bs).frame_Enemy_Len <= 56.0 {
+            (*bs).doAttack = 1;
+            (*bs).saberDefending = 0;
+        }
+    }
 }
 
 /// Raven `BotWeaponCanLead`.
@@ -1469,7 +5203,6 @@ pub fn BotAimLeading(
     }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `BotAimOffsetGoalAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4687-4801`
@@ -1477,10 +5210,119 @@ pub fn BotAimOffsetGoalAngles(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    todo!("Port BotAimOffsetGoalAngles — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut accVal: f32;
+
+        if (*bs).skills.perfectaim != 0 {
+            return;
+        }
+
+        if (*bs).aimOffsetTime > (*world).level.time as f32 {
+            if (*bs).aimOffsetAmtYaw != 0.0 {
+                (*bs).goalAngles[YAW as usize] += (*bs).aimOffsetAmtYaw;
+            }
+
+            if (*bs).aimOffsetAmtPitch != 0.0 {
+                (*bs).goalAngles[PITCH as usize] += (*bs).aimOffsetAmtPitch;
+            }
+
+            let mut i: c_int = 0;
+            while i <= 2 {
+                if (*bs).goalAngles[i as usize] > 360.0 {
+                    (*bs).goalAngles[i as usize] -= 360.0;
+                }
+
+                if (*bs).goalAngles[i as usize] < 0.0 {
+                    (*bs).goalAngles[i as usize] += 360.0;
+                }
+
+                i += 1;
+            }
+            return;
+        }
+
+        accVal = (*bs).skills.accuracy / (*bs).settings.skill;
+
+        // bs->currentEnemy / revengeEnemy resolved to gentity pointers / ids.
+        let currentEnemy: *mut gentity_t = match (*bs).currentEnemy {
+            Some(id) => base.add(id.index()),
+            None => core::ptr::null_mut(),
+        };
+
+        if !currentEnemy.is_null()
+            && BotMindTricked(ctx, (*bs).client, (*currentEnemy).s.number) != 0
+        {
+            // having to judge where they are by hearing them, so we should be quite inaccurate here
+            accVal *= 7.0;
+
+            if accVal < 30.0 {
+                accVal = 30.0;
+            }
+        }
+
+        if (*bs).revengeEnemy.is_some()
+            && (*bs).revengeHateLevel != 0
+            && (*bs).currentEnemy == (*bs).revengeEnemy
+        {
+            // bot becomes more skilled as anger level raises
+            accVal = accVal / (*bs).revengeHateLevel as f32;
+        }
+
+        if !currentEnemy.is_null() && (*bs).frame_Enemy_Vis != 0 {
+            // assume our goal is aiming at the enemy, seeing as he's visible and all
+            if (*currentEnemy).s.pos.trDelta[0] == 0.0
+                && (*currentEnemy).s.pos.trDelta[1] == 0.0
+                && (*currentEnemy).s.pos.trDelta[2] == 0.0
+            {
+                accVal = 0.0; // he's not even moving, so he shouldn't really be hard to hit.
+            } else {
+                // if he's moving he's this much harder to hit
+                accVal = (accVal as f64 + accVal as f64 * 0.25) as f32;
+            }
+
+            if (*base.add((*bs).client as usize)).s.pos.trDelta[0] != 0.0
+                || (*base.add((*bs).client as usize)).s.pos.trDelta[1] != 0.0
+                || (*base.add((*bs).client as usize)).s.pos.trDelta[2] != 0.0
+            {
+                // make it somewhat harder to aim if we're moving also
+                accVal = (accVal as f64 + accVal as f64 * 0.15) as f32;
+            }
+        }
+
+        if accVal > 90.0 {
+            accVal = 90.0;
+        }
+        if accVal < 1.0 {
+            accVal = 0.0;
+        }
+
+        if accVal == 0.0 {
+            (*bs).aimOffsetAmtYaw = 0.0;
+            (*bs).aimOffsetAmtPitch = 0.0;
+            return;
+        }
+
+        if (*world).bg_state.rng.rand() % 10 <= 5 {
+            (*bs).aimOffsetAmtYaw = ((*world).bg_state.rng.rand() % (accVal as c_int)) as f32;
+        } else {
+            (*bs).aimOffsetAmtYaw =
+                (-((*world).bg_state.rng.rand() % (accVal as c_int))) as f32;
+        }
+
+        if (*world).bg_state.rng.rand() % 10 <= 5 {
+            (*bs).aimOffsetAmtPitch = ((*world).bg_state.rng.rand() % (accVal as c_int)) as f32;
+        } else {
+            (*bs).aimOffsetAmtPitch =
+                (-((*world).bg_state.rng.rand() % (accVal as c_int))) as f32;
+        }
+
+        (*bs).aimOffsetTime =
+            ((*world).level.time + (*world).bg_state.rng.rand() % 500 + 200) as f32;
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `ShouldSecondaryFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4804-4882`
@@ -1488,10 +5330,75 @@ pub fn ShouldSecondaryFire(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port ShouldSecondaryFire — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let weap: c_int;
+        let dif: c_int;
+        let mut rTime: f32;
+
+        weap = (*bs).cur_ps.weapon;
+
+        if (*bs).cur_ps.ammo[weaponData[weap as usize].ammoIndex as usize]
+            < weaponData[weap as usize].altEnergyPerShot
+        {
+            return 0;
+        }
+
+        if (*bs).cur_ps.weaponstate == WEAPON_CHARGING_ALT as c_int
+            && (*bs).cur_ps.weapon == WP_ROCKET_LAUNCHER
+        {
+            let heldTime: f32 =
+                ((*world).level.time - (*bs).cur_ps.weaponChargeTime) as f32;
+
+            rTime = (*bs).cur_ps.rocketLockTime;
+
+            if rTime < 1.0 {
+                rTime = (*bs).cur_ps.rocketLastValidTime;
+            }
+
+            if heldTime > 5000.0 {
+                // just give up and release it if we can't manage a lock in 5 seconds
+                return 2;
+            }
+
+            if rTime > 0.0 {
+                dif = (((*world).level.time as f32 - rTime) / (1200.0f32 / 16.0f32)) as c_int;
+
+                if dif >= 10 {
+                    return 2;
+                } else if (*bs).frame_Enemy_Len > 250.0 {
+                    return 1;
+                }
+            } else if (*bs).frame_Enemy_Len > 250.0 {
+                return 1;
+            }
+        } else if (*bs).cur_ps.weaponstate == WEAPON_CHARGING_ALT as c_int
+            && ((*world).level.time - (*bs).cur_ps.weaponChargeTime) > (*bs).altChargeTime
+        {
+            return 2;
+        } else if (*bs).cur_ps.weaponstate == WEAPON_CHARGING_ALT as c_int {
+            return 1;
+        }
+
+        if weap == WP_BRYAR_PISTOL && (*bs).frame_Enemy_Len < 300.0 {
+            return 1;
+        } else if weap == WP_BOWCASTER && (*bs).frame_Enemy_Len > 300.0 {
+            return 1;
+        } else if weap == WP_REPEATER
+            && (*bs).frame_Enemy_Len < 600.0
+            && (*bs).frame_Enemy_Len > 250.0
+        {
+            return 1;
+        } else if weap == WP_BLASTER && (*bs).frame_Enemy_Len < 300.0 {
+            return 1;
+        } else if weap == WP_ROCKET_LAUNCHER && (*bs).frame_Enemy_Len > 250.0 {
+            return 1;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `CombatBotAI`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4885-5023`
@@ -1500,10 +5407,124 @@ pub fn CombatBotAI(
     bs: *mut bot_state_t,
     thinktime: f32,
 ) -> c_int {
-    todo!("Port CombatBotAI — parked: seam-threading")
+    let _ = thinktime;
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut eorg: vec3_t = [0.0; 3];
+        let mut a: vec3_t = [0.0; 3];
+        let secFire: c_int;
+        let mut fovcheck: f32;
+
+        if (*bs).currentEnemy.is_none() {
+            return 0;
+        }
+        let currentEnemy = base.add((*bs).currentEnemy.unwrap().index());
+
+        if !(*currentEnemy).client.is_null() {
+            _VectorCopy((*((*currentEnemy).client as *mut gclient_t)).ps.origin, &mut eorg);
+        } else {
+            _VectorCopy((*currentEnemy).s.origin, &mut eorg);
+        }
+
+        _VectorSubtract(eorg, (*bs).eye, &mut a);
+        let atmp = a;
+        vectoangles(atmp, &mut a);
+
+        if BotGetWeaponRange(bs) == BWEAPONRANGE_SABER {
+            if (*bs).frame_Enemy_Len <= SABER_ATTACK_RANGE as f32 {
+                (*bs).doAttack = 1;
+            }
+        } else if BotGetWeaponRange(bs) == BWEAPONRANGE_MELEE {
+            if (*bs).frame_Enemy_Len <= MELEE_ATTACK_RANGE as f32 {
+                (*bs).doAttack = 1;
+            }
+        } else {
+            if (*bs).cur_ps.weapon == WP_THERMAL || (*bs).cur_ps.weapon == WP_ROCKET_LAUNCHER {
+                // be careful with the hurty weapons
+                fovcheck = 40.0;
+
+                if (*bs).cur_ps.weaponstate == WEAPON_CHARGING_ALT as c_int
+                    && (*bs).cur_ps.weapon == WP_ROCKET_LAUNCHER
+                {
+                    // if we're charging the weapon up then we can hold fire down within a normal fov
+                    fovcheck = 60.0;
+                }
+            } else {
+                fovcheck = 60.0;
+            }
+
+            if (*bs).cur_ps.weaponstate == WEAPON_CHARGING as c_int
+                || (*bs).cur_ps.weaponstate == WEAPON_CHARGING_ALT as c_int
+            {
+                fovcheck = 160.0;
+            }
+
+            if (*bs).frame_Enemy_Len < 128.0 {
+                fovcheck *= 2.0;
+            }
+
+            if InFieldOfVision((*bs).viewangles, fovcheck, a) != 0 {
+                if (*bs).cur_ps.weapon == WP_THERMAL {
+                    if ((((*world).level.time - (*bs).cur_ps.weaponChargeTime) as f32)
+                        < ((*bs).frame_Enemy_Len * 2.0)
+                        && ((*world).level.time - (*bs).cur_ps.weaponChargeTime) < 4000
+                        && (*bs).frame_Enemy_Len > 64.0)
+                        || ((*bs).cur_ps.weaponstate != WEAPON_CHARGING as c_int
+                            && (*bs).cur_ps.weaponstate != WEAPON_CHARGING_ALT as c_int)
+                    {
+                        if (*bs).cur_ps.weaponstate != WEAPON_CHARGING as c_int
+                            && (*bs).cur_ps.weaponstate != WEAPON_CHARGING_ALT as c_int
+                        {
+                            if (*bs).frame_Enemy_Len > 512.0 && (*bs).frame_Enemy_Len < 800.0 {
+                                (*bs).doAltAttack = 1;
+                            } else {
+                                (*bs).doAttack = 1;
+                            }
+                        }
+
+                        if (*bs).cur_ps.weaponstate == WEAPON_CHARGING as c_int {
+                            (*bs).doAttack = 1;
+                        } else if (*bs).cur_ps.weaponstate == WEAPON_CHARGING_ALT as c_int {
+                            (*bs).doAltAttack = 1;
+                        }
+                    }
+                } else {
+                    secFire = ShouldSecondaryFire(ctx, bs);
+
+                    if (*bs).cur_ps.weaponstate != WEAPON_CHARGING_ALT as c_int
+                        && (*bs).cur_ps.weaponstate != WEAPON_CHARGING as c_int
+                    {
+                        (*bs).altChargeTime = (*world).bg_state.rng.Q_irand(500, 1000);
+                    }
+
+                    if secFire == 1 {
+                        (*bs).doAltAttack = 1;
+                    } else if secFire == 0 {
+                        if (*bs).cur_ps.weapon != WP_THERMAL {
+                            if (*bs).cur_ps.weaponstate != WEAPON_CHARGING as c_int
+                                || (*bs).altChargeTime
+                                    > ((*world).level.time - (*bs).cur_ps.weaponChargeTime)
+                            {
+                                (*bs).doAttack = 1;
+                            }
+                        } else {
+                            (*bs).doAttack = 1;
+                        }
+                    }
+
+                    if secFire == 2 {
+                        // released a charge
+                        return 1;
+                    }
+                }
+            }
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `BotFallbackNavigation`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5029-5070`
@@ -1511,21 +5532,96 @@ pub fn BotFallbackNavigation(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port BotFallbackNavigation — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let mut b_angle: vec3_t = [0.0; 3];
+        let mut fwd: vec3_t = [0.0; 3];
+        let mut trto: vec3_t = [0.0; 3];
+        let mut mins: vec3_t = [0.0; 3];
+        let mut maxs: vec3_t = [0.0; 3];
+        let mut tr: trace_t = core::mem::zeroed();
+
+        if (*bs).currentEnemy.is_some() && (*bs).frame_Enemy_Vis != 0 {
+            return 2; // we're busy
+        }
+
+        mins[0] = -15.0;
+        mins[1] = -15.0;
+        mins[2] = 0.0;
+        maxs[0] = 15.0;
+        maxs[1] = 15.0;
+        maxs[2] = 32.0;
+
+        (*bs).goalAngles[PITCH as usize] = 0.0;
+        (*bs).goalAngles[ROLL as usize] = 0.0;
+
+        _VectorCopy((*bs).goalAngles, &mut b_angle);
+
+        crate::q_math::AngleVectors(b_angle, Some(&mut fwd), None, None);
+
+        trto[0] = (*bs).origin[0] + fwd[0] * 16.0;
+        trto[1] = (*bs).origin[1] + fwd[1] * 16.0;
+        trto[2] = (*bs).origin[2] + fwd[2] * 16.0;
+
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr,
+                &(*bs).origin,
+                &mins,
+                &maxs,
+                &trto,
+                ENTITYNUM_NONE,
+                MASK_SOLID,
+            ),
+        );
+
+        if tr.fraction == 1.0 {
+            _VectorCopy(trto, &mut (*bs).goalPosition);
+            return 1; // success!
+        } else {
+            (*bs).goalAngles[YAW as usize] = ((*world).bg_state.rng.rand() % 360) as f32;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
-/// Raven `BotTryAnotherWeapon`.
+/// Raven `BotTryAnotherWeapon` — out of ammo, resort to the first weapon we come
+/// across that has ammo.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5072-5103`
 pub fn BotTryAnotherWeapon(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port BotTryAnotherWeapon — parked: seam-threading")
+    unsafe {
+        let mut i: c_int = 1;
+
+        while i < WP_NUM_WEAPONS {
+            if (*bs).cur_ps.ammo[weaponData[i as usize].ammoIndex as usize]
+                >= weaponData[i as usize].energyPerShot
+                && ((*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << i)) != 0
+            {
+                (*bs).virtualWeapon = i;
+                BotSelectWeapon(ctx, (*bs).client, i);
+                return 1;
+            }
+
+            i += 1;
+        }
+
+        if (*bs).cur_ps.weapon != 1 && (*bs).virtualWeapon != 1 {
+            // should always have this.. shouldn't we?
+            (*bs).virtualWeapon = 1;
+            BotSelectWeapon(ctx, (*bs).client, 1);
+            return 1;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `BotWeaponSelectable`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5106-5120`
@@ -1534,10 +5630,23 @@ pub fn BotWeaponSelectable(
     bs: *mut bot_state_t,
     weapon: c_int,
 ) -> qboolean {
-    todo!("Port BotWeaponSelectable — parked: seam-threading")
+    let _ = ctx;
+    unsafe {
+        if weapon == WP_NONE {
+            return qfalse;
+        }
+
+        if (*bs).cur_ps.ammo[weaponData[weapon as usize].ammoIndex as usize]
+            >= weaponData[weapon as usize].energyPerShot
+            && ((*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << weapon)) != 0
+        {
+            return qtrue;
+        }
+
+        qfalse
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `BotSelectIdealWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5123-5213`
@@ -1545,11 +5654,97 @@ pub fn BotSelectIdealWeapon(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port BotSelectIdealWeapon — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut i: c_int;
+        let mut bestweight: c_int = -1;
+        let mut bestweapon: c_int = 0;
+
+        i = 0;
+
+        while i < WP_NUM_WEAPONS {
+            if (*bs).cur_ps.ammo[weaponData[i as usize].ammoIndex as usize]
+                >= weaponData[i as usize].energyPerShot
+                && (*bs).botWeaponWeights[i as usize] > bestweight as f32
+                && ((*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << i)) != 0
+            {
+                if i == WP_THERMAL {
+                    // special case..
+                    if (*bs).currentEnemy.is_some() && (*bs).frame_Enemy_Len < 700.0 {
+                        bestweight = (*bs).botWeaponWeights[i as usize] as c_int;
+                        bestweapon = i;
+                    }
+                } else {
+                    bestweight = (*bs).botWeaponWeights[i as usize] as c_int;
+                    bestweapon = i;
+                }
+            }
+
+            i += 1;
+        }
+
+        if (*bs).currentEnemy.is_some()
+            && (*bs).frame_Enemy_Len < 300.0
+            && (bestweapon == WP_BRYAR_PISTOL
+                || bestweapon == WP_BLASTER
+                || bestweapon == WP_BOWCASTER)
+            && ((*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << WP_SABER)) != 0
+        {
+            bestweapon = WP_SABER;
+            bestweight = 1;
+        }
+
+        // bs->currentEnemy resolved to a gentity pointer.
+        let currentEnemy: *mut gentity_t = match (*bs).currentEnemy {
+            Some(id) => base.add(id.index()),
+            None => core::ptr::null_mut(),
+        };
+
+        if !currentEnemy.is_null()
+            && (*bs).frame_Enemy_Len > 300.0
+            && !(*currentEnemy).client.is_null()
+            && (*((*currentEnemy).client as *mut gclient_t)).ps.weapon != WP_SABER
+            && bestweapon == WP_SABER
+        {
+            // if the enemy is far away, and we have our saber selected, see if we have any good
+            // distance weapons instead
+            if BotWeaponSelectable(ctx, bs, WP_DISRUPTOR) != 0 {
+                bestweapon = WP_DISRUPTOR;
+                bestweight = 1;
+            } else if BotWeaponSelectable(ctx, bs, WP_ROCKET_LAUNCHER) != 0 {
+                bestweapon = WP_ROCKET_LAUNCHER;
+                bestweight = 1;
+            } else if BotWeaponSelectable(ctx, bs, WP_BOWCASTER) != 0 {
+                bestweapon = WP_BOWCASTER;
+                bestweight = 1;
+            } else if BotWeaponSelectable(ctx, bs, WP_BLASTER) != 0 {
+                bestweapon = WP_BLASTER;
+                bestweight = 1;
+            } else if BotWeaponSelectable(ctx, bs, WP_REPEATER) != 0 {
+                bestweapon = WP_REPEATER;
+                bestweight = 1;
+            } else if BotWeaponSelectable(ctx, bs, WP_DEMP2) != 0 {
+                bestweapon = WP_DEMP2;
+                bestweight = 1;
+            }
+        }
+
+        if bestweight != -1
+            && (*bs).cur_ps.weapon != bestweapon
+            && (*bs).virtualWeapon != bestweapon
+        {
+            (*bs).virtualWeapon = bestweapon;
+            BotSelectWeapon(ctx, (*bs).client, bestweapon);
+            return 1;
+        }
+
+        0
+    }
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
-/// Raven `BotSelectChoiceWeapon`.
+/// Raven `BotSelectChoiceWeapon` — if `!doselection` then bot will only check if
+/// he has the specified weapon and return 1 (yes) or 0 (no).
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5216-5251`
 pub fn BotSelectChoiceWeapon(
@@ -1558,7 +5753,41 @@ pub fn BotSelectChoiceWeapon(
     weapon: c_int,
     doselection: c_int,
 ) -> c_int {
-    todo!("Port BotSelectChoiceWeapon — parked: seam-threading")
+    unsafe {
+        let mut i: c_int;
+        let mut hasit: c_int = 0;
+
+        i = 0;
+
+        while i < WP_NUM_WEAPONS {
+            if (*bs).cur_ps.ammo[weaponData[i as usize].ammoIndex as usize]
+                > weaponData[i as usize].energyPerShot
+                && i == weapon
+                && ((*bs).cur_ps.stats[STAT_WEAPONS as usize] & (1 << i)) != 0
+            {
+                hasit = 1;
+                break;
+            }
+
+            i += 1;
+        }
+
+        if hasit != 0
+            && (*bs).cur_ps.weapon != weapon
+            && doselection != 0
+            && (*bs).virtualWeapon != weapon
+        {
+            (*bs).virtualWeapon = weapon;
+            BotSelectWeapon(ctx, (*bs).client, weapon);
+            return 2;
+        }
+
+        if hasit != 0 {
+            return 1;
+        }
+
+        0
+    }
 }
 
 /// Raven `BotSelectMelee`.
@@ -1579,7 +5808,6 @@ pub fn BotSelectMelee(
     0
 }
 
-// PORT-ESCALATION(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
 /// Raven `GetLoveLevel`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5269-5312`
@@ -1588,7 +5816,55 @@ pub fn GetLoveLevel(
     bs: *mut bot_state_t,
     love: *mut bot_state_t,
 ) -> c_int {
-    todo!("Port GetLoveLevel — parked: seam-threading")
+    unsafe {
+        let world = ctx.world;
+        let base = (*world).entities.as_mut_ptr();
+        let mut i: c_int = 0;
+        let lname: *const c_char;
+
+        if (*world).cvars.g_gametype.integer == GT_DUEL
+            || (*world).cvars.g_gametype.integer == GT_POWERDUEL
+        {
+            // There is no love in 1-on-1
+            return 0;
+        }
+
+        if bs.is_null()
+            || love.is_null()
+            || (*base.add((*love).client as usize)).client.is_null()
+        {
+            return 0;
+        }
+
+        if (*bs).lovednum == 0 {
+            return 0;
+        }
+
+        if (*world).cvars.bot_attachments.integer == 0 {
+            return 1;
+        }
+
+        lname = (*((*base.add((*love).client as usize)).client as *mut gclient_t))
+            .pers
+            .netname
+            .as_ptr();
+
+        if lname.is_null() {
+            return 0;
+        }
+
+        let lname_s = cstr_to_str(lname);
+
+        while i < (*bs).lovednum {
+            if cstr_to_str((*bs).loved[i as usize].name.as_ptr() as *const c_char) == lname_s {
+                return (*bs).loved[i as usize].level;
+            }
+
+            i += 1;
+        }
+
+        0
+    }
 }
 
 /// Raven `BotLovedOneDied`.

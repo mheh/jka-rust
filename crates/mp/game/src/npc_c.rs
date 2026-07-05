@@ -1607,11 +1607,6 @@ pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
     }
 }
 
-// PORT-ESCALATION(va-variadic-seam): every branch formats a sound path
-// through `va(fmt, ...)`; `va`'s C varargs seam is itself parked
-// ("variadic `...` — seam decision pending", `q_shared.rs`) with a
-// fixed one-arg stub signature, so the substitution value has nowhere
-// to go until that seam lands.
 /// Raven `G_DroidSounds`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1787-1814`
@@ -1619,7 +1614,52 @@ pub fn G_DroidSounds(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    todo!("Port G_DroidSounds — parked: va-variadic-seam")
+    unsafe {
+        let client = (*self_).client as *mut gclient_t;
+        if client.is_null() {
+            return;
+        }
+
+        // Raven: make the noises
+        if crate::g_timer::TIMER_Done(ctx, self_, c"patrolNoise".as_ptr()) != 0
+            && (*ctx.world).bg_state.rng.Q_irand(0, 20) == 0
+        {
+            let npc_class = (*client).NPC_class;
+            let sound_path = match npc_class {
+                class_t::CLASS_R2D2 => {
+                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                    format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx)
+                }
+                class_t::CLASS_R5D2 => {
+                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
+                    format!("sound/chars/r5d2/misc/r5talk{}.wav", idx)
+                }
+                class_t::CLASS_PROBE => {
+                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                    format!("sound/chars/probe/misc/probetalk{}.wav", idx)
+                }
+                class_t::CLASS_MOUSE => {
+                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+                    format!("sound/chars/mouse/misc/mousego{}.wav", idx)
+                }
+                class_t::CLASS_GONK => {
+                    let idx = (*ctx.world).bg_state.rng.Q_irand(1, 2);
+                    format!("sound/chars/gonk/misc/gonktalk{}.wav", idx)
+                }
+                _ => return,
+            };
+
+            crate::g_utils::G_SoundOnEnt(
+                ctx,
+                self_,
+                CHAN_AUTO,
+                cstr(&sound_path).as_ptr(),
+            );
+
+            let duration = (*ctx.world).bg_state.rng.Q_irand(2000, 4000);
+            crate::g_timer::TIMER_Set(ctx, self_, c"patrolNoise".as_ptr(), duration);
+        }
+    }
 }
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes the

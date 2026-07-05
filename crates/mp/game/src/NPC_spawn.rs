@@ -2324,8 +2324,10 @@ pub fn SP_NPC_Monster_Swamp(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    // PORT-ESCALATION(packet-contract): depends on SP_NPC_spawner (ctx, parked).
-    todo!("Port SP_NPC_Monster_Swamp — oracle/oracle/codemp/game/NPC_spawn.c:3453")
+    unsafe {
+        (*self_).NPC_type = c"Swamp".as_ptr();
+        SP_NPC_spawner(ctx, self_);
+    }
 }
 
 /// Raven `SP_NPC_Monster_Howler`.

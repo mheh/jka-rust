@@ -102,35 +102,59 @@ pub fn NPC_ATST_Pain(
 ///
 /// Hunt down the enemy. Set goal to enemy and move toward it.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:130-142`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn ATST_Hunt(
     ctx: GameContext<'_>,
     visible: qboolean,
     advance: qboolean,
 ) {
-    todo!("Port ATST_Hunt — parked: ai-context")
+    unsafe {
+        // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world).globals
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        if (*npc_info).goalEntity.is_none() {
+            // hunt
+            (*npc_info).goalEntity = (*npc).enemy;
+        }
+
+        (*npc_info).combatMove = qtrue;
+
+        NPC_MoveToGoal(ctx, qtrue);
+    }
 }
 
 /// Raven `ATST_Ranged`.
 ///
 /// Perform a ranged attack. Check attack delay, fire weapons, chase if needed.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:149-170`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn ATST_Ranged(
     ctx: GameContext<'_>,
     visible: qboolean,
     advance: qboolean,
     altAttack: qboolean,
 ) {
-    todo!("Port ATST_Ranged — parked: ai-context")
+    unsafe {
+        // PORT-NOTE(ai-context): NPC/NPCInfo/ucmd accessed via (*ctx.world).globals
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+        let ucmd = &mut (*ctx.world).globals.ucmd;
+
+        if TIMER_Done(ctx, npc, b"atkDelay\0".as_ptr() as *const c_char) != qfalse && visible != qfalse {
+            // Attack?
+            TIMER_Set(ctx, npc, b"atkDelay\0".as_ptr() as *const c_char,
+                (*ctx.world).bg_state.rng.Q_irand(500, 3000));
+
+            if altAttack != qfalse {
+                (*ucmd).buttons |= BUTTON_ATTACK | BUTTON_ALT_ATTACK;
+            } else {
+                (*ucmd).buttons |= BUTTON_ATTACK;
+            }
+        }
+
+        if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
+            ATST_Hunt(ctx, visible, advance);
+        }
+    }
 }
 
 /// Raven `ATST_Attack`.
@@ -138,13 +162,104 @@ pub fn ATST_Ranged(
 /// Main attack decision logic. Check if enemy still valid, determine distance,
 /// check visibility, and decide weapon type based on distance.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:177-264`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn ATST_Attack(ctx: GameContext<'_>) {
-    todo!("Port ATST_Attack — parked: ai-context")
+    unsafe {
+        // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world).globals
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        let mut alt_attack: qboolean = qfalse;
+        let mut blaster_test: c_int;
+        let mut charger_test: c_int;
+        let mut weapon: c_int;
+        let distance: c_int;
+        let dist_rate: distance_e;
+        let visible: qboolean;
+        let advance: qboolean;
+
+        if NPC_CheckEnemyExt(ctx, qfalse) == qfalse {
+            (*npc).enemy = None;
+            return;
+        }
+
+        NPC_FaceEnemy(ctx, qtrue);
+
+        // Rate our distance to the target, and our visibility
+        let enemy_id = (*npc).enemy.unwrap();
+        let enemy = &(*ctx.world).entities[enemy_id.0 as usize];
+        distance = DistanceHorizontalSquared((*npc).r.currentOrigin, (*enemy).r.currentOrigin) as c_int;
+        dist_rate = if distance > MIN_MELEE_RANGE_SQR { DIST_LONG } else { DIST_MELEE };
+        visible = NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
+        advance = if distance > MIN_DISTANCE_SQR { qtrue } else { qfalse };
+
+        // If we cannot see our target, move to see it
+        if visible == qfalse {
+            if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
+                ATST_Hunt(ctx, visible, advance);
+                return;
+            }
+        }
+
+        // Decide what type of attack to do
+        match dist_rate {
+            DIST_MELEE => {
+                // NPC_ChangeWeapon( WP_ATST_MAIN );
+            }
+
+            DIST_LONG => {
+                // NPC_ChangeWeapon( WP_ATST_SIDE );
+                // rwwFIXMEFIXME: make atst weaps work.
+
+                // See if the side weapons are there
+                blaster_test = trap::G2API_GetSurfaceRenderStatus(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_G2API_GETSURFACERENDERSTATUS::GG2GetSurfaceRenderStatusArgs::new(
+                        (*npc).ghoul2,
+                        0,
+                        cstr("head_light_blaster_cann").as_ptr(),
+                    ),
+                );
+                charger_test = trap::G2API_GetSurfaceRenderStatus(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_G2API_GETSURFACERENDERSTATUS::GG2GetSurfaceRenderStatusArgs::new(
+                        (*npc).ghoul2,
+                        0,
+                        cstr("head_concussion_charger").as_ptr(),
+                    ),
+                );
+
+                // It has both side weapons
+                if blaster_test != -1
+                    && (blaster_test & TURN_OFF) == 0
+                    && charger_test != -1
+                    && (charger_test & TURN_OFF) == 0
+                {
+                    weapon = (*ctx.world).bg_state.rng.Q_irand(0, 1); // 0 is blaster, 1 is charger (ALT SIDE)
+
+                    if weapon != 0 {
+                        // Fire charger
+                        alt_attack = qtrue;
+                    } else {
+                        alt_attack = qfalse;
+                    }
+                } else if blaster_test != -1 && (blaster_test & TURN_OFF) == 0 {
+                    // Blaster is on
+                    alt_attack = qfalse;
+                } else if charger_test != -1 && (charger_test & TURN_OFF) == 0 {
+                    // Charger is on
+                    alt_attack = qtrue;
+                } else {
+                    NPC_ChangeWeapon(WP_NONE);
+                }
+            }
+
+            _ => {}
+        }
+
+        NPC_FaceEnemy(ctx, qtrue);
+
+        ATST_Ranged(ctx, visible, advance, alt_attack);
+    }
 }
 
 /// Raven `ATST_Patrol`.
@@ -152,26 +267,41 @@ pub fn ATST_Attack(ctx: GameContext<'_>) {
 /// Patrol the area. Check for stealth players, update goal if no enemy,
 /// and move toward goal.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:271-290`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn ATST_Patrol(ctx: GameContext<'_>) {
-    todo!("Port ATST_Patrol — parked: ai-context")
+    unsafe {
+        // PORT-NOTE(ai-context): NPC/ucmd accessed via (*ctx.world).globals
+        let npc = (*ctx.world).globals.NPC;
+        let ucmd = &mut (*ctx.world).globals.ucmd;
+
+        if NPC_CheckPlayerTeamStealth(ctx) != qfalse {
+            NPC_UpdateAngles(ctx, qtrue, qtrue);
+            return;
+        }
+
+        // If we have somewhere to go, then do that
+        if (*npc).enemy.is_none() {
+            if UpdateGoal(ctx) != core::ptr::null_mut() {
+                (*ucmd).buttons |= BUTTON_WALKING;
+                NPC_MoveToGoal(ctx, qtrue);
+                NPC_UpdateAngles(ctx, qtrue, qtrue);
+            }
+        }
+    }
 }
 
 /// Raven `ATST_Idle`.
 ///
 /// ATST in idle state. Play idle behavior and set stand animation.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:297-303`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn ATST_Idle(ctx: GameContext<'_>) {
-    todo!("Port ATST_Idle — parked: ai-context")
+    unsafe {
+        // PORT-NOTE(ai-context): NPC accessed via (*ctx.world).globals
+        let npc = (*ctx.world).globals.NPC;
+
+        NPC_BSIdle(ctx);
+
+        NPC_SetAnim(npc, SETANIM_BOTH, BOTH_STAND1, SETANIM_FLAG_NORMAL);
+    }
 }
 
 /// Raven `NPC_BSATST_Default`.
@@ -179,11 +309,21 @@ pub fn ATST_Idle(ctx: GameContext<'_>) {
 /// Main behavior state machine for ATST. Choose between attack, patrol,
 /// and idle based on NPC state.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:310-328`
-// PORT-ESCALATION(ai-context): reads the ambient "current NPC" global(s)
-// `NPC`/`NPCInfo` that Raven's `ai_main.c` think-loop sets per NPC frame — no
-// `GameWorld`/`GameContext` field or entity param carries them yet (topic
-// `ai-context`, matching the `NPC_reactions.rs`/`NPC_utils.rs`/`NPC_combat.rs`
-// precedent in this same mega-pass).
 pub fn NPC_BSATST_Default(ctx: GameContext<'_>) {
-    todo!("Port NPC_BSATST_Default — parked: ai-context")
+    unsafe {
+        // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world).globals
+        let npc = (*ctx.world).globals.NPC;
+        let npc_info = (*ctx.world).globals.NPCInfo;
+
+        if (*npc).enemy.is_some() {
+            if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
+                (*npc_info).goalEntity = (*npc).enemy;
+            }
+            ATST_Attack(ctx);
+        } else if ((*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
+            ATST_Patrol(ctx);
+        } else {
+            ATST_Idle(ctx);
+        }
+    }
 }

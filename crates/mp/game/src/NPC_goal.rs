@@ -16,8 +16,6 @@ use crate::prelude::*;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
-// PORT-ESCALATION(seam-threading): reads `level.time` and writes `NPCInfo` —
-// no GameWorld/NPC context handle on the staged raw-pointer signature.
 /// Raven `SetGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:10-24`
@@ -26,11 +24,11 @@ pub fn SetGoal(
     goal: *mut gentity_t,
     rating: f32,
 ) {
-    todo!("Port SetGoal — parked: seam-threading")
+    let npc_info = &mut (*ctx.world).globals.NPCInfo;
+    npc_info.goalEntity = ent_id_opt((*ctx.world).entities.as_mut_ptr(), goal);
+    npc_info.goalTime = (*ctx.world).level.time;
 }
 
-// PORT-ESCALATION(seam-threading): reads/writes `NPCInfo` and calls `SetGoal`
-// — no GameWorld/NPC context handle on the staged raw-pointer signature.
 /// Raven `NPC_SetGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:31-58`
@@ -39,16 +37,54 @@ pub fn NPC_SetGoal(
     goal: *mut gentity_t,
     rating: f32,
 ) {
-    todo!("Port NPC_SetGoal — parked: seam-threading")
+    let npc_info = &mut (*ctx.world).globals.NPCInfo;
+    let entity_base = (*ctx.world).entities.as_mut_ptr();
+    let goal_id = ent_id_opt(entity_base, goal);
+
+    if goal_id == npc_info.goalEntity {
+        return;
+    }
+
+    if goal.is_null() {
+        return;
+    }
+
+    if !(*goal).client.is_null() {
+        return;
+    }
+
+    if npc_info.goalEntity.is_some() {
+        npc_info.lastGoalEntity = npc_info.goalEntity;
+    }
+
+    SetGoal(ctx, goal, rating);
 }
 
-// PORT-ESCALATION(seam-threading): reads/writes `NPCInfo` and calls `SetGoal`
-// — no GameWorld/NPC context handle on the staged raw-pointer signature.
 /// Raven `NPC_ClearGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:65-86`
 pub fn NPC_ClearGoal(ctx: GameContext<'_>) {
-    todo!("Port NPC_ClearGoal — parked: seam-threading")
+    let npc_info = &mut (*ctx.world).globals.NPCInfo;
+
+    if npc_info.lastGoalEntity.is_none() {
+        SetGoal(ctx, core::ptr::null_mut(), 0.0);
+        return;
+    }
+
+    let last_goal_id = npc_info.lastGoalEntity;
+    npc_info.lastGoalEntity = None;
+
+    if let Some(goal_id) = last_goal_id {
+        let entity_base = (*ctx.world).entities.as_mut_ptr();
+        let goal = unsafe { entity_base.add(goal_id.0 as usize) };
+
+        if (*goal).inuse && ((*goal).s.eFlags & EF_NODRAW) == 0 {
+            SetGoal(ctx, goal, 0.0);
+            return;
+        }
+    }
+
+    SetGoal(ctx, core::ptr::null_mut(), 0.0);
 }
 
 /// Raven `G_BoundsOverlap`.
@@ -89,19 +125,28 @@ pub fn G_BoundsOverlap(
     qtrue
 }
 
-// PORT-ESCALATION(seam-threading): reads `NPC`/`level` globals, writes `NPCInfo`
-// and `ucmd`, calls `trap_ICARUS_TaskIDComplete` — no GameWorld/engine handle on
-// the staged raw-pointer signature.
 /// Raven `NPC_ReachedGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:117-129`
 pub fn NPC_ReachedGoal(ctx: GameContext<'_>) {
-    todo!("Port NPC_ReachedGoal — parked: seam-threading")
+    NPC_ClearGoal(ctx);
+
+    let npc_info = &mut (*ctx.world).globals.NPCInfo;
+    npc_info.goalTime = (*ctx.world).level.time;
+
+    npc_info.aiFlags &= !NPCAI_MOVING;
+    (*ctx.world).globals.ucmd.forwardmove = 0;
+
+    let npc = (*ctx.world).globals.NPC;
+    trap::ICARUS_TaskIDComplete(
+        ctx.engine,
+        mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
+            npc,
+            TID_MOVE_NAV,
+        ),
+    );
 }
 
-// PORT-ESCALATION(seam-threading): reads `NPC`/`NPCInfo` globals, calls
-// `FlyingCreature`/`NAV_HitNavGoal` — no GameWorld/NPC context handle on the
-// staged raw-pointer signature.
 /// Raven `ReachedGoal`.
 ///
 /// Checks if an NPC has reached its goal entity by comparing the NPC's position
@@ -113,12 +158,26 @@ pub fn ReachedGoal(
     ctx: GameContext<'_>,
     goal: *mut gentity_t,
 ) -> qboolean {
-    todo!("Port ReachedGoal — parked: seam-threading")
+    let npc_info = &mut (*ctx.world).globals.NPCInfo;
+
+    if (npc_info.aiFlags & NPCAI_TOUCHED_GOAL) != 0 {
+        npc_info.aiFlags &= !NPCAI_TOUCHED_GOAL;
+        return qtrue;
+    }
+
+    let npc = (*ctx.world).globals.NPC;
+    let flying = FlyingCreature(npc);
+
+    NAV_HitNavGoal(
+        (*npc).r.currentOrigin,
+        (*npc).r.mins,
+        (*npc).r.maxs,
+        (*goal).r.currentOrigin,
+        npc_info.goalRadius,
+        flying,
+    )
 }
 
-// PORT-ESCALATION(seam-threading): reads `NPCInfo` global, calls
-// `NPC_ClearGoal`/`NPC_ReachedGoal`/`ReachedGoal` — no GameWorld/NPC context
-// handle on the staged raw-pointer signature.
 /// Raven `UpdateGoal`.
 ///
 /// Updates the NPC's goal state: returns the current goal entity if it's valid,
@@ -127,5 +186,25 @@ pub fn ReachedGoal(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:243-267`
 pub fn UpdateGoal(ctx: GameContext<'_>) -> *mut gentity_t {
-    todo!("Port UpdateGoal — parked: seam-threading")
+    let npc_info = &(*ctx.world).globals.NPCInfo;
+
+    if npc_info.goalEntity.is_none() {
+        return core::ptr::null_mut();
+    }
+
+    let goal_id = npc_info.goalEntity.unwrap();
+    let entity_base = (*ctx.world).entities.as_mut_ptr();
+    let goal = unsafe { entity_base.add(goal_id.0 as usize) };
+
+    if !(*goal).inuse {
+        NPC_ClearGoal(ctx);
+        return core::ptr::null_mut();
+    }
+
+    if ReachedGoal(ctx, goal) != 0 {
+        NPC_ReachedGoal(ctx);
+        return core::ptr::null_mut();
+    }
+
+    goal
 }
