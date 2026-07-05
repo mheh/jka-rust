@@ -40,7 +40,9 @@ const FIXER_CONTRACT = `FIXER CONTRACT — you fix CALL SITES and MECHANICAL mis
 2. call-SHAPE mismatch (E0061 arg-count, E0308 type, E0609 field, E0614/E0608 deref/index, E0599 method) -> the DECLARED signature/field is LAW; bend the CALL SITE to it (add args, deref explicitly ((*p).f), turbofish, &/&mut adjust, arena-resolve EntityId, overlay-cast). NEVER edit a declared signature, NEVER rewrite or delete a fn body's logic, NEVER introduce todo!() to silence a type/call error.
 3. visibility/import (E0603/E0432/E0659) -> fix pub/use/dedupe at the module boundary.
 4. unsafe hygiene (E0133) -> wrap the seam access in the minimal unsafe block, matching surrounding style.
-Anything that needs a RULING or a genuine LOGIC PORT (not mechanical) -> DO NOT guess: leave it, and report it in your \`blocked\` list with {file, error, reason}. Blocked items are surfaced to the human and NOT retried.`
+Anything that needs a RULING or a genuine LOGIC PORT (not mechanical) -> DO NOT guess: leave it, and report it in your \`blocked\` list with {file, error, reason}. Blocked items are surfaced to the human and NOT retried.
+ANTI-TIME-BOX: you return ONLY when every file in your group has been worked or is genuinely ruling-blocked. "not investigated" / "ran out of budget" are INVALID blocked reasons — work the full inventory, largest files first. Before declaring any symbol/path blocked, grep the worktree for an existing use of it; an existing use IS the answer.
+FAQ (verified answers — do not re-derive, do not contradict): the entity arena field is (*ctx.world).g_entities (NOT .entities); trace_t is in the prelude and has no Default — init with \`let mut tr: trace_t = unsafe { core::mem::zeroed() };\`; gNPC_t fields are reached through the NPC pointer with an extra deref (\`(*(*ent).NPC).goalRadius\`); RNG fns live on (*ctx.world).bg_state.rng (game tier) / self.bg.rng (bg tier); gclient access through the c_void client field needs the overlay cast \`(*((*ent).client as *mut gclient_t))\`.`
 
 const STYLE = `NEVER touch oracle/. NEVER run cargo. NEVER add a co-author trailer. Preserve Raven comments; doc-comment + Source cite on any newly-ported item; behavioral parity over prettiness.`
 
@@ -58,13 +60,18 @@ function commit(msg, label) {
 const INV_SCHEMA = { type: 'object', properties: {
   total_errors: { type: 'number' },
   files: { type: 'array', items: { type: 'object', properties: { file: { type: 'string' }, errors: { type: 'number' } }, required: ['file', 'errors'] } },
-}, required: ['total_errors', 'files'] }
+  tail: { type: 'string' },
+}, required: ['total_errors', 'files', 'tail'] }
+
+// A cargo run that failed to launch (wrong cwd, bad -p spec) produces ZERO grep-able errors —
+// indistinguishable from green unless the cargo tail proves the check actually ran.
+const CARGO_PROOF = `Run EXACTLY: cd ${WT} && cargo check -p mp_game --message-format=short 2>&1 (the cd is mandatory — a cargo run from any other directory fails instantly and its empty output counts as 0 errors, which is a FALSE GREEN). Return the LAST LINE of the cargo output verbatim as \`tail\` — it must contain either "Finished" (green) or the "could not compile"/"previous errors" summary; if your tail says "did not match any packages" or similar, your cwd is wrong: fix it and re-run before returning.`
 
 // ---- Triage: cargo check -> inventory file + subsystem-balanced groups ----
 phase('Triage')
 const triage = await agent(
   `TRIAGE for the jampgame integrate run. Worktree ${WT}, branch skeleton.
-1. Run: cargo check -p mp_game --message-format=short 2>&1 (mp_bg is already green; mp_game carries the tail).
+1. ${CARGO_PROOF} (mp_bg is already green; mp_game carries the tail.)
 2. Build a per-file inventory: for each .rs file with errors, its error count, the error codes present (e.g. E0609, E0308, E0061), and 2-3 sample messages.
 3. WRITE the full inventory as JSON to ${INV_DIR}/inv-r1.json (mkdir -p ${INV_DIR} first). Shape: {total_errors, files:[{file, errors, codes:[..], samples:[..]}]}. This file is what fixers read.
 4. Bin the files into ${GROUPS} groups balanced by TOTAL error count, keeping same-subsystem files together where natural (NPC_AI_* together, bg_* together, the g_weapon/g_combat/w_saber weapon cluster together, ICARUS together, etc.). Every erroring file in exactly one group; give each group a short name.
@@ -119,12 +126,22 @@ Do NOT git commit (a serial committer handles it). Return JSON {group, fixed, fi
 
   // serial commit for the round, then re-inventory (recount for the tripwire + next round)
   await commit(`Integrate round ${round}: ${active.length} groups, ${roundFixed} fixes`, `commit:r${round}`)
-  const reInv = await agent(
+  let reInv = await agent(
     `RE-INVENTORY after integrate round ${round}. Worktree ${WT}.
-Run: cargo check -p mp_game --message-format=short 2>&1. Rebuild the per-file inventory (count + codes + 2-3 samples per erroring file) and WRITE it as JSON to ${INV_DIR}/inv-r${round + 1}.json (mkdir -p if needed).
-Return ONLY JSON {total_errors, files:[{file, errors}]}. No prose.`,
+${CARGO_PROOF}
+Rebuild the per-file inventory (count + codes + 2-3 samples per erroring file) and WRITE it as JSON to ${INV_DIR}/inv-r${round + 1}.json (mkdir -p if needed).
+Return ONLY JSON {total_errors, files:[{file, errors}], tail}. No prose.`,
     { phase: 'Fix rounds', label: `re-triage:r${round}`, model: 'haiku', effort: 'low', schema: INV_SCHEMA }
   )
+  if (reInv.total_errors === 0 && !/finished/i.test(String(reInv.tail || ''))) {
+    log(`Recount claims 0 errors but cargo tail is "${String(reInv.tail || '').slice(0, 80)}" — refuting with an independent sonnet recount`)
+    reInv = await agent(
+      `VERIFY a suspicious green claim after integrate round ${round}. Worktree ${WT}.
+${CARGO_PROOF}
+Rebuild the per-file inventory and WRITE it to ${INV_DIR}/inv-r${round + 1}.json. Return ONLY JSON {total_errors, files:[{file, errors}], tail}.`,
+      { phase: 'Fix rounds', label: `re-triage-verify:r${round}`, model: 'sonnet', effort: 'low', schema: INV_SCHEMA }
+    )
+  }
   inv = reInv
   const newTotal = reInv.total_errors
   roundTotals.push({ round, total: newTotal, fixed: roundFixed })
