@@ -164,6 +164,16 @@ parks trace to the generated signatures not carrying already-settled rulings.
     trap_LocateGameData, only s/r/ps prefixes are fixed) — regenerate
     tail asserts.
 
+## Landing-pass rulings (2026-07-04, user)
+
+27. **`gentity_t.m_pVehicle`.** DISPOSITION (user, 2026-07-04): deferred to the
+    abi-seam refactor — keep `*mut c_void` + ruling-14 overlay casts (same
+    treatment as gclient client field); lands when the seam refactor
+    restructures the tier boundary.
+    (Note: this branch's ledger predates the pass-3 landing-pass block; entry
+    added here to record the disposition where the residual data-table port
+    commits.)
+
 ## Already covered — no decision (bless-the-rule appendix)
 
 vec3_t out-params (§C7; VectorCopy ×1358), qboolean returns → bool ×652
