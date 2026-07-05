@@ -18,10 +18,11 @@ use crate::ent_fn_enums::{EntThink, EntTouch, EntUse};
 use crate::g_combat::{G_Damage, G_RadiusDamage};
 use crate::g_misc::TeleportPlayer;
 use crate::g_utils::{
-    G_EffectIndex, G_FreeEntity, G_PickTarget, G_PlayEffectID, G_PointInBounds, G_ScaleNetHealth,
-    G_SetAngles, G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_Spawn, G_UseTargets,
+    G_EffectIndex, G_EntitySound, G_FreeEntity, G_PickTarget, G_PlayEffectID, G_PointInBounds,
+    G_ScaleNetHealth, G_SetAngles, G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_Spawn,
+    G_UseTargets,
 };
-use crate::g_main::G_Printf;
+use crate::g_main::{G_Error, G_Printf};
 use crate::g_mover::SP_func_rotating;
 use crate::g_spawn::{G_SpawnFloat, G_SpawnInt, G_SpawnString};
 use crate::NPC_utils::G_ActivateBehavior;
@@ -889,6 +890,7 @@ pub fn Do_Strike(
             if (*tr_hit).inuse != 0 && (*tr_hit).takedamage != 0 {
                 // damage it then
                 G_Damage(
+                    ctx,
                     tr_hit,
                     ent,
                     ent,
@@ -1467,6 +1469,7 @@ pub fn hurt_touch(
                 // kill it now
                 let mut v_dir: vec3_t = [0.0, 1.0, 0.0];
                 G_Damage(
+                    ctx,
                     other,
                     other,
                     other,
@@ -1500,6 +1503,7 @@ pub fn hurt_touch(
                 && !(*activator_ptr).client.is_null()
             {
                 G_Damage(
+                    ctx,
                     other,
                     activator_ptr,
                     activator_ptr,
@@ -1511,6 +1515,7 @@ pub fn hurt_touch(
                 );
             } else {
                 G_Damage(
+                    ctx,
                     other,
                     self_,
                     self_,
@@ -1664,6 +1669,7 @@ pub fn shipboundary_touch(
             // if a vehicle touches a boundary without a pilot in it or with
             // parts missing, just blow the thing up
             G_Damage(
+                ctx,
                 other,
                 other,
                 other,
@@ -1898,6 +1904,7 @@ pub fn hyperspace_touch(
                 // if a vehicle touches a boundary without a pilot in it or
                 // with parts missing, just blow the thing up
                 G_Damage(
+                    ctx,
                     other,
                     other,
                     other,

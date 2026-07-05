@@ -23,6 +23,7 @@ use mp_bg::public::powerup::{PW_BLUEFLAG, PW_NEUTRALFLAG, PW_REDFLAG};
 use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED};
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS;
+use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
@@ -63,7 +64,7 @@ pub fn Use_Target_Give(
 
             // make sure it isn't going to respawn or show any events
             (*t).nextthink = 0;
-            trap::UnlinkEntity(ctx.engine, t);
+            trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(t));
         }
     }
 }
@@ -119,7 +120,7 @@ pub fn Think_Target_Delay(
     ent: *mut gentity_t,
 ) {
     unsafe {
-        G_UseTargets(ctx, ent, (*ent).activator);
+        G_UseTargets(ctx, ent, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator));
     }
 }
 
@@ -133,11 +134,11 @@ pub fn Use_Target_Delay(
     activator: *mut gentity_t,
 ) {
     unsafe {
-        if (*ent).nextthink > ctx.world.level.time && ((*ent).spawnflags & 1) != 0 {
+        if (*ent).nextthink > (*ctx.world).level.time && ((*ent).spawnflags & 1) != 0 {
             return;
         }
         G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
-        (*ent).nextthink = ctx.world.level.time + ((*ent).wait + (*ent).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0;
+        (*ent).nextthink = (*ctx.world).level.time + (((*ent).wait + (*ent).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0) as c_int;
         (*ent).think = Some(EntThink::Think_Target_Delay);
         (*ent).activator = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), activator));
     }
@@ -205,19 +206,19 @@ pub fn Use_Target_Print(
         }
 
         if (*ent).wait != 0.0 {
-            if (*ent).genericValue14 >= ctx.world.level.time {
+            if (*ent).genericValue14 >= (*ctx.world).level.time {
                 return;
             }
-            (*ent).genericValue14 = ctx.world.level.time + (*ent).wait;
+            (*ent).genericValue14 = ((*ctx.world).level.time as f32 + (*ent).wait) as c_int;
         }
 
         // Debug-only checks (FINAL_BUILD mode skips these)
-        if (*ent).genericValue15 > ctx.world.level.time {
+        if (*ent).genericValue15 > (*ctx.world).level.time {
             // Com_Printf("TARGET PRINT ERRORS:\n");
             // ... logging code ...
             // Com_Error(ERR_DROP, "target_print used in quick succession, fix it! See the console for details.");
         }
-        (*ent).genericValue15 = ctx.world.level.time + 5000.0;
+        (*ent).genericValue15 = (*ctx.world).level.time + 5000;
 
         G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
 
@@ -413,7 +414,7 @@ pub fn target_laser_think(
         if tr.entityNum != 0 {
             // hurt it if we can
             let targ = &mut (*ctx.world).g_entities[tr.entityNum as usize];
-            G_Damage(targ, self_, (*self_).activator, Some(&mut (*self_).movedir), tr.endpos, (*self_).damage, DAMAGE_NO_KNOCKBACK, meansOfDeath_t::MOD_TARGET_LASER as c_int);
+            G_Damage(ctx, targ, self_, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*self_).activator), Some(&mut (*self_).movedir), tr.endpos, (*self_).damage, DAMAGE_NO_KNOCKBACK, meansOfDeath_t::MOD_TARGET_LASER as c_int);
         }
 
         // VectorCopy(tr.endpos, self->s.origin2)
@@ -422,7 +423,7 @@ pub fn target_laser_think(
         (*self_).s.origin2[2] = tr.endpos[2];
 
         trap::LinkEntity(ctx.engine, self_);
-        (*self_).nextthink = ctx.world.level.time + crate::g_items::FRAMETIME as f32;
+        (*self_).nextthink = (*ctx.world).level.time + crate::g_items::FRAMETIME;
     }
 }
 
@@ -435,7 +436,7 @@ pub fn target_laser_on(
 ) {
     unsafe {
         if (*self_).activator.is_none() {
-            (*self_).activator = self_;
+            (*self_).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), self_);
         }
         target_laser_think(ctx, self_);
     }
@@ -449,7 +450,7 @@ pub fn target_laser_off(
     self_: *mut gentity_t,
 ) {
     unsafe {
-        trap::UnlinkEntity(ctx.engine, self_);
+        trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(self_));
         (*self_).nextthink = 0.0;
     }
 }
@@ -464,7 +465,7 @@ pub fn target_laser_use(
     activator: *mut gentity_t,
 ) {
     unsafe {
-        (*self_).activator = activator;
+        (*self_).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
         if (*self_).nextthink > 0 {
             target_laser_off(ctx, self_);
         } else {
@@ -488,7 +489,7 @@ pub fn target_laser_start(
             if ent.is_null() {
                 // G_Printf("%s at %s: %s is a bad target\n", self->classname, vtos(self->s.origin), self->target);
             }
-            (*self_).enemy = ent;
+            (*self_).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
         } else {
             G_SetMovedir((*self_).s.angles, (*self_).movedir);
         }
@@ -516,7 +517,7 @@ pub fn SP_target_laser(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
         // let everything else get spawned before we start firing
         (*self_).think = Some(EntThink::target_laser_start);
-        (*self_).nextthink = ctx.world.level.time + crate::g_items::FRAMETIME as f32;
+        (*self_).nextthink = (*ctx.world).level.time + crate::g_items::FRAMETIME;
     }
 }
 
@@ -635,6 +636,7 @@ pub fn target_kill_use(
     unsafe {
         G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
         G_Damage(
+            ctx,
             activator,
             core::ptr::null_mut(),
             core::ptr::null_mut(),
@@ -676,25 +678,25 @@ pub fn target_location_linkup(
     ent: *mut gentity_t,
 ) {
     unsafe {
-        if ctx.world.level.locationLinked != 0 {
+        if (*ctx.world).level.locationLinked != 0 {
             return;
         }
 
-        ctx.world.level.locationLinked = qtrue;
-        ctx.world.level.locationHead = core::ptr::null_mut();
+        (*ctx.world).level.locationLinked = qtrue;
+        (*ctx.world).level.locationHead = core::ptr::null_mut();
 
         trap::SetConfigstring(ctx.engine, mp_bg::public::configstring::CS_LOCATIONS, b"unknown\0".as_ptr() as *const c_char);
 
         let mut n = 1;
-        for i in 0..ctx.world.level.num_entities {
+        for i in 0..(*ctx.world).level.num_entities {
             let ent_ptr = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             if !(*ent_ptr).classname.is_null() && Q_stricmp((*ent_ptr).classname, b"target_location\0".as_ptr() as *const c_char) == 0 {
                 // lets overload some variables!
                 (*ent_ptr).health = n; // use for location marking
                 trap::SetConfigstring(ctx.engine, mp_bg::public::configstring::CS_LOCATIONS + n as c_int, (*ent_ptr).message);
                 n += 1;
-                (*ent_ptr).nextTrain = ctx.world.level.locationHead;
-                ctx.world.level.locationHead = ent_ptr;
+                (*ent_ptr).nextTrain = (*ctx.world).level.locationHead;
+                (*ctx.world).level.locationHead = ent_ptr;
             }
         }
 
@@ -708,7 +710,7 @@ pub fn target_location_linkup(
 pub fn SP_target_location(ctx: GameContext<'_>, self_: *mut gentity_t,) {
     unsafe {
         (*self_).think = Some(EntThink::target_location_linkup);
-        (*self_).nextthink = ctx.world.level.time + 200.0; // Let them all spawn first
+        (*self_).nextthink = (*ctx.world).level.time + 200; // Let them all spawn first
 
         G_SetOrigin(self_, (*self_).s.origin);
     }
@@ -748,7 +750,7 @@ pub fn target_counter_use(
             (*self_).flags |= FL_INACTIVE;
         }
 
-        (*self_).activator = activator;
+        (*self_).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
         G_UseTargets(ctx, self_, activator);
 
         if (*self_).count == 0 {
@@ -880,7 +882,7 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
         if !(*self_).behaviorSet[bSet_t::BSET_USE as usize].is_null() {
             if (*self_).spawnflags & 1 != 0 {
                 if (*self_).activator.is_none() {
-                    if ctx.world.cvars.g_developer.integer != 0 {
+                    if (*ctx.world).cvars.g_developer.integer != 0 {
                         // Informational debug message
                     }
                     return;
@@ -893,28 +895,28 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
                 if trap::ICARUS_IsInitialized(ctx.engine, (*self_).s.number) == 0 {
                     if (*activator_ent).script_targetname.is_null() || *(*activator_ent).script_targetname == b'\0' as c_char {
                         // DIVERGENCE (ruling 18/19): store owned string instead of va() pointer
-                        let name = format!("newICARUSEnt{}", ctx.world.globals.numNewICARUSEnts);
-                        ctx.world.globals.numNewICARUSEnts += 1;
+                        let name = format!("newICARUSEnt{}", (*ctx.world).globals.numNewICARUSEnts);
+                        (*ctx.world).globals.numNewICARUSEnts += 1;
                         (*activator_ent).script_targetname = G_NewString(cstr(&name));
                     }
 
                     if trap::ICARUS_ValidEnt(ctx.engine, activator_ent) != 0 {
                         trap::ICARUS_InitEnt(ctx.engine, activator_ent);
                     } else {
-                        if ctx.world.cvars.g_developer.integer != 0 {
+                        if (*ctx.world).cvars.g_developer.integer != 0 {
                             // Informational debug message
                         }
                         return;
                     }
                 }
 
-                if ctx.world.cvars.g_developer.integer != 0 {
+                if (*ctx.world).cvars.g_developer.integer != 0 {
                     // Informational debug message
                 }
                 let script_path = format!("{}/{}", cstr_to_str(Q3_SCRIPT_DIR.as_ptr()), cstr_to_str((*self_).behaviorSet[bSet_t::BSET_USE as usize]));
                 trap::ICARUS_RunScript(ctx.engine, activator_ent, cstr(&script_path));
             } else {
-                if ctx.world.cvars.g_developer.integer != 0 && (*self_).activator.is_some() {
+                if (*ctx.world).cvars.g_developer.integer != 0 && (*self_).activator.is_some() {
                     // Informational debug message
                 }
                 G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
@@ -922,7 +924,7 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
         }
 
         if (*self_).wait != 0.0 {
-            (*self_).nextthink = ctx.world.level.time + (*self_).wait;
+            (*self_).nextthink = ((*ctx.world).level.time as f32 + (*self_).wait) as c_int;
         }
     }
 }
@@ -937,16 +939,16 @@ pub fn target_scriptrunner_use(
     activator: *mut gentity_t,
 ) {
     unsafe {
-        if (*self_).nextthink > ctx.world.level.time {
+        if (*self_).nextthink > (*ctx.world).level.time {
             return;
         }
 
-        (*self_).activator = activator;
-        (*self_).enemy = other;
+        (*self_).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
+        (*self_).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), other);
         if (*self_).delay != 0.0 {
             // delay before firing scriptrunner
             // TODO: Port fn-pointer assignment: (*self_).think = scriptrunner_run;
-            (*self_).nextthink = ctx.world.level.time + (*self_).delay;
+            (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
         } else {
             scriptrunner_run(ctx, self_);
         }

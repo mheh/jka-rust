@@ -840,7 +840,7 @@ pub fn WP_SaberParseParms(
                         "WP_SaberParseParms: saber {} has illegal number of blades ({}) max: {}",
                         s_useSaber, n, MAX_BLADES
                     );
-                    crate::g_main::Com_Error(ERR_DROP, cstr(&msg).as_ptr());
+                    crate::g_main::Com_Error(ERR_DROP as c_int, cstr(&msg).as_ptr());
                     continue;
                 }
                 s.numBlades = n;
@@ -2135,7 +2135,7 @@ pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
             } else {
                 if (totallen + len + 1 /* for the endline */) >= MAX_SABER_DATA_SIZE as c_int {
                     crate::g_main::Com_Error(
-                        ERR_DROP,
+                        ERR_DROP as c_int,
                         c"Saber extensions (*.sab) are too large".as_ptr(),
                     );
                 }

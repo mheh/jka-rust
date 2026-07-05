@@ -214,8 +214,9 @@ pub fn Remote_Strafe(ctx: GameContext<'_>) {
             client_ref.ps.velocity[2] += REMOTE_UPWARD_PUSH;
 
             // Set the strafe start time so we can do a controlled roll
-            (*npc_info).standTime =
-                (*ctx.world).level.time + 3000 + (*ctx.world).bg_state.rng.random() * 500.0;
+            (*npc_info).standTime = (*ctx.world).level.time
+                + 3000
+                + ((*ctx.world).bg_state.rng.random() * 500.0) as c_int;
         }
     }
 }
@@ -335,12 +336,12 @@ pub fn Remote_Fire(ctx: GameContext<'_>) {
     );
 
     unsafe {
-        (*missile).classname = c"briar".as_ptr();
-        (*missile).s.weapon = WP_BRYAR_PISTOL;
+        (*missile).classname = c"briar".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
 
         (*missile).damage = 10;
         (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
-        (*missile).methodOfDeath = MOD_BRYAR_PISTOL;
+        (*missile).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
         (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
     }
 }

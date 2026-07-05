@@ -147,7 +147,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 
         // Handle turbo/acceleration
         if !(*pVeh).m_pPilot.is_null() && ((*pVeh).m_ucmd.buttons & BUTTON_ALT_ATTACK != 0)
-            && (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0.0) != 0
+            && (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0.0) != 0.0
         {
             if ((!parentPS.is_null() && (*parentPS).electrifyTime > curTime)
                 || (!pilotPS.is_null() && ((*pilotPS).weapon == WP_MELEE
@@ -282,7 +282,7 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
                 s = -s;
             }
 
-            angDif *= s / (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(1) as f32;
+            angDif *= s / (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(1.0);
 
             if angDif > maxDif {
                 angDif = maxDif;
@@ -383,7 +383,7 @@ pub fn G_CreateSpeederNPC(
     unsafe {
         // Allocate the Vehicle object
         // QAGAME branch (_JK2MP with QAGAME compile flag)
-        G_AllocateVehicleObject(ctx, pVeh);
+        crate::g_utils::G_AllocateVehicleObject(ctx, pVeh);
 
         // Zero-initialize the vehicle
         core::ptr::write_bytes(*pVeh, 0, 1);

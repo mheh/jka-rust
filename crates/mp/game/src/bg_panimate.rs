@@ -1695,7 +1695,7 @@ impl PmoveContext<'_> {
         }
         if anim < 0 {
             let s = format!("ERROR: anim {} < 0\n", anim);
-            crate::g_main::Com_Error(ERR_DROP, cstr(&s).as_ptr());
+            crate::g_main::Com_Error(ERR_DROP as c_int, cstr(&s).as_ptr());
         }
         unsafe {
             ((*(*self.pm).animations.offset(anim as isize)).numFrames as f32
@@ -1883,7 +1883,7 @@ impl PmoveContext<'_> {
                         "{} exceeds the allowed game-side animation buffer!",
                         cstr_to_str(filename)
                     );
-                    crate::g_main::Com_Error(ERR_DROP, cstr(&s).as_ptr());
+                    crate::g_main::Com_Error(ERR_DROP as c_int, cstr(&s).as_ptr());
                 }
                 return -1;
             }

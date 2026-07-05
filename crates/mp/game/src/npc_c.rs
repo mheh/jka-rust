@@ -807,11 +807,11 @@ pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
 
         //been told to play a victory sound after a delay
         if (*npc_info).greetingDebounceTime != 0 && (*npc_info).greetingDebounceTime < world.level.time {
-            let ev = crate::q_math::Q_irand(
+            let ev = (*ctx.world).bg_state.rng.Q_irand(
                 entity_event_t::EV_VICTORY1 as c_int,
                 entity_event_t::EV_VICTORY3 as c_int,
             );
-            let debounce = crate::q_math::Q_irand(2000, 4000);
+            let debounce = (*ctx.world).bg_state.rng.Q_irand(2000, 4000);
             crate::NPC_sounds::G_AddVoiceEvent(ctx, npc_ent, ev, debounce);
             (*npc_info).greetingDebounceTime = 0;
         }

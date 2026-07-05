@@ -2841,7 +2841,7 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
                     MASK_SOLID,
                 );
 
-                if (tr.entityNum >= ENTITYNUM_WORLD
+                if (tr.entityNum as c_int >= ENTITYNUM_WORLD
                     || (*w).g_entities[tr.entityNum as usize].s.eType == et_terrain)
                     && tr.endpos[2] < (*terrain).r.absmin[2] + 750.0
                 {

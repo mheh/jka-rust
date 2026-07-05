@@ -56,6 +56,12 @@ pub trait BgTraps {
         bufsize: c_int,
     ) -> c_int;
 
+    /// Mirror of `trap_R_RegisterSkin` — the bg-visible surface bg saber-load
+    /// code (`WP_SaberParseParms`'s `customSkin` field) needs to register a
+    /// skin without holding `&Engine`.
+    /// Source: `oracle/oracle/codemp/game/g_syscalls.c:1179-1182`
+    fn r_register_skin(&self, name: *const c_char) -> qhandle_t;
+
     // --- ghoul2 straps (the 10 strap_G2API_* wrappers, g_strap.c) ---
 
     /// Raven `trap_G2API_AddBolt` — the bg-visible mirror of `crate::trap::G2API_AddBolt`

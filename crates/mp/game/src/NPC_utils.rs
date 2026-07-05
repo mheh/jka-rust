@@ -698,12 +698,13 @@ pub fn G_ActivateBehavior(
 
         let mut bSID: c_int = -1;
         if !(*self_).NPC.is_null() {
-            bSID = GetIDForString(&mut BSTable, bs_name);
+            bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         }
 
         if bSID > -1 {
-            (*(*self_).NPC).tempBehavior = bState_t::BS_DEFAULT;
-            (*(*self_).NPC).behaviorState = bSID;
+            (*((*self_).NPC as *mut gNPC_t)).tempBehavior = bState_t::BS_DEFAULT;
+            (*((*self_).NPC as *mut gNPC_t)).behaviorState =
+                core::mem::transmute::<c_int, bState_t>(bSID);
         } else {
             // if (0) branch is dead code in oracle
             let script_path = format!(

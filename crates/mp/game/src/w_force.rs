@@ -28,6 +28,8 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::npc::g_npc_t::gNPC_t;
+use mp_bg::local::force_power_needed::forcePowerNeeded;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
@@ -224,7 +226,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
             //Then use the powers for this class, and skip all this nonsense.
             // MISSING-SYMBOL: `bgSiegeClasses` — siege-class force table.
             for i in 0..NUM_FORCE_POWERS as usize {
-                (*cl).ps.fd.forcePowerLevel[i] = bgSiegeClasses[(*cl).siegeClass as usize].forcePowerLevels[i];
+                (*cl).ps.fd.forcePowerLevel[i] = (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize].forcePowerLevels[i];
                 if (*cl).ps.fd.forcePowerLevel[i] == 0 {
                     (*cl).ps.fd.forcePowersKnown &= !(1 << i);
                 } else {
@@ -272,9 +274,9 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // branch overwrites `forcePowers` from the bot's personality file;
         // `botstates` is still a `()` placeholder (MISSING-SYMBOL) so this
         // branch is transcribed against the faithful indexing shape below.
-        if (*ent).r.svFlags & SVF_BOT != 0 && !botstates[(*ent).s.number as usize].is_null() {
+        if (*ent).r.svFlags & SVF_BOT != 0 && !(*ctx.world).globals.botstates[(*ent).s.number as usize].is_null() {
             //if it's a bot just copy the info directly from its personality
-            let bot_forceinfo = cstr_to_str((*botstates[(*ent).s.number as usize]).forceinfo.as_ptr());
+            let bot_forceinfo = cstr_to_str((*(*ctx.world).globals.botstates[(*ent).s.number as usize]).forceinfo.as_ptr());
             write_cstr_field(&mut forcePowers, &bot_forceinfo);
         }
 
@@ -324,7 +326,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         i += 1;
 
         let mut fp_bytes = fp_bytes;
-        if gametype != GT_SIEGE as c_int && (*ent).r.svFlags & SVF_BOT != 0 && !botstates[(*ent).s.number as usize].is_null()
+        if gametype != GT_SIEGE as c_int && (*ent).r.svFlags & SVF_BOT != 0 && !(*ctx.world).globals.botstates[(*ent).s.number as usize].is_null()
         {
             //hmm..I'm going to cheat here.
             let oldI = i;
@@ -334,7 +336,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     if i_r as c_int == FP_ABSORB {
                         fp_bytes[i] = b'3';
                     }
-                    if (*botstates[(*ent).s.number as usize]).settings.skill >= 4 {
+                    if (*(*ctx.world).globals.botstates[(*ent).s.number as usize]).settings.skill >= 4 {
                         //cheat and give them more stuff
                         if i_r as c_int == FP_HEAL {
                             fp_bytes[i] = b'3';
@@ -343,7 +345,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         }
                     }
                 } else if (*cl).ps.fd.forceSide == FORCE_DARKSIDE as c_int {
-                    if (*botstates[(*ent).s.number as usize]).settings.skill >= 4 {
+                    if (*(*ctx.world).globals.botstates[(*ent).s.number as usize]).settings.skill >= 4 {
                         if i_r as c_int == FP_GRIP {
                             fp_bytes[i] = b'3';
                         } else if i_r as c_int == FP_LIGHTNING {
@@ -582,7 +584,7 @@ pub fn WP_SpawnInitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
             //Then use the powers for this class.
             // MISSING-SYMBOL: `bgSiegeClasses`.
             for i in 0..NUM_FORCE_POWERS as usize {
-                (*cl).ps.fd.forcePowerLevel[i] = bgSiegeClasses[(*cl).siegeClass as usize].forcePowerLevels[i];
+                (*cl).ps.fd.forcePowerLevel[i] = (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize].forcePowerLevels[i];
                 if (*cl).ps.fd.forcePowerLevel[i] == 0 {
                     (*cl).ps.fd.forcePowersKnown &= !(1 << i);
                 } else {
@@ -5604,7 +5606,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                             (*cl).ps.fd.forcePowerRegenDebounceTime = level_time + 7000;
                         } else if (*cl).siegeClass != -1
                             // MISSING-SYMBOL: `bgSiegeClasses`.
-                            && bgSiegeClasses[(*cl).siegeClass as usize].classflags & (1 << CFL_FASTFORCEREGEN) != 0
+                            && (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize].classflags & (1 << CFL_FASTFORCEREGEN) != 0
                         {
                             //if this is siege and our player class has the fast force regen ability, then recharge with 1/5th the usual delay
                             (*cl).ps.fd.forcePowerRegenDebounceTime =

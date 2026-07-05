@@ -5827,7 +5827,10 @@ impl PmoveContext<'_> {
                 return 1;
             } else if forcedUse == HI_SENTRY_GUN as c_int {
                 if (*ps).fd.sentryDeployed != 0 {
-                    self.PM_AddEventWithParm(EV_ITEMUSEFAIL as c_int, SENTRY_ALREADYPLACED);
+                    self.PM_AddEventWithParm(
+                        EV_ITEMUSEFAIL as c_int,
+                        mp_qshared::shared::itemUseFail_t::SENTRY_ALREADYPLACED as c_int,
+                    );
                     return 0;
                 }
 
@@ -5862,7 +5865,10 @@ impl PmoveContext<'_> {
                     || tr.startsolid != 0
                     || tr.allsolid != 0
                 {
-                    self.PM_AddEventWithParm(EV_ITEMUSEFAIL as c_int, SENTRY_NOROOM);
+                    self.PM_AddEventWithParm(
+                        EV_ITEMUSEFAIL as c_int,
+                        mp_qshared::shared::itemUseFail_t::SENTRY_NOROOM as c_int,
+                    );
                     return 0;
                 }
                 return 1;
@@ -5903,7 +5909,10 @@ impl PmoveContext<'_> {
                         return 1;
                     }
                 }
-                self.PM_AddEventWithParm(EV_ITEMUSEFAIL as c_int, SHIELD_NOROOM);
+                self.PM_AddEventWithParm(
+                    EV_ITEMUSEFAIL as c_int,
+                    mp_qshared::shared::itemUseFail_t::SHIELD_NOROOM as c_int,
+                );
                 return 0;
             } else if forcedUse == HI_JETPACK as c_int {
                 return 1;

@@ -237,8 +237,8 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
         }
 
         // If they're bucking, play the animation and leave...
-        if (*parent).client.is_null() == false && (*((*parent).client as *mut gclient_t)).ps.legsAnim == BOTH_VT_BUCK {
-            if (*((*parent).client as *mut gclient_t)).ps.legsAnimTimer <= 0 {
+        if (*parent).client.is_null() == false && (*((*parent).client as *mut gclient_t)).ps.legsAnim == BOTH_VT_BUCK as c_int {
+            if (*((*parent).client as *mut gclient_t)).ps.legsTimer <= 0 {
                 (*pVeh).m_ulFlags &= !(VEH_BUCKING as u64);
             } else {
                 return;

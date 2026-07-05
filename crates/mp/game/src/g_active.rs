@@ -93,8 +93,11 @@ use crate::g_items::{
 };
 use crate::g_nav::FlyingCreature;
 use crate::g_utils::{
-    G_AddEvent, G_SetAngles, G_SetAnim, G_SetOrigin, G_Sound, G_SoundIndex, G_TempEntity, TryUse,
+    G_AddEvent, G_MuteSound, G_SetAngles, G_SetAnim, G_SetOrigin, G_Sound, G_SoundIndex,
+    G_TempEntity, TryUse,
 };
+use crate::g_combat::G_CheckForDismemberment;
+use crate::w_saber::saberCheckKnockdown_DuelLoss;
 use crate::g_weapon::FireWeapon;
 use crate::ai_main::InFieldOfVision;
 use crate::bg_g2_utils::BG_AttachToRancor;

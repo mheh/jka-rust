@@ -106,7 +106,7 @@ pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         TIMER_Set(ctx, self_, cstr("enemyLastVisible").as_ptr(), 0);
-        (*((*self_).NPC as *mut gNPC_t)).tempBehavior = BS_DEFAULT as c_int;
+        (*((*self_).NPC as *mut gNPC_t)).tempBehavior = BS_DEFAULT;
 
         G_ClearEnemy(ctx, self_);
 

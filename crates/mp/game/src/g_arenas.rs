@@ -11,6 +11,7 @@
 
 use crate::prelude::*;
 use crate::g_main::CalculateRanks;
+use crate::trap;
 
 
 /// Raven `UpdateTournamentInfo`.
@@ -54,7 +55,7 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
 
     CalculateRanks(ctx);
 
-    if (*ctx.world).level.clients[playerClientNum as usize].sess.sessionTeam == TEAM_SPECTATOR as c_int {
+    if (*(*ctx.world).level.clients.add(playerClientNum as usize)).sess.sessionTeam == TEAM_SPECTATOR as c_int {
         let formatted = format!(
             "postgame {} {} 0 0 0 0 0 0 0 0 0 0 0",
             (*ctx.world).level.numNonSpectatorClients, playerClientNum
@@ -74,21 +75,21 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
         if (*ctx.world).cvars.g_gametype.integer >= GT_CTF as c_int {
             score1 = (*ctx.world).level.teamScores[TEAM_RED as usize];
             score2 = (*ctx.world).level.teamScores[TEAM_BLUE as usize];
-            if (*ctx.world).level.clients[playerClientNum as usize].sess.sessionTeam == TEAM_RED as c_int {
+            if (*(*ctx.world).level.clients.add(playerClientNum as usize)).sess.sessionTeam == TEAM_RED as c_int {
                 won = (*ctx.world).level.teamScores[TEAM_RED as usize] > (*ctx.world).level.teamScores[TEAM_BLUE as usize];
             } else {
                 won = (*ctx.world).level.teamScores[TEAM_BLUE as usize] > (*ctx.world).level.teamScores[TEAM_RED as usize];
             }
         } else {
-            if core::ptr::addr_of!((*ctx.world).level.clients[playerClientNum as usize])
-                == core::ptr::addr_of!((*ctx.world).level.clients[(*ctx.world).level.sortedClients[0] as usize])
+            if core::ptr::addr_of!((*(*ctx.world).level.clients.add(playerClientNum as usize)))
+                == core::ptr::addr_of!((*(*ctx.world).level.clients.add((*ctx.world).level.sortedClients[0] as usize)))
             {
                 won = true;
-                score1 = (*ctx.world).level.clients[(*ctx.world).level.sortedClients[0] as usize].ps.persistant[PERS_SCORE as usize];
-                score2 = (*ctx.world).level.clients[(*ctx.world).level.sortedClients[1] as usize].ps.persistant[PERS_SCORE as usize];
+                score1 = (*(*ctx.world).level.clients.add((*ctx.world).level.sortedClients[0] as usize)).ps.persistant[PERS_SCORE as usize];
+                score2 = (*(*ctx.world).level.clients.add((*ctx.world).level.sortedClients[1] as usize)).ps.persistant[PERS_SCORE as usize];
             } else {
-                score2 = (*ctx.world).level.clients[(*ctx.world).level.sortedClients[0] as usize].ps.persistant[PERS_SCORE as usize];
-                score1 = (*ctx.world).level.clients[(*ctx.world).level.sortedClients[1] as usize].ps.persistant[PERS_SCORE as usize];
+                score2 = (*(*ctx.world).level.clients.add((*ctx.world).level.sortedClients[0] as usize)).ps.persistant[PERS_SCORE as usize];
+                score1 = (*(*ctx.world).level.clients.add((*ctx.world).level.sortedClients[1] as usize)).ps.persistant[PERS_SCORE as usize];
             }
         }
         if won && client.ps.persistant[PERS_KILLED as usize] == 0 {
@@ -123,8 +124,8 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
         let buf_str = format!(
             " {} {} {}",
             n,
-            (*ctx.world).level.clients[n as usize].ps.persistant[PERS_RANK as usize],
-            (*ctx.world).level.clients[n as usize].ps.persistant[PERS_SCORE as usize]
+            (*(*ctx.world).level.clients.add(n as usize)).ps.persistant[PERS_RANK as usize],
+            (*(*ctx.world).level.clients.add(n as usize)).ps.persistant[PERS_SCORE as usize]
         );
         write_cstr_field(&mut buf, &buf_str);
         buflen = buf.iter().position(|&c| c == 0).unwrap_or(0) as c_int;
@@ -143,6 +144,9 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
     }
 
     let msg_str = cstr_to_str(msg.as_ptr());
-    trap::SendConsoleCommand(ctx.engine, GSendconsolecommandArgs::new(EXEC_APPEND, cstr(&msg_str).as_ptr()));
+    trap::SendConsoleCommand(
+        ctx.engine,
+        mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND as c_int, cstr(&msg_str)),
+    );
     }
 }

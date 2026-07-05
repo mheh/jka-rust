@@ -152,9 +152,9 @@ pub fn G_AngerAlert(
             //I'm interrogating, don't wake everyone else up yet...
             return;
         }
-        G_AlertTeam(ctx, 
+        G_AlertTeam(ctx,
             self_,
-            (*self_).enemy,
+            ent_ptr(ctx, (*self_).enemy),
             ANGER_ALERT_RADIUS,
             ANGER_ALERT_SOUND_RADIUS,
         );
@@ -198,7 +198,7 @@ pub fn G_TeamEnemy(
             }
             if !(*ent).enemy.is_none() {
                 //they have an enemy
-                let enemy_client = (*(*ent).enemy).client as *mut gclient_t;
+                let enemy_client = (*ent_ptr(ctx, (*ent).enemy)).client as *mut gclient_t;
                 if enemy_client.is_null() || (*enemy_client).playerTeam != (*self_client).playerTeam {
                     //the ent's enemy is either a normal ent or is a player/NPC that is not on my team
                     return 1;
@@ -424,6 +424,7 @@ pub fn G_ForceSaberOn(
 pub fn G_SetEnemy(
     ctx: GameContext<'_>,self_: *mut gentity_t, enemy: *mut gentity_t) {
     unsafe {
+        let base = ent_base(ctx);
         let mut event: c_int = 0;
 
         //Must be valid
@@ -443,7 +444,7 @@ pub fn G_SetEnemy(
 
         let npc = (*self_).NPC as *mut gNPC_t;
         if npc.is_null() {
-            (*self_).enemy = enemy;
+            (*self_).enemy = ent_id_opt(base, enemy);
             return;
         }
 
@@ -489,7 +490,7 @@ pub fn G_SetEnemy(
 
             //FIXME: Have to do this to prevent alert cascading
             G_ClearEnemy(ctx, self_);
-            (*self_).enemy = enemy;
+            (*self_).enemy = ent_id_opt(base, enemy);
 
             //Special case- if player is being hunted by his own people, set their enemy team correctly
             if (*client).playerTeam == NPCTEAM_PLAYER && (*enemy).s.number == 0 {
@@ -593,7 +594,7 @@ pub fn G_SetEnemy(
 
         //Take the enemy
         G_ClearEnemy(ctx, self_);
-        (*self_).enemy = enemy;
+        (*self_).enemy = ent_id_opt(base, enemy);
     }
 }
 

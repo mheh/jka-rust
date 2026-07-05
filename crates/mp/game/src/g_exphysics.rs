@@ -95,7 +95,7 @@ pub fn G_RunExPhys(
             );
             if tr.startsolid != 0 || tr.allsolid != 0 {
                 if let Some(touch_fn) = (*ent).touch {
-                    crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t, &tr);
+                    crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t, &mut tr);
                 }
             }
         }
@@ -243,9 +243,9 @@ pub fn G_RunExPhys(
             }
         }
 
-        if tr.entityNum != ENTITYNUM_NONE && (*ent).touch.is_some() {
+        if tr.entityNum as c_int != ENTITYNUM_NONE && (*ent).touch.is_some() {
             if let Some(touch_fn) = (*ent).touch {
-                crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t, &tr);
+                crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t, &mut tr);
             }
         }
 

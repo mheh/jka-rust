@@ -538,9 +538,10 @@ pub struct GameGlobals {
     pub enemyLOS: qboolean,
     /// `faceEnemy`. Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:44`
     pub faceEnemy: qboolean,
-    //TODO: Port int[TEAM_NUM_TEAMS]
-    // Source: oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:50
-    pub groupSpeechDebounceTime: (),
+    /// `groupSpeechDebounceTime[TEAM_NUM_TEAMS]` — stops several group AI from
+    /// speaking all at once.
+    /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:50`
+    pub groupSpeechDebounceTime: [c_int; mp_bg::public::team::TEAM_NUM_TEAMS as usize],
     /// `hitAlly`. Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:43`
     pub hitAlly: qboolean,
     /// `move`. Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:45`

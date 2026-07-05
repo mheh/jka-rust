@@ -172,7 +172,7 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
         // If we hit our target, then stop and fire!
         if (info.flags & 1) != 0 {
             // NIF_COLLISION = 1
-            if info.blocker == (*NPC).enemy {
+            if ent_id_opt(world.g_entities.as_ptr(), info.blocker) == (*NPC).enemy {
                 Sniper_HoldPosition(ctx);
             }
         }
@@ -207,7 +207,7 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
                         ctx,
                         (*NPC).r.currentOrigin,
                         (*NPC).r.currentOrigin,
-                        (*NPC).enemy.as_ref().unwrap().r.currentOrigin,
+                        world.g_entities[(*NPC).enemy.unwrap().index()].r.currentOrigin,
                         CP_CLEAR | CP_HAS_ROUTE | CP_HORZ_DIST_COLL,
                         32.0,
                         -1,
@@ -275,7 +275,7 @@ pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
                             && (*owner).client != core::ptr::null_mut()
                             && (*owner).health >= 0
                             && (*((*owner).client as *mut gclient_t)).playerTeam
-                                == (*(*NPC).client as *mut gclient_t).enemyTeam
+                                == (*((*NPC).client as *mut gclient_t)).enemyTeam
                         {
                             // an enemy
                             // G_SetEnemy would need to be called here
@@ -396,7 +396,7 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
                             ctx,
                             NPC,
                             c"duck".as_ptr(),
-                            (((*NPC).client as *mut gclient_t).pers.maxHealth - (*NPC).health) * 100,
+                            ((*((*NPC).client as *mut gclient_t)).pers.maxHealth - (*NPC).health) * 100,
                         );
                         TIMER_Set(ctx, NPC, c"hideTime".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(3000, 7000));
                         newSquadState = SQUAD_COVER;
@@ -478,7 +478,7 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                             ctx,
                             (*NPC).r.currentOrigin,
                             (*NPC).r.currentOrigin,
-                            (*NPC).enemy.as_ref().unwrap().r.currentOrigin,
+                            world.g_entities[(*NPC).enemy.unwrap().index()].r.currentOrigin,
                             CP_CLEAR | CP_HAS_ROUTE | CP_HORZ_DIST_COLL,
                             32.0,
                             -1,
@@ -544,9 +544,9 @@ pub fn Sniper_CheckFireState(ctx: GameContext<'_>) {
         }
 
         // Check if velocity is zero (not moving)
-        if (*(*NPC).client as *mut gclient_t).ps.velocity[0] != 0.0
-            || (*(*NPC).client as *mut gclient_t).ps.velocity[1] != 0.0
-            || (*(*NPC).client as *mut gclient_t).ps.velocity[2] != 0.0
+        if (*((*NPC).client as *mut gclient_t)).ps.velocity[0] != 0.0
+            || (*((*NPC).client as *mut gclient_t)).ps.velocity[1] != 0.0
+            || (*((*NPC).client as *mut gclient_t)).ps.velocity[2] != 0.0
         {
             // if moving at all, don't do this
             return;
@@ -601,7 +601,7 @@ pub fn Sniper_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
         let hitEnt = &mut world.g_entities[hit as usize];
         if hit == enemy_number
             || (hitEnt.client != core::ptr::null_mut()
-                && (*(hitEnt.client as *mut gclient_t)).playerTeam == (*(*NPC).client as *mut gclient_t).enemyTeam)
+                && (*(hitEnt.client as *mut gclient_t)).playerTeam == (*((*NPC).client as *mut gclient_t)).enemyTeam)
             || (hitEnt.takedamage != 0
                 && ((hitEnt.r.svFlags & 0x00000004) != 0 // SVF_GLASS_BRUSH = 0x00000004
                     || hitEnt.health < 40
@@ -636,7 +636,7 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
         let mut up = [0.0f32; 3];
 
         // Get the positions
-        AngleVectors((*(*NPC).client as *mut gclient_t).ps.viewangles, Some(&mut forward), Some(&mut right), Some(&mut up));
+        AngleVectors((*((*NPC).client as *mut gclient_t)).ps.viewangles, Some(&mut forward), Some(&mut right), Some(&mut up));
         // CalcMuzzlePoint(ctx, NPC, forward, right, up, &mut muzzle);
         // CalcEntitySpot(ctx, (*NPC).enemy, SPOT_ORIGIN, &mut target);
 
@@ -726,7 +726,15 @@ pub fn Sniper_UpdateEnemyPos(ctx: GameContext<'_>) {
             let index = (i / ENEMY_POS_LAG_INTERVAL) as usize;
             if index == 0 {
                 let mut spot = [0.0f32; 3];
-                CalcEntitySpot(ctx, (*NPC).enemy, spot_t::SPOT_HEAD_LEAN, &mut spot);
+                CalcEntitySpot(
+                    ctx,
+                    (*NPC)
+                        .enemy
+                        .map(|id| &world.g_entities[id.index()] as *const gentity_t)
+                        .unwrap_or(core::ptr::null()),
+                    spot_t::SPOT_HEAD_LEAN,
+                    &mut spot,
+                );
                 (*NPCInfo).enemyLaggedPos[index][0] = spot[0];
                 (*NPCInfo).enemyLaggedPos[index][1] = spot[1];
                 (*NPCInfo).enemyLaggedPos[index][2] = spot[2] - (*ctx.world).bg_state.rng.flrand(2.0, 16.0);
@@ -802,7 +810,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
 
         if world.globals.enemyDist2 < 16384.0 {
             // 128 squared, too close, so switch to primary fire
-            if (*(*NPC).client as *mut gclient_t).ps.weapon == 18 {
+            if (*((*NPC).client as *mut gclient_t)).ps.weapon == 18 {
                 // WP_DISRUPTOR = 18
                 // sniping... should be assumed
                 if ((*NPCInfo).scriptFlags & 0x08) != 0 {
@@ -824,7 +832,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             }
         } else if world.globals.enemyDist2 > 65536.0 {
             // 256 squared
-            if (*(*NPC).client as *mut gclient_t).ps.weapon == 18 {
+            if (*((*NPC).client as *mut gclient_t)).ps.weapon == 18 {
                 // WP_DISRUPTOR
                 // sniping... should be assumed
                 if ((*NPCInfo).scriptFlags & 0x08) == 0 {
@@ -841,7 +849,14 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
 
         Sniper_UpdateEnemyPos(ctx);
         // can we see our target?
-        if NPC_ClearLOS4(ctx, (*NPC).enemy) != 0 {
+        if NPC_ClearLOS4(
+            ctx,
+            (*NPC)
+                .enemy
+                .map(|id| &mut world.g_entities[id.index()] as *mut gentity_t)
+                .unwrap_or(core::ptr::null_mut()),
+        ) != 0
+        {
             let maxShootDist;
 
             (*NPCInfo).enemyLastSeenTime = world.level.time;
@@ -859,7 +874,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
                 let mut tr: trace_t = core::mem::zeroed();
                 let hit;
 
-                AngleVectors((*(*NPC).client as *mut gclient_t).ps.viewangles, Some(&mut fwd), Some(&mut right), Some(&mut up));
+                AngleVectors((*((*NPC).client as *mut gclient_t)).ps.viewangles, Some(&mut fwd), Some(&mut right), Some(&mut up));
                 // CalcMuzzlePoint(ctx, NPC, fwd, right, up, &mut muzzle);
                 // VectorMA(muzzle, 8192, fwd, &mut end);
                 // trap_Trace(&tr, muzzle, NULL, NULL, end, NPC->s.number, MASK_SHOT);

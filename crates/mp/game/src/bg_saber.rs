@@ -37,7 +37,7 @@ use mp_bg::public::transition_move_table::transitionMove;
 use mp_bg::public::saber_move_transition_angle_table::saberMoveTransitionAngle;
 use mp_bg::public::parry_debounce_table::bg_parryDebounce;
 use crate::bg_channel::PmoveContext;
-use crate::bg_panimate::PM_SaberBounceForAttack;
+use crate::bg_panimate::{BG_InSaberLock, PM_SaberBounceForAttack};
 use crate::q_math::{Q_random, AngleVectors, PITCH, ROLL, YAW};
 use mp_bg::public::saber_move_name as ls;
 use mp_bg::public::anim_number::animNumber_t as A;

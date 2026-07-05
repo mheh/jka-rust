@@ -65,8 +65,9 @@ use mp_qshared::shared::q_math_rand::RAND_MAX;
 // --- pass-2 shard-2 body-fill callee imports (resolved owning files per packet) ---
 use crate::bg_misc::BG_EvaluateTrajectory;
 use crate::bg_panimate::{
-    BG_InGrappleMove, BG_KickingAnim, BG_SaberInAttack, BG_SaberStartTransAnim,
-    BG_SuperBreakWinAnim, PM_InSaberAnim, PM_SaberInTransition,
+    BG_InGrappleMove, BG_InSaberLock, BG_KickingAnim, BG_SaberInAttack, BG_SaberInKata,
+    BG_SaberInSpecial, BG_SaberInTransitionAny, BG_SaberStartTransAnim, BG_SuperBreakWinAnim,
+    PM_InSaberAnim, PM_SaberInTransition,
 };
 use crate::bg_pmove::BG_SabersOff;
 use crate::bg_saber::PM_SaberInBrokenParry;
@@ -765,7 +766,7 @@ pub fn G_CheckLookTarget(
     lookingSpeed: *mut f32,
 ) -> qboolean {
     unsafe {
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
         let sc = (*ent).client as *mut gclient_t;
 
         // an NPC bolted to a vehicle should just look around randomly
@@ -3920,7 +3921,7 @@ pub fn WP_SaberApplyDamage(
             let iu = i as usize;
             let mut dflags = 0;
 
-            let victim = &mut (*ctx.world).entities
+            let victim = &mut (*ctx.world).g_entities
                 [(*ctx.world).globals.victimEntityNum[iu] as usize]
                 as *mut gentity_t;
 
@@ -3979,7 +3980,7 @@ pub fn WP_SaberDoHit(
 
             (*ctx.world).globals.victimHitEffectDone[iu] = qtrue;
 
-            let victim = &mut (*ctx.world).entities
+            let victim = &mut (*ctx.world).g_entities
                 [(*ctx.world).globals.victimEntityNum[iu] as usize]
                 as *mut gentity_t;
 
@@ -4292,7 +4293,7 @@ pub fn CheckSaberDamage(
     extrapolate: qboolean,
 ) -> qboolean {
     unsafe {
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
         let sc = (*self_).client as *mut gclient_t;
         let mut tr: trace_t = core::mem::zeroed();
         let mut dir: vec3_t = [0.0; 3];
@@ -5981,7 +5982,7 @@ pub fn WP_SaberStartMissileBlockCheck(
     ucmd: *mut usercmd_t,
 ) {
     unsafe {
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
         let sc = (*self_).client as *mut gclient_t;
         let mut dist: f32;
         let mut ent: *mut gentity_t;
@@ -6427,7 +6428,7 @@ pub fn CheckThrownSaberDamaged(
         let mut vecsub: vec3_t;
         let mut veclen: f32;
         let te: *mut gentity_t;
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
 
         let soc = (*saberOwner).client as *mut gclient_t;
         if !saberOwner.is_null()
@@ -7075,7 +7076,7 @@ pub fn saberReactivate(
         (*saberent).s.eType = ET_GENERAL as c_int;
         (*saberent).s.eFlags = 0;
 
-        (*saberent).parent = Some(ent_id((*ctx.world).entities.as_mut_ptr(), saberOwner));
+        (*saberent).parent = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), saberOwner));
 
         (*saberent).genericValue5 = 0;
 
@@ -7311,7 +7312,7 @@ pub fn saberKnockOutOfHand(
 
         (*saberent).s.modelGhoul2 = 127;
 
-        (*saberent).parent = Some(ent_id((*ctx.world).entities.as_mut_ptr(), saberOwner));
+        (*saberent).parent = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), saberOwner));
 
         (*saberent).damage = SABER_THROWN_HIT_DAMAGE;
         (*saberent).methodOfDeath = MOD_SABER;
@@ -8553,7 +8554,7 @@ pub fn G_KickTrace(
                     }
                 }
                 if !(*hitEnt).client.is_null()
-                    && ((*(*hitEnt).client).ps.pm_flags & PMF_TIME_KNOCKBACK) == 0 //not already flying through air?  Intended to stop multiple hits, but...
+                    && ((*((*hitEnt).client as *mut gclient_t)).ps.pm_flags & PMF_TIME_KNOCKBACK) == 0 //not already flying through air?  Intended to stop multiple hits, but...
                     && G_CanBeEnemy(ctx, ent, hitEnt) != 0
                 {
                     //FIXME: this should not always work
@@ -9846,7 +9847,7 @@ pub fn WP_SaberPositionUpdate(
                         (*saberent).s.modelGhoul2 = 127;
 
                         (*saberent).parent =
-                            Some(ent_id((*ctx.world).entities.as_mut_ptr(), self_));
+                            Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), self_));
 
                         (*client).ps.saberEntityState = 1;
 
@@ -10071,7 +10072,7 @@ pub fn WP_SaberPositionUpdate(
                                 rBladeNum = 0;
                                 continue;
                             } else {
-                                let saberEnt = &mut (*ctx.world).entities
+                                let saberEnt = &mut (*ctx.world).g_entities
                                     [(*client).ps.saberEntityNum as usize]
                                     as *mut gentity_t;
                                 let mut saberOrg: vec3_t = [0.0; 3];

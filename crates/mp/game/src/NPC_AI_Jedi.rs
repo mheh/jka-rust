@@ -28,6 +28,17 @@ use crate::NPC_AI_Stormtrooper::MIN_ROCKET_DIST_SQUARED;
 // canonical path per crate::saber::saber_flags.
 use crate::saber::saber_flags::SFL_NO_CARTWHEELS;
 
+// Raven `rank_t` (anonymous enum, `ai.h:31-40`) — values pinned per file,
+// matching `NPC_combat.rs`'s `RANK_CREWMAN`/`NPC_AI_Utils.rs`'s `RANK_ENSIGN`.
+// Source: `oracle/oracle/codemp/game/ai.h:31-40`
+pub const RANK_CIVILIAN: c_int = 0;
+pub const RANK_CREWMAN: c_int = 1;
+pub const RANK_ENSIGN: c_int = 2;
+pub const RANK_LT_JG: c_int = 3;
+pub const RANK_LT: c_int = 4;
+pub const RANK_LT_COMM: c_int = 5;
+pub const RANK_COMMANDER: c_int = 6;
+pub const RANK_CAPTAIN: c_int = 7;
 
 /// Raven `G_StartMatrixEffect`.
 ///

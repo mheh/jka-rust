@@ -196,7 +196,12 @@ pub fn G_ParseAnimFileSet(
     let _ = animCFG;
     const qfalse: qboolean = 0;
     unsafe {
+        let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
+        let mut callbacks = crate::bg_channel::GameCallbacksImpl { world: ctx.world, engine: ctx.engine };
         *animFileIndex = crate::bg_panimate::BG_ParseAnimationFile(
+            &mut (*ctx.world).bg_state,
+            &traps,
+            &mut callbacks,
             filename,
             std::ptr::null_mut(),
             qfalse,
@@ -565,8 +570,8 @@ pub fn NPC_ParseParms(
         let mut surfOn: [c_char; 1024] = [0; 1024];
         let parsingPlayer: qboolean =
             if (*NPC).s.number == 0 && !client_ptr.is_null() { 1 } else { 0 };
-        let mut playerMins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2];
-        let mut playerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];
+        let mut localPlayerMins: vec3_t = [-15.0, -15.0, DEFAULT_MINS_2];
+        let mut localPlayerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];
         let mut npcSaber1: c_int = 0;
         let mut npcSaber2: c_int = 0;
 
@@ -619,8 +624,8 @@ pub fn NPC_ParseParms(
         (*ri).torsoPitchRangeUp = 30;
         (*ri).torsoPitchRangeDown = 50;
 
-        (*NPC).r.mins = playerMins;
-        (*NPC).r.maxs = playerMaxs;
+        (*NPC).r.mins = localPlayerMins;
+        (*NPC).r.maxs = localPlayerMaxs;
         (*client_ptr).ps.crouchheight = CROUCH_MAXS_2 as c_int;
         (*client_ptr).ps.standheight = DEFAULT_MAXS_2 as c_int;
 

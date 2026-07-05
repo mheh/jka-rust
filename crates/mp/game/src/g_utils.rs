@@ -24,6 +24,7 @@ use crate::prelude::*;
 
 use crate::client::gclient_t;
 use crate::trap;
+use crate::g_main::G_Printf;
 use crate::q_shared::Q_strcat;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_ERROR::GErrorArgs;

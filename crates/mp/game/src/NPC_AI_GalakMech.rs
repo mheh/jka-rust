@@ -528,7 +528,9 @@ pub fn NPC_GM_Pain(
                 level_time + (*ctx.world).bg_state.rng.Q_irand(500, 2500);
         }
 
-        if !inflictor.is_null() && (*inflictor).lastEnemy == self_ {
+        if !inflictor.is_null()
+            && (*inflictor).lastEnemy == ent_id_opt((*ctx.world).g_entities.as_ptr(), self_)
+        {
             // He force-pushed my own lobfires back at me
             let npc = (*self_).NPC as *mut gNPC_t;
             if r#mod == meansOfDeath_t::MOD_REPEATER_ALT as c_int && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
@@ -619,7 +621,7 @@ pub fn GM_Move(ctx: GameContext<'_>) -> qboolean {
         // FIXME: if we bump into another one of our guys and can't get around him, just stop!
         // If we hit our target, then stop and fire!
         if (info.flags & NIF_COLLISION) != 0 {
-            if info.blocker == (*npc_ent).enemy {
+            if ent_id_opt((*ctx.world).g_entities.as_ptr(), info.blocker) == (*npc_ent).enemy {
                 GM_HoldPosition(ctx);
             }
         }
@@ -752,7 +754,7 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
         }
 
         let client = (*npc_ent).client as *mut gclient_t;
-        if !VectorCompare((*client).ps.velocity, vec3_origin) {
+        if VectorCompare((*client).ps.velocity, vec3_origin) == qfalse {
             // if moving at all, don't do this
             return;
         }
@@ -795,7 +797,7 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
 
                     // see if impact would be too close to me
                     distThreshold = 16384.0; // 128*128, default
-                    if (*npc_ent).s.weapon == WP_REPEATER {
+                    if (*npc_ent).s.weapon == WP_REPEATER as c_int {
                         if ((*npc_info).scriptFlags & SCF_ALT_FIRE) != 0 {
                             distThreshold = 65536.0; // 256*256
                         }
@@ -810,7 +812,7 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
                         // we've haven't seen them in the last 5 seconds
                         // see if it's too far from where he is
                         distThreshold = 65536.0; // 256*256, default
-                        if (*npc_ent).s.weapon == WP_REPEATER {
+                        if (*npc_ent).s.weapon == WP_REPEATER as c_int {
                             if ((*npc_info).scriptFlags & SCF_ALT_FIRE) != 0 {
                                 distThreshold = 262144.0; // 512*512
                             }
@@ -916,7 +918,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         let npc_info = (*ctx.world).globals.NPCInfo;
         let level_time = (*ctx.world).level.time;
         let ucmd = &mut (*ctx.world).globals.ucmd;
-        let g_entities_base = (*ctx.world).g_entities;
+        let g_entities_base = (*ctx.world).g_entities.as_mut_ptr();
         let client = (*npc_ent).client as *mut gclient_t;
 
         // Don't do anything if we're hurt
@@ -1041,6 +1043,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                                     crate::g_utils::G_SoundIndex(c"sound/weapons/galak/laserdamage.wav".as_ptr()),
                                 );
                                 crate::g_combat::G_Damage(
+                                    ctx,
                                     trace_ent,
                                     npc_ent,
                                     npc_ent,
@@ -1431,7 +1434,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     (*client).ps.powerups[statIndex_t::PW_BATTLESUIT as usize] =
                         level_time + ARMOR_EFFECT_TIME;
                     crate::g_combat::G_Damage(
-                        (*npc_ent).enemy,
+                        ctx,
+                        enemy_ent,
                         npc_ent,
                         npc_ent,
                         None,
@@ -1442,7 +1446,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     );
                 } else {
                     crate::g_combat::G_Damage(
-                        (*npc_ent).enemy,
+                        ctx,
+                        enemy_ent,
                         npc_ent,
                         npc_ent,
                         None,
@@ -1467,7 +1472,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 smackDir[2] += 30.0;
                 VectorNormalize(&mut smackDir);
                 crate::g_combat::G_Damage(
-                    (*npc_ent).enemy,
+                    ctx,
+                    enemy_ent,
                     npc_ent,
                     npc_ent,
                     Some(&mut smackDir),
@@ -1476,7 +1482,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     DAMAGE_NO_KNOCKBACK,
                     meansOfDeath_t::MOD_UNKNOWN as c_int,
                 );
-                crate::g_utils::G_Throw(ctx, (*npc_ent).enemy, smackDir, 100.0);
+                crate::g_utils::G_Throw(ctx, enemy_ent, smackDir, 100.0);
                 if (*enemy_ent).client != core::ptr::null_mut() {
                     (*((*enemy_ent).client as *mut gclient_t)).ps.electrifyTime = level_time + 1000;
                 }

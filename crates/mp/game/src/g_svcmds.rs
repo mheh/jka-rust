@@ -192,7 +192,7 @@ pub fn AddIP(ctx: GameContext<'_>, str: *mut c_char) {
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:201-218`
 pub fn G_ProcessIPBans(ctx: GameContext<'_>) {
     let world = unsafe { &*ctx.world };
-    let ban_ips_str = unsafe { cstr_to_str(world.cvars.g_banIPs.string) };
+    let ban_ips_str = unsafe { cstr_to_str(world.cvars.g_banIPs.string.as_ptr()) };
 
     // Parse space-separated tokens from the string
     for token in ban_ips_str.split_whitespace() {
@@ -461,7 +461,7 @@ pub fn ClientForString(ctx: GameContext<'_>, s: *const c_char) -> *mut gclient_t
             continue;
         }
 
-        if crate::q_shared::Q_stricmp(cl.pers.netname, s) == 0 {
+        if crate::q_shared::Q_stricmp(cl.pers.netname.as_ptr(), s) == 0 {
             return unsafe { world.level.clients.add(i) as *mut gclient_t };
         }
     }

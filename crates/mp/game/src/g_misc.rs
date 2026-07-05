@@ -29,6 +29,7 @@ use crate::g_main::G_Printf;
 use crate::g_object::G_RunObject;
 use crate::g_spawn::{G_SpawnFloat, G_SpawnInt};
 use crate::q_math::{DirToByte, PerpendicularVector, VectorNormalize};
+use crate::q_shared::Info_SetValueForKey;
 use crate::trap;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;

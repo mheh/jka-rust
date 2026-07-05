@@ -13,6 +13,7 @@ use crate::prelude::*;
 
 use core::ffi::CStr;
 
+use crate::bg_lib::qsort;
 use crate::entity::flags::{FL_DROPPED_ITEM, FL_FORCE_GESTURE};
 use crate::g_items::RespawnItem;
 use crate::g_utils::{G_Find, G_FreeEntity, G_TempEntity};
@@ -442,7 +443,7 @@ pub fn Team_FragBonuses(
 
         // did the attacker frag the flag carrier?
         if (*((*targ).client as *mut gclient_t)).ps.powerups[enemy_flag_pw as usize] != 0 {
-            (*((*attacker).client as *mut gclient_t)).pers.teamState.lastfraggedcarrier = world.level.time;
+            (*((*attacker).client as *mut gclient_t)).pers.teamState.lastfraggedcarrier = world.level.time as f32;
             // AddScore(attacker, targ->r.currentOrigin, CTF_FRAG_CARRIER_BONUS);
             (*((*attacker).client as *mut gclient_t)).pers.teamState.fragcarrier += 1;
             PrintCTFMessage(ctx, (*attacker).s.number, team, ctfMsg_t::CTFMESSAGE_FRAGGED_FLAG_CARRIER as c_int);
@@ -452,7 +453,7 @@ pub fn Team_FragBonuses(
             for i in 0..max_clients {
                 let ent = &mut world.g_entities[i as usize];
                 if (*ent).inuse != 0 && (*((*ent).client as *mut gclient_t)).sess.sessionTeam as c_int == otherteam {
-                    (*((*ent).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = 0;
+                    (*((*ent).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = 0.0;
                 }
             }
             return;
@@ -460,7 +461,7 @@ pub fn Team_FragBonuses(
 
         // did the attacker frag a head carrier? other->client->ps.generic1
         if (*((*targ).client as *mut gclient_t)).ps.generic1 != 0 {
-            (*((*attacker).client as *mut gclient_t)).pers.teamState.lastfraggedcarrier = world.level.time;
+            (*((*attacker).client as *mut gclient_t)).pers.teamState.lastfraggedcarrier = world.level.time as f32;
             // AddScore(attacker, targ->r.currentOrigin, CTF_FRAG_CARRIER_BONUS * tokens * tokens);
             (*((*attacker).client as *mut gclient_t)).pers.teamState.fragcarrier += 1;
 
@@ -469,7 +470,7 @@ pub fn Team_FragBonuses(
             for i in 0..max_clients {
                 let ent = &mut world.g_entities[i as usize];
                 if (*ent).inuse != 0 && (*((*ent).client as *mut gclient_t)).sess.sessionTeam as c_int == otherteam {
-                    (*((*ent).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = 0;
+                    (*((*ent).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = 0.0;
                 }
             }
             return;
@@ -483,7 +484,7 @@ pub fn Team_FragBonuses(
             // AddScore(attacker, targ->r.currentOrigin, CTF_CARRIER_DANGER_PROTECT_BONUS);
 
             (*((*attacker).client as *mut gclient_t)).pers.teamState.carrierdefense += 1;
-            (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = 0;
+            (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = 0.0;
 
             (*((*attacker).client as *mut gclient_t)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
             let _team = (*((*attacker).client as *mut gclient_t)).sess.sessionTeam as c_int;
@@ -499,7 +500,7 @@ pub fn Team_FragBonuses(
             // AddScore(attacker, targ->r.currentOrigin, CTF_CARRIER_DANGER_PROTECT_BONUS);
 
             (*((*attacker).client as *mut gclient_t)).pers.teamState.carrierdefense += 1;
-            (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = 0;
+            (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = 0.0;
 
             (*((*attacker).client as *mut gclient_t)).ps.persistant[persEnum_t::PERS_DEFEND_COUNT as usize] += 1;
             let _team = (*((*attacker).client as *mut gclient_t)).sess.sessionTeam as c_int;
@@ -627,14 +628,14 @@ pub fn Team_CheckHurtCarrier(
         if (*((*targ).client as *mut gclient_t)).ps.powerups[flag_pw as usize] != 0
             && (*((*targ).client as *mut gclient_t)).sess.sessionTeam as c_int != (*((*attacker).client as *mut gclient_t)).sess.sessionTeam as c_int
         {
-            (*((*attacker).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = world.level.time;
+            (*((*attacker).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = world.level.time as f32;
         }
 
         // skulls
         if (*((*targ).client as *mut gclient_t)).ps.generic1 != 0
             && (*((*targ).client as *mut gclient_t)).sess.sessionTeam as c_int != (*((*attacker).client as *mut gclient_t)).sess.sessionTeam as c_int
         {
-            (*((*attacker).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = world.level.time;
+            (*((*attacker).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = world.level.time as f32;
         }
     }
 }

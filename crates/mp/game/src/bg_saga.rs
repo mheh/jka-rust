@@ -676,7 +676,9 @@ pub fn BG_SiegeTranslateForcePowers(buf: *mut c_char, siegeClass: *mut siegeClas
                     k = 0;
 
                     if Q_stricmp(check_power.as_ptr(), c"FP_JUMP".as_ptr()) == 0 {
-                        strcpy(check_power.as_mut_ptr(), c"FP_LEVITATION".as_ptr());
+                        unsafe {
+                            libc::strcpy(check_power.as_mut_ptr(), c"FP_LEVITATION".as_ptr());
+                        }
                     }
 
                     while FPTable[k as usize].id != -1 && !FPTable[k as usize].name.is_null()
@@ -1254,7 +1256,7 @@ pub fn BG_SiegeFindThemeForTeam(team: c_int, bg: &BgState) -> *mut siegeTeam_t {
 ///
 /// Raven: precache all the sabers for the active classes for the team.
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1363-1413`
-pub fn BG_PrecacheSabersForSiegeTeam(team: c_int, bg: &mut BgState) {
+pub fn BG_PrecacheSabersForSiegeTeam(team: c_int, bg: &mut BgState, traps: &dyn BgTraps) {
     unsafe {
         let mut saber: saberInfo_t = core::mem::zeroed();
         let mut saber_name: *mut c_char;
@@ -1276,10 +1278,10 @@ pub fn BG_PrecacheSabersForSiegeTeam(team: c_int, bg: &mut BgState) {
                     };
 
                     if !saber_name.is_null() && *saber_name != 0 {
-                        WP_SaberParseParms(saber_name as *const c_char, &mut saber, bg, &mp_abi::game::syscalls::BgTrapsImpl);
+                        WP_SaberParseParms(saber_name as *const c_char, &mut saber, bg, traps);
                         if Q_stricmp(saber_name as *const c_char, saber.name.as_ptr()) == 0 {
                             if saber.model[0] != 0 {
-                                BG_ModelCache(saber.model.as_ptr(), core::ptr::null(), bg, &mp_abi::game::syscalls::BgTrapsImpl);
+                                BG_ModelCache(saber.model.as_ptr(), core::ptr::null(), bg, traps);
                             }
                         }
                     }

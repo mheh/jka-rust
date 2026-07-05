@@ -11,6 +11,8 @@
 use crate::prelude::*;
 use crate::q_math::{AngleVectors, VectorNormalize};
 use crate::trap;
+use crate::g_nav::NAV_AvoidCollision;
+use crate::g_navnew::{NAVNEW_AvoidCollision, NAVNEW_MoveToGoal};
 use std::ffi::c_int;
 
 /// File-scope static for `NPC_move.c` navigation state (oracle/oracle/codemp/game/NPC_move.c:14).

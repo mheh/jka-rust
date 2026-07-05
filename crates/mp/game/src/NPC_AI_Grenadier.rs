@@ -178,7 +178,7 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
 
         // If we hit our target, then stop and fire!
         if (info.flags & NIF_COLLISION) != 0 {
-            if info.blocker == (*npc_ptr).enemy {
+            if ent_id_opt(world.g_entities.as_ptr(), info.blocker) == (*npc_ptr).enemy {
                 Grenadier_HoldPosition(ctx);
             }
         }
@@ -279,7 +279,7 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
                             if !world.level.alertEvents[alertEvent as usize].owner.is_null()
                                 && !(*world.level.alertEvents[alertEvent as usize].owner).client.is_null()
                                 && (*world.level.alertEvents[alertEvent as usize].owner).health >= 0
-                                && (*(*world.level.alertEvents[alertEvent as usize].owner).client).playerTeam
+                                && (*((*world.level.alertEvents[alertEvent as usize].owner).client as *mut gclient_t)).playerTeam
                                     == (*((*npc_ptr).client as *mut gclient_t)).enemyTeam
                             {
                                 // an enemy
@@ -501,7 +501,7 @@ pub fn Grenadier_EvaluateShot(
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:461-662`
 pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
     unsafe {
-        let world = &*ctx.world;
+        let world = &mut *ctx.world;
         let npc_ptr = world.globals.NPC;
         let npc_info_ptr = world.globals.NPCInfo;
 
@@ -558,13 +558,15 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
                 let mut trace: trace_t = core::mem::zeroed();
                 trap::Trace(
                     ctx.engine,
-                    &mut trace,
-                    (*npc_ptr).r.currentOrigin,
-                    (*enemy_ent).r.mins,
-                    (*enemy_ent).r.maxs,
-                    (*enemy_ent).r.currentOrigin,
-                    (*npc_ptr).s.number,
-                    (*enemy_ent).clipmask,
+                    mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                        &mut trace,
+                        &(*npc_ptr).r.currentOrigin,
+                        &(*enemy_ent).r.mins,
+                        &(*enemy_ent).r.maxs,
+                        &(*enemy_ent).r.currentOrigin,
+                        (*npc_ptr).s.number,
+                        (*enemy_ent).clipmask,
+                    ),
                 );
                 if !trace.allsolid && !trace.startsolid && (trace.fraction == 1.0 || trace.entityNum == (*enemy_ent).s.number) {
                     // I can get right to him

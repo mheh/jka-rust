@@ -166,7 +166,7 @@ pub fn MineMonster_TryDamage(
             tr.endpos,
             damage,
             DAMAGE_NO_KNOCKBACK,
-            MOD_MELEE,
+            MOD_MELEE as c_int,
         );
         let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
         let bite_str = cstr(&format!("sound/chars/mine/misc/bite{}.wav", idx));
@@ -204,21 +204,21 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) { unsafe {
         if do_attack4 {
             let dur = (1750.0 + rng.random() as f32 * 200.0) as c_int;
             TIMER_Set(ctx, npc, attacking_id.as_ptr(), dur);
-            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK4, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK4 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
             TIMER_Set(ctx, npc, cstr("attack2_dmg").as_ptr(), 950);
         } else if rng.random() as f32 > 0.5f32 {
             if rng.random() as f32 > 0.8f32 {
                 TIMER_Set(ctx, npc, attacking_id.as_ptr(), 850);
-                NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK3, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK3 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 TIMER_Set(ctx, npc, cstr("attack2_dmg").as_ptr(), 400);
             } else {
                 TIMER_Set(ctx, npc, attacking_id.as_ptr(), 850);
-                NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 TIMER_Set(ctx, npc, cstr("attack1_dmg").as_ptr(), 450);
             }
         } else {
             TIMER_Set(ctx, npc, attacking_id.as_ptr(), 1250);
-            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK2, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
             TIMER_Set(ctx, npc, cstr("attack1_dmg").as_ptr(), 700);
         }
     } else {

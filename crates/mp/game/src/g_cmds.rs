@@ -23,8 +23,21 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::client::client_connected::CON_CONNECTED;
+use crate::client::player_team_state::playerTeamStateState_t;
 use crate::prelude::*;
 use crate::trap;
+
+/// Raven `SAY_ALL`/`SAY_TEAM`/`SAY_TELL` chat-mode `#define`s.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:3064-3066`
+const SAY_ALL: c_int = 0;
+const SAY_TEAM: c_int = 1;
+const SAY_TELL: c_int = 2;
+
+/// Raven `LAST_USEABLE_WEAPON` — `WP_BRYAR_OLD`.
+///
+/// Source: `oracle/oracle/codemp/game/bg_weapons.h:43`
+const LAST_USEABLE_WEAPON: c_int = crate::shared::WP_BRYAR_OLD;
 
 /// Raven `gc_orders[]` — canned "game command" voice-order strings.
 ///
@@ -1217,7 +1230,7 @@ pub fn SetTeam(
         }
 
         // he starts at 'base'
-        (*client).pers.teamState.state = TEAM_BEGIN;
+        (*client).pers.teamState.state = playerTeamStateState_t::TEAM_BEGIN;
         if oldTeam != TEAM_SPECTATOR {
             (*ent).flags &= !FL_GODMODE;
             (*client).ps.stats[STAT_HEALTH as usize] = 0;

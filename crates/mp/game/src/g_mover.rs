@@ -618,8 +618,8 @@ pub fn G_MoverTeam(
             let mut origin: vec3_t = [0.0; 3];
             let mut angles: vec3_t = [0.0; 3];
             let time = (*ctx.world).level.time;
-            crate::bg_misc::BG_EvaluateTrajectory(&(*part).s.pos as *const trajectory_t, time, origin);
-            crate::bg_misc::BG_EvaluateTrajectory(&(*part).s.apos as *const trajectory_t, time, angles);
+            crate::bg_misc::BG_EvaluateTrajectory(&(*part).s.pos as *const trajectory_t, time, &mut origin);
+            crate::bg_misc::BG_EvaluateTrajectory(&(*part).s.apos as *const trajectory_t, time, &mut angles);
             let r#move = [
                 origin[0] - (*part).r.currentOrigin[0],
                 origin[1] - (*part).r.currentOrigin[1],
@@ -636,7 +636,7 @@ pub fn G_MoverTeam(
                     break; // move was blocked
                 }
             }
-            part = (*part).teamchain;
+            part = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*part).teamchain);
         }
 
         if !part.is_null() {
@@ -649,12 +649,12 @@ pub fn G_MoverTeam(
                 let time = (*ctx.world).level.time;
                 let mut cur_origin = (*p).r.currentOrigin;
                 let mut cur_angles = (*p).r.currentAngles;
-                crate::bg_misc::BG_EvaluateTrajectory(&(*p).s.pos as *const trajectory_t, time, cur_origin);
-                crate::bg_misc::BG_EvaluateTrajectory(&(*p).s.apos as *const trajectory_t, time, cur_angles);
+                crate::bg_misc::BG_EvaluateTrajectory(&(*p).s.pos as *const trajectory_t, time, &mut cur_origin);
+                crate::bg_misc::BG_EvaluateTrajectory(&(*p).s.apos as *const trajectory_t, time, &mut cur_angles);
                 (*p).r.currentOrigin = cur_origin;
                 (*p).r.currentAngles = cur_angles;
                 trap::LinkEntity(ctx.engine, GLinkentityArgs::new(p));
-                p = (*p).teamchain;
+                p = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*p).teamchain);
             }
 
             // if the pusher has a "blocked" function, call it
@@ -675,7 +675,7 @@ pub fn G_MoverTeam(
                     }
                 }
             }
-            p = (*p).teamchain;
+            p = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*p).teamchain);
         }
     }
 }
@@ -798,7 +798,7 @@ pub fn SetMoverState(
         }
         let time = (*ctx.world).level.time;
         let mut cur_origin = (*ent).r.currentOrigin;
-        crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos as *const trajectory_t, time, cur_origin);
+        crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos as *const trajectory_t, time, &mut cur_origin);
         (*ent).r.currentOrigin = cur_origin;
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -819,7 +819,7 @@ pub fn MatchTeam(
         let mut slave = teamLeader;
         while !slave.is_null() {
             SetMoverState(ctx, slave, moverState as moverState_t, time);
-            slave = (*slave).teamchain;
+            slave = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*slave).teamchain);
         }
     }
 }
@@ -882,9 +882,9 @@ pub fn Reached_BinaryMover(
 
             // fire targets
             if (*ent).activator.is_none() {
-                (*ent).activator = ent;
+                (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
             }
-            G_UseTargets2(ctx, ent, (*ent).activator, (*ent).opentarget);
+            G_UseTargets2(ctx, ent, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator), (*ent).opentarget);
         } else if (*ent).moverState == MOVER_2TO1 {
             // closed
             let mut doorcenter: vec3_t = [0.0; 3];
@@ -894,10 +894,10 @@ pub fn Reached_BinaryMover(
             G_PlayDoorSound(ctx, ent, BMS_END);
 
             // close areaportals
-            if (*ent).teammaster == ent || (*ent).teammaster.is_none() {
+            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster) == ent || (*ent).teammaster.is_none() {
                 trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qfalse));
             }
-            G_UseTargets2(ctx, ent, (*ent).activator, (*ent).closetarget);
+            G_UseTargets2(ctx, ent, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator), (*ent).closetarget);
         } else {
             G_Error(ctx, c"Reached_BinaryMover: bad moverState".as_ptr());
         }
@@ -913,7 +913,7 @@ pub fn Use_BinaryMover_Go(
 ) {
     unsafe {
         let activator = (*ent).activator;
-        (*ent).activator = activator;
+        (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
 
         if (*ent).moverState == MOVER_POS1 {
             let mut doorcenter: vec3_t = [0.0; 3];
@@ -929,10 +929,10 @@ pub fn Use_BinaryMover_Go(
             (*ent).s.time = (*ctx.world).level.time;
 
             // open areaportal
-            if (*ent).teammaster == ent || (*ent).teammaster.is_none() {
+            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster) == ent || (*ent).teammaster.is_none() {
                 trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qtrue));
             }
-            G_UseTargets(ctx, ent, (*ent).activator);
+            G_UseTargets(ctx, ent, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator));
             return;
         }
 
@@ -946,7 +946,7 @@ pub fn Use_BinaryMover_Go(
             } else {
                 (*ent).nextthink = (*ctx.world).level.time + (*ent).wait as c_int;
             }
-            G_UseTargets2(ctx, ent, (*ent).activator, (*ent).target2);
+            G_UseTargets2(ctx, ent, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator), (*ent).target2);
             return;
         }
 
@@ -1036,7 +1036,7 @@ pub fn UnLockDoors(
             }
             (*slave).spawnflags &= !MOVER_LOCKED;
             (*slave).s.frame = 1; // second stage of anim
-            slave = (*slave).teamchain;
+            slave = crate::ent_id::resolve(slave.offset(-((*slave).s.number as isize)), (*slave).teamchain);
             if slave.is_null() {
                 break;
             }
@@ -1056,7 +1056,7 @@ pub fn LockDoors(
         loop {
             (*slave).spawnflags |= MOVER_LOCKED;
             (*slave).s.frame = 0; // first stage of anim
-            slave = (*slave).teamchain;
+            slave = crate::ent_id::resolve(slave.offset(-((*slave).s.number as isize)), (*slave).teamchain);
             if slave.is_null() {
                 break;
             }
@@ -1081,7 +1081,7 @@ pub fn Use_BinaryMover(
 
         // only the master should be used
         if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
-            Use_BinaryMover(ctx, (*ent).teammaster, other, activator);
+            Use_BinaryMover(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster), other, activator);
             return;
         }
 
@@ -1097,8 +1097,8 @@ pub fn Use_BinaryMover(
 
         G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
 
-        (*ent).enemy = other;
-        (*ent).activator = activator;
+        (*ent).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), other);
+        (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
         if (*ent).delay != 0 {
             (*ent).think = Some(EntThink::Use_BinaryMover_Go);
             (*ent).nextthink = (*ctx.world).level.time + (*ent).delay;
@@ -1401,7 +1401,7 @@ pub fn Think_SpawnNewDoorTrigger(
             let mut other = ent;
             while !other.is_null() {
                 (*other).takedamage = qtrue;
-                other = (*other).teamchain;
+                other = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*other).teamchain);
             }
         }
 
@@ -1494,7 +1494,7 @@ pub fn G_FindDoorTrigger(
         if (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
             // not the master door, get the master door
             while !(*door).teammaster.is_none() && (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
-                door = (*door).teammaster;
+                door = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*door).teammaster);
             }
         }
         if !(*door).targetname.is_null() {
@@ -1526,7 +1526,7 @@ pub fn G_FindDoorTrigger(
             if owner.is_null() {
                 break;
             }
-            if (*owner).parent == door {
+            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*owner).parent) == door {
                 return owner;
             }
         }
@@ -1553,7 +1553,7 @@ pub fn G_EntIsUnlockedDoor(
             if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
                 // not the master door, get the master door
                 while !(*ent).teammaster.is_none() && (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
-                    ent = (*ent).teammaster;
+                    ent = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster);
                 }
             }
             if !(*ent).targetname.is_null() {
@@ -2012,11 +2012,11 @@ pub fn Think_SetupTrainTargets(
     ent: *mut gentity_t,
 ) {
     unsafe {
-        (*ent).nextTrain = G_Find(ctx, 
+        (*ent).nextTrain = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), G_Find(ctx,
             core::ptr::null_mut(),
             core::mem::offset_of!(gentity_t, targetname) as c_int,
             (*ent).target,
-        );
+        ));
         if (*ent).nextTrain.is_none() {
             Com_Printf(c"func_train at %s with an unfound target\n".as_ptr());
             // Free me?`
@@ -2664,7 +2664,7 @@ pub fn funcBBrushDie(
 ) {
     unsafe {
         (*self_).takedamage = qfalse; // stop chain reaction runaway loops
-        (*self_).enemy = attacker;
+        (*self_).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), attacker);
 
         if (*self_).delay != 0 {
             (*self_).think = Some(EntThink::funcBBrushDieGo);
@@ -2724,7 +2724,7 @@ pub fn funcBBrushPain(
                     G_UseTargets2(ctx, self_, attacker, (*self_).paintarget);
                 }
             } else {
-                G_UseTargets2(ctx, self_, (*self_).activator, (*self_).paintarget);
+                G_UseTargets2(ctx, self_, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*self_).activator), (*self_).paintarget);
             }
         }
 
@@ -3128,7 +3128,7 @@ pub fn func_wait_return_solid(
             (*self_).use_ = Some(EntUse::func_usable_use);
             (*self_).clipmask = 0;
             if !(*self_).target2.is_null() && *(*self_).target2 != 0 {
-                G_UseTargets2(ctx, self_, (*self_).activator, (*self_).target2);
+                G_UseTargets2(ctx, self_, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*self_).activator), (*self_).target2);
             }
         } else {
             (*self_).clipmask = 0;

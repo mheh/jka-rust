@@ -78,6 +78,7 @@ pub use crate::cstr_util::{cstr, cstr_to_str, cstr_to_string, write_cstr_field};
 pub use crate::entity::flags::*;
 pub use crate::g_client::{playerMaxs, playerMins};
 pub use crate::g_items::FRAMETIME;
+pub use crate::g_items::{REWARD_SPRITE_TIME, PLAYEREVENT_GAUNTLETREWARD};
 pub use crate::g_mover::{BMS_END, BMS_MID, BMS_START};
 pub use crate::ai_main_consts::*;
 pub use crate::g_local_consts::*;

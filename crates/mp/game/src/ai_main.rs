@@ -19,6 +19,24 @@ use mp_bg::weapons::weapon_t::{
     WP_REPEATER, WP_ROCKET_LAUNCHER, WP_STUN_BATON, WP_THERMAL, WP_TRIP_MINE,
 };
 
+// Raven `ACTION_*` bot-command flags (`botlib.h:66-89`) — `bot_input_t::actionflags`
+// bitmask; not yet ported to a shared home, pinned here (this file's the sole consumer).
+// Source: `oracle/oracle/codemp/game/botlib.h:66-89`
+const ACTION_ATTACK: c_int = 0x0000001;
+const ACTION_USE: c_int = 0x0000002;
+const ACTION_RESPAWN: c_int = 0x0000008;
+const ACTION_JUMP: c_int = 0x0000010;
+const ACTION_CROUCH: c_int = 0x0000080;
+const ACTION_MOVEFORWARD: c_int = 0x0000200;
+const ACTION_MOVEBACK: c_int = 0x0000800;
+const ACTION_MOVELEFT: c_int = 0x0001000;
+const ACTION_MOVERIGHT: c_int = 0x0002000;
+const ACTION_DELAYEDJUMP: c_int = 0x0008000;
+const ACTION_GESTURE: c_int = 0x0020000;
+const ACTION_WALK: c_int = 0x0080000;
+const ACTION_FORCEPOWER: c_int = 0x0100000;
+const ACTION_ALT_ATTACK: c_int = 0x0200000;
+
 // Pass-2 body imports: the outbound trap seam, the ai_main.h const families
 // (fork ruling 10), and the syscall `Args` builders each ported body constructs.
 use crate::botai::bot_ctf_state_t::bot_ctf_state_t;
@@ -1758,8 +1776,8 @@ pub fn BotTrace_Strafe(
     // PORT-NOTE(DEFAULT_MAXS_2/STRAFEAROUND_*): these consts have no shared
     // ported home yet; referenced as cited and reported as missing.
     unsafe {
-        let playerMins: vec3_t = [-15.0, -15.0, /*DEFAULT_MINS_2*/ -8.0];
-        let playerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];
+        let localPlayerMins: vec3_t = [-15.0, -15.0, /*DEFAULT_MINS_2*/ -8.0];
+        let localPlayerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];
 
         if (*bs).cur_ps.groundEntityNum == ENTITYNUM_NONE {
             // don't do this in the air, it can be.. dangerous.
@@ -1801,8 +1819,8 @@ pub fn BotTrace_Strafe(
             GTraceArgs::new(
                 &mut tr,
                 &from,
-                &playerMins,
-                &playerMaxs,
+                &localPlayerMins,
+                &localPlayerMaxs,
                 &to,
                 (*bs).client,
                 MASK_PLAYERSOLID,
@@ -1829,8 +1847,8 @@ pub fn BotTrace_Strafe(
             GTraceArgs::new(
                 &mut tr,
                 &from,
-                &playerMins,
-                &playerMaxs,
+                &localPlayerMins,
+                &localPlayerMaxs,
                 &to,
                 (*bs).client,
                 MASK_PLAYERSOLID,
@@ -1854,8 +1872,8 @@ pub fn BotTrace_Strafe(
             GTraceArgs::new(
                 &mut tr,
                 &from,
-                &playerMins,
-                &playerMaxs,
+                &localPlayerMins,
+                &localPlayerMaxs,
                 &to,
                 (*bs).client,
                 MASK_PLAYERSOLID,

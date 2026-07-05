@@ -719,7 +719,7 @@ pub fn NPC_Begin(
             crate::g_utils::G_UseTargets(ctx, spawn_point, ent);
         }
 
-        trap::ICARUS_InitEnt(ctx.engine, mp_abi::game::syscalls::ICARUS_INITENT::IcarusInitentArgs::new(ent));
+        trap::ICARUS_InitEnt(ctx.engine, mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs::new(ent));
 
         SetNPCGlobals(ctx, ent);
 
@@ -766,7 +766,7 @@ pub fn NPC_Begin(
         (*(*ent).NPC).lastClearOrigin = [0.0; 3];
 
         if crate::NPC_utils::G_ActivateBehavior(ctx, ent, BSET_SPAWN) != 0 {
-            trap::ICARUS_MaintainTaskManager(ctx.engine, mp_abi::game::syscalls::ICARUS_MAINTAINTASKMANAGER::IcarusMaintaintaskmanagerArgs::new((*ent).s.number));
+            trap::ICARUS_MaintainTaskManager(ctx.engine, mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*ent).s.number));
         }
 
         crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*client).renderInfo.eyePoint);
@@ -1376,13 +1376,13 @@ pub fn NPC_VehiclePrecache(
                 ));
                 skin = trap::R_RegisterSkin(
                     ctx.engine,
-                    mp_abi::game::syscalls::TRAP_R_REGISTERSKIN::TrapRRegisterskinArgs::new(path.as_ptr()),
+                    mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(path.as_ptr()),
                 );
             }
             let glm_path = cstr(&format!("models/players/{}/model.glm", cstr_to_str(p_veh_info.model as *const c_char)));
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2modelArgs::new(
+                mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
                     &mut temp_g2 as *mut *mut c_void,
                     glm_path.as_ptr(),
                     0,
@@ -1417,7 +1417,7 @@ pub fn NPC_VehiclePrecache(
                 }
                 trap::G2API_CleanGhoul2Models(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2_CLEANGHOUL2MODELS::GG2Cleanghoul2modelsArgs::new(&mut temp_g2 as *mut *mut c_void),
+                    mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs::new(&mut temp_g2 as *mut *mut c_void),
                 );
             }
         }
@@ -2659,7 +2659,7 @@ pub fn NPC_SpawnType(
 
     unsafe {
         (*npc_spawner).think = Some(EntThink::G_FreeEntity);
-        (*npc_spawner).nextthink = ctx.world.level.time + 50; // FRAMETIME
+        (*npc_spawner).nextthink = (*ctx.world).level.time + 50; // FRAMETIME
     }
 
     if npc_type.is_null() {
@@ -2952,7 +2952,7 @@ pub fn Cmd_NPC_f(
     } else if Q_stricmp(c"kill".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
         NPC_Kill_f(ctx);
     } else if Q_stricmp(c"showbounds".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
-        ctx.world.globals.showBBoxes = if ctx.world.globals.showBBoxes != 0 { 0 } else { 1 };
+        (*ctx.world).globals.showBBoxes = if (*ctx.world).globals.showBBoxes != 0 { 0 } else { 1 };
     } else if Q_stricmp(c"score".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
         let mut cmd2: [u8; 1024] = [0; 1024];
         trap::Argv(ctx.engine, 2, cmd2.as_mut_ptr() as *mut c_char, 1024);

@@ -169,7 +169,7 @@ pub fn AI_SetClosestBuddy(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) {
         for i in 0..(*group).numGroup {
             (*group).member[i as usize].closestBuddy = ENTITYNUM_NONE;
 
-            let mut bestDist = Q3_INFINITE;
+            let mut bestDist: f32 = Q3_INFINITE as f32;
             for j in 0..(*group).numGroup {
                 let dist = DistanceSquared(
                     (*ctx.world).g_entities[(*group).member[i as usize].number as usize].r.currentOrigin,
@@ -1091,7 +1091,9 @@ pub fn AI_CheckEnemyCollision(
         NAV_GetLastMove(ctx, &mut info as *mut navInfo_t);
 
         //See if we've hit something
-        if !info.blocker.is_null() && info.blocker != (*ent).enemy {
+        if !info.blocker.is_null()
+            && ent_id_opt((*ctx.world).g_entities.as_ptr(), info.blocker) != (*ent).enemy
+        {
             let blockerClient = (*info.blocker).client as *mut gclient_t;
             let entClient = (*ent).client as *mut gclient_t;
             if !blockerClient.is_null() && (*blockerClient).playerTeam == (*entClient).enemyTeam {

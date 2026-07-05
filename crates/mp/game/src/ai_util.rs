@@ -291,7 +291,7 @@ pub fn BotDoChat(
         }
 
         // Frequency roll: skip chat unless always==true or lucky roll
-        if crate::q_math::Q_irand(1, 10) > bs_ref.chatFrequency && always == 0 {
+        if (*ctx.world).bg_state.rng.Q_irand(1, 10) > bs_ref.chatFrequency && always == 0 {
             return 0;
         }
 
@@ -353,7 +353,7 @@ pub fn BotDoChat(
         }
 
         // Pick a random line
-        let mut getthisline = crate::q_math::Q_irand(0, lines + 1);
+        let mut getthisline = (*ctx.world).bg_state.rng.Q_irand(0, lines + 1);
         if getthisline < 1 {
             getthisline = 1;
         }
@@ -409,14 +409,21 @@ pub fn BotDoChat(
 
                 let mut cobject: *mut gentity_t = core::ptr::null_mut();
 
+                let world = &mut *ctx.world;
                 if *chatgroup_b.offset(inc_1) == b's' as u8 && !bs_ref.chatObject.is_none() {
-                    cobject = bs_ref.chatObject;
+                    cobject = bs_ref
+                        .chatObject
+                        .map(|id| &mut world.g_entities[id.0 as usize] as *mut gentity_t)
+                        .unwrap_or(core::ptr::null_mut());
                 } else if *chatgroup_b.offset(inc_1) == b'a' as u8 && !bs_ref.chatAltObject.is_none() {
-                    cobject = bs_ref.chatAltObject;
+                    cobject = bs_ref
+                        .chatAltObject
+                        .map(|id| &mut world.g_entities[id.0 as usize] as *mut gentity_t)
+                        .unwrap_or(core::ptr::null_mut());
                 }
 
                 if !cobject.is_null() && !(*cobject).client.is_null() {
-                    let pers = &(*(*cobject).client).pers;
+                    let pers = &(*((*cobject).client as *mut gclient_t)).pers;
                     let mut inc_n = 0isize;
 
                     while pers.netname[inc_n as usize] != 0 {
@@ -440,7 +447,7 @@ pub fn BotDoChat(
         } else {
             bs_ref.doChat = 1;
         }
-        bs_ref.chatTime_stored = ((line_len as c_int) * 45) + crate::q_math::Q_irand(1300, 1500);
+        bs_ref.chatTime_stored = ((line_len as c_int) * 45) + (*ctx.world).bg_state.rng.Q_irand(1300, 1500);
         bs_ref.chatTime = world.level.time + (bs_ref.chatTime_stored as f32);
 
         B_TempFree(ctx, crate::game_globals::MAX_CHAT_BUFFER_SIZE as c_int);

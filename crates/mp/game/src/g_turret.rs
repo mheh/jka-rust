@@ -236,7 +236,13 @@ pub fn turret_fire(
     dir: vec3_t,
 ) {
     unsafe {
-        let contents = trap::PointContents(ctx.engine, start, (*ent).s.number);
+        let contents = trap::PointContents(
+            ctx.engine,
+            mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(
+                &start as *const vec3_t,
+                (*ent).s.number,
+            ),
+        );
         if (contents & MASK_SHOT) != 0 {
             return;
         }
@@ -257,7 +263,7 @@ pub fn turret_fire(
         (*bolt).s.otherEntityNum2 = (*ent).genericValue14;
         (*bolt).s.emplacedOwner = (*ent).genericValue15;
 
-        (*bolt).classname = c"turret_proj".as_ptr();
+        (*bolt).classname = c"turret_proj".as_ptr() as *mut c_char;
         (*bolt).nextthink = (*ctx.world).level.time + 10000;
         (*bolt).think = Some(EntThink::G_FreeEntity);
         (*bolt).s.eType = ET_MISSILE as c_int;
@@ -301,7 +307,7 @@ pub fn turret_fire(
         (*bolt).r.currentOrigin[1] = start[1];
         (*bolt).r.currentOrigin[2] = start[2];
 
-        (*bolt).parent = ent;
+        (*bolt).parent = Some(ent_id((*ctx.world).g_entities.as_ptr(), ent));
     }
 }
 

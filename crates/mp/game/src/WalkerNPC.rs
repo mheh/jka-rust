@@ -341,7 +341,7 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
         crate::g_vehicles::Vehicle_SetAnim(
             parent as *mut gentity_t,
             SETANIM_LEGS,
-            anim,
+            anim as c_int,
             i_flags,
             i_blend,
         );

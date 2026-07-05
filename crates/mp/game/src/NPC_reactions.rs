@@ -249,7 +249,7 @@ pub fn NPC_ChoosePainAnimation(
         let client = (*self_).client as *mut gclient_t;
         let mut pain_chance = 0.5f32;
 
-        if !client.is_null() && (*client).NPC_class == CLASS_GALAKMECH {
+        if !client.is_null() && (*client).NPC_class as c_int == CLASS_GALAKMECH {
             if hitLoc == HL_GENERIC1 {
                 // Hit the antenna!
                 pain_chance = 1.0f32;
@@ -274,7 +274,7 @@ pub fn NPC_ChoosePainAnimation(
                 } else {
                     pain_chance = 1.0f32;
                 }
-            } else if !client.is_null() && (*client).NPC_class == CLASS_PROTOCOL {
+            } else if !client.is_null() && (*client).NPC_class as c_int == CLASS_PROTOCOL {
                 pain_chance = 1.0f32;
             } else {
                 pain_chance = NPC_GetPainChance(ctx, self_, damage);
@@ -295,16 +295,16 @@ pub fn NPC_ChoosePainAnimation(
                 let legs_anim = (*client).ps.legsAnim;
                 let torso_anim = (*client).ps.torsoAnim;
 
-                if !crate::bg_panimate::PM_SpinningAnim(legs_anim) &&
-                   !crate::bg_panimate::BG_SaberInSpecialAttack(torso_anim) &&
-                   !crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) &&
-                   !crate::bg_panimate::PM_RollingAnim(legs_anim) &&
-                   !(crate::bg_panimate::BG_FlippingAnim(legs_anim) && !crate::bg_panimate::PM_InCartwheel(legs_anim)) {
+                if crate::bg_panimate::PM_SpinningAnim(legs_anim) == qfalse &&
+                   crate::bg_panimate::BG_SaberInSpecialAttack(torso_anim) == qfalse &&
+                   crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse &&
+                   crate::bg_pmove::PM_RollingAnim(legs_anim) == qfalse &&
+                   !(crate::bg_panimate::BG_FlippingAnim(legs_anim) != qfalse && crate::bg_panimate::PM_InCartwheel(legs_anim) == qfalse) {
                     // Play an anim
                     let npc = (*self_).NPC as *mut gNPC_t;
                     let local_anim_index = (*self_).localAnimIndex;
 
-                    if !client.is_null() && (*client).NPC_class == CLASS_GALAKMECH {
+                    if !client.is_null() && (*client).NPC_class as c_int == CLASS_GALAKMECH {
                         pain_anim = BOTH_PAIN1;
                     } else if r#mod == MOD_MELEE {
                         pain_anim = crate::bg_panimate::BG_PickAnim(local_anim_index, BOTH_PAIN2, BOTH_PAIN3);
@@ -463,7 +463,7 @@ pub fn NPC_Pain(
                         voice_event = 32;  // EV_FFTURN
                         (*npc).behaviorState = (*npc).tempBehavior;
                         (*npc).tempBehavior = (*npc).defaultBehavior;
-                        (*npc).defaultBehavior = 0;  // BS_DEFAULT
+                        (*npc).defaultBehavior = bState_t::BS_DEFAULT;
                         (*other).flags &= !0x00000100;  // ~FL_NOTARGET
                         (*self_).r.svFlags &= !0x00080000;  // ~SVF_ICARUS_FREEZE
                         G_SetEnemy(ctx, self_, other);

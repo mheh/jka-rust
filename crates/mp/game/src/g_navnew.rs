@@ -729,19 +729,31 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
             //duh, nothing to trace against
             return QFALSE;
         }
-        let mut playerMins = [0.0f32; 3];
-        let mut playerMaxs = [0.0f32; 3];
-        playerMins[0] = -15.0;
-        playerMins[1] = -15.0;
-        playerMins[2] = DEFAULT_MINS_2;
-        playerMaxs[0] = 15.0;
-        playerMaxs[1] = 15.0;
-        playerMaxs[2] = DEFAULT_MAXS_2;
+        let mut localPlayerMins = [0.0f32; 3];
+        let mut localPlayerMaxs = [0.0f32; 3];
+        localPlayerMins[0] = -15.0;
+        localPlayerMins[1] = -15.0;
+        localPlayerMins[2] = DEFAULT_MINS_2;
+        localPlayerMaxs[0] = 15.0;
+        localPlayerMaxs[1] = 15.0;
+        localPlayerMaxs[2] = DEFAULT_MAXS_2;
 
         let mut pos1 = [0.0f32; 3];
         let mut pos2 = [0.0f32; 3];
-        trap::Nav_GetNodePosition(ctx.engine, mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new(wp1, &mut pos1 as *mut vec3_t));
-        trap::Nav_GetNodePosition(ctx.engine, mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new(wp2, &mut pos2 as *mut vec3_t));
+        trap::Nav_GetNodePosition(
+            ctx.engine,
+            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                wp1,
+                &mut pos1 as *mut vec3_t,
+            ),
+        );
+        trap::Nav_GetNodePosition(
+            ctx.engine,
+            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                wp2,
+                &mut pos2 as *mut vec3_t,
+            ),
+        );
 
         let mut clipmask = MASK_NPCSOLID | CONTENTS_BOTCLIP;
         if checkWorld == QFALSE {
@@ -759,8 +771,8 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
             crate::q_math::_VectorCopy((*ignoreEnt).r.maxs, &mut maxs);
             ignoreEntNum = (*ignoreEnt).s.number;
         } else {
-            crate::q_math::_VectorCopy(playerMins, &mut mins);
-            crate::q_math::_VectorCopy(playerMaxs, &mut mins);
+            crate::q_math::_VectorCopy(localPlayerMins, &mut mins);
+            crate::q_math::_VectorCopy(localPlayerMaxs, &mut mins);
             ignoreEntNum = ENTITYNUM_NONE;
         }
         mins[2] += STEPSIZE;
@@ -880,7 +892,7 @@ pub fn NAVNEW_MoveToGoal(
 
             trap::Nav_GetNodePosition(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new(bestNode, &mut origin as *mut vec3_t),
+                mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(bestNode, &mut origin as *mut vec3_t),
             );
 
             if inGoalWP == QFALSE {
@@ -897,11 +909,11 @@ pub fn NAVNEW_MoveToGoal(
                         (*((*self_).NPC as *mut gNPC_t)).aiFlags |= NPCAI_BLOCKED;
                         trap::Nav_GetNodePosition(
                             ctx.engine,
-                            mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new(oldBestNode, &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest as *mut vec3_t),
+                            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(oldBestNode, &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest as *mut vec3_t),
                         );
                         trap::Nav_GetNodePosition(
                             ctx.engine,
-                            mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new(bestNode, &mut origin as *mut vec3_t),
+                            mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(bestNode, &mut origin as *mut vec3_t),
                         );
                     }
                 }
@@ -922,7 +934,7 @@ pub fn NAVNEW_MoveToGoal(
                     //we were heading straight for the goal, head for the goal's wp instead
                     trap::Nav_GetNodePosition(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new(bestNode, &mut origin as *mut vec3_t),
+                        mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(bestNode, &mut origin as *mut vec3_t),
                     );
                     foundClearPath = NAVNEW_AvoidCollision(ctx, self_, goal_ent_ptr, &mut tempInfo, setBlockedInfo, 5);
                 }
@@ -948,7 +960,7 @@ pub fn NAVNEW_MoveToGoal(
                     (*((*self_).NPC as *mut gNPC_t)).aiFlags |= NPCAI_BLOCKED;
                     trap::Nav_GetNodePosition(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new(bestNode, &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest as *mut vec3_t),
+                        mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(bestNode, &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest as *mut vec3_t),
                     );
                 }
                 //Only set blocked info first time
@@ -1023,14 +1035,14 @@ pub fn NAVNEW_MoveToGoal(
             //Get the positions
             trap::Nav_GetNodePosition(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new(
+                mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
                     if !goal_ent_ptr.is_null() { (*goal_ent_ptr).waypoint } else { NODE_NONE },
                     &mut dest as *mut vec3_t,
                 ),
             );
             trap::Nav_GetNodePosition(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new(bestNode, &mut start as *mut vec3_t),
+                mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(bestNode, &mut start as *mut vec3_t),
             );
 
             //Draw the route
@@ -1039,7 +1051,7 @@ pub fn NAVNEW_MoveToGoal(
                 let mut wpPos = [0.0f32; 3];
                 trap::Nav_GetNodePosition(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_NAV_GETNODEPOS::GNavGetnodeposArgs::new((*self_).waypoint, &mut wpPos as *mut vec3_t),
+                    mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new((*self_).waypoint, &mut wpPos as *mut vec3_t),
                 );
                 G_DrawNode(wpPos, NODE_NAVGOAL);
             }

@@ -157,7 +157,7 @@ pub fn Mark1_Idle(ctx: GameContext<'_>) {
         crate::NPC_AI_Default::NPC_BSIdle(ctx);
         let npc = (*ctx.world).globals.NPC;
         if !npc.is_null() {
-            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_SLEEP1, SETANIM_FLAG_NORMAL);
+            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_SLEEP1 as c_int, SETANIM_FLAG_NORMAL);
         }
     }
 }
@@ -211,7 +211,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
         let missile = crate::g_missile::CreateMissile(ctx, muzzle1, muzzle_dir, BOWCASTER_VELOCITY as f32, 10000, npc, QFALSE);
 
         if !missile.is_null() {
-            (*missile).classname = c"bowcaster_proj".as_ptr();
+            (*missile).classname = c"bowcaster_proj".as_ptr().cast_mut();
             (*missile).s.weapon = WP_BOWCASTER as c_int;
 
             (*missile).r.maxs[0] = BOWCASTER_SIZE as f32;
@@ -223,7 +223,7 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
 
             (*missile).damage = damage;
             (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
-            (*missile).methodOfDeath = MOD_ROCKET;
+            (*missile).methodOfDeath = MOD_ROCKET as c_int;
             (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
             (*missile).splashDamage = BOWCASTER_SPLASH_DAMAGE;
             (*missile).splashRadius = BOWCASTER_SPLASH_RADIUS;
@@ -281,12 +281,12 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
         crate::g_utils::G_Sound(ctx, npc, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/mark1/misc/mark1_fire".as_ptr()));
 
         if !missile.is_null() {
-            (*missile).classname = c"bryar_proj".as_ptr();
+            (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
             (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
 
             (*missile).damage = 1;
             (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
-            (*missile).methodOfDeath = MOD_BRYAR_PISTOL;
+            (*missile).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
             (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
         }
     }
@@ -331,14 +331,14 @@ pub fn Mark1_die(
             NPC_SetAnim(
                 self_,
                 SETANIM_BOTH,
-                BOTH_DEATH2,
+                BOTH_DEATH2 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
         } else {
             NPC_SetAnim(
                 self_,
                 SETANIM_BOTH,
-                BOTH_DEATH1,
+                BOTH_DEATH1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
         }
@@ -359,7 +359,7 @@ pub fn Mark1_dying(
             return;
         }
 
-        if (*(*self_).client).ps.torsoTimer > 0 {
+        if (*((*self_).client as *mut gclient_t)).ps.torsoTimer > 0 {
             if crate::g_timer::TIMER_Done(ctx, self_, c"dyingExplosion".as_ptr()) != 0 {
                 let num = (*ctx.world).bg_state.rng.Q_irand(1, 3);
 
@@ -448,7 +448,7 @@ pub fn NPC_Mark1_Pain(
                 NPC_SetAnim(
                     self_,
                     SETANIM_BOTH,
-                    BOTH_PAIN1,
+                    BOTH_PAIN1 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
             }
@@ -503,7 +503,7 @@ pub fn NPC_Mark1_Pain(
                         NPC_SetAnim(
                             self_,
                             SETANIM_BOTH,
-                            BOTH_PAIN1,
+                            BOTH_PAIN1 as c_int,
                             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                         );
                         break;
@@ -636,12 +636,12 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
         let missile = crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc, QFALSE);
 
         if !missile.is_null() {
-            (*missile).classname = c"bryar_proj".as_ptr();
+            (*missile).classname = c"bryar_proj".as_ptr().cast_mut();
             (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
 
             (*missile).damage = 1;
             (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
-            (*missile).methodOfDeath = MOD_BRYAR_PISTOL;
+            (*missile).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
             (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
         }
     }
@@ -680,24 +680,24 @@ pub fn Mark1_BlasterAttack(
             if chance == 1 {
                 (*npc_info).burstCount = 0;
                 crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1000, 3000));
-                (*(*npc).client).ps.torsoTimer = 0;
+                (*((*npc).client as *mut gclient_t)).ps.torsoTimer = 0;
             } else {
                 if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay2".as_ptr()) != 0 {
                     crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay2".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(50, 50));
                     Mark1_FireBlaster(ctx);
-                    NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 }
                 return;
             }
         } else if advance != 0 {
-            if (*(*npc).client).ps.torsoAnim == BOTH_ATTACK1 {
-                (*(*npc).client).ps.torsoTimer = 0;
+            if (*((*npc).client as *mut gclient_t)).ps.torsoAnim == BOTH_ATTACK1 as c_int {
+                (*((*npc).client as *mut gclient_t)).ps.torsoTimer = 0;
             }
             Mark1_Hunt(ctx);
         } else {
             // Make sure he's not firing.
-            if (*(*npc).client).ps.torsoAnim == BOTH_ATTACK1 {
-                (*(*npc).client).ps.torsoTimer = 0;
+            if (*((*npc).client as *mut gclient_t)).ps.torsoAnim == BOTH_ATTACK1 as c_int {
+                (*((*npc).client as *mut gclient_t)).ps.torsoTimer = 0;
             }
         }
     }
@@ -757,7 +757,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
         let missile = crate::g_missile::CreateMissile(ctx, muzzle1, forward, BOWCASTER_VELOCITY as f32, 10000, npc, QFALSE);
 
         if !missile.is_null() {
-            (*missile).classname = c"bowcaster_proj".as_ptr();
+            (*missile).classname = c"bowcaster_proj".as_ptr().cast_mut();
             (*missile).s.weapon = WP_BOWCASTER as c_int;
 
             (*missile).r.maxs[0] = BOWCASTER_SIZE as f32;
@@ -769,7 +769,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
 
             (*missile).damage = damage;
             (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
-            (*missile).methodOfDeath = MOD_ROCKET;
+            (*missile).methodOfDeath = MOD_ROCKET as c_int;
             (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
             (*missile).splashDamage = BOWCASTER_SPLASH_DAMAGE;
             (*missile).splashRadius = BOWCASTER_SPLASH_RADIUS;
@@ -794,7 +794,7 @@ pub fn Mark1_RocketAttack(
 
         if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
             crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1000, 3000));
-            NPC_SetAnim(npc, SETANIM_TORSO, BOTH_ATTACK2, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+            NPC_SetAnim(npc, SETANIM_TORSO, BOTH_ATTACK2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
             Mark1_FireRocket(ctx);
         } else if advance != 0 {
             Mark1_Hunt(ctx);
@@ -861,7 +861,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
             else {
                 // It should never get here, but just in case
                 (*npc).health = 0;
-                (*(*npc).client).ps.stats[STAT_HEALTH] = 0;
+                (*((*npc).client as *mut gclient_t)).ps.stats[STAT_HEALTH] = 0;
                 if let Some(die_fn) = (*npc).die {
                     crate::ent_fn_enums::dispatch_die(ctx, die_fn, npc, npc, npc, 100, MOD_UNKNOWN as c_int);
                 }

@@ -71,11 +71,11 @@ use mp_abi::game::syscalls::G_ICARUS_VALIDENT::GIcarusValidentArgs;
 use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
 use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
 use mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs;
-use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetBoltInfoArgs;
-use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetSkinArgs;
-use mp_abi::game::syscalls::G_R_REGISTERSKIN::GR_RegisterSkinArgs;
-use mp_abi::game::syscalls::G_SETCONFIGSTRING::GSetConfigstringArgs;
-use mp_abi::game::syscalls::G_SET_SERVERCULL::GSetServerCullArgs;
+use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetboltinfoArgs as GG2SetBoltInfoArgs;
+use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetskinArgs as GG2SetSkinArgs;
+use mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs as GR_RegisterSkinArgs;
+use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
+use mp_abi::game::syscalls::G_SET_SERVER_CULL::GSetServerCullArgs;
 
 use mp_bg::public::fieldtype::fieldtype_t;
 

@@ -325,7 +325,7 @@ pub fn VEH_TurretFindEnemies(
                 }
                 // else: we will shoot at bbrushes!
             } else if !(*target).client.is_null()
-                && (*(*target).client as *mut gclient_t).sess.sessionTeam == TEAM_SPECTATOR
+                && (*((*target).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
             {
                 i += 1;
                 continue;
@@ -335,14 +335,14 @@ pub fn VEH_TurretFindEnemies(
                 i += 1;
                 continue;
             }
-            if !(*parent).client.is_null() && (*(*parent).client as *mut gclient_t).sess.sessionTeam != 0 {
+            if !(*parent).client.is_null() && (*((*parent).client as *mut gclient_t)).sess.sessionTeam != 0 {
                 if !(*target).client.is_null() {
-                    if (*(*target).client as *mut gclient_t).sess.sessionTeam == (*(*parent).client as *mut gclient_t).sess.sessionTeam {
+                    if (*((*target).client as *mut gclient_t)).sess.sessionTeam == (*((*parent).client as *mut gclient_t)).sess.sessionTeam {
                         // A bot/client/NPC we don't want to shoot
                         i += 1;
                         continue;
                     }
-                } else if (*target).teamnodmg == (*(*parent).client as *mut gclient_t).sess.sessionTeam {
+                } else if (*target).teamnodmg == (*((*parent).client as *mut gclient_t)).sess.sessionTeam {
                     // some other entity that's allied with us
                     i += 1;
                     continue;
@@ -422,7 +422,7 @@ pub fn VEH_TurretObeyPassengerControl(
             let curMuzzle: c_int = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
             let mut aimAngles = [0f32; 3];
             _VectorCopy(
-                (*(*passenger).client as *mut gclient_t).ps.viewangles,
+                (*((*passenger).client as *mut gclient_t)).ps.viewangles,
                 &mut aimAngles,
             );
 
@@ -437,7 +437,7 @@ pub fn VEH_TurretObeyPassengerControl(
                 curMuzzle,
                 &mut aimAngles,
             );
-            if ((*(*passenger).client as *mut gclient_t).pers.cmd.buttons
+            if ((*((*passenger).client as *mut gclient_t)).pers.cmd.buttons
                 & (BUTTON_ATTACK | BUTTON_ALT_ATTACK))
                 != 0
             {
@@ -512,7 +512,7 @@ pub fn VEH_TurretThink(
                 || turretEnemy == parent
                 || (*turretEnemy).r.ownerNum == (*parent).s.number // a passenger?
                 || (!(*turretEnemy).client.is_null()
-                    && (*(*turretEnemy).client as *mut gclient_t).sess.sessionTeam == TEAM_SPECTATOR)
+                    && (*((*turretEnemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR)
             {
                 // don't keep going after spectators, pilot, self, dead people, etc.
                 turretEnemy = core::ptr::null_mut();

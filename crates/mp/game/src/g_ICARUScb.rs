@@ -26,6 +26,16 @@ const qfalse: qboolean = 0;
 // `g_mover.rs:69`) since it's a `#define` constant, not a global.
 // Source: `oracle/oracle/codemp/game/g_local.h`
 const FRAMETIME: c_int = 100;
+
+// Raven ICARUS `Q3_Registers.h` anonymous variable-type enum. Ported locally
+// (small, self-contained, independent of the `interpreter.h` ID/Type enum
+// chain) since only `VTYPE_FLOAT` is referenced here.
+// Source: `oracle/oracle/codemp/icarus/Q3_Registers.h:5-10`
+const VTYPE_NONE: c_int = 0;
+const VTYPE_FLOAT: c_int = 1;
+const VTYPE_STRING: c_int = 2;
+const VTYPE_VECTOR: c_int = 3;
+
 use crate::g_combat::G_Damage;
 use crate::g_mover::{G_PlayDoorSound, MatchTeam, BMS_END};
 use crate::g_utils::G_FreeEntity;
@@ -683,7 +693,11 @@ pub fn Q3_GetTag(
             return 0;
         }
 
-        // TYPE_ORIGIN / TYPE_ANGLES: unported-global consts (missing_symbols).
+        //TODO: Port TYPE_ORIGIN, TYPE_ANGLES
+        // Source: oracle/oracle/codemp/icarus/interpreter.h:35-80 — anonymous enum
+        // values are transitive off `TK_USERDEF` (external lexer base) through the
+        // full ID_* token list; needs the ICARUS interpreter enum chain ported
+        // (C++-track subsystem, porting-rules §F), not a mechanical symbol fix.
         if lookup == TYPE_ORIGIN {
             return TAG_GetOrigin(ctx, (*ent).ownername, name, info);
         } else if lookup == TYPE_ANGLES {

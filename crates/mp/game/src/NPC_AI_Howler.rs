@@ -165,7 +165,7 @@ pub fn Howler_TryDamage(
             ),
         );
 
-        if tr.entityNum != ENTITYNUM_WORLD {
+        if tr.entityNum != ENTITYNUM_WORLD as c_short {
             crate::g_combat::G_Damage(
                 ctx,
                 &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t,
@@ -175,7 +175,7 @@ pub fn Howler_TryDamage(
                 tr.endpos,
                 damage,
                 DAMAGE_NO_KNOCKBACK,
-                MOD_MELEE,
+                MOD_MELEE as c_int,
             );
         }
     }

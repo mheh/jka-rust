@@ -312,12 +312,12 @@ pub fn Mark2_FireBlaster(
 
     let missile = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_ptr, qfalse);
 
-    (*missile).classname = b"bryar_proj\0".as_ptr() as *const c_char;
+    (*missile).classname = b"bryar_proj\0".as_ptr() as *mut c_char;
     (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
 
     (*missile).damage = 1;
     (*missile).dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
-    (*missile).methodOfDeath = MOD_BRYAR_PISTOL;
+    (*missile).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
     (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
   }
 }
@@ -383,8 +383,8 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
 
     if (*npc_info_ptr).localState == LSTATE_RISINGUP {
         (*npc_ptr).flags &= !FL_SHIELDED;
-        NPC_SetAnim(npc_ptr, crate::anim::SETANIM_BOTH, crate::anim::BOTH_RUN1START, crate::anim::SETANIM_FLAG_HOLD | crate::anim::SETANIM_FLAG_OVERRIDE);
-        if (*(*npc_ptr).client).ps.legsTimer <= 0 && (*(*npc_ptr).client).ps.torsoAnim == crate::anim::BOTH_RUN1START {
+        NPC_SetAnim(npc_ptr, SETANIM_BOTH, BOTH_RUN1START as c_int, SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE);
+        if (*((*npc_ptr).client as *mut gclient_t)).ps.legsTimer <= 0 && (*((*npc_ptr).client as *mut gclient_t)).ps.torsoAnim == BOTH_RUN1START as c_int {
             (*npc_info_ptr).localState = LSTATE_NONE;
         }
         return;
@@ -394,7 +394,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
         if (*npc_info_ptr).localState == LSTATE_DOWN || (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN {
             if TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue {
                 (*npc_info_ptr).localState = LSTATE_RISINGUP;
-                NPC_SetAnim(npc_ptr, crate::anim::SETANIM_BOTH, crate::anim::BOTH_RUN1STOP, crate::anim::SETANIM_FLAG_HOLD | crate::anim::SETANIM_FLAG_OVERRIDE);
+                NPC_SetAnim(npc_ptr, SETANIM_BOTH, BOTH_RUN1STOP as c_int, SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE);
                 TIMER_Set(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 8000));
             }
         } else {
@@ -405,17 +405,17 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
 
     if advance == qtrue && TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue && (*npc_info_ptr).localState == LSTATE_DOWN {
         (*npc_info_ptr).localState = LSTATE_RISINGUP;
-        NPC_SetAnim(npc_ptr, crate::anim::SETANIM_BOTH, crate::anim::BOTH_RUN1STOP, crate::anim::SETANIM_FLAG_HOLD | crate::anim::SETANIM_FLAG_OVERRIDE);
+        NPC_SetAnim(npc_ptr, SETANIM_BOTH, BOTH_RUN1STOP as c_int, SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE);
         TIMER_Set(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 8000));
     }
 
     NPC_FaceEnemy(ctx, qtrue);
 
     if (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN {
-        NPC_SetAnim(npc_ptr, crate::anim::SETANIM_BOTH, crate::anim::BOTH_RUN1STOP, crate::anim::SETANIM_FLAG_HOLD | crate::anim::SETANIM_FLAG_OVERRIDE);
+        NPC_SetAnim(npc_ptr, SETANIM_BOTH, BOTH_RUN1STOP as c_int, SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE);
         TIMER_Set(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 9000));
 
-        if (*(*npc_ptr).client).ps.legsTimer <= 0 && (*(*npc_ptr).client).ps.torsoAnim == crate::anim::BOTH_RUN1STOP {
+        if (*((*npc_ptr).client as *mut gclient_t)).ps.legsTimer <= 0 && (*((*npc_ptr).client as *mut gclient_t)).ps.torsoAnim == BOTH_RUN1STOP as c_int {
             (*npc_ptr).flags |= FL_SHIELDED;
             (*npc_info_ptr).localState = LSTATE_DOWN;
         }

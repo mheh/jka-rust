@@ -659,14 +659,14 @@ pub fn NPC_CheckEnemyStealth(
             ];
             let mut hAngle_perc = NPC_GetHFOVPercentage(
                 targ_org,
-                (*(*NPC).client as *mut gclient_t).renderInfo.eyePoint,
-                (*(*NPC).client as *mut gclient_t).renderInfo.eyeAngles,
+                (*((*NPC).client as *mut gclient_t)).renderInfo.eyePoint,
+                (*((*NPC).client as *mut gclient_t)).renderInfo.eyeAngles,
                 (*NPCInfo).stats.hfov as f32,
             );
             let mut vAngle_perc = NPC_GetVFOVPercentage(
                 targ_org,
-                (*(*NPC).client as *mut gclient_t).renderInfo.eyePoint,
-                (*(*NPC).client as *mut gclient_t).renderInfo.eyeAngles,
+                (*((*NPC).client as *mut gclient_t)).renderInfo.eyePoint,
+                (*((*NPC).client as *mut gclient_t)).renderInfo.eyeAngles,
                 (*NPCInfo).stats.vfov as f32,
             );
 
@@ -727,13 +727,13 @@ pub fn NPC_CheckEnemyStealth(
                 let myContents = trap::PointContents(
                     ctx.engine,
                     GPointContentsArgs::new(
-                        &(*(*NPC).client as *mut gclient_t).renderInfo.eyePoint as *const vec3_t,
+                        &(*((*NPC).client as *mut gclient_t)).renderInfo.eyePoint as *const vec3_t,
                         (*NPC).s.number,
                     ),
                 );
                 if (myContents & CONTENTS_WATER) == 0 {
                     // I'm not in water
-                    if (*(*NPC).client as *mut gclient_t).NPC_class == CLASS_SWAMPTROOPER {
+                    if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_SWAMPTROOPER {
                         // these guys can see in in/through water pretty well
                         vis_rating = 0.10;
                     } else {
@@ -741,7 +741,7 @@ pub fn NPC_CheckEnemyStealth(
                     }
                 } else {
                     // else, if we're both in water
-                    if (*(*NPC).client as *mut gclient_t).NPC_class == CLASS_SWAMPTROOPER {
+                    if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_SWAMPTROOPER {
                         // I can see him just fine
                     } else {
                         vis_rating = 0.15;
@@ -764,7 +764,7 @@ pub fn NPC_CheckEnemyStealth(
             }
 
             // If he's violated the threshold, then realize him
-            let (realize, cautious) = if (*(*NPC).client as *mut gclient_t).NPC_class == CLASS_SWAMPTROOPER {
+            let (realize, cautious) = if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_SWAMPTROOPER {
                 // swamptroopers can see much better
                 (CAUTIOUS_THRESHOLD, CAUTIOUS_THRESHOLD * 0.75)
             } else {

@@ -33,7 +33,7 @@ use crate::entity::flags::{FL_DROPPED_ITEM, FL_NOTARGET, FL_TEAMSLAVE};
 use crate::g_combat::G_RadiusDamage;
 use crate::g_exphysics::G_RunExPhys;
 use crate::g_log::{G_LogWeaponItem, G_LogWeaponPickup, G_LogWeaponPowerup};
-use crate::g_main::{G_Error, G_LogPrintf, G_RunThink};
+use crate::g_main::{G_Error, G_LogPrintf, G_Printf, G_RunThink};
 use crate::g_missile::CreateMissile;
 use crate::g_object::G_RunObject;
 use crate::g_spawn::G_SpawnFloat;
@@ -74,11 +74,8 @@ const PITCH: usize = 0;
 const YAW: usize = 1;
 const ROLL: usize = 2;
 
-/// Raven `ITMSF_ALLOWNPC` — file-scope in `g_items.c` (item spawnflag: NPCs
-/// may pick this item up).
-///
-/// Source: `oracle/oracle/codemp/game/g_items.c:32`
-pub const ITMSF_ALLOWNPC: c_int = 4;
+// `ITMSF_ALLOWNPC` — item spawnflag defined above with the other `ITMSF_*`
+// spawnflags (g_items.c:32); duplicate file-scope const removed at integration.
 
 // Raven `g_items.c:42-44` medpack heal caps.
 pub const MAX_MEDPACK_HEAL_AMOUNT: c_int = 25;
@@ -146,6 +143,12 @@ pub const ITEM_RADIUS: f32 = 15.0;
 // carry their own private copy of this same value; this is the one exported
 // for bare-use sites without a local copy.
 pub const FRAMETIME: c_int = 100;
+
+// Raven `#define REWARD_SPRITE_TIME 2000` (`g_local.h:39`).
+pub const REWARD_SPRITE_TIME: c_int = 2000;
+
+// Raven `#define PLAYEREVENT_GAUNTLETREWARD 0x0002` (`bg_public.h:717`).
+pub const PLAYEREVENT_GAUNTLETREWARD: c_int = 0x0002;
 
 // Raven `#define TURRET_DEATH_DELAY 2000` / `TURRET_LIFETIME 60000` (`g_items.c:697-698`).
 pub const TURRET_DEATH_DELAY: c_int = 2000;
@@ -1337,7 +1340,7 @@ pub fn ItemUse_Seeker(
                 // set it to my team
                 (*remote).r.ownerNum = (*ent).s.number;
                 (*remote).s.owner = (*ent).s.number;
-                (*remote).activator = ent;
+                (*remote).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
                 if (*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_BLUE {
                     (*((*remote).client as *mut gclient_t)).playerTeam = NPCTEAM_PLAYER;
                 } else if (*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_RED {
@@ -2861,7 +2864,7 @@ pub fn CheckItemCanBePickedUpByNPC(
     unsafe {
         let npc = (*pickerupper).NPC as *mut gNPC_t;
         if ((*item).flags & FL_DROPPED_ITEM) != 0
-            && (*item).activator != &mut (*ctx.world).g_entities[0] as *mut gentity_t
+            && crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*item).activator) != &mut (*ctx.world).g_entities[0] as *mut gentity_t
             && (*pickerupper).s.number != 0
             && (*pickerupper).s.weapon == WP_NONE as c_int
             && !(*pickerupper).enemy.is_none()

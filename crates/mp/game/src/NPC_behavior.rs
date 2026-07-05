@@ -10,6 +10,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use crate::ent_fn_enums::EntThink;
 use crate::g_nav::NPC_SetMoveGoal;
 use crate::NPC_combat::{
@@ -20,11 +21,11 @@ use crate::NPC_combat::{
 use crate::NPC_goal::{NPC_ClearGoal, UpdateGoal};
 use crate::NPC_move::{NPC_MoveToGoal, NPC_SlideMoveToGoal};
 use crate::NPC_utils::{
-    CalcEntitySpot, G_ActivateBehavior, InFOV, NPC_AimWiggle, NPC_CheckEnemyExt, NPC_ClearLOS4,
+    CalcEntitySpot, G_ActivateBehavior, NPC_AimWiggle, NPC_CheckEnemyExt, NPC_ClearLOS4,
     NPC_FaceEnemy, NPC_SomeoneLookingAtMe, NPC_UpdateAngles, NPC_UpdateFiringAngles,
     NPC_UpdateShootAngles,
 };
-use crate::NPC_senses::{NPC_CheckAlertEvents, NPC_CheckVisibility, NPC_GetHFOVPercentage};
+use crate::NPC_senses::{InFOV, NPC_CheckAlertEvents, NPC_CheckVisibility, NPC_GetHFOVPercentage};
 use crate::NPC_sounds::G_AddVoiceEvent;
 use crate::g_nav::{NAV_FindClosestWaypointForEnt, NAV_GetNearestNode};
 use crate::g_timer::{TIMER_Done, TIMER_Set};
@@ -118,15 +119,17 @@ pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
                     if attack_ok != QFALSE {
                         let mut tr: trace_t = unsafe { core::mem::zeroed() };
                         trap::Trace(
-                            ctx.engine,
-                            &mut tr,
+    ctx.engine,
+    GTraceArgs::new(
+&mut tr as *mut trace_t,
                             &muzzle as *const vec3_t,
                             core::ptr::null(),
                             core::ptr::null(),
                             &enemy_org as *const vec3_t,
                             (*NPC).s.number,
                             MASK_SHOT,
-                        );
+    ),
+);
                         let mut traceEnt = &mut world.g_entities[tr.entityNum as usize] as *mut gentity_t;
                         let npc_client = (*NPC).client as *mut gclient_t;
                         let enemy_client_id = ent_id_opt(base, traceEnt);
@@ -141,15 +144,17 @@ pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
                             // No, so shoot for the head.
                             attack_scale *= 0.75;
                             trap::Trace(
-                                ctx.engine,
-                                &mut tr,
+    ctx.engine,
+    GTraceArgs::new(
+&mut tr as *mut trace_t,
                                 &muzzle as *const vec3_t,
                                 core::ptr::null(),
                                 core::ptr::null(),
                                 &enemy_head as *const vec3_t,
                                 (*NPC).s.number,
                                 MASK_SHOT,
-                            );
+    ),
+);
                             traceEnt = &mut world.g_entities[tr.entityNum as usize] as *mut gentity_t;
                         }
 

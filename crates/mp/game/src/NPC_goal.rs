@@ -83,7 +83,7 @@ unsafe {
             let entity_base = (*ctx.world).g_entities.as_mut_ptr();
             let goal = entity_base.add(goal_id.0 as usize);
 
-            if (*goal).inuse && ((*goal).s.eFlags & EF_NODRAW) == 0 {
+            if (*goal).inuse != 0 && ((*goal).s.eFlags & EF_NODRAW) == 0 {
                 SetGoal(ctx, goal, 0.0);
                 return;
             }
@@ -149,7 +149,7 @@ unsafe {
             ctx.engine,
             mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
                 npc,
-                TID_MOVE_NAV,
+                TID_MOVE_NAV as c_int,
             ),
         );
 }
@@ -207,7 +207,7 @@ unsafe {
         let entity_base = (*ctx.world).g_entities.as_mut_ptr();
         let goal = entity_base.add(goal_id.0 as usize);
 
-        if !(*goal).inuse {
+        if (*goal).inuse == 0 {
             NPC_ClearGoal(ctx);
             return core::ptr::null_mut();
         }

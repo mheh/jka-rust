@@ -432,7 +432,7 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
                         [0.0f32; 3],
                         2,
                         DAMAGE_NO_KNOCKBACK,
-                        MOD_MELEE,
+                        MOD_MELEE as c_int,
                     );
 
                     crate::g_utils::G_Sound(

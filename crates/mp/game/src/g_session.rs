@@ -138,9 +138,7 @@ pub fn G_ReadSessionData(
 
     trap::Cvar_VariableStringBuffer(
         ctx.engine,
-        cstr(&var).as_ptr(),
-        s.as_mut_ptr(),
-        MAX_STRING_CHARS as u32,
+        GCvarVariableStringBufferArgs::new(cstr(&var), s.as_mut_ptr(), MAX_STRING_CHARS as i32),
     );
 
     let s_str = unsafe { cstr_to_str(s.as_ptr()) };

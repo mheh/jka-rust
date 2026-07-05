@@ -23,6 +23,16 @@ const SENTRY_FORWARD_BASE_SPEED: f32 = 150.0f32;
 const SENTRY_FORWARD_MULTIPLIER: f32 = 25.0f32;
 const MIN_DISTANCE_SQR: f32 = 10000.0f32;
 
+/// Sentry `localState` enum (anonymous enum local to this TU).
+///
+/// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:23-30`
+const LSTATE_NONE: i32 = 0;
+const LSTATE_ASLEEP: i32 = 1;
+const LSTATE_WAKEUP: i32 = 2;
+const LSTATE_ACTIVE: i32 = 3;
+const LSTATE_POWERING_UP: i32 = 4;
+const LSTATE_ATTACKING: i32 = 5;
+
 /// `NPC_Sentry_Precache` — Precache sounds and effects for the sentry gun.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Sentry.c:37-57`
@@ -66,7 +76,7 @@ pub fn sentry_use(
         crate::npc_c::NPC_SetAnim(
             self_,
             SETANIM_BOTH,
-            BOTH_POWERUP1,
+            BOTH_POWERUP1 as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
         );
         (*(*self_).NPC).localState = LSTATE_ACTIVE;
@@ -100,7 +110,7 @@ pub fn NPC_Sentry_Pain(
             crate::npc_c::NPC_SetAnim(
                 self_,
                 SETANIM_BOTH,
-                BOTH_FLY_SHIELDED,
+                BOTH_FLY_SHIELDED as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
             crate::g_utils::G_Sound(
@@ -142,7 +152,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
                 crate::npc_c::NPC_SetAnim(
                     NPC,
                     SETANIM_BOTH,
-                    BOTH_ATTACK1,
+                    BOTH_ATTACK1 as c_int,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                 );
             } else {
@@ -160,7 +170,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             crate::npc_c::NPC_SetAnim(
                 NPC,
                 SETANIM_BOTH,
-                BOTH_POWERUP1,
+                BOTH_POWERUP1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
             crate::g_timer::TIMER_Set(ctx, NPC, cstr("powerup").as_ptr(), 250);
@@ -279,7 +289,7 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
                     dif = if dif < 0.0 { -24.0 } else { 24.0 };
                 }
 
-                (*(*NPC).client).ps.velocity[2] = ((*(*NPC).client).ps.velocity[2] + dif) / 2.0;
+                (*((*NPC).client as *mut gclient_t)).ps.velocity[2] = ((*((*NPC).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
             }
         } else {
             let goal: *mut gentity_t = if let Some(goal_id) = (*NPCInfo).goalEntity {
@@ -296,37 +306,37 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
                 if dif.abs() > SENTRY_HOVER_HEIGHT {
                     ucmd.upmove = if ucmd.upmove < 0 { -4 } else { 4 };
                 } else {
-                    if (*(*NPC).client).ps.velocity[2] != 0.0 {
-                        (*(*NPC).client).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
+                    if (*((*NPC).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
+                        (*((*NPC).client as *mut gclient_t)).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
 
-                        if (*(*NPC).client).ps.velocity[2].abs() < 2.0 {
-                            (*(*NPC).client).ps.velocity[2] = 0.0;
+                        if (*((*NPC).client as *mut gclient_t)).ps.velocity[2].abs() < 2.0 {
+                            (*((*NPC).client as *mut gclient_t)).ps.velocity[2] = 0.0;
                         }
                     }
                 }
-            } else if (*(*NPC).client).ps.velocity[2] != 0.0 {
-                (*(*NPC).client).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
+            } else if (*((*NPC).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
+                (*((*NPC).client as *mut gclient_t)).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
 
-                if (*(*NPC).client).ps.velocity[2].abs() < 1.0 {
-                    (*(*NPC).client).ps.velocity[2] = 0.0;
+                if (*((*NPC).client as *mut gclient_t)).ps.velocity[2].abs() < 1.0 {
+                    (*((*NPC).client as *mut gclient_t)).ps.velocity[2] = 0.0;
                 }
             }
         }
 
         // Apply friction
-        if (*(*NPC).client).ps.velocity[0] != 0.0 {
-            (*(*NPC).client).ps.velocity[0] *= SENTRY_VELOCITY_DECAY;
+        if (*((*NPC).client as *mut gclient_t)).ps.velocity[0] != 0.0 {
+            (*((*NPC).client as *mut gclient_t)).ps.velocity[0] *= SENTRY_VELOCITY_DECAY;
 
-            if (*(*NPC).client).ps.velocity[0].abs() < 1.0 {
-                (*(*NPC).client).ps.velocity[0] = 0.0;
+            if (*((*NPC).client as *mut gclient_t)).ps.velocity[0].abs() < 1.0 {
+                (*((*NPC).client as *mut gclient_t)).ps.velocity[0] = 0.0;
             }
         }
 
-        if (*(*NPC).client).ps.velocity[1] != 0.0 {
-            (*(*NPC).client).ps.velocity[1] *= SENTRY_VELOCITY_DECAY;
+        if (*((*NPC).client as *mut gclient_t)).ps.velocity[1] != 0.0 {
+            (*((*NPC).client as *mut gclient_t)).ps.velocity[1] *= SENTRY_VELOCITY_DECAY;
 
-            if (*(*NPC).client).ps.velocity[1].abs() < 1.0 {
-                (*(*NPC).client).ps.velocity[1] = 0.0;
+            if (*((*NPC).client as *mut gclient_t)).ps.velocity[1].abs() < 1.0 {
+                (*((*NPC).client as *mut gclient_t)).ps.velocity[1] = 0.0;
             }
         }
 
@@ -347,7 +357,7 @@ pub fn Sentry_Idle(ctx: GameContext<'_>) {
 
         // Is he waking up?
         if (*NPCInfo).localState == LSTATE_WAKEUP {
-            if (*(*NPC).client).ps.torsoTimer <= 0 {
+            if (*((*NPC).client as *mut gclient_t)).ps.torsoTimer <= 0 {
                 (*NPCInfo).scriptFlags |= SCF_LOOK_FOR_ENEMIES;
                 (*NPCInfo).burstCount = 0;
             }
@@ -355,7 +365,7 @@ pub fn Sentry_Idle(ctx: GameContext<'_>) {
             crate::npc_c::NPC_SetAnim(
                 NPC,
                 SETANIM_BOTH,
-                BOTH_SLEEP1,
+                BOTH_SLEEP1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
             (*NPC).flags |= FL_SHIELDED;
@@ -379,7 +389,7 @@ pub fn Sentry_Strafe(ctx: GameContext<'_>) {
         let mut tr: trace_t = core::mem::zeroed();
 
         crate::q_math::AngleVectors(
-            (*(*NPC).client).renderInfo.eyeAngles,
+            (*((*NPC).client as *mut gclient_t)).renderInfo.eyeAngles,
             None,
             Some(&mut right),
             None,
@@ -406,14 +416,14 @@ pub fn Sentry_Strafe(ctx: GameContext<'_>) {
         // Close enough
         if tr.fraction > 0.9f32 {
             crate::q_math::_VectorMA(
-                (*(*NPC).client).ps.velocity,
+                (*((*NPC).client as *mut gclient_t)).ps.velocity,
                 (SENTRY_STRAFE_VEL * dir as f32),
                 right,
-                &mut (*(*NPC).client).ps.velocity,
+                &mut (*((*NPC).client as *mut gclient_t)).ps.velocity,
             );
 
             // Add a slight upward push
-            (*(*NPC).client).ps.velocity[2] += SENTRY_UPWARD_PUSH;
+            (*((*NPC).client as *mut gclient_t)).ps.velocity[2] += SENTRY_UPWARD_PUSH;
 
             // Set the strafe start time so we can do a controlled roll
             (*NPCInfo).standTime = world.level.time + 3000 + (world.bg_state.rng.random() * 500.0) as c_int;
@@ -469,10 +479,10 @@ pub fn Sentry_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
 
         let speed = SENTRY_FORWARD_BASE_SPEED + (SENTRY_FORWARD_MULTIPLIER * world.cvars.g_spskill.integer as f32);
         crate::q_math::_VectorMA(
-            (*(*NPC).client).ps.velocity,
+            (*((*NPC).client as *mut gclient_t)).ps.velocity,
             speed,
             forward,
-            &mut (*(*NPC).client).ps.velocity,
+            &mut (*((*NPC).client as *mut gclient_t)).ps.velocity,
         );
     }
 }
@@ -508,7 +518,7 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
                     crate::npc_c::NPC_SetAnim(
                         NPC,
                         SETANIM_BOTH,
-                        BOTH_FLY_SHIELDED,
+                        BOTH_FLY_SHIELDED as c_int,
                         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
                     );
                     crate::g_utils::G_SoundOnEnt(

@@ -66,8 +66,8 @@ pub fn G_ReflectMissile(
             // Bounce back at them if you can
             let mut missile_to_owner: vec3_t = [0.0; 3];
             crate::q_math::_VectorSubtract(
-                &(*ctx.world).g_entities[(*missile).r.ownerNum as usize].r.currentOrigin,
-                &(*missile).r.currentOrigin,
+                (*ctx.world).g_entities[(*missile).r.ownerNum as usize].r.currentOrigin,
+                (*missile).r.currentOrigin,
                 &mut missile_to_owner
             );
             crate::q_math::VectorNormalize(&mut missile_to_owner);
@@ -75,18 +75,18 @@ pub fn G_ReflectMissile(
         } else if isowner != 0 {
             // Push the missile away from owner with boost
             let mut missile_dir: vec3_t = [0.0; 3];
-            crate::q_math::_VectorSubtract(&(*missile).r.currentOrigin, &(*ent).r.currentOrigin, &mut missile_dir);
-            crate::q_math::_VectorCopy(&(*missile).s.pos.trDelta, &mut bounce_dir);
+            crate::q_math::_VectorSubtract((*missile).r.currentOrigin, (*ent).r.currentOrigin, &mut missile_dir);
+            crate::q_math::_VectorCopy((*missile).s.pos.trDelta, &mut bounce_dir);
             let dot = crate::q_math::_DotProduct(forward, missile_dir);
-            crate::q_math::_VectorScale(&mut bounce_dir, dot);
+            crate::q_math::_VectorScale(bounce_dir, dot, &mut bounce_dir);
             crate::q_math::VectorNormalize(&mut bounce_dir);
         } else {
             // Default deflection
             let mut missile_dir: vec3_t = [0.0; 3];
-            crate::q_math::_VectorSubtract(&(*ent).r.currentOrigin, &(*missile).r.currentOrigin, &mut missile_dir);
-            crate::q_math::_VectorCopy(&(*missile).s.pos.trDelta, &mut bounce_dir);
+            crate::q_math::_VectorSubtract((*ent).r.currentOrigin, (*missile).r.currentOrigin, &mut missile_dir);
+            crate::q_math::_VectorCopy((*missile).s.pos.trDelta, &mut bounce_dir);
             let dot = crate::q_math::_DotProduct(forward, missile_dir);
-            crate::q_math::_VectorScale(&mut bounce_dir, dot);
+            crate::q_math::_VectorScale(bounce_dir, dot, &mut bounce_dir);
             crate::q_math::VectorNormalize(&mut bounce_dir);
         }
 
@@ -96,9 +96,9 @@ pub fn G_ReflectMissile(
         }
 
         crate::q_math::VectorNormalize(&mut bounce_dir);
-        crate::q_math::_VectorScale(&bounce_dir, speed, &mut (*missile).s.pos.trDelta);
+        crate::q_math::_VectorScale(bounce_dir, speed, &mut (*missile).s.pos.trDelta);
         (*missile).s.pos.trTime = (*ctx.world).level.time;
-        crate::q_math::_VectorCopy(&(*missile).r.currentOrigin, &mut (*missile).s.pos.trBase);
+        crate::q_math::_VectorCopy((*missile).r.currentOrigin, &mut (*missile).s.pos.trBase);
 
         if (*missile).s.weapon != WP_SABER && (*missile).s.weapon != G2_MODEL_PART {
             (*missile).r.ownerNum = (*ent).s.number;
@@ -131,12 +131,12 @@ pub fn G_DeflectMissile(
 
         if !(*ent).client.is_null() {
             crate::q_math::AngleVectors((*(*ent).client as *mut gclient_t).ps.viewangles, Some(&mut missile_dir), None, None);
-            crate::q_math::_VectorCopy(&missile_dir, &mut bounce_dir);
+            crate::q_math::_VectorCopy(missile_dir, &mut bounce_dir);
             let dot = crate::q_math::_DotProduct(forward, missile_dir);
-            crate::q_math::_VectorScale(&bounce_dir, dot);
+            crate::q_math::_VectorScale(bounce_dir, dot, &mut bounce_dir);
             crate::q_math::VectorNormalize(&mut bounce_dir);
         } else {
-            crate::q_math::_VectorCopy(&forward, &mut bounce_dir);
+            crate::q_math::_VectorCopy(forward, &mut bounce_dir);
             crate::q_math::VectorNormalize(&mut bounce_dir);
         }
 
@@ -146,9 +146,9 @@ pub fn G_DeflectMissile(
         }
 
         crate::q_math::VectorNormalize(&mut bounce_dir);
-        crate::q_math::_VectorScale(&bounce_dir, speed, &mut (*missile).s.pos.trDelta);
+        crate::q_math::_VectorScale(bounce_dir, speed, &mut (*missile).s.pos.trDelta);
         (*missile).s.pos.trTime = (*ctx.world).level.time;
-        crate::q_math::_VectorCopy(&(*missile).r.currentOrigin, &mut (*missile).s.pos.trBase);
+        crate::q_math::_VectorCopy((*missile).r.currentOrigin, &mut (*missile).s.pos.trBase);
 
         if (*missile).s.weapon != WP_SABER && (*missile).s.weapon != G2_MODEL_PART {
             (*missile).r.ownerNum = (*ent).s.number;
@@ -173,11 +173,11 @@ pub fn G_BounceMissile(
         // Reflect the velocity on the trace plane
         let hitTime = (*ctx.world).level.previousTime + ((*ctx.world).level.time - (*ctx.world).level.previousTime) as c_float * tr.fraction;
         crate::bg_misc::BG_EvaluateTrajectoryDelta(&(*ent).s.pos, hitTime as c_int, &mut velocity);
-        let dot = crate::q_math::_DotProduct(&velocity, &tr.plane.normal);
-        crate::q_math::_VectorMA(&velocity, -2.0 * dot, &tr.plane.normal, &mut (*ent).s.pos.trDelta);
+        let dot = crate::q_math::_DotProduct(velocity, tr.plane.normal);
+        crate::q_math::_VectorMA(velocity, -2.0 * dot, tr.plane.normal, &mut (*ent).s.pos.trDelta);
 
         if ((*ent).flags & FL_BOUNCE_SHRAPNEL) != 0 {
-            crate::q_math::_VectorScale(&(*ent).s.pos.trDelta, 0.25, &mut (*ent).s.pos.trDelta);
+            crate::q_math::_VectorScale((*ent).s.pos.trDelta, 0.25, &mut (*ent).s.pos.trDelta);
             (*ent).s.pos.trType = TR_GRAVITY;
 
             // Check for stop
@@ -187,7 +187,7 @@ pub fn G_BounceMissile(
                 return;
             }
         } else if ((*ent).flags & FL_BOUNCE_HALF) != 0 {
-            crate::q_math::_VectorScale(&(*ent).s.pos.trDelta, 0.65, &mut (*ent).s.pos.trDelta);
+            crate::q_math::_VectorScale((*ent).s.pos.trDelta, 0.65, &mut (*ent).s.pos.trDelta);
             // Check for stop
             if tr.plane.normal[2] > 0.2 && crate::q_math::VectorLength((*ent).s.pos.trDelta) < 40.0 {
                 G_SetOrigin(ent, tr.endpos);
@@ -204,8 +204,8 @@ pub fn G_BounceMissile(
             G_Sound(ctx, ent, CHAN_BODY as c_int, G_SoundIndex(sound_name));
         }
 
-        crate::q_math::_VectorAdd(&(*ent).r.currentOrigin, &tr.plane.normal, &mut (*ent).r.currentOrigin);
-        crate::q_math::_VectorCopy(&(*ent).r.currentOrigin, &mut (*ent).s.pos.trBase);
+        crate::q_math::_VectorAdd((*ent).r.currentOrigin, tr.plane.normal, &mut (*ent).r.currentOrigin);
+        crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*ent).s.pos.trBase);
         (*ent).s.pos.trTime = (*ctx.world).level.time;
 
         if (*ent).bounceCount != -5 {
@@ -292,12 +292,12 @@ pub fn G_BounceProjectile(start: vec3_t, impact: vec3_t, dir: vec3_t, endout: &m
     let mut v: vec3_t = [0.0; 3];
     let mut newv: vec3_t = [0.0; 3];
 
-    crate::q_math::_VectorSubtract(&impact, &start, &mut v);
-    let dot = crate::q_math::_DotProduct(&v, &dir);
-    crate::q_math::_VectorMA(&v, -2.0 * dot, &dir, &mut newv);
+    crate::q_math::_VectorSubtract(impact, start, &mut v);
+    let dot = crate::q_math::_DotProduct(v, dir);
+    crate::q_math::_VectorMA(v, -2.0 * dot, dir, &mut newv);
 
     crate::q_math::VectorNormalize(&mut newv);
-    crate::q_math::_VectorMA(&impact, 8192.0, &newv, endout);
+    crate::q_math::_VectorMA(impact, 8192.0, newv, endout);
 }
 
 /// Raven `CreateMissile`.
@@ -332,9 +332,9 @@ pub fn CreateMissile(
 
         let mut snapped_org = org;
         trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvector::new(&mut snapped_org));
-        crate::q_math::_VectorCopy(&snapped_org, &mut (*missile).s.pos.trBase);
-        crate::q_math::_VectorScale(&dir, vel, &mut (*missile).s.pos.trDelta);
-        crate::q_math::_VectorCopy(&snapped_org, &mut (*missile).r.currentOrigin);
+        crate::q_math::_VectorCopy(snapped_org, &mut (*missile).s.pos.trBase);
+        crate::q_math::_VectorScale(dir, vel, &mut (*missile).s.pos.trDelta);
+        crate::q_math::_VectorCopy(snapped_org, &mut (*missile).r.currentOrigin);
         trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvector::new(&mut (*missile).s.pos.trDelta));
 
         missile
@@ -477,7 +477,7 @@ pub fn G_MissileImpact(
             if (*ent).methodOfDeath != MOD_REPEATER_ALT as c_int && (*ent).methodOfDeath != MOD_ROCKET as c_int && (*ent).methodOfDeath != MOD_FLECHETTE_ALT_SPLASH as c_int && (*ent).methodOfDeath != MOD_ROCKET_HOMING as c_int && (*ent).methodOfDeath != MOD_THERMAL as c_int && (*ent).methodOfDeath != MOD_THERMAL_SPLASH as c_int && (*ent).methodOfDeath != MOD_TRIP_MINE_SPLASH as c_int && (*ent).methodOfDeath != MOD_TIMED_MINE_SPLASH as c_int && (*ent).methodOfDeath != MOD_DET_PACK_SPLASH as c_int && (*ent).methodOfDeath != MOD_VEHICLE as c_int && (*ent).methodOfDeath != MOD_CONC as c_int && (*ent).methodOfDeath != MOD_CONC_ALT as c_int && (*ent).methodOfDeath != MOD_SABER as c_int && (*ent).methodOfDeath != MOD_TURBLAST as c_int && (*ent).methodOfDeath != MOD_TARGET_LASER as c_int {
                 let mut fwd: vec3_t = [0.0; 3];
                 if !trace.is_null() {
-                    crate::q_math::_VectorCopy(&tr.plane.normal, &mut fwd);
+                    crate::q_math::_VectorCopy(tr.plane.normal, &mut fwd);
                 } else {
                     crate::q_math::AngleVectors((*other).r.currentAngles, Some(&mut fwd), None, None);
                 }
@@ -506,8 +506,8 @@ pub fn G_MissileImpact(
             let otherDefLevel = (*(*other).client as *mut gclient_t).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize];
 
             let te = G_TempEntity(ctx, (*ent).r.currentOrigin, EV_SABER_BLOCK as c_int);
-            crate::q_math::_VectorCopy(&(*ent).r.currentOrigin, &mut (*te).s.origin);
-            crate::q_math::_VectorCopy(&tr.plane.normal, &mut (*te).s.angles);
+            crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*te).s.origin);
+            crate::q_math::_VectorCopy(tr.plane.normal, &mut (*te).s.angles);
             (*te).s.eventParm = 0;
             (*te).s.weapon = 0;
             (*te).s.legsAnim = 0;
@@ -545,8 +545,8 @@ pub fn G_MissileImpact(
             if (*otherOwner).takedamage != 0 && !(*otherOwner).client.is_null() && (*ent).s.weapon != WP_ROCKET_LAUNCHER && (*ent).s.weapon != WP_THERMAL && (*ent).s.weapon != WP_TRIP_MINE && (*ent).s.weapon != WP_DET_PACK && (*ent).s.weapon != WP_DEMP2 && (*ent).methodOfDeath != MOD_REPEATER_ALT as c_int && (*ent).methodOfDeath != MOD_FLECHETTE_ALT_SPLASH as c_int && (*ent).methodOfDeath != MOD_CONC as c_int && (*ent).methodOfDeath != MOD_CONC_ALT as c_int {
                 let mut fwd: vec3_t = [0.0; 3];
                 let te = G_TempEntity(ctx, (*ent).r.currentOrigin, EV_SABER_BLOCK as c_int);
-                crate::q_math::_VectorCopy(&(*ent).r.currentOrigin, &mut (*te).s.origin);
-                crate::q_math::_VectorCopy(&tr.plane.normal, &mut (*te).s.angles);
+                crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*te).s.origin);
+                crate::q_math::_VectorCopy(tr.plane.normal, &mut (*te).s.angles);
                 (*te).s.eventParm = 0;
                 (*te).s.weapon = 0;
                 (*te).s.legsAnim = 0;
@@ -633,7 +633,8 @@ pub fn G_MissileImpact(
 
             if (*ent).s.weapon == WP_DEMP2 {
                 if !other.is_null() && !(*other).client.is_null() && (*(*other).client as *mut gclient_t).NPC_class == CLASS_VEHICLE {
-                    if !(*other).m_pVehicle.is_null() && !(*(*other).m_pVehicle).m_pVehicleInfo.is_null() && ((*(*(*other).m_pVehicle).m_pVehicleInfo).type_ == VH_SPEEDER || ((*(*(*other).m_pVehicle).m_pVehicleInfo).type_ == VH_FIGHTER && !(*ent).classname.is_null() && crate::q_shared::Q_stricmp((*ent).classname, c"vehicle_proj".as_ptr() as *const c_char) == 0)) && FighterIsLanded((*other).m_pVehicle, &mut (*(*other).client as *mut gclient_t).ps) == 0 && (((*other).spawnflags & 2) == 0) {
+                    let other_vehicle = (*other).m_pVehicle as *mut Vehicle_t;
+                    if !other_vehicle.is_null() && !(*other_vehicle).m_pVehicleInfo.is_null() && ((*(*other_vehicle).m_pVehicleInfo).type_ == VH_SPEEDER || ((*(*other_vehicle).m_pVehicleInfo).type_ == VH_FIGHTER && !(*ent).classname.is_null() && crate::q_shared::Q_stricmp((*ent).classname, c"vehicle_proj".as_ptr() as *const c_char) == 0)) && FighterIsLanded(other_vehicle, &mut (*(*other).client as *mut gclient_t).ps) == 0 && (((*other).spawnflags & 2) == 0) {
                         if (*(*other).client as *mut gclient_t).ps.electrifyTime > (*ctx.world).level.time {
                             (*(*other).client as *mut gclient_t).ps.electrifyTime += (*ctx.world).bg_state.rng.Q_irand(200, 500);
                             if (*(*other).client as *mut gclient_t).ps.electrifyTime > (*ctx.world).level.time + 4000 {
@@ -779,11 +780,11 @@ pub fn G_RunMissile(
             );
             tr.fraction = 0.0;
         } else {
-            crate::q_math::_VectorCopy(&tr.endpos, &mut (*ent).r.currentOrigin);
+            crate::q_math::_VectorCopy(tr.endpos, &mut (*ent).r.currentOrigin);
         }
 
         if (*ent).passThroughNum != 0 && tr.entityNum as u32 == ((*ent).passThroughNum - 1) as u32 {
-            crate::q_math::_VectorCopy(&origin, &mut (*ent).r.currentOrigin);
+            crate::q_math::_VectorCopy(origin, &mut (*ent).r.currentOrigin);
             trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentity::new(ent));
             // Fall through to passthrough label
         } else {
@@ -793,7 +794,7 @@ pub fn G_RunMissile(
                 let mut lowerOrg: vec3_t = [0.0; 3];
                 let mut trG: trace_t = std::mem::zeroed();
 
-                crate::q_math::_VectorCopy(&(*ent).r.currentOrigin, &mut lowerOrg);
+                crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut lowerOrg);
                 lowerOrg[2] -= 1.0;
                 trap::Trace(
                     ctx.engine,
@@ -808,7 +809,7 @@ pub fn G_RunMissile(
                     ),
                 );
 
-                crate::q_math::_VectorCopy(&trG.endpos, &mut groundSpot);
+                crate::q_math::_VectorCopy(trG.endpos, &mut groundSpot);
 
                 if trG.startsolid == 0 && trG.allsolid == 0 && trG.entityNum as u32 == ENTITYNUM_WORLD as u32 {
                     (*ent).s.groundEntityNum = trG.entityNum as c_int;
@@ -845,7 +846,7 @@ pub fn G_RunMissile(
 
                 // Ghoul2 mark handling code is #if 0, so we skip to the active part
                 if (*ent).s.weapon > WP_NONE as c_int && (*ent).s.weapon < WP_NUM_WEAPONS as c_int && (tr.entityNum as usize) < MAX_CLIENTS || (*ctx.world).g_entities[tr.entityNum as usize].s.eType == ET_NPC {
-                    crate::q_math::_VectorCopy(&(*ent).r.currentOrigin, &mut (*ent).s.origin);
+                    crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*ent).s.origin);
                     crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos, (*ctx.world).level.time, &mut (*ent).s.origin2);
 
                     if VectorCompare((*ent).s.origin, (*ent).s.origin2) != 0 {
@@ -878,8 +879,8 @@ pub fn G_RunMissile(
                 crate::q_math::VectorClear(&mut (*ent).s.pos.trDelta);
                 (*ent).s.pos.trTime = (*ctx.world).level.time;
 
-                crate::q_math::_VectorCopy(&groundSpot, &mut (*ent).s.pos.trBase);
-                crate::q_math::_VectorCopy(&groundSpot, &mut (*ent).r.currentOrigin);
+                crate::q_math::_VectorCopy(groundSpot, &mut (*ent).s.pos.trBase);
+                crate::q_math::_VectorCopy(groundSpot, &mut (*ent).r.currentOrigin);
 
                 if (*ent).s.apos.trType != TR_STATIONARY {
                     (*ent).s.apos.trType = TR_STATIONARY;

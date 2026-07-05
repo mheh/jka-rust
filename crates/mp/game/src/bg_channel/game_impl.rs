@@ -92,6 +92,16 @@ impl BgTraps for GameBgTraps<'_> {
         todo!("Port BgTraps::fs_getfilelist delegation — crate::trap::FS_GetFileList")
     }
 
+    fn r_register_skin(&self, name: *const c_char) -> qhandle_t {
+        // Mechanical delegation (ruling 13), matching `g2api_add_bolt`'s
+        // CString-conversion shape. Raven: `trap_R_RegisterSkin` (`G_R_REGISTERSKIN`).
+        let name = unsafe { std::ffi::CStr::from_ptr(name) }.to_owned();
+        crate::trap::R_RegisterSkin(
+            self.ctx.engine,
+            mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(name),
+        )
+    }
+
     fn g2api_add_bolt(&self, ghoul2: *mut c_void, modelIndex: c_int, boneName: *const c_char) -> c_int {
         // Real delegation to the already-wired `trap_G2API_AddBolt` seam
         // (`G_G2_ADDBOLT`); bg-visible callers (e.g. `AttachRidersGeneric`)

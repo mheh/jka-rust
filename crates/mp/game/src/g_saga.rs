@@ -37,7 +37,7 @@ use crate::client::CON_CONNECTED;
 use crate::g_client::{ClientBegin, ClientSpawn, ClientUserinfoChanged};
 use crate::g_combat::AddScore;
 use crate::g_items::RegisterItem;
-use crate::g_main::LogExit;
+use crate::g_main::{G_Error, LogExit};
 use crate::g_utils::{
     G_Find, G_PlayEffectID, G_SetOrigin, G_Sound, G_TempEntity, G_UseTargets2,
     GlobalUse,
@@ -448,8 +448,16 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
             );
 
             // precache saber data for classes that use sabers on both teams
-            BG_PrecacheSabersForSiegeTeam(SIEGETEAM_TEAM1, &mut (*ctx.world).bg_state);
-            BG_PrecacheSabersForSiegeTeam(SIEGETEAM_TEAM2, &mut (*ctx.world).bg_state);
+            BG_PrecacheSabersForSiegeTeam(
+                SIEGETEAM_TEAM1,
+                &mut (*ctx.world).bg_state,
+                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            );
+            BG_PrecacheSabersForSiegeTeam(
+                SIEGETEAM_TEAM2,
+                &mut (*ctx.world).bg_state,
+                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            );
 
             G_SiegeRegisterWeaponsAndHoldables(ctx, SIEGETEAM_TEAM1);
             G_SiegeRegisterWeaponsAndHoldables(ctx, SIEGETEAM_TEAM2);

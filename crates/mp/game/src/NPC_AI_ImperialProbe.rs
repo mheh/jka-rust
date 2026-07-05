@@ -81,12 +81,13 @@ pub fn NPC_Probe_Precache(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:49-170`
 pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
     let npc = world.globals.NPC;
     let npc_info = world.globals.NPCInfo;
 
     // Update our angles regardless
-    NPC_UpdateAngles(ctx, true, true);
+    NPC_UpdateAngles(ctx, qtrue, qtrue);
 
     // If we have an enemy, we should try to hover at about enemy eye level
     if let Some(enemy_id) = (*npc).enemy {
@@ -100,7 +101,7 @@ pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
                 dif = if dif < 0.0 { -16.0 } else { 16.0 };
             }
 
-            (*(*npc).client).ps.velocity[2] = ((*(*npc).client).ps.velocity[2] + dif) / 2.0;
+            (*((*npc).client as *mut gclient_t)).ps.velocity[2] = ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
         }
     } else {
         let mut goal: Option<*mut gentity_t> = None;
@@ -117,52 +118,54 @@ pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
             if dif.abs() > 24.0 {
                 world.globals.ucmd.upmove = if world.globals.ucmd.upmove < 0 { -4 } else { 4 };
             } else {
-                if (*(*npc).client).ps.velocity[2] != 0.0 {
-                    (*(*npc).client).ps.velocity[2] *= VELOCITY_DECAY;
+                if (*((*npc).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
+                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] *= VELOCITY_DECAY;
 
-                    if (*(*npc).client).ps.velocity[2].abs() < 2.0 {
-                        (*(*npc).client).ps.velocity[2] = 0.0;
+                    if (*((*npc).client as *mut gclient_t)).ps.velocity[2].abs() < 2.0 {
+                        (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 0.0;
                     }
                 }
             }
-        } else if (*(*npc).client).ps.velocity[2] != 0.0 {
+        } else if (*((*npc).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
             // Apply friction
-            (*(*npc).client).ps.velocity[2] *= VELOCITY_DECAY;
+            (*((*npc).client as *mut gclient_t)).ps.velocity[2] *= VELOCITY_DECAY;
 
-            if (*(*npc).client).ps.velocity[2].abs() < 1.0 {
-                (*(*npc).client).ps.velocity[2] = 0.0;
+            if (*((*npc).client as *mut gclient_t)).ps.velocity[2].abs() < 1.0 {
+                (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 0.0;
             }
         }
     }
 
     // Apply friction
-    if (*(*npc).client).ps.velocity[0] != 0.0 {
-        (*(*npc).client).ps.velocity[0] *= VELOCITY_DECAY;
+    if (*((*npc).client as *mut gclient_t)).ps.velocity[0] != 0.0 {
+        (*((*npc).client as *mut gclient_t)).ps.velocity[0] *= VELOCITY_DECAY;
 
-        if (*(*npc).client).ps.velocity[0].abs() < 1.0 {
-            (*(*npc).client).ps.velocity[0] = 0.0;
+        if (*((*npc).client as *mut gclient_t)).ps.velocity[0].abs() < 1.0 {
+            (*((*npc).client as *mut gclient_t)).ps.velocity[0] = 0.0;
         }
     }
 
-    if (*(*npc).client).ps.velocity[1] != 0.0 {
-        (*(*npc).client).ps.velocity[1] *= VELOCITY_DECAY;
+    if (*((*npc).client as *mut gclient_t)).ps.velocity[1] != 0.0 {
+        (*((*npc).client as *mut gclient_t)).ps.velocity[1] *= VELOCITY_DECAY;
 
-        if (*(*npc).client).ps.velocity[1].abs() < 1.0 {
-            (*(*npc).client).ps.velocity[1] = 0.0;
+        if (*((*npc).client as *mut gclient_t)).ps.velocity[1].abs() < 1.0 {
+            (*((*npc).client as *mut gclient_t)).ps.velocity[1] = 0.0;
         }
     }
+  }
 }
 
 /// Raven `ImperialProbe_Strafe`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:182-209`
 pub fn ImperialProbe_Strafe(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
     let npc = world.globals.NPC;
     let npc_info = world.globals.NPCInfo;
 
     let mut right = [0.0; 3];
-    AngleVectors((*(*npc).client).renderInfo.eyeAngles, None, Some(&mut right), None);
+    AngleVectors((*((*npc).client as *mut gclient_t)).renderInfo.eyeAngles, None, Some(&mut right), None);
 
     // Pick a random strafe direction, then check to see if doing a strafe would be
     // reasonable valid
@@ -192,18 +195,19 @@ pub fn ImperialProbe_Strafe(ctx: GameContext<'_>) {
     // Close enough
     if tr.fraction > 0.9 {
         _VectorMA(
-            (*(*npc).client).ps.velocity,
+            (*((*npc).client as *mut gclient_t)).ps.velocity,
             (HUNTER_STRAFE_VEL * dir) as f32,
             right,
-            &mut (*(*npc).client).ps.velocity,
+            &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
         );
 
         // Add a slight upward push
-        (*(*npc).client).ps.velocity[2] += HUNTER_UPWARD_PUSH as f32;
+        (*((*npc).client as *mut gclient_t)).ps.velocity[2] += HUNTER_UPWARD_PUSH as f32;
 
         // Set the strafe start time so we can do a controlled roll
         (*npc_info).standTime = world.level.time + 3000 + (world.bg_state.rng.random() * 500.0) as i32;
     }
+  }
 }
 
 /// Raven `ImperialProbe_Hunt`.
@@ -222,7 +226,7 @@ pub fn ImperialProbe_Hunt(
     NPC_SetAnim(
         npc,
         SETANIM_BOTH,
-        BOTH_RUN1,
+        BOTH_RUN1 as c_int,
         SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
     );
 
@@ -260,10 +264,10 @@ pub fn ImperialProbe_Hunt(
 
     let speed = HUNTER_FORWARD_BASE_SPEED as f32 + HUNTER_FORWARD_MULTIPLIER as f32 * world.cvars.g_spskill.integer as f32;
     _VectorMA(
-        (*(*npc).client).ps.velocity,
+        (*((*npc).client as *mut gclient_t)).ps.velocity,
         speed,
         forward,
-        &mut (*(*npc).client).ps.velocity,
+        &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
     );
 }
 
@@ -271,7 +275,8 @@ pub fn ImperialProbe_Hunt(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:268-324`
 pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
     let npc = world.globals.NPC;
 
     let mut muzzle1 = [0.0; 3];
@@ -328,8 +333,8 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
 
     let missile = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc, 0);
 
-    (*missile).classname = cstr("bryar_proj").as_ptr();
-    (*missile).s.weapon = WP_BRYAR_PISTOL;
+    (*missile).classname = cstr("bryar_proj").as_ptr().cast_mut();
+    (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
 
     if world.cvars.g_spskill.integer <= 1 {
         (*missile).damage = 5;
@@ -338,8 +343,9 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
     }
 
     (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
-    (*missile).methodOfDeath = MOD_UNKNOWN;
+    (*missile).methodOfDeath = MOD_UNKNOWN as c_int;
     (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+  }
 }
 
 /// Raven `ImperialProbe_Ranged`.
@@ -374,7 +380,8 @@ pub fn ImperialProbe_Ranged(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:377-426`
 pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
     let npc = world.globals.NPC;
     let npc_info = world.globals.NPCInfo;
 
@@ -398,7 +405,7 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
         return;
     }
 
-    NPC_SetAnim(npc, SETANIM_BOTH, BOTH_RUN1, SETANIM_FLAG_NORMAL);
+    NPC_SetAnim(npc, SETANIM_BOTH, BOTH_RUN1 as c_int, SETANIM_FLAG_NORMAL);
 
     // Rate our distance to the target, and our visibility
     let distance = DistanceHorizontalSquared((*npc).r.currentOrigin, if let Some(enemy_id) = (*npc).enemy {
@@ -426,6 +433,7 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
 
     // Decide what type of attack to do
     ImperialProbe_Ranged(ctx, visible, advance);
+  }
 }
 
 /// Raven `NPC_Probe_Pain`.
@@ -467,16 +475,16 @@ pub fn NPC_Probe_Pain(
             if (mod_ == MOD_DEMP2 || mod_ == MOD_DEMP2_ALT) && !other.is_null() {
                 let mut dir = [0.0; 3];
 
-                NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
 
                 _VectorSubtract((*self_).r.currentOrigin, (*other).r.currentOrigin, &mut dir);
                 VectorNormalize(&mut dir);
 
-                _VectorMA((*(*self_).client).ps.velocity, 550.0, dir, &mut (*(*self_).client).ps.velocity);
-                (*(*self_).client).ps.velocity[2] -= 127.0;
+                _VectorMA((*((*self_).client as *mut gclient_t)).ps.velocity, 550.0, dir, &mut (*((*self_).client as *mut gclient_t)).ps.velocity);
+                (*((*self_).client as *mut gclient_t)).ps.velocity[2] -= 127.0;
             }
 
-            (*(*self_).client).ps.electrifyTime = world.level.time + 3000;
+            (*((*self_).client as *mut gclient_t)).ps.electrifyTime = world.level.time + 3000;
 
             (*(*self_).NPC).localState = LSTATE_DROP;
         }
@@ -484,7 +492,7 @@ pub fn NPC_Probe_Pain(
         let pain_chance = NPC_GetPainChance(ctx, self_, damage);
 
         if world.bg_state.rng.random() < pain_chance {
-            NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1, SETANIM_FLAG_OVERRIDE);
+            NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE);
         }
     }
 
@@ -503,19 +511,20 @@ pub fn ImperialProbe_Idle(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:518-556`
 pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
     let npc = world.globals.NPC;
 
     ImperialProbe_MaintainHeight(ctx);
 
     if NPC_CheckPlayerTeamStealth(ctx) != 0 {
-        NPC_UpdateAngles(ctx, 1, 1);
+        NPC_UpdateAngles(ctx, qtrue, qtrue);
         return;
     }
 
     // If we have somewhere to go, then do that
     if (*npc).enemy.is_none() {
-        NPC_SetAnim(npc, SETANIM_BOTH, BOTH_RUN1, SETANIM_FLAG_NORMAL);
+        NPC_SetAnim(npc, SETANIM_BOTH, BOTH_RUN1 as c_int, SETANIM_FLAG_NORMAL);
 
         if UpdateGoal(ctx) != core::ptr::null_mut() {
             // start loop sound once we move
@@ -537,14 +546,16 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
         TIMER_Set(ctx, npc, c"angerNoise".as_ptr(), world.bg_state.rng.Q_irand(2000, 4000));
     }
 
-    NPC_UpdateAngles(ctx, 1, 1);
+    NPC_UpdateAngles(ctx, qtrue, qtrue);
+  }
 }
 
 /// Raven `ImperialProbe_Wait`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:563-582`
 pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
     let npc = world.globals.NPC;
     let npc_info = world.globals.NPCInfo;
 
@@ -577,18 +588,20 @@ pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
             } else {
                 core::ptr::null_mut()
             };
-            G_Damage(ctx, npc, enemy_ptr, enemy_ptr, None, [0.0; 3], 2000, 0, MOD_UNKNOWN);
+            G_Damage(ctx, npc, enemy_ptr, enemy_ptr, None, [0.0; 3], 2000, 0, MOD_UNKNOWN as c_int);
         }
     }
 
-    NPC_UpdateAngles(ctx, 1, 1);
+    NPC_UpdateAngles(ctx, qtrue, qtrue);
+  }
 }
 
 /// Raven `NPC_BSImperialProbe_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:589-609`
 pub fn NPC_BSImperialProbe_Default(ctx: GameContext<'_>) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
     let npc = world.globals.NPC;
     let npc_info = world.globals.NPCInfo;
 
@@ -602,4 +615,5 @@ pub fn NPC_BSImperialProbe_Default(ctx: GameContext<'_>) {
     } else {
         ImperialProbe_Idle(ctx);
     }
+  }
 }

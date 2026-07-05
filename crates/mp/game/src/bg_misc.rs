@@ -1804,9 +1804,12 @@ pub fn BG_TempFree(size: c_int, bg: &mut BgState) {
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3383-3390`
 pub fn BG_StringAlloc(source: *const c_char, bg: &mut BgState) -> *mut c_char {
     unsafe {
-        let len = libc::strlen(source) + 1;
+        // Raven `strlen(source)+1` / `strcpy(dest, source)`. `dest` is sized
+        // exactly `len`, so `Q_strncpyz(dest, source, len)` copies the same
+        // bytes (strlen chars + NUL) as the unbounded `strcpy`.
+        let len = crate::q_shared::Q_strlen(source) + 1;
         let dest = BG_Alloc(len as c_int, bg);
-        libc::strcpy(dest as *mut c_char, source);
+        Q_strncpyz(dest as *mut c_char, source, len as c_int);
         dest as *mut c_char
     }
 }

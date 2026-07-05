@@ -15,7 +15,7 @@
 
 use crate::prelude::*;
 use crate::g_utils::G_EffectIndex;
-use crate::q_shared::{COM_BeginParseSession, COM_ParseExt};
+use crate::q_shared::{COM_BeginParseSession, COM_ParseExt, SkipBracedSection, SkipRestOfLine};
 use mp_bg::vehicles::vehicle_s::VEH_MAX_PASSENGERS;
 
 /// Raven `BG_ClearVehicleParseParms`.
@@ -428,8 +428,11 @@ pub fn BG_ParseVehicleParm(
                         *(b.add(field.ofs as usize) as *mut c_int) = anim;
                     }
                     VF_WEAPON => {
-                        *(b.add(field.ofs as usize) as *mut c_int) =
-                            VEH_VehWeaponIndexForName(cstr(&value).as_ptr(), bg);
+                        // Raven: assignment is commented out in the oracle — the
+                        // VF_WEAPON case is a no-op `break;`.
+                        // Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:228-230`
+                        //*(b.add(field.ofs as usize) as *mut c_int) =
+                        //    VEH_VehWeaponIndexForName(cstr(&value).as_ptr(), bg);
                     }
                     VF_MODEL | VF_MODEL_CLIENT => {
                         *(b.add(field.ofs as usize) as *mut c_int) =

@@ -14,6 +14,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleDelta,
     AngleVectors, VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2,
@@ -52,33 +53,37 @@ pub fn G_ClearLineOfSight(
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
     trap::Trace(
         ctx.engine,
-        &mut tr as *mut trace_t,
+        GTraceArgs::new(
+&mut tr as *mut trace_t,
         &point1 as *const vec3_t,
         core::ptr::null(),
         core::ptr::null(),
         &point2 as *const vec3_t,
         ignore,
         clipmask,
+        ),
     );
 
     if tr.fraction == 1.0 {
         return 1;
     }
 
-    let hit = unsafe { &mut ctx.world.cast_mut().g_entities[tr.entityNum as usize] };
+    let hit = unsafe { &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t };
 
-    if EntIsGlass(hit) {
+    if EntIsGlass(hit) != 0 {
         let mut newpoint1 = tr.endpos;
         trap::Trace(
-            ctx.engine,
-            &mut tr as *mut trace_t,
+        ctx.engine,
+        GTraceArgs::new(
+&mut tr as *mut trace_t,
             &newpoint1 as *const vec3_t,
             core::ptr::null(),
             core::ptr::null(),
             &point2 as *const vec3_t,
-            hit.s.number,
+            unsafe { (*hit).s.number },
             clipmask,
-        );
+        ),
+    );
 
         if tr.fraction == 1.0 {
             return 1;
@@ -102,19 +107,21 @@ pub fn CanSee(
     let mut eyes = [0.0; 3];
     let mut spot = [0.0; 3];
 
-    let npc = unsafe { ctx.world.cast_mut().globals.NPC };
+    let npc = unsafe { (&mut *ctx.world).globals.NPC };
     CalcEntitySpot(ctx, npc, spot_t::SPOT_HEAD_LEAN, &mut eyes);
 
     CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, &mut spot);
     trap::Trace(
         ctx.engine,
-        &mut tr as *mut trace_t,
+        GTraceArgs::new(
+&mut tr as *mut trace_t,
         &eyes as *const vec3_t,
         core::ptr::null(),
         core::ptr::null(),
         &spot as *const vec3_t,
         unsafe { (*npc).s.number },
         MASK_OPAQUE,
+        ),
     );
     ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_OPAQUE);
     if tr.fraction == 1.0 {
@@ -124,13 +131,15 @@ pub fn CanSee(
     CalcEntitySpot(ctx, ent, spot_t::SPOT_HEAD, &mut spot);
     trap::Trace(
         ctx.engine,
-        &mut tr as *mut trace_t,
+        GTraceArgs::new(
+&mut tr as *mut trace_t,
         &eyes as *const vec3_t,
         core::ptr::null(),
         core::ptr::null(),
         &spot as *const vec3_t,
         unsafe { (*npc).s.number },
         MASK_OPAQUE,
+        ),
     );
     ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_OPAQUE);
     if tr.fraction == 1.0 {
@@ -140,13 +149,15 @@ pub fn CanSee(
     CalcEntitySpot(ctx, ent, spot_t::SPOT_LEGS, &mut spot);
     trap::Trace(
         ctx.engine,
-        &mut tr as *mut trace_t,
+        GTraceArgs::new(
+&mut tr as *mut trace_t,
         &eyes as *const vec3_t,
         core::ptr::null(),
         core::ptr::null(),
         &spot as *const vec3_t,
         unsafe { (*npc).s.number },
         MASK_OPAQUE,
+        ),
     );
     ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_OPAQUE);
     if tr.fraction == 1.0 {
@@ -327,8 +338,8 @@ pub fn InVisrange(
     let mut spot = [0.0; 3];
     let mut deltaVector = [0.0; 3];
 
-    let npc = unsafe { ctx.world.cast_mut().globals.NPC };
-    let npcinfo = unsafe { ctx.world.cast_mut().globals.NPCInfo };
+    let npc = unsafe { (&mut *ctx.world).globals.NPC };
+    let npcinfo = unsafe { (&mut *ctx.world).globals.NPCInfo };
 
     CalcEntitySpot(ctx, npc, spot_t::SPOT_HEAD_LEAN, &mut eyes);
     CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, &mut spot);
@@ -363,8 +374,8 @@ pub fn NPC_CheckVisibility(
         return visibility_t::VIS_NOT;
     }
 
-    let npc = unsafe { ctx.world.cast_mut().globals.NPC };
-    let npcinfo = unsafe { ctx.world.cast_mut().globals.NPCInfo };
+    let npc = unsafe { (&mut *ctx.world).globals.NPC };
+    let npcinfo = unsafe { (&mut *ctx.world).globals.NPCInfo };
 
     // check PVS
     if (flags & CHECK_PVS) != 0 {
@@ -443,7 +454,7 @@ pub fn G_CheckSoundEvents(
     let mut bestTime = -1;
     let max_hear_dist_squared = maxHearDist * maxHearDist;
 
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
 
     for i in 0..world.level.numAlertEvents as usize {
         // are we purposely ignoring this alert?
@@ -534,7 +545,7 @@ pub fn G_CheckSightEvents(
     let mut bestTime = -1;
     let max_see_dist_squared = maxSeeDist * maxSeeDist;
 
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
 
     for i in 0..world.level.numAlertEvents as usize {
         // are we purposely ignoring this alert?
@@ -613,7 +624,7 @@ pub fn G_CheckAlertEvents(
     let mut bestSoundAlert = -1;
     let mut bestSightAlert = -1;
 
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
 
     if world.g_entities[0].health <= 0 {
         // player is dead
@@ -700,8 +711,8 @@ pub fn NPC_CheckAlertEvents(
     mustHaveOwner: qboolean,
     minAlertLevel: c_int,
 ) -> c_int {
-    let npc = unsafe { ctx.world.cast_mut().globals.NPC };
-    let npcinfo = unsafe { ctx.world.cast_mut().globals.NPCInfo };
+    let npc = unsafe { (&mut *ctx.world).globals.NPC };
+    let npcinfo = unsafe { (&mut *ctx.world).globals.NPCInfo };
 
     G_CheckAlertEvents(
         ctx,
@@ -729,7 +740,7 @@ pub fn G_CheckForDanger(
         return 0;
     }
 
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
 
     if (world.level.alertEvents[alertEvent as usize].level as i32) >= AEL_DANGER as i32 {
         // run away!
@@ -782,7 +793,7 @@ pub fn NPC_CheckForDanger(
     ctx: GameContext<'_>,
     alertEvent: c_int,
 ) -> qboolean {
-    let npc = unsafe { ctx.world.cast_mut().globals.NPC };
+    let npc = unsafe { (&mut *ctx.world).globals.NPC };
     G_CheckForDanger(ctx, npc, alertEvent)
 }
 
@@ -797,7 +808,7 @@ pub fn AddSoundEvent(
     alertLevel: alertEventLevel_e,
     needLOS: qboolean,
 ) {
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
 
     // FIXME: Handle this in another manner?
     if world.level.numAlertEvents >= MAX_ALERT_EVENTS as c_int {
@@ -845,7 +856,7 @@ pub fn AddSightEvent(
     alertLevel: alertEventLevel_e,
     addLight: f32,
 ) {
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
 
     // FIXME: Handle this in another manner?
     if world.level.numAlertEvents >= MAX_ALERT_EVENTS as c_int {
@@ -883,7 +894,7 @@ pub fn AddSightEvent(
 pub fn ClearPlayerAlertEvents(ctx: GameContext<'_>) {
     pub const ALERT_CLEAR_TIME: c_int = 200;
 
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
     let cur_num_alerts = world.level.numAlertEvents;
     let mut i = 0;
     // loop through them all (max 32)
@@ -928,7 +939,7 @@ pub fn ClearPlayerAlertEvents(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:695-730`
 pub fn RemoveOldestAlert(ctx: GameContext<'_>) -> qboolean {
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
 
     let mut oldest_event = -1;
     let mut oldest_time = 16777216; // Q3_INFINITE
@@ -991,18 +1002,20 @@ pub fn G_ClearLOS(
     // FIXME: ENTITYNUM_NONE ok?
     trap::Trace(
         ctx.engine,
-        &mut tr as *mut trace_t,
+        GTraceArgs::new(
+&mut tr as *mut trace_t,
         &start as *const vec3_t,
         core::ptr::null(),
         core::ptr::null(),
         &end as *const vec3_t,
         ENTITYNUM_NONE,
         CONTENTS_OPAQUE,
+        ),
     );
     while tr.fraction < 1.0 && trace_count < 3 {
         // can see through 3 panes of glass
         if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
-            let world = unsafe { ctx.world.cast_mut() };
+            let world = unsafe { (&mut *ctx.world) };
             if tr.entityNum < MAX_GENTITIES as u32 {
                 if !world.g_entities[tr.entityNum as usize].r.svFlags
                     & (SVF_GLASS_BRUSH as c_int)
@@ -1010,15 +1023,17 @@ pub fn G_ClearLOS(
                 {
                     // can see through glass, trace again, ignoring me
                     trap::Trace(
-                        ctx.engine,
-                        &mut tr as *mut trace_t,
+        ctx.engine,
+        GTraceArgs::new(
+&mut tr as *mut trace_t,
                         &tr.endpos as *const vec3_t,
                         core::ptr::null(),
                         core::ptr::null(),
                         &end as *const vec3_t,
                         tr.entityNum as c_int,
                         MASK_OPAQUE,
-                    );
+        ),
+    );
                     trace_count += 1;
                     continue;
                 }
@@ -1178,7 +1193,7 @@ pub fn G_FindLocalInterestPoint(
     let mut eyes = [0.0; 3];
     let mut diff_vec = [0.0; 3];
 
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
 
     CalcEntitySpot(ctx, self_, spot_t::SPOT_HEAD_LEAN, &mut eyes);
     for i in 0..world.level.numInterestPoints as usize {
@@ -1225,7 +1240,7 @@ pub fn SP_target_interest(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
 ) {
-    let world = unsafe { ctx.world.cast_mut() };
+    let world = unsafe { (&mut *ctx.world) };
 
     if world.level.numInterestPoints >= MAX_INTEREST_POINTS as c_int {
         // ERROR: Too many interest points, limit is MAX_INTEREST_POINTS

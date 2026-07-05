@@ -184,7 +184,7 @@ pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
         o_evis = NPC_CheckVisibility(ctx, enemy as *const _ as *mut _, CHECK_FOV | CHECK_SHOOT);
         (*world).globals.enemyVisibility = o_evis;
 
-        if o_evis > VIS_PVS {
+        if o_evis as i32 > VIS_PVS as i32 {
             if NPC_EnemyTooFar(ctx, enemy as *const _ as *mut _, 0.0, qtrue) == 0 {
                 NPC_CheckCanAttack(ctx, 1.0, qfalse);
                 turned = true;
@@ -306,8 +306,8 @@ pub fn NPC_BSRunAndShoot(ctx: GameContext<'_>) {
                         NPC_LostEnemyDecideChase(ctx);
                     }
 
-                    unsafe { &mut *ctx.world }.globals.ucmd.angles[YAW] = 0.0;
-                    unsafe { &mut *ctx.world }.globals.ucmd.angles[PITCH] = 0.0;
+                    unsafe { &mut *ctx.world }.globals.ucmd.angles[YAW] = 0;
+                    unsafe { &mut *ctx.world }.globals.ucmd.angles[PITCH] = 0;
                     npc_info.goalEntity = npc.enemy;
                     npc_info.goalRadius = 12;
                     NPC_MoveToGoal(ctx, qtrue);

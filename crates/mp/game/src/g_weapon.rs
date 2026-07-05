@@ -164,9 +164,6 @@ const EMPLACED_GUN_HEALTH: c_int = 800;
 // original — still a plain `#define` there, never externed).
 const MAX_STRAFE_TIME: f32 = 2000.0;
 
-// Raven `MAX_XHAIR_DIST_ACCURACY` (`g_weapon.c:4049`).
-pub(crate) const MAX_XHAIR_DIST_ACCURACY: f32 = 20000.0;
-
 // Local mirrors of the same `surfaceflags.h` masks used across this file
 // (`g_items.rs`/`g_turret_G2.rs` precedent).
 const CONTENTS_LIGHTSABER: c_int = 0x0004_0000;
