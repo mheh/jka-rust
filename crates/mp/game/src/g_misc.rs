@@ -1088,12 +1088,21 @@ pub fn check_recharge(
     use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_USE;
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
     unsafe {
+        let activator = match (*ent).activator {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+        let activator_cl = if activator.is_null() {
+            core::ptr::null_mut()
+        } else {
+            (*activator).client as *mut gclient_t
+        };
         if (*ent).fly_sound_debounce_time < (*ctx.world).level.time
-            || (*ent).activator.is_none()
-            || (*ent).activator.as_ref().map_or(true, |a| a.client.is_null())
-            || (*(*ent).activator).client.as_ref().map_or(true, |c| c.pers.cmd.buttons & BUTTON_USE == 0)
+            || activator.is_null()
+            || activator_cl.is_null()
+            || (*activator_cl).pers.cmd.buttons & BUTTON_USE == 0
         {
-            if !(*ent).activator.is_none() {
+            if !activator.is_null() {
                 G_Sound(ctx, ent, CHAN_AUTO as c_int, (*ent).genericValue7);
             }
             (*ent).s.loopSound = 0;
@@ -2167,8 +2176,8 @@ pub fn maglock_die(
 ) {
     use crate::entity::flags::FL_INACTIVE;
     unsafe {
-        if !(*self_).activator.is_none() {
-            let door = (*self_).activator;
+        if let Some(door_id) = (*self_).activator {
+            let door = &mut (*ctx.world).entities[door_id.index()] as *mut gentity_t;
             (*door).lockCount -= 1;
             if (*door).lockCount == 0 {
                 (*door).flags &= !FL_INACTIVE;
