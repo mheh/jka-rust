@@ -1,0 +1,15 @@
+# Scenario 5: fall-onto-box. Spawn high (origin z=300, box bottom at 276) above
+# a 64-tall box sitting on the floor, and fall onto its top (z=64) with no
+# input. Exercises free-fall under gravity, PM_GroundTrace acquiring the box as
+# ground, and PM_CrashLand's quadratic fall-damage/anim logic on a hard landing
+# (legsTimer=TIMER_LAND, bobCycle reset to 0, velocity[2] zeroed, the
+# EV_FALL/EV_ROLL event choice). origin z=300 = 0x43960000.
+#
+# Floor (top z=0) plus a 64x64x64 box centred on origin, top at z=64.
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+brush -32 -32 0 32 32 64 surf=0x2000
+
+ps origin 0x00000000 0x00000000 0x43960000
+ps groundEntityNum 1023
+start
+cmd 50 0 0 0 0 0 0 0 x40

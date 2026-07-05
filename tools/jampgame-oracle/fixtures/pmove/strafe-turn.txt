@@ -1,0 +1,11 @@
+# Scenario 3: strafe-turn. Move forward-and-right (forwardmove=64,
+# rightmove=64) while turning the view yaw by +800 BAM shorts (~4.4 deg) every
+# command. Exercises PM_UpdateViewAngles / delta_angles, the pml.forward/right
+# projection basis rotating each step, diagonal acceleration, and PM_Friction.
+# The trailing "x30 800" means: repeat 30 times, adding 800 to the yaw short
+# each repeat (the parser's yaw-increment form).
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+
+ps origin 0x00000000 0x00000000 0x41c20000
+start
+cmd 50 64 64 0 0 0 0 0 x30 800

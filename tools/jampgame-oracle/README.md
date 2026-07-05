@@ -204,3 +204,248 @@ The oracle keeps its RNG in file statics, so each family is dumped by a fresh
 process. The Rust side mirrors that constraint: one `#[test]` per family, one
 `Rng` per family, sub-checks sequential inside — never parallel draws against a
 shared generator.
+
+---
+
+# The pmove single-step slice
+
+The frozen contract for this slice lives in [`pmove-spec.md`](pmove-spec.md)
+(committed verbatim next to this README so the repo is self-contained). It is
+the binding source of truth; this section is the operator's summary. Two
+dumpers, two goldens:
+
+- **`main_trace.c` → `golden/pmove_trace.txt`** — proves the axial-brush trace
+  stub (`pmworld.h`) *in isolation*, before any pmove logic. If a pmove golden
+  ever mismatches, this proves the collision layer is not the suspect.
+- **`main_pmove.c` → `golden/pmove.txt`** — drives the UNMODIFIED oracle `Pmove`
+  over six on-foot scenarios, dumping every playerState_t / pmove_t field that
+  changes during basic movement as IEEE-754 bit-hex.
+
+The Rust parity test (`crates/mp/game/tests/pmove_parity.rs`, Agent B) drives
+`mp_game::bg_pmove::Pmove` over the **same** fixture files + the **same**
+synthetic `animation.cfg` and must reproduce both goldens byte-for-byte.
+
+## Build model (`-DQAGAME`, `-fgnu89-inline`, RNG rename)
+
+`bg_pmove.c` under `-DQAGAME` (jampgame *is* Raven's QAGAME build) pulls in
+`g_local.h` + `ghoul2/G2.h`, so the pmove dumper links a much larger closure
+than the saberload slice and needs the ghoul2/cgame/icarus header trees copied
+into `build/`. The linked TUs (all UNMODIFIED oracle):
+
+`bg_pmove.c bg_slidemove.c bg_panimate.c bg_saber.c bg_saberLoad.c bg_misc.c
+bg_weapons.c q_shared.c q_math.c` + `main_pmove.c`.
+
+Flags of note beyond the shared set (`-D__linux__ -ffp-contract=off -include
+shim.h`):
+
+- **`-fgnu89-inline`** — Raven's PM_* helpers are non-static `inline`
+  (`qboolean PM_INLINE PM_IsRocketTrooper(void)`, `PM_INLINE == ID_INLINE ==
+  inline`). Under C99 semantics clang emits *no* out-of-line symbol at `-O0`, so
+  the intra-TU call goes unresolved at link. gnu89 inline semantics (Raven's own
+  compilation model) emit the external definition. This changes only symbol
+  emission — never the IEEE math.
+- **q_math.c is recompiled with its holdrand RNG functions renamed**
+  (`-DQ_irand=o_Q_irand -Dirand=o_irand -Dflrand=o_flrand -DQ_flrand=o_Q_flrand
+  -DRand_Init=o_Rand_Init`). See "RNG tripwire" below.
+- No `animtable_def.c` — `bg_panimate.c` `#include`s `cgame/animtable.h`
+  directly, so it already defines `animTable`; linking `animtable_def.c` (as the
+  saberload slice does) would duplicate the symbol.
+
+The trace dumper is self-contained (only `pmworld.h` + a fixture parser) and
+compiles for the plain native target — no QAGAME, links nothing.
+
+## Stub table (`main_pmove.c`)
+
+The TU provides everything the closure extern-references from unlinked game TUs
+or the engine. Every entry that must NOT be reached on the basic on-foot path is
+an `abort()`ing stub — a firing stub means a fixture leaked off the path, and
+the abort makes it loud + greppable (the Rust `TestCallbacks`/`TestTraps`
+`panic!` for the same reason).
+
+| symbol(s) | role |
+| --- | --- |
+| `g_entities[]`, `level`, `g_gametype`, `bg_fighterAltControl`, `g_vehWeaponInfo` | zeroed data globals the closure reads |
+| `FPTable` | force-power name/id table (bg_saga form), matches the port |
+| `pmove_t.trace` / `.pointcontents` | the `pmworld.h` axial-brush world (see below) |
+| `trap_SnapVector` | `rintf` per component (see snap_vector pin) |
+| `trap_FS_FOpenFile/Read/FCloseFile/Write/GetFileList` | fixtures-backed; only the `animation.cfg` load path uses them. Any request is mapped to `<fixdir>/<basename>`; a missing file returns −1 so optional loads (animevents) skip |
+| `Q_irand` (+`irand`/`flrand`/`Q_flrand`/`Rand_Init`) | 32-bit holdrand LCG mirror + draw counter — the RNG tripwire |
+| `Com_Printf` → stderr; `Com_Error` → `exit(3)` | diagnostics never enter stdout; a triggered `Com_Error` is a fixture bug |
+| `Client_CheckImpactBBrush`, `G_CheapWeaponFire`, `G_Damage`, `G_DamageFromKiller`, `G_AddEvent`, `G_PlayEffect(ID)`, `G_CanBeEnemy`, `G_FlyVehicleSurfaceDestruction`, `G_NewString`, `G_SoundIndex`, `NPC_SetAnim`, `Q3_SetParm`, `TryGrapple`, `WP_GetVehicleCamPos`, `FighterIsLanded`, `trap_Trace`, `trap_FX_PlayEffect`, `trap_R_RegisterSkin`, `trap_G2API_*`, `strap_G2API_*` | **`abort()` stubs** — vehicle / entity-impact / ghoul2 / effects surface, all unreachable on the basic on-foot MELEE path |
+
+The two `GameCallbacks` that *are* reachable — the QAGAME anim restart-check —
+are served directly by the anim mirror (below), not by a stub.
+
+## Anim mirror rule
+
+`bg_panimate`'s QAGAME `BG_Start{Legs,Torso}Anim` restart-check reads
+`g_entities[clientNum].s.legsAnim/torsoAnim` — the value
+`BG_PlayerStateToEntityState` writes live at the *end* of each server frame,
+i.e. the *previous* frame's `ps` anim. The dumper reproduces this by copying
+`ps.legsAnim/torsoAnim` into `g_entities[0].s` **after** every `Pmove` (and
+seeding it from the initial `ps` at `start`), so the next step's restart-check
+sees the prior value. The Rust `TestCallbacks::entity_legs/torso_anim` returns
+the identical mirror.
+
+## Synthetic `animation.cfg`
+
+`Pmove` needs a loaded animation set (`pm->animations`): `PM_SetAnim` →
+`BG_SetAnimFinal` **asserts** `firstFrame > 0 || numFrames > 0` on any anim it
+plays, and both sides must parse the same frame data or their `legsTimer` /
+`torsoTimer` / `bobCycle` diverge. There is no real `animation.cfg` asset in the
+repo, so `fixtures/pmove/animation.cfg` is **synthetic** — generated by
+`gen_animcfg.py` from the oracle `animTable` (`cgame/animtable.h`). It emits
+*every* animTable token so no assert can fire regardless of path; the ~50
+movement anims the on-foot MELEE path plays (`BOTH_STAND1`, `BOTH_WALK1`,
+`BOTH_RUN1`, `BOTH_JUMP1`, `BOTH_INAIR1`, `BOTH_LAND1`, roll/land/turn/crouch
+variants, `TORSO_WEAPONREADY*`) carry hand-tuned, distinct, plausible frame
+blocks so the timer goldens are non-degenerate; every other token carries a
+uniform filler `1 1 -1 20` purely to satisfy the assert and is never played.
+The specific numbers are irrelevant to parity because **both** dumper and Rust
+port parse this exact committed file. The grammar is Raven's
+`BG_ParseAnimationFile` (`bg_panimate.c:2442-2520`): `<TOKEN> <firstFrame>
+<numFrames> <loopFrames> <fps>`, `//` and `/* */` comments honoured by
+`COM_Parse`; `frameLerp = ceil(1000/fps)`. Both sides load it via
+`BG_ParseAnimationFile("models/players/_humanoid/animation.cfg",
+bgHumanoidAnimations, qtrue)` (the dumper redirects the vpath to the fixture
+file through the stubbed FS traps).
+
+## snap_vector pin
+
+`trap_SnapVector(v)` is pinned to `v[i] = rintf(v[i])` ↔ Rust
+`f32::round_ties_even` (round-to-nearest, ties-to-even). **This may differ from
+the real jamp engine's `SnapVector`** (an x87/SSE `cvtss2si`-style round in the
+shipping build). It is fine for the differential slice — both sides use `rintf`
+— but is flagged here for the eventual live-engine seam revisit.
+
+## The trace stub (`pmworld.h`) — verbatim algorithm
+
+The world is a set of axis-aligned box brushes (`brush x0 y0 z0 x1 y1 z1
+surf=<hex>`). The trace is Q3's `CM_ClipBoxToBrush` restricted to those axial
+brushes — which reproduces exactly the semantics pmove depends on. **Bit-identity
+rules**: (a) every float literal carries the `f` suffix (a bare `0.125` promotes
+the subexpression to `double`; the Rust f32 side would diverge); (b) only f32
+`+ - * /` and compares — no libm/fabs/sqrt/macros, because axial normals are
+exact `(0,±1)` and need no normalization. With `-ffp-contract=off` the result is
+IEEE-deterministic on both sides. Pseudocode (per brush; `SURFACE_CLIP_EPSILON =
+0.125f`):
+
+```
+enterFrac = -1; leaveFrac = 1; startout = getout = 0; clip = none
+for each of the 6 outward axial faces (normal exactly one of ±x,±y,±z; dist = world face dist):
+    ofs[i]  = normal[i] < 0 ? boxMaxs[i] : boxMins[i]           # Minkowski expand
+    dist    = faceDist - dot(ofs, normal)
+    d1 = dot(start, normal) - dist                             # signed dist, start
+    d2 = dot(end,   normal) - dist                             # signed dist, end
+    if d2 > 0: getout   = 1                                     # end not in solid
+    if d1 > 0: startout = 1                                     # start not in solid
+    if d1 > 0 and (d2 >= 0.125f or d2 >= d1): return           # wholly in front -> no hit
+    if d1 <= 0 and d2 <= 0: continue                            # never crosses this plane
+    if d1 > d2:                                                 # entering
+        f = (d1 - 0.125f) / (d1 - d2); if f < 0: f = 0
+        if f > enterFrac: enterFrac = f; clip = this plane
+    else:                                                       # leaving
+        f = (d1 + 0.125f) / (d1 - d2); if f > 1: f = 1
+        if f < leaveFrac: leaveFrac = f
+if not startout:                                               # start was inside brush
+    startsolid = 1; if not getout: allsolid = 1; fraction = 0
+    return
+if enterFrac < leaveFrac and enterFrac > -1 and enterFrac < fraction:
+    if enterFrac < 0: enterFrac = 0
+    fraction = enterFrac; plane = clip; surfaceFlags = brush.surf; contents = CONTENTS_SOLID
+```
+
+Driver outputs pmove consumes: `allsolid`, `startsolid`, `fraction`,
+`endpos[i] = start[i] + fraction*(end[i]-start[i])`, axial `plane.normal` +
+`plane.dist` + `plane.type`/`signbits`, per-brush `surfaceFlags`,
+`contents = CONTENTS_SOLID`, and `entityNum = fraction < 1 ? ENTITYNUM_WORLD
+(1022) : ENTITYNUM_NONE (1023)`. `pointcontents` = point inside any brush AABB
+→ `CONTENTS_SOLID` else 0.
+
+## RNG tripwire
+
+The only mid-pmove RNG draws are `PM_HoverTrace`/jetpack (`Q_irand`), which the
+fixtures never reach. To make "no draw" *observable*, `main_pmove.c` defines its
+own `Q_irand` (+`irand`/`flrand`/…) mirroring Raven's holdrand LCG **normalized
+to 32-bit** (the port's `u32` `Rng` model — Raven's `unsigned long holdrand` is
+64-bit on this LP64 host and would diverge) plus a draw counter; `run.sh` renames
+q_math.c's own copies to `o_*` to avoid a duplicate symbol. `holdrand` is seeded
+to `0x89abcdef` and dumped as `rng=%08x` every step. On the basic path it stays
+`0x89abcdef` in all six scenarios — any draw would move it and the diff would
+catch it. (Deviation from spec §4, which named the file-static `holdrand`
+directly: that static is inaccessible in the unmodified q_math.c, so the tripwire
+is this reproducible 32-bit mirror instead — strictly observable on both sides.)
+
+## Fixture grammar (as implemented — Agent B must match)
+
+Both dumpers read line-oriented text; `#` starts a comment. Floats are either a
+plain (possibly negative) integer — parsed exactly as `(float)atol` — or an
+`0x????????` f32 **bit pattern**; there are no decimal-point tokens (they would
+double-round differently on the two sides).
+
+**`fixtures/pmove/trace.txt`** (trace dumper):
+```
+brush  <x0> <y0> <z0> <x1> <y1> <z1> surf=<hex>
+sweep  <sx> <sy> <sz> <ex> <ey> <ez> <mnx> <mny> <mnz> <mxx> <mxy> <mxz>
+reset                          # clear the brush set
+```
+
+**`fixtures/pmove/<scenario>.txt`** (pmove dumper):
+```
+brush <x0> <y0> <z0> <x1> <y1> <z1> surf=<hex>     # world geometry
+ps    <field> <value...>                            # override a baseline pin
+start                                               # freeze anim mirror + emit step 0 (pre-move)
+cmd   <dt> <fwd> <right> <up> <buttons> <yaw> <pitch> <roll> [xN [yawinc]]
+```
+`ps` fields: `origin`/`velocity`/`viewangles` (3 f32), `delta_angles` (3 int),
+and scalars `groundEntityNum` `pm_flags` `pm_type` `legsAnim` `torsoAnim`
+`weapon` `gravity` `speed` (f32) `basespeed` `fallingToDeath` `clientNum`. A
+`cmd` row's `angles` are raw `int16` BAM (no `ANGLE2SHORT` float math in the
+parser); `buttons` accepts hex. `xN` repeats the row N times; an optional
+`yawinc` adds to the yaw short each repeat (used by strafe-turn). (This is the
+spec §5 grammar with `ps <field> <value>` spelled space-separated rather than
+`key=value`, and `yawinc` added for the turning scenario.)
+
+The **baseline pins** every scenario starts from (spec §2), before `ps`
+overrides: `pm_type=PM_NORMAL`, `weapon=cmd.weapon=WP_MELEE`,
+`weaponstate=WEAPON_READY`, `stats[STAT_HEALTH]=100`, `gravity=800`,
+`speed=250`, `basespeed=250`, `standheight=40`, `crouchheight=16`,
+`viewheight=DEFAULT_VIEWHEIGHT`, `groundEntityNum=ENTITYNUM_NONE`,
+`clientNum=0`, `m_iVehicleNum=0`, everything else (fd, saberMove, zoomMode,
+heldByClient, emplacedIndex, legsAnim/torsoAnim, …) zero; `tracemask =
+MASK_PLAYERSOLID`, `baseEnt = g_entities`, `entSize = sizeof(gentity_t)`.
+
+## Dump line format
+
+One line per step (`s=N`; step 0 is the pre-move baseline emitted at `start`):
+```
+s=N t=<commandTime> org=<3×f32hex> vel=<3×f32hex> va=<3×f32hex> da=<3×int>
+gnd=<groundEntityNum> pmf=<pm_flags hex> pmt=<pm_time> la=<legsAnim>:<legsTimer>
+ta=<torsoAnim>:<torsoTimer> fl=<legsFlip><torsoFlip> bob=<bobCycle>
+vh=<viewheight> ef=<eFlags hex> seq=<eventSequence>
+ev=<events[0]>:<eventParms[0]>,<events[1]>:<eventParms[1]> wt=<weaponTime>
+ws=<weaponstate> spd=<speed f32hex> wl=<waterlevel> wtp=<watertype>
+nt=<numtouch> mn=<mins[2] f32hex> mx=<maxs[2] f32hex> xy=<xyspeed f32hex>
+air=<inAirAnim> f2d=<fallingToDeath> fjz=<fd.forceJumpZStart f32hex>
+ntr=<trace calls this Pmove> rng=<holdrand hex>
+```
+`ntr` resets per `Pmove` (a per-step trace-count tripwire; a `dt>66` row
+aggregates the chop-loop's PmoveSingle calls). `rng` is the holdrand tripwire.
+
+## The six scenarios (`golden/pmove.txt`, concatenated with `-- scenario X --`)
+
+| # | scenario | exercises | steps |
+| --- | --- | --- | --- |
+| 1 | `idle` | ground snap, stand anim, resting stability | 21 |
+| 2 | `walk-fwd` | forward accel, bobCycle, run/walk gait, BUTTON_WALKING | 61 |
+| 3 | `strafe-turn` | diagonal move + per-cmd yaw turn, forward/right basis, friction | 31 |
+| 4 | `jump-land` | PM_CheckJump (EV_JUMP=16), PMF_JUMP_HELD upmove=20 refeed, ballistic arc, PM_CrashLand (EV_FOOTSTEP=2) | 38 |
+| 5 | `fall-onto-box` | free-fall, ground reacquire on a box top, PM_CrashLand quadratic (EV_FALL=11, material parm) | 41 |
+| 6 | `wall-step` | PM_StepSlideMove step-up over a 16-tall ledge, clip-slide + corner crease on a 128-tall wall, one `dt=200` chop row | 34 |
+
+Sanity anchors baked into the goldens: idle settles `gnd=1022` (ENTITYNUM_WORLD)
+by step 1 with zero velocity; jump shows `EV_JUMP` + a ~19-step airborne arc
+(`gnd=1023`, `pmf=2` PMF_JUMP_HELD, `la=1138` BOTH_JUMP1) + landing; fall parks
+the box-top at `88.125`; wall-step steps up onto the ledge (`origin z 40.125`)
+then stops at the wall; no `abort()` fires; `rng` stays `89abcdef` across all
+six.

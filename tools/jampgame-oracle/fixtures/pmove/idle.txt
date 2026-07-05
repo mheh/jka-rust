@@ -1,0 +1,12 @@
+# Scenario 1: idle. Spawn 0.25 above a flat floor (top z=0) and feed 20 empty
+# 50ms commands. Exercises the ground snap, the stand anim, and weaponTime drain
+# to a stable resting state. groundEntityNum must settle to ENTITYNUM_WORLD
+# (1022), velocity to 0, and the trace count / rng tripwire must hold constant.
+#
+# origin z: box mins2 = -24, so a box bottom at 0.25 means origin z = 24.25.
+# 24.25 = 0x41c20000.
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+
+ps origin 0x00000000 0x00000000 0x41c20000
+start
+cmd 50 0 0 0 0 0 0 0 x20
