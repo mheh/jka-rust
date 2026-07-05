@@ -798,7 +798,8 @@ pub fn NPC_Begin(
         crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*client).renderInfo.eyePoint);
 
         ucmd = core::mem::zeroed();
-        crate::q_math::_VectorCopy((*client).pers.cmd.angles, &mut ucmd.angles);
+        // Raven `VectorCopy` is a macro; here it copies the `int angles[3]`.
+        ucmd.angles = (*client).pers.cmd.angles;
 
         (*client).ps.groundEntityNum = ENTITYNUM_NONE;
 
@@ -931,7 +932,7 @@ pub fn NPC_Spawn_Do(
             bottom[2] = MIN_WORLD_COORD as f32;
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(
+                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                     &mut tr as *mut trace_t,
                     &(*ent).r.currentOrigin as *const vec3_t,
                     &(*ent).r.mins as *const vec3_t,
@@ -956,15 +957,15 @@ pub fn NPC_Spawn_Do(
         newent = crate::g_utils::G_Spawn(ctx);
 
         if newent.is_null() {
-            crate::g_main::Com_Printf(cstr(&format!("{}ERROR: NPC G_Spawn failed\n", S_COLOR_RED)).as_ptr());
+            crate::g_main::Com_Printf(cstr(&format!("{}ERROR: NPC G_Spawn failed\n", S_COLOR_RED.to_string_lossy())).as_ptr());
             return core::ptr::null_mut();
         }
 
         (*newent).fullName = (*ent).fullName;
 
-        (*newent).NPC = New_NPC_t(ctx, (*newent).s.number);
+        (*newent).NPC = New_NPC_t(ctx, (*newent).s.number) as *mut c_void;
         if (*newent).NPC.is_null() {
-            crate::g_main::Com_Printf(cstr(&format!("{}ERROR: NPC G_Alloc NPC failed\n", S_COLOR_RED)).as_ptr());
+            crate::g_main::Com_Printf(cstr(&format!("{}ERROR: NPC G_Alloc NPC failed\n", S_COLOR_RED.to_string_lossy())).as_ptr());
             // Raven: goto finish; (unreachable `return NULL;` right after — the
             // goto always wins). Preserve control-flow, not shape (§C10).
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
@@ -990,7 +991,7 @@ pub fn NPC_Spawn_Do(
         (*temp_goal).r.svFlags |= SVF_NOCLIENT;
 
         if (*newent).client.is_null() {
-            crate::g_main::Com_Printf(cstr(&format!("{}ERROR: NPC BG_Alloc client failed\n", S_COLOR_RED)).as_ptr());
+            crate::g_main::Com_Printf(cstr(&format!("{}ERROR: NPC BG_Alloc client failed\n", S_COLOR_RED.to_string_lossy())).as_ptr());
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
                 crate::g_utils::G_SetOrigin(ent, save_org);
             }
@@ -1050,7 +1051,7 @@ pub fn NPC_Spawn_Do(
                     crate::WalkerNPC::G_CreateWalkerNPC(ctx, (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t, (*ent).NPC_type as *const c_char);
                 }
                 _ => {
-                    crate::g_main::Com_Printf(cstr(&format!("{} ERROR: Couldn't spawn NPC {}\n", S_COLOR_RED, cstr_to_str((*ent).NPC_type as *const c_char))).as_ptr());
+                    crate::g_main::Com_Printf(cstr(&format!("{} ERROR: Couldn't spawn NPC {}\n", S_COLOR_RED.to_string_lossy(), cstr_to_str((*ent).NPC_type as *const c_char))).as_ptr());
                     crate::g_utils::G_FreeEntity(ctx, newent);
                     crate::g_utils::G_FreeEntity(ctx, ent);
                     return core::ptr::null_mut();
@@ -1096,7 +1097,7 @@ pub fn NPC_Spawn_Do(
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*newent).r.currentOrigin);
         crate::g_utils::G_SetOrigin(newent, (*ent).s.origin);
         if crate::NPC_stats::NPC_ParseParms(ctx, (*ent).NPC_type as *const c_char, newent) == qfalse {
-            crate::g_main::Com_Printf(cstr(&format!("{} ERROR: Couldn't spawn NPC {}\n", S_COLOR_RED, cstr_to_str((*ent).NPC_type as *const c_char))).as_ptr());
+            crate::g_main::Com_Printf(cstr(&format!("{} ERROR: Couldn't spawn NPC {}\n", S_COLOR_RED.to_string_lossy(), cstr_to_str((*ent).NPC_type as *const c_char))).as_ptr());
             crate::g_utils::G_FreeEntity(ctx, newent);
             crate::g_utils::G_FreeEntity(ctx, ent);
             return core::ptr::null_mut();
@@ -1166,9 +1167,11 @@ pub fn NPC_Spawn_Do(
 
         if !(*ent).parms.is_null() {
             for parm_num in 0..MAX_PARMS {
-                let p = (*(*ent).parms).parm[parm_num as usize];
-                if !p.is_null() && *p != 0 {
-                    Q3_SetParm(ctx, (*newent).s.number, (parm_num) as i32, p as *const c_char);
+                // Raven's `parm[parmNum]` null arm is constant-true (char array,
+                // never NULL); only the `[0]` emptiness check survives.
+                let p = &(*(*ent).parms).parm[parm_num as usize];
+                if p[0] != 0 {
+                    Q3_SetParm(ctx, (*newent).s.number, (parm_num) as i32, p.as_ptr() as *const c_char);
                 }
             }
         }
@@ -1360,7 +1363,7 @@ pub fn SP_NPC_spawner(
         if (*self_).wait == (0) as f32 {
             (*self_).wait = (500) as f32;
         } else {
-            (*self_).wait *= 1000;
+            (*self_).wait *= (1000) as f32;
         }
 
         (*self_).delay *= 1000;
@@ -1527,7 +1530,7 @@ pub fn SP_NPC_Vehicle(
         if (*self_).wait == (0) as f32 {
             (*self_).wait = (500) as f32;
         } else {
-            (*self_).wait *= 1000;
+            (*self_).wait *= (1000) as f32;
         }
         (*self_).delay *= 1000;
 
@@ -2911,7 +2914,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 Com_Printf(
                     cstr(&format!(
                         "NPC_Kill Error: team '{}' not recognized\n",
-                        cstr_to_str(name.as_ptr() as *const c_char)
+                        unsafe { cstr_to_str(name.as_ptr() as *const c_char) }
                     ))
                     .as_ptr(),
                 );
@@ -2942,8 +2945,8 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                     Com_Printf(
                         cstr(&format!(
                             "Killing NPC {} named {}\n",
-                            cstr_to_str(player.NPC_type as *const c_char),
-                            cstr_to_str(player.targetname as *const c_char)
+                            unsafe { cstr_to_str(player.NPC_type as *const c_char) },
+                            unsafe { cstr_to_str(player.targetname as *const c_char) }
                         ))
                         .as_ptr(),
                     );
@@ -2977,8 +2980,8 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                     Com_Printf(
                         cstr(&format!(
                             "Killing NPC {} named {}\n",
-                            cstr_to_str(player.NPC_type as *const c_char),
-                            cstr_to_str(player.targetname as *const c_char)
+                            unsafe { cstr_to_str(player.NPC_type as *const c_char) },
+                            unsafe { cstr_to_str(player.targetname as *const c_char) }
                         ))
                         .as_ptr(),
                     );
@@ -2995,8 +2998,8 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 Com_Printf(
                         cstr(&format!(
                             "Killing NPC {} named {}\n",
-                            cstr_to_str(player.NPC_type as *const c_char),
-                            cstr_to_str(player.targetname as *const c_char)
+                            unsafe { cstr_to_str(player.NPC_type as *const c_char) },
+                            unsafe { cstr_to_str(player.targetname as *const c_char) }
                         ))
                         .as_ptr(),
                     );
@@ -3079,7 +3082,7 @@ pub fn Cmd_NPC_f(
                 Com_Printf(
                     cstr(&format!(
                         "ERROR: NPC score - no such NPC {}\n",
-                        cstr_to_str(cmd2.as_ptr() as *const c_char)
+                        unsafe { cstr_to_str(cmd2.as_ptr() as *const c_char) }
                     ))
                     .as_ptr(),
                 );

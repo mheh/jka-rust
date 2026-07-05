@@ -431,7 +431,10 @@ pub fn PM_CheckPullAttack() -> saberMoveName_t {
 /// Raven: returns a pointer to the requested saberNum.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saber.c:4100-4141`
-pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, bg: &BgState) -> *mut saberInfo_t {
+// The QAGAME branch reads the game-tier `g_entities` arena, which bg code
+// cannot name; callers thread the arena base in — pmove callers from the
+// `pm->baseEnt` overlay, game-tier callers from `(*ctx.world).g_entities`.
+pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, ents: *mut gentity_t) -> *mut saberInfo_t {
     unsafe {
         // Per oracle C code (QAGAME branch):
         // gentity_t *ent = &g_entities[clientNum];
@@ -441,32 +444,21 @@ pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, bg: &BgState) -> *mut saber
         //   return &ent->client->saber[saberNum];
         // }
         // return NULL;
-
-        // PORT-NOTE(entity-access-arena): BG_MySaber needs to access g_entities[clientNum].
-        // Entity access is normally through PM_BGEntForNum (PmoveContext method).
-        // In this free-fn context, the entity array is accessed through an arena pattern.
-        // Assuming the g_entities array is accessible via a module-level or prelude mechanism,
-        // we dereference it as a contiguous array of gentity_t pointers and index by clientNum.
-
-        // Use the gentity arena accessor pattern (entities stored as pointers in an array)
-        // This accesses the global g_entities arena, casting appropriately
-        let entities_arena_ptr: *mut gentity_t = *(core::ptr::from_ref(&g_entities) as *const *mut gentity_t);
-
-        if entities_arena_ptr.is_null() || clientNum < 0 {
+        if ents.is_null() || clientNum < 0 {
             return core::ptr::null_mut();
         }
 
-        let ent: *mut gentity_t = entities_arena_ptr.add(clientNum as usize);
+        let ent: *mut gentity_t = ents.add(clientNum as usize);
 
         // Check inuse and client existence
         if (*ent).inuse == 0 || (*ent).client.is_null() {
             return core::ptr::null_mut();
         }
 
-        // Check if the saber has a model
-        if (*((*ent).client as *mut gclient_t)).saber[saberNum as usize].model.is_null()
-            || (*((*ent).client as *mut gclient_t)).saber[saberNum as usize].model[0] as c_int == 0
-        {
+        // Check if the saber has a model. Raven's `!saber.model` tests a
+        // `char model[MAX_QPATH]` array, which never decays to NULL — so that
+        // clause is constant-false and only the empty-string check survives.
+        if (*((*ent).client as *mut gclient_t)).saber[saberNum as usize].model[0] as c_int == 0 {
             return core::ptr::null_mut();
         }
 
@@ -2376,7 +2368,7 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).weaponstate == WEAPON_DROPPING as c_int {
-                PM_FinishWeaponChange();
+                self.PM_FinishWeaponChange();
                 return;
             }
 

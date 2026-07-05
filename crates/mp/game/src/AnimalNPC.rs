@@ -31,7 +31,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         if level_time >= (*pVeh).m_iDieTime {
             // If the vehicle is not empty. (`Inhabited`/`EjectAll` have
             // no Animal override, so dispatch resolves to the generic base.)
-            if crate::veh_dispatch::inhabited(pVeh) != qfalse {
+            if crate::veh_dispatch::inhabited(ctx, pVeh) != qfalse {
                 crate::veh_dispatch::eject_all(ctx, pVeh);
             }
         }
@@ -56,7 +56,7 @@ pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:168-329`
-pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
+pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut speedInc: f32;
         let mut speedIdleDec: f32;
@@ -147,20 +147,18 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 /// By BG-compatible, I mean no use of game-specific data - ONLY use
 /// stuff available in the MP bgEntity.
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:338-464`
-pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
+pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity;
         let parentPS = (*parent).playerState;
 
         let rider = if (*parent).s.owner != ENTITYNUM_NONE {
-            // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`.
-            // This dispatch-virtual signature carries no pm/world handle, so
-            // resolve through the contiguous game arena relative to `parent`
-            // (which sits at its own `s.number`); the `gentity_t` cast gives the
-            // arena stride.
-            (parent as *mut gentity_t)
-                .offset(((*parent).s.owner - (*parent).s.number) as isize)
-                as *mut bgEntity_t
+            // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`;
+            // `ctx` now threads the world, so index the game arena directly.
+            (*ctx.world)
+                .g_entities
+                .as_mut_ptr()
+                .add((*parent).s.owner as usize) as *mut bgEntity_t
         } else {
             core::ptr::null_mut()
         };
@@ -223,13 +221,13 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:467-470`
 pub fn AnimalProcessOri(
     ctx: GameContext<'_>,pVeh: *mut Vehicle_t) {
-    ProcessOrientCommands(pVeh);
+    ProcessOrientCommands(ctx, pVeh);
 }
 
 /// Raven `AnimateVehicle`.
 ///
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:474-615`
-pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
+pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut anim: animNumber_t = BOTH_VT_IDLE;
         let mut iFlags: c_int = SETANIM_FLAG_NORMAL;
@@ -272,8 +270,9 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
                 }
 
                 iAnimLen = (crate::bg_panimate::BG_AnimLength(
+                    &(*ctx.world).bg_state,
                     (*parent).localAnimIndex,
-                    anim,
+                    anim as c_int,
                 ) as f32 * 0.7f32) as c_int;
                 (*pVeh).m_iBoarding = level_time + iAnimLen;
 
@@ -336,7 +335,7 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
 /// Raven: rwwFIXMEFIXME: This is all going to have to be predicted I think,
 /// or it will feel awful and lagged.
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:620-849`
-pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
+pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut anim: animNumber_t = BOTH_VT_IDLE;
         let mut iFlags: c_int = SETANIM_FLAG_NORMAL;
@@ -423,12 +422,12 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
                         let actor_right_dot: f32;
 
                         // `pilot->enemy` is an `EntityId` arena index (Raven's
-                        // `gentity_t*`). No world handle in this dispatch-virtual
-                        // signature, so resolve it through the contiguous arena
-                        // relative to `pilot` (at its own `s.number`).
-                        let enemy_ent = pilot.offset(
-                            ((*pilot).enemy.unwrap().0 as i32 - (*pilot).s.number) as isize,
-                        );
+                        // `gentity_t*`); `ctx` now threads the world, so index the
+                        // game arena directly.
+                        let enemy_ent = (*ctx.world)
+                            .g_entities
+                            .as_mut_ptr()
+                            .add((*pilot).enemy.unwrap().0 as usize);
                         crate::q_math::_VectorSubtract(
                             (*pilot).r.currentOrigin,
                             (*enemy_ent).r.currentOrigin,

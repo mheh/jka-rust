@@ -108,7 +108,7 @@ pub extern "C" fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qbool
 ///
 /// Raven: MP RULE - ALL PROCESSMOVECOMMANDS FUNCTIONS MUST BE BG-COMPATIBLE!!!
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:278-490`
-pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
+pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut speedInc: f32;
         let speedIdleDec: f32;
@@ -131,7 +131,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
         if (*pVeh).m_ulFlags & VEH_FLYING != 0 {
             speedInc = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.acceleration).unwrap_or(0.0)
                 * (*pVeh).m_fTimeModifier * 0.4f32;
-        } else if crate::veh_dispatch::inhabited(pVeh) as c_int == 0 {
+        } else if crate::veh_dispatch::inhabited(ctx, pVeh) as c_int == 0 {
             // Drifts to a stop
             speedInc = 0.0f32;
         } else {
@@ -258,7 +258,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 /// Raven: the `_JK2MP` branch handles MP vehicle orientation (yaw control via view angles);
 /// the `#else` SP branch (lines 553-594) is dead code and is dropped per porting-rules §10.
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:505-600`
-pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
+pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let riderPS: *mut playerState_t;
         let parentPS: *mut playerState_t;
@@ -311,7 +311,7 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
 /// Raven: "This function makes sure that the vehicle is properly animated."
 /// The body is empty in the oracle (SpeederNPC.c:609) — a deliberate no-op.
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:608-610`
-pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {}
+pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {}
 
 /// Raven `AnimateRiders`.
 ///
@@ -321,7 +321,7 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {}
 /// `#ifdef _JK2MP` with `if (1) return;` at line 741, making it dead code, dropped per
 /// porting-rules §10.
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:630-1038`
-pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
+pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         // Only handle boarding animation in MP build; pilot animation is dead code
         if (*pVeh).m_iBoarding == 0 {
@@ -348,12 +348,17 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
                 Anim = BOTH_VS_MOUNTTHROW_L;
             }
 
-            // Set the delay time (40% of animation time)
-            // PORT-NOTE(bg-anim-table): BG_AnimLength requires bgAllAnims table access
-            // iAnimLen = BG_AnimLength(pVeh->m_pPilot->localAnimIndex, Anim) * 0.4f32;
+            // Set the delay time (40% of animation time). `ctx` now threads the bg
+            // channel into this dispatch chain, so BG_AnimLength is reachable
+            // (game-tier free-function form off `bg_state`).
+            iAnimLen = (crate::bg_panimate::BG_AnimLength(
+                &(*ctx.world).bg_state,
+                (*(*pVeh).m_pPilot).localAnimIndex,
+                Anim as c_int,
+            ) as f32
+                * 0.4f32) as c_int;
             // PORT-NOTE(vtable-access): BG_GetTime() needs game-tier state or engine access
             // pVeh->m_iBoarding = BG_GetTime() + iAnimLen;
-            iAnimLen = 100; // Placeholder
 
             // Set the animation which won't be interrupted until completed
             // PORT-NOTE(bg-anim-dispatch): BG_SetAnim requires bgAllAnims and PmoveContext

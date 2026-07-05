@@ -4,7 +4,13 @@
 //! types), verified against oracle with size/offset asserts. //TODO: Port the
 //! gameplay logic (g_*.c functions).
 
-#![allow(non_camel_case_types, non_snake_case)]
+#![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
+// The pass-3 port reaches world state through raw pointers (`(*ctx.world).…`),
+// so container indexing on those paths implicitly autorefs through the deref —
+// the exact pattern this deny-by-default lint flags. The refs are intentional
+// (single-writer world, seam-confined unsafe); silencing beats 130 noisy
+// explicit-ref rewrites. Revisit when the safe-state migration lands.
+#![allow(dangerous_implicit_autorefs)]
 
 pub mod ai;
 pub mod botai;

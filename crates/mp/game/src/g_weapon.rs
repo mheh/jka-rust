@@ -574,8 +574,9 @@ pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs::new(
                         &mut tr,
                         &start as *const vec3_t,
-                        &[0.0f32; 3] as *const vec3_t,
-                        &[0.0f32; 3] as *const vec3_t,
+                        // Oracle passes NULL mins/maxs here (point trace).
+                        core::ptr::null(),
+                        core::ptr::null(),
                         &end as *const vec3_t,
                         ignore,
                         MASK_SHOT,
@@ -840,8 +841,9 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs::new(
                         &mut tr,
                         &start as *const vec3_t,
-                        &[0.0; 3] as *const vec3_t,
-                        &[0.0; 3] as *const vec3_t,
+                        // Oracle passes NULL mins/maxs here (point trace).
+                        core::ptr::null(),
+                        core::ptr::null(),
                         &end as *const vec3_t,
                         skip,
                         MASK_SHOT,
@@ -5171,7 +5173,8 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
                                 crate::q_math::_VectorCopy(trace.endpos, &mut newEnd);
                                 WP_VehLeadCrosshairVeh(
                                     ctx,
-                                    &mut (*ctx.world).g_entities[trace.entityNum as usize].ent,
+                                    &mut (*ctx.world).g_entities[trace.entityNum as usize]
+                                        as *mut gentity_t,
                                     &mut newEnd,
                                     fixedDir,
                                     start,
@@ -5224,12 +5227,12 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
                         (*ctx.world).level.time + delay;
                     pVeh.weaponStatus[weaponNum as usize].ammo -= (*vehWeapon).iAmmoPerShot;
                     if !pVeh.m_pParentEntity.is_null()
-                        && !(*pVeh.m_pParentEntity as *mut gentity_t).is_null()
-                        && !(*(*pVeh.m_pParentEntity as *mut gentity_t))
+                        && !(pVeh.m_pParentEntity as *mut gentity_t).is_null()
+                        && !(*(pVeh.m_pParentEntity as *mut gentity_t))
                             .client
                             .is_null()
                     {
-                        (*((*(*pVeh.m_pParentEntity as *mut gentity_t)).client
+                        (*((*(pVeh.m_pParentEntity as *mut gentity_t)).client
                             as *mut gclient_t))
                             .ps
                             .ammo[weaponNum as usize] = pVeh.weaponStatus[weaponNum as usize].ammo;
@@ -5243,12 +5246,12 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
             if cumulativeAmmo != 0 {
                 pVeh.weaponStatus[weaponNum as usize].ammo -= cumulativeAmmo;
                 if !pVeh.m_pParentEntity.is_null()
-                    && !(*pVeh.m_pParentEntity as *mut gentity_t).is_null()
-                    && !(*(*pVeh.m_pParentEntity as *mut gentity_t))
+                    && !(pVeh.m_pParentEntity as *mut gentity_t).is_null()
+                    && !(*(pVeh.m_pParentEntity as *mut gentity_t))
                         .client
                         .is_null()
                 {
-                    (*((*(*pVeh.m_pParentEntity as *mut gentity_t)).client as *mut gclient_t))
+                    (*((*(pVeh.m_pParentEntity as *mut gentity_t)).client as *mut gclient_t))
                         .ps
                         .ammo[weaponNum as usize] = pVeh.weaponStatus[weaponNum as usize].ammo;
                 }
@@ -5320,7 +5323,7 @@ pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) 
         {
             let emp = &mut (*ctx.world).g_entities
                 [(*((*ent).client as *mut gclient_t)).ps.emplacedIndex as usize]
-                .ent;
+                as *mut gentity_t;
 
             if (*emp).inuse != 0 && (*emp).health > 0 {
                 let mut yaw = 0.0f32;
@@ -5367,14 +5370,15 @@ pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) 
             let mut vehTurnAngles = [0.0f32; 3];
             let vehEnt = &mut (*ctx.world).g_entities
                 [(*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum as usize]
-                .ent;
+                as *mut gentity_t;
 
             if (*vehEnt).inuse != 0
                 && !(*vehEnt).client.is_null()
                 && !(*vehEnt).m_pVehicle.is_null()
             {
                 crate::q_math::_VectorCopy(
-                    (*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_vOrientation,
+                    *((*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_vOrientation
+                        as *const vec3_t),
                     &mut vehTurnAngles,
                 );
                 vehTurnAngles[0] = (*((*ent).client as *mut gclient_t)).ps.viewangles[0];
@@ -5468,7 +5472,7 @@ pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) 
         }
     }
 
-    G_LogWeaponFire(ctx, (*ent).s.number, (*ent).s.weapon);
+    unsafe { G_LogWeaponFire(ctx, (*ent).s.number, (*ent).s.weapon) };
 }
 
 /// Raven `WP_FireEmplaced`.
@@ -5486,7 +5490,7 @@ pub fn WP_FireEmplaced(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qbool
 
         let gun = &mut (*ctx.world).g_entities
             [(*((*ent).client as *mut gclient_t)).ps.emplacedIndex as usize]
-            .ent;
+            as *mut gentity_t;
 
         if (*gun).inuse == 0 || (*gun).health <= 0 {
             return;
@@ -5524,7 +5528,7 @@ pub fn WP_FireEmplaced(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qbool
             None,
             None,
         );
-        crate::q_math::vectoangles(&forward, &mut angs);
+        crate::q_math::vectoangles(forward, &mut angs);
         crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
 
         WP_FireEmplacedMissile(ctx, gun, gunpoint, dir, altFire, ent);
@@ -5642,7 +5646,7 @@ pub fn emplaced_gun_use(
         (*self_).s.weapon = oldWeapon;
 
         (*activator).r.ownerNum = (*self_).s.number;
-        (*self_).activator = activator;
+        (*self_).activator = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), activator));
 
         let mut anglesToOwner = [0.0f32; 3];
         crate::q_math::_VectorSubtract(
@@ -5650,7 +5654,7 @@ pub fn emplaced_gun_use(
             (*((*activator).client as *mut gclient_t)).ps.origin,
             &mut anglesToOwner,
         );
-        crate::q_math::vectoangles(&anglesToOwner, &mut anglesToOwner);
+        crate::q_math::vectoangles(anglesToOwner, &mut anglesToOwner);
     }
 }
 
@@ -5847,7 +5851,7 @@ pub fn emplaced_gun_die(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4944-5027`
 pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        let name = "models/map_objects/mp/turret_chair.glm";
+        let name = c"models/map_objects/mp/turret_chair.glm";
 
         let item = BG_FindItemForWeapon(WP_EMPLACED_GUN);
         if !item.is_null() {
@@ -5917,7 +5921,7 @@ pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
             &mut (*ent).s.origin2[0],
         );
 
-        (*ent).s.modelindex = G_ModelIndex(name as *const c_char);
+        (*ent).s.modelindex = G_ModelIndex(name.as_ptr());
         (*ent).s.modelGhoul2 = 1;
         (*ent).s.g2radius = 110;
 

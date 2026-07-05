@@ -191,6 +191,22 @@ parks trace to the generated signatures not carrying already-settled rulings.
     Raven's global syscall pointer). All ctx-taking code continues to use
     `ctx.engine`; the cell is ONLY for the ctx-less boundary fn-ptrs.
 
+31. **Vehicle-dispatch ctx threading.** RULING: BLESSED (user, 2026-07-05):
+    every `veh_dispatch` virtual (`Board`/`Eject`/`ValidateBoard`/`SetPilot`/
+    `Ghost`/`UnGhost`/`Inhabited`/`Animate{Vehicle,Riders}`/`Process{Move,Orient}
+    Commands`/…) and its per-class impls (`{Speeder,Walker,Animal,Fighter}NPC`,
+    `g_vehicles`) take `ctx: GameContext<'_>` as their FIRST param, threaded from
+    the `veh_dispatch` entry fns; the `GameCallbacks::board_vehicle` seam rebuilds
+    `ctx` from its held `world`/`engine` (mirrors `try_grapple`). The removed
+    Raven fn-ptr vtable slots make the dispatch our own construct, so the slot
+    signatures were free to change. This cleared the parked bg-channel debt now
+    that world/bg_state are reachable: `BG_AnimLength` calls in `AnimalNPC::
+    AnimateVehicle`, `SpeederNPC::AnimateRiders`, and `g_vehicles::UpdateRider`
+    (was a `0`/`100` placeholder); and the `.offset((owner-number))` pointer-
+    arithmetic arena workarounds in `WalkerNPC`/`AnimalNPC` `ProcessOrientCommands`
+    + `AnimalNPC::AnimateRiders` became direct `(*ctx.world).g_entities[...]`
+    indexing.
+
 ## Already covered — no decision (bless-the-rule appendix)
 
 vec3_t out-params (§C7; VectorCopy ×1358), qboolean returns → bool ×652

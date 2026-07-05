@@ -150,6 +150,14 @@ pub struct BgState {
     /// cross-frame state, so it's an owned field.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:57`
     pub c_pmove: c_int,
+
+    // --- game-cvar mirrors (bg code cannot reach GameCvars) ---
+    /// Mirror of the `bg_fighterAltControl` cvar's `.integer`, written by the
+    /// game-tier cvar register/update path for `BG_UnrestrainedPitchRoll`.
+    /// Raven read the `vmCvar_t` global directly (`extern vmCvar_t
+    /// bg_fighterAltControl`).
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:7783`
+    pub bg_fighterAltControl: c_int,
 }
 
 impl BgState {
@@ -165,7 +173,7 @@ impl BgState {
             bgNumAnimEvents: 1,
             bgHumanoidAnimations: Vec::new(),
             BGPAFtext: Vec::new(),
-            BGPAFtextLoaded: QFALSE,
+            BGPAFtextLoaded: qfalse,
             SaberParms: Vec::new(),
             bgSaberParseTBuffer: Vec::new(),
             saberMoveData: &saberMoveData,
@@ -194,6 +202,7 @@ impl BgState {
             bg_poolSize: 0,
             bg_poolTail: 0,
             c_pmove: 0,
+            bg_fighterAltControl: 0,
         }
     }
 }

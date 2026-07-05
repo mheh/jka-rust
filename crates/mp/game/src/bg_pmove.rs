@@ -194,8 +194,8 @@ impl PmoveContext<'_> {
         unsafe {
             let ps = (*self.pm).ps;
             let mut anim = BOTH_STAND2 as c_int;
-            let saber1 = BG_MySaber((*ps).clientNum, 0, self.bg);
-            let saber2 = BG_MySaber((*ps).clientNum, 1, self.bg);
+            let saber1 = self.BG_MySaber((*ps).clientNum, 0);
+            let saber2 = self.BG_MySaber((*ps).clientNum, 1);
 
             if (*ps).saberEntityNum == 0 {
                 //lost it
@@ -1831,8 +1831,8 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).weapon == WP_SABER as c_int {
-                let saber1 = BG_MySaber((*ps).clientNum, 0, self.bg);
-                let saber2 = BG_MySaber((*ps).clientNum, 1, self.bg);
+                let saber1 = self.BG_MySaber((*ps).clientNum, 0);
+                let saber2 = self.BG_MySaber((*ps).clientNum, 1);
                 if !saber1.is_null() && (*saber1).saberFlags & SFL_NO_FLIPS != 0 {
                     allowFlips = qfalse;
                 }
@@ -2122,8 +2122,8 @@ impl PmoveContext<'_> {
                 let mut allowFlips = qtrue;
                 let mut allowWallGrabs = qtrue;
                 if (*ps).weapon == WP_SABER as c_int {
-                    let saber1 = BG_MySaber((*ps).clientNum, 0, self.bg);
-                    let saber2 = BG_MySaber((*ps).clientNum, 1, self.bg);
+                    let saber1 = self.BG_MySaber((*ps).clientNum, 0);
+                    let saber2 = self.BG_MySaber((*ps).clientNum, 1);
                     if !saber1.is_null() && (*saber1).saberFlags & SFL_NO_WALL_RUNS != 0 {
                         allowWallRuns = qfalse;
                     }
@@ -3336,11 +3336,11 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).weapon == WP_SABER as c_int {
-                let mut saber = BG_MySaber((*ps).clientNum, 0, self.bg);
+                let mut saber = self.BG_MySaber((*ps).clientNum, 0);
                 if !saber.is_null() && (*saber).saberFlags & SFL_NO_ROLLS != 0 {
                     return 0;
                 }
-                saber = BG_MySaber((*ps).clientNum, 1, self.bg);
+                saber = self.BG_MySaber((*ps).clientNum, 1);
                 if !saber.is_null() && (*saber).saberFlags & SFL_NO_ROLLS != 0 {
                     return 0;
                 }
@@ -7026,17 +7026,25 @@ impl PmoveContext<'_> {
 
 /// Raven `BG_UnrestrainedPitchRoll`.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:7784-7798`
-// PORT-NOTE(bg_fighterAltControl): the `bg_fighterAltControl.integer` cvar lives on GameCvars
-// (game tier) and has no channel through `bg: &BgState`; referenced as cited pending a fixer to
-// thread it. Reported as a missing symbol.
+// ESCALATED (worker W4): Raven reads the game-tier `bg_fighterAltControl` cvar
+// (a cached `vmCvar_t` registered in `g_main.c`) as `.integer`. This bg-tier free
+// fn only has `bg: &BgState`; the mirror ladder resolves to a BgState field:
+//  * no cvar-mirror field exists on `BgState` yet;
+//  * threading it as a param fails — the `PmoveContext` callers
+//    (`PM_UpdateViewAngles` @7079, `PM_UpdateViewAngles`-vehicle @8992) have no
+//    cvar/world handle (`PmoveContext` holds only pm/pml/bg/traps/callbacks),
+//    only the `ctx.world` callers (FighterNPC.rs, g_vehicles.rs) do.
+// RECOMMENDED (needs bg_channel owner): add `pub bg_fighterAltControl: c_int` to
+// `BgState`, written from the game-tier cvar-update init (where `g_main.c`
+// registers/refreshes the cvar), and read it here as `bg.bg_fighterAltControl`.
+// Source: oracle/oracle/codemp/game/bg_pmove.c:7783-7798, g_main.c:177,420
 pub fn BG_UnrestrainedPitchRoll(
     ps: *mut playerState_t,
     pVeh: *mut Vehicle_t,
     bg: &BgState,
 ) -> qboolean {
-    let _ = bg;
     unsafe {
-        if bg_fighterAltControl.integer != 0
+        if bg.bg_fighterAltControl != 0
             && (*ps).clientNum < MAX_CLIENTS as c_int //real client
             && (*ps).m_iVehicleNum != 0 //in a vehicle
             && !pVeh.is_null() //valid vehicle data pointer
@@ -7477,11 +7485,11 @@ impl PmoveContext<'_> {
                 // Automatically slow down as the roll ends.
             }
 
-            let mut saber = BG_MySaber((*ps).clientNum, 0, self.bg);
+            let mut saber = self.BG_MySaber((*ps).clientNum, 0);
             if !saber.is_null() && (*saber).moveSpeedScale != 1.0 {
                 (*ps).speed *= (*saber).moveSpeedScale;
             }
-            saber = BG_MySaber((*ps).clientNum, 1, self.bg);
+            saber = self.BG_MySaber((*ps).clientNum, 1);
             if !saber.is_null() && (*saber).moveSpeedScale != 1.0 {
                 (*ps).speed *= (*saber).moveSpeedScale;
             }

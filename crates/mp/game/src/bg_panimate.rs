@@ -1886,7 +1886,7 @@ impl PmoveContext<'_> {
                 if len > 0 {
                     let s = format!(
                         "{} exceeds the allowed game-side animation buffer!",
-                        cstr_to_str(filename)
+                        unsafe { cstr_to_str(filename) }
                     );
                     crate::g_main::Com_Error(ERR_DROP as c_int, cstr(&s).as_ptr());
                 }
@@ -1918,11 +1918,11 @@ impl PmoveContext<'_> {
         loop {
             token = COM_Parse(&mut text_p);
 
-            if token.is_null() || (*token as u8) == 0 {
+            if token.is_null() || unsafe { *token as u8 } == 0 {
                 break;
             }
 
-            animNum = GetIDForString(animTable.as_mut_ptr(), token);
+            animNum = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, token);
             if animNum == -1 {
                 continue;
             }
@@ -1977,7 +1977,7 @@ impl PmoveContext<'_> {
         if isHumanoid != 0 {
             write_cstr_field(
                 &mut self.bg.bgAllAnims[0].filename,
-                &cstr_to_str(filename),
+                &unsafe { cstr_to_str(filename) },
             );
             self.bg.bgAllAnims[0].anims = animset;
             self.bg.BGPAFtextLoaded = 1;
@@ -1986,7 +1986,7 @@ impl PmoveContext<'_> {
         } else {
             write_cstr_field(
                 &mut self.bg.bgAllAnims[nextIndex as usize].filename,
-                &cstr_to_str(filename),
+                &unsafe { cstr_to_str(filename) },
             );
             self.bg.bgAllAnims[nextIndex as usize].anims = animset;
 
@@ -2185,17 +2185,19 @@ pub fn BG_SaberStartTransAnim(
     anim: c_int,
     animSpeed: *mut f32,
     broken: c_int,
-    bg: &BgState,
+    // Game-tier entity arena base for `BG_MySaber` (bg code cannot name the
+    // arena; pmove callers pass `pm->baseEnt`, game callers `g_entities`).
+    ents: *mut gentity_t,
 ) {
     use animNumber_t::*;
     unsafe {
         if anim >= BOTH_A1_T__B_ as c_int && anim <= BOTH_ROLL_STAB as c_int {
             if weapon == WP_SABER {
-                let mut saber = BG_MySaber(clientNum, 0, bg);
+                let mut saber = BG_MySaber(clientNum, 0, ents);
                 if !saber.is_null() && (*saber).animSpeedScale != 1.0 {
                     *animSpeed *= (*saber).animSpeedScale;
                 }
-                saber = BG_MySaber(clientNum, 1, bg);
+                saber = BG_MySaber(clientNum, 1, ents);
                 if !saber.is_null() && (*saber).animSpeedScale != 1.0 {
                     *animSpeed *= (*saber).animSpeedScale;
                 }
@@ -2262,7 +2264,7 @@ pub fn BG_SetAnimFinal(
             anim,
             &mut editAnimSpeed,
             (*ps).brokenLimbs,
-            self.bg,
+            (*self.pm).baseEnt as *mut gentity_t,
         );
 
         // Set torso anim

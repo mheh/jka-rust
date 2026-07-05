@@ -3,7 +3,6 @@
 use core::ffi::c_int;
 
 use mp_bg::weapons::weapon_t::WP_NUM_WEAPONS;
-use mp_qshared::common::mp::gentity::gentity_t;
 use mp_qshared::common::mp::entity_id::EntityId;
 use mp_qshared::common::mp::qcommon::{playerState_t, usercmd_t};
 use mp_qshared::shared::{qboolean, vec3_t, wpobject_t};

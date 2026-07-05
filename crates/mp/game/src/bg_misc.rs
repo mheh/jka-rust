@@ -1784,7 +1784,8 @@ pub fn BG_ModelCache(
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3328-3341`
 pub fn BG_Alloc(size: c_int, bg: &mut BgState) -> *mut c_void {
-    bg.bg_poolSize = (bg.bg_poolSize + 0x00000003) & 0xfffffffc;
+    // C masks with unsigned `0xfffffffc`; `!3` is the same i32 bit pattern.
+    bg.bg_poolSize = (bg.bg_poolSize + 0x00000003) & !3;
     if bg.bg_poolSize + size > bg.bg_poolTail {
         panic!(
             "BG_Alloc: buffer exceeded tail ({} > {})",
@@ -1816,7 +1817,7 @@ pub fn BG_AllocUnaligned(size: c_int, bg: &mut BgState) -> *mut c_void {
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3356-3369`
 pub fn BG_TempAlloc(size: c_int, bg: &mut BgState) -> *mut c_void {
     let mut sz = size;
-    sz = (sz + 0x00000003) & 0xfffffffc;
+    sz = (sz + 0x00000003) & !3;
     if bg.bg_poolTail - sz < bg.bg_poolSize {
         panic!(
             "BG_TempAlloc: buffer exceeded head ({} > {})",
@@ -1838,7 +1839,7 @@ const MAX_POOL_SIZE: c_int = 3000000;
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:3371-3381`
 pub fn BG_TempFree(size: c_int, bg: &mut BgState) {
     let mut sz = size;
-    sz = (sz + 0x00000003) & 0xfffffffc;
+    sz = (sz + 0x00000003) & !3;
     if bg.bg_poolTail + sz > MAX_POOL_SIZE {
         panic!(
             "BG_TempFree: tail greater than size ({} > {})",

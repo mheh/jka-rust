@@ -2,7 +2,6 @@
 
 use core::ffi::c_schar;
 
-use mp_qshared::common::mp::gentity::gentity_t;
 use mp_qshared::common::mp::entity_id::EntityId;
 use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 use mp_qshared::common::mp::qcommon::usercmd_t;

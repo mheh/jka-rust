@@ -126,7 +126,7 @@ pub fn G_FindTeams(ctx: GameContext<'_>) {
         let mut i: c_int = 1;
         while i < num_entities {
             let e = &mut *base.add(i as usize);
-            if e.inuse != QFALSE && !e.team.is_null() && e.flags & FL_TEAMSLAVE == 0 {
+            if e.inuse != qfalse && !e.team.is_null() && e.flags & FL_TEAMSLAVE == 0 {
                 // CONTENTS_TRIGGER not yet ported as a const anywhere in this
                 // crate graph (precedent: g_mover.rs `G_FindDoorTrigger`,
                 // g_nav.rs) — the "triggers never link up in teams" skip is
@@ -137,7 +137,7 @@ pub fn G_FindTeams(ctx: GameContext<'_>) {
                 let mut j = i + 1;
                 while j < num_entities {
                     let e2 = &mut *base.add(j as usize);
-                    if e2.inuse != QFALSE
+                    if e2.inuse != qfalse
                         && !e2.team.is_null()
                         && e2.flags & FL_TEAMSLAVE == 0
                         && CStr::from_ptr(e.team).to_bytes() == CStr::from_ptr(e2.team).to_bytes()
@@ -189,11 +189,16 @@ pub fn G_RegisterCvars(ctx: GameContext<'_>) {
         // architecture gap, not a missing symbol. Left untranscribed; the
         // digest-listed state-affecting tail below (g_gametype validation +
         // warmupModificationCount) is ported faithfully.
-        let remapped = QFALSE;
+        let remapped = qfalse;
         //TODO: Port G_RegisterCvars per-row trap_Cvar_Register loop
         // Source: oracle/oracle/codemp/game/g_main.c:808-817
 
-        if remapped != QFALSE {
+        // bg-tier cvar mirror: bg code reads this from BgState (Raven read the
+        // vmCvar_t global directly).
+        (*ctx.world).bg_state.bg_fighterAltControl =
+            (*ctx.world).cvars.bg_fighterAltControl.integer;
+
+        if remapped != qfalse {
             G_RemapTeamShaders();
         }
 
@@ -255,10 +260,15 @@ pub fn G_UpdateCvars(ctx: GameContext<'_>) {
         // G_RegisterCvars — the per-row `trap_Cvar_Update(cv->vmCvar)` +
         // `modificationCount` diff loop over `GAME_CVAR_TABLE` cannot be
         // transcribed without per-field reflection.
-        let remapped = QFALSE;
+        let remapped = qfalse;
         //TODO: Port G_UpdateCvars per-row trap_Cvar_Update loop
         // Source: oracle/oracle/codemp/game/g_main.c:857-872
-        if remapped != QFALSE {
+
+        // bg-tier cvar mirror (see G_RegisterCvars).
+        (*ctx.world).bg_state.bg_fighterAltControl =
+            (*ctx.world).cvars.bg_fighterAltControl.integer;
+
+        if remapped != qfalse {
             G_RemapTeamShaders();
         }
     }
@@ -396,9 +406,9 @@ pub fn G_PowerDuelCount(
             let ent = (*ctx.world).g_entities.as_mut_ptr().add(i as usize);
             let cl = (*ent).client as *mut gclient_t;
 
-            if (*ent).inuse != QFALSE
+            if (*ent).inuse != qfalse
                 && !cl.is_null()
-                && (countSpec != QFALSE || (*cl).sess.sessionTeam != TEAM_SPECTATOR)
+                && (countSpec != qfalse || (*cl).sess.sessionTeam != TEAM_SPECTATOR)
             {
                 if (*cl).sess.duelTeam == DUELTEAM_LONE as c_int {
                     *loners += 1;
@@ -424,7 +434,7 @@ pub fn AddPowerDuelPlayers(ctx: GameContext<'_>) {
 
         let mut nonspec_loners: c_int = 0;
         let mut nonspec_doubles: c_int = 0;
-        G_PowerDuelCount(ctx, &mut nonspec_loners, &mut nonspec_doubles, QFALSE);
+        G_PowerDuelCount(ctx, &mut nonspec_loners, &mut nonspec_doubles, qfalse);
         if nonspec_loners >= 1 && nonspec_doubles >= 2 {
             // we have enough people, stop
             return;
@@ -433,7 +443,7 @@ pub fn AddPowerDuelPlayers(ctx: GameContext<'_>) {
         // Could be written faster, but it's not enough to care I suppose.
         let mut loners: c_int = 0;
         let mut doubles: c_int = 0;
-        G_PowerDuelCount(ctx, &mut loners, &mut doubles, QTRUE);
+        G_PowerDuelCount(ctx, &mut loners, &mut doubles, qtrue);
 
         if loners < 1 || doubles < 2 {
             // don't bother trying to spawn anyone yet if the balance is not
@@ -519,8 +529,8 @@ pub fn RemovePowerDuelLosers(ctx: GameContext<'_>) {
 
             if (*cl).pers.connected == CON_CONNECTED
                 && ((*cl).ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0
-                    || (*cl).iAmALoser != QFALSE)
-                && ((*cl).sess.sessionTeam != TEAM_SPECTATOR || (*cl).iAmALoser != QFALSE)
+                    || (*cl).iAmALoser != qfalse)
+                && ((*cl).sess.sessionTeam != TEAM_SPECTATOR || (*cl).iAmALoser != qfalse)
             {
                 // he was dead or he was spectating as a loser
                 remClients[remNum] = (*cl).ps.clientNum;
@@ -548,7 +558,7 @@ pub fn RemovePowerDuelLosers(ctx: GameContext<'_>) {
             j += 1;
         }
 
-        (*ctx.world).globals.g_dontFrickinCheck = QFALSE;
+        (*ctx.world).globals.g_dontFrickinCheck = qfalse;
 
         // recalculate stuff now that we have reset teams.
         CalculateRanks(ctx);
@@ -808,18 +818,18 @@ pub fn G_CanResetDuelists(ctx: GameContext<'_>) -> qboolean {
             let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
             let cl = (*ent).client as *mut gclient_t;
 
-            if (*ent).inuse == QFALSE
+            if (*ent).inuse == qfalse
                 || cl.is_null()
                 || (*ent).health <= 0
                 || (*cl).sess.sessionTeam == TEAM_SPECTATOR
                 || (*cl).sess.duelTeam <= DUELTEAM_FREE as c_int
             {
-                return QFALSE;
+                return qfalse;
             }
             i += 1;
         }
 
-        QTRUE
+        qtrue
     }
 }
 
@@ -836,9 +846,9 @@ pub fn G_ResetDuelists(ctx: GameContext<'_>) {
             let clientNum = (*ctx.world).level.sortedClients[i];
             let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
 
-            (*ctx.world).globals.g_noPDuelCheck = QTRUE;
+            (*ctx.world).globals.g_noPDuelCheck = qtrue;
             crate::g_combat::player_die(ctx, ent, ent, ent, 999, MOD_SUICIDE as c_int);
-            (*ctx.world).globals.g_noPDuelCheck = QFALSE;
+            (*ctx.world).globals.g_noPDuelCheck = qfalse;
             trap::UnlinkEntity(
                 ctx.engine,
                 mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent),
@@ -895,7 +905,7 @@ pub fn CalculateRanks(ctx: GameContext<'_>) {
 
                     if world.clients[i as usize].pers.connected == CON_CONNECTED {
                         if world.clients[i as usize].sess.sessionTeam != TEAM_SPECTATOR
-                            || world.clients[i as usize].iAmALoser != QFALSE
+                            || world.clients[i as usize].iAmALoser != qfalse
                         {
                             world.level.numPlayingClients += 1;
                         }
@@ -1093,7 +1103,7 @@ pub fn CalculateRanks(ctx: GameContext<'_>) {
             || world.cvars.g_gametype.integer == GT_DUEL
             || world.cvars.g_gametype.integer == GT_POWERDUEL
         {
-            world.globals.gQueueScoreMessage = QTRUE;
+            world.globals.gQueueScoreMessage = qtrue;
             world.globals.gQueueScoreMessageTime = world.level.time + 500;
         }
     }
@@ -1145,7 +1155,7 @@ pub fn MoveClientToIntermission(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).s.eType = entityType_t::ET_GENERAL as c_int;
         (*ent).s.modelindex = 0;
         (*ent).s.loopSound = 0;
-        (*ent).s.loopIsSoundset = QFALSE;
+        (*ent).s.loopIsSoundset = qfalse;
         (*ent).s.event = 0;
         (*ent).r.contents = 0;
     }
@@ -1168,7 +1178,7 @@ pub fn FindIntermissionPoint(ctx: GameContext<'_>) {
         if world.cvars.g_gametype.integer == GT_SIEGE
             && world.level.intermissiontime != 0
             && world.level.intermissiontime <= world.level.time
-            && world.globals.gSiegeRoundEnded != QFALSE
+            && world.globals.gSiegeRoundEnded != qfalse
         {
             if world.globals.gSiegeRoundWinningTeam == SIEGETEAM_TEAM1 as qboolean {
                 ent = G_Find(
@@ -1259,10 +1269,10 @@ pub fn BeginIntermission(ctx: GameContext<'_>) {
             if world.cvars.g_gametype.integer != GT_POWERDUEL {
                 AdjustTournamentScores(ctx);
             }
-            if DuelLimitHit(ctx) != QFALSE {
-                world.globals.gDuelExit = QTRUE;
+            if DuelLimitHit(ctx) != qfalse {
+                world.globals.gDuelExit = qtrue;
             } else {
-                world.globals.gDuelExit = QFALSE;
+                world.globals.gDuelExit = qfalse;
             }
         }
 
@@ -1273,7 +1283,7 @@ pub fn BeginIntermission(ctx: GameContext<'_>) {
         let mut i: c_int = 0;
         while i < world.level.maxclients {
             let client = world.g_entities.as_mut_ptr().add(i as usize);
-            if (*client).inuse == QFALSE {
+            if (*client).inuse == qfalse {
                 i += 1;
                 continue;
             }
@@ -1314,12 +1324,12 @@ pub fn DuelLimitHit(ctx: GameContext<'_>) -> qboolean {
             if (*ctx.world).cvars.g_duel_fraglimit.integer != 0
                 && (*cl).sess.wins >= (*ctx.world).cvars.g_duel_fraglimit.integer
             {
-                return QTRUE;
+                return qtrue;
             }
             i += 1;
         }
 
-        QFALSE
+        qfalse
     }
 }
 
@@ -1362,15 +1372,15 @@ pub fn ExitLevel(ctx: GameContext<'_>) {
         if world.cvars.g_gametype.integer == GT_DUEL
             || world.cvars.g_gametype.integer == GT_POWERDUEL
         {
-            if DuelLimitHit(ctx) == QFALSE {
-                if world.level.restarted == QFALSE {
+            if DuelLimitHit(ctx) == qfalse {
+                if world.level.restarted == qfalse {
                     //TODO: Port EXEC_APPEND
                     // Source: oracle/oracle/codemp/game/g_main.c:2151 (bg_public.h cbufExec_t)
                     trap::SendConsoleCommand(
                         ctx.engine,
                         mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("map_restart 0\n")),
                     );
-                    world.level.restarted = QTRUE;
+                    world.level.restarted = qtrue;
                     world.level.changemap = std::ptr::null_mut();
                     world.level.intermissiontime = 0;
                 }
@@ -1382,7 +1392,7 @@ pub fn ExitLevel(ctx: GameContext<'_>) {
 
         if world.cvars.g_gametype.integer == GT_SIEGE
             && world.cvars.g_siegeTeamSwitch.integer != 0
-            && world.globals.g_siegePersistant.beatingTime != QFALSE
+            && world.globals.g_siegePersistant.beatingTime != qfalse
         {
             // restart same map...
             trap::SendConsoleCommand(
@@ -1580,7 +1590,7 @@ pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
                 continue;
             }
 
-            if cl.readyToExit != QFALSE {
+            if cl.readyToExit != qfalse {
                 ready += 1;
                 if i < 16 {
                     ready_mask |= 1 << i;
@@ -1593,10 +1603,10 @@ pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
 
         if (world.cvars.g_gametype.integer == GT_DUEL
             || world.cvars.g_gametype.integer == GT_POWERDUEL)
-            && world.globals.gDidDuelStuff == QFALSE
+            && world.globals.gDidDuelStuff == qfalse
             && world.level.time > world.level.intermissiontime + 2000
         {
-            world.globals.gDidDuelStuff = QTRUE;
+            world.globals.gDidDuelStuff = qtrue;
 
             if world.cvars.g_austrian.integer != 0 && world.cvars.g_gametype.integer != GT_POWERDUEL
             {
@@ -1631,7 +1641,7 @@ pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
 
             // if we are running a tournement map, kick the loser to spectator status,
             // which will automatically grab the next spectator and restart
-            if DuelLimitHit(ctx) == QFALSE {
+            if DuelLimitHit(ctx) == qfalse {
                 if world.cvars.g_gametype.integer == GT_POWERDUEL {
                     RemovePowerDuelLosers(ctx);
                     AddPowerDuelPlayers(ctx);
@@ -1828,7 +1838,7 @@ pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
 
         if (world.cvars.g_gametype.integer == GT_DUEL
             || world.cvars.g_gametype.integer == GT_POWERDUEL)
-            && world.globals.gDuelExit == QFALSE
+            && world.globals.gDuelExit == qfalse
         {
             // in duel, we have different behaviour for between-round intermissions
             if world.level.time > world.level.intermissiontime + 4000 {
@@ -1877,7 +1887,7 @@ pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
 
         // if nobody wants to go, clear timer
         if ready == 0 {
-            world.level.readyToExit = QFALSE;
+            world.level.readyToExit = qfalse;
             return;
         }
 
@@ -1888,8 +1898,8 @@ pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
         }
 
         // the first person to ready starts the ten second timeout
-        if world.level.readyToExit == QFALSE {
-            world.level.readyToExit = QTRUE;
+        if world.level.readyToExit == qfalse {
+            world.level.readyToExit = qtrue;
             world.level.exitTime = world.level.time;
         }
 
@@ -1909,7 +1919,7 @@ pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
 pub fn ScoreIsTied(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         if (*ctx.world).level.numPlayingClients < 2 {
-            return QFALSE;
+            return qfalse;
         }
 
         if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
@@ -1947,17 +1957,17 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
             return;
         }
 
-        if world.globals.gDoSlowMoDuel != QFALSE {
+        if world.globals.gDoSlowMoDuel != qfalse {
             // don't go to intermission while in slow motion
             return;
         }
 
-        if world.globals.gEscaping != QFALSE {
+        if world.globals.gEscaping != qfalse {
             let mut i: c_int = 0;
             let mut num_live_clients: c_int = 0;
             while (i as usize) < MAX_CLIENTS {
                 let ent = &world.g_entities[i as usize];
-                if ent.inuse != QFALSE && !ent.client.is_null() && ent.health > 0 {
+                if ent.inuse != qfalse && !ent.client.is_null() && ent.health > 0 {
                     let cl = &*(ent.client as *mut crate::client::gclient_t);
                     if cl.sess.sessionTeam != TEAM_SPECTATOR && cl.ps.pm_flags & PMF_FOLLOW == 0 {
                         num_live_clients += 1;
@@ -1966,12 +1976,12 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
                 i += 1;
             }
             if world.globals.gEscapeTime < world.level.time {
-                world.globals.gEscaping = QFALSE;
+                world.globals.gEscaping = qfalse;
                 LogExit(ctx, cstr("Escape time ended.").as_ptr());
                 return;
             }
             if num_live_clients == 0 {
-                world.globals.gEscaping = QFALSE;
+                world.globals.gEscaping = qfalse;
                 LogExit(ctx, cstr("Everyone failed to escape.").as_ptr());
                 return;
             }
@@ -1988,7 +1998,7 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
 
         // check for sudden death
         if world.cvars.g_gametype.integer != GT_SIEGE {
-            if ScoreIsTied(ctx) != QFALSE {
+            if ScoreIsTied(ctx) != qfalse {
                 // always wait for sudden death
                 if world.cvars.g_gametype.integer != GT_DUEL || world.cvars.g_timelimit.integer == 0
                 {
@@ -2029,8 +2039,8 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
         }
 
         if world.cvars.g_gametype.integer == GT_POWERDUEL && world.level.numPlayingClients >= 3 {
-            if world.globals.g_endPDuel != QFALSE {
-                world.globals.g_endPDuel = QFALSE;
+            if world.globals.g_endPDuel != qfalse {
+                world.globals.g_endPDuel = qfalse;
                 LogExit(ctx, cstr("Powerduel ended.").as_ptr());
             }
             return;
@@ -2041,7 +2051,7 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
         }
 
         let s_kill_limit: &str;
-        let mut print_limit = QTRUE;
+        let mut print_limit = qtrue;
         if world.cvars.g_gametype.integer == GT_DUEL
             || world.cvars.g_gametype.integer == GT_POWERDUEL
         {
@@ -2049,7 +2059,7 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
                 s_kill_limit = "Kill limit hit.";
             } else {
                 s_kill_limit = "";
-                print_limit = QFALSE;
+                print_limit = qfalse;
             }
         } else {
             s_kill_limit = "Kill limit hit.";
@@ -2117,7 +2127,7 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
                         Com_Printf(cstr("POWERDUEL WIN CONDITION: Duel limit hit (1)\n").as_ptr());
                     }
                     LogExit(ctx, cstr("Duel limit hit.").as_ptr());
-                    world.globals.gDuelExit = QTRUE;
+                    world.globals.gDuelExit = qtrue;
                     let netname = cstr_to_str(cl.pers.netname.as_ptr());
                     trap::SendServerCommand(
                         ctx.engine,
@@ -2136,8 +2146,8 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
                         Com_Printf(cstr("POWERDUEL WIN CONDITION: Kill limit (3)\n").as_ptr());
                     }
                     LogExit(ctx, cstr(s_kill_limit).as_ptr());
-                    world.globals.gDuelExit = QFALSE;
-                    if print_limit != QFALSE {
+                    world.globals.gDuelExit = qfalse;
+                    if print_limit != qfalse {
                         let netname = cstr_to_str(cl.pers.netname.as_ptr());
                         let hit_limit = cstr_to_str(G_GetStringEdString(
                             ctx,
@@ -2234,7 +2244,7 @@ pub fn G_RemoveDuelist(ctx: GameContext<'_>, team: c_int) {
             let ent = entities.add(i);
             let cl = (*ent).client as *mut gclient_t;
 
-            if (*ent).inuse != QFALSE
+            if (*ent).inuse != qfalse
                 && !cl.is_null()
                 && (*cl).sess.sessionTeam != TEAM_SPECTATOR
                 && (*cl).sess.duelTeam == team
@@ -2336,14 +2346,14 @@ pub fn CheckTournament(ctx: GameContext<'_>) {
         } else if world.cvars.g_gametype.integer == GT_POWERDUEL {
             if world.level.numPlayingClients < 2 {
                 // hmm, ok, pull more in.
-                world.globals.g_dontFrickinCheck = QFALSE;
+                world.globals.g_dontFrickinCheck = qfalse;
             }
 
             if world.level.numPlayingClients > 3 {
                 // umm..yes..lets take care of that then.
                 let mut lone: c_int = 0;
                 let mut dbl: c_int = 0;
-                G_PowerDuelCount(ctx, &mut lone, &mut dbl, QFALSE);
+                G_PowerDuelCount(ctx, &mut lone, &mut dbl, qfalse);
                 if lone > 1 {
                     G_RemoveDuelist(ctx, DUELTEAM_LONE as c_int);
                 } else if dbl > 2 {
@@ -2353,19 +2363,19 @@ pub fn CheckTournament(ctx: GameContext<'_>) {
                 // hmm, someone disconnected or something and we need em
                 let mut lone: c_int = 0;
                 let mut dbl: c_int = 0;
-                G_PowerDuelCount(ctx, &mut lone, &mut dbl, QFALSE);
+                G_PowerDuelCount(ctx, &mut lone, &mut dbl, qfalse);
                 if lone < 1 {
-                    world.globals.g_dontFrickinCheck = QFALSE;
+                    world.globals.g_dontFrickinCheck = qfalse;
                 } else if dbl < 1 {
-                    world.globals.g_dontFrickinCheck = QFALSE;
+                    world.globals.g_dontFrickinCheck = qfalse;
                 }
             }
 
             // pull in a spectator if needed
-            if world.level.numPlayingClients < 3 && world.globals.g_dontFrickinCheck == QFALSE {
+            if world.level.numPlayingClients < 3 && world.globals.g_dontFrickinCheck == qfalse {
                 AddPowerDuelPlayers(ctx);
 
-                if world.level.numPlayingClients >= 3 && G_CanResetDuelists(ctx) != QFALSE {
+                if world.level.numPlayingClients >= 3 && G_CanResetDuelists(ctx) != qfalse {
                     let te = G_TempEntity(ctx, vec3_origin, EV_GLOBAL_DUEL as c_int);
                     (*te).r.svFlags |= SVF_BROADCAST;
                     // this is really pretty nasty, but..
@@ -2387,13 +2397,13 @@ pub fn CheckTournament(ctx: GameContext<'_>) {
                     );
                     G_ResetDuelists(ctx);
 
-                    world.globals.g_dontFrickinCheck = QTRUE;
+                    world.globals.g_dontFrickinCheck = qtrue;
                 } else if world.level.numPlayingClients > 0 || world.level.numConnectedClients > 0 {
                     if world.globals.g_duelPrintTimer < world.level.time {
                         // print once every 10 seconds
                         let mut lone: c_int = 0;
                         let mut dbl: c_int = 0;
-                        G_PowerDuelCount(ctx, &mut lone, &mut dbl, QTRUE);
+                        G_PowerDuelCount(ctx, &mut lone, &mut dbl, qtrue);
                         if lone < 1 {
                             let msg = cstr_to_str(G_GetStringEdString(
                                 ctx,
@@ -2421,7 +2431,7 @@ pub fn CheckTournament(ctx: GameContext<'_>) {
 
                 if world.level.numPlayingClients >= 3 && world.level.numNonSpectatorClients >= 3 {
                     // pulled in a needed person
-                    if G_CanResetDuelists(ctx) != QFALSE {
+                    if G_CanResetDuelists(ctx) != qfalse {
                         let te = G_TempEntity(ctx, vec3_origin, EV_GLOBAL_DUEL as c_int);
                         (*te).r.svFlags |= SVF_BROADCAST;
                         (*te).s.otherEntityNum = world.level.sortedClients[0];
@@ -2471,27 +2481,27 @@ pub fn CheckTournament(ctx: GameContext<'_>) {
                 }
             } else {
                 // if you have proper num of players then don't try to add again
-                world.globals.g_dontFrickinCheck = QTRUE;
+                world.globals.g_dontFrickinCheck = qtrue;
             }
 
             world.level.warmupTime = 0;
             return;
         } else if world.level.warmupTime != 0 {
             let mut counts: [c_int; TEAM_NUM_TEAMS as usize] = [0; TEAM_NUM_TEAMS as usize];
-            let mut not_enough = QFALSE;
+            let mut not_enough = qfalse;
 
             if world.cvars.g_gametype.integer > GT_TEAM {
                 counts[TEAM_BLUE as usize] = TeamCount(ctx, -1, TEAM_BLUE as c_int) as c_int;
                 counts[TEAM_RED as usize] = TeamCount(ctx, -1, TEAM_RED as c_int) as c_int;
 
                 if counts[TEAM_RED as usize] < 1 || counts[TEAM_BLUE as usize] < 1 {
-                    not_enough = QTRUE;
+                    not_enough = qtrue;
                 }
             } else if world.level.numPlayingClients < 2 {
-                not_enough = QTRUE;
+                not_enough = qtrue;
             }
 
-            if not_enough != QFALSE {
+            if not_enough != qfalse {
                 if world.level.warmupTime != -1 {
                     world.level.warmupTime = -1;
                     trap::SetConfigstring(
@@ -2542,7 +2552,7 @@ pub fn CheckTournament(ctx: GameContext<'_>) {
                         cstr("map_restart 0\n"),
                     ),
                 );
-                world.level.restarted = QTRUE;
+                world.level.restarted = qtrue;
                 return;
             }
         }
@@ -2604,7 +2614,7 @@ pub fn CheckVote(ctx: GameContext<'_>) {
                 ),
             );
 
-            if world.level.votingGametype != QFALSE {
+            if world.level.votingGametype != qfalse {
                 let cur = trap::Cvar_VariableIntegerValue(
                     ctx.engine,
                     mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(cstr("g_gametype")),
@@ -2612,7 +2622,7 @@ pub fn CheckVote(ctx: GameContext<'_>) {
                 if cur != world.level.votingGametypeTo {
                     // If we're voting to a different game type, be sure to refresh all the map stuff
                     let next_map_ptr =
-                        crate::g_bot::G_RefreshNextMap(ctx, world.level.votingGametypeTo, QTRUE);
+                        crate::g_bot::G_RefreshNextMap(ctx, world.level.votingGametypeTo, qtrue);
                     let next_map = if next_map_ptr.is_null() {
                         String::new()
                     } else {
@@ -2632,7 +2642,7 @@ pub fn CheckVote(ctx: GameContext<'_>) {
                     }
                 } else {
                     // otherwise, just leave the map until a restart
-                    crate::g_bot::G_RefreshNextMap(ctx, world.level.votingGametypeTo, QFALSE);
+                    crate::g_bot::G_RefreshNextMap(ctx, world.level.votingGametypeTo, qfalse);
                 }
 
                 if world.cvars.g_fraglimitVoteCorrection.integer != 0 {
@@ -2683,7 +2693,7 @@ pub fn CheckVote(ctx: GameContext<'_>) {
                     }
                 }
 
-                world.level.votingGametype = QFALSE;
+                world.level.votingGametype = qfalse;
                 world.level.votingGametypeTo = 0;
             }
         }
@@ -2814,13 +2824,13 @@ pub fn SetLeader(ctx: GameContext<'_>, team: c_int, client: c_int) {
                 i += 1;
                 continue;
             }
-            if world.clients[i as usize].sess.teamLeader != QFALSE {
-                world.clients[i as usize].sess.teamLeader = QFALSE;
+            if world.clients[i as usize].sess.teamLeader != qfalse {
+                world.clients[i as usize].sess.teamLeader = qfalse;
                 ClientUserinfoChanged(ctx, i);
             }
             i += 1;
         }
-        world.clients[client as usize].sess.teamLeader = QTRUE;
+        world.clients[client as usize].sess.teamLeader = qtrue;
         ClientUserinfoChanged(ctx, client);
         let netname = cstr_to_str(world.clients[client as usize].pers.netname.as_ptr());
         let msg = cstr_to_str(G_GetStringEdString(
@@ -2850,7 +2860,7 @@ pub fn CheckTeamLeader(ctx: GameContext<'_>, team: c_int) {
                 i += 1;
                 continue;
             }
-            if world.clients[i as usize].sess.teamLeader != QFALSE {
+            if world.clients[i as usize].sess.teamLeader != qfalse {
                 break;
             }
             i += 1;
@@ -2863,7 +2873,7 @@ pub fn CheckTeamLeader(ctx: GameContext<'_>, team: c_int) {
                     continue;
                 }
                 if world.g_entities[i as usize].r.svFlags & SVF_BOT == 0 {
-                    world.clients[i as usize].sess.teamLeader = QTRUE;
+                    world.clients[i as usize].sess.teamLeader = qtrue;
                     break;
                 }
                 i += 1;
@@ -2874,7 +2884,7 @@ pub fn CheckTeamLeader(ctx: GameContext<'_>, team: c_int) {
                     i += 1;
                     continue;
                 }
-                world.clients[i as usize].sess.teamLeader = QTRUE;
+                world.clients[i as usize].sess.teamLeader = qtrue;
                 break;
             }
         }
@@ -3059,7 +3069,7 @@ pub fn G_RunThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
         }
 
-        if (*ent).inuse != QFALSE {
+        if (*ent).inuse != qfalse {
             trap::ICARUS_MaintainTaskManager(
                 ctx.engine,
                 mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*ent).s.number),
@@ -3114,7 +3124,7 @@ pub fn NAV_CheckCalcPaths(ctx: GameContext<'_>) {
 
             trap::Nav_CalculatePaths(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_CALCULATEPATHS::GNavCalculatepathsArgs::new(QFALSE),
+                mp_abi::game::syscalls::G_NAV_CALCULATEPATHS::GNavCalculatepathsArgs::new(qfalse),
             );
 
             if world.globals.fatalErrors != 0 {
@@ -3126,7 +3136,7 @@ pub fn NAV_CheckCalcPaths(ctx: GameContext<'_>) {
                         .unwrap(),
                     ck_sum.integer,
                 ),
-            ) == QFALSE
+            ) == qfalse
             {
                 let name = cstr_to_str(mapname.string.as_ptr());
                 Com_Printf(
@@ -3194,7 +3204,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
             let mut i: c_int = 0;
             while (i as usize) < MAX_CLIENTS {
                 let cl_ent = world.g_entities.as_mut_ptr().add(i as usize);
-                if (*cl_ent).inuse != QFALSE
+                if (*cl_ent).inuse != qfalse
                     && !(*cl_ent).client.is_null()
                     && (*((*cl_ent).client as *mut crate::client::gclient_t)).tempSpectate > world.level.time
                     && (*((*cl_ent).client as *mut crate::client::gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
@@ -3209,8 +3219,8 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 world.level.time + world.cvars.g_siegeRespawn.integer * 1000;
         }
 
-        if world.globals.gDoSlowMoDuel != QFALSE {
-            if world.level.restarted != QFALSE {
+        if world.globals.gDoSlowMoDuel != qfalse {
+            if world.level.restarted != qfalse {
                 let mut buf: [c_char; 128] = [0; 128];
                 trap::Cvar_VariableStringBuffer(
                     ctx.engine,
@@ -3229,7 +3239,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                     ),
                 );
                 if t_fval == 1.0f32 {
-                    world.globals.gDoSlowMoDuel = QFALSE;
+                    world.globals.gDoSlowMoDuel = qfalse;
                 }
             } else {
                 // difference in time between when the slow motion was initiated and now
@@ -3277,14 +3287,14 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         ),
                     );
                     if time_dif > 1500.0 && t_fval == 1.0f32 {
-                        world.globals.gDoSlowMoDuel = QFALSE;
+                        world.globals.gDoSlowMoDuel = qfalse;
                     }
                 }
             }
         }
 
         // if we are waiting for the level to restart, do nothing
-        if world.level.restarted != QFALSE {
+        if world.level.restarted != qfalse {
             return;
         }
 
@@ -3315,7 +3325,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
             let mut i: c_int = 0;
             while i < world.level.num_entities {
                 let ent = world.g_entities.as_mut_ptr().add(i as usize);
-                if (*ent).inuse == QFALSE {
+                if (*ent).inuse == qfalse {
                     i += 1;
                     continue;
                 }
@@ -3348,7 +3358,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
         let mut i: c_int = 0;
         while i < world.level.num_entities {
             let ent = world.g_entities.as_mut_ptr().add(i as usize);
-            if (*ent).inuse == QFALSE {
+            if (*ent).inuse == qfalse {
                 i += 1;
                 continue;
             }
@@ -3361,7 +3371,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         (*((*ent).client as *mut crate::client::gclient_t)).ps.externalEvent = 0;
                     }
                 }
-                if (*ent).freeAfterEvent != QFALSE {
+                if (*ent).freeAfterEvent != qfalse {
                     // tempEntities or dropped items completely go away after their event
                     if (*ent).s.eFlags & EF_SOUNDTRACKER != 0 {
                         // don't trigger the event again..
@@ -3374,9 +3384,9 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         i += 1;
                         continue;
                     }
-                } else if (*ent).unlinkAfterEvent != QFALSE {
+                } else if (*ent).unlinkAfterEvent != qfalse {
                     // items that will respawn will hide themselves after their pickup event
-                    (*ent).unlinkAfterEvent = QFALSE;
+                    (*ent).unlinkAfterEvent = qfalse;
                     trap::UnlinkEntity(
                         ctx.engine,
                         mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(ent),
@@ -3385,12 +3395,12 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
             }
 
             // temporary entities don't think
-            if (*ent).freeAfterEvent != QFALSE {
+            if (*ent).freeAfterEvent != qfalse {
                 i += 1;
                 continue;
             }
 
-            if (*ent).r.linked == QFALSE && (*ent).neverFree != QFALSE {
+            if (*ent).r.linked == qfalse && (*ent).neverFree != qfalse {
                 i += 1;
                 continue;
             }
@@ -3401,7 +3411,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 continue;
             }
 
-            if (*ent).s.eType == entityType_t::ET_ITEM as c_int || (*ent).physicsObject != QFALSE {
+            if (*ent).s.eType == entityType_t::ET_ITEM as c_int || (*ent).physicsObject != qfalse {
                 G_RunItem(ctx, ent);
                 i += 1;
                 continue;
@@ -3424,12 +3434,12 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         .as_mut_ptr()
                         .add((*client).inSpaceIndex as usize);
 
-                    if (*spacetrigger).inuse == QFALSE
+                    if (*spacetrigger).inuse == qfalse
                         || G_PointInBounds(
                             (*client).ps.origin,
                             (*spacetrigger).r.absmin,
                             (*spacetrigger).r.absmax,
-                        ) == QFALSE
+                        ) == qfalse
                     {
                         // no longer in space then I suppose
                         (*client).inSpaceIndex = 0;
@@ -3437,7 +3447,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         // check for suffocation
                         if (*client).inSpaceSuffocation < world.level.time {
                             // suffocate!
-                            if (*ent).health > 0 && (*ent).takedamage != QFALSE {
+                            if (*ent).health > 0 && (*ent).takedamage != qfalse {
                                 // if they're still alive..
                                 let dmg = world.bg_state.rng.Q_irand(50, 70);
                                 G_Damage(
@@ -3504,7 +3514,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         // have to keep holding use
                         (*client).isHacking = 0;
                         (*client).ps.hackingTime = 0;
-                    } else if hacked.is_null() || (*hacked).inuse == QFALSE {
+                    } else if hacked.is_null() || (*hacked).inuse == qfalse {
                         // shouldn't happen, but safety first
                         (*client).isHacking = 0;
                         (*client).ps.hackingTime = 0;
@@ -3512,7 +3522,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         (*client).ps.origin,
                         (*hacked).r.absmin,
                         (*hacked).r.absmax,
-                    ) == QFALSE
+                    ) == qfalse
                     {
                         // they stepped outside the thing they're hacking, so reset hacking time
                         (*client).isHacking = 0;
@@ -3525,7 +3535,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 }
 
                 // JETPACK_DEFUEL_RATE ~= 200, JETPACK_REFUEL_RATE ~= 150 (g_main.c:3895-3896 local #defines)
-                if (*client).jetPackOn != QFALSE {
+                if (*client).jetPackOn != qfalse {
                     // using jetpack, drain fuel
                     if (*client).jetPackDebReduce < world.level.time {
                         if (*client).pers.cmd.upmove > 0 {
@@ -3642,7 +3652,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
         let mut i: c_int = 0;
         while i < world.level.maxclients {
             let ent = world.g_entities.as_mut_ptr().add(i as usize);
-            if (*ent).inuse != QFALSE {
+            if (*ent).inuse != qfalse {
                 ClientEndFrame(ctx, ent);
             }
             i += 1;
@@ -3691,12 +3701,12 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
         // At the end of the frame, send out the ghoul2 kill queue, if there is one
         G_SendG2KillQueue(ctx);
 
-        if world.globals.gQueueScoreMessage != QFALSE {
+        if world.globals.gQueueScoreMessage != qfalse {
             if world.globals.gQueueScoreMessageTime < world.level.time {
                 SendScoreboardMessageToAllClients(ctx);
 
                 world.globals.gQueueScoreMessageTime = 0;
-                world.globals.gQueueScoreMessage = QFALSE;
+                world.globals.gQueueScoreMessage = qfalse;
             }
         }
 

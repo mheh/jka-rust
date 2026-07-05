@@ -3770,7 +3770,9 @@ pub fn SiegeTakesPriority(
         let bcl: *mut gclient_t;
         let mut dif: vec3_t = [0.0; 3];
         let mut tr: trace_t = core::mem::zeroed();
-        let _ = &flagForDefendableObjective;
+        // Raven assigns `flagForDefendableObjective` in the team branch below but
+        // never reads it (dead local); no premature use here.
+        // Source: `oracle/oracle/codemp/game/ai_main.c:3259,3306,3312`
 
         if (*world).cvars.g_gametype.integer != GT_SIEGE {
             return 0;
@@ -4154,7 +4156,7 @@ pub fn GetIdealDestination(
         let mut tempInt: c_int;
         let cWPIndex: c_int;
         let bChicken: c_int;
-        let idleWP: c_int;
+        let mut idleWP: c_int;
         let mut distChange: f32;
         let mut plusLen: f32;
         let mut minusLen: f32;

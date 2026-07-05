@@ -32,7 +32,7 @@ pub fn RegisterAssets(
 ///
 /// Updates vehicle speed based on movement input and vehicle properties.
 /// Source: `oracle/oracle/codemp/game/WalkerNPC.c:129-251`
-pub fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
+pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let pVeh = &mut *pVeh;
         let parent = pVeh.m_pParentEntity;
@@ -188,7 +188,7 @@ pub fn WalkerYawAdjust(
 ///
 /// Processes vehicle orientation based on rider input and vehicle properties.
 /// Source: `oracle/oracle/codemp/game/WalkerNPC.c:316-411`
-pub fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
+pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let pVeh = &mut *pVeh;
         let parent = pVeh.m_pParentEntity;
@@ -207,12 +207,11 @@ pub fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
         let mut rider: *mut bgEntity_t = std::ptr::null_mut();
         if (*parent).s.owner != ENTITYNUM_NONE {
             // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`;
-            // no pm/world handle in this dispatch-virtual signature, so resolve
-            // through the contiguous game arena relative to `parent` (at its own
-            // `s.number`); the `gentity_t` cast gives the arena stride.
-            rider = (parent as *mut gentity_t)
-                .offset(((*parent).s.owner - (*parent).s.number) as isize)
-                as *mut bgEntity_t;
+            // `ctx` now threads the world, so index the game arena directly.
+            rider = (*ctx.world)
+                .g_entities
+                .as_mut_ptr()
+                .add((*parent).s.owner as usize) as *mut bgEntity_t;
         }
 
         if rider.is_null() {
@@ -282,7 +281,7 @@ pub fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
 ///
 /// Animates the Walker vehicle based on speed and state.
 /// Source: `oracle/oracle/codemp/game/WalkerNPC.c:415-536`
-pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
+pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let pVeh = &mut *pVeh;
         let mut anim = BOTH_STAND1;

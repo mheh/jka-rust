@@ -784,7 +784,10 @@ pub fn G_CheckSpecialDeathAnim(
         let mut deathAnim: c_int = -1;
 
         // crouch-death helper: returns the thrown-back vs crouched death anim.
-        let crouch_death = |ctx: GameContext<'_>| -> c_int {
+        // `move` captures the Copy raw pointer `client` by value, so it holds no
+        // environment borrow of `client` — the later `&mut (*client).ps` reborrows
+        // don't collide with the closure's shared capture.
+        let crouch_death = move |ctx: GameContext<'_>| -> c_int {
             let mut fwd: vec3_t = [0.0; 3];
             AngleVectors((*client).ps.viewangles, Some(&mut fwd), None, None);
             let thrown = crate::q_math::_DotProduct(fwd, (*client).ps.velocity);
@@ -5138,7 +5141,7 @@ pub fn G_Damage(
                                         ) != qfalse
                                         {
                                             crate::g_vehicles::G_VehicleSetDamageLocFlags(
-                                                targ, surface, deathPoint,
+                                                ctx, targ, surface, deathPoint,
                                             );
                                             if !wasDying {
                                                 (*tc).ps.otherKillerDebounceTime = 0;
@@ -5149,7 +5152,7 @@ pub fn G_Damage(
                                         }
                                     } else {
                                         crate::g_vehicles::G_VehicleSetDamageLocFlags(
-                                            targ, surface, deathPoint,
+                                            ctx, targ, surface, deathPoint,
                                         );
                                     }
                                 }

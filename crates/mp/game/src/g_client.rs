@@ -2218,11 +2218,11 @@ pub fn G_UpdateClientAnims(
                 };
 
                 if anim_speed < 0.0 {
-                    last_frame = anim.firstFrame;
-                    first_frame = anim.firstFrame + anim.numFrames;
+                    last_frame = anim.firstFrame as i32;
+                    first_frame = anim.firstFrame as i32 + anim.numFrames as i32;
                 } else {
-                    first_frame = anim.firstFrame;
-                    last_frame = anim.firstFrame + anim.numFrames;
+                    first_frame = anim.firstFrame as i32;
+                    last_frame = anim.firstFrame as i32 + anim.numFrames as i32;
                 }
 
                 a_flags |= BONE_ANIM_BLEND;
@@ -2269,7 +2269,7 @@ pub fn G_UpdateClientAnims(
                 f,
                 &mut animSpeedScale as *mut f32,
                 (*((*self_).client as *mut gclient_t)).ps.brokenLimbs,
-                &(*ctx.world).bg_state,
+                (*ctx.world).g_entities.as_mut_ptr(),
             );
 
             let all_anims = &(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize];
@@ -2286,11 +2286,11 @@ pub fn G_UpdateClientAnims(
             a_flags2 |= BONE_ANIM_BLEND;
 
             if anim_speed < 0.0 {
-                last2 = anim.firstFrame;
-                first2 = anim.firstFrame + anim.numFrames;
+                last2 = anim.firstFrame as i32;
+                first2 = anim.firstFrame as i32 + anim.numFrames as i32;
             } else {
-                first2 = anim.firstFrame;
-                last2 = anim.firstFrame + anim.numFrames;
+                first2 = anim.firstFrame as i32;
+                last2 = anim.firstFrame as i32 + anim.numFrames as i32;
             }
 
             trap::G2API_SetBoneAnim(

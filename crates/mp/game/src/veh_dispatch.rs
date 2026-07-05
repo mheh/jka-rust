@@ -103,43 +103,47 @@ pub fn start_death_delay(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, iDelayTimeO
 
 /// `Inhabited` — generic base only (`type`-independent).
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:...` (`Inhabited`).
-pub fn inhabited(pVeh: *mut Vehicle_t) -> qboolean {
-    crate::g_vehicles::Inhabited(pVeh)
+pub fn inhabited(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
+    crate::g_vehicles::Inhabited(ctx, pVeh)
 }
 
 /// `ValidateBoard` — generic base only.
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:...` (`ValidateBoard`).
-pub fn validate_board(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean {
-    crate::g_vehicles::ValidateBoard(pVeh, pEnt)
+pub fn validate_board(
+    ctx: GameContext<'_>,
+    pVeh: *mut Vehicle_t,
+    pEnt: *mut bgEntity_t,
+) -> qboolean {
+    crate::g_vehicles::ValidateBoard(ctx, pVeh, pEnt)
 }
 
 /// `SetPilot` — generic base only.
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3280`.
-pub fn set_pilot(pVeh: *mut Vehicle_t, pPilot: *mut bgEntity_t) {
-    crate::g_vehicles::SetPilot(pVeh, pPilot)
+pub fn set_pilot(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pPilot: *mut bgEntity_t) {
+    crate::g_vehicles::SetPilot(ctx, pVeh, pPilot)
 }
 
 /// `Ghost` — generic base only.
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:...` (`Ghost`).
-pub fn ghost(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
-    crate::g_vehicles::Ghost(pVeh, pEnt)
+pub fn ghost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
+    crate::g_vehicles::Ghost(ctx, pVeh, pEnt)
 }
 
 /// `UnGhost` — generic base only.
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1718` (`UnGhost`).
-pub fn un_ghost(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
-    crate::g_vehicles::UnGhost(pVeh, pEnt)
+pub fn un_ghost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
+    crate::g_vehicles::UnGhost(ctx, pVeh, pEnt)
 }
 
 /// `AnimateVehicle` — per-class only (the generic base leaves the slot null, so
 /// Raven's callers `if`-guard it; the `_` arm is that skip). Fighter's override
 /// is not yet ported.
 /// Source: `oracle/oracle/codemp/game/{Speeder,Walker,Animal}NPC.c` (`AnimateVehicle`).
-pub fn animate_vehicle(pVeh: *mut Vehicle_t) {
+pub fn animate_vehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateVehicle(pVeh),
-        vehicleType_t::VH_WALKER => crate::WalkerNPC::AnimateVehicle(pVeh),
-        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::AnimateVehicle(pVeh),
+        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateVehicle(ctx, pVeh),
+        vehicleType_t::VH_WALKER => crate::WalkerNPC::AnimateVehicle(ctx, pVeh),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::AnimateVehicle(ctx, pVeh),
         //TODO: Port FighterNPC::AnimateVehicle
         // Source: oracle/oracle/codemp/game/FighterNPC.c:1951
         vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::AnimateVehicle — FighterNPC.c:1951"),
@@ -150,10 +154,10 @@ pub fn animate_vehicle(pVeh: *mut Vehicle_t) {
 /// `AnimateRiders` — per-class only (Walker leaves it null). Fighter's override
 /// is not yet ported.
 /// Source: `oracle/oracle/codemp/game/{Speeder,Animal}NPC.c` (`AnimateRiders`).
-pub fn animate_riders(pVeh: *mut Vehicle_t) {
+pub fn animate_riders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateRiders(pVeh),
-        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::AnimateRiders(pVeh),
+        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateRiders(ctx, pVeh),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::AnimateRiders(ctx, pVeh),
         //TODO: Port FighterNPC::AnimateRiders
         // Source: oracle/oracle/codemp/game/FighterNPC.c:1952
         vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::AnimateRiders — FighterNPC.c:1952"),
@@ -163,11 +167,11 @@ pub fn animate_riders(pVeh: *mut Vehicle_t) {
 
 /// `ProcessMoveCommands` — per-class only. Fighter's override is not yet ported.
 /// Source: `oracle/oracle/codemp/game/{Speeder,Walker,Animal}NPC.c`.
-pub fn process_move_commands(pVeh: *mut Vehicle_t) {
+pub fn process_move_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessMoveCommands(pVeh),
-        vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessMoveCommands(pVeh),
-        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessMoveCommands(pVeh),
+        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessMoveCommands(ctx, pVeh),
+        vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessMoveCommands(ctx, pVeh),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessMoveCommands(ctx, pVeh),
         //TODO: Port FighterNPC::ProcessMoveCommands
         // Source: oracle/oracle/codemp/game/FighterNPC.c:1970
         vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::ProcessMoveCommands — FighterNPC.c:1970"),
@@ -177,11 +181,11 @@ pub fn process_move_commands(pVeh: *mut Vehicle_t) {
 
 /// `ProcessOrientCommands` — per-class only. Fighter's override is not yet ported.
 /// Source: `oracle/oracle/codemp/game/{Speeder,Walker,Animal}NPC.c`.
-pub fn process_orient_commands(pVeh: *mut Vehicle_t) {
+pub fn process_orient_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessOrientCommands(pVeh),
-        vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessOrientCommands(pVeh),
-        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessOrientCommands(pVeh),
+        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessOrientCommands(ctx, pVeh),
+        vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessOrientCommands(ctx, pVeh),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessOrientCommands(ctx, pVeh),
         //TODO: Port FighterNPC::ProcessOrientCommands
         // Source: oracle/oracle/codemp/game/FighterNPC.c:1971
         vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::ProcessOrientCommands — FighterNPC.c:1971"),

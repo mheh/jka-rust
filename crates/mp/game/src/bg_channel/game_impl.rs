@@ -455,10 +455,19 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     }
     fn board_vehicle(&mut self, vehEntNum: c_int, entNum: c_int) -> qboolean {
         // Resolves `vehEntNum`->`m_pVehicle` and `entNum`->`bgEntity_t` against
-        // the world arena, builds a `GameContext`, and delegates to
-        // `crate::veh_dispatch::board`. Deferred like its sibling upcalls until
-        // the num->arena resolution helper lands (the pmove slice does not drive
-        // boarding). Source: `oracle/oracle/codemp/game/bg_pmove.c` (boarding).
-        todo!("Port GameCallbacks::board_vehicle delegation — crate::veh_dispatch::board (g_vehicles.c:630)")
+        // the world arena, rebuilds the module `GameContext` from the handles this
+        // impl holds, and delegates to `crate::veh_dispatch::board` (now that the
+        // dispatch chain threads `ctx`). Source: `oracle/oracle/codemp/game/g_vehicles.c:630`.
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            let pEnt = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t
+                as *mut bgEntity_t;
+            crate::veh_dispatch::board(ctx, pVeh, pEnt)
+        }
     }
 }

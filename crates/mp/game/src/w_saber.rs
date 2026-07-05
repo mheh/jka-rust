@@ -2528,7 +2528,7 @@ pub fn G_GetAttackDamage(
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            &(*ctx.world).bg_state,
+            (*ctx.world).g_entities.as_mut_ptr(),
         );
         let speedDif = (attackAnimLength - (attackAnimLength * animSpeedFactor)) as c_int;
         attackAnimLength += speedDif as f32;
@@ -2583,7 +2583,7 @@ pub fn G_GetAnimPoint(
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
-            &(*ctx.world).bg_state,
+            (*ctx.world).g_entities.as_mut_ptr(),
         );
         let speedDif = (attackAnimLength - (attackAnimLength * animSpeedFactor)) as c_int;
         attackAnimLength += speedDif as f32;

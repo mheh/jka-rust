@@ -133,11 +133,11 @@ pub fn AddRemap(
 pub fn BuildShaderStateConfig(ctx: GameContext<'_>) -> *const c_char {
     unsafe {
         const MAX_STRING_CHARS: usize = 1024;
-        static mut buff: [c_char; MAX_STRING_CHARS * 4] = [0; MAX_STRING_CHARS * 4];
+        static mut BUFF: [c_char; MAX_STRING_CHARS * 4] = [0; MAX_STRING_CHARS * 4];
 
         // Zero out the buffer at the start
         for i in 0..MAX_STRING_CHARS * 4 {
-            buff[i] = 0;
+            BUFF[i] = 0;
         }
 
         let world = &*ctx.world;
@@ -148,10 +148,10 @@ pub fn BuildShaderStateConfig(ctx: GameContext<'_>) -> *const c_char {
 
             let formatted = format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset);
             let out_cstr = CString::new(formatted).unwrap_or_else(|_| CString::new("").unwrap());
-            Q_strcat(buff.as_mut_ptr(), (MAX_STRING_CHARS * 4) as c_int, out_cstr.as_ptr());
+            Q_strcat(BUFF.as_mut_ptr(), (MAX_STRING_CHARS * 4) as c_int, out_cstr.as_ptr());
         }
 
-        buff.as_ptr()
+        BUFF.as_ptr()
     }
 }
 
@@ -784,11 +784,11 @@ pub fn tv(
     z: f32,
 ) -> *mut f32 {
     unsafe {
-        static mut index: c_int = 0;
-        static mut vecs: [[f32; 3]; 8] = [[0.0; 3]; 8];
+        static mut INDEX: c_int = 0;
+        static mut VECS: [[f32; 3]; 8] = [[0.0; 3]; 8];
 
-        let v = &mut vecs[index as usize];
-        index = (index + 1) & 7;
+        let v = &mut VECS[INDEX as usize];
+        INDEX = (INDEX + 1) & 7;
 
         v[0] = x;
         v[1] = y;
@@ -806,11 +806,11 @@ pub fn vtos(
     v: vec3_t,
 ) -> *mut c_char {
     unsafe {
-        static mut index: c_int = 0;
-        static mut str: [[c_char; 32]; 8] = [[0; 32]; 8];
+        static mut INDEX: c_int = 0;
+        static mut STR: [[c_char; 32]; 8] = [[0; 32]; 8];
 
-        let s = &mut str[index as usize];
-        index = (index + 1) & 7;
+        let s = &mut STR[INDEX as usize];
+        INDEX = (INDEX + 1) & 7;
 
         let formatted = format!("({} {} {})", v[0] as c_int, v[1] as c_int, v[2] as c_int);
         let bytes = formatted.as_bytes();
