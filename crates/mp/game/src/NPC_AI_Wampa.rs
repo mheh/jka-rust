@@ -506,7 +506,7 @@ pub fn NPC_Wampa_Pain(
                         crate::g_timer::TIMER_Set(ctx, self_, c"walk".as_ptr(), -1);
 
                         if !(*self_).NPC.is_null() {
-                            (*(*self_).NPC).localState = LSTATE_WAITING;
+                            (*((*self_).NPC as *mut crate::npc::g_npc_t::gNPC_t)).localState = LSTATE_WAITING;
                         }
                     }
                 }

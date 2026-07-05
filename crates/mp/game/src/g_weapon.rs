@@ -4955,7 +4955,7 @@ pub fn WP_VehCheckTraceFromCamPos(
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:4116-4413`
 pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolean) {
     unsafe {
-        let pVeh = (*ent).m_pVehicle;
+        let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
         if pVeh.is_null() {
             return;
         }

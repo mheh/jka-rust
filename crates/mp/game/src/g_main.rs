@@ -846,7 +846,7 @@ pub fn G_ResetDuelists(ctx: GameContext<'_>) {
             ClientSpawn(ctx, ent);
 
             // add a teleportation effect
-            let origin = (*(*ent).client).ps.origin;
+            let origin = (*((*ent).client as *mut crate::client::gclient_t)).ps.origin;
             let tent = G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_IN as c_int);
             (*tent).s.clientNum = (*ent).s.clientNum;
             i += 1;
@@ -1281,7 +1281,7 @@ pub fn BeginIntermission(ctx: GameContext<'_>) {
             if (*client).health <= 0 {
                 if world.cvars.g_gametype.integer != GT_POWERDUEL
                     || (*client).client.is_null()
-                    || (*(*client).client).sess.sessionTeam != TEAM_SPECTATOR
+                    || (*((*client).client as *mut crate::client::gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
                 {
                     // don't respawn spectators in powerduel or it will mess the line order all up
                     respawn(ctx, client);
@@ -1958,7 +1958,7 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
             while (i as usize) < MAX_CLIENTS {
                 let ent = &world.g_entities[i as usize];
                 if ent.inuse != QFALSE && !ent.client.is_null() && ent.health > 0 {
-                    let cl = &*ent.client;
+                    let cl = &*(ent.client as *mut crate::client::gclient_t);
                     if cl.sess.sessionTeam != TEAM_SPECTATOR && cl.ps.pm_flags & PMF_FOLLOW == 0 {
                         num_live_clients += 1;
                     }
@@ -3196,11 +3196,11 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 let cl_ent = world.g_entities.as_mut_ptr().add(i as usize);
                 if (*cl_ent).inuse != QFALSE
                     && !(*cl_ent).client.is_null()
-                    && (*(*cl_ent).client).tempSpectate > world.level.time
-                    && (*(*cl_ent).client).sess.sessionTeam != TEAM_SPECTATOR
+                    && (*((*cl_ent).client as *mut crate::client::gclient_t)).tempSpectate > world.level.time
+                    && (*((*cl_ent).client as *mut crate::client::gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
                 {
                     respawn(ctx, cl_ent);
-                    (*(*cl_ent).client).tempSpectate = 0;
+                    (*((*cl_ent).client as *mut crate::client::gclient_t)).tempSpectate = 0;
                 }
                 i += 1;
             }
@@ -3358,7 +3358,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 if (*ent).s.event != 0 {
                     (*ent).s.event = 0; // &= EV_EVENT_BITS;
                     if !(*ent).client.is_null() {
-                        (*(*ent).client).ps.externalEvent = 0;
+                        (*((*ent).client as *mut crate::client::gclient_t)).ps.externalEvent = 0;
                     }
                 }
                 if (*ent).freeAfterEvent != QFALSE {
@@ -3416,7 +3416,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
             if (i as usize) < MAX_CLIENTS {
                 G_CheckClientTimeouts(ctx, ent);
 
-                let client = (*ent).client;
+                let client = (*ent).client as *mut crate::client::gclient_t;
                 if (*client).inSpaceIndex != 0 && (*client).inSpaceIndex != ENTITYNUM_NONE {
                     // we're in space, check for suffocating and for exiting
                     let spacetrigger = world
@@ -3608,7 +3608,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 i += 1;
                 continue;
             } else if (*ent).s.eType == entityType_t::ET_NPC as c_int {
-                let client = (*ent).client;
+                let client = (*ent).client as *mut crate::client::gclient_t;
                 // turn off any expired powerups
                 let mut j: usize = 0;
                 while j < MAX_POWERUPS {
