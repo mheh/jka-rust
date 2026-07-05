@@ -406,10 +406,12 @@ pub fn turret_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         if (*self_).painDebounceTime > (*ctx.world).level.time {
             // In pain — aim randomly
+            // Oracle uses `flrand` (holdrand stream), not the `random()` macro.
+            // Source: `oracle/oracle/codemp/game/g_turret.c:249-250`
             desiredAngles[YAW] =
-                top.r.currentAngles[YAW] + (*ctx.world).bg_state.rng.random() * 90.0 - 45.0;
+                top.r.currentAngles[YAW] + (*ctx.world).bg_state.rng.flrand(-45.0, 45.0);
             desiredAngles[PITCH] =
-                top.r.currentAngles[PITCH] + (*ctx.world).bg_state.rng.random() * 20.0 - 10.0;
+                top.r.currentAngles[PITCH] + (*ctx.world).bg_state.rng.flrand(-10.0, 10.0);
 
             if desiredAngles[PITCH] < -PITCH_CAP {
                 desiredAngles[PITCH] = -PITCH_CAP;
@@ -419,7 +421,9 @@ pub fn turret_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             diffYaw = AngleSubtract(desiredAngles[YAW], top.r.currentAngles[YAW]);
             diffPitch = AngleSubtract(desiredAngles[PITCH], top.r.currentAngles[PITCH]);
-            turnSpeed = (*ctx.world).bg_state.rng.random() * 10.0 - 5.0;
+            // Oracle uses `flrand` (holdrand stream), not the `random()` macro.
+            // Source: `oracle/oracle/codemp/game/g_turret.c:263`
+            turnSpeed = (*ctx.world).bg_state.rng.flrand(-5.0, 5.0);
         } else if let Some(enemy_id) = (*self_).enemy {
             // Aim at enemy
             let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;

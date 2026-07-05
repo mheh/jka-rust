@@ -200,11 +200,13 @@ pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
                                 _VectorMA(muzzle, distanceToEnemy, forward, &mut hitspot);
                                 _VectorSubtract(hitspot, enemy_org, &mut diff);
                                 let mut aim_off = VectorLength(diff);
-                                if aim_off > world.bg_state.rng.flrand(0.0, 1.0) * max_aim_off {
+                                // Oracle uses the `random()` macro (randSeed stream), not flrand.
+                                // Source: `oracle/oracle/codemp/game/NPC_behavior.c:140,146`
+                                if aim_off > world.bg_state.rng.random() * max_aim_off {
                                     attack_scale *= 0.75;
                                     _VectorSubtract(hitspot, enemy_head, &mut diff);
                                     aim_off = VectorLength(diff);
-                                    if aim_off > world.bg_state.rng.flrand(0.0, 1.0) * max_aim_off {
+                                    if aim_off > world.bg_state.rng.random() * max_aim_off {
                                         attack_ok = QFALSE;
                                     }
                                 }

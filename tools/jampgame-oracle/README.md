@@ -36,6 +36,21 @@ only needed to regenerate or spot-check.
 - **bglib** — `srand`/`rand` streams (5 seeds), `atoi`/`atof`/`_atof` over a
   string fixture table, `qsort` over an int array and a struct array (deterministic
   comparator), and `memmove` overlap cases.
+- **saberload** — `bg_saberLoad.c`'s `WP_SaberParseParms` `.sab` parser. Drives
+  the real load path (`WP_SaberLoadParms` fills the `SaberParms` buffer from
+  `fixtures/sabers/*.sab`, then `WP_SaberParseParms` per saber name) and dumps
+  every `saberInfo_t` field in declaration order (floats as IEEE-754 bit-hex,
+  strings quoted, `blade[]`/sound arrays indexed) plus the per-saber
+  sound/skin registration logs. Six saber names exercise: a realistic single
+  (`Kyle`, doubling as the `DEFAULT_SABER` fallback target), a staff (two blade
+  styles, secondary `*2` fields, per-index `saberColor2`/`saberLength2`,
+  swing/hit2 sound lists, `SFL_TWO_HANDED`), an edge saber (below-cap
+  length/radius clamped to 4.0/0.25, unknown tokens skipped, `SABER_ARC`,
+  negative/large numerics, force-restrict + style bitfields, `animTable`
+  lookups, a `customSkin` registration, a value-less trailing keyword), a
+  truncated block (`broken_saber` → unexpected-EOF → `qfalse`), a not-found
+  name (poisoned by the unclosed block → `qfalse`), and the empty name
+  (immediate `DEFAULT_SABER`).
 
 ## Build model (no `-DQ3_VM`)
 
@@ -75,7 +90,68 @@ host cannot faithfully reach them otherwise. The extractions edit nothing in
   and `>>1` diverges from the 32-bit target. Normalized `long` → `int` (the
   port's i32 model) with the `__linux__` `isnan` assert dropped.
 
+## The saberload slice: build model, stubs, and entry sequence
+
+Unlike the qmath/bglib slices (which compile for the plain native target), the
+saberload dumper is compiled with **`-DQAGAME`** — jampgame *is* Raven's QAGAME
+build, so the `#elif defined CGAME` branches are dead (effect tokens
+`SkipRestOfLine` instead of registering; `BG_SoundIndex` routes to
+`G_SoundIndex`). It links the **unmodified** `bg_saberLoad.c` + `q_shared.c`
+(the `COM_*` parser + `GetIDForString`/string tables) plus `animtable_def.c`
+(compiles `cgame/animtable.h` standalone to define the `animTable` symbol,
+byte-identical to the port's generated `anim_table.rs`). `run.sh` copies the
+full `game/` + `qcommon/` header closure, the two `namespace_*.h` shims, and
+`animtable.h` into `build/` so the copied sources' relative includes resolve;
+`oracle/` is never touched.
+
+**Entry sequence** (mirrors how the game loads sabers, read out of
+`WP_SaberLoadParms` → `WP_SaberParseParms`): the dumper first calls
+`WP_SaberLoadParms()`, which `trap_FS_GetFileList("ext_data/sabers", ".sab", …)`,
+then for each file `trap_FS_FOpenFile` / `trap_FS_Read` / `COM_Compress` /
+`Q_strcat`s the contents (plus a trailing `\n`) into the `SaberParms` buffer.
+It then calls `WP_SaberParseParms(name, &saber)` per saber name over a
+zeroed `saberInfo_t`. The Rust parity test drives the identical two-step over
+the ported `crate::bg_saberLoad` (`BgState` owns `SaberParms`; a fixtures-backed
+`TestTraps: BgTraps` serves the FS calls).
+
+**Stub definitions provided in `main_saberload.c`** (the TU extern-declares
+these; the linker demands them):
+
+| symbol | faithfulness |
+| --- | --- |
+| `trap_FS_GetFileList` / `FOpenFile` / `Read` / `FCloseFile` | backed by `fixtures/sabers/`; vpaths (`ext_data/sabers[/name]`) mapped by stripping `ext_data/` and prefixing the fixture dir. Listing is **sorted** (byte-lexicographic) since `readdir` is unordered — the Rust `TestTraps` sorts identically, so `SaberParms` is byte-identical on both sides. `FS_Write` is a no-op (never on the load path). |
+| `trap_R_RegisterSkin` | name-logging counter (per-saber, from 1). Skins genuinely cross the observable `BgTraps` seam, so both sides mint the same deterministic handle — the `customSkin` field carries it and the name is logged (`regskin`). |
+| `G_SoundIndex` (behind `BG_SoundIndex`) | name-logging observer that returns **0** — see normalization below. |
+| `FPTable` | the force-power name/id table, written with Raven's `ENUM2STRING` macro (oracle `bg_saga.c:100-121`); matches the port's `bg_saga::FPTable`. |
+| `animTable` | supplied by `animtable_def.c` (the real `cgame/animtable.h`). |
+| `Com_Printf` / `Com_Error` | routed to **stderr** so parser diagnostics never enter the golden (stdout). `Com_Error` additionally `exit(3)`s (mirrors the port's `panic!`); fixtures never trigger it (`numBlades` kept valid, buffer small). |
+| `Q_irand` | link-satisfying stub, **never called** — only `TranslateSaberColor`'s `"random"` color reaches it, and fixtures avoid `"random"` (it would need a seed-matched RNG on both sides). |
+
 ## Normalizations (documented divergences — porting-rules §19)
+
+- **Sound-index return values are 0 on both sides; only the registration
+  *names* are observable.** The port's `G_SoundIndex` is a documented
+  placeholder returning 0 (the configstring architecture is unwired), so every
+  `saberInfo_t` sound field (`soundOn`, `swingSound[]`, `hitSound[]`, …) is 0.
+  The oracle dumper's `G_SoundIndex` stub matches (returns 0). What *is*
+  pinned is the sequence of names `BG_SoundIndex` is called with (the `regsound`
+  log) — real parser behavior, identical on both sides. The port exposes this
+  order through a dormant thread-local observation seam (`saber_snd_tape_*` in
+  `bg_saberLoad.rs`); it only *observes* (return value unchanged), so production
+  behavior is byte-identical whether or not the tape is installed. Skins, by
+  contrast, cross the real `BgTraps` seam and so carry a genuine per-saber
+  counter (`skin` field + `regskin` log). This asymmetry — skins observable via
+  the wired seam, sounds only name-observable pending `G_SoundIndex` — is itself
+  the surfaced divergence.
+- **The unclosed `broken_saber` block poisons not-found searches.** In the
+  concatenated `SaberParms` buffer the truncated block has no closing `}`, so
+  any full traversal (`SkipBracedSection`) runs `p` to `NULL` and the search
+  loop exits `qfalse` via `if(!p)` before the `DEFAULT_SABER` fall-through can
+  fire. This is Raven's real behavior (pinned by the `broken_saber` and
+  `nonexistent_xyz` cases); it is not a divergence, just a consequence noted so
+  the golden's `ret 0` values read correctly.
+
+## Normalizations (qmath/bglib)
 
 - **`ColorBytes3`** writes only bytes `[0..2]` of an uninitialized `unsigned i`;
   byte `[3]` is indeterminate stack garbage. The dumper masks it (`& 0x00ffffff`)
@@ -114,6 +190,13 @@ real port bugs — the divergence is the product:
   on `*string` directly; a leading `.` with no digits leaves `c == '0'` so the
   fractional block is skipped and `_atof(".5")` returns 0 advancing 0. The port
   had seeded `c` from the sign char and wrongly consumed the `.`.
+- **saberload: none.** The pass-3 port of `WP_SaberParseParms` /
+  `WP_SaberLoadParms` reproduced the golden byte-for-byte on first reconciliation
+  across all field categories (clamps, per-blade `saberColor`/`saberLength`
+  indices, style/force bitfields, `animTable` lookups, flag composition, the
+  registration logs, and the `DEFAULT_SABER` / EOF / not-found control paths).
+  The only port-side addition was the dormant `saber_snd_tape_*` observation
+  seam described above, which changes no behavior.
 
 ## Single-threading
 

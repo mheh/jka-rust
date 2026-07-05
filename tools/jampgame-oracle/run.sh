@@ -23,6 +23,17 @@ cp "$G/q_math.c" "$G/bg_lib.c" "$G/q_shared.h" "$G/teams.h" "$G/bg_lib.h" \
    "$G/surfaceflags.h" build/codemp/game/
 cp "$Q/disablewarnings.h" "$Q/tags.h" build/codemp/qcommon/
 
+# --- bg_saberLoad slice extra sources/headers (all copied UNMODIFIED) ---
+# The saberLoad dumper compiles the whole bg_saberLoad.c + q_shared.c (the
+# COM_* parser + string tables) against the real bg header chain, so copy the
+# full game/qcommon header closure plus the two namespace shims and the
+# animtable.h that defines the animTable symbol.
+cp "$G/bg_saberLoad.c" "$G/q_shared.c" build/codemp/game/
+cp "$G"/*.h build/codemp/game/
+cp "$Q"/*.h build/codemp/qcommon/
+cp "$ORACLE/codemp/namespace_begin.h" "$ORACLE/codemp/namespace_end.h" build/codemp/
+cp "$ORACLE/codemp/cgame/animtable.h" build/codemp/game/
+
 # shim.h (force-included first): pull real libm so Raven's 2-arg powf(float,int)
 # in q_shared.h/q_math.c is renamed out of the way of libm's powf(float,float).
 cat > build/codemp/game/shim.h <<'EOF'
@@ -75,6 +86,16 @@ cc $CFLAGS -o build/qmath_dump main_qmath.c \
 cc $CFLAGS -o build/bglib_dump main_bglib.c \
    build/codemp/game/bg_lib.c build/codemp/game/raven_atoi.c
 
+# bg_saberLoad dumper: compiled with -DQAGAME (jampgame == Raven's QAGAME),
+# linking the unmodified bg_saberLoad.c + q_shared.c (COM_* parser + string
+# tables) + animtable_def.c (defines the animTable symbol). All engine traps
+# and the FPTable/G_SoundIndex externs are stubbed in main_saberload.c.
+SABERCFLAGS="-w -std=gnu11 -D__linux__ -DQAGAME -D_FORTIFY_SOURCE=0 -ffp-contract=off \
+        -include build/codemp/game/shim.h -I. -I build/codemp/game"
+# shellcheck disable=SC2086
+cc $SABERCFLAGS -o build/saberload_dump main_saberload.c animtable_def.c \
+   build/codemp/game/bg_saberLoad.c build/codemp/game/q_shared.c
+
 mkdir -p golden
 status=0
 run_one() {
@@ -90,6 +111,7 @@ run_one() {
 if [ "${1:-}" = "--regen" ]; then REGEN=1; fi
 run_one qmath build/qmath_dump
 run_one bglib build/bglib_dump
+run_one saberload build/saberload_dump
 
 [ "$status" -eq 0 ] && echo "jampgame-oracle: OK"
 exit "$status"

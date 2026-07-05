@@ -1,0 +1,11 @@
+// zz_malformed.sab — a truncated saber block (no closing brace) to pin the
+// "unexpected EOF while parsing" error path. Named to sort LAST so its block
+// sits at the end of the concatenated SaberParms buffer, making the EOF
+// deterministic. Parsing "broken_saber" sets the fields seen before EOF, then
+// COM_ParseExt returns an empty token and WP_SaberParseParms returns qfalse.
+broken_saber
+{
+	name			"Broken Saber"
+	saberType		SABER_SINGLE
+	saberColor		yellow
+	saberLength		30
