@@ -25,18 +25,21 @@ Raven's `jampgamex86.dll`:
   `FIXME: create type` markers or unresolved referenced Rust type names.
 - [x] Document enum-only/unused ABI tokens instead of leaving them as port TODOs
   when Raven exposes no wrapper, callsite, or transport behavior.
-- [ ] Expose exported C symbols with the original names: `dllEntry` and
-  `vmMain`.
+- [x] Expose exported C symbols with the original names: `dllEntry` and
+  `vmMain` (`crates/jampgame`, the thin cdylib shell).
 - [ ] Match Raven's calling convention and `vmMain` argument/return word
-  behavior.
-- [ ] Store and call the engine syscall callback handed in through `dllEntry`.
-- [ ] Match argument packing for ints, pointers, and floats, including the
-  original `PASSFLOAT` convention.
-- [ ] Source or define ABI-correct layouts for every crossed type, including
+  behavior. (The 12-word signature and `-1` fall-through are live; most
+  command arms are still `todo!()` pending wiring.)
+- [x] Store and call the engine syscall callback handed in through `dllEntry`
+  (`ENGINE: OnceLock<CEngine>`, called by every `trap::*` wrapper).
+- [x] Match argument packing for ints, pointers, and floats, including the
+  original `PASSFLOAT` convention (`abi_transport::pass_float`).
+- [x] Source or define ABI-correct layouts for every crossed type, including
   entities, player state, traces, cvars, commands, botlib data, ICARUS data, nav
-  data, and Ghoul2 data.
-- [ ] Verify struct sizes, alignments, and field offsets against Raven headers
-  for all ABI-visible types.
+  data, and Ghoul2 data (type port complete — Waves 0–7).
+- [x] Verify struct sizes, alignments, and field offsets against Raven headers
+  for all ABI-visible types (`size_of`/`offset_of!` static-asserts, badge-verified
+  against clang ground truth).
 - [ ] Model shared memory and global expectations visible to the engine.
 - [ ] Implement engine-observable side effects for `GAME_INIT`,
   `GAME_RUN_FRAME`, `GAME_SHUTDOWN`, client lifecycle calls, botlib, ICARUS, nav,
@@ -57,9 +60,13 @@ So the ABI target is:
 > module, such that the engine can load it through the same `dllEntry`/`vmMain`
 > contract and observe equivalent behavior.
 
-The present state is not yet a drop-in `jampgamex86.dll` replacement. It is the
-scaffold for making that replacement possible without losing the original ABI
-numbers or mixing MP game, MP cgame, MP UI, and SP surfaces into one global enum.
+The present state is not yet a drop-in `jampgamex86.dll` replacement, but it is
+no longer just the scaffold: the full jampgame logic port is transcribed and
+integrated (`mp_game` compiles green, merged 2026-07-05), without losing the
+original ABI numbers or mixing MP game, MP cgame, MP UI, and SP surfaces into
+one global enum. What remains before hot-swap is `todo!()` stub burn-down,
+wiring the remaining `vmMain` command arms, and oracle differential
+verification — compiling green is not verified parity.
 
 ## Related ABI Track: SP `GetGameAPI`
 

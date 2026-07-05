@@ -7,8 +7,10 @@ Each was ported for MP, then investigated + ported for SP (SP structures differ)
 (`gclient_s`=7344, `level_locals_t`=47176, `renderInfo_t`=368, all friend types) ported
 fresh from oracle and cargo-validated with size/offset asserts. The `spectatorState_t`,
 `playerTeamStateState_t`, and `alertEvent*` enums were corrected to real `typedef enum`s
-(the retired `src/` scaffolding had wrongly flattened them to `int`). Remaining `mp_game`
-work is the gameplay *logic* (`g_*.c`), not types.
+(the retired `src/` scaffolding had wrongly flattened them to `int`). The gameplay
+*logic* (`g_*.c`) has since been transcribed and integrated too (pass 3; `mp_game`
+green, merged 2026-07-05) — remaining `mp_game` work is `todo!()` stub burn-down
+and oracle differential verification, not types.
 
 Placement principle: put each type in the **lowest tier that needs it** (native < qshared
 < bg < game), mirroring which Raven header owns it. `*mut`-only types are forward-declared

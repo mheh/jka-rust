@@ -46,7 +46,7 @@ rust-analyzer is stale in this workspace — **always confirm compilation with
 - `docs/engine-plan.md` — legacy engine sketch; being superseded by
   `docs/architecture/engine-seam.md` (see decisions ledger).
 
-## Port tooling & the future logic-port pipeline
+## Port tooling & the logic-port pipeline
 
 The type port ran on: `tools/closure-prototype/sweep.py` (one libclang parse →
 per-type packets: verbatim source slice + ready-to-paste layout asserts; badge
@@ -56,16 +56,19 @@ explore → machine verify). Principle: **tooling turns the oracle into
 self-contained, machine-verifiable work orders; agents transcribe, a mechanical
 referee judges.**
 
-For the logic port, half exists: `closure.py fn:Name --tree` (function call-tree
-closure, stops at the trap_* seam) and `portpacket.py <module> <Fn>` (full
-single-function packet: body + cites, inlined helpers, type closure w/ badges,
-referenced globals, syscall surface). **To build after slice 0 proves the shape
-by hand:** a batch function sweep (manifest generator), a `port-logic` workflow
-consuming function packets, call-graph ordering (cyclic — needs SCC, not the
-type port's DAG levels), fn-pointer dispatch resolution (think/touch/die), and
-the referee swap: frozen design docs + oracle differential tests replace clang
-layout as ground truth. Goal: per-function cost drops to mechanical throughput;
-model-ladder porters (Haiku/Sonnet) with escalations batched, not interactive.
+The logic-port pipeline was built and **ran**: `sweep.py` → `packets3.py`
+(pass-3 function packets: threading digests, resolved-sig LAW extraction,
+sharding) → the pass-3 port workflow (blind parallel transcribers) → the
+integrate workflow (triage → bounded fix rounds → serial finisher) plus
+`bulkfix.py` batch tooling (`--cast` int/float/enum span casts, `--overlay`
+c_void-family modes). **jampgame transcription and integration are done**:
+`mp_game` compiles with 0 errors (integrate phase: ~5,800 → 0), `cargo check
+--workspace` green, merged to master 2026-07-05. Remaining on jampgame:
+`todo!()` stub burn-down (76 at green, in progress), then per-file oracle
+review and the referee swap — oracle differential tests (single-threaded; the
+oracle has global state) replace clang layout as ground truth. The
+`dangerous_implicit_autorefs` lint is allowed crate-wide in `mp_game`
+(documented in its lib.rs) pending the safe-state migration.
 
 - **MP** (`jamp` engine) ships 3 loadable DLLs: `jampgame`, `cgame`, `ui`.
 - **SP** (`jasp` engine) ships **only** `jagame`; SP cgame/ui are statically
