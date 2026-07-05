@@ -107,7 +107,8 @@ for (let round = 1; round <= MAX_ROUNDS && !green; round++) {
   const results = await parallel(active.map((g, i) => () => agent(
     `INTEGRATE FIXER — round ${round}, group "${g.name}". Worktree ${WT}, branch skeleton.
 YOUR FILES ONLY (${g.cur} errors this round): ${g.files.join(', ')}.
-Current error detail is in ${invPath} (JSON {files:[{file,errors,codes,samples}]}) — Read it and take only the entries for your files. Do NOT run cargo; the inventory file is your error source.
+Current error detail is in ${invPath} (JSON {files:[{file,errors,codes,samples}]}) — Read it and take only the entries for your files. Do NOT run cargo; the inventory file is your error source.${round >= 2 ? `
+INVENTORY GUARANTEE: the inventory file above carries codes:[..] and samples:[..] for every file. If an entry for one of your files is missing that detail, that is a tooling fault — report it as ONE blocked item and still fix what the samples of your OTHER files and the rustfmt parse gate let you fix; do not zero-work the whole group.` : ''}
 Work FILE BY FILE. For each of your files: read the errors, apply the fixes per the contract, then run the rustfmt PARSE GATE on that file before moving on.
 ${FIXER_CONTRACT}
 ${KNOWN_DEBT}
@@ -129,8 +130,7 @@ Do NOT git commit (a serial committer handles it). Return JSON {group, fixed, fi
   let reInv = await agent(
     `RE-INVENTORY after integrate round ${round}. Worktree ${WT}.
 ${CARGO_PROOF}
-Rebuild the per-file inventory (count + codes + 2-3 samples per erroring file) and WRITE it as JSON to ${INV_DIR}/inv-r${round + 1}.json (mkdir -p if needed).
-Return ONLY JSON {total_errors, files:[{file, errors}], tail}. No prose.`,
+WRITE the full inventory as JSON to ${INV_DIR}/inv-r${round + 1}.json (mkdir -p if needed). The FILE must contain, for EVERY erroring file: {file, errors, codes:["E0308",..], samples:["<up to 3 verbatim error lines>",..]} — the next round's fixers are FORBIDDEN from running cargo and depend entirely on those codes+samples; a file entry without them starves a whole fixer group. Your RETURN stays thin: ONLY JSON {total_errors, files:[{file, errors}], tail}. No prose.`,
     { phase: 'Fix rounds', label: `re-triage:r${round}`, model: 'haiku', effort: 'low', schema: INV_SCHEMA }
   )
   if (reInv.total_errors === 0 && !/finished/i.test(String(reInv.tail || ''))) {
