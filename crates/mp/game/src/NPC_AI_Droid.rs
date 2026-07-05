@@ -277,7 +277,7 @@ pub fn NPC_Droid_Pain(
         let mut pain_chance: f32;
 
         // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
-        crate::q_math::_VectorCopy((*(*self_).NPC).lastPathAngles, &mut (*self_).s.angles);
+        crate::q_math::_VectorCopy((*((*self_).NPC as *mut gNPC_t)).lastPathAngles, &mut (*self_).s.angles);
 
         if (*((*self_).client as *mut gclient_t)).NPC_class == 3 { // CLASS_R5D2 = 3
             pain_chance = NPC_GetPainChance(ctx, self_, damage);
@@ -285,7 +285,7 @@ pub fn NPC_Droid_Pain(
             if mod_ == 47 || mod_ == 48 || (*ctx.world).bg_state.rng.random() < pain_chance { // MOD_DEMP2 = 47, MOD_DEMP2_ALT = 48
                 if (*self_).s.m_iVehicleNum == 0 && ((*self_).health < 30 || mod_ == 47 || mod_ == 48) {
                     if ((*self_).spawnflags & 2) == 0 {
-                        if ((*(*self_).NPC).localState != LSTATE_SPINNING) &&
+                        if ((*((*self_).NPC as *mut gNPC_t)).localState != LSTATE_SPINNING) &&
                            (trap::G2API_GetSurfaceRenderStatus(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
@@ -309,7 +309,7 @@ pub fn NPC_Droid_Pain(
 
                             TIMER_Set(ctx, self_, b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
                             TIMER_Set(ctx, self_, b"droidspark\0".as_ptr() as *const c_char, 100);
-                            (*(*self_).NPC).localState = LSTATE_SPINNING;
+                            (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                         }
                     }
                 } else {
@@ -321,26 +321,26 @@ pub fn NPC_Droid_Pain(
                         NPC_SetAnim(self_, 0, 21, 0x80 | 0x200); // BOTH_PAIN2 = 21
                     }
 
-                    (*(*self_).NPC).localState = LSTATE_SPINNING;
+                    (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                     TIMER_Set(ctx, self_, b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(1000, 2000));
                 }
             }
         } else if (*((*self_).client as *mut gclient_t)).NPC_class == 4 { // CLASS_MOUSE = 4
             if mod_ == 47 || mod_ == 48 {
-                (*(*self_).NPC).localState = LSTATE_SPINNING;
+                (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                 (*((*self_).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world).level.time + 3000;
             } else {
-                (*(*self_).NPC).localState = LSTATE_BACKINGUP;
+                (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_BACKINGUP;
             }
 
-            (*(*self_).NPC).scriptFlags &= !4; // SCF_LOOK_FOR_ENEMIES = 4
+            (*((*self_).NPC as *mut gNPC_t)).scriptFlags &= !4; // SCF_LOOK_FOR_ENEMIES = 4
         } else if (*((*self_).client as *mut gclient_t)).NPC_class == 2 { // CLASS_R2D2 = 2
             pain_chance = NPC_GetPainChance(ctx, self_, damage);
 
             if mod_ == 47 || mod_ == 48 || (*ctx.world).bg_state.rng.random() < pain_chance {
                 if (*self_).s.m_iVehicleNum == 0 && ((*self_).health < 30 || mod_ == 47 || mod_ == 48) {
                     if ((*self_).spawnflags & 2) == 0 {
-                        if ((*(*self_).NPC).localState != LSTATE_SPINNING) &&
+                        if ((*((*self_).NPC as *mut gNPC_t)).localState != LSTATE_SPINNING) &&
                            (trap::G2API_GetSurfaceRenderStatus(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
@@ -364,7 +364,7 @@ pub fn NPC_Droid_Pain(
 
                             TIMER_Set(ctx, self_, b"droidsmoketotal\0".as_ptr() as *const c_char, 5000);
                             TIMER_Set(ctx, self_, b"droidspark\0".as_ptr() as *const c_char, 100);
-                            (*(*self_).NPC).localState = LSTATE_SPINNING;
+                            (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                         }
                     }
                 } else {
@@ -376,7 +376,7 @@ pub fn NPC_Droid_Pain(
                         NPC_SetAnim(self_, 0, 21, 0x80 | 0x200); // BOTH_PAIN2 = 21
                     }
 
-                    (*(*self_).NPC).localState = LSTATE_SPINNING;
+                    (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
                     TIMER_Set(ctx, self_, b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(1000, 2000));
                 }
             }

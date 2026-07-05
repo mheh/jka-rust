@@ -507,7 +507,7 @@ pub fn Rancor_Attack(
             match (*(*npc).client).ps.legsAnim {
             BOTH_MELEE1 => {
                 Rancor_Smash(ctx);
-                crate::NPC_utils::G_GetBoltPosition(ctx, npc, (*(*npc).client).renderInfo.handLBolt, shakePos, 0);
+                crate::NPC_utils::G_GetBoltPosition(ctx, npc, (*(*npc).client).renderInfo.handLBolt, Some(&mut shakePos), 0);
                 crate::g_utils::G_ScreenShake(ctx, shakePos, core::ptr::null_mut(), 4.0, 1000, qfalse);
                 //CGCam_Shake( 1.0f*playerDist/128.0f, 1000 );
             },
@@ -710,7 +710,7 @@ pub fn NPC_Rancor_Pain(
                     || (*self_).enemy.is_none()
                     || (*self_enemy).health == 0
                     || (!(*self_enemy).client.is_null() && (*((*self_enemy).client as *mut gclient_t)).NPC_class == CLASS_RANCOR)
-                    || (!(*self_).NPC.is_null() && (*(*self_).NPC).consecutiveBlockedMoves>=10 && DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < DistanceSquared((*self_enemy).r.currentOrigin, (*self_).r.currentOrigin)) {
+                    || (!(*self_).NPC.is_null() && (*((*self_).NPC as *mut gNPC_t)).consecutiveBlockedMoves>=10 && DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < DistanceSquared((*self_enemy).r.currentOrigin, (*self_).r.currentOrigin)) {
                     //if my enemy is dead (or attacked by player) and I'm not still holding/eating someone, turn on the attacker
                     //FIXME: if can't nav to my enemy, take this guy if I can nav to him
                     crate::NPC_combat::G_SetEnemy(ctx, self_, attacker);
@@ -740,7 +740,7 @@ pub fn NPC_Rancor_Pain(
                         if (*self_).health > 100 || hitByRancor != 0 {
                             crate::g_timer::TIMER_Remove(ctx, self_, c"attacking".as_ptr());
 
-                            mp_qshared::shared::q_math::VectorCopy(&(*(*self_).NPC).lastPathAngles, &mut (*self_).s.angles);
+                            crate::q_math::_VectorCopy((*((*self_).NPC as *mut gNPC_t)).lastPathAngles, &mut (*self_).s.angles);
 
                             if (*self_).count == 1 {
                                 crate::npc_c::NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN2, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
@@ -750,7 +750,7 @@ pub fn NPC_Rancor_Pain(
                             crate::g_timer::TIMER_Set(ctx, self_, c"takingPain".as_ptr(), (*(*self_).client).ps.legsTimer + (*ctx.world).bg_state.rng.Q_irand(0, 500));
                         }
                         if (*self_).count == 1 {
-                            (*(*self_).NPC).localState = LSTATE_WAITING;
+                            (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_WAITING;
                         }
                     }
                 }

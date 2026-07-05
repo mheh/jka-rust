@@ -9,6 +9,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::NPC_AI_Default::NPC_BSIdle;
 use crate::NPC_reactions::NPC_Pain;
 use crate::bg_misc::BG_FindItemForWeapon;
 use crate::g_items::RegisterItem;
@@ -186,7 +187,7 @@ pub fn ATST_Attack(ctx: GameContext<'_>) {
 
         // Rate our distance to the target, and our visibility
         let enemy_id = (*npc).enemy.unwrap();
-        let enemy = &(*ctx.world).entities[enemy_id.0 as usize];
+        let enemy = &(*ctx.world).g_entities[enemy_id.0 as usize];
         distance = DistanceHorizontalSquared((*npc).r.currentOrigin, (*enemy).r.currentOrigin) as c_int;
         dist_rate = if distance > MIN_MELEE_RANGE_SQR { DIST_LONG } else { DIST_MELEE };
         visible = NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
@@ -213,18 +214,18 @@ pub fn ATST_Attack(ctx: GameContext<'_>) {
                 // See if the side weapons are there
                 blaster_test = trap::G2API_GetSurfaceRenderStatus(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2API_GETSURFACERENDERSTATUS::GG2GetSurfaceRenderStatusArgs::new(
+                    mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
                         (*npc).ghoul2,
                         0,
-                        cstr("head_light_blaster_cann").as_ptr(),
+                        cstr("head_light_blaster_cann"),
                     ),
                 );
                 charger_test = trap::G2API_GetSurfaceRenderStatus(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2API_GETSURFACERENDERSTATUS::GG2GetSurfaceRenderStatusArgs::new(
+                    mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
                         (*npc).ghoul2,
                         0,
-                        cstr("head_concussion_charger").as_ptr(),
+                        cstr("head_concussion_charger"),
                     ),
                 );
 

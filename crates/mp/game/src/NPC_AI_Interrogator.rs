@@ -163,7 +163,7 @@ pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = (*ctx.world).globals.NPCInfo;
         let ucmd = &mut (*ctx.world).globals.ucmd;
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
 
         (*npc).s.loopSound = crate::g_utils::G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr());
 
@@ -189,7 +189,7 @@ pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
                         dif = if dif < 0.0 { -16.0 } else { 16.0 };
                     }
 
-                    (*(*npc).client).ps.velocity[2] = ((*(*npc).client).ps.velocity[2] + dif) / 2.0;
+                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] = ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
                 }
             }
         } else {
@@ -214,39 +214,39 @@ pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
                 if dif.abs() > 24.0 {
                     ucmd.upmove = if ucmd.upmove < 0 { -4 } else { 4 };
                 } else {
-                    if (*(*npc).client).ps.velocity[2] != 0.0 {
-                        (*(*npc).client).ps.velocity[2] *= VELOCITY_DECAY;
+                    if (*((*npc).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
+                        (*((*npc).client as *mut gclient_t)).ps.velocity[2] *= VELOCITY_DECAY;
 
-                        if (*(*npc).client).ps.velocity[2].abs() < 2.0 {
-                            (*(*npc).client).ps.velocity[2] = 0.0;
+                        if (*((*npc).client as *mut gclient_t)).ps.velocity[2].abs() < 2.0 {
+                            (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 0.0;
                         }
                     }
                 }
             }
             // Apply friction
-            else if (*(*npc).client).ps.velocity[2] != 0.0 {
-                (*(*npc).client).ps.velocity[2] *= VELOCITY_DECAY;
+            else if (*((*npc).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
+                (*((*npc).client as *mut gclient_t)).ps.velocity[2] *= VELOCITY_DECAY;
 
-                if (*(*npc).client).ps.velocity[2].abs() < 1.0 {
-                    (*(*npc).client).ps.velocity[2] = 0.0;
+                if (*((*npc).client as *mut gclient_t)).ps.velocity[2].abs() < 1.0 {
+                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 0.0;
                 }
             }
         }
 
         // Apply friction
-        if (*(*npc).client).ps.velocity[0] != 0.0 {
-            (*(*npc).client).ps.velocity[0] *= VELOCITY_DECAY;
+        if (*((*npc).client as *mut gclient_t)).ps.velocity[0] != 0.0 {
+            (*((*npc).client as *mut gclient_t)).ps.velocity[0] *= VELOCITY_DECAY;
 
-            if (*(*npc).client).ps.velocity[0].abs() < 1.0 {
-                (*(*npc).client).ps.velocity[0] = 0.0;
+            if (*((*npc).client as *mut gclient_t)).ps.velocity[0].abs() < 1.0 {
+                (*((*npc).client as *mut gclient_t)).ps.velocity[0] = 0.0;
             }
         }
 
-        if (*(*npc).client).ps.velocity[1] != 0.0 {
-            (*(*npc).client).ps.velocity[1] *= VELOCITY_DECAY;
+        if (*((*npc).client as *mut gclient_t)).ps.velocity[1] != 0.0 {
+            (*((*npc).client as *mut gclient_t)).ps.velocity[1] *= VELOCITY_DECAY;
 
-            if (*(*npc).client).ps.velocity[1].abs() < 1.0 {
-                (*(*npc).client).ps.velocity[1] = 0.0;
+            if (*((*npc).client as *mut gclient_t)).ps.velocity[1].abs() < 1.0 {
+                (*((*npc).client as *mut gclient_t)).ps.velocity[1] = 0.0;
             }
         }
     }
@@ -260,14 +260,14 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = (*ctx.world).globals.NPCInfo;
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
 
         let mut end: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
         let mut tr: trace_t = core::mem::zeroed();
 
         crate::q_math::AngleVectors(
-            (*(*npc).client).renderInfo.eyeAngles,
+            (*((*npc).client as *mut gclient_t)).renderInfo.eyeAngles,
             None,
             Some(&mut right),
             None,
@@ -294,10 +294,10 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
         // Close enough
         if tr.fraction > 0.9f32 {
             crate::q_math::_VectorMA(
-                (*(*npc).client).ps.velocity,
+                (*((*npc).client as *mut gclient_t)).ps.velocity,
                 (HUNTER_STRAFE_VEL * dir) as f32,
                 right,
-                &mut (*(*npc).client).ps.velocity,
+                &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
             );
 
             // Add a slight upward push
@@ -316,7 +316,7 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
                         dif = if dif < 0.0 { -(HUNTER_UPWARD_PUSH as f32) } else { HUNTER_UPWARD_PUSH as f32 };
                     }
 
-                    (*(*npc).client).ps.velocity[2] += dif;
+                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] += dif;
                 }
             }
 
@@ -334,7 +334,7 @@ pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qbool
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = (*ctx.world).globals.NPCInfo;
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
 
         Interrogator_PartsMove(ctx);
 
@@ -387,10 +387,10 @@ pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qbool
 
         let speed = HUNTER_FORWARD_BASE_SPEED as f32 + (HUNTER_FORWARD_MULTIPLIER as f32) * (*ctx.world).cvars.g_spskill.integer as f32;
         crate::q_math::_VectorMA(
-            (*(*npc).client).ps.velocity,
+            (*((*npc).client as *mut gclient_t)).ps.velocity,
             speed,
             forward,
-            &mut (*(*npc).client).ps.velocity,
+            &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
         );
     }
 }
@@ -403,7 +403,7 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = (*ctx.world).globals.NPCInfo;
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
 
         if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
             let enemy_ptr = match (*npc).enemy {
@@ -495,7 +495,7 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
             (*npc).r.currentOrigin,
             match (*npc).enemy {
                 Some(id) => {
-                    let base = (*ctx.world).entities.as_mut_ptr();
+                    let base = (*ctx.world).g_entities.as_mut_ptr();
                     (*base.add(id.index())).r.currentOrigin
                 }
                 None => (*npc).r.currentOrigin,
@@ -504,7 +504,7 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
 
         let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, match (*npc).enemy {
             Some(id) => {
-                let base = (*ctx.world).entities.as_mut_ptr();
+                let base = (*ctx.world).g_entities.as_mut_ptr();
                 base.add(id.index())
             }
             None => core::ptr::null_mut(),

@@ -18,9 +18,10 @@
 use crate::prelude::*;
 use crate::NPC_combat::{
     NPC_ChangeWeapon, NPC_FindCombatPoint, NPC_FreeCombatPoint, NPC_MaxDistSquaredForWeapon,
-    NPC_ReachedGoal, NPC_SetCombatPoint, NPC_SetMoveGoal, WeaponThink,
+    NPC_SetCombatPoint, WeaponThink,
 };
-use crate::NPC_goal::UpdateGoal;
+use crate::NPC_goal::{NPC_ReachedGoal, UpdateGoal};
+use crate::g_nav::NPC_SetMoveGoal;
 use crate::NPC_move::NPC_MoveToGoal;
 use crate::NPC_reactions::NPC_Pain;
 use crate::NPC_sounds::G_AddVoiceEvent;
@@ -107,7 +108,7 @@ pub fn NPC_Sniper_PlayConfusionSound(
 
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).squadState = SQUAD_IDLE;
-        (*npc).tempBehavior = bState_t::BS_DEFAULT as c_int;
+        (*npc).tempBehavior = bState_t::BS_DEFAULT;
 
         // Clear the enemy
         // Note: Using G_ClearEnemy parked, so we null the field directly
@@ -373,7 +374,7 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
         if ((*NPCInfo).goalEntity != (*NPC).enemy) && ((*NPCInfo).goalEntity != None) {
             // Did we make it?
             let flying = FlyingCreature(NPC);
-            let goal_ent = &mut world.entities[(*NPCInfo).goalEntity.unwrap().index()] as *mut gentity_t;
+            let goal_ent = &mut world.g_entities[(*NPCInfo).goalEntity.unwrap().index()] as *mut gentity_t;
             if NAV_HitNavGoal(
                 (*NPC).r.currentOrigin,
                 (*NPC).r.mins,
@@ -596,8 +597,8 @@ pub fn Sniper_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
             return QFALSE;
         }
 
-        let enemy_number = world.entities[(*NPC).enemy.unwrap().index()].s.number;
-        let hitEnt = &mut world.entities[hit as usize];
+        let enemy_number = world.g_entities[(*NPC).enemy.unwrap().index()].s.number;
+        let hitEnt = &mut world.g_entities[hit as usize];
         if hit == enemy_number
             || (hitEnt.client != core::ptr::null_mut()
                 && (*(hitEnt.client as *mut gclient_t)).playerTeam == (*(*NPC).client as *mut gclient_t).enemyTeam)
@@ -699,7 +700,7 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
             }
             // GetAnglesForDirection(muzzle, target, angles);
         } else {
-            let enemy_maxs2 = world.entities[(*NPC).enemy.unwrap().index()].r.maxs[2];
+            let enemy_maxs2 = world.g_entities[(*NPC).enemy.unwrap().index()].r.maxs[2];
             target[2] += (*ctx.world).bg_state.rng.flrand(0.0, enemy_maxs2);
             // CalcEntitySpot((*NPC).enemy, SPOT_HEAD_LEAN, &mut target);
             // GetAnglesForDirection(muzzle, target, angles);
@@ -790,7 +791,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             return;
         }
 
-        let enemy_ptr = &mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
+        let enemy_ptr = &mut world.g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
 
         world.globals.enemyLOS2 = QFALSE;
         world.globals.enemyCS2 = QFALSE;

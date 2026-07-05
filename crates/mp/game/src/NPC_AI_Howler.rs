@@ -90,7 +90,7 @@ pub fn Howler_Patrol(ctx: GameContext<'_>) {
         // rwwFIXMEFIXME: Care about all clients, not just client 0
         let mut dif: vec3_t = [0.0; 3];
         crate::q_math::_VectorSubtract(
-            (*ctx.world).entities[0].r.currentOrigin,
+            (*ctx.world).g_entities[0].r.currentOrigin,
             (*npc).r.currentOrigin,
             &mut dif,
         );
@@ -99,7 +99,7 @@ pub fn Howler_Patrol(ctx: GameContext<'_>) {
             crate::NPC_combat::G_SetEnemy(
                 ctx,
                 npc,
-                &mut (*ctx.world).entities[0] as *mut gentity_t,
+                &mut (*ctx.world).g_entities[0] as *mut gentity_t,
             );
         }
 
@@ -148,7 +148,7 @@ pub fn Howler_TryDamage(
         let mut dir: vec3_t = [0.0; 3];
         let mut tr: trace_t = std::mem::zeroed();
 
-        crate::q_math::AngleVectors((*(*npc).client).ps.viewangles, Some(&mut dir), None, None);
+        crate::q_math::AngleVectors((*((*npc).client as *mut gclient_t)).ps.viewangles, Some(&mut dir), None, None);
         crate::q_math::_VectorMA((*npc).r.currentOrigin, MIN_DISTANCE as f32, dir, &mut end);
 
         // Should probably trace from the mouth, but, ah well.
@@ -168,7 +168,7 @@ pub fn Howler_TryDamage(
         if tr.entityNum != ENTITYNUM_WORLD {
             crate::g_combat::G_Damage(
                 ctx,
-                &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t,
+                &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t,
                 npc,
                 npc,
                 Some(&mut dir),
@@ -208,7 +208,7 @@ pub fn Howler_Attack(ctx: GameContext<'_>) {
 
         // Need to do delayed damage since the attack animations encapsulate multiple mini-attacks
         if crate::g_timer::TIMER_Done2(ctx, npc, c"attack_dmg".as_ptr(), qtrue) != 0 {
-            let enemy_ptr = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*npc).enemy);
+            let enemy_ptr = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
             Howler_TryDamage(ctx, enemy_ptr, 5);
         }
 
@@ -229,7 +229,7 @@ pub fn Howler_Combat(ctx: GameContext<'_>) {
         let advance: qboolean;
 
         // If we cannot see our target or we have somewhere to go, then do that
-        let enemy_ptr = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*npc).enemy);
+        let enemy_ptr = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
         if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy_ptr) == qfalse
             || !crate::NPC_goal::UpdateGoal(ctx).is_null()
         {
@@ -281,7 +281,7 @@ pub fn NPC_Howler_Pain(
             crate::g_timer::TIMER_Remove(ctx, self_, c"attacking".as_ptr());
             crate::g_timer::TIMER_Set(ctx, self_, c"takingPain".as_ptr(), 2900);
 
-            let npc = (*self_).NPC as *mut crate::npc::gNPC_t;
+            let npc = (*self_).NPC as *mut gNPC_t;
             if !npc.is_null() {
                 crate::q_math::_VectorCopy((*npc).lastPathAngles, &mut (*self_).s.angles);
             }
@@ -294,7 +294,7 @@ pub fn NPC_Howler_Pain(
             );
 
             if !(*self_).NPC.is_null() {
-                let npc_mut = (*self_).NPC as *mut crate::npc::gNPC_t;
+                let npc_mut = (*self_).NPC as *mut gNPC_t;
                 (*npc_mut).localState = LSTATE_WAITING;
             }
         }

@@ -114,11 +114,11 @@ pub const MIN_ROCKET_DIST_SQUARED: f32 = 16384.0;
 // assignment sites.
 #[inline]
 unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
-    unsafe { (*ctx.world).entities.as_ptr() }
+    unsafe { (*ctx.world).g_entities.as_ptr() }
 }
 #[inline]
 unsafe fn ent_resolve(ctx: GameContext<'_>, id: EntityId) -> *mut gentity_t {
-    unsafe { &mut (*ctx.world).entities[id.index()] as *mut gentity_t }
+    unsafe { &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t }
 }
 #[inline]
 unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
@@ -482,7 +482,7 @@ pub fn ST_Move(ctx: GameContext<'_>) -> qboolean {
                         if (*group).member[j as usize].number == (*NPCInfo).blockingEntNum {
                             // we're being blocked by one of our own, pass our goal
                             // onto them and I'll stand still
-                            let member = &mut world.entities[(*group).member[j as usize].number as usize] as *mut gentity_t;
+                            let member = &mut world.g_entities[(*group).member[j as usize].number as usize] as *mut gentity_t;
                             ST_TransferMoveGoal(ctx, NPC, member);
                             break;
                         }
@@ -560,8 +560,8 @@ pub fn NPC_BSST_Sleep(ctx: GameContext<'_>) {
                 && ((*NPCInfo).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0
             {
                 // rwwFIXMEFIXME: Care about all clients not just 0 (Raven comment).
-                if world.entities[0].health > 0 {
-                    let target = &mut world.entities[0] as *mut gentity_t;
+                if world.g_entities[0].health > 0 {
+                    let target = &mut world.g_entities[0] as *mut gentity_t;
                     G_SetEnemy(ctx, NPC, target);
                     return;
                 }
@@ -833,7 +833,7 @@ pub fn NPC_CheckPlayerTeamStealth(ctx: GameContext<'_>) -> qboolean {
         NPC_CheckEnemyStealth( &g_entities[0] );	//Change this pointer to assess other entities
         */
         for i in 0..ENTITYNUM_WORLD {
-            let enemy = &mut world.entities[i as usize] as *mut gentity_t;
+            let enemy = &mut world.g_entities[i as usize] as *mut gentity_t;
 
             if (*enemy).inuse == QFALSE {
                 continue;
@@ -1466,7 +1466,7 @@ pub fn ST_ResolveBlockedShot(
         if TIMER_Done(ctx, NPC, c"duck".as_ptr()) != 0 {
             // we're not ducking
             if AI_GroupContainsEntNum((*NPCInfo).group, hit) != QFALSE {
-                let member = &mut world.entities[hit as usize] as *mut gentity_t;
+                let member = &mut world.g_entities[hit as usize] as *mut gentity_t;
                 if TIMER_Done(ctx, member, c"duck".as_ptr()) != 0 {
                     // they aren't ducking
                     if TIMER_Done(ctx, member, c"stand".as_ptr()) != 0 {
@@ -1891,7 +1891,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
             ST_Speech(ctx, NPC, SPEECH_LOST, 0.0);
             (*(*group).enemy).waypoint = NAV_FindClosestWaypointForEnt(ctx, (*group).enemy, WAYPOINT_NONE);
             for i in 0..(*group).numGroup {
-                let member = &mut world.entities[(*group).member[i as usize].number as usize] as *mut gentity_t;
+                let member = &mut world.g_entities[(*group).member[i as usize].number as usize] as *mut gentity_t;
                 SetNPCGlobals(ctx, member);
                 if trap::ICARUS_TaskIDPending(ctx.engine, GIcarusTaskidpendingArgs::new(NPC, TID_MOVE_NAV as c_int)) != 0 {
                     // running somewhere that a script requires us to go, don't break
@@ -1998,7 +1998,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
             let mut avoidDist: f32 = 0.0;
 
             // get the next guy
-            let member = &mut world.entities[(*group).member[i as usize].number as usize] as *mut gentity_t;
+            let member = &mut world.g_entities[(*group).member[i as usize].number as usize] as *mut gentity_t;
             if (*member).enemy == None {
                 // don't include guys that aren't angry
                 continue;
@@ -2171,7 +2171,7 @@ pub fn ST_Commander(ctx: GameContext<'_>) {
                                 if (*group).member[j as usize].number == (*NPCInfo).blockingEntNum {
                                     // we're being blocked by one of our own, pass our
                                     // goal onto them and I'll stand still
-                                    let blocker = &mut world.entities[(*group).member[j as usize].number as usize] as *mut gentity_t;
+                                    let blocker = &mut world.g_entities[(*group).member[j as usize].number as usize] as *mut gentity_t;
                                     ST_TransferMoveGoal(ctx, NPC, blocker);
                                     break;
                                 }
@@ -2640,7 +2640,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
                     let mut impactPos = world.globals.impactPos;
                     let hit = NPC_ShotEntity(ctx, enemy, impactPos);
                     world.globals.impactPos = impactPos;
-                    let hitEnt = &mut world.entities[hit as usize] as *mut gentity_t;
+                    let hitEnt = &mut world.g_entities[hit as usize] as *mut gentity_t;
                     let hitClient = (*hitEnt).client as *mut gclient_t;
 
                     if hit == (*enemy).s.number

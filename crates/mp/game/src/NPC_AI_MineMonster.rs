@@ -292,7 +292,7 @@ pub fn NPC_MineMonster_Pain(
     attacker: *mut gentity_t,
     damage: c_int,
 ) { unsafe {
-    let parm = ((((*self_).health as f32) / ((*(*self_).client).pers.maxHealth as f32)) * 100.0).floor() as c_int;
+    let parm = ((((*self_).health as f32) / ((*((*self_).client as *mut gclient_t)).pers.maxHealth as f32)) * 100.0).floor() as c_int;
     G_AddEvent(self_, EV_PAIN, parm);
 
     if damage >= 10 {

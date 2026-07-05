@@ -21,7 +21,7 @@ pub fn NPC_LostEnemyDecideChase(ctx: GameContext<'_>) {
         BS_HUNT_AND_KILL => {
             if npc.enemy.is_some() && npc.lastWaypoint != WAYPOINT_NONE {
                 if let Some(enemy_id) = npc.enemy {
-                    let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+                    let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
                     if unsafe { &*enemy }.lastWaypoint != WAYPOINT_NONE {
                         NPC_BSSearchStart(ctx, unsafe { &*enemy }.lastWaypoint, BS_SEARCH);
                     }
@@ -72,10 +72,10 @@ pub fn NPC_StandTrackAndShoot(
     if canDuck != 0 && (duck_ok || (!attack_ok && client.ps.weaponTime <= 0)) && (*world).globals.ucmd.upmove != -127 {
         if !duck_ok {
             if let Some(enemy_id) = npc.enemy {
-                let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+                let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
                 if let Some(enemy_enemy) = unsafe { &*enemy }.enemy {
                     if enemy_enemy.0 == npc.s.number as u32 {
-                        if (unsafe { &*enemy }.client.buttons & BUTTON_ATTACK as i32) != 0 {
+                        if (unsafe { &*(enemy.client as *mut gclient_t) }.buttons & BUTTON_ATTACK as i32) != 0 {
                             if NPC_CheckDefend(ctx, 1.0) != 0 {
                                 duck_ok = true;
                             }
@@ -180,7 +180,7 @@ pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
     NPC_CheckEnemy(ctx, (npc_info.tempBehavior != BS_HUNT_AND_KILL) as qboolean, qfalse, qtrue);
 
     if let Some(enemy_id) = npc.enemy {
-        let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+        let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
         o_evis = NPC_CheckVisibility(ctx, enemy as *const _ as *mut _, CHECK_FOV | CHECK_SHOOT);
         (*world).globals.enemyVisibility = o_evis;
 
@@ -293,7 +293,7 @@ pub fn NPC_BSRunAndShoot(ctx: GameContext<'_>) {
             let mut vec = [0.0; 3];
 
             if let Some(enemy_id) = npc.enemy {
-                let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+                let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
                 crate::q_math::_VectorSubtract(unsafe { &*enemy }.r.currentOrigin, npc.r.currentOrigin, &mut vec);
                 vec[2] = 0.0;
 
@@ -375,7 +375,7 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
     }
 
     if let Some(enemy_id) = npc.enemy {
-        let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+        let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
         if (unsafe { &*enemy }.inuse as qboolean) == 0 || (unsafe { &*enemy }.NPC != core::ptr::null_mut() && unsafe { &*enemy }.health <= 0) {
             trap::ICARUS_TaskIDComplete(
                 ctx.engine,
@@ -390,7 +390,7 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
 
     CalcEntitySpot(ctx, (*world).globals.NPC, SPOT_WEAPON, &mut muzzle);
     if let Some(enemy_id) = npc.enemy {
-        let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+        let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
         CalcEntitySpot(ctx, enemy as *const _ as *mut _, SPOT_HEAD, &mut org);
 
         if !unsafe { &*enemy }.client.is_null() {
@@ -460,7 +460,7 @@ pub fn NPC_BSShoot(ctx: GameContext<'_>) {
     (*world).globals.enemyVisibility = VIS_SHOOT;
 
     if client.ps.weaponstate as i32 != WEAPON_READY as i32 && client.ps.weaponstate as i32 != WEAPON_FIRING as i32 {
-        unsafe { &mut *ctx.world }.globals.client.ps.weaponstate = WEAPON_READY;
+        unsafe { (*(*ctx.world).globals.client).ps.weaponstate = WEAPON_READY };
     }
 
     WeaponThink(ctx, qtrue);
@@ -527,7 +527,7 @@ pub fn NPC_BSDefault(ctx: GameContext<'_>) {
                     if !alert_entry.owner.is_null() {
                         let alert_owner = unsafe { &*alert_entry.owner };
                         if !alert_owner.client.is_null() && alert_owner.health >= 0 {
-                            if unsafe { &*alert_owner.client }.playerTeam == client.enemyTeam {
+                            if unsafe { &*(alert_owner.client as *mut gclient_t) }.playerTeam == client.enemyTeam {
                                 G_SetEnemy(ctx, (*world).globals.NPC, alert_entry.owner);
                             }
                         }
@@ -576,7 +576,7 @@ pub fn NPC_BSDefault(ctx: GameContext<'_>) {
                 npc_info.combatMove = 0;
 
                 if let Some(goal_id) = npc_info.goalEntity {
-                    let goal_entity = unsafe { &*(*world).entities.as_ptr().add(goal_id.0 as usize) };
+                    let goal_entity = unsafe { &*(*world).g_entities.as_ptr().add(goal_id.0 as usize) };
                     crate::q_math::_VectorSubtract(unsafe { &*goal_entity }.r.currentOrigin, npc.r.currentOrigin, &mut dir);
                     crate::q_math::vectoangles(dir, &mut angles);
                     npc_info.desiredYaw = angles[YAW];

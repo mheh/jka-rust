@@ -10,6 +10,7 @@
 
 use crate::prelude::*;
 use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
+use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
 use crate::client::spectator_state::spectatorState_t;
 use crate::client::spectator_state::spectatorState_t::*;
 use mp_bg::public::duel_team::duelTeam_t::*;
@@ -298,9 +299,11 @@ pub fn G_InitWorldSession(ctx: GameContext<'_>) {
 
     trap::Cvar_VariableStringBuffer(
         ctx.engine,
-        cstr("session").as_ptr(),
-        s.as_mut_ptr(),
-        MAX_STRING_CHARS as u32,
+        GCvarVariableStringBufferArgs::new(
+            cstr("session"),
+            s.as_mut_ptr(),
+            MAX_STRING_CHARS as c_int,
+        ),
     );
 
     let s_str = unsafe { cstr_to_str(s.as_ptr()) };

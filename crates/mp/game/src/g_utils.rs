@@ -1291,6 +1291,7 @@ pub fn G_KillBox(
 
             // nail it
             crate::g_combat::G_Damage(
+                ctx,
                 hit,
                 ent,
                 ent,

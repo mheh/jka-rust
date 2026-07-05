@@ -781,11 +781,11 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
                         trap::Trace(
                             ctx.engine,
                             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                                &mut tr,
-                                muzzle,
-                                vec3_origin,
-                                vec3_origin,
-                                end,
+                                &mut tr as *mut trace_t,
+                                &muzzle as *const vec3_t,
+                                &vec3_origin as *const vec3_t,
+                                &vec3_origin as *const vec3_t,
+                                &end as *const vec3_t,
                                 (*npc_ent).s.number,
                                 MASK_SHOT,
                             ),
@@ -1012,11 +1012,11 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     trap::Trace(
                         ctx.engine,
                         mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                            &mut trace,
-                            (*client).renderInfo.muzzlePoint,
-                            mins,
-                            maxs,
-                            end,
+                            &mut trace as *mut trace_t,
+                            &(*client).renderInfo.muzzlePoint as *const vec3_t,
+                            &mins as *const vec3_t,
+                            &maxs as *const vec3_t,
+                            &end as *const vec3_t,
                             (*npc_ent).s.number,
                             MASK_SHOT,
                         ),
@@ -1162,7 +1162,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         }
 
         // can we see our target?
-        if crate::NPC_utils::NPC_ClearLOS4(ctx, (*npc_ent).enemy) != 0 {
+        if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy_ent) != 0 {
             (*npc_info).enemyLastSeenTime = level_time; // used here for aim debouncing, not always a clear LOS
             (*ctx.world).globals.enemyLOS4 = qtrue;
 
@@ -1178,12 +1178,12 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     (*ctx.world).globals.enemyCS4 = qfalse; // not true, but should stop us from firing
                     (*ctx.world).globals.hitAlly4 = qtrue; // us!
                 } else {
-                    let hit = crate::NPC_combat::NPC_ShotEntity(ctx, (*npc_ent).enemy, IMPACT_POS_4);
+                    let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, IMPACT_POS_4);
                     let hit_ent = g_entities_base.add(hit as usize);
                     if hit == (*enemy_ent).s.number as c_int
                         || (!hit_ent.is_null()
                             && (*hit_ent).client != core::ptr::null_mut()
-                            && (*(*hit_ent).client).playerTeam == (*client).enemyTeam)
+                            && (*((*hit_ent).client as *mut gclient_t)).playerTeam == (*client).enemyTeam)
                         || (!hit_ent.is_null() && (*hit_ent).takedamage != 0)
                     {
                         // can hit enemy or will hit glass or other breakable, so shoot anyway
@@ -1195,7 +1195,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         crate::NPC_combat::NPC_AimAdjust(ctx, 1); // adjust aim better longer we can see enemy
                         if !hit_ent.is_null()
                             && (*hit_ent).client != core::ptr::null_mut()
-                            && (*(*hit_ent).client).playerTeam == (*client).playerTeam
+                            && (*((*hit_ent).client as *mut gclient_t)).playerTeam == (*client).playerTeam
                         {
                             // would hit an ally, don't fire!!!
                             (*ctx.world).globals.hitAlly4 = qtrue;
@@ -1209,7 +1209,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             (*npc_ent).r.currentOrigin,
         ) != 0
         {
-            let hit = crate::NPC_combat::NPC_ShotEntity(ctx, (*npc_ent).enemy, IMPACT_POS_4);
+            let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, IMPACT_POS_4);
             let hit_ent = g_entities_base.add(hit as usize);
 
             if crate::g_timer::TIMER_Done(ctx, npc_ent, c"talkDebounce".as_ptr()) != 0
@@ -1232,12 +1232,12 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
 
             (*npc_info).enemyLastSeenTime = level_time;
 
-            let hit = crate::NPC_combat::NPC_ShotEntity(ctx, (*npc_ent).enemy, IMPACT_POS_4);
+            let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, IMPACT_POS_4);
             let hit_ent = g_entities_base.add(hit as usize);
             if hit == (*enemy_ent).s.number as c_int
                 || (!hit_ent.is_null()
                     && (*hit_ent).client != core::ptr::null_mut()
-                    && (*(*hit_ent).client).playerTeam == (*client).enemyTeam)
+                    && (*((*hit_ent).client as *mut gclient_t)).playerTeam == (*client).enemyTeam)
                 || (!hit_ent.is_null() && (*hit_ent).takedamage != 0)
             {
                 // can hit enemy or will hit glass or other breakable, so shoot anyway
@@ -1392,7 +1392,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         }
         crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
 
-        if ((*npc_info).scriptFlags & crate::npc_const::SCF_DONT_FIRE) != 0 {
+        if ((*npc_info).scriptFlags & SCF_DONT_FIRE) != 0 {
             (*ctx.world).globals.shoot4 = qfalse;
         }
 
@@ -1409,7 +1409,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         if (*ctx.world).globals.shoot4 != 0 {
             // try to shoot if it's time
             if crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0 {
-                if ((*npc_info).scriptFlags & crate::npc_const::SCF_FIRE_WEAPON) == 0 {
+                if ((*npc_info).scriptFlags & SCF_FIRE_WEAPON) == 0 {
                     // we've already fired, no need to do it again here
                     crate::NPC_combat::WeaponThink(ctx, qtrue);
                 }
@@ -1560,11 +1560,11 @@ pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
                 trap::Trace(
                     ctx.engine,
                     mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                        &mut tr,
-                        (*npc_ent).r.currentOrigin,
-                        shield_mins,
-                        shield_maxs,
-                        (*npc_ent).r.currentOrigin,
+                        &mut tr as *mut trace_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
+                        &shield_mins as *const vec3_t,
+                        &shield_maxs as *const vec3_t,
+                        &(*npc_ent).r.currentOrigin as *const vec3_t,
                         (*npc_ent).s.number,
                         (*npc_ent).clipmask,
                     ),

@@ -275,7 +275,7 @@ pub fn G_RunStuckMissile(
 
                 if delta_moving || apos_moving {
                     // Thing I stuck to is moving or rotating now, kill me
-                    G_Damage(ent, other, other, None, core::ptr::null_mut(), 99999, 0, MOD_CRUSH as c_int);
+                    G_Damage(ctx, ent, other, other, None, crate::q_math::vec3_origin, 99999, 0, MOD_CRUSH as c_int);
                     return;
                 }
             }
@@ -613,11 +613,11 @@ pub fn G_MissileImpact(
                             crate::ent_fn_enums::dispatch_think(ctx, think_fn, ent);
                         }
                     } else {
-                        G_Damage(other, ent, &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize], Some(&mut velocity), (*ent).r.currentOrigin, (*ent).damage, DAMAGE_HALF_ABSORB as c_int, (*ent).methodOfDeath);
+                        G_Damage(ctx, other, ent, &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize], Some(&mut velocity), (*ent).r.currentOrigin, (*ent).damage, DAMAGE_HALF_ABSORB as c_int, (*ent).methodOfDeath);
                         didDmg = qtrue;
                     }
                 } else {
-                    G_Damage(other, ent, &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize], Some(&mut velocity), (*ent).r.currentOrigin, (*ent).damage, 0, (*ent).methodOfDeath);
+                    G_Damage(ctx, other, ent, &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize], Some(&mut velocity), (*ent).r.currentOrigin, (*ent).damage, 0, (*ent).methodOfDeath);
                     didDmg = qtrue;
                 }
 

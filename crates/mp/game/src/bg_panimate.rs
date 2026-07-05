@@ -734,11 +734,11 @@ pub fn BG_BrokenParryForAttack(bg_state: &crate::bg_channel::BgState, r#move: c_
 /// saber was hit — for now presumes the saber gets knocked away from center.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:727-761`
-pub fn BG_BrokenParryForParry(r#move: c_int) -> c_int {
+pub fn BG_BrokenParryForParry(bg_state: &mut crate::bg_channel::BgState, r#move: c_int) -> c_int {
     match r#move {
         LS_PARRY_UP => {
             // Since we don't know what dir the hit came from, randomly pick knock down or knock back.
-            if Q_irand(0, 1) != 0 {
+            if bg_state.rng.Q_irand(0, 1) != 0 {
                 LS_H1_B_
             } else {
                 LS_H1_T_
