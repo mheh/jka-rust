@@ -153,7 +153,14 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
         let parentPS = (*parent).playerState;
 
         let rider = if (*parent).s.owner != ENTITYNUM_NONE {
-            crate::bg_pmove::PM_BGEntForNum((*parent).s.owner as c_int)
+            // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`.
+            // This dispatch-virtual signature carries no pm/world handle, so
+            // resolve through the contiguous game arena relative to `parent`
+            // (which sits at its own `s.number`); the `gentity_t` cast gives the
+            // arena stride.
+            (parent as *mut gentity_t)
+                .offset(((*parent).s.owner - (*parent).s.number) as isize)
+                as *mut bgEntity_t
         } else {
             core::ptr::null_mut()
         };
@@ -415,9 +422,16 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
                         let mut actor_right: [f32; 3] = [0.0f32; 3];
                         let actor_right_dot: f32;
 
+                        // `pilot->enemy` is an `EntityId` arena index (Raven's
+                        // `gentity_t*`). No world handle in this dispatch-virtual
+                        // signature, so resolve it through the contiguous arena
+                        // relative to `pilot` (at its own `s.number`).
+                        let enemy_ent = pilot.offset(
+                            ((*pilot).enemy.unwrap().0 as i32 - (*pilot).s.number) as isize,
+                        );
                         crate::q_math::_VectorSubtract(
                             (*pilot).r.currentOrigin,
-                            (*(*pilot).enemy.unwrap()).r.currentOrigin,
+                            (*enemy_ent).r.currentOrigin,
                             &mut to_enemy,
                         );
                         to_enemy_dist = crate::q_math::VectorNormalize(&mut to_enemy);
@@ -516,7 +530,12 @@ pub fn G_CreateAnimalNPC(
     unsafe {
         crate::g_utils::G_AllocateVehicleObject(ctx, pVeh);
         core::ptr::write_bytes(*pVeh as *mut u8, 0, core::mem::size_of::<Vehicle_t>());
-        (*(*pVeh)).m_pVehicleInfo = &mut (*ctx.world).bg_state.g_vehicleInfo
-            [crate::bg_vehicleLoad::BG_VehicleGetIndex(strAnimalType) as usize];
+        let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(
+            strAnimalType,
+            &mut (*ctx.world).bg_state,
+            &crate::bg_channel::GameBgTraps::new(ctx.engine),
+        ) as usize;
+        (*(*pVeh)).m_pVehicleInfo =
+            &mut (*ctx.world).bg_state.g_vehicleInfo[veh_index];
     }
 }

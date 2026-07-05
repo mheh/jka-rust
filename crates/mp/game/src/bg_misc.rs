@@ -258,7 +258,12 @@ pub fn BG_FileExists(fileName: *const c_char, bg: &BgState, traps: &dyn BgTraps)
 /// whatever the hell you want.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:358-423`
+// PORT-NOTE(ctx-cascade): gained `ctx: GameContext<'_>` so the `F_PARM*` branch
+// can forward to the game-tier `Q3_SetParm` (which now reaches the entity arena
+// through `ctx.world`); both call sites (`G_SpawnGEntityFromSpawnVars`,
+// `SP_worldspawn`) already carry `ctx`.
 pub fn BG_ParseField(
+    ctx: GameContext<'_>,
     l_fields: *mut BG_field_t,
     key: *const c_char,
     value: *const c_char,
@@ -327,7 +332,7 @@ pub fn BG_ParseField(
                         // QAGAME branch: Q3_SetParm(((gentity_t*)ent)->s.number, type - F_PARM1, value).
                         let g = ent as *mut gentity_t;
                         let parm_num = (*f).r#type as c_int - fieldtype_t::F_PARM1 as c_int;
-                        Q3_SetParm((*g).s.number, parm_num, value);
+                        Q3_SetParm(ctx, (*g).s.number, parm_num, value);
                     }
                     _ => {
                         // F_IGNORE and any other tag: no-op.

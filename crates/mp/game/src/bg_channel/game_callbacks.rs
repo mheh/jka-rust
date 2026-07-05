@@ -121,9 +121,12 @@ pub trait GameCallbacks {
     /// Source: `oracle/oracle/codemp/game/g_local.h:217`
     fn npc_set_anim(&mut self, entNum: c_int, type_: c_int, anim: c_int, priority: c_int);
 
-    /// Raven vehicle-camera position query used by the pmove view code.
-    /// Source: `oracle/oracle/codemp/game/g_vehicles.c` (cam-pos helper)
-    fn get_vehicle_cam_pos(&mut self, entNum: c_int, camPos: *mut vec3_t);
+    /// Raven `WP_GetVehicleCamPos(ent, pilot, camPos)` — the third-person
+    /// vehicle camera origin, queried from the bg crosshair-trace path
+    /// (`BG_VehTraceFromCamPos`). The game body needs a `GameContext`
+    /// (`G_EstimateCamPos`), so bg reaches it here by entity number.
+    /// Source: `oracle/oracle/codemp/game/g_weapon.c:3961-4020`
+    fn wp_get_vehicle_cam_pos(&mut self, vehEntNum: c_int, pilotEntNum: c_int, camPos: *mut vec3_t);
 
     /// Raven `BG`/game enemy-eligibility test consulted during movement.
     /// Source: `oracle/oracle/codemp/game/g_combat.c` (`CanBeEnemy`)

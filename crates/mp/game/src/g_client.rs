@@ -3379,7 +3379,11 @@ pub fn SetupGameGhoul2Model(
                 // overlay pattern; m_pVehicle is accessed safely through the overlay cast in this context.
                 if !(*ent).client.is_null() && (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE {
                     write_cstr_field(&mut vehicleName, cstr_to_str(modelname));
-                    BG_GetVehicleModelName(modelname, &mut (*ctx.world).bg_state);
+                    BG_GetVehicleModelName(
+                        modelname,
+                        &mut (*ctx.world).bg_state,
+                        &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                    );
                     write_cstr_field(&mut truncModelName, cstr_to_str(modelname));
                     skin[0] = 0;
                     if !(*ent).m_pVehicle.is_null()

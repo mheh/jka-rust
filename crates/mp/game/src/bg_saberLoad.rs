@@ -199,7 +199,7 @@ pub fn BG_ParseLiteral(data: *mut *const c_char, string: *const c_char) -> qbool
 /// Raven `TranslateSaberColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:149-180`
-pub fn TranslateSaberColor(name: *const c_char) -> saber_colors_t {
+pub fn TranslateSaberColor(name: *const c_char, bg: &mut BgState) -> saber_colors_t {
     unsafe {
         if qstricmp_eq(name, c"red") {
             return SABER_RED;
@@ -220,7 +220,7 @@ pub fn TranslateSaberColor(name: *const c_char) -> saber_colors_t {
             return SABER_PURPLE;
         }
         if qstricmp_eq(name, c"random") {
-            return crate::q_math::Q_irand(SABER_ORANGE, SABER_PURPLE);
+            return bg.rng.Q_irand(SABER_ORANGE, SABER_PURPLE);
         }
     }
     SABER_BLUE
@@ -878,12 +878,12 @@ pub fn WP_SaberParseParms(
 
                 if n == -1 {
                     // this fills in the rest of the blades with the same color by default
-                    let color = TranslateSaberColor(value);
+                    let color = TranslateSaberColor(value, bg);
                     for i in 0..MAX_BLADES as c_int {
                         s.blade[i as usize].color = color;
                     }
                 } else {
-                    s.blade[n as usize].color = TranslateSaberColor(value);
+                    s.blade[n as usize].color = TranslateSaberColor(value, bg);
                 }
                 continue;
             }
@@ -2066,18 +2066,23 @@ pub fn WP_SetSaber(
 /// Raven `WP_SaberSetColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2727-2734`
+// PORT-NOTE(rng-cascade): gained `bg: &mut BgState` so its `TranslateSaberColor`
+// call reaches the shared `Rng` (the `"random"` color branch). This fn has no
+// callers in-tree, so no call site propagates the added param.
 pub fn WP_SaberSetColor(
     sabers: *mut saberInfo_t,
     saberNum: c_int,
     bladeNum: c_int,
     colorName: *mut c_char,
+    bg: &mut BgState,
 ) {
     if sabers.is_null() {
         return;
     }
     unsafe {
         let entry = sabers.offset(saberNum as isize);
-        (*entry).blade[bladeNum as usize].color = TranslateSaberColor(colorName as *const c_char);
+        (*entry).blade[bladeNum as usize].color =
+            TranslateSaberColor(colorName as *const c_char, bg);
     }
 }
 

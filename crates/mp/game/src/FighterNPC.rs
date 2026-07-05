@@ -640,7 +640,11 @@ pub fn G_CreateFighterNPC(
         std::ptr::write_bytes(*pVeh, 0, 1);
 
         // Set the vehicle info pointer based on vehicle type name.
-        let veh_index = BG_VehicleGetIndex(strType);
+        let veh_index = BG_VehicleGetIndex(
+            strType,
+            &mut (*ctx.world).bg_state,
+            &crate::bg_channel::GameBgTraps::new(ctx.engine),
+        );
         (*(*pVeh)).m_pVehicleInfo = &(*ctx.world).bg_state.g_vehicleInfo[veh_index as usize] as *const _ as *mut vehicleInfo_t;
     }
 }

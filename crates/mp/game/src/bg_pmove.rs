@@ -5381,6 +5381,7 @@ pub fn BG_VehTraceFromCamPos(
     bestDist: f32,
     bg: &BgState,
     traps: &dyn BgTraps,
+    callbacks: &mut dyn GameCallbacks,
 ) -> c_int {
     let _ = bg;
     unsafe {
@@ -5389,11 +5390,12 @@ pub fn BG_VehTraceFromCamPos(
         let mut camPos: vec3_t = [0.0; 3];
 
         let veh = (*bgEnt).m_pVehicle as *mut Vehicle_t;
-        // QAGAME
-        crate::g_weapon::WP_GetVehicleCamPos(
-            bgEnt as *mut gentity_t,
-            (*veh).m_pPilot as *mut gentity_t,
-            &mut camPos,
+        // QAGAME: `WP_GetVehicleCamPos` is a game-tier body (needs `GameContext`
+        // for `G_EstimateCamPos`); reached by entity number through the upcall.
+        callbacks.wp_get_vehicle_cam_pos(
+            (*bgEnt).s.number,
+            (*((*veh).m_pPilot as *mut gentity_t)).s.number,
+            &mut camPos as *mut vec3_t,
         );
 
         let minAutoAimDist = crate::q_math::Distance(entOrg, camPos)
@@ -5519,6 +5521,7 @@ impl PmoveContext<'_> {
                         tr.fraction * lockDist,
                         self.bg,
                         self.traps,
+                        self.callbacks,
                     ) != 0
                     {
                         tr = camTrace;

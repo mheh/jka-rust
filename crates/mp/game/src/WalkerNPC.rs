@@ -206,7 +206,13 @@ pub fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
 
         let mut rider: *mut bgEntity_t = std::ptr::null_mut();
         if (*parent).s.owner != ENTITYNUM_NONE {
-            rider = crate::bg_pmove::PM_BGEntForNum((*parent).s.owner as c_int);
+            // Raven `PM_BGEntForNum(parent->s.owner)` == `&g_entities[owner]`;
+            // no pm/world handle in this dispatch-virtual signature, so resolve
+            // through the contiguous game arena relative to `parent` (at its own
+            // `s.number`); the `gentity_t` cast gives the arena stride.
+            rider = (parent as *mut gentity_t)
+                .offset(((*parent).s.owner - (*parent).s.number) as isize)
+                as *mut bgEntity_t;
         }
 
         if rider.is_null() {
@@ -393,7 +399,11 @@ pub fn G_CreateWalkerNPC(
             core::ptr::write_bytes(*pVeh as *mut u8, 0, core::mem::size_of::<Vehicle_t>());
 
             // Set the vehicle info pointer to the appropriate vehicle type
-            let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(strAnimalType);
+            let veh_index = crate::bg_vehicleLoad::BG_VehicleGetIndex(
+                strAnimalType,
+                &mut (*ctx.world).bg_state,
+                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            );
             (**pVeh).m_pVehicleInfo = &mut (*ctx.world).bg_state.g_vehicleInfo[veh_index as usize];
         }
     }

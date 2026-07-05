@@ -4725,7 +4725,12 @@ pub fn G_EstimateCamPos(
 /// Raven `WP_GetVehicleCamPos`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3961-4020`
-pub fn WP_GetVehicleCamPos(ent: *mut gentity_t, pilot: *mut gentity_t, camPos: &mut [f32; 3]) {
+pub fn WP_GetVehicleCamPos(
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    pilot: *mut gentity_t,
+    camPos: &mut [f32; 3],
+) {
     // PORT-NOTE(unported-type): `vehicleInfo_t` (`Vehicle_t::m_pVehicleInfo`)
     // isn't ported yet; fields referenced through it exactly as the oracle
     // cites them, reported as missing symbols.
@@ -4919,22 +4924,25 @@ pub fn WP_VehCheckTraceFromCamPos(
                 // NOW do the trace from the camPos and compare with above trace
                 let mut extraTrace: trace_t = std::mem::zeroed();
                 let mut newEnd: vec3_t = [0.0; 3];
-                // PORT-NOTE(bg-fn-shape): `BG_VehTraceFromCamPos` is a bg-tier
-                // free fn taking `&BgState`/`&dyn BgTraps`,
-                // not `GameContext`; called through `(*ctx.world).bg_state`/the
-                // game-tier trap adapter per that shape. Reported as a shape
-                // mismatch since this caller only has `ctx`.
+                // `BG_VehTraceFromCamPos` is a bg-tier free fn (`&BgState`/
+                // `&dyn BgTraps`); its `WP_GetVehicleCamPos` upcall needs game
+                // state, so it also takes `&mut dyn GameCallbacks`. This
+                // game-tier caller builds both adapters from `ctx`.
                 let camTraceEntNum = crate::bg_pmove::BG_VehTraceFromCamPos(
                     &mut extraTrace,
                     ent as *mut bgEntity_t,
                     (*ent).r.currentOrigin,
                     shotStart,
                     end,
-                    newEnd,
-                    *shotDir,
+                    &mut newEnd,
+                    &mut *shotDir,
                     trace.fraction * (*ctx.world).globals.g_cullDistance,
                     &(*ctx.world).bg_state,
-                    ctx.engine,
+                    &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                    &mut crate::bg_channel::GameCallbacksImpl {
+                        world: ctx.world,
+                        engine: ctx.engine,
+                    },
                 );
                 if camTraceEntNum != 0 {
                     let camTraceEnt = &mut (*ctx.world).g_entities[(camTraceEntNum - 1) as usize]

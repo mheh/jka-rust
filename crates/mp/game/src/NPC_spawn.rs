@@ -1021,7 +1021,11 @@ pub fn NPC_Spawn_Do(
 
         let npc_vehicle = cstr("NPC_Vehicle");
         if crate::q_shared::Q_stricmp((*ent).classname as *const c_char, npc_vehicle.as_ptr()) == 0 {
-            let i_veh_index = BG_VehicleGetIndex((*ent).NPC_type as *const c_char);
+            let i_veh_index = BG_VehicleGetIndex(
+                (*ent).NPC_type as *const c_char,
+                &mut (*ctx.world).bg_state,
+                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            );
 
             if i_veh_index == VEHICLE_NONE {
                 crate::g_utils::G_FreeEntity(ctx, newent);
@@ -1159,7 +1163,7 @@ pub fn NPC_Spawn_Do(
             for parm_num in 0..MAX_PARMS {
                 let p = (*(*ent).parms).parm[parm_num as usize];
                 if !p.is_null() && *p != 0 {
-                    Q3_SetParm((*newent).s.number, parm_num, p as *const c_char);
+                    Q3_SetParm(ctx, (*newent).s.number, parm_num, p as *const c_char);
                 }
             }
         }
@@ -1385,7 +1389,11 @@ pub fn NPC_VehiclePrecache(
 ) -> qboolean {
     unsafe {
         let mut droid_npc_type: *const c_char = core::ptr::null();
-        let i_veh_index = BG_VehicleGetIndex((*spawner).NPC_type as *const c_char);
+        let i_veh_index = BG_VehicleGetIndex(
+            (*spawner).NPC_type as *const c_char,
+            &mut (*ctx.world).bg_state,
+            &crate::bg_channel::GameBgTraps::new(ctx.engine),
+        );
         if i_veh_index == VEHICLE_NONE {
             return qfalse;
         }

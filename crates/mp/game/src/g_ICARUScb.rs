@@ -677,6 +677,18 @@ pub fn Q3_Lerp2Angles(
     }
 }
 
+/// ICARUS `interpreter.h` type-ID for a `vec3_t` angles field.
+///
+/// Derived through the generated token chain (tokenizer.h `TK_USERDEF`=8 ->
+/// interpreter.h `NUM_USER_TOKENS`=19 -> `ID_AFFECT`=19 ... `NUM_IDS`=51 ->
+/// `TYPE_WAIT_COMPLETE`=51, `TYPE_WAIT_TRIGGERED`=52, `TYPE_ANGLES`=53).
+/// Source: `oracle/oracle/codemp/icarus/interpreter.h:35-80`
+const TYPE_ANGLES: c_int = 53;
+
+/// ICARUS `interpreter.h` type-ID for a `vec3_t` origin field (`TYPE_ORIGIN`=54).
+/// Source: `oracle/oracle/codemp/icarus/interpreter.h:35-80`
+const TYPE_ORIGIN: c_int = 54;
+
 /// Raven `Q3_GetTag`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:948-970`
@@ -695,14 +707,7 @@ pub fn Q3_GetTag(
             return 0;
         }
 
-        // interpreter.h `enum` type-IDs, derived through the generated chain
-        // (tokenizer.h `TK_USERDEF`=8 -> interpreter.h `NUM_USER_TOKENS`=19 ->
-        // `ID_AFFECT`=19 ... `NUM_IDS`=51 -> `TYPE_WAIT_COMPLETE`=51,
-        // `TYPE_WAIT_TRIGGERED`=52, `TYPE_ANGLES`=53, `TYPE_ORIGIN`=54).
-        // Source: oracle/oracle/codemp/icarus/interpreter.h:35-80
-        const TYPE_ANGLES: c_int = 53;
-        const TYPE_ORIGIN: c_int = 54;
-
+        // `TYPE_ORIGIN`/`TYPE_ANGLES` are module-level consts (see above).
         if lookup == TYPE_ORIGIN {
             return TAG_GetOrigin(ctx, (*ent).ownername, name, info);
         } else if lookup == TYPE_ANGLES {
@@ -2810,25 +2815,22 @@ pub fn Q3_SetForcePowerLevel(
     );
 }
 
-// PORT-NOTE(ctx-free-boundary): the packet's LAW signature (matching this
-// file's pre-existing worktree shape) drops `ctx` — this fn is reached from
-// the bg/fn-ptr boundary with no GameContext channel, so Raven's
-// `G_DebugPrint` calls (parmNum range warning, truncation warning) have no
-// route here and are silently dropped rather than invented.
 /// Raven `Q3_SetParm`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3651-3690`
+// PORT-NOTE(dropped-warnings): all callers thread the game `GameContext`
+// (Q3_Set, BG_ParseField, NPC_Spawn_Do), so the entity arena is reached via
+// `ctx.world`. Raven's `G_DebugPrint` warnings (parmNum range, truncation) are
+// still dropped — no `WL_*` route is set up here — matching the file's other
+// `Q3_Set*` stubs.
 pub fn Q3_SetParm(
+    ctx: GameContext<'_>,
     entID: c_int,
     parmNum: c_int,
     parmValue: *const c_char,
 ) {
     unsafe {
-        // PORT-NOTE(ctx-free-boundary): no GameContext to index `entities`
-        // through — `g_entities`/`GetIDForString`/`G_Alloc` global-array access
-        // used here per the oracle body verbatim (missing_symbols if the
-        // array isn't reachable without ctx).
-        let ent = &mut g_entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if parmNum < 0 || parmNum >= MAX_PARMS as c_int {
             return;
@@ -4585,7 +4587,7 @@ pub fn Q3_Set(
             }
 
             _ if toSet == SET_PARM1 as i32 || toSet == SET_PARM2 as i32 || toSet == SET_PARM3 as i32 || toSet == SET_PARM4 as i32 || toSet == SET_PARM5 as i32 || toSet == SET_PARM6 as i32 || toSet == SET_PARM7 as i32 || toSet == SET_PARM8 as i32 || toSet == SET_PARM9 as i32 || toSet == SET_PARM10 as i32 || toSet == SET_PARM11 as i32 || toSet == SET_PARM12 as i32 || toSet == SET_PARM13 as i32 || toSet == SET_PARM14 as i32 || toSet == SET_PARM15 as i32 || toSet == SET_PARM16 as i32 => {
-                Q3_SetParm(entID, toSet - SET_PARM1 as i32, data);
+                Q3_SetParm(ctx, entID, toSet - SET_PARM1 as i32, data);
             }
 
             _ if toSet == SET_SPAWNSCRIPT as i32 || toSet == SET_USESCRIPT as i32 || toSet == SET_AWAKESCRIPT as i32 || toSet == SET_ANGERSCRIPT as i32 || toSet == SET_ATTACKSCRIPT as i32 || toSet == SET_VICTORYSCRIPT as i32 || toSet == SET_PAINSCRIPT as i32 || toSet == SET_FLEESCRIPT as i32 || toSet == SET_DEATHSCRIPT as i32 || toSet == SET_DELAYEDSCRIPT as i32 || toSet == SET_BLOCKEDSCRIPT as i32 || toSet == SET_FFIRESCRIPT as i32 || toSet == SET_FFDEATHSCRIPT as i32 || toSet == SET_MINDTRICKSCRIPT as i32 => {

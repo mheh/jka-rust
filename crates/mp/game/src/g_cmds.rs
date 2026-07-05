@@ -15,8 +15,7 @@
 //! `saberMoveData`, `bg_customSiegeSoundNames`, `gc_orders`, `gameNames`,
 //! `concat_args_line`) but are not yet confirmed landed on `BgState`; siege-team
 //! consts (`SIEGETEAM_TEAM1`/`_TEAM2`/`MAX_SIEGE_CLASSES`) used as literals
-//! pending the ported enum; `TryGrapple`'s ctx-free signature vs. its
-//! `Cmd_ToggleSaber_f` call (shape mismatch, see call site); and a scope cut
+//! pending the ported enum; and a scope cut
 //! in `ClientCommand`'s `_DEBUG`/`VM_MEMALLOC_DEBUG`/most-of-`!FINAL_BUILD`
 //! debug-command branches (not transcribed this pass — see the PORT-NOTE at
 //! the `ClientCommand` dispatch tail).
@@ -3646,24 +3645,15 @@ pub fn G_ClientNumFromNetname(
 /// Raven `TryGrapple`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:3148-3191`
-// PORT-NOTE(unported-type): reads/returns Raven `animNumber_t`
-// (`BOTH_*`/`TORSO_*`/`LEGS_*`) enumerator(s) — this ~1500-entry enum is a
-// documented deferred type-port item (`docs/type-port-todo.md`), not a
-// missing `use`. Left as unresolved bare identifiers, these silently
-// type-check as irrefutable match-pattern bindings (always-true), which is
-// a behavioral bug, not just a compile gap — parked instead.
 pub fn TryGrapple(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
-    // PORT-NOTE(animNumber_t): `BOTH_KYLE_GRAB` is a bare identifier from the
-    // ~1500-entry deferred `animNumber_t` enum (docs/type-port-todo.md); using
-    // it as a plain `c_int` constant here (its Raven enumerator value), not a
-    // typed match arm, so it is at least referenced correctly pending the type
-    // port landing.
-    const BOTH_KYLE_GRAB: c_int = 0; // placeholder value — see PORT-NOTE above
-    const SETANIM_BOTH: c_int = 2;
-    const SETANIM_FLAG_OVERRIDE: c_int = 1 << 0;
-    const SETANIM_FLAG_HOLD: c_int = 1 << 1;
+    use mp_bg::public::anim_number::animNumber_t;
+    use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
+    // `animNumber_t` is `#[repr(i32)]`; the anim fields (`torsoAnim`, ...) store
+    // the value as `c_int`, so compare/pass the discriminant.
+    let kyle_grab: c_int = animNumber_t::BOTH_KYLE_GRAB as c_int;
 
     unsafe {
         let client = (*ent).client as *mut gclient_t;
@@ -3683,19 +3673,14 @@ pub fn TryGrapple(
         }
 
         if (*client).ps.weapon == WP_SABER && (*client).ps.saberHolstered == 0 {
-            // SHAPE-MISMATCH: `TryGrapple` is ctx-free (bg-boundary/fn-ptr
-            // signature per the packet), but `Cmd_ToggleSaber_f` requires
-            // `ctx: GameContext<'_>` as its first param — no ctx is reachable
-            // here. Reported in shape_mismatches; call left as the packet's
-            // resolved callee signature demands.
             crate::g_cmds::Cmd_ToggleSaber_f(ctx, ent);
             if (*client).ps.saberHolstered == 0 {
                 return qfalse;
             }
         }
 
-        crate::g_utils::G_SetAnim(ent, &mut (*client).pers.cmd as *mut _, SETANIM_BOTH, BOTH_KYLE_GRAB, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD, 0);
-        if (*client).ps.torsoAnim == BOTH_KYLE_GRAB {
+        crate::g_utils::G_SetAnim(ent, &mut (*client).pers.cmd as *mut _, SETANIM_BOTH, kyle_grab, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD, 0);
+        if (*client).ps.torsoAnim == kyle_grab {
             (*client).ps.torsoTimer += 500;
             if (*client).ps.legsAnim == (*client).ps.torsoAnim {
                 (*client).ps.legsTimer = (*client).ps.torsoTimer;

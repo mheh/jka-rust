@@ -796,6 +796,7 @@ pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
             let key = (*ctx.world).level.spawnVars[i as usize][0];
             let value = (*ctx.world).level.spawnVars[i as usize][1];
             BG_ParseField(
+                ctx,
                 FIELDS.as_ptr() as *mut BG_field_t,
                 key,
                 value,
@@ -1166,6 +1167,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             {
                 // Only let them set spawnscript, we don't want them setting an angle or something on the world.
                 BG_ParseField(
+                    ctx,
                     FIELDS.as_ptr() as *mut BG_field_t,
                     (*ctx.world).level.spawnVars[i as usize][0],
                     (*ctx.world).level.spawnVars[i as usize][1],

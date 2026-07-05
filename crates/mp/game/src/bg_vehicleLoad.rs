@@ -805,8 +805,10 @@ pub fn BG_VehicleLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
 /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1590-1593`
 pub fn BG_VehicleGetIndex(
     vehicleName: *const c_char,
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
 ) -> c_int {
-    VEH_VehicleIndexForName(vehicleName)
+    VEH_VehicleIndexForName(vehicleName, bg, traps)
 }
 
 /// Raven `BG_GetVehicleModelName`.
@@ -816,16 +818,16 @@ pub fn BG_VehicleGetIndex(
 /// stomp over `modelname` with it.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1599-1611`
-// SHAPE-MISMATCH: `BG_VehicleGetIndex` (unchanged, not in this packet's open
-// set) calls `VEH_VehicleIndexForName(vehicleName)` with no `bg` — its
-// signature was not retrofit here; see shape_mismatches.
+// PORT-NOTE(traps-cascade): gained `traps: &dyn BgTraps` so `BG_VehicleGetIndex`
+// (now `(name, bg, traps)`) can load an as-yet-unregistered vehicle.
 pub fn BG_GetVehicleModelName(
     modelname: *mut c_char,
     bg: &mut BgState,
+    traps: &dyn BgTraps,
 ) {
     unsafe {
         let veh_name = modelname.add(1);
-        let v_index = BG_VehicleGetIndex(veh_name);
+        let v_index = BG_VehicleGetIndex(veh_name, bg, traps);
         debug_assert!(*modelname == b'$' as c_char);
 
         if v_index == VEHICLE_NONE {
@@ -846,15 +848,16 @@ pub fn BG_GetVehicleModelName(
 ///
 /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1613-1633`
 // MISSING-SYMBOL: `ERR_DROP` (`Com_Error` level const) not yet ported; see
-// missing_symbols. `BG_GetVehicleModelName`'s SHAPE-MISMATCH note re
-// `BG_VehicleGetIndex` applies here too.
+// missing_symbols.
+// PORT-NOTE(traps-cascade): gained `traps: &dyn BgTraps` for `BG_VehicleGetIndex`.
 pub fn BG_GetVehicleSkinName(
     skinname: *mut c_char,
     bg: &mut BgState,
+    traps: &dyn BgTraps,
 ) {
     unsafe {
         let veh_name = skinname.add(1);
-        let v_index = BG_VehicleGetIndex(veh_name);
+        let v_index = BG_VehicleGetIndex(veh_name, bg, traps);
         debug_assert!(*skinname == b'$' as c_char);
 
         if v_index == VEHICLE_NONE {

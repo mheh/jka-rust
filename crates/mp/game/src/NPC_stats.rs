@@ -1577,7 +1577,7 @@ pub fn NPC_ParseParms(
                     continue;
                 }
                 if !client_ptr.is_null() {
-                    let color = crate::bg_saberLoad::TranslateSaberColor(value);
+                    let color = crate::bg_saberLoad::TranslateSaberColor(value, &mut (*ctx.world).bg_state);
                     for bi in 0..MAX_BLADES {
                         (*client_ptr).saber[0].blade[bi].color = color;
                     }
@@ -1595,7 +1595,7 @@ pub fn NPC_ParseParms(
                         }
                         if !client_ptr.is_null() {
                             (*client_ptr).saber[$saber_idx].blade[$blade_idx].color =
-                                crate::bg_saberLoad::TranslateSaberColor(value);
+                                crate::bg_saberLoad::TranslateSaberColor(value, &mut (*ctx.world).bg_state);
                         }
                         continue 'parse;
                     }
@@ -1615,7 +1615,7 @@ pub fn NPC_ParseParms(
                     continue;
                 }
                 if !client_ptr.is_null() {
-                    let color = crate::bg_saberLoad::TranslateSaberColor(value);
+                    let color = crate::bg_saberLoad::TranslateSaberColor(value, &mut (*ctx.world).bg_state);
                     for bi in 0..MAX_BLADES {
                         (*client_ptr).saber[1].blade[bi].color = color;
                     }

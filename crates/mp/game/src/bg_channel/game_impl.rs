@@ -416,8 +416,19 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn npc_set_anim(&mut self, entNum: c_int, type_: c_int, anim: c_int, priority: c_int) {
         todo!("Port GameCallbacks::npc_set_anim delegation — NPC_SetAnim")
     }
-    fn get_vehicle_cam_pos(&mut self, entNum: c_int, camPos: *mut vec3_t) {
-        todo!("Port GameCallbacks::get_vehicle_cam_pos delegation — g_vehicles.c")
+    fn wp_get_vehicle_cam_pos(&mut self, vehEntNum: c_int, pilotEntNum: c_int, camPos: *mut vec3_t) {
+        // Resolves the vehicle + pilot nums against the world arena, rebuilds the
+        // module `GameContext`, and delegates to the ported `WP_GetVehicleCamPos`.
+        // Source: `oracle/oracle/codemp/game/g_weapon.c:3961-4020`.
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let ent = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let pilot = &mut (*self.world).g_entities[pilotEntNum as usize] as *mut gentity_t;
+            crate::g_weapon::WP_GetVehicleCamPos(ctx, ent, pilot, &mut *camPos);
+        }
     }
     fn can_be_enemy(&mut self, entNum: c_int, otherNum: c_int) -> qboolean {
         todo!("Port GameCallbacks::can_be_enemy delegation — g_combat.c")
@@ -426,7 +437,18 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         todo!("Port GameCallbacks::get_time — level.time accessor")
     }
     fn try_grapple(&mut self, entNum: c_int) -> qboolean {
-        todo!("Port GameCallbacks::try_grapple delegation — g_active.c")
+        // Resolves `entNum` against the world arena, rebuilds the module
+        // `GameContext` from the handles this impl holds, and delegates to the
+        // ported `TryGrapple` body.
+        // Source: `oracle/oracle/codemp/game/g_cmds.c:3148-3191` (`TryGrapple`).
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            crate::g_cmds::TryGrapple(ctx, ent)
+        }
     }
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
         todo!("Port GameCallbacks::q3_set_parm delegation — Q3_SetParm (g_ICARUScb.c)")
