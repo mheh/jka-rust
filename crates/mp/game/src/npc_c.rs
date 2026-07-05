@@ -1536,10 +1536,10 @@ pub fn NPC_ExecuteBState(
             //We just shot but aren't still shooting, so hold the gun up for a while
             if (*client).ps.weapon == WP_SABER {
                 //One-handed
-                NPC_SetAnim(npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONREADY1 as c_int, SETANIM_FLAG_NORMAL);
+                NPC_SetAnim(ctx, npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONREADY1 as c_int, SETANIM_FLAG_NORMAL);
             } else if (*client).ps.weapon == WP_BRYAR_PISTOL {
                 //Sniper pose
-                NPC_SetAnim(npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONREADY3 as c_int, SETANIM_FLAG_NORMAL);
+                NPC_SetAnim(ctx, npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONREADY3 as c_int, SETANIM_FLAG_NORMAL);
             }
         } else if (*npc_ent).enemy.is_none() {
             //HACK!
@@ -1547,7 +1547,7 @@ pub fn NPC_ExecuteBState(
                 || (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY3 as c_int
             {
                 //we look ready for action, using one of the first 2 weapon, let's rest our weapon on our shoulder
-                NPC_SetAnim(npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONIDLE3 as c_int, SETANIM_FLAG_NORMAL);
+                NPC_SetAnim(ctx, npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONIDLE3 as c_int, SETANIM_FLAG_NORMAL);
             }
         }
 
@@ -1855,10 +1855,11 @@ pub fn NPC_InitGame(ctx: GameContext<'_>) {
 /// out upstream, so this is the whole live body.
 /// Source: `oracle/oracle/codemp/game/NPC.c:2058-2110`
 pub fn NPC_SetAnim(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     setAnimParts: c_int,
     anim: c_int,
     setAnimFlags: c_int,
 ) {
-    G_SetAnim(ent, core::ptr::null_mut(), setAnimParts, anim, setAnimFlags, 0);
+    G_SetAnim(ctx, ent, core::ptr::null_mut(), setAnimParts, anim, setAnimFlags, 0);
 }

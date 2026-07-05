@@ -589,26 +589,25 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             crate::g_active::Client_CheckImpactBBrush(ctx, self_, other);
         }
     }
-    fn flyveh_surface_destruction(&mut self, entNum: c_int, trNum: c_int, magnitude: f32) {
-        // ESCALATION — lossy seam. Target `G_FlyVehicleSurfaceDestruction(ctx, veh,
-        // trace: *mut trace_t, magnitude: c_int, force: qboolean)` exists
-        // (`crate::g_vehicles`, oracle `g_vehicles.c:3190`), but this bg-visible
-        // trait signature cannot supply two of its arguments: the impact `trace_t*`
-        // (bg passes `trNum = 0`, a sentinel — see `bg_slidemove.rs:437`) and the
-        // `force` flag (dropped). The oracle call passes the live slide-move impact
-        // trace and `forceSurfDestruction` (`bg_slidemove.c:472`). Reconstructing
-        // them here would be invented behavior (porting-rules §A2), and the fix —
-        // widening the `GameCallbacks::flyveh_surface_destruction` signature to
-        // carry the trace + force, plus the matching `bg_slidemove` call site —
-        // lives in files this porter does not own (`game_callbacks.rs`,
-        // `bg_slidemove.rs`). Left as a loud, greppable stub pending that decision.
-        //TODO: Port GameCallbacks::flyveh_surface_destruction (lossy seam: trace_t*/force unsendable)
-        // Source: oracle/oracle/codemp/game/g_vehicles.c:3190; bg_slidemove.c:25,472
-        todo!(
-            "ESCALATION: GameCallbacks::flyveh_surface_destruction — trait sig drops the impact \
-             trace_t* (trNum={trNum}) and force flag G_FlyVehicleSurfaceDestruction needs; \
-             widening the seam is out of this porter's file scope"
-        )
+    fn flyveh_surface_destruction(
+        &mut self,
+        entNum: c_int,
+        trace: *mut trace_t,
+        magnitude: c_int,
+        force: qboolean,
+    ) {
+        // Resolve `entNum`->vehicle gentity, rebuild `ctx`, and delegate to
+        // `G_FlyVehicleSurfaceDestruction` with the bg-supplied impact `trace` and
+        // `force` flag. Source: `oracle/oracle/codemp/game/g_vehicles.c:3190`;
+        // `bg_slidemove.c:472`.
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let veh = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            crate::g_vehicles::G_FlyVehicleSurfaceDestruction(ctx, veh, trace, magnitude, force);
+        }
     }
     fn set_anim(
         &mut self,
@@ -619,19 +618,28 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         setAnimFlags: c_int,
         blendTime: c_int,
     ) {
-        // `G_SetAnim` is ctx-free and takes a `gentity_t*`; resolve `entNum` and
-        // pass the bg-owned `ucmd` through. Source: `g_utils.c` (`G_SetAnim`).
+        // `G_SetAnim` takes a `gentity_t*` + the module `GameContext`; resolve
+        // `entNum`, rebuild `ctx`, and pass the bg-owned `ucmd` through.
+        // Source: `g_utils.c` (`G_SetAnim`).
         unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::g_utils::G_SetAnim(ent, ucmd, setAnimParts, anim, setAnimFlags, blendTime);
+            crate::g_utils::G_SetAnim(ctx, ent, ucmd, setAnimParts, anim, setAnimFlags, blendTime);
         }
     }
     fn npc_set_anim(&mut self, entNum: c_int, type_: c_int, anim: c_int, priority: c_int) {
-        // Raven `NPC_SetAnim(ent, setAnimParts=type, anim, setFlags=priority)` is
-        // ctx-free; resolve `entNum`. Source: `npc.cpp` (`NPC_SetAnim`).
+        // Raven `NPC_SetAnim(ent, setAnimParts=type, anim, setFlags=priority)`;
+        // resolve `entNum` and rebuild `ctx`. Source: `npc.cpp` (`NPC_SetAnim`).
         unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
             let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
-            crate::npc_c::NPC_SetAnim(ent, type_, anim, priority);
+            crate::npc_c::NPC_SetAnim(ctx, ent, type_, anim, priority);
         }
     }
     fn wp_get_vehicle_cam_pos(&mut self, vehEntNum: c_int, pilotEntNum: c_int, camPos: *mut vec3_t) {
@@ -703,6 +711,68 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             let pEnt = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t
                 as *mut bgEntity_t;
             crate::veh_dispatch::board(ctx, pVeh, pEnt)
+        }
+    }
+    fn update_vehicle(&mut self, vehEntNum: c_int, ucmd: *const usercmd_t) {
+        // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, delegate to the
+        // generic-base `Update` dispatch. Source: `bg_pmove.c:10919-10944`.
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            crate::veh_dispatch::update(ctx, pVeh, ucmd);
+        }
+    }
+    fn pm_animate_vehicle(&mut self, vehEntNum: c_int) {
+        // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, delegate to the
+        // generic-base `Animate` dispatch. Source: `bg_pmove.c:10921-10945`.
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            crate::veh_dispatch::animate(ctx, pVeh);
+        }
+    }
+    fn update_rider(&mut self, vehEntNum: c_int, riderEntNum: c_int, ucmd: *mut usercmd_t) {
+        // Resolve the vehicle + rider. Driver path: bg passed `&pVeh->m_ucmd`.
+        // Passenger path: bg passes null, so guard `inuse && client` and use the
+        // rider's own `client->pers.cmd` (game-side). Source: `bg_pmove.c:10947-10961`.
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            let rider = &mut (*self.world).g_entities[riderEntNum as usize] as *mut gentity_t;
+            let cmd = if ucmd.is_null() {
+                if (*rider).inuse == qfalse || (*rider).client.is_null() {
+                    return;
+                }
+                &mut (*((*rider).client as *mut gclient_t)).pers.cmd as *mut usercmd_t
+            } else {
+                ucmd
+            };
+            crate::veh_dispatch::update_rider(ctx, pVeh, rider as *mut bgEntity_t, cmd);
+        }
+    }
+    fn attach_riders(&mut self, vehEntNum: c_int) {
+        // Resolve `vehEntNum`->`m_pVehicle`, rebuild `ctx`, delegate to the
+        // generic-base `AttachRiders` dispatch. Source: `bg_pmove.c:11146-11149`.
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
+            let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
+            crate::veh_dispatch::attach_riders(ctx, pVeh);
         }
     }
 }

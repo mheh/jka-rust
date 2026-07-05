@@ -191,7 +191,7 @@ pub fn Q3_GetAnimBoth(
         let upper_name = Q3_GetAnimUpper(ctx, ent);
 
         if lower_name.is_null() || *lower_name == 0 {
-            G_DebugPrint(ctx, 
+            G_DebugPrint(ctx,
                 WL_WARNING as c_int,
                 b"Q3_GetAnimBoth: NULL legs animation string found!\n\0".as_ptr() as *const c_char,
             );
@@ -199,7 +199,7 @@ pub fn Q3_GetAnimBoth(
         }
 
         if upper_name.is_null() || *upper_name == 0 {
-            G_DebugPrint(ctx, 
+            G_DebugPrint(ctx,
                 WL_WARNING as c_int,
                 b"Q3_GetAnimBoth: NULL torso animation string found!\n\0".as_ptr() as *const c_char,
             );
@@ -1772,7 +1772,7 @@ pub fn SetLowerAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
             return;
         }
 
-        G_SetAnim(
+        G_SetAnim(ctx,
             ent,
             std::ptr::null_mut(),
             SETANIM_LEGS,
@@ -1800,7 +1800,7 @@ pub fn SetUpperAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
             return;
         }
 
-        G_SetAnim(
+        G_SetAnim(ctx,
             ent,
             std::ptr::null_mut(),
             SETANIM_TORSO,

@@ -71,7 +71,7 @@ pub fn sentry_use(
         crate::NPC_utils::G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
 
         (*self_).flags &= !FL_SHIELDED;
-        crate::npc_c::NPC_SetAnim(
+        crate::npc_c::NPC_SetAnim(ctx,
             self_,
             SETANIM_BOTH,
             BOTH_POWERUP1 as c_int,
@@ -105,7 +105,7 @@ pub fn NPC_Sentry_Pain(
                 (*world).bg_state.rng.Q_irand(9000, 12000),
             );
             (*self_).flags |= FL_SHIELDED;
-            crate::npc_c::NPC_SetAnim(
+            crate::npc_c::NPC_SetAnim(ctx,
                 self_,
                 SETANIM_BOTH,
                 BOTH_FLY_SHIELDED as c_int,
@@ -148,7 +148,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             ) != 0
             {
                 (*NPCInfo).localState = LSTATE_ATTACKING;
-                crate::npc_c::NPC_SetAnim(
+                crate::npc_c::NPC_SetAnim(ctx,
                     NPC,
                     SETANIM_BOTH,
                     BOTH_ATTACK1 as c_int,
@@ -166,7 +166,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
                 CHAN_AUTO,
                 crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_shield_open").as_ptr()),
             );
-            crate::npc_c::NPC_SetAnim(
+            crate::npc_c::NPC_SetAnim(ctx,
                 NPC,
                 SETANIM_BOTH,
                 BOTH_POWERUP1 as c_int,
@@ -365,7 +365,7 @@ pub fn Sentry_Idle(ctx: GameContext<'_>) {
                 (*NPCInfo).burstCount = 0;
             }
         } else {
-            crate::npc_c::NPC_SetAnim(
+            crate::npc_c::NPC_SetAnim(ctx,
                 NPC,
                 SETANIM_BOTH,
                 BOTH_SLEEP1 as c_int,
@@ -518,7 +518,7 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
                         world.bg_state.rng.Q_irand(2000, 3500),
                     );
                     (*NPC).flags |= FL_SHIELDED;
-                    crate::npc_c::NPC_SetAnim(
+                    crate::npc_c::NPC_SetAnim(ctx,
                         NPC,
                         SETANIM_BOTH,
                         BOTH_FLY_SHIELDED as c_int,

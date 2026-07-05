@@ -99,7 +99,7 @@ pub fn Rancor_CheckRoar(
             //haven't ever gotten mad yet
             (*self_).wait = 1.0;//do this only once
             (*((*self_).client as *mut gclient_t)).ps.eFlags2 |= EF2_ALERTED;
-            crate::npc_c::NPC_SetAnim(self_, SETANIM_BOTH, BOTH_STAND1TO2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+            crate::npc_c::NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_STAND1TO2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
             crate::g_timer::TIMER_Set(ctx, self_, c"rageTime".as_ptr(), (*((*self_).client as *mut gclient_t)).ps.legsTimer);
             return qtrue;
         }
@@ -292,7 +292,7 @@ pub fn Rancor_Swing(
                     } else if !(*radiusEnt).client.is_null() {
                         (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                         (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtendTime = 0;
-                        crate::npc_c::NPC_SetAnim(radiusEnt, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        crate::npc_c::NPC_SetAnim(ctx, radiusEnt, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     }
                 } else {
                     //smack
@@ -427,9 +427,9 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
                         //bite something off
                         let hitLoc = (*ctx.world).bg_state.rng.Q_irand(G2_MODELPART_HEAD as c_int, G2_MODELPART_RLEG as c_int);
                         if hitLoc == G2_MODELPART_HEAD as c_int {
-                            crate::npc_c::NPC_SetAnim(radiusEnt, SETANIM_BOTH, BOTH_DEATH17 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                            crate::npc_c::NPC_SetAnim(ctx, radiusEnt, SETANIM_BOTH, BOTH_DEATH17 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                         } else if hitLoc == G2_MODELPART_WAIST as c_int {
-                            crate::npc_c::NPC_SetAnim(radiusEnt, SETANIM_BOTH, BOTH_DEATHBACKWARD2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                            crate::npc_c::NPC_SetAnim(ctx, radiusEnt, SETANIM_BOTH, BOTH_DEATHBACKWARD2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                         }
                         //radiusEnt->client->dismembered = qfalse;
                         //FIXME: the limb should just disappear, cuz I ate it
@@ -459,16 +459,16 @@ pub fn Rancor_Attack(
                 //holding enemy
                 if (*activator).health > 0 && (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                     //quick bite
-                    crate::npc_c::NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    crate::npc_c::NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_ATTACK1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 450);
                 } else {
                     //full eat
-                    crate::npc_c::NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK3 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    crate::npc_c::NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_ATTACK3 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 900);
                     //Make victim scream in fright
                     if (*activator).health > 0 && !(*activator).client.is_null() {
                         crate::g_utils::G_AddEvent(activator, (*ctx.world).bg_state.rng.Q_irand(EV_DEATH1 as c_int, EV_DEATH3 as c_int), 0);
-                        crate::npc_c::NPC_SetAnim(activator, SETANIM_TORSO, BOTH_FALLDEATH1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        crate::npc_c::NPC_SetAnim(ctx, activator, SETANIM_TORSO, BOTH_FALLDEATH1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                         if !(*activator).NPC.is_null() {
                             //no more thinking for you
                             crate::g_combat::TossClientItems(ctx, npc);
@@ -485,15 +485,15 @@ pub fn Rancor_Attack(
                 (*((*npc).client as *mut gclient_t)).ps.velocity[2] = 150.0;
                 (*((*npc).client as *mut gclient_t)).ps.groundEntityNum = ENTITYNUM_NONE;
 
-                crate::npc_c::NPC_SetAnim(npc, SETANIM_BOTH, BOTH_MELEE2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                crate::npc_c::NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_MELEE2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 1250);
             } else if !(*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                 //smash
-                crate::npc_c::NPC_SetAnim(npc, SETANIM_BOTH, BOTH_MELEE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                crate::npc_c::NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_MELEE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 1000);
             } else {
                 //try to grab
-                crate::npc_c::NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                crate::npc_c::NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_ATTACK2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 1000);
             }
 
@@ -528,7 +528,7 @@ pub fn Rancor_Attack(
                         //G_DoDismemberment( NPC->activator, NPC->activator->r.currentOrigin, MOD_SABER, 1000, HL_HEAD, qtrue );
                         (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                         (*activator_client).ps.forceHandExtendTime = 0;
-                        crate::npc_c::NPC_SetAnim(activator, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        crate::npc_c::NPC_SetAnim(ctx, activator, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     }
                     crate::g_utils::G_Sound(ctx, activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()));
                 }
@@ -552,7 +552,7 @@ pub fn Rancor_Attack(
                         let activator_client = (*activator).client as *mut gclient_t;
                         (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                         (*activator_client).ps.forceHandExtendTime = 0;
-                        crate::npc_c::NPC_SetAnim(activator, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        crate::npc_c::NPC_SetAnim(ctx, activator, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     }
                     crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg2".as_ptr(), 1350);
                     crate::g_utils::G_Sound(ctx, activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()));
@@ -589,7 +589,7 @@ pub fn Rancor_Attack(
                         crate::g_combat::G_Damage(ctx, activator, npc, npc, Some(&mut [0.0; 3]), (*activator).r.currentOrigin, (*crate::ent_id::resolve(ent_base, (*npc).enemy)).health+10, DAMAGE_NO_PROTECTION|DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK|DAMAGE_NO_HIT_LOC, MOD_MELEE as c_int);//, HL_NONE );
                         (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                         (*activator_client).ps.forceHandExtendTime = 0;
-                        crate::npc_c::NPC_SetAnim(activator, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        crate::npc_c::NPC_SetAnim(ctx, activator, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                         crate::g_utils::G_AddEvent(activator, EV_JUMP as c_int, (*activator).health);
                     }
                     if !(*activator).client.is_null() {
@@ -743,9 +743,9 @@ pub fn NPC_Rancor_Pain(
                             crate::q_math::_VectorCopy((*((*self_).NPC as *mut gNPC_t)).lastPathAngles, &mut (*self_).s.angles);
 
                             if (*self_).count == 1 {
-                                crate::npc_c::NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                                crate::npc_c::NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_PAIN2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                             } else {
-                                crate::npc_c::NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                                crate::npc_c::NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                             }
                             crate::g_timer::TIMER_Set(ctx, self_, c"takingPain".as_ptr(), (*((*self_).client as *mut gclient_t)).ps.legsTimer + (*ctx.world).bg_state.rng.Q_irand(0, 500));
                         }

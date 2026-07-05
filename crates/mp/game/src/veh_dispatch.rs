@@ -182,3 +182,34 @@ pub fn process_orient_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         _ => {}
     }
 }
+
+/// `Update` — generic base only (the shared setter is the sole assigner; no
+/// per-class override). Distinct from `AnimateVehicle`/`AnimateRiders`.
+/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3306`.
+pub fn update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+    crate::g_vehicles::Update(ctx, pVeh, pUcmd)
+}
+
+/// `Animate` — generic base only (the `vehicleInfo_t.Animate` slot, distinct
+/// from the per-class `AnimateVehicle` slot dispatched by [`animate_vehicle`]).
+/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3298`.
+pub fn animate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+    crate::g_vehicles::Animate(ctx, pVeh)
+}
+
+/// `UpdateRider` — generic base only.
+/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3307`.
+pub fn update_rider(
+    ctx: GameContext<'_>,
+    pVeh: *mut Vehicle_t,
+    pRider: *mut bgEntity_t,
+    pUcmd: *mut usercmd_t,
+) -> qboolean {
+    crate::g_vehicles::UpdateRider(ctx, pVeh, pRider, pUcmd)
+}
+
+/// `AttachRiders` — generic base only.
+/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3310`.
+pub fn attach_riders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+    crate::g_vehicles::AttachRiders(ctx, pVeh)
+}

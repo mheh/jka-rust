@@ -204,21 +204,21 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) { unsafe {
         if do_attack4 {
             let dur = (1750.0 + rng.random() as f32 * 200.0) as c_int;
             TIMER_Set(ctx, npc, attacking_id.as_ptr(), dur);
-            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK4 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+            NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_ATTACK4 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
             TIMER_Set(ctx, npc, cstr("attack2_dmg").as_ptr(), 950);
         } else if rng.random() as f32 > 0.5f32 {
             if rng.random() as f32 > 0.8f32 {
                 TIMER_Set(ctx, npc, attacking_id.as_ptr(), 850);
-                NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK3 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_ATTACK3 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 TIMER_Set(ctx, npc, cstr("attack2_dmg").as_ptr(), 400);
             } else {
                 TIMER_Set(ctx, npc, attacking_id.as_ptr(), 850);
-                NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_ATTACK1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 TIMER_Set(ctx, npc, cstr("attack1_dmg").as_ptr(), 450);
             }
         } else {
             TIMER_Set(ctx, npc, attacking_id.as_ptr(), 1250);
-            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+            NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_ATTACK2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
             TIMER_Set(ctx, npc, cstr("attack1_dmg").as_ptr(), 700);
         }
     } else {
@@ -303,7 +303,7 @@ pub fn NPC_MineMonster_Pain(
 
         _VectorCopy((*((*self_).NPC as *mut gNPC_t)).lastPathAngles, &mut (*self_).s.angles);
 
-        NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+        NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
 
         if !(*self_).NPC.is_null() {
             (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_WAITING;

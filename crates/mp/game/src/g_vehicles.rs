@@ -1689,7 +1689,7 @@ pub fn AttachRiders(
                 trap::LinkEntity(ctx.engine, GLinkentityArgs::new(droid));
 
                 if !(*droid).NPC.is_null() {
-                    crate::npc_c::NPC_SetAnim(
+                    crate::npc_c::NPC_SetAnim(ctx,
                         droid,
                         SETANIM_BOTH,
                         animNumber_t::BOTH_STAND2 as c_int,

@@ -3615,7 +3615,7 @@ pub fn StandardSetBodyAnim(
 ) {
     // Raven `SETANIM_BOTH` (`bg_public.h`), passed as a literal at the call site.
     const SETANIM_BOTH: c_int = 2;
-    crate::g_utils::G_SetAnim(self_, std::ptr::null_mut(), SETANIM_BOTH, anim, flags, 0);
+    crate::g_utils::G_SetAnim(ctx, self_, std::ptr::null_mut(), SETANIM_BOTH, anim, flags, 0);
 }
 
 /// Raven `G_ClientNumFromNetname`.
@@ -3679,7 +3679,7 @@ pub fn TryGrapple(
             }
         }
 
-        crate::g_utils::G_SetAnim(ent, &mut (*client).pers.cmd as *mut _, SETANIM_BOTH, kyle_grab, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD, 0);
+        crate::g_utils::G_SetAnim(ctx, ent, &mut (*client).pers.cmd as *mut _, SETANIM_BOTH, kyle_grab, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD, 0);
         if (*client).ps.torsoAnim == kyle_grab {
             (*client).ps.torsoTimer += 500;
             if (*client).ps.legsAnim == (*client).ps.torsoAnim {

@@ -326,7 +326,7 @@ pub fn NPC_ChoosePainAnimation(
                     }
 
                     if pain_anim != -1 {
-                        crate::npc_c::NPC_SetAnim(self_, parts, pain_anim, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        crate::npc_c::NPC_SetAnim(ctx, self_, parts, pain_anim, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     }
                 }
 

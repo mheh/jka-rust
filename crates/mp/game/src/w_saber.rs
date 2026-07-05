@@ -1633,7 +1633,7 @@ pub fn WP_SabersCheckLock2(
             }
         }
 
-        crate::g_utils::G_SetAnim(
+        crate::g_utils::G_SetAnim(ctx,
             attacker,
             core::ptr::null_mut(),
             SETANIM_BOTH,
@@ -1649,7 +1649,7 @@ pub fn WP_SabersCheckLock2(
                 anim.firstFrame as c_int + (anim.numFrames as f32 * attStart) as c_int;
         }
 
-        crate::g_utils::G_SetAnim(
+        crate::g_utils::G_SetAnim(ctx,
             defender,
             core::ptr::null_mut(),
             SETANIM_BOTH,
@@ -4904,7 +4904,7 @@ pub fn CheckSaberDamage(
                     //set anim now on both parts
                     let anim = (*ctx.world).bg_state.saberMoveData[(*sc).ps.saberMove as usize]
                         .animToUse;
-                    G_SetAnim(
+                    G_SetAnim(ctx,
                         self_,
                         &mut (*sc).pers.cmd as *mut usercmd_t,
                         SETANIM_BOTH,
@@ -9151,7 +9151,7 @@ pub fn G_GrabSomeMofos(
                 if tortureAnim == -1 || correspondingAnim == -1 {
                     if (*client).ps.torsoTimer < 300 && (*client).grappleState == 0 {
                         // you failed to grab anyone, play the "failed to grab" anim
-                        G_SetAnim(
+                        G_SetAnim(ctx,
                             self_,
                             &mut (*client).pers.cmd,
                             SETANIM_BOTH,
@@ -9174,7 +9174,7 @@ pub fn G_GrabSomeMofos(
                 (*gcl).grappleState = 20;
 
                 // time to crack some heads
-                G_SetAnim(
+                G_SetAnim(ctx,
                     self_,
                     &mut (*client).pers.cmd,
                     SETANIM_BOTH,
@@ -9187,7 +9187,7 @@ pub fn G_GrabSomeMofos(
                     (*client).ps.weaponTime = (*client).ps.torsoTimer;
                 }
 
-                G_SetAnim(
+                G_SetAnim(ctx,
                     grabbed,
                     &mut (*gcl).pers.cmd,
                     SETANIM_BOTH,
@@ -9220,7 +9220,7 @@ pub fn G_GrabSomeMofos(
 
         if (*client).ps.torsoTimer < 300 && (*client).grappleState == 0 {
             // you failed to grab anyone, play the "failed to grab" anim
-            G_SetAnim(
+            G_SetAnim(ctx,
                 self_,
                 &mut (*client).pers.cmd,
                 SETANIM_BOTH,
@@ -9337,7 +9337,7 @@ pub fn WP_SaberPositionUpdate(
                         && (*client).ps.legsTimer > 100)
                 {
                     // if they're pretty far from finishing the anim then shove them into another anim
-                    G_SetAnim(
+                    G_SetAnim(ctx,
                         self_,
                         &mut (*client).pers.cmd,
                         SETANIM_BOTH,
@@ -9364,7 +9364,7 @@ pub fn WP_SaberPositionUpdate(
                     {
                         (*client).grappleState = 0;
 
-                        G_SetAnim(
+                        G_SetAnim(ctx,
                             self_,
                             &mut (*client).pers.cmd,
                             SETANIM_BOTH,

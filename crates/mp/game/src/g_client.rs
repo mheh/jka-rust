@@ -706,7 +706,7 @@ pub fn SelectNearestDeathmatchSpawnPoint(
         let mut spot: *mut gentity_t = core::ptr::null_mut();
 
         loop {
-            spot = crate::g_utils::G_Find(ctx, 
+            spot = crate::g_utils::G_Find(ctx,
                 spot,
                 fofs_classname(),
                 b"info_player_deathmatch\0".as_ptr() as *const c_char,
@@ -740,7 +740,7 @@ pub fn SelectRandomDeathmatchSpawnPoint(ctx: GameContext<'_>) -> *mut gentity_t 
         let mut spots: [*mut gentity_t; MAX_SPAWN_POINTS] = [core::ptr::null_mut(); MAX_SPAWN_POINTS];
 
         loop {
-            spot = crate::g_utils::G_Find(ctx, 
+            spot = crate::g_utils::G_Find(ctx,
                 spot,
                 fofs_classname(),
                 b"info_player_deathmatch\0".as_ptr() as *const c_char,
@@ -757,7 +757,7 @@ pub fn SelectRandomDeathmatchSpawnPoint(ctx: GameContext<'_>) -> *mut gentity_t 
 
         if count == 0 {
             // no spots that won't telefrag
-            return crate::g_utils::G_Find(ctx, 
+            return crate::g_utils::G_Find(ctx,
                 core::ptr::null_mut(),
                 fofs_classname(),
                 b"info_player_deathmatch\0".as_ptr() as *const c_char,
@@ -2122,7 +2122,7 @@ pub fn G_BreakArm(
             return;
         }
 
-        G_SetAnim(
+        G_SetAnim(ctx,
             ent,
             &mut (*((*ent).client as *mut gclient_t)).pers.cmd as *mut usercmd_t,
             SETANIM_BOTH,
@@ -3013,7 +3013,7 @@ pub fn ClientSpawn(
             (*client).ps.legsTimer = 0;
 
             if (*client).ps.weapon == WP_SABER {
-                G_SetAnim(
+                G_SetAnim(ctx,
                     ent,
                     core::ptr::null_mut(),
                     SETANIM_BOTH,
@@ -3022,7 +3022,7 @@ pub fn ClientSpawn(
                     0,
                 );
             } else {
-                G_SetAnim(
+                G_SetAnim(ctx,
                     ent,
                     core::ptr::null_mut(),
                     SETANIM_TORSO,

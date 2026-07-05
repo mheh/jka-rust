@@ -101,9 +101,18 @@ pub trait GameCallbacks {
     /// Source: `oracle/oracle/codemp/game/g_active.c` (impact-bbrush helper)
     fn client_check_impact_bbrush(&mut self, entNum: c_int, impactNum: c_int);
 
-    /// Raven flyer-vehicle surface-destruction upcall from vehicle impacts.
-    /// Source: `oracle/oracle/codemp/game/g_vehicles.c` (surface-destruction)
-    fn flyveh_surface_destruction(&mut self, entNum: c_int, trNum: c_int, magnitude: f32);
+    /// Raven `G_FlyVehicleSurfaceDestruction(veh, trace, magnitude, force)`
+    /// upcall from vehicle impacts. bg holds the impact `trace_t*` and the
+    /// `forceSurfDestruction` flag, so they cross the seam directly (the `trace`
+    /// pointer is bg-owned scratch, valid for the call).
+    /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3190`; `bg_slidemove.c:472`.
+    fn flyveh_surface_destruction(
+        &mut self,
+        entNum: c_int,
+        trace: *mut trace_t,
+        magnitude: c_int,
+        force: qboolean,
+    );
 
     /// Raven `G_SetAnim(ent, ucmd, setAnimParts, anim, setAnimFlags, blendTime)`.
     /// Source: `oracle/oracle/codemp/game/g_local.h:1022`
@@ -153,4 +162,31 @@ pub trait GameCallbacks {
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c` (`PM_GroundTrace` boarding);
     /// dispatch target `oracle/oracle/codemp/game/g_vehicles.c:630` (`Board`).
     fn board_vehicle(&mut self, vehEntNum: c_int, entNum: c_int) -> qboolean;
+
+    /// Vehicle `Update` upcall from `PmoveSingle`'s vehicle-NPC path
+    /// (`m_pVehicleInfo->Update`). `ucmd` is the move command bg passes directly
+    /// (`&pm->cmd` when idle, `&pVeh->m_ucmd` when driven — both bg-reachable),
+    /// routed game-side through [`crate::veh_dispatch::update`].
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:10919-10944`.
+    fn update_vehicle(&mut self, vehEntNum: c_int, ucmd: *const usercmd_t);
+
+    /// Vehicle `Animate` upcall (`m_pVehicleInfo->Animate`, the whole-vehicle
+    /// slot — NOT the per-class `AnimateVehicle`), routed through
+    /// [`crate::veh_dispatch::animate`]. `pm_`-prefixed to disambiguate from the
+    /// vehicle-load `AnimateVehicle` dispatch.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:10921-10945`.
+    fn pm_animate_vehicle(&mut self, vehEntNum: c_int);
+
+    /// Vehicle `UpdateRider` upcall. A non-null `ucmd` is the driver path
+    /// (bg passes `&pVeh->m_ucmd`); a null `ucmd` is the passenger path — the
+    /// impl guards `inuse && client` and uses the rider's own `client->pers.cmd`
+    /// (game-side, not bg-reachable). Routed through
+    /// [`crate::veh_dispatch::update_rider`].
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:10947-10961`.
+    fn update_rider(&mut self, vehEntNum: c_int, riderEntNum: c_int, ucmd: *mut usercmd_t);
+
+    /// Vehicle `AttachRiders` upcall (`m_pVehicleInfo->AttachRiders`), routed
+    /// through [`crate::veh_dispatch::attach_riders`].
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c:11146-11149`.
+    fn attach_riders(&mut self, vehEntNum: c_int);
 }

@@ -157,7 +157,7 @@ pub fn Mark1_Idle(ctx: GameContext<'_>) {
         crate::NPC_AI_Default::NPC_BSIdle(ctx);
         let npc = (*ctx.world).globals.NPC;
         if !npc.is_null() {
-            NPC_SetAnim(npc, SETANIM_BOTH, BOTH_SLEEP1 as c_int, SETANIM_FLAG_NORMAL);
+            NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_SLEEP1 as c_int, SETANIM_FLAG_NORMAL);
         }
     }
 }
@@ -328,14 +328,14 @@ pub fn Mark1_die(
 
         // Choose a death anim
         if (*ctx.world).bg_state.rng.Q_irand(1, 10) > 5 {
-            NPC_SetAnim(
+            NPC_SetAnim(ctx,
                 self_,
                 SETANIM_BOTH,
                 BOTH_DEATH2 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
         } else {
-            NPC_SetAnim(
+            NPC_SetAnim(ctx,
                 self_,
                 SETANIM_BOTH,
                 BOTH_DEATH1 as c_int,
@@ -445,7 +445,7 @@ pub fn NPC_Mark1_Pain(
             let chance = (*ctx.world).bg_state.rng.Q_irand(1, 4);
 
             if chance == 1 && damage > 5 {
-                NPC_SetAnim(
+                NPC_SetAnim(ctx,
                     self_,
                     SETANIM_BOTH,
                     BOTH_PAIN1 as c_int,
@@ -500,7 +500,7 @@ pub fn NPC_Mark1_Pain(
                             cstr(&format!("torso_tube{}", (i + 1) as c_int)).as_ptr(),
                             TURN_OFF,
                         );
-                        NPC_SetAnim(
+                        NPC_SetAnim(ctx,
                             self_,
                             SETANIM_BOTH,
                             BOTH_PAIN1 as c_int,
@@ -685,7 +685,7 @@ pub fn Mark1_BlasterAttack(
                 if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay2".as_ptr()) != 0 {
                     crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay2".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(50, 50));
                     Mark1_FireBlaster(ctx);
-                    NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_ATTACK1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 }
                 return;
             }
@@ -794,7 +794,7 @@ pub fn Mark1_RocketAttack(
 
         if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
             crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1000, 3000));
-            NPC_SetAnim(npc, SETANIM_TORSO, BOTH_ATTACK2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+            NPC_SetAnim(ctx, npc, SETANIM_TORSO, BOTH_ATTACK2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
             Mark1_FireRocket(ctx);
         } else if advance != 0 {
             Mark1_Hunt(ctx);

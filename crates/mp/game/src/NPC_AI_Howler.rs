@@ -196,7 +196,7 @@ pub fn Howler_Attack(ctx: GameContext<'_>) {
                 c"attacking".as_ptr(),
                 (1700.0 + ((*ctx.world).bg_state.rng.random() as f32 * 200.0)) as c_int,
             );
-            crate::npc_c::NPC_SetAnim(
+            crate::npc_c::NPC_SetAnim(ctx,
                 npc,
                 SETANIM_BOTH,
                 BOTH_ATTACK1,
@@ -286,7 +286,7 @@ pub fn NPC_Howler_Pain(
                 crate::q_math::_VectorCopy((*npc).lastPathAngles, &mut (*self_).s.angles);
             }
 
-            crate::npc_c::NPC_SetAnim(
+            crate::npc_c::NPC_SetAnim(ctx,
                 self_,
                 SETANIM_BOTH,
                 BOTH_PAIN1,

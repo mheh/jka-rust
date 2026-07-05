@@ -259,7 +259,7 @@ pub fn WP_ResistForcePush(
             //play resist just in torso
             parts = SETANIM_TORSO;
         }
-        crate::npc_c::NPC_SetAnim(
+        crate::npc_c::NPC_SetAnim(ctx,
             self_,
             parts,
             animNumber_t::BOTH_RESISTPUSH as c_int,
@@ -600,7 +600,7 @@ pub fn Boba_DoFlameThrower(
     self_: *mut gentity_t,
 ) {
     unsafe {
-        crate::npc_c::NPC_SetAnim(
+        crate::npc_c::NPC_SetAnim(ctx,
             self_,
             SETANIM_TORSO,
             animNumber_t::BOTH_FORCELIGHTNING_HOLD as c_int,
@@ -2372,7 +2372,7 @@ pub fn Jedi_CheckFlipEvasions(
                 } else {
                     parts = SETANIM_LEGS;
                 }
-                crate::npc_c::NPC_SetAnim(
+                crate::npc_c::NPC_SetAnim(ctx,
                     self_,
                     parts,
                     anim,
@@ -2469,7 +2469,7 @@ pub fn Jedi_CheckFlipEvasions(
                 let mut fwdAngles2: vec3_t = [0.0; 3];
                 let mut jumpRt: vec3_t = [0.0; 3];
 
-                crate::npc_c::NPC_SetAnim(
+                crate::npc_c::NPC_SetAnim(ctx,
                     self_,
                     parts,
                     anim,
@@ -2569,7 +2569,7 @@ pub fn Jedi_CheckFlipEvasions(
                                     } else {
                                         SETANIM_LEGS
                                     };
-                                    crate::npc_c::NPC_SetAnim(
+                                    crate::npc_c::NPC_SetAnim(ctx,
                                         self_,
                                         parts2,
                                         anim,
@@ -2661,7 +2661,7 @@ pub fn Jedi_CheckFlipEvasions(
                             } else {
                                 SETANIM_LEGS
                             };
-                            crate::npc_c::NPC_SetAnim(
+                            crate::npc_c::NPC_SetAnim(ctx,
                                 self_,
                                 parts2,
                                 anim,
@@ -3290,7 +3290,7 @@ pub fn Jedi_SaberBlockGo(
                                     BOTH_BUTTERFLY_RIGHT as c_int
                                 };
                                 evasionType = evasionType_t::EVASION_CARTWHEEL;
-                                crate::npc_c::NPC_SetAnim(
+                                crate::npc_c::NPC_SetAnim(ctx,
                                     self_,
                                     SETANIM_BOTH,
                                     butterflyAnim,
@@ -3436,7 +3436,7 @@ pub fn Jedi_SaberBlockGo(
         if dodgeAnim != -1 {
             //dodged
             evasionType = evasionType_t::EVASION_DODGE;
-            crate::npc_c::NPC_SetAnim(
+            crate::npc_c::NPC_SetAnim(ctx,
                 self_,
                 SETANIM_BOTH,
                 dodgeAnim,
@@ -5205,7 +5205,7 @@ pub fn Jedi_TryJump(
                                         } else {
                                             jumpAnim = BOTH_FLIP_F as c_int;
                                         }
-                                        crate::npc_c::NPC_SetAnim(
+                                        crate::npc_c::NPC_SetAnim(ctx,
                                             npc,
                                             SETANIM_BOTH,
                                             jumpAnim,
@@ -5967,7 +5967,7 @@ pub fn NPC_Jedi_Pain(
             (*client).noclip = qfalse;
         }
         if (*client).ps.legsAnim == BOTH_CEILING_CLING as c_int {
-            crate::npc_c::NPC_SetAnim(
+            crate::npc_c::NPC_SetAnim(ctx,
                 self_,
                 SETANIM_LEGS,
                 BOTH_CEILING_DROP as c_int,
@@ -5975,7 +5975,7 @@ pub fn NPC_Jedi_Pain(
             );
         }
         if (*client).ps.torsoAnim == BOTH_CEILING_CLING as c_int {
-            crate::npc_c::NPC_SetAnim(
+            crate::npc_c::NPC_SetAnim(ctx,
                 self_,
                 SETANIM_TORSO,
                 BOTH_CEILING_DROP as c_int,
@@ -6140,7 +6140,7 @@ pub fn Jedi_Ambush(
         let world = ctx.world;
         let client = (*self_).client as *mut gclient_t;
         (*client).noclip = qfalse;
-        crate::npc_c::NPC_SetAnim(
+        crate::npc_c::NPC_SetAnim(ctx,
             self_,
             SETANIM_BOTH,
             BOTH_CEILING_DROP as c_int,
@@ -6194,7 +6194,7 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
         'finish: {
             if Jedi_WaitingAmbush(npc) != qfalse {
                 //hiding on the ceiling
-                crate::npc_c::NPC_SetAnim(
+                crate::npc_c::NPC_SetAnim(ctx,
                     npc,
                     SETANIM_BOTH,
                     BOTH_CEILING_CLING as c_int,

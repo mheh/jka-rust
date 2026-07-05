@@ -1003,11 +1003,11 @@ impl PmoveContext<'_> {
     }
 
     /// Raven `PmoveSingle` — one fixed-timestep move (`QAGAME` build: game-side
-    /// `#ifdef QAGAME` branches compiled, cgame `#else` branches dropped). Ported
-    /// faithfully except the game-tier vehicle-NPC virtual dispatch
-    /// (`m_pVehicleInfo->Update`/`Animate`/`UpdateRider`/`AttachRiders`), which has
-    /// no `GameCallbacks` channel yet and carries `//TODO: Port` deferrals — see
-    /// the vehicle-block markers below and the ESCALATION in the port report.
+    /// `#ifdef QAGAME` branches compiled, cgame `#else` branches dropped). The
+    /// game-tier vehicle-NPC virtual dispatch
+    /// (`m_pVehicleInfo->Update`/`Animate`/`UpdateRider`/`AttachRiders`) crosses
+    /// the seam via the `GameCallbacks` upcalls (`update_vehicle`/
+    /// `pm_animate_vehicle`/`update_rider`/`attach_riders`, by entity number).
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:10174-11157`
     pub fn PmoveSingle(&mut self, pmove: *mut pmove_t) {
         unsafe {
@@ -1666,13 +1666,12 @@ impl PmoveContext<'_> {
                 }
 
                 if (*ps).m_iVehicleNum == 0 {
-                    // no one is driving, just update and get out (QAGAME)
-                    //TODO: Port PmoveSingle vehicle-NPC Update/Animate dispatch
-                    // The `m_pVehicleInfo->Update`/`Animate` virtuals are game-tier
-                    // (take `GameContext`) and have no GameCallbacks channel yet;
-                    // route them via a new upcall following the `board_vehicle`
-                    // precedent (see ESCALATION in this file's port report).
+                    // no one is driving, just update and get out (QAGAME). The
+                    // `Update`/`Animate` virtuals are game-tier; bg reaches them via
+                    // the GameCallbacks upcalls (by entity number).
                     // Source: oracle/oracle/codemp/game/bg_pmove.c:10919-10922
+                    self.callbacks.update_vehicle((*veh).s.number, &(*self.pm).cmd);
+                    self.callbacks.pm_animate_vehicle((*veh).s.number);
                 } else {
                     let selfEnt = self.pm_entVeh;
 
@@ -1700,13 +1699,34 @@ impl PmoveContext<'_> {
                         );
                     }
 
-                    //TODO: Port PmoveSingle vehicle-NPC Update/Animate/UpdateRider dispatch
-                    // The `m_pVehicleInfo->Update`/`Animate`/`UpdateRider` virtuals and
-                    // the passenger `UpdateRider` loop are game-tier (take `GameContext`
-                    // and walk `gentity_t` passengers) with no GameCallbacks channel yet;
-                    // route them via a new upcall following the `board_vehicle`
-                    // precedent (see ESCALATION in this file's port report).
+                    // The `Update`/`Animate`/`UpdateRider` virtuals and the passenger
+                    // `UpdateRider` loop are game-tier; bg reaches them via the
+                    // GameCallbacks upcalls. The driver's cmd is the bg-reachable
+                    // `m_ucmd`; each passenger's `client->pers.cmd` is game-side, so a
+                    // null `ucmd` signals the impl to use the rider's own pers.cmd
+                    // (and to guard `inuse && client`).
                     // Source: oracle/oracle/codemp/game/bg_pmove.c:10944-10961
+                    self.callbacks
+                        .update_vehicle((*veh).s.number, &(*pVeh).m_ucmd);
+                    self.callbacks.pm_animate_vehicle((*veh).s.number);
+                    self.callbacks.update_rider(
+                        (*veh).s.number,
+                        (*selfEnt).s.number,
+                        &mut (*pVeh).m_ucmd,
+                    );
+                    // update the passengers
+                    let mut i: c_int = 0;
+                    while i < (*pVeh).m_iNumPassengers {
+                        if !(*pVeh).m_ppPassengers[i as usize].is_null() {
+                            let passNum = (*(*pVeh).m_ppPassengers[i as usize]).s.number;
+                            self.callbacks.update_rider(
+                                (*veh).s.number,
+                                passNum,
+                                core::ptr::null_mut(),
+                            );
+                        }
+                        i += 1;
+                    }
                 }
                 noAnimate = qtrue;
             }
@@ -1828,12 +1848,10 @@ impl PmoveContext<'_> {
                 // this could be kind of "inefficient" because it's called after every
                 // passenger pmove too.
                 if !(*veh).m_pVehicle.is_null() && !(*veh).ghoul2.is_null() {
-                    //TODO: Port PmoveSingle vehicle AttachRiders dispatch
-                    // `m_pVehicleInfo->AttachRiders` is a game-tier virtual (takes
-                    // `GameContext`) with no GameCallbacks channel yet; route it via a
-                    // new upcall following the `board_vehicle` precedent (see
-                    // ESCALATION in this file's port report).
+                    // `AttachRiders` is a game-tier virtual; bg reaches it via the
+                    // GameCallbacks upcall (by entity number).
                     // Source: oracle/oracle/codemp/game/bg_pmove.c:11146-11149
+                    self.callbacks.attach_riders((*veh).s.number);
                 }
             }
 
