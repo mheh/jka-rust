@@ -116,6 +116,32 @@ impl core::ops::IndexMut<usize> for BotInfos {
     }
 }
 
+/// `bot_state_t *botstates[MAX_CLIENTS]` — per-client bot AI state pointers
+/// (`ai_main.c` file-scope global). Newtype because a raw-pointer array has no
+/// library `Default` impl.
+/// Source: `oracle/oracle/codemp/game/ai_main.c:46`
+pub struct BotStates(pub [*mut crate::botai::bot_state_s::bot_state_t; mp_qshared::shared::MAX_CLIENTS]);
+
+impl Default for BotStates {
+    fn default() -> Self {
+        BotStates([core::ptr::null_mut(); mp_qshared::shared::MAX_CLIENTS])
+    }
+}
+
+// Transparent indexing (`globals.botstates[i]`) so call sites written against
+// a plain `bot_state_t *[MAX_CLIENTS]` need no change.
+impl core::ops::Index<usize> for BotStates {
+    type Output = *mut crate::botai::bot_state_s::bot_state_t;
+    fn index(&self, i: usize) -> &Self::Output {
+        &self.0[i]
+    }
+}
+impl core::ops::IndexMut<usize> for BotStates {
+    fn index_mut(&mut self, i: usize) -> &mut Self::Output {
+        &mut self.0[i]
+    }
+}
+
 /// `char *g_arenaInfos[MAX_ARENAS]` — arena info strings (`g_bot.c:13`). Newtype because
 /// a 1024-element array has no library `Default` impl (only arrays up to 32 elements do).
 /// Source: `oracle/oracle/codemp/game/g_bot.c:13`
@@ -620,9 +646,9 @@ pub struct GameGlobals {
     /// Source: `oracle/oracle/codemp/game/NPC_stats.c:238`
     pub NPCFile: NpcFileBuffer,
     // --- `ai_main.c` file-scope globals ---
-    //TODO: Port bot_state_t *[MAX_CLIENTS]*
-    // Source: oracle/oracle/codemp/game/ai_main.c:46
-    pub botstates: (),
+    /// `botstates` (`bot_state_t *[MAX_CLIENTS]`; null-init raw pointers).
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:46`
+    pub botstates: BotStates,
     /// `droppedBlueFlag` (`gentity_t *`; raw pointer, matches the
     /// raw-pointer entity signatures used throughout the pass-2 shards).
     /// Source: `oracle/oracle/codemp/game/ai_main.c:94`
