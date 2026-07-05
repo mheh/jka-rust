@@ -4005,9 +4005,12 @@ impl PmoveContext<'_> {
                                     == (*(*servEnt).client).sess.sessionTeam as c_int
                             {
                                 //not belonging to a team, or client is on same team
-                                if let Some(board) = (*(*veh).m_pVehicleInfo).Board {
-                                    board(veh, self.pm_entSelf);
-                                }
+                                // Fork-7: the vehicle `Board` body is game-tier;
+                                // bg reaches it via the GameCallbacks upcall (by
+                                // entity number), which dispatches through
+                                // `crate::veh_dispatch::board`.
+                                self.callbacks
+                                    .board_vehicle(trace.entityNum, (*self.pm_entSelf).s.number);
                             }
                         }
                     }

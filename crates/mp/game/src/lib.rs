@@ -116,6 +116,7 @@ pub mod g_weapon;
 pub mod game_cvars;
 pub mod game_globals;
 pub mod q_math;
+pub mod veh_dispatch;
 pub mod ent_id;
 pub mod q_shared;
 pub mod tri_coll_test;

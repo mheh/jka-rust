@@ -130,4 +130,14 @@ pub trait GameCallbacks {
     /// Raven `Q3_SetParm`-style ICARUS parameter set reachable from game logic.
     /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c` (`Q3_SetParm`)
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char);
+
+    /// Fork-7 vehicle boarding upcall. `bg_pmove`'s ground-check boards a
+    /// vehicle NPC by calling `pVeh->m_pVehicleInfo->Board(pVeh, pEnt)` — a
+    /// game-tier body. Under fork 7 that dispatches through
+    /// [`crate::veh_dispatch::board`], which is game-tier (takes `GameContext`),
+    /// so bg reaches it here by entity number rather than by calling the
+    /// game-tier dispatch directly.
+    /// Source: `oracle/oracle/codemp/game/bg_pmove.c` (`PM_GroundTrace` boarding);
+    /// dispatch target `oracle/oracle/codemp/game/g_vehicles.c:630` (`Board`).
+    fn board_vehicle(&mut self, vehEntNum: c_int, entNum: c_int) -> qboolean;
 }

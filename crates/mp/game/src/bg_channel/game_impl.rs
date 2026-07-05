@@ -381,4 +381,12 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
         todo!("Port GameCallbacks::q3_set_parm delegation — Q3_SetParm (g_ICARUScb.c)")
     }
+    fn board_vehicle(&mut self, vehEntNum: c_int, entNum: c_int) -> qboolean {
+        // Resolves `vehEntNum`->`m_pVehicle` and `entNum`->`bgEntity_t` against
+        // the world arena, builds a `GameContext`, and delegates to
+        // `crate::veh_dispatch::board`. Deferred like its sibling upcalls until
+        // the num->arena resolution helper lands (the pmove slice does not drive
+        // boarding). Source: `oracle/oracle/codemp/game/bg_pmove.c` (boarding).
+        todo!("Port GameCallbacks::board_vehicle delegation — crate::veh_dispatch::board (g_vehicles.c:630)")
+    }
 }
