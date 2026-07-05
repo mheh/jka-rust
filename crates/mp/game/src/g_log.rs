@@ -723,8 +723,9 @@ pub fn GetFavoriteWeaponForClient(
 
     // now look through our list of kills per weapon and pick the biggest
     // ----------------------------------------------------------------
+    // Oracle does not reset `fav` here (only `nMostKills`), so a client with zero
+    // recorded kills returns WP_NONE (0). g_log.c:1692.
     n_most_kills = 0;
-    fav = WP_STUN_BATON as c_int;
     weapon = WP_STUN_BATON as c_int;
     while weapon < WP_NUM_WEAPONS as c_int {
         if kills_with_weapon[weapon as usize] > n_most_kills {

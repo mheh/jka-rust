@@ -30,10 +30,10 @@ pub const LSTATE_CLEAR: i32 = 0;
 pub const LSTATE_WAITING: i32 = 1;
 
 // Combat distance constants for Howler melee attacks.
-// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:12-14`
-const MIN_DISTANCE: c_int = 64;
+// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:4,7`
+const MIN_DISTANCE: c_int = 54;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
-const MAX_DISTANCE: c_int = 256;
+const MAX_DISTANCE: c_int = 128;
 
 // Animation constants (bg_public.h) — Howler pain response anim.
 // Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:187`

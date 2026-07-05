@@ -40,8 +40,8 @@
 //! `ai-context`, matching `NPC_reactions.rs`/`NPC_utils.rs`).
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::g_nav::{G_DrawEdge, G_DrawNode, NAV_CheckAhead, NAV_TestBestNode, NAV_TestForBlocked};
+use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
 
@@ -100,8 +100,7 @@ pub fn NPC_ClearBlocked(self_: *mut gentity_t) {
 /// Raven `NPC_SetBlocked`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:43-51`
-pub fn NPC_SetBlocked(
-    ctx: GameContext<'_>,self_: *mut gentity_t, blocker: *mut gentity_t) {
+pub fn NPC_SetBlocked(ctx: GameContext<'_>, self_: *mut gentity_t, blocker: *mut gentity_t) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         if npc.is_null() {
@@ -109,7 +108,9 @@ pub fn NPC_SetBlocked(
         }
 
         //self->NPC->aiFlags |= NPCAI_BLOCKED;
-        (*npc).blockedSpeechDebounceTime = (*ctx.world).level.time + MIN_BLOCKED_SPEECH_TIME + (((*ctx.world).bg_state.rng.random() * 4000.0) as c_int);
+        (*npc).blockedSpeechDebounceTime = (*ctx.world).level.time
+            + MIN_BLOCKED_SPEECH_TIME
+            + (((*ctx.world).bg_state.rng.random() * 4000.0) as c_int);
         (*npc).blockingEntNum = (*blocker).s.number;
     }
 }
@@ -185,7 +186,9 @@ pub fn NAVNEW_PushBlocker(
         }
 
         let client = (*blocker).client as *mut gclient_t;
-        if !client.is_null() && VectorCompare((*client).pushVec, [0.0f32, 0.0, 0.0]) == QFALSE {
+        // Oracle: `!blocker->client || !VectorCompare(pushVec, vec3_origin)` — bail
+        // when the blocker has no client OR is already being pushed elsewhere.
+        if client.is_null() || VectorCompare((*client).pushVec, [0.0f32, 0.0, 0.0]) == QFALSE {
             //someone else is pushing him, wait until they give up?
             return;
         }
@@ -194,7 +197,7 @@ pub fn NAVNEW_PushBlocker(
         crate::q_math::_VectorCopy((*blocker).r.mins, &mut mins);
         mins[2] += STEPSIZE;
 
-        let moveamt = ((*self_).r.maxs[1] + (*blocker).r.maxs[1]) * 1.2;//yes, magic number
+        let moveamt = ((*self_).r.maxs[1] + (*blocker).r.maxs[1]) * 1.2; //yes, magic number
 
         let mut end = [0.0f32; 3];
         crate::q_math::_VectorMA((*blocker).r.currentOrigin, -moveamt, right, &mut end);
@@ -355,8 +358,12 @@ pub fn NAVNEW_SidestepBlocker(
         let yaw = crate::bg_misc::vectoyaw(blocked_dir);
 
         //Get the avoid radius
-        let avoid_radius_1 = ((*blocker).r.maxs[0] * (*blocker).r.maxs[0] + (*blocker).r.maxs[1] * (*blocker).r.maxs[1]).sqrt();
-        let avoid_radius_2 = ((*self_).r.maxs[0] * (*self_).r.maxs[0] + (*self_).r.maxs[1] * (*self_).r.maxs[1]).sqrt();
+        let avoid_radius_1 = ((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
+            + (*blocker).r.maxs[1] * (*blocker).r.maxs[1])
+            .sqrt();
+        let avoid_radius_2 = ((*self_).r.maxs[0] * (*self_).r.maxs[0]
+            + (*self_).r.maxs[1] * (*self_).r.maxs[1])
+            .sqrt();
         let avoidRadius = avoid_radius_1 + avoid_radius_2;
 
         //See if we're inside our avoidance radius
@@ -379,7 +386,12 @@ pub fn NAVNEW_SidestepBlocker(
             let mut avoidRight_dir = [0.0f32; 3];
             crate::q_math::AngleVectors(avoidAngles, Some(&mut *movedir), None, None);
             let mut block_pos = [0.0f32; 3];
-            crate::q_math::_VectorMA((*self_).r.currentOrigin, blocked_dist, *movedir, &mut block_pos);
+            crate::q_math::_VectorMA(
+                (*self_).r.currentOrigin,
+                blocked_dist,
+                *movedir,
+                &mut block_pos,
+            );
             let mut tr: trace_t = core::mem::zeroed();
             trap::Trace(
                 ctx.engine,
@@ -393,7 +405,11 @@ pub fn NAVNEW_SidestepBlocker(
                     (*self_).clipmask | CONTENTS_BOTCLIP,
                 ),
             );
-            return if tr.fraction == 1.0 && tr.allsolid == 0 && tr.startsolid == 0 { QTRUE } else { QFALSE };
+            return if tr.fraction == 1.0 && tr.allsolid == 0 && tr.startsolid == 0 {
+                QTRUE
+            } else {
+                QFALSE
+            };
         }
 
         //test right
@@ -402,7 +418,12 @@ pub fn NAVNEW_SidestepBlocker(
         crate::q_math::AngleVectors(avoidAngles, Some(&mut avoidRight_dir), None, None);
 
         let mut block_pos = [0.0f32; 3];
-        crate::q_math::_VectorMA((*self_).r.currentOrigin, blocked_dist, avoidRight_dir, &mut block_pos);
+        crate::q_math::_VectorMA(
+            (*self_).r.currentOrigin,
+            blocked_dist,
+            avoidRight_dir,
+            &mut block_pos,
+        );
 
         let mut tr: trace_t = core::mem::zeroed();
         trap::Trace(
@@ -418,7 +439,10 @@ pub fn NAVNEW_SidestepBlocker(
             ),
         );
 
-        if tr.allsolid == 0 && tr.startsolid == 0 {
+        // Oracle computes rightSucc then ALWAYS runs the left trace and computes
+        // leftSucc; the combined `rightSucc*dist>=avoidRadius || leftSucc*dist>=..`
+        // partial-success check must run for both sides, so keep this flat.
+        let rightSucc = if tr.allsolid == 0 && tr.startsolid == 0 {
             if tr.fraction >= 1.0f32 {
                 //all clear, go for it (favor the right if both are equal)
                 crate::q_math::_VectorCopy(avoidRight_dir, movedir);
@@ -426,90 +450,68 @@ pub fn NAVNEW_SidestepBlocker(
                 (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
                 return QTRUE;
             }
-            let rightSucc = tr.fraction;
-
-            //now test left
-            let adj_arcAngle = -arcAngle;
-            avoidAngles[1] = crate::q_math::AngleNormalize360(yaw + adj_arcAngle);
-            let mut avoidLeft_dir = [0.0f32; 3];
-            crate::q_math::AngleVectors(avoidAngles, Some(&mut avoidLeft_dir), None, None);
-
-            crate::q_math::_VectorMA((*self_).r.currentOrigin, blocked_dist, avoidLeft_dir, &mut block_pos);
-
-            trap::Trace(
-                ctx.engine,
-                GTraceArgs::new(
-                    &mut tr as *mut trace_t,
-                    &(*self_).r.currentOrigin as *const vec3_t,
-                    &mins as *const vec3_t,
-                    &(*self_).r.maxs as *const vec3_t,
-                    &block_pos as *const vec3_t,
-                    (*self_).s.number,
-                    (*self_).clipmask | CONTENTS_BOTCLIP,
-                ),
-            );
-
-            if tr.allsolid == 0 && tr.startsolid == 0 {
-                if tr.fraction >= 1.0f32 {
-                    //all clear, go for it (right side would have already succeeded if as good as this)
-                    crate::q_math::_VectorCopy(avoidLeft_dir, movedir);
-                    (*npc).lastSideStepSide = -1;
-                    (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
-                    return QTRUE;
-                }
-                let leftSucc = tr.fraction;
-
-                if rightSucc * blocked_dist >= avoidRadius || leftSucc * blocked_dist >= avoidRadius {
-                    //the traces hit something, but got a relatively good distance
-                    if rightSucc >= leftSucc {
-                        //favor the right, all things being equal
-                        crate::q_math::_VectorCopy(avoidRight_dir, movedir);
-                        (*npc).lastSideStepSide = 1;
-                        (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
-                    } else {
-                        crate::q_math::_VectorCopy(avoidLeft_dir, movedir);
-                        (*npc).lastSideStepSide = -1;
-                        (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
-                    }
-                    return QTRUE;
-                }
-
-                //if neither are enough, we probably can't get around him
-                return QFALSE;
-            } else {
-                return QFALSE;
-            }
+            tr.fraction
         } else {
-            //test left
-            let mut arcAngle_neg = -arcAngle;
-            avoidAngles[crate::q_math::YAW] = crate::q_math::AngleNormalize360(yaw + arcAngle_neg);
-            let mut avoidLeft_dir = [0.0f32; 3];
-            crate::q_math::AngleVectors(avoidAngles, Some(&mut avoidLeft_dir), None, None);
+            0.0f32
+        };
 
-            crate::q_math::_VectorMA((*self_).r.currentOrigin, blocked_dist, avoidLeft_dir, &mut block_pos);
+        //now test left
+        let arcAngle = -arcAngle;
+        avoidAngles[crate::q_math::YAW] = crate::q_math::AngleNormalize360(yaw + arcAngle);
+        let mut avoidLeft_dir = [0.0f32; 3];
+        crate::q_math::AngleVectors(avoidAngles, Some(&mut avoidLeft_dir), None, None);
 
-            trap::Trace(
-                ctx.engine,
-                GTraceArgs::new(
-                    &mut tr as *mut trace_t,
-                    &(*self_).r.currentOrigin as *const vec3_t,
-                    &mins as *const vec3_t,
-                    &(*self_).r.maxs as *const vec3_t,
-                    &block_pos as *const vec3_t,
-                    (*self_).s.number,
-                    (*self_).clipmask | CONTENTS_BOTCLIP,
-                ),
-            );
+        crate::q_math::_VectorMA(
+            (*self_).r.currentOrigin,
+            blocked_dist,
+            avoidLeft_dir,
+            &mut block_pos,
+        );
 
-            if tr.allsolid == 0 && tr.startsolid == 0 {
-                if tr.fraction >= 1.0f32 {
-                    //all clear, go for it (right side would have already succeeded if as good as this)
-                    crate::q_math::_VectorCopy(avoidLeft_dir, movedir);
-                    (*npc).lastSideStepSide = -1;
-                    (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
-                    return QTRUE;
-                }
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &(*self_).r.currentOrigin as *const vec3_t,
+                &mins as *const vec3_t,
+                &(*self_).r.maxs as *const vec3_t,
+                &block_pos as *const vec3_t,
+                (*self_).s.number,
+                (*self_).clipmask | CONTENTS_BOTCLIP,
+            ),
+        );
+
+        let leftSucc = if tr.allsolid == 0 && tr.startsolid == 0 {
+            if tr.fraction >= 1.0f32 {
+                //all clear, go for it (right side would have already succeeded if as good as this)
+                crate::q_math::_VectorCopy(avoidLeft_dir, movedir);
+                (*npc).lastSideStepSide = -1;
+                (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
+                return QTRUE;
             }
+            tr.fraction
+        } else {
+            0.0f32
+        };
+
+        if leftSucc == 0.0f32 && rightSucc == 0.0f32 {
+            //both sides failed
+            return QFALSE;
+        }
+
+        if rightSucc * blocked_dist >= avoidRadius || leftSucc * blocked_dist >= avoidRadius {
+            //the traces hit something, but got a relatively good distance
+            if rightSucc >= leftSucc {
+                //favor the right, all things being equal
+                crate::q_math::_VectorCopy(avoidRight_dir, movedir);
+                (*npc).lastSideStepSide = 1;
+                (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
+            } else {
+                crate::q_math::_VectorCopy(avoidLeft_dir, movedir);
+                (*npc).lastSideStepSide = -1;
+                (*npc).sideStepHoldTime = (*ctx.world).level.time + 2000;
+            }
+            return QTRUE;
         }
 
         //if neither are enough, we probably can't get around him
@@ -532,7 +534,11 @@ pub fn NAVNEW_Bypass(
     unsafe {
         //Draw debug info if requested
         if (*ctx.world).globals.NAVDEBUG_showCollision != 0 {
-            G_DrawEdge((*self_).r.currentOrigin, (*blocker).r.currentOrigin, EDGE_NORMAL);
+            G_DrawEdge(
+                (*self_).r.currentOrigin,
+                (*blocker).r.currentOrigin,
+                EDGE_NORMAL,
+            );
         }
 
         let mut moveangles = [0.0f32; 3];
@@ -549,7 +555,16 @@ pub fn NAVNEW_Bypass(
 
         //Okay, so he's not moving to my side, see which side of him is most clear
         let mut movedir_out = movedir;
-        if NAVNEW_SidestepBlocker(ctx, self_, blocker, blocked_dir, blocked_dist, &mut movedir_out, right) != QFALSE {
+        if NAVNEW_SidestepBlocker(
+            ctx,
+            self_,
+            blocker,
+            blocked_dir,
+            blocked_dist,
+            &mut movedir_out,
+            right,
+        ) != QFALSE
+        {
             return QTRUE;
         }
 
@@ -595,13 +610,19 @@ pub fn NAVNEW_ResolveEntityCollision(
         if crate::q_shared::Q_stricmp((*blocker).classname, cstr("func_door").as_ptr()) == 0 {
             let mut center = [0.0f32; 3];
             CalcTeamDoorCenter(ctx, blocker, &mut center);
-            if crate::q_math::DistanceSquared((*self_).r.currentOrigin, center) > MIN_DOOR_BLOCK_DIST_SQR as f32 {
+            if crate::q_math::DistanceSquared((*self_).r.currentOrigin, center)
+                > MIN_DOOR_BLOCK_DIST_SQR as f32
+            {
                 return QTRUE;
             }
         }
 
         let mut blocked_dir = [0.0f32; 3];
-        crate::q_math::_VectorSubtract((*blocker).r.currentOrigin, (*self_).r.currentOrigin, &mut blocked_dir);
+        crate::q_math::_VectorSubtract(
+            (*blocker).r.currentOrigin,
+            (*self_).r.currentOrigin,
+            &mut blocked_dir,
+        );
         let blocked_dist = crate::q_math::VectorNormalize(&mut blocked_dir);
 
         //Make sure an actual collision is going to happen
@@ -609,7 +630,16 @@ pub fn NAVNEW_ResolveEntityCollision(
         //		return qtrue;
 
         //First, attempt to walk around the blocker or shove him out of the way
-        if NAVNEW_Bypass(ctx, self_, blocker, blocked_dir, blocked_dist, movedir, setBlockedInfo) != QFALSE {
+        if NAVNEW_Bypass(
+            ctx,
+            self_,
+            blocker,
+            blocked_dir,
+            blocked_dist,
+            movedir,
+            setBlockedInfo,
+        ) != QFALSE
+        {
             return QTRUE;
         }
 
@@ -647,13 +677,26 @@ pub fn NAVNEW_AvoidCollision(
         //Get an end position
         let mut movedir = [0.0f32; 3];
         let mut movepos = [0.0f32; 3];
-        crate::q_math::_VectorMA((*self_).r.currentOrigin, (*info).distance, (*info).direction, &mut movepos);
+        crate::q_math::_VectorMA(
+            (*self_).r.currentOrigin,
+            (*info).distance,
+            (*info).direction,
+            &mut movepos,
+        );
         crate::q_math::_VectorCopy((*info).direction, &mut movedir);
 
         //Now test against entities
-        if NAV_CheckAhead(ctx, self_, movepos, &mut (*info).trace as *mut trace_t, CONTENTS_BODY) == QFALSE {
+        if NAV_CheckAhead(
+            ctx,
+            self_,
+            movepos,
+            &mut (*info).trace as *mut trace_t,
+            CONTENTS_BODY,
+        ) == QFALSE
+        {
             //Get the blocker
-            (*info).blocker = &mut (*ctx.world).g_entities[(*info).trace.entityNum as usize] as *mut gentity_t;
+            (*info).blocker =
+                &mut (*ctx.world).g_entities[(*info).trace.entityNum as usize] as *mut gentity_t;
             (*info).flags |= NIF_COLLISION;
 
             //Ok to hit our goal entity
@@ -677,7 +720,15 @@ pub fn NAVNEW_AvoidCollision(
             //	return qtrue;
 
             //Test for blocking by standing on goal
-            if NAV_TestForBlocked(ctx, self_, goal, (*info).blocker, (*info).distance, &mut (*info).flags as *mut c_int) == QTRUE {
+            if NAV_TestForBlocked(
+                ctx,
+                self_,
+                goal,
+                (*info).blocker,
+                (*info).distance,
+                &mut (*info).flags as *mut c_int,
+            ) == QTRUE
+            {
                 return QFALSE;
             }
 
@@ -688,7 +739,15 @@ pub fn NAVNEW_AvoidCollision(
             */
 
             //See if we can get that entity to move out of our way
-            if NAVNEW_ResolveEntityCollision(ctx, self_, (*info).blocker, movedir, (*info).pathDirection, setBlockedInfo) == QFALSE {
+            if NAVNEW_ResolveEntityCollision(
+                ctx,
+                self_,
+                (*info).blocker,
+                movedir,
+                (*info).pathDirection,
+                setBlockedInfo,
+            ) == QFALSE
+            {
                 return QFALSE;
             }
 
@@ -808,7 +867,10 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
 ///
 /// Source: `oracle/oracle/codemp/game/g_navnew.c:578-865`
 pub fn NAVNEW_MoveToGoal(
-    ctx: GameContext<'_>, self_: *mut gentity_t, info: *mut navInfo_t) -> c_int {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    info: *mut navInfo_t,
+) -> c_int {
     unsafe {
         let mut bestNode = WAYPOINT_NONE;
         let mut foundClearPath = QFALSE;
@@ -820,7 +882,11 @@ pub fn NAVNEW_MoveToGoal(
         let mut goalWPFailed = QFALSE;
         let mut numTries = 0;
 
-        core::ptr::copy_nonoverlapping(info as *const navInfo_t, &mut tempInfo as *mut navInfo_t, 1);
+        core::ptr::copy_nonoverlapping(
+            info as *const navInfo_t,
+            &mut tempInfo as *mut navInfo_t,
+            1,
+        );
 
         //Must have a goal entity to move there
         if (*((*self_).NPC as *mut gNPC_t)).goalEntity.is_none() {
@@ -843,18 +909,28 @@ pub fn NAVNEW_MoveToGoal(
             core::ptr::null_mut()
         };
 
-        if !goal_ent_ptr.is_null() && (*goal_ent_ptr).waypoint == WAYPOINT_NONE && (*goal_ent_ptr).noWaypointTime > (*ctx.world).level.time {
+        if !goal_ent_ptr.is_null()
+            && (*goal_ent_ptr).waypoint == WAYPOINT_NONE
+            && (*goal_ent_ptr).noWaypointTime > (*ctx.world).level.time
+        {
             //didn't have a valid one in about the past second, don't look again just yet
             return WAYPOINT_NONE;
         }
 
-        if (*self_).noWaypointTime > (*ctx.world).level.time && !goal_ent_ptr.is_null() && (*goal_ent_ptr).noWaypointTime > (*ctx.world).level.time {
+        if (*self_).noWaypointTime > (*ctx.world).level.time
+            && !goal_ent_ptr.is_null()
+            && (*goal_ent_ptr).noWaypointTime > (*ctx.world).level.time
+        {
             //just use current waypoints
             bestNode = trap::Nav_GetBestNodeAltRoute2(
                 ctx.engine,
                 mp_abi::game::syscalls::G_NAV_GETBESTNODEALT2::GNavGetbestnodealt2Args::new(
                     (*self_).waypoint,
-                    if !goal_ent_ptr.is_null() { (*goal_ent_ptr).waypoint } else { NODE_NONE },
+                    if !goal_ent_ptr.is_null() {
+                        (*goal_ent_ptr).waypoint
+                    } else {
+                        NODE_NONE
+                    },
                     bestNode,
                 ),
             );
@@ -870,16 +946,19 @@ pub fn NAVNEW_MoveToGoal(
             //one of us didn't have a valid waypoint!
             if (*self_).waypoint == NODE_NONE {
                 //don't even try to find one again for a bit
-                (*self_).noWaypointTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
+                (*self_).noWaypointTime =
+                    (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
             }
             if !goal_ent_ptr.is_null() && (*goal_ent_ptr).waypoint == NODE_NONE {
                 //don't even try to find one again for a bit
-                (*goal_ent_ptr).noWaypointTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
+                (*goal_ent_ptr).noWaypointTime =
+                    (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
             }
             return WAYPOINT_NONE;
         } else {
             if !goal_ent_ptr.is_null() && (*goal_ent_ptr).noWaypointTime < (*ctx.world).level.time {
-                (*goal_ent_ptr).noWaypointTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
+                (*goal_ent_ptr).noWaypointTime =
+                    (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
             }
         }
 
@@ -893,7 +972,10 @@ pub fn NAVNEW_MoveToGoal(
 
             trap::Nav_GetNodePosition(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(bestNode, &mut origin as *mut vec3_t),
+                mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                    bestNode,
+                    &mut origin as *mut vec3_t,
+                ),
             );
 
             if inGoalWP == QFALSE {
@@ -920,14 +1002,23 @@ pub fn NAVNEW_MoveToGoal(
                 }
             }
 
-            core::ptr::copy_nonoverlapping(info as *const navInfo_t, &mut tempInfo as *mut navInfo_t, 1);
-            crate::q_math::_VectorSubtract(origin, (*self_).r.currentOrigin, &mut tempInfo.direction);
+            core::ptr::copy_nonoverlapping(
+                info as *const navInfo_t,
+                &mut tempInfo as *mut navInfo_t,
+                1,
+            );
+            crate::q_math::_VectorSubtract(
+                origin,
+                (*self_).r.currentOrigin,
+                &mut tempInfo.direction,
+            );
             crate::q_math::VectorNormalize(&mut tempInfo.direction);
 
             //NOTE: One very important thing NAVNEW_AvoidCollision does is
             //		it actually CHANGES the value of "direction" - it changes it to
             //		whatever dir you need to go in to avoid the obstacle...
-            foundClearPath = NAVNEW_AvoidCollision(ctx, self_, goal_ent_ptr, &mut tempInfo, setBlockedInfo, 5);
+            foundClearPath =
+                NAVNEW_AvoidCollision(ctx, self_, goal_ent_ptr, &mut tempInfo, setBlockedInfo, 5);
 
             if foundClearPath == QFALSE {
                 //blocked by an ent
@@ -935,9 +1026,19 @@ pub fn NAVNEW_MoveToGoal(
                     //we were heading straight for the goal, head for the goal's wp instead
                     trap::Nav_GetNodePosition(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(bestNode, &mut origin as *mut vec3_t),
+                        mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                            bestNode,
+                            &mut origin as *mut vec3_t,
+                        ),
                     );
-                    foundClearPath = NAVNEW_AvoidCollision(ctx, self_, goal_ent_ptr, &mut tempInfo, setBlockedInfo, 5);
+                    foundClearPath = NAVNEW_AvoidCollision(
+                        ctx,
+                        self_,
+                        goal_ent_ptr,
+                        &mut tempInfo,
+                        setBlockedInfo,
+                        5,
+                    );
                 }
             }
 
@@ -946,12 +1047,19 @@ pub fn NAVNEW_MoveToGoal(
                 //If we got set to blocked, clear it
                 NPC_ClearBlocked(self_);
                 //Take the dir
-                core::ptr::copy_nonoverlapping(&tempInfo as *const navInfo_t, info as *mut navInfo_t, 1);
+                core::ptr::copy_nonoverlapping(
+                    &tempInfo as *const navInfo_t,
+                    info as *mut navInfo_t,
+                    1,
+                );
                 if (*self_).s.weapon == WP_SABER {
                     //jedi
                     if (*info).direction[2] * (*info).distance > 64.0 {
                         (*((*self_).NPC as *mut gNPC_t)).aiFlags |= NPCAI_BLOCKED;
-                        crate::q_math::_VectorCopy(origin, &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest);
+                        crate::q_math::_VectorCopy(
+                            origin,
+                            &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest,
+                        );
                         return WAYPOINT_NONE;
                     }
                 }
@@ -961,7 +1069,10 @@ pub fn NAVNEW_MoveToGoal(
                     (*((*self_).NPC as *mut gNPC_t)).aiFlags |= NPCAI_BLOCKED;
                     trap::Nav_GetNodePosition(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(bestNode, &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest as *mut vec3_t),
+                        mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                            bestNode,
+                            &mut (*((*self_).NPC as *mut gNPC_t)).blockedDest as *mut vec3_t,
+                        ),
                     );
                 }
                 //Only set blocked info first time
@@ -969,10 +1080,22 @@ pub fn NAVNEW_MoveToGoal(
 
                 if inGoalWP != QFALSE {
                     //we headed for our goal and failed and our goal's WP and failed
-                    if (*self_).waypoint == (if !goal_ent_ptr.is_null() { (*goal_ent_ptr).waypoint } else { NODE_NONE }) {
+                    if (*self_).waypoint
+                        == (if !goal_ent_ptr.is_null() {
+                            (*goal_ent_ptr).waypoint
+                        } else {
+                            NODE_NONE
+                        })
+                    {
                         //our waypoint is our goal's waypoint, nothing we can do
                         //remember that this node is blocked
-                        trap::Nav_AddFailedNode(ctx.engine, mp_abi::game::syscalls::G_NAV_ADDFAILEDNODE::GNavAddfailednodeArgs::new(self_, (*self_).waypoint));
+                        trap::Nav_AddFailedNode(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_NAV_ADDFAILEDNODE::GNavAddfailednodeArgs::new(
+                                self_,
+                                (*self_).waypoint,
+                            ),
+                        );
                         return WAYPOINT_NONE;
                     } else {
                         //try going for our waypoint this time
@@ -1008,7 +1131,13 @@ pub fn NAVNEW_MoveToGoal(
                     //we headed for *our* waypoint and couldn't get to it
                     if (*ctx.world).cvars.d_altRoutes.integer != 0 {
                         //remember that this node is blocked
-                        trap::Nav_AddFailedNode(ctx.engine, mp_abi::game::syscalls::G_NAV_ADDFAILEDNODE::GNavAddfailednodeArgs::new(self_, (*self_).waypoint));
+                        trap::Nav_AddFailedNode(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_NAV_ADDFAILEDNODE::GNavAddfailednodeArgs::new(
+                                self_,
+                                (*self_).waypoint,
+                            ),
+                        );
                         //Now we should get our waypoints again
                         //FIXME: cache the trace-data for subsequent calls as only the route info would have changed
                         return WAYPOINT_NONE;
@@ -1037,13 +1166,20 @@ pub fn NAVNEW_MoveToGoal(
             trap::Nav_GetNodePosition(
                 ctx.engine,
                 mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
-                    if !goal_ent_ptr.is_null() { (*goal_ent_ptr).waypoint } else { NODE_NONE },
+                    if !goal_ent_ptr.is_null() {
+                        (*goal_ent_ptr).waypoint
+                    } else {
+                        NODE_NONE
+                    },
                     &mut dest as *mut vec3_t,
                 ),
             );
             trap::Nav_GetNodePosition(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(bestNode, &mut start as *mut vec3_t),
+                mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                    bestNode,
+                    &mut start as *mut vec3_t,
+                ),
             );
 
             //Draw the route
@@ -1052,7 +1188,10 @@ pub fn NAVNEW_MoveToGoal(
                 let mut wpPos = [0.0f32; 3];
                 trap::Nav_GetNodePosition(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new((*self_).waypoint, &mut wpPos as *mut vec3_t),
+                    mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs::new(
+                        (*self_).waypoint,
+                        &mut wpPos as *mut vec3_t,
+                    ),
                 );
                 G_DrawNode(wpPos, NODE_NAVGOAL);
             }
@@ -1063,7 +1202,14 @@ pub fn NAVNEW_MoveToGoal(
             }
             trap::Nav_ShowPath(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_SHOWPATH::GNavShowpathArgs::new(bestNode, if !goal_ent_ptr.is_null() { (*goal_ent_ptr).waypoint } else { NODE_NONE }),
+                mp_abi::game::syscalls::G_NAV_SHOWPATH::GNavShowpathArgs::new(
+                    bestNode,
+                    if !goal_ent_ptr.is_null() {
+                        (*goal_ent_ptr).waypoint
+                    } else {
+                        NODE_NONE
+                    },
+                ),
             );
         }
 
@@ -1071,7 +1217,8 @@ pub fn NAVNEW_MoveToGoal(
 
         //let me keep this waypoint for a while
         if (*self_).noWaypointTime < (*ctx.world).level.time {
-            (*self_).noWaypointTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
+            (*self_).noWaypointTime =
+                (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1500);
         }
         bestNode
     }

@@ -19,11 +19,12 @@ pub fn NPC_LostEnemyDecideChase(ctx: GameContext<'_>) {
 
     match npc_info.behaviorState {
         BS_HUNT_AND_KILL => {
-            if npc.enemy.is_some() && npc.lastWaypoint != WAYPOINT_NONE {
-                if let Some(enemy_id) = npc.enemy {
+            // Oracle: `NPC->enemy == NPCInfo->goalEntity && NPC->enemy->lastWaypoint != WAYPOINT_NONE`.
+            if let Some(enemy_id) = npc.enemy {
+                if npc.enemy == npc_info.goalEntity {
                     let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
-                    if unsafe { &*enemy }.lastWaypoint != WAYPOINT_NONE {
-                        NPC_BSSearchStart(ctx, unsafe { &*enemy }.lastWaypoint, BS_SEARCH);
+                    if enemy.lastWaypoint != WAYPOINT_NONE {
+                        NPC_BSSearchStart(ctx, enemy.lastWaypoint, BS_SEARCH);
                     }
                 }
             }
@@ -55,6 +56,7 @@ pub fn NPC_StandTrackAndShoot(
 
     let mut attack_ok = false;
     let mut duck_ok = false;
+    let mut faced = false;
     let mut attack_scale = 1.0;
 
     if canDuck != 0 {
@@ -67,6 +69,7 @@ pub fn NPC_StandTrackAndShoot(
 
     if !duck_ok {
         attack_ok = NPC_CheckCanAttack(ctx, attack_scale, qtrue) != 0;
+        faced = true;
     }
 
     if canDuck != 0 && (duck_ok || (!attack_ok && client.ps.weaponTime <= 0)) && (*world).globals.ucmd.upmove != -127 {
@@ -92,7 +95,7 @@ pub fn NPC_StandTrackAndShoot(
         }
     }
 
-    false as qboolean
+    faced as qboolean
 }
 
 /// Raven `NPC_BSIdle`.

@@ -2027,7 +2027,7 @@ impl PmoveContext<'_> {
     pub fn BG_StartLegsAnim(&mut self, ps: *mut playerState_t, anim: c_int) {
         unsafe {
             if (*ps).pm_type >= PM_DEAD as c_int {
-                debug_assert!(!BG_InDeathAnim(anim) != 0);
+                debug_assert!(BG_InDeathAnim(anim) == 0);
                 if (*ps).clientNum < MAX_CLIENTS as c_int || anim != BOTH_VT_DEATH1 as c_int {
                     return;
                 }
@@ -2101,7 +2101,7 @@ impl PmoveContext<'_> {
     pub fn BG_StartTorsoAnim(&mut self, ps: *mut playerState_t, anim: c_int) {
         unsafe {
             if (*ps).pm_type >= PM_DEAD as c_int {
-                debug_assert!(!BG_InDeathAnim(anim) != 0);
+                debug_assert!(BG_InDeathAnim(anim) == 0);
                 return;
             }
 
@@ -2297,12 +2297,15 @@ pub fn BG_SetAnimFinal(
                     let frame = &*animations.offset(anim as isize);
                     if setAnimFlags & SETANIM_FLAG_HOLDLESS != 0 {
                         // Make sure to only wait in full 1/20 sec server frame intervals.
-                        let dur0 =
-                            (frame.numFrames - 1) as f32 * (frame.frameLerp as f32).abs();
-                        let speedDif = dur0 - (dur0 * editAnimSpeed);
+                        // Oracle: `int dur; int speedDif;` — both truncate to int
+                        // before the add (bg_panimate.c:2839-2844).
+                        let dur0 = ((frame.numFrames - 1) as f32
+                            * (frame.frameLerp as f32).abs())
+                            as c_int;
+                        let speedDif = (dur0 as f32 - (dur0 as f32 * editAnimSpeed)) as c_int;
                         let dur = dur0 + speedDif;
-                        if dur > 1.0 {
-                            (*ps).torsoTimer = (dur - 1.0) as c_int;
+                        if dur > 1 {
+                            (*ps).torsoTimer = dur - 1;
                         } else {
                             (*ps).torsoTimer = (frame.frameLerp as f32).abs() as c_int;
                         }
@@ -2338,12 +2341,15 @@ pub fn BG_SetAnimFinal(
                     let frame = &*animations.offset(anim as isize);
                     if setAnimFlags & SETANIM_FLAG_HOLDLESS != 0 {
                         // Make sure to only wait in full 1/20 sec server frame intervals.
-                        let dur0 =
-                            (frame.numFrames - 1) as f32 * (frame.frameLerp as f32).abs();
-                        let speedDif = dur0 - (dur0 * editAnimSpeed);
+                        // Oracle: `int dur; int speedDif;` — both truncate to int
+                        // before the add (bg_panimate.c:2887-2892).
+                        let dur0 = ((frame.numFrames - 1) as f32
+                            * (frame.frameLerp as f32).abs())
+                            as c_int;
+                        let speedDif = (dur0 as f32 - (dur0 as f32 * editAnimSpeed)) as c_int;
                         let dur = dur0 + speedDif;
-                        if dur > 1.0 {
-                            (*ps).legsTimer = (dur - 1.0) as c_int;
+                        if dur > 1 {
+                            (*ps).legsTimer = dur - 1;
                         } else {
                             (*ps).legsTimer = (frame.frameLerp as f32).abs() as c_int;
                         }

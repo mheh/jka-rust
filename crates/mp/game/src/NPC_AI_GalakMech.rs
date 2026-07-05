@@ -55,9 +55,9 @@ const SCF_FIRE_WEAPON: i32 = 0x00001000;
 // `g_mover.rs`.
 const FRAMETIME: c_int = 100;
 
-// Raven file-static `navInfo_t::flags` bit `NIF_COLLISION`.
+// Raven file-static `navInfo_t::flags` bit `NIF_COLLISION` (b_local.h:305 = 0x4).
 // Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c` (used throughout)
-const NIF_COLLISION: i32 = 0x00000008;
+const NIF_COLLISION: i32 = 0x00000004;
 
 // Raven file-static `vec3_t impactPos4` — shared across GM_CheckFireState,
 // NPC_BSGM_Attack, and others for caching impact positions.
@@ -1130,8 +1130,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 && ((*ctx.world).bg_state.rng.Q_irand(0, 10 * (2 - (*ctx.world).cvars.g_spskill.integer)) == 0
                     && (*ctx.world).globals.enemyDist4 > MIN_LOB_DIST_SQUARED
                     && (*ctx.world).globals.enemyDist4 < MAX_LOB_DIST_SQUARED
-                    || !crate::g_timer::TIMER_Done(ctx, npc_ent, c"noLob".as_ptr()) != 0
-                        && !crate::g_timer::TIMER_Done(ctx, npc_ent, c"noRapid".as_ptr()) != 0)
+                    || crate::g_timer::TIMER_Done(ctx, npc_ent, c"noLob".as_ptr()) == 0
+                        && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noRapid".as_ptr()) == 0)
                 && (*enemy_ent).s.weapon != WP_TURRET as c_int
             {
                 // sometimes use the laser beam attack, but only after he's taken down our generator
@@ -1327,7 +1327,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 1500.0,
                 qtrue,
             );
-            if VectorCompare(vec3_origin, velocity) != 0 || (!clearshot != 0 && (*ctx.world).globals.enemyLOS4 != 0 && (*ctx.world).globals.enemyCS4 != 0) {
+            if VectorCompare(vec3_origin, velocity) != 0 || (clearshot == 0 && (*ctx.world).globals.enemyLOS4 != 0 && (*ctx.world).globals.enemyCS4 != 0) {
                 // no clear lob shot and no lob shot that will hit something breakable
                 if (*ctx.world).globals.enemyLOS4 != 0
                     && (*ctx.world).globals.enemyCS4 != 0
@@ -1357,7 +1357,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
         }
 
-        if !crate::g_timer::TIMER_Done(ctx, npc_ent, c"standTime".as_ptr()) != 0 {
+        if crate::g_timer::TIMER_Done(ctx, npc_ent, c"standTime".as_ptr()) == 0 {
             (*ctx.world).globals.move4 = qfalse;
         }
         if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) == 0 {
@@ -1377,7 +1377,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             }
         }
 
-        if !crate::g_timer::TIMER_Done(ctx, npc_ent, c"flee".as_ptr()) != 0 {
+        if crate::g_timer::TIMER_Done(ctx, npc_ent, c"flee".as_ptr()) == 0 {
             // running away
             (*ctx.world).globals.faceEnemy4 = qfalse;
         }

@@ -191,7 +191,7 @@ pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
                             // Adjust pitch aim.
                             _VectorSubtract(hitspot, muzzle, &mut delta);
                             vectoangles(delta, &mut angleToEnemy);
-                            (*NPCInfo).desiredPitch = angleToEnemy[2];
+                            (*NPCInfo).desiredPitch = angleToEnemy[0]; // PITCH
                             NPC_UpdateShootAngles(ctx, angleToEnemy, QTRUE, QFALSE);
 
                             if dead_on == QFALSE {

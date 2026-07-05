@@ -14,14 +14,15 @@ use crate::prelude::*;
 use mp_qshared::shared::surface_flags::{MASK_SHOT, CONTENTS_LIGHTSABER};
 
 /// Sentry hover height constants.
-const SENTRY_HOVER_HEIGHT: f32 = 50.0f32;
-const SENTRY_VELOCITY_DECAY: f32 = 0.6f32;
-const SENTRY_STRAFE_DIS: f32 = 150.0f32;
-const SENTRY_STRAFE_VEL: f32 = 300.0f32;
-const SENTRY_UPWARD_PUSH: f32 = 25.0f32;
-const SENTRY_FORWARD_BASE_SPEED: f32 = 150.0f32;
-const SENTRY_FORWARD_MULTIPLIER: f32 = 25.0f32;
-const MIN_DISTANCE_SQR: f32 = 10000.0f32;
+const SENTRY_HOVER_HEIGHT: f32 = 24.0f32;
+const SENTRY_VELOCITY_DECAY: f32 = 0.85f32;
+const SENTRY_STRAFE_DIS: f32 = 200.0f32;
+const SENTRY_STRAFE_VEL: f32 = 256.0f32;
+const SENTRY_UPWARD_PUSH: f32 = 32.0f32;
+const SENTRY_FORWARD_BASE_SPEED: f32 = 10.0f32;
+const SENTRY_FORWARD_MULTIPLIER: f32 = 5.0f32;
+// MIN_DISTANCE 256; MIN_DISTANCE_SQR = 256*256.
+const MIN_DISTANCE_SQR: f32 = 65536.0f32;
 
 /// Sentry `localState` enum (anonymous enum local to this TU).
 ///

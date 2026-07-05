@@ -1857,8 +1857,8 @@ pub fn SiegeItemThink(
                     && (*((*carrier).client as *mut gclient_t)).sess.sessionTeam != SIEGETEAM_TEAM2)
                 || ((*((*carrier).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW != 0)
             {
-                // respawn on the original spot
-                SiegeItemRespawnOnOriginalSpot(ctx, ent, carrier);
+                // respawn on the original spot; oracle passes NULL here (g_saga.c:1435)
+                SiegeItemRespawnOnOriginalSpot(ctx, ent, core::ptr::null_mut());
             } else if (*carrier).health < 1 {
                 // The carrier died so pop out where he is (unless in nodrop).
                 if !(*ent).target6.is_null() && *(*ent).target6 != 0 {

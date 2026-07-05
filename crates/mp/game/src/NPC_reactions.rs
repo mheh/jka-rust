@@ -57,7 +57,7 @@ pub fn NPC_CheckAttacker(
     r#mod: c_int,
 ) {
     unsafe {
-        const FL_NOTARGET: c_int = 0x00000100;
+        const FL_NOTARGET: c_int = 0x00000020;
         const WP_SABER: c_int = 1;
         const MOD_SABER: c_int = 16;
 
@@ -125,8 +125,9 @@ pub fn NPC_CheckAttacker(
                 _ => 0.0f32,  // Hardest difficulty
             };
 
-            // Randomly pick up the target
-            if ((*ctx.world).bg_state.rng.random() as f32 / 32768.0f32) > luck_threshold {
+            // Randomly pick up the target. Raven `random()` is already in [0,1);
+            // `Rng::random` matches it, so no extra /32768 normalization.
+            if (*ctx.world).bg_state.rng.random() > luck_threshold {
                 G_ClearEnemy(ctx, other);
                 (*other).enemy = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), npc));
             }
@@ -285,8 +286,9 @@ pub fn NPC_ChoosePainAnimation(
             }
         }
 
-        // See if we're going to flinch
-        if ((*ctx.world).bg_state.rng.random() as f32 / 32768.0f32) < pain_chance {
+        // See if we're going to flinch. Raven `random()` is already in [0,1);
+        // `Rng::random` matches it, so no extra /32768 normalization.
+        if (*ctx.world).bg_state.rng.random() < pain_chance {
             let mut pain_anim = -1;
 
             // Pick and play our animation
@@ -336,8 +338,17 @@ pub fn NPC_ChoosePainAnimation(
                     NPC_SetPainEvent(ctx, self_);
                 }
             } else {
-                // Being force-gripped
-                crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, (*ctx.world).bg_state.rng.Q_irand(335, 337), 0);
+                // Being force-gripped. Oracle: `Q_irand(EV_CHOKE1, EV_CHOKE3)`
+                // (the BOTH_PAIN* anim numbers are unrelated).
+                crate::NPC_sounds::G_AddVoiceEvent(
+                    ctx,
+                    self_,
+                    (*ctx.world).bg_state.rng.Q_irand(
+                        entity_event_t::EV_CHOKE1 as c_int,
+                        entity_event_t::EV_CHOKE3 as c_int,
+                    ),
+                    0,
+                );
             }
 
             // Setup the timing for it
@@ -377,7 +388,8 @@ pub fn NPC_Pain(
         const BSET_PAIN: c_int = 2;
         const BSET_FFIRE: c_int = 5;
         const PM_DEAD: c_int = 3;
-        const EV_FFWARN: c_int = 55;
+        // entity_event_t::EV_FFWARN — the absolute event enum value.
+        const EV_FFWARN: c_int = 131;
 
         let mut other_team = TEAM_FREE;
         let mut voice_event = -1;
@@ -412,14 +424,14 @@ pub fn NPC_Pain(
         }
 
         if !client.is_null() && (*client).playerTeam != 0 && !other_client.is_null() && other_team == (*client).playerTeam {
-            // Hit by a teammate
-            let npc_ptr = (*ctx.world).globals.NPC;
+            // Hit by a teammate. Oracle uses `self`/`other`, not the ambient
+            // `NPC` global (SetNPCGlobals(self) is not called until later).
             let other_id = ent_id((*ctx.world).g_entities.as_mut_ptr(), other);
-            let npc_id = ent_id((*ctx.world).g_entities.as_mut_ptr(), npc_ptr);
+            let self_id = ent_id((*ctx.world).g_entities.as_mut_ptr(), self_);
 
-            if (*npc_ptr).enemy != Some(other_id) && npc_ptr != other {
+            if (*self_).enemy != Some(other_id) && (*other).enemy != Some(self_id) {
                 // We weren't already enemies
-                if !(*npc_ptr).enemy.is_none() || !(*other).enemy.is_none() {
+                if !(*self_).enemy.is_none() || !(*other).enemy.is_none() {
                     // If one of us actually has an enemy already, it's okay, just an accident
                     if !client.is_null() && !npc.is_null() {
                         // Run any pain instructions
@@ -460,15 +472,17 @@ pub fn NPC_Pain(
                     } else {
                         // Turn on our ally
                         (*npc).blockedSpeechDebounceTime = 0;
-                        voice_event = 32;  // EV_FFTURN
+                        voice_event = 132;  // EV_FFTURN
                         (*npc).behaviorState = (*npc).tempBehavior;
                         (*npc).tempBehavior = (*npc).defaultBehavior;
                         (*npc).defaultBehavior = bState_t::BS_DEFAULT;
-                        (*other).flags &= !0x00000100;  // ~FL_NOTARGET
-                        (*self_).r.svFlags &= !0x00080000;  // ~SVF_ICARUS_FREEZE
+                        (*other).flags &= !0x00000020;  // ~FL_NOTARGET
+                        (*self_).r.svFlags &= !0x00008000;  // ~SVF_ICARUS_FREEZE
                         G_SetEnemy(ctx, self_, other);
-                        (*npc).scriptFlags &= !(0x00000080 | 0x00000100 | 0x00000200 | 0x00001000 | 0x00002000);  // ~(SCF_DONT_FIRE|...)
-                        (*npc).scriptFlags |= (0x00000001 | 0x00004000);  // |= (SCF_CHASE_ENEMIES|SCF_NO_MIND_TRICK)
+                        // ~(SCF_DONT_FIRE|SCF_CROUCHED|SCF_WALKING|SCF_NO_COMBAT_TALK|SCF_FORCED_MARCH)
+                        (*npc).scriptFlags &= !(0x00004000 | 0x00000001 | 0x00000002 | 0x00000200 | 0x00010000);
+                        // |= (SCF_CHASE_ENEMIES|SCF_NO_MIND_TRICK)
+                        (*npc).scriptFlags |= (0x00000400 | 0x00080000);
 
                         if (*ctx.world).globals.killPlayerTimer == 0 {
                             (*ctx.world).globals.killPlayerTimer = (*ctx.world).level.time + 10000;
@@ -559,9 +573,11 @@ pub fn NPC_Touch(
                 (*npc_info_ptr).aiFlags |= NPCAI_TOUCHED_GOAL;
             }
 
-            // Check for enemy collision
-            if ((*self_).r.svFlags & 0x00000200) == 0 && ((*other).flags & 0x00000100) == 0 {
-                // ~SVF_IGNORE_ENEMIES, ~FL_NOTARGET
+            // Check for enemy collision. Oracle's only active test is
+            // `!(other->flags & FL_NOTARGET)`; the SVF_IGNORE_ENEMIES clause is
+            // commented out there, so it is not reintroduced here.
+            if ((*other).flags & 0x00000020) == 0 {
+                // ~FL_NOTARGET
                 let client = (*self_).client as *mut gclient_t;
                 if !client.is_null() && (*client).enemyTeam != 0 {
                     // See if we bumped into an enemy
@@ -660,31 +676,33 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
         const CLASS_MOUSE: c_int = 22;
         const CLASS_GONK: c_int = 23;
         const CHAN_AUTO: c_int = 0;
-        const EV_CHASE1: c_int = 1;
-        const EV_CHASE3: c_int = 3;
-        const EV_OUTFLANK1: c_int = 4;
-        const EV_OUTFLANK2: c_int = 5;
-        const EV_COVER1: c_int = 6;
-        const EV_COVER5: c_int = 10;
-        const EV_SUSPICIOUS4: c_int = 49;
-        const EV_SOUND1: c_int = 50;
-        const EV_SOUND3: c_int = 52;
-        const EV_CONFUSE1: c_int = 53;
-        const EV_SIGHT1: c_int = 35;
-        const EV_SIGHT2: c_int = 36;
-        const EV_SIGHT3: c_int = 37;
-        const EV_DETECTED1: c_int = 38;
-        const EV_DETECTED5: c_int = 42;
-        const EV_GIVEUP3: c_int = 46;
-        const EV_GIVEUP4: c_int = 47;
-        const EV_JDETECTED1: c_int = 51;
-        const EV_JDETECTED2: c_int = 51;
-        const EV_ANGER1: c_int = 54;
-        const EV_ANGER3: c_int = 56;
-        const EV_TAUNT1: c_int = 57;
-        const EV_TAUNT2: c_int = 58;
-        const EV_LOST1: c_int = 45;
-        const EV_ESCAPING2: c_int = 33;
+        // Absolute entity_event_t values — G_AddVoiceEvent consumes the enum
+        // value directly, so these must match the ported entity_event_t.
+        const EV_CHASE1: c_int = 133;
+        const EV_CHASE3: c_int = 135;
+        const EV_OUTFLANK1: c_int = 147;
+        const EV_OUTFLANK2: c_int = 148;
+        const EV_COVER1: c_int = 136;
+        const EV_COVER5: c_int = 140;
+        const EV_SUSPICIOUS4: c_int = 167;
+        const EV_SOUND1: c_int = 161;
+        const EV_SOUND3: c_int = 163;
+        const EV_CONFUSE1: c_int = 122;
+        const EV_SIGHT1: c_int = 158;
+        const EV_SIGHT2: c_int = 159;
+        const EV_SIGHT3: c_int = 160;
+        const EV_DETECTED1: c_int = 141;
+        const EV_DETECTED5: c_int = 145;
+        const EV_GIVEUP3: c_int = 154;
+        const EV_GIVEUP4: c_int = 155;
+        const EV_JDETECTED1: c_int = 172;
+        const EV_JDETECTED2: c_int = 173;
+        const EV_ANGER1: c_int = 116;
+        const EV_ANGER3: c_int = 118;
+        const EV_TAUNT1: c_int = 175;
+        const EV_TAUNT2: c_int = 176;
+        const EV_LOST1: c_int = 146;
+        const EV_ESCAPING2: c_int = 150;
 
         let mut event = -1;
 
@@ -857,19 +875,19 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
         if event != -1 {
             // Hack here because we reuse some "combat" and "extra" sounds
             let add_flag = if !npc.is_null() {
-                ((*npc).scriptFlags & 0x00001000) != 0
+                ((*npc).scriptFlags & 0x00000200) != 0  // SCF_NO_COMBAT_TALK
             } else {
                 false
             };
 
             if !npc.is_null() {
-                (*npc).scriptFlags &= !0x00001000;  // ~SCF_NO_COMBAT_TALK
+                (*npc).scriptFlags &= !0x00000200;  // ~SCF_NO_COMBAT_TALK
             }
 
             crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, event, 3000);
 
             if add_flag && !npc.is_null() {
-                (*npc).scriptFlags |= 0x00001000;  // |= SCF_NO_COMBAT_TALK
+                (*npc).scriptFlags |= 0x00000200;  // |= SCF_NO_COMBAT_TALK
             }
         }
     }
@@ -979,8 +997,9 @@ pub fn NPC_Use(
             if !(*self_).behaviorSet[BSET_USE as usize].is_null() {
                 NPC_UseResponse(ctx, self_, other, 1);
             } else if !npc.is_null() && (*self_).enemy.is_none() && !activator.is_null() && (*activator).s.number == 0 &&
-                      ((*npc).scriptFlags & 0x00004000) == 0 {
+                      ((*npc).scriptFlags & 0x00000080) == 0 {
                 // I don't have an enemy and I was used by the player
+                // (oracle gates on !(scriptFlags & SCF_NO_RESPONSE) = 0x80)
                 NPC_UseResponse(ctx, self_, other, 0);
             }
         }

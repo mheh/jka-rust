@@ -935,11 +935,14 @@ pub fn NPC_ST_InvestigateEvent(
             && ((*NPCInfo).scriptFlags & SCF_CHASE_ENEMIES) != 0
         {
             // make it so they can walk right to this point and look at it rather
-            // than having to use combatPoints
-            let mut investigateGoal = (*NPCInfo).investigateGoal;
+            // than having to use combatPoints.
+            // Oracle passes `NPCInfo->investigateGoal` itself by reference, so the
+            // bbox-expanded value persists in the field in every branch (including
+            // the `trace.fraction >= 1.0` "too high to bother" branch). Write
+            // directly into the field, not a local copy.
             if G_ExpandPointToBBox(
                 ctx,
-                &mut investigateGoal,
+                &mut (*NPCInfo).investigateGoal,
                 (*NPC).r.mins,
                 (*NPC).r.maxs,
                 (*NPC).s.number,
@@ -948,14 +951,14 @@ pub fn NPC_ST_InvestigateEvent(
             {
                 // we were able to move the investigateGoal to a point in which our
                 // bbox would fit — drop the goal to the ground so we can get at it
-                let mut end = investigateGoal;
+                let mut end = (*NPCInfo).investigateGoal;
                 end[2] -= 512.0; // FIXME: not always right? (Raven comment).
                 let mut trace: trace_t = core::mem::zeroed();
                 trap::Trace(
                     ctx.engine,
                     GTraceArgs::new(
                         &mut trace as *mut trace_t,
-                        &investigateGoal as *const vec3_t,
+                        &(*NPCInfo).investigateGoal as *const vec3_t,
                         &(*NPC).r.mins as *const vec3_t,
                         &(*NPC).r.maxs as *const vec3_t,
                         &end as *const vec3_t,
@@ -967,13 +970,11 @@ pub fn NPC_ST_InvestigateEvent(
                     // too high to even bother
                     // FIXME: look at them??? (Raven comment).
                 } else {
-                    investigateGoal = trace.endpos;
-                    (*NPCInfo).investigateGoal = investigateGoal;
-                    NPC_SetMoveGoal(ctx, NPC, investigateGoal, 16, QTRUE, -1, core::ptr::null_mut());
+                    (*NPCInfo).investigateGoal = trace.endpos;
+                    NPC_SetMoveGoal(ctx, NPC, (*NPCInfo).investigateGoal, 16, QTRUE, -1, core::ptr::null_mut());
                     (*NPCInfo).localState = LSTATE_INVESTIGATE;
                 }
             } else {
-                (*NPCInfo).investigateGoal = investigateGoal;
                 let id = NPC_FindCombatPoint(
                     ctx,
                     (*NPCInfo).investigateGoal,

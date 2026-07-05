@@ -105,10 +105,7 @@ unsafe fn ent_index(ctx: GameContext<'_>, ent: *const gentity_t) -> c_int {
 // `level.clients`, `level.sortedClients`, `level.teamScores`, `g_entities`, and calls
 // `trap_SendServerCommand`; the staged raw-pointer signature carries no
 // GameWorld/engine handle to reach any of these.
-pub fn DeathmatchScoreboardMessage(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn DeathmatchScoreboardMessage(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_qshared::common::mp::playerstate::{
         PERS_ASSIST_COUNT, PERS_CAPTURES, PERS_DEFEND_COUNT, PERS_EXCELLENT_COUNT,
         PERS_GAUNTLET_FRAG_COUNT, PERS_IMPRESSIVE_COUNT, PERS_KILLED, PERS_RANK, PERS_SCORE,
@@ -126,7 +123,10 @@ pub fn DeathmatchScoreboardMessage(
         }
 
         for i in 0..numSorted {
-            let cl = (*world).level.clients.add((*world).level.sortedClients[i as usize] as usize);
+            let cl = (*world)
+                .level
+                .clients
+                .add((*world).level.sortedClients[i as usize] as usize);
 
             let ping = if (*cl).pers.connected == crate::client::client_connected::CON_CONNECTING {
                 -1
@@ -180,7 +180,10 @@ pub fn DeathmatchScoreboardMessage(
 
         let cmd = format!(
             "scores {} {} {}{}",
-            i, (*world).level.teamScores[TEAM_RED as usize], (*world).level.teamScores[TEAM_BLUE as usize], string
+            i,
+            (*world).level.teamScores[TEAM_RED as usize],
+            (*world).level.teamScores[TEAM_BLUE as usize],
+            string
         );
         trap::SendServerCommand(
             ctx.engine,
@@ -199,10 +202,7 @@ const MAX_CLIENT_SCORE_SEND: c_int = 32;
 /// Raven `Cmd_Score_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:98-100`
-pub fn Cmd_Score_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_Score_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     DeathmatchScoreboardMessage(ctx, ent);
 }
 
@@ -212,10 +212,7 @@ pub fn Cmd_Score_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `g_cheats` cvar and
 // calls `trap_SendServerCommand`/`G_GetStringEdString`+`ent-g_entities`; no
 // GameCvars/engine handle is reachable from this raw-pointer signature.
-pub fn CheatsOk(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn CheatsOk(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         if (*ctx.world).cvars.g_cheats.integer == 0 {
             // PORT-NOTE(G_GetStringEdString): OPEN fn (g_main.rs) — called with the
@@ -265,10 +262,7 @@ pub fn CheatsOk(
 // presumably-'static pointer into file-scope storage) — can't own a `String` and
 // return a raw pointer to it without leaking/aliasing. Also needs `trap_Argc`/
 // `trap_Argv`, unreachable without an engine handle.
-pub fn ConcatArgs(
-    ctx: GameContext<'_>,
-    start: c_int,
-) -> *mut c_char {
+pub fn ConcatArgs(ctx: GameContext<'_>, start: c_int) -> *mut c_char {
     // DIVERGENCE: Raven returns a pointer into file-scope
     // `static char line[MAX_STRING_CHARS]`; ported callers all consume the
     // result immediately (as `*const c_char`), so a `ctx`-owned scratch buffer
@@ -312,10 +306,7 @@ pub fn ConcatArgs(
 /// Remove case and control characters.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:161-175`
-pub fn SanitizeString(
-    r#in: *mut c_char,
-    out: *mut c_char,
-) {
+pub fn SanitizeString(r#in: *mut c_char, out: *mut c_char) {
     unsafe {
         let mut i = r#in;
         let mut o = out;
@@ -349,11 +340,7 @@ pub fn SanitizeString(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.maxclients`,
 // `level.clients`, and calls `trap_SendServerCommand`; no GameWorld/engine handle
 // reachable from this raw-pointer signature.
-pub fn ClientNumberFromString(
-    ctx: GameContext<'_>,
-    to: *mut gentity_t,
-    s: *mut c_char,
-) -> c_int {
+pub fn ClientNumberFromString(ctx: GameContext<'_>, to: *mut gentity_t, s: *mut c_char) -> c_int {
     unsafe {
         let world = ctx.world;
         let ss = cstr_to_str(s);
@@ -431,11 +418,7 @@ pub fn ClientNumberFromString(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` (itself
 // parked), reads `g_entities`, calls `trap_Argv`/`trap_Argc`/`Com_Printf`; no
 // GameWorld/engine handle reachable from this raw-pointer signature.
-pub fn Cmd_Give_f(
-    ctx: GameContext<'_>,
-    cmdent: *mut gentity_t,
-    baseArg: c_int,
-) {
+pub fn Cmd_Give_f(ctx: GameContext<'_>, cmdent: *mut gentity_t, baseArg: c_int) {
     unsafe {
         if CheatsOk(ctx, cmdent) == qfalse {
             return;
@@ -446,11 +429,18 @@ pub fn Cmd_Give_f(
             let mut otherindex = [0 as c_char; MAX_TOKEN_CHARS];
             trap::Argv(
                 ctx.engine,
-                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, otherindex.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    1,
+                    otherindex.as_mut_ptr(),
+                    MAX_TOKEN_CHARS as c_int,
+                ),
             );
 
             if otherindex[0] == 0 {
-                crate::g_main::Com_Printf(cstr("giveother requires that the second argument be a client index number.\n").as_ptr());
+                crate::g_main::Com_Printf(
+                    cstr("giveother requires that the second argument be a client index number.\n")
+                        .as_ptr(),
+                );
                 return;
             }
 
@@ -464,7 +454,9 @@ pub fn Cmd_Give_f(
             ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
             if (*ent).inuse == qfalse || (*ent).client.is_null() {
-                crate::g_main::Com_Printf(cstr(&format!("{} is not an active client\n", i)).as_ptr());
+                crate::g_main::Com_Printf(
+                    cstr(&format!("{} is not an active client\n", i)).as_ptr(),
+                );
                 return;
             }
         } else {
@@ -476,7 +468,11 @@ pub fn Cmd_Give_f(
         let mut name = [0 as c_char; MAX_TOKEN_CHARS];
         trap::Argv(
             ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1 + baseArg, name.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1 + baseArg,
+                name.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
         );
         let name_str = cstr_to_str(name.as_ptr());
 
@@ -489,11 +485,17 @@ pub fn Cmd_Give_f(
         }
 
         if give_all || name_str.eq_ignore_ascii_case("health") {
-            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) == 3 + baseArg {
+            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new())
+                == 3 + baseArg
+            {
                 let mut arg = [0 as c_char; MAX_TOKEN_CHARS];
                 trap::Argv(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2 + baseArg, arg.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                        2 + baseArg,
+                        arg.as_mut_ptr(),
+                        MAX_TOKEN_CHARS as c_int,
+                    ),
                 );
                 (*ent).health = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
                 if (*ent).health > (*client).ps.stats[STAT_MAX_HEALTH as usize] {
@@ -508,7 +510,8 @@ pub fn Cmd_Give_f(
         }
 
         if give_all || name_str.eq_ignore_ascii_case("weapons") {
-            (*client).ps.stats[STAT_WEAPONS as usize] = (1 << (LAST_USEABLE_WEAPON + 1)) - (1 << WP_NONE);
+            (*client).ps.stats[STAT_WEAPONS as usize] =
+                (1 << (LAST_USEABLE_WEAPON + 1)) - (1 << WP_NONE);
             if !give_all {
                 return;
             }
@@ -518,7 +521,11 @@ pub fn Cmd_Give_f(
             let mut arg = [0 as c_char; MAX_TOKEN_CHARS];
             trap::Argv(
                 ctx.engine,
-                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2 + baseArg, arg.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    2 + baseArg,
+                    arg.as_mut_ptr(),
+                    MAX_TOKEN_CHARS as c_int,
+                ),
             );
             let n: c_int = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
             (*client).ps.stats[STAT_WEAPONS as usize] |= 1 << n;
@@ -527,11 +534,17 @@ pub fn Cmd_Give_f(
 
         if give_all || name_str.eq_ignore_ascii_case("ammo") {
             let mut num = 999;
-            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) == 3 + baseArg {
+            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new())
+                == 3 + baseArg
+            {
                 let mut arg = [0 as c_char; MAX_TOKEN_CHARS];
                 trap::Argv(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2 + baseArg, arg.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                        2 + baseArg,
+                        arg.as_mut_ptr(),
+                        MAX_TOKEN_CHARS as c_int,
+                    ),
                 );
                 num = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(999);
             }
@@ -544,15 +557,23 @@ pub fn Cmd_Give_f(
         }
 
         if give_all || name_str.eq_ignore_ascii_case("armor") {
-            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) == 3 + baseArg {
+            if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new())
+                == 3 + baseArg
+            {
                 let mut arg = [0 as c_char; MAX_TOKEN_CHARS];
                 trap::Argv(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2 + baseArg, arg.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                        2 + baseArg,
+                        arg.as_mut_ptr(),
+                        MAX_TOKEN_CHARS as c_int,
+                    ),
                 );
-                (*client).ps.stats[STAT_ARMOR as usize] = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
+                (*client).ps.stats[STAT_ARMOR as usize] =
+                    cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
             } else {
-                (*client).ps.stats[STAT_ARMOR as usize] = (*client).ps.stats[STAT_MAX_HEALTH as usize];
+                (*client).ps.stats[STAT_ARMOR as usize] =
+                    (*client).ps.stats[STAT_MAX_HEALTH as usize];
             }
 
             if !give_all {
@@ -611,10 +632,7 @@ pub fn Cmd_Give_f(
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:403-418`
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
-pub fn Cmd_God_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_God_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if CheatsOk(ctx, ent) == qfalse {
             return;
@@ -647,10 +665,7 @@ pub fn Cmd_God_f(
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:430-444`
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
-pub fn Cmd_Notarget_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_Notarget_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if CheatsOk(ctx, ent) == qfalse {
             return;
@@ -681,10 +696,7 @@ pub fn Cmd_Notarget_f(
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:454-469`
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `CheatsOk` and
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
-pub fn Cmd_Noclip_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_Noclip_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if CheatsOk(ctx, ent) == qfalse {
             return;
@@ -696,7 +708,11 @@ pub fn Cmd_Noclip_f(
         } else {
             "noclip ON\n"
         };
-        (*client).noclip = if (*client).noclip != qfalse { qfalse } else { qtrue };
+        (*client).noclip = if (*client).noclip != qfalse {
+            qfalse
+        } else {
+            qtrue
+        };
 
         let s = format!("print \"{}\"", msg);
         trap::SendServerCommand(
@@ -716,10 +732,7 @@ pub fn Cmd_Noclip_f(
 /// resize the view, hide the scoreboard, and take a special screenshot.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:482-496`
-pub fn Cmd_LevelShot_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_LevelShot_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if CheatsOk(ctx, ent) == qfalse {
             return;
@@ -756,10 +769,7 @@ pub fn Cmd_LevelShot_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.clients` and
 // calls `trap_Argc`/`trap_Argv`/`trap_GetUserinfo`/`trap_SetUserinfo`; no
 // GameWorld/engine handle reachable here.
-pub fn Cmd_TeamTask_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_TeamTask_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     const MAX_INFO_STRING: usize = 1024; // Source: `oracle/oracle/codemp/qcommon/q_shared.h`
 
     unsafe {
@@ -772,7 +782,11 @@ pub fn Cmd_TeamTask_f(
         let mut arg = [0 as c_char; MAX_TOKEN_CHARS];
         trap::Argv(
             ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, arg.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                arg.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
         );
         let task: c_int = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
 
@@ -786,10 +800,17 @@ pub fn Cmd_TeamTask_f(
             ),
         );
         let value = format!("{}", task);
-        crate::q_shared::Info_SetValueForKey(userinfo.as_mut_ptr(), c"teamtask".as_ptr(), cstr(&value).as_ptr());
+        crate::q_shared::Info_SetValueForKey(
+            userinfo.as_mut_ptr(),
+            c"teamtask".as_ptr(),
+            cstr(&value).as_ptr(),
+        );
         trap::SetUserinfo(
             ctx.engine,
-            mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(clientNum, cstr(&cstr_to_str(userinfo.as_ptr()))),
+            mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
+                clientNum,
+                cstr(&cstr_to_str(userinfo.as_ptr())),
+            ),
         );
         crate::g_client::ClientUserinfoChanged(ctx, clientNum);
     }
@@ -801,10 +822,7 @@ pub fn Cmd_TeamTask_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_autoKickTKSpammers`/
 // `g_autoBanTKSpammers` cvars and calls `AddIP`/`trap_SendServerCommand`/
 // `trap_SendConsoleCommand`; no GameWorld/engine handle reachable here.
-pub fn G_CheckTKAutoKickBan(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn G_CheckTKAutoKickBan(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if ent.is_null() || (*ent).client.is_null() || (*ent).s.number >= MAX_CLIENTS as c_int {
             return;
@@ -815,55 +833,102 @@ pub fn G_CheckTKAutoKickBan(
 
         if cvars.g_autoKickTKSpammers.integer > 0 || cvars.g_autoBanTKSpammers.integer > 0 {
             (*client).sess.TKCount += 1;
-            if cvars.g_autoBanTKSpammers.integer > 0 && (*client).sess.TKCount >= cvars.g_autoBanTKSpammers.integer {
+            if cvars.g_autoBanTKSpammers.integer > 0
+                && (*client).sess.TKCount >= cvars.g_autoBanTKSpammers.integer
+            {
                 if (*client).sess.IPstring[0] != 0 {
                     // ban their IP
                     crate::g_svcmds::AddIP(ctx, (*client).sess.IPstring.as_mut_ptr());
                 }
 
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"TKBAN".as_ptr() as *mut c_char);
-                let s = format!("print \"{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), cstr_to_str(m));
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char,
+                    c"TKBAN".as_ptr() as *mut c_char,
+                );
+                let s = format!(
+                    "print \"{} {}\n\"",
+                    cstr_to_str((*client).pers.netname.as_ptr()),
+                    cstr_to_str(m)
+                );
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        -1,
+                        cstr(&s),
+                    ),
                 );
                 let cc = format!("clientkick {}\n", (*ent).s.number);
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT as c_int, cstr(&cc)),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
+                        EXEC_INSERT as c_int,
+                        cstr(&cc),
+                    ),
                 );
                 return;
             }
-            if cvars.g_autoKickTKSpammers.integer > 0 && (*client).sess.TKCount >= cvars.g_autoKickTKSpammers.integer {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"TKKICK".as_ptr() as *mut c_char);
-                let s = format!("print \"{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), cstr_to_str(m));
+            if cvars.g_autoKickTKSpammers.integer > 0
+                && (*client).sess.TKCount >= cvars.g_autoKickTKSpammers.integer
+            {
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char,
+                    c"TKKICK".as_ptr() as *mut c_char,
+                );
+                let s = format!(
+                    "print \"{} {}\n\"",
+                    cstr_to_str((*client).pers.netname.as_ptr()),
+                    cstr_to_str(m)
+                );
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        -1,
+                        cstr(&s),
+                    ),
                 );
                 let cc = format!("clientkick {}\n", (*ent).s.number);
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT as c_int, cstr(&cc)),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
+                        EXEC_INSERT as c_int,
+                        cstr(&cc),
+                    ),
                 );
                 return;
             }
             // okay, not gone (yet), but warn them...
             if cvars.g_autoBanTKSpammers.integer > 0
-                && (cvars.g_autoKickTKSpammers.integer <= 0 || cvars.g_autoBanTKSpammers.integer < cvars.g_autoKickTKSpammers.integer)
+                && (cvars.g_autoKickTKSpammers.integer <= 0
+                    || cvars.g_autoBanTKSpammers.integer < cvars.g_autoKickTKSpammers.integer)
             {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"WARNINGTKBAN".as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char,
+                    c"WARNINGTKBAN".as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{}\n\"", cstr_to_str(m));
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&s),
+                    ),
                 );
             } else if cvars.g_autoKickTKSpammers.integer > 0 {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"WARNINGTKKICK".as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char,
+                    c"WARNINGTKKICK".as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{}\n\"", cstr_to_str(m));
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&s),
+                    ),
                 );
             }
         }
@@ -877,10 +942,7 @@ pub fn G_CheckTKAutoKickBan(
 // `g_allowDuelSuicide`/`g_autoKickKillSpammers`/`g_autoBanKillSpammers` cvars and
 // `level.numPlayingClients`/`level.warmupTime`; no GameWorld/engine handle
 // reachable here.
-pub fn Cmd_Kill_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_Kill_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
@@ -900,11 +962,18 @@ pub fn Cmd_Kill_f(
             && (*world).level.warmupTime == 0
         {
             if cvars.g_allowDuelSuicide.integer == 0 {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"ATTEMPTDUELKILL".as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"ATTEMPTDUELKILL".as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{}\n\"", cstr_to_str(m));
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&s),
+                    ),
                 );
                 return;
             }
@@ -912,52 +981,100 @@ pub fn Cmd_Kill_f(
 
         if cvars.g_autoKickKillSpammers.integer > 0 || cvars.g_autoBanKillSpammers.integer > 0 {
             (*client).sess.killCount += 1;
-            if cvars.g_autoBanKillSpammers.integer > 0 && (*client).sess.killCount >= cvars.g_autoBanKillSpammers.integer {
-                if (*client).sess.IPstring[0] != 0 {
-                    crate::g_svcmds::AddIP(ctx, (*client).sess.IPstring.as_mut_ptr());
-                }
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"SUICIDEBAN".as_ptr() as *mut c_char);
-                let s = format!("print \"{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), cstr_to_str(m));
+            if cvars.g_autoBanKillSpammers.integer > 0
+                && (*client).sess.killCount >= cvars.g_autoBanKillSpammers.integer
+            {
+                // Oracle guards with `if ( ent->client->sess.IPstring )`, but
+                // IPstring is a `char[32]` array whose address is never null, so
+                // this ban runs unconditionally. Preserve the always-true quirk.
+                crate::g_svcmds::AddIP(ctx, (*client).sess.IPstring.as_mut_ptr());
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char,
+                    c"SUICIDEBAN".as_ptr() as *mut c_char,
+                );
+                let s = format!(
+                    "print \"{} {}\n\"",
+                    cstr_to_str((*client).pers.netname.as_ptr()),
+                    cstr_to_str(m)
+                );
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        -1,
+                        cstr(&s),
+                    ),
                 );
                 let cc = format!("clientkick {}\n", (*ent).s.number);
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT as c_int, cstr(&cc)),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
+                        EXEC_INSERT as c_int,
+                        cstr(&cc),
+                    ),
                 );
                 return;
             }
-            if cvars.g_autoKickKillSpammers.integer > 0 && (*client).sess.killCount >= cvars.g_autoKickKillSpammers.integer {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"SUICIDEKICK".as_ptr() as *mut c_char);
-                let s = format!("print \"{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), cstr_to_str(m));
+            if cvars.g_autoKickKillSpammers.integer > 0
+                && (*client).sess.killCount >= cvars.g_autoKickKillSpammers.integer
+            {
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char,
+                    c"SUICIDEKICK".as_ptr() as *mut c_char,
+                );
+                let s = format!(
+                    "print \"{} {}\n\"",
+                    cstr_to_str((*client).pers.netname.as_ptr()),
+                    cstr_to_str(m)
+                );
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        -1,
+                        cstr(&s),
+                    ),
                 );
                 let cc = format!("clientkick {}\n", (*ent).s.number);
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT as c_int, cstr(&cc)),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
+                        EXEC_INSERT as c_int,
+                        cstr(&cc),
+                    ),
                 );
                 return;
             }
             if cvars.g_autoBanKillSpammers.integer > 0
-                && (cvars.g_autoKickKillSpammers.integer <= 0 || cvars.g_autoBanKillSpammers.integer < cvars.g_autoKickKillSpammers.integer)
+                && (cvars.g_autoKickKillSpammers.integer <= 0
+                    || cvars.g_autoBanKillSpammers.integer < cvars.g_autoKickKillSpammers.integer)
             {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"WARNINGSUICIDEBAN".as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char,
+                    c"WARNINGSUICIDEBAN".as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{}\n\"", cstr_to_str(m));
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&s),
+                    ),
                 );
             } else if cvars.g_autoKickKillSpammers.integer > 0 {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"WARNINGSUICIDEKICK".as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char,
+                    c"WARNINGSUICIDEKICK".as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{}\n\"", cstr_to_str(m));
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&s),
+                    ),
                 );
             }
         }
@@ -971,10 +1088,7 @@ pub fn Cmd_Kill_f(
 /// Raven `G_GetDuelWinner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:645-661`
-pub fn G_GetDuelWinner(
-    ctx: GameContext<'_>,
-    client: *mut gclient_t,
-) -> *mut gentity_t {
+pub fn G_GetDuelWinner(ctx: GameContext<'_>, client: *mut gclient_t) -> *mut gentity_t {
     unsafe {
         let world = ctx.world;
         for i in 0..(*world).level.maxclients {
@@ -1003,11 +1117,7 @@ pub fn G_GetDuelWinner(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads the `g_gametype` cvar
 // and calls `trap_SendServerCommand`/`G_LogPrintf`/`TeamName`; no GameWorld/
 // engine handle reachable here.
-pub fn BroadcastTeamChange(
-    ctx: GameContext<'_>,
-    client: *mut gclient_t,
-    oldTeam: c_int,
-) {
+pub fn BroadcastTeamChange(ctx: GameContext<'_>, client: *mut gclient_t, oldTeam: c_int) {
     use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
@@ -1018,37 +1128,88 @@ pub fn BroadcastTeamChange(
         }
 
         if (*client).sess.sessionTeam == TEAM_RED {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"JOINEDTHEREDTEAM".as_ptr() as *mut c_char);
-            let s = format!("cp \"{}{}{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), "^7", "", cstr_to_str(m));
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"JOINEDTHEREDTEAM".as_ptr() as *mut c_char,
+            );
+            let s = format!(
+                "cp \"{}{}{} {}\n\"",
+                cstr_to_str((*client).pers.netname.as_ptr()),
+                "^7",
+                "",
+                cstr_to_str(m)
+            );
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    -1,
+                    cstr(&s),
+                ),
             );
         } else if (*client).sess.sessionTeam == TEAM_BLUE {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"JOINEDTHEBLUETEAM".as_ptr() as *mut c_char);
-            let s = format!("cp \"{}{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), "^7", cstr_to_str(m));
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"JOINEDTHEBLUETEAM".as_ptr() as *mut c_char,
+            );
+            let s = format!(
+                "cp \"{}{} {}\n\"",
+                cstr_to_str((*client).pers.netname.as_ptr()),
+                "^7",
+                cstr_to_str(m)
+            );
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    -1,
+                    cstr(&s),
+                ),
             );
         } else if (*client).sess.sessionTeam == TEAM_SPECTATOR && oldTeam != TEAM_SPECTATOR {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"JOINEDTHESPECTATORS".as_ptr() as *mut c_char);
-            let s = format!("cp \"{}{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), "^7", cstr_to_str(m));
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"JOINEDTHESPECTATORS".as_ptr() as *mut c_char,
+            );
+            let s = format!(
+                "cp \"{}{} {}\n\"",
+                cstr_to_str((*client).pers.netname.as_ptr()),
+                "^7",
+                cstr_to_str(m)
+            );
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    -1,
+                    cstr(&s),
+                ),
             );
         } else if (*client).sess.sessionTeam == TEAM_FREE {
             use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
-            if (*ctx.world).cvars.g_gametype.integer == GT_DUEL || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL {
+            if (*ctx.world).cvars.g_gametype.integer == GT_DUEL
+                || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
+            {
                 // NOTE: Just doing a vs. once it counts two players up — Raven leaves
                 // this branch as commented-out dead code (a currentWinner vs. print).
             } else {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"JOINEDTHEBATTLE".as_ptr() as *mut c_char);
-                let s = format!("cp \"{}{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), "^7", cstr_to_str(m));
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"JOINEDTHEBATTLE".as_ptr() as *mut c_char,
+                );
+                let s = format!(
+                    "cp \"{}{} {}\n\"",
+                    cstr_to_str((*client).pers.netname.as_ptr()),
+                    "^7",
+                    cstr_to_str(m)
+                );
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        -1,
+                        cstr(&s),
+                    ),
                 );
             }
         }
@@ -1069,10 +1230,7 @@ pub fn BroadcastTeamChange(
 /// Raven `G_PowerDuelCheckFail`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:720-743`
-pub fn G_PowerDuelCheckFail(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn G_PowerDuelCheckFail(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     // Raven `duelTeam_t` (`bg_public.h:1019-1025`); `gclient_t::sess.duelTeam` is
     // stored as plain `c_int`, so the enum discriminants are transcribed as consts.
     const DUELTEAM_FREE: c_int = 0;
@@ -1080,7 +1238,9 @@ pub fn G_PowerDuelCheckFail(
     const DUELTEAM_DOUBLE: c_int = 2;
 
     unsafe {
-        if (*ent).client.is_null() || (*((*ent).client as *mut gclient_t)).sess.duelTeam == DUELTEAM_FREE {
+        if (*ent).client.is_null()
+            || (*((*ent).client as *mut gclient_t)).sess.duelTeam == DUELTEAM_FREE
+        {
             return qtrue;
         }
 
@@ -1109,11 +1269,7 @@ pub fn G_PowerDuelCheckFail(
 // a dozen trap_*/G_* helpers; no GameWorld/engine handle reachable here. Also
 // mutates the file-scope `g_dontPenalizeTeam qboolean` global; becomes a
 // GameWorld field once threaded.
-pub fn SetTeam(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    s: *mut c_char,
-) {
+pub fn SetTeam(ctx: GameContext<'_>, ent: *mut gentity_t, s: *mut c_char) {
     use crate::client::spectator_state::spectatorState_t::*;
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_SIEGE, GT_TEAM};
 
@@ -1150,26 +1306,44 @@ pub fn SetTeam(
                 team = crate::g_client::PickTeam(ctx, clientNum) as c_int;
             }
 
-            if (*world).cvars.g_teamForceBalance.integer != 0 && (*world).cvars.g_trueJedi.integer == 0 {
+            if (*world).cvars.g_teamForceBalance.integer != 0
+                && (*world).cvars.g_trueJedi.integer == 0
+            {
                 let mut counts = [0 as c_int; TEAM_NUM_TEAMS as usize];
-                counts[TEAM_BLUE as usize] = crate::g_client::TeamCount(ctx, (*client).ps.clientNum, TEAM_BLUE) as c_int;
-                counts[TEAM_RED as usize] = crate::g_client::TeamCount(ctx, (*client).ps.clientNum, TEAM_RED) as c_int;
+                counts[TEAM_BLUE as usize] =
+                    crate::g_client::TeamCount(ctx, (*client).ps.clientNum, TEAM_BLUE) as c_int;
+                counts[TEAM_RED as usize] =
+                    crate::g_client::TeamCount(ctx, (*client).ps.clientNum, TEAM_RED) as c_int;
 
                 if team == TEAM_RED && counts[TEAM_RED as usize] - counts[TEAM_BLUE as usize] > 1 {
-                    let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"TOOMANYRED".as_ptr() as *mut c_char);
+                    let m = crate::g_main::G_GetStringEdString(
+                        ctx,
+                        c"MP_SVGAME".as_ptr() as *mut c_char,
+                        c"TOOMANYRED".as_ptr() as *mut c_char,
+                    );
                     let msg = format!("print \"{}\n\"", cstr_to_str(m));
                     trap::SendServerCommand(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new((*client).ps.clientNum, cstr(&msg)),
+                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                            (*client).ps.clientNum,
+                            cstr(&msg),
+                        ),
                     );
                     return; // ignore the request
                 }
                 if team == TEAM_BLUE && counts[TEAM_BLUE as usize] - counts[TEAM_RED as usize] > 1 {
-                    let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"TOOMANYBLUE".as_ptr() as *mut c_char);
+                    let m = crate::g_main::G_GetStringEdString(
+                        ctx,
+                        c"MP_SVGAME".as_ptr() as *mut c_char,
+                        c"TOOMANYBLUE".as_ptr() as *mut c_char,
+                    );
                     let msg = format!("print \"{}\n\"", cstr_to_str(m));
                     trap::SendServerCommand(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new((*client).ps.clientNum, cstr(&msg)),
+                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                            (*client).ps.clientNum,
+                            cstr(&msg),
+                        ),
                     );
                     return; // ignore the request
                 }
@@ -1194,7 +1368,14 @@ pub fn SetTeam(
                         (*ent).flags &= !FL_GODMODE;
                         (*client).ps.stats[STAT_HEALTH as usize] = 0;
                         (*ent).health = 0;
-                        crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_TEAM_CHANGE as c_int);
+                        crate::g_combat::player_die(
+                            ctx,
+                            ent,
+                            ent,
+                            ent,
+                            100000,
+                            MOD_TEAM_CHANGE as c_int,
+                        );
                     }
                 }
 
@@ -1207,7 +1388,9 @@ pub fn SetTeam(
         }
 
         // override decision if limiting the players
-        if (*world).cvars.g_gametype.integer == GT_DUEL && (*world).level.numNonSpectatorClients >= 2 {
+        if (*world).cvars.g_gametype.integer == GT_DUEL
+            && (*world).level.numNonSpectatorClients >= 2
+        {
             team = TEAM_SPECTATOR;
         } else if (*world).cvars.g_gametype.integer == GT_POWERDUEL
             && ((*world).level.numPlayingClients >= 3 || G_PowerDuelCheckFail(ctx, ent) != qfalse)
@@ -1225,7 +1408,9 @@ pub fn SetTeam(
         }
 
         // if the player was dead leave the body
-        if (*client).ps.stats[STAT_HEALTH as usize] <= 0 && (*client).sess.sessionTeam != TEAM_SPECTATOR {
+        if (*client).ps.stats[STAT_HEALTH as usize] <= 0
+            && (*client).sess.sessionTeam != TEAM_SPECTATOR
+        {
             crate::g_client::MaintainBodyQueue(ctx, ent);
         }
 
@@ -1266,7 +1451,11 @@ pub fn SetTeam(
         BroadcastTeamChange(ctx, client, oldTeam);
 
         if oldTeam != TEAM_SPECTATOR {
-            let tent = crate::g_utils::G_TempEntity(ctx, (*client).ps.origin, EV_PLAYER_TELEPORT_OUT as c_int);
+            let tent = crate::g_utils::G_TempEntity(
+                ctx,
+                (*client).ps.origin,
+                EV_PLAYER_TELEPORT_OUT as c_int,
+            );
             (*tent).s.clientNum = clientNum;
         }
 
@@ -1287,10 +1476,7 @@ pub fn SetTeam(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): computes `ent - g_entities`
 // (client slot index) to set `ps.clientNum`; no GameWorld/engine handle reachable
 // to locate the `g_entities` base here.
-pub fn StopFollowing(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn StopFollowing(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use crate::client::spectator_state::spectatorState_t::SPECTATOR_FREE;
 
     unsafe {
@@ -1323,10 +1509,7 @@ pub fn StopFollowing(
 // `gEscaping`, `g_gametype`/`g_allowDuelSuicide` cvars, calls `trap_Argc`/
 // `trap_Argv`/`trap_SendServerCommand`/`SetTeam`; no GameWorld/engine handle
 // reachable here.
-pub fn Cmd_Team_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_Team_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
@@ -1343,22 +1526,36 @@ pub fn Cmd_Team_f(
                 _ => None,
             };
             if let Some(k) = key {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, cstr(k).as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    cstr(k).as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{}\n\"", cstr_to_str(m));
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&s),
+                    ),
                 );
             }
             return;
         }
 
         if (*client).switchTeamTime > (*world).level.time {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOSWITCH".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOSWITCH".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
             );
             return;
         }
@@ -1392,7 +1589,11 @@ pub fn Cmd_Team_f(
         let mut s = [0 as c_char; MAX_TOKEN_CHARS];
         trap::Argv(
             ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, s.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                s.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
         );
 
         SetTeam(ctx, ent, s.as_mut_ptr());
@@ -1407,10 +1608,7 @@ pub fn Cmd_Team_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` cvar and
 // `level.time`, calls `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`G_Damage`/
 // `ClientUserinfoChanged`; no GameWorld/engine handle reachable here.
-pub fn Cmd_DuelTeam_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_DuelTeam_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_POWERDUEL;
 
     const DUELTEAM_FREE: c_int = 0;
@@ -1436,18 +1634,28 @@ pub fn Cmd_DuelTeam_f(
             if let Some(m) = msg {
                 trap::SendServerCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(m)),
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(m),
+                    ),
                 );
             }
             return;
         }
 
         if (*client).switchDuelTeamTime > (*world).level.time {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOSWITCH".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOSWITCH".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
             );
             return;
         }
@@ -1455,7 +1663,11 @@ pub fn Cmd_DuelTeam_f(
         let mut s = [0 as c_char; MAX_TOKEN_CHARS];
         trap::Argv(
             ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, s.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                s.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
         );
         let ss = cstr_to_str(s.as_ptr());
 
@@ -1471,7 +1683,10 @@ pub fn Cmd_DuelTeam_f(
             let msg = format!("print \"'{}' not a valid duel team.\n\"", ss);
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&msg),
+                ),
             );
         }
 
@@ -1514,10 +1729,7 @@ pub fn Cmd_DuelTeam_f(
 // types (only `MAX_SIEGE_CLASSES_PER_TEAM` and `duelTeam_t` are ported so far).
 // Which type/const carries the siege *team* id (as opposed to `team_t`
 // RED/BLUE), and what is `MAX_SIEGE_CLASSES` named once ported?
-pub fn G_TeamForSiegeClass(
-    ctx: GameContext<'_>,
-    clName: *const c_char,
-) -> c_int {
+pub fn G_TeamForSiegeClass(ctx: GameContext<'_>, clName: *const c_char) -> c_int {
     // PORT-NOTE(siege-team-consts): `SIEGETEAM_TEAM1`/`SIEGETEAM_TEAM2`/
     // `MAX_SIEGE_CLASSES` are not yet resolved in the landed `mp_bg::saga`
     // surface (only `MAX_SIEGE_CLASSES_PER_TEAM` is ported); using Raven's
@@ -1569,10 +1781,7 @@ pub fn G_TeamForSiegeClass(
 // `BG_SiegeCheckClassLegality`/`ClientUserinfoChanged`/`player_die`/`ClientBegin`;
 // no GameWorld/engine handle reachable here. Also mutates file-scope
 // `g_preventTeamBegin`.
-pub fn Cmd_SiegeClass_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_SiegeClass_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
@@ -1595,11 +1804,18 @@ pub fn Cmd_SiegeClass_f(
         let client = (*ent).client as *mut gclient_t;
 
         if (*client).switchClassTime > (*world).level.time {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOCLASSSWITCH".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOCLASSSWITCH".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
             );
             return;
         }
@@ -1629,12 +1845,21 @@ pub fn Cmd_SiegeClass_f(
             (*world).globals.g_preventTeamBegin = qfalse;
 
             if (*client).sess.sessionTeam != team {
-                if (*client).sess.sessionTeam != TEAM_SPECTATOR || (*client).sess.siegeDesiredTeam != team {
-                    let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOCLASSTEAM".as_ptr() as *mut c_char);
+                if (*client).sess.sessionTeam != TEAM_SPECTATOR
+                    || (*client).sess.siegeDesiredTeam != team
+                {
+                    let m = crate::g_main::G_GetStringEdString(
+                        ctx,
+                        c"MP_SVGAME".as_ptr() as *mut c_char,
+                        c"NOCLASSTEAM".as_ptr() as *mut c_char,
+                    );
                     let s = format!("print \"{}\n\"", cstr_to_str(m));
                     trap::SendServerCommand(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                            ent_index(ctx, ent),
+                            cstr(&s),
+                        ),
                     );
                     return;
                 }
@@ -1643,9 +1868,16 @@ pub fn Cmd_SiegeClass_f(
 
         let preScore = (*client).ps.persistant[PERS_SCORE as usize];
 
-        crate::bg_saga::BG_SiegeCheckClassLegality(team, className.as_mut_ptr(), &mut (*world).bg_state);
+        crate::bg_saga::BG_SiegeCheckClassLegality(
+            team,
+            className.as_mut_ptr(),
+            &mut (*world).bg_state,
+        );
 
-        write_cstr_field(&mut (*client).sess.siegeClass, &cstr_to_str(className.as_ptr()));
+        write_cstr_field(
+            &mut (*client).sess.siegeClass,
+            &cstr_to_str(className.as_ptr()),
+        );
 
         crate::g_client::ClientUserinfoChanged(ctx, (*ent).s.number);
 
@@ -1673,10 +1905,7 @@ pub fn Cmd_SiegeClass_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype` cvar,
 // calls `WP_InitForcePowers`/`G_GetStringEdString`/`trap_SendServerCommand`/
 // `trap_Argc`/`trap_Argv`/`Cmd_Team_f`; no GameWorld/engine handle reachable here.
-pub fn Cmd_ForceChanged_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_ForceChanged_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
@@ -1688,18 +1917,31 @@ pub fn Cmd_ForceChanged_f(
         if (*client).sess.sessionTeam == TEAM_SPECTATOR {
             crate::w_force::WP_InitForcePowers(ctx, ent);
         } else {
-            let buf = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"FORCEPOWERCHANGED".as_ptr() as *mut c_char);
+            let buf = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"FORCEPOWERCHANGED".as_ptr() as *mut c_char,
+            );
             let fpChStr = cstr_to_str(buf);
-            let s = format!("print \"{}{}\n\n\"", S_COLOR_GREEN.to_string_lossy(), fpChStr);
+            let s = format!(
+                "print \"{}{}\n\n\"",
+                S_COLOR_GREEN.to_string_lossy(),
+                fpChStr
+            );
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
             );
 
             (*client).ps.fd.forceDoInit = 1;
         }
 
-        if (*world).cvars.g_gametype.integer == GT_DUEL || (*world).cvars.g_gametype.integer == GT_POWERDUEL {
+        if (*world).cvars.g_gametype.integer == GT_DUEL
+            || (*world).cvars.g_gametype.integer == GT_POWERDUEL
+        {
             return;
         }
 
@@ -1707,7 +1949,11 @@ pub fn Cmd_ForceChanged_f(
             let mut arg = [0 as c_char; MAX_TOKEN_CHARS];
             trap::Argv(
                 ctx.engine,
-                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, arg.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    1,
+                    arg.as_mut_ptr(),
+                    MAX_TOKEN_CHARS as c_int,
+                ),
             );
 
             if arg[0] != 0 {
@@ -1778,13 +2024,19 @@ pub fn G_SetSaber(
             debug_assert!(false, "should never happen!"); // Raven `assert(0)`
             write_cstr_field(&mut (*client).sess.saberType, "none");
         } else {
-            write_cstr_field(&mut (*client).sess.saberType, &cstr_to_str((*client).saber[0].name.as_ptr()));
+            write_cstr_field(
+                &mut (*client).sess.saberType,
+                &cstr_to_str((*client).saber[0].name.as_ptr()),
+            );
         }
 
         if (*client).saber[1].model[0] == 0 {
             write_cstr_field(&mut (*client).sess.saber2Type, "none");
         } else {
-            write_cstr_field(&mut (*client).sess.saber2Type, &cstr_to_str((*client).saber[1].name.as_ptr()));
+            write_cstr_field(
+                &mut (*client).sess.saber2Type,
+                &cstr_to_str((*client).saber[1].name.as_ptr()),
+            );
         }
 
         if crate::bg_saberLoad::WP_SaberStyleValidForSaber(
@@ -1811,10 +2063,7 @@ pub fn G_SetSaber(
 /// Raven `Cmd_Follow_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:1462-1503`
-pub fn Cmd_Follow_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_Follow_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use crate::client::spectator_state::spectatorState_t::*;
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
@@ -1878,11 +2127,7 @@ pub fn Cmd_Follow_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.clients`/
 // `level.maxclients` and `g_gametype` cvar, calls `SetTeam`/`G_Error`; no
 // GameWorld/engine handle reachable here.
-pub fn Cmd_FollowCycle_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    dir: c_int,
-) {
+pub fn Cmd_FollowCycle_f(ctx: GameContext<'_>, ent: *mut gentity_t, dir: c_int) {
     use crate::client::spectator_state::spectatorState_t::*;
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
@@ -1890,7 +2135,8 @@ pub fn Cmd_FollowCycle_f(
         let world = ctx.world;
         let client = (*ent).client as *mut gclient_t;
 
-        if ((*world).cvars.g_gametype.integer == GT_DUEL || (*world).cvars.g_gametype.integer == GT_POWERDUEL)
+        if ((*world).cvars.g_gametype.integer == GT_DUEL
+            || (*world).cvars.g_gametype.integer == GT_POWERDUEL)
             && (*client).sess.sessionTeam == TEAM_FREE
         {
             (*client).sess.losses += 1;
@@ -1916,14 +2162,22 @@ pub fn Cmd_FollowCycle_f(
                 clientnum = (*world).level.maxclients - 1;
             }
 
-            if (*(*world).level.clients.add(clientnum as usize)).pers.connected != CON_CONNECTED {
+            if (*(*world).level.clients.add(clientnum as usize))
+                .pers
+                .connected
+                != CON_CONNECTED
+            {
                 if clientnum == original {
                     break;
                 }
                 continue;
             }
 
-            if (*(*world).level.clients.add(clientnum as usize)).sess.sessionTeam == TEAM_SPECTATOR {
+            if (*(*world).level.clients.add(clientnum as usize))
+                .sess
+                .sessionTeam
+                == TEAM_SPECTATOR
+            {
                 if clientnum == original {
                     break;
                 }
@@ -1999,14 +2253,27 @@ pub fn G_SayTo(
             );
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, other), cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, other),
+                    cstr(&s),
+                ),
             );
         } else {
             let cmdname = if mode == SAY_TEAM { "tchat" } else { "chat" };
-            let s = format!("{} \"{}{}{}{}\"", cmdname, name_str, Q_COLOR_ESCAPE as u8 as char, (color as u8) as char, message_str);
+            let s = format!(
+                "{} \"{}{}{}{}\"",
+                cmdname,
+                name_str,
+                Q_COLOR_ESCAPE as u8 as char,
+                (color as u8) as char,
+                message_str
+            );
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, other), cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, other),
+                    cstr(&s),
+                ),
             );
         }
     }
@@ -2049,7 +2316,8 @@ pub fn G_Say(
                 crate::g_main::G_LogPrintf(ctx, cstr(&logmsg).as_ptr());
 
                 let mut location = [0 as c_char; 64];
-                if crate::g_team::Team_GetLocationMsg(ctx, ent, location.as_mut_ptr(), 64) != qfalse {
+                if crate::g_team::Team_GetLocationMsg(ctx, ent, location.as_mut_ptr(), 64) != qfalse
+                {
                     name = format!("^7({}^7)^7: ", netname);
                     locMsg = Some(cstr_to_str(location.as_ptr()));
                 } else {
@@ -2058,14 +2326,20 @@ pub fn G_Say(
                 color = COLOR_CYAN;
             }
             SAY_TELL => {
-                let targetClient = if !target.is_null() { (*target).client as *mut gclient_t } else { std::ptr::null_mut() };
+                let targetClient = if !target.is_null() {
+                    (*target).client as *mut gclient_t
+                } else {
+                    std::ptr::null_mut()
+                };
                 if !target.is_null()
                     && (*world).cvars.g_gametype.integer >= GT_TEAM
                     && !targetClient.is_null()
                     && (*targetClient).sess.sessionTeam == (*client).sess.sessionTeam
                 {
                     let mut location = [0 as c_char; 64];
-                    if crate::g_team::Team_GetLocationMsg(ctx, ent, location.as_mut_ptr(), 64) != qfalse {
+                    if crate::g_team::Team_GetLocationMsg(ctx, ent, location.as_mut_ptr(), 64)
+                        != qfalse
+                    {
                         name = format!("^7[{}^7]^7: ", netname);
                         locMsg = Some(cstr_to_str(location.as_ptr()));
                     } else {
@@ -2091,10 +2365,26 @@ pub fn G_Say(
         let text_str = cstr_to_str(text.as_ptr());
 
         if !target.is_null() {
-            let lm = locMsg.map(|s| { let mut b: Vec<c_char> = s.bytes().map(|c| c as c_char).collect(); b.push(0); b });
+            let lm = locMsg.map(|s| {
+                let mut b: Vec<c_char> = s.bytes().map(|c| c as c_char).collect();
+                b.push(0);
+                b
+            });
             let mut lm_buf = lm;
-            let lm_ptr = lm_buf.as_mut().map(|v| v.as_mut_ptr()).unwrap_or(std::ptr::null_mut());
-            G_SayTo(ctx, ent, target, mode, color, cstr(&name).as_ptr(), cstr(&text_str).as_ptr(), lm_ptr);
+            let lm_ptr = lm_buf
+                .as_mut()
+                .map(|v| v.as_mut_ptr())
+                .unwrap_or(std::ptr::null_mut());
+            G_SayTo(
+                ctx,
+                ent,
+                target,
+                mode,
+                color,
+                cstr(&name).as_ptr(),
+                cstr(&text_str).as_ptr(),
+                lm_ptr,
+            );
             return;
         }
 
@@ -2109,10 +2399,26 @@ pub fn G_Say(
         // send it to all the apropriate clients
         for j in 0..(*world).level.maxclients {
             let other = &mut (*world).g_entities[j as usize] as *mut gentity_t;
-            let lm = locMsg.clone().map(|s| { let mut b: Vec<c_char> = s.bytes().map(|c| c as c_char).collect(); b.push(0); b });
+            let lm = locMsg.clone().map(|s| {
+                let mut b: Vec<c_char> = s.bytes().map(|c| c as c_char).collect();
+                b.push(0);
+                b
+            });
             let mut lm_buf = lm;
-            let lm_ptr = lm_buf.as_mut().map(|v| v.as_mut_ptr()).unwrap_or(std::ptr::null_mut());
-            G_SayTo(ctx, ent, other, mode, color, cstr(&name).as_ptr(), cstr(&text_str).as_ptr(), lm_ptr);
+            let lm_ptr = lm_buf
+                .as_mut()
+                .map(|v| v.as_mut_ptr())
+                .unwrap_or(std::ptr::null_mut());
+            G_SayTo(
+                ctx,
+                ent,
+                other,
+                mode,
+                color,
+                cstr(&name).as_ptr(),
+                cstr(&text_str).as_ptr(),
+                lm_ptr,
+            );
         }
     }
 }
@@ -2120,12 +2426,7 @@ pub fn G_Say(
 /// Raven `Cmd_Say_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:1695-1712`
-pub fn Cmd_Say_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    mode: c_int,
-    arg0: qboolean,
-) {
+pub fn Cmd_Say_f(ctx: GameContext<'_>, ent: *mut gentity_t, mode: c_int, arg0: qboolean) {
     unsafe {
         if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) < 2
             && arg0 == qfalse
@@ -2149,10 +2450,7 @@ pub fn Cmd_Say_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `level.maxclients`,
 // `g_entities`, calls `trap_Argc`/`trap_Argv`/`ConcatArgs`/`G_LogPrintf`/`G_Say`;
 // no GameWorld/engine handle reachable here.
-pub fn Cmd_Tell_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_Tell_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let world = ctx.world;
 
@@ -2163,7 +2461,11 @@ pub fn Cmd_Tell_f(
         let mut arg = [0 as c_char; MAX_TOKEN_CHARS];
         trap::Argv(
             ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, arg.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                arg.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
         );
         let targetNum: c_int = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(-1);
         if targetNum < 0 || targetNum >= (*world).level.maxclients {
@@ -2178,8 +2480,18 @@ pub fn Cmd_Tell_f(
         let p = ConcatArgs(ctx, 2);
 
         let netname_ent = cstr_to_str((*((*ent).client as *mut gclient_t)).pers.netname.as_ptr());
-        let netname_target = cstr_to_str((*((*target).client as *mut gclient_t)).pers.netname.as_ptr());
-        let logmsg = format!("tell: {} to {}: {}\n", netname_ent, netname_target, cstr_to_str(p));
+        let netname_target = cstr_to_str(
+            (*((*target).client as *mut gclient_t))
+                .pers
+                .netname
+                .as_ptr(),
+        );
+        let logmsg = format!(
+            "tell: {} to {}: {}\n",
+            netname_ent,
+            netname_target,
+            cstr_to_str(p)
+        );
         crate::g_main::G_LogPrintf(ctx, cstr(&logmsg).as_ptr());
         G_Say(ctx, ent, target, SAY_TELL, p as *const c_char);
         // don't tell to the player self if it was already directed to this player
@@ -2199,10 +2511,7 @@ pub fn Cmd_Tell_f(
 // `level.time`, the file-scope `bg_customSiegeSoundNames` table, calls
 // `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`G_TempEntity`/`G_SoundIndex`;
 // no GameWorld/engine handle reachable here.
-pub fn Cmd_VoiceCommand_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_VoiceCommand_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_TEAM;
 
     const MAX_CUSTOM_SIEGE_SOUNDS: usize = 32; // Source: `oracle/oracle/codemp/game/bg_public.h`
@@ -2219,12 +2528,21 @@ pub fn Cmd_VoiceCommand_f(
             return;
         }
 
-        if (*client).sess.sessionTeam == TEAM_SPECTATOR || (*client).tempSpectate >= (*world).level.time {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOVOICECHATASSPEC".as_ptr() as *mut c_char);
+        if (*client).sess.sessionTeam == TEAM_SPECTATOR
+            || (*client).tempSpectate >= (*world).level.time
+        {
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOVOICECHATASSPEC".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
             trap::SendServerCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
             );
             return;
         }
@@ -2232,7 +2550,11 @@ pub fn Cmd_VoiceCommand_f(
         let mut arg = [0 as c_char; MAX_TOKEN_CHARS];
         trap::Argv(
             ctx.engine,
-            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, arg.as_mut_ptr(), MAX_TOKEN_CHARS as c_int),
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                arg.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
         );
 
         if arg[0] as u8 == b'*' {
@@ -2269,16 +2591,27 @@ pub fn Cmd_VoiceCommand_f(
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:1822-1840`
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities`, calls
 // `trap_Argv`/`G_Say`; no GameWorld/engine handle reachable here.
-pub fn Cmd_GameCommand_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_GameCommand_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let world = ctx.world;
         let mut s = [0 as c_char; MAX_TOKEN_CHARS];
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, s.as_mut_ptr(), MAX_TOKEN_CHARS as c_int));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                s.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
+        );
         let player: c_int = cstr_to_str(s.as_ptr()).trim().parse().unwrap_or(0);
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2, s.as_mut_ptr(), MAX_TOKEN_CHARS as c_int));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                2,
+                s.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
+        );
         let order: c_int = cstr_to_str(s.as_ptr()).trim().parse().unwrap_or(0);
 
         if player < 0 || player >= MAX_CLIENTS as c_int {
@@ -2288,7 +2621,13 @@ pub fn Cmd_GameCommand_f(
             return;
         }
         let target = &mut (*world).g_entities[player as usize] as *mut gentity_t;
-        G_Say(ctx, ent, target, SAY_TELL, gc_orders[order as usize].as_ptr());
+        G_Say(
+            ctx,
+            ent,
+            target,
+            SAY_TELL,
+            gc_orders[order as usize].as_ptr(),
+        );
         G_Say(ctx, ent, ent, SAY_TELL, gc_orders[order as usize].as_ptr());
     }
 }
@@ -2299,16 +2638,16 @@ pub fn Cmd_GameCommand_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): computes `ent - g_entities`
 // and calls `trap_SendServerCommand`/`vtos`; no GameWorld/engine handle reachable
 // here.
-pub fn Cmd_Where_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_Where_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let v = crate::g_utils::vtos(ctx, (*ent).s.origin);
         let s = format!("print \"{}\n\"", cstr_to_str(v));
         trap::SendServerCommand(
             ctx.engine,
-            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
+            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                ent_index(ctx, ent),
+                cstr(&s),
+            ),
         );
     }
 }
@@ -2318,10 +2657,7 @@ pub fn Cmd_Where_f(
 /// Finds the client number of the client with the given name.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:1871-1890`
-pub fn G_ClientNumberFromName(
-    ctx: GameContext<'_>,
-    name: *const c_char,
-) -> c_int {
+pub fn G_ClientNumberFromName(ctx: GameContext<'_>, name: *const c_char) -> c_int {
     unsafe {
         let mut s2 = [0 as c_char; MAX_STRING_CHARS];
         let mut n2 = [0 as c_char; MAX_STRING_CHARS];
@@ -2346,10 +2682,7 @@ pub fn G_ClientNumberFromName(
 /// Rich's revised version of `SanitizeString`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:1899-1937`
-pub fn SanitizeString2(
-    r#in: *mut c_char,
-    out: *mut c_char,
-) {
+pub fn SanitizeString2(r#in: *mut c_char, out: *mut c_char) {
     pub const MAX_NAME_LENGTH: usize = 32; // Source: `oracle/oracle/codemp/game/bg_public.h`
     unsafe {
         let mut i: isize = 0;
@@ -2398,10 +2731,7 @@ pub fn SanitizeString2(
 /// names before comparing.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:1946-1965`
-pub fn G_ClientNumberFromStrippedName(
-    ctx: GameContext<'_>,
-    name: *const c_char,
-) -> c_int {
+pub fn G_ClientNumberFromStrippedName(ctx: GameContext<'_>, name: *const c_char) -> c_int {
     unsafe {
         let mut s2 = [0 as c_char; MAX_STRING_CHARS];
         let mut n2 = [0 as c_char; MAX_STRING_CHARS];
@@ -2427,11 +2757,10 @@ pub fn G_ClientNumberFromStrippedName(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes many `level.vote*`
 // fields, `g_allowVote` cvar, calls a dozen trap_*/G_* helpers; no GameWorld/
 // engine handle reachable here.
-pub fn Cmd_CallVote_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
-    use mp_bg::public::gametype::{GT_DUEL, GT_FFA, GT_MAX_GAME_TYPE, GT_POWERDUEL, GT_SINGLE_PLAYER};
+pub fn Cmd_CallVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
+    use mp_bg::public::gametype::{
+        GT_DUEL, GT_FFA, GT_MAX_GAME_TYPE, GT_POWERDUEL, GT_SINGLE_PLAYER,
+    };
 
     const MAX_VOTE_COUNT: c_int = 5; // Source: `oracle/oracle/codemp/game/g_local.h`
     const MAX_STRING_TOKENS: usize = 1024;
@@ -2441,49 +2770,127 @@ pub fn Cmd_CallVote_f(
         let client = (*ent).client as *mut gclient_t;
 
         if (*world).cvars.g_allowVote.integer == 0 {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOVOTE".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOVOTE".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
 
         if (*world).level.voteTime != 0 || (*world).level.voteExecuteTime >= (*world).level.time {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"VOTEINPROGRESS".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"VOTEINPROGRESS".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
         if (*client).pers.voteCount >= MAX_VOTE_COUNT {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"MAXVOTES".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"MAXVOTES".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
 
-        if (*world).cvars.g_gametype.integer != GT_DUEL && (*world).cvars.g_gametype.integer != GT_POWERDUEL {
+        if (*world).cvars.g_gametype.integer != GT_DUEL
+            && (*world).cvars.g_gametype.integer != GT_POWERDUEL
+        {
             if (*client).sess.sessionTeam == TEAM_SPECTATOR {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOSPECVOTE".as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"NOSPECVOTE".as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{}\n\"", cstr_to_str(m));
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&s),
+                    ),
+                );
                 return;
             }
         }
 
         let mut arg1 = [0 as c_char; MAX_STRING_TOKENS];
         let mut arg2 = [0 as c_char; MAX_STRING_TOKENS];
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, arg1.as_mut_ptr(), MAX_STRING_TOKENS as c_int));
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2, arg2.as_mut_ptr(), MAX_STRING_TOKENS as c_int));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                arg1.as_mut_ptr(),
+                MAX_STRING_TOKENS as c_int,
+            ),
+        );
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                2,
+                arg2.as_mut_ptr(),
+                MAX_STRING_TOKENS as c_int,
+            ),
+        );
         let arg1_s = cstr_to_str(arg1.as_ptr());
         let arg2_s = cstr_to_str(arg2.as_ptr());
 
         if arg1_s.contains(';') || arg2_s.contains(';') {
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"Invalid vote string.\n\"")));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr("print \"Invalid vote string.\n\""),
+                ),
+            );
             return;
         }
 
-        let valid = ["map_restart", "nextmap", "map", "g_gametype", "kick", "clientkick", "g_doWarmup", "timelimit", "fraglimit"];
+        let valid = [
+            "map_restart",
+            "nextmap",
+            "map",
+            "g_gametype",
+            "kick",
+            "clientkick",
+            "g_doWarmup",
+            "timelimit",
+            "fraglimit",
+        ];
         if !valid.iter().any(|v| arg1_s.eq_ignore_ascii_case(v)) {
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"Invalid vote string.\n\"")));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr("print \"Invalid vote string.\n\""),
+                ),
+            );
             trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"Vote commands are: map_restart, nextmap, map <mapname>, g_gametype <n>, kick <player>, clientkick <clientnum>, g_doWarmup, timelimit <time>, fraglimit <frags>.\n\"")));
             return;
         }
@@ -2491,13 +2898,25 @@ pub fn Cmd_CallVote_f(
         if (*world).level.voteExecuteTime != 0 {
             (*world).level.voteExecuteTime = 0;
             let cc = format!("{}\n", cstr_to_str((*world).level.voteString.as_ptr()));
-            trap::SendConsoleCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND as c_int, cstr(&cc)));
+            trap::SendConsoleCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
+                    EXEC_APPEND as c_int,
+                    cstr(&cc),
+                ),
+            );
         }
 
         if arg1_s.eq_ignore_ascii_case("g_gametype") {
             let i: c_int = arg2_s.trim().parse().unwrap_or(0);
             if i == GT_SINGLE_PLAYER || i < GT_FFA || i >= GT_MAX_GAME_TYPE {
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"Invalid gametype.\n\"")));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr("print \"Invalid gametype.\n\""),
+                    ),
+                );
                 return;
             }
 
@@ -2505,23 +2924,44 @@ pub fn Cmd_CallVote_f(
             (*world).level.votingGametypeTo = i;
 
             write_cstr_field(&mut (*world).level.voteString, &format!("{} {}", arg1_s, i));
-            write_cstr_field(&mut (*world).level.voteDisplayString, &format!("{} {}", arg1_s, cstr_to_str(gameNames[i as usize].as_ptr())));
+            write_cstr_field(
+                &mut (*world).level.voteDisplayString,
+                &format!("{} {}", arg1_s, cstr_to_str(gameNames[i as usize].as_ptr())),
+            );
         } else if arg1_s.eq_ignore_ascii_case("map") {
             let mut s = [0 as c_char; MAX_STRING_CHARS];
             let gametype = trap::Cvar_VariableIntegerValue(ctx.engine, mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(cstr("g_gametype")));
-            if crate::g_bot::G_DoesMapSupportGametype(ctx, cstr(&arg2_s).as_ptr(), gametype) == qfalse {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOVOTE_MAPNOTSUPPORTEDBYGAME".as_ptr() as *mut c_char);
+            if crate::g_bot::G_DoesMapSupportGametype(ctx, cstr(&arg2_s).as_ptr(), gametype)
+                == qfalse
+            {
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"NOVOTE_MAPNOTSUPPORTEDBYGAME".as_ptr() as *mut c_char,
+                );
                 let msg = format!("print \"{}\n\"", cstr_to_str(m));
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&msg),
+                    ),
+                );
                 return;
             }
 
             trap::Cvar_VariableStringBuffer(ctx.engine, mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs::new(cstr("nextmap"), s.as_mut_ptr(), MAX_STRING_CHARS as c_int));
             let s_str = cstr_to_str(s.as_ptr());
             if !s_str.is_empty() {
-                write_cstr_field(&mut (*world).level.voteString, &format!("{} {}; set nextmap \"{}\"", arg1_s, arg2_s, s_str));
+                write_cstr_field(
+                    &mut (*world).level.voteString,
+                    &format!("{} {}; set nextmap \"{}\"", arg1_s, arg2_s, s_str),
+                );
             } else {
-                write_cstr_field(&mut (*world).level.voteString, &format!("{} {}", arg1_s, arg2_s));
+                write_cstr_field(
+                    &mut (*world).level.voteString,
+                    &format!("{} {}", arg1_s, arg2_s),
+                );
             }
 
             let arenaInfo = crate::g_bot::G_GetArenaInfoByMap(ctx, cstr(&arg2_s).as_ptr());
@@ -2536,43 +2976,88 @@ pub fn Cmd_CallVote_f(
                 cstr_to_str(mapName)
             };
 
-            write_cstr_field(&mut (*world).level.voteDisplayString, &format!("map {}", mapName_str));
+            write_cstr_field(
+                &mut (*world).level.voteDisplayString,
+                &format!("map {}", mapName_str),
+            );
         } else if arg1_s.eq_ignore_ascii_case("clientkick") {
             let n: c_int = arg2_s.trim().parse().unwrap_or(-1);
             if n < 0 || n >= MAX_CLIENTS as c_int {
                 let msg = format!("print \"invalid client number {}.\n\"", n);
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&msg),
+                    ),
+                );
                 return;
             }
 
             let nclient = (*world).g_entities[n as usize].client as *mut gclient_t;
             if (*nclient).pers.connected == crate::client::client_connected::CON_DISCONNECTED {
-                let msg = format!("print \"there is no client with the client number {}.\n\"", n);
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
+                let msg = format!(
+                    "print \"there is no client with the client number {}.\n\"",
+                    n
+                );
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&msg),
+                    ),
+                );
                 return;
             }
 
-            write_cstr_field(&mut (*world).level.voteString, &format!("{} {}", arg1_s, arg2_s));
-            write_cstr_field(&mut (*world).level.voteDisplayString, &format!("kick {}", cstr_to_str((*nclient).pers.netname.as_ptr())));
+            write_cstr_field(
+                &mut (*world).level.voteString,
+                &format!("{} {}", arg1_s, arg2_s),
+            );
+            write_cstr_field(
+                &mut (*world).level.voteDisplayString,
+                &format!("kick {}", cstr_to_str((*nclient).pers.netname.as_ptr())),
+            );
         } else if arg1_s.eq_ignore_ascii_case("kick") {
             let mut clientid = G_ClientNumberFromName(ctx, cstr(&arg2_s).as_ptr());
             if clientid == -1 {
                 clientid = G_ClientNumberFromStrippedName(ctx, cstr(&arg2_s).as_ptr());
                 if clientid == -1 {
-                    let msg = format!("print \"there is no client named '{}' currently on the server.\n\"", arg2_s);
-                    trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
+                    let msg = format!(
+                        "print \"there is no client named '{}' currently on the server.\n\"",
+                        arg2_s
+                    );
+                    trap::SendServerCommand(
+                        ctx.engine,
+                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                            ent_index(ctx, ent),
+                            cstr(&msg),
+                        ),
+                    );
                     return;
                 }
             }
 
-            write_cstr_field(&mut (*world).level.voteString, &format!("clientkick {}", clientid));
+            write_cstr_field(
+                &mut (*world).level.voteString,
+                &format!("clientkick {}", clientid),
+            );
             let ncl = (*world).g_entities[clientid as usize].client as *mut gclient_t;
-            write_cstr_field(&mut (*world).level.voteDisplayString, &format!("kick {}", cstr_to_str((*ncl).pers.netname.as_ptr())));
+            write_cstr_field(
+                &mut (*world).level.voteDisplayString,
+                &format!("kick {}", cstr_to_str((*ncl).pers.netname.as_ptr())),
+            );
         } else if arg1_s.eq_ignore_ascii_case("nextmap") {
             let mut s = [0 as c_char; MAX_STRING_CHARS];
             trap::Cvar_VariableStringBuffer(ctx.engine, mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs::new(cstr("nextmap"), s.as_mut_ptr(), MAX_STRING_CHARS as c_int));
             if cstr_to_str(s.as_ptr()).is_empty() {
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"nextmap not set.\n\"")));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr("print \"nextmap not set.\n\""),
+                    ),
+                );
                 return;
             }
             crate::g_saga::SiegeClearSwitchData(ctx);
@@ -2580,14 +3065,31 @@ pub fn Cmd_CallVote_f(
             let vs = cstr_to_str((*world).level.voteString.as_ptr());
             write_cstr_field(&mut (*world).level.voteDisplayString, &vs);
         } else {
-            write_cstr_field(&mut (*world).level.voteString, &format!("{} \"{}\"", arg1_s, arg2_s));
+            write_cstr_field(
+                &mut (*world).level.voteString,
+                &format!("{} \"{}\"", arg1_s, arg2_s),
+            );
             let vs = cstr_to_str((*world).level.voteString.as_ptr());
             write_cstr_field(&mut (*world).level.voteDisplayString, &vs);
         }
 
-        let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"PLCALLEDVOTE".as_ptr() as *mut c_char);
-        let s = format!("print \"{}^7 {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), cstr_to_str(m));
-        trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)));
+        let m = crate::g_main::G_GetStringEdString(
+            ctx,
+            c"MP_SVGAME".as_ptr() as *mut c_char,
+            c"PLCALLEDVOTE".as_ptr() as *mut c_char,
+        );
+        let s = format!(
+            "print \"{}^7 {}\n\"",
+            cstr_to_str((*client).pers.netname.as_ptr()),
+            cstr_to_str(m)
+        );
+        trap::SendServerCommand(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                -1,
+                cstr(&s),
+            ),
+        );
 
         (*world).level.voteTime = (*world).level.time;
         (*world).level.voteYes = 1;
@@ -2598,10 +3100,34 @@ pub fn Cmd_CallVote_f(
         }
         (*client).mGameFlags |= PSG_VOTED as u32;
 
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_VOTE_TIME, cstr(&format!("{}", (*world).level.voteTime))));
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_VOTE_STRING, cstr(&cstr_to_str((*world).level.voteDisplayString.as_ptr()))));
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_VOTE_YES, cstr(&format!("{}", (*world).level.voteYes))));
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_VOTE_NO, cstr(&format!("{}", (*world).level.voteNo))));
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                CS_VOTE_TIME,
+                cstr(&format!("{}", (*world).level.voteTime)),
+            ),
+        );
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                CS_VOTE_STRING,
+                cstr(&cstr_to_str((*world).level.voteDisplayString.as_ptr())),
+            ),
+        );
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                CS_VOTE_YES,
+                cstr(&format!("{}", (*world).level.voteYes)),
+            ),
+        );
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                CS_VOTE_NO,
+                cstr(&format!("{}", (*world).level.voteNo)),
+            ),
+        );
     }
 }
 
@@ -2611,10 +3137,7 @@ pub fn Cmd_CallVote_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes `level.voteTime`/
 // `voteYes`/`voteNo`, `g_gametype` cvar, calls `trap_Argv`/`trap_SendServerCommand`/
 // `trap_SetConfigstring`; no GameWorld/engine handle reachable here.
-pub fn Cmd_Vote_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_Vote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 
     unsafe {
@@ -2622,41 +3145,98 @@ pub fn Cmd_Vote_f(
         let client = (*ent).client as *mut gclient_t;
 
         if (*world).level.voteTime == 0 {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOVOTEINPROG".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOVOTEINPROG".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
         if (*client).mGameFlags & (PSG_VOTED as u32) != 0 {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"VOTEALREADY".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"VOTEALREADY".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
-        if (*world).cvars.g_gametype.integer != GT_DUEL && (*world).cvars.g_gametype.integer != GT_POWERDUEL {
+        if (*world).cvars.g_gametype.integer != GT_DUEL
+            && (*world).cvars.g_gametype.integer != GT_POWERDUEL
+        {
             if (*client).sess.sessionTeam == TEAM_SPECTATOR {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOVOTEASSPEC".as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"NOVOTEASSPEC".as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{}\n\"", cstr_to_str(m));
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&s),
+                    ),
+                );
                 return;
             }
         }
 
-        let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"PLVOTECAST".as_ptr() as *mut c_char);
+        let m = crate::g_main::G_GetStringEdString(
+            ctx,
+            c"MP_SVGAME".as_ptr() as *mut c_char,
+            c"PLVOTECAST".as_ptr() as *mut c_char,
+        );
         let s = format!("print \"{}\n\"", cstr_to_str(m));
-        trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+        trap::SendServerCommand(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                ent_index(ctx, ent),
+                cstr(&s),
+            ),
+        );
 
         (*client).mGameFlags |= PSG_VOTED as u32;
 
         let mut msg = [0 as c_char; 64];
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, msg.as_mut_ptr(), 64));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, msg.as_mut_ptr(), 64),
+        );
 
         if msg[0] as u8 == b'y' || msg[1] as u8 == b'Y' || msg[1] as u8 == b'1' {
             (*world).level.voteYes += 1;
-            trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_VOTE_YES, cstr(&format!("{}", (*world).level.voteYes))));
+            trap::SetConfigstring(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                    CS_VOTE_YES,
+                    cstr(&format!("{}", (*world).level.voteYes)),
+                ),
+            );
         } else {
             (*world).level.voteNo += 1;
-            trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_VOTE_NO, cstr(&format!("{}", (*world).level.voteNo))));
+            trap::SetConfigstring(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                    CS_VOTE_NO,
+                    cstr(&format!("{}", (*world).level.voteNo)),
+                ),
+            );
         }
         // a majority will be determined in CheckVote, which will also account
         // for players entering or leaving
@@ -2669,10 +3249,7 @@ pub fn Cmd_Vote_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes many
 // `level.teamVote*` fields, `g_gametype`/`g_allowTeamVote` cvars, `level.clients`;
 // no GameWorld/engine handle reachable here.
-pub fn Cmd_CallTeamVote_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_CallTeamVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_TEAM;
 
     const MAX_STRING_TOKENS: usize = 1024;
@@ -2685,7 +3262,13 @@ pub fn Cmd_CallTeamVote_f(
         let client = (*ent).client as *mut gclient_t;
 
         if (*world).cvars.g_gametype.integer < GT_TEAM {
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"Cannot call a team vote in a non-team gametype!\n\"")));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr("print \"Cannot call a team vote in a non-team gametype!\n\""),
+                ),
+            );
             return;
         }
         let team = (*client).sess.sessionTeam;
@@ -2694,38 +3277,91 @@ pub fn Cmd_CallTeamVote_f(
         } else if team == TEAM_BLUE {
             1
         } else {
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"Cannot call a team vote if not on a team!\n\"")));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr("print \"Cannot call a team vote if not on a team!\n\""),
+                ),
+            );
             return;
         };
 
         if (*world).cvars.g_allowTeamVote.integer == 0 {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOVOTE".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOVOTE".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
 
         if (*world).level.teamVoteTime[cs_offset as usize] != 0 {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"TEAMVOTEALREADY".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"TEAMVOTEALREADY".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
         if (*client).pers.teamVoteCount >= MAX_VOTE_COUNT {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"MAXTEAMVOTES".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"MAXTEAMVOTES".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
         if (*client).sess.sessionTeam == TEAM_SPECTATOR {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOSPECVOTE".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOSPECVOTE".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
 
         let mut arg1 = [0 as c_char; MAX_STRING_TOKENS];
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, arg1.as_mut_ptr(), MAX_STRING_TOKENS as c_int));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                arg1.as_mut_ptr(),
+                MAX_STRING_TOKENS as c_int,
+            ),
+        );
         let arg1_s = cstr_to_str(arg1.as_ptr());
         let mut arg2_s = String::new();
         let argc = trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new());
@@ -2734,12 +3370,25 @@ pub fn Cmd_CallTeamVote_f(
                 arg2_s.push(' ');
             }
             let mut a = [0 as c_char; MAX_STRING_TOKENS];
-            trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(i, a.as_mut_ptr(), MAX_STRING_TOKENS as c_int));
+            trap::Argv(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    i,
+                    a.as_mut_ptr(),
+                    MAX_STRING_TOKENS as c_int,
+                ),
+            );
             arg2_s.push_str(&cstr_to_str(a.as_ptr()));
         }
 
         if arg1_s.contains(';') || arg2_s.contains(';') {
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"Invalid vote string.\n\"")));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr("print \"Invalid vote string.\n\""),
+                ),
+            );
             return;
         }
 
@@ -2771,13 +3420,17 @@ pub fn Cmd_CallTeamVote_f(
                     targetClientNum = (*world).level.maxclients;
                     for i in 0..(*world).level.maxclients {
                         let cl = (*world).level.clients.add(i as usize);
-                        if (*cl).pers.connected == crate::client::client_connected::CON_DISCONNECTED {
+                        if (*cl).pers.connected == crate::client::client_connected::CON_DISCONNECTED
+                        {
                             continue;
                         }
                         if (*cl).sess.sessionTeam != team {
                             continue;
                         }
-                        let mut nbuf: Vec<c_char> = cstr_to_str((*cl).pers.netname.as_ptr()).bytes().map(|b| b as c_char).collect();
+                        let mut nbuf: Vec<c_char> = cstr_to_str((*cl).pers.netname.as_ptr())
+                            .bytes()
+                            .map(|b| b as c_char)
+                            .collect();
                         nbuf.push(0);
                         crate::q_shared::Q_CleanStr(nbuf.as_mut_ptr());
                         let netname = cstr_to_str(nbuf.as_ptr());
@@ -2787,7 +3440,8 @@ pub fn Cmd_CallTeamVote_f(
                         }
                     }
                     if targetClientNum >= (*world).level.maxclients {
-                        let msg = format!("print \"{} is not a valid player on your team.\n\"", arg2_s);
+                        let msg =
+                            format!("print \"{} is not a valid player on your team.\n\"", arg2_s);
                         trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
                         return;
                     }
@@ -2795,26 +3449,53 @@ pub fn Cmd_CallTeamVote_f(
             }
             if targetClientNum >= MAX_CLIENTS as c_int {
                 let msg = format!("print \"{} is not a valid player on your team.\n\"", arg2_s);
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&msg),
+                    ),
+                );
                 return;
             }
             let tcl = (*world).level.clients.add(targetClientNum as usize);
             if (*tcl).sess.sessionTeam != (*client).sess.sessionTeam {
-                let msg = format!("print \"Cannot call a team vote on someone not on your team ({}).\n\"", cstr_to_str((*tcl).pers.netname.as_ptr()));
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
+                let msg = format!(
+                    "print \"Cannot call a team vote on someone not on your team ({}).\n\"",
+                    cstr_to_str((*tcl).pers.netname.as_ptr())
+                );
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&msg),
+                    ),
+                );
                 return;
             }
             arg2_s = format!("{}", targetClientNum);
         } else {
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"Invalid vote string.\n\"")));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr("print \"Invalid vote string.\n\""),
+                ),
+            );
             trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"Team vote commands are: leader <player on your team> OR kick <player on your team>.\n\"")));
             return;
         }
 
         if arg1_s.eq_ignore_ascii_case("kick") {
-            write_cstr_field(&mut (*world).level.teamVoteString[cs_offset as usize], &format!("clientkick {}", arg2_s));
+            write_cstr_field(
+                &mut (*world).level.teamVoteString[cs_offset as usize],
+                &format!("clientkick {}", arg2_s),
+            );
         } else {
-            write_cstr_field(&mut (*world).level.teamVoteString[cs_offset as usize], &format!("{} {}", arg1_s, arg2_s));
+            write_cstr_field(
+                &mut (*world).level.teamVoteString[cs_offset as usize],
+                &format!("{} {}", arg1_s, arg2_s),
+            );
         }
 
         for i in 0..(*world).level.maxclients {
@@ -2823,8 +3504,17 @@ pub fn Cmd_CallTeamVote_f(
                 continue;
             }
             if (*cl).sess.sessionTeam == team {
-                let msg = format!("print \"{} called a team vote.\n\"", cstr_to_str((*client).pers.netname.as_ptr()));
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(i, cstr(&msg)));
+                let msg = format!(
+                    "print \"{} called a team vote.\n\"",
+                    cstr_to_str((*client).pers.netname.as_ptr())
+                );
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        i,
+                        cstr(&msg),
+                    ),
+                );
             }
         }
 
@@ -2840,10 +3530,45 @@ pub fn Cmd_CallTeamVote_f(
         }
         (*client).mGameFlags |= PSG_TEAMVOTED as u32;
 
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_TEAMVOTE_TIME + cs_offset, cstr(&format!("{}", (*world).level.teamVoteTime[cs_offset as usize]))));
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_TEAMVOTE_STRING + cs_offset, cstr(&cstr_to_str((*world).level.teamVoteString[cs_offset as usize].as_ptr()))));
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_TEAMVOTE_YES + cs_offset, cstr(&format!("{}", (*world).level.teamVoteYes[cs_offset as usize]))));
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_TEAMVOTE_NO + cs_offset, cstr(&format!("{}", (*world).level.teamVoteNo[cs_offset as usize]))));
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                CS_TEAMVOTE_TIME + cs_offset,
+                cstr(&format!(
+                    "{}",
+                    (*world).level.teamVoteTime[cs_offset as usize]
+                )),
+            ),
+        );
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                CS_TEAMVOTE_STRING + cs_offset,
+                cstr(&cstr_to_str(
+                    (*world).level.teamVoteString[cs_offset as usize].as_ptr(),
+                )),
+            ),
+        );
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                CS_TEAMVOTE_YES + cs_offset,
+                cstr(&format!(
+                    "{}",
+                    (*world).level.teamVoteYes[cs_offset as usize]
+                )),
+            ),
+        );
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                CS_TEAMVOTE_NO + cs_offset,
+                cstr(&format!(
+                    "{}",
+                    (*world).level.teamVoteNo[cs_offset as usize]
+                )),
+            ),
+        );
     }
 }
 
@@ -2853,10 +3578,7 @@ pub fn Cmd_CallTeamVote_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads/writes
 // `level.teamVote*` fields, calls `trap_Argv`/`trap_SendServerCommand`/
 // `trap_SetConfigstring`; no GameWorld/engine handle reachable here.
-pub fn Cmd_TeamVote_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_TeamVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let world = ctx.world;
         let client = (*ent).client as *mut gclient_t;
@@ -2870,39 +3592,100 @@ pub fn Cmd_TeamVote_f(
         };
 
         if (*world).level.teamVoteTime[cs_offset as usize] == 0 {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOTEAMVOTEINPROG".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOTEAMVOTEINPROG".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
         if (*client).mGameFlags & (PSG_TEAMVOTED as u32) != 0 {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"TEAMVOTEALREADYCAST".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"TEAMVOTEALREADYCAST".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
         if (*client).sess.sessionTeam == TEAM_SPECTATOR {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOVOTEASSPEC".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOVOTEASSPEC".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
 
-        let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"PLTEAMVOTECAST".as_ptr() as *mut c_char);
+        let m = crate::g_main::G_GetStringEdString(
+            ctx,
+            c"MP_SVGAME".as_ptr() as *mut c_char,
+            c"PLTEAMVOTECAST".as_ptr() as *mut c_char,
+        );
         let s = format!("print \"{}\n\"", cstr_to_str(m));
-        trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+        trap::SendServerCommand(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                ent_index(ctx, ent),
+                cstr(&s),
+            ),
+        );
 
         (*client).mGameFlags |= PSG_TEAMVOTED as u32;
 
         let mut msg = [0 as c_char; 64];
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, msg.as_mut_ptr(), 64));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, msg.as_mut_ptr(), 64),
+        );
 
         if msg[0] as u8 == b'y' || msg[1] as u8 == b'Y' || msg[1] as u8 == b'1' {
             (*world).level.teamVoteYes[cs_offset as usize] += 1;
-            trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_TEAMVOTE_YES + cs_offset, cstr(&format!("{}", (*world).level.teamVoteYes[cs_offset as usize]))));
+            trap::SetConfigstring(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                    CS_TEAMVOTE_YES + cs_offset,
+                    cstr(&format!(
+                        "{}",
+                        (*world).level.teamVoteYes[cs_offset as usize]
+                    )),
+                ),
+            );
         } else {
             (*world).level.teamVoteNo[cs_offset as usize] += 1;
-            trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_TEAMVOTE_NO + cs_offset, cstr(&format!("{}", (*world).level.teamVoteNo[cs_offset as usize]))));
+            trap::SetConfigstring(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                    CS_TEAMVOTE_NO + cs_offset,
+                    cstr(&format!(
+                        "{}",
+                        (*world).level.teamVoteNo[cs_offset as usize]
+                    )),
+                ),
+            );
         }
         // a majority will be determined in TeamCheckVote, which will also account
         // for players entering or leaving
@@ -2915,10 +3698,7 @@ pub fn Cmd_TeamVote_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_cheats` cvar, calls
 // `trap_Argc`/`trap_Argv`/`trap_SendServerCommand`/`TeleportPlayer`; no
 // GameWorld/engine handle reachable here.
-pub fn Cmd_SetViewpos_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_SetViewpos_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let world = ctx.world;
         let mut origin: vec3_t = [0.0, 0.0, 0.0];
@@ -2926,22 +3706,52 @@ pub fn Cmd_SetViewpos_f(
         let mut buffer = [0 as c_char; MAX_TOKEN_CHARS];
 
         if (*world).cvars.g_cheats.integer == 0 {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NOCHEATS".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NOCHEATS".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
         if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) != 5 {
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"usage: setviewpos x y z yaw\n\"")));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr("print \"usage: setviewpos x y z yaw\n\""),
+                ),
+            );
             return;
         }
 
         for i in 0..3usize {
-            trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(i as c_int + 1, buffer.as_mut_ptr(), MAX_TOKEN_CHARS as c_int));
+            trap::Argv(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    i as c_int + 1,
+                    buffer.as_mut_ptr(),
+                    MAX_TOKEN_CHARS as c_int,
+                ),
+            );
             origin[i] = crate::bg_lib::atof(buffer.as_ptr()) as f32;
         }
 
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(4, buffer.as_mut_ptr(), MAX_TOKEN_CHARS as c_int));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                4,
+                buffer.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
+        );
         angles[YAW as usize] = crate::bg_lib::atof(buffer.as_ptr()) as f32;
 
         crate::g_misc::TeleportPlayer(ctx, ent, origin, angles);
@@ -2954,10 +3764,7 @@ pub fn Cmd_SetViewpos_f(
 // Raven's body is entirely `#if 0`-style commented out (dead code, kept for
 // reference in the oracle) — the compiled function is a callable no-op.
 // Source: `oracle/oracle/codemp/game/g_cmds.c:2453-2466`
-pub fn Cmd_Stats_f(
-    ent: *mut gentity_t,
-) {
-}
+pub fn Cmd_Stats_f(ent: *mut gentity_t) {}
 
 /// Raven `G_ItemUsable`.
 ///
@@ -2965,11 +3772,7 @@ pub fn Cmd_Stats_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_entities` (via
 // `G_AddEvent(&g_entities[ps->clientNum], ...)`) and calls `trap_Trace`; no
 // GameWorld/engine handle reachable here.
-pub fn G_ItemUsable(
-    ctx: GameContext<'_>,
-    ps: *mut playerState_t,
-    forcedUse: c_int,
-) -> c_int {
+pub fn G_ItemUsable(ctx: GameContext<'_>, ps: *mut playerState_t, forcedUse: c_int) -> c_int {
     unsafe {
         let world = ctx.world;
         let mut forcedUse = forcedUse;
@@ -3004,14 +3807,22 @@ pub fn G_ItemUsable(
             }
             HI_SEEKER => {
                 if (*ps).eFlags & EF_SEEKERDRONE != 0 {
-                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, mp_qshared::shared::itemUseFail_t::SEEKER_ALREADYDEPLOYED as c_int);
+                    crate::g_utils::G_AddEvent(
+                        &mut (*world).g_entities[(*ps).clientNum as usize],
+                        EV_ITEMUSEFAIL as c_int,
+                        mp_qshared::shared::itemUseFail_t::SEEKER_ALREADYDEPLOYED as c_int,
+                    );
                     return 0;
                 }
                 1
             }
             HI_SENTRY_GUN => {
                 if (*ps).fd.sentryDeployed != 0 {
-                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, mp_qshared::shared::itemUseFail_t::SENTRY_ALREADYPLACED as c_int);
+                    crate::g_utils::G_AddEvent(
+                        &mut (*world).g_entities[(*ps).clientNum as usize],
+                        EV_ITEMUSEFAIL as c_int,
+                        mp_qshared::shared::itemUseFail_t::SENTRY_ALREADYPLACED as c_int,
+                    );
                     return 0;
                 }
 
@@ -3051,8 +3862,15 @@ pub fn G_ItemUsable(
                     ),
                 );
 
-                if (tr.fraction != 1.0 && tr.entityNum != (*ps).clientNum as c_short) || tr.startsolid != qfalse as u8 || tr.allsolid != qfalse as u8 {
-                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, mp_qshared::shared::itemUseFail_t::SENTRY_NOROOM as c_int);
+                if (tr.fraction != 1.0 && tr.entityNum != (*ps).clientNum as c_short)
+                    || tr.startsolid != qfalse as u8
+                    || tr.allsolid != qfalse as u8
+                {
+                    crate::g_utils::G_AddEvent(
+                        &mut (*world).g_entities[(*ps).clientNum as usize],
+                        EV_ITEMUSEFAIL as c_int,
+                        mp_qshared::shared::itemUseFail_t::SENTRY_NOROOM as c_int,
+                    );
                     return 0;
                 }
 
@@ -3081,7 +3899,8 @@ pub fn G_ItemUsable(
                         mp_qshared::shared::surface_flags::MASK_SHOT,
                     ),
                 );
-                if tr.fraction > 0.9 && tr.startsolid == qfalse as u8 && tr.allsolid == qfalse as u8 {
+                if tr.fraction > 0.9 && tr.startsolid == qfalse as u8 && tr.allsolid == qfalse as u8
+                {
                     let pos = tr.endpos;
                     let dest2: vec3_t = [pos[0], pos[1], pos[2] - 4096.0];
                     let mut tr2: trace_t = core::mem::zeroed();
@@ -3101,7 +3920,11 @@ pub fn G_ItemUsable(
                         return 1;
                     }
                 }
-                crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, mp_qshared::shared::itemUseFail_t::SHIELD_NOROOM as c_int);
+                crate::g_utils::G_AddEvent(
+                    &mut (*world).g_entities[(*ps).clientNum as usize],
+                    EV_ITEMUSEFAIL as c_int,
+                    mp_qshared::shared::itemUseFail_t::SHIELD_NOROOM as c_int,
+                );
                 0
             }
             HI_JETPACK | HI_HEALTHDISP | HI_AMMODISP | HI_EWEB | HI_CLOAK => 1,
@@ -3113,10 +3936,7 @@ pub fn G_ItemUsable(
 /// Raven `Cmd_ToggleSaber_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:2595-2670`
-pub fn Cmd_ToggleSaber_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_ToggleSaber_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
@@ -3159,18 +3979,38 @@ pub fn Cmd_ToggleSaber_f(
                 (*client).ps.saberHolstered = 0;
 
                 if (*client).saber[0].soundOn != 0 {
-                    crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[0].soundOn);
+                    crate::g_utils::G_Sound(
+                        ctx,
+                        ent,
+                        CHAN_AUTO as c_int,
+                        (*client).saber[0].soundOn,
+                    );
                 }
                 if (*client).saber[1].soundOn != 0 {
-                    crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOn);
+                    crate::g_utils::G_Sound(
+                        ctx,
+                        ent,
+                        CHAN_AUTO as c_int,
+                        (*client).saber[1].soundOn,
+                    );
                 }
             } else {
                 (*client).ps.saberHolstered = 2;
                 if (*client).saber[0].soundOff != 0 {
-                    crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[0].soundOff);
+                    crate::g_utils::G_Sound(
+                        ctx,
+                        ent,
+                        CHAN_AUTO as c_int,
+                        (*client).saber[0].soundOff,
+                    );
                 }
                 if (*client).saber[1].soundOff != 0 && (*client).saber[1].model[0] != 0 {
-                    crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOff);
+                    crate::g_utils::G_Sound(
+                        ctx,
+                        ent,
+                        CHAN_AUTO as c_int,
+                        (*client).saber[1].soundOff,
+                    );
                 }
                 // prevent anything from being done for 400ms after holster
                 (*client).ps.weaponTime = 400;
@@ -3185,10 +4025,7 @@ pub fn Cmd_ToggleSaber_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
 // `d_saberStanceDebug` cvars, the file-scope `bgSiegeClasses` table, calls
 // `trap_SendServerCommand`; no GameWorld/engine handle reachable here.
-pub fn Cmd_SaberAttackCycle_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_SaberAttackCycle_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_SIEGE;
 
     unsafe {
@@ -3203,18 +4040,31 @@ pub fn Cmd_SaberAttackCycle_f(
 
         if (*client).saber[0].model[0] != 0 && (*client).saber[1].model[0] != 0 {
             // no cycling for akimbo
-            if crate::bg_saberLoad::WP_SaberCanTurnOffSomeBlades(&mut (*client).saber[1]) != qfalse {
+            if crate::bg_saberLoad::WP_SaberCanTurnOffSomeBlades(&mut (*client).saber[1]) != qfalse
+            {
                 if (*client).ps.saberHolstered == 1 {
-                    crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOn);
+                    crate::g_utils::G_Sound(
+                        ctx,
+                        ent,
+                        CHAN_AUTO as c_int,
+                        (*client).saber[1].soundOn,
+                    );
                     (*client).ps.saberHolstered = 0;
                     (*client).ps.fd.saberAnimLevel = saber_styles_t::SS_DUAL as c_int;
                 } else if (*client).ps.saberHolstered == 0 {
                     if (*client).saber[1].saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE != 0 {
                         // can't turn it off manually
-                    } else if (*client).saber[1].bladeStyle2Start > 0 && (*client).saber[1].saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE2 != 0 {
+                    } else if (*client).saber[1].bladeStyle2Start > 0
+                        && (*client).saber[1].saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE2 != 0
+                    {
                         // can't turn it off manually
                     } else {
-                        crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOff);
+                        crate::g_utils::G_Sound(
+                            ctx,
+                            ent,
+                            CHAN_AUTO as c_int,
+                            (*client).saber[1].soundOff,
+                        );
                         (*client).ps.saberHolstered = 1;
                         (*client).ps.fd.saberAnimLevel = saber_styles_t::SS_FAST as c_int;
                     }
@@ -3225,7 +4075,9 @@ pub fn Cmd_SaberAttackCycle_f(
                 }
                 return;
             }
-        } else if (*client).saber[0].numBlades > 1 && crate::bg_saberLoad::WP_SaberCanTurnOffSomeBlades(&mut (*client).saber[0]) != qfalse {
+        } else if (*client).saber[0].numBlades > 1
+            && crate::bg_saberLoad::WP_SaberCanTurnOffSomeBlades(&mut (*client).saber[0]) != qfalse
+        {
             if (*client).ps.saberHolstered == 1 {
                 if (*client).ps.saberInFlight != qfalse {
                     if (*world).cvars.d_saberStanceDebug.integer != 0 {
@@ -3236,7 +4088,12 @@ pub fn Cmd_SaberAttackCycle_f(
                 crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[0].soundOn);
                 (*client).ps.saberHolstered = 0;
                 if (*client).saber[0].stylesForbidden != 0 {
-                    crate::bg_saberLoad::WP_UseFirstValidSaberStyle(&mut (*client).saber[0], &mut (*client).saber[1], (*client).ps.saberHolstered, &mut selectLevel);
+                    crate::bg_saberLoad::WP_UseFirstValidSaberStyle(
+                        &mut (*client).saber[0],
+                        &mut (*client).saber[1],
+                        (*client).ps.saberHolstered,
+                        &mut selectLevel,
+                    );
                     if (*client).ps.weaponTime <= 0 {
                         (*client).ps.fd.saberAnimLevel = selectLevel;
                     } else {
@@ -3246,22 +4103,37 @@ pub fn Cmd_SaberAttackCycle_f(
             } else if (*client).ps.saberHolstered == 0 {
                 if (*client).saber[0].saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE != 0 {
                     // can't turn it off manually
-                } else if (*client).saber[0].bladeStyle2Start > 0 && (*client).saber[0].saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE2 != 0 {
+                } else if (*client).saber[0].bladeStyle2Start > 0
+                    && (*client).saber[0].saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE2 != 0
+                {
                     // can't turn it off manually
                 } else {
-                    crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[0].soundOff);
+                    crate::g_utils::G_Sound(
+                        ctx,
+                        ent,
+                        CHAN_AUTO as c_int,
+                        (*client).saber[0].soundOff,
+                    );
                     (*client).ps.saberHolstered = 1;
                     if (*client).saber[0].singleBladeStyle != saber_styles_t::SS_NONE {
                         if (*client).ps.weaponTime <= 0 {
-                            (*client).ps.fd.saberAnimLevel = (*client).saber[0].singleBladeStyle as c_int;
+                            (*client).ps.fd.saberAnimLevel =
+                                (*client).saber[0].singleBladeStyle as c_int;
                         } else {
-                            (*client).saberCycleQueue = (*client).saber[0].singleBladeStyle as c_int;
+                            (*client).saberCycleQueue =
+                                (*client).saber[0].singleBladeStyle as c_int;
                         }
                     }
                 }
             }
             if (*world).cvars.d_saberStanceDebug.integer != 0 {
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"SABERSTANCEDEBUG: Attempted to toggle staff blade.\n\"")));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr("print \"SABERSTANCEDEBUG: Attempted to toggle staff blade.\n\""),
+                    ),
+                );
             }
             return;
         }
@@ -3286,7 +4158,10 @@ pub fn Cmd_SaberAttackCycle_f(
                     i = saber_styles_t::SS_FAST as c_int;
                 }
 
-                if (*world).bg_state.bgSiegeClasses[(*client).siegeClass as usize].saberStance & (1 << i) != 0 {
+                if (*world).bg_state.bgSiegeClasses[(*client).siegeClass as usize].saberStance
+                    & (1 << i)
+                    != 0
+                {
                     selectLevel = i;
                     break;
                 }
@@ -3294,7 +4169,15 @@ pub fn Cmd_SaberAttackCycle_f(
             }
 
             if (*world).cvars.d_saberStanceDebug.integer != 0 {
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"SABERSTANCEDEBUG: Attempted to cycle given class stance.\n\"")));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(
+                            "print \"SABERSTANCEDEBUG: Attempted to cycle given class stance.\n\"",
+                        ),
+                    ),
+                );
             }
         } else {
             selectLevel += 1;
@@ -3302,12 +4185,23 @@ pub fn Cmd_SaberAttackCycle_f(
                 selectLevel = FORCE_LEVEL_1;
             }
             if (*world).cvars.d_saberStanceDebug.integer != 0 {
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr("print \"SABERSTANCEDEBUG: Attempted to cycle stance normally.\n\"")));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr("print \"SABERSTANCEDEBUG: Attempted to cycle stance normally.\n\""),
+                    ),
+                );
             }
         }
 
         if usingSiegeStyle == qfalse {
-            crate::bg_saberLoad::WP_UseFirstValidSaberStyle(&mut (*client).saber[0], &mut (*client).saber[1], (*client).ps.saberHolstered, &mut selectLevel);
+            crate::bg_saberLoad::WP_UseFirstValidSaberStyle(
+                &mut (*client).saber[0],
+                &mut (*client).saber[1],
+                (*client).ps.saberHolstered,
+                &mut selectLevel,
+            );
         }
 
         if (*client).ps.weaponTime <= 0 {
@@ -3329,9 +4223,7 @@ pub fn G_OtherPlayersDueling(ctx: GameContext<'_>) -> qboolean {
             let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             let client = (*ent).client as *mut gclient_t;
 
-            if (*ent).inuse != qfalse
-                && !client.is_null()
-                && (*client).ps.duelInProgress != qfalse
+            if (*ent).inuse != qfalse && !client.is_null() && (*client).ps.duelInProgress != qfalse
             {
                 return qtrue;
             }
@@ -3348,10 +4240,7 @@ pub fn G_OtherPlayersDueling(ctx: GameContext<'_>) -> qboolean {
 // `g_gametype` cvars, `level.time`, `g_entities`, calls `trap_SendServerCommand`/
 // `trap_Trace`/`G_OtherPlayersDueling`/`OnSameTeam`/`G_AddEvent`/`G_Sound`; no
 // GameWorld/engine handle reachable here.
-pub fn Cmd_EngageDuel_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_EngageDuel_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL, GT_TEAM};
 
     unsafe {
@@ -3362,17 +4251,39 @@ pub fn Cmd_EngageDuel_f(
             return;
         }
 
-        if (*world).cvars.g_gametype.integer == GT_DUEL || (*world).cvars.g_gametype.integer == GT_POWERDUEL {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NODUEL_GAMETYPE".as_ptr() as *mut c_char);
+        if (*world).cvars.g_gametype.integer == GT_DUEL
+            || (*world).cvars.g_gametype.integer == GT_POWERDUEL
+        {
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NODUEL_GAMETYPE".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
 
         if (*world).cvars.g_gametype.integer >= GT_TEAM {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"NODUEL_GAMETYPE".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"NODUEL_GAMETYPE".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
 
@@ -3393,16 +4304,36 @@ pub fn Cmd_EngageDuel_f(
         }
 
         if (*client).ps.fd.privateDuelTime > (*world).level.time {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"CANTDUEL_JUSTDID".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"CANTDUEL_JUSTDID".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
 
         if G_OtherPlayersDueling(ctx) != qfalse {
-            let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"CANTDUEL_BUSY".as_ptr() as *mut c_char);
+            let m = crate::g_main::G_GetStringEdString(
+                ctx,
+                c"MP_SVGAME".as_ptr() as *mut c_char,
+                c"CANTDUEL_BUSY".as_ptr() as *mut c_char,
+            );
             let s = format!("print \"{}\n\"", cstr_to_str(m));
-            trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    ent_index(ctx, ent),
+                    cstr(&s),
+                ),
+            );
             return;
         }
 
@@ -3448,19 +4379,33 @@ pub fn Cmd_EngageDuel_f(
                 return;
             }
 
-            if (*world).cvars.g_gametype.integer >= GT_TEAM && crate::g_team::OnSameTeam(ctx, ent, challenged) != qfalse {
+            if (*world).cvars.g_gametype.integer >= GT_TEAM
+                && crate::g_team::OnSameTeam(ctx, ent, challenged) != qfalse
+            {
                 return;
             }
 
-            if (*challengedClient).ps.duelIndex == (*ent).s.number && (*challengedClient).ps.duelTime >= (*world).level.time {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"PLDUELACCEPT".as_ptr() as *mut c_char);
+            if (*challengedClient).ps.duelIndex == (*ent).s.number
+                && (*challengedClient).ps.duelTime >= (*world).level.time
+            {
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"PLDUELACCEPT".as_ptr() as *mut c_char,
+                );
                 let s = format!(
                     "print \"{} {} {}!\n\"",
                     cstr_to_str((*challengedClient).pers.netname.as_ptr()),
                     cstr_to_str(m),
                     cstr_to_str((*client).pers.netname.as_ptr())
                 );
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        -1,
+                        cstr(&s),
+                    ),
+                );
 
                 (*client).ps.duelInProgress = qtrue;
                 (*challengedClient).ps.duelInProgress = qtrue;
@@ -3473,32 +4418,82 @@ pub fn Cmd_EngageDuel_f(
 
                 if (*client).ps.saberHolstered == 0 {
                     if (*client).saber[0].soundOff != 0 {
-                        crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[0].soundOff);
+                        crate::g_utils::G_Sound(
+                            ctx,
+                            ent,
+                            CHAN_AUTO as c_int,
+                            (*client).saber[0].soundOff,
+                        );
                     }
                     if (*client).saber[1].soundOff != 0 && (*client).saber[1].model[0] != 0 {
-                        crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOff);
+                        crate::g_utils::G_Sound(
+                            ctx,
+                            ent,
+                            CHAN_AUTO as c_int,
+                            (*client).saber[1].soundOff,
+                        );
                     }
                     (*client).ps.weaponTime = 400;
                     (*client).ps.saberHolstered = 2;
                 }
                 if (*challengedClient).ps.saberHolstered == 0 {
                     if (*challengedClient).saber[0].soundOff != 0 {
-                        crate::g_utils::G_Sound(ctx, challenged, CHAN_AUTO as c_int, (*challengedClient).saber[0].soundOff);
+                        crate::g_utils::G_Sound(
+                            ctx,
+                            challenged,
+                            CHAN_AUTO as c_int,
+                            (*challengedClient).saber[0].soundOff,
+                        );
                     }
-                    if (*challengedClient).saber[1].soundOff != 0 && (*challengedClient).saber[1].model[0] != 0 {
-                        crate::g_utils::G_Sound(ctx, challenged, CHAN_AUTO as c_int, (*challengedClient).saber[1].soundOff);
+                    if (*challengedClient).saber[1].soundOff != 0
+                        && (*challengedClient).saber[1].model[0] != 0
+                    {
+                        crate::g_utils::G_Sound(
+                            ctx,
+                            challenged,
+                            CHAN_AUTO as c_int,
+                            (*challengedClient).saber[1].soundOff,
+                        );
                     }
                     (*challengedClient).ps.weaponTime = 400;
                     (*challengedClient).ps.saberHolstered = 2;
                 }
             } else {
-                let m1 = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"PLDUELCHALLENGE".as_ptr() as *mut c_char);
-                let s1 = format!("cp \"{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), cstr_to_str(m1));
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, challenged), cstr(&s1)));
+                let m1 = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"PLDUELCHALLENGE".as_ptr() as *mut c_char,
+                );
+                let s1 = format!(
+                    "cp \"{} {}\n\"",
+                    cstr_to_str((*client).pers.netname.as_ptr()),
+                    cstr_to_str(m1)
+                );
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, challenged),
+                        cstr(&s1),
+                    ),
+                );
 
-                let m2 = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"PLDUELCHALLENGED".as_ptr() as *mut c_char);
-                let s2 = format!("cp \"{} {}\n\"", cstr_to_str(m2), cstr_to_str((*challengedClient).pers.netname.as_ptr()));
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s2)));
+                let m2 = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"PLDUELCHALLENGED".as_ptr() as *mut c_char,
+                );
+                let s2 = format!(
+                    "cp \"{} {}\n\"",
+                    cstr_to_str(m2),
+                    cstr_to_str((*challengedClient).pers.netname.as_ptr())
+                );
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        ent_index(ctx, ent),
+                        cstr(&s2),
+                    ),
+                );
             }
 
             (*challengedClient).ps.fd.privateDuelTime = 0;
@@ -3520,10 +4515,7 @@ pub fn Cmd_EngageDuel_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Argc`/
 // `trap_Argv`/`Com_Printf`, reads the file-scope `animTable`/`saberMoveData`
 // tables; no GameWorld/engine handle reachable here.
-pub fn Cmd_DebugSetSaberMove_f(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn Cmd_DebugSetSaberMove_f(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let world = ctx.world;
         let argNum = trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new());
@@ -3533,7 +4525,14 @@ pub fn Cmd_DebugSetSaberMove_f(
             return;
         }
 
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, arg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                arg.as_mut_ptr(),
+                MAX_STRING_CHARS as c_int,
+            ),
+        );
 
         if arg[0] == 0 {
             return;
@@ -3563,11 +4562,7 @@ pub fn Cmd_DebugSetSaberMove_f(
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_Argc`/
 // `trap_Argv`/`Com_Printf`, reads the file-scope `animTable`; no GameWorld/engine
 // handle reachable here.
-pub fn Cmd_DebugSetBodyAnim_f(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    flags: c_int,
-) {
+pub fn Cmd_DebugSetBodyAnim_f(ctx: GameContext<'_>, self_: *mut gentity_t, flags: c_int) {
     unsafe {
         let world = ctx.world;
         let argNum = trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new());
@@ -3578,7 +4573,14 @@ pub fn Cmd_DebugSetBodyAnim_f(
             return;
         }
 
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, arg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                1,
+                arg.as_mut_ptr(),
+                MAX_STRING_CHARS as c_int,
+            ),
+        );
 
         if arg[0] == 0 {
             return;
@@ -3594,37 +4596,45 @@ pub fn Cmd_DebugSetBodyAnim_f(
         }
 
         if i as usize == MAX_ANIMATIONS as usize {
-            crate::g_main::Com_Printf(cstr(&format!("Animation '{}' does not exist\n", cstr_to_str(arg.as_ptr()))).as_ptr());
+            crate::g_main::Com_Printf(
+                cstr(&format!(
+                    "Animation '{}' does not exist\n",
+                    cstr_to_str(arg.as_ptr())
+                ))
+                .as_ptr(),
+            );
             return;
         }
 
         StandardSetBodyAnim(ctx, self_, i, flags);
 
-        crate::g_main::Com_Printf(cstr(&format!("Set body anim to {}\n", cstr_to_str(arg.as_ptr()))).as_ptr());
+        crate::g_main::Com_Printf(
+            cstr(&format!("Set body anim to {}\n", cstr_to_str(arg.as_ptr()))).as_ptr(),
+        );
     }
 }
 
 /// Raven `StandardSetBodyAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:3114-3117`
-pub fn StandardSetBodyAnim(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    anim: c_int,
-    flags: c_int,
-) {
+pub fn StandardSetBodyAnim(ctx: GameContext<'_>, self_: *mut gentity_t, anim: c_int, flags: c_int) {
     // Raven `SETANIM_BOTH` (`bg_public.h`), passed as a literal at the call site.
     const SETANIM_BOTH: c_int = 2;
-    crate::g_utils::G_SetAnim(ctx, self_, std::ptr::null_mut(), SETANIM_BOTH, anim, flags, 0);
+    crate::g_utils::G_SetAnim(
+        ctx,
+        self_,
+        std::ptr::null_mut(),
+        SETANIM_BOTH,
+        anim,
+        flags,
+        0,
+    );
 }
 
 /// Raven `G_ClientNumFromNetname`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:3128-3146`
-pub fn G_ClientNumFromNetname(
-    ctx: GameContext<'_>,
-    name: *mut c_char,
-) -> c_int {
+pub fn G_ClientNumFromNetname(ctx: GameContext<'_>, name: *mut c_char) -> c_int {
     unsafe {
         for i in 0..MAX_CLIENTS {
             let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
@@ -3645,10 +4655,7 @@ pub fn G_ClientNumFromNetname(
 /// Raven `TryGrapple`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_cmds.c:3148-3191`
-pub fn TryGrapple(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn TryGrapple(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     use mp_bg::public::anim_number::animNumber_t;
     use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
     // `animNumber_t` is `#[repr(i32)]`; the anim fields (`torsoAnim`, ...) store
@@ -3679,7 +4686,15 @@ pub fn TryGrapple(
             }
         }
 
-        crate::g_utils::G_SetAnim(ctx, ent, &mut (*client).pers.cmd as *mut _, SETANIM_BOTH, kyle_grab, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD, 0);
+        crate::g_utils::G_SetAnim(
+            ctx,
+            ent,
+            &mut (*client).pers.cmd as *mut _,
+            SETANIM_BOTH,
+            kyle_grab,
+            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            0,
+        );
         if (*client).ps.torsoAnim == kyle_grab {
             (*client).ps.torsoTimer += 500;
             if (*client).ps.legsAnim == (*client).ps.torsoAnim {
@@ -3701,10 +4716,7 @@ pub fn TryGrapple(
 // and many other `level.*`/cvar globals, and dispatches to every other `Cmd_*_f`
 // in this file (nearly all themselves parked); no GameWorld/engine handle
 // reachable from this raw-pointer signature.
-pub fn ClientCommand(
-    ctx: GameContext<'_>,
-    clientNum: c_int,
-) {
+pub fn ClientCommand(ctx: GameContext<'_>, clientNum: c_int) {
     unsafe {
         let world = ctx.world;
         let ent = &mut (*world).g_entities[clientNum as usize] as *mut gentity_t;
@@ -3713,11 +4725,20 @@ pub fn ClientCommand(
         }
 
         let mut cmd = [0 as c_char; MAX_TOKEN_CHARS];
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(0, cmd.as_mut_ptr(), MAX_TOKEN_CHARS as c_int));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                0,
+                cmd.as_mut_ptr(),
+                MAX_TOKEN_CHARS as c_int,
+            ),
+        );
         let cmd_s = cstr_to_str(cmd.as_ptr());
 
         // rww - redirect bot commands
-        if cmd_s.contains("bot_") && crate::ai_wpnav::AcceptBotCommand(ctx, cmd.as_mut_ptr(), ent) != 0 {
+        if cmd_s.contains("bot_")
+            && crate::ai_wpnav::AcceptBotCommand(ctx, cmd.as_mut_ptr(), ent) != 0
+        {
             return;
         }
 
@@ -3756,24 +4777,55 @@ pub fn ClientCommand(
             let mut giveError = qfalse;
 
             let intermission_gated = [
-                "give", "giveother", "god", "notarget", "noclip", "kill", "teamtask",
-                "levelshot", "follow", "follownext", "followprev", "team", "duelteam",
-                "siegeclass", "where", "callvote", "vote", "callteamvote", "teamvote",
-                "gc", "setviewpos", "stats",
+                "give",
+                "giveother",
+                "god",
+                "notarget",
+                "noclip",
+                "kill",
+                "teamtask",
+                "levelshot",
+                "follow",
+                "follownext",
+                "followprev",
+                "team",
+                "duelteam",
+                "siegeclass",
+                "where",
+                "callvote",
+                "vote",
+                "callteamvote",
+                "teamvote",
+                "gc",
+                "setviewpos",
+                "stats",
             ];
 
             if cmd_s.eq_ignore_ascii_case("forcechanged") {
                 // special case: still update force change
                 Cmd_ForceChanged_f(ctx, ent);
                 return;
-            } else if intermission_gated.iter().any(|c| cmd_s.eq_ignore_ascii_case(c)) {
+            } else if intermission_gated
+                .iter()
+                .any(|c| cmd_s.eq_ignore_ascii_case(c))
+            {
                 giveError = qtrue;
             }
 
             if giveError != qfalse {
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"CANNOT_TASK_INTERMISSION".as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"CANNOT_TASK_INTERMISSION".as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{} ({}) \n\"", cstr_to_str(m), cmd_s);
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(clientNum, cstr(&s)));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        clientNum,
+                        cstr(&s),
+                    ),
+                );
             } else {
                 Cmd_Say_f(ctx, ent, qfalse, qtrue);
             }
@@ -3789,12 +4841,24 @@ pub fn ClientCommand(
             // debug use map object
             if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) > 1 {
                 let mut sArg = [0 as c_char; MAX_STRING_CHARS];
-                trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, sArg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+                trap::Argv(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                        1,
+                        sArg.as_mut_ptr(),
+                        MAX_STRING_CHARS as c_int,
+                    ),
+                );
 
                 // PORT-NOTE(FOFS-targetname): `FOFS(targetname)` is the byte offset
                 // of `gentity_t::targetname`; using the ported field-offset constant.
                 let targetname_ofs = std::mem::offset_of!(gentity_t, targetname) as c_int;
-                let mut targ = crate::g_utils::G_Find(ctx, std::ptr::null_mut(), targetname_ofs, sArg.as_ptr());
+                let mut targ = crate::g_utils::G_Find(
+                    ctx,
+                    std::ptr::null_mut(),
+                    targetname_ofs,
+                    sArg.as_ptr(),
+                );
 
                 while !targ.is_null() {
                     if let Some(use_fn) = (*targ).use_ {
@@ -3852,7 +4916,14 @@ pub fn ClientCommand(
         else if cmd_s.eq_ignore_ascii_case("killother") && CheatsOk(ctx, ent) != qfalse {
             if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) > 1 {
                 let mut sArg = [0 as c_char; MAX_STRING_CHARS];
-                trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, sArg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+                trap::Argv(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                        1,
+                        sArg.as_mut_ptr(),
+                        MAX_STRING_CHARS as c_int,
+                    ),
+                );
 
                 let entNum = G_ClientNumFromNetname(ctx, sArg.as_mut_ptr());
 
@@ -3863,7 +4934,14 @@ pub fn ClientCommand(
                         (*kEnt).flags &= !FL_GODMODE;
                         (*kClient).ps.stats[STAT_HEALTH as usize] = -999;
                         (*kEnt).health = -999;
-                        crate::g_combat::player_die(ctx, kEnt, kEnt, kEnt, 100000, MOD_SUICIDE as c_int);
+                        crate::g_combat::player_die(
+                            ctx,
+                            kEnt,
+                            kEnt,
+                            kEnt,
+                            100000,
+                            MOD_SUICIDE as c_int,
+                        );
                     }
                 }
             }
@@ -3892,27 +4970,62 @@ pub fn ClientCommand(
         // begin bot debug cmds
         else if cmd_s.eq_ignore_ascii_case("debugBMove_Forward") && CheatsOk(ctx, ent) != qfalse {
             let mut sarg = [0 as c_char; MAX_STRING_CHARS];
-            trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, sarg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+            trap::Argv(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    1,
+                    sarg.as_mut_ptr(),
+                    MAX_STRING_CHARS as c_int,
+                ),
+            );
             let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, 4000, -1, -1);
         } else if cmd_s.eq_ignore_ascii_case("debugBMove_Back") && CheatsOk(ctx, ent) != qfalse {
             let mut sarg = [0 as c_char; MAX_STRING_CHARS];
-            trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, sarg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+            trap::Argv(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    1,
+                    sarg.as_mut_ptr(),
+                    MAX_STRING_CHARS as c_int,
+                ),
+            );
             let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, -4000, -1, -1);
         } else if cmd_s.eq_ignore_ascii_case("debugBMove_Right") && CheatsOk(ctx, ent) != qfalse {
             let mut sarg = [0 as c_char; MAX_STRING_CHARS];
-            trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, sarg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+            trap::Argv(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    1,
+                    sarg.as_mut_ptr(),
+                    MAX_STRING_CHARS as c_int,
+                ),
+            );
             let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, -1, 4000, -1);
         } else if cmd_s.eq_ignore_ascii_case("debugBMove_Left") && CheatsOk(ctx, ent) != qfalse {
             let mut sarg = [0 as c_char; MAX_STRING_CHARS];
-            trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, sarg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+            trap::Argv(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    1,
+                    sarg.as_mut_ptr(),
+                    MAX_STRING_CHARS as c_int,
+                ),
+            );
             let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, -1, -4000, -1);
         } else if cmd_s.eq_ignore_ascii_case("debugBMove_Up") && CheatsOk(ctx, ent) != qfalse {
             let mut sarg = [0 as c_char; MAX_STRING_CHARS];
-            trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, sarg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+            trap::Argv(
+                ctx.engine,
+                mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                    1,
+                    sarg.as_mut_ptr(),
+                    MAX_STRING_CHARS as c_int,
+                ),
+            );
             let bCl: c_int = cstr_to_str(sarg.as_ptr()).trim().parse().unwrap_or(0);
             crate::ai_main::Bot_SetForcedMovement(ctx, bCl, -1, -1, 4000);
         }
@@ -3929,7 +5042,14 @@ pub fn ClientCommand(
                 let mut iArg: c_int = 0;
                 if trap::Argc(ctx.engine, mp_abi::game::syscalls::G_ARGC::GArgcArgs::new()) > 1 {
                     let mut arg = [0 as c_char; MAX_STRING_CHARS];
-                    trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, arg.as_mut_ptr(), MAX_STRING_CHARS as c_int));
+                    trap::Argv(
+                        ctx.engine,
+                        mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                            1,
+                            arg.as_mut_ptr(),
+                            MAX_STRING_CHARS as c_int,
+                        ),
+                    );
                     if arg[0] != 0 {
                         iArg = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
                     }
@@ -3940,12 +5060,28 @@ pub fn ClientCommand(
             if cmd_s.eq_ignore_ascii_case("addbot") {
                 // because addbot isn't a recognized command unless you're the
                 // server, but it is in the menus regardless
-                let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"ONLY_ADD_BOTS_AS_SERVER".as_ptr() as *mut c_char);
+                let m = crate::g_main::G_GetStringEdString(
+                    ctx,
+                    c"MP_SVGAME".as_ptr() as *mut c_char,
+                    c"ONLY_ADD_BOTS_AS_SERVER".as_ptr() as *mut c_char,
+                );
                 let s = format!("print \"{}.\n\"", cstr_to_str(m));
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(clientNum, cstr(&s)));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        clientNum,
+                        cstr(&s),
+                    ),
+                );
             } else {
                 let s = format!("print \"unknown cmd {}\n\"", cmd_s);
-                trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(clientNum, cstr(&s)));
+                trap::SendServerCommand(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                        clientNum,
+                        cstr(&s),
+                    ),
+                );
             }
         }
     }

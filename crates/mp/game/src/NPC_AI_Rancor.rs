@@ -423,7 +423,7 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
                 crate::g_combat::G_Damage(ctx, radiusEnt, npc, npc, Some(&mut [0.0; 3]), (*radiusEnt).r.currentOrigin, (*ctx.world).bg_state.rng.Q_irand(15, 30), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE as c_int);
                 if (*radiusEnt).health <= 0 && !(*radiusEnt).client.is_null() {
                     //killed them, chance of dismembering
-                    if !(*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                    if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                         //bite something off
                         let hitLoc = (*ctx.world).bg_state.rng.Q_irand(G2_MODELPART_HEAD as c_int, G2_MODELPART_RLEG as c_int);
                         if hitLoc == G2_MODELPART_HEAD as c_int {
@@ -487,7 +487,7 @@ pub fn Rancor_Attack(
 
                 crate::npc_c::NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_MELEE2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 1250);
-            } else if !(*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+            } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                 //smash
                 crate::npc_c::NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_MELEE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 1000);
@@ -660,7 +660,7 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
         {
             let enemy = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
             let distance = crate::q_math::Distance((*npc).r.currentOrigin, (*enemy).r.currentOrigin);
-            let advance = if distance > ((*npc).r.maxs[0] + MIN_DISTANCE as f32) { qtrue } else { qfalse };
+            let mut advance = if distance > ((*npc).r.maxs[0] + MIN_DISTANCE as f32) { qtrue } else { qfalse };
             let mut doCharge = qfalse;
 
             if advance != 0 {
@@ -669,14 +669,15 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
                 if (*enemy).health > 0
                     && (distance - 250.0).abs() <= 80.0
                     && crate::NPC_senses::InFOV3((*enemy).r.currentOrigin, (*npc).r.currentOrigin, yawOnlyAngles, 30, 30) != 0 {
-                    if !(*ctx.world).bg_state.rng.Q_irand(0, 9) != 0 {
+                    if (*ctx.world).bg_state.rng.Q_irand(0, 9) == 0 {
                         //go for the charge
                         doCharge = qtrue;
+                        advance = qfalse;
                     }
                 }
             }
 
-            if (advance != 0 || crate::g_timer::TIMER_Done(ctx, npc, c"attacking".as_ptr()) != 0) {
+            if advance != 0 && crate::g_timer::TIMER_Done(ctx, npc, c"attacking".as_ptr()) != 0 {
                 // waiting monsters can't attack
                 if crate::g_timer::TIMER_Done2(ctx, npc, c"takingPain".as_ptr(), qtrue) != 0 {
                     (*npc_info).localState = LSTATE_CLEAR;
@@ -706,7 +707,7 @@ pub fn NPC_Rancor_Pain(
             && attacker != self_enemy
             && ((*attacker).flags & FL_NOTARGET) == 0 {
             if (*self_).count == 0 {
-                if ((*attacker).s.number == 0 && !(*ctx.world).bg_state.rng.Q_irand(0,3) != 0)
+                if ((*attacker).s.number == 0 && (*ctx.world).bg_state.rng.Q_irand(0,3) == 0)
                     || (*self_).enemy.is_none()
                     || (*self_enemy).health == 0
                     || (!(*self_enemy).client.is_null() && (*((*self_enemy).client as *mut gclient_t)).NPC_class == CLASS_RANCOR)
@@ -722,7 +723,7 @@ pub fn NPC_Rancor_Pain(
                 }
             }
         }
-        if (hitByRancor != 0 || ((*self_).count == 1 && !(*self_).activator.is_none() && !(*ctx.world).bg_state.rng.Q_irand(0,4) != 0) || (*ctx.world).bg_state.rng.Q_irand(0, 200) < damage)
+        if (hitByRancor != 0 || ((*self_).count == 1 && !(*self_).activator.is_none() && (*ctx.world).bg_state.rng.Q_irand(0,4) == 0) || (*ctx.world).bg_state.rng.Q_irand(0, 200) < damage)
             && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_STAND1TO2 as c_int
             && crate::g_timer::TIMER_Done(ctx, self_, c"takingPain".as_ptr()) != 0 {
             if Rancor_CheckRoar(ctx, self_) == qfalse {
@@ -888,10 +889,9 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
                     }
                 }
                 if crate::g_timer::TIMER_Done(ctx, npc, c"lookForNewEnemy".as_ptr()) != 0 {
-                    let newEnemy = crate::NPC_combat::NPC_CheckEnemy(ctx, ((*npc_info).confusionTime < (*ctx.world).level.time) as c_int, qfalse, qfalse);
                     let sav_enemy = (*npc).enemy;
                     (*npc).enemy = None;
-                    let newEnemy = newEnemy;
+                    let newEnemy = crate::NPC_combat::NPC_CheckEnemy(ctx, ((*npc_info).confusionTime < (*ctx.world).level.time) as c_int, qfalse, qfalse);
                     (*npc).enemy = sav_enemy;
                     if !newEnemy.is_null() && ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), newEnemy) != sav_enemy {
                         //picked up a new enemy!

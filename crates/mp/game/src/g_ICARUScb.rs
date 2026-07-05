@@ -15,8 +15,8 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::g_nav::NAV_FindClosestWaypointForEnt;
+use crate::prelude::*;
 use crate::q_math::vec3_origin;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
@@ -38,28 +38,27 @@ const VTYPE_FLOAT: c_int = 1;
 const VTYPE_STRING: c_int = 2;
 const VTYPE_VECTOR: c_int = 3;
 
-use crate::g_combat::{G_Damage, player_die};
+use crate::ent_fn_enums::{EntBlocked, EntReached, EntThink};
+use crate::g_client::SetClientViewAngle;
+use crate::g_combat::{player_die, G_Damage};
+use crate::g_misc::{TAG_GetAngles, TAG_GetOrigin, TAG_GetOrigin2, TAG_GetRadius};
 use crate::g_mover::{G_PlayDoorSound, MatchTeam, BMS_END};
 use crate::g_utils::G_FreeEntity;
-use crate::g_misc::{TAG_GetOrigin, TAG_GetOrigin2, TAG_GetAngles, TAG_GetRadius};
-use crate::ent_fn_enums::{EntThink, EntBlocked, EntReached};
-use std::ffi::CString;
-use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
 use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
-use mp_abi::game::syscalls::G_ICARUS_TASKIDSET::GIcarusTaskidsetArgs;
-use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
+use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
+use mp_abi::game::syscalls::G_ICARUS_GETFLOATVARIABLE::GIcarusGetfloatvariableArgs;
+use mp_abi::game::syscalls::G_ICARUS_GETSTRINGVARIABLE::GIcarusGetstringvariableArgs;
+use mp_abi::game::syscalls::G_ICARUS_GETVECTORVARIABLE::GIcarusGetvectorvariableArgs;
 use mp_abi::game::syscalls::G_ICARUS_SETVAR::GIcarusSetvarArgs;
+use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
+use mp_abi::game::syscalls::G_ICARUS_TASKIDSET::GIcarusTaskidsetArgs;
+use mp_abi::game::syscalls::G_ICARUS_VARIABLEDECLARED::GIcarusVariabledeclaredArgs;
+use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_ROFF_CACHE::GRoffCacheArgs;
 use mp_abi::game::syscalls::G_ROFF_PLAY::GRoffPlayArgs;
-use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
-use mp_abi::game::syscalls::G_ICARUS_VARIABLEDECLARED::GIcarusVariabledeclaredArgs;
-use mp_abi::game::syscalls::G_ICARUS_GETFLOATVARIABLE::GIcarusGetfloatvariableArgs;
-use mp_abi::game::syscalls::G_ICARUS_GETVECTORVARIABLE::GIcarusGetvectorvariableArgs;
-use mp_abi::game::syscalls::G_ICARUS_GETSTRINGVARIABLE::GIcarusGetstringvariableArgs;
-use crate::g_client::SetClientViewAngle;
 use mp_qshared::common::mp::entity_id::ent_id;
-
+use std::ffi::CString;
 
 /// Raven `Q3_TaskIDClear`.
 ///
@@ -133,7 +132,12 @@ pub fn G_DebugPrint(
         } else {
             // default / WL_VERBOSE
             Com_Printf(
-                cstr(&format!("{}INFO: {}", S_COLOR_GREEN.to_string_lossy(), text)).as_ptr(),
+                cstr(&format!(
+                    "{}INFO: {}",
+                    S_COLOR_GREEN.to_string_lossy(),
+                    text
+                ))
+                .as_ptr(),
             );
         }
     }
@@ -142,11 +146,11 @@ pub fn G_DebugPrint(
 /// Raven `Q3_GetAnimLower`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:331-344`
-pub fn Q3_GetAnimLower(
-    ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut c_char {
+pub fn Q3_GetAnimLower(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut c_char {
     unsafe {
         if (*ent).client.is_null() {
-            G_DebugPrint(ctx,
+            G_DebugPrint(
+                ctx,
                 WL_WARNING as c_int,
                 b"Q3_GetAnimLower: attempted to read animation state off non-client!\n\0".as_ptr()
                     as *const c_char,
@@ -163,11 +167,11 @@ pub fn Q3_GetAnimLower(
 /// Raven `Q3_GetAnimUpper`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:351-364`
-pub fn Q3_GetAnimUpper(
-    ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut c_char {
+pub fn Q3_GetAnimUpper(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut c_char {
     unsafe {
         if (*ent).client.is_null() {
-            G_DebugPrint(ctx,
+            G_DebugPrint(
+                ctx,
                 WL_WARNING as c_int,
                 b"Q3_GetAnimUpper: attempted to read animation state off non-client!\n\0".as_ptr()
                     as *const c_char,
@@ -184,14 +188,14 @@ pub fn Q3_GetAnimUpper(
 /// Raven `Q3_GetAnimBoth`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:371-398`
-pub fn Q3_GetAnimBoth(
-    ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut c_char {
+pub fn Q3_GetAnimBoth(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut c_char {
     unsafe {
         let lower_name = Q3_GetAnimLower(ctx, ent);
         let upper_name = Q3_GetAnimUpper(ctx, ent);
 
         if lower_name.is_null() || *lower_name == 0 {
-            G_DebugPrint(ctx,
+            G_DebugPrint(
+                ctx,
                 WL_WARNING as c_int,
                 b"Q3_GetAnimBoth: NULL legs animation string found!\n\0".as_ptr() as *const c_char,
             );
@@ -199,7 +203,8 @@ pub fn Q3_GetAnimBoth(
         }
 
         if upper_name.is_null() || *upper_name == 0 {
-            G_DebugPrint(ctx,
+            G_DebugPrint(
+                ctx,
                 WL_WARNING as c_int,
                 b"Q3_GetAnimBoth: NULL torso animation string found!\n\0".as_ptr() as *const c_char,
             );
@@ -316,6 +321,12 @@ pub fn Q3_Play(
             if (*ent).roffid != 0 {
                 (*ent).roffname = G_NewString(name);
 
+                // Save this off for later
+                trap::ICARUS_TaskIDSet(
+                    ctx.engine,
+                    GIcarusTaskidsetArgs::new(ent, taskID_t::TID_MOVE_NAV as c_int, taskID),
+                );
+
                 (*ent).s.origin2 = (*ent).r.currentOrigin;
                 (*ent).s.angles2 = (*ent).r.currentAngles;
 
@@ -397,8 +408,7 @@ pub fn moverCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `Blocked_Mover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:635-658`
-pub fn Blocked_Mover(
-    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t) {
+pub fn Blocked_Mover(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) {
     unsafe {
         // remove anything other than a client -- no longer the case
 
@@ -442,8 +452,7 @@ pub fn Blocked_Mover(
 ///
 /// Utility function.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:667-673`
-pub fn moveAndRotateCallback(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn moveAndRotateCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
     //stop turning
     anglerCallback(ctx, ent);
     //stop moving
@@ -453,17 +462,15 @@ pub fn moveAndRotateCallback(
 /// Raven `Q3_Lerp2Start`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:682-721`
-pub fn Q3_Lerp2Start(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    taskID: c_int,
-    duration: f32,
-) {
+pub fn Q3_Lerp2Start(ctx: GameContext<'_>, entID: c_int, taskID: c_int, duration: f32) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
-            || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
+            || Q_stricmp(
+                (*ent).classname,
+                b"target_scriptrunner\0".as_ptr() as *const c_char,
+            ) == 0
         {
             G_DebugPrint(
                 ctx,
@@ -501,17 +508,15 @@ pub fn Q3_Lerp2Start(
 /// Raven `Q3_Lerp2End`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:730-769`
-pub fn Q3_Lerp2End(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    taskID: c_int,
-    duration: f32,
-) {
+pub fn Q3_Lerp2End(ctx: GameContext<'_>, entID: c_int, taskID: c_int, duration: f32) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
-            || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
+            || Q_stricmp(
+                (*ent).classname,
+                b"target_scriptrunner\0".as_ptr() as *const c_char,
+            ) == 0
         {
             G_DebugPrint(
                 ctx,
@@ -561,7 +566,10 @@ pub fn Q3_Lerp2Pos(
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
-            || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
+            || Q_stricmp(
+                (*ent).classname,
+                b"target_scriptrunner\0".as_ptr() as *const c_char,
+            ) == 0
         {
             G_DebugPrint(
                 ctx,
@@ -903,7 +911,23 @@ pub fn Q3_GetFloat(
         let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
 
         match toGet {
-            _ if toGet == SET_PARM1 as i32 || toGet == SET_PARM2 as i32 || toGet == SET_PARM3 as i32 || toGet == SET_PARM4 as i32 || toGet == SET_PARM5 as i32 || toGet == SET_PARM6 as i32 || toGet == SET_PARM7 as i32 || toGet == SET_PARM8 as i32 || toGet == SET_PARM9 as i32 || toGet == SET_PARM10 as i32 || toGet == SET_PARM11 as i32 || toGet == SET_PARM12 as i32 || toGet == SET_PARM13 as i32 || toGet == SET_PARM14 as i32 || toGet == SET_PARM15 as i32 || toGet == SET_PARM16 as i32 => {
+            _ if toGet == SET_PARM1 as i32
+                || toGet == SET_PARM2 as i32
+                || toGet == SET_PARM3 as i32
+                || toGet == SET_PARM4 as i32
+                || toGet == SET_PARM5 as i32
+                || toGet == SET_PARM6 as i32
+                || toGet == SET_PARM7 as i32
+                || toGet == SET_PARM8 as i32
+                || toGet == SET_PARM9 as i32
+                || toGet == SET_PARM10 as i32
+                || toGet == SET_PARM11 as i32
+                || toGet == SET_PARM12 as i32
+                || toGet == SET_PARM13 as i32
+                || toGet == SET_PARM14 as i32
+                || toGet == SET_PARM15 as i32
+                || toGet == SET_PARM16 as i32 =>
+            {
                 if (*ent).parms.is_null() {
                     G_DebugPrint(
                         ctx,
@@ -917,7 +941,8 @@ pub fn Q3_GetFloat(
                     );
                     return 0;
                 }
-                *value = atof((*(*ent).parms).parm[(toGet - SET_PARM1 as i32) as usize].as_ptr()) as f32;
+                *value =
+                    atof((*(*ent).parms).parm[(toGet - SET_PARM1 as i32) as usize].as_ptr()) as f32;
             }
             _ if toGet == SET_COUNT as i32 => *value = (*ent).count as f32,
             _ if toGet == SET_HEALTH as i32 => *value = (*ent).health as f32,
@@ -967,7 +992,9 @@ pub fn Q3_GetFloat(
                 }
                 *value = (*((*ent).client as *mut gclient_t)).ps.velocity[2];
             }
-            _ if toGet == SET_Z_OFFSET as i32 => *value = (*ent).r.currentOrigin[2] - (*ent).s.origin[2],
+            _ if toGet == SET_Z_OFFSET as i32 => {
+                *value = (*ent).r.currentOrigin[2] - (*ent).s.origin[2]
+            }
             _ if toGet == SET_DPITCH as i32 => return 0,
             _ if toGet == SET_DYAW as i32 => return 0,
             _ if toGet == SET_WIDTH as i32 => *value = (*ent).r.mins[0],
@@ -977,7 +1004,14 @@ pub fn Q3_GetFloat(
             _ if toGet == SET_EARSHOT as i32 => return 0,
             _ if toGet == SET_VIGILANCE as i32 => return 0,
             _ if toGet == SET_GRAVITY as i32 => *value = (*ctx.world).cvars.g_gravity.value,
-            _ if toGet == SET_FACEEYESCLOSED as i32 || toGet == SET_FACEEYESOPENED as i32 || toGet == SET_FACEAUX as i32 || toGet == SET_FACEBLINK as i32 || toGet == SET_FACEBLINKFROWN as i32 || toGet == SET_FACEFROWN as i32 || toGet == SET_FACENORMAL as i32 => {
+            _ if toGet == SET_FACEEYESCLOSED as i32
+                || toGet == SET_FACEEYESOPENED as i32
+                || toGet == SET_FACEAUX as i32
+                || toGet == SET_FACEBLINK as i32
+                || toGet == SET_FACEBLINKFROWN as i32
+                || toGet == SET_FACEFROWN as i32
+                || toGet == SET_FACENORMAL as i32 =>
+            {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1041,11 +1075,49 @@ pub fn Q3_GetFloat(
                 }
                 *value = (*((*ent).client as *mut gclient_t)).ps.stats[STAT_ARMOR as usize] as f32;
             }
-            _ if toGet == SET_WALKSPEED as i32 || toGet == SET_RUNSPEED as i32 || toGet == SET_YAWSPEED as i32 || toGet == SET_AGGRESSION as i32 || toGet == SET_AIM as i32 || toGet == SET_FRICTION as i32 || toGet == SET_SHOOTDIST as i32 || toGet == SET_HFOV as i32 || toGet == SET_VFOV as i32 || toGet == SET_DELAYSCRIPTTIME as i32 || toGet == SET_FORWARDMOVE as i32 || toGet == SET_RIGHTMOVE as i32 || toGet == SET_STARTFRAME as i32 || toGet == SET_ENDFRAME as i32 || toGet == SET_ANIMFRAME as i32 || toGet == SET_SHOT_SPACING as i32 || toGet == SET_MISSIONSTATUSTIME as i32 || toGet == SET_IGNOREPAIN as i32 || toGet == SET_IGNOREENEMIES as i32 || toGet == SET_IGNOREALERTS as i32 || toGet == SET_DONTSHOOT as i32 => return 0,
+            _ if toGet == SET_WALKSPEED as i32
+                || toGet == SET_RUNSPEED as i32
+                || toGet == SET_YAWSPEED as i32
+                || toGet == SET_AGGRESSION as i32
+                || toGet == SET_AIM as i32
+                || toGet == SET_FRICTION as i32
+                || toGet == SET_SHOOTDIST as i32
+                || toGet == SET_HFOV as i32
+                || toGet == SET_VFOV as i32
+                || toGet == SET_DELAYSCRIPTTIME as i32
+                || toGet == SET_FORWARDMOVE as i32
+                || toGet == SET_RIGHTMOVE as i32
+                || toGet == SET_STARTFRAME as i32
+                || toGet == SET_ENDFRAME as i32
+                || toGet == SET_ANIMFRAME as i32
+                || toGet == SET_SHOT_SPACING as i32
+                || toGet == SET_MISSIONSTATUSTIME as i32
+                || toGet == SET_IGNOREPAIN as i32
+                || toGet == SET_IGNOREENEMIES as i32
+                || toGet == SET_IGNOREALERTS as i32
+                || toGet == SET_DONTSHOOT as i32 =>
+            {
+                return 0
+            }
             _ if toGet == SET_NOTARGET as i32 => *value = ((*ent).flags & FL_NOTARGET) as f32,
-            _ if toGet == SET_DONTFIRE as i32 || toGet == SET_LOCKED_ENEMY as i32 || toGet == SET_CROUCHED as i32 || toGet == SET_WALKING as i32 || toGet == SET_RUNNING as i32 || toGet == SET_CHASE_ENEMIES as i32 || toGet == SET_LOOK_FOR_ENEMIES as i32 || toGet == SET_FACE_MOVE_DIR as i32 || toGet == SET_FORCED_MARCH as i32 || toGet == SET_UNDYING as i32 || toGet == SET_NOAVOID as i32 => return 0,
+            _ if toGet == SET_DONTFIRE as i32
+                || toGet == SET_LOCKED_ENEMY as i32
+                || toGet == SET_CROUCHED as i32
+                || toGet == SET_WALKING as i32
+                || toGet == SET_RUNNING as i32
+                || toGet == SET_CHASE_ENEMIES as i32
+                || toGet == SET_LOOK_FOR_ENEMIES as i32
+                || toGet == SET_FACE_MOVE_DIR as i32
+                || toGet == SET_FORCED_MARCH as i32
+                || toGet == SET_UNDYING as i32
+                || toGet == SET_NOAVOID as i32 =>
+            {
+                return 0
+            }
             _ if toGet == SET_SOLID as i32 => *value = (*ent).r.contents as f32,
-            _ if toGet == SET_PLAYER_USABLE as i32 => *value = ((*ent).r.svFlags & SVF_PLAYER_USABLE) as f32,
+            _ if toGet == SET_PLAYER_USABLE as i32 => {
+                *value = ((*ent).r.svFlags & SVF_PLAYER_USABLE) as f32
+            }
             _ if toGet == SET_LOOP_ANIM as i32 => return 0,
             _ if toGet == SET_INTERFACE as i32 => {
                 G_DebugPrint(
@@ -1055,7 +1127,13 @@ pub fn Q3_GetFloat(
                 );
                 return 0;
             }
-            _ if toGet == SET_SHIELDS as i32 || toGet == SET_VAMPIRE as i32 || toGet == SET_FORCE_INVINCIBLE as i32 || toGet == SET_GREET_ALLIES as i32 => return 0,
+            _ if toGet == SET_SHIELDS as i32
+                || toGet == SET_VAMPIRE as i32
+                || toGet == SET_FORCE_INVINCIBLE as i32
+                || toGet == SET_GREET_ALLIES as i32 =>
+            {
+                return 0
+            }
             _ if toGet == SET_VIDEO_FADE_IN as i32 => {
                 G_DebugPrint(
                     ctx,
@@ -1074,16 +1152,43 @@ pub fn Q3_GetFloat(
                 return 0;
             }
             _ if toGet == SET_INVISIBLE as i32 => *value = ((*ent).s.eFlags & EF_NODRAW) as f32,
-            _ if toGet == SET_PLAYER_LOCKED as i32 || toGet == SET_LOCK_PLAYER_WEAPONS as i32 || toGet == SET_NO_IMPACT_DAMAGE as i32 => return 0,
-            _ if toGet == SET_NO_KNOCKBACK as i32 => *value = ((*ent).flags & FL_NO_KNOCKBACK) as f32,
+            _ if toGet == SET_PLAYER_LOCKED as i32
+                || toGet == SET_LOCK_PLAYER_WEAPONS as i32
+                || toGet == SET_NO_IMPACT_DAMAGE as i32 =>
+            {
+                return 0
+            }
+            _ if toGet == SET_NO_KNOCKBACK as i32 => {
+                *value = ((*ent).flags & FL_NO_KNOCKBACK) as f32
+            }
             _ if toGet == SET_ALT_FIRE as i32 || toGet == SET_NO_RESPONSE as i32 => return 0,
             _ if toGet == SET_INVINCIBLE as i32 => *value = ((*ent).flags & FL_GODMODE) as f32,
-            _ if toGet == SET_MISSIONSTATUSACTIVE as i32 || toGet == SET_NO_COMBAT_TALK as i32 || toGet == SET_NO_ALERT_TALK as i32 || toGet == SET_USE_CP_NEAREST as i32 || toGet == SET_DISMEMBERABLE as i32 || toGet == SET_NO_FORCE as i32 || toGet == SET_NO_ACROBATICS as i32 || toGet == SET_USE_SUBTITLES as i32 || toGet == SET_NO_FALLTODEATH as i32 || toGet == SET_MORELIGHT as i32 || toGet == SET_TREASONED as i32 || toGet == SET_DISABLE_SHADER_ANIM as i32 || toGet == SET_SHADER_ANIM as i32 => return 0,
+            _ if toGet == SET_MISSIONSTATUSACTIVE as i32
+                || toGet == SET_NO_COMBAT_TALK as i32
+                || toGet == SET_NO_ALERT_TALK as i32
+                || toGet == SET_USE_CP_NEAREST as i32
+                || toGet == SET_DISMEMBERABLE as i32
+                || toGet == SET_NO_FORCE as i32
+                || toGet == SET_NO_ACROBATICS as i32
+                || toGet == SET_USE_SUBTITLES as i32
+                || toGet == SET_NO_FALLTODEATH as i32
+                || toGet == SET_MORELIGHT as i32
+                || toGet == SET_TREASONED as i32
+                || toGet == SET_DISABLE_SHADER_ANIM as i32
+                || toGet == SET_SHADER_ANIM as i32 =>
+            {
+                return 0
+            }
             _ => {
-                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name)) != VTYPE_FLOAT {
+                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name))
+                    != VTYPE_FLOAT
+                {
                     return 0;
                 }
-                return trap::ICARUS_GetFloatVariable(ctx.engine, GIcarusGetfloatvariableArgs::new(name, value));
+                return trap::ICARUS_GetFloatVariable(
+                    ctx.engine,
+                    GIcarusGetfloatvariableArgs::new(name, value),
+                );
             }
         }
 
@@ -1109,9 +1214,26 @@ pub fn Q3_GetVector(
         let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
 
         match toGet {
-            _ if toGet == SET_PARM1 as i32 || toGet == SET_PARM2 as i32 || toGet == SET_PARM3 as i32 || toGet == SET_PARM4 as i32 || toGet == SET_PARM5 as i32 || toGet == SET_PARM6 as i32 || toGet == SET_PARM7 as i32 || toGet == SET_PARM8 as i32 || toGet == SET_PARM9 as i32 || toGet == SET_PARM10 as i32 || toGet == SET_PARM11 as i32 || toGet == SET_PARM12 as i32 || toGet == SET_PARM13 as i32 || toGet == SET_PARM14 as i32 || toGet == SET_PARM15 as i32 || toGet == SET_PARM16 as i32 => {
+            _ if toGet == SET_PARM1 as i32
+                || toGet == SET_PARM2 as i32
+                || toGet == SET_PARM3 as i32
+                || toGet == SET_PARM4 as i32
+                || toGet == SET_PARM5 as i32
+                || toGet == SET_PARM6 as i32
+                || toGet == SET_PARM7 as i32
+                || toGet == SET_PARM8 as i32
+                || toGet == SET_PARM9 as i32
+                || toGet == SET_PARM10 as i32
+                || toGet == SET_PARM11 as i32
+                || toGet == SET_PARM12 as i32
+                || toGet == SET_PARM13 as i32
+                || toGet == SET_PARM14 as i32
+                || toGet == SET_PARM15 as i32
+                || toGet == SET_PARM16 as i32 =>
+            {
                 // Raven: sscanf(parm, "%f %f %f", &value[0], &value[1], &value[2])
-                let parm_str = cstr_to_str((*(*ent).parms).parm[(toGet - SET_PARM1 as i32) as usize].as_ptr());
+                let parm_str =
+                    cstr_to_str((*(*ent).parms).parm[(toGet - SET_PARM1 as i32) as usize].as_ptr());
                 let mut parts = parm_str.split_whitespace();
                 value[0] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
                 value[1] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
@@ -1129,10 +1251,15 @@ pub fn Q3_GetVector(
                 return 0;
             }
             _ => {
-                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name)) != VTYPE_VECTOR {
+                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name))
+                    != VTYPE_VECTOR
+                {
                     return 0;
                 }
-                return trap::ICARUS_GetVectorVariable(ctx.engine, GIcarusGetvectorvariableArgs::new(name, value as *mut vec3_t));
+                return trap::ICARUS_GetVectorVariable(
+                    ctx.engine,
+                    GIcarusGetvectorvariableArgs::new(name, value as *mut vec3_t),
+                );
             }
         }
 
@@ -1164,7 +1291,23 @@ pub fn Q3_GetString(
                     return 0;
                 }
             }
-            _ if toGet == SET_PARM1 as i32 || toGet == SET_PARM2 as i32 || toGet == SET_PARM3 as i32 || toGet == SET_PARM4 as i32 || toGet == SET_PARM5 as i32 || toGet == SET_PARM6 as i32 || toGet == SET_PARM7 as i32 || toGet == SET_PARM8 as i32 || toGet == SET_PARM9 as i32 || toGet == SET_PARM10 as i32 || toGet == SET_PARM11 as i32 || toGet == SET_PARM12 as i32 || toGet == SET_PARM13 as i32 || toGet == SET_PARM14 as i32 || toGet == SET_PARM15 as i32 || toGet == SET_PARM16 as i32 => {
+            _ if toGet == SET_PARM1 as i32
+                || toGet == SET_PARM2 as i32
+                || toGet == SET_PARM3 as i32
+                || toGet == SET_PARM4 as i32
+                || toGet == SET_PARM5 as i32
+                || toGet == SET_PARM6 as i32
+                || toGet == SET_PARM7 as i32
+                || toGet == SET_PARM8 as i32
+                || toGet == SET_PARM9 as i32
+                || toGet == SET_PARM10 as i32
+                || toGet == SET_PARM11 as i32
+                || toGet == SET_PARM12 as i32
+                || toGet == SET_PARM13 as i32
+                || toGet == SET_PARM14 as i32
+                || toGet == SET_PARM15 as i32
+                || toGet == SET_PARM16 as i32 =>
+            {
                 if !(*ent).parms.is_null() {
                     *value = (*(*ent).parms).parm[(toGet - SET_PARM1 as i32) as usize].as_mut_ptr();
                 } else {
@@ -1182,23 +1325,55 @@ pub fn Q3_GetString(
             }
             _ if toGet == SET_TARGET as i32 => *value = (*ent).target,
             _ if toGet == SET_LOCATION as i32 => return 0,
-            _ if toGet == SET_SPAWNSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_SPAWN as usize],
+            _ if toGet == SET_SPAWNSCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_SPAWN as usize]
+            }
             _ if toGet == SET_USESCRIPT as i32 => *value = (*ent).behaviorSet[BSET_USE as usize],
-            _ if toGet == SET_AWAKESCRIPT as i32 => *value = (*ent).behaviorSet[BSET_AWAKE as usize],
-            _ if toGet == SET_ANGERSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_ANGER as usize],
-            _ if toGet == SET_ATTACKSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_ATTACK as usize],
-            _ if toGet == SET_VICTORYSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_VICTORY as usize],
-            _ if toGet == SET_LOSTENEMYSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_LOSTENEMY as usize],
+            _ if toGet == SET_AWAKESCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_AWAKE as usize]
+            }
+            _ if toGet == SET_ANGERSCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_ANGER as usize]
+            }
+            _ if toGet == SET_ATTACKSCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_ATTACK as usize]
+            }
+            _ if toGet == SET_VICTORYSCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_VICTORY as usize]
+            }
+            _ if toGet == SET_LOSTENEMYSCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_LOSTENEMY as usize]
+            }
             _ if toGet == SET_PAINSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_PAIN as usize],
             _ if toGet == SET_FLEESCRIPT as i32 => *value = (*ent).behaviorSet[BSET_FLEE as usize],
-            _ if toGet == SET_DEATHSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_DEATH as usize],
-            _ if toGet == SET_DELAYEDSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_DELAYED as usize],
-            _ if toGet == SET_BLOCKEDSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_BLOCKED as usize],
-            _ if toGet == SET_FFIRESCRIPT as i32 => *value = (*ent).behaviorSet[BSET_FFIRE as usize],
-            _ if toGet == SET_FFDEATHSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_FFDEATH as usize],
-            _ if toGet == SET_ENEMY as i32 || toGet == SET_LEADER as i32 || toGet == SET_CAPTURE as i32 => return 0,
+            _ if toGet == SET_DEATHSCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_DEATH as usize]
+            }
+            _ if toGet == SET_DELAYEDSCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_DELAYED as usize]
+            }
+            _ if toGet == SET_BLOCKEDSCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_BLOCKED as usize]
+            }
+            _ if toGet == SET_FFIRESCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_FFIRE as usize]
+            }
+            _ if toGet == SET_FFDEATHSCRIPT as i32 => {
+                *value = (*ent).behaviorSet[BSET_FFDEATH as usize]
+            }
+            _ if toGet == SET_ENEMY as i32
+                || toGet == SET_LEADER as i32
+                || toGet == SET_CAPTURE as i32 =>
+            {
+                return 0
+            }
             _ if toGet == SET_TARGETNAME as i32 => *value = (*ent).targetname,
-            _ if toGet == SET_PAINTARGET as i32 || toGet == SET_CAMERA_GROUP as i32 || toGet == SET_CAMERA_GROUP_TAG as i32 => return 0,
+            _ if toGet == SET_PAINTARGET as i32
+                || toGet == SET_CAMERA_GROUP as i32
+                || toGet == SET_CAMERA_GROUP_TAG as i32 =>
+            {
+                return 0
+            }
             _ if toGet == SET_LOOK_TARGET as i32 => {
                 G_DebugPrint(
                     ctx,
@@ -1207,7 +1382,14 @@ pub fn Q3_GetString(
                         as *const c_char,
                 );
             }
-            _ if toGet == SET_TARGET2 as i32 || toGet == SET_REMOVE_TARGET as i32 || toGet == SET_WEAPON as i32 || toGet == SET_ITEM as i32 || toGet == SET_MUSIC_STATE as i32 => return 0,
+            _ if toGet == SET_TARGET2 as i32
+                || toGet == SET_REMOVE_TARGET as i32
+                || toGet == SET_WEAPON as i32
+                || toGet == SET_ITEM as i32
+                || toGet == SET_MUSIC_STATE as i32 =>
+            {
+                return 0
+            }
             _ if toGet == SET_NAVGOAL as i32 => {
                 G_DebugPrint(
                     ctx,
@@ -1318,10 +1500,15 @@ pub fn Q3_GetString(
             }
             _ if toGet == SET_FULLNAME as i32 => *value = (*ent).fullName,
             _ => {
-                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name)) != VTYPE_STRING {
+                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name))
+                    != VTYPE_STRING
+                {
                     return 0;
                 }
-                return trap::ICARUS_GetStringVariable(ctx.engine, GIcarusGetstringvariableArgs::new(name, *value as *const c_char));
+                return trap::ICARUS_GetStringVariable(
+                    ctx.engine,
+                    GIcarusGetstringvariableArgs::new(name, *value as *const c_char),
+                );
             }
         }
 
@@ -1493,7 +1680,10 @@ pub fn Q3_Lerp2Origin(
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
-            || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
+            || Q_stricmp(
+                (*ent).classname,
+                b"target_scriptrunner\0".as_ptr() as *const c_char,
+            ) == 0
         {
             G_DebugPrint(
                 ctx,
@@ -1550,6 +1740,24 @@ pub fn Q3_Lerp2Origin(
 pub fn Q3_SetOriginOffset(ctx: GameContext<'_>, entID: c_int, axis: c_int, offset: f32) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
+
+        if !(*ent).client.is_null()
+            || Q_stricmp(
+                (*ent).classname,
+                b"target_scriptrunner\0".as_ptr() as *const c_char,
+            ) == 0
+        {
+            G_DebugPrint(
+                ctx,
+                WL_ERROR as c_int,
+                cstr(&format!(
+                    "Q3_SetOriginOffset: ent {} is NOT a mover!\n",
+                    entID
+                ))
+                .as_ptr(),
+            );
+            return;
+        }
 
         let mut origin = (*ent).s.origin;
         origin[axis as usize] += offset;
@@ -1613,7 +1821,11 @@ pub fn Q3_SetLeader(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
             G_DebugPrint(
                 ctx,
                 WL_ERROR as c_int,
-                cstr(&format!("Q3_SetLeader: ent {} is NOT a player or NPC!\n", entID)).as_ptr(),
+                cstr(&format!(
+                    "Q3_SetLeader: ent {} is NOT a player or NPC!\n",
+                    entID
+                ))
+                .as_ptr(),
             );
             return;
         }
@@ -1738,12 +1950,21 @@ pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) ->
             }
             (*npc).goalEntity = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), targ));
             (*npc).goalRadius = (((*ent).r.maxs[0] + (*ent).r.maxs[0]).sqrt()
-                + ((*targ).r.maxs[0] + (*targ).r.maxs[0]).sqrt()) as c_int;
+                + ((*targ).r.maxs[0] + (*targ).r.maxs[0]).sqrt())
+                as c_int;
             (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
             qfalse
         } else {
             let goalRadius = TAG_GetRadius(ctx, std::ptr::null(), name);
-            NPC_SetMoveGoal(ctx, ent, goalPos, goalRadius, qtrue, -1, std::ptr::null_mut());
+            NPC_SetMoveGoal(
+                ctx,
+                ent,
+                goalPos,
+                goalRadius,
+                qtrue,
+                -1,
+                std::ptr::null_mut(),
+            );
             let goal_id = (*npc).goalEntity.unwrap();
             let goal_ent = &mut (*ctx.world).g_entities[goal_id.0 as usize] as *mut gentity_t;
             (*goal_ent).lastWaypoint = WAYPOINT_NONE;
@@ -1772,7 +1993,8 @@ pub fn SetLowerAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
             return;
         }
 
-        G_SetAnim(ctx,
+        G_SetAnim(
+            ctx,
             ent,
             std::ptr::null_mut(),
             SETANIM_LEGS,
@@ -1800,7 +2022,8 @@ pub fn SetUpperAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
             return;
         }
 
-        G_SetAnim(ctx,
+        G_SetAnim(
+            ctx,
             ent,
             std::ptr::null_mut(),
             SETANIM_TORSO,
@@ -1869,12 +2092,7 @@ pub fn Q3_SetAnimLower(ctx: GameContext<'_>, entID: c_int, anim_name: *const c_c
 /// Raven: the real body (`PM_SetLegsAnimTimer`/`PM_SetTorsoAnimTimer`) is
 /// `#if 0`'d out in the oracle itself; only the "not supported" print remains live.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2449-2476`
-pub fn Q3_SetAnimHoldTime(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    int_data: c_int,
-    lower: qboolean,
-) {
+pub fn Q3_SetAnimHoldTime(ctx: GameContext<'_>, entID: c_int, int_data: c_int, lower: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -1885,11 +2103,7 @@ pub fn Q3_SetAnimHoldTime(
 /// Raven `Q3_SetHealth`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2487-2527`
-pub fn Q3_SetHealth(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: c_int,
-) {
+pub fn Q3_SetHealth(ctx: GameContext<'_>, entID: c_int, data: c_int) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         let mut data = data;
@@ -1907,8 +2121,7 @@ pub fn Q3_SetHealth(
 
         (*client).ps.stats[STAT_HEALTH as usize] = data;
 
-        if (*client).ps.stats[STAT_HEALTH as usize] > (*client).ps.stats[STAT_MAX_HEALTH as usize]
-        {
+        if (*client).ps.stats[STAT_HEALTH as usize] > (*client).ps.stats[STAT_MAX_HEALTH as usize] {
             (*ent).health = (*client).ps.stats[STAT_MAX_HEALTH as usize];
             (*client).ps.stats[STAT_HEALTH as usize] = (*ent).health;
         }
@@ -1929,11 +2142,7 @@ pub fn Q3_SetHealth(
 /// Raven `Q3_SetArmor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2539-2559`
-pub fn Q3_SetArmor(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: c_int,
-) {
+pub fn Q3_SetArmor(ctx: GameContext<'_>, entID: c_int, data: c_int) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -1956,11 +2165,7 @@ pub fn Q3_SetArmor(
 /// Raven `Q3_SetBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2573-2687`
-pub fn Q3_SetBState(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    bs_name: *const c_char,
-) -> qboolean {
+pub fn Q3_SetBState(ctx: GameContext<'_>, entID: c_int, bs_name: *const c_char) -> qboolean {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2046,11 +2251,7 @@ pub fn Q3_SetBState(
 /// Raven `Q3_SetTempBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2699-2737`
-pub fn Q3_SetTempBState(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    bs_name: *const c_char,
-) -> qboolean {
+pub fn Q3_SetTempBState(ctx: GameContext<'_>, entID: c_int, bs_name: *const c_char) -> qboolean {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2081,11 +2282,7 @@ pub fn Q3_SetTempBState(
 /// Raven `Q3_SetDefaultBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2749-2771`
-pub fn Q3_SetDefaultBState(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    bs_name: *const c_char,
-) {
+pub fn Q3_SetDefaultBState(ctx: GameContext<'_>, entID: c_int, bs_name: *const c_char) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2228,11 +2425,7 @@ pub fn Q3_SetTimeScale(ctx: GameContext<'_>, entID: c_int, data: *const c_char) 
 /// Raven `Q3_SetInvisible`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2941-2968`
-pub fn Q3_SetInvisible(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    invisible: qboolean,
-) {
+pub fn Q3_SetInvisible(ctx: GameContext<'_>, entID: c_int, invisible: qboolean) {
     unsafe {
         let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2477,11 +2670,7 @@ pub fn Q3_SetRunSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
 /// Raven `Q3_SetYawSpeed`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3207-3211`
-pub fn Q3_SetYawSpeed(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    float_data: f32,
-) {
+pub fn Q3_SetYawSpeed(ctx: GameContext<'_>, entID: c_int, float_data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2492,11 +2681,7 @@ pub fn Q3_SetYawSpeed(
 /// Raven `Q3_SetAggression`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3223-3227`
-pub fn Q3_SetAggression(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    int_data: c_int,
-) {
+pub fn Q3_SetAggression(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2507,11 +2692,7 @@ pub fn Q3_SetAggression(
 /// Raven `Q3_SetAim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3239-3243`
-pub fn Q3_SetAim(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    int_data: c_int,
-) {
+pub fn Q3_SetAim(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2522,11 +2703,7 @@ pub fn Q3_SetAim(
 /// Raven `Q3_SetFriction`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3255-3273`
-pub fn Q3_SetFriction(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    int_data: c_int,
-) {
+pub fn Q3_SetFriction(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
     unsafe {
         let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2554,11 +2731,7 @@ pub fn Q3_SetFriction(
 /// Raven `Q3_SetGravity`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3285-3307`
-pub fn Q3_SetGravity(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    float_data: f32,
-) {
+pub fn Q3_SetGravity(ctx: GameContext<'_>, entID: c_int, float_data: f32) {
     unsafe {
         let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2587,11 +2760,7 @@ pub fn Q3_SetGravity(
 /// Raven `Q3_SetWait`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3319-3330`
-pub fn Q3_SetWait(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    float_data: f32,
-) {
+pub fn Q3_SetWait(ctx: GameContext<'_>, entID: c_int, float_data: f32) {
     unsafe {
         let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         (*self_).wait = float_data;
@@ -2601,11 +2770,7 @@ pub fn Q3_SetWait(
 /// Raven `Q3_SetShotSpacing`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3333-3337`
-pub fn Q3_SetShotSpacing(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    int_data: c_int,
-) {
+pub fn Q3_SetShotSpacing(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2616,11 +2781,7 @@ pub fn Q3_SetShotSpacing(
 /// Raven `Q3_SetFollowDist`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3348-3352`
-pub fn Q3_SetFollowDist(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    float_data: f32,
-) {
+pub fn Q3_SetFollowDist(ctx: GameContext<'_>, entID: c_int, float_data: f32) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2631,11 +2792,7 @@ pub fn Q3_SetFollowDist(
 /// Raven `Q3_SetScale`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3364-3396`
-pub fn Q3_SetScale(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    float_data: f32,
-) {
+pub fn Q3_SetScale(ctx: GameContext<'_>, entID: c_int, float_data: f32) {
     unsafe {
         let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2659,9 +2816,7 @@ pub fn Q3_SetScale(
 /// Raven `Q3_GameSideCheckStringCounterIncrement`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3406-3429`
-pub fn Q3_GameSideCheckStringCounterIncrement(
-    string: *const c_char,
-) -> f32 {
+pub fn Q3_GameSideCheckStringCounterIncrement(string: *const c_char) -> f32 {
     unsafe {
         let s = cstr_to_str(string);
         let mut val = 0.0f32;
@@ -2683,11 +2838,7 @@ pub fn Q3_GameSideCheckStringCounterIncrement(
 /// Raven `Q3_SetCount`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3440-3460`
-pub fn Q3_SetCount(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: *const c_char,
-) {
+pub fn Q3_SetCount(ctx: GameContext<'_>, entID: c_int, data: *const c_char) {
     unsafe {
         let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2703,11 +2854,7 @@ pub fn Q3_SetCount(
 /// Raven `Q3_SetTargetName`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3472-3490`
-pub fn Q3_SetTargetName(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    targetname: *const c_char,
-) {
+pub fn Q3_SetTargetName(ctx: GameContext<'_>, entID: c_int, targetname: *const c_char) {
     unsafe {
         let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2722,11 +2869,7 @@ pub fn Q3_SetTargetName(
 /// Raven `Q3_SetTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3502-3520`
-pub fn Q3_SetTarget(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    target: *const c_char,
-) {
+pub fn Q3_SetTarget(ctx: GameContext<'_>, entID: c_int, target: *const c_char) {
     unsafe {
         let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2741,11 +2884,7 @@ pub fn Q3_SetTarget(
 /// Raven `Q3_SetTarget2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3531-3552`
-pub fn Q3_SetTarget2(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    target2: *const c_char,
-) {
+pub fn Q3_SetTarget2(ctx: GameContext<'_>, entID: c_int, target2: *const c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2756,11 +2895,7 @@ pub fn Q3_SetTarget2(
 /// Raven `Q3_SetRemoveTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3562-3566`
-pub fn Q3_SetRemoveTarget(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    target: *const c_char,
-) {
+pub fn Q3_SetRemoveTarget(ctx: GameContext<'_>, entID: c_int, target: *const c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2771,11 +2906,7 @@ pub fn Q3_SetRemoveTarget(
 /// Raven `Q3_SetPainTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3578-3599`
-pub fn Q3_SetPainTarget(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    targetname: *const c_char,
-) {
+pub fn Q3_SetPainTarget(ctx: GameContext<'_>, entID: c_int, targetname: *const c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2786,11 +2917,7 @@ pub fn Q3_SetPainTarget(
 /// Raven `Q3_SetFullName`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3610-3628`
-pub fn Q3_SetFullName(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    fullName: *const c_char,
-) {
+pub fn Q3_SetFullName(ctx: GameContext<'_>, entID: c_int, fullName: *const c_char) {
     unsafe {
         let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2805,10 +2932,7 @@ pub fn Q3_SetFullName(
 /// Raven `Q3_SetMusicState`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3630-3634`
-pub fn Q3_SetMusicState(
-    ctx: GameContext<'_>,
-    dms: *const c_char,
-) {
+pub fn Q3_SetMusicState(ctx: GameContext<'_>, dms: *const c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2840,12 +2964,7 @@ pub fn Q3_SetForcePowerLevel(
 // `ctx.world`. Raven's `G_DebugPrint` warnings (parmNum range, truncation) are
 // still dropped — no `WL_*` route is set up here — matching the file's other
 // `Q3_Set*` stubs.
-pub fn Q3_SetParm(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    parmNum: c_int,
-    parmValue: *const c_char,
-) {
+pub fn Q3_SetParm(ctx: GameContext<'_>, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2879,11 +2998,7 @@ pub fn Q3_SetParm(
 /// Raven `Q3_SetCaptureGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3701-3705`
-pub fn Q3_SetCaptureGoal(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    name: *const c_char,
-) {
+pub fn Q3_SetCaptureGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2894,11 +3009,7 @@ pub fn Q3_SetCaptureGoal(
 /// Raven `Q3_SetEvent`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3714-3718`
-pub fn Q3_SetEvent(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    event_name: *const c_char,
-) {
+pub fn Q3_SetEvent(ctx: GameContext<'_>, entID: c_int, event_name: *const c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2910,11 +3021,7 @@ pub fn Q3_SetEvent(
 /// Raven `Q3_SetIgnorePain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3727-3731`
-pub fn Q3_SetIgnorePain(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: qboolean,
-) {
+pub fn Q3_SetIgnorePain(ctx: GameContext<'_>, entID: c_int, data: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2925,11 +3032,7 @@ pub fn Q3_SetIgnorePain(
 /// Raven `Q3_SetIgnoreEnemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3740-3744`
-pub fn Q3_SetIgnoreEnemies(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: qboolean,
-) {
+pub fn Q3_SetIgnoreEnemies(ctx: GameContext<'_>, entID: c_int, data: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2940,11 +3043,7 @@ pub fn Q3_SetIgnoreEnemies(
 /// Raven `Q3_SetIgnoreAlerts`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3753-3757`
-pub fn Q3_SetIgnoreAlerts(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: qboolean,
-) {
+pub fn Q3_SetIgnoreAlerts(ctx: GameContext<'_>, entID: c_int, data: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2955,11 +3054,7 @@ pub fn Q3_SetIgnoreAlerts(
 /// Raven `Q3_SetNoTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3767-3781`
-pub fn Q3_SetNoTarget(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    data: qboolean,
-) {
+pub fn Q3_SetNoTarget(ctx: GameContext<'_>, entID: c_int, data: qboolean) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -2974,11 +3069,7 @@ pub fn Q3_SetNoTarget(
 /// Raven `Q3_SetDontShoot`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3790-3794`
-pub fn Q3_SetDontShoot(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetDontShoot(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -2989,11 +3080,7 @@ pub fn Q3_SetDontShoot(
 /// Raven `Q3_SetDontFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3803-3807`
-pub fn Q3_SetDontFire(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetDontFire(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3004,11 +3091,7 @@ pub fn Q3_SetDontFire(
 /// Raven `Q3_SetFireWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3816-3820`
-pub fn Q3_SetFireWeapon(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetFireWeapon(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3019,11 +3102,7 @@ pub fn Q3_SetFireWeapon(
 /// Raven `Q3_SetInactive`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3830-3848`
-pub fn Q3_SetInactive(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetInactive(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -3038,11 +3117,7 @@ pub fn Q3_SetInactive(
 /// Raven `Q3_SetFuncUsableVisible`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3857-3880`
-pub fn Q3_SetFuncUsableVisible(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    visible: qboolean,
-) {
+pub fn Q3_SetFuncUsableVisible(ctx: GameContext<'_>, entID: c_int, visible: qboolean) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -3059,11 +3134,7 @@ pub fn Q3_SetFuncUsableVisible(
 /// Raven `Q3_SetLockedEnemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3889-3893`
-pub fn Q3_SetLockedEnemy(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    locked: qboolean,
-) {
+pub fn Q3_SetLockedEnemy(ctx: GameContext<'_>, entID: c_int, locked: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3074,10 +3145,7 @@ pub fn Q3_SetLockedEnemy(
 /// Raven `Q3_SetCinematicSkipScript`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3903-3907`
-pub fn Q3_SetCinematicSkipScript(
-    ctx: GameContext<'_>,
-    scriptname: *mut c_char,
-) {
+pub fn Q3_SetCinematicSkipScript(ctx: GameContext<'_>, scriptname: *mut c_char) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3088,11 +3156,7 @@ pub fn Q3_SetCinematicSkipScript(
 /// Raven `Q3_SetNoMindTrick`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3916-3920`
-pub fn Q3_SetNoMindTrick(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetNoMindTrick(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3103,11 +3167,7 @@ pub fn Q3_SetNoMindTrick(
 /// Raven `Q3_SetCrouched`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3929-3933`
-pub fn Q3_SetCrouched(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetCrouched(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3118,11 +3178,7 @@ pub fn Q3_SetCrouched(
 /// Raven `Q3_SetWalking`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3942-3967`
-pub fn Q3_SetWalking(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetWalking(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -3151,11 +3207,7 @@ pub fn Q3_SetWalking(
 /// Raven `Q3_SetRunning`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3976-3980`
-pub fn Q3_SetRunning(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetRunning(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3166,11 +3218,7 @@ pub fn Q3_SetRunning(
 /// Raven `Q3_SetForcedMarch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3989-3993`
-pub fn Q3_SetForcedMarch(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetForcedMarch(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3181,11 +3229,7 @@ pub fn Q3_SetForcedMarch(
 /// Raven `Q3_SetChaseEnemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4001-4005`
-pub fn Q3_SetChaseEnemies(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetChaseEnemies(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3196,11 +3240,7 @@ pub fn Q3_SetChaseEnemies(
 /// Raven `Q3_SetLookForEnemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4015-4019`
-pub fn Q3_SetLookForEnemies(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetLookForEnemies(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3211,11 +3251,7 @@ pub fn Q3_SetLookForEnemies(
 /// Raven `Q3_SetFaceMoveDir`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4027-4031`
-pub fn Q3_SetFaceMoveDir(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetFaceMoveDir(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3226,11 +3262,7 @@ pub fn Q3_SetFaceMoveDir(
 /// Raven `Q3_SetAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4040-4044`
-pub fn Q3_SetAltFire(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetAltFire(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3241,11 +3273,7 @@ pub fn Q3_SetAltFire(
 /// Raven `Q3_SetDontFlee`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4053-4057`
-pub fn Q3_SetDontFlee(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetDontFlee(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3256,11 +3284,7 @@ pub fn Q3_SetDontFlee(
 /// Raven `Q3_SetNoResponse`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4066-4070`
-pub fn Q3_SetNoResponse(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetNoResponse(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3271,11 +3295,7 @@ pub fn Q3_SetNoResponse(
 /// Raven `Q3_SetCombatTalk`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4079-4083`
-pub fn Q3_SetCombatTalk(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetCombatTalk(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3286,11 +3306,7 @@ pub fn Q3_SetCombatTalk(
 /// Raven `Q3_SetAlertTalk`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4092-4096`
-pub fn Q3_SetAlertTalk(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetAlertTalk(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3301,11 +3317,7 @@ pub fn Q3_SetAlertTalk(
 /// Raven `Q3_SetUseCpNearest`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4105-4109`
-pub fn Q3_SetUseCpNearest(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetUseCpNearest(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3316,11 +3328,7 @@ pub fn Q3_SetUseCpNearest(
 /// Raven `Q3_SetNoForce`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4118-4122`
-pub fn Q3_SetNoForce(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetNoForce(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3331,11 +3339,7 @@ pub fn Q3_SetNoForce(
 /// Raven `Q3_SetNoAcrobatics`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4131-4135`
-pub fn Q3_SetNoAcrobatics(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetNoAcrobatics(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3346,11 +3350,7 @@ pub fn Q3_SetNoAcrobatics(
 /// Raven `Q3_SetUseSubtitles`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4144-4148`
-pub fn Q3_SetUseSubtitles(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetUseSubtitles(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3361,11 +3361,7 @@ pub fn Q3_SetUseSubtitles(
 /// Raven `Q3_SetNoFallToDeath`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4157-4161`
-pub fn Q3_SetNoFallToDeath(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetNoFallToDeath(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3376,11 +3372,7 @@ pub fn Q3_SetNoFallToDeath(
 /// Raven `Q3_SetDismemberable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4170-4174`
-pub fn Q3_SetDismemberable(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    dismemberable: qboolean,
-) {
+pub fn Q3_SetDismemberable(ctx: GameContext<'_>, entID: c_int, dismemberable: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3391,11 +3383,7 @@ pub fn Q3_SetDismemberable(
 /// Raven `Q3_SetMoreLight`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4184-4188`
-pub fn Q3_SetMoreLight(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    add: qboolean,
-) {
+pub fn Q3_SetMoreLight(ctx: GameContext<'_>, entID: c_int, add: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3406,11 +3394,7 @@ pub fn Q3_SetMoreLight(
 /// Raven `Q3_SetUndying`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4197-4201`
-pub fn Q3_SetUndying(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    undying: qboolean,
-) {
+pub fn Q3_SetUndying(ctx: GameContext<'_>, entID: c_int, undying: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3422,11 +3406,7 @@ pub fn Q3_SetUndying(
 ///
 /// Raven: the debug message says "Invicible" (typo preserved verbatim).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4210-4214`
-pub fn Q3_SetInvincible(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    invincible: qboolean,
-) {
+pub fn Q3_SetInvincible(ctx: GameContext<'_>, entID: c_int, invincible: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3438,11 +3418,7 @@ pub fn Q3_SetInvincible(
 ///
 /// Raven: the debug message says "Invicible" (typo preserved verbatim).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4224-4228`
-pub fn Q3_SetForceInvincible(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    forceInv: qboolean,
-) {
+pub fn Q3_SetForceInvincible(ctx: GameContext<'_>, entID: c_int, forceInv: qboolean) {
     G_DebugPrint(
         ctx,
         WL_WARNING as c_int,
@@ -3453,11 +3429,7 @@ pub fn Q3_SetForceInvincible(
 /// Raven `Q3_SetNoAvoid`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4237-4261`
-pub fn Q3_SetNoAvoid(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    noAvoid: qboolean,
-) {
+pub fn Q3_SetNoAvoid(ctx: GameContext<'_>, entID: c_int, noAvoid: qboolean) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -3486,10 +3458,7 @@ pub fn Q3_SetNoAvoid(
 /// Raven `SolidifyOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4271-4295`
-pub fn SolidifyOwner(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SolidifyOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
@@ -3517,11 +3486,7 @@ pub fn SolidifyOwner(
 /// Raven `Q3_SetSolid`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4305-4345`
-pub fn Q3_SetSolid(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    solid: qboolean,
-) -> qboolean {
+pub fn Q3_SetSolid(ctx: GameContext<'_>, entID: c_int, solid: qboolean) -> qboolean {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -3566,11 +3531,7 @@ pub fn Q3_SetSolid(
 /// Raven `Q3_SetForwardMove`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4354-4372`
-pub fn Q3_SetForwardMove(
-    ctx: GameContext<'_>,
-    entID: c_int,
-    fmoveVal: c_int,
-) {
+pub fn Q3_SetForwardMove(ctx: GameContext<'_>, entID: c_int, fmoveVal: c_int) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
@@ -4416,7 +4377,16 @@ pub fn Q3_Set(
             _ if toSet == SET_LOOPSOUND as i32 => Q3_SetLoopSound(ctx, entID, data),
 
             _ if toSet == SET_ICARUS_FREEZE as i32 || toSet == SET_ICARUS_UNFREEZE as i32 => {
-                Q3_SetICARUSFreeze(ctx, entID, data, if toSet == (SET_ICARUS_FREEZE) as i32 { qtrue } else { qfalse });
+                Q3_SetICARUSFreeze(
+                    ctx,
+                    entID,
+                    data,
+                    if toSet == (SET_ICARUS_FREEZE) as i32 {
+                        qtrue
+                    } else {
+                        qfalse
+                    },
+                );
             }
 
             _ if toSet == SET_WEAPON as i32 => Q3_SetWeapon(ctx, entID, data),
@@ -4606,11 +4576,41 @@ pub fn Q3_Set(
                 //Q3_SetEnemy( entID, (char *) data);
             }
 
-            _ if toSet == SET_PARM1 as i32 || toSet == SET_PARM2 as i32 || toSet == SET_PARM3 as i32 || toSet == SET_PARM4 as i32 || toSet == SET_PARM5 as i32 || toSet == SET_PARM6 as i32 || toSet == SET_PARM7 as i32 || toSet == SET_PARM8 as i32 || toSet == SET_PARM9 as i32 || toSet == SET_PARM10 as i32 || toSet == SET_PARM11 as i32 || toSet == SET_PARM12 as i32 || toSet == SET_PARM13 as i32 || toSet == SET_PARM14 as i32 || toSet == SET_PARM15 as i32 || toSet == SET_PARM16 as i32 => {
+            _ if toSet == SET_PARM1 as i32
+                || toSet == SET_PARM2 as i32
+                || toSet == SET_PARM3 as i32
+                || toSet == SET_PARM4 as i32
+                || toSet == SET_PARM5 as i32
+                || toSet == SET_PARM6 as i32
+                || toSet == SET_PARM7 as i32
+                || toSet == SET_PARM8 as i32
+                || toSet == SET_PARM9 as i32
+                || toSet == SET_PARM10 as i32
+                || toSet == SET_PARM11 as i32
+                || toSet == SET_PARM12 as i32
+                || toSet == SET_PARM13 as i32
+                || toSet == SET_PARM14 as i32
+                || toSet == SET_PARM15 as i32
+                || toSet == SET_PARM16 as i32 =>
+            {
                 Q3_SetParm(ctx, entID, toSet - SET_PARM1 as i32, data);
             }
 
-            _ if toSet == SET_SPAWNSCRIPT as i32 || toSet == SET_USESCRIPT as i32 || toSet == SET_AWAKESCRIPT as i32 || toSet == SET_ANGERSCRIPT as i32 || toSet == SET_ATTACKSCRIPT as i32 || toSet == SET_VICTORYSCRIPT as i32 || toSet == SET_PAINSCRIPT as i32 || toSet == SET_FLEESCRIPT as i32 || toSet == SET_DEATHSCRIPT as i32 || toSet == SET_DELAYEDSCRIPT as i32 || toSet == SET_BLOCKEDSCRIPT as i32 || toSet == SET_FFIRESCRIPT as i32 || toSet == SET_FFDEATHSCRIPT as i32 || toSet == SET_MINDTRICKSCRIPT as i32 => {
+            _ if toSet == SET_SPAWNSCRIPT as i32
+                || toSet == SET_USESCRIPT as i32
+                || toSet == SET_AWAKESCRIPT as i32
+                || toSet == SET_ANGERSCRIPT as i32
+                || toSet == SET_ATTACKSCRIPT as i32
+                || toSet == SET_VICTORYSCRIPT as i32
+                || toSet == SET_PAINSCRIPT as i32
+                || toSet == SET_FLEESCRIPT as i32
+                || toSet == SET_DEATHSCRIPT as i32
+                || toSet == SET_DELAYEDSCRIPT as i32
+                || toSet == SET_BLOCKEDSCRIPT as i32
+                || toSet == SET_FFIRESCRIPT as i32
+                || toSet == SET_FFDEATHSCRIPT as i32
+                || toSet == SET_MINDTRICKSCRIPT as i32 =>
+            {
                 if Q3_SetBehaviorSet(ctx, entID, toSet, data) == qfalse {
                     G_DebugPrint(
                         ctx,
@@ -4911,21 +4911,40 @@ pub fn Q3_Set(
 
             _ if toSet == SET_LOCKYAW as i32 => Q3_SetLockAngle(ctx, entID, data),
 
-            _ if toSet == SET_CAMERA_GROUP as i32 => Q3_CameraGroup(ctx, entID, data as *mut c_char),
+            _ if toSet == SET_CAMERA_GROUP as i32 => {
+                Q3_CameraGroup(ctx, entID, data as *mut c_char)
+            }
             _ if toSet == SET_CAMERA_GROUP_Z_OFS as i32 => {
                 float_data = atof(data) as f32;
                 Q3_CameraGroupZOfs(ctx, float_data);
             }
-            _ if toSet == SET_CAMERA_GROUP_TAG as i32 => Q3_CameraGroupTag(ctx, data as *mut c_char),
+            _ if toSet == SET_CAMERA_GROUP_TAG as i32 => {
+                Q3_CameraGroupTag(ctx, data as *mut c_char)
+            }
 
             //FIXME: put these into camera commands
             _ if toSet == SET_LOOK_TARGET as i32 => Q3_LookTarget(ctx, entID, data as *mut c_char),
-            _ if toSet == SET_ADDRHANDBOLT_MODEL as i32 => Q3_AddRHandModel(ctx, entID, data as *mut c_char),
-            _ if toSet == SET_REMOVERHANDBOLT_MODEL as i32 => Q3_RemoveRHandModel(ctx, entID, data as *mut c_char),
-            _ if toSet == SET_ADDLHANDBOLT_MODEL as i32 => Q3_AddLHandModel(ctx, entID, data as *mut c_char),
-            _ if toSet == SET_REMOVELHANDBOLT_MODEL as i32 => Q3_RemoveLHandModel(ctx, entID, data as *mut c_char),
+            _ if toSet == SET_ADDRHANDBOLT_MODEL as i32 => {
+                Q3_AddRHandModel(ctx, entID, data as *mut c_char)
+            }
+            _ if toSet == SET_REMOVERHANDBOLT_MODEL as i32 => {
+                Q3_RemoveRHandModel(ctx, entID, data as *mut c_char)
+            }
+            _ if toSet == SET_ADDLHANDBOLT_MODEL as i32 => {
+                Q3_AddLHandModel(ctx, entID, data as *mut c_char)
+            }
+            _ if toSet == SET_REMOVELHANDBOLT_MODEL as i32 => {
+                Q3_RemoveLHandModel(ctx, entID, data as *mut c_char)
+            }
 
-            _ if toSet == SET_FACEEYESCLOSED as i32 || toSet == SET_FACEEYESOPENED as i32 || toSet == SET_FACEAUX as i32 || toSet == SET_FACEBLINK as i32 || toSet == SET_FACEBLINKFROWN as i32 || toSet == SET_FACEFROWN as i32 || toSet == SET_FACENORMAL as i32 => {
+            _ if toSet == SET_FACEEYESCLOSED as i32
+                || toSet == SET_FACEEYESOPENED as i32
+                || toSet == SET_FACEAUX as i32
+                || toSet == SET_FACEBLINK as i32
+                || toSet == SET_FACEBLINKFROWN as i32
+                || toSet == SET_FACEFROWN as i32
+                || toSet == SET_FACENORMAL as i32 =>
+            {
                 float_data = atof(data) as f32;
                 Q3_Face(ctx, entID, toSet, float_data);
             }
@@ -5232,7 +5251,18 @@ pub fn Q3_Set(
                 );
             }
 
-            _ if toSet == SET_FORCE_HEAL_LEVEL as i32 || toSet == SET_FORCE_JUMP_LEVEL as i32 || toSet == SET_FORCE_SPEED_LEVEL as i32 || toSet == SET_FORCE_PUSH_LEVEL as i32 || toSet == SET_FORCE_PULL_LEVEL as i32 || toSet == SET_FORCE_MINDTRICK_LEVEL as i32 || toSet == SET_FORCE_GRIP_LEVEL as i32 || toSet == SET_FORCE_LIGHTNING_LEVEL as i32 || toSet == SET_SABER_THROW as i32 || toSet == SET_SABER_DEFENSE as i32 || toSet == SET_SABER_OFFENSE as i32 => {
+            _ if toSet == SET_FORCE_HEAL_LEVEL as i32
+                || toSet == SET_FORCE_JUMP_LEVEL as i32
+                || toSet == SET_FORCE_SPEED_LEVEL as i32
+                || toSet == SET_FORCE_PUSH_LEVEL as i32
+                || toSet == SET_FORCE_PULL_LEVEL as i32
+                || toSet == SET_FORCE_MINDTRICK_LEVEL as i32
+                || toSet == SET_FORCE_GRIP_LEVEL as i32
+                || toSet == SET_FORCE_LIGHTNING_LEVEL as i32
+                || toSet == SET_SABER_THROW as i32
+                || toSet == SET_SABER_DEFENSE as i32
+                || toSet == SET_SABER_OFFENSE as i32 =>
+            {
                 int_data = atoi(data);
                 Q3_SetForcePowerLevel(ctx, entID, toSet - SET_FORCE_HEAL_LEVEL as i32, int_data);
             }

@@ -46,7 +46,8 @@ const SCF_USE_CP_NEAREST: i32 = 0x00100000;
 const SCF_DONT_FIRE: i32 = 0x00000010;
 const SCF_FIRE_WEAPON: i32 = 0x00000008;
 const SCF_IGNORE_ALERTS: i32 = 0x00000001;
-const SCF_LOOK_FOR_ENEMIES: i32 = 0x00000080;
+// Oracle `b_public.h:38`: SCF_LOOK_FOR_ENEMIES = 0x00000800.
+const SCF_LOOK_FOR_ENEMIES: i32 = 0x00000800;
 
 // Combat point flags.
 // Source: `oracle/oracle/codemp/game/b_public.h`
@@ -383,7 +384,10 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                     && world.globals.enemyLOS3 != QFALSE
                     && world.globals.enemyDist3 <= 10000.0)
             {
-                let newSquadState = SQUAD_STAND_AND_SHOOT;
+                // Oracle assigns the dead local `newSquadState` here (never written back
+                // to NPCInfo->squadState), so squadState stays SQUAD_RETREAT and the later
+                // `== SQUAD_RETREAT` flee/IDLE reset fires. Preserve that quirk (§20).
+                let mut newSquadState = SQUAD_STAND_AND_SHOOT;
                 // we got where we wanted to go, set timers based on why we were running
                 match (*npc_info_ptr).squadState {
                     SQUAD_RETREAT => {
@@ -397,7 +401,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                                 .unwrap_or(0),
                         );
                         TIMER_Set(ctx, npc_ptr, c"hideTime".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 7000));
-                        (*npc_info_ptr).squadState = SQUAD_COVER;
+                        newSquadState = SQUAD_COVER;
                     }
                     SQUAD_TRANSITION => {
                         // was heading for a combat point

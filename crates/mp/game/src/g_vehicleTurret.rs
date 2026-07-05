@@ -15,18 +15,21 @@ use crate::prelude::*;
 // Source: `oracle/oracle/codemp/game/q_shared.h`
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
-use crate::NPC_utils::NPC_SetBoneAngles;
-use crate::g_weapon::{WP_CalcVehMuzzle, WP_FireVehicleWeapon, G_VehMuzzleFireFX};
-use crate::g_utils::G_RadiusList;
+use crate::entity::flags::{FL_BBRUSH, FL_NOTARGET};
 use crate::g_team::OnSameTeam;
-use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorNormalize, VectorLengthSquared, _VectorCopy, _VectorMA, _VectorSubtract, vectoangles};
+use crate::g_utils::G_RadiusList;
+use crate::g_weapon::{G_VehMuzzleFireFX, WP_CalcVehMuzzle, WP_FireVehicleWeapon};
+use crate::q_math::{
+    _VectorCopy, _VectorMA, _VectorSubtract, vectoangles, AngleNormalize180, AnglesSubtract,
+    VectorLengthSquared, VectorNormalize,
+};
 use crate::q_shared::{Q_stricmp, Q_strncmp};
 use crate::trap;
-use crate::entity::flags::{FL_NOTARGET, FL_BBRUSH};
-use mp_bg::weapons::weapon_t::WP_TURRET;
-use mp_qshared::shared::limits::{ENTITYNUM_WORLD, ENTITYNUM_NONE};
-use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ATTACK, BUTTON_ALT_ATTACK};
+use crate::NPC_utils::NPC_SetBoneAngles;
 use mp_bg::public::team::TEAM_SPECTATOR;
+use mp_bg::weapons::weapon_t::WP_TURRET;
+use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK};
+use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD};
 use mp_qshared::shared::surface_flags::MASK_SHOT;
 
 // Helper: Raven angle-vector indices
@@ -87,11 +90,12 @@ pub fn VEH_TurretCheckFire(
         // take the ammo away
         (*pVeh).turretStatus[turretNum as usize].ammo -= (*vehWeapon).iAmmoPerShot;
         // toggle to the next muzzle on this turret, if there is one
-        nextMuzzle = if (curMuzzle + 1) == (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[0] {
-            (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[1]
-        } else {
-            (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[0]
-        };
+        nextMuzzle =
+            if (curMuzzle + 1) == (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[0] {
+                (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[1]
+            } else {
+                (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].iMuzzle[0]
+            };
         if nextMuzzle != 0 {
             // a valid muzzle to toggle to
             (*pVeh).turretStatus[turretNum as usize].nextMuzzle = nextMuzzle - 1;
@@ -125,7 +129,10 @@ pub fn VEH_TurretAnglesToEnemy(
             _VectorSubtract(org, (*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut diff);
             let dist = VectorNormalize(&mut diff);
             if !(*turretEnemy).client.is_null() {
-                _VectorCopy((*((*turretEnemy).client as *mut gclient_t)).ps.velocity, &mut velocity);
+                _VectorCopy(
+                    (*((*turretEnemy).client as *mut gclient_t)).ps.velocity,
+                    &mut velocity,
+                );
             } else {
                 _VectorCopy((*turretEnemy).s.pos.trDelta, &mut velocity);
             }
@@ -165,7 +172,11 @@ pub fn VEH_TurretAim(
         // get the current absolute angles of the turret right now
         vectoangles((*pVeh).m_vMuzzleDir[curMuzzle as usize], &mut curAngles);
         // subtract out the vehicle's angles to get the relative alignment
-        AnglesSubtract(curAngles, *((*pVeh).m_vOrientation as *const vec3_t), &mut curAngles);
+        AnglesSubtract(
+            curAngles,
+            *((*pVeh).m_vOrientation as *const vec3_t),
+            &mut curAngles,
+        );
 
         if !turretEnemy.is_null() {
             aimCorrect = qtrue;
@@ -181,35 +192,47 @@ pub fn VEH_TurretAim(
             );
         }
         // subtract out the vehicle's angles to get the relative desired alignment
-        AnglesSubtract(*desiredAngles, *((*pVeh).m_vOrientation as *const vec3_t), desiredAngles);
+        AnglesSubtract(
+            *desiredAngles,
+            *((*pVeh).m_vOrientation as *const vec3_t),
+            desiredAngles,
+        );
         // Now clamp the desired relative angles
         // clamp yaw
         (*desiredAngles)[YAW] = AngleNormalize180((*desiredAngles)[YAW]);
         if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft != 0.0
-            && (*desiredAngles)[YAW] > (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft
+            && (*desiredAngles)[YAW]
+                > (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft
         {
             aimCorrect = qfalse;
-            (*desiredAngles)[YAW] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft;
+            (*desiredAngles)[YAW] =
+                (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampLeft;
         }
         if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight != 0.0
-            && (*desiredAngles)[YAW] < (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight
+            && (*desiredAngles)[YAW]
+                < (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight
         {
             aimCorrect = qfalse;
-            (*desiredAngles)[YAW] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight;
+            (*desiredAngles)[YAW] =
+                (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].yawClampRight;
         }
         // clamp pitch
         (*desiredAngles)[PITCH] = AngleNormalize180((*desiredAngles)[PITCH]);
         if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown != 0.0
-            && (*desiredAngles)[PITCH] > (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown
+            && (*desiredAngles)[PITCH]
+                > (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown
         {
             aimCorrect = qfalse;
-            (*desiredAngles)[PITCH] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown;
+            (*desiredAngles)[PITCH] =
+                (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampDown;
         }
         if (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp != 0.0
-            && (*desiredAngles)[PITCH] < (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp
+            && (*desiredAngles)[PITCH]
+                < (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp
         {
             aimCorrect = qfalse;
-            (*desiredAngles)[PITCH] = (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp;
+            (*desiredAngles)[PITCH] =
+                (*(*pVeh).m_pVehicleInfo).turret[turretNum as usize].pitchClampUp;
         }
         // Now get the offset we want from our current relative angles
         AnglesSubtract(*desiredAngles, curAngles, &mut addAngles);
@@ -279,14 +302,22 @@ pub fn VEH_TurretFindEnemies(
         let mut org = [0f32; 3];
         let mut org2 = [0f32; 3];
         let mut foundClient: qboolean = qfalse;
-        let mut entity_list: [*mut gentity_t; 512] = [core::ptr::null_mut(); 512]; // MAX_GENTITIES approximated as 512
+        let mut entity_list: [*mut gentity_t; MAX_GENTITIES] =
+            [core::ptr::null_mut(); MAX_GENTITIES];
         let mut target: *mut gentity_t;
         let mut bestTarget: *mut gentity_t = core::ptr::null_mut();
 
         WP_CalcVehMuzzle(ctx, parent, curMuzzle);
         _VectorCopy((*pVeh).m_vMuzzlePos[curMuzzle as usize], &mut org2);
 
-        count = G_RadiusList(ctx, org2, (*turretStats).fAIRange, parent, qtrue, entity_list.as_mut_ptr());
+        count = G_RadiusList(
+            ctx,
+            org2,
+            (*turretStats).fAIRange,
+            parent,
+            qtrue,
+            entity_list.as_mut_ptr(),
+        );
 
         i = 0;
         while i < count {
@@ -330,25 +361,40 @@ pub fn VEH_TurretFindEnemies(
                 i += 1;
                 continue;
             }
-            if target == (*pVeh).m_pPilot as *mut gentity_t || (*target).r.ownerNum == (*parent).s.number {
+            if target == (*pVeh).m_pPilot as *mut gentity_t
+                || (*target).r.ownerNum == (*parent).s.number
+            {
                 // don't get angry at my pilot or passengers?
                 i += 1;
                 continue;
             }
-            if !(*parent).client.is_null() && (*((*parent).client as *mut gclient_t)).sess.sessionTeam != 0 {
+            if !(*parent).client.is_null()
+                && (*((*parent).client as *mut gclient_t)).sess.sessionTeam != 0
+            {
                 if !(*target).client.is_null() {
-                    if (*((*target).client as *mut gclient_t)).sess.sessionTeam == (*((*parent).client as *mut gclient_t)).sess.sessionTeam {
+                    if (*((*target).client as *mut gclient_t)).sess.sessionTeam
+                        == (*((*parent).client as *mut gclient_t)).sess.sessionTeam
+                    {
                         // A bot/client/NPC we don't want to shoot
                         i += 1;
                         continue;
                     }
-                } else if (*target).teamnodmg == (*((*parent).client as *mut gclient_t)).sess.sessionTeam {
+                } else if (*target).teamnodmg
+                    == (*((*parent).client as *mut gclient_t)).sess.sessionTeam
+                {
                     // some other entity that's allied with us
                     i += 1;
                     continue;
                 }
             }
-            if trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&org2 as *const vec3_t, &(*target).r.currentOrigin as *const vec3_t)) == qfalse {
+            if trap::InPVS(
+                ctx.engine,
+                mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                    &org2 as *const vec3_t,
+                    &(*target).r.currentOrigin as *const vec3_t,
+                ),
+            ) == qfalse
+            {
                 i += 1;
                 continue;
             }
@@ -412,10 +458,7 @@ pub fn VEH_TurretObeyPassengerControl(
         let passenger: *mut gentity_t =
             (*pVeh).m_ppPassengers[((*turretStats).passengerNum - 1) as usize] as *mut gentity_t;
 
-        if !passenger.is_null()
-            && !(*passenger).client.is_null()
-            && (*passenger).health > 0
-        {
+        if !passenger.is_null() && !(*passenger).client.is_null() && (*passenger).health > 0 {
             // a valid, living passenger client
             let vehWeapon: *mut vehWeaponInfo_t =
                 &mut (*ctx.world).bg_state.g_vehWeaponInfo[(*turretStats).iWeapon as usize];
@@ -502,9 +545,10 @@ pub fn VEH_TurretThink(
         curMuzzle = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
 
         if (*pVeh).turretStatus[turretNum as usize].enemyEntNum < ENTITYNUM_WORLD {
-            turretEnemy = &mut (*(*ctx.world).g_entities.as_mut_ptr().add(
-                (*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize,
-            ));
+            turretEnemy = &mut (*(*ctx.world)
+                .g_entities
+                .as_mut_ptr()
+                .add((*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize));
             if (*turretEnemy).health < 0
                 || (*turretEnemy).inuse == qfalse
                 || turretEnemy == (*pVeh).m_pPilot as *mut gentity_t
@@ -523,9 +567,10 @@ pub fn VEH_TurretThink(
         if (*pVeh).turretStatus[turretNum as usize].enemyHoldTime < (*ctx.world).level.time {
             if VEH_TurretFindEnemies(ctx, pVeh, parent, turretStats, turretNum, curMuzzle) != qfalse
             {
-                turretEnemy = &mut (*(*ctx.world).g_entities.as_mut_ptr().add(
-                    (*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize,
-                ));
+                turretEnemy = &mut (*(*ctx.world)
+                    .g_entities
+                    .as_mut_ptr()
+                    .add((*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize));
                 doAim = qtrue;
             } else if !(*parent).enemy.is_none() {
                 if let Some(enemy_id) = (*parent).enemy {
@@ -622,7 +667,15 @@ pub fn VEH_TurretThink(
                 &mut aimAngles,
             ) != qfalse
             {
-                VEH_TurretCheckFire(ctx, pVeh, parent, turretStats, vehWeapon, turretNum, curMuzzle);
+                VEH_TurretCheckFire(
+                    ctx,
+                    pVeh,
+                    parent,
+                    turretStats,
+                    vehWeapon,
+                    turretNum,
+                    curMuzzle,
+                );
             }
         }
     }

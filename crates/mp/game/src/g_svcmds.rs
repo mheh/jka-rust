@@ -66,7 +66,9 @@ pub fn StringToFilter(ctx: GameContext<'_>, s: *mut c_char, f: *mut c_void) -> q
         let num_str = std::ffi::CStr::from_bytes_until_nul(&num[..])
             .unwrap_or_default()
             .to_string_lossy();
-        b[i_val] = num_str.parse::<u8>().unwrap_or(0);
+        // Oracle assigns `atoi(num)` (int) into a byte, truncating to the low 8
+        // bits (e.g. "300" -> 44); `as u8` reproduces that wrap. g_svcmds.c:89.
+        b[i_val] = num_str.parse::<i32>().unwrap_or(0) as u8;
 
         if b[i_val] != 0 {
             m[i_val] = 255;
@@ -161,13 +163,15 @@ pub fn G_FilterPacket(ctx: GameContext<'_>, from: *mut c_char) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/g_svcmds.c:173-194`
 pub fn AddIP(ctx: GameContext<'_>, str: *mut c_char) {
     let world = unsafe { &mut *ctx.world };
-    let mut i: c_int = 0;
 
-    for i_val in 0..(world.globals.numIPFilters as usize) {
-        if world.globals.ipFilters[i_val].compare == 0xffffffff {
-            i = i_val as c_int;
-            break;
+    // Oracle's index runs to `numIPFilters` when no free slot is found, so the
+    // `i == numIPFilters` test below appends a new slot (g_svcmds.c:177-179).
+    let mut i: c_int = 0;
+    while i < world.globals.numIPFilters {
+        if world.globals.ipFilters[i as usize].compare == 0xffffffff {
+            break; // free spot
         }
+        i += 1;
     }
 
     if i == world.globals.numIPFilters {
