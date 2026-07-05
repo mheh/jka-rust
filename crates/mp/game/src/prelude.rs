@@ -309,7 +309,7 @@ pub use crate::NPC_utils::{CalcEntitySpot, NPC_CheckEnemyExt, NPC_ClearLOS4, NPC
 pub use crate::bg_lib::atof;
 pub use crate::bg_lib::atoi;
 pub use crate::bg_misc::{BG_EmplacedView, BG_FindItemForWeapon};
-pub use crate::bg_panimate::BG_InKnockDownOnly;
+pub use crate::bg_panimate::{BG_InKnockDownOnly, BG_InReboundHold, BG_InReboundJump};
 pub use crate::bg_pmove::BG_SabersOff;
 pub use crate::g_client::SpotWouldTelefrag2;
 pub use crate::g_combat::{G_CheckVehicleNPCTeamDamage, G_Damage, G_RadiusDamage};

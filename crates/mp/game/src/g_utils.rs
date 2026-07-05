@@ -24,6 +24,7 @@ use crate::prelude::*;
 
 use crate::client::gclient_t;
 use crate::trap;
+use crate::q_shared::Q_strcat;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_ERROR::GErrorArgs;
 use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
@@ -323,7 +324,7 @@ pub fn G_Find(
 ) -> *mut gentity_t {
     unsafe {
         let world = &mut *ctx.world;
-        let base = world.entities.as_mut_ptr();
+        let base = world.g_entities.as_mut_ptr();
         let num_entities = world.level.num_entities;
 
         let mut cur = if from.is_null() {
@@ -382,7 +383,7 @@ pub fn G_RadiusList(
         let world = &mut *ctx.world;
         let mut ent_count: c_int = 0;
         for e in 0..num_listed_entities {
-            let ent = &mut world.entities[entity_list[e as usize] as usize] as *mut gentity_t;
+            let ent = &mut world.g_entities[entity_list[e as usize] as usize] as *mut gentity_t;
 
             if ent == ignore || (*ent).inuse == qfalse || (*ent).takedamage != takeDamage {
                 continue;
@@ -580,7 +581,7 @@ pub fn G_CleanAllFakeClients(ctx: GameContext<'_>) {
         let world = &mut *ctx.world;
         let mut i = MAX_CLIENTS as usize;
         while i < mp_qshared::shared::MAX_GENTITIES {
-            let ent = &mut world.entities[i] as *mut gentity_t;
+            let ent = &mut world.g_entities[i] as *mut gentity_t;
             if (*ent).inuse != qfalse && (*ent).s.eType == ET_NPC as c_int && !(*ent).client.is_null()
             {
                 G_FreeFakeClient(&mut (*ent).client as *mut *mut c_void as *mut *mut gclient_t);
@@ -838,7 +839,7 @@ pub fn G_InitGentity(
 ) {
     unsafe {
         let world = &mut *ctx.world;
-        let base = world.entities.as_mut_ptr();
+        let base = world.g_entities.as_mut_ptr();
         (*e).inuse = qtrue;
         (*e).classname = b"noclass\0".as_ptr() as *mut c_char;
         (*e).s.number = e.offset_from(base) as c_int;
@@ -865,7 +866,7 @@ pub fn G_SpewEntList(ctx: GameContext<'_>) {
         let mut numTempEntST = 0;
 
         for i in 0..mp_qshared::shared::ENTITYNUM_MAX_NORMAL as usize {
-            let ent = &world.entities[i];
+            let ent = &world.g_entities[i];
             if ent.inuse != qfalse {
                 if ent.s.eType == ET_NPC as c_int {
                     numNPC += 1;
@@ -893,7 +894,7 @@ pub fn G_Spawn(ctx: GameContext<'_>) -> *mut gentity_t {
         let mut i: c_int = 0;
 
         for force in 0..2 {
-            e = &mut world.entities[MAX_CLIENTS as usize] as *mut gentity_t;
+            e = &mut world.g_entities[MAX_CLIENTS as usize] as *mut gentity_t;
             i = MAX_CLIENTS as c_int;
             while i < world.level.num_entities {
                 if (*e).inuse == qfalse {
@@ -929,7 +930,7 @@ pub fn G_Spawn(ctx: GameContext<'_>) -> *mut gentity_t {
         world.level.num_entities += 1;
 
         // let the server system know that there are more entities
-        let entities_base = world.entities.as_mut_ptr();
+        let entities_base = world.g_entities.as_mut_ptr();
         let clients_base = &mut world.clients[0] as *mut gclient_t as *mut playerState_t;
         trap::LocateGameData(
             ctx.engine,
@@ -955,7 +956,7 @@ pub fn G_EntitiesFree(ctx: GameContext<'_>) -> qboolean {
         let world = &*ctx.world;
         let mut i = MAX_CLIENTS as c_int;
         while i < world.level.num_entities {
-            if world.entities[i as usize].inuse == qfalse {
+            if world.g_entities[i as usize].inuse == qfalse {
                 return qtrue;
             }
             i += 1;
@@ -1076,9 +1077,9 @@ pub fn G_FreeEntity(
             }
 
             let world = &mut *ctx.world;
-            if saberEntNum > 0 && world.entities[saberEntNum as usize].inuse != qfalse {
-                world.entities[saberEntNum as usize].neverFree = qfalse;
-                let saber_ent = &mut world.entities[saberEntNum as usize] as *mut gentity_t;
+            if saberEntNum > 0 && world.g_entities[saberEntNum as usize].inuse != qfalse {
+                world.g_entities[saberEntNum as usize].neverFree = qfalse;
+                let saber_ent = &mut world.g_entities[saberEntNum as usize] as *mut gentity_t;
                 G_FreeEntity(ctx, saber_ent);
             }
 
@@ -1106,7 +1107,7 @@ pub fn G_FreeEntity(
             let world = &mut *ctx.world;
             let mut i = 0usize;
             while i < MAX_CLIENTS {
-                let ent = &mut world.entities[i] as *mut gentity_t;
+                let ent = &mut world.g_entities[i] as *mut gentity_t;
                 if !ent.is_null() && (*ent).inuse != qfalse && !(*ent).client.is_null() {
                     let client = (*ent).client as *mut gclient_t;
                     let mut ch = (trackchan_t::TRACK_CHANNEL_NONE as c_int - 50) as usize;
@@ -1273,7 +1274,7 @@ pub fn G_KillBox(
 
         let world = &mut *ctx.world;
         for i in 0..num {
-            let hit = &mut world.entities[touch[i as usize] as usize] as *mut gentity_t;
+            let hit = &mut world.g_entities[touch[i as usize] as usize] as *mut gentity_t;
             if (*hit).client.is_null() {
                 continue;
             }
@@ -1315,7 +1316,7 @@ pub fn G_AddPredictableEvent(
         if ent.is_null() || (*ent).client.is_null() {
             return;
         }
-        crate::bg_misc::BG_AddPredictableEventToPlayerstate(event, eventParm, &mut (*(*ent).client).ps);
+        crate::bg_misc::BG_AddPredictableEventToPlayerstate(event, eventParm, &mut (*((*ent).client as *mut gclient_t)).ps);
     }
 }
 
@@ -1445,7 +1446,7 @@ pub fn G_MuteSound(
         (*te).s.trickedentindex = channel;
 
         let world = &mut *ctx.world;
-        let e = &mut world.entities[entnum as usize] as *mut gentity_t;
+        let e = &mut world.g_entities[entnum as usize] as *mut gentity_t;
         if (*e).s.eFlags & EF_SOUNDTRACKER != 0 {
             G_FreeEntity(ctx, e);
             (*e).s.eFlags = 0;
@@ -1477,12 +1478,12 @@ pub fn G_Sound(
             let idx = (channel - 50) as usize;
             let world = &mut *ctx.world;
             let killIdx = (*client).ps.fd.killSoundEntIndex[idx];
-            if world.entities[killIdx as usize].inuse != qfalse && killIdx > MAX_CLIENTS as c_int {
+            if world.g_entities[killIdx as usize].inuse != qfalse && killIdx > MAX_CLIENTS as c_int {
                 G_MuteSound(ctx, killIdx, mp_qshared::shared::sound_channel::CHAN_VOICE);
                 let client = (*ent).client as *mut gclient_t;
                 let killIdx = (*client).ps.fd.killSoundEntIndex[idx];
-                if killIdx > MAX_CLIENTS as c_int && world.entities[killIdx as usize].inuse != qfalse {
-                    let e = &mut world.entities[killIdx as usize] as *mut gentity_t;
+                if killIdx > MAX_CLIENTS as c_int && world.g_entities[killIdx as usize].inuse != qfalse {
+                    let e = &mut world.g_entities[killIdx as usize] as *mut gentity_t;
                     G_FreeEntity(ctx, e);
                 }
                 (*client).ps.fd.killSoundEntIndex[idx] = 0;
@@ -1793,11 +1794,11 @@ pub fn TryUse(
 
         // Check if in a vehicle
         if (*ent).s.number < MAX_CLIENTS as c_int && (*client).ps.m_iVehicleNum != 0 {
-            let current_veh = &mut world.entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
+            let current_veh = &mut world.g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
             if (*current_veh).inuse != qfalse && !(*current_veh).m_pVehicle.is_null() {
                 // PORT-NOTE(vehicle-dispatch-not-wired): Vehicle vtable (Eject/Board) dispatch is not wired.
                 // Skipping vehicle eject/board logic pending vehicle subsystem completion.
-                (*client).pers.cmd.buttons &= !crate::q_shared::button_bits::BUTTON_USE;
+                (*client).pers.cmd.buttons &= !BUTTON_USE;
                 return;
             }
         }
@@ -1812,7 +1813,7 @@ pub fn TryUse(
         // Check body grab
         if (*client).bodyGrabIndex != ENTITYNUM_NONE {
             if (*client).bodyGrabTime < world.level.time {
-                let grabbed = &mut world.entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
+                let grabbed = &mut world.g_entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
                 if (*grabbed).inuse != qfalse {
                     if !(*grabbed).client.is_null() {
                         let grabbed_client = (*grabbed).client as *mut gclient_t;
@@ -1858,7 +1859,7 @@ pub fn TryUse(
             return;
         }
 
-        let target = &mut world.entities[trace.entityNum as usize] as *mut gentity_t;
+        let target = &mut world.g_entities[trace.entityNum as usize] as *mut gentity_t;
 
         // Check for vehicle target
         if !target.is_null() && !(*target).m_pVehicle.is_null() && !(*target).client.is_null()
@@ -1866,7 +1867,7 @@ pub fn TryUse(
             && ((*client).ps.zoomMode == qfalse)
         {
             // PORT-NOTE(vehicle-dispatch-not-wired): Vehicle vtable dispatch not available.
-            (*client).pers.cmd.buttons &= !crate::q_shared::button_bits::BUTTON_USE;
+            (*client).pers.cmd.buttons &= !BUTTON_USE;
             return;
         }
 

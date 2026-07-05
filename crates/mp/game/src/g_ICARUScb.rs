@@ -27,8 +27,9 @@ const qfalse: qboolean = 0;
 // Source: `oracle/oracle/codemp/game/g_local.h`
 const FRAMETIME: c_int = 100;
 use crate::g_combat::G_Damage;
-use crate::g_mover::{G_PlayDoorSound, MatchTeam};
+use crate::g_mover::{G_PlayDoorSound, MatchTeam, BMS_END};
 use crate::g_utils::G_FreeEntity;
+use crate::g_misc::{TAG_GetOrigin, TAG_GetOrigin2, TAG_GetAngles, TAG_GetRadius};
 use crate::ent_fn_enums::{EntThink, EntBlocked, EntReached};
 use std::ffi::CString;
 use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
@@ -1601,7 +1602,7 @@ pub fn Q3_SetLeader(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
             } else if (*leader).health <= 0 {
                 return;
             } else {
-                (*client).leader = Some(ent_id((*ctx.world).entities.as_mut_ptr(), leader));
+                (*client).leader = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), leader));
             }
         }
     }
@@ -1701,7 +1702,7 @@ pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) ->
                 );
                 return qfalse;
             }
-            (*npc).goalEntity = Some(ent_id((*ctx.world).entities.as_mut_ptr(), targ));
+            (*npc).goalEntity = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), targ));
             (*npc).goalRadius = (((*ent).r.maxs[0] + (*ent).r.maxs[0]).sqrt()
                 + ((*targ).r.maxs[0] + (*targ).r.maxs[0]).sqrt()) as c_int;
             (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;

@@ -161,7 +161,7 @@ pub fn BG_GetRootSurfNameWithVariant(
 ) -> qboolean {
     const MAX_VARIANTS: c_int = 8;
 
-    if ghoul2.is_null() || !traps.g2api_get_surface_render_status(ghoul2, 0, rootSurfName) {
+    if ghoul2.is_null() || traps.g2api_get_surface_render_status(ghoul2, 0, rootSurfName) == qfalse {
         // see if the basic name without variants is on
         unsafe {
             Q_strncpyz(returnSurfName, rootSurfName, returnSize);
@@ -181,7 +181,7 @@ pub fn BG_GetRootSurfNameWithVariant(
             unsafe {
                 Q_strncpyz(returnSurfName, variant_cstr.as_ptr(), returnSize);
             }
-            if !traps.g2api_get_surface_render_status(ghoul2, 0, returnSurfName) {
+            if traps.g2api_get_surface_render_status(ghoul2, 0, returnSurfName) == qfalse {
                 return qtrue;
             }
         }

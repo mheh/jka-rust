@@ -4,6 +4,7 @@
 ///
 /// Type definition source: `oracle/oracle/codemp/game/bg_vehicles.h:20-26`
 #[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EWeaponPose {
     /// No weapon pose.
     WPOSE_NONE = 0,

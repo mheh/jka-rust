@@ -159,6 +159,34 @@ pub static WeaponReadyAnim: [c_int; 19] = [
     TORSO_WEAPONREADY1 as c_int,  // WP_TURRET
 ];
 
+/// Raven `WeaponReadyLegsAnim[WP_NUM_WEAPONS]` — legs weapon-ready animation
+/// per weapon type.
+///
+/// Ruling 24: bg const table lives as a `static` in its owning bg module
+/// (the `bg_itemlist` precedent).
+/// Source: `oracle/oracle/codemp/game/bg_misc.c:268-291`
+pub static WeaponReadyLegsAnim: [c_int; 19] = [
+    BOTH_STAND1 as c_int, // WP_NONE
+    BOTH_STAND1 as c_int, // WP_STUN_BATON
+    BOTH_STAND1 as c_int, // WP_MELEE
+    BOTH_STAND2 as c_int, // WP_SABER
+    BOTH_STAND1 as c_int, // WP_BRYAR_PISTOL
+    BOTH_STAND1 as c_int, // WP_BLASTER
+    BOTH_STAND1 as c_int, // WP_DISRUPTOR
+    BOTH_STAND1 as c_int, // WP_BOWCASTER
+    BOTH_STAND1 as c_int, // WP_REPEATER
+    BOTH_STAND1 as c_int, // WP_DEMP2
+    BOTH_STAND1 as c_int, // WP_FLECHETTE
+    BOTH_STAND1 as c_int, // WP_ROCKET_LAUNCHER
+    BOTH_STAND1 as c_int, // WP_THERMAL
+    BOTH_STAND1 as c_int, // WP_TRIP_MINE
+    BOTH_STAND1 as c_int, // WP_DET_PACK
+    BOTH_STAND1 as c_int, // WP_CONCUSSION
+    BOTH_STAND1 as c_int, // WP_BRYAR_OLD
+    BOTH_STAND1 as c_int, // WP_EMPLACED_GUN
+    BOTH_STAND1 as c_int, // WP_TURRET
+];
+
 /// Cost lookup helper folding `bgForcePowerCostSaberThrow` back into the
 /// `[fp index][fp level]` shape the Raven source indexes directly. See the
 /// note on `bgForcePowerCost` above.
@@ -1749,6 +1777,11 @@ pub fn BG_TempAlloc(size: c_int, bg: &mut BgState) -> *mut c_void {
     bg.bg_poolTail -= sz;
     unsafe { bg.bg_pool.as_mut_ptr().add(bg.bg_poolTail as usize) as *mut c_void }
 }
+
+// Raven `MAX_POOL_SIZE` — QAGAME (jampgame) arm; CGAME/ui arms are dropped
+// per porting-rules §20 (MP jampgame only).
+// Source: `oracle/oracle/codemp/game/bg_misc.c:3311-3316`
+const MAX_POOL_SIZE: c_int = 3000000;
 
 /// Raven `BG_TempFree`.
 ///

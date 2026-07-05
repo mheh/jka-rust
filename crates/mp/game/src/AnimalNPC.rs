@@ -99,7 +99,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
             speedInc = (*(*pVeh).m_pVehicleInfo).acceleration * (*pVeh).m_fTimeModifier;
         }
 
-        if (*parentPS).speed != 0.0f32 || (*parentPS).groundEntityNum == ENTITYNUM_NONE as u32
+        if (*parentPS).speed != 0.0f32 || (*parentPS).groundEntityNum == ENTITYNUM_NONE
             || (*pVeh).m_ucmd.forwardmove != 0 || (*pVeh).m_ucmd.upmove > 0 {
             if (*pVeh).m_ucmd.forwardmove > 0 && speedInc != 0.0f32 {
                 (*parentPS).speed += speedInc;
@@ -152,7 +152,7 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
         let parent = (*pVeh).m_pParentEntity;
         let parentPS = (*parent).playerState;
 
-        let rider = if (*parent).s.owner != ENTITYNUM_NONE as u32 {
+        let rider = if (*parent).s.owner != ENTITYNUM_NONE {
             crate::bg_pmove::PM_BGEntForNum((*parent).s.owner as c_int)
         } else {
             core::ptr::null_mut()
@@ -164,8 +164,7 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
 
             if !rider.is_null() {
                 let mut angDif =
-                    crate::q_math::AngleSubtract(
-                        (*pVeh).m_vOrientation[YAW],
+                    crate::q_math::AngleSubtract(                        *(*pVeh).m_vOrientation.add(YAW),
                         (*riderPS).viewangles[YAW],
                     );
                 if !parentPS.is_null() && (*parentPS).speed > 0.0f32 {
@@ -180,8 +179,7 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
                     } else if angDif < -maxDif {
                         angDif = -maxDif;
                     }
-                    (*pVeh).m_vOrientation[YAW] = crate::q_math::AngleNormalize180(
-                        (*pVeh).m_vOrientation[YAW] - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
+                    *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(                        *(*pVeh).m_vOrientation.add(YAW) - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
                     );
                 }
             }
@@ -189,8 +187,7 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
             let riderPS = (*rider).playerState;
             if !rider.is_null() {
                 let mut angDif =
-                    crate::q_math::AngleSubtract(
-                        (*pVeh).m_vOrientation[YAW],
+                    crate::q_math::AngleSubtract(                        *(*pVeh).m_vOrientation.add(YAW),
                         (*riderPS).viewangles[YAW],
                     );
                 if !parentPS.is_null() && (*parentPS).speed > 0.0f32 {
@@ -205,8 +202,7 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
                     } else if angDif < -maxDif {
                         angDif = -maxDif;
                     }
-                    (*pVeh).m_vOrientation[YAW] = crate::q_math::AngleNormalize180(
-                        (*pVeh).m_vOrientation[YAW] - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
+                    *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(                        *(*pVeh).m_vOrientation.add(YAW) - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
                     );
                 }
             }
@@ -241,17 +237,17 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
         }
 
         // If they're bucking, play the animation and leave...
-        if (*parent).client.is_null() == false && (*(*parent).client).ps.legsAnim == BOTH_VT_BUCK {
-            if (*(*parent).client).ps.legsAnimTimer <= 0 {
-                (*pVeh).m_ulFlags &= !VEH_BUCKING;
+        if (*parent).client.is_null() == false && (*((*parent).client as *mut gclient_t)).ps.legsAnim == BOTH_VT_BUCK {
+            if (*((*parent).client as *mut gclient_t)).ps.legsAnimTimer <= 0 {
+                (*pVeh).m_ulFlags &= !(VEH_BUCKING as u64);
             } else {
                 return;
             }
-        } else if ((*pVeh).m_ulFlags & VEH_BUCKING) != 0 {
+        } else if ((*pVeh).m_ulFlags & (VEH_BUCKING as u64)) != 0 {
             iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
             anim = BOTH_VT_BUCK;
             iBlend = 500;
-            Vehicle_SetAnim(parent, SETANIM_LEGS, BOTH_VT_BUCK, iFlags, iBlend);
+            Vehicle_SetAnim(parent, SETANIM_LEGS, BOTH_VT_BUCK as c_int, iFlags, iBlend);
             return;
         }
 
@@ -275,9 +271,9 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
                 (*pVeh).m_iBoarding = level_time + iAnimLen;
 
                 iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
-                Vehicle_SetAnim(parent, SETANIM_LEGS, anim, iFlags, iBlend);
+                Vehicle_SetAnim(parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
                 if !pilot.is_null() {
-                    Vehicle_SetAnim(pilot, SETANIM_BOTH, anim, iFlags, iBlend);
+                    Vehicle_SetAnim(pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
                 }
                 return;
             } else if (*pVeh).m_iBoarding <= level_time {
@@ -286,7 +282,7 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
         }
 
         let fSpeedPercToMax = if !(*parent).client.is_null() {
-            (*(*parent).client).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
+            (*((*parent).client as *mut gclient_t)).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
         } else {
             0.0f32
         };
@@ -304,7 +300,7 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
             };
             let running = fSpeedPercToMax > 0.275f32;
 
-            (*pVeh).m_ulFlags &= !VEH_CRASHING;
+            (*pVeh).m_ulFlags &= !(VEH_CRASHING as u64);
 
             if turbo {
                 iBlend = 50;
@@ -323,7 +319,7 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
             }
         }
 
-        Vehicle_SetAnim(parent, SETANIM_LEGS, anim, iFlags, iBlend);
+        Vehicle_SetAnim(parent, SETANIM_LEGS, anim as c_int, iFlags, iBlend);
     }
 }
 
@@ -350,7 +346,7 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
         }
 
         let fSpeedPercToMax = if !(*parent).client.is_null() {
-            (*(*parent).client).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
+            (*((*parent).client as *mut gclient_t)).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
         } else {
             0.0f32
         };
@@ -361,8 +357,8 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
         } else {
             let hasWeapon = !pilotPS.is_none()
                 && !pilotPS.unwrap().is_null()
-                && (*pilotPS.unwrap()).weapon != WP_NONE as u32
-                && (*pilotPS.unwrap()).weapon != WP_MELEE as u32;
+                && (*pilotPS.unwrap()).weapon != WP_NONE
+                && (*pilotPS.unwrap()).weapon != WP_MELEE;
             let attacking = hasWeapon
                 && !pilotPS.is_none()
                 && !pilotPS.unwrap().is_null()
@@ -375,24 +371,24 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
             let running = fSpeedPercToMax > 0.275f32;
             let mut weapon_pose: EWeaponPose = WPOSE_NONE;
 
-            (*pVeh).m_ulFlags &= !VEH_CRASHING;
+            (*pVeh).m_ulFlags &= !(VEH_CRASHING as u64);
 
             // Compute The Weapon Pose
             if !pilotPS.is_none() && !pilotPS.unwrap().is_null() {
-                if (*pilotPS.unwrap()).weapon == WP_BLASTER as u32 {
+                if (*pilotPS.unwrap()).weapon == WP_BLASTER {
                     weapon_pose = WPOSE_BLASTER;
-                } else if (*pilotPS.unwrap()).weapon == WP_SABER as u32 {
-                    if ((*pVeh).m_ulFlags & VEH_SABERINLEFTHAND) != 0
-                        && (*pilotPS.unwrap()).torsoAnim == BOTH_VT_ATL_TO_R_S as u32
+                } else if (*pilotPS.unwrap()).weapon == WP_SABER {
+                    if ((*pVeh).m_ulFlags & (VEH_SABERINLEFTHAND as u64)) != 0
+                        && (*pilotPS.unwrap()).torsoAnim == BOTH_VT_ATL_TO_R_S as c_int
                     {
-                        (*pVeh).m_ulFlags &= !VEH_SABERINLEFTHAND;
+                        (*pVeh).m_ulFlags &= !(VEH_SABERINLEFTHAND as u64);
                     }
-                    if ((*pVeh).m_ulFlags & VEH_SABERINLEFTHAND) == 0
-                        && (*pilotPS.unwrap()).torsoAnim == BOTH_VT_ATR_TO_L_S as u32
+                    if ((*pVeh).m_ulFlags & (VEH_SABERINLEFTHAND as u64)) == 0
+                        && (*pilotPS.unwrap()).torsoAnim == BOTH_VT_ATR_TO_L_S as c_int
                     {
-                        (*pVeh).m_ulFlags |= VEH_SABERINLEFTHAND;
+                        (*pVeh).m_ulFlags |= (VEH_SABERINLEFTHAND as u64);
                     }
-                    weapon_pose = if ((*pVeh).m_ulFlags & VEH_SABERINLEFTHAND) != 0 {
+                    weapon_pose = if ((*pVeh).m_ulFlags & (VEH_SABERINLEFTHAND as u64)) != 0 {
                         WPOSE_SABERLEFT
                     } else {
                         WPOSE_SABERRIGHT
@@ -428,13 +424,13 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
 
                         crate::q_math::AngleVectors(
                             (*parent).r.currentAngles,
-                            core::ptr::null_mut(),
-                            &mut actor_right,
-                            core::ptr::null_mut(),
+                            None,
+                            Some(&mut actor_right),
+                            None,
                         );
                         actor_right_dot = crate::q_math::_DotProduct(to_enemy, actor_right);
 
-                        if actor_right_dot.abs() > 0.5f32 || !pilotPS.is_none() && !pilotPS.unwrap().is_null() && (*pilotPS.unwrap()).weapon == WP_SABER as u32 {
+                        if actor_right_dot.abs() > 0.5f32 || !pilotPS.is_none() && !pilotPS.unwrap().is_null() && (*pilotPS.unwrap()).weapon == WP_SABER {
                             left_mut = actor_right_dot > 0.0f32;
                             right_mut = !left_mut;
                         } else {
@@ -443,7 +439,7 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
                         }
                     } else if !pilotPS.is_none()
                         && !pilotPS.unwrap().is_null()
-                        && (*pilotPS.unwrap()).weapon == WP_SABER as u32
+                        && (*pilotPS.unwrap()).weapon == WP_SABER
                         && !left_mut
                         && !right_mut
                     {
@@ -499,7 +495,7 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
             }
         }
 
-        Vehicle_SetAnim(pilot, SETANIM_BOTH, anim, iFlags, iBlend);
+        Vehicle_SetAnim(pilot, SETANIM_BOTH, anim as c_int, iFlags, iBlend);
     }
 }
 

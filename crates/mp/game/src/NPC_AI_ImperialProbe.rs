@@ -13,15 +13,17 @@ use crate::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
 use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
 use crate::g_items::RegisterItem;
 use crate::g_missile::CreateMissile;
-use crate::g_utils::{G_EffectIndex, G_SoundIndex, G_Sound, G_SoundOnEnt, G_PlayEffectID, G_Damage};
+use crate::g_utils::{G_EffectIndex, G_SoundIndex, G_Sound, G_SoundOnEnt, G_PlayEffectID};
+use crate::g_combat::G_Damage;
 use crate::npc_c::NPC_SetAnim;
 use crate::q_math::{AngleVectors, VectorNormalize, DistanceHorizontalSquared, _VectorMA, _VectorSubtract, _VectorCopy, vectoangles, AngleNormalize360};
 use crate::q_shared::va;
-use crate::NPC_utils::NPC_CheckPlayerTeamStealth;
+use crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth;
 use crate::NPC_goal::UpdateGoal;
 use crate::g_timer::{TIMER_Done, TIMER_Set};
-use crate::ent_fn_enums::{ent_id, ent_id_opt};
+use crate::world::{ent_id, ent_id_opt};
 use crate::trap;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
 // Local state enums
 // Source: oracle/oracle/codemp/game/NPC_AI_ImperialProbe.c:10-17
@@ -88,7 +90,7 @@ pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
 
     // If we have an enemy, we should try to hover at about enemy eye level
     if let Some(enemy_id) = (*npc).enemy {
-        let enemy = &mut world.entities[enemy_id.0 as usize];
+        let enemy = &mut world.g_entities[enemy_id.0 as usize];
         // Find the height difference
         let mut dif = (*enemy).r.currentOrigin[2] - (*npc).r.currentOrigin[2];
 
@@ -104,9 +106,9 @@ pub fn ImperialProbe_MaintainHeight(ctx: GameContext<'_>) {
         let mut goal: Option<*mut gentity_t> = None;
 
         if let Some(goal_entity_id) = (*npc_info).goalEntity {
-            goal = Some(&mut world.entities[goal_entity_id.0 as usize]);
+            goal = Some(&mut world.g_entities[goal_entity_id.0 as usize]);
         } else if let Some(last_goal_id) = (*npc_info).lastGoalEntity {
-            goal = Some(&mut world.entities[last_goal_id.0 as usize]);
+            goal = Some(&mut world.g_entities[last_goal_id.0 as usize]);
         }
 
         if let Some(goal_ent) = goal {
@@ -173,7 +175,7 @@ pub fn ImperialProbe_Strafe(ctx: GameContext<'_>) {
         &mut end,
     );
 
-    let mut tr: trace_t = Default::default();
+    let mut tr: trace_t = unsafe { core::mem::zeroed() };
     trap::Trace(
         ctx.engine,
         GTraceArgs::new(
@@ -250,7 +252,7 @@ pub fn ImperialProbe_Hunt(
         }
     } else {
         if let Some(enemy_id) = (*npc).enemy {
-            let enemy = &mut world.entities[enemy_id.0 as usize];
+            let enemy = &mut world.g_entities[enemy_id.0 as usize];
             _VectorSubtract((*enemy).r.currentOrigin, (*npc).r.currentOrigin, &mut forward);
             distance = VectorNormalize(&mut forward);
         }
@@ -284,7 +286,7 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
 
     let gen_bolt_1 = trap::G2API_AddBolt(
         ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddBoltArgs::new((*npc).ghoul2, 0, c"*flash".as_ptr()),
+        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*npc).ghoul2, 0, c"*flash".to_owned()),
     );
 
     trap::G2API_GetBoltMatrix(
@@ -310,7 +312,7 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
 
     if (*npc).health != 0 {
         let enemy_ptr = if let Some(enemy_id) = (*npc).enemy {
-            &mut world.entities[enemy_id.0 as usize] as *mut gentity_t
+            &mut world.g_entities[enemy_id.0 as usize] as *mut gentity_t
         } else {
             core::ptr::null_mut()
         };
@@ -400,12 +402,12 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
 
     // Rate our distance to the target, and our visibility
     let distance = DistanceHorizontalSquared((*npc).r.currentOrigin, if let Some(enemy_id) = (*npc).enemy {
-        (*world.entities.as_mut_ptr().add(enemy_id.0 as usize)).r.currentOrigin
+        (*world.g_entities.as_mut_ptr().add(enemy_id.0 as usize)).r.currentOrigin
     } else {
         [0.0; 3]
     }) as c_int;
     let visible = if let Some(enemy_id) = (*npc).enemy {
-        NPC_ClearLOS4(ctx, &mut world.entities[enemy_id.0 as usize])
+        NPC_ClearLOS4(ctx, &mut world.g_entities[enemy_id.0 as usize])
     } else {
         0
     };
@@ -446,7 +448,7 @@ pub fn NPC_Probe_Pain(
             (*self_).r.currentOrigin[1],
             (*self_).r.currentOrigin[2] - 128.0,
         ];
-        let mut trace: trace_t = Default::default();
+        let mut trace: trace_t = unsafe { core::mem::zeroed() };
 
         trap::Trace(
             ctx.engine,
@@ -552,7 +554,7 @@ pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
             (*npc).r.currentOrigin[1],
             (*npc).r.currentOrigin[2] - 32.0,
         ];
-        let mut trace: trace_t = Default::default();
+        let mut trace: trace_t = unsafe { core::mem::zeroed() };
 
         (*npc_info).desiredYaw = AngleNormalize360((*npc_info).desiredYaw + 25.0);
 
@@ -571,11 +573,11 @@ pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
 
         if trace.fraction != 1.0 {
             let enemy_ptr = if let Some(enemy_id) = (*npc).enemy {
-                &mut world.entities[enemy_id.0 as usize]
+                &mut world.g_entities[enemy_id.0 as usize]
             } else {
                 core::ptr::null_mut()
             };
-            G_Damage(npc, enemy_ptr, enemy_ptr, None, [0.0; 3], 2000, 0, MOD_UNKNOWN);
+            G_Damage(ctx, npc, enemy_ptr, enemy_ptr, None, [0.0; 3], 2000, 0, MOD_UNKNOWN);
         }
     }
 

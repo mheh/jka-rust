@@ -175,26 +175,26 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
         let bolt = match which {
             0 => crate::trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddBoltArgs::new(
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
                     (*NPC).ghoul2,
                     0,
-                    cstr("*flash1").as_ptr() as *const c_char,
+                    cstr("*flash1"),
                 ),
             ),
             1 => crate::trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddBoltArgs::new(
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
                     (*NPC).ghoul2,
                     0,
-                    cstr("*flash2").as_ptr() as *const c_char,
+                    cstr("*flash2"),
                 ),
             ),
             _ => crate::trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddBoltArgs::new(
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
                     (*NPC).ghoul2,
                     0,
-                    cstr("*flash03").as_ptr() as *const c_char,
+                    cstr("*flash03"),
                 ),
             ),
         };
@@ -270,7 +270,7 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
 
         // If we have an enemy, we should try to hover at about enemy eye level
         if let Some(enemy_id) = (*NPC).enemy {
-            let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+            let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
             let mut dif: f32 = (enemy.r.currentOrigin[2] + enemy.r.maxs[2]) - (*NPC).r.currentOrigin[2];
 
             // cap to prevent dramatic height shifts
@@ -283,9 +283,9 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
             }
         } else {
             let goal: *mut gentity_t = if let Some(goal_id) = (*NPCInfo).goalEntity {
-                (unsafe { &*(*world).entities.as_ptr().add(goal_id.0 as usize) }) as *const gentity_t as *mut gentity_t
+                (unsafe { &*(*world).g_entities.as_ptr().add(goal_id.0 as usize) }) as *const gentity_t as *mut gentity_t
             } else if let Some(last_goal_id) = (*NPCInfo).lastGoalEntity {
-                (unsafe { &*(*world).entities.as_ptr().add(last_goal_id.0 as usize) }) as *const gentity_t as *mut gentity_t
+                (unsafe { &*(*world).g_entities.as_ptr().add(last_goal_id.0 as usize) }) as *const gentity_t as *mut gentity_t
             } else {
                 core::ptr::null_mut()
             };
@@ -461,7 +461,7 @@ pub fn Sentry_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
             }
         } else {
             if let Some(enemy_id) = (*NPC).enemy {
-                let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+                let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
                 crate::q_math::_VectorSubtract(enemy.r.currentOrigin, (*NPC).r.currentOrigin, &mut forward);
                 distance = crate::q_math::VectorNormalize(&mut forward);
             }
@@ -565,7 +565,7 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
 
         // He's dead.
         if let Some(enemy_id) = (*NPC).enemy {
-            let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+            let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
             if enemy.health < 1 {
                 (*NPC).enemy = None;
                 Sentry_Idle(ctx);
@@ -581,7 +581,7 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
 
         // Rate our distance to the target and visibilty
         if let Some(enemy_id) = (*NPC).enemy {
-            let enemy = unsafe { &*(*world).entities.as_ptr().add(enemy_id.0 as usize) };
+            let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
             distance = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, enemy.r.currentOrigin);
             visible = crate::NPC_utils::NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
             advance = if distance > MIN_DISTANCE_SQR { qtrue } else { qfalse };

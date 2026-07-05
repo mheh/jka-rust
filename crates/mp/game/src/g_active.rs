@@ -100,7 +100,9 @@ use crate::ai_main::InFieldOfVision;
 use crate::bg_g2_utils::BG_AttachToRancor;
 use crate::npc_c::NPC_SetAnim;
 use crate::q_math::{vectoangles, AngleVectors, VectorLength, VectorLengthSquared, VectorNormalize};
-use mp_bg::public::pmove_t::Pmove;
+use crate::bg_pmove::Pmove;
+use crate::g_utils::G_EntitySound;
+use crate::w_force::G_PreDefSound;
 
 use crate::npc::g_npc_t::gNPC_t;
 use crate::ent_fn_enums::EntTouch;

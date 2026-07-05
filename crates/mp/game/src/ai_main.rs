@@ -197,7 +197,7 @@ pub fn BotOrder(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         // PORT-NOTE(botstates): `globals.botstates` is still a `()` placeholder;
         // indexed as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
         let botstates = &(*world).globals.botstates;
@@ -252,7 +252,7 @@ pub fn BotOrder(
                 (*bi).chatObject = Some(ent_id(base, ent));
                 (*bi).chatAltObject = None;
                 let sect = cstr("OrderAccepted");
-                if BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 1) != 0 {
+                if crate::ai_util::BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 1) != 0 {
                     (*bi).chatTeam = 1;
                 }
             }
@@ -269,7 +269,7 @@ pub fn BotOrder(
                         (*bi).chatObject = Some(ent_id(base, ent));
                         (*bi).chatAltObject = None;
                         let sect = cstr("OrderAccepted");
-                        if BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 0) != 0 {
+                        if crate::ai_util::BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 0) != 0 {
                             (*bi).chatTeam = 1;
                         }
                     }
@@ -290,7 +290,7 @@ pub fn BotMindTricked(
 ) -> c_int {
     unsafe {
         let world = &*ctx.world;
-        let en = &world.entities[enemyClient as usize];
+        let en = &world.g_entities[enemyClient as usize];
         if en.client.is_null() {
             return 0;
         }
@@ -350,7 +350,7 @@ pub fn BotAI_GetClientState(
 ) -> c_int {
     unsafe {
         let world = &*ctx.world;
-        let ent = &world.entities[clientNum as usize];
+        let ent = &world.g_entities[clientNum as usize];
         if ent.inuse == qfalse {
             return qfalse;
         }
@@ -371,7 +371,7 @@ pub fn BotAI_GetEntityState(
     state: *mut entityState_t,
 ) -> c_int {
     unsafe {
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
         let ent = base.add(entityNum as usize);
         core::ptr::write_bytes(state, 0, 1);
         if (*ent).inuse == qfalse {
@@ -905,7 +905,7 @@ pub fn PlayersInGame(ctx: GameContext<'_>) -> c_int {
         let mut i: usize = 0;
         let mut pl = 0;
         while i < MAX_CLIENTS {
-            let ent = &world.entities[i];
+            let ent = &world.g_entities[i];
             if !ent.client.is_null()
                 && (*(ent.client as *mut gclient_t)).pers.connected == CON_CONNECTED
             {
@@ -998,7 +998,7 @@ pub fn BotAISetupClient(
         if PlayersInGame(ctx) != 0 {
             // don't talk to yourself
             let sect = cstr("GeneralGreetings");
-            BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
+            crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
         }
 
         qtrue
@@ -1156,7 +1156,7 @@ pub fn WPOrgVisible(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut tr: trace_t = core::mem::zeroed();
 
         trap::Trace(
@@ -1282,7 +1282,7 @@ pub fn CheckForFunc(
             return 0;
         }
 
-        let fent = &world.entities[tr.entityNum as usize];
+        let fent = &world.g_entities[tr.entityNum as usize];
         // Raven `if (!fent)` on `&g_entities[...]` is structurally dead. Raven
         // then `strstr(fent->classname, ...)` and would deref a null classname
         // (UB); guarding null is the one defined behavior here.
@@ -1882,7 +1882,7 @@ pub fn BotTrace_Jump(
     // as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
 
         let mut mins: vec3_t = [0.0; 3];
         let mut maxs: vec3_t = [0.0; 3];
@@ -2056,7 +2056,7 @@ pub fn PassStandardEnemyChecks(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
 
         if bs.is_null() || en.is_null() {
             // shouldn't happen
@@ -2173,7 +2173,7 @@ pub fn BotDamageNotification(
     // placeholder (indexed as intended); `ENEMY_FORGET_MS` has no ported home.
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
 
         if bot.is_null() || attacker.is_null() || (*attacker).client.is_null() {
             return;
@@ -2395,7 +2395,7 @@ pub fn PassLovedOneCheck(
     // ported home yet (reported missing).
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let clients = (*world).level.clients;
 
         if (*bs).lovednum == 0 {
@@ -2459,7 +2459,7 @@ pub fn ScanForEnemies(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
 
         let mut a: vec3_t = [0.0; 3];
         let mut distcheck: f32;
@@ -2639,7 +2639,7 @@ pub fn BotIsAChickenWuss(
     // ported home yet; referenced as cited and reported as missing.
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let lt = (*world).level.time;
         let gt = (*world).cvars.g_gametype.integer;
 
@@ -2755,7 +2755,7 @@ pub fn GetNearestBadThing(
     // home yet; referenced as cited and reported as missing.
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: c_int = 0;
         let mut glen: f32;
         let mut hold: vec3_t = [0.0; 3];
@@ -2971,7 +2971,7 @@ pub fn BotGetFlagBack(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let clients = (*world).level.clients;
         let mut i: c_int = 0;
         let mut foundCarrier: c_int = 0;
@@ -3040,7 +3040,7 @@ pub fn BotGuardFlagCarrier(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let clients = (*world).level.clients;
         let mut i: c_int = 0;
         let mut foundCarrier: c_int = 0;
@@ -3244,7 +3244,7 @@ pub fn CTFTakesPriority(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut ent: *mut gentity_t;
         let enemyFlag: c_int;
         let myFlag: c_int;
@@ -3492,7 +3492,7 @@ pub fn Siege_TargetClosestObjective(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: c_int = 0;
         let mut bestindex: c_int = -1;
         let mut testdistance: f32;
@@ -3609,7 +3609,7 @@ pub fn Siege_DefendFromAttackers(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let wpClose: c_int;
         let mut i: usize = 0;
         let mut testdist: f32;
@@ -3678,7 +3678,7 @@ pub fn Siege_CountDefenders(
     use crate::botai::bot_siege_state_t::bot_siege_state_t;
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: usize = 0;
         let mut num: c_int = 0;
         let mut ent: *mut gentity_t;
@@ -3719,13 +3719,13 @@ pub fn Siege_CountTeammates(
         // Raven re-derefs `g_entities[bs->client].client->sess.sessionTeam` each
         // iteration; the bot's own client is always valid, so hoist it.
         let myteam = {
-            let me = &world.entities[(*bs).client as usize];
+            let me = &world.g_entities[(*bs).client as usize];
             (*(me.client as *mut gclient_t)).sess.sessionTeam
         };
         let mut i: usize = 0;
         let mut num = 0;
         while i < MAX_CLIENTS {
-            let ent = &world.entities[i];
+            let ent = &world.g_entities[i];
             if !ent.client.is_null()
                 && (*(ent.client as *mut gclient_t)).sess.sessionTeam == myteam
             {
@@ -3747,7 +3747,7 @@ pub fn SiegeTakesPriority(
     use crate::botai::bot_siege_state_t::bot_siege_state_t;
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let attacker: c_int;
         let flagForDefendableObjective: c_int;
         let flagForAttackableObjective: c_int;
@@ -3938,7 +3938,7 @@ pub fn JMTakesPriority(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: usize = 0;
         let wpClose: c_int;
         let theImportantEntity: *mut gentity_t;
@@ -4013,7 +4013,7 @@ pub fn BotHasAssociated(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let as_ent: *mut gentity_t;
 
         if (*wp).associated_entity == ENTITYNUM_NONE {
@@ -4139,7 +4139,7 @@ pub fn GetIdealDestination(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut tempInt: c_int;
         let cWPIndex: c_int;
         let bChicken: c_int;
@@ -4438,7 +4438,7 @@ pub fn CommanderBotCTFAI(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: usize = 0;
         let mut ent: *mut gentity_t;
         let mut squadmates: c_int = 0;
@@ -4600,7 +4600,7 @@ pub fn CommanderBotSiegeAI(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: usize = 0;
         let mut squadmates: c_int = 0;
         let mut commanded: c_int = 0;
@@ -4693,7 +4693,7 @@ pub fn CommanderBotTeamplayAI(
     use crate::botai::bot_teamplay_state_t::bot_teamplay_state_t;
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: usize = 0;
         let mut squadmates: c_int = 0;
         let mut teammates: c_int = 0;
@@ -4820,7 +4820,7 @@ pub fn MeleeCombatHandling(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut usethisvec: vec3_t = [0.0; 3];
         let mut downvec: vec3_t = [0.0; 3];
         let mut midorg: vec3_t = [0.0; 3];
@@ -4921,7 +4921,7 @@ pub fn SaberCombatHandling(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut usethisvec: vec3_t = [0.0; 3];
         let mut downvec: vec3_t = [0.0; 3];
         let mut midorg: vec3_t = [0.0; 3];
@@ -5179,7 +5179,7 @@ pub fn BotAimLeading(
 ) {
     unsafe {
         let bs = &mut *bs;
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
         let currentEnemy = crate::ent_id::resolve(base, bs.currentEnemy);
         if currentEnemy.is_null() || (*currentEnemy).client.is_null() {
             return;
@@ -5237,7 +5237,7 @@ pub fn BotAimOffsetGoalAngles(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut accVal: f32;
 
         if (*bs).skills.perfectaim != 0 {
@@ -5435,7 +5435,7 @@ pub fn CombatBotAI(
     let _ = thinktime;
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut eorg: vec3_t = [0.0; 3];
         let mut a: vec3_t = [0.0; 3];
         let secFire: c_int;
@@ -5681,7 +5681,7 @@ pub fn BotSelectIdealWeapon(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: c_int;
         let mut bestweight: c_int = -1;
         let mut bestweapon: c_int = 0;
@@ -5843,7 +5843,7 @@ pub fn GetLoveLevel(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: c_int = 0;
         let lname: *const c_char;
 
@@ -5903,7 +5903,7 @@ pub fn BotLovedOneDied(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
 
         // `loved->lastHurt` resolved to a gentity pointer (None => NULL).
         let loved_lastHurt: *mut gentity_t = match (*loved).lastHurt {
@@ -5954,7 +5954,7 @@ pub fn BotLovedOneDied(
             (*bs).chatObject = (*loved).lastHurt;
             (*bs).chatAltObject = Some(ent_id(base, base.add((*loved).client as usize)));
             let sect = cstr("LovedOneKilledLovedOne");
-            BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
+            crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
             return;
         }
 
@@ -5968,7 +5968,7 @@ pub fn BotLovedOneDied(
                     (*bs).chatObject = (*loved).lastHurt;
                     (*bs).chatAltObject = None;
                     let sect = cstr("Hatred");
-                    BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 1);
+                    crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 1);
                 }
             }
         } else if (*bs).revengeHateLevel < (*bs).loved_death_thresh - 1 {
@@ -5977,7 +5977,7 @@ pub fn BotLovedOneDied(
             (*bs).chatObject = Some(ent_id(base, base.add((*loved).client as usize)));
             (*bs).chatAltObject = (*loved).lastHurt;
             let sect = cstr("BelovedKilled");
-            BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
+            crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
             (*bs).revengeHateLevel = 0;
             (*bs).revengeEnemy = (*loved).lastHurt;
         }
@@ -6196,7 +6196,7 @@ pub fn CheckForFriendInLOF(
 ) -> *mut gentity_t {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut fwd: vec3_t = [0.0; 3];
         let mut trfrom: vec3_t = [0.0; 3];
         let mut trto: vec3_t = [0.0; 3];
@@ -6268,7 +6268,7 @@ pub fn BotScanForLeader(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
 
         if (*bs).isSquadLeader != 0 {
             return;
@@ -6312,7 +6312,7 @@ pub fn BotReplyGreetings(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut i: usize = 0;
         let mut numhello: c_int = 0;
 
@@ -6325,7 +6325,7 @@ pub fn BotReplyGreetings(
                 (*bi).chatObject = Some(ent_id(base, base.add((*bs).client as usize)));
                 (*bi).chatAltObject = None;
                 let sect = cstr("ResponseGreetings");
-                if BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 0) != 0 {
+                if crate::ai_util::BotDoChat(ctx, bi, sect.as_ptr() as *mut c_char, 0) != 0 {
                     numhello += 1;
                 }
             }
@@ -6349,7 +6349,7 @@ pub fn CTFFlagMovement(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut diddrop: c_int = 0;
         let mut desiredDrop: *mut gentity_t = core::ptr::null_mut();
         let mut a: vec3_t = [0.0; 3];
@@ -6454,7 +6454,7 @@ pub fn BotCheckDetPacks(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let mut dp: *mut gentity_t = core::ptr::null_mut();
         let mut myDet: *mut gentity_t = core::ptr::null_mut();
         let mut a: vec3_t = [0.0; 3];
@@ -6541,7 +6541,7 @@ pub fn BotUseInventoryItem(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let clients = (*world).level.clients;
         let self_health = (*base.add((*bs).client as usize)).health;
 
@@ -6727,7 +6727,7 @@ pub fn StandardBotAI(
 ) {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
         let lt = (*world).level.time;
         let clients = (*world).level.clients;
         let me = base.add((*bs).client as usize);
@@ -6931,7 +6931,7 @@ pub fn StandardBotAI(
                     (*bs).chatObject = (*bs).lastHurt;
                     (*bs).chatAltObject = None;
                     let sect = cstr("Died");
-                    BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
+                    crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
                 } else if PassLovedOneCheck(ctx, bs, lastHurt) == 0
                     && !(*world).globals.botstates[(*lastHurt).s.number as usize].is_null()
                     && PassLovedOneCheck(
@@ -6944,7 +6944,7 @@ pub fn StandardBotAI(
                     (*bs).chatObject = (*bs).lastHurt;
                     (*bs).chatAltObject = None;
                     let sect = cstr("KilledOnPurposeByLove");
-                    BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
+                    crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
                 }
 
                 (*bs).deathActivitiesDone = 1;
@@ -7336,7 +7336,7 @@ pub fn StandardBotAI(
                     (*bs).chatObject = (*bs).revengeEnemy;
                     (*bs).chatAltObject = None;
                     let sect = cstr("KilledHatedOne");
-                    BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 1);
+                    crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 1);
                     (*bs).revengeEnemy = None;
                     (*bs).revengeHateLevel = 0;
                 } else if (*currentEnemy).health < 1
@@ -7348,7 +7348,7 @@ pub fn StandardBotAI(
                     (*bs).chatObject = (*bs).currentEnemy;
                     (*bs).chatAltObject = None;
                     let sect = cstr("Killed");
-                    BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
+                    crate::ai_util::BotDoChat(ctx, bs, sect.as_ptr() as *mut c_char, 0);
                 }
 
                 (*bs).currentEnemy = None;
@@ -8322,7 +8322,7 @@ pub fn BotAIStartFrame(
 ) -> c_int {
     unsafe {
         let world = ctx.world;
-        let base = (*world).entities.as_mut_ptr();
+        let base = (*world).g_entities.as_mut_ptr();
 
         if (*world).globals.gUpdateVars < (*world).level.time {
             trap::Cvar_Update(

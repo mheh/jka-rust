@@ -275,6 +275,7 @@ pub fn G_TryPushingEntity(
         {
             // just blow the fuck out of them
             G_Damage(
+                ctx,
                 check,
                 pusher,
                 pusher,
@@ -371,6 +372,7 @@ pub fn G_TryPushingEntity(
         {
             if (*check).health > 0 {
                 G_Damage(
+                    ctx,
                     check,
                     pusher,
                     pusher,
@@ -515,6 +517,7 @@ pub fn G_MoverPush(
 
             if (*pusher).damage != 0 && !(*check).client.is_null() && ((*pusher).spawnflags & 32) != 0 {
                 G_Damage(
+                    ctx,
                     check,
                     pusher,
                     pusher,
@@ -532,6 +535,7 @@ pub fn G_MoverPush(
             {
                 // whatever, just crush it
                 G_Damage(
+                    ctx,
                     check,
                     pusher,
                     pusher,
@@ -549,6 +553,7 @@ pub fn G_MoverPush(
             // bobbing entities are instant-kill and never get blocked
             if (*pusher).s.pos.trType == trType_t::TR_SINE || (*pusher).s.apos.trType == trType_t::TR_SINE {
                 G_Damage(
+                    ctx,
                     check,
                     pusher,
                     pusher,
@@ -1217,6 +1222,7 @@ pub fn Blocked_Door(
             // NULL pointers here); substitute the zero vector since `G_Damage`
             // is itself an unported stub either way.
             G_Damage(
+                ctx,
                 other,
                 ent,
                 ent,
@@ -2541,7 +2547,7 @@ pub fn funcBBrushDieGo(
             // faithfully; left unguarded (over-inclusive) rather than
             // silently dropped.
             if (*other).s.groundEntityNum == (*self_).s.number {
-                G_Damage(other, self_, self_, None, [0.0, 0.0, 0.0], 99999, 0, meansOfDeath_t::MOD_CRUSH as c_int);
+                G_Damage(ctx, other, self_, self_, None, [0.0, 0.0, 0.0], 99999, 0, meansOfDeath_t::MOD_CRUSH as c_int);
             }
         }
 

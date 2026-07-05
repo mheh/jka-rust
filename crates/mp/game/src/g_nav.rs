@@ -19,6 +19,7 @@ use crate::trap;
 use crate::NPC_utils::{G_ActivateBehavior, NPC_FaceEntity};
 use crate::g_mover::{G_EntIsBreakable, G_EntIsDoor, G_EntIsRemovableUsable, G_EntIsUnlockedDoor};
 use crate::g_utils::G_CheckInSolid;
+use crate::NPC_goal::G_BoundsOverlap;
 use crate::g_misc::TAG_Add;
 use crate::g_main::Com_Error;
 use crate::q_shared::Com_sprintf;

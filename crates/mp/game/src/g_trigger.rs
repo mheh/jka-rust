@@ -16,11 +16,10 @@ use crate::prelude::*;
 use crate::entity::flags::FL_INACTIVE;
 use crate::ent_fn_enums::{EntThink, EntTouch, EntUse};
 use crate::g_combat::{G_Damage, G_RadiusDamage};
-use crate::g_items::SVF_NOCLIENT;
 use crate::g_misc::TeleportPlayer;
 use crate::g_utils::{
-    G_EffectIndex, G_FreeEntity, G_PickTarget, G_PlayEffectID, G_ScaleNetHealth, G_SetAngles,
-    G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_Spawn, G_UseTargets,
+    G_EffectIndex, G_FreeEntity, G_PickTarget, G_PlayEffectID, G_PointInBounds, G_ScaleNetHealth,
+    G_SetAngles, G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_Spawn, G_UseTargets,
 };
 use crate::g_main::G_Printf;
 use crate::g_mover::SP_func_rotating;
@@ -314,10 +313,7 @@ pub fn multi_trigger(
                 return;
             }
 
-            // PORT-NOTE(bgSiegeClasses): `bgSiegeClasses` (the bg-owned siege
-            // class table) is not yet ported anywhere in this crate; referenced
-            // verbatim per zero-park policy (reported as a missing symbol).
-            let siege_class_name = bgSiegeClasses
+            let siege_class_name = (*ctx.world).bg_state.bgSiegeClasses
                 [(*((*activator).client as *mut gclient_t)).siegeClass as usize]
                 .name
                 .as_ptr();
@@ -617,11 +613,10 @@ pub fn Touch_Multi(
                         return;
                     }
 
-                    // PORT-NOTE(bgSiegeClasses): `bgSiegeClasses` is not yet
-                    // ported anywhere in this crate; referenced verbatim per
-                    // zero-park policy (reported as a missing symbol).
-                    let siege_class_name =
-                        bgSiegeClasses[(*other_client).siegeClass as usize].name.as_ptr();
+                    let siege_class_name = (*ctx.world).bg_state.bgSiegeClasses
+                        [(*other_client).siegeClass as usize]
+                        .name
+                        .as_ptr();
                     if G_NameInTriggerClassList(siege_class_name as *mut c_char, (*self_).idealclass)
                         == 0
                     {

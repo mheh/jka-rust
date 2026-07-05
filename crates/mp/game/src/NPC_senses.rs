@@ -15,16 +15,15 @@
 
 use crate::prelude::*;
 use crate::q_math::{
-    _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleDelta, AngleVectors,
-    DotProduct, VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2, vec3_origin,
-    vectoangles,
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleDelta,
+    AngleVectors, VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2,
+    vec3_origin, vectoangles,
 };
 use crate::level::alert_event::{
     alertEvent_t, alertEventLevel_e, alertEventLevel_e::AEL_DANGER, alertEventType_e,
     MAX_ALERT_EVENTS,
 };
 use crate::level::interest_point::MAX_INTEREST_POINTS;
-use mp_qshared::common::trace_t;
 use mp_qshared::shared::{CONTENTS_OPAQUE, MASK_OPAQUE, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_GENTITIES};
 
 // SVF flags (from g_public.h)
@@ -50,7 +49,7 @@ pub fn G_ClearLineOfSight(
     ignore: c_int,
     clipmask: c_int,
 ) -> qboolean {
-    let mut tr = trace_t::default();
+    let mut tr: trace_t = unsafe { core::mem::zeroed() };
     trap::Trace(
         ctx.engine,
         &mut tr as *mut trace_t,
@@ -66,7 +65,7 @@ pub fn G_ClearLineOfSight(
         return 1;
     }
 
-    let hit = unsafe { &mut ctx.world.cast_mut().entities[tr.entityNum as usize] };
+    let hit = unsafe { &mut ctx.world.cast_mut().g_entities[tr.entityNum as usize] };
 
     if EntIsGlass(hit) {
         let mut newpoint1 = tr.endpos;
@@ -99,7 +98,7 @@ pub fn CanSee(
     ctx: GameContext<'_>,
     ent: *mut gentity_t,
 ) -> qboolean {
-    let mut tr = trace_t::default();
+    let mut tr: trace_t = unsafe { core::mem::zeroed() };
     let mut eyes = [0.0; 3];
     let mut spot = [0.0; 3];
 
@@ -179,7 +178,7 @@ pub fn InFront(
     angles[0] = 0.0;
     AngleVectors(angles, Some(&mut forward), None, None);
 
-    dot = DotProduct(dir, forward);
+    dot = _DotProduct(dir, forward);
 
     if dot > threshHold { 1 } else { 0 }
 }
@@ -616,7 +615,7 @@ pub fn G_CheckAlertEvents(
 
     let world = unsafe { ctx.world.cast_mut() };
 
-    if world.entities[0].health <= 0 {
+    if world.g_entities[0].health <= 0 {
         // player is dead
         return -1;
     }
@@ -986,7 +985,7 @@ pub fn G_ClearLOS(
     start: vec3_t,
     end: vec3_t,
 ) -> qboolean {
-    let mut tr = trace_t::default();
+    let mut tr: trace_t = unsafe { core::mem::zeroed() };
     let mut trace_count = 0;
 
     // FIXME: ENTITYNUM_NONE ok?
@@ -1005,7 +1004,7 @@ pub fn G_ClearLOS(
         if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
             let world = unsafe { ctx.world.cast_mut() };
             if tr.entityNum < MAX_GENTITIES as u32 {
-                if !world.entities[tr.entityNum as usize].r.svFlags
+                if !world.g_entities[tr.entityNum as usize].r.svFlags
                     & (SVF_GLASS_BRUSH as c_int)
                     != 0
                 {

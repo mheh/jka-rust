@@ -22,6 +22,12 @@ use crate::g_team::OnSameTeam;
 use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorNormalize, VectorLengthSquared, _VectorCopy, _VectorMA, _VectorSubtract, vectoangles};
 use crate::q_shared::{Q_stricmp, Q_strncmp};
 use crate::trap;
+use crate::entity::flags::{FL_NOTARGET, FL_BBRUSH};
+use mp_bg::weapons::weapon_t::WP_TURRET;
+use mp_qshared::shared::limits::{ENTITYNUM_WORLD, ENTITYNUM_NONE};
+use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ATTACK, BUTTON_ALT_ATTACK};
+use mp_bg::public::team::TEAM_SPECTATOR;
+use mp_qshared::shared::surface_flags::MASK_SHOT;
 
 // Helper: Raven angle-vector indices
 const PITCH: usize = 0;
@@ -290,14 +296,14 @@ pub fn VEH_TurretFindEnemies(
             if target == parent
                 || (*target).takedamage == qfalse
                 || (*target).health <= 0
-                || ((*target).flags & crate::constants::FL_NOTARGET) != 0
+                || ((*target).flags & FL_NOTARGET) != 0
             {
                 i += 1;
                 continue;
             }
             if (*target).client.is_null() {
                 // only attack clients
-                if ((*target).flags & crate::constants::FL_BBRUSH) == 0
+                if ((*target).flags & FL_BBRUSH) == 0
                     // not a breakable brush
                     || (*target).takedamage == qfalse
                     // is a bbrush, but invincible
@@ -307,7 +313,7 @@ pub fn VEH_TurretFindEnemies(
                 {
                     // not in invicible bbrush, but can only be broken by an NPC that is not me
                     let s = cstr("misc_turret");
-                    if (*target).s.weapon == crate::constants::WP_TURRET
+                    if (*target).s.weapon == WP_TURRET
                         && !(*target).classname.is_null()
                         && Q_strncmp((*target).classname, s.as_ptr(), 11) == 0
                     {
@@ -319,7 +325,7 @@ pub fn VEH_TurretFindEnemies(
                 }
                 // else: we will shoot at bbrushes!
             } else if !(*target).client.is_null()
-                && (*(*target).client as *mut gclient_t).sess.sessionTeam == crate::constants::TEAM_SPECTATOR
+                && (*(*target).client as *mut gclient_t).sess.sessionTeam == TEAM_SPECTATOR
             {
                 i += 1;
                 continue;
@@ -342,7 +348,7 @@ pub fn VEH_TurretFindEnemies(
                     continue;
                 }
             }
-            if trap::InPVS(ctx.engine, org2, (*target).r.currentOrigin) == qfalse {
+            if trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&org2 as *const vec3_t, &(*target).r.currentOrigin as *const vec3_t)) == qfalse {
                 i += 1;
                 continue;
             }
@@ -358,7 +364,7 @@ pub fn VEH_TurretFindEnemies(
                     core::ptr::null(),
                     &org as *const vec3_t,
                     (*parent).s.number,
-                    crate::constants::MASK_SHOT,
+                    MASK_SHOT,
                 ),
             );
 
@@ -432,7 +438,7 @@ pub fn VEH_TurretObeyPassengerControl(
                 &mut aimAngles,
             );
             if ((*(*passenger).client as *mut gclient_t).pers.cmd.buttons
-                & (crate::constants::BUTTON_ATTACK | crate::constants::BUTTON_ALT_ATTACK))
+                & (BUTTON_ATTACK | BUTTON_ALT_ATTACK))
                 != 0
             {
                 // he's pressing an attack button, so fire!
@@ -495,7 +501,7 @@ pub fn VEH_TurretThink(
         rangeSq = (*turretStats).fAIRange * (*turretStats).fAIRange;
         curMuzzle = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
 
-        if (*pVeh).turretStatus[turretNum as usize].enemyEntNum < crate::constants::ENTITYNUM_WORLD {
+        if (*pVeh).turretStatus[turretNum as usize].enemyEntNum < ENTITYNUM_WORLD {
             turretEnemy = &mut (*(*ctx.world).g_entities.as_mut_ptr().add(
                 (*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize,
             ));
@@ -506,11 +512,11 @@ pub fn VEH_TurretThink(
                 || turretEnemy == parent
                 || (*turretEnemy).r.ownerNum == (*parent).s.number // a passenger?
                 || (!(*turretEnemy).client.is_null()
-                    && (*(*turretEnemy).client as *mut gclient_t).sess.sessionTeam == crate::constants::TEAM_SPECTATOR)
+                    && (*(*turretEnemy).client as *mut gclient_t).sess.sessionTeam == TEAM_SPECTATOR)
             {
                 // don't keep going after spectators, pilot, self, dead people, etc.
                 turretEnemy = core::ptr::null_mut();
-                (*pVeh).turretStatus[turretNum as usize].enemyEntNum = crate::constants::ENTITYNUM_NONE;
+                (*pVeh).turretStatus[turretNum as usize].enemyEntNum = ENTITYNUM_NONE;
             }
         }
 
@@ -527,8 +533,8 @@ pub fn VEH_TurretThink(
                         .g_entities
                         .as_mut_ptr()
                         .add(enemy_id.0 as usize);
-                    if (*enemy_ptr).s.number < crate::constants::ENTITYNUM_WORLD {
-                        if (*ctx.world).cvars.g_gametype.integer < crate::constants::GT_TEAM
+                    if (*enemy_ptr).s.number < ENTITYNUM_WORLD {
+                        if (*ctx.world).cvars.g_gametype.integer < GT_TEAM
                             || OnSameTeam(ctx, enemy_ptr, parent) == qfalse
                         {
                             // either not in a team game or the enemy isn't on the same team
@@ -566,8 +572,10 @@ pub fn VEH_TurretThink(
                     // was in valid radius
                     if trap::InPVS(
                         ctx.engine,
-                        (*pVeh).m_vMuzzlePos[curMuzzle as usize],
-                        (*turretEnemy).r.currentOrigin,
+                        mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                            &(*pVeh).m_vMuzzlePos[curMuzzle as usize] as *const vec3_t,
+                            &(*turretEnemy).r.currentOrigin as *const vec3_t,
+                        ),
                     ) != qfalse
                     {
                         // Every now and again, check to see if we can even trace to the enemy
@@ -586,7 +594,7 @@ pub fn VEH_TurretThink(
                                 core::ptr::null(),
                                 &end as *const vec3_t,
                                 (*parent).s.number,
-                                crate::constants::MASK_SHOT,
+                                MASK_SHOT,
                             ),
                         );
 

@@ -8,6 +8,7 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::bg_channel::GameBgTraps;
 use crate::prelude::*;
 use std::ffi::CString;
 
@@ -553,8 +554,6 @@ pub fn NPC_ParseParms(
     unsafe {
         let mut NPCName = NPCName_in;
 
-        let mut n: c_int;
-        let mut f: f32;
         let mut sound: [c_char; MAX_QPATH] = [0; MAX_QPATH];
         let mut playerModel: [c_char; MAX_QPATH] = [0; MAX_QPATH];
         let mut customSkin: [c_char; MAX_QPATH] = [0; MAX_QPATH];
@@ -1518,7 +1517,7 @@ pub fn NPC_ParseParms(
                     saber_name,
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
                     &mut (*ctx.world).bg_state,
-                    &mp_abi::game::syscalls::BgTrapsImpl,
+                    &GameBgTraps::new(ctx.engine),
                 );
                 let idx_s = format!("@{}", cstr_to_str(saber_name));
                 npcSaber1 = crate::g_utils::G_ModelIndex(cstr(&idx_s).as_ptr());
@@ -1546,7 +1545,7 @@ pub fn NPC_ParseParms(
                         saber_name,
                         &mut (*client_ptr).saber[1] as *mut saberInfo_t,
                         &mut (*ctx.world).bg_state,
-                        &mp_abi::game::syscalls::BgTrapsImpl,
+                        &GameBgTraps::new(ctx.engine),
                     );
                     if (*client_ptr).saber[1].saberFlags & SFL_TWO_HANDED != 0 {
                         //tsk tsk, can't use a twoHanded saber as second saber
@@ -1801,7 +1800,7 @@ pub fn NPC_ParseParms(
                     cstr("Kyle").as_ptr(),
                     &mut (*client_ptr).saber[0] as *mut saberInfo_t,
                     &mut (*ctx.world).bg_state,
-                    &mp_abi::game::syscalls::BgTrapsImpl,
+                    &GameBgTraps::new(ctx.engine),
                 );
             }
 

@@ -351,7 +351,13 @@ pub fn Team_SetFlagStatus(
                 st[2] = 0;
             }
 
-            trap::SetConfigstring(ctx.engine, 6, st.as_ptr());
+            trap::SetConfigstring(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                    6,
+                    cstr(&cstr_to_str(st.as_ptr())),
+                ),
+            );
         }
     }
 }
@@ -439,7 +445,7 @@ pub fn Team_FragBonuses(
             (*((*attacker).client as *mut gclient_t)).pers.teamState.lastfraggedcarrier = world.level.time;
             // AddScore(attacker, targ->r.currentOrigin, CTF_FRAG_CARRIER_BONUS);
             (*((*attacker).client as *mut gclient_t)).pers.teamState.fragcarrier += 1;
-            PrintCTFMessage((*attacker).s.number, team, ctfMsg_t::CTFMESSAGE_FRAGGED_FLAG_CARRIER as c_int);
+            PrintCTFMessage(ctx, (*attacker).s.number, team, ctfMsg_t::CTFMESSAGE_FRAGGED_FLAG_CARRIER as c_int);
 
             // the target had the flag, clear the hurt carrier field on the other team
             let max_clients = world.cvars.g_maxclients.integer;
@@ -556,8 +562,8 @@ pub fn Team_FragBonuses(
         let v1_len = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
         let v2_len = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
 
-        if ((v1_len < 500.0 && trap::InPVS(ctx.engine, (*flag).r.currentOrigin.as_ptr(), (*targ).r.currentOrigin.as_ptr()) != 0)
-            || (v2_len < 500.0 && trap::InPVS(ctx.engine, (*flag).r.currentOrigin.as_ptr(), (*attacker).r.currentOrigin.as_ptr()) != 0))
+        if ((v1_len < 500.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*flag).r.currentOrigin as *const vec3_t, &(*targ).r.currentOrigin as *const vec3_t)) != 0)
+            || (v2_len < 500.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*flag).r.currentOrigin as *const vec3_t, &(*attacker).r.currentOrigin as *const vec3_t)) != 0))
             && (*((*attacker).client as *mut gclient_t)).sess.sessionTeam as c_int != (*((*targ).client as *mut gclient_t)).sess.sessionTeam as c_int
         {
             // we defended the base flag
@@ -581,8 +587,8 @@ pub fn Team_FragBonuses(
             let v1_len = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
             let v2_len = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
 
-            if ((v1_len < 300.0 && trap::InPVS(ctx.engine, (*carrier).r.currentOrigin.as_ptr(), (*targ).r.currentOrigin.as_ptr()) != 0)
-                || (v2_len < 300.0 && trap::InPVS(ctx.engine, (*carrier).r.currentOrigin.as_ptr(), (*attacker).r.currentOrigin.as_ptr()) != 0))
+            if ((v1_len < 300.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*carrier).r.currentOrigin as *const vec3_t, &(*targ).r.currentOrigin as *const vec3_t)) != 0)
+                || (v2_len < 300.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*carrier).r.currentOrigin as *const vec3_t, &(*attacker).r.currentOrigin as *const vec3_t)) != 0))
                 && (*((*attacker).client as *mut gclient_t)).sess.sessionTeam as c_int != (*((*targ).client as *mut gclient_t)).sess.sessionTeam as c_int
             {
                 // AddScore(attacker, targ->r.currentOrigin, CTF_CARRIER_PROTECT_BONUS);
@@ -874,7 +880,7 @@ pub fn Team_TouchOurFlag(
             PrintCTFMessage(ctx, (*other).s.number, team, ctfMsg_t::CTFMESSAGE_PLAYER_RETURNED_FLAG as c_int);
             // AddScore(other, ent->r.currentOrigin, CTF_RECOVERY_BONUS);
             (*cl).pers.teamState.flagrecovery += 1;
-            (*cl).pers.teamState.lastreturnedflag = world.level.time;
+            (*cl).pers.teamState.lastreturnedflag = world.level.time as f32;
             Team_ReturnFlagSound(ctx, Team_ResetFlag(ctx, team), team);
             return 0;
         }
@@ -918,7 +924,7 @@ pub fn Team_TouchOurFlag(
                     // AddScore(player, ent->r.currentOrigin, CTF_TEAM_BONUS);
                 }
                 // award extra points for capture assists
-                if (*(*player).client as *mut gclient_t).pers.teamState.lastreturnedflag + 300000 > world.level.time {
+                if (*(*player).client as *mut gclient_t).pers.teamState.lastreturnedflag + 300000.0 > world.level.time as f32 {
                     // AddScore (player, ent->r.currentOrigin, CTF_RETURN_FLAG_ASSIST_BONUS);
                     (*cl).pers.teamState.assists += 1;
 
@@ -964,7 +970,7 @@ pub fn Team_TouchEnemyFlag(
 
         let world = &*ctx.world;
         // AddScore call is parked - needs from g_combat
-        (*cl).pers.teamState.flagsince = world.level.time;
+        (*cl).pers.teamState.flagsince = world.level.time as f32;
         Team_TakeFlagSound(ctx, ent, team);
 
         -1 // Do not respawn this automatically, but do delete it if it was FL_DROPPED
@@ -1025,18 +1031,18 @@ pub fn Team_GetLocation(
                 + (origin[2] - (*eloc).r.currentOrigin[2]) * (origin[2] - (*eloc).r.currentOrigin[2]);
 
             if len > bestlen {
-                eloc = (*eloc).nextTrain;
+                eloc = match (*eloc).nextTrain { Some(id) => &mut (*ctx.world).g_entities[id.0 as usize] as *mut gentity_t, None => core::ptr::null_mut() };
                 continue;
             }
 
-            if trap::InPVS(ctx.engine, origin.as_ptr(), (*eloc).r.currentOrigin.as_ptr()) == 0 {
-                eloc = (*eloc).nextTrain;
+            if trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&origin as *const vec3_t, &(*eloc).r.currentOrigin as *const vec3_t)) == 0 {
+                eloc = match (*eloc).nextTrain { Some(id) => &mut (*ctx.world).g_entities[id.0 as usize] as *mut gentity_t, None => core::ptr::null_mut() };
                 continue;
             }
 
             bestlen = len;
             best = eloc;
-            eloc = (*eloc).nextTrain;
+            eloc = match (*eloc).nextTrain { Some(id) => &mut (*ctx.world).g_entities[id.0 as usize] as *mut gentity_t, None => core::ptr::null_mut() };
         }
 
         best
@@ -1162,7 +1168,7 @@ pub fn SelectRandomTeamSpawnPoint(
                     && *(*spots[i as usize]).idealclass != 0
                 {
                     let bg_classes = &(*ctx.world).bg_state.bgSiegeClasses;
-                    let class_name = CStr::from_ptr(bg_classes[siegeClass as usize].name);
+                    let class_name = CStr::from_ptr(bg_classes[siegeClass as usize].name.as_ptr());
                     let spot_class = CStr::from_ptr((*spots[i as usize]).idealclass);
                     if Q_stricmp(class_name.as_ptr(), spot_class.as_ptr()) == 0 {
                         class_spots[class_count as usize] = spots[i as usize];

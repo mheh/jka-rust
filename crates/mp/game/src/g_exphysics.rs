@@ -126,8 +126,8 @@ pub fn G_RunExPhys(
         let mut boneOrg: vec3_t = [0.0; 3];
         let mut projectedBoneOrg: vec3_t = [0.0; 3];
         let mut collisionRootPos: vec3_t = [0.0; 3];
-        let mut matrix: mdxaBone_t = Default::default();
-        let mut bestCollision: trace_t = Default::default();
+        let mut matrix: mdxaBone_t = core::mem::zeroed();
+        let mut bestCollision: trace_t = core::mem::zeroed();
         let mut hasFirstCollision: qboolean = qfalse;
         let mut i: c_int = 0;
 
@@ -152,7 +152,11 @@ pub fn G_RunExPhys(
                     &(*ent).modelScale as *const vec3_t,
                 ),
             );
-            BG_GiveMeVectorFromMatrix(&matrix, Eorientations::ORIGIN as c_int, &mut boneOrg);
+            crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(
+                &matrix as *const mdxaBone_t,
+                mp_qshared::shared::Eorientations::ORIGIN as c_int,
+                &mut boneOrg,
+            );
 
             _VectorAdd(boneOrg, trajDif, &mut projectedBoneOrg);
 

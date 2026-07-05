@@ -411,14 +411,14 @@ pub fn FighterDamageRoutine(
                 if num % 3 != 0 {
                     // NOT everyone should do this
                     *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
                         if *(*pVeh).m_vOrientation.add(0) > 60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = 60.0f32;
                         }
                     }
                 } else if num % 2 == 0 {
                     *(*pVeh).m_vOrientation.add(0) -= (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
                         if *(*pVeh).m_vOrientation.add(0) < -60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = -60.0f32;
                         }
@@ -447,14 +447,14 @@ pub fn FighterDamageRoutine(
 
                 if num % 3 != 0 {
                     *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
                         if *(*pVeh).m_vOrientation.add(0) > 60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = 60.0f32;
                         }
                     }
                 } else if num % 4 == 0 {
                     *(*pVeh).m_vOrientation.add(0) -= (*pVeh).m_fTimeModifier;
-                    if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
+                    if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
                         if *(*pVeh).m_vOrientation.add(0) < -60.0f32 {
                             *(*pVeh).m_vOrientation.add(0) = -60.0f32;
                         }
@@ -602,7 +602,7 @@ pub fn FighterPitchClamp(
     curTime: c_int,
 ) {
     unsafe {
-        if BG_UnrestrainedPitchRoll(riderPS, pVeh) == qfalse {
+        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
             // Cap pitch reasonably
             if let Some(vi) = (*pVeh).m_pVehicleInfo.as_ref() {
                 if vi.pitchLimit != -1.0
@@ -641,7 +641,7 @@ pub fn G_CreateFighterNPC(
 
         // Set the vehicle info pointer based on vehicle type name.
         let veh_index = BG_VehicleGetIndex(strType);
-        (*(*pVeh)).m_pVehicleInfo = &(*ctx.world).bg_state.g_vehicleInfo[veh_index as usize];
+        (*(*pVeh)).m_pVehicleInfo = &(*ctx.world).bg_state.g_vehicleInfo[veh_index as usize] as *const _ as *mut vehicleInfo_t;
     }
 }
 

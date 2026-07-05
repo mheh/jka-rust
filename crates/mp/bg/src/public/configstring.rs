@@ -18,6 +18,11 @@ pub const SCORE_NOT_PRESENT: c_int = -9999;
 /// Source: `oracle/oracle/codemp/game/bg_public.h:39`
 pub const VOTE_TIME: c_int = 30000;
 
+/// Raven `RANK_TIED_FLAG` — flag OR'd onto `PERS_RANK` when a player is tied.
+///
+/// Source: `oracle/oracle/codemp/game/bg_public.h:33`
+pub const RANK_TIED_FLAG: c_int = 0x4000;
+
 // Config strings are a general means of communicating variable length
 // strings from the server to all connected clients.
 //

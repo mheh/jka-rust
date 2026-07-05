@@ -30,7 +30,7 @@ use mp_qshared::shared::CHAN_WEAPON;
 // SPINE (fork rulings 1/4/8 + `engine-seam.md`): stateful fns thread
 // `GameContext` (`.world: *mut GameWorld`, `.engine`); `level` →
 // `(*ctx.world).level`, cvars → `(*ctx.world).cvars`, `g_entities[i]` →
-// `(*ctx.world).entities[i]`, traps → `trap::X(ctx.engine, …)`. Cross-file
+// `(*ctx.world).g_entities[i]`, traps → `trap::X(ctx.engine, …)`. Cross-file
 // callees use their resolved raw-pointer signatures verbatim.
 //
 // NOTE (integration-deferred, mirroring `w_force.rs`): a few Raven constants
@@ -421,7 +421,7 @@ pub fn SaberUpdateSelf(
             return;
         }
 
-        let owner = &mut (*ctx.world).entities[owner_num as usize] as *mut gentity_t;
+        let owner = &mut (*ctx.world).g_entities[owner_num as usize] as *mut gentity_t;
 
         if (*owner).inuse == 0 || (*owner).client.is_null() {
             (*ent).think = Some(EntThink::G_FreeEntity);
@@ -488,7 +488,7 @@ pub fn SaberGotHit(
     unsafe {
         // `own = &g_entities[self->r.ownerNum]` — an array slot, never null; the
         // oracle's `!own` guard is vacuous in Rust, only the client check bites.
-        let own = &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+        let own = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
         if (*own).client.is_null() {
             return;
         }
@@ -518,12 +518,12 @@ pub fn SetSaberBoxSize(
 
         let on = (*saberent).r.ownerNum;
         if on < MAX_CLIENTS && on >= 0 {
-            owner = &mut (*ctx.world).entities[on as usize] as *mut gentity_t;
+            owner = &mut (*ctx.world).g_entities[on as usize] as *mut gentity_t;
         } else if on >= 0
             && on < ENTITYNUM_WORLD
-            && (*ctx.world).entities[on as usize].s.eType == ET_NPC as c_int
+            && (*ctx.world).g_entities[on as usize].s.eType == ET_NPC as c_int
         {
-            owner = &mut (*ctx.world).entities[on as usize] as *mut gentity_t;
+            owner = &mut (*ctx.world).g_entities[on as usize] as *mut gentity_t;
         }
 
         if owner.is_null() || (*owner).inuse == 0 || (*owner).client.is_null() {
@@ -690,7 +690,7 @@ pub fn WP_SaberInitBladeData(
         while i < (*ctx.world).level.num_entities {
             // make sure there are no other saber entities floating around that think
             // they belong to this client.
-            let checkEnt = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            let checkEnt = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
             if (*checkEnt).inuse != 0
                 && (*checkEnt).neverFree != 0
@@ -796,7 +796,7 @@ pub fn G_CheckLookTarget(
             let mut eyeOrg: vec3_t = [0.0; 3];
 
             if (*sc).renderInfo.lookMode == lookMode_t::LM_ENT {
-                let lookCent = &mut (*ctx.world).entities[(*sc).renderInfo.lookTarget as usize]
+                let lookCent = &mut (*ctx.world).g_entities[(*sc).renderInfo.lookTarget as usize]
                     as *mut gentity_t;
                 if !lookCent.is_null() {
                     // ruling 22: `enemy` is `Option<EntityId>`; identity-compare by id.
@@ -997,7 +997,7 @@ pub fn G_G2PlayerAngles(
 
             // If no real clients are in the same PVS then don't do any of this stuff
             while i < MAX_CLIENTS as c_int {
-                let clEnt = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+                let clEnt = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                 if !clEnt.is_null()
                     && (*clEnt).inuse != 0
@@ -1033,7 +1033,7 @@ pub fn G_G2PlayerAngles(
 
             if (*sc).ps.hasLookTarget != 0 {
                 _VectorSubtract(
-                    (*ctx.world).entities[(*sc).ps.lookTarget as usize].r.currentOrigin,
+                    (*ctx.world).g_entities[(*sc).ps.lookTarget as usize].r.currentOrigin,
                     (*sc).ps.origin,
                     &mut lookAngles,
                 );
@@ -1046,7 +1046,7 @@ pub fn G_G2PlayerAngles(
             lookAngles[PITCH as usize] = 0.0;
 
             if (*sc).ps.emplacedIndex != 0 {
-                emplaced = &mut (*ctx.world).entities[(*sc).ps.emplacedIndex as usize].s
+                emplaced = &mut (*ctx.world).g_entities[(*sc).ps.emplacedIndex as usize].s
                     as *mut entityState_t;
             }
 
@@ -1081,7 +1081,7 @@ pub fn G_G2PlayerAngles(
             if (*sc).ps.heldByClient != 0 && (*sc).ps.heldByClient <= MAX_CLIENTS as c_int {
                 // then put our arm in this client's hand (index+1 because index 0 is valid)
                 let heldByIndex = (*sc).ps.heldByClient - 1;
-                let other = &mut (*ctx.world).entities[heldByIndex as usize] as *mut gentity_t;
+                let other = &mut (*ctx.world).g_entities[heldByIndex as usize] as *mut gentity_t;
                 let mut lHandBolt: c_int = 0;
 
                 if !other.is_null()
@@ -2621,7 +2621,7 @@ pub fn G_G2TraceCollide(
             return qfalse;
         }
 
-        if (*ctx.world).entities[(*tr).entityNum as usize].inuse == 0 {
+        if (*ctx.world).g_entities[(*tr).entityNum as usize].inuse == 0 {
             // don't do perpoly on corpses.
             return qfalse;
         }
@@ -2641,7 +2641,7 @@ pub fn G_G2TraceCollide(
             G2Trace[tN as usize].mEntityNum = -1;
             tN += 1;
         }
-        let g2Hit = &mut (*ctx.world).entities[(*tr).entityNum as usize] as *mut gentity_t;
+        let g2Hit = &mut (*ctx.world).g_entities[(*tr).entityNum as usize] as *mut gentity_t;
 
         if !g2Hit.is_null() && (*g2Hit).inuse != 0 && !(*g2Hit).ghoul2.is_null() {
             let mut g2HitOrigin: vec3_t = [0.0; 3];
@@ -4098,7 +4098,7 @@ pub fn WP_SaberRadiusDamage(
         );
 
         for i in 0..numEnts {
-            let radiusEnt = &mut (*ctx.world).entities[radiusEnts[i as usize] as usize]
+            let radiusEnt = &mut (*ctx.world).g_entities[radiusEnts[i as usize] as usize]
                 as *mut gentity_t;
             if (*radiusEnt).inuse == 0 {
                 continue;
@@ -4424,7 +4424,7 @@ pub fn CheckSaberDamage(
                 if tr.entityNum < MAX_CLIENTS as c_int {
                     G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
                 } else if tr.entityNum < ENTITYNUM_WORLD {
-                    let trHit = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+                    let trHit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                     if (*trHit).inuse != 0 && !(*trHit).ghoul2.is_null() {
                         //hit a non-client entity with a g2 instance
@@ -4486,7 +4486,7 @@ pub fn CheckSaberDamage(
                     if tr.entityNum < MAX_CLIENTS as c_int {
                         G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
                     } else if tr.entityNum < ENTITYNUM_WORLD {
-                        let trHit = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+                        let trHit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                         if (*trHit).inuse != 0 && !(*trHit).ghoul2.is_null() {
                             //hit a non-client entity with a g2 instance
@@ -4526,7 +4526,7 @@ pub fn CheckSaberDamage(
                 if tr.entityNum < MAX_CLIENTS as c_int {
                     G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
                 } else if tr.entityNum < ENTITYNUM_WORLD {
-                    let trHit = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+                    let trHit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                     if (*trHit).inuse != 0 && !(*trHit).ghoul2.is_null() {
                         //hit a non-client entity with a g2 instance
@@ -4558,7 +4558,7 @@ pub fn CheckSaberDamage(
             if (*ctx.world).cvars.d_saberSPStyleDamage.integer != 0 {
                 let mut fDmg: f32 = 0.0f32;
                 if (*sc).ps.saberInFlight != 0 {
-                    let saberEnt = &mut (*ctx.world).entities[(*sc).ps.saberEntityNum as usize]
+                    let saberEnt = &mut (*ctx.world).g_entities[(*sc).ps.saberEntityNum as usize]
                         as *mut gentity_t;
                     if saberEnt.is_null() || (*saberEnt).s.saberInFlight == 0 {
                         //does less damage on the way back
@@ -4777,8 +4777,8 @@ pub fn CheckSaberDamage(
 
         if dmg == 0 {
             if tr.entityNum < MAX_CLIENTS as c_int
-                || ((*ctx.world).entities[tr.entityNum as usize].inuse != 0
-                    && ((*ctx.world).entities[tr.entityNum as usize].r.contents
+                || ((*ctx.world).g_entities[tr.entityNum as usize].inuse != 0
+                    && ((*ctx.world).g_entities[tr.entityNum as usize].r.contents
                         & CONTENTS_LIGHTSABER)
                         != 0)
             {
@@ -4853,7 +4853,7 @@ pub fn CheckSaberDamage(
         VectorNormalize(&mut dir);
 
         if tr.entityNum == ENTITYNUM_WORLD
-            || (*ctx.world).entities[tr.entityNum as usize].s.eType == ET_TERRAIN as c_int
+            || (*ctx.world).g_entities[tr.entityNum as usize].s.eType == ET_TERRAIN as c_int
         {
             //register this as a wall hit for jedi AI
             (*sc).ps.saberEventFlags |= SEF_HITWALL;
@@ -4932,14 +4932,14 @@ pub fn CheckSaberDamage(
         let mut do_block_stuff = false;
 
         if (tr.fraction != 1.0 || tr.startsolid != 0)
-            && (*ctx.world).entities[tr.entityNum as usize].takedamage != 0
-            && ((*ctx.world).entities[tr.entityNum as usize].health > 0
-                || ((*ctx.world).entities[tr.entityNum as usize].s.eFlags & EF_DISINTEGRATION) == 0)
+            && (*ctx.world).g_entities[tr.entityNum as usize].takedamage != 0
+            && ((*ctx.world).g_entities[tr.entityNum as usize].health > 0
+                || ((*ctx.world).g_entities[tr.entityNum as usize].s.eFlags & EF_DISINTEGRATION) == 0)
             && tr.entityNum != (*self_).s.number
-            && (*ctx.world).entities[tr.entityNum as usize].inuse != 0
+            && (*ctx.world).g_entities[tr.entityNum as usize].inuse != 0
         {
             //hit something that had health and takes damage
-            let trEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+            let trEnt = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
             let trc = (*trEnt).client as *mut gclient_t;
 
             if idleDamage != 0
@@ -5132,13 +5132,13 @@ pub fn CheckSaberDamage(
                 }
             }
         } else if (tr.fraction != 1.0 || tr.startsolid != 0)
-            && ((*ctx.world).entities[tr.entityNum as usize].r.contents & CONTENTS_LIGHTSABER) != 0
-            && (*ctx.world).entities[tr.entityNum as usize].r.contents != -1
-            && (*ctx.world).entities[tr.entityNum as usize].inuse != 0
+            && ((*ctx.world).g_entities[tr.entityNum as usize].r.contents & CONTENTS_LIGHTSABER) != 0
+            && (*ctx.world).g_entities[tr.entityNum as usize].r.contents != -1
+            && (*ctx.world).g_entities[tr.entityNum as usize].inuse != 0
         {
             //saber clash
-            let oo_num = (*ctx.world).entities[tr.entityNum as usize].r.ownerNum;
-            otherOwner = &mut (*ctx.world).entities[oo_num as usize] as *mut gentity_t;
+            let oo_num = (*ctx.world).g_entities[tr.entityNum as usize].r.ownerNum;
+            otherOwner = &mut (*ctx.world).g_entities[oo_num as usize] as *mut gentity_t;
 
             if (*otherOwner).inuse == 0 || (*otherOwner).client.is_null() {
                 return qfalse;
@@ -5221,7 +5221,7 @@ pub fn CheckSaberDamage(
 
             if saberCheckKnockdown_Smashed(
                 ctx,
-                &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t,
+                &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t,
                 otherOwner,
                 self_,
                 dmg,
@@ -5237,7 +5237,7 @@ pub fn CheckSaberDamage(
                 && rSaberNum == 0
                 && saberCheckKnockdown_Smashed(
                     ctx,
-                    &mut (*ctx.world).entities[(*sc).ps.saberEntityNum as usize] as *mut gentity_t,
+                    &mut (*ctx.world).g_entities[(*sc).ps.saberEntityNum as usize] as *mut gentity_t,
                     self_,
                     otherOwner,
                     dmg,
@@ -5347,7 +5347,7 @@ pub fn CheckSaberDamage(
                 if (*sc).ps.saberEntityNum != 0 {
                     saberCheckKnockdown_BrokenParry(
                         ctx,
-                        &mut (*ctx.world).entities[(*sc).ps.saberEntityNum as usize]
+                        &mut (*ctx.world).g_entities[(*sc).ps.saberEntityNum as usize]
                             as *mut gentity_t,
                         self_,
                         otherOwner,
@@ -5396,7 +5396,7 @@ pub fn CheckSaberDamage(
                 if (*ooc).ps.saberEntityNum != 0 {
                     saberCheckKnockdown_BrokenParry(
                         ctx,
-                        &mut (*ctx.world).entities[(*ooc).ps.saberEntityNum as usize]
+                        &mut (*ctx.world).g_entities[(*ooc).ps.saberEntityNum as usize]
                             as *mut gentity_t,
                         otherOwner,
                         self_,
@@ -5592,7 +5592,7 @@ pub fn CheckSaberDamage(
                         if (*ooc).ps.saberEntityNum != 0 {
                             saberCheckKnockdown_BrokenParry(
                                 ctx,
-                                &mut (*ctx.world).entities[(*ooc).ps.saberEntityNum as usize]
+                                &mut (*ctx.world).g_entities[(*ooc).ps.saberEntityNum as usize]
                                     as *mut gentity_t,
                                 otherOwner,
                                 self_,
@@ -5657,7 +5657,7 @@ pub fn CheckSaberDamage(
                             if (*sc).ps.saberEntityNum != 0 {
                                 saberCheckKnockdown_BrokenParry(
                                     ctx,
-                                    &mut (*ctx.world).entities[(*sc).ps.saberEntityNum as usize]
+                                    &mut (*ctx.world).g_entities[(*sc).ps.saberEntityNum as usize]
                                         as *mut gentity_t,
                                     self_,
                                     otherOwner,
@@ -6095,7 +6095,7 @@ pub fn WP_SaberStartMissileBlockCheck(
         closestDist = radius;
 
         for e in 0..numListedEntities as usize {
-            ent = &mut (*ctx.world).entities[entityList[e] as usize] as *mut gentity_t;
+            ent = &mut (*ctx.world).g_entities[entityList[e] as usize] as *mut gentity_t;
 
             if ent == self_ {
                 continue;
@@ -6167,7 +6167,7 @@ pub fn WP_SaberStartMissileBlockCheck(
                     continue;
                 }
 
-                let pOwner = &mut (*ctx.world).entities[(*ent).r.ownerNum as usize]
+                let pOwner = &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize]
                     as *mut gentity_t;
                 let poc = (*pOwner).client as *mut gclient_t;
 
@@ -6308,7 +6308,7 @@ pub fn WP_SaberStartMissileBlockCheck(
                         && (*self_).enemy.is_none()
                         && (*ent).r.ownerNum != ENTITYNUM_NONE
                     {
-                        let owner = &mut (*ctx.world).entities[(*ent).r.ownerNum as usize]
+                        let owner = &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize]
                             as *mut gentity_t;
                         let owc = (*owner).client as *mut gclient_t;
                         if (*owner).health >= 0
@@ -6328,7 +6328,7 @@ pub fn WP_SaberStartMissileBlockCheck(
         if (*self_).s.eType == ET_NPC as c_int && (*self_).localAnimIndex <= 1 {
             //humanoid NPCs don't set angles based on server angles for looking, unlike other NPCs
             if !(*self_).client.is_null() && (*sc).renderInfo.lookTarget < ENTITYNUM_WORLD {
-                lookT = &mut (*ctx.world).entities[(*sc).renderInfo.lookTarget as usize]
+                lookT = &mut (*ctx.world).g_entities[(*sc).renderInfo.lookTarget as usize]
                     as *mut gentity_t;
             }
         }
@@ -6394,7 +6394,7 @@ pub fn WP_SaberStartMissileBlockCheck(
             } else {
                 //player
                 let owner =
-                    &mut (*ctx.world).entities[(*incoming).r.ownerNum as usize] as *mut gentity_t;
+                    &mut (*ctx.world).g_entities[(*incoming).r.ownerNum as usize] as *mut gentity_t;
 
                 WP_SaberBlockNonRandom(self_, (*incoming).r.currentOrigin, qtrue);
                 let owc = (*owner).client as *mut gclient_t;
@@ -6737,7 +6737,7 @@ pub fn saberCheckRadiusDamage(
         // saberOwner is an array slot, never null; the oracle's `!saberOwner`
         // guard is vacuous in Rust.
         let saberOwner =
-            &mut (*ctx.world).entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
+            &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
 
         if returning != 0 && returning != 2 {
             dist = MIN_SABER_SLICE_RETURN_DISTANCE;
@@ -6756,7 +6756,7 @@ pub fn saberCheckRadiusDamage(
         }
 
         while i < (*ctx.world).level.num_entities {
-            let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
             CheckThrownSaberDamaged(ctx, saberent, saberOwner, ent, dist, returning, qfalse);
             i += 1;
         }
@@ -6878,7 +6878,7 @@ pub fn MakeDeadSaber(
         (*saberent).flags = FL_BOUNCE_HALF;
 
         if (*ent).r.ownerNum >= 0 && (*ent).r.ownerNum < ENTITYNUM_WORLD {
-            let owner = &mut (*ctx.world).entities[(*ent).r.ownerNum as usize] as *mut gentity_t;
+            let owner = &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize] as *mut gentity_t;
 
             if (*owner).inuse != 0
                 && !(*owner).client.is_null()
@@ -6943,7 +6943,7 @@ pub fn DownedSaberThink(
             return;
         }
 
-        let saberOwn = &mut (*ctx.world).entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
+        let saberOwn = &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
 
         if (*saberOwn).inuse == 0
             || (*saberOwn).client.is_null()
@@ -7636,7 +7636,7 @@ pub fn saberBackToOwner(
     unsafe {
         let level_time = (*ctx.world).level.time;
         let saberOwner =
-            &mut (*ctx.world).entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
+            &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
         let mut dir: vec3_t = [0.0; 3];
         let ownerLen;
 
@@ -7805,15 +7805,15 @@ pub fn thrownSaberTouch(
         if !other.is_null()
             && (*other).r.ownerNum < MAX_CLIENTS
             && ((*other).r.contents & CONTENTS_LIGHTSABER) != 0
-            && !(*ctx.world).entities[(*other).r.ownerNum as usize].client.is_null()
-            && (*ctx.world).entities[(*other).r.ownerNum as usize].inuse != 0
+            && !(*ctx.world).g_entities[(*other).r.ownerNum as usize].client.is_null()
+            && (*ctx.world).g_entities[(*other).r.ownerNum as usize].inuse != 0
         {
-            hitEnt = &mut (*ctx.world).entities[(*other).r.ownerNum as usize] as *mut gentity_t;
+            hitEnt = &mut (*ctx.world).g_entities[(*other).r.ownerNum as usize] as *mut gentity_t;
         }
 
         // we'll skip the dist check, since we don't really care about that
         let saberOwner =
-            &mut (*ctx.world).entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
+            &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
         CheckThrownSaberDamaged(ctx, saberent, saberOwner, hitEnt, 256, 0, qtrue);
 
         (*saberent).speed = 0;
@@ -7829,7 +7829,7 @@ pub fn saberFirstThrown(
 ) {
     unsafe {
         let level_time = (*ctx.world).level.time;
-        let saberOwn = &mut (*ctx.world).entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
+        let saberOwn = &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
 
         if (*saberent).r.ownerNum == ENTITYNUM_NONE {
             MakeDeadSaber(ctx, saberent);
@@ -8497,7 +8497,7 @@ pub fn G_KickTrace(
             (*client).jediKickIndex = trace.entityNum as c_int;
             (*client).jediKickTime = (*ctx.world).level.time + (*client).ps.legsTimer;
 
-            hitEnt = &mut (*ctx.world).entities[trace.entityNum as usize] as *mut gentity_t;
+            hitEnt = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
             //FIXME: regardless of what we hit, do kick hit sound and impact effect
             //G_PlayEffect( "misc/kickHit", trace.endpos, trace.plane.normal );
             if (*client).ps.torsoAnim == BOTH_A7_HILT as c_int {
@@ -9070,7 +9070,7 @@ pub fn G_GrabSomeMofos(
         );
 
         if trace.fraction != 1.0 && trace.entityNum < ENTITYNUM_WORLD {
-            let grabbed = &mut (*ctx.world).entities[trace.entityNum as usize] as *mut gentity_t;
+            let grabbed = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
             let gcl = (*grabbed).client as *mut gclient_t;
 
             if (*grabbed).inuse != 0
@@ -9265,7 +9265,7 @@ pub fn WP_SaberPositionUpdate(
             G_GrabSomeMofos(ctx, self_);
         } else if (*client).grappleState != 0 {
             let grappler =
-                &mut (*ctx.world).entities[(*client).grappleIndex as usize] as *mut gentity_t;
+                &mut (*ctx.world).g_entities[(*client).grappleIndex as usize] as *mut gentity_t;
             let gcl = (*grappler).client as *mut gclient_t;
 
             if (*grappler).inuse == 0
@@ -9584,7 +9584,7 @@ pub fn WP_SaberPositionUpdate(
                 break 'nextStep;
             }
 
-            mySaber = &mut (*ctx.world).entities[saberNumLocal as usize] as *mut gentity_t;
+            mySaber = &mut (*ctx.world).g_entities[saberNumLocal as usize] as *mut gentity_t;
 
             if (*self_).health < 1 {
                 // we don't want to waste CPU calculating saber positions for corpses, but we
@@ -9681,7 +9681,7 @@ pub fn WP_SaberPositionUpdate(
 
             properAngles[0] = 0.0;
             if (*self_).s.number < MAX_CLIENTS && (*client).ps.m_iVehicleNum != 0 {
-                vehEnt = &mut (*ctx.world).entities[(*client).ps.m_iVehicleNum as usize]
+                vehEnt = &mut (*ctx.world).g_entities[(*client).ps.m_iVehicleNum as usize]
                     as *mut gentity_t;
                 if (*vehEnt).inuse != 0
                     && !(*vehEnt).client.is_null()
@@ -9802,7 +9802,7 @@ pub fn WP_SaberPositionUpdate(
 
             if (*client).ps.saberInFlight != 0 {
                 // do the thrown-saber stuff
-                let saberent = &mut (*ctx.world).entities[saberNum as usize] as *mut gentity_t;
+                let saberent = &mut (*ctx.world).g_entities[saberNum as usize] as *mut gentity_t;
 
                 if !saberent.is_null() {
                     if (*client).ps.saberEntityState == 0 && (*client).ps.saberEntityNum != 0 {
@@ -9928,7 +9928,7 @@ pub fn WP_SaberPositionUpdate(
             }
 
             if BG_SabersOff(&mut (*client).ps) == qfalse {
-                let saberent = &mut (*ctx.world).entities[saberNum as usize] as *mut gentity_t;
+                let saberent = &mut (*ctx.world).g_entities[saberNum as usize] as *mut gentity_t;
 
                 if (*client).ps.saberInFlight == 0 && !saberent.is_null() {
                     (*saberent).r.svFlags |= SVF_NOCLIENT;
@@ -9944,13 +9944,13 @@ pub fn WP_SaberPositionUpdate(
                     if (*client).ps.saberIdleWound < (*ctx.world).level.time {
                         let te = G_TempEntity(
                             ctx,
-                            (*ctx.world).entities[saberNum as usize].r.currentOrigin,
+                            (*ctx.world).g_entities[saberNum as usize].r.currentOrigin,
                             EV_SABER_BLOCK,
                         );
                         let mut dir: vec3_t = [0.0; 3];
                         crate::q_math::VectorSet(&mut dir, 0.0, 1.0, 0.0);
                         crate::q_math::_VectorCopy(
-                            (*ctx.world).entities[saberNum as usize].r.currentOrigin,
+                            (*ctx.world).g_entities[saberNum as usize].r.currentOrigin,
                             &mut (*te).s.origin,
                         );
                         crate::q_math::_VectorCopy(dir, &mut (*te).s.angles);
@@ -10242,17 +10242,17 @@ pub fn WP_SaberPositionUpdate(
                                     trMask = MASK_PLAYERSOLID | CONTENTS_LIGHTSABER | MASK_SHOT;
                                 } else {
                                     while sN < MAX_CLIENTS {
-                                        if (*ctx.world).entities[sN as usize].inuse != 0
-                                            && !(*ctx.world).entities[sN as usize].client.is_null()
-                                            && (*ctx.world).entities[sN as usize].r.linked != qfalse
-                                            && (*ctx.world).entities[sN as usize].health > 0
-                                            && ((*ctx.world).entities[sN as usize].r.contents
+                                        if (*ctx.world).g_entities[sN as usize].inuse != 0
+                                            && !(*ctx.world).g_entities[sN as usize].client.is_null()
+                                            && (*ctx.world).g_entities[sN as usize].r.linked != qfalse
+                                            && (*ctx.world).g_entities[sN as usize].health > 0
+                                            && ((*ctx.world).g_entities[sN as usize].r.contents
                                                 & CONTENTS_BODY)
                                                 != 0
                                         {
                                             // Take this mask off before the saber trace, because we
                                             // want to hit the saber first
-                                            (*ctx.world).entities[sN as usize].r.contents &=
+                                            (*ctx.world).g_entities[sN as usize].r.contents &=
                                                 !CONTENTS_BODY;
                                             clientUnlinked[sN as usize] = qtrue;
                                         } else {
@@ -10439,10 +10439,10 @@ pub fn WP_SaberPositionUpdate(
                                         while sN < MAX_CLIENTS {
                                             if clientUnlinked[sN as usize] != qfalse {
                                                 // Make clients clip properly again.
-                                                if (*ctx.world).entities[sN as usize].inuse != 0
-                                                    && (*ctx.world).entities[sN as usize].health > 0
+                                                if (*ctx.world).g_entities[sN as usize].inuse != 0
+                                                    && (*ctx.world).g_entities[sN as usize].health > 0
                                                 {
-                                                    (*ctx.world).entities[sN as usize].r.contents |=
+                                                    (*ctx.world).g_entities[sN as usize].r.contents |=
                                                         CONTENTS_BODY;
                                                 }
                                             }

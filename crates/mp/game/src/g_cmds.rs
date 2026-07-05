@@ -26,6 +26,35 @@ use crate::client::client_connected::CON_CONNECTED;
 use crate::prelude::*;
 use crate::trap;
 
+/// Raven `gc_orders[]` — canned "game command" voice-order strings.
+///
+/// Source: `oracle/oracle/codemp/game/g_cmds.c:1812-1820`
+static gc_orders: [&core::ffi::CStr; 7] = [
+    c"hold your position",
+    c"hold this position",
+    c"come here",
+    c"cover me",
+    c"guard location",
+    c"search and destroy",
+    c"report",
+];
+
+/// Raven `gameNames[]` — display names for each `gametype_t`.
+///
+/// Source: `oracle/oracle/codemp/game/g_cmds.c:1851-1862`
+static gameNames: [&core::ffi::CStr; 10] = [
+    c"Free For All",
+    c"Holocron FFA",
+    c"Jedi Master",
+    c"Duel",
+    c"Power Duel",
+    c"Single Player",
+    c"Team FFA",
+    c"Siege",
+    c"Capture the Flag",
+    c"Capture the Ysalamiri",
+];
+
 /// Byte-exact C-string equality (`!strcmp(a, b)`), used by the name-lookup
 /// walkers below in place of Raven's `strcmp`.
 unsafe fn cstr_eq(mut a: *const c_char, mut b: *const c_char) -> bool {
@@ -774,9 +803,9 @@ pub fn G_CheckTKAutoKickBan(
         if cvars.g_autoKickTKSpammers.integer > 0 || cvars.g_autoBanTKSpammers.integer > 0 {
             (*client).sess.TKCount += 1;
             if cvars.g_autoBanTKSpammers.integer > 0 && (*client).sess.TKCount >= cvars.g_autoBanTKSpammers.integer {
-                if !(*client).sess.IPstring.is_null() {
+                if (*client).sess.IPstring[0] != 0 {
                     // ban their IP
-                    crate::g_svcmds::AddIP(ctx, (*client).sess.IPstring);
+                    crate::g_svcmds::AddIP(ctx, (*client).sess.IPstring.as_mut_ptr());
                 }
 
                 let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"TKBAN".as_ptr() as *mut c_char);
@@ -788,7 +817,7 @@ pub fn G_CheckTKAutoKickBan(
                 let cc = format!("clientkick {}\n", (*ent).s.number);
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT, cstr(&cc)),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT as c_int, cstr(&cc)),
                 );
                 return;
             }
@@ -802,7 +831,7 @@ pub fn G_CheckTKAutoKickBan(
                 let cc = format!("clientkick {}\n", (*ent).s.number);
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT, cstr(&cc)),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT as c_int, cstr(&cc)),
                 );
                 return;
             }
@@ -871,8 +900,8 @@ pub fn Cmd_Kill_f(
         if cvars.g_autoKickKillSpammers.integer > 0 || cvars.g_autoBanKillSpammers.integer > 0 {
             (*client).sess.killCount += 1;
             if cvars.g_autoBanKillSpammers.integer > 0 && (*client).sess.killCount >= cvars.g_autoBanKillSpammers.integer {
-                if !(*client).sess.IPstring.is_null() {
-                    crate::g_svcmds::AddIP(ctx, (*client).sess.IPstring);
+                if (*client).sess.IPstring[0] != 0 {
+                    crate::g_svcmds::AddIP(ctx, (*client).sess.IPstring.as_mut_ptr());
                 }
                 let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME_ADMIN".as_ptr() as *mut c_char, c"SUICIDEBAN".as_ptr() as *mut c_char);
                 let s = format!("print \"{} {}\n\"", cstr_to_str((*client).pers.netname.as_ptr()), cstr_to_str(m));
@@ -883,7 +912,7 @@ pub fn Cmd_Kill_f(
                 let cc = format!("clientkick {}\n", (*ent).s.number);
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT, cstr(&cc)),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT as c_int, cstr(&cc)),
                 );
                 return;
             }
@@ -897,7 +926,7 @@ pub fn Cmd_Kill_f(
                 let cc = format!("clientkick {}\n", (*ent).s.number);
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT, cstr(&cc)),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_INSERT as c_int, cstr(&cc)),
                 );
                 return;
             }
@@ -922,7 +951,7 @@ pub fn Cmd_Kill_f(
         (*ent).flags &= !FL_GODMODE;
         (*client).ps.stats[STAT_HEALTH as usize] = -999;
         (*ent).health = -999;
-        crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_SUICIDE);
+        crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_SUICIDE as c_int);
     }
 }
 
@@ -1152,7 +1181,7 @@ pub fn SetTeam(
                         (*ent).flags &= !FL_GODMODE;
                         (*client).ps.stats[STAT_HEALTH as usize] = 0;
                         (*ent).health = 0;
-                        crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_TEAM_CHANGE);
+                        crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_TEAM_CHANGE as c_int);
                     }
                 }
 
@@ -1194,7 +1223,7 @@ pub fn SetTeam(
             (*client).ps.stats[STAT_HEALTH as usize] = 0;
             (*ent).health = 0;
             (*world).globals.g_dontPenalizeTeam = qtrue;
-            crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_SUICIDE);
+            crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_SUICIDE as c_int);
             (*world).globals.g_dontPenalizeTeam = qfalse;
         }
         if team == TEAM_SPECTATOR {
@@ -1224,7 +1253,7 @@ pub fn SetTeam(
         BroadcastTeamChange(ctx, client, oldTeam);
 
         if oldTeam != TEAM_SPECTATOR {
-            let tent = crate::g_utils::G_TempEntity(ctx, (*client).ps.origin, EV_PLAYER_TELEPORT_OUT);
+            let tent = crate::g_utils::G_TempEntity(ctx, (*client).ps.origin, EV_PLAYER_TELEPORT_OUT as c_int);
             (*tent).s.clientNum = clientNum;
         }
 
@@ -1441,6 +1470,7 @@ pub fn Cmd_DuelTeam_f(
             let curTeam = (*client).sess.duelTeam;
             (*client).sess.duelTeam = oldTeam;
             crate::g_combat::G_Damage(
+                ctx,
                 ent,
                 ent,
                 ent,
@@ -1448,7 +1478,7 @@ pub fn Cmd_DuelTeam_f(
                 (*client).ps.origin,
                 99999,
                 DAMAGE_NO_PROTECTION,
-                MOD_SUICIDE,
+                MOD_SUICIDE as c_int,
             );
             (*client).sess.duelTeam = curTeam;
         }
@@ -1611,7 +1641,7 @@ pub fn Cmd_SiegeClass_f(
                 (*ent).flags &= !FL_GODMODE;
                 (*client).ps.stats[STAT_HEALTH as usize] = 0;
                 (*ent).health = 0;
-                crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_SUICIDE);
+                crate::g_combat::player_die(ctx, ent, ent, ent, 100000, MOD_SUICIDE as c_int);
             }
 
             if (*client).sess.sessionTeam == TEAM_SPECTATOR || startedAsSpec != qfalse {
@@ -1647,7 +1677,7 @@ pub fn Cmd_ForceChanged_f(
         } else {
             let buf = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"FORCEPOWERCHANGED".as_ptr() as *mut c_char);
             let fpChStr = cstr_to_str(buf);
-            let s = format!("print \"{}{}\n\n\"", S_COLOR_GREEN, fpChStr);
+            let s = format!("print \"{}{}\n\n\"", S_COLOR_GREEN.to_string_lossy(), fpChStr);
             trap::SendServerCommand(
                 ctx.engine,
                 mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)),
@@ -2198,27 +2228,25 @@ pub fn Cmd_VoiceCommand_f(
 
         let s = format!("*{}", cstr_to_str(arg.as_ptr()));
 
-        // PORT-NOTE(bg_customSiegeSoundNames): fork-1 file-scope table now reached
-        // via `(*world).bg_state.bg_customSiegeSoundNames`.
         let mut i: usize = 0;
-        let names = &(*world).bg_state.bg_customSiegeSoundNames;
+        let names = &mp_bg::local::bg_customSiegeSoundNames;
         while i < MAX_CUSTOM_SIEGE_SOUNDS {
-            if names[i].is_null() {
+            if names[i].is_none() {
                 break;
             }
-            if crate::q_shared::Q_stricmp(names[i], cstr(&s).as_ptr()) == 0 {
+            if crate::q_shared::Q_stricmp(names[i].unwrap().as_ptr(), cstr(&s).as_ptr()) == 0 {
                 break;
             }
             i += 1;
         }
 
-        if i == MAX_CUSTOM_SIEGE_SOUNDS || names[i].is_null() {
+        if i == MAX_CUSTOM_SIEGE_SOUNDS || names[i].is_none() {
             return;
         }
 
-        let te = crate::g_utils::G_TempEntity(ctx, [0.0f32, 0.0, 0.0], EV_VOICECMD_SOUND);
+        let te = crate::g_utils::G_TempEntity(ctx, [0.0f32, 0.0, 0.0], EV_VOICECMD_SOUND as c_int);
         (*te).s.groundEntityNum = (*ent).s.number;
-        (*te).s.eventParm = crate::g_utils::G_SoundIndex(names[i]);
+        (*te).s.eventParm = crate::g_utils::G_SoundIndex(names[i].unwrap().as_ptr());
         (*te).r.svFlags |= SVF_BROADCAST;
     }
 }
@@ -2243,15 +2271,12 @@ pub fn Cmd_GameCommand_f(
         if player < 0 || player >= MAX_CLIENTS as c_int {
             return;
         }
-        // PORT-NOTE(gc_orders): `gc_orders` file-scope string table reached via
-        // `(*world).bg_state.gc_orders` (bg-owned-global ruling).
-        let gc_orders = &(*world).bg_state.gc_orders;
         if order < 0 || order as usize > gc_orders.len() {
             return;
         }
         let target = &mut (*world).g_entities[player as usize] as *mut gentity_t;
-        G_Say(ctx, ent, target, SAY_TELL, gc_orders[order as usize]);
-        G_Say(ctx, ent, ent, SAY_TELL, gc_orders[order as usize]);
+        G_Say(ctx, ent, target, SAY_TELL, gc_orders[order as usize].as_ptr());
+        G_Say(ctx, ent, ent, SAY_TELL, gc_orders[order as usize].as_ptr());
     }
 }
 
@@ -2453,7 +2478,7 @@ pub fn Cmd_CallVote_f(
         if (*world).level.voteExecuteTime != 0 {
             (*world).level.voteExecuteTime = 0;
             let cc = format!("{}\n", cstr_to_str((*world).level.voteString.as_ptr()));
-            trap::SendConsoleCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr(&cc)));
+            trap::SendConsoleCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND as c_int, cstr(&cc)));
         }
 
         if arg1_s.eq_ignore_ascii_case("g_gametype") {
@@ -2467,10 +2492,7 @@ pub fn Cmd_CallVote_f(
             (*world).level.votingGametypeTo = i;
 
             write_cstr_field(&mut (*world).level.voteString, &format!("{} {}", arg1_s, i));
-            // PORT-NOTE(gameNames): fork-1 file-scope table reached via
-            // `(*world).bg_state.gameNames`.
-            let gameNames = &(*world).bg_state.gameNames;
-            write_cstr_field(&mut (*world).level.voteDisplayString, &format!("{} {}", arg1_s, cstr_to_str(gameNames[i as usize])));
+            write_cstr_field(&mut (*world).level.voteDisplayString, &format!("{} {}", arg1_s, cstr_to_str(gameNames[i as usize].as_ptr())));
         } else if arg1_s.eq_ignore_ascii_case("map") {
             let mut s = [0 as c_char; MAX_STRING_CHARS];
             let gametype = trap::Cvar_VariableIntegerValue(ctx.engine, mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(cstr("g_gametype")));
@@ -2559,9 +2581,9 @@ pub fn Cmd_CallVote_f(
         (*world).level.voteNo = 0;
 
         for i in 0..(*world).level.maxclients {
-            (*(*world).level.clients.add(i as usize)).mGameFlags &= !PSG_VOTED;
+            (*(*world).level.clients.add(i as usize)).mGameFlags &= !(PSG_VOTED as u32);
         }
-        (*client).mGameFlags |= PSG_VOTED;
+        (*client).mGameFlags |= PSG_VOTED as u32;
 
         trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_VOTE_TIME, cstr(&format!("{}", (*world).level.voteTime))));
         trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_VOTE_STRING, cstr(&cstr_to_str((*world).level.voteDisplayString.as_ptr()))));
@@ -2592,7 +2614,7 @@ pub fn Cmd_Vote_f(
             trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
             return;
         }
-        if (*client).mGameFlags & PSG_VOTED != 0 {
+        if (*client).mGameFlags & (PSG_VOTED as u32) != 0 {
             let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"VOTEALREADY".as_ptr() as *mut c_char);
             let s = format!("print \"{}\n\"", cstr_to_str(m));
             trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
@@ -2611,7 +2633,7 @@ pub fn Cmd_Vote_f(
         let s = format!("print \"{}\n\"", cstr_to_str(m));
         trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
 
-        (*client).mGameFlags |= PSG_VOTED;
+        (*client).mGameFlags |= PSG_VOTED as u32;
 
         let mut msg = [0 as c_char; 64];
         trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, msg.as_mut_ptr(), 64));
@@ -2800,10 +2822,10 @@ pub fn Cmd_CallTeamVote_f(
         for i in 0..(*world).level.maxclients {
             let cl = (*world).level.clients.add(i as usize);
             if (*cl).sess.sessionTeam == team {
-                (*cl).mGameFlags &= !PSG_TEAMVOTED;
+                (*cl).mGameFlags &= !(PSG_TEAMVOTED as u32);
             }
         }
-        (*client).mGameFlags |= PSG_TEAMVOTED;
+        (*client).mGameFlags |= PSG_TEAMVOTED as u32;
 
         trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_TEAMVOTE_TIME + cs_offset, cstr(&format!("{}", (*world).level.teamVoteTime[cs_offset as usize]))));
         trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_TEAMVOTE_STRING + cs_offset, cstr(&cstr_to_str((*world).level.teamVoteString[cs_offset as usize].as_ptr()))));
@@ -2840,7 +2862,7 @@ pub fn Cmd_TeamVote_f(
             trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
             return;
         }
-        if (*client).mGameFlags & PSG_TEAMVOTED != 0 {
+        if (*client).mGameFlags & (PSG_TEAMVOTED as u32) != 0 {
             let m = crate::g_main::G_GetStringEdString(ctx, c"MP_SVGAME".as_ptr() as *mut c_char, c"TEAMVOTEALREADYCAST".as_ptr() as *mut c_char);
             let s = format!("print \"{}\n\"", cstr_to_str(m));
             trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
@@ -2857,7 +2879,7 @@ pub fn Cmd_TeamVote_f(
         let s = format!("print \"{}\n\"", cstr_to_str(m));
         trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&s)));
 
-        (*client).mGameFlags |= PSG_TEAMVOTED;
+        (*client).mGameFlags |= PSG_TEAMVOTED as u32;
 
         let mut msg = [0 as c_char; 64];
         trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, msg.as_mut_ptr(), 64));
@@ -2949,8 +2971,8 @@ pub fn G_ItemUsable(
 
         if forcedUse == 0 {
             // PORT-NOTE(bg_itemlist): fork-1 file-scope table now reached via
-            // `(*world).bg_state.bg_itemlist`.
-            forcedUse = (*world).bg_state.bg_itemlist[(*ps).stats[STAT_HOLDABLE_ITEM as usize] as usize].giTag;
+            // `bg_itemlist`.
+            forcedUse = bg_itemlist[(*ps).stats[STAT_HOLDABLE_ITEM as usize] as usize].giTag;
         }
 
         if crate::bg_misc::BG_IsItemSelectable(ps, forcedUse) == qfalse {
@@ -2969,14 +2991,14 @@ pub fn G_ItemUsable(
             }
             HI_SEEKER => {
                 if (*ps).eFlags & EF_SEEKERDRONE != 0 {
-                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SEEKER_ALREADYDEPLOYED);
+                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, SEEKER_ALREADYDEPLOYED);
                     return 0;
                 }
                 1
             }
             HI_SENTRY_GUN => {
                 if (*ps).fd.sentryDeployed != 0 {
-                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SENTRY_ALREADYPLACED);
+                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, SENTRY_ALREADYPLACED);
                     return 0;
                 }
 
@@ -3016,8 +3038,8 @@ pub fn G_ItemUsable(
                     ),
                 );
 
-                if (tr.fraction != 1.0 && tr.entityNum != (*ps).clientNum) || tr.startsolid != qfalse || tr.allsolid != qfalse {
-                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SENTRY_NOROOM);
+                if (tr.fraction != 1.0 && tr.entityNum != (*ps).clientNum as c_short) || tr.startsolid != qfalse as u8 || tr.allsolid != qfalse as u8 {
+                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, SENTRY_NOROOM);
                     return 0;
                 }
 
@@ -3046,7 +3068,7 @@ pub fn G_ItemUsable(
                         mp_qshared::shared::surface_flags::MASK_SHOT,
                     ),
                 );
-                if tr.fraction > 0.9 && tr.startsolid == qfalse && tr.allsolid == qfalse {
+                if tr.fraction > 0.9 && tr.startsolid == qfalse as u8 && tr.allsolid == qfalse as u8 {
                     let pos = tr.endpos;
                     let dest2: vec3_t = [pos[0], pos[1], pos[2] - 4096.0];
                     let mut tr2: trace_t = core::mem::zeroed();
@@ -3062,11 +3084,11 @@ pub fn G_ItemUsable(
                             MASK_SOLID,
                         ),
                     );
-                    if tr2.startsolid == qfalse && tr2.allsolid == qfalse {
+                    if tr2.startsolid == qfalse as u8 && tr2.allsolid == qfalse as u8 {
                         return 1;
                     }
                 }
-                crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SHIELD_NOROOM);
+                crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, SHIELD_NOROOM);
                 0
             }
             HI_JETPACK | HI_HEALTHDISP | HI_AMMODISP | HI_EWEB | HI_CLOAK => 1,
@@ -3172,7 +3194,7 @@ pub fn Cmd_SaberAttackCycle_f(
                 if (*client).ps.saberHolstered == 1 {
                     crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOn);
                     (*client).ps.saberHolstered = 0;
-                    (*client).ps.fd.saberAnimLevel = SS_DUAL;
+                    (*client).ps.fd.saberAnimLevel = SS_DUAL as c_int;
                 } else if (*client).ps.saberHolstered == 0 {
                     if (*client).saber[1].saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE != 0 {
                         // can't turn it off manually
@@ -3181,7 +3203,7 @@ pub fn Cmd_SaberAttackCycle_f(
                     } else {
                         crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOff);
                         (*client).ps.saberHolstered = 1;
-                        (*client).ps.fd.saberAnimLevel = SS_FAST;
+                        (*client).ps.fd.saberAnimLevel = SS_FAST as c_int;
                     }
                 }
 
@@ -3247,8 +3269,8 @@ pub fn Cmd_SaberAttackCycle_f(
             usingSiegeStyle = qtrue;
 
             while i != selectLevel {
-                if i >= SS_NUM_SABER_STYLES {
-                    i = SS_FAST;
+                if i >= SS_NUM_SABER_STYLES as c_int {
+                    i = SS_FAST as c_int;
                 }
 
                 if (*world).bg_state.bgSiegeClasses[(*client).siegeClass as usize].saberStance & (1 << i) != 0 {
@@ -3394,7 +3416,7 @@ pub fn Cmd_EngageDuel_f(
             ),
         );
 
-        if tr.fraction != 1.0 && tr.entityNum < MAX_CLIENTS as c_int {
+        if tr.fraction != 1.0 && tr.entityNum < MAX_CLIENTS as c_short {
             let challenged = &mut (*world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
             if challenged.is_null()
@@ -3433,8 +3455,8 @@ pub fn Cmd_EngageDuel_f(
                 (*client).ps.duelTime = (*world).level.time + 2000;
                 (*challengedClient).ps.duelTime = (*world).level.time + 2000;
 
-                crate::g_utils::G_AddEvent(ent, EV_PRIVATE_DUEL, 1);
-                crate::g_utils::G_AddEvent(challenged, EV_PRIVATE_DUEL, 1);
+                crate::g_utils::G_AddEvent(ent, EV_PRIVATE_DUEL as c_int, 1);
+                crate::g_utils::G_AddEvent(challenged, EV_PRIVATE_DUEL as c_int, 1);
 
                 if (*client).ps.saberHolstered == 0 {
                     if (*client).saber[0].soundOff != 0 {
@@ -3506,16 +3528,16 @@ pub fn Cmd_DebugSetSaberMove_f(
 
         let client = (*self_).client as *mut gclient_t;
         (*client).ps.saberMove = cstr_to_str(arg.as_ptr()).trim().parse().unwrap_or(0);
-        (*client).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
+        (*client).ps.saberBlocked = BLOCKED_BOUNCE_MOVE as c_int;
 
         if (*client).ps.saberMove >= LS_MOVE_MAX {
             (*client).ps.saberMove = LS_MOVE_MAX - 1;
         }
 
         // PORT-NOTE(animTable/saberMoveData): fork-1 file-scope tables now reached
-        // via `(*world).bg_state.animTable`/`(*world).bg_state.saberMoveData`.
+        // via `animTable`/`(*world).bg_state.saberMoveData`.
         let animIdx = (*world).bg_state.saberMoveData[(*client).ps.saberMove as usize].animToUse;
-        let name = cstr_to_str((*world).bg_state.animTable[animIdx as usize].name.as_ptr());
+        let name = cstr_to_str(animTable[animIdx as usize].name.as_ptr());
         crate::g_main::Com_Printf(cstr(&format!("Anim for move: {}\n", name)).as_ptr());
     }
 }
@@ -3550,9 +3572,9 @@ pub fn Cmd_DebugSetBodyAnim_f(
         }
 
         // PORT-NOTE(animTable): fork-1 file-scope table now reached via
-        // `(*world).bg_state.animTable`.
+        // `animTable`.
         while (i as usize) < MAX_ANIMATIONS as usize {
-            if crate::q_shared::Q_stricmp(arg.as_ptr(), (*world).bg_state.animTable[i as usize].name.as_ptr()) == 0 {
+            if crate::q_shared::Q_stricmp(arg.as_ptr(), animTable[i as usize].name.as_ptr()) == 0 {
                 break;
             }
             i += 1;
@@ -3842,7 +3864,7 @@ pub fn ClientCommand(
                         (*kEnt).flags &= !FL_GODMODE;
                         (*kClient).ps.stats[STAT_HEALTH as usize] = -999;
                         (*kEnt).health = -999;
-                        crate::g_combat::player_die(ctx, kEnt, kEnt, kEnt, 100000, MOD_SUICIDE);
+                        crate::g_combat::player_die(ctx, kEnt, kEnt, kEnt, 100000, MOD_SUICIDE as c_int);
                     }
                 }
             }

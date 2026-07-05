@@ -114,7 +114,7 @@ pub fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 
         // PORT-NOTE(pm-global): electrifyTime check requires access to global pm;
         // accessing through bg_pmove module. Ruling 14 overlay cast (bgEntity_t->gentity_t).
-        if !parent_ps.is_null() && parent_ps.electrifyTime > 0 {
+        if parent_ps.electrifyTime > 0 {
             // Electrify check: reduce speed by half
             // Note: oracle accesses pm->cmd.serverTime; we check electrifyTime > 0 as proxy
             let mut reduced_max = speed_max * 0.5;
@@ -278,14 +278,16 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
         let mut i_flags = SETANIM_FLAG_NORMAL;
         let mut i_blend = 300;
 
-        let parent = pVeh.m_pParentEntity;
-        if parent.is_null() {
+        let parent_bg = pVeh.m_pParentEntity;
+        if parent_bg.is_null() {
             return;
         }
-        let parent = &mut *parent;
+        // Ruling 14 overlay cast: `bgEntity_t` is only the shared head of
+        // `gentity_t`; `health`/`client` live past that head on the real object.
+        let parent = parent_bg as *mut gentity_t;
 
         // We're dead (boarding is reused here so I don't have to make another variable)
-        if parent.health <= 0 {
+        if (*parent).health <= 0 {
             return;
         }
 
@@ -293,16 +295,18 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
         let speed_max = pVeh.m_pVehicleInfo.as_ref()
             .map(|v| v.speedMax)
             .unwrap_or(100.0);
-        let f_speed_perc_to_max = parent.client.as_ref()
-            .map(|c| c.ps.speed / speed_max)
-            .unwrap_or(0.0);
+        let f_speed_perc_to_max = if !(*parent).client.is_null() {
+            (*((*parent).client as *mut gclient_t)).ps.speed / speed_max
+        } else {
+            0.0
+        };
 
         // If we're moving...
         if f_speed_perc_to_max > 0.0 {
             i_blend = 300;
             i_flags = SETANIM_FLAG_OVERRIDE;
 
-            let f_yaw_delta = pVeh.m_vPrevOrientation[YAW as usize] - pVeh.m_vOrientation[YAW as usize];
+            let f_yaw_delta = pVeh.m_vPrevOrientation[YAW as usize] - *pVeh.m_vOrientation.add(YAW as usize);
 
             // If we're walking (or our speed is less than 27.5%)...
             if (pVeh.m_ucmd.buttons & BUTTON_WALKING as c_int) != 0 || f_speed_perc_to_max < 0.275 {
@@ -323,9 +327,8 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
                 i_blend = 600;
 
                 // Check if vehicle is inhabited
-                if parent.client.as_ref()
-                    .map(|c| c.ps.m_iVehicleNum != 0)
-                    .unwrap_or(false)
+                if !(*parent).client.is_null()
+                    && (*((*parent).client as *mut gclient_t)).ps.m_iVehicleNum != 0
                 {
                     anim = BOTH_STAND1;
                 } else {

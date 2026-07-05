@@ -48,13 +48,13 @@ pub fn Wampa_SetBolts(
     unsafe {
         if !self_.is_null() && !(*self_).client.is_null() {
             let ri = &mut (*((*self_).client as *mut gclient_t)).renderInfo;
-            ri.headBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*head_eyes".as_ptr());
-            ri.torsoBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"lower_spine".as_ptr());
-            ri.crotchBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"rear_bone".as_ptr());
-            ri.handLBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*l_hand".as_ptr());
-            ri.handRBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*r_hand".as_ptr());
-            ri.footLBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*l_leg_foot".as_ptr());
-            ri.footRBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*r_leg_foot".as_ptr());
+            ri.headBolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, c"*head_eyes".to_owned()));
+            ri.torsoBolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, c"lower_spine".to_owned()));
+            ri.crotchBolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, c"rear_bone".to_owned()));
+            ri.handLBolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, c"*l_hand".to_owned()));
+            ri.handRBolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, c"*r_hand".to_owned()));
+            ri.footLBolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, c"*l_leg_foot".to_owned()));
+            ri.footRBolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, c"*r_leg_foot".to_owned()));
         }
     }
 }
@@ -205,7 +205,7 @@ pub fn Wampa_Slash(
         let numEnts = crate::NPC_utils::NPC_GetEntsNearBolt(ctx, radiusEntNums.as_mut_ptr(), radius, boltIndex, boltOrg);
 
         for i in 0..(numEnts as usize) {
-            let radiusEnt = (*ctx.world).entities.get_unchecked_mut(radiusEntNums[i] as usize) as *mut gentity_t;
+            let radiusEnt = (*ctx.world).g_entities.get_unchecked_mut(radiusEntNums[i] as usize) as *mut gentity_t;
             if !(*radiusEnt).inuse {
                 continue;
             }
@@ -223,12 +223,12 @@ pub fn Wampa_Slash(
 
             if DistanceSquared((*radiusEnt).r.currentOrigin, boltOrg) <= radiusSquared {
                 // smack
-                crate::g_combat::G_Damage(radiusEnt, npc, npc, Some(&mut crate::prelude::vec3_origin), radiusEnt.r.currentOrigin, if backhand != 0 { (*ctx.world).bg_state.rng.Q_irand(10, 15) } else { (*ctx.world).bg_state.rng.Q_irand(20, 30) }, if backhand != 0 { crate::prelude::DAMAGE_NO_ARMOR } else { crate::prelude::DAMAGE_NO_ARMOR | crate::prelude::DAMAGE_NO_KNOCKBACK }, crate::prelude::MOD_MELEE);
+                crate::g_combat::G_Damage(ctx, radiusEnt, npc, npc, Some(&mut crate::prelude::vec3_origin), radiusEnt.r.currentOrigin, if backhand != 0 { (*ctx.world).bg_state.rng.Q_irand(10, 15) } else { (*ctx.world).bg_state.rng.Q_irand(20, 30) }, if backhand != 0 { crate::prelude::DAMAGE_NO_ARMOR } else { crate::prelude::DAMAGE_NO_ARMOR | crate::prelude::DAMAGE_NO_KNOCKBACK }, crate::prelude::MOD_MELEE);
                 if backhand != 0 {
                     // actually push the enemy
                     let mut pushDir: [f32; 3] = [0.0; 3];
                     let mut angs: [f32; 3] = [0.0; 3];
-                    crate::q_math::VectorCopy((*((*npc).client as *mut gclient_t)).ps.viewangles, &mut angs);
+                    crate::q_math::_VectorCopy((*((*npc).client as *mut gclient_t)).ps.viewangles, &mut angs);
                     angs[crate::prelude::YAW as usize] += (*ctx.world).bg_state.rng.flrand(25.0, 50.0);
                     angs[crate::prelude::PITCH as usize] = (*ctx.world).bg_state.rng.flrand(-25.0, -15.0);
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
@@ -236,7 +236,7 @@ pub fn Wampa_Slash(
                         && (*(radiusEnt.client as *mut gclient_t)).NPC_class != crate::prelude::CLASS_RANCOR
                         && (*(radiusEnt.client as *mut gclient_t)).NPC_class != crate::prelude::CLASS_ATST
                     {
-                        crate::g_combat::G_Throw(ctx, radiusEnt, pushDir, 65.0);
+                        crate::g_utils::G_Throw(ctx, radiusEnt, pushDir, 65.0);
                         if crate::bg_pmove::BG_KnockDownable(&mut (*(radiusEnt.client as *mut gclient_t)).ps) != 0
                             && radiusEnt.health > 0
                             && (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0
@@ -264,7 +264,7 @@ pub fn Wampa_Slash(
                     // one out of every 4 normal hits does a knockdown, too
                     let mut pushDir: [f32; 3] = [0.0; 3];
                     let mut angs: [f32; 3] = [0.0; 3];
-                    crate::q_math::VectorCopy((*((*npc).client as *mut gclient_t)).ps.viewangles, &mut angs);
+                    crate::q_math::_VectorCopy((*((*npc).client as *mut gclient_t)).ps.viewangles, &mut angs);
                     angs[crate::prelude::YAW as usize] += (*ctx.world).bg_state.rng.flrand(25.0, 50.0);
                     angs[crate::prelude::PITCH as usize] = (*ctx.world).bg_state.rng.flrand(-25.0, -15.0);
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
@@ -365,7 +365,7 @@ pub fn Wampa_Combat(ctx: GameContext<'_>) {
         let npc_info = (*ctx.world).globals.NPCInfo;
         // Raven dereferences `NPC->enemy` unguarded here; this function is only
         // called while actively engaged, so the enemy is assumed live.
-        let enemy_ent = &mut (*ctx.world).entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
+        let enemy_ent = &mut (*ctx.world).g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
 
         // If we cannot see our target or we have somewhere to go, then do that
         if !crate::NPC_utils::NPC_ClearLOS(ctx, (*npc).r.currentOrigin, (*enemy_ent).r.currentOrigin) != 0 {
@@ -459,7 +459,7 @@ pub fn NPC_Wampa_Pain(
             // Resolved once; only dereferenced downstream after the `is_none()`
             // short-circuit guards it (mirrors Raven's unguarded `self->enemy->x`).
             let enemy_ptr = match (*self_).enemy {
-                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                 None => core::ptr::null_mut(),
             };
             if ((*attacker).s.number == 0 && !(*ctx.world).bg_state.rng.Q_irand(0, 3) != 0)
@@ -492,7 +492,7 @@ pub fn NPC_Wampa_Pain(
                     if (*self_).health > 100 || hitByWampa != 0 {
                         crate::g_timer::TIMER_Remove(ctx, self_, c"attacking".as_ptr());
 
-                        crate::q_math::VectorCopy((*(*self_).NPC).lastPathAngles, &mut (*self_).s.angles);
+                        crate::q_math::_VectorCopy((*((*self_).NPC as *mut gNPC_t)).lastPathAngles, &mut (*self_).s.angles);
 
                         if !(*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                             crate::npc_c::NPC_SetAnim(self_, SETANIM_BOTH, crate::prelude::BOTH_PAIN2, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
@@ -544,7 +544,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
         if !(*npc).enemy.is_none() {
             // Guaranteed `Some` inside this block by the guard above (mirrors
             // Raven's unguarded `NPC->enemy->x` once `NPC->enemy` is known set).
-            let enemy_ptr = &mut (*ctx.world).entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
+            let enemy_ptr = &mut (*ctx.world).g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
             if !crate::g_timer::TIMER_Done(ctx, npc, c"attacking".as_ptr()) != 0 {
                 // in middle of attack
                 // face enemy

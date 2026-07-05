@@ -422,7 +422,7 @@ pub fn G_MissileImpact(
                     (*ent).freeAfterEvent = qtrue;
                     (*ent).s.eType = ET_GENERAL;
                 }
-                crate::q_math::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
+                tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
                 G_SetOrigin(ent, tr.endpos);
                 (*ent).takedamage = qfalse;
                 if (*ent).splashDamage != 0 {
@@ -454,7 +454,7 @@ pub fn G_MissileImpact(
                     (*ent).freeAfterEvent = qtrue;
                     (*ent).s.eType = ET_GENERAL;
                 }
-                crate::q_math::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
+                tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
                 G_SetOrigin(ent, tr.endpos);
                 (*ent).takedamage = qfalse;
                 if (*ent).splashDamage != 0 {
@@ -670,7 +670,7 @@ pub fn G_MissileImpact(
             (*ent).s.eType = ET_GENERAL;
         }
 
-        crate::q_math::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
+        tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
         G_SetOrigin(ent, tr.endpos);
 
         (*ent).takedamage = qfalse;
@@ -725,7 +725,7 @@ pub fn G_RunMissile(
         if (*ctx.world).cvars.d_projectileGhoul2Collision.integer != 0 {
             trap::G2Trace(
                 ctx.engine,
-                crate::trap::GG2trace::new(
+                mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs::new(
                     &mut tr,
                     &(*ent).r.currentOrigin,
                     &(*ent).r.mins,

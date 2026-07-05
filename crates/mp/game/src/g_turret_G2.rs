@@ -509,8 +509,8 @@ pub fn turretG2_fire(
             (*bolt).dflags = DAMAGE_NO_KNOCKBACK | DAMAGE_HEAVY_WEAP_CLASS;
             (*bolt).splashDamage = (*ent).splashDamage;
             (*bolt).splashRadius = (*ent).splashDamage;
-            (*bolt).methodOfDeath = MOD_TARGET_LASER;
-            (*bolt).splashMethodOfDeath = MOD_TARGET_LASER;
+            (*bolt).methodOfDeath = MOD_TARGET_LASER as c_int;
+            (*bolt).splashMethodOfDeath = MOD_TARGET_LASER as c_int;
             (*bolt).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
 
             // Set bounding box
@@ -650,7 +650,7 @@ pub fn turretG2_aim(
         let maxPitchSpeed = if (*self_).spawnflags & SPF_TURRETG2_TURBO != 0 { 15.0 } else { 3.0 };
 
         // move our gun base yaw to where we should be at this time....
-        BG_EvaluateTrajectory(&(*self_).s.apos as *const trajectory_t, (*ctx.world).level.time, (*self_).r.currentAngles);
+        BG_EvaluateTrajectory(&(*self_).s.apos as *const trajectory_t, (*ctx.world).level.time, &mut (*self_).r.currentAngles);
         (*self_).r.currentAngles[YAW as usize] = AngleNormalize360((*self_).r.currentAngles[YAW as usize]);
         (*self_).speed = AngleNormalize360((*self_).speed);
 
@@ -1159,7 +1159,7 @@ pub fn finish_spawning_turretG2(
 
         G_SetOrigin(base, (*base).s.origin);
 
-        (*base).s.eType = ET_GENERAL;
+        (*base).s.eType = ET_GENERAL as c_int;
 
         // Handle team damage immunity
         if !(*base).team.is_null() && *(*base).team != 0 && (*base).teamnodmg == 0 {

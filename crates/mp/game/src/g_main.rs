@@ -27,7 +27,9 @@ use std::ffi::CString;
 
 use crate::client::client_connected::{CON_CONNECTED, CON_CONNECTING};
 use crate::client::spectator_state::spectatorState_t::{SPECTATOR_FOLLOW, SPECTATOR_SCOREBOARD};
+use crate::bg_lib::qsort;
 use crate::g_cmds::{DeathmatchScoreboardMessage, SetTeam, StopFollowing};
+use mp_bg::public::configstring::RANK_TIED_FLAG;
 use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_FREE, DUELTEAM_LONE};
 use mp_bg::public::gametype::{GT_DUEL, GT_POWERDUEL};
 use mp_qshared::shared::MAX_CLIENTS;
@@ -784,7 +786,7 @@ pub fn G_ResetDuelists(ctx: GameContext<'_>) {
             let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
 
             (*ctx.world).globals.g_noPDuelCheck = QTRUE;
-            crate::g_combat::player_die(ctx, ent, ent, ent, 999, MOD_SUICIDE);
+            crate::g_combat::player_die(ctx, ent, ent, ent, 999, MOD_SUICIDE as c_int);
             (*ctx.world).globals.g_noPDuelCheck = QFALSE;
             trap::UnlinkEntity(
                 ctx.engine,
@@ -1268,7 +1270,7 @@ pub fn ExitLevel(ctx: GameContext<'_>) {
                     // Source: oracle/oracle/codemp/game/g_main.c:2151 (bg_public.h cbufExec_t)
                     trap::SendConsoleCommand(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr("map_restart 0\n")),
+                        mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("map_restart 0\n")),
                     );
                     world.level.restarted = QTRUE;
                     world.level.changemap = std::ptr::null_mut();
@@ -1287,12 +1289,12 @@ pub fn ExitLevel(ctx: GameContext<'_>) {
             // restart same map...
             trap::SendConsoleCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr("map_restart 0\n")),
+                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("map_restart 0\n")),
             );
         } else {
             trap::SendConsoleCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr("vstr nextmap\n")),
+                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("vstr nextmap\n")),
             );
         }
         world.level.changemap = std::ptr::null_mut();
@@ -2300,7 +2302,7 @@ pub fn CheckTournament(ctx: GameContext<'_>) {
                 );
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr("map_restart 0\n")),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("map_restart 0\n")),
                 );
                 world.level.restarted = QTRUE;
                 return;
@@ -2335,7 +2337,7 @@ pub fn G_KickAllBots(ctx: GameContext<'_>) {
             trap::SendConsoleCommand(
                 ctx.engine,
                 mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
-                    EXEC_INSERT,
+                    (EXEC_INSERT as c_int),
                     cstr(&format!("kick \"{}\"\n", cleaned)),
                 ),
             );
@@ -2358,7 +2360,7 @@ pub fn CheckVote(ctx: GameContext<'_>) {
             let vote_string = cstr_to_str(world.level.voteString.as_ptr());
             trap::SendConsoleCommand(
                 ctx.engine,
-                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr(&format!("{}\n", vote_string))),
+                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr(&format!("{}\n", vote_string))),
             );
 
             if world.level.votingGametype != QFALSE {
@@ -2379,7 +2381,7 @@ pub fn CheckVote(ctx: GameContext<'_>) {
                     if !next_map.is_empty() {
                         trap::SendConsoleCommand(
                             ctx.engine,
-                            mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr(&format!("map {}\n", next_map))),
+                            mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr(&format!("map {}\n", next_map))),
                         );
                     }
                 } else {
@@ -2410,14 +2412,14 @@ pub fn CheckVote(ctx: GameContext<'_>) {
                             // if voting to duel, and fraglimit is more than 3 (or unlimited), then set it down to 3
                             trap::SendConsoleCommand(
                                 ctx.engine,
-                                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr("fraglimit 3\n")),
+                                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("fraglimit 3\n")),
                             );
                         }
                         if current_tl != 0 {
                             // if voting to duel, and timelimit is set, make it unlimited
                             trap::SendConsoleCommand(
                                 ctx.engine,
-                                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr("timelimit 0\n")),
+                                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("timelimit 0\n")),
                             );
                         }
                     } else if (world.level.votingGametypeTo != GT_DUEL && world.level.votingGametypeTo != GT_POWERDUEL)
@@ -2427,7 +2429,7 @@ pub fn CheckVote(ctx: GameContext<'_>) {
                             // if voting from duel, an fraglimit is less than 20, then set it up to 20
                             trap::SendConsoleCommand(
                                 ctx.engine,
-                                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr("fraglimit 20\n")),
+                                mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr("fraglimit 20\n")),
                             );
                         }
                     }
@@ -2641,7 +2643,7 @@ pub fn CheckTeamVote(
             } else {
                 trap::SendConsoleCommand(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(EXEC_APPEND, cstr(&format!("{}\n", vote_string))),
+                    mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new((EXEC_APPEND as c_int), cstr(&format!("{}\n", vote_string))),
                 );
             }
         } else if world.level.teamVoteNo[cs_offset] >= world.level.numteamVotingClients[cs_offset] / 2 {
@@ -3101,7 +3103,7 @@ pub fn G_RunFrame(
                             if (*ent).health > 0 && (*ent).takedamage != QFALSE {
                                 // if they're still alive..
                                 let dmg = world.bg_state.rng.Q_irand(50, 70);
-                                G_Damage(ent, spacetrigger, spacetrigger, None, (*client).ps.origin, dmg, DAMAGE_NO_ARMOR, MOD_SUICIDE);
+                                G_Damage(ctx, ent, spacetrigger, spacetrigger, None, (*client).ps.origin, dmg, DAMAGE_NO_ARMOR, MOD_SUICIDE as c_int);
 
                                 if (*ent).health > 0 {
                                     // play the choking sound
@@ -3203,7 +3205,7 @@ pub fn G_RunFrame(
 
                 if world.cvars.g_gametype.integer == GT_SIEGE
                     && (*client).siegeClass != -1
-                    && world.bg_state.bgSiegeClasses[(*client).siegeClass as usize].classflags & (1 << CFL_STATVIEWER) != 0
+                    && world.bg_state.bgSiegeClasses[(*client).siegeClass as usize].classflags & (1 << (CFL_STATVIEWER as c_int)) != 0
                 {
                     // see if it's time to send this guy an update of extended info
                     if (*client).siegeEDataSend < world.level.time {

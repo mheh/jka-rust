@@ -13,7 +13,7 @@
 //! GameWorld`, `.engine`) as an ADDED first parameter (not present on the
 //! staged raw-pointer skeleton). Globals are `GameWorld` fields (fork 1):
 //! `level` -> `(*ctx.world).level`, cvars -> `(*ctx.world).cvars`,
-//! `g_entities[i]` -> `(*ctx.world).entities[i]`. Traps go through
+//! `g_entities[i]` -> `(*ctx.world).g_entities[i]`. Traps go through
 //! `trap::X(ctx.engine, <Name>Args::new(...))`. Cross-file callees are invoked
 //! with the packet's resolved raw-pointer signatures verbatim.
 //!
@@ -68,9 +68,9 @@ use mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs;
 use mp_abi::game::syscalls::G_ICARUS_VALIDENT::GIcarusValidentArgs;
 
 // Missing trap Args types - will be resolved by integration
-use mp_abi::game::syscalls::G_CVAR_SET::GCvar_SetArgs;
-use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddBoltArgs;
-use mp_abi::game::syscalls::G_G2_INITGHOUL2::GG2InitGhoul2ModelArgs;
+use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
+use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
+use mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs;
 use mp_abi::game::syscalls::G_G2_SETBOLTINFO::GG2SetBoltInfoArgs;
 use mp_abi::game::syscalls::G_G2_SETSKIN::GG2SetSkinArgs;
 use mp_abi::game::syscalls::G_R_REGISTERSKIN::GR_RegisterSkinArgs;
@@ -1170,7 +1170,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                     FIELDS.as_ptr() as *mut BG_field_t,
                     (*ctx.world).level.spawnVars[i as usize][0],
                     (*ctx.world).level.spawnVars[i as usize][1],
-                    (*ctx.world).entities.as_mut_ptr() as *mut byte,
+                    (*ctx.world).g_entities.as_mut_ptr() as *mut byte,
                 );
             }
         }
@@ -1192,7 +1192,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
 
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
-                GG2InitGhoul2ModelArgs::new(
+                GG2Initghoul2ModelArgs::new(
                     &mut (*ctx.world).globals.precachedKyle as *mut *mut c_void,
                     c"models/players/kyle/model.glm".as_ptr(),
                     0,
@@ -1218,7 +1218,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         if (*ctx.world).globals.g2SaberInstance.is_null() {
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
-                GG2InitGhoul2ModelArgs::new(
+                GG2Initghoul2ModelArgs::new(
                     &mut (*ctx.world).globals.g2SaberInstance as *mut *mut c_void,
                     c"models/weapons2/saber/saber_w.glm".as_ptr(),
                     0,
@@ -1238,7 +1238,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 // now set up the gun bolt on it
                 trap::G2API_AddBolt(
                     ctx.engine,
-                    GG2AddBoltArgs::new(
+                    GG2AddboltArgs::new(
                         (*ctx.world).globals.g2SaberInstance,
                         0,
                         c"*blade1".as_ptr(),
@@ -1277,12 +1277,12 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         ); // message of the day
 
         G_SpawnString(ctx, c"gravity".as_ptr(), c"800".as_ptr(), &mut text);
-        trap::Cvar_Set(ctx.engine, GCvar_SetArgs::new(c"g_gravity".as_ptr(), text));
+        trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(c"g_gravity".as_ptr(), text));
 
         G_SpawnString(ctx, c"enableBreath".as_ptr(), c"0".as_ptr(), &mut text);
         trap::Cvar_Set(
             ctx.engine,
-            GCvar_SetArgs::new(c"g_enableBreath".as_ptr(), text),
+            GCvarSetArgs::new(c"g_enableBreath".as_ptr(), text),
         );
 
         G_SpawnString(ctx, c"soundSet".as_ptr(), c"default".as_ptr(), &mut text);
@@ -1291,8 +1291,8 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             GSetConfigstringArgs::new(CS_GLOBAL_AMBIENT_SET, text),
         );
 
-        (*ctx.world).entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;
-        (*ctx.world).entities[ENTITYNUM_WORLD as usize].classname =
+        (*ctx.world).g_entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;
+        (*ctx.world).g_entities[ENTITYNUM_WORLD as usize].classname =
             c"worldspawn".as_ptr() as *mut c_char;
 
         // see if we want a warmup time
@@ -1303,7 +1303,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         if (*ctx.world).cvars.g_restarted.integer != 0 {
             trap::Cvar_Set(
                 ctx.engine,
-                GCvar_SetArgs::new(c"g_restarted".as_ptr(), c"0".as_ptr()),
+                GCvarSetArgs::new(c"g_restarted".as_ptr(), c"0".as_ptr()),
             );
             (*ctx.world).level.warmupTime = 0;
         }
@@ -1408,7 +1408,7 @@ pub fn G_PrecacheSoundsets(ctx: GameContext<'_>) {
         let mut counted_sets: c_int = 0;
 
         for i in 0..(mp_qshared::shared::MAX_GENTITIES as usize) {
-            let ent = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
 
             if (*ent).inuse != QFALSE && !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
                 if counted_sets >= MAX_AMBIENT_SETS {
@@ -1454,16 +1454,16 @@ pub fn G_SpawnEntitiesFromString(ctx: GameContext<'_>, inSubBSP: qboolean) {
             G_SpawnGEntityFromSpawnVars(ctx, inSubBSP);
         }
 
-        if !(*ctx.world).entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize]
+        if !(*ctx.world).g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize]
             .is_null()
-            && *(*ctx.world).entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize]
+            && *(*ctx.world).g_entities[ENTITYNUM_WORLD as usize].behaviorSet[BSET_SPAWN as usize]
                 != 0
         {
             // World has a spawn script, but we don't want the world in ICARUS and running scripts,
             // so make a scriptrunner and start it going.
             let script_runner = G_Spawn(ctx);
             if !script_runner.is_null() {
-                (*script_runner).behaviorSet[1] = (*ctx.world).entities[ENTITYNUM_WORLD as usize]
+                (*script_runner).behaviorSet[1] = (*ctx.world).g_entities[ENTITYNUM_WORLD as usize]
                     .behaviorSet[BSET_SPAWN as usize];
                 (*script_runner).count = 1;
                 (*script_runner).think = Some(EntThink::scriptrunner_run);

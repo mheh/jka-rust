@@ -11,6 +11,32 @@
 
 use crate::prelude::*;
 use crate::botai::nodeobject_s::nodeobject_t;
+use crate::g_svcmds::ipFilter_t;
+
+/// `ipFilter_t ipFilters[MAX_IPFILTERS]` (`g_svcmds.c:54`). Newtype because a
+/// 1024-element array has no library `Default` impl (only arrays up to 32
+/// elements do in stable Rust).
+#[derive(Clone, Copy)]
+pub struct IpFilters(pub [ipFilter_t; MAX_IPFILTERS]);
+
+impl Default for IpFilters {
+    fn default() -> Self {
+        IpFilters([ipFilter_t { mask: 0, compare: 0 }; MAX_IPFILTERS])
+    }
+}
+
+impl core::ops::Index<usize> for IpFilters {
+    type Output = ipFilter_t;
+    fn index(&self, i: usize) -> &ipFilter_t {
+        &self.0[i]
+    }
+}
+
+impl core::ops::IndexMut<usize> for IpFilters {
+    fn index_mut(&mut self, i: usize) -> &mut ipFilter_t {
+        &mut self.0[i]
+    }
+}
 
 // Raven `#define MAX_ITEMS 256`.
 // Source: `oracle/oracle/codemp/game/bg_public.h:31`
@@ -867,9 +893,9 @@ pub struct GameGlobals {
     /// Source: `oracle/oracle/codemp/game/g_spawn.c:1226`
     pub precachedKyle: *mut c_void,
     // --- `g_svcmds.c` file-scope globals ---
-    //TODO: Port ipFilter_t[MAX_IPFILTERS]
-    // Source: oracle/oracle/codemp/game/g_svcmds.c:54
-    pub ipFilters: (),
+    /// `ipFilter_t ipFilters[MAX_IPFILTERS]`.
+    /// Source: oracle/oracle/codemp/game/g_svcmds.c:54
+    pub ipFilters: IpFilters,
     /// `numIPFilters`. Source: `oracle/oracle/codemp/game/g_svcmds.c:55`
     pub numIPFilters: c_int,
     // --- `g_target.c` file-scope globals ---
@@ -928,9 +954,9 @@ pub struct GameGlobals {
     /// point.
     /// Source: `oracle/oracle/codemp/game/w_saber.c:3508`
     pub dmgSpot: [vec3_t; MAX_SABER_VICTIMS],
-    //TODO: Port qboolean[MAX_SABER_VICTIMS]
-    // Source: oracle/oracle/codemp/game/w_saber.c:3509
-    pub dismemberDmg: (),
+    /// `static qboolean dismemberDmg[MAX_SABER_VICTIMS]` — per-victim dismember flag.
+    /// Source: oracle/oracle/codemp/game/w_saber.c:3509
+    pub dismemberDmg: [qboolean; MAX_SABER_VICTIMS],
     /// `numVictims`. Source: `oracle/oracle/codemp/game/w_saber.c:3511`
     pub numVictims: c_int,
     /// `saberClashEventParm`. Source: `oracle/oracle/codemp/game/w_saber.c:3797`
@@ -949,18 +975,21 @@ pub struct GameGlobals {
     pub saberHitSaber: qboolean,
     /// `saberHitWall`. Source: `oracle/oracle/codemp/game/w_saber.c:3846`
     pub saberHitWall: qboolean,
-    //TODO: Port int[MAX_SABER_VICTIMS]
-    // Source: oracle/oracle/codemp/game/w_saber.c:3510
-    pub saberKnockbackFlags: (),
+    /// `static int saberKnockbackFlags[MAX_SABER_VICTIMS]` — per-victim knockback flags.
+    /// Source: oracle/oracle/codemp/game/w_saber.c:3510
+    pub saberKnockbackFlags: [c_int; MAX_SABER_VICTIMS],
     /// `saberSpinSound`. Source: `oracle/oracle/codemp/game/w_saber.c:18`
     pub saberSpinSound: c_int,
-    //TODO: Port float[MAX_SABER_VICTIMS]
-    // Source: oracle/oracle/codemp/game/w_saber.c:3506
-    pub totalDmg: (),
-    //TODO: Port int[MAX_SABER_VICTIMS]
-    // Source: oracle/oracle/codemp/game/w_saber.c:3504
-    pub victimEntityNum: (),
-    //TODO: Port qboolean[MAX_SABER_VICTIMS]
-    // Source: oracle/oracle/codemp/game/w_saber.c:3505
-    pub victimHitEffectDone: (),
+    /// `static float totalDmg[MAX_SABER_VICTIMS]` — per-victim accumulated damage.
+    /// Stored as `c_int` (matches the ported bodies, which accumulate integer
+    /// `trDmg` and feed `G_Damage`'s `int damage`); the wall-scale multiply
+    /// widens to `f32` at the site, as in the oracle.
+    /// Source: oracle/oracle/codemp/game/w_saber.c:3506
+    pub totalDmg: [c_int; MAX_SABER_VICTIMS],
+    /// `static int victimEntityNum[MAX_SABER_VICTIMS]` — per-victim entity number.
+    /// Source: oracle/oracle/codemp/game/w_saber.c:3504
+    pub victimEntityNum: [c_int; MAX_SABER_VICTIMS],
+    /// `static qboolean victimHitEffectDone[MAX_SABER_VICTIMS]` — per-victim hit-effect flag.
+    /// Source: oracle/oracle/codemp/game/w_saber.c:3505
+    pub victimHitEffectDone: [qboolean; MAX_SABER_VICTIMS],
 }

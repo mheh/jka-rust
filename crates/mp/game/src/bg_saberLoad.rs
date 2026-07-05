@@ -20,7 +20,95 @@ use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
 use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t;
+use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t::*;
 use mp_qshared::shared::{QFALSE, QTRUE};
+// `SaberMoveTable`/`SaberTable` id spellings (LS_*/SABER_*) + the force-power
+// name table shared with `bg_saga`.
+use mp_bg::public::saber_move_name::*;
+use crate::bg_saga::FPTable;
+
+/// Raven `SaberTable` — saber-type name/id lookup table.
+/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:46-61`
+pub static SaberTable: [stringID_table_t; 13] = [
+    stringID_table_t { name: c"SABER_NONE".as_ptr() as *mut c_char, id: SABER_NONE as c_int },
+    stringID_table_t { name: c"SABER_SINGLE".as_ptr() as *mut c_char, id: SABER_SINGLE as c_int },
+    stringID_table_t { name: c"SABER_STAFF".as_ptr() as *mut c_char, id: SABER_STAFF as c_int },
+    stringID_table_t { name: c"SABER_BROAD".as_ptr() as *mut c_char, id: SABER_BROAD as c_int },
+    stringID_table_t { name: c"SABER_PRONG".as_ptr() as *mut c_char, id: SABER_PRONG as c_int },
+    stringID_table_t { name: c"SABER_DAGGER".as_ptr() as *mut c_char, id: SABER_DAGGER as c_int },
+    stringID_table_t { name: c"SABER_ARC".as_ptr() as *mut c_char, id: SABER_ARC as c_int },
+    stringID_table_t { name: c"SABER_SAI".as_ptr() as *mut c_char, id: SABER_SAI as c_int },
+    stringID_table_t { name: c"SABER_CLAW".as_ptr() as *mut c_char, id: SABER_CLAW as c_int },
+    stringID_table_t { name: c"SABER_LANCE".as_ptr() as *mut c_char, id: SABER_LANCE as c_int },
+    stringID_table_t { name: c"SABER_STAR".as_ptr() as *mut c_char, id: SABER_STAR as c_int },
+    stringID_table_t { name: c"SABER_TRIDENT".as_ptr() as *mut c_char, id: SABER_TRIDENT as c_int },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+];
+
+/// Raven `SaberMoveTable` — saber-move name/id lookup table.
+/// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:63-127`
+pub static SaberMoveTable: [stringID_table_t; 60] = [
+    stringID_table_t { name: c"LS_NONE".as_ptr() as *mut c_char, id: LS_NONE as c_int },
+    stringID_table_t { name: c"LS_A_TL2BR".as_ptr() as *mut c_char, id: LS_A_TL2BR as c_int },
+    stringID_table_t { name: c"LS_A_L2R".as_ptr() as *mut c_char, id: LS_A_L2R as c_int },
+    stringID_table_t { name: c"LS_A_BL2TR".as_ptr() as *mut c_char, id: LS_A_BL2TR as c_int },
+    stringID_table_t { name: c"LS_A_BR2TL".as_ptr() as *mut c_char, id: LS_A_BR2TL as c_int },
+    stringID_table_t { name: c"LS_A_R2L".as_ptr() as *mut c_char, id: LS_A_R2L as c_int },
+    stringID_table_t { name: c"LS_A_TR2BL".as_ptr() as *mut c_char, id: LS_A_TR2BL as c_int },
+    stringID_table_t { name: c"LS_A_T2B".as_ptr() as *mut c_char, id: LS_A_T2B as c_int },
+    stringID_table_t { name: c"LS_A_BACKSTAB".as_ptr() as *mut c_char, id: LS_A_BACKSTAB as c_int },
+    stringID_table_t { name: c"LS_A_BACK".as_ptr() as *mut c_char, id: LS_A_BACK as c_int },
+    stringID_table_t { name: c"LS_A_BACK_CR".as_ptr() as *mut c_char, id: LS_A_BACK_CR as c_int },
+    stringID_table_t { name: c"LS_ROLL_STAB".as_ptr() as *mut c_char, id: LS_ROLL_STAB as c_int },
+    stringID_table_t { name: c"LS_A_LUNGE".as_ptr() as *mut c_char, id: LS_A_LUNGE as c_int },
+    stringID_table_t { name: c"LS_A_JUMP_T__B_".as_ptr() as *mut c_char, id: LS_A_JUMP_T__B_ as c_int },
+    stringID_table_t { name: c"LS_A_FLIP_STAB".as_ptr() as *mut c_char, id: LS_A_FLIP_STAB as c_int },
+    stringID_table_t { name: c"LS_A_FLIP_SLASH".as_ptr() as *mut c_char, id: LS_A_FLIP_SLASH as c_int },
+    stringID_table_t { name: c"LS_JUMPATTACK_DUAL".as_ptr() as *mut c_char, id: LS_JUMPATTACK_DUAL as c_int },
+    stringID_table_t { name: c"LS_JUMPATTACK_ARIAL_LEFT".as_ptr() as *mut c_char, id: LS_JUMPATTACK_ARIAL_LEFT as c_int },
+    stringID_table_t { name: c"LS_JUMPATTACK_ARIAL_RIGHT".as_ptr() as *mut c_char, id: LS_JUMPATTACK_ARIAL_RIGHT as c_int },
+    stringID_table_t { name: c"LS_JUMPATTACK_CART_LEFT".as_ptr() as *mut c_char, id: LS_JUMPATTACK_CART_LEFT as c_int },
+    stringID_table_t { name: c"LS_JUMPATTACK_CART_RIGHT".as_ptr() as *mut c_char, id: LS_JUMPATTACK_CART_RIGHT as c_int },
+    stringID_table_t { name: c"LS_JUMPATTACK_STAFF_LEFT".as_ptr() as *mut c_char, id: LS_JUMPATTACK_STAFF_LEFT as c_int },
+    stringID_table_t { name: c"LS_JUMPATTACK_STAFF_RIGHT".as_ptr() as *mut c_char, id: LS_JUMPATTACK_STAFF_RIGHT as c_int },
+    stringID_table_t { name: c"LS_BUTTERFLY_LEFT".as_ptr() as *mut c_char, id: LS_BUTTERFLY_LEFT as c_int },
+    stringID_table_t { name: c"LS_BUTTERFLY_RIGHT".as_ptr() as *mut c_char, id: LS_BUTTERFLY_RIGHT as c_int },
+    stringID_table_t { name: c"LS_A_BACKFLIP_ATK".as_ptr() as *mut c_char, id: LS_A_BACKFLIP_ATK as c_int },
+    stringID_table_t { name: c"LS_SPINATTACK_DUAL".as_ptr() as *mut c_char, id: LS_SPINATTACK_DUAL as c_int },
+    stringID_table_t { name: c"LS_SPINATTACK".as_ptr() as *mut c_char, id: LS_SPINATTACK as c_int },
+    stringID_table_t { name: c"LS_LEAP_ATTACK".as_ptr() as *mut c_char, id: LS_LEAP_ATTACK as c_int },
+    stringID_table_t { name: c"LS_SWOOP_ATTACK_RIGHT".as_ptr() as *mut c_char, id: LS_SWOOP_ATTACK_RIGHT as c_int },
+    stringID_table_t { name: c"LS_SWOOP_ATTACK_LEFT".as_ptr() as *mut c_char, id: LS_SWOOP_ATTACK_LEFT as c_int },
+    stringID_table_t { name: c"LS_TAUNTAUN_ATTACK_RIGHT".as_ptr() as *mut c_char, id: LS_TAUNTAUN_ATTACK_RIGHT as c_int },
+    stringID_table_t { name: c"LS_TAUNTAUN_ATTACK_LEFT".as_ptr() as *mut c_char, id: LS_TAUNTAUN_ATTACK_LEFT as c_int },
+    stringID_table_t { name: c"LS_KICK_F".as_ptr() as *mut c_char, id: LS_KICK_F as c_int },
+    stringID_table_t { name: c"LS_KICK_B".as_ptr() as *mut c_char, id: LS_KICK_B as c_int },
+    stringID_table_t { name: c"LS_KICK_R".as_ptr() as *mut c_char, id: LS_KICK_R as c_int },
+    stringID_table_t { name: c"LS_KICK_L".as_ptr() as *mut c_char, id: LS_KICK_L as c_int },
+    stringID_table_t { name: c"LS_KICK_S".as_ptr() as *mut c_char, id: LS_KICK_S as c_int },
+    stringID_table_t { name: c"LS_KICK_BF".as_ptr() as *mut c_char, id: LS_KICK_BF as c_int },
+    stringID_table_t { name: c"LS_KICK_RL".as_ptr() as *mut c_char, id: LS_KICK_RL as c_int },
+    stringID_table_t { name: c"LS_KICK_F_AIR".as_ptr() as *mut c_char, id: LS_KICK_F_AIR as c_int },
+    stringID_table_t { name: c"LS_KICK_B_AIR".as_ptr() as *mut c_char, id: LS_KICK_B_AIR as c_int },
+    stringID_table_t { name: c"LS_KICK_R_AIR".as_ptr() as *mut c_char, id: LS_KICK_R_AIR as c_int },
+    stringID_table_t { name: c"LS_KICK_L_AIR".as_ptr() as *mut c_char, id: LS_KICK_L_AIR as c_int },
+    stringID_table_t { name: c"LS_STABDOWN".as_ptr() as *mut c_char, id: LS_STABDOWN as c_int },
+    stringID_table_t { name: c"LS_STABDOWN_STAFF".as_ptr() as *mut c_char, id: LS_STABDOWN_STAFF as c_int },
+    stringID_table_t { name: c"LS_STABDOWN_DUAL".as_ptr() as *mut c_char, id: LS_STABDOWN_DUAL as c_int },
+    stringID_table_t { name: c"LS_DUAL_SPIN_PROTECT".as_ptr() as *mut c_char, id: LS_DUAL_SPIN_PROTECT as c_int },
+    stringID_table_t { name: c"LS_STAFF_SOULCAL".as_ptr() as *mut c_char, id: LS_STAFF_SOULCAL as c_int },
+    stringID_table_t { name: c"LS_A1_SPECIAL".as_ptr() as *mut c_char, id: LS_A1_SPECIAL as c_int },
+    stringID_table_t { name: c"LS_A2_SPECIAL".as_ptr() as *mut c_char, id: LS_A2_SPECIAL as c_int },
+    stringID_table_t { name: c"LS_A3_SPECIAL".as_ptr() as *mut c_char, id: LS_A3_SPECIAL as c_int },
+    stringID_table_t { name: c"LS_UPSIDE_DOWN_ATTACK".as_ptr() as *mut c_char, id: LS_UPSIDE_DOWN_ATTACK as c_int },
+    stringID_table_t { name: c"LS_PULL_ATTACK_STAB".as_ptr() as *mut c_char, id: LS_PULL_ATTACK_STAB as c_int },
+    stringID_table_t { name: c"LS_PULL_ATTACK_SWING".as_ptr() as *mut c_char, id: LS_PULL_ATTACK_SWING as c_int },
+    stringID_table_t { name: c"LS_SPINATTACK_ALORA".as_ptr() as *mut c_char, id: LS_SPINATTACK_ALORA as c_int },
+    stringID_table_t { name: c"LS_DUAL_FB".as_ptr() as *mut c_char, id: LS_DUAL_FB as c_int },
+    stringID_table_t { name: c"LS_DUAL_LR".as_ptr() as *mut c_char, id: LS_DUAL_LR as c_int },
+    stringID_table_t { name: c"LS_HILT_BASH".as_ptr() as *mut c_char, id: LS_HILT_BASH as c_int },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+];
 
 // PORT-NOTE(missing-symbol): `MAX_ANIMATIONS` is an `animNumber_t` enum
 // terminator (anims.h), not yet exposed as a bare const; referenced through
@@ -697,7 +785,7 @@ pub fn WP_SaberParseParms(
             // saber type
             if qstricmp_eq(tok, c"saberType") {
                 let value = parse_string_field!();
-                let saberType = crate::q_shared::GetIDForString(SaberTable, value);
+                let saberType = crate::q_shared::GetIDForString(SaberTable.as_ptr() as *mut stringID_table_t, value);
                 if saberType >= saberType_t::SABER_SINGLE as c_int
                     && saberType <= saberType_t::NUM_SABERS as c_int
                 {
@@ -981,7 +1069,7 @@ pub fn WP_SaberParseParms(
             // force power restrictions
             if qstricmp_eq(tok, c"forceRestrict") {
                 let value = parse_string_field!();
-                let fp = crate::q_shared::GetIDForString(FPTable, value);
+                let fp = crate::q_shared::GetIDForString(FPTable.as_ptr() as *mut stringID_table_t, value);
                 if fp >= FP_FIRST && fp < NUM_FORCE_POWERS {
                     s.forceRestrictions |= 1 << fp;
                 }
@@ -1140,7 +1228,7 @@ pub fn WP_SaberParseParms(
             // kata move
             if qstricmp_eq(tok, c"kataMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(SaberMoveTable, value);
+                saberMove = crate::q_shared::GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.kataMove = saberMove;
                 }
@@ -1149,7 +1237,7 @@ pub fn WP_SaberParseParms(
             // lungeAtkMove move
             if qstricmp_eq(tok, c"lungeAtkMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(SaberMoveTable, value);
+                saberMove = crate::q_shared::GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.lungeAtkMove = saberMove;
                 }
@@ -1158,7 +1246,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkUpMove move
             if qstricmp_eq(tok, c"jumpAtkUpMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(SaberMoveTable, value);
+                saberMove = crate::q_shared::GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkUpMove = saberMove;
                 }
@@ -1167,7 +1255,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkFwdMove move
             if qstricmp_eq(tok, c"jumpAtkFwdMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(SaberMoveTable, value);
+                saberMove = crate::q_shared::GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkFwdMove = saberMove;
                 }
@@ -1176,7 +1264,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkBackMove move
             if qstricmp_eq(tok, c"jumpAtkBackMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(SaberMoveTable, value);
+                saberMove = crate::q_shared::GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkBackMove = saberMove;
                 }
@@ -1185,7 +1273,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkRightMove move
             if qstricmp_eq(tok, c"jumpAtkRightMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(SaberMoveTable, value);
+                saberMove = crate::q_shared::GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkRightMove = saberMove;
                 }
@@ -1194,7 +1282,7 @@ pub fn WP_SaberParseParms(
             // jumpAtkLeftMove move
             if qstricmp_eq(tok, c"jumpAtkLeftMove") {
                 let value = parse_string_field!();
-                saberMove = crate::q_shared::GetIDForString(SaberMoveTable, value);
+                saberMove = crate::q_shared::GetIDForString(SaberMoveTable.as_ptr() as *mut stringID_table_t, value);
                 if saberMove >= LS_INVALID && saberMove < LS_MOVE_MAX {
                     s.jumpAtkLeftMove = saberMove;
                 }
@@ -1203,7 +1291,7 @@ pub fn WP_SaberParseParms(
             // readyAnim
             if qstricmp_eq(tok, c"readyAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(animTable, value);
+                anim = crate::q_shared::GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.readyAnim = anim;
                 }
@@ -1212,7 +1300,7 @@ pub fn WP_SaberParseParms(
             // drawAnim
             if qstricmp_eq(tok, c"drawAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(animTable, value);
+                anim = crate::q_shared::GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.drawAnim = anim;
                 }
@@ -1221,7 +1309,7 @@ pub fn WP_SaberParseParms(
             // putawayAnim
             if qstricmp_eq(tok, c"putawayAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(animTable, value);
+                anim = crate::q_shared::GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.putawayAnim = anim;
                 }
@@ -1230,7 +1318,7 @@ pub fn WP_SaberParseParms(
             // tauntAnim
             if qstricmp_eq(tok, c"tauntAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(animTable, value);
+                anim = crate::q_shared::GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.tauntAnim = anim;
                 }
@@ -1239,7 +1327,7 @@ pub fn WP_SaberParseParms(
             // bowAnim
             if qstricmp_eq(tok, c"bowAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(animTable, value);
+                anim = crate::q_shared::GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.bowAnim = anim;
                 }
@@ -1248,7 +1336,7 @@ pub fn WP_SaberParseParms(
             // meditateAnim
             if qstricmp_eq(tok, c"meditateAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(animTable, value);
+                anim = crate::q_shared::GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.meditateAnim = anim;
                 }
@@ -1257,7 +1345,7 @@ pub fn WP_SaberParseParms(
             // flourishAnim
             if qstricmp_eq(tok, c"flourishAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(animTable, value);
+                anim = crate::q_shared::GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.flourishAnim = anim;
                 }
@@ -1266,7 +1354,7 @@ pub fn WP_SaberParseParms(
             // gloatAnim
             if qstricmp_eq(tok, c"gloatAnim") {
                 let value = parse_string_field!();
-                anim = crate::q_shared::GetIDForString(animTable, value);
+                anim = crate::q_shared::GetIDForString(animTable.as_ptr() as *mut stringID_table_t, value);
                 if anim >= 0 && anim < (animNumber_t::MAX_ANIMATIONS as c_int) {
                     s.gloatAnim = anim;
                 }

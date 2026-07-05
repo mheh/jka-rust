@@ -348,7 +348,7 @@ pub fn BotWaypointRender(ctx: GameContext<'_>) {
                 return;
             }
 
-            let viewent: *mut gentity_t = &mut (*w).entities[0];
+            let viewent: *mut gentity_t = &mut (*w).g_entities[0];
 
             if viewent.is_null() || (*viewent).client.is_null() {
                 // client isn't in the game yet?
@@ -1422,7 +1422,7 @@ pub fn DoorBlockingSection(ctx: GameContext<'_>, start: c_int, end: c_int) -> c_
             return 0;
         }
 
-        let cn = (*w).entities[tr.entityNum as usize].classname;
+        let cn = (*w).g_entities[tr.entityNum as usize].classname;
         // Raven derefs `testdoor->classname` unconditionally; a slot with a
         // null classname would crash there — the one defined behavior here is
         // "no `func_` match" (returns 0). (§19)
@@ -1740,7 +1740,7 @@ pub fn CalculateSiegeGoals(ctx: GameContext<'_>) {
         let mut i: c_int = 0;
 
         while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).entities[i as usize];
+            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
 
             let mut tent: *mut gentity_t = core::ptr::null_mut();
 
@@ -1872,7 +1872,7 @@ pub fn CalculateWeightGoals(ctx: GameContext<'_>) {
         i = 0;
 
         while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).entities[i as usize];
+            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
 
             let mut weight: f32 = 0.0;
 
@@ -2234,7 +2234,7 @@ pub fn FlagObjects(ctx: GameContext<'_>) {
         let mut tr: trace_t = core::mem::zeroed();
 
         while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).entities[i as usize];
+            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
             if !ent.is_null() && (*ent).inuse != 0 && !(*ent).classname.is_null() {
                 if flag_red.is_null() && c_str_eq((*ent).classname, b"team_CTF_redflag") {
                     flag_red = ent;
@@ -2842,7 +2842,7 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
                 );
 
                 if (tr.entityNum >= ENTITYNUM_WORLD
-                    || (*w).entities[tr.entityNum as usize].s.eType == et_terrain)
+                    || (*w).g_entities[tr.entityNum as usize].s.eType == et_terrain)
                     && tr.endpos[2] < (*terrain).r.absmin[2] + 750.0
                 {
                     // only drop nodes on terrain directly
@@ -2956,7 +2956,7 @@ pub fn BeginAutoPathRoutine(ctx: GameContext<'_>) {
         CreateNewWP(ctx, crate::q_math::vec3_origin, 0); // create a dummy waypoint to insert under
 
         while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).entities[i as usize];
+            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
 
             if !ent.is_null()
                 && (*ent).inuse != 0
@@ -3093,7 +3093,7 @@ pub fn LoadPath_ThisLevel(ctx: GameContext<'_>) {
 
         // set the flag entities
         while i < (*w).level.num_entities {
-            let ent: *mut gentity_t = &mut (*w).entities[i as usize];
+            let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
 
             if !ent.is_null() && (*ent).inuse != 0 && !(*ent).classname.is_null() {
                 if (*w).globals.eFlagRed.is_null() && c_str_eq((*ent).classname, b"team_CTF_redflag") {
@@ -3126,7 +3126,7 @@ pub fn GetClosestSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentit
         let mut i: c_int = MAX_CLIENTS as c_int;
 
         while i < (*w).level.num_entities {
-            let spawn: *mut gentity_t = &mut (*w).entities[i as usize];
+            let spawn: *mut gentity_t = &mut (*w).g_entities[i as usize];
             if !spawn.is_null()
                 && (*spawn).inuse != 0
                 && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0
@@ -3164,7 +3164,7 @@ pub fn GetNextSpawnInIndex(
         let mut i: c_int = (*currentSpawn).s.number + 1;
 
         while i < (*w).level.num_entities {
-            let spawn: *mut gentity_t = &mut (*w).entities[i as usize];
+            let spawn: *mut gentity_t = &mut (*w).g_entities[i as usize];
             if !spawn.is_null()
                 && (*spawn).inuse != 0
                 && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0
@@ -3180,7 +3180,7 @@ pub fn GetNextSpawnInIndex(
             // loop back around to 0 (client range end)
             i = MAX_CLIENTS as c_int;
             while i < (*w).level.num_entities {
-                let spawn: *mut gentity_t = &mut (*w).entities[i as usize];
+                let spawn: *mut gentity_t = &mut (*w).g_entities[i as usize];
                 if !spawn.is_null()
                     && (*spawn).inuse != 0
                     && (Q_stricmp((*spawn).classname, c"info_player_start".as_ptr()) == 0

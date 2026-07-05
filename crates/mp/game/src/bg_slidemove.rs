@@ -20,6 +20,7 @@ use crate::prelude::*;
 use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorNormalize2};
 use crate::g_main::Com_Printf;
 use mp_qshared::shared::trajectory::trType_t;
+use mp_bg::vehicles::MIN_LANDING_SLOPE;
 
 // --- file-local `#defines` from `bg_slidemove.c` (porting-rules per-file
 // convention, cf. `bg_pmove.rs`'s `MIN_WALK_NORMAL`/`PMF_STUCK_TO_WALL`). ---

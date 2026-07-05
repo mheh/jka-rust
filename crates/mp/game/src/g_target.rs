@@ -29,7 +29,7 @@ const qfalse: qboolean = 0;
 
 /// Raven `#define Q3_SCRIPT_DIR "scripts"`.
 /// Source: `oracle/oracle/codemp/game/q_shared.h:10`
-pub const Q3_SCRIPT_DIR: *const c_char = b"scripts\0" as *const c_char;
+pub const Q3_SCRIPT_DIR: &core::ffi::CStr = c"scripts";
 
 /// Raven `Use_Target_Give`.
 ///
@@ -139,7 +139,7 @@ pub fn Use_Target_Delay(
         G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
         (*ent).nextthink = ctx.world.level.time + ((*ent).wait + (*ent).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0;
         (*ent).think = Some(EntThink::Think_Target_Delay);
-        (*ent).activator = Some(ent_id(ctx.world.entities.as_mut_ptr(), activator));
+        (*ent).activator = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), activator));
     }
 }
 
@@ -360,7 +360,7 @@ pub fn SP_target_speaker(
         // TODO: Port fn-pointer assignment: (*ent).use = Use_Target_Speaker;
 
         if (*ent).spawnflags & 4 != 0 {
-            (*ent).r.svFlags |= mp_bg::public::server_flags::SVF_BROADCAST;
+            (*ent).r.svFlags |= SVF_BROADCAST;
         }
 
         (*ent).s.pos.trBase = (*ent).s.origin;
@@ -384,7 +384,7 @@ pub fn target_laser_think(
 
         // if pointed at another entity, set movedir to point at it
         if let Some(enemy_id) = (*self_).enemy {
-            let enemy = &mut ctx.world.entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             // VectorMA(self->enemy->s.origin, 0.5, self->enemy->r.mins, point)
             point[0] = (*enemy).s.origin[0] + 0.5 * (*enemy).r.mins[0];
             point[1] = (*enemy).s.origin[1] + 0.5 * (*enemy).r.mins[1];
@@ -412,7 +412,7 @@ pub fn target_laser_think(
 
         if tr.entityNum != 0 {
             // hurt it if we can
-            let targ = &mut ctx.world.entities[tr.entityNum as usize];
+            let targ = &mut (*ctx.world).g_entities[tr.entityNum as usize];
             G_Damage(targ, self_, (*self_).activator, Some(&mut (*self_).movedir), tr.endpos, (*self_).damage, DAMAGE_NO_KNOCKBACK, meansOfDeath_t::MOD_TARGET_LASER as c_int);
         }
 
@@ -687,7 +687,7 @@ pub fn target_location_linkup(
 
         let mut n = 1;
         for i in 0..ctx.world.level.num_entities {
-            let ent_ptr = &mut ctx.world.entities[i] as *mut gentity_t;
+            let ent_ptr = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             if !(*ent_ptr).classname.is_null() && Q_stricmp((*ent_ptr).classname, b"target_location\0".as_ptr() as *const c_char) == 0 {
                 // lets overload some variables!
                 (*ent_ptr).health = n; // use for location marking
@@ -888,7 +888,7 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
 
                 // PORT-NOTE(EntityId-deref): activator is Option<EntityId>; dereferenced via arena lookup
                 let activator_id = (*self_).activator.unwrap();
-                let activator_ent = &mut ctx.world.entities[activator_id.0 as usize] as *mut gentity_t;
+                let activator_ent = &mut (*ctx.world).g_entities[activator_id.0 as usize] as *mut gentity_t;
 
                 if trap::ICARUS_IsInitialized(ctx.engine, (*self_).s.number) == 0 {
                     if (*activator_ent).script_targetname.is_null() || *(*activator_ent).script_targetname == b'\0' as c_char {
@@ -911,7 +911,7 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
                 if ctx.world.cvars.g_developer.integer != 0 {
                     // Informational debug message
                 }
-                let script_path = format!("{}/{}", cstr_to_str(Q3_SCRIPT_DIR), cstr_to_str((*self_).behaviorSet[bSet_t::BSET_USE as usize]));
+                let script_path = format!("{}/{}", cstr_to_str(Q3_SCRIPT_DIR.as_ptr()), cstr_to_str((*self_).behaviorSet[bSet_t::BSET_USE as usize]));
                 trap::ICARUS_RunScript(ctx.engine, activator_ent, cstr(&script_path));
             } else {
                 if ctx.world.cvars.g_developer.integer != 0 && (*self_).activator.is_some() {
@@ -1061,7 +1061,13 @@ pub fn target_level_change_use(
 ) {
     unsafe {
         G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
-        trap::SendConsoleCommand(ctx.engine, mp_bg::public::exec_level::EXEC_NOW, va(b"map %s\0".as_ptr() as *const c_char, (*self_).message));
+        trap::SendConsoleCommand(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SEND_CONSOLE_COMMAND::GSendConsoleCommandArgs::new(
+                cbufExec_t::EXEC_NOW as c_int,
+                cstr(&format!("map {}", cstr_to_string((*self_).message))),
+            ),
+        );
     }
 }
 

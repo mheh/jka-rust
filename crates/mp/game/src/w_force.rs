@@ -9,7 +9,7 @@
 //! (`.world: *mut GameWorld`, `.engine`) — the only ported-logic precedent
 //! (`g_init_game`). Globals are `GameWorld` fields (fork 1): `level` →
 //! `(*ctx.world).level`, cvars → `(*ctx.world).cvars`, `g_entities[i]` →
-//! `(*ctx.world).entities[i]`. Traps go through `trap::X(ctx.engine, …)`.
+//! `(*ctx.world).g_entities[i]`. Traps go through `trap::X(ctx.engine, …)`.
 //! Cross-file callees are invoked with the packet's resolved raw-pointer
 //! signatures verbatim (their own porters thread the spine).
 //!
@@ -33,6 +33,20 @@ use crate::prelude::*;
 // Source: `oracle/oracle/codemp/game/q_shared.h`
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
+
+// Raven force-mastery-level anonymous enum (bg_public.h) → int-wide consts per
+// the enum-vs-alias rule (anonymous enum → `const`s). Only the two spellings the
+// ported bodies name are surfaced.
+// Source: `oracle/oracle/codemp/game/bg_public.h:383-392`
+pub const FORCE_MASTERY_UNINITIATED: c_int = 0;
+pub const FORCE_MASTERY_INITIATE: c_int = 1;
+pub const FORCE_MASTERY_PADAWAN: c_int = 2;
+pub const FORCE_MASTERY_JEDI: c_int = 3;
+pub const FORCE_MASTERY_JEDI_GUARDIAN: c_int = 4;
+pub const FORCE_MASTERY_JEDI_ADEPT: c_int = 5;
+pub const FORCE_MASTERY_JEDI_KNIGHT: c_int = 6;
+pub const FORCE_MASTERY_JEDI_MASTER: c_int = 7;
+pub const NUM_FORCE_MASTERY_LEVELS: c_int = 8;
 use crate::NPC_AI_Jedi::Jedi_Decloak;
 use crate::ai_main::{InFieldOfVision, OrgVisible};
 use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri, BG_LegalizedForcePowers};
@@ -1222,7 +1236,7 @@ pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         for i in 0..MAX_CLIENTS as usize {
-            let ent = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
 
             if !(*ent).client.is_null()
                 && self_ != ent
@@ -1267,7 +1281,7 @@ pub fn ForceTeamHeal(ctx: GameContext<'_>, self_: *mut gentity_t) {
         (*cl).ps.fd.forcePowerDebounce[FP_TEAM_HEAL as usize] = level_time + 2000;
 
         for i in 0..numpl {
-            let ent = &mut (*ctx.world).entities[pl[i]] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[pl[i]] as *mut gentity_t;
             let ocl = (*ent).client as *mut gclient_t;
             if (*ocl).ps.stats[STAT_HEALTH as usize] > 0 && (*ent).health > 0 {
                 (*ocl).ps.stats[STAT_HEALTH as usize] += healthadd;
@@ -1332,7 +1346,7 @@ pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         for i in 0..MAX_CLIENTS as usize {
-            let ent = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
 
             if !(*ent).client.is_null()
                 && self_ != ent
@@ -1380,7 +1394,7 @@ pub fn ForceTeamForceReplenish(ctx: GameContext<'_>, self_: *mut gentity_t) {
         );
 
         for i in 0..numpl {
-            let ent = &mut (*ctx.world).entities[pl[i]] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[pl[i]] as *mut gentity_t;
             let ocl = (*ent).client as *mut gclient_t;
             (*ocl).ps.fd.forcePower += poweradd;
             if (*ocl).ps.fd.forcePower > 100 {
@@ -1453,23 +1467,23 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         if tr.fraction != 1.0
             && tr.entityNum != ENTITYNUM_NONE
-            && !(*ctx.world).entities[tr.entityNum as usize].client.is_null()
-            && (*((*ctx.world).entities[tr.entityNum as usize].client as *mut gclient_t))
+            && !(*ctx.world).g_entities[tr.entityNum as usize].client.is_null()
+            && (*((*ctx.world).g_entities[tr.entityNum as usize].client as *mut gclient_t))
                 .ps
                 .fd
                 .forceGripCripple
                 == 0
-            && (*((*ctx.world).entities[tr.entityNum as usize].client as *mut gclient_t))
+            && (*((*ctx.world).g_entities[tr.entityNum as usize].client as *mut gclient_t))
                 .ps
                 .fd
                 .forceGripBeingGripped
                 < level_time as f32
-            && ForcePowerUsableOn(ctx, self_, &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t, FP_GRIP) != 0
+            && ForcePowerUsableOn(ctx, self_, &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t, FP_GRIP) != 0
             && ((*ctx.world).cvars.g_friendlyFire.integer != 0
-                || OnSameTeam(ctx, self_, &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t) == 0)
+                || OnSameTeam(ctx, self_, &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t) == 0)
         //don't grip someone who's still crippled
         {
-            let target = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+            let target = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
             let tcl = (*target).client as *mut gclient_t;
 
             if (*target).s.number < MAX_CLIENTS as c_int && (*tcl).ps.m_iVehicleNum != 0 {
@@ -1520,7 +1534,7 @@ pub fn ForceSpeed(ctx: GameContext<'_>, self_: *mut gentity_t, forceDuration: c_
             && (*cl).holdingObjectiveItem < ENTITYNUM_WORLD
         {
             //holding Siege item
-            if (*ctx.world).entities[(*cl).holdingObjectiveItem as usize].genericValue15 != 0 {
+            if (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize].genericValue15 != 0 {
                 //disables force powers
                 return;
             }
@@ -1876,7 +1890,7 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
             );
 
             for e in 0..numListedEntities {
-                let traceEnt = &mut (*ctx.world).entities[iEntityList[e as usize] as usize]
+                let traceEnt = &mut (*ctx.world).g_entities[iEntityList[e as usize] as usize]
                     as *mut gentity_t;
 
                 if traceEnt == self_ {
@@ -2001,7 +2015,7 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 return;
             }
 
-            let traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+            let traceEnt = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
             ForceLightningDamage(ctx, self_, traceEnt, forward, tr.endpos);
         }
     }
@@ -2186,7 +2200,7 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
             );
 
             for e in 0..numListedEntities {
-                let traceEnt = &mut (*ctx.world).entities[iEntityList[e as usize] as usize]
+                let traceEnt = &mut (*ctx.world).g_entities[iEntityList[e as usize] as usize]
                     as *mut gentity_t;
 
                 if traceEnt == self_ {
@@ -2306,13 +2320,13 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
                 || tr.fraction == 1.0
                 || tr.allsolid != 0
                 || tr.startsolid != 0
-                || (*ctx.world).entities[tr.entityNum as usize].client.is_null()
-                || (*ctx.world).entities[tr.entityNum as usize].inuse == 0
+                || (*ctx.world).g_entities[tr.entityNum as usize].client.is_null()
+                || (*ctx.world).g_entities[tr.entityNum as usize].inuse == 0
             {
                 return 0;
             }
 
-            let traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+            let traceEnt = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
             ForceDrainDamage(ctx, self_, traceEnt, forward, tr.endpos);
             gotOneOrMore = 1;
         }
@@ -2615,7 +2629,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
             return qfalse;
         }
 
-        let traceEnt = &mut (*ctx.world).entities[(*tr).entityNum as usize] as *mut gentity_t;
+        let traceEnt = &mut (*ctx.world).g_entities[(*tr).entityNum as usize] as *mut gentity_t;
 
         if !(*traceEnt).NPC.is_null() && (*((*traceEnt).NPC as *mut gNPC_t)).scriptFlags & SCF_NO_FORCE != 0 {
             return qfalse;
@@ -2837,7 +2851,7 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         if (*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] == FORCE_LEVEL_1 {
-            let ent = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
             if tr.fraction != 1.0
                 && tr.entityNum != ENTITYNUM_NONE
                 && (*ent).inuse != 0
@@ -2872,7 +2886,7 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: *mut gentity_t) {
             );
 
             for e in 0..numListedEntities {
-                let mut ent = &mut (*ctx.world).entities[entityList[e as usize] as usize]
+                let mut ent = &mut (*ctx.world).g_entities[entityList[e as usize] as usize]
                     as *mut gentity_t;
 
                 {
@@ -2903,7 +2917,7 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         entityList[e as usize] = ENTITYNUM_NONE;
                     }
                 }
-                ent = &mut (*ctx.world).entities[entityList[e as usize] as usize] as *mut gentity_t;
+                ent = &mut (*ctx.world).g_entities[entityList[e as usize] as usize] as *mut gentity_t;
                 if ent != self_ && !(*ent).client.is_null() {
                     gotatleastone = qtrue;
                     WP_AddAsMindtricked(&mut (*cl).ps.fd, (*ent).s.number);
@@ -3248,7 +3262,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
             );
 
             if tr.fraction != 1.0 && tr.entityNum != ENTITYNUM_NONE {
-                let hit = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+                let hit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
                 if (*hit).client.is_null() && (*hit).s.eType == ET_NPC as c_int {
                     //g2animent
                     if (*hit).s.genericenemyindex < level_time {
@@ -3286,7 +3300,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
 
             let mut e: usize = 0;
             while (e as c_int) < numListedEntities {
-                let ent = &mut (*ctx.world).entities[entityList[e] as usize] as *mut gentity_t;
+                let ent = &mut (*ctx.world).g_entities[entityList[e] as usize] as *mut gentity_t;
 
                 if (*ent).client.is_null() && (*ent).s.eType == ET_NPC as c_int {
                     //g2animent
@@ -3334,7 +3348,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
 
         for e in 0..(numListedEntities as usize) {
             let ent: *mut gentity_t = if entityList[e] != ENTITYNUM_NONE && entityList[e] >= 0 && entityList[e] < MAX_GENTITIES as c_int {
-                &mut (*ctx.world).entities[entityList[e] as usize] as *mut gentity_t
+                &mut (*ctx.world).g_entities[entityList[e] as usize] as *mut gentity_t
             } else {
                 std::ptr::null_mut()
             };
@@ -3924,7 +3938,7 @@ pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower
             FP_GRIP => {
                 (*cl).ps.fd.forceGripUseTime = level_time + 3000;
                 let gripIdx = (*cl).ps.fd.forceGripEntityNum as usize;
-                let gripEnt = &mut (*ctx.world).entities[gripIdx] as *mut gentity_t;
+                let gripEnt = &mut (*ctx.world).g_entities[gripIdx] as *mut gentity_t;
                 if (*cl).ps.fd.forcePowerLevel[FP_GRIP as usize] > FORCE_LEVEL_1
                     && !(*gripEnt).client.is_null()
                     && (*gripEnt).health > 0
@@ -4029,7 +4043,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
         (*cl).ps.eFlags &= !EF_INVULNERABLE;
         (*cl).invulnerableTimer = 0;
 
-        let gripEnt = &mut (*ctx.world).entities[(*cl).ps.fd.forceGripEntityNum as usize] as *mut gentity_t;
+        let gripEnt = &mut (*ctx.world).g_entities[(*cl).ps.fd.forceGripEntityNum as usize] as *mut gentity_t;
 
         if gripEnt.is_null()
             || (*gripEnt).client.is_null()
@@ -4317,7 +4331,7 @@ fn WP_UpdateMindtrickEnts(ctx: GameContext<'_>, self_: *mut gentity_t) {
         let mut i: c_int = 0;
         while i < MAX_CLIENTS as c_int {
             if G_IsMindTricked(&mut (*cl).ps.fd, i) != 0 {
-                let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+                let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                 if (*ent).client.is_null()
                     || (*ent).inuse == 0
@@ -4425,7 +4439,7 @@ fn WP_ForcePowerRun(
                 if (*cl).holdingObjectiveItem >= MAX_CLIENTS as c_int
                     && (*cl).holdingObjectiveItem < ENTITYNUM_WORLD
                 {
-                    if (*ctx.world).entities[(*cl).holdingObjectiveItem as usize].genericValue15 != 0
+                    if (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize].genericValue15 != 0
                     {
                         //disables force powers
                         WP_ForcePowerStop(ctx, self_, forcePower);
@@ -4543,7 +4557,7 @@ fn WP_ForcePowerRun(
             FP_TELEPATHY => {
                 if (*cl).holdingObjectiveItem >= MAX_CLIENTS as c_int
                     && (*cl).holdingObjectiveItem < ENTITYNUM_WORLD
-                    && (*ctx.world).entities[(*cl).holdingObjectiveItem as usize].genericValue15
+                    && (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize].genericValue15
                         != 0
                 {
                     //if force hindered can't mindtrick whilst carrying a siege item
@@ -4735,7 +4749,7 @@ pub fn FindGenericEnemyIndex(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         let mut i: c_int = 0;
         while i < MAX_CLIENTS as c_int {
-            let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
             if !(*ent).client.is_null()
                 && (*ent).s.number != (*self_).s.number
@@ -4866,7 +4880,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         if (*cl).ps.genericEnemyIndex != ENTITYNUM_NONE && (*cl).ps.genericEnemyIndex != -1 {
-            let en = &mut (*ctx.world).entities[(*cl).ps.genericEnemyIndex as usize] as *mut gentity_t;
+            let en = &mut (*ctx.world).g_entities[(*cl).ps.genericEnemyIndex as usize] as *mut gentity_t;
 
             if (*en).client.is_null() {
                 (*cl).ps.genericEnemyIndex = ENTITYNUM_NONE;
@@ -4891,7 +4905,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         if (*cl).ps.genericEnemyIndex != ENTITYNUM_NONE && (*cl).ps.genericEnemyIndex != -1 {
-            let en = &mut (*ctx.world).entities[(*cl).ps.genericEnemyIndex as usize] as *mut gentity_t;
+            let en = &mut (*ctx.world).g_entities[(*cl).ps.genericEnemyIndex as usize] as *mut gentity_t;
 
             let mut elevated: vec3_t = (*cl).ps.origin;
             elevated[2] += 40.0;
@@ -5549,7 +5563,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                 //don't regen force power while throwing saber
                 if (*cl).ps.saberEntityNum < ENTITYNUM_NONE && (*cl).ps.saberEntityNum > 0 {
                     //player is 0
-                    if (*ctx.world).entities[(*cl).ps.saberEntityNum as usize].s.pos.trType == TR_LINEAR as c_int {
+                    if (*ctx.world).g_entities[(*cl).ps.saberEntityNum as usize].s.pos.trType == TR_LINEAR as c_int {
                         //fell to the ground and we're trying to pull it back
                         usingForce = qtrue;
                     }
@@ -5583,8 +5597,8 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
 
                     if gametype == GT_SIEGE as c_int {
                         if (*cl).holdingObjectiveItem != 0
-                            && (*ctx.world).entities[(*cl).holdingObjectiveItem as usize].inuse != 0
-                            && (*ctx.world).entities[(*cl).holdingObjectiveItem as usize].genericValue15 != 0
+                            && (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize].inuse != 0
+                            && (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize].genericValue15 != 0
                         {
                             //1 point per 7 seconds.. super slow
                             (*cl).ps.fd.forcePowerRegenDebounceTime = level_time + 7000;

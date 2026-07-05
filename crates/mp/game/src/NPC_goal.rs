@@ -24,9 +24,11 @@ pub fn SetGoal(
     goal: *mut gentity_t,
     rating: f32,
 ) {
-    let npc_info = &mut (*ctx.world).globals.NPCInfo;
-    npc_info.goalEntity = ent_id_opt((*ctx.world).entities.as_mut_ptr(), goal);
-    npc_info.goalTime = (*ctx.world).level.time;
+unsafe {
+        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
+        npc_info.goalEntity = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), goal);
+        npc_info.goalTime = (*ctx.world).level.time;
+}
 }
 
 /// Raven `NPC_SetGoal`.
@@ -37,54 +39,58 @@ pub fn NPC_SetGoal(
     goal: *mut gentity_t,
     rating: f32,
 ) {
-    let npc_info = &mut (*ctx.world).globals.NPCInfo;
-    let entity_base = (*ctx.world).entities.as_mut_ptr();
-    let goal_id = ent_id_opt(entity_base, goal);
+unsafe {
+        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
+        let entity_base = (*ctx.world).g_entities.as_mut_ptr();
+        let goal_id = ent_id_opt(entity_base, goal);
 
-    if goal_id == npc_info.goalEntity {
-        return;
-    }
+        if goal_id == npc_info.goalEntity {
+            return;
+        }
 
-    if goal.is_null() {
-        return;
-    }
+        if goal.is_null() {
+            return;
+        }
 
-    if !(*goal).client.is_null() {
-        return;
-    }
+        if !(*goal).client.is_null() {
+            return;
+        }
 
-    if npc_info.goalEntity.is_some() {
-        npc_info.lastGoalEntity = npc_info.goalEntity;
-    }
+        if npc_info.goalEntity.is_some() {
+            npc_info.lastGoalEntity = npc_info.goalEntity;
+        }
 
-    SetGoal(ctx, goal, rating);
+        SetGoal(ctx, goal, rating);
+}
 }
 
 /// Raven `NPC_ClearGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:65-86`
 pub fn NPC_ClearGoal(ctx: GameContext<'_>) {
-    let npc_info = &mut (*ctx.world).globals.NPCInfo;
+unsafe {
+        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
 
-    if npc_info.lastGoalEntity.is_none() {
-        SetGoal(ctx, core::ptr::null_mut(), 0.0);
-        return;
-    }
-
-    let last_goal_id = npc_info.lastGoalEntity;
-    npc_info.lastGoalEntity = None;
-
-    if let Some(goal_id) = last_goal_id {
-        let entity_base = (*ctx.world).entities.as_mut_ptr();
-        let goal = unsafe { entity_base.add(goal_id.0 as usize) };
-
-        if (*goal).inuse && ((*goal).s.eFlags & EF_NODRAW) == 0 {
-            SetGoal(ctx, goal, 0.0);
+        if npc_info.lastGoalEntity.is_none() {
+            SetGoal(ctx, core::ptr::null_mut(), 0.0);
             return;
         }
-    }
 
-    SetGoal(ctx, core::ptr::null_mut(), 0.0);
+        let last_goal_id = npc_info.lastGoalEntity;
+        npc_info.lastGoalEntity = None;
+
+        if let Some(goal_id) = last_goal_id {
+            let entity_base = (*ctx.world).g_entities.as_mut_ptr();
+            let goal = entity_base.add(goal_id.0 as usize);
+
+            if (*goal).inuse && ((*goal).s.eFlags & EF_NODRAW) == 0 {
+                SetGoal(ctx, goal, 0.0);
+                return;
+            }
+        }
+
+        SetGoal(ctx, core::ptr::null_mut(), 0.0);
+}
 }
 
 /// Raven `G_BoundsOverlap`.
@@ -129,22 +135,24 @@ pub fn G_BoundsOverlap(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:117-129`
 pub fn NPC_ReachedGoal(ctx: GameContext<'_>) {
-    NPC_ClearGoal(ctx);
+NPC_ClearGoal(ctx);
 
-    let npc_info = &mut (*ctx.world).globals.NPCInfo;
-    npc_info.goalTime = (*ctx.world).level.time;
+unsafe {
+        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
+        npc_info.goalTime = (*ctx.world).level.time;
 
-    npc_info.aiFlags &= !NPCAI_MOVING;
-    (*ctx.world).globals.ucmd.forwardmove = 0;
+        npc_info.aiFlags &= !NPCAI_MOVING;
+        (*ctx.world).globals.ucmd.forwardmove = 0;
 
-    let npc = (*ctx.world).globals.NPC;
-    trap::ICARUS_TaskIDComplete(
-        ctx.engine,
-        mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
-            npc,
-            TID_MOVE_NAV,
-        ),
-    );
+        let npc = (*ctx.world).globals.NPC;
+        trap::ICARUS_TaskIDComplete(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs::new(
+                npc,
+                TID_MOVE_NAV,
+            ),
+        );
+}
 }
 
 /// Raven `ReachedGoal`.
@@ -158,24 +166,26 @@ pub fn ReachedGoal(
     ctx: GameContext<'_>,
     goal: *mut gentity_t,
 ) -> qboolean {
-    let npc_info = &mut (*ctx.world).globals.NPCInfo;
+unsafe {
+        let npc_info = &mut *(*ctx.world).globals.NPCInfo;
 
-    if (npc_info.aiFlags & NPCAI_TOUCHED_GOAL) != 0 {
-        npc_info.aiFlags &= !NPCAI_TOUCHED_GOAL;
-        return qtrue;
-    }
+        if (npc_info.aiFlags & NPCAI_TOUCHED_GOAL) != 0 {
+            npc_info.aiFlags &= !NPCAI_TOUCHED_GOAL;
+            return qtrue;
+        }
 
-    let npc = (*ctx.world).globals.NPC;
-    let flying = FlyingCreature(npc);
+        let npc = (*ctx.world).globals.NPC;
+        let flying = FlyingCreature(npc);
 
-    NAV_HitNavGoal(
-        (*npc).r.currentOrigin,
-        (*npc).r.mins,
-        (*npc).r.maxs,
-        (*goal).r.currentOrigin,
-        npc_info.goalRadius,
-        flying,
-    )
+        NAV_HitNavGoal(
+            (*npc).r.currentOrigin,
+            (*npc).r.mins,
+            (*npc).r.maxs,
+            (*goal).r.currentOrigin,
+            npc_info.goalRadius,
+            flying,
+        )
+}
 }
 
 /// Raven `UpdateGoal`.
@@ -186,25 +196,27 @@ pub fn ReachedGoal(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:243-267`
 pub fn UpdateGoal(ctx: GameContext<'_>) -> *mut gentity_t {
-    let npc_info = &(*ctx.world).globals.NPCInfo;
+unsafe {
+        let npc_info = &*(*ctx.world).globals.NPCInfo;
 
-    if npc_info.goalEntity.is_none() {
-        return core::ptr::null_mut();
-    }
+        if npc_info.goalEntity.is_none() {
+            return core::ptr::null_mut();
+        }
 
-    let goal_id = npc_info.goalEntity.unwrap();
-    let entity_base = (*ctx.world).entities.as_mut_ptr();
-    let goal = unsafe { entity_base.add(goal_id.0 as usize) };
+        let goal_id = npc_info.goalEntity.unwrap();
+        let entity_base = (*ctx.world).g_entities.as_mut_ptr();
+        let goal = entity_base.add(goal_id.0 as usize);
 
-    if !(*goal).inuse {
-        NPC_ClearGoal(ctx);
-        return core::ptr::null_mut();
-    }
+        if !(*goal).inuse {
+            NPC_ClearGoal(ctx);
+            return core::ptr::null_mut();
+        }
 
-    if ReachedGoal(ctx, goal) != 0 {
-        NPC_ReachedGoal(ctx);
-        return core::ptr::null_mut();
-    }
+        if ReachedGoal(ctx, goal) != 0 {
+            NPC_ReachedGoal(ctx);
+            return core::ptr::null_mut();
+        }
 
-    goal
+        goal
+}
 }

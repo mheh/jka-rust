@@ -68,8 +68,9 @@ pub fn NPC_Seeker_Pain(
     damage: c_int,
 ) {
     unsafe {
-        if !((*(*self_).NPC).aiFlags & crate::npc::ai_flags::NPCAI_CUSTOM_GRAVITY) {
+        if (*((*self_).NPC as *mut gNPC_t)).aiFlags & crate::npc::ai_flags::NPCAI_CUSTOM_GRAVITY == 0 {
             crate::g_combat::G_Damage(
+                ctx,
                 self_,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
@@ -109,7 +110,7 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
                 crate::g_timer::TIMER_Set(ctx, NPC, c"heightChange".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1000, 3000));
 
                 // Find the height difference
-                let enemy = &mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
+                let enemy = &mut world.g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
                 let dif = ((*enemy).r.currentOrigin[2]
                     + (*ctx.world).bg_state.rng.flrand(
                         (*enemy).r.maxs[2] / 2.0f32,
@@ -198,7 +199,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
 
         if (*ctx.world).bg_state.rng.random() > 0.7f32
             || (*NPC).enemy.is_none()
-            || (*(&mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t)).client.is_null()
+            || (*(&mut world.g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t)).client.is_null()
         {
             // Do a regular style strafe
             crate::q_math::AngleVectors(
@@ -216,7 +217,18 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
                 end[i] = (*NPC).r.currentOrigin[i] + SEEKER_STRAFE_DIS * side as f32 * right[i];
             }
 
-            crate::trap::Trace(ctx.engine, &mut tr, (*NPC).r.currentOrigin, core::ptr::null(), core::ptr::null(), end, (*NPC).s.number, MASK_SOLID);
+            crate::trap::Trace(
+                ctx.engine,
+                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                    &mut tr,
+                    &(*NPC).r.currentOrigin,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &end,
+                    (*NPC).s.number,
+                    MASK_SOLID,
+                ),
+            );
 
             // Close enough
             if tr.fraction > 0.9f32 {
@@ -245,7 +257,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
         } else {
             let mut stDis: f32;
             // guaranteed non-null by the `if` branch above (enemy is_some && enemy.client non-null)
-            let enemy = &mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
+            let enemy = &mut world.g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
 
             // Do a strafe to try and keep on the side of their enemy
             crate::q_math::AngleVectors(
@@ -272,7 +284,18 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
                 end[i] += (*ctx.world).bg_state.rng.crandom() * 25.0f32 * dir[i];
             }
 
-            crate::trap::Trace(ctx.engine, &mut tr, (*NPC).r.currentOrigin, core::ptr::null(), core::ptr::null(), end, (*NPC).s.number, MASK_SOLID);
+            crate::trap::Trace(
+                ctx.engine,
+                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                    &mut tr,
+                    &(*NPC).r.currentOrigin,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &end,
+                    (*NPC).s.number,
+                    MASK_SOLID,
+                ),
+            );
 
             // Close enough
             if tr.fraction > 0.9f32 {
@@ -359,7 +382,7 @@ pub fn Seeker_Hunt(
             }
         } else {
             let mut forward: vec3_t = [0.0f32; 3];
-            let enemy = &mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
+            let enemy = &mut world.g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
             forward[0] = (*enemy).r.currentOrigin[0] - (*NPC).r.currentOrigin[0];
             forward[1] = (*enemy).r.currentOrigin[1] - (*NPC).r.currentOrigin[1];
             forward[2] = (*enemy).r.currentOrigin[2] - (*NPC).r.currentOrigin[2];
@@ -436,11 +459,12 @@ pub fn Seeker_Ranged(
             } else {
                 // out of ammo, so let it die...give it a push up so it can fall more and blow up on impact
                 crate::g_combat::G_Damage(
+                    ctx,
                     NPC,
                     NPC,
                     NPC,
                     None,
-                    core::ptr::null(),
+                    crate::q_math::vec3_origin,
                     999,
                     0,
                     MOD_UNKNOWN,
@@ -466,7 +490,7 @@ pub fn Seeker_Attack(ctx: GameContext<'_>) {
         Seeker_MaintainHeight(ctx);
 
         // Rate our distance to the target, and our visibilty
-        let enemy = &mut (*ctx.world).entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
+        let enemy = &mut (*ctx.world).g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
         let distance = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, (*enemy).r.currentOrigin);
         let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, (*NPC).enemy);
         let mut advance = if distance > MIN_DISTANCE_SQR as f32 { qtrue } else { qfalse };
@@ -506,7 +530,7 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
         numFound = crate::trap::EntitiesInBox(ctx.engine, mins, maxs, entityList.as_mut_ptr(), mp_qshared::shared::MAX_GENTITIES as c_int);
 
         for i in 0..numFound {
-            let ent = &mut world.entities[entityList[i as usize] as usize];
+            let ent = &mut world.g_entities[entityList[i as usize] as usize];
 
             if ent.s.number == (*NPC).s.number || ent.client.is_null() || ent.health <= 0 || ent.inuse == 0 {
                 continue;
@@ -552,7 +576,7 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
         let mut minDistSqr: f32;
         let mut pt: vec3_t = [0.0f32; 3];
         let mut dir: vec3_t = [0.0f32; 3];
-        let mut owner: *mut gentity_t = &mut world.entities[(*NPC).s.owner as usize];
+        let mut owner: *mut gentity_t = &mut world.g_entities[(*NPC).s.owner as usize];
 
         Seeker_MaintainHeight(ctx);
 
@@ -641,16 +665,17 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
 
         //N/A for MP.
         if (*NPC).r.ownerNum < ENTITYNUM_NONE {
-            let owner = &mut world.entities[0];
+            let owner = &mut world.g_entities[0];
             if (*owner).health <= 0 || (!(*owner).client.is_null() && (*(*owner).client).pers.connected == crate::client::client_connected::CON_DISCONNECTED) {
                 //owner is dead or gone
                 //remove me
                 crate::g_combat::G_Damage(
+                    ctx,
                     NPC,
                     core::ptr::null_mut(),
                     core::ptr::null_mut(),
                     None,
-                    core::ptr::null(),
+                    crate::q_math::vec3_origin,
                     10000,
                     crate::level::damage_flags::DAMAGE_NO_PROTECTION,
                     MOD_TELEFRAG,
@@ -665,7 +690,7 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
         }
 
         if let Some(enemy_id) = (*NPC).enemy {
-            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             if (*enemy).health > 0 && (*enemy).inuse != 0 {
             if (*(*NPC).client).NPC_class != CLASS_BOBAFETT
                 && ((*enemy).s.number == 0

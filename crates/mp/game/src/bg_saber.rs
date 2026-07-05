@@ -37,9 +37,12 @@ use mp_bg::public::transition_move_table::transitionMove;
 use mp_bg::public::saber_move_transition_angle_table::saberMoveTransitionAngle;
 use mp_bg::public::parry_debounce_table::bg_parryDebounce;
 use crate::bg_channel::PmoveContext;
+use crate::bg_panimate::PM_SaberBounceForAttack;
 use crate::q_math::{Q_random, AngleVectors, PITCH, ROLL, YAW};
 use mp_bg::public::saber_move_name as ls;
 use mp_bg::public::anim_number::animNumber_t as A;
+// Raven `saber_styles_t` variants (`SS_*`) spelled bare in the ported bodies.
+use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::*;
 
 // Per-file `#define` consts (porting-rules convention: cite the Raven #define,
 // keep them local since no shared home exists yet).
@@ -77,6 +80,37 @@ pub const SFL2_NO_MANUAL_DEACTIVATE: c_int = 1 << 7;
 /// `SFL2_NO_MANUAL_DEACTIVATE2`. If set, the blades cannot manually be toggled on and off.
 /// Source: `oracle/oracle/codemp/game/q_shared.h:732`
 pub const SFL2_NO_MANUAL_DEACTIVATE2: c_int = 1 << 16;
+
+// Remaining `SFL2_*` primary/secondary blade-style flags.
+// Source: `oracle/oracle/codemp/game/q_shared.h:715-734`
+/// `SFL2_NO_WALL_MARKS`. Stops the saber from drawing marks on the world.
+pub const SFL2_NO_WALL_MARKS: c_int = 1 << 0;
+/// `SFL2_NO_DLIGHT`. Stops the saber from drawing a dynamic light.
+pub const SFL2_NO_DLIGHT: c_int = 1 << 1;
+/// `SFL2_NO_BLADE`. Stops the saber from drawing a blade.
+pub const SFL2_NO_BLADE: c_int = 1 << 2;
+/// `SFL2_NO_CLASH_FLARE`. The saber will not do the big, white clash flare with other sabers.
+pub const SFL2_NO_CLASH_FLARE: c_int = 1 << 3;
+/// `SFL2_NO_DISMEMBERMENT`. The saber never does dismemberment.
+pub const SFL2_NO_DISMEMBERMENT: c_int = 1 << 4;
+/// `SFL2_NO_IDLE_EFFECT`. The saber will not do damage or any effects when it is idle.
+pub const SFL2_NO_IDLE_EFFECT: c_int = 1 << 5;
+/// `SFL2_ALWAYS_BLOCK`. The blades will always be blocking.
+pub const SFL2_ALWAYS_BLOCK: c_int = 1 << 6;
+/// `SFL2_NO_WALL_MARKS2`. Secondary blade: stops the saber from drawing marks on the world.
+pub const SFL2_NO_WALL_MARKS2: c_int = 1 << 9;
+/// `SFL2_NO_DLIGHT2`. Secondary blade: stops the saber from drawing a dynamic light.
+pub const SFL2_NO_DLIGHT2: c_int = 1 << 10;
+/// `SFL2_NO_BLADE2`. Secondary blade: stops the saber from drawing a blade.
+pub const SFL2_NO_BLADE2: c_int = 1 << 11;
+/// `SFL2_NO_CLASH_FLARE2`. Secondary blade: no clash flare.
+pub const SFL2_NO_CLASH_FLARE2: c_int = 1 << 12;
+/// `SFL2_NO_DISMEMBERMENT2`. Secondary blade: never does dismemberment.
+pub const SFL2_NO_DISMEMBERMENT2: c_int = 1 << 13;
+/// `SFL2_NO_IDLE_EFFECT2`. Secondary blade: no idle effect.
+pub const SFL2_NO_IDLE_EFFECT2: c_int = 1 << 14;
+/// `SFL2_ALWAYS_BLOCK2`. Secondary blade: always blocking.
+pub const SFL2_ALWAYS_BLOCK2: c_int = 1 << 15;
 
 // Vector helpers are the canonical `crate::q_math` forms reached via the
 // prelude glob: `VectorSet`/`_VectorMA`/`_VectorScale`/`_VectorSubtract`

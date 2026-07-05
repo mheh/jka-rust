@@ -10,7 +10,10 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-
+use crate::g_utils::G_SpeechEvent;
+use crate::g_timer::{TIMER_Done, TIMER_Set};
+use crate::NPC_combat::G_ClearEnemy;
+use crate::trap;
 
 /// Raven `G_AddVoiceEvent`.
 ///
@@ -21,75 +24,92 @@ pub fn G_AddVoiceEvent(
     event: c_int,
     speakDebounceTime: c_int,
 ) {
-    if (*self_).NPC.is_null() {
-        return;
+    unsafe {
+        if (*self_).NPC.is_null() {
+            return;
+        }
+
+        if (*self_).client.is_null()
+            || (*((*self_).client as *mut gclient_t)).ps.pm_type >= PM_DEAD as c_int
+        {
+            return;
+        }
+
+        if (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime > (*ctx.world).level.time {
+            return;
+        }
+
+        if trap::ICARUS_TaskIDPending(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs::new(
+                self_,
+                TID_CHAN_VOICE as c_int,
+            ),
+        ) != qfalse
+        {
+            return;
+        }
+
+        if ((*((*self_).NPC as *mut gNPC_t)).scriptFlags & SCF_NO_COMBAT_TALK) != 0
+            && ((event >= EV_ANGER1 as c_int && event <= EV_VICTORY3 as c_int)
+                || (event >= EV_CHASE1 as c_int && event <= EV_SUSPICIOUS5 as c_int))
+        {
+            return;
+        }
+
+        if ((*((*self_).NPC as *mut gNPC_t)).scriptFlags & SCF_NO_ALERT_TALK) != 0
+            && (event >= EV_GIVEUP1 as c_int && event <= EV_SUSPICIOUS5 as c_int)
+        {
+            return;
+        }
+
+        G_SpeechEvent(ctx, self_, event);
+
+        let new_time = (*ctx.world).level.time
+            + if speakDebounceTime == 0 {
+                5000
+            } else {
+                speakDebounceTime
+            };
+        (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = new_time;
     }
-
-    if (*self_).client.is_null() || (*(*self_).client).ps.pm_type >= PM_DEAD {
-        return;
-    }
-
-    if (*(*self_).NPC).blockedSpeechDebounceTime > (*ctx.world).level.time {
-        return;
-    }
-
-    if trap::ICARUS_TaskIDPending(ctx.engine, GICARUSTaskIDPendingArgs::new(self_, TID_CHAN_VOICE)) {
-        return;
-    }
-
-    if ((*(*self_).NPC).scriptFlags & SCF_NO_COMBAT_TALK) != 0
-        && ((event >= EV_ANGER1 && event <= EV_VICTORY3)
-            || (event >= EV_CHASE1 && event <= EV_SUSPICIOUS5))
-    {
-        return;
-    }
-
-    if ((*(*self_).NPC).scriptFlags & SCF_NO_ALERT_TALK) != 0
-        && (event >= EV_GIVEUP1 && event <= EV_SUSPICIOUS5)
-    {
-        return;
-    }
-
-    G_SpeechEvent(ctx, self_, event);
-
-    let new_time = (*ctx.world).level.time
-        + if speakDebounceTime == 0 {
-            5000
-        } else {
-            speakDebounceTime
-        };
-    (*(*self_).NPC).blockedSpeechDebounceTime = new_time;
 }
 
 /// Raven `NPC_PlayConfusionSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_sounds.c:66-93`
 pub fn NPC_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
-    if (*self_).health > 0 {
-        if (*self_).enemy.is_some()
-            || !TIMER_Done(ctx, self_, cstr("enemyLastVisible").as_ptr())
-            || (*(*self_).client).renderInfo.lookTarget == 0
-        {
-            (*(*self_).NPC).blockedSpeechDebounceTime = 0;
-            G_AddVoiceEvent(
-                ctx,
-                self_,
-                (*ctx.world).bg_state.rng.Q_irand(EV_CONFUSE2, EV_CONFUSE3),
-                2000,
-            );
-        } else if !(*self_).NPC.is_null()
-            && (*(*self_).NPC).investigateDebounceTime + (*(*self_).NPC).pauseTime
-                > (*ctx.world).level.time
-        {
-            (*(*self_).NPC).blockedSpeechDebounceTime = 0;
-            G_AddVoiceEvent(ctx, self_, EV_CONFUSE1, 2000);
+    unsafe {
+        if (*self_).health > 0 {
+            if (*self_).enemy.is_some()
+                || TIMER_Done(ctx, self_, cstr("enemyLastVisible").as_ptr()) == qfalse
+                || (*((*self_).client as *mut gclient_t)).renderInfo.lookTarget == 0
+            {
+                (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
+                G_AddVoiceEvent(
+                    ctx,
+                    self_,
+                    (*ctx.world)
+                        .bg_state
+                        .rng
+                        .Q_irand(EV_CONFUSE2 as c_int, EV_CONFUSE3 as c_int),
+                    2000,
+                );
+            } else if !(*self_).NPC.is_null()
+                && (*((*self_).NPC as *mut gNPC_t)).investigateDebounceTime
+                    + (*((*self_).NPC as *mut gNPC_t)).pauseTime
+                    > (*ctx.world).level.time
+            {
+                (*((*self_).NPC as *mut gNPC_t)).blockedSpeechDebounceTime = 0;
+                G_AddVoiceEvent(ctx, self_, EV_CONFUSE1 as c_int, 2000);
+            }
         }
+
+        TIMER_Set(ctx, self_, cstr("enemyLastVisible").as_ptr(), 0);
+        (*((*self_).NPC as *mut gNPC_t)).tempBehavior = BS_DEFAULT as c_int;
+
+        G_ClearEnemy(ctx, self_);
+
+        (*((*self_).NPC as *mut gNPC_t)).investigateCount = 0;
     }
-
-    TIMER_Set(ctx, self_, cstr("enemyLastVisible").as_ptr(), 0);
-    (*(*self_).NPC).tempBehavior = BS_DEFAULT;
-
-    G_ClearEnemy(ctx, self_);
-
-    (*(*self_).NPC).investigateCount = 0;
 }

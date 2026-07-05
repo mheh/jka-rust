@@ -10,12 +10,14 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_main::CalculateRanks;
 
 
 /// Raven `UpdateTournamentInfo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_arenas.c:20-101`
 pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
+    unsafe {
     let mut i: c_int;
     let mut player: *mut gentity_t;
     let mut playerClientNum: c_int;
@@ -62,7 +64,7 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
         if (*player).client.is_null() {
             return;
         }
-        let client = unsafe { &mut *(*player).client };
+        let client = &mut *((*player).client as *mut gclient_t);
         if client.accuracy_shots != 0 {
             accuracy = client.accuracy_hits * 100 / client.accuracy_shots;
         } else {
@@ -140,6 +142,7 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
         i += 1;
     }
 
-    let msg_str = unsafe { cstr_to_str(msg.as_ptr()) };
+    let msg_str = cstr_to_str(msg.as_ptr());
     trap::SendConsoleCommand(ctx.engine, GSendconsolecommandArgs::new(EXEC_APPEND, cstr(&msg_str).as_ptr()));
+    }
 }

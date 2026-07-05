@@ -77,7 +77,7 @@ pub fn TurretPain(
         }
 
         if !attacker.is_null() && !(*attacker).client.is_null() {
-            let client_ptr = (*attacker).client;
+            let client_ptr = (*attacker).client as *mut gclient_t;
             if (*client_ptr).ps.weapon == WP_DEMP2 {
                 let time = (*ctx.world).level.time;
                 let random_val = (*ctx.world).bg_state.rng.random();
@@ -132,7 +132,7 @@ pub fn auto_turret_die(
         if owner_num < (*ctx.world).g_entities.len() {
             let owner = &mut (*ctx.world).g_entities[owner_num];
             owner.think = None;
-            owner.use_fn = None;
+            owner.use_ = None;
         }
 
         let mut forward = [0.0, 0.0, 1.0];
@@ -152,7 +152,7 @@ pub fn auto_turret_die(
 
         pos[2] += (*self_).r.maxs[2] * 0.5;
 
-        G_PlayEffect(EFFECT_EXPLOSION_TURRET, pos, forward);
+        G_PlayEffect(EFFECT_EXPLOSION_TURRET as c_int, pos, forward);
         G_PlayEffectID(G_EffectIndex(c"turret/explode".as_ptr()), pos, forward);
 
         if (*self_).splashDamage > 0 && (*self_).splashRadius > 0 {
@@ -164,7 +164,7 @@ pub fn auto_turret_die(
                 (*self_).splashRadius as f32,
                 attacker,
                 std::ptr::null_mut(),
-                MOD_UNKNOWN,
+                MOD_UNKNOWN as c_int,
             );
         }
 
@@ -260,7 +260,7 @@ pub fn turret_fire(
         (*bolt).classname = c"turret_proj".as_ptr();
         (*bolt).nextthink = (*ctx.world).level.time + 10000;
         (*bolt).think = Some(EntThink::G_FreeEntity);
-        (*bolt).s.eType = ET_MISSILE;
+        (*bolt).s.eType = ET_MISSILE as c_int;
         (*bolt).s.weapon = WP_EMPLACED_GUN;
         (*bolt).r.ownerNum = (*ent).s.number;
         (*bolt).damage = (*ent).damage;
@@ -268,7 +268,7 @@ pub fn turret_fire(
         (*bolt).teamnodmg = (*ent).teamnodmg;
         (*bolt).splashDamage = (*ent).damage;
         (*bolt).splashRadius = 100;
-        (*bolt).methodOfDeath = MOD_TARGET_LASER;
+        (*bolt).methodOfDeath = MOD_TARGET_LASER as c_int;
         (*bolt).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
 
         // VectorSet(maxs, 1.5, 1.5, 1.5)
@@ -294,7 +294,7 @@ pub fn turret_fire(
         (*bolt).s.pos.trDelta[1] = dir[1] * (*ent).mass as f32;
         (*bolt).s.pos.trDelta[2] = dir[2] * (*ent).mass as f32;
 
-        trap::SnapVector(ctx.engine, trap::GSnapvector::new(&mut (*bolt).s.pos.trDelta));
+        trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut (*bolt).s.pos.trDelta as *mut vec3_t));
 
         // VectorCopy(start, currentOrigin)
         (*bolt).r.currentOrigin[0] = start[0];
@@ -322,7 +322,7 @@ pub fn turret_head_think(
 
         if (*self_).painDebounceTime > (*ctx.world).level.time {
             let mut v_up = [0.0, 0.0, 1.0];
-            G_PlayEffect(EFFECT_SPARKS, (*self_).r.currentOrigin, v_up);
+            G_PlayEffect(EFFECT_SPARKS as c_int, (*self_).r.currentOrigin, v_up);
 
             if (*ctx.world).bg_state.rng.Q_irand(0, 3) != 0 {
                 // 25% chance of still firing
@@ -419,7 +419,7 @@ pub fn turret_aim(
             org[2] = (*enemy).r.currentOrigin[2] + (*enemy).r.maxs[2] * 0.5;
 
             // Check for walker vehicle
-            if (*enemy).s.eType == ET_NPC && (*enemy).s.NPC_class == CLASS_VEHICLE && !(*enemy).m_pVehicle.is_null() {
+            if (*enemy).s.eType == ET_NPC as c_int && (*enemy).s.NPC_class == CLASS_VEHICLE && !(*enemy).m_pVehicle.is_null() {
                 let enemy_veh = (*enemy).m_pVehicle as *mut Vehicle_t;
                 if (*enemy_veh).m_pVehicleInfo as *const vehicleInfo_t != std::ptr::null() {
                     if (*(*enemy_veh).m_pVehicleInfo).vehicle_type == VH_WALKER {
@@ -599,7 +599,7 @@ pub fn turret_find_enemies(
                     continue;
                 }
             }
-            if !trap::InPVS(ctx.engine, org2, (*target).r.currentOrigin) {
+            if trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&org2 as *const vec3_t, &(*target).r.currentOrigin as *const vec3_t)) == 0 {
                 continue;
             }
 
@@ -608,8 +608,19 @@ pub fn turret_find_enemies(
             org[1] = (*target).r.currentOrigin[1];
             org[2] = (*target).r.currentOrigin[2] + (*target).r.maxs[2] * 0.5;
 
-            let mut tr: crate::q_shared::trace_t = std::mem::zeroed();
-            trap::Trace(ctx.engine, &mut tr, org2, std::ptr::null(), std::ptr::null(), org, (*self_).s.number, MASK_SHOT);
+            let mut tr: trace_t = std::mem::zeroed();
+            trap::Trace(
+                ctx.engine,
+                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &org2 as *const vec3_t,
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    &org as *const vec3_t,
+                    (*self_).s.number,
+                    MASK_SHOT,
+                ),
+            );
 
             if tr.allsolid == 0 && tr.startsolid == 0 && (tr.fraction == 1.0 || tr.entityNum as c_int == (*target).s.number) {
                 let mut enemyDir = [0.0; 3];
@@ -620,8 +631,8 @@ pub fn turret_find_enemies(
                 let enemyDist = crate::q_math::VectorLengthSquared(enemyDir);
 
                 let atst_name = c"atst_vehicle".as_ptr();
-                let target_is_atst = !Q_stricmp((*target).NPC_type, atst_name);
-                let best_is_atst = !bestTarget.is_null() && !Q_stricmp((*bestTarget).NPC_type, atst_name);
+                let target_is_atst = Q_stricmp((*target).NPC_type, atst_name) == 0;
+                let best_is_atst = !bestTarget.is_null() && Q_stricmp((*bestTarget).NPC_type, atst_name) == 0;
 
                 if enemyDist < bestDist || (target_is_atst && !best_is_atst) {
                     if (*self_).attackDebounceTime < (*ctx.world).level.time {
@@ -635,7 +646,7 @@ pub fn turret_find_enemies(
             }
         }
 
-        if found {
+        if found != 0 {
             G_SetEnemy(ctx, self_, bestTarget);
             if VALIDSTRING((*self_).target2) {
                 G_UseTargets2(ctx, self_, self_, (*self_).target2);
@@ -669,7 +680,7 @@ pub fn turret_base_think(
         }
 
         if (*self_).enemy.is_none() {
-            if turret_find_enemies(ctx, self_) {
+            if turret_find_enemies(ctx, self_) != 0 {
                 turnOff = qfalse;
             }
         } else {
@@ -692,7 +703,7 @@ pub fn turret_base_think(
                     // Was in valid radius
                     if trap::InPVS(ctx.engine, (*self_).r.currentOrigin, (*enemy).r.currentOrigin) {
                         // Every now and then, check if we can trace to enemy
-                        let mut tr: crate::q_shared::trace_t = std::mem::zeroed();
+                        let mut tr: trace_t = std::mem::zeroed();
                         let mut org = [0.0; 3];
                         let mut org2 = [0.0; 3];
 
@@ -717,7 +728,18 @@ pub fn turret_base_think(
                             org2[2] -= 10.0;
                         }
 
-                        trap::Trace(ctx.engine, &mut tr, org2, std::ptr::null(), std::ptr::null(), org, (*self_).s.number, MASK_SHOT);
+                        trap::Trace(
+                ctx.engine,
+                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &org2 as *const vec3_t,
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    &org as *const vec3_t,
+                    (*self_).s.number,
+                    MASK_SHOT,
+                ),
+            );
 
                         if tr.allsolid == 0 && tr.startsolid == 0 && tr.entityNum as c_int == (*enemy).s.number {
                             turnOff = qfalse;
@@ -731,7 +753,7 @@ pub fn turret_base_think(
             turret_head_think(ctx, self_);
         }
 
-        if turnOff {
+        if turnOff != 0 {
             if (*self_).bounceCount < (*ctx.world).level.time {
                 turret_sleep(ctx, self_);
             }
@@ -791,13 +813,13 @@ pub fn SP_misc_turret(
         (*base).r.mins[1] = -32.0;
         (*base).r.mins[2] = 0.0;
 
-        (*base).use_fn = Some(EntUse::turret_base_use);
+        (*base).use_ = Some(EntUse::turret_base_use);
         (*base).think = Some(EntThink::turret_base_think);
         (*base).nextthink = (*ctx.world).level.time + FRAMETIME * 5;
 
-        trap::LinkEntity(ctx.engine, base);
+        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base));
 
-        if !turret_base_spawn_top(ctx, base) {
+        if turret_base_spawn_top(ctx, base) == 0 {
             G_FreeEntity(ctx, base);
         }
     }
@@ -838,7 +860,7 @@ pub fn turret_base_spawn_top(
         (*top).teamnodmg = (*base).teamnodmg;
         (*top).alliedTeam = (*base).alliedTeam;
 
-        (*base).s.eType = ET_GENERAL;
+        (*base).s.eType = ET_GENERAL as c_int;
 
         // Set up explosion effects
         G_EffectIndex(c"turret/explode".as_ptr());
@@ -846,7 +868,7 @@ pub fn turret_base_spawn_top(
         G_EffectIndex(c"turret/hoth_muzzle_flash".as_ptr());
 
         // Pitch angle (actually yaw, stored in speed field)
-        (*top).speed = 0;
+        (*top).speed = 0.0;
 
         // Random time offset for no-enemy-search-around mode
         (*top).count = ((*ctx.world).bg_state.rng.random() * 9000.0) as c_int;
@@ -887,8 +909,8 @@ pub fn turret_base_spawn_top(
         (*top).s.shouldtarget = qtrue;
 
         // Link them to each other
-        (*base).target_ent = top;
-        (*top).target_ent = base;
+        (*base).target_ent = ent_id_opt((*ctx.world).g_entities.as_ptr(), top);
+        (*top).target_ent = ent_id_opt((*ctx.world).g_entities.as_ptr(), base);
 
         // Search radius
         if (*base).radius == 0.0 {
@@ -953,7 +975,7 @@ pub fn turret_base_spawn_top(
         // Set as turret
         (*top).s.weapon = WP_EMPLACED_GUN;
 
-        trap::LinkEntity(ctx.engine, top);
+        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(top));
         qtrue
     }
 }

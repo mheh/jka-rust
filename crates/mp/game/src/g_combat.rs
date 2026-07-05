@@ -1264,7 +1264,7 @@ pub fn G_PickDeathAnim(
 pub fn G_GetJediMaster(ctx: GameContext<'_>) -> *mut gentity_t {
     unsafe {
         for i in 0..MAX_CLIENTS as usize {
-            let ent = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             let client = (*ent).client as *mut gclient_t;
             if (*ent).inuse != qfalse
                 && !client.is_null()
@@ -1306,7 +1306,7 @@ pub fn G_AlertTeam(
         // Get the number of entities in a given space
         let numEnts = trap::EntitiesInBox(
             ctx.engine,
-            mp_abi::game::syscalls::G_ENTITIESINBOX::GEntitiesinboxArgs::new(
+            mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs::new(
                 &mins as *const vec3_t,
                 &maxs as *const vec3_t,
                 radiusEnts.as_mut_ptr(),
@@ -1316,7 +1316,7 @@ pub fn G_AlertTeam(
 
         // Cull this list
         for i in 0..numEnts {
-            let check = &mut (*ctx.world).entities[radiusEnts[i as usize] as usize] as *mut gentity_t;
+            let check = &mut (*ctx.world).g_entities[radiusEnts[i as usize] as usize] as *mut gentity_t;
 
             // Validate clients
             if (*check).client.is_null() {
@@ -1375,7 +1375,7 @@ pub fn G_AlertTeam(
                 if distSq > 16384.0
                     && trap::InPVS(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_INPVS::GInpvsArgs::new(
+                        mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
                             &(*victim).r.currentOrigin as *const vec3_t,
                             &(*check).r.currentOrigin as *const vec3_t,
                         ),
@@ -1664,7 +1664,7 @@ pub fn G_AddPowerDuelScore(ctx: GameContext<'_>, team: c_int, score: c_int) {
     unsafe {
         let mut i = 0;
         while i < MAX_CLIENTS as c_int {
-            let check = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            let check = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
             let checkClient = (*check).client as *mut gclient_t;
             if (*check).inuse != qfalse
                 && !checkClient.is_null()
@@ -1690,7 +1690,7 @@ pub fn G_AddPowerDuelLoserScore(ctx: GameContext<'_>, team: c_int, score: c_int)
     unsafe {
         let mut i = 0;
         while i < MAX_CLIENTS as c_int {
-            let check = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            let check = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
             let checkClient = (*check).client as *mut gclient_t;
             if (*check).inuse != qfalse
                 && !checkClient.is_null()
@@ -1785,7 +1785,7 @@ pub fn player_die(
     // the counter lives in one atomic (behavior-preserving).
     static DEATH_ANIM_I: core::sync::atomic::AtomicI32 = core::sync::atomic::AtomicI32::new(0);
     unsafe {
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
         let cl = (*self_).client as *mut gclient_t;
         let mut wasJediMaster: qboolean = qfalse;
         let mut sPMType: c_int = 0;
@@ -1830,7 +1830,7 @@ pub fn player_die(
 
             if (*cl).ps.otherKillerTime >= (*ctx.world).level.time {
                 // use the last attacker
-                murderer = &mut (*ctx.world).entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
+                murderer = &mut (*ctx.world).g_entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
                 if (*murderer).inuse == qfalse || (*murderer).client.is_null() {
                     murderer = core::ptr::null_mut();
                 } else {
@@ -1841,7 +1841,7 @@ pub fn player_die(
                         && !(*murderer).m_pVehicle.is_null()
                         && !(*murdererVeh).m_pPilot.is_null()
                     {
-                        let murderPilot = &mut (*ctx.world).entities
+                        let murderPilot = &mut (*ctx.world).g_entities
                             [(*((*murdererVeh).m_pPilot as *mut gentity_t)).s.number as usize]
                             as *mut gentity_t;
                         if (*murderPilot).inuse != qfalse && !(*murderPilot).client.is_null() {
@@ -1875,7 +1875,7 @@ pub fn player_die(
                     && !(*attackerVeh).m_pPilot.is_null()
                 {
                     // set vehicles pilot's killer as murderer
-                    murderer = &mut (*ctx.world).entities
+                    murderer = &mut (*ctx.world).g_entities
                         [(*((*attackerVeh).m_pPilot as *mut gentity_t)).s.number as usize]
                         as *mut gentity_t;
                     if (*murderer).inuse != qfalse
@@ -1883,7 +1883,7 @@ pub fn player_die(
                         && (*((*murderer).client as *mut gclient_t)).ps.otherKillerTime
                             >= (*ctx.world).level.time
                     {
-                        murderer = &mut (*ctx.world).entities
+                        murderer = &mut (*ctx.world).g_entities
                             [(*((*murderer).client as *mut gclient_t)).ps.otherKiller as usize]
                             as *mut gentity_t;
                         if (*murderer).inuse == qfalse || (*murderer).client.is_null() {
@@ -1893,7 +1893,7 @@ pub fn player_die(
                         murderer = core::ptr::null_mut();
                     }
                 } else {
-                    murderer = &mut (*ctx.world).entities[(*attacker).s.number as usize]
+                    murderer = &mut (*ctx.world).g_entities[(*attacker).s.number as usize]
                         as *mut gentity_t;
                 }
             } else if !(*selfVeh).m_pPilot.is_null() {
@@ -1994,7 +1994,7 @@ pub fn player_die(
         if (*cl).holdingObjectiveItem > 0 {
             // carrying a siege objective item - make sure it updates and removes itself from us now
             let objectiveItem =
-                &mut (*ctx.world).entities[(*cl).holdingObjectiveItem as usize] as *mut gentity_t;
+                &mut (*ctx.world).g_entities[(*cl).holdingObjectiveItem as usize] as *mut gentity_t;
 
             if (*objectiveItem).inuse != qfalse {
                 if let Some(think_fn) = (*objectiveItem).think {
@@ -2012,7 +2012,7 @@ pub fn player_die(
 
         if (*cl).NPC_class != class_t::CLASS_VEHICLE && (*cl).ps.m_iVehicleNum != 0 {
             // I'm riding a vehicle - tell it I'm getting off
-            let veh = &mut (*ctx.world).entities[(*cl).ps.m_iVehicleNum as usize] as *mut gentity_t;
+            let veh = &mut (*ctx.world).g_entities[(*cl).ps.m_iVehicleNum as usize] as *mut gentity_t;
             let vehVeh = (*veh).m_pVehicle as *mut Vehicle_t;
 
             if (*veh).inuse != qfalse && !(*veh).client.is_null() && !(*veh).m_pVehicle.is_null() {
@@ -2091,7 +2091,7 @@ pub fn player_die(
                 let tg = (*npc).tempGoal.unwrap();
                 crate::g_utils::G_FreeEntity(
                     ctx,
-                    &mut (*ctx.world).entities[tg.0 as usize] as *mut gentity_t,
+                    &mut (*ctx.world).g_entities[tg.0 as usize] as *mut gentity_t,
                 );
                 (*npc).tempGoal = None;
             }
@@ -2154,7 +2154,7 @@ pub fn player_die(
             && (*attacker).client.is_null()
             && (*inflictor).s.weapon == WP_TURRET as c_int
         {
-            let act = &mut (*ctx.world).entities[(*inflictor).activator.unwrap().0 as usize]
+            let act = &mut (*ctx.world).g_entities[(*inflictor).activator.unwrap().0 as usize]
                 as *mut gentity_t;
             if !(*act).client.is_null() && (*act).inuse != qfalse {
                 attacker = act;
@@ -2181,7 +2181,7 @@ pub fn player_die(
             && (*cl).ps.otherKillerTime > (*ctx.world).level.time
         {
             // remember who last attacked us
-            attacker = &mut (*ctx.world).entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
+            attacker = &mut (*ctx.world).g_entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
             if (*cl).otherKillerMOD != meansOfDeath_t::MOD_UNKNOWN as c_int {
                 actualMOD = (*cl).otherKillerMOD;
             }
@@ -2351,13 +2351,13 @@ pub fn player_die(
 
                     if otherClNum >= 0
                         && otherClNum < MAX_CLIENTS as c_int
-                        && (*ctx.world).entities[otherClNum as usize].inuse != qfalse
-                        && !(*ctx.world).entities[otherClNum as usize].client.is_null()
+                        && (*ctx.world).g_entities[otherClNum as usize].inuse != qfalse
+                        && !(*ctx.world).g_entities[otherClNum as usize].client.is_null()
                         && otherClNum != (*attacker).s.number
                     {
                         AddScore(
                             ctx,
-                            &mut (*ctx.world).entities[otherClNum as usize] as *mut gentity_t,
+                            &mut (*ctx.world).g_entities[otherClNum as usize] as *mut gentity_t,
                             (*self_).r.currentOrigin,
                             1,
                         );
@@ -2444,13 +2444,13 @@ pub fn player_die(
 
                 if otherClNum >= 0
                     && otherClNum < MAX_CLIENTS as c_int
-                    && (*ctx.world).entities[otherClNum as usize].inuse != qfalse
-                    && !(*ctx.world).entities[otherClNum as usize].client.is_null()
+                    && (*ctx.world).g_entities[otherClNum as usize].inuse != qfalse
+                    && !(*ctx.world).g_entities[otherClNum as usize].client.is_null()
                     && otherClNum != (*self_).s.number
                 {
                     AddScore(
                         ctx,
-                        &mut (*ctx.world).entities[otherClNum as usize] as *mut gentity_t,
+                        &mut (*ctx.world).g_entities[otherClNum as usize] as *mut gentity_t,
                         (*self_).r.currentOrigin,
                         1,
                     );
@@ -2520,7 +2520,7 @@ pub fn player_die(
             if (*client).sess.spectatorClient == (*self_).s.number {
                 crate::g_cmds::Cmd_Score_f(
                     ctx,
-                    &mut (*ctx.world).entities[i as usize] as *mut gentity_t,
+                    &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t,
                 );
             }
         }
@@ -2678,7 +2678,7 @@ pub fn player_die(
                 let mut heLives: qboolean = qfalse;
 
                 while i < MAX_CLIENTS as c_int {
-                    let check = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+                    let check = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
                     let checkClient = (*check).client as *mut gclient_t;
                     if (*check).inuse != qfalse
                         && !checkClient.is_null()
@@ -4275,7 +4275,7 @@ pub fn G_LocationBasedDamageModifier(
 pub fn G_ThereIsAMaster(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         for i in 0..MAX_CLIENTS as usize {
-            let ent = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             let client = (*ent).client as *mut gclient_t;
             if !client.is_null() && (*client).ps.isJediMaster != qfalse {
                 return qtrue;
@@ -4348,7 +4348,7 @@ pub fn G_ApplyVehicleOtherKiller(
                 // propogate otherkiller down to pilot and passengers
                 if !(*targ).m_pVehicle.is_null() {
                     if !(*targVeh).m_pPilot.is_null() {
-                        let pilot = &mut (*ctx.world).entities
+                        let pilot = &mut (*ctx.world).g_entities
                             [(*((*targVeh).m_pPilot as *mut gentity_t)).s.number as usize]
                             as *mut gentity_t;
                         if !(*pilot).client.is_null() {
@@ -4364,7 +4364,7 @@ pub fn G_ApplyVehicleOtherKiller(
                     }
                     let mut passNum = 0;
                     while passNum < (*targVeh).m_iNumPassengers {
-                        let pass = &mut (*ctx.world).entities[(*((*targVeh).m_ppPassengers
+                        let pass = &mut (*ctx.world).g_entities[(*((*targVeh).m_ppPassengers
                             [passNum as usize]
                             as *mut gentity_t))
                             .s
@@ -4434,7 +4434,7 @@ pub fn G_Damage(
     r#mod: c_int,
 ) {
     unsafe {
-        let base = (*ctx.world).entities.as_mut_ptr();
+        let base = (*ctx.world).g_entities.as_mut_ptr();
         let mut take: c_int;
         let mut save: c_int;
         let asave: c_int;
@@ -4448,7 +4448,7 @@ pub fn G_Damage(
         if !targ.is_null() && (*targ).damageRedirect != qfalse {
             G_Damage(
                 ctx,
-                &mut (*ctx.world).entities[(*targ).damageRedirectTo as usize] as *mut gentity_t,
+                &mut (*ctx.world).g_entities[(*targ).damageRedirectTo as usize] as *mut gentity_t,
                 inflictor,
                 attacker,
                 dir.as_deref_mut(),
@@ -4518,7 +4518,7 @@ pub fn G_Damage(
             // don't take damage when in a walker, or fighter unless it's dead
             let tc = (*targ).client as *mut gclient_t;
             if (*tc).ps.clientNum < MAX_CLIENTS as c_int && (*tc).ps.m_iVehicleNum != 0 {
-                let veh = &mut (*ctx.world).entities[(*tc).ps.m_iVehicleNum as usize]
+                let veh = &mut (*ctx.world).g_entities[(*tc).ps.m_iVehicleNum as usize]
                     as *mut gentity_t;
                 let vv = (*veh).m_pVehicle as *mut Vehicle_t;
                 if !(*veh).m_pVehicle.is_null() && (*veh).health > 0 {
@@ -4634,10 +4634,10 @@ pub fn G_Damage(
             return;
         }
         if inflictor.is_null() {
-            inflictor = &mut (*ctx.world).entities[ENTITYNUM_WORLD as usize] as *mut gentity_t;
+            inflictor = &mut (*ctx.world).g_entities[ENTITYNUM_WORLD as usize] as *mut gentity_t;
         }
         if attacker.is_null() {
-            attacker = &mut (*ctx.world).entities[ENTITYNUM_WORLD as usize] as *mut gentity_t;
+            attacker = &mut (*ctx.world).g_entities[ENTITYNUM_WORLD as usize] as *mut gentity_t;
         }
 
         // shootable doors / buttons don't actually have any health
@@ -4846,14 +4846,14 @@ pub fn G_Damage(
                     && (*attacker).client.is_null()
                     && (*attacker).activator.is_some()
                     && {
-                        let act = &mut (*ctx.world).entities
+                        let act = &mut (*ctx.world).g_entities
                             [(*attacker).activator.unwrap().0 as usize]
                             as *mut gentity_t;
                         targ != act && (*act).inuse != qfalse && !(*act).client.is_null()
                     }
                 {
                     // emplaced guns don't hurt teammates of user
-                    let act = &mut (*ctx.world).entities[(*attacker).activator.unwrap().0 as usize]
+                    let act = &mut (*ctx.world).g_entities[(*attacker).activator.unwrap().0 as usize]
                         as *mut gentity_t;
                     if crate::g_team::OnSameTeam(ctx, targ, act) != qfalse {
                         if (*ctx.world).cvars.g_friendlyFire.integer == 0 {
@@ -4898,7 +4898,7 @@ pub fn G_Damage(
                 && (*targ).s.owner >= 0
                 && (*targ).s.owner < MAX_CLIENTS as c_int
             {
-                let targown = &mut (*ctx.world).entities[(*targ).s.owner as usize] as *mut gentity_t;
+                let targown = &mut (*ctx.world).g_entities[(*targ).s.owner as usize] as *mut gentity_t;
 
                 if !targown.is_null()
                     && (*targown).inuse != qfalse
@@ -4952,7 +4952,7 @@ pub fn G_Damage(
                         // a non-client hit a non-client object
                         if (*targ).teamnodmg == (*attacker).teamnodmg {
                             if (*attacker).activator.is_some() && {
-                                let a = &mut (*ctx.world).entities
+                                let a = &mut (*ctx.world).g_entities
                                     [(*attacker).activator.unwrap().0 as usize]
                                     as *mut gentity_t;
                                 (*a).inuse != qfalse
@@ -5628,7 +5628,7 @@ pub fn G_DamageFromKiller(
             && (*vc).ps.otherKillerTime > (*ctx.world).level.time
         {
             let potentialKiller =
-                &mut (*ctx.world).entities[(*vc).ps.otherKiller as usize] as *mut gentity_t;
+                &mut (*ctx.world).g_entities[(*vc).ps.otherKiller as usize] as *mut gentity_t;
 
             if (*potentialKiller).inuse != qfalse {
                 // he's valid I guess
@@ -5788,7 +5788,7 @@ pub fn G_RadiusDamage(
 
         let numListedEntities = trap::EntitiesInBox(
             ctx.engine,
-            mp_abi::game::syscalls::G_ENTITIESINBOX::GEntitiesinboxArgs::new(
+            mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs::new(
                 &mins as *const vec3_t,
                 &maxs as *const vec3_t,
                 entityList.as_mut_ptr(),
@@ -5797,7 +5797,7 @@ pub fn G_RadiusDamage(
         );
 
         for e in 0..numListedEntities {
-            let ent = &mut (*ctx.world).entities[entityList[e as usize] as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[entityList[e as usize] as usize] as *mut gentity_t;
 
             if ent == ignore {
                 continue;

@@ -17,7 +17,7 @@ use crate::g_combat::G_AlertTeam;
 use crate::g_timer::{TIMER_Done, TIMER_Exists, TIMER_Set};
 use crate::g_utils::{vtos, G_Sound};
 use crate::q_math::{
-    vec3_origin, AngleVectors, DistanceHorizontalSquared, Q_irand, VectorLength,
+    vec3_origin, AngleVectors, DistanceHorizontalSquared, VectorLength,
     VectorLengthSquared, VectorNormalize, _DotProduct, _VectorCopy, _VectorMA, _VectorSubtract,
     vectoangles,
 };
@@ -69,7 +69,7 @@ const DEBUG_LEVEL_INFO: c_int = 3;
 /// (ruling 22 seam helper), precedent `g_missile.rs`/`g_trigger.rs`.
 #[inline]
 unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
-    unsafe { (*ctx.world).entities.as_ptr() }
+    unsafe { (*ctx.world).g_entities.as_ptr() }
 }
 
 /// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
@@ -77,7 +77,7 @@ unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
 #[inline]
 unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -116,7 +116,7 @@ pub fn G_ClearEnemy(
 
         if !(*self_).enemy.is_none() {
             let client = (*self_).client as *mut gclient_t;
-            let enemy = &mut (*ctx.world).entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
+            let enemy = &mut (*ctx.world).g_entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
             if !client.is_null() && (*client).renderInfo.lookTarget == (*enemy).s.number {
                 NPC_ClearLookTarget(self_);
             }
@@ -181,7 +181,7 @@ pub fn G_TeamEnemy(
 
         let num_entities = (*ctx.world).level.num_entities;
         for i in 1..num_entities {
-            let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
             if ent == self_ {
                 continue;
             }
@@ -254,37 +254,37 @@ pub fn G_AttackDelay(
         match (*client).NPC_class {
             class_t::CLASS_IMPERIAL => {
                 //they give orders and hang back
-                attDelay += Q_irand(500, 1500);
+                attDelay += (*ctx.world).bg_state.rng.Q_irand(500, 1500);
             }
             class_t::CLASS_STORMTROOPER => {
                 //stormtroopers shoot sooner
                 if (*npc).rank >= RANK_LT {
                     //officers shoot even sooner
-                    attDelay -= Q_irand(500, 1500);
+                    attDelay -= (*ctx.world).bg_state.rng.Q_irand(500, 1500);
                 } else {
                     //normal stormtroopers don't have as fast reflexes as officers
-                    attDelay -= Q_irand(0, 1000);
+                    attDelay -= (*ctx.world).bg_state.rng.Q_irand(0, 1000);
                 }
             }
             class_t::CLASS_SWAMPTROOPER => {
                 //shoot very quickly?  What about guys in water?
-                attDelay -= Q_irand(1000, 2000);
+                attDelay -= (*ctx.world).bg_state.rng.Q_irand(1000, 2000);
             }
             class_t::CLASS_IMPWORKER => {
                 //they panic, don't fire right away
-                attDelay += Q_irand(1000, 2500);
+                attDelay += (*ctx.world).bg_state.rng.Q_irand(1000, 2500);
             }
             class_t::CLASS_TRANDOSHAN => {
-                attDelay -= Q_irand(500, 1500);
+                attDelay -= (*ctx.world).bg_state.rng.Q_irand(500, 1500);
             }
             class_t::CLASS_JAN
             | class_t::CLASS_LANDO
             | class_t::CLASS_PRISONER
             | class_t::CLASS_REBEL => {
-                attDelay -= Q_irand(500, 1500);
+                attDelay -= (*ctx.world).bg_state.rng.Q_irand(500, 1500);
             }
             class_t::CLASS_GALAKMECH | class_t::CLASS_ATST => {
-                attDelay -= Q_irand(1000, 2000);
+                attDelay -= (*ctx.world).bg_state.rng.Q_irand(1000, 2000);
             }
             class_t::CLASS_REELO | class_t::CLASS_UGNAUGHT | class_t::CLASS_JAWA => {
                 return;
@@ -318,26 +318,26 @@ pub fn G_AttackDelay(
             w if w == WP_BLASTER as c_int => {
                 if ((*npc).scriptFlags & SCF_ALT_FIRE) != 0 {
                     //rapid-fire blasters
-                    attDelay += Q_irand(0, 500);
+                    attDelay += (*ctx.world).bg_state.rng.Q_irand(0, 500);
                 } else {
                     //regular blaster
-                    attDelay -= Q_irand(0, 500);
+                    attDelay -= (*ctx.world).bg_state.rng.Q_irand(0, 500);
                 }
             }
             w if w == WP_BOWCASTER as c_int => {
-                attDelay += Q_irand(0, 500);
+                attDelay += (*ctx.world).bg_state.rng.Q_irand(0, 500);
             }
             w if w == WP_REPEATER as c_int => {
                 if ((*npc).scriptFlags & SCF_ALT_FIRE) == 0 {
                     //rapid-fire blasters
-                    attDelay += Q_irand(0, 500);
+                    attDelay += (*ctx.world).bg_state.rng.Q_irand(0, 500);
                 }
             }
             w if w == WP_FLECHETTE as c_int => {
-                attDelay += Q_irand(500, 1500);
+                attDelay += (*ctx.world).bg_state.rng.Q_irand(500, 1500);
             }
             w if w == WP_ROCKET_LAUNCHER as c_int => {
-                attDelay += Q_irand(500, 1500);
+                attDelay += (*ctx.world).bg_state.rng.Q_irand(500, 1500);
             }
             //rwwFIXMEFIXME: Have this weapon for NPCs?
             w if w == WP_DISRUPTOR as c_int => {
@@ -374,15 +374,15 @@ pub fn G_AttackDelay(
         if attDelay > cap {
             attDelay = cap;
         }
-        TIMER_Set(ctx, self_, c"attackDelay".as_ptr() as *const c_char, attDelay); //Q_irand( 1500, 4500 ) );
+        TIMER_Set(ctx, self_, c"attackDelay".as_ptr() as *const c_char, attDelay); //(*ctx.world).bg_state.rng.Q_irand( 1500, 4500 ) );
         //don't move right away either
         if attDelay > 4000 {
-            attDelay = 4000 - Q_irand(500, 1500);
+            attDelay = 4000 - (*ctx.world).bg_state.rng.Q_irand(500, 1500);
         } else {
-            attDelay -= Q_irand(500, 1500);
+            attDelay -= (*ctx.world).bg_state.rng.Q_irand(500, 1500);
         }
 
-        TIMER_Set(ctx, self_, c"roamTime".as_ptr() as *const c_char, attDelay); //was Q_irand( 1000, 3500 );
+        TIMER_Set(ctx, self_, c"roamTime".as_ptr() as *const c_char, attDelay); //was (*ctx.world).bg_state.rng.Q_irand( 1000, 3500 );
     }
 }
 
@@ -509,7 +509,7 @@ pub fn G_SetEnemy(
                 //rwwFIXMEFIXME: Set forcePushTime
                 if G_TeamEnemy(ctx, self_) == 0 {
                     //team did not have an enemy previously
-                    event = Q_irand(EV_ANGER1 as c_int, EV_ANGER3 as c_int);
+                    event = (*ctx.world).bg_state.rng.Q_irand(EV_ANGER1 as c_int, EV_ANGER3 as c_int);
                 }
 
                 if event != 0 {
@@ -533,7 +533,7 @@ pub fn G_SetEnemy(
                     G_AimSet(
                         ctx,
                         self_,
-                        Q_irand(
+                        (*ctx.world).bg_state.rng.Q_irand(
                             (*npc).stats.aim - (5 * g_spskill),
                             (*npc).stats.aim - g_spskill,
                         ),
@@ -555,7 +555,7 @@ pub fn G_SetEnemy(
                     G_AimSet(
                         ctx,
                         self_,
-                        Q_irand(
+                        (*ctx.world).bg_state.rng.Q_irand(
                             (*npc).stats.aim - (maxErr * (3 - g_spskill)),
                             (*npc).stats.aim - (minErr * (3 - g_spskill)),
                         ),
@@ -958,7 +958,7 @@ pub fn ShotThroughGlass(
     mask: c_int,
 ) -> qboolean {
     unsafe {
-        let hit = &mut (*ctx.world).entities[(*tr).entityNum as usize] as *mut gentity_t;
+        let hit = &mut (*ctx.world).g_entities[(*tr).entityNum as usize] as *mut gentity_t;
         if hit != target && EntIsGlass(hit) != 0 {
             //ok to shoot through breakable glass
             let skip = (*hit).s.number;
@@ -1013,7 +1013,7 @@ pub fn CanShoot(
                 MASK_SHOT,
             ),
         );
-        let mut traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+        let mut traceEnt = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
         // point blank, baby!
         let shooter_npc = (*shooter).NPC as *mut gNPC_t;
@@ -1023,7 +1023,7 @@ pub fn CanShoot(
         }
 
         if ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_SHOT) != 0 {
-            traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+            traceEnt = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
         }
 
         // shot is dead on
@@ -1045,7 +1045,7 @@ pub fn CanShoot(
                 MASK_SHOT,
             ),
         );
-        traceEnt = &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t;
+        traceEnt = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
         if traceEnt == ent {
             return 1;
         }
@@ -1327,7 +1327,7 @@ pub fn NPC_PickEnemy(
 
         if findPlayersFirst != QFALSE {
             //try to find a player first
-            let newenemy = &mut world.entities[0] as *mut gentity_t;
+            let newenemy = &mut world.g_entities[0] as *mut gentity_t;
             if !(*newenemy).client.is_null()
                 && ((*newenemy).flags & FL_NOTARGET) == 0
                 && ((*newenemy).s.eFlags & EF_NODRAW) == 0
@@ -1440,7 +1440,7 @@ pub fn NPC_PickEnemy(
 
         if num_choices != 0 {
             let idx = (world.bg_state.rng.rand() as usize) % num_choices;
-            return &mut world.entities[choice[idx] as usize] as *mut gentity_t;
+            return &mut world.g_entities[choice[idx] as usize] as *mut gentity_t;
         }
 
         num_choices = 0;
@@ -1448,7 +1448,7 @@ pub fn NPC_PickEnemy(
         closestEnemy = core::ptr::null_mut();
 
         for entNum in 0..world.level.num_entities {
-            let newenemy = &mut world.entities[entNum as usize] as *mut gentity_t;
+            let newenemy = &mut world.g_entities[entNum as usize] as *mut gentity_t;
 
             if newenemy == npc
                 || (*newenemy).client.is_null()
@@ -1581,7 +1581,7 @@ pub fn NPC_PickEnemy(
         }
 
         let idx = (world.bg_state.rng.rand() as usize) % num_choices;
-        &mut world.entities[choice[idx] as usize] as *mut gentity_t
+        &mut world.g_entities[choice[idx] as usize] as *mut gentity_t
     }
 }
 
@@ -1605,7 +1605,7 @@ pub fn NPC_PickAlly(
         let mut bestDist = range;
 
         for entNum in 0..world.level.num_entities {
-            let ally = &mut world.entities[entNum as usize] as *mut gentity_t;
+            let ally = &mut world.g_entities[entNum as usize] as *mut gentity_t;
 
             if (*ally).client.is_null() || (*ally).health <= 0 {
                 continue;
@@ -1987,7 +1987,7 @@ pub fn NPC_EvaluateShot(
         }
 
         let enemy = ent_ptr(ctx, (*npc).enemy);
-        let hitEnt = &mut (*ctx.world).entities[hit as usize] as *mut gentity_t;
+        let hitEnt = &mut (*ctx.world).g_entities[hit as usize] as *mut gentity_t;
         if hit == (*enemy).s.number || ((*hitEnt).r.svFlags & crate::g_public_consts::SVF_GLASS_BRUSH) != 0 {
             //can hit enemy or will hit glass, so shoot anyway
             return QTRUE;
@@ -2154,7 +2154,7 @@ pub fn NPC_CheckCanAttack(
                 );
                 ShotThroughGlass(ctx, &mut tr as *mut trace_t, enemy, hitspot, MASK_SHOT);
 
-                traceEnt = &mut world.entities[tr.entityNum as usize] as *mut gentity_t;
+                traceEnt = &mut world.g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                 hitspot = tr.endpos;
 
@@ -2679,9 +2679,13 @@ pub fn NPC_FindCombatPoint(
 // this file; per-file precedent (`g_navnew.rs`).
 const ENTITYNUM_NONE_LOCAL: c_int = (mp_qshared::shared::MAX_GENTITIES - 1) as c_int;
 
-// Raven `CPF_SQUAD` (`combatPoint_t::flags` bit) — not yet ported as a
-// central const; inlined here from the header value.
-// Source: `oracle/oracle/codemp/game/b_local.h:267`
+// Raven `CPF_DUCK`/`CPF_FLEE`/`CPF_INVESTIGATE`/`CPF_SQUAD`
+// (`combatPoint_t::flags` bits) — not yet ported as central consts; inlined
+// here from the header values (per-file-copy precedent, `NPC_AI_Stormtrooper.rs`).
+// Source: `oracle/oracle/codemp/game/b_local.h:264-267`
+pub const CPF_DUCK: c_int = 0x00000001;
+pub const CPF_FLEE: c_int = 0x00000002;
+pub const CPF_INVESTIGATE: c_int = 0x00000004;
 pub const CPF_SQUAD: c_int = 0x00000008;
 
 // `DistanceSquared` is the canonical `crate::q_math::DistanceSquared`, reached
@@ -2821,11 +2825,11 @@ pub fn NPC_SearchForWeapons(ctx: GameContext<'_>) -> *mut gentity_t {
 
         let num_entities = world.level.num_entities as usize;
         for i in 0..num_entities {
-            if world.entities[i].inuse == 0 {
+            if world.g_entities[i].inuse == 0 {
                 continue;
             }
 
-            let found = &mut world.entities[i] as *mut gentity_t;
+            let found = &mut world.g_entities[i] as *mut gentity_t;
 
             //FIXME: Also look for ammo_racks that have weapons on them?
             if (*found).s.eType != ET_ITEM as c_int {
@@ -2965,7 +2969,7 @@ pub fn NPC_AimAdjust(
 
         if TIMER_Exists(ctx, npc, c"aimDebounce".as_ptr() as *const c_char) == QFALSE {
             let debounce = 500 + (3 - g_spskill) * 100;
-            TIMER_Set(ctx, npc, c"aimDebounce".as_ptr() as *const c_char, Q_irand(debounce, debounce + 1000));
+            TIMER_Set(ctx, npc, c"aimDebounce".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(debounce, debounce + 1000));
             return;
         }
         if TIMER_Done(ctx, npc, c"aimDebounce".as_ptr() as *const c_char) != QFALSE {
@@ -2981,7 +2985,7 @@ pub fn NPC_AimAdjust(
             //Com_Printf( "%s new aim = %d\n", NPC->NPC_type, NPCInfo->currentAim );
 
             let debounce = 500 + (3 - g_spskill) * 100;
-            TIMER_Set(ctx, npc, c"aimDebounce".as_ptr() as *const c_char, Q_irand(debounce, debounce + 1000));
+            TIMER_Set(ctx, npc, c"aimDebounce".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(debounce, debounce + 1000));
         }
     }
 }
@@ -3003,10 +3007,10 @@ pub fn G_AimSet(
                 ctx,
                 self_,
                 c"aimDebounce".as_ptr() as *const c_char,
-                Q_irand(debounce, debounce + 1000),
+                (*ctx.world).bg_state.rng.Q_irand(debounce, debounce + 1000),
             );
             //	int debounce = 1000+(3-g_spskill.integer)*500;
-            //	TIMER_Set( self, "aimDebounce", Q_irand( debounce,debounce+2000 ) );
+            //	TIMER_Set( self, "aimDebounce", (*ctx.world).bg_state.rng.Q_irand( debounce,debounce+2000 ) );
         }
     }
 }

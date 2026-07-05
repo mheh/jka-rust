@@ -116,15 +116,17 @@ pub fn NPC_Mark1_Part_Explode(
 
             trap::G2API_GetBoltMatrix(
                 ctx.engine,
-                (*self_).ghoul2,
-                0,
-                bolt,
-                &mut boltMatrix,
-                (*self_).r.currentAngles,
-                (*self_).r.currentOrigin,
-                (*ctx.world).level.time,
-                core::ptr::null_mut(),
-                (*self_).modelScale,
+                mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                    (*self_).ghoul2,
+                    0,
+                    bolt,
+                    &mut boltMatrix,
+                    &(*self_).r.currentAngles,
+                    &(*self_).r.currentOrigin,
+                    (*ctx.world).level.time,
+                    core::ptr::null_mut(),
+                    &(*self_).modelScale,
+                ),
             );
 
             crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut org);
@@ -178,20 +180,22 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
         let mut muzzle_dir: vec3_t = [0.0; 3];
 
         let damage = 50;
-        let bolt = trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash5".as_ptr());
+        let bolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*npc).ghoul2, 0, c"*flash5".to_owned()));
 
         trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            (*npc).ghoul2,
-            0,
-            bolt,
-            &mut boltMatrix,
-            (*npc).r.currentAngles,
-            (*npc).r.currentOrigin,
-            (*ctx.world).level.time,
-            core::ptr::null_mut(),
-            (*npc).modelScale,
-        );
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                    (*npc).ghoul2,
+                    0,
+                    bolt,
+                    &mut boltMatrix,
+                    &(*npc).r.currentAngles,
+                    &(*npc).r.currentOrigin,
+                    (*ctx.world).level.time,
+                    core::ptr::null_mut(),
+                    &(*npc).modelScale,
+                ),
+            );
 
         crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
         crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
@@ -246,20 +250,22 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
         let mut muzzle1: vec3_t = [0.0; 3];
         let mut muzzle_dir: vec3_t = [0.0; 3];
 
-        let bolt = trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash1".as_ptr());
+        let bolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*npc).ghoul2, 0, c"*flash1".to_owned()));
 
         trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            (*npc).ghoul2,
-            0,
-            bolt,
-            &mut boltMatrix,
-            (*npc).r.currentAngles,
-            (*npc).r.currentOrigin,
-            (*ctx.world).level.time,
-            core::ptr::null_mut(),
-            (*npc).modelScale,
-        );
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                    (*npc).ghoul2,
+                    0,
+                    bolt,
+                    &mut boltMatrix,
+                    &(*npc).r.currentAngles,
+                    &(*npc).r.currentOrigin,
+                    (*ctx.world).level.time,
+                    core::ptr::null_mut(),
+                    &(*npc).modelScale,
+                ),
+            );
 
         crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
         crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y as c_int, &mut muzzle_dir);
@@ -314,10 +320,10 @@ pub fn Mark1_die(
             ctx,
             self_,
             CHAN_AUTO,
-            crate::g_utils::G_SoundIndex(crate::q_shared::va(
-                c"sound/chars/mark1/misc/death%d.wav".as_ptr(),
+            crate::g_utils::G_SoundIndex(cstr(&format!(
+                "sound/chars/mark1/misc/death{}.wav",
                 (*ctx.world).bg_state.rng.Q_irand(1, 2),
-            )),
+            )).as_ptr()),
         );
 
         // Choose a death anim
@@ -362,24 +368,28 @@ pub fn Mark1_dying(
                     let random_num = (*ctx.world).bg_state.rng.Q_irand(8, 10);
                     let newBolt = trap::G2API_AddBolt(
                         ctx.engine,
-                        (*self_).ghoul2,
-                        0,
-                        crate::q_shared::va(c"*flash%d".as_ptr(), random_num),
+                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                            (*self_).ghoul2,
+                            0,
+                            std::ffi::CString::new(format!("*flash{}", random_num)).unwrap(),
+                        ),
                     );
                     NPC_Mark1_Part_Explode(ctx, self_, newBolt);
                 } else {
                     let random_num = (*ctx.world).bg_state.rng.Q_irand(1, 6);
                     let newBolt = trap::G2API_AddBolt(
                         ctx.engine,
-                        (*self_).ghoul2,
-                        0,
-                        crate::q_shared::va(c"*torso_tube%d".as_ptr(), random_num),
+                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                            (*self_).ghoul2,
+                            0,
+                            std::ffi::CString::new(format!("*torso_tube{}", random_num)).unwrap(),
+                        ),
                     );
                     NPC_Mark1_Part_Explode(ctx, self_, newBolt);
                     crate::NPC_utils::NPC_SetSurfaceOnOff(
                         ctx,
                         self_,
-                        crate::q_shared::va(c"torso_tube%d".as_ptr(), random_num),
+                        cstr(&format!("torso_tube{}", random_num)).as_ptr(),
                         TURN_OFF,
                     );
                 }
@@ -389,7 +399,7 @@ pub fn Mark1_dying(
 
             // See which weapons are there
             // Randomly fire blaster
-            if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"l_arm".as_ptr()) == 0 {
+            if trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*self_).ghoul2, 0, c"l_arm".to_owned())) == 0 {
                 if (*ctx.world).bg_state.rng.Q_irand(1, 5) == 1 {
                     crate::npc_c::SaveNPCGlobals(ctx);
                     crate::npc_c::SetNPCGlobals(ctx, self_);
@@ -399,7 +409,7 @@ pub fn Mark1_dying(
             }
 
             // Randomly fire rocket
-            if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"r_arm".as_ptr()) == 0 {
+            if trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*self_).ghoul2, 0, c"r_arm".to_owned())) == 0 {
                 if (*ctx.world).bg_state.rng.Q_irand(1, 10) == 1 {
                     crate::npc_c::SaveNPCGlobals(ctx);
                     crate::npc_c::SetNPCGlobals(ctx, self_);
@@ -446,7 +456,7 @@ pub fn NPC_Mark1_Pain(
         // Hit in the left arm?
         else if hitLoc == HL_ARM_LT && (*self_).locationDamage[HL_ARM_LT as usize] > LEFT_ARM_HEALTH {
             if (*self_).locationDamage[hitLoc as usize] >= LEFT_ARM_HEALTH {
-                let newBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*flash3".as_ptr());
+                let newBolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, c"*flash3".to_owned()));
                 if newBolt != -1 {
                     NPC_Mark1_Part_Explode(ctx, self_, newBolt);
                 }
@@ -457,7 +467,7 @@ pub fn NPC_Mark1_Pain(
         // Hit in the right arm?
         else if hitLoc == HL_ARM_RT && (*self_).locationDamage[HL_ARM_RT as usize] > RIGHT_ARM_HEALTH {
             if (*self_).locationDamage[hitLoc as usize] >= RIGHT_ARM_HEALTH {
-                let newBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*flash4".as_ptr());
+                let newBolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, c"*flash4".to_owned()));
                 if newBolt != -1 {
                     NPC_Mark1_Part_Explode(ctx, self_, newBolt);
                 }
@@ -475,9 +485,11 @@ pub fn NPC_Mark1_Pain(
                     if (*self_).locationDamage[hitLoc as usize] >= AMMO_POD_HEALTH {
                         let newBolt = trap::G2API_AddBolt(
                             ctx.engine,
-                            (*self_).ghoul2,
-                            0,
-                            crate::q_shared::va(c"*torso_tube%d".as_ptr(), (i + 1) as c_int),
+                            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                                (*self_).ghoul2,
+                                0,
+                                std::ffi::CString::new(format!("*torso_tube{}", (i + 1) as c_int)).unwrap(),
+                            ),
                         );
                         if newBolt != -1 {
                             NPC_Mark1_Part_Explode(ctx, self_, newBolt);
@@ -485,7 +497,7 @@ pub fn NPC_Mark1_Pain(
                         crate::NPC_utils::NPC_SetSurfaceOnOff(
                             ctx,
                             self_,
-                            crate::q_shared::va(c"torso_tube%d".as_ptr(), (i + 1) as c_int),
+                            cstr(&format!("torso_tube{}", (i + 1) as c_int)).as_ptr(),
                             TURN_OFF,
                         );
                         NPC_SetAnim(
@@ -501,10 +513,11 @@ pub fn NPC_Mark1_Pain(
         }
 
         // Are both guns shot off?
-        if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"l_arm".as_ptr()) > 0
-            && trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"r_arm".as_ptr()) > 0
+        if trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*self_).ghoul2, 0, c"l_arm".to_owned())) > 0
+            && trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*self_).ghoul2, 0, c"r_arm".to_owned())) > 0
         {
             crate::g_combat::G_Damage(
+                ctx,
                 self_,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
@@ -572,35 +585,37 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
         // Which muzzle to fire from?
         let bolt = if (*npc_info).localState <= LSTATE_FIRED0 || (*npc_info).localState == LSTATE_FIRED4 {
             (*npc_info).localState = LSTATE_FIRED1;
-            trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash1".as_ptr())
+            trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*npc).ghoul2, 0, c"*flash1".to_owned()))
         } else if (*npc_info).localState == LSTATE_FIRED1 {
             (*npc_info).localState = LSTATE_FIRED2;
-            trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash2".as_ptr())
+            trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*npc).ghoul2, 0, c"*flash2".to_owned()))
         } else if (*npc_info).localState == LSTATE_FIRED2 {
             (*npc_info).localState = LSTATE_FIRED3;
-            trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash3".as_ptr())
+            trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*npc).ghoul2, 0, c"*flash3".to_owned()))
         } else {
             (*npc_info).localState = LSTATE_FIRED4;
-            trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash4".as_ptr())
+            trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*npc).ghoul2, 0, c"*flash4".to_owned()))
         };
 
         trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            (*npc).ghoul2,
-            0,
-            bolt,
-            &mut boltMatrix,
-            (*npc).r.currentAngles,
-            (*npc).r.currentOrigin,
-            (*ctx.world).level.time,
-            core::ptr::null_mut(),
-            (*npc).modelScale,
-        );
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                    (*npc).ghoul2,
+                    0,
+                    bolt,
+                    &mut boltMatrix,
+                    &(*npc).r.currentAngles,
+                    &(*npc).r.currentOrigin,
+                    (*ctx.world).level.time,
+                    core::ptr::null_mut(),
+                    &(*npc).modelScale,
+                ),
+            );
 
         crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
 
         if (*npc).health != 0 {
-            crate::NPC_utils::CalcEntitySpot(ctx, (*npc).enemy, spot_t::SPOT_HEAD, &mut enemy_org1);
+            crate::NPC_utils::CalcEntitySpot(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy), spot_t::SPOT_HEAD, &mut enemy_org1);
             delta1[0] = enemy_org1[0] - muzzle1[0];
             delta1[1] = enemy_org1[1] - muzzle1[1];
             delta1[2] = enemy_org1[2] - muzzle1[2];
@@ -711,24 +726,26 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
         let mut up: vec3_t = [0.0; 3];
 
         let damage = 50;
-        let bolt = trap::G2API_AddBolt(ctx.engine, (*npc).ghoul2, 0, c"*flash5".as_ptr());
+        let bolt = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*npc).ghoul2, 0, c"*flash5".to_owned()));
 
         trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            (*npc).ghoul2,
-            0,
-            bolt,
-            &mut boltMatrix,
-            (*npc).r.currentAngles,
-            (*npc).r.currentOrigin,
-            (*ctx.world).level.time,
-            core::ptr::null_mut(),
-            (*npc).modelScale,
-        );
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                    (*npc).ghoul2,
+                    0,
+                    bolt,
+                    &mut boltMatrix,
+                    &(*npc).r.currentAngles,
+                    &(*npc).r.currentOrigin,
+                    (*ctx.world).level.time,
+                    core::ptr::null_mut(),
+                    &(*npc).modelScale,
+                ),
+            );
 
         crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
 
-        crate::NPC_utils::CalcEntitySpot(ctx, (*npc).enemy, spot_t::SPOT_HEAD, &mut enemy_org1);
+        crate::NPC_utils::CalcEntitySpot(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy), spot_t::SPOT_HEAD, &mut enemy_org1);
         delta1[0] = enemy_org1[0] - muzzle1[0];
         delta1[1] = enemy_org1[1] - muzzle1[1];
         delta1[2] = enemy_org1[2] - muzzle1[2];
@@ -808,7 +825,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
         }
 
         // Enemy is dead or he has no enemy.
-        let npc_enemy = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*npc).enemy);
+        let npc_enemy = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
         if (*npc_enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
             (*npc).enemy = None;
             return;
@@ -817,7 +834,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
         // Rate our distance to the target and visibility
         let distance = crate::q_math::DistanceHorizontalSquared((*npc).r.currentOrigin, (*npc_enemy).r.currentOrigin) as c_int;
         let distRate = if distance > MIN_MELEE_RANGE_SQR { DIST_LONG } else { DIST_MELEE };
-        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, (*npc).enemy);
+        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy));
         let advance = if distance > MIN_DISTANCE_SQR { QTRUE } else { QFALSE };
 
         // If we cannot see our target, move to see it
@@ -827,8 +844,8 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
         }
 
         // See if the side weapons are there
-        let blasterTest = trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*npc).ghoul2, 0, c"l_arm".as_ptr());
-        let rocketTest = trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*npc).ghoul2, 0, c"r_arm".as_ptr());
+        let blasterTest = trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*npc).ghoul2, 0, c"l_arm".to_owned()));
+        let rocketTest = trap::G2API_GetSurfaceRenderStatus(ctx.engine, mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new((*npc).ghoul2, 0, c"r_arm".to_owned()));
 
         let final_distRate =
             // It has both side weapons

@@ -25,7 +25,11 @@
 use crate::prelude::*;
 
 use crate::bg_misc::{BG_FindItemForHoldable, BG_FindItemForWeapon};
-use crate::bg_saga::BG_SiegeFindThemeForTeam;
+use crate::bg_saga::{
+    BG_PrecacheSabersForSiegeTeam, BG_SiegeFindClassIndexByName, BG_SiegeFindThemeForTeam,
+    BG_SiegeGetPairedValue, BG_SiegeGetValueGroup, BG_SiegeLoadClasses, BG_SiegeLoadTeams,
+    BG_SiegeSetTeamTheme,
+};
 use crate::client::gclient::gclient_t;
 use crate::client::spectator_state::spectatorState_t;
 use crate::client::player_team_state::playerTeamStateState_t;
@@ -230,7 +234,7 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
                 mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs::new(
                     levelname_c,
                     &mut f,
-                    mp_abi::fs::FS_READ,
+                    FS_READ,
                 ),
             );
 

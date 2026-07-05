@@ -45,6 +45,7 @@ use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::vehicles::vehicleType_t;
+use crate::bg_channel::GameBgTraps;
 
 // Raven vehicle constants spelled locally per this file's staging convention
 // (the integrator wires the const home later; the name preserves intent).
@@ -292,7 +293,7 @@ pub fn G_AttachToVehicle(
         );
         BG_GiveMeVectorFromMatrix(
             &boltMatrix,
-            ORIGIN,
+                Eorientations::ORIGIN as c_int,
             &mut (*entClient).ps.origin,
         );
         crate::g_utils::G_SetOrigin(ent, (*entClient).ps.origin);
@@ -431,7 +432,7 @@ pub fn Board(
         }
 
         // Bucking so we can't do anything.
-        if ((*pVeh).m_ulFlags & VEH_BUCKING) != 0 {
+        if ((*pVeh).m_ulFlags & (VEH_BUCKING as u64)) != 0 {
             return qfalse;
         }
 
@@ -451,8 +452,8 @@ pub fn Board(
                 // Find an empty slot and put that passenger here.
                 let mut i: c_int = 0;
                 while i < (*vi).maxPassengers {
-                    if (*(*pVeh).m_ppPassengers.add(i as usize)).is_null() {
-                        *(*pVeh).m_ppPassengers.add(i as usize) = ent as *mut bgEntity_t;
+                    if (*(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)).is_null() {
+                        *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) = ent as *mut bgEntity_t;
                         // Server just needs to tell client which passengernum he is
                         if !(*ent).client.is_null() {
                             (*entClient).ps.generic1 = i + 1;
@@ -517,14 +518,14 @@ pub fn Board(
                 }
 
                 let pc = (*parent).client as *mut gclient_t;
-                (*pc).ps.speed = 0;
+                (*pc).ps.speed = 0.0;
                 (*pVeh).m_ucmd = core::mem::zeroed();
             } else if (*pVeh).m_iNumPassengers < (*vi).maxPassengers {
                 // Find an empty slot and put that passenger here.
                 let mut i: c_int = 0;
                 while i < (*vi).maxPassengers {
-                    if (*(*pVeh).m_ppPassengers.add(i as usize)).is_null() {
-                        *(*pVeh).m_ppPassengers.add(i as usize) = ent as *mut bgEntity_t;
+                    if (*(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)).is_null() {
+                        *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) = ent as *mut bgEntity_t;
                         // Server just needs to tell client which passengernum he is
                         if !(*ent).client.is_null() {
                             (*entClient).ps.generic1 = i + 1;
@@ -564,7 +565,7 @@ pub fn Board(
         }
 
         let mut vPlayerDir: vec3_t = [0.0; 3];
-        _VectorCopy((*pVeh).m_vOrientation, &mut vPlayerDir);
+        _VectorCopy(*((*pVeh).m_vOrientation as *const vec3_t), &mut vPlayerDir);
         vPlayerDir[ROLL] = 0.0;
         crate::g_client::SetClientViewAngle(ent, vPlayerDir);
 
@@ -704,6 +705,7 @@ pub fn G_EjectDroidUnit(
             // G_Damage takes `dir: &mut vec3_t` (fork-9 reshaped only OUT-params, not
             // nullable INs) — a zero vec3 stands in for the C NULL. See shape_mismatch.
             crate::g_combat::G_Damage(
+                ctx,
                 droidEnt,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
@@ -711,7 +713,7 @@ pub fn G_EjectDroidUnit(
                 (*droidEnt).s.origin,
                 10000,
                 0,
-                MOD_SUICIDE,
+                MOD_SUICIDE as c_int,
             );
         }
 
@@ -742,6 +744,7 @@ pub fn EjectAll(
             if (*vi).killRiderOnDeath != qfalse && !pilot.is_null() {
                 crate::g_utils::G_MuteSound(ctx, (*pilot).s.number, CHAN_VOICE);
                 crate::g_combat::G_Damage(
+                    ctx,
                     pilot,
                     core::ptr::null_mut(),
                     core::ptr::null_mut(),
@@ -749,7 +752,7 @@ pub fn EjectAll(
                     (*pilot).s.origin,
                     10000,
                     0,
-                    MOD_SUICIDE,
+                    MOD_SUICIDE as c_int,
                 );
             }
         }
@@ -759,6 +762,7 @@ pub fn EjectAll(
             if (*vi).killRiderOnDeath != qfalse && !pilot.is_null() {
                 crate::g_utils::G_MuteSound(ctx, (*pilot).s.number, CHAN_VOICE);
                 crate::g_combat::G_Damage(
+                    ctx,
                     pilot,
                     core::ptr::null_mut(),
                     core::ptr::null_mut(),
@@ -766,19 +770,20 @@ pub fn EjectAll(
                     (*pilot).s.origin,
                     10000,
                     0,
-                    MOD_SUICIDE,
+                    MOD_SUICIDE as c_int,
                 );
             }
         }
         if (*pVeh).m_iNumPassengers != 0 {
             let mut i: c_int = 0;
             while i < (*vi).maxPassengers {
-                if !(*(*pVeh).m_ppPassengers.add(i as usize)).is_null() {
-                    let rider = *(*pVeh).m_ppPassengers.add(i as usize) as *mut gentity_t;
-                    crate::veh_dispatch::eject(ctx, pVeh, *(*pVeh).m_ppPassengers.add(i as usize), qtrue);
+                if !(*(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)).is_null() {
+                    let rider = *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t;
+                    crate::veh_dispatch::eject(ctx, pVeh, *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize), qtrue);
                     if (*vi).killRiderOnDeath != qfalse && !rider.is_null() {
                         crate::g_utils::G_MuteSound(ctx, (*rider).s.number, CHAN_VOICE);
                         crate::g_combat::G_Damage(
+                            ctx,
                             rider,
                             core::ptr::null_mut(),
                             core::ptr::null_mut(),
@@ -786,7 +791,7 @@ pub fn EjectAll(
                             (*rider).s.origin,
                             10000,
                             0,
-                            MOD_SUICIDE,
+                            MOD_SUICIDE as c_int,
                         );
                     }
                 }
@@ -866,19 +871,19 @@ pub fn Initialize(
 
         // initialize the ammo to max
         let mut i: c_int = 0;
-        while i < MAX_VEHICLE_WEAPONS {
+        while i < MAX_VEHICLE_WEAPONS as c_int {
             let m = (*vi).weapon[i as usize].ammoMax;
             (*pVeh).weaponStatus[i as usize].ammo = m;
             (*pc).ps.ammo[i as usize] = m;
             i += 1;
         }
         i = 0;
-        while i < MAX_VEHICLE_TURRETS {
+        while i < MAX_VEHICLE_TURRETS as c_int {
             (*pVeh).turretStatus[i as usize].nextMuzzle =
                 (*vi).turret[i as usize].iMuzzle[i as usize] - 1;
             let m = (*vi).turret[i as usize].iAmmoMax;
             (*pVeh).turretStatus[i as usize].ammo = m;
-            (*pc).ps.ammo[(MAX_VEHICLE_WEAPONS + i) as usize] = m;
+            (*pc).ps.ammo[MAX_VEHICLE_WEAPONS + i as usize] = m;
             if (*vi).turret[i as usize].bAI != qfalse {
                 // they're going to be finding enemies, init this to NONE
                 (*pVeh).turretStatus[i as usize].enemyEntNum = ENTITYNUM_NONE;
@@ -886,10 +891,10 @@ pub fn Initialize(
             i += 1;
         }
         // begin stopped...?
-        (*pc).ps.speed = 0;
+        (*pc).ps.speed = 0.0;
 
-        (*pVeh).m_vOrientation = [0.0; 3];
-        (*pVeh).m_vOrientation[YAW] = (*parent).s.angles[YAW];
+        *((*pVeh).m_vOrientation as *mut vec3_t) = [0.0; 3];
+        *(*pVeh).m_vOrientation.add(YAW as usize) = (*parent).s.angles[YAW];
 
         // MP gravity
         if (*vi).gravity != 0 && (*vi).gravity as f32 != (*ctx.world).cvars.g_gravity.value {
@@ -905,7 +910,7 @@ pub fn Initialize(
             // MP uses the static pointer array; just NULL every slot.
             let mut i: c_int = 0;
             while i < (*vi).maxPassengers {
-                *(*pVeh).m_ppPassengers.add(i as usize) = core::ptr::null_mut();
+                *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) = core::ptr::null_mut();
                 i += 1;
             }
         }
@@ -930,7 +935,7 @@ pub fn Initialize(
 
         // initialize to blaster
         (*pc).ps.weapon = WP_BLASTER;
-        (*pc).ps.weaponstate = WEAPON_READY;
+        (*pc).ps.weaponstate = WEAPON_READY as c_int;
         (*pc).ps.stats[STAT_WEAPONS as usize] |= 1 << WP_BLASTER;
 
         // Initialize to landed (wings closed, gears down) animation.
@@ -938,7 +943,7 @@ pub fn Initialize(
             let iFlags = SETANIM_FLAG_NORMAL;
             let iBlend = 300;
             let _ = (iFlags, iBlend);
-            (*pVeh).m_ulFlags |= VEH_GEARSOPEN; // MP
+            (*pVeh).m_ulFlags |= (VEH_GEARSOPEN as u64); // MP
             // PORT-NOTE(bg-channel): MP path is
             //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
             //              bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
@@ -980,7 +985,7 @@ pub fn Update(
 
         // increment the ammo for all rechargeable weapons
         let mut i: c_int = 0;
-        while i < MAX_VEHICLE_WEAPONS {
+        while i < MAX_VEHICLE_WEAPONS as c_int {
             let iu = i as usize;
             if (*vi).weapon[iu].ID > VEH_WEAPON_BASE
                 && (*vi).weapon[iu].ammoRechargeMS != 0
@@ -997,7 +1002,7 @@ pub fn Update(
             i += 1;
         }
         i = 0;
-        while i < MAX_VEHICLE_TURRETS {
+        while i < MAX_VEHICLE_TURRETS as c_int {
             let iu = i as usize;
             if (*vi).turret[iu].iWeapon > VEH_WEAPON_BASE
                 && (*vi).turret[iu].iAmmoRechargeMS != 0
@@ -1008,7 +1013,7 @@ pub fn Update(
                 (*pVeh).turretStatus[iu].lastAmmoInc = (*pUmcd).serverTime;
                 (*pVeh).turretStatus[iu].ammo += 1;
                 if !parent.is_null() && !(*parent).client.is_null() {
-                    (*pclient).ps.ammo[(MAX_VEHICLE_WEAPONS + i) as usize] =
+                    (*pclient).ps.ammo[MAX_VEHICLE_WEAPONS + i as usize] =
                         (*pVeh).turretStatus[iu].ammo;
                 }
             }
@@ -1043,17 +1048,19 @@ pub fn Update(
         // See whether this vehicle should be dieing or dead. (MP: `m_iDieTime != 0`)
         if (*pVeh).m_iDieTime != 0 {
             // Keep track of the old orientation.
-            _VectorCopy((*pVeh).m_vOrientation, &mut (*pVeh).m_vPrevOrientation);
+            _VectorCopy(*((*pVeh).m_vOrientation as *const vec3_t), &mut (*pVeh).m_vPrevOrientation);
             crate::veh_dispatch::process_orient_commands(pVeh);
-            SetClientViewAngle(parent, (*pVeh).m_vOrientation);
+            //TODO: Port SetClientViewAngle
+            // Source: oracle/oracle/codemp/game/g_client.c (fn not yet ported to g_client.rs)
+            SetClientViewAngle(parent, *((*pVeh).m_vOrientation as *const vec3_t));
             if !(*pVeh).m_pPilot.is_null() {
-                SetClientViewAngle((*pVeh).m_pPilot as *mut gentity_t, (*pVeh).m_vOrientation);
+                SetClientViewAngle((*pVeh).m_pPilot as *mut gentity_t, *((*pVeh).m_vOrientation as *const vec3_t));
             }
             crate::veh_dispatch::process_move_commands(pVeh);
             if (*vi).r#type == vehicleType_t::VH_FIGHTER {
-                AngleVectors((*pVeh).m_vOrientation, Some(&mut (*pclient).ps.moveDir), None, None);
+                AngleVectors(*((*pVeh).m_vOrientation as *const vec3_t), Some(&mut (*pclient).ps.moveDir), None, None);
             } else {
-                let vVehAngles: vec3_t = [0.0, (*pVeh).m_vOrientation[YAW], 0.0];
+                let vVehAngles: vec3_t = [0.0, *(*pVeh).m_vOrientation.add(YAW as usize), 0.0];
                 AngleVectors(vVehAngles, Some(&mut (*pclient).ps.moveDir), None, None);
             }
             crate::veh_dispatch::death_update(ctx, pVeh);
@@ -1092,6 +1099,7 @@ pub fn Update(
                 {
                     // no longer in the game?
                     crate::g_combat::G_Damage(
+                        ctx,
                         parent,
                         parent,
                         parent,
@@ -1099,7 +1107,7 @@ pub fn Update(
                         (*pclient).ps.origin,
                         99999,
                         DAMAGE_NO_PROTECTION,
-                        MOD_SUICIDE,
+                        MOD_SUICIDE as c_int,
                     );
                 } else {
                     let oc = (*oldPilot).client as *mut gclient_t;
@@ -1111,6 +1119,7 @@ pub fn Update(
                     } else if (*pVeh).m_iPilotTime < (*ctx.world).level.time {
                         // dying time
                         crate::g_combat::G_Damage(
+                            ctx,
                             parent,
                             parent,
                             parent,
@@ -1118,7 +1127,7 @@ pub fn Update(
                             (*pclient).ps.origin,
                             99999,
                             DAMAGE_NO_PROTECTION,
-                            MOD_SUICIDE,
+                            MOD_SUICIDE as c_int,
                         );
                     }
                 }
@@ -1183,7 +1192,7 @@ pub fn Update(
             if (*pVeh).m_iNumPassengers > 0 {
                 let mut i: c_int = 0;
                 while i < (*vi).maxPassengers {
-                    let psngr = *(*pVeh).m_ppPassengers.add(i as usize) as *mut gentity_t;
+                    let psngr = *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t;
                     if !psngr.is_null() {
                         let sc = (*psngr).client as *mut gclient_t;
                         if (*psngr).inuse == qfalse
@@ -1194,7 +1203,7 @@ pub fn Update(
                             crate::veh_dispatch::eject(
                                 ctx,
                                 pVeh,
-                                *(*pVeh).m_ppPassengers.add(i as usize),
+                                *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize),
                                 qtrue,
                             );
                             (*pVeh).m_iNumPassengers -= 1;
@@ -1211,7 +1220,7 @@ pub fn Update(
             // check for weapon linking/unlinking command
             let mut linkHeld = qfalse;
             let mut i: c_int = 0;
-            while i < MAX_VEHICLE_WEAPONS {
+            while i < MAX_VEHICLE_WEAPONS as c_int {
                 let iu = i as usize;
                 if (*vi).weapon[iu].linkable == 2 {
                     // always linked
@@ -1243,7 +1252,7 @@ pub fn Update(
             // MP: pass link state over the network so cgame knows
             (*parentPS).vehWeaponsLinked = qfalse;
             let mut i: c_int = 0;
-            while i < MAX_VEHICLE_WEAPONS {
+            while i < MAX_VEHICLE_WEAPONS as c_int {
                 if (*pVeh).weaponStatus[i as usize].linked != qfalse {
                     (*parentPS).vehWeaponsLinked = qtrue;
                 }
@@ -1252,7 +1261,7 @@ pub fn Update(
 
             // QAGAME turrets
             let mut i: c_int = 0;
-            while i < MAX_VEHICLE_TURRETS {
+            while i < MAX_VEHICLE_TURRETS as c_int {
                 crate::g_vehicleTurret::VEH_TurretThink(ctx, pVeh, parent, i);
                 i += 1;
             }
@@ -1264,7 +1273,7 @@ pub fn Update(
             && (*pVeh).m_iBoarding != 0
         {
             let pilotPS = (*(*pVeh).m_pPilot).playerState;
-            _VectorCopy((*pVeh).m_vOrientation, &mut (*pilotPS).viewangles);
+            _VectorCopy(*((*pVeh).m_vOrientation as *const vec3_t), &mut (*pilotPS).viewangles);
             (*pVeh).m_ucmd.buttons = 0;
             (*pVeh).m_ucmd.forwardmove = 0;
             (*pVeh).m_ucmd.rightmove = 0;
@@ -1272,11 +1281,13 @@ pub fn Update(
         }
 
         // Keep track of the old orientation.
-        _VectorCopy((*pVeh).m_vOrientation, &mut (*pVeh).m_vPrevOrientation);
+        _VectorCopy(*((*pVeh).m_vOrientation as *const vec3_t), &mut (*pVeh).m_vPrevOrientation);
 
         // Process the orient commands.
         crate::veh_dispatch::process_orient_commands(pVeh);
-        SetClientViewAngle(parent, (*pVeh).m_vOrientation);
+        //TODO: Port SetClientViewAngle
+        // Source: oracle/oracle/codemp/game/g_client.c (fn not yet ported to g_client.rs)
+        SetClientViewAngle(parent, *((*pVeh).m_vOrientation as *const vec3_t));
         if !(*pVeh).m_pPilot.is_null() {
             // MP
             let pilotPS = (*(*pVeh).m_pPilot).playerState;
@@ -1286,7 +1297,7 @@ pub fn Update(
                 let mut newVAngle: vec3_t = [0.0; 3];
                 newVAngle[PITCH] = (*pilotPS).viewangles[PITCH];
                 newVAngle[YAW] = (*pilotPS).viewangles[YAW];
-                newVAngle[ROLL] = (*pVeh).m_vOrientation[ROLL];
+                newVAngle[ROLL] = *(*pVeh).m_vOrientation.add(ROLL as usize);
                 SetClientViewAngle((*pVeh).m_pPilot as *mut gentity_t, newVAngle);
             }
         }
@@ -1321,9 +1332,9 @@ pub fn Update(
 
         // Setup the move direction.
         if (*vi).r#type == vehicleType_t::VH_FIGHTER {
-            AngleVectors((*pVeh).m_vOrientation, Some(&mut (*pclient).ps.moveDir), None, None);
+            AngleVectors(*((*pVeh).m_vOrientation as *const vec3_t), Some(&mut (*pclient).ps.moveDir), None, None);
         } else {
-            let vVehAngles: vec3_t = [0.0, (*pVeh).m_vOrientation[YAW], 0.0];
+            let vVehAngles: vec3_t = [0.0, *(*pVeh).m_vOrientation.add(YAW as usize), 0.0];
             AngleVectors(vVehAngles, Some(&mut (*pclient).ps.moveDir), None, None);
         }
 
@@ -1345,7 +1356,7 @@ pub fn Update(
                         | DAMAGE_NO_HIT_LOC
                         | DAMAGE_NO_PROTECTION
                         | DAMAGE_NO_ARMOR,
-                    MOD_SUICIDE,
+                    MOD_SUICIDE as c_int,
                 );
             }
             // make sure playerstate value stays in sync
@@ -1402,7 +1413,7 @@ pub fn UpdateRider(
                 if crate::veh_dispatch::eject(ctx, pVeh, pRider, qfalse) != qfalse {
                     return qfalse;
                 }
-            } else if ((*pVeh).m_ulFlags & VEH_FLYING) == 0 {
+            } else if ((*pVeh).m_ulFlags & (VEH_FLYING as u64)) == 0 {
                 // If going too fast, roll off.
                 if (*pc).ps.speed <= 600 && (*pUmcd).rightmove != 0 {
                     if crate::veh_dispatch::eject(ctx, pVeh, pRider, qfalse) != qfalse {
@@ -1419,8 +1430,8 @@ pub fn UpdateRider(
                         _VectorScale((*pc).ps.velocity, 0.25f32, &mut (*rc).ps.velocity);
                         Vehicle_SetAnim(rider, SETANIM_BOTH, Anim, iFlags, iBlend);
                         // just to make sure it's cleared when roll is done
-                        (*rc).ps.weaponTime = (*rc).ps.torsoAnimTimer - 200;
-                        crate::g_utils::G_AddEvent(rider, EV_ROLL, 0);
+                        (*rc).ps.weaponTime = (*rc).ps.torsoTimer - 200;
+                        crate::g_utils::G_AddEvent(rider, EV_ROLL as c_int, 0);
                         return qfalse;
                     }
                 } else {
@@ -1482,7 +1493,7 @@ pub fn UpdateRider(
 
                     if trap::ICARUS_TaskIDPending(
                         ctx.engine,
-                        GIcarusTaskidpendingArgs::new(rider, TID_CHAN_VOICE),
+                        GIcarusTaskidpendingArgs::new(rider, TID_CHAN_VOICE as c_int),
                     ) == qfalse
                     {
                         crate::g_utils::G_AddEvent(rider, EV_JUMP, 0);
@@ -1517,7 +1528,7 @@ pub fn UpdateRider(
                 }
 
                 if crate::veh_dispatch::eject(ctx, pVeh, pRider, qfalse) != qfalse {
-                    if ((*pVeh).m_ulFlags & VEH_FLYING) == 0 {
+                    if ((*pVeh).m_ulFlags & (VEH_FLYING as u64)) == 0 {
                         _VectorScale((*pc).ps.velocity, 0.25f32, &mut (*rc).ps.velocity);
                         Vehicle_SetAnim(
                             rider,
@@ -1527,8 +1538,8 @@ pub fn UpdateRider(
                             300,
                         );
                         // just to make sure it's cleared when roll is done
-                        (*rc).ps.weaponTime = (*rc).ps.torsoAnimTimer - 200;
-                        crate::g_utils::G_AddEvent(rider, EV_ROLL, 0);
+                        (*rc).ps.weaponTime = (*rc).ps.torsoTimer - 200;
+                        crate::g_utils::G_AddEvent(rider, EV_ROLL as c_int, 0);
                     }
                     return qfalse;
                 }
@@ -1549,7 +1560,7 @@ pub fn AttachRiders(
     unsafe {
         let mut i: c_int = 0;
 
-        crate::bg_vehicleLoad::AttachRidersGeneric(pVeh, &(*ctx.world).bg_state, ctx.bg_traps());
+        crate::bg_vehicleLoad::AttachRidersGeneric(pVeh, &(*ctx.world).bg_state, &GameBgTraps::new(ctx.engine));
 
         if !(*pVeh).m_pPilot.is_null() {
             let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
@@ -1574,10 +1585,10 @@ pub fn AttachRiders(
 
         // attach passengers
         while i < (*pVeh).m_iNumPassengers {
-            if !(*(*pVeh).m_ppPassengers.add(i as usize)).is_null() {
+            if !(*(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)).is_null() {
                 let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
                 let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
-                let pilot = *(*pVeh).m_ppPassengers.add(i as usize) as *mut gentity_t;
+                let pilot = *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t;
 
                 debug_assert!(!(*parent).ghoul2.is_null());
                 let crotchBolt = trap::G2API_AddBolt(
@@ -1608,7 +1619,7 @@ pub fn AttachRiders(
                 let ppc = (*pilot).client as *mut gclient_t;
                 BG_GiveMeVectorFromMatrix(
                     &boltMatrix,
-                    ORIGIN,
+                        Eorientations::ORIGIN as c_int,
                     &mut (*ppc).ps.origin,
                 );
 
@@ -1650,10 +1661,10 @@ pub fn AttachRiders(
                 let mut fwd: vec3_t = [0.0; 3];
                 BG_GiveMeVectorFromMatrix(
                     &boltMatrix,
-                    ORIGIN,
+                        Eorientations::ORIGIN as c_int,
                     &mut (*dcl).ps.origin,
                 );
-                BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y, &mut fwd);
+                BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut fwd);
                 vectoangles(fwd, &mut (*dcl).ps.viewangles);
 
                 crate::g_utils::G_SetOrigin(droid, (*dcl).ps.origin);
@@ -1760,7 +1771,7 @@ pub fn G_VehicleDamageBoxSizing(
         let mut right: vec3_t = [0.0; 3];
         let mut up: vec3_t = [0.0; 3];
         AngleVectors(
-            (*pVeh).m_vOrientation,
+            *((*pVeh).m_vOrientation as *const vec3_t),
             Some(&mut fwd),
             Some(&mut right),
             Some(&mut up),
@@ -1806,6 +1817,7 @@ pub fn G_VehicleDamageBoxSizing(
         } else {
             // oh well, DIE!
             crate::g_combat::G_Damage(
+                ctx,
                 parent,
                 parent,
                 parent,
@@ -1813,7 +1825,7 @@ pub fn G_VehicleDamageBoxSizing(
                 (*pcl).ps.origin,
                 9999,
                 DAMAGE_NO_PROTECTION,
-                MOD_SUICIDE,
+                MOD_SUICIDE as c_int,
             );
         }
     }
@@ -2017,6 +2029,7 @@ pub fn G_SetVehDamageFlags(
                             // `point: vec3_t`, so zero vecs stand in.
                             let null_point: vec3_t = [0.0; 3];
                             crate::g_combat::G_Damage(
+                                ctx,
                                 droidEnt,
                                 enemy_ptr,
                                 enemy_ptr,
@@ -2024,7 +2037,7 @@ pub fn G_SetVehDamageFlags(
                                 null_point,
                                 99999,
                                 0,
-                                MOD_UNKNOWN,
+                                MOD_UNKNOWN as c_int,
                             );
                         }
                     }
@@ -2230,7 +2243,7 @@ pub fn G_FlyVehicleDestroySurface(
             500.0,
             veh,
             core::ptr::null_mut(),
-            MOD_VEH_EXPLOSION,
+            MOD_VEH_EXPLOSION as c_int,
         );
 
         // when spiraling to your death, do the electical shader
@@ -2507,10 +2520,10 @@ pub fn Eject(
             // if there are some passengers, promote the first passenger to pilot
             let mut j: c_int = 0;
             while j < (*pVeh).m_iNumPassengers {
-                if !(*(*pVeh).m_ppPassengers.add(j as usize)).is_null() {
+                if !(*(*pVeh).m_ppPassengers.as_mut_ptr().add(j as usize)).is_null() {
                     let mut k: c_int = 1;
-                    crate::veh_dispatch::set_pilot(pVeh, *(*pVeh).m_ppPassengers.add(j as usize));
-                    let newPilot = *(*pVeh).m_ppPassengers.add(j as usize) as *mut gentity_t;
+                    crate::veh_dispatch::set_pilot(pVeh, *(*pVeh).m_ppPassengers.as_mut_ptr().add(j as usize));
+                    let newPilot = *(*pVeh).m_ppPassengers.as_mut_ptr().add(j as usize) as *mut gentity_t;
                     (*parent).r.ownerNum = (*newPilot).s.number;
                     (*parent).s.owner = (*parent).r.ownerNum; // for prediction
                     (*pc).ps.m_iVehicleNum = (*newPilot).s.number + 1;
@@ -2520,16 +2533,16 @@ pub fn Eject(
                     if !(*newPilot).client.is_null() {
                         (*((*newPilot).client as *mut gclient_t)).ps.generic1 = 0;
                     }
-                    *(*pVeh).m_ppPassengers.add(j as usize) = core::ptr::null_mut();
+                    *(*pVeh).m_ppPassengers.as_mut_ptr().add(j as usize) = core::ptr::null_mut();
                     while k < (*pVeh).m_iNumPassengers {
-                        if (*(*pVeh).m_ppPassengers.add((k - 1) as usize)).is_null() {
+                        if (*(*pVeh).m_ppPassengers.as_mut_ptr().add((k - 1) as usize)).is_null() {
                             // move down
-                            *(*pVeh).m_ppPassengers.add((k - 1) as usize) =
-                                *(*pVeh).m_ppPassengers.add(k as usize);
-                            *(*pVeh).m_ppPassengers.add(k as usize) = core::ptr::null_mut();
+                            *(*pVeh).m_ppPassengers.as_mut_ptr().add((k - 1) as usize) =
+                                *(*pVeh).m_ppPassengers.as_mut_ptr().add(k as usize);
+                            *(*pVeh).m_ppPassengers.as_mut_ptr().add(k as usize) = core::ptr::null_mut();
                             // QAGAME: server just needs to tell client which passenger he is
                             let moved =
-                                *(*pVeh).m_ppPassengers.add((k - 1) as usize) as *mut gentity_t;
+                                *(*pVeh).m_ppPassengers.as_mut_ptr().add((k - 1) as usize) as *mut gentity_t;
                             if !(*moved).client.is_null() {
                                 (*((*moved).client as *mut gclient_t)).ps.generic1 = k;
                             }
@@ -2548,14 +2561,14 @@ pub fn Eject(
             // Look for this guy in the passenger list.
             let mut i: c_int = 0;
             while i < (*vi).maxPassengers {
-                let psngr = *(*pVeh).m_ppPassengers.add(i as usize) as *mut gentity_t;
+                let psngr = *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t;
                 // If we found him...
                 if psngr == ent {
                     // QAGAME: server just needs to tell client he's not a passenger anymore
                     if !(*psngr).client.is_null() {
                         (*((*psngr).client as *mut gclient_t)).ps.generic1 = 0;
                     }
-                    *(*pVeh).m_ppPassengers.add(i as usize) = core::ptr::null_mut();
+                    *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) = core::ptr::null_mut();
                     (*pVeh).m_iNumPassengers -= 1;
                     break;
                 }
@@ -2600,7 +2613,9 @@ pub fn Eject(
 
         (*ec).ps.viewangles[PITCH as usize] = 0.0;
         (*ec).ps.viewangles[ROLL as usize] = 0.0;
-        (*ec).ps.viewangles[YAW as usize] = (*pVeh).m_vOrientation[YAW as usize];
+        (*ec).ps.viewangles[YAW as usize] = *(*pVeh).m_vOrientation.add(YAW as usize);
+        //TODO: Port SetClientViewAngle
+        // Source: oracle/oracle/codemp/game/g_client.c (fn not yet ported to g_client.rs)
         crate::g_client::SetClientViewAngle(ent, (*ec).ps.viewangles);
 
         if (*ec).solidHack != 0 {
@@ -2643,6 +2658,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     if !(*pVeh).m_pPilot.is_null() {
                         //FIXME: does this give proper credit to the enemy who shot you down?
                         crate::g_combat::G_Damage(
+                            ctx,
                             (*pVeh).m_pPilot as *mut gentity_t,
                             parent,
                             parent,
@@ -2650,23 +2666,24 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                             (*pc).ps.origin,
                             999,
                             DAMAGE_NO_PROTECTION,
-                            MOD_EXPLOSIVE,
+                            MOD_EXPLOSIVE as c_int,
                         );
                     }
                     if (*pVeh).m_iNumPassengers != 0 {
                         let mut i: c_int = 0;
                         while i < (*vi).maxPassengers {
-                            if !(*(*pVeh).m_ppPassengers.add(i as usize)).is_null() {
+                            if !(*(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)).is_null() {
                                 //FIXME: does this give proper credit to the enemy who shot you down?
                                 crate::g_combat::G_Damage(
-                                    *(*pVeh).m_ppPassengers.add(i as usize) as *mut gentity_t,
+                                    ctx,
+                                    *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t,
                                     parent,
                                     parent,
                                     None,
                                     (*pc).ps.origin,
                                     999,
                                     DAMAGE_NO_PROTECTION,
-                                    MOD_EXPLOSIVE,
+                                    MOD_EXPLOSIVE as c_int,
                                 );
                             }
                             i += 1;
@@ -2743,7 +2760,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                         (*vi).explosionRadius,
                         core::ptr::null_mut(),
                         core::ptr::null_mut(),
-                        MOD_VEH_EXPLOSION,
+                        MOD_VEH_EXPLOSION as c_int,
                     );
                 }
 

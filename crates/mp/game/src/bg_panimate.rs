@@ -21,6 +21,11 @@ use crate::prelude::*;
 use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};
 use crate::bg_saber::BG_MySaber;
 use crate::q_math::Q_irand;
+use crate::q_shared::COM_Parse;
+
+// Raven `#define MAX_ANIM_FILES 64`.
+// Source: `oracle/oracle/codemp/game/bg_public.h:255`
+pub const MAX_ANIM_FILES: c_int = 64;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::broken_limb::brokenLimb_t;
 use mp_bg::public::saber_move_name::{
@@ -1124,19 +1129,20 @@ pub fn BG_StabDownAnim(anim: c_int) -> qboolean {
 
 /// Raven `PM_SaberBounceForAttack`.
 ///
+/// Pure over the `saberMoveData` const table (touches no pmove state), so it is
+/// a free function — matching the oracle `int PM_SaberBounceForAttack(int move)`
+/// and every call site (bg_saber, w_saber) that spells it bare.
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1086-1114`
-impl PmoveContext<'_> {
-    pub fn PM_SaberBounceForAttack(&mut self, r#move: c_int) -> c_int {
-        match self.bg.saberMoveData[r#move as usize].startQuad {
-            Q_B | Q_BR => LS_B1_BR,
-            Q_R => LS_B1__R,
-            Q_TR => LS_B1_TR,
-            Q_T => LS_B1_T_,
-            Q_TL => LS_B1_TL,
-            Q_L => LS_B1__L,
-            Q_BL => LS_B1_BL,
-            _ => LS_NONE,
-        }
+pub fn PM_SaberBounceForAttack(r#move: c_int) -> c_int {
+    match saberMoveData[r#move as usize].startQuad {
+        Q_B | Q_BR => LS_B1_BR,
+        Q_R => LS_B1__R,
+        Q_TR => LS_B1_TR,
+        Q_T => LS_B1_T_,
+        Q_TL => LS_B1_TL,
+        Q_L => LS_B1__L,
+        Q_BL => LS_B1_BL,
+        _ => LS_NONE,
     }
 }
 

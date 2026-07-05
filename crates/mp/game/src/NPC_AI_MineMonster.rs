@@ -25,6 +25,7 @@ use crate::NPC_combat::G_SetEnemy;
 use crate::npc_c::NPC_SetAnim;
 use mp_bg::public::entity_event::entity_event_t;
 use crate::trap;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
 // Raven's working combat range defines (NPC_AI_MineMonster.c:3-8):
 // These define the working combat range for these suckers
@@ -45,29 +46,29 @@ const LSTATE_WAITING: i32 = 1;
 ///
 /// Precaches the MineMonster's sound effects.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:18-27`
-pub fn NPC_MineMonster_Precache(ctx: GameContext<'_>) {
+pub fn NPC_MineMonster_Precache(ctx: GameContext<'_>) { unsafe {
     for i in 0..4 {
         let bite_sound = cstr(&format!("sound/chars/mine/misc/bite{}.wav", i + 1));
         G_SoundIndex(bite_sound.as_ptr());
         let miss_sound = cstr(&format!("sound/chars/mine/misc/miss{}.wav", i + 1));
         G_SoundIndex(miss_sound.as_ptr());
     }
-}
+}}
 
 /// Raven `MineMonster_Idle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:35-42`
-pub fn MineMonster_Idle(ctx: GameContext<'_>) {
+pub fn MineMonster_Idle(ctx: GameContext<'_>) { unsafe {
     if !UpdateGoal(ctx).is_null() {
         (*ctx.world).globals.ucmd.buttons &= !BUTTON_WALKING;
         NPC_MoveToGoal(ctx, qtrue);
     }
-}
+}}
 
 /// Raven `MineMonster_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:50-83`
-pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
+pub fn MineMonster_Patrol(ctx: GameContext<'_>) { unsafe {
     let mut dif: vec3_t = [0.0; 3];
     let npc = (*ctx.world).globals.NPC;
     let npc_info = (*ctx.world).globals.NPCInfo;
@@ -99,7 +100,7 @@ pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
         MineMonster_Idle(ctx);
         return;
     }
-}
+}}
 
 /// Raven `MineMonster_Move`.
 ///
@@ -107,7 +108,7 @@ pub fn MineMonster_Patrol(ctx: GameContext<'_>) {
 pub fn MineMonster_Move(
     ctx: GameContext<'_>,
     visible: qboolean,
-) {
+) { unsafe {
     let npc = (*ctx.world).globals.NPC;
     let npc_info = (*ctx.world).globals.NPCInfo;
 
@@ -116,7 +117,7 @@ pub fn MineMonster_Move(
         NPC_MoveToGoal(ctx, qtrue);
         (*npc_info).goalRadius = MAX_DISTANCE;
     }
-}
+}}
 
 /// Raven `MineMonster_TryDamage`.
 ///
@@ -125,7 +126,7 @@ pub fn MineMonster_TryDamage(
     ctx: GameContext<'_>,
     enemy: *mut gentity_t,
     damage: c_int,
-) {
+) { unsafe {
     if enemy.is_null() {
         return;
     }
@@ -134,17 +135,19 @@ pub fn MineMonster_TryDamage(
     let mut dir: vec3_t = [0.0; 3];
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
     let npc = (*ctx.world).globals.NPC;
+    let origin = vec3_origin;
+    let start = (*npc).r.currentOrigin;
 
-    AngleVectors((*(*npc).client).ps.viewangles, Some(&mut dir), None, None);
+    AngleVectors((*((*npc).client as *mut gclient_t)).ps.viewangles, Some(&mut dir), None, None);
     _VectorMA((*npc).r.currentOrigin, MIN_DISTANCE as f32, dir, &mut end);
 
     trap::Trace(
         ctx.engine,
-        trap::GTraceArgs::new(
+        GTraceArgs::new(
             core::ptr::addr_of_mut!(tr) as *mut trace_t,
-            core::ptr::addr_of!((*npc).r.currentOrigin) as *const vec3_t,
-            core::ptr::addr_of!(vec3_origin) as *const vec3_t,
-            core::ptr::addr_of!(vec3_origin) as *const vec3_t,
+            core::ptr::addr_of!(start) as *const vec3_t,
+            core::ptr::addr_of!(origin) as *const vec3_t,
+            core::ptr::addr_of!(origin) as *const vec3_t,
             core::ptr::addr_of!(end) as *const vec3_t,
             (*npc).s.number,
             MASK_SHOT,
@@ -175,12 +178,12 @@ pub fn MineMonster_TryDamage(
         let sound_idx = G_EffectIndex(miss_str.as_ptr());
         G_Sound(ctx, npc, CHAN_AUTO, sound_idx);
     }
-}
+}}
 
 /// Raven `MineMonster_Attack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:129-186`
-pub fn MineMonster_Attack(ctx: GameContext<'_>) {
+pub fn MineMonster_Attack(ctx: GameContext<'_>) { unsafe {
     let npc = (*ctx.world).globals.NPC;
     let attacking_id = cstr("attacking");
 
@@ -233,12 +236,12 @@ pub fn MineMonster_Attack(ctx: GameContext<'_>) {
     }
 
     TIMER_Done2(ctx, npc, cstr("attacking").as_ptr(), qtrue);
-}
+}}
 
 /// Raven `MineMonster_Combat`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:189-227`
-pub fn MineMonster_Combat(ctx: GameContext<'_>) {
+pub fn MineMonster_Combat(ctx: GameContext<'_>) { unsafe {
     let npc = (*ctx.world).globals.NPC;
     let npc_info = (*ctx.world).globals.NPCInfo;
 
@@ -277,7 +280,7 @@ pub fn MineMonster_Combat(ctx: GameContext<'_>) {
     } else {
         MineMonster_Attack(ctx);
     }
-}
+}}
 
 /// Raven `NPC_MineMonster_Pain`.
 ///
@@ -288,7 +291,7 @@ pub fn NPC_MineMonster_Pain(
     self_: *mut gentity_t,
     attacker: *mut gentity_t,
     damage: c_int,
-) {
+) { unsafe {
     let parm = ((((*self_).health as f32) / ((*(*self_).client).pers.maxHealth as f32)) * 100.0).floor() as c_int;
     G_AddEvent(self_, EV_PAIN, parm);
 
@@ -306,12 +309,12 @@ pub fn NPC_MineMonster_Pain(
             (*(*self_).NPC).localState = LSTATE_WAITING;
         }
     }
-}
+}}
 
 /// Raven `NPC_BSMineMonster_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_MineMonster.c:262-278`
-pub fn NPC_BSMineMonster_Default(ctx: GameContext<'_>) {
+pub fn NPC_BSMineMonster_Default(ctx: GameContext<'_>) { unsafe {
     let npc = (*ctx.world).globals.NPC;
     let npc_info = (*ctx.world).globals.NPCInfo;
 
@@ -324,4 +327,4 @@ pub fn NPC_BSMineMonster_Default(ctx: GameContext<'_>) {
     }
 
     NPC_UpdateAngles(ctx, qtrue, qtrue);
-}
+}}

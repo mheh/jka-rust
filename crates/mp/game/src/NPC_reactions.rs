@@ -45,10 +45,8 @@ use crate::teams::npcteam::NPCTEAM_NEUTRAL;
 use crate::g_utils::{G_AddEvent, G_Sound, G_UseTargets2};
 use crate::NPC_utils::{G_ActivateBehavior, NPC_CheckLookTarget, NPC_SetLookTarget};
 use crate::NPC_combat::{G_SetEnemy, G_ClearEnemy};
-use crate::q_math::Q_irand;
 use crate::npc_c::{SaveNPCGlobals, SetNPCGlobals, RestoreNPCGlobals};
 use crate::q_shared::Q_stricmp;
-use ffi::c_int;
 
 /// Raven `NPC_CheckAttacker`.
 ///
@@ -641,7 +639,7 @@ pub fn NPC_TempLookTarget(
             //Not already looking at something else
             //Look at him for 1 to 3 seconds
             let level_time = (*ctx.world).level.time;
-            NPC_SetLookTarget(self_, lookEntNum, level_time + Q_irand(minLookTime, maxLookTime));
+            NPC_SetLookTarget(self_, lookEntNum, level_time + (*ctx.world).bg_state.rng.Q_irand(minLookTime, maxLookTime));
         }
     }
 }
@@ -750,7 +748,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                 }
             }
             CLASS_JEDI => {
-                if !has_enemy {
+                if (*self_).enemy.is_none() {
                     if 0 != 0 {  // rwwFIXMEFIXME: support flags!
                         event = (*ctx.world).bg_state.rng.Q_irand(EV_ANGER1, EV_ANGER3);
                     } else {

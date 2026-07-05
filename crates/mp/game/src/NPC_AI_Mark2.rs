@@ -133,6 +133,7 @@ pub fn NPC_Mark2_Part_Explode(
     self_: *mut gentity_t,
     bolt: c_int,
 ) {
+  unsafe {
     if bolt >= 0 {
         let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
         let mut org: vec3_t = [0.0; 3];
@@ -161,6 +162,7 @@ pub fn NPC_Mark2_Part_Explode(
     }
 
     (*self_).count += 1;
+  }
 }
 
 /// Raven `NPC_Mark2_Pain`.
@@ -172,6 +174,7 @@ pub fn NPC_Mark2_Pain(
     attacker: *mut gentity_t,
     damage: c_int,
 ) {
+  unsafe {
     let hit_loc = (*ctx.world).globals.gPainHitLoc;
 
     NPC_Pain(ctx, self_, attacker, damage);
@@ -179,19 +182,19 @@ pub fn NPC_Mark2_Pain(
     for i in 0..3 {
         if hit_loc == HL_GENERIC1 + i && (*self_).locationDamage[(HL_GENERIC1 + i) as usize] > AMMO_POD_HEALTH {
             if (*self_).locationDamage[hit_loc as usize] >= AMMO_POD_HEALTH {
-                let surface_name = va(b"torso_canister%d\0".as_ptr() as *const c_char, (i + 1) as c_int);
+                let surface_name = cstr(&format!("torso_canister{}", (i + 1) as c_int));
                 let new_bolt = trap::G2API_AddBolt(
                     ctx.engine,
                     mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
                         (*self_).ghoul2,
                         0,
-                        surface_name,
+                        surface_name.clone(),
                     ),
                 );
                 if new_bolt != -1 {
                     NPC_Mark2_Part_Explode(ctx, self_, new_bolt);
                 }
-                NPC_SetSurfaceOnOff(ctx, self_, surface_name, TURN_OFF);
+                NPC_SetSurfaceOnOff(ctx, self_, surface_name.as_ptr(), TURN_OFF);
                 break;
             }
         }
@@ -200,7 +203,7 @@ pub fn NPC_Mark2_Pain(
     G_Sound(
         ctx,
         self_,
-        crate::g_defines::CHAN_AUTO,
+        CHAN_AUTO,
         G_SoundIndex(b"sound/chars/mark2/misc/mark2_pain\0".as_ptr() as *const c_char),
     );
 
@@ -214,15 +217,17 @@ pub fn NPC_Mark2_Pain(
             [0.0; 3],
             (*self_).health,
             crate::level::damage_flags::DAMAGE_NO_PROTECTION,
-            crate::level::mod_types::MOD_UNKNOWN,
+            MOD_UNKNOWN,
         );
     }
+  }
 }
 
 /// Raven `Mark2_Hunt`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:118-130`
 pub fn Mark2_Hunt(ctx: GameContext<'_>) {
+  unsafe {
     let npc_ptr = (*ctx.world).globals.NPC;
     let npc_info_ptr = (*ctx.world).globals.NPCInfo;
 
@@ -234,6 +239,7 @@ pub fn Mark2_Hunt(ctx: GameContext<'_>) {
 
     (*npc_info_ptr).combatMove = qtrue;
     NPC_MoveToGoal(ctx, qtrue);
+  }
 }
 
 /// Raven `Mark2_FireBlaster`.
@@ -243,6 +249,7 @@ pub fn Mark2_FireBlaster(
     ctx: GameContext<'_>,
     advance: qboolean,
 ) {
+  unsafe {
     let mut muzzle1: vec3_t = [0.0; 3];
     let mut enemy_org1: vec3_t = [0.0; 3];
     let mut delta1: vec3_t = [0.0; 3];
@@ -259,7 +266,7 @@ pub fn Mark2_FireBlaster(
         mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
             (*npc_ptr).ghoul2,
             0,
-            b"*flash\0".as_ptr() as *const c_char,
+            c"*flash".to_owned(),
         ),
     );
 
@@ -282,11 +289,11 @@ pub fn Mark2_FireBlaster(
 
     if (*npc_ptr).health != 0 {
         let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
-            &(*ctx.world).entities[eid.0 as usize] as *const gentity_t
+            &(*ctx.world).g_entities[eid.0 as usize] as *const gentity_t
         } else {
             core::ptr::null()
         };
-        CalcEntitySpot(ctx, enemy_ptr, crate::entity::spot_type::SPOT_HEAD, &mut enemy_org1);
+        CalcEntitySpot(ctx, enemy_ptr, crate::npc::spot_t::spot_t::SPOT_HEAD, &mut enemy_org1);
         crate::q_math::_VectorSubtract(enemy_org1, muzzle1, &mut delta1);
         vectoangles(delta1, &mut angleToEnemy1);
         AngleVectors(angleToEnemy1, Some(&mut forward), Some(&mut vright), Some(&mut up));
@@ -299,19 +306,20 @@ pub fn Mark2_FireBlaster(
     G_Sound(
         ctx,
         npc_ptr,
-        crate::g_defines::CHAN_AUTO,
+        CHAN_AUTO,
         G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char),
     );
 
     let missile = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_ptr, qfalse);
 
     (*missile).classname = b"bryar_proj\0".as_ptr() as *const c_char;
-    (*missile).s.weapon = crate::g_defines::WP_BRYAR_PISTOL;
+    (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
 
     (*missile).damage = 1;
     (*missile).dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
-    (*missile).methodOfDeath = crate::level::mod_types::MOD_BRYAR_PISTOL;
-    (*missile).clipmask = crate::g_defines::MASK_SHOT | crate::g_defines::CONTENTS_LIGHTSABER;
+    (*missile).methodOfDeath = MOD_BRYAR_PISTOL;
+    (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+  }
 }
 
 /// Raven `Mark2_BlasterAttack`.
@@ -321,6 +329,7 @@ pub fn Mark2_BlasterAttack(
     ctx: GameContext<'_>,
     advance: qboolean,
 ) {
+  unsafe {
     let npc_ptr = (*ctx.world).globals.NPC;
     let npc_info_ptr = (*ctx.world).globals.NPCInfo;
 
@@ -345,12 +354,14 @@ pub fn Mark2_BlasterAttack(
     } else if advance == qtrue {
         Mark2_Hunt(ctx);
     }
+  }
 }
 
 /// Raven `Mark2_AttackDecision`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:212-295`
 pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
+  unsafe {
     let npc_ptr = (*ctx.world).globals.NPC;
     let npc_info_ptr = (*ctx.world).globals.NPCInfo;
 
@@ -358,12 +369,12 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
 
     let distance = {
         let d = crate::q_math::DistanceHorizontalSquared((*npc_ptr).r.currentOrigin, (*npc_ptr).enemy.map(|eid| {
-            (*ctx.world).entities[eid.0 as usize].r.currentOrigin
+            (*ctx.world).g_entities[eid.0 as usize].r.currentOrigin
         }).unwrap_or([0.0; 3]));
         d as c_int
     } as i64;
     let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
-        &mut (*ctx.world).entities[eid.0 as usize] as *mut gentity_t
+        &mut (*ctx.world).g_entities[eid.0 as usize] as *mut gentity_t
     } else {
         core::ptr::null_mut()
     };
@@ -371,7 +382,7 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
     let advance = (distance > MIN_DISTANCE_SQR as i64) as qboolean;
 
     if (*npc_info_ptr).localState == LSTATE_RISINGUP {
-        (*npc_ptr).flags &= !crate::g_defines::FL_SHIELDED;
+        (*npc_ptr).flags &= !FL_SHIELDED;
         NPC_SetAnim(npc_ptr, crate::anim::SETANIM_BOTH, crate::anim::BOTH_RUN1START, crate::anim::SETANIM_FLAG_HOLD | crate::anim::SETANIM_FLAG_OVERRIDE);
         if (*(*npc_ptr).client).ps.legsTimer <= 0 && (*(*npc_ptr).client).ps.torsoAnim == crate::anim::BOTH_RUN1START {
             (*npc_info_ptr).localState = LSTATE_NONE;
@@ -405,23 +416,25 @@ pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
         TIMER_Set(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 9000));
 
         if (*(*npc_ptr).client).ps.legsTimer <= 0 && (*(*npc_ptr).client).ps.torsoAnim == crate::anim::BOTH_RUN1STOP {
-            (*npc_ptr).flags |= crate::g_defines::FL_SHIELDED;
+            (*npc_ptr).flags |= FL_SHIELDED;
             (*npc_info_ptr).localState = LSTATE_DOWN;
         }
     } else if (*npc_info_ptr).localState == LSTATE_DOWN {
-        (*npc_ptr).flags |= crate::g_defines::FL_SHIELDED;
+        (*npc_ptr).flags |= FL_SHIELDED;
         Mark2_BlasterAttack(ctx, qfalse);
     } else if TIMER_Done(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char) == qtrue {
         (*npc_info_ptr).localState = LSTATE_DROPPINGDOWN;
     } else if advance == qtrue {
         Mark2_BlasterAttack(ctx, advance);
     }
+  }
 }
 
 /// Raven `Mark2_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:303-330`
 pub fn Mark2_Patrol(ctx: GameContext<'_>) {
+  unsafe {
     let npc_ptr = (*ctx.world).globals.NPC;
 
     if NPC_CheckPlayerTeamStealth(ctx) == qtrue {
@@ -431,7 +444,7 @@ pub fn Mark2_Patrol(ctx: GameContext<'_>) {
 
     if (*npc_ptr).enemy.is_none() {
         if UpdateGoal(ctx) != core::ptr::null_mut() {
-            (*ctx.world).globals.ucmd.buttons |= crate::g_defines::BUTTON_WALKING;
+            (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
             NPC_MoveToGoal(ctx, qtrue);
             NPC_UpdateAngles(ctx, qtrue, qtrue);
         }
@@ -440,6 +453,7 @@ pub fn Mark2_Patrol(ctx: GameContext<'_>) {
             TIMER_Set(ctx, npc_ptr, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
         }
     }
+  }
 }
 
 /// Raven `Mark2_Idle`.
@@ -453,6 +467,7 @@ pub fn Mark2_Idle(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:347-362`
 pub fn NPC_BSMark2_Default(ctx: GameContext<'_>) {
+  unsafe {
     let npc_ptr = (*ctx.world).globals.NPC;
     let npc_info_ptr = (*ctx.world).globals.NPCInfo;
 
@@ -464,4 +479,5 @@ pub fn NPC_BSMark2_Default(ctx: GameContext<'_>) {
     } else {
         Mark2_Idle(ctx);
     }
+  }
 }

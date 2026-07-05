@@ -14,6 +14,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use mp_bg::public::pmove_t::MAXTOUCH;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
@@ -5817,7 +5818,10 @@ impl PmoveContext<'_> {
                 return 1;
             } else if forcedUse == HI_SEEKER as c_int {
                 if (*ps).eFlags & EF_SEEKERDRONE != 0 {
-                    self.PM_AddEventWithParm(EV_ITEMUSEFAIL as c_int, SEEKER_ALREADYDEPLOYED);
+                    self.PM_AddEventWithParm(
+                        EV_ITEMUSEFAIL as c_int,
+                        mp_qshared::shared::itemUseFail_t::SEEKER_ALREADYDEPLOYED as c_int,
+                    );
                     return 0;
                 }
                 return 1;

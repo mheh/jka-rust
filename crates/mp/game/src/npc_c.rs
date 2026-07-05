@@ -79,7 +79,10 @@ pub fn CorpsePhysics(
             if !client.is_null() && ((*client).ps.eFlags & EF_NODRAW) == 0 {
                 crate::NPC_senses::AddSightEvent(
                     ctx,
-                    (*self_).enemy,
+                    match (*self_).enemy {
+                        Some(id) => &mut world.g_entities[id.index()] as *mut gentity_t,
+                        None => core::ptr::null_mut(),
+                    },
                     (*self_).r.currentOrigin,
                     384.0,
                     alertEventLevel_e::AEL_DISCOVERED,
@@ -180,7 +183,7 @@ pub fn NPC_RemoveBody(
             ) == 0
             {
                 let activator = match (*self_).activator {
-                    Some(id) => &mut world.entities[id.index()] as *mut gentity_t,
+                    Some(id) => &mut world.g_entities[id.index()] as *mut gentity_t,
                     None => core::ptr::null_mut(),
                 };
                 let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
@@ -232,7 +235,7 @@ pub fn NPC_RemoveBody(
                 ) == 0
                 {
                     let activator = match (*self_).activator {
-                        Some(id) => &mut world.entities[id.index()] as *mut gentity_t,
+                        Some(id) => &mut world.g_entities[id.index()] as *mut gentity_t,
                         None => core::ptr::null_mut(),
                     };
                     let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
@@ -242,7 +245,7 @@ pub fn NPC_RemoveBody(
                     {
                         //not being held by a Rancor
                         if !client.is_null() && (*client).ps.saberEntityNum > 0 && (*client).ps.saberEntityNum < ENTITYNUM_WORLD {
-                            let saberent = world.entities.as_mut_ptr().add((*client).ps.saberEntityNum as usize);
+                            let saberent = world.g_entities.as_mut_ptr().add((*client).ps.saberEntityNum as usize);
                             crate::g_utils::G_FreeEntity(ctx, saberent);
                         }
                         crate::g_utils::G_FreeEntity(ctx, self_);
@@ -691,7 +694,7 @@ pub fn NPC_ShowDebugInfo(ctx: GameContext<'_>) {
                 ctx.engine,
                 mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
                     &(*found).r.currentOrigin as *const vec3_t,
-                    &world.entities[0].r.currentOrigin as *const vec3_t,
+                    &world.g_entities[0].r.currentOrigin as *const vec3_t,
                 ),
             ) != 0
             {
@@ -876,7 +879,7 @@ pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
         // Raven's borg-specific `/* ... */`'d branch is dead code upstream —
         // only the live `else` block (everyone else) runs.
         // Guaranteed `Some` — the early return above covers the `None` case.
-        let enemy = &mut world.entities[(*npc_ent).enemy.unwrap().index()] as *mut gentity_t;
+        let enemy = &mut world.g_entities[(*npc_ent).enemy.unwrap().index()] as *mut gentity_t;
         let enemy_origin = (*enemy).r.currentOrigin;
         let self_origin = (*npc_ent).r.currentOrigin;
         let vec: vec3_t = [
@@ -1385,7 +1388,7 @@ pub fn NPC_RunBehavior(
                         //if in battle and have no weapon, run away, fixme: when in BS_HUNT_AND_KILL, they just stand there
                         if bState != bState_t::BS_FLEE as c_int {
                             // Guaranteed `Some` — covered by the `enemy.is_none()` guard above.
-                            let enemy = &mut world.entities[(*npc_ent).enemy.unwrap().index()] as *mut gentity_t;
+                            let enemy = &mut world.g_entities[(*npc_ent).enemy.unwrap().index()] as *mut gentity_t;
                             crate::NPC_behavior::NPC_StartFlee(ctx, enemy, (*enemy).r.currentOrigin, alertEventLevel_e::AEL_DANGER_GREAT as c_int, 5000, 10000);
                         } else {
                             crate::NPC_behavior::NPC_BSFlee(ctx);
@@ -1491,7 +1494,7 @@ pub fn NPC_ExecuteBState(
         NPC_RunBehavior(ctx, (*client).playerTeam as c_int, bState as c_int);
 
         if let Some(enemy_id) = (*npc_ent).enemy {
-            let enemy = &mut world.entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut world.g_entities[enemy_id.index()] as *mut gentity_t;
             if (*enemy).inuse == 0 {
                 //just in case bState doesn't catch this
                 crate::NPC_combat::G_ClearEnemy(ctx, npc_ent);
@@ -1502,12 +1505,12 @@ pub fn NPC_ExecuteBState(
             crate::NPC_utils::NPC_SetLookTarget(npc_ent, (*client).ps.saberLockEnemy, world.level.time + 1000);
         } else if crate::NPC_utils::NPC_CheckLookTarget(ctx, npc_ent) == 0 {
             if let Some(enemy_id) = (*npc_ent).enemy {
-                crate::NPC_utils::NPC_SetLookTarget(npc_ent, world.entities[enemy_id.index()].s.number, 0);
+                crate::NPC_utils::NPC_SetLookTarget(npc_ent, world.g_entities[enemy_id.index()].s.number, 0);
             }
         }
 
         if let Some(enemy_id) = (*npc_ent).enemy {
-            let enemy = &mut world.entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut world.g_entities[enemy_id.index()] as *mut gentity_t;
             if ((*enemy).flags & FL_DONT_SHOOT) != 0 {
                 world.globals.ucmd.buttons &= !BUTTON_ATTACK;
                 world.globals.ucmd.buttons &= !BUTTON_ALT_ATTACK;
@@ -1749,7 +1752,7 @@ pub fn NPC_Think(
         (*self_).nextthink = world.level.time + FRAMETIME / 2;
 
         for i in 0..MAX_CLIENTS {
-            let player = world.entities.as_mut_ptr().add(i as usize);
+            let player = world.g_entities.as_mut_ptr().add(i as usize);
             if (*player).inuse != 0
                 && !(*player).client.is_null()
                 && (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR

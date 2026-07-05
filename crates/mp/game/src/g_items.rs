@@ -18,7 +18,17 @@ use crate::bg_misc::{
     BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_EmplacedView, BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_FindItem, BG_FindItemForHoldable, BG_FindItemForWeapon,
 };
 use crate::client::gclient::gclient_t;
+
+// Raven `#define ITMSF_*` item spawnflags.
+// Source: `oracle/oracle/codemp/game/g_items.c:30-35`
+pub const ITMSF_SUSPEND: c_int = 1;
+pub const ITMSF_NOPLAYER: c_int = 2;
+pub const ITMSF_ALLOWNPC: c_int = 4;
+pub const ITMSF_NOTSOLID: c_int = 8;
+pub const ITMSF_VERTICAL: c_int = 16;
+pub const ITMSF_INVISIBLE: c_int = 32;
 use crate::client::{CON_CONNECTED, CON_DISCONNECTED};
+use crate::w_saber::HasSetSaberOnly;
 use crate::entity::flags::{FL_DROPPED_ITEM, FL_NOTARGET, FL_TEAMSLAVE};
 use crate::g_combat::G_RadiusDamage;
 use crate::g_exphysics::G_RunExPhys;
@@ -127,8 +137,6 @@ pub const CS_ITEMS: c_int = 27;
 const EF_ITEMPLACEHOLDER: c_int = 1 << 23;
 const EF_CLIENTSMOOTH: c_int = 1 << 28;
 const EF_G2ANIMATING: c_int = 1 << 0;
-
-use mp_bg::public::entity_event::entity_event_t;
 
 // Raven `ITEM_RADIUS` (`bg_public.h:35`).
 pub const ITEM_RADIUS: f32 = 15.0;

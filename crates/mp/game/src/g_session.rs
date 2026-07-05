@@ -10,6 +10,10 @@
 
 use crate::prelude::*;
 use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
+use crate::client::spectator_state::spectatorState_t;
+use crate::client::spectator_state::spectatorState_t::*;
+use mp_bg::public::duel_team::duelTeam_t::*;
+use crate::g_main::{G_PowerDuelCount, G_Printf};
 
 
 /// Raven `G_WriteClientSessionData`.
@@ -86,24 +90,26 @@ pub fn G_WriteClientSessionData(
         }
     };
 
-    let s = format!(
-        "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
-        (*client).sess.sessionTeam as i32,
-        (*client).sess.spectatorTime,
-        (*client).sess.spectatorState as i32,
-        (*client).sess.spectatorClient,
-        (*client).sess.wins,
-        (*client).sess.losses,
-        (*client).sess.teamLeader as i32,
-        (*client).sess.setForce,
-        (*client).sess.saberLevel,
-        (*client).sess.selectedFP,
-        (*client).sess.duelTeam,
-        (*client).sess.siegeDesiredTeam,
-        siege_class_str,
-        saber_type_str,
-        saber2_type_str
-    );
+    let s = unsafe {
+        format!(
+            "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+            (*client).sess.sessionTeam as i32,
+            (*client).sess.spectatorTime,
+            (*client).sess.spectatorState as i32,
+            (*client).sess.spectatorClient,
+            (*client).sess.wins,
+            (*client).sess.losses,
+            (*client).sess.teamLeader as i32,
+            (*client).sess.setForce,
+            (*client).sess.saberLevel,
+            (*client).sess.selectedFP,
+            (*client).sess.duelTeam,
+            (*client).sess.siegeDesiredTeam,
+            siege_class_str,
+            saber_type_str,
+            saber2_type_str
+        )
+    };
 
     let var = format!("session{}", client_idx);
     trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr(&var), cstr(&s)));
@@ -185,7 +191,8 @@ pub fn G_ReadSessionData(
     }
 
     (*client).sess.sessionTeam = session_team as team_t;
-    (*client).sess.spectatorState = spectator_state as spectatorState_t;
+    (*client).sess.spectatorState =
+        core::mem::transmute::<i32, spectatorState_t>(spectator_state);
     (*client).sess.teamLeader = if team_leader != 0 { qtrue } else { qfalse };
 
     (*client).ps.fd.saberAnimLevel = (*client).sess.saberLevel;
@@ -253,9 +260,9 @@ pub fn G_InitSessionData(
                     let mut doubles: c_int = 0;
                     G_PowerDuelCount(ctx, &mut loners, &mut doubles, qtrue);
                     if doubles == 0 || loners > (doubles / 2) {
-                        (*client).sess.duelTeam = DUELTEAM_DOUBLE;
+                        (*client).sess.duelTeam = DUELTEAM_DOUBLE as c_int;
                     } else {
-                        (*client).sess.duelTeam = DUELTEAM_LONE;
+                        (*client).sess.duelTeam = DUELTEAM_LONE as c_int;
                     }
                     (*client).sess.sessionTeam = TEAM_SPECTATOR;
                 }

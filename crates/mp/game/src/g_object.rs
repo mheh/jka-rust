@@ -156,7 +156,7 @@ pub fn G_RunObject(
 
     crate::trap::Trace(
         ctx.engine,
-        crate::trap::GTraceArgs::new(
+        mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
             &mut tr as *mut trace_t,
             &unsafe { (*ent).r.currentOrigin } as *const vec3_t,
             &unsafe { (*ent).r.mins } as *const vec3_t,
@@ -169,7 +169,10 @@ pub fn G_RunObject(
 
     if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction > 0.0f32 {
         crate::q_math::_VectorCopy(tr.endpos, &mut unsafe { (*ent).r.currentOrigin });
-        crate::trap::LinkEntity(ctx.engine, crate::trap::GLinkentityArgs::new(ent));
+        crate::trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+        );
     } else {
         // if ( tr.startsolid )
         tr.fraction = 0.0f32;

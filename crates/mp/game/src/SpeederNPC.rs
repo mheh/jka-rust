@@ -147,7 +147,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 
         // Handle turbo/acceleration
         if !(*pVeh).m_pPilot.is_null() && ((*pVeh).m_ucmd.buttons & BUTTON_ALT_ATTACK != 0)
-            && (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0) != 0
+            && (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0.0) != 0
         {
             if ((!parentPS.is_null() && (*parentPS).electrifyTime > curTime)
                 || (!pilotPS.is_null() && ((*pilotPS).weapon == WP_MELEE
@@ -166,7 +166,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
                     }
 
                     if !parentPS.is_null() {
-                        (*parentPS).speed = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0) as f32;
+                        (*parentPS).speed = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0.0) as f32;
                     }
                 }
             }
@@ -183,27 +183,27 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
         } else if (curTime > (*pVeh).m_iTurboTime)
             && ((*pVeh).m_ulFlags & VEH_FLYING == 0)
             && ((*pVeh).m_ucmd.forwardmove < 0)
-            && ((*pVeh).m_vOrientation[ROLL] as f32).abs() > 25.0f32
+            && (*(*pVeh).m_vOrientation.add(ROLL) as f32).abs() > 25.0f32
         {
             (*pVeh).m_ulFlags |= VEH_SLIDEBREAKING;
         }
 
         // Determine speed max based on turbo
         if curTime < (*pVeh).m_iTurboTime {
-            speedMax = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0) as f32;
+            speedMax = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0.0) as f32;
             if !parentPS.is_null() {
                 (*parentPS).eFlags |= EF_JETPACK_ACTIVE;
             }
         } else {
-            speedMax = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(0) as f32;
+            speedMax = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(0.0) as f32;
             if !parentPS.is_null() {
                 (*parentPS).eFlags &= !EF_JETPACK_ACTIVE;
             }
         }
 
-        speedIdle = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedIdle).unwrap_or(0) as f32;
+        speedIdle = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedIdle).unwrap_or(0.0) as f32;
         speedIdleAccel = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.accelIdle).unwrap_or(0.0) * (*pVeh).m_fTimeModifier;
-        speedMin = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMin).unwrap_or(0) as f32;
+        speedMin = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMin).unwrap_or(0.0) as f32;
 
         // Handle forward/backward movement
         if (!parentPS.is_null() && (*parentPS).speed != 0.0f32)
@@ -272,11 +272,11 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
         }
         parentPS = (*(*pVeh).m_pParentEntity).playerState;
 
-        angDif = AngleSubtract((*pVeh).m_vOrientation[YAW], (*riderPS).viewangles[YAW]);
+        angDif = AngleSubtract(*(*pVeh).m_vOrientation.add(YAW), (*riderPS).viewangles[YAW]);
 
         if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
             let mut s: f32 = (*parentPS).speed;
-            let maxDif: f32 = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turningSpeed).unwrap_or(0) as f32 * 4.0f32;
+            let maxDif: f32 = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turningSpeed).unwrap_or(0.0) as f32 * 4.0f32;
 
             if s < 0.0f32 {
                 s = -s;
@@ -290,8 +290,8 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
                 angDif = -maxDif;
             }
 
-            (*pVeh).m_vOrientation[YAW] = AngleNormalize180(
-                (*pVeh).m_vOrientation[YAW]
+            *(*pVeh).m_vOrientation.add(YAW) = AngleNormalize180(
+                *(*pVeh).m_vOrientation.add(YAW)
                     - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
             );
 

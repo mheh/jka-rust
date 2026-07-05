@@ -112,7 +112,7 @@ pub fn Jedi_PlayDeflectSound(
         // sequence matches: no draw occurs when nothing is emitted.
         let level_time = (*ctx.world).level.time;
         if (*self_).s.number == 0 {
-            let ev = crate::q_math::Q_irand(
+            let ev = (*ctx.world).bg_state.rng.Q_irand(
                 entity_event_t::EV_DEFLECT1 as c_int,
                 entity_event_t::EV_DEFLECT3 as c_int,
             );
@@ -120,7 +120,7 @@ pub fn Jedi_PlayDeflectSound(
         } else {
             let npc = (*self_).NPC as *mut gNPC_t;
             if (*self_).health > 0 && !npc.is_null() && (*npc).blockedSpeechDebounceTime < level_time {
-                let ev = crate::q_math::Q_irand(
+                let ev = (*ctx.world).bg_state.rng.Q_irand(
                     entity_event_t::EV_DEFLECT1 as c_int,
                     entity_event_t::EV_DEFLECT3 as c_int,
                 );
@@ -144,19 +144,19 @@ pub fn NPC_Jedi_PlayConfusionSound(
             if !client.is_null()
                 && ((*client).NPC_class == CLASS_TAVION || (*client).NPC_class == CLASS_DESANN)
             {
-                let ev = crate::q_math::Q_irand(
+                let ev = (*ctx.world).bg_state.rng.Q_irand(
                     entity_event_t::EV_CONFUSE1 as c_int,
                     entity_event_t::EV_CONFUSE3 as c_int,
                 );
                 crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
-            } else if crate::q_math::Q_irand(0, 1) != 0 {
-                let ev = crate::q_math::Q_irand(
+            } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                let ev = (*ctx.world).bg_state.rng.Q_irand(
                     entity_event_t::EV_TAUNT1 as c_int,
                     entity_event_t::EV_TAUNT3 as c_int,
                 );
                 crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, ev, 2000);
             } else {
-                let ev = crate::q_math::Q_irand(
+                let ev = (*ctx.world).bg_state.rng.Q_irand(
                     entity_event_t::EV_GLOAT1 as c_int,
                     entity_event_t::EV_GLOAT3 as c_int,
                 );
@@ -316,7 +316,7 @@ pub fn Boba_StopKnockdown(
         }
 
         let ang: vec3_t = [0.0, (*self_).r.currentAngles[YAW], 0.0];
-        let strafeTime = crate::q_math::Q_irand(1000, 2000);
+        let strafeTime = (*ctx.world).bg_state.rng.Q_irand(1000, 2000);
 
         let mut fwd: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
@@ -326,7 +326,7 @@ pub fn Boba_StopKnockdown(
         let fDot = pDir[0] * fwd[0] + pDir[1] * fwd[1] + pDir[2] * fwd[2];
         let rDot = pDir[0] * right[0] + pDir[1] * right[1] + pDir[2] * right[2];
 
-        if crate::q_math::Q_irand(0, 2) != 0 {
+        if (*ctx.world).bg_state.rng.Q_irand(0, 2) != 0 {
             //flip or roll with it
             // C leaves tempCmd's other fields uninitialized (UB read in ForceJump);
             // zero-initialize as the one defined behavior (porting-rules §19).
@@ -347,7 +347,7 @@ pub fn Boba_StopKnockdown(
                 crate::g_timer::TIMER_Set(ctx, self_, c"strafeRight".as_ptr(), -1);
             }
             crate::g_utils::G_AddEvent(self_, entity_event_t::EV_JUMP as c_int, 0);
-            if crate::q_math::Q_irand(0, 1) == 0 {
+            if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                 //flip
                 (*client).ps.fd.forceJumpCharge = 280.0; //FIXME: calc this intelligently?
                 crate::w_force::ForceJump(ctx, self_, &mut tempCmd);
@@ -356,7 +356,7 @@ pub fn Boba_StopKnockdown(
                 crate::g_timer::TIMER_Set(ctx, self_, c"duck".as_ptr(), strafeTime);
             }
             (*self_).painDebounceTime = 0; //so we do something
-        } else if crate::q_math::Q_irand(0, 1) == 0 && forceKnockdown != qfalse {
+        } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 && forceKnockdown != qfalse {
             //resist
             WP_ResistForcePush(ctx, self_, pusher, qtrue);
         } else {
@@ -1148,7 +1148,7 @@ pub fn NPC_Jedi_RateNewEnemy(
         Jedi_Aggression(self_, newAggression - (*((*self_).NPC as *mut gNPC_t)).stats.aggression);
 
         //don't taunt right away
-        crate::g_timer::TIMER_Set(ctx, self_, c"chatter".as_ptr(), crate::q_math::Q_irand(4000, 7000));
+        crate::g_timer::TIMER_Set(ctx, self_, c"chatter".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(4000, 7000));
     }
 }
 
@@ -1187,7 +1187,7 @@ pub fn Jedi_RageStop(
         if !(*self_).NPC.is_null() {
             //calm down and back off
             crate::g_timer::TIMER_Set(ctx, self_, c"roamTime".as_ptr(), 0);
-            Jedi_Aggression(self_, crate::q_math::Q_irand(-5, 0));
+            Jedi_Aggression(self_, (*ctx.world).bg_state.rng.Q_irand(-5, 0));
         }
     }
 }

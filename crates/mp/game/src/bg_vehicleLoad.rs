@@ -14,6 +14,8 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_utils::G_EffectIndex;
+use crate::q_shared::{COM_BeginParseSession, COM_ParseExt};
 use mp_bg::vehicles::vehicle_s::VEH_MAX_PASSENGERS;
 
 /// Raven `BG_ClearVehicleParseParms`.

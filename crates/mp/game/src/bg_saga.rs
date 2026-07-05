@@ -24,6 +24,8 @@
 
 use crate::prelude::*;
 use crate::q_shared::Q_stricmp;
+// Raven `saber_styles_t` variants (`SS_*`) spelled bare in the saber-style table.
+use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::*;
 
 /// Raven's `#define SIEGECHAR_TAB 9` (tab literal used by the hand-rolled
 /// siege-file parser instead of `'\t'`).

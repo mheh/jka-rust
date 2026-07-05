@@ -11,7 +11,7 @@
 //! traps thread the `GameContext<'_>` receiver (`.world: *mut GameWorld`,
 //! `.engine`) as an ADDITIVE first parameter (the faithful C signature carries
 //! none). Globals are `GameWorld` fields (fork 1): `level` →
-//! `(*ctx.world).level`, `g_entities[i]` → `(*ctx.world).entities[i]`; this
+//! `(*ctx.world).level`, `g_entities[i]` → `(*ctx.world).g_entities[i]`; this
 //! file's own `teamNumbers`/`teamStrength`/`teamCounter` file-scope globals
 //! were added to `GameWorld` (additive, Raven names kept — see
 //! `world/game_world.rs`). Traps go through `trap::X(ctx.engine, …)`.
@@ -44,7 +44,7 @@ use crate::NPC_combat::{G_ClearEnemy, G_SetEnemy, NPC_ClearShot};
 use crate::NPC_sounds::G_AddVoiceEvent;
 use crate::g_utils::{G_BoneIndex, GetAnglesForDirection};
 use crate::q_shared::{Q_stricmp, GetIDForString, GetStringForID, va};
-use crate::q_math::{AngleDelta, AngleNormalize360, AngleVectors, Distance, flrand, Q_irand, vec3_origin, PITCH, YAW, ROLL, _VectorCopy};
+use crate::q_math::{AngleDelta, AngleNormalize360, AngleVectors, Distance, vec3_origin, PITCH, YAW, ROLL, _VectorCopy};
 use crate::g_target::Q3_SCRIPT_DIR;
 use crate::teams::npcteam::{NPCTEAM_PLAYER, NPCTEAM_ENEMY, NPCTEAM_NEUTRAL, NPCTEAM_FREE};
 use crate::level::alert_event::{alertEvent_t, alertEventLevel_e::AEL_DISCOVERED};
@@ -433,11 +433,11 @@ pub fn NPC_AimWiggle(
         if (*npc_info).aimErrorDebounceTime < (*ctx.world).level.time {
             // Raven derefs `NPC->enemy` unconditionally here (assumed non-null
             // by the caller).
-            let enemy = &mut (*ctx.world).entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
-            (*npc_info).aimOfs[0] = 0.3 * flrand((*enemy).r.mins[0], (*enemy).r.maxs[0]);
-            (*npc_info).aimOfs[1] = 0.3 * flrand((*enemy).r.mins[1], (*enemy).r.maxs[1]);
+            let enemy = &mut (*ctx.world).g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
+            (*npc_info).aimOfs[0] = 0.3 * (*ctx.world).bg_state.rng.flrand((*enemy).r.mins[0], (*enemy).r.maxs[0]);
+            (*npc_info).aimOfs[1] = 0.3 * (*ctx.world).bg_state.rng.flrand((*enemy).r.mins[1], (*enemy).r.maxs[1]);
             if (*enemy).r.maxs[2] > 0.0 {
-                (*npc_info).aimOfs[2] = (*enemy).r.maxs[2] * flrand(0.0, -1.0);
+                (*npc_info).aimOfs[2] = (*enemy).r.maxs[2] * (*ctx.world).bg_state.rng.flrand(0.0, -1.0);
             }
         }
         for i in 0..3 {
@@ -492,13 +492,13 @@ pub fn NPC_UpdateFiringAngles(
         }
 
         if (*npc_info).aimErrorDebounceTime < (*ctx.world).level.time {
-            if Q_irand(0, 1) != 0 {
-                (*npc_info).lastAimErrorYaw = ((6 - (*npc_info).stats.aim) as f32) * flrand(-1.0, 1.0);
+            if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                (*npc_info).lastAimErrorYaw = ((6 - (*npc_info).stats.aim) as f32) * (*ctx.world).bg_state.rng.flrand(-1.0, 1.0);
             }
-            if Q_irand(0, 1) != 0 {
-                (*npc_info).lastAimErrorPitch = ((6 - (*npc_info).stats.aim) as f32) * flrand(-1.0, 1.0);
+            if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                (*npc_info).lastAimErrorPitch = ((6 - (*npc_info).stats.aim) as f32) * (*ctx.world).bg_state.rng.flrand(-1.0, 1.0);
             }
-            (*npc_info).aimErrorDebounceTime = (*ctx.world).level.time + Q_irand(250, 2000);
+            (*npc_info).aimErrorDebounceTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(250, 2000);
         }
 
         let npc_client = (*npc).client as *mut gclient_t;
@@ -657,7 +657,7 @@ pub fn SetTeamNumbers(ctx: GameContext<'_>) {
         }
 
         for i in 0..1usize {
-            let found = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let found = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             if !(*found).client.is_null() {
                 if (*found).health > 0 {
                     let client = (*found).client as *mut gclient_t;
@@ -708,7 +708,7 @@ pub fn G_ActivateBehavior(
             // if (0) branch is dead code in oracle
             let script_path = format!(
                 "{}/{}",
-                cstr_to_str(Q3_SCRIPT_DIR),
+                cstr_to_str(Q3_SCRIPT_DIR.as_ptr()),
                 cstr_to_str(bs_name)
             );
             trap::ICARUS_RunScript(ctx.engine, GIcarusRunscriptArgs::new(self_, cstr(&script_path)));
@@ -896,7 +896,7 @@ pub fn NPC_SomeoneLookingAtMe(
     unsafe {
         let mut i: usize = 0;
         while i < MAX_CLIENTS {
-            let pEnt = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let pEnt = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
 
             let eligible = !pEnt.is_null()
                 && (*pEnt).inuse != QFALSE
@@ -1062,7 +1062,7 @@ pub fn NPC_ValidEnemy(
         }
 
         let ent_enemy = match (*ent).enemy {
-            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
 
@@ -1156,7 +1156,7 @@ pub fn NPC_FindNearestEnemy(
 
         let mut i = 0;
         while i < num_ents {
-            let rad_ent = &mut (*ctx.world).entities[iradius_ents[i as usize] as usize] as *mut gentity_t;
+            let rad_ent = &mut (*ctx.world).g_entities[iradius_ents[i as usize] as usize] as *mut gentity_t;
 
             //Don't consider self
             if rad_ent == ent {
@@ -1209,7 +1209,7 @@ pub fn NPC_PickEnemyExt(
 
         //If we have a valid enemy, use it
         if ent_id >= 0 {
-            return &mut (*ctx.world).entities[ent_id as usize] as *mut gentity_t;
+            return &mut (*ctx.world).g_entities[ent_id as usize] as *mut gentity_t;
         }
 
         if checkAlerts != QFALSE {
@@ -1226,7 +1226,7 @@ pub fn NPC_PickEnemyExt(
 
                 if ((*event).level as c_int) >= (AEL_DISCOVERED as c_int) {
                     //If it's the player, attack him
-                    if (*event).owner == &mut (*ctx.world).entities[0] as *mut gentity_t {
+                    if (*event).owner == &mut (*ctx.world).g_entities[0] as *mut gentity_t {
                         return (*event).owner;
                     }
 
@@ -1251,7 +1251,7 @@ pub fn NPC_PickEnemyExt(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1356-1359`
 pub fn NPC_FindPlayer(ctx: GameContext<'_>) -> qboolean {
-    unsafe { NPC_TargetVisible(ctx, &mut (*ctx.world).entities[0] as *mut gentity_t) }
+    unsafe { NPC_TargetVisible(ctx, &mut (*ctx.world).g_entities[0] as *mut gentity_t) }
 }
 
 /// Raven `NPC_CheckPlayerDistance`.
@@ -1377,14 +1377,14 @@ pub fn NPC_FacePosition(
         (*npc_info).desiredPitch = AngleNormalize360(angles[PITCH]);
 
         if let Some(enemy_id) = (*npc).enemy {
-            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             if !(*enemy).client.is_null() {
                 let enemy_client = (*enemy).client as *mut gclient_t;
                 if (*enemy_client).NPC_class == CLASS_ATST {
                     // FIXME: this is kind of dumb, but it was the easiest way to get it to look sort of ok
                     (*npc_info).desiredYaw +=
-                        flrand(-5.0, 5.0) + (((*ctx.world).level.time as f32) * 0.004).sin() * 7.0;
-                    (*npc_info).desiredPitch += flrand(-2.0, 2.0);
+                        (*ctx.world).bg_state.rng.flrand(-5.0, 5.0) + (((*ctx.world).level.time as f32) * 0.004).sin() * 7.0;
+                    (*npc_info).desiredPitch += (*ctx.world).bg_state.rng.flrand(-2.0, 2.0);
                 }
             }
         }
@@ -1542,7 +1542,7 @@ pub fn NPC_CheckLookTarget(
 
             if lookTarget >= 0 && lookTarget < ENTITYNUM_WORLD {
                 //within valid range
-                let target = &mut (*ctx.world).entities[lookTarget as usize] as *mut gentity_t;
+                let target = &mut (*ctx.world).g_entities[lookTarget as usize] as *mut gentity_t;
                 if (target.is_null()) || (*target).inuse == QFALSE {
                     //lookTarget not inuse or not valid anymore
                     NPC_ClearLookTarget(self_);
@@ -1597,7 +1597,7 @@ pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
             G_AddVoiceEvent(
                 ctx,
                 npc,
-                Q_irand(entity_event_t::EV_CONFUSE1 as c_int, entity_event_t::EV_CONFUSE3 as c_int),
+                (*ctx.world).bg_state.rng.Q_irand(entity_event_t::EV_CONFUSE1 as c_int, entity_event_t::EV_CONFUSE3 as c_int),
                 2000,
             );
         }
