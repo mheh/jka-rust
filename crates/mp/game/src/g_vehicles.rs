@@ -1496,7 +1496,7 @@ pub fn UpdateRider(
                         GIcarusTaskidpendingArgs::new(rider, TID_CHAN_VOICE as c_int),
                     ) == qfalse
                     {
-                        crate::g_utils::G_AddEvent(rider, EV_JUMP, 0);
+                        crate::g_utils::G_AddEvent(rider, (EV_JUMP) as i32, 0);
                     }
                     Vehicle_SetAnim(
                         rider,

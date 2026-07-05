@@ -1716,8 +1716,8 @@ impl PmoveContext<'_> {
             let oldAnim = (*(*self.pm).ps).legsAnim;
             let newAnim = anim;
 
-            if oldAnim < MAX_TOTALANIMATIONS && oldAnim >= BOTH_DEATH1 as c_int
-                && newAnim < MAX_TOTALANIMATIONS && newAnim >= BOTH_DEATH1 as c_int
+            if oldAnim < (MAX_TOTALANIMATIONS) as i32 && oldAnim >= BOTH_DEATH1 as c_int
+                && newAnim < (MAX_TOTALANIMATIONS) as i32 && newAnim >= BOTH_DEATH1 as c_int
             {
                 let old_str = format!("OLD: {}\n", cstr_to_str(animTable[oldAnim as usize].name));
                 let new_str = format!("NEW: {}\n", cstr_to_str(animTable[newAnim as usize].name));
@@ -1929,7 +1929,7 @@ impl PmoveContext<'_> {
                 break;
             }
             unsafe {
-                (*animset.offset(animNum as isize)).firstFrame = atoi(token) as c_int;
+                (*animset.offset(animNum as isize)).firstFrame = (atoi(token) as c_int) as u16;
             }
 
             token = COM_Parse(&mut text_p);

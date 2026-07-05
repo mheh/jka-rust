@@ -376,7 +376,7 @@ pub fn SP_target_speaker(
         (*ent).noise_index = G_SoundIndex(buffer.as_ptr());
 
         // a repeating speaker can be done completely client side
-        (*ent).s.eType = mp_bg::public::entity_type::entityType_t::ET_SPEAKER;
+        (*ent).s.eType = (mp_bg::public::entity_type::entityType_t::ET_SPEAKER) as i32;
         (*ent).s.eventParm = (*ent).noise_index;
         (*ent).s.frame = ((*ent).wait * 10.0) as c_int;
         (*ent).s.clientNum = ((*ent).random * 10.0) as c_int;
@@ -522,7 +522,7 @@ pub fn target_laser_start(
     self_: *mut gentity_t,
 ) {
     unsafe {
-        (*self_).s.eType = mp_bg::public::entity_type::entityType_t::ET_BEAM;
+        (*self_).s.eType = (mp_bg::public::entity_type::entityType_t::ET_BEAM) as i32;
 
         if !(*self_).target.is_null() {
             let ent = G_Find(ctx, core::ptr::null_mut(), core::mem::offset_of!(gentity_t, targetname) as c_int, (*self_).target);

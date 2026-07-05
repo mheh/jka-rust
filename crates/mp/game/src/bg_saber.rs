@@ -627,8 +627,8 @@ impl PmoveContext<'_> {
             );
 
             let mut ent: *mut bgEntity_t = core::ptr::null_mut();
-            if tr.entityNum < ENTITYNUM_WORLD as c_int {
-                ent = self.PM_BGEntForNum(tr.entityNum);
+            if tr.entityNum < (ENTITYNUM_WORLD as c_int) as i16 {
+                ent = self.PM_BGEntForNum((tr.entityNum) as i32);
             }
 
             if !ent.is_null()
@@ -1180,8 +1180,8 @@ impl PmoveContext<'_> {
                 MASK_PLAYERSOLID as c_int,
             );
 
-            if tr.fraction != 1.0 && tr.entityNum >= 0 && tr.entityNum < ENTITYNUM_NONE as c_int {
-                let bgEnt = self.PM_BGEntForNum(tr.entityNum);
+            if tr.fraction != 1.0 && tr.entityNum >= 0 && tr.entityNum < (ENTITYNUM_NONE as c_int) as i16 {
+                let bgEnt = self.PM_BGEntForNum((tr.entityNum) as i32);
                 if !bgEnt.is_null()
                     && ((*bgEnt).s.eType == ET_PLAYER as c_int || (*bgEnt).s.eType == ET_NPC as c_int)
                 {
@@ -1301,9 +1301,9 @@ impl PmoveContext<'_> {
                 MASK_PLAYERSOLID as c_int,
             );
 
-            if (*tr).fraction != 1.0 && (*tr).entityNum >= 0 && (*tr).entityNum < ENTITYNUM_NONE as c_int
+            if (*tr).fraction != 1.0 && (*tr).entityNum >= 0 && (*tr).entityNum < (ENTITYNUM_NONE as c_int) as i16
             {
-                let bgEnt = self.PM_BGEntForNum((*tr).entityNum);
+                let bgEnt = self.PM_BGEntForNum(((*tr).entityNum) as i32);
                 if !bgEnt.is_null()
                     && ((*bgEnt).s.eType == ET_PLAYER as c_int || (*bgEnt).s.eType == ET_NPC as c_int)
                 {
@@ -1559,8 +1559,8 @@ impl PmoveContext<'_> {
                 MASK_PLAYERSOLID as c_int,
             );
 
-            if tr.fraction != 1.0 && tr.entityNum < ENTITYNUM_WORLD as c_int {
-                let bgEnt = self.PM_BGEntForNum(tr.entityNum);
+            if tr.fraction != 1.0 && tr.entityNum < (ENTITYNUM_WORLD as c_int) as i16 {
+                let bgEnt = self.PM_BGEntForNum((tr.entityNum) as i32);
                 if !bgEnt.is_null()
                     && ((*bgEnt).s.eType == ET_PLAYER as c_int || (*bgEnt).s.eType == ET_NPC as c_int)
                 {
@@ -2219,7 +2219,7 @@ impl PmoveContext<'_> {
                 match (*ps).saberBlocked {
                     x if x == BLOCKED_BOUNCE_MOVE as c_int => {
                         (*ps).torsoTimer = 0;
-                        self.PM_SetSaberMove((*ps).saberMove);
+                        self.PM_SetSaberMove(((*ps).saberMove) as i16);
                         (*ps).weaponTime = (*ps).torsoTimer;
                         (*ps).saberBlocked = 0;
                     }
@@ -2315,7 +2315,7 @@ impl PmoveContext<'_> {
 
             if (*ps).saberEntityNum != 0 {
                 if (*ps).weaponTime <= 0 && (*ps).torsoTimer <= 0 {
-                    if (*ps).weapon != (*self.pm).cmd.weapon {
+                    if (*ps).weapon != ((*self.pm).cmd.weapon) as i32 {
                         PM_BeginWeaponChange((*self.pm).cmd.weapon);
                     }
                 }

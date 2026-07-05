@@ -493,8 +493,8 @@ pub fn SP_terrain(
         let mut seed: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         let mut mission_type: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         if (*ctx.world).cvars.g_RMG.integer != 0 {
-            trap::Cvar_VariableStringBuffer(ctx.engine, GCvarVariableStringBufferArgs::new(cstr("RMG_seed"), seed.as_mut_ptr(), MAX_QPATH));
-            trap::Cvar_VariableStringBuffer(ctx.engine, GCvarVariableStringBufferArgs::new(cstr("RMG_mission"), mission_type.as_mut_ptr(), MAX_QPATH));
+            trap::Cvar_VariableStringBuffer(ctx.engine, GCvarVariableStringBufferArgs::new(cstr("RMG_seed"), seed.as_mut_ptr(), (MAX_QPATH) as i32));
+            trap::Cvar_VariableStringBuffer(ctx.engine, GCvarVariableStringBufferArgs::new(cstr("RMG_mission"), mission_type.as_mut_ptr(), (MAX_QPATH) as i32));
         }
 
         // Get info required for the common init
@@ -536,7 +536,7 @@ pub fn SP_terrain(
         let mut i: c_int = 0;
         while i < MAX_INSTANCE_TYPES {
             let mut final_: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-            trap::Cvar_VariableStringBuffer(ctx.engine, GCvarVariableStringBufferArgs::new(cstr(&format!("RMG_instance{}", i)), final_.as_mut_ptr(), MAX_QPATH));
+            trap::Cvar_VariableStringBuffer(ctx.engine, GCvarVariableStringBufferArgs::new(cstr(&format!("RMG_instance{}", i)), final_.as_mut_ptr(), (MAX_QPATH) as i32));
             if *final_.as_ptr() != 0 {
                 Info_SetValueForKey(temp.as_mut_ptr(), cstr(&format!("inst{}", i)).as_ptr(), final_.as_ptr());
             }
@@ -609,9 +609,9 @@ pub fn G_PortalifyEntities(
                     ),
                 );
                 if tr.fraction == 1.0
-                    || (tr.entityNum == (*scan).s.number
-                        && tr.entityNum != ENTITYNUM_NONE
-                        && tr.entityNum != ENTITYNUM_WORLD)
+                    || (tr.entityNum == ((*scan).s.number) as i16
+                        && tr.entityNum != (ENTITYNUM_NONE) as i16
+                        && tr.entityNum != (ENTITYNUM_WORLD) as i16)
                 {
                     if (*scan).client.is_null() || (*scan).s.eType == entityType_t::ET_NPC as c_int {
                         (*scan).s.isPortalEnt = qtrue;
@@ -711,7 +711,7 @@ pub fn HolocronTouch(
         let mut force_reselect = WP_NONE;
 
         if !trace.is_null() {
-            (*self_).s.groundEntityNum = (*trace).entityNum;
+            (*self_).s.groundEntityNum = ((*trace).entityNum) as i32;
         }
 
         if other.is_null() || (*other).client.is_null() || (*other).health < 1 {
@@ -736,7 +736,7 @@ pub fn HolocronTouch(
             return;
         }
 
-        while i < NUM_FORCE_POWERS {
+        while i < (NUM_FORCE_POWERS) as i32 {
             if (*((*other).client as *mut gclient_t)).ps.holocronsCarried[i as usize] != 0.0 {
                 othercarrying += 1;
 
@@ -954,8 +954,8 @@ pub fn SP_misc_holocron(
             (*ent).count = 0;
         }
 
-        if (*ent).count >= NUM_FORCE_POWERS {
-            (*ent).count = NUM_FORCE_POWERS - 1;
+        if (*ent).count >= (NUM_FORCE_POWERS) as i32 {
+            (*ent).count = (NUM_FORCE_POWERS - 1) as i32;
         }
         //No longer doing this, causing too many complaints about accidentally setting no force powers at all
         //and starting a holocron game (making it basically just FFA)
@@ -1388,7 +1388,7 @@ pub fn SP_misc_ammo_floor_unit(
         (*ent).r.maxs[2] += 0.1;
 
         // allow to ride movers
-        (*ent).s.groundEntityNum = tr.entityNum;
+        (*ent).s.groundEntityNum = (tr.entityNum) as i32;
 
         G_SetOrigin(ent, tr.endpos);
 
@@ -1490,7 +1490,7 @@ pub fn SP_misc_shield_floor_unit(
         (*ent).r.maxs[2] += 0.1;
 
         // allow to ride movers
-        (*ent).s.groundEntityNum = tr.entityNum;
+        (*ent).s.groundEntityNum = (tr.entityNum) as i32;
 
         G_SetOrigin(ent, tr.endpos);
 
@@ -2272,7 +2272,7 @@ pub fn maglock_link(
             return;
         }
         let trace_ent = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
-        if trace.entityNum >= ENTITYNUM_WORLD as c_int || trace_ent.is_null() || Q_stricmp(c"func_door".as_ptr(), (*trace_ent).classname) != 0 {
+        if trace.entityNum >= (ENTITYNUM_WORLD as c_int) as i16 || trace_ent.is_null() || Q_stricmp(c"func_door".as_ptr(), (*trace_ent).classname) != 0 {
             (*self_).think = Some(EntThink::maglock_link);
             (*self_).nextthink = (*ctx.world).level.time + 100;
             return;
@@ -2397,9 +2397,9 @@ pub fn misc_faller_create(
         (*faller).s.modelindex = G_ModelIndex(c"models/players/stormtrooper/model.glm".as_ptr());
         (*faller).s.g2radius = 100;
 
-        (*faller).s.customRGBA[0] = (*ctx.world).bg_state.rng.Q_irand(1, 255) as u8;
-        (*faller).s.customRGBA[1] = (*ctx.world).bg_state.rng.Q_irand(1, 255) as u8;
-        (*faller).s.customRGBA[2] = (*ctx.world).bg_state.rng.Q_irand(1, 255) as u8;
+        (*faller).s.customRGBA[0] = ((*ctx.world).bg_state.rng.Q_irand(1, 255) as u8) as i32;
+        (*faller).s.customRGBA[1] = ((*ctx.world).bg_state.rng.Q_irand(1, 255) as u8) as i32;
+        (*faller).s.customRGBA[2] = ((*ctx.world).bg_state.rng.Q_irand(1, 255) as u8) as i32;
         (*faller).s.customRGBA[3] = 255;
 
         (*faller).r.mins = [-15.0, -15.0, DEFAULT_MINS_2 as f32];
@@ -2839,7 +2839,7 @@ pub fn G_ClientForShooter(ctx: GameContext<'_>) -> *mut gclient_t {
             (*ctx.world).globals.g_shooterClientInit = qtrue;
         }
 
-        while (i as usize) < MAX_SHOOTERS {
+        while (i as usize) < (MAX_SHOOTERS) as usize {
             if (*ctx.world).globals.g_shooterClients[i as usize].inuse == qfalse {
                 return &mut (*ctx.world).globals.g_shooterClients[i as usize].cl as *mut gclient_t;
             }
@@ -2858,7 +2858,7 @@ pub fn G_FreeClientForShooter(
     ctx: GameContext<'_>,cl: *mut gclient_t) {
     unsafe {
         let mut i: usize = 0;
-        while i < MAX_SHOOTERS {
+        while i < (MAX_SHOOTERS) as usize {
             if &mut (*ctx.world).globals.g_shooterClients[i].cl as *mut gclient_t == cl {
                 (*ctx.world).globals.g_shooterClients[i].inuse = qfalse;
                 return;

@@ -784,7 +784,7 @@ pub fn AddSiegeWinningTeamPoints(
         // referenced verbatim (missing_symbols).
         let mut i: c_int = 0;
 
-        while i < MAX_CLIENTS {
+        while i < (MAX_CLIENTS) as i32 {
             let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
             if !(*ent).client.is_null() && (*((*ent).client as *mut gclient_t)).sess.sessionTeam == team {
@@ -841,7 +841,7 @@ pub fn SiegeDoTeamAssign(ctx: GameContext<'_>) {
         let mut i: c_int = 0;
 
         // yeah, this is great...
-        while i < MAX_CLIENTS {
+        while i < (MAX_CLIENTS) as i32 {
             let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
             if (*ent).inuse != 0 && !(*ent).client.is_null()
@@ -981,7 +981,7 @@ pub fn SiegeRoundComplete(
                 // oh well, just find something active and use it then.
                 let mut i: c_int = 0;
 
-                while i < MAX_CLIENTS {
+                while i < (MAX_CLIENTS) as i32 {
                     let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                     if (*ent).inuse != 0 {
@@ -1186,7 +1186,7 @@ pub fn SiegeBeginRound(
             let mut spawnEnt: qboolean = qfalse;
 
             // respawn everyone now
-            while i < MAX_CLIENTS {
+            while i < (MAX_CLIENTS) as i32 {
                 let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                 if (*ent).inuse != 0 && !(*ent).client.is_null() {
@@ -1270,7 +1270,7 @@ pub fn SiegeCheckTimers(ctx: GameContext<'_>) {
             // set up.
             i = 0;
 
-            while i < MAX_CLIENTS {
+            while i < (MAX_CLIENTS) as i32 {
                 let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                 if !(*ent).client.is_null()
@@ -1285,7 +1285,7 @@ pub fn SiegeCheckTimers(ctx: GameContext<'_>) {
 
             i = 0;
 
-            while i < MAX_CLIENTS {
+            while i < (MAX_CLIENTS) as i32 {
                 let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                 if !(*ent).client.is_null()
@@ -1584,7 +1584,7 @@ pub fn SP_info_siege_radaricon(
         G_SpawnString(ctx, b"icon\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s);
         if s.is_null() || *s == 0 {
             // that's the whole point of the entity
-            crate::g_main::Com_Error(ERR_DROP, cstr("misc_siege_radaricon without an icon").as_ptr());
+            crate::g_main::Com_Error((ERR_DROP) as i32, cstr("misc_siege_radaricon without an icon").as_ptr());
             return;
         }
 
@@ -1832,7 +1832,7 @@ pub fn SiegeItemThink(
         }
 
         // Bolt us to whoever is carrying us if a client
-        if (*ent).genericValue8 < MAX_CLIENTS {
+        if (*ent).genericValue8 < (MAX_CLIENTS) as i32 {
             (*ent).s.boltToPlayer = (*ent).genericValue8 + 1;
         } else {
             (*ent).s.boltToPlayer = 0;

@@ -479,14 +479,14 @@ pub fn NPC_Wampa_Pain(
             }
         }
         if (hitByWampa != 0 || (*ctx.world).bg_state.rng.Q_irand(0, 100) < damage) // hit by wampa, hit while holding live victim, or took a lot of damage
-            && (*((*self_).client as *mut gclient_t)).ps.legsAnim != crate::prelude::BOTH_GESTURE1
-            && (*((*self_).client as *mut gclient_t)).ps.legsAnim != crate::prelude::BOTH_GESTURE2
+            && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_GESTURE1) as i32
+            && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_GESTURE2) as i32
             && crate::g_timer::TIMER_Done(ctx, self_, c"takingPain".as_ptr()) != 0
         {
             if !Wampa_CheckRoar(ctx, self_) != 0 {
-                if (*((*self_).client as *mut gclient_t)).ps.legsAnim != crate::prelude::BOTH_ATTACK1
-                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim != crate::prelude::BOTH_ATTACK2
-                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim != crate::prelude::BOTH_ATTACK3
+                if (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_ATTACK1) as i32
+                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_ATTACK2) as i32
+                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim != (crate::prelude::BOTH_ATTACK3) as i32
                 {
                     // cant interrupt one of the big attack anims
                     if (*self_).health > 100 || hitByWampa != 0 {

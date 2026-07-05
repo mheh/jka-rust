@@ -538,7 +538,7 @@ pub fn NPC_SpotWouldTelefrag(
                 &mins as *const vec3_t,
                 &maxs as *const vec3_t,
                 touch.as_mut_ptr(),
-                MAX_GENTITIES,
+                (MAX_GENTITIES) as i32,
             ),
         );
 
@@ -699,7 +699,7 @@ pub fn NPC_Begin(
             NPC_SetWeapons(ctx, ent);
         }
         (*((*ent).NPC as *mut gNPC_t)).currentAmmo = (*client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize];
-        (*client).ps.weaponstate = WEAPON_IDLE;
+        (*client).ps.weaponstate = (WEAPON_IDLE) as i32;
         ChangeWeapon(ctx, ent, (*client).ps.weapon);
 
         crate::q_math::_VectorCopy(spawn_origin, &mut (*client).ps.origin);
@@ -736,7 +736,7 @@ pub fn NPC_Begin(
         }
 
         if (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_VEHICLE {
-            NPC_SetAnim(ent, SETANIM_BOTH, BOTH_STAND1, SETANIM_FLAG_NORMAL);
+            NPC_SetAnim(ent, SETANIM_BOTH, (BOTH_STAND1) as i32, SETANIM_FLAG_NORMAL);
         }
 
         if !spawn_point.is_null() {
@@ -789,7 +789,7 @@ pub fn NPC_Begin(
         }
         (*((*ent).NPC as *mut gNPC_t)).lastClearOrigin = [0.0; 3];
 
-        if crate::NPC_utils::G_ActivateBehavior(ctx, ent, BSET_SPAWN) != 0 {
+        if crate::NPC_utils::G_ActivateBehavior(ctx, ent, (BSET_SPAWN) as i32) != 0 {
             trap::ICARUS_MaintainTaskManager(ctx.engine, mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*ent).s.number));
         }
 
@@ -1100,7 +1100,7 @@ pub fn NPC_Spawn_Do(
                 let base = (*ctx.world).g_entities.as_mut_ptr();
                 for n in 0..1 {
                     let e = base.add(n as usize);
-                    if (*e).s.eType != ET_NPC && !(*e).client.is_null() {
+                    if (*e).s.eType != (ET_NPC) as i32 && !(*e).client.is_null() {
                         crate::q_math::_VectorCopy((*e).s.origin, &mut (*newent).s.origin);
                         (*((*newent).client as *mut gclient_t)).playerTeam = (*((*e).client as *mut gclient_t)).playerTeam;
                         (*newent).s.teamowner = (*((*e).client as *mut gclient_t)).playerTeam;
@@ -2850,7 +2850,7 @@ pub fn NPC_Spawn_f(
         trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(3, targetname.as_mut_ptr() as *mut c_char, 1024));
     }
 
-    NPC_SpawnType(ctx, ent, npc_type.as_mut_ptr() as *mut c_char, targetname.as_mut_ptr() as *mut c_char, is_vehicle);
+    NPC_SpawnType(ctx, ent, npc_type.as_mut_ptr() as *mut c_char, targetname.as_mut_ptr() as *mut c_char, (is_vehicle) as i32);
 }
 
 /// Raven `NPC_Kill_f`.

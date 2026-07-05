@@ -493,7 +493,7 @@ pub fn JMSaberTouch(
         (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 1 << WP_SABER;
         (*((*other).client as *mut gclient_t)).ps.weapon = WP_SABER;
         (*other).s.weapon = WP_SABER;
-        G_AddEvent(other, EV_BECOME_JEDIMASTER, 0);
+        G_AddEvent(other, (EV_BECOME_JEDIMASTER) as i32, 0);
 
         // Track the jedi master
         let cs = format!("{}", (*other).s.number);
@@ -1136,7 +1136,7 @@ pub fn CopyToBodyQue(
         // grab a body que and cycle to the next one
         let body = (*ctx.world).level.bodyQue[(*ctx.world).level.bodyQueIndex as usize];
         (*ctx.world).level.bodyQueIndex =
-            ((*ctx.world).level.bodyQueIndex + 1) % BODY_QUEUE_SIZE;
+            ((*ctx.world).level.bodyQueIndex + 1) % (BODY_QUEUE_SIZE) as i32;
 
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(body));
         (*body).s = (*ent).s;
@@ -1665,7 +1665,7 @@ pub fn ClientConnect(
             mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
                 clientNum,
                 userinfo_buf.as_mut_ptr(),
-                MAX_INFO_STRING,
+                (MAX_INFO_STRING) as i32,
             ),
         );
         let userinfo = cstr_to_str(userinfo_buf.as_ptr());
@@ -1786,7 +1786,7 @@ pub fn ClientConnect(
         // count current clients and rank for scoreboard
         CalculateRanks(ctx);
 
-        let te = G_TempEntity(ctx, [0.0, 0.0, 0.0], EV_CLIENTJOIN);
+        let te = G_TempEntity(ctx, [0.0, 0.0, 0.0], (EV_CLIENTJOIN) as i32);
         (*te).r.svFlags |= SVF_BROADCAST;
         (*te).s.eventParm = clientNum;
 
@@ -1817,7 +1817,7 @@ pub fn ClientBegin(
                     mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
                         clientNum,
                         userinfo_buf.as_mut_ptr(),
-                        MAX_INFO_STRING,
+                        (MAX_INFO_STRING) as i32,
                     ),
                 );
                 let mut userinfo = cstr_to_str(userinfo_buf.as_ptr());
@@ -1889,8 +1889,8 @@ pub fn ClientBegin(
             i += 1;
         }
 
-        i = TRACK_CHANNEL_1;
-        while i < NUM_TRACK_CHANNELS {
+        i = (TRACK_CHANNEL_1) as usize;
+        while i < (NUM_TRACK_CHANNELS) as usize {
             let idx = (i - 50) as usize;
             if (*((*ent).client as *mut gclient_t)).ps.fd.killSoundEntIndex[idx] != 0
                 && (*((*ent).client as *mut gclient_t)).ps.fd.killSoundEntIndex[idx] < MAX_GENTITIES as c_int
@@ -1920,7 +1920,7 @@ pub fn ClientBegin(
             mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
                 clientNum,
                 userinfo_buf.as_mut_ptr(),
-                MAX_INFO_STRING,
+                (MAX_INFO_STRING) as i32,
             ),
         );
         let userinfo = cstr_to_str(userinfo_buf.as_ptr());
@@ -2008,7 +2008,7 @@ pub fn ClientBegin(
 
         if (*client).sess.sessionTeam != TEAM_SPECTATOR {
             // send event
-            let tent = G_TempEntity(ctx, (*client).ps.origin, EV_PLAYER_TELEPORT_IN);
+            let tent = G_TempEntity(ctx, (*client).ps.origin, (EV_PLAYER_TELEPORT_IN) as i32);
             (*tent).s.clientNum = (*ent).s.clientNum;
 
             if (*ctx.world).cvars.g_gametype.integer != GT_DUEL
@@ -2081,7 +2081,7 @@ pub fn G_BreakArm(
             return;
         }
 
-        if arm == BROKENLIMB_LARM {
+        if arm == (BROKENLIMB_LARM) as i32 {
             if (*((*ent).client as *mut gclient_t)).saber[1].model[0] != 0
                 && (*((*ent).client as *mut gclient_t)).ps.weapon == WP_SABER
                 && (*((*ent).client as *mut gclient_t)).ps.saberHolstered == 0
@@ -2096,10 +2096,10 @@ pub fn G_BreakArm(
         (*((*ent).client as *mut gclient_t)).ps.brokenLimbs |= 1 << arm; // this arm is now marked as broken
 
         // Do a pain anim based on the side. Since getting your arm broken does tend to hurt.
-        if arm == BROKENLIMB_LARM {
-            anim = BOTH_PAIN2;
-        } else if arm == BROKENLIMB_RARM {
-            anim = BOTH_PAIN3;
+        if arm == (BROKENLIMB_LARM) as i32 {
+            anim = (BOTH_PAIN2) as i32;
+        } else if arm == (BROKENLIMB_RARM) as i32 {
+            anim = (BOTH_PAIN3) as i32;
         }
 
         if anim == -1 {
@@ -2333,14 +2333,14 @@ pub fn ClientSpawn(
             mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs::new(
                 index,
                 userinfo_buf.as_mut_ptr(),
-                MAX_INFO_STRING,
+                (MAX_INFO_STRING) as i32,
             ),
         );
         let mut userinfo = cstr_to_str(userinfo_buf.as_ptr());
         let mut changed_saber = qfalse;
 
         let mut l: c_int = 0;
-        while l < MAX_SABERS {
+        while l < (MAX_SABERS) as i32 {
             let saber = match l {
                 0 => Some(cstr_to_str((*client).sess.saberType.as_ptr())),
                 1 => Some(cstr_to_str((*client).sess.saber2Type.as_ptr())),
@@ -2376,7 +2376,7 @@ pub fn ClientSpawn(
             G_SaberModelSetup(ctx, ent);
 
             l = 0;
-            while l < MAX_SABERS {
+            while l < (MAX_SABERS) as i32 {
                 let saber = match l {
                     0 => Some(cstr_to_str((*client).sess.saberType.as_ptr())),
                     1 => Some(cstr_to_str((*client).sess.saber2Type.as_ptr())),
@@ -2573,7 +2573,7 @@ pub fn ClientSpawn(
         // voted flag
         let mut flags = (*client).ps.eFlags & EF_TELEPORT_BIT;
         flags ^= EF_TELEPORT_BIT;
-        let game_flags = (*client).mGameFlags & (PSG_VOTED | PSG_TEAMVOTED);
+        let game_flags = (*client).mGameFlags & ((PSG_VOTED | PSG_TEAMVOTED)) as u32;
 
         // clear everything but the persistant data
         let saved = (*client).pers;
@@ -2999,7 +2999,7 @@ pub fn ClientSpawn(
                     ent,
                     core::ptr::null_mut(),
                     SETANIM_BOTH,
-                    BOTH_STAND1TO2,
+                    (BOTH_STAND1TO2) as i32,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS,
                     0,
                 );
@@ -3008,13 +3008,13 @@ pub fn ClientSpawn(
                     ent,
                     core::ptr::null_mut(),
                     SETANIM_TORSO,
-                    TORSO_RAISEWEAP1,
+                    (TORSO_RAISEWEAP1) as i32,
                     SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS,
                     0,
                 );
                 (*client).ps.legsAnim = WeaponReadyAnim[(*client).ps.weapon as usize];
             }
-            (*client).ps.weaponstate = WEAPON_RAISING;
+            (*client).ps.weaponstate = (WEAPON_RAISING) as i32;
             (*client).ps.weaponTime = (*client).ps.torsoTimer;
         }
 
@@ -3110,15 +3110,15 @@ pub fn ClientDisconnect(
         }
 
         let mut i: c_int = 0;
-        while i < NUM_FORCE_POWERS {
+        while i < (NUM_FORCE_POWERS) as i32 {
             if (*((*ent).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << i) != 0 {
                 WP_ForcePowerStop(ctx, ent, i as forcePowers_t);
             }
             i += 1;
         }
 
-        i = TRACK_CHANNEL_1;
-        while i < NUM_TRACK_CHANNELS {
+        i = (TRACK_CHANNEL_1) as i32;
+        while i < (NUM_TRACK_CHANNELS) as i32 {
             let idx = (i - 50) as usize;
             if (*((*ent).client as *mut gclient_t)).ps.fd.killSoundEntIndex[idx] != 0
                 && (*((*ent).client as *mut gclient_t)).ps.fd.killSoundEntIndex[idx] < MAX_GENTITIES as c_int
@@ -3165,7 +3165,7 @@ pub fn ClientDisconnect(
         if (*((*ent).client as *mut gclient_t)).pers.connected == CON_CONNECTED as _
             && (*((*ent).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
         {
-            let tent = G_TempEntity(ctx, (*((*ent).client as *mut gclient_t)).ps.origin, EV_PLAYER_TELEPORT_OUT);
+            let tent = G_TempEntity(ctx, (*((*ent).client as *mut gclient_t)).ps.origin, (EV_PLAYER_TELEPORT_OUT) as i32);
             (*tent).s.clientNum = (*ent).s.clientNum;
 
             // They don't get to take powerups with them!
@@ -3215,7 +3215,7 @@ pub fn ClientDisconnect(
             );
         }
         i = 0;
-        while i < MAX_SABERS {
+        while i < (MAX_SABERS) as i32 {
             let idx = i as usize;
             if !(*((*ent).client as *mut gclient_t)).weaponGhoul2[idx].is_null()
                 && trap::G2_HaveWeGhoul2Models(
@@ -3346,7 +3346,7 @@ pub fn SetupGameGhoul2Model(
             ) != qfalse
         {
             if (*ctx.world).cvars.d_perPlayerGhoul2.integer != 0
-                || (*ent).s.number >= MAX_CLIENTS
+                || (*ent).s.number >= (MAX_CLIENTS) as i32
                 || G_PlayerHasCustomSkeleton(ent) != qfalse
             {
                 // rww - allow option for perplayer models on server for collision and bolt stuff.
@@ -3531,7 +3531,7 @@ pub fn SetupGameGhoul2Model(
                             b"players/_humanoid/\0".as_ptr() as *const c_char,
                         )
                         .is_null()
-                            && (*ent).s.number < MAX_CLIENTS
+                            && (*ent).s.number < (MAX_CLIENTS) as i32
                             && G_PlayerHasCustomSkeleton(ent) == qfalse
                     {
                         // a bad model
@@ -3549,7 +3549,7 @@ pub fn SetupGameGhoul2Model(
                         );
                     }
 
-                    if (*ent).s.number >= MAX_CLIENTS {
+                    if (*ent).s.number >= (MAX_CLIENTS) as i32 {
                         (*ent).s.modelGhoul2 = 1; // so we know to free it on the client when we're removed.
 
                         if skin[0] as c_int != 0 {
@@ -3607,7 +3607,7 @@ pub fn SetupGameGhoul2Model(
             }
         }
 
-        if (*ent).s.number >= MAX_CLIENTS || G_PlayerHasCustomSkeleton(ent) != qfalse {
+        if (*ent).s.number >= (MAX_CLIENTS) as i32 || G_PlayerHasCustomSkeleton(ent) != qfalse {
             (*ent).localAnimIndex = -1;
 
             GLAName[0] = 0;
@@ -3649,7 +3649,7 @@ pub fn SetupGameGhoul2Model(
             }
 
             if (*ent).localAnimIndex == -1 {
-                crate::g_main::Com_Error(ERR_DROP, cstr("NPC had an invalid GLA\n").as_ptr());
+                crate::g_main::Com_Error((ERR_DROP) as i32, cstr("NPC had an invalid GLA\n").as_ptr());
             }
         } else {
             GLAName[0] = 0;
@@ -3671,7 +3671,7 @@ pub fn SetupGameGhoul2Model(
             }
         }
 
-        if (*ent).s.NPC_class == CLASS_VEHICLE && !(*ent).m_pVehicle.is_null() {
+        if (*ent).s.NPC_class == (CLASS_VEHICLE) as i32 && !(*ent).m_pVehicle.is_null() {
             // do special vehicle stuff
             let mut strTemp: [c_char; 128] = [0; 128];
             let mut i: c_int = 0;
@@ -3690,7 +3690,7 @@ pub fn SetupGameGhoul2Model(
 
             // Setup the Exhausts.
             i = 0;
-            while i < MAX_VEHICLE_EXHAUSTS {
+            while i < (MAX_VEHICLE_EXHAUSTS) as i32 {
                 write_cstr_field(&mut strTemp, &format!("*exhaust{}", i + 1));
                 (*((*ent).m_pVehicle as *mut Vehicle_t)).m_iExhaustTag[i as usize] = trap::G2API_AddBolt(
                     ctx.engine,
@@ -3701,7 +3701,7 @@ pub fn SetupGameGhoul2Model(
 
             // Setup the Muzzles.
             i = 0;
-            while i < MAX_VEHICLE_MUZZLES {
+            while i < (MAX_VEHICLE_MUZZLES) as i32 {
                 write_cstr_field(&mut strTemp, &format!("*muzzle{}", i + 1));
                 (*((*ent).m_pVehicle as *mut Vehicle_t)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(
                     ctx.engine,
@@ -3720,7 +3720,7 @@ pub fn SetupGameGhoul2Model(
 
             // Setup the Turrets.
             i = 0;
-            while i < MAX_VEHICLE_TURRET_MUZZLES {
+            while i < (MAX_VEHICLE_TURRET_MUZZLES) as i32 {
                 if !(*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).turret[i as usize]
                     .gunnerViewTag
                     .is_null()
@@ -3742,7 +3742,7 @@ pub fn SetupGameGhoul2Model(
         }
 
         if !(*ent).client.is_null()
-            && ((*((*ent).client as *mut gclient_t)).ps.weapon == WP_SABER || (*ent).s.number < MAX_CLIENTS)
+            && ((*((*ent).client as *mut gclient_t)).ps.weapon == WP_SABER || (*ent).s.number < (MAX_CLIENTS) as i32)
         {
             // a player or NPC saber user
             trap::G2API_AddBolt(
@@ -3867,7 +3867,7 @@ pub fn SetupGameGhoul2Model(
             }
         }
 
-        if (*ent).s.number >= MAX_CLIENTS {
+        if (*ent).s.number >= (MAX_CLIENTS) as i32 {
             // some extra NPC stuff
             if trap::G2API_AddBolt(
                 ctx.engine,

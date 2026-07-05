@@ -1019,7 +1019,7 @@ pub fn G_ClearLOS(
         // can see through 3 panes of glass
         if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
             let world = unsafe { (&mut *ctx.world) };
-            if tr.entityNum < MAX_GENTITIES as u32 {
+            if tr.entityNum < (MAX_GENTITIES as u32) as i16 {
                 if !world.g_entities[tr.entityNum as usize].r.svFlags
                     & (SVF_GLASS_BRUSH as c_int)
                     != 0

@@ -5327,7 +5327,7 @@ pub fn G_Damage(
                     let mut maxtake = take;
 
                     if (*tc).forcePowerSoundDebounce < (*ctx.world).level.time {
-                        crate::w_force::G_PreDefSound(ctx, (*tc).ps.origin, PDSOUND_PROTECTHIT);
+                        crate::w_force::G_PreDefSound(ctx, (*tc).ps.origin, (PDSOUND_PROTECTHIT) as i32);
                         (*tc).forcePowerSoundDebounce = (*ctx.world).level.time + 400;
                     }
 
@@ -5482,7 +5482,7 @@ pub fn G_Damage(
                     (*ctx.world).globals.gPainHitLoc = -1;
                 }
 
-                if (*ctx.world).globals.gPainHitLoc < HL_MAX
+                if (*ctx.world).globals.gPainHitLoc < (HL_MAX) as i32
                     && (*ctx.world).globals.gPainHitLoc >= 0
                     && (*targ).locationDamage[(*ctx.world).globals.gPainHitLoc as usize] < Q3_INFINITE
                     && ((*targ).s.eType == entityType_t::ET_PLAYER as c_int
@@ -5500,12 +5500,12 @@ pub fn G_Damage(
                             + (*targ).locationDamage[HL_HAND_RT as usize]
                             >= 80
                         {
-                            crate::g_client::G_BreakArm(ctx, targ, BROKENLIMB_RARM);
+                            crate::g_client::G_BreakArm(ctx, targ, (BROKENLIMB_RARM) as i32);
                         } else if (*targ).locationDamage[HL_ARM_LT as usize]
                             + (*targ).locationDamage[HL_HAND_LT as usize]
                             >= 80
                         {
-                            crate::g_client::G_BreakArm(ctx, targ, BROKENLIMB_LARM);
+                            crate::g_client::G_BreakArm(ctx, targ, (BROKENLIMB_LARM) as i32);
                         }
                     }
                 }
@@ -5795,7 +5795,7 @@ pub fn G_RadiusDamage(
                 &mins as *const vec3_t,
                 &maxs as *const vec3_t,
                 entityList.as_mut_ptr(),
-                MAX_GENTITIES,
+                (MAX_GENTITIES) as i32,
             ),
         );
 

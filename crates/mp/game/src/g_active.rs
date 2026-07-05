@@ -800,7 +800,7 @@ pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut user
         let client = (*ent).client as *mut gclient_t;
 
         if (*client).sess.spectatorState != SPECTATOR_FOLLOW {
-            (*client).ps.pm_type = PM_SPECTATOR;
+            (*client).ps.pm_type = (PM_SPECTATOR) as i32;
             (*client).ps.speed = 400.0; // faster than normal
             (*client).ps.basespeed = 400.0;
 
@@ -1481,7 +1481,7 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
             || (*cl).ps.saberBlocked != BLOCKED_NONE as c_int
             || (*cl).ps.saberBlocking >= level_time
             || (*cl).ps.weapon == WP_MELEE
-            || ((*cl).ps.weapon != (*cl).pers.cmd.weapon && (*ent).s.eType != ET_NPC as c_int)
+            || ((*cl).ps.weapon != ((*cl).pers.cmd.weapon) as i32 && (*ent).s.eType != ET_NPC as c_int)
         {
             //FIXME: also check for turning?
             let mut brokeOut: qboolean = qfalse;
@@ -1501,7 +1501,7 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
                 || (*cl).ps.saberBlocked != BLOCKED_NONE as c_int
                 || (*cl).ps.saberBlocking >= level_time
                 || (*cl).ps.weapon == WP_MELEE
-                || ((*cl).ps.weapon != (*cl).pers.cmd.weapon && (*ent).s.eType != ET_NPC as c_int)
+                || ((*cl).ps.weapon != ((*cl).pers.cmd.weapon) as i32 && (*ent).s.eType != ET_NPC as c_int)
             {
                 //if in an idle, break out
                 let la = (*cl).ps.legsAnim;
@@ -2189,19 +2189,19 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if (*client).noclip != qfalse {
-            (*client).ps.pm_type = PM_NOCLIP;
+            (*client).ps.pm_type = (PM_NOCLIP) as i32;
         } else if (*client).ps.eFlags & EF_DISINTEGRATION != 0 {
-            (*client).ps.pm_type = PM_NOCLIP;
+            (*client).ps.pm_type = (PM_NOCLIP) as i32;
         } else if (*client).ps.stats[STAT_HEALTH as usize] <= 0 {
-            (*client).ps.pm_type = PM_DEAD;
+            (*client).ps.pm_type = (PM_DEAD) as i32;
         } else if (*client).ps.forceGripChangeMovetype != 0 {
             (*client).ps.pm_type = (*client).ps.forceGripChangeMovetype;
         } else if (*client).jetPackOn != qfalse {
-            (*client).ps.pm_type = PM_JETPACK;
+            (*client).ps.pm_type = (PM_JETPACK) as i32;
             (*client).ps.eFlags |= EF_JETPACK_ACTIVE;
             killJetFlags = qfalse;
         } else {
-            (*client).ps.pm_type = PM_NORMAL;
+            (*client).ps.pm_type = (PM_NORMAL) as i32;
         }
 
         if killJetFlags != qfalse {
@@ -2844,7 +2844,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         pm.ps = &mut (*client).ps as *mut playerState_t;
         pm.cmd = *ucmd;
-        if (*pm.ps).pm_type == PM_DEAD {
+        if (*pm.ps).pm_type == (PM_DEAD) as i32 {
             pm.tracemask = MASK_PLAYERSOLID & !CONTENTS_BODY;
         } else if (*ent).r.svFlags & SVF_BOT != 0 {
             pm.tracemask = MASK_PLAYERSOLID | CONTENTS_MONSTERCLIP;
@@ -3552,7 +3552,7 @@ pub fn ClientThink(ctx: GameContext<'_>, clientNum: c_int, ucmd: *mut usercmd_t)
     unsafe {
         let ent = &mut (*ctx.world).g_entities[clientNum as usize] as *mut gentity_t;
         let cl = (*ent).client as *mut gclient_t;
-        if clientNum < MAX_CLIENTS {
+        if clientNum < (MAX_CLIENTS) as i32 {
             trap::GetUsercmd(
                 ctx.engine,
                 mp_abi::game::syscalls::G_GET_USERCMD::GGetUsercmdArgs::new(
@@ -3575,7 +3575,7 @@ pub fn ClientThink(ctx: GameContext<'_>, clientNum: c_int, ucmd: *mut usercmd_t)
         }
         // vehicles are clients and when running synchronous they still need to
         // think here so special case them.
-        else if clientNum >= MAX_CLIENTS {
+        else if clientNum >= (MAX_CLIENTS) as i32 {
             ClientThink_real(ctx, ent);
         }
     }
@@ -3675,7 +3675,7 @@ pub fn ClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // If the end of unit layout is displayed, don't give the player any
         // normal movement attributes
         if (*ctx.world).level.intermissiontime != 0 {
-            if (*ent).s.number < MAX_CLIENTS || (*entCl).NPC_class == CLASS_VEHICLE {
+            if (*ent).s.number < (MAX_CLIENTS) as i32 || (*entCl).NPC_class == CLASS_VEHICLE {
                 //players and vehicles do nothing in intermissions
                 return;
             }

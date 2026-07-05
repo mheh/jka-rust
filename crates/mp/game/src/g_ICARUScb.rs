@@ -1961,7 +1961,7 @@ pub fn Q3_SetBState(
 
         let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         if bSID > -1 {
-            if bSID == BS_SEARCH || bSID == BS_WANDER {
+            if bSID == (BS_SEARCH) as i32 || bSID == (BS_WANDER) as i32 {
                 if (*ent).waypoint != WAYPOINT_NONE {
                     NPC_BSSearchStart(ctx, (*ent).waypoint, bSID);
                 } else {
@@ -1985,29 +1985,29 @@ pub fn Q3_SetBState(
             }
 
             (*npc).tempBehavior = BS_DEFAULT;
-            if (*npc).behaviorState == BS_NOCLIP && bSID != BS_NOCLIP {
+            if (*npc).behaviorState == BS_NOCLIP && bSID != (BS_NOCLIP) as i32 {
                 (*ent).r.currentOrigin[2] += 0.125;
                 G_SetOrigin(ent, (*ent).r.currentOrigin);
             }
             (*npc).behaviorState = bSID;
-            if bSID == BS_DEFAULT {
+            if bSID == (BS_DEFAULT) as i32 {
                 (*npc).defaultBehavior = bSID;
             }
         }
 
         (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
 
-        if bSID == BS_NOCLIP {
+        if bSID == (BS_NOCLIP) as i32 {
             (*((*ent).client as *mut gclient_t)).noclip = qtrue;
         } else {
             (*((*ent).client as *mut gclient_t)).noclip = qfalse;
         }
 
-        if bSID == BS_ADVANCE_FIGHT {
+        if bSID == (BS_ADVANCE_FIGHT) as i32 {
             return qfalse;
         }
 
-        if bSID == BS_JUMP {
+        if bSID == (BS_JUMP) as i32 {
             (*npc).jumpState = JS_FACING;
         }
 
@@ -4389,7 +4389,7 @@ pub fn Q3_Set(
             _ if toSet == SET_LOOPSOUND as i32 => Q3_SetLoopSound(ctx, entID, data),
 
             _ if toSet == SET_ICARUS_FREEZE as i32 || toSet == SET_ICARUS_UNFREEZE as i32 => {
-                Q3_SetICARUSFreeze(ctx, entID, data, if toSet == SET_ICARUS_FREEZE { qtrue } else { qfalse });
+                Q3_SetICARUSFreeze(ctx, entID, data, if toSet == (SET_ICARUS_FREEZE) as i32 { qtrue } else { qfalse });
             }
 
             _ if toSet == SET_WEAPON as i32 => Q3_SetWeapon(ctx, entID, data),

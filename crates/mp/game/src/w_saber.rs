@@ -531,7 +531,7 @@ pub fn SetSaberBoxSize(
         debug_assert!(!saberent.is_null() && (*saberent).inuse != 0);
 
         let on = (*saberent).r.ownerNum;
-        if on < MAX_CLIENTS && on >= 0 {
+        if on < (MAX_CLIENTS) as i32 && on >= 0 {
             owner = &mut (*ctx.world).g_entities[on as usize] as *mut gentity_t;
         } else if on >= 0
             && on < ENTITYNUM_WORLD
@@ -624,7 +624,7 @@ pub fn SetSaberBoxSize(
 
         for i in 0..3usize {
             j = 0;
-            while j < MAX_SABERS {
+            while j < (MAX_SABERS) as i32 {
                 if (*oc).saber[j as usize].model[0] == 0 {
                     break;
                 }
@@ -7824,7 +7824,7 @@ pub fn thrownSaberTouch(
         (*saberent).nextthink = level_time;
 
         if !other.is_null()
-            && (*other).r.ownerNum < MAX_CLIENTS
+            && (*other).r.ownerNum < (MAX_CLIENTS) as i32
             && ((*other).r.contents & CONTENTS_LIGHTSABER) != 0
             && !(*ctx.world).g_entities[(*other).r.ownerNum as usize].client.is_null()
             && (*ctx.world).g_entities[(*other).r.ownerNum as usize].inuse != 0
@@ -9701,7 +9701,7 @@ pub fn WP_SaberPositionUpdate(
             properOrigin[2] += addVel[2] * fVSpeed;
 
             properAngles[0] = 0.0;
-            if (*self_).s.number < MAX_CLIENTS && (*client).ps.m_iVehicleNum != 0 {
+            if (*self_).s.number < (MAX_CLIENTS) as i32 && (*client).ps.m_iVehicleNum != 0 {
                 vehEnt = &mut (*ctx.world).g_entities[(*client).ps.m_iVehicleNum as usize]
                     as *mut gentity_t;
                 if (*vehEnt).inuse != 0
@@ -10262,7 +10262,7 @@ pub fn WP_SaberPositionUpdate(
                                     // skip the saber-contents-only trace and get right to the full trace
                                     trMask = MASK_PLAYERSOLID | CONTENTS_LIGHTSABER | MASK_SHOT;
                                 } else {
-                                    while sN < MAX_CLIENTS {
+                                    while sN < (MAX_CLIENTS) as i32 {
                                         if (*ctx.world).g_entities[sN as usize].inuse != 0
                                             && !(*ctx.world).g_entities[sN as usize].client.is_null()
                                             && (*ctx.world).g_entities[sN as usize].r.linked != qfalse
@@ -10457,7 +10457,7 @@ pub fn WP_SaberPositionUpdate(
 
                                     if (*ctx.world).cvars.g_saberTraceSaberFirst.integer != 0 {
                                         sN = 0;
-                                        while sN < MAX_CLIENTS {
+                                        while sN < (MAX_CLIENTS) as i32 {
                                             if clientUnlinked[sN as usize] != qfalse {
                                                 // Make clients clip properly again.
                                                 if (*ctx.world).g_entities[sN as usize].inuse != 0

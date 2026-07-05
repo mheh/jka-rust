@@ -338,7 +338,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
             //hmm..I'm going to cheat here.
             let oldI = i;
             i_r = 0;
-            while i < fp_bytes.len() && fp_bytes[i] != b'\n' && (i_r as c_int) < NUM_FORCE_POWERS {
+            while i < fp_bytes.len() && fp_bytes[i] != b'\n' && (i_r as c_int) < (NUM_FORCE_POWERS) as i32 {
                 if (*cl).ps.fd.forceSide == FORCE_LIGHTSIDE as c_int {
                     if i_r as c_int == FP_ABSORB {
                         fp_bytes[i] = b'3';
@@ -378,7 +378,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         i_r = 0;
-        while i < fp_bytes.len() && fp_bytes[i] != b'\n' && (i_r as c_int) < NUM_FORCE_POWERS {
+        while i < fp_bytes.len() && fp_bytes[i] != b'\n' && (i_r as c_int) < (NUM_FORCE_POWERS) as i32 {
             let ch = fp_bytes[i];
             let digit = (ch as char).to_digit(10).unwrap_or(0) as c_int;
             (*cl).ps.fd.forcePowerLevel[i_r] = digit;
@@ -475,7 +475,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         i = 0;
-        while (i as c_int) < NUM_FORCE_POWERS {
+        while (i as c_int) < (NUM_FORCE_POWERS) as i32 {
             if (*cl).ps.fd.forcePowersKnown & (1 << i) != 0 && (*cl).ps.fd.forcePowerLevel[i] == 0 {
                 //err..
                 (*cl).ps.fd.forcePowersKnown &= !(1 << i);
@@ -503,7 +503,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
         }
 
-        while (i as c_int) < NUM_FORCE_POWERS {
+        while (i as c_int) < (NUM_FORCE_POWERS) as i32 {
             (*cl).ps.fd.forcePowerBaseLevel[i] = (*cl).ps.fd.forcePowerLevel[i];
             i += 1;
         }
@@ -1477,7 +1477,7 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
         );
 
         if tr.fraction != 1.0
-            && tr.entityNum != ENTITYNUM_NONE
+            && tr.entityNum != (ENTITYNUM_NONE) as i16
             && !(*ctx.world).g_entities[tr.entityNum as usize].client.is_null()
             && (*((*ctx.world).g_entities[tr.entityNum as usize].client as *mut gclient_t))
                 .ps
@@ -1505,7 +1505,7 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 // surface. Left as a no-op eject; the surrounding grip logic is
                 // otherwise faithful.
             }
-            (*cl).ps.fd.forceGripEntityNum = tr.entityNum;
+            (*cl).ps.fd.forceGripEntityNum = (tr.entityNum) as i32;
             (*tcl).ps.fd.forceGripStarted = level_time as f32;
             (*cl).ps.fd.forceGripDamageDebounceTime = 0;
 
@@ -1993,7 +1993,7 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
                         MASK_SHOT,
                     ),
                 );
-                if tr.fraction < 1.0 && tr.entityNum != (*traceEnt).s.number {
+                if tr.fraction < 1.0 && tr.entityNum != ((*traceEnt).s.number) as i16 {
                     //must have clear LOS
                     continue;
                 }
@@ -2021,7 +2021,7 @@ pub fn ForceShootLightning(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     MASK_SHOT,
                 ),
             );
-            if tr.entityNum == ENTITYNUM_NONE || tr.fraction == 1.0 || tr.allsolid != 0 || tr.startsolid != 0
+            if tr.entityNum == (ENTITYNUM_NONE) as i16 || tr.fraction == 1.0 || tr.allsolid != 0 || tr.startsolid != 0
             {
                 return;
             }
@@ -2300,7 +2300,7 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
                         MASK_SHOT,
                     ),
                 );
-                if tr.fraction < 1.0 && tr.entityNum != (*traceEnt).s.number {
+                if tr.fraction < 1.0 && tr.entityNum != ((*traceEnt).s.number) as i16 {
                     continue;
                 }
 
@@ -2327,7 +2327,7 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
                     MASK_SHOT,
                 ),
             );
-            if tr.entityNum == ENTITYNUM_NONE
+            if tr.entityNum == (ENTITYNUM_NONE) as i16
                 || tr.fraction == 1.0
                 || tr.allsolid != 0
                 || tr.startsolid != 0
@@ -2636,7 +2636,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
             ),
         );
 
-        if (*tr).entityNum == ENTITYNUM_NONE || (*tr).fraction == 1.0 || (*tr).allsolid != 0 || (*tr).startsolid != 0 {
+        if (*tr).entityNum == (ENTITYNUM_NONE) as i16 || (*tr).fraction == 1.0 || (*tr).allsolid != 0 || (*tr).startsolid != 0 {
             return qfalse;
         }
 
@@ -2669,7 +2669,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
             let tcl = (*traceEnt).client as *mut gclient_t;
             let mut over_ride: c_int = 0;
 
-            if G_ActivateBehavior(ctx, traceEnt, BSET_MINDTRICK) != 0 {
+            if G_ActivateBehavior(ctx, traceEnt, (BSET_MINDTRICK) as i32) != 0 {
                 //activated a script on him
                 //FIXME: do the visual sparkles effect on their heads, still?
                 WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, 0);
@@ -2864,13 +2864,13 @@ pub fn ForceTelepathy(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if (*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] == FORCE_LEVEL_1 {
             let ent = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
             if tr.fraction != 1.0
-                && tr.entityNum != ENTITYNUM_NONE
+                && tr.entityNum != (ENTITYNUM_NONE) as i16
                 && (*ent).inuse != 0
                 && !(*ent).client.is_null()
                 && (*((*ent).client as *mut gclient_t)).pers.connected != 0
                 && (*((*ent).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
             {
-                WP_AddAsMindtricked(&mut (*cl).ps.fd, tr.entityNum);
+                WP_AddAsMindtricked(&mut (*cl).ps.fd, (tr.entityNum) as i32);
                 if tookPower == 0 {
                     WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, 0);
                 }
@@ -3272,7 +3272,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                 ),
             );
 
-            if tr.fraction != 1.0 && tr.entityNum != ENTITYNUM_NONE {
+            if tr.fraction != 1.0 && tr.entityNum != (ENTITYNUM_NONE) as i16 {
                 let hit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
                 if (*hit).client.is_null() && (*hit).s.eType == ET_NPC as c_int {
                     //g2animent
@@ -3282,7 +3282,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                 }
 
                 numListedEntities = 0;
-                entityList[numListedEntities as usize] = tr.entityNum;
+                entityList[numListedEntities as usize] = (tr.entityNum) as i32;
 
                 if pull != 0 {
                     if ForcePowerUsableOn(ctx, self_, hit, FP_PULL) == 0 {
@@ -3497,7 +3497,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                     MASK_SHOT,
                 ),
             );
-            if tr.fraction < 1.0 && tr.entityNum != (*ent).s.number {
+            if tr.fraction < 1.0 && tr.entityNum != ((*ent).s.number) as i16 {
                 //must have clear LOS
                 //try from eyes too before you give up
                 let mut eyePoint: vec3_t = (*cl).ps.origin;
@@ -3515,7 +3515,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                     ),
                 );
 
-                if tr.fraction < 1.0 && tr.entityNum != (*ent).s.number {
+                if tr.fraction < 1.0 && tr.entityNum != ((*ent).s.number) as i16 {
                     continue;
                 }
             }
@@ -3792,7 +3792,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                             MASK_SHOT,
                         ),
                     );
-                    if tr.entityNum != (*push_list[x]).s.number || tr.fraction == 1.0 || tr.allsolid != 0 || tr.startsolid != 0
+                    if tr.entityNum != ((*push_list[x]).s.number) as i16 || tr.fraction == 1.0 || tr.allsolid != 0 || tr.startsolid != 0
                     {
                         //must be pointing right at it
                         continue;
@@ -4121,7 +4121,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
             return;
         }
 
-        if tr.fraction != 1.0 && tr.entityNum != (*gripEnt).s.number {
+        if tr.fraction != 1.0 && tr.entityNum != ((*gripEnt).s.number) as i16 {
             WP_ForcePowerStop(ctx, self_, forcePower);
             return;
         }
@@ -5008,26 +5008,26 @@ pub fn HolocronUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 }
 
                 if (*cl).ps.fd.forcePowersKnown & (1 << i) != 0
-                    && i != FP_LEVITATION
-                    && i != FP_SABER_OFFENSE
+                    && i != (FP_LEVITATION) as usize
+                    && i != (FP_SABER_OFFENSE) as usize
                 {
                     (*cl).ps.fd.forcePowersKnown -= 1 << i;
                 }
 
                 if (*cl).ps.fd.forcePowersActive & (1 << i) != 0
-                    && i != FP_LEVITATION
-                    && i != FP_SABER_OFFENSE
+                    && i != (FP_LEVITATION) as usize
+                    && i != (FP_SABER_OFFENSE) as usize
                 {
-                    WP_ForcePowerStop(ctx, self_, i);
+                    WP_ForcePowerStop(ctx, self_, (i) as i32);
                 }
 
-                if i == FP_LEVITATION {
+                if i == (FP_LEVITATION) as usize {
                     if noHRank >= FORCE_LEVEL_1 {
                         (*cl).ps.fd.forcePowerLevel[i as usize] = noHRank;
                     } else {
                         (*cl).ps.fd.forcePowerLevel[i as usize] = FORCE_LEVEL_1;
                     }
-                } else if i == FP_SABER_OFFENSE {
+                } else if i == (FP_SABER_OFFENSE) as usize {
                     (*cl).ps.fd.forcePowersKnown |= 1 << i;
 
                     if noHRank >= FORCE_LEVEL_1 {
@@ -5074,26 +5074,26 @@ pub fn JediMasterUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 (*cl).ps.fd.forcePowersKnown |= 1 << i;
                 (*cl).ps.fd.forcePowerLevel[i as usize] = FORCE_LEVEL_3;
 
-                if i == FP_TEAM_HEAL || i == FP_TEAM_FORCE || i == FP_DRAIN || i == FP_ABSORB {
+                if i == (FP_TEAM_HEAL) as usize || i == (FP_TEAM_FORCE) as usize || i == (FP_DRAIN) as usize || i == (FP_ABSORB) as usize {
                     //team powers are useless in JM, absorb is too, drain relatively useless
                     (*cl).ps.fd.forcePowersKnown &= !(1 << i);
                     (*cl).ps.fd.forcePowerLevel[i as usize] = 0;
                 }
 
-                if i == FP_TELEPATHY {
+                if i == (FP_TELEPATHY) as usize {
                     //level 3 mindtrick lets the JM hide too much
                     (*cl).ps.fd.forcePowerLevel[i as usize] = FORCE_LEVEL_2;
                 }
             } else {
-                if (*cl).ps.fd.forcePowersKnown & (1 << i) != 0 && i != FP_LEVITATION {
+                if (*cl).ps.fd.forcePowersKnown & (1 << i) != 0 && i != (FP_LEVITATION) as usize {
                     (*cl).ps.fd.forcePowersKnown -= 1 << i;
                 }
 
-                if (*cl).ps.fd.forcePowersActive & (1 << i) != 0 && i != FP_LEVITATION {
-                    WP_ForcePowerStop(ctx, self_, i);
+                if (*cl).ps.fd.forcePowersActive & (1 << i) != 0 && i != (FP_LEVITATION) as usize {
+                    WP_ForcePowerStop(ctx, self_, (i) as i32);
                 }
 
-                if i == FP_LEVITATION {
+                if i == (FP_LEVITATION) as usize {
                     (*cl).ps.fd.forcePowerLevel[i as usize] = FORCE_LEVEL_1;
                 } else {
                     (*cl).ps.fd.forcePowerLevel[i as usize] = FORCE_LEVEL_0;
@@ -5113,7 +5113,7 @@ pub fn WP_HasForcePowers(ps: *const playerState_t) -> qboolean {
         if !ps.is_null() {
             let mut i = 0;
             while i < NUM_FORCE_POWERS {
-                if i == FP_LEVITATION {
+                if i == (FP_LEVITATION) as usize {
                     if (*ps).fd.forcePowerLevel[i as usize] > FORCE_LEVEL_1 {
                         return qtrue;
                     }

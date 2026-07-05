@@ -1313,14 +1313,14 @@ pub fn Jedi_ClearPathToSpot(
         );
 
         //Do a simple check
-        if trace.allsolid != qfalse || trace.startsolid != qfalse {
+        if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
             //inside solid
             return qfalse;
         }
 
         if trace.fraction < 1.0f32 {
             //hit something
-            if impactEntNum != ENTITYNUM_NONE && trace.entityNum == impactEntNum {
+            if impactEntNum != ENTITYNUM_NONE && trace.entityNum == (impactEntNum) as i16 {
                 //hit what we're going after
                 return qtrue;
             } else {
@@ -1355,7 +1355,7 @@ pub fn Jedi_ClearPathToSpot(
                     (*npc).clipmask,
                 ),
             );
-            if trace.fraction < 1.0f32 || trace.allsolid != qfalse || trace.startsolid != qfalse {
+            if trace.fraction < 1.0f32 || trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
                 //good to go
                 i += (*npc).r.maxs[0] * 2.0;
                 continue;
@@ -1432,7 +1432,7 @@ pub fn NPC_MoveDirClear(
                 (*npc).clipmask | CONTENTS_BOTCLIP,
             ),
         );
-        if trace.allsolid != qfalse || trace.startsolid != qfalse {
+        if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
             //hmm, trace started inside this brush
             if reset != qfalse {
                 trace.fraction = 1.0f32;
@@ -1449,8 +1449,8 @@ pub fn NPC_MoveDirClear(
                 Some(id) => ge.add(id.0 as usize),
                 None => core::ptr::null_mut(),
             };
-            if (!enemy.is_null() && trace.entityNum == (*enemy).s.number)
-                || (!goal.is_null() && trace.entityNum == (*goal).s.number)
+            if (!enemy.is_null() && trace.entityNum == ((*enemy).s.number) as i16)
+                || (!goal.is_null() && trace.entityNum == ((*goal).s.number) as i16)
             {
                 //okay to bump into enemy or goal
                 return qtrue;
@@ -1487,7 +1487,7 @@ pub fn NPC_MoveDirClear(
             ),
         );
 
-        if trace.allsolid != qfalse || trace.startsolid != qfalse {
+        if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
             //Not going off a cliff
             return qtrue;
         }
@@ -2502,7 +2502,7 @@ pub fn Jedi_CheckFlipEvasions(
                 crate::q_math::_VectorSubtract((*self_).r.currentOrigin, traceto, &mut idealNormal);
                 crate::q_math::VectorNormalize(&mut idealNormal);
                 let traceEnt = ge.add(trace.entityNum as usize);
-                if (trace.entityNum < ENTITYNUM_WORLD
+                if (trace.entityNum < (ENTITYNUM_WORLD) as i16
                     && !traceEnt.is_null()
                     && (*traceEnt).s.solid != SOLID_BMODEL)
                     || crate::q_math::_DotProduct(trace.plane.normal, idealNormal) > 0.7f32
@@ -3628,7 +3628,7 @@ pub fn Jedi_SaberBlock(
                 CONTENTS_BODY,
             ),
         );
-        if tr.allsolid != qfalse || tr.startsolid != qfalse || tr.fraction >= 1.0f32 {
+        if tr.allsolid != (qfalse) as u8 || tr.startsolid != (qfalse) as u8 || tr.fraction >= 1.0f32 {
             //estimate
             let mut dir2Me: vec3_t = [0.0; 3];
             crate::q_math::_VectorSubtract(axisPoint, saberPoint, &mut dir2Me);
@@ -3793,7 +3793,7 @@ pub fn Jedi_EvasionSaber(
         }
 
         if (*enemy_client).ps.weaponTime != 0
-            && (*enemy_client).ps.weaponstate == WEAPON_FIRING
+            && (*enemy_client).ps.weaponstate == (WEAPON_FIRING) as i32
         {
             if (*client).ps.saberInFlight == qfalse && Jedi_SaberBlock(ctx, 0, 0) != qfalse {
                 return;
@@ -3808,7 +3808,7 @@ pub fn Jedi_EvasionSaber(
         crate::q_math::VectorNormalize(&mut dirEnemy2Me);
 
         if (*enemy_client).ps.weaponTime != 0
-            && (*enemy_client).ps.weaponstate == WEAPON_FIRING
+            && (*enemy_client).ps.weaponstate == (WEAPON_FIRING) as i32
         {
             //enemy is attacking
             enemy_attacking = qtrue;
@@ -4149,7 +4149,7 @@ pub fn Jedi_FindEnemyInCone(
                     MASK_SHOT,
                 ),
             );
-            if tr.fraction < 1.0f32 && tr.entityNum != (*check).s.number {
+            if tr.fraction < 1.0f32 && tr.entityNum != ((*check).s.number) as i16 {
                 e += 1;
                 continue;
             }
@@ -5005,13 +5005,13 @@ pub fn Jedi_Jump(
                             );
                         }
 
-                        if trace.allsolid != qfalse || trace.startsolid != qfalse {
+                        if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
                             blocked = qtrue;
                             break;
                         }
                         if trace.fraction < 1.0f32 {
                             //hit something
-                            if trace.entityNum == goalEntNum {
+                            if trace.entityNum == (goalEntNum) as i16 {
                                 //hit the enemy, that's perfect!
                                 break;
                             } else {
@@ -5597,7 +5597,7 @@ pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
                         ),
                     );
                 }
-                if trace.allsolid != qfalse || trace.startsolid != qfalse {
+                if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 {
                     break 'check true;
                 }
                 if trace.fraction < 1.0f32 {
@@ -5634,9 +5634,9 @@ pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
                     (*npc).clipmask,
                 ),
             );
-            if trace.allsolid != qfalse || trace.startsolid != qfalse || trace.fraction < 1.0f32 {
+            if trace.allsolid != (qfalse) as u8 || trace.startsolid != (qfalse) as u8 || trace.fraction < 1.0f32 {
                 //hit ground!
-                if trace.entityNum < ENTITYNUM_WORLD {
+                if trace.entityNum < (ENTITYNUM_WORLD) as i16 {
                     //landed on an ent
                     let groundEnt = ge.add(trace.entityNum as usize);
                     if (*groundEnt).r.svFlags & SVF_GLASS_BRUSH != 0 {

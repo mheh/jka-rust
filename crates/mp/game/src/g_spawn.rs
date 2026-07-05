@@ -1337,7 +1337,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 defaultStyles[i as usize][0].as_ptr() as *mut c_char,
                 &mut text,
             );
-            lengthRed = strlen(text);
+            lengthRed = (strlen(text)) as i32;
             trap::SetConfigstring(
                 ctx.engine,
                 GSetConfigstringArgs::new(
@@ -1354,7 +1354,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 defaultStyles[i as usize][1].as_ptr() as *mut c_char,
                 &mut text,
             );
-            lengthGreen = strlen(text);
+            lengthGreen = (strlen(text)) as i32;
             trap::SetConfigstring(
                 ctx.engine,
                 GSetConfigstringArgs::new(
@@ -1371,7 +1371,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 defaultStyles[i as usize][2].as_ptr() as *mut c_char,
                 &mut text,
             );
-            lengthBlue = strlen(text);
+            lengthBlue = (strlen(text)) as i32;
             trap::SetConfigstring(
                 ctx.engine,
                 GSetConfigstringArgs::new(
