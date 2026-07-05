@@ -247,7 +247,7 @@ pub fn WP_FireBryarPistol(
         let mut damage: c_int = BRYAR_PISTOL_DAMAGE;
         let mut count: c_int;
 
-        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, BRYAR_PISTOL_VEL as f32, 10000, ent, altFire);
+        let missile = crate::g_missile::CreateMissile(ctx, (*ctx.world).globals.muzzle, (*ctx.world).globals.forward, BRYAR_PISTOL_VEL as f32, 10000, ent, altFire);
 
         (*missile).classname = c"bryar_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_BRYAR_PISTOL;
@@ -477,7 +477,7 @@ pub fn WP_FireBlaster(
         let mut dir: vec3_t = [0.0; 3];
         let mut angs: vec3_t = [0.0; 3];
 
-        crate::q_math::vectoangles(forward, &mut angs);
+        crate::q_math::vectoangles((*ctx.world).globals.forward, &mut angs);
 
         if altFire != qfalse {
             // add some slop to the alt-fire direction
@@ -488,7 +488,7 @@ pub fn WP_FireBlaster(
         crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
 
         // FIXME: if temp_org does not have clear trace to inside the bbox, don't shoot!
-        WP_FireBlasterMissile(ctx, ent, muzzle, dir, altFire);
+        WP_FireBlasterMissile(ctx, ent, (*ctx.world).globals.muzzle, dir, altFire);
     }
 }
 
@@ -518,7 +518,7 @@ pub fn WP_DisruptorMainFire(
         start[2] += (*(*ent).client).ps.viewheight as f32; // By eyes
 
         for i in 0..3 {
-            end[i] = start[i] + shotRange * forward[i];
+            end[i] = start[i] + shotRange * (*ctx.world).globals.forward[i];
         }
 
         ignore = (*ent).s.number;
@@ -576,7 +576,7 @@ pub fn WP_DisruptorMainFire(
                 if crate::w_saber::WP_SaberCanBlock(ctx, traceEnt, tr.endpos, 0, MOD_DISRUPTOR as c_int, qtrue, 0) != 0 {
                     // broadcast and stop the shot because it was blocked
                     tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_MAIN_SHOT);
-                    (*tent).s.origin2 = muzzle;
+                    (*tent).s.origin2 = (*ctx.world).globals.muzzle;
                     (*tent).s.eventParm = (*ent).s.number;
 
                     let te = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK);
@@ -605,7 +605,7 @@ pub fn WP_DisruptorMainFire(
 
         // always render a shot beam, doing this the old way because I don't much feel like overriding the effect.
         tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_MAIN_SHOT);
-        (*tent).s.origin2 = muzzle;
+        (*tent).s.origin2 = (*ctx.world).globals.muzzle;
         (*tent).s.eventParm = (*ent).s.number;
 
         traceEnt = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
@@ -616,7 +616,7 @@ pub fn WP_DisruptorMainFire(
                     (*(*ent).client).accuracy_hits += 1;
                 }
 
-                crate::g_combat::G_Damage(traceEnt, ent, ent, forward, tr.endpos, damage, DAMAGE_NORMAL, MOD_DISRUPTOR as c_int);
+                crate::g_combat::G_Damage(ctx, traceEnt, ent, ent, Some(&mut (*ctx.world).globals.forward), tr.endpos, damage, DAMAGE_NORMAL, MOD_DISRUPTOR as c_int);
 
                 tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_HIT);
                 (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
@@ -681,7 +681,7 @@ pub fn WP_DisruptorAltFire(
         let mut render_impact = qtrue;
         let mut start: vec3_t;
         let mut end: vec3_t = [0.0; 3];
-        let mut muzzle2 = muzzle;
+        let mut muzzle2 = (*ctx.world).globals.muzzle;
         let mut tr: trace_t = std::mem::zeroed();
         let mut traceEnt: *mut gentity_t;
         let mut tent: *mut gentity_t;
@@ -726,7 +726,7 @@ pub fn WP_DisruptorAltFire(
 
         for _i in 0..traces {
             for k in 0..3 {
-                end[k] = start[k] + shotRange * forward[k];
+                end[k] = start[k] + shotRange * (*ctx.world).globals.forward[k];
             }
 
             if (*ctx.world).cvars.d_projectileGhoul2Collision.integer != 0 {
@@ -775,7 +775,7 @@ pub fn WP_DisruptorAltFire(
             {
                 if crate::w_saber::WP_SaberCanBlock(ctx, traceEnt, tr.endpos, 0, MOD_DISRUPTOR_SNIPER as c_int, qtrue, 0) != 0 {
                     tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_SNIPER_SHOT);
-                    (*tent).s.origin2 = muzzle;
+                    (*tent).s.origin2 = (*ctx.world).globals.muzzle;
                     (*tent).s.shouldtarget = fullCharge;
                     (*tent).s.eventParm = (*ent).s.number;
 
@@ -795,7 +795,7 @@ pub fn WP_DisruptorAltFire(
 
             // always render a shot beam, doing this the old way because I don't much feel like overriding the effect.
             tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_SNIPER_SHOT);
-            (*tent).s.origin2 = muzzle;
+            (*tent).s.origin2 = (*ctx.world).globals.muzzle;
             (*tent).s.shouldtarget = fullCharge;
             (*tent).s.eventParm = (*ent).s.number;
 
@@ -817,7 +817,7 @@ pub fn WP_DisruptorAltFire(
                         || (*traceEnt).s.eType == entityType_t::ET_MOVER as c_int
                     {
                         if (*traceEnt).takedamage != 0 {
-                            crate::g_combat::G_Damage(traceEnt, ent, ent, forward, tr.endpos, damage, DAMAGE_NO_KNOCKBACK, MOD_DISRUPTOR_SNIPER as c_int);
+                            crate::g_combat::G_Damage(ctx, traceEnt, ent, ent, Some(&mut (*ctx.world).globals.forward), tr.endpos, damage, DAMAGE_NO_KNOCKBACK, MOD_DISRUPTOR_SNIPER as c_int);
 
                             tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_DISRUPTOR_HIT);
                             (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
@@ -845,7 +845,7 @@ pub fn WP_DisruptorAltFire(
                         preAng = (*(*traceEnt).client).ps.viewangles;
                     }
 
-                    crate::g_combat::G_Damage(traceEnt, ent, ent, forward, tr.endpos, damage, DAMAGE_NO_KNOCKBACK, MOD_DISRUPTOR_SNIPER as c_int);
+                    crate::g_combat::G_Damage(ctx, traceEnt, ent, ent, Some(&mut (*ctx.world).globals.forward), tr.endpos, damage, DAMAGE_NO_KNOCKBACK, MOD_DISRUPTOR_SNIPER as c_int);
 
                     if !(*traceEnt).client.is_null()
                         && preHealth > 0
@@ -922,7 +922,7 @@ pub fn WP_BowcasterAltFire(
     unsafe {
         let damage: c_int = BOWCASTER_DAMAGE;
 
-        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, BOWCASTER_VELOCITY as f32, 10000, ent, qfalse);
+        let missile = crate::g_missile::CreateMissile(ctx, (*ctx.world).globals.muzzle, (*ctx.world).globals.forward, BOWCASTER_VELOCITY as f32, 10000, ent, qfalse);
 
         (*missile).classname = c"bowcaster_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_BOWCASTER;
@@ -987,14 +987,14 @@ pub fn WP_BowcasterMainFire(
         for i in 0..count {
             vel = BOWCASTER_VELOCITY as f32 * ((*ctx.world).bg_state.rng.crandom() * BOWCASTER_VEL_RANGE + 1.0);
 
-            crate::q_math::vectoangles(forward, &mut angs);
+            crate::q_math::vectoangles((*ctx.world).globals.forward, &mut angs);
 
             angs[PITCH] += (*ctx.world).bg_state.rng.crandom() * BOWCASTER_ALT_SPREAD * 0.2;
             angs[YAW] += (i as f32 + 0.5) * BOWCASTER_ALT_SPREAD - count as f32 * 0.5 * BOWCASTER_ALT_SPREAD;
 
             crate::q_math::AngleVectors(angs, Some(&mut dir), None, None);
 
-            missile = crate::g_missile::CreateMissile(ctx, muzzle, dir, vel, 10000, ent, qtrue);
+            missile = crate::g_missile::CreateMissile(ctx, (*ctx.world).globals.muzzle, dir, vel, 10000, ent, qtrue);
 
             (*missile).classname = c"bowcaster_alt_proj".as_ptr() as *mut c_char;
             (*missile).s.weapon = WP_BOWCASTER;
@@ -1036,7 +1036,7 @@ pub fn WP_RepeaterMainFire(
     unsafe {
         let damage: c_int = REPEATER_DAMAGE;
 
-        let missile = crate::g_missile::CreateMissile(ctx, muzzle, dir, REPEATER_VELOCITY as f32, 10000, ent, qfalse);
+        let missile = crate::g_missile::CreateMissile(ctx, (*ctx.world).globals.muzzle, dir, REPEATER_VELOCITY as f32, 10000, ent, qfalse);
 
         (*missile).classname = c"repeater_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_REPEATER;
@@ -1060,7 +1060,7 @@ pub fn WP_RepeaterAltFire(
     unsafe {
         let damage: c_int = REPEATER_ALT_DAMAGE;
 
-        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, REPEATER_ALT_VELOCITY as f32, 10000, ent, qtrue);
+        let missile = crate::g_missile::CreateMissile(ctx, (*ctx.world).globals.muzzle, (*ctx.world).globals.forward, REPEATER_ALT_VELOCITY as f32, 10000, ent, qtrue);
 
         (*missile).classname = c"repeater_alt_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_REPEATER;
@@ -1099,7 +1099,7 @@ pub fn WP_FireRepeater(
         let mut dir: vec3_t = [0.0; 3];
         let mut angs: vec3_t = [0.0; 3];
 
-        crate::q_math::vectoangles(forward, &mut angs);
+        crate::q_math::vectoangles((*ctx.world).globals.forward, &mut angs);
 
         if altFire != qfalse {
             WP_RepeaterAltFire(ctx, ent);
@@ -1124,7 +1124,7 @@ pub fn WP_DEMP2_MainFire(
     unsafe {
         let damage: c_int = DEMP2_DAMAGE;
 
-        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, DEMP2_VELOCITY as f32, 10000, ent, qfalse);
+        let missile = crate::g_missile::CreateMissile(ctx, (*ctx.world).globals.muzzle, (*ctx.world).globals.forward, DEMP2_VELOCITY as f32, 10000, ent, qfalse);
 
         (*missile).classname = c"demp2_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_DEMP2;
@@ -1233,7 +1233,7 @@ pub fn DEMP2_AltRadiusDamage(
             dir[2] += 12.0;
 
             if gent != myOwner {
-                crate::g_combat::G_Damage(gent, myOwner, myOwner, dir, (*ent).r.currentOrigin, (*ent).damage, DAMAGE_DEATH_KNOCKBACK, (*ent).splashMethodOfDeath);
+                crate::g_combat::G_Damage(ctx, gent, myOwner, myOwner, Some(&mut dir), (*ent).r.currentOrigin, (*ent).damage, DAMAGE_DEATH_KNOCKBACK, (*ent).splashMethodOfDeath);
                 if (*gent).takedamage != 0 && !(*gent).client.is_null() {
                     if (*(*gent).client).ps.electrifyTime < (*ctx.world).level.time {
                         // electrocution effect
@@ -1320,12 +1320,12 @@ pub fn WP_DEMP2_AltFire(
         let mut count: c_int;
         let origcount: c_int;
         let mut fact: f32;
-        let mut start: vec3_t = muzzle;
+        let mut start: vec3_t = (*ctx.world).globals.muzzle;
         let mut end: vec3_t = [0.0; 3];
         let mut tr: trace_t = std::mem::zeroed();
 
         for i in 0..3 {
-            end[i] = start[i] + DEMP2_ALT_RANGE * forward[i];
+            end[i] = start[i] + DEMP2_ALT_RANGE * (*ctx.world).globals.forward[i];
         }
 
         count = ((*ctx.world).level.time - (*(*ent).client).ps.weaponChargeTime) / DEMP2_CHARGE_UNIT;
@@ -1406,7 +1406,7 @@ pub fn WP_FlechetteMainFire(
         let mut missile: *mut gentity_t;
 
         for i in 0..FLECHETTE_SHOTS {
-            crate::q_math::vectoangles(forward, &mut angs);
+            crate::q_math::vectoangles((*ctx.world).globals.forward, &mut angs);
 
             if i != 0 {
                 // do nothing on the first shot, it will hit the crosshairs
@@ -1416,7 +1416,7 @@ pub fn WP_FlechetteMainFire(
 
             crate::q_math::AngleVectors(angs, Some(&mut fwd), None, None);
 
-            missile = crate::g_missile::CreateMissile(ctx, muzzle, fwd, FLECHETTE_VEL as f32, 10000, ent, qfalse);
+            missile = crate::g_missile::CreateMissile(ctx, (*ctx.world).globals.muzzle, fwd, FLECHETTE_VEL as f32, 10000, ent, qfalse);
 
             (*missile).classname = c"flech_proj".as_ptr() as *mut c_char;
             (*missile).s.weapon = WP_FLECHETTE;
@@ -1600,10 +1600,10 @@ pub fn WP_FlechetteAltFire(
     unsafe {
         let mut dir: vec3_t;
         let mut fwd: vec3_t = [0.0; 3];
-        let mut start: vec3_t = muzzle;
+        let mut start: vec3_t = (*ctx.world).globals.muzzle;
         let mut angs: vec3_t = [0.0; 3];
 
-        crate::q_math::vectoangles(forward, &mut angs);
+        crate::q_math::vectoangles((*ctx.world).globals.forward, &mut angs);
 
         WP_TraceSetStart(ctx, self_, start, vec3_origin, vec3_origin); // make sure our start point isn't on the other side of a wall
 
@@ -1811,7 +1811,7 @@ pub fn WP_FireRocket(
             vel *= 0.5;
         }
 
-        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, vel, 10000, ent, altFire);
+        let missile = crate::g_missile::CreateMissile(ctx, (*ctx.world).globals.muzzle, (*ctx.world).globals.forward, vel, 10000, ent, altFire);
 
         if !(*ent).client.is_null() && (*(*ent).client).ps.rocketLockIndex != crate::shared::ENTITYNUM_NONE as c_int {
             let lockTimeInterval = (if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE { 2400.0 } else { 1200.0 }) / 16.0;
@@ -1947,8 +1947,8 @@ pub fn thermalThinkStandard(
 pub fn WP_FireThermalDetonator(
     ctx: GameContext<'_>,ent: *mut gentity_t, altFire: qboolean) -> *mut gentity_t {
     unsafe {
-        let dir: vec3_t = forward;
-        let start: vec3_t = muzzle;
+        let dir: vec3_t = (*ctx.world).globals.forward;
+        let start: vec3_t = (*ctx.world).globals.muzzle;
         let mut chargeAmount: f32 = 1.0; // default of full charge
 
         let bolt = crate::g_utils::G_Spawn(ctx);
@@ -2033,7 +2033,7 @@ pub fn WP_DropThermal(
     // PORT-NOTE(file-static-globals): `forward`/`vright`/`up` are the unported
     // file-static globals (ruling 1); referenced bare, reported missing.
     unsafe {
-        crate::q_math::AngleVectors((*(*ent).client).ps.viewangles, Some(&mut forward), Some(&mut vright), Some(&mut up));
+        crate::q_math::AngleVectors((*(*ent).client).ps.viewangles, Some(&mut (*ctx.world).globals.forward), Some(&mut (*ctx.world).globals.vright), Some(&mut (*ctx.world).globals.up));
         WP_FireThermalDetonator(ctx, ent, qfalse)
     }
 }
@@ -2551,8 +2551,8 @@ pub fn CreateLaserTrap(
 pub fn WP_PlaceLaserTrap(
     ctx: GameContext<'_>,ent: *mut gentity_t, alt_fire: qboolean) {
     unsafe {
-        let dir: vec3_t = forward;
-        let start: vec3_t = muzzle;
+        let dir: vec3_t = (*ctx.world).globals.forward;
+        let start: vec3_t = (*ctx.world).globals.muzzle;
         // `FOFS(classname)` — byte offset of `gentity_t::classname` (Raven macro, `g_local.h`).
         let fofs_classname = core::mem::offset_of!(gentity_t, classname) as c_int;
 
@@ -2760,7 +2760,7 @@ pub fn DetPackBlow(
             // we were attached to something, do *direct* damage to it!
             let target = &mut (*ctx.world).g_entities[target_id.index()] as *mut gentity_t;
             let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
-            crate::g_combat::G_Damage(target, self_, owner, [0.0, 0.0, 0.0], (*self_).r.currentOrigin, (*self_).damage, 0, MOD_DET_PACK_SPLASH as c_int);
+            crate::g_combat::G_Damage(ctx, target, self_, owner, Some(&mut [0.0_f32, 0.0, 0.0]), (*self_).r.currentOrigin, (*self_).damage, 0, MOD_DET_PACK_SPLASH as c_int);
         }
         crate::g_combat::G_RadiusDamage(
             ctx, (*self_).r.currentOrigin,
@@ -2987,13 +2987,13 @@ pub fn WP_DropDetPack(
         if alt_fire != qfalse {
             BlowDetpacks(ctx, ent);
         } else {
-            crate::q_math::AngleVectors((*(*ent).client).ps.viewangles, Some(&mut forward), Some(&mut vright), Some(&mut up));
+            crate::q_math::AngleVectors((*(*ent).client).ps.viewangles, Some(&mut (*ctx.world).globals.forward), Some(&mut (*ctx.world).globals.vright), Some(&mut (*ctx.world).globals.up));
 
-            CalcMuzzlePoint(ctx, ent, forward, vright, up, &mut muzzle);
+            CalcMuzzlePoint(ctx, ent, (*ctx.world).globals.forward, (*ctx.world).globals.vright, (*ctx.world).globals.up, &mut (*ctx.world).globals.muzzle);
 
-            crate::q_math::VectorNormalize(&mut forward);
-            crate::q_math::_VectorMA(muzzle, -4.0, forward, &mut muzzle);
-            drop_charge(ctx, ent, muzzle, forward);
+            crate::q_math::VectorNormalize(&mut (*ctx.world).globals.forward);
+            crate::q_math::_VectorMA((*ctx.world).globals.muzzle, -4.0, (*ctx.world).globals.forward, &mut (*ctx.world).globals.muzzle);
+            drop_charge(ctx, ent, (*ctx.world).globals.muzzle, (*ctx.world).globals.forward);
 
             (*(*ent).client).ps.hasDetPackPlanted = qtrue;
         }
@@ -3013,7 +3013,7 @@ pub fn WP_FireConcussionAlt(
         let mut render_impact = qtrue;
         let mut start: vec3_t;
         let mut end: vec3_t = [0.0; 3];
-        let mut muzzle2 = muzzle;
+        let mut muzzle2 = (*ctx.world).globals.muzzle;
         let mut tr: trace_t = std::mem::zeroed();
         let mut traceEnt: *mut gentity_t;
         let mut tent: *mut gentity_t;
@@ -3023,7 +3023,7 @@ pub fn WP_FireConcussionAlt(
         let mut shot_maxs: vec3_t = [1.0, 1.0, 1.0];
 
         // Shove us backwards for half a second
-        crate::q_math::_VectorMA((*(*ent).client).ps.velocity, -200.0, forward, &mut (*(*ent).client).ps.velocity);
+        crate::q_math::_VectorMA((*(*ent).client).ps.velocity, -200.0, (*ctx.world).globals.forward, &mut (*(*ent).client).ps.velocity);
         (*(*ent).client).ps.groundEntityNum = crate::shared::ENTITYNUM_NONE as c_int;
         if (*(*ent).client).ps.pm_flags & crate::shared::PMF_DUCKED != 0 {
             // hunkered down
@@ -3032,15 +3032,15 @@ pub fn WP_FireConcussionAlt(
             (*(*ent).client).ps.pm_time = 250;
         }
 
-        muzzle2 = muzzle; // making a backup copy
+        muzzle2 = (*ctx.world).globals.muzzle; // making a backup copy
 
-        start = muzzle;
+        start = (*ctx.world).globals.muzzle;
         W_TraceSetStart(ctx, ent, start, [0.0; 3], [0.0; 3]);
 
         let mut skip: c_int = (*ent).s.number;
 
         for _i in 0..traces {
-            crate::q_math::_VectorMA(start, shotRange, forward, &mut end);
+            crate::q_math::_VectorMA(start, shotRange, (*ctx.world).globals.forward, &mut end);
 
             if (*ctx.world).cvars.d_projectileGhoul2Collision.integer != 0 {
                 trap::G2Trace(
@@ -3098,15 +3098,15 @@ pub fn WP_FireConcussionAlt(
                         let noKnockBack = (*traceEnt).flags & FL_NO_KNOCKBACK; // will be set if they die, I want to know if it was on *before* they died
                         if !(*traceEnt).client.is_null() && (*(*traceEnt).client).NPC_class == CLASS_GALAKMECH {
                             // hehe
-                            crate::g_combat::G_Damage(traceEnt, ent, ent, forward, tr.endpos, 10, DAMAGE_NO_KNOCKBACK | DAMAGE_NO_HIT_LOC, MOD_CONC_ALT as c_int);
+                            crate::g_combat::G_Damage(ctx, traceEnt, ent, ent, Some(&mut (*ctx.world).globals.forward), tr.endpos, 10, DAMAGE_NO_KNOCKBACK | DAMAGE_NO_HIT_LOC, MOD_CONC_ALT as c_int);
                             break;
                         }
-                        crate::g_combat::G_Damage(traceEnt, ent, ent, forward, tr.endpos, damage, DAMAGE_NO_KNOCKBACK | DAMAGE_NO_HIT_LOC, MOD_CONC_ALT as c_int);
+                        crate::g_combat::G_Damage(ctx, traceEnt, ent, ent, Some(&mut (*ctx.world).globals.forward), tr.endpos, damage, DAMAGE_NO_KNOCKBACK | DAMAGE_NO_HIT_LOC, MOD_CONC_ALT as c_int);
 
                         // do knockback and knockdown manually
                         if !(*traceEnt).client.is_null() {
                             // only if we hit a client
-                            let mut pushDir: vec3_t = forward;
+                            let mut pushDir: vec3_t = (*ctx.world).globals.forward;
                             if pushDir[2] < 0.2 {
                                 pushDir[2] = 0.2;
                             } // hmm, re-normalize?  nah...
@@ -3171,15 +3171,15 @@ pub fn WP_FireConcussionAlt(
 
         // now go along the trail and make sight events
         let mut dir: vec3_t = [0.0; 3];
-        crate::q_math::_VectorSubtract(tr.endpos, muzzle, &mut dir);
+        crate::q_math::_VectorSubtract(tr.endpos, (*ctx.world).globals.muzzle, &mut dir);
 
         // let's pack all this junk into a single tempent, and send it off.
         tent = crate::g_utils::G_TempEntity(ctx, tr.endpos, EV_CONC_ALT_IMPACT);
         (*tent).s.eventParm = crate::q_math::DirToByte(tr.plane.normal);
         (*tent).s.owner = (*ent).s.number;
         (*tent).s.angles = dir;
-        (*tent).s.origin2 = muzzle;
-        (*tent).s.angles2 = forward;
+        (*tent).s.origin2 = (*ctx.world).globals.muzzle;
+        (*tent).s.angles2 = (*ctx.world).globals.forward;
     }
 }
 
@@ -3194,10 +3194,10 @@ pub fn WP_FireConcussion(
         let damage: c_int = CONC_DAMAGE;
         let vel: f32 = CONC_VELOCITY as f32;
 
-        let mut start: vec3_t = muzzle;
+        let mut start: vec3_t = (*ctx.world).globals.muzzle;
         W_TraceSetStart(ctx, ent, start, [0.0; 3], [0.0; 3]); // make sure our start point isn't on the other side of a wall
 
-        let missile = crate::g_missile::CreateMissile(ctx, start, forward, vel, 10000, ent, qfalse);
+        let missile = crate::g_missile::CreateMissile(ctx, start, (*ctx.world).globals.forward, vel, 10000, ent, qfalse);
 
         (*missile).classname = c"conc_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = crate::shared::WP_CONCUSSION;
@@ -3242,12 +3242,12 @@ pub fn WP_FireStunBaton(
         }
 
         let mut tmp = muzzleStun;
-        crate::q_math::_VectorMA(tmp, 20.0, forward, &mut muzzleStun);
+        crate::q_math::_VectorMA(tmp, 20.0, (*ctx.world).globals.forward, &mut muzzleStun);
         tmp = muzzleStun;
-        crate::q_math::_VectorMA(tmp, 4.0, vright, &mut muzzleStun);
+        crate::q_math::_VectorMA(tmp, 4.0, (*ctx.world).globals.vright, &mut muzzleStun);
 
         let mut end: vec3_t = [0.0; 3];
-        crate::q_math::_VectorMA(muzzleStun, STUN_BATON_RANGE, forward, &mut end);
+        crate::q_math::_VectorMA(muzzleStun, STUN_BATON_RANGE, (*ctx.world).globals.forward, &mut end);
 
         let maxs: vec3_t = [6.0, 6.0, 6.0];
         let mut mins: vec3_t = [0.0; 3];
@@ -3283,7 +3283,7 @@ pub fn WP_FireStunBaton(
                 ctx, tr_ent, CHAN_WEAPON,
                 crate::g_utils::G_SoundIndex(cstr(&format!("sound/weapons/melee/punch{}", (*ctx.world).bg_state.rng.Q_irand(1, 4))).as_ptr()),
             );
-            crate::g_combat::G_Damage(tr_ent, ent, ent, forward, tr.endpos, STUN_BATON_DAMAGE, DAMAGE_NO_KNOCKBACK | DAMAGE_HALF_ABSORB, MOD_STUN_BATON as c_int);
+            crate::g_combat::G_Damage(ctx, tr_ent, ent, ent, Some(&mut (*ctx.world).globals.forward), tr.endpos, STUN_BATON_DAMAGE, DAMAGE_NO_KNOCKBACK | DAMAGE_HALF_ABSORB, MOD_STUN_BATON as c_int);
 
             if !(*tr_ent).client.is_null() {
                 // if it's a player then use the shock effect
@@ -3336,12 +3336,12 @@ pub fn WP_FireMelee(
         }
 
         let mut tmp = muzzlePunch;
-        crate::q_math::_VectorMA(tmp, 20.0, forward, &mut muzzlePunch);
+        crate::q_math::_VectorMA(tmp, 20.0, (*ctx.world).globals.forward, &mut muzzlePunch);
         tmp = muzzlePunch;
-        crate::q_math::_VectorMA(tmp, 4.0, vright, &mut muzzlePunch);
+        crate::q_math::_VectorMA(tmp, 4.0, (*ctx.world).globals.vright, &mut muzzlePunch);
 
         let mut end: vec3_t = [0.0; 3];
-        crate::q_math::_VectorMA(muzzlePunch, MELEE_RANGE, forward, &mut end);
+        crate::q_math::_VectorMA(muzzlePunch, MELEE_RANGE, (*ctx.world).globals.forward, &mut end);
 
         let maxs: vec3_t = [6.0, 6.0, 6.0];
         let mut mins: vec3_t = [0.0; 3];
@@ -3387,7 +3387,7 @@ pub fn WP_FireMelee(
                     dmg *= 2;
                 }
 
-                crate::g_combat::G_Damage(tr_ent, ent, ent, forward, tr.endpos, dmg, DAMAGE_NO_ARMOR, MOD_MELEE as c_int);
+                crate::g_combat::G_Damage(ctx, tr_ent, ent, ent, Some(&mut (*ctx.world).globals.forward), tr.endpos, dmg, DAMAGE_NO_ARMOR, MOD_MELEE as c_int);
             }
         }
     }

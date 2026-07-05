@@ -946,6 +946,19 @@ pub struct GameGlobals {
     // --- `g_weapon.c` file-scope globals ---
     /// `s_quadFactor`. Source: `oracle/oracle/codemp/game/g_weapon.c:12`
     pub s_quadFactor: f32,
+    /// `static vec3_t forward` — fire-time forward axis shared across
+    /// `WP_Fire*`/`CalcMuzzlePoint` (ruling 29).
+    /// Source: `oracle/oracle/codemp/game/g_weapon.c:13`
+    pub forward: vec3_t,
+    /// `static vec3_t vright` — fire-time right axis (ruling 29).
+    /// Source: `oracle/oracle/codemp/game/g_weapon.c:13`
+    pub vright: vec3_t,
+    /// `static vec3_t up` — fire-time up axis (ruling 29).
+    /// Source: `oracle/oracle/codemp/game/g_weapon.c:13`
+    pub up: vec3_t,
+    /// `static vec3_t muzzle` — fire-time muzzle point (ruling 29).
+    /// Source: `oracle/oracle/codemp/game/g_weapon.c:14`
+    pub muzzle: vec3_t,
     // --- `w_saber.c` file-scope globals ---
     /// `static vec3_t dmgDir[MAX_SABER_VICTIMS]` — per-victim saber damage
     /// direction.
