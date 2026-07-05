@@ -47,22 +47,12 @@ const SETANIM_FLAG_HOLD: c_int = 0x0200;
 const SETANIM_FLAG_RESTART: c_int = 0x0400;
 const SETANIM_FLAG_HOLDLESS: c_int = 0x0800;
 
-// Animation numbers (TODO: Port animNumber_t enum - these should come from mp_bg::public::anim_number)
-// For now, using placeholder values that match Raven's ordinals
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(i32)]
-enum AnimNum {
-    BOTH_DEATH1 = 0,
-    BOTH_VS_IDLE = 190,
-    BOTH_VS_MOUNT_L = 191,
-    BOTH_VS_MOUNT_R = 192,
-    BOTH_VS_MOUNTJUMP_L = 193,
-    BOTH_VS_MOUNTTHROW_R = 194,
-    BOTH_VS_MOUNTTHROW_L = 195,
-}
-
-type animNumber_t = AnimNum;
-use AnimNum::*;
+// `animNumber_t`/`BOTH_VS_IDLE`/… are the canonical `mp_bg::public::anim_number`
+// enum + variants, reached via the prelude glob. The former per-file
+// placeholder `AnimNum` enum (+ `use AnimNum::*;`) duplicated those variant
+// names, causing a glob-glob ambiguity with the canonical import at every
+// call site through `crate::prelude::*` (porting-rules §E dedupe-at-import
+// rule).
 
 // Orientation indices (already in prelude but redefining locally for clarity)
 const PITCH: usize = 0;
@@ -308,7 +298,7 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
             // PORT-NOTE(fork-7-vtable-access): pm->cmd.serverTime access requires bg-channel state;
             // electrify effect is guarded by pm access which needs threading
             // if parentPS->electrifyTime > pm->cmd.serverTime {
-            //     pVeh->m_vOrientation[YAW] += (sin(pm->cmd.serverTime/1000.0f)*3.0f)*pVeh->m_fTimeModifier;
+            //     pVeh->m_vOrientation[YAW] += (sin(pm->cmd.serverTime/1000.0f32)*3.0f32)*pVeh->m_fTimeModifier;
             // }
         }
 
@@ -360,7 +350,7 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
 
             // Set the delay time (40% of animation time)
             // PORT-NOTE(fork-7-bg-anim-table): BG_AnimLength requires bgAllAnims table access
-            // iAnimLen = BG_AnimLength(pVeh->m_pPilot->localAnimIndex, Anim) * 0.4f;
+            // iAnimLen = BG_AnimLength(pVeh->m_pPilot->localAnimIndex, Anim) * 0.4f32;
             // PORT-NOTE(fork-7-vtable-access): BG_GetTime() needs game-tier state or engine access
             // pVeh->m_iBoarding = BG_GetTime() + iAnimLen;
             iAnimLen = 100; // Placeholder

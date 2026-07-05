@@ -15,10 +15,12 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::g_utils::{G_SoundIndex, G_Sound, G_EffectIndex, G_AddEvent, G_Damage};
+use crate::g_utils::{G_SoundIndex, G_Sound, G_EffectIndex, G_AddEvent};
+use crate::g_combat::G_Damage;
 use crate::g_timer::{TIMER_Done, TIMER_Done2, TIMER_Set, TIMER_Exists, TIMER_Remove};
 use crate::q_math::{_VectorSubtract, _VectorMA, _VectorCopy, VectorLengthSquared, DistanceHorizontalSquared, AngleVectors};
-use crate::NPC_utils::{NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_FaceEnemy, NPC_MoveToGoal, NPC_UpdateAngles, UpdateGoal};
+use crate::NPC_utils::{NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_FaceEnemy, NPC_UpdateAngles, UpdateGoal};
+use crate::NPC_move::NPC_MoveToGoal;
 use crate::NPC_combat::G_SetEnemy;
 use crate::npc_c::NPC_SetAnim;
 use mp_bg::public::entity_event::entity_event_t;

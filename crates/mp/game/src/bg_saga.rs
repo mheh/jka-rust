@@ -786,7 +786,7 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
             return;
         }
 
-        traps.fs_read(class_info.as_mut_ptr(), len, f);
+        traps.fs_read(class_info.as_mut_ptr() as *mut c_void, len, f);
         traps.fs_fclose(f);
         class_info[len as usize] = 0;
 
@@ -919,7 +919,7 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader = 0;
             let title_length: usize = strlen(parse_buf.as_ptr());
             let mut found_class: bool = false;
-            for i in 0..SPC_MAX {
+            for i in 0..SPC_MAX as i16 {
                 let array_title_length: usize = strlen(classTitles[i as usize]);
                 if array_title_length > title_length {
                     break;
@@ -934,10 +934,10 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
             }
 
             if !found_class {
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY;
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY as i16;
             }
         } else {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY;
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY as i16;
         }
 
         if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"holdables".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
@@ -1121,7 +1121,7 @@ pub fn BG_SiegeFindClassByName(classname: *const c_char, bg: &BgState) -> *mut s
 
         while i < bg.bgNumSiegeClasses as isize {
             if Q_stricmp(bg.bgSiegeClasses[i as usize].name.as_ptr(), classname) == 0 {
-                return &mut bg.bgSiegeClasses[i as usize] as *mut siegeClass_t;
+                return &bg.bgSiegeClasses[i as usize] as *const siegeClass_t as *mut siegeClass_t;
             }
             i += 1;
         }
@@ -1149,7 +1149,7 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
             return;
         }
 
-        traps.fs_read(team_info.as_mut_ptr(), len, f);
+        traps.fs_read(team_info.as_mut_ptr() as *mut c_void, len, f);
         traps.fs_fclose(f);
         team_info[len as usize] = 0;
 
@@ -1181,7 +1181,7 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
                     BG_SiegeFindClassByName(parse_buf.as_ptr(), bg);
 
                 if bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses as usize].is_null() {
-                    panic!("Invalid class specified: '{}'", crate::q_shared::cstr_to_str(parse_buf.as_ptr()));
+                    panic!("Invalid class specified: '{}'", cstr_to_str(parse_buf.as_ptr()));
                 }
 
                 bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses += 1;
@@ -1312,7 +1312,7 @@ pub fn BG_SiegeCheckClassLegality(team: c_int, classname: *mut c_char, bg: &BgSt
         }
 
         while i < (**team_ptr).numClasses as isize {
-            if Q_stricmp(classname, (**team_ptr).classes[i as usize].as_ptr().cast()) == 0 {
+            if Q_stricmp(classname, (**team_ptr).classes[i as usize].cast()) == 0 {
                 return qtrue;
             }
             i += 1;
@@ -1332,10 +1332,10 @@ pub fn BG_SiegeFindTeamForTheme(themeName: *mut c_char, bg: &BgState) -> *mut si
         let mut i: isize = 0;
 
         while i < bg.bgNumSiegeTeams as isize {
-            if !bg.bgSiegeTeams[i as usize].name.is_null()
+            if bg.bgSiegeTeams[i as usize].name[0] != 0
                 && Q_stricmp(bg.bgSiegeTeams[i as usize].name.as_ptr(), themeName) == 0
             {
-                return &mut bg.bgSiegeTeams[i as usize] as *mut siegeTeam_t;
+                return &bg.bgSiegeTeams[i as usize] as *const siegeTeam_t as *mut siegeTeam_t;
             }
 
             i += 1;

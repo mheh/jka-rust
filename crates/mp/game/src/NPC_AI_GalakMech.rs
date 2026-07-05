@@ -240,7 +240,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*client).ps.electrifyTime = level_time + 1000;
             if crate::g_timer::TIMER_Done(ctx, self_, c"dyingExplosion".as_ptr()) != 0 {
                 let mut newBolt: c_int;
-                match crate::q_math::Q_irand(1, 14) {
+                match (*ctx.world).bg_state.rng.Q_irand(1, 14) {
                     // Find place to generate explosion
                     1 => {
                         if trap::G2API_GetSurfaceRenderStatus(
@@ -453,7 +453,7 @@ pub fn GM_Dying(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     ctx,
                     self_,
                     c"dyingExplosion".as_ptr(),
-                    crate::q_math::Q_irand(300, 1100),
+                    (*ctx.world).bg_state.rng.Q_irand(300, 1100),
                 );
             }
         } else {
@@ -513,9 +513,9 @@ pub fn NPC_GM_Pain(
                         ctx,
                         self_,
                         speech,
-                        crate::q_math::Q_irand(3000, 5000),
+                        (*ctx.world).bg_state.rng.Q_irand(3000, 5000),
                     );
-                    (*self_).delay = level_time + crate::q_math::Q_irand(5000, 7000);
+                    (*self_).delay = level_time + (*ctx.world).bg_state.rng.Q_irand(5000, 7000);
                 }
             } else {
                 crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
@@ -523,15 +523,15 @@ pub fn NPC_GM_Pain(
         } else if hitLoc == HL_GENERIC1 {
             crate::NPC_reactions::NPC_SetPainEvent(ctx, self_);
             // self->s.powerups |= ( 1 << PW_SHOCKED );
-            // self->client->ps.powerups[PW_SHOCKED] = level.time + Q_irand( 500, 2500 );
+            // self->client->ps.powerups[PW_SHOCKED] = level.time + (*ctx.world).bg_state.rng.Q_irand( 500, 2500 );
             (*(*self_).client.cast::<gclient_t>()).ps.electrifyTime =
-                level_time + crate::q_math::Q_irand(500, 2500);
+                level_time + (*ctx.world).bg_state.rng.Q_irand(500, 2500);
         }
 
         if !inflictor.is_null() && (*inflictor).lastEnemy == self_ {
             // He force-pushed my own lobfires back at me
             let npc = (*self_).NPC as *mut gNPC_t;
-            if r#mod == meansOfDeath_t::MOD_REPEATER_ALT as c_int && crate::q_math::Q_irand(0, 2) == 0 {
+            if r#mod == meansOfDeath_t::MOD_REPEATER_ALT as c_int && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                 if crate::g_timer::TIMER_Done(ctx, self_, c"noRapid".as_ptr()) != 0 {
                     if !npc.is_null() {
                         (*npc).scriptFlags &= !SCF_ALT_FIRE;
@@ -541,7 +541,7 @@ pub fn NPC_GM_Pain(
                         ctx,
                         self_,
                         c"noLob".as_ptr(),
-                        crate::q_math::Q_irand(2000, 6000),
+                        (*ctx.world).bg_state.rng.Q_irand(2000, 6000),
                     );
                 } else {
                     // hopefully this will make us fire the laser
@@ -549,10 +549,10 @@ pub fn NPC_GM_Pain(
                         ctx,
                         self_,
                         c"noLob".as_ptr(),
-                        crate::q_math::Q_irand(1000, 2000),
+                        (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
                     );
                 }
-            } else if r#mod == meansOfDeath_t::MOD_REPEATER as c_int && crate::q_math::Q_irand(0, 5) == 0 {
+            } else if r#mod == meansOfDeath_t::MOD_REPEATER as c_int && (*ctx.world).bg_state.rng.Q_irand(0, 5) == 0 {
                 if crate::g_timer::TIMER_Done(ctx, self_, c"noLob".as_ptr()) != 0 {
                     if !npc.is_null() {
                         (*npc).scriptFlags |= SCF_ALT_FIRE;
@@ -562,7 +562,7 @@ pub fn NPC_GM_Pain(
                         ctx,
                         self_,
                         c"noRapid".as_ptr(),
-                        crate::q_math::Q_irand(2000, 6000),
+                        (*ctx.world).bg_state.rng.Q_irand(2000, 6000),
                     );
                 } else {
                     // hopefully this will make us fire the laser
@@ -570,7 +570,7 @@ pub fn NPC_GM_Pain(
                         ctx,
                         self_,
                         c"noRapid".as_ptr(),
-                        crate::q_math::Q_irand(1000, 2000),
+                        (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
                     );
                 }
             }
@@ -717,7 +717,7 @@ pub fn GM_CheckMoveState(ctx: GameContext<'_>) {
                     ctx,
                     npc_ent,
                     c"attackDelay".as_ptr(),
-                    crate::q_math::Q_irand(250, 500), // FIXME: Slant for difficulty levels
+                    (*ctx.world).bg_state.rng.Q_irand(250, 500), // FIXME: Slant for difficulty levels
                 );
                 return;
             }

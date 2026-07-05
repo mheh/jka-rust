@@ -18,8 +18,8 @@ pub fn BG_AttachToRancor(
     modelList: *mut qhandle_t,
     modelScale: vec3_t,
     inMouth: qboolean,
-    out_origin: vec3_t,
-    out_angles: vec3_t,
+    mut out_origin: vec3_t,
+    mut out_angles: vec3_t,
     out_axis: *mut vec3_t,
     bg: &BgState,
     traps: &dyn BgTraps,
@@ -56,16 +56,14 @@ pub fn BG_AttachToRancor(
     // PORT-NOTE(vec3-outparam-fork9): out_origin/out_angles are by-value vec3_t in resolved
     // signature but C semantics require writing through pointers; treating as nullable pointers
     // (checking against zero/null for safety; addresses alignment concerns).
-    if out_origin as *const vec3_t as usize != 0 {
+    if &out_origin as *const vec3_t as usize != 0 {
         let mut local_origin: vec3_t = [0.0, 0.0, 0.0];
         BG_GiveMeVectorFromMatrix(
             &boltMatrix as *const mdxaBone_t,
             Eorientations::ORIGIN as c_int,
             &mut local_origin,
         );
-        unsafe {
-            *(out_origin as *mut vec3_t) = local_origin;
-        }
+        out_origin = local_origin;
     }
 
     if !out_axis.is_null() {
@@ -74,48 +72,46 @@ pub fn BG_AttachToRancor(
             BG_GiveMeVectorFromMatrix(
                 &boltMatrix as *const mdxaBone_t,
                 Eorientations::POSITIVE_Z as c_int,
-                unsafe { &mut (*out_axis)[0] },
+                unsafe { &mut *out_axis.add(0) },
             );
             BG_GiveMeVectorFromMatrix(
                 &boltMatrix as *const mdxaBone_t,
                 Eorientations::NEGATIVE_Y as c_int,
-                unsafe { &mut (*out_axis)[1] },
+                unsafe { &mut *out_axis.add(1) },
             );
             BG_GiveMeVectorFromMatrix(
                 &boltMatrix as *const mdxaBone_t,
                 Eorientations::NEGATIVE_X as c_int,
-                unsafe { &mut (*out_axis)[2] },
+                unsafe { &mut *out_axis.add(2) },
             );
         } else {
             // in hand
             BG_GiveMeVectorFromMatrix(
                 &boltMatrix as *const mdxaBone_t,
                 Eorientations::NEGATIVE_Y as c_int,
-                unsafe { &mut (*out_axis)[0] },
+                unsafe { &mut *out_axis.add(0) },
             );
             BG_GiveMeVectorFromMatrix(
                 &boltMatrix as *const mdxaBone_t,
                 Eorientations::POSITIVE_X as c_int,
-                unsafe { &mut (*out_axis)[1] },
+                unsafe { &mut *out_axis.add(1) },
             );
             BG_GiveMeVectorFromMatrix(
                 &boltMatrix as *const mdxaBone_t,
                 Eorientations::POSITIVE_Z as c_int,
-                unsafe { &mut (*out_axis)[2] },
+                unsafe { &mut *out_axis.add(2) },
             );
         }
 
         // FIXME: this is messing up our axis and turning us inside-out?
-        if out_angles as *const vec3_t as usize != 0 {
+        if &out_angles as *const vec3_t as usize != 0 {
             let mut local_angles: vec3_t = [0.0, 0.0, 0.0];
-            vectoangles(unsafe { (*out_axis)[0] }, &mut local_angles);
-            vectoangles(unsafe { (*out_axis)[2] }, &mut temp_angles);
+            vectoangles(unsafe { *out_axis.add(0) }, &mut local_angles);
+            vectoangles(unsafe { *out_axis.add(2) }, &mut temp_angles);
             local_angles[2] = -temp_angles[0]; // ROLL = -PITCH
-            unsafe {
-                *(out_angles as *mut vec3_t) = local_angles;
-            }
+            out_angles = local_angles;
         }
-    } else if out_angles as *const vec3_t as usize != 0 {
+    } else if &out_angles as *const vec3_t as usize != 0 {
         let mut temp_axis: [vec3_t; 3] = [[0.0, 0.0, 0.0]; 3];
         if inMouth != 0 {
             // in mouth
@@ -148,9 +144,7 @@ pub fn BG_AttachToRancor(
         vectoangles(temp_axis[0], &mut local_angles);
         vectoangles(temp_axis[2], &mut temp_angles);
         local_angles[2] = -temp_angles[0]; // ROLL = -PITCH
-        unsafe {
-            *(out_angles as *mut vec3_t) = local_angles;
-        }
+        out_angles = local_angles;
     }
 }
 

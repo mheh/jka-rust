@@ -264,11 +264,12 @@ impl PmoveContext<'_> {
                 startspot[2] += (*self.pm).mins[2] + 4.0;
                 _VectorCopy(startspot, &mut endspot);
                 endspot[2] -= 300.0;
+                let vec3_origin_local = crate::q_math::vec3_origin;
                 self.traps.trace(
                     &mut trace,
                     core::ptr::addr_of!((*(*self.pm).ps).origin) as *const vec3_t,
-                    core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
-                    core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
+                    core::ptr::addr_of!(vec3_origin_local) as *const vec3_t,
+                    core::ptr::addr_of!(vec3_origin_local) as *const vec3_t,
                     core::ptr::addr_of!(endspot) as *const vec3_t,
                     (*forwhom).s.number,
                     MASK_SOLID,
@@ -294,7 +295,7 @@ impl PmoveContext<'_> {
 
                 tempAngles[PITCH] = 0.0;
                 tempAngles[ROLL] = 0.0;
-                tempAngles[YAW] = (*pVeh).m_vOrientation[YAW];
+                tempAngles[YAW] = (*(*pVeh).m_vOrientation.add(YAW));
                 AngleVectors(tempAngles, Some(&mut ovf), Some(&mut ovr), None);
             } else {
                 AngleVectors((*(*self.pm).ps).viewangles, Some(&mut ovf), Some(&mut ovr), None);
@@ -420,7 +421,7 @@ impl PmoveContext<'_> {
                         speed = 60.0;
                     }
 
-                    _VectorCopy((*pVeh).m_vOrientation, &mut tempVAngles);
+                    _VectorCopy(*(*pVeh).m_vOrientation.cast::<vec3_t>(), &mut tempVAngles);
                     tempVAngles[ROLL] = 0.0;
                     AngleVectors(tempVAngles, None, Some(&mut rt), None);
                     let dp = velocity[0] * rt[0] + velocity[1] * rt[1] + velocity[2] * rt[2];
@@ -451,12 +452,12 @@ impl PmoveContext<'_> {
                     continue;
                 }
                 {
-                    if (*pVeh).m_vOrientation[i] >= vAngles[i] + vehicleBankingSpeed {
-                        (*pVeh).m_vOrientation[i] -= vehicleBankingSpeed;
-                    } else if (*pVeh).m_vOrientation[i] <= vAngles[i] - vehicleBankingSpeed {
-                        (*pVeh).m_vOrientation[i] += vehicleBankingSpeed;
+                    if (*(*pVeh).m_vOrientation.add(i)) >= vAngles[i] + vehicleBankingSpeed {
+                        (*(*pVeh).m_vOrientation.add(i)) -= vehicleBankingSpeed;
+                    } else if (*(*pVeh).m_vOrientation.add(i)) <= vAngles[i] - vehicleBankingSpeed {
+                        (*(*pVeh).m_vOrientation.add(i)) += vehicleBankingSpeed;
                     } else {
-                        (*pVeh).m_vOrientation[i] = vAngles[i];
+                        (*(*pVeh).m_vOrientation.add(i)) = vAngles[i];
                     }
                 }
             }
@@ -561,7 +562,7 @@ impl PmoveContext<'_> {
 
                             vAng[PITCH] = 0.0;
                             vAng[ROLL] = 0.0;
-                            vAng[YAW] = (*pVeh).m_vOrientation[YAW];
+                            vAng[YAW] = (*(*pVeh).m_vOrientation.add(YAW));
                             AngleVectors(
                                 vAng,
                                 Some(&mut fxAxis[2]),
@@ -647,7 +648,7 @@ impl PmoveContext<'_> {
                                     //splash
                                     vAng[PITCH] = 0.0;
                                     vAng[ROLL] = 0.0;
-                                    vAng[YAW] = (*pVeh).m_vOrientation[YAW];
+                                    vAng[YAW] = (*(*pVeh).m_vOrientation.add(YAW));
                                     AngleVectors(
                                         vAng,
                                         Some(&mut fxAxis[2]),
@@ -673,18 +674,18 @@ impl PmoveContext<'_> {
                 let n = self.pml.groundTrace.plane.normal;
                 self.PM_SetVehicleAngles(n);
                 // We're on the ground.
-                (*pVeh).m_ulFlags &= !VEH_FLYING;
+                (*pVeh).m_ulFlags &= !(VEH_FLYING as u64);
 
                 (*pVeh).m_vAngularVelocity = 0.0;
             } else {
                 // NULL call: flying-in-air; by-value normal cannot express NULL (fork-9).
                 self.PM_SetVehicleAngles(crate::q_math::vec3_origin);
                 // We're flying in the air.
-                (*pVeh).m_ulFlags |= VEH_FLYING;
+                (*pVeh).m_ulFlags |= VEH_FLYING as u64;
 
                 if (*pVeh).m_vAngularVelocity == 0.0 {
                     (*pVeh).m_vAngularVelocity =
-                        (*pVeh).m_vOrientation[YAW] - (*pVeh).m_vPrevOrientation[YAW];
+                        (*(*pVeh).m_vOrientation.add(YAW)) - (*pVeh).m_vPrevOrientation[YAW];
                     if (*pVeh).m_vAngularVelocity < -15.0 {
                         (*pVeh).m_vAngularVelocity = -15.0;
                     }
@@ -861,14 +862,14 @@ impl PmoveContext<'_> {
             if self.pm_flying != FLY_VEHICLE
                 && !pEnt.is_null()
                 && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int
-                && !(*pEnt).m_pVehicle.is_null()
-                && (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).r#type as c_int
+                && !((*pEnt).m_pVehicle as *mut Vehicle_t).is_null()
+                && (*(*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type as c_int
                     != vehicleType_t::VH_ANIMAL as c_int
-                && (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).r#type as c_int
+                && (*(*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type as c_int
                     != vehicleType_t::VH_WALKER as c_int
-                && (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).friction != 0.0
+                && (*(*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).friction != 0.0
             {
-                let friction = (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).friction;
+                let friction = (*(*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).friction;
                 if (*ps).pm_flags & PMF_TIME_KNOCKBACK == 0 {
                     let control = if speed < pm_stopspeed { pm_stopspeed } else { speed };
                     drop += control * friction * self.pml.frametime;
@@ -1361,7 +1362,7 @@ impl PmoveContext<'_> {
                     (*ucmd).angles[YAW] = ((((*ps).viewangles[YAW] * 65536.0 / 360.0) as c_int
                         & 65535)
                         - (*ps).delta_angles[YAW] as c_int)
-                        as i16;
+                        as c_int;
                     if doMove != qfalse {
                         //push me forward
                         let zVel = (*ps).velocity[2];
@@ -1469,8 +1470,8 @@ impl PmoveContext<'_> {
                         (*ps).clientNum,
                         MASK_PLAYERSOLID,
                     );
-                    if trace2.allsolid == qfalse
-                        && trace2.startsolid == qfalse
+                    if trace2.allsolid == 0
+                        && trace2.startsolid == 0
                         && trace2.fraction < 1.0
                         && trace2.plane.normal[2] > 0.7
                     {
@@ -1524,7 +1525,7 @@ impl PmoveContext<'_> {
                             as c_int
                             & 65535)
                             - (*ps).delta_angles[YAW] as c_int)
-                            as i16;
+                            as c_int;
                         if true
                         //aslkfhsakf
                         {
@@ -1686,7 +1687,7 @@ impl PmoveContext<'_> {
                     (*ucmd).angles[YAW] = ((((*ps).viewangles[YAW] * 65536.0 / 360.0) as c_int
                         & 65535)
                         - (*ps).delta_angles[YAW] as c_int)
-                        as i16;
+                        as c_int;
                     if true {
                         if doMove != qfalse {
                             //pull me toward the wall
@@ -1889,7 +1890,7 @@ impl PmoveContext<'_> {
 
             // #if METROID_JUMP (defined)
             if (*pm).waterlevel < 2 {
-                if (*ps).gravity > 0.0 {
+                if (*ps).gravity > 0 {
                     //can't do this in zero-G
                     if self.PM_ForceJumpingUp() != qfalse {
                         //holding jump in air
@@ -2064,7 +2065,7 @@ impl PmoveContext<'_> {
                 return qfalse;
             }
 
-            if (*ps).gravity <= 0.0 {
+            if (*ps).gravity <= 0 {
                 //in low grav, you push in the dir you're facing as long as there is something behind you to shove off of
                 let mut forward: vec3_t = [0.0; 3];
                 let mut back: vec3_t = [0.0; 3];
@@ -2240,7 +2241,7 @@ impl PmoveContext<'_> {
 
                         if doTrace == qfalse
                             || (trace.fraction < 1.0
-                                && (trace.entityNum < MAX_CLIENTS as c_int
+                                && ((trace.entityNum as c_int) < MAX_CLIENTS as c_int
                                     || (wallNormal[0] * idealNormal[0]
                                         + wallNormal[1] * idealNormal[1]
                                         + wallNormal[2] * idealNormal[2])
@@ -2286,7 +2287,7 @@ impl PmoveContext<'_> {
                                 if anim == BOTH_BUTTERFLY_LEFT as c_int {
                                     parts = SETANIM_BOTH;
                                     (*pm).cmd.buttons &= !BUTTON_ATTACK;
-                                    (*ps).saberMove = saberMoveName_t::LS_NONE as c_int;
+                                    (*ps).saberMove = LS_NONE as c_int;
                                 } else if (*ps).weaponTime == 0 {
                                     parts = SETANIM_BOTH;
                                 }
@@ -2502,10 +2503,10 @@ impl PmoveContext<'_> {
                                 );
                                 _VectorSubtract((*ps).origin, traceto, &mut idealNormal);
                                 VectorNormalize(&mut idealNormal);
-                                let traceEnt = self.PM_BGEntForNum(trace.entityNum);
+                                let traceEnt = self.PM_BGEntForNum(trace.entityNum as c_int);
 
                                 if trace.fraction < 1.0
-                                    && ((trace.entityNum < ENTITYNUM_WORLD
+                                    && (((trace.entityNum as c_int) < ENTITYNUM_WORLD
                                         && !traceEnt.is_null()
                                         && (*traceEnt).s.solid != SOLID_BMODEL)
                                         || (trace.plane.normal[0] * idealNormal[0]
@@ -2602,10 +2603,10 @@ impl PmoveContext<'_> {
                                 );
                                 _VectorSubtract((*ps).origin, traceto, &mut idealNormal);
                                 VectorNormalize(&mut idealNormal);
-                                let traceEnt = self.PM_BGEntForNum(trace.entityNum);
+                                let traceEnt = self.PM_BGEntForNum(trace.entityNum as c_int);
                                 if trace.fraction < 1.0
                                     && Q_fabs(trace.plane.normal[2]) <= 0.2
-                                    && ((trace.entityNum < ENTITYNUM_WORLD
+                                    && (((trace.entityNum as c_int) < ENTITYNUM_WORLD
                                         && !traceEnt.is_null()
                                         && (*traceEnt).s.solid != SOLID_BMODEL)
                                         || (trace.plane.normal[0] * idealNormal[0]
@@ -2652,7 +2653,7 @@ impl PmoveContext<'_> {
             self.PM_AddEvent(EV_JUMP as c_int);
 
             //Set the animations
-            if (*ps).gravity > 0.0 && BG_InSpecialJump((*ps).legsAnim) == qfalse {
+            if (*ps).gravity > 0 && BG_InSpecialJump((*ps).legsAnim) == qfalse {
                 self.PM_JumpForDir();
             }
 
@@ -2721,7 +2722,7 @@ impl PmoveContext<'_> {
             self.PM_StepSlideMove(qtrue);
 
             let ps = (*self.pm).ps;
-            (*ps).velocity[2] -= (*ps).gravity * self.pml.frametime;
+            (*ps).velocity[2] -= (*ps).gravity as f32 * self.pml.frametime;
             if (*ps).velocity[2] < 0.0 {
                 // cancel as soon as we are falling down again
                 (*ps).pm_flags &= !PMF_ALL_TIMES;
@@ -2805,7 +2806,7 @@ impl PmoveContext<'_> {
             let smove = 0.0f32;
 
             // normal slowdown
-            if (*ps).gravity != 0.0
+            if (*ps).gravity != 0
                 && (*ps).velocity[2] < 0.0
                 && (*ps).groundEntityNum == ENTITYNUM_NONE
             {
@@ -3160,7 +3161,7 @@ impl PmoveContext<'_> {
             if self.pml.groundTrace.surfaceFlags & SURF_SLICK != 0
                 || (*ps).pm_flags & PMF_TIME_KNOCKBACK != 0
             {
-                (*ps).velocity[2] -= (*ps).gravity * self.pml.frametime;
+                (*ps).velocity[2] -= (*ps).gravity as f32 * self.pml.frametime;
             }
 
             let vel = VectorLength((*ps).velocity);
@@ -3376,7 +3377,7 @@ impl PmoveContext<'_> {
                     CONTENTS_SOLID,
                 );
                 if trace.fraction >= 1.0 {
-                    (*ps).saberMove = saberMoveName_t::LS_NONE as c_int;
+                    (*ps).saberMove = LS_NONE as c_int;
                     return anim;
                 }
             }
@@ -3442,7 +3443,7 @@ impl PmoveContext<'_> {
             // calculate the exact velocity on landing
             let dist = (*ps).origin[2] - self.pml.previous_origin[2];
             let vel = self.pml.previous_velocity[2];
-            let acc = -(*ps).gravity;
+            let acc = -(*ps).gravity as f32;
 
             let a = acc / 2.0;
             let b = vel;
@@ -3729,7 +3730,7 @@ impl PmoveContext<'_> {
                             (*ps).clientNum,
                             (*pm).tracemask,
                         );
-                        if (*trace).allsolid == qfalse {
+                        if (*trace).allsolid == 0 {
                             point[0] = (*ps).origin[0];
                             point[1] = (*ps).origin[1];
                             point[2] = (*ps).origin[2] - 0.25;
@@ -3892,7 +3893,7 @@ impl PmoveContext<'_> {
             self.pml.groundTrace = trace;
 
             // do something corrective if the trace starts in a solid...
-            if trace.allsolid != qfalse {
+            if trace.allsolid != 0 {
                 if self.PM_CorrectAllSolid(&mut trace) == qfalse {
                     return;
                 }
@@ -3973,18 +3974,18 @@ impl PmoveContext<'_> {
                 // QAGAME: check if we landed on a vehicle
                 if (*ps).clientNum < MAX_CLIENTS as c_int
                     && (*ps).m_iVehicleNum == 0
-                    && trace.entityNum < ENTITYNUM_WORLD
-                    && trace.entityNum >= MAX_CLIENTS as c_int
+                    && (trace.entityNum as c_int) < ENTITYNUM_WORLD
+                    && (trace.entityNum as c_int) >= MAX_CLIENTS as c_int
                     && (*ps).zoomMode == 0
                     && !self.pm_entSelf.is_null()
                 {
-                    let trEnt = self.PM_BGEntForNum(trace.entityNum) as *mut gentity_t;
+                    let trEnt = self.PM_BGEntForNum(trace.entityNum as c_int) as *mut gentity_t;
                     let veh = (*trEnt).m_pVehicle as *mut Vehicle_t;
                     if (*trEnt).inuse != 0
                         && !(*trEnt).client.is_null()
                         && (*trEnt).s.eType == entityType_t::ET_NPC as c_int
                         && (*trEnt).s.NPC_class == CLASS_VEHICLE as c_int
-                        && (*(*trEnt).client).ps.m_iVehicleNum == 0
+                        && (*((*trEnt).client as *mut gclient_t)).ps.m_iVehicleNum == 0
                         && !veh.is_null()
                         && (*(*veh).m_pVehicleInfo).r#type as c_int
                             != vehicleType_t::VH_WALKER as c_int
@@ -4002,7 +4003,7 @@ impl PmoveContext<'_> {
                             if (*pm).gametype < GT_TEAM as c_int
                                 || (*trEnt).alliedTeam as c_int == 0
                                 || (*trEnt).alliedTeam as c_int
-                                    == (*(*servEnt).client).sess.sessionTeam as c_int
+                                    == (*((*servEnt).client as *mut gclient_t)).sess.sessionTeam as c_int
                             {
                                 //not belonging to a team, or client is on same team
                                 // Fork-7: the vehicle `Board` body is game-tier;
@@ -4010,7 +4011,7 @@ impl PmoveContext<'_> {
                                 // entity number), which dispatches through
                                 // `crate::veh_dispatch::board`.
                                 self.callbacks
-                                    .board_vehicle(trace.entityNum, (*self.pm_entSelf).s.number);
+                                    .board_vehicle(trace.entityNum as c_int, (*self.pm_entSelf).s.number);
                             }
                         }
                     }
@@ -4024,10 +4025,10 @@ impl PmoveContext<'_> {
                 }
             }
 
-            (*ps).groundEntityNum = trace.entityNum;
+            (*ps).groundEntityNum = trace.entityNum as c_int;
             (*ps).lastOnGround = (*pm).cmd.serverTime;
 
-            self.PM_AddTouchEnt(trace.entityNum);
+            self.PM_AddTouchEnt(trace.entityNum as c_int);
         }
     }
 }
@@ -4092,7 +4093,7 @@ impl PmoveContext<'_> {
                     (*ps).clientNum,
                     (*pm).tracemask,
                 );
-                if trace.allsolid == qfalse && trace.startsolid == qfalse {
+                if trace.allsolid == 0 && trace.startsolid == 0 {
                     //should never start in solid
                     if trace.fraction >= 1.0 {
                         //all clear: drop the bottom of my bbox back down
@@ -4111,7 +4112,7 @@ impl PmoveContext<'_> {
                             (*ps).clientNum,
                             (*pm).tracemask,
                         );
-                        if trace.allsolid == qfalse && trace.startsolid == qfalse {
+                        if trace.allsolid == 0 && trace.startsolid == 0 {
                             if trace.fraction >= 1.0 {
                                 //all clear: move me up
                                 (*ps).origin[2] += updist;
@@ -4186,8 +4187,8 @@ impl PmoveContext<'_> {
                         (*ps).m_iVehicleNum,
                         (*pm).tracemask,
                     );
-                    if solidTr.startsolid != qfalse
-                        || solidTr.allsolid != qfalse
+                    if solidTr.startsolid != 0
+                        || solidTr.allsolid != 0
                         || solidTr.fraction != 1.0
                     {
                         //whoops, can't fit here. Down to 0!
@@ -4196,7 +4197,7 @@ impl PmoveContext<'_> {
                         // QAGAME solidHack
                         let me = self.PM_BGEntForNum((*ps).clientNum) as *mut gentity_t;
                         if (*me).inuse != 0 && !(*me).client.is_null() {
-                            (*(*me).client).solidHack = self.callbacks.get_time() + 200;
+                            (*((*me).client as *mut gclient_t)).solidHack = self.callbacks.get_time() + 200;
                         }
                     }
                 }
@@ -4245,7 +4246,7 @@ impl PmoveContext<'_> {
                         (*ps).clientNum,
                         (*pm).tracemask,
                     );
-                    if trace.allsolid == qfalse {
+                    if trace.allsolid == 0 {
                         (*ps).pm_flags &= !PMF_ROLLING;
                     }
                 } else if (*pm).cmd.upmove < 0
@@ -4269,7 +4270,7 @@ impl PmoveContext<'_> {
                             (*ps).clientNum,
                             (*pm).tracemask,
                         );
-                        if trace.allsolid == qfalse {
+                        if trace.allsolid == 0 {
                             (*ps).pm_flags &= !PMF_DUCKED;
                         }
                     }
@@ -4879,7 +4880,7 @@ impl PmoveContext<'_> {
                 + (*ps).velocity[1] * (*ps).velocity[1])
                 .sqrt();
 
-            if (*ps).saberMove == saberMoveName_t::LS_SPINATTACK as c_int {
+            if (*ps).saberMove == LS_SPINATTACK as c_int {
                 self.PM_ContinueLegsAnim((*ps).torsoAnim);
             } else if (*ps).groundEntityNum == ENTITYNUM_NONE {
                 // airborne leaves position in cycle intact, but doesn't advance
@@ -4957,7 +4958,7 @@ impl PmoveContext<'_> {
             let _ = footstep;
             footstep = qfalse;
 
-            if (*ps).saberMove == saberMoveName_t::LS_SPINATTACK as c_int {
+            if (*ps).saberMove == LS_SPINATTACK as c_int {
                 bobmove = 0.2;
                 self.PM_ContinueLegsAnim((*ps).torsoAnim);
             } else if (*ps).pm_flags & PMF_DUCKED != 0 {
@@ -5237,11 +5238,12 @@ impl PmoveContext<'_> {
                 start[2] += 10.0;
                 end[2] -= 40.0;
 
+                let vec3_origin_local = crate::q_math::vec3_origin;
                 self.traps.trace(
                     &mut tr,
                     core::ptr::addr_of!(start) as *const vec3_t,
-                    core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
-                    core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
+                    core::ptr::addr_of!(vec3_origin_local) as *const vec3_t,
+                    core::ptr::addr_of!(vec3_origin_local) as *const vec3_t,
                     core::ptr::addr_of!(end) as *const vec3_t,
                     (*ps).clientNum,
                     MASK_WATER,
@@ -5342,7 +5344,7 @@ impl PmoveContext<'_> {
             }
 
             if weapon == WP_SABER as c_int {
-                self.PM_SetSaberMove(saberMoveName_t::LS_DRAW as c_short);
+                self.PM_SetSaberMove(LS_DRAW as c_short);
             } else {
                 self.PM_SetAnim(SETANIM_TORSO, TORSO_RAISEWEAP1 as c_int, SETANIM_FLAG_OVERRIDE, 0);
             }
@@ -5396,18 +5398,19 @@ pub fn BG_VehTraceFromCamPos(
         );
 
         // QAGAME
+        let vec3_origin_local = crate::q_math::vec3_origin;
         traps.trace(
             camTrace,
             core::ptr::addr_of!(camPos) as *const vec3_t,
-            core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
-            core::ptr::addr_of!(crate::q_math::vec3_origin) as *const vec3_t,
+            core::ptr::addr_of!(vec3_origin_local) as *const vec3_t,
+            core::ptr::addr_of!(vec3_origin_local) as *const vec3_t,
             core::ptr::addr_of!(extraEnd) as *const vec3_t,
             (*bgEnt).s.number,
             CONTENTS_SOLID | CONTENTS_BODY,
         );
 
-        if (*camTrace).allsolid == qfalse
-            && (*camTrace).startsolid == qfalse
+        if (*camTrace).allsolid == 0
+            && (*camTrace).startsolid == 0
             && (*camTrace).fraction < 1.0
             && ((*camTrace).fraction * crate::g_weapon::MAX_XHAIR_DIST_ACCURACY) > minAutoAimDist
             && (((*camTrace).fraction * crate::g_weapon::MAX_XHAIR_DIST_ACCURACY)
@@ -5418,7 +5421,7 @@ pub fn BG_VehTraceFromCamPos(
             _VectorCopy((*camTrace).endpos, newEnd);
             _VectorSubtract(*newEnd, shotStart, shotDir);
             VectorNormalize(shotDir);
-            return (*camTrace).entityNum + 1;
+            return (*camTrace).entityNum as c_int + 1;
         }
         0
     }
@@ -5511,10 +5514,10 @@ impl PmoveContext<'_> {
             }
 
             if tr.fraction != 1.0
-                && tr.entityNum < ENTITYNUM_NONE
-                && tr.entityNum != (*ps).clientNum
+                && (tr.entityNum as c_int) < ENTITYNUM_NONE
+                && tr.entityNum as c_int != (*ps).clientNum
             {
-                let bgEnt = self.PM_BGEntForNum(tr.entityNum);
+                let bgEnt = self.PM_BGEntForNum(tr.entityNum as c_int);
                 if !bgEnt.is_null() && (*bgEnt).s.powerups & (1 << PW_CLOAKED) != 0 {
                     (*ps).rocketLockIndex = ENTITYNUM_NONE;
                     (*ps).rocketLockTime = 0.0;
@@ -5523,20 +5526,20 @@ impl PmoveContext<'_> {
                         || (*bgEnt).s.eType == entityType_t::ET_NPC as c_int)
                 {
                     if (*ps).rocketLockIndex == ENTITYNUM_NONE {
-                        (*ps).rocketLockIndex = tr.entityNum;
+                        (*ps).rocketLockIndex = tr.entityNum as c_int;
                         (*ps).rocketLockTime = (*pm).cmd.serverTime as f32;
-                    } else if (*ps).rocketLockIndex != tr.entityNum
+                    } else if (*ps).rocketLockIndex != tr.entityNum as c_int
                         && (*ps).rocketTargetTime < (*pm).cmd.serverTime as f32
                     {
-                        (*ps).rocketLockIndex = tr.entityNum;
+                        (*ps).rocketLockIndex = tr.entityNum as c_int;
                         (*ps).rocketLockTime = (*pm).cmd.serverTime as f32;
-                    } else if (*ps).rocketLockIndex == tr.entityNum {
+                    } else if (*ps).rocketLockIndex == tr.entityNum as c_int {
                         if (*ps).rocketLockTime == -1.0 {
                             (*ps).rocketLockTime = (*ps).rocketLastValidTime;
                         }
                     }
 
-                    if (*ps).rocketLockIndex == tr.entityNum {
+                    if (*ps).rocketLockIndex == tr.entityNum as c_int {
                         (*ps).rocketTargetTime = ((*pm).cmd.serverTime + 500) as f32;
                     }
                 } else if vehicleLock == qfalse {
@@ -5572,7 +5575,7 @@ impl PmoveContext<'_> {
             if vehicleRocketLock != qfalse {
                 if (*pm).cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK) != 0 {
                     //actually charging
-                    if !veh.is_null() && !(*veh).m_pVehicle.is_null() {
+                    if !veh.is_null() && !((*veh).m_pVehicle as *mut Vehicle_t).is_null() {
                         let pv = (*veh).m_pVehicle as *mut Vehicle_t;
                         let info = (*pv).m_pVehicleInfo;
                         let id0 = (*info).weapon[0].ID as usize;
@@ -5595,25 +5598,25 @@ impl PmoveContext<'_> {
                 }
             } else {
                 let w = (*ps).weapon;
-                if w == weapon_t::WP_BRYAR_PISTOL as c_int {
+                if w == WP_BRYAR_PISTOL as c_int {
                     if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
                         charging = qtrue;
                         altFire = qtrue;
                     }
-                } else if w == weapon_t::WP_CONCUSSION as c_int {
+                } else if w == WP_CONCUSSION as c_int {
                     if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
                         altFire = qtrue;
                     }
-                } else if w == weapon_t::WP_BRYAR_OLD as c_int {
+                } else if w == WP_BRYAR_OLD as c_int {
                     if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
                         charging = qtrue;
                         altFire = qtrue;
                     }
-                } else if w == weapon_t::WP_BOWCASTER as c_int {
+                } else if w == WP_BOWCASTER as c_int {
                     if (*pm).cmd.buttons & BUTTON_ATTACK != 0 {
                         charging = qtrue;
                     }
-                } else if w == weapon_t::WP_ROCKET_LAUNCHER as c_int {
+                } else if w == WP_ROCKET_LAUNCHER as c_int {
                     if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
                         && (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize]
                             >= weaponData[(*ps).weapon as usize].altEnergyPerShot
@@ -5622,19 +5625,19 @@ impl PmoveContext<'_> {
                         charging = qtrue;
                         altFire = qtrue;
                     }
-                } else if w == weapon_t::WP_THERMAL as c_int {
+                } else if w == WP_THERMAL as c_int {
                     if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
                         altFire = qtrue;
                         charging = qtrue;
                     } else if (*pm).cmd.buttons & BUTTON_ATTACK != 0 {
                         charging = qtrue;
                     }
-                } else if w == weapon_t::WP_DEMP2 as c_int {
+                } else if w == WP_DEMP2 as c_int {
                     if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
                         altFire = qtrue;
                         charging = qtrue;
                     }
-                } else if w == weapon_t::WP_DISRUPTOR as c_int {
+                } else if w == WP_DISRUPTOR as c_int {
                     if (*pm).cmd.buttons & BUTTON_ATTACK != 0
                         && (*ps).zoomMode == 1
                         && (*ps).zoomLocked != qfalse
@@ -5765,7 +5768,6 @@ impl PmoveContext<'_> {
     /// Raven `PM_ItemUsable`.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6239-6366`
     pub fn PM_ItemUsable(&mut self, ps: *mut playerState_t, forcedUse: c_int) -> c_int {
-        use holdable_t::*;
         unsafe {
             let mut fwd: vec3_t = [0.0; 3];
             let mut fwdorg: vec3_t = [0.0; 3];
@@ -5852,9 +5854,9 @@ impl PmoveContext<'_> {
                     MASK_PLAYERSOLID,
                 );
 
-                if (tr.fraction != 1.0 && tr.entityNum != (*ps).clientNum)
-                    || tr.startsolid != qfalse
-                    || tr.allsolid != qfalse
+                if (tr.fraction != 1.0 && tr.entityNum as c_int != (*ps).clientNum)
+                    || tr.startsolid != 0
+                    || tr.allsolid != 0
                 {
                     self.PM_AddEventWithParm(EV_ITEMUSEFAIL as c_int, SENTRY_NOROOM);
                     return 0;
@@ -5881,7 +5883,7 @@ impl PmoveContext<'_> {
                     (*ps).clientNum,
                     MASK_SHOT,
                 );
-                if tr.fraction > 0.9 && tr.startsolid == qfalse && tr.allsolid == qfalse {
+                if tr.fraction > 0.9 && tr.startsolid == 0 && tr.allsolid == 0 {
                     _VectorCopy(tr.endpos, &mut pos);
                     VectorSet(&mut dest, pos[0], pos[1], pos[2] - 4096.0);
                     self.traps.trace(
@@ -5893,7 +5895,7 @@ impl PmoveContext<'_> {
                         (*ps).clientNum,
                         MASK_SOLID,
                     );
-                    if tr.startsolid == qfalse && tr.allsolid == qfalse {
+                    if tr.startsolid == 0 && tr.allsolid == 0 {
                         return 1;
                     }
                 }
@@ -5941,7 +5943,7 @@ impl PmoveContext<'_> {
             let mut iBlend = 0;
             let mut Anim = -1;
 
-            if veh.is_null() || (*veh).m_pVehicle.is_null() {
+            if veh.is_null() || ((*veh).m_pVehicle as *mut Vehicle_t).is_null() {
                 return;
             }
             let pVeh = (*veh).m_pVehicle as *mut Vehicle_t;
@@ -5975,7 +5977,7 @@ impl PmoveContext<'_> {
                             self.PM_AddEvent(EV_SABER_ATTACK as c_int);
                         }
 
-                        (*ps).saberMove = saberMoveName_t::LS_R_TL2BR as c_int;
+                        (*ps).saberMove = LS_R_TL2BR as c_int;
 
                         if (*ps).torsoTimer > 0
                             && ((*ps).torsoAnim == BOTH_VS_ATR_S as c_int
@@ -6116,7 +6118,6 @@ impl PmoveContext<'_> {
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:6641-7672`
     pub fn PM_Weapon(&mut self) {
         use animNumber_t::*;
-        use holdable_t::*;
         unsafe {
             let pm = self.pm;
             let ps = (*pm).ps;
@@ -6157,7 +6158,7 @@ impl PmoveContext<'_> {
                 }
 
                 if weap != -1 {
-                    (*pm).cmd.weapon = weap as i8;
+                    (*pm).cmd.weapon = weap as u8;
                     (*ps).weapon = weap;
                     return;
                 }
@@ -6168,10 +6169,10 @@ impl PmoveContext<'_> {
                 veh = self.pm_entVeh;
                 if !veh.is_null() && {
                     let pv = (*veh).m_pVehicle as *mut Vehicle_t;
-                    (!(*veh).m_pVehicle.is_null()
+                    (!((*veh).m_pVehicle as *mut Vehicle_t).is_null()
                         && (*(*pv).m_pVehicleInfo).r#type as c_int
                             == vehicleType_t::VH_WALKER as c_int)
-                        || (!(*veh).m_pVehicle.is_null()
+                        || (!((*veh).m_pVehicle as *mut Vehicle_t).is_null()
                             && (*(*pv).m_pVehicleInfo).r#type as c_int
                                 == vehicleType_t::VH_FIGHTER as c_int)
                 } {
@@ -6381,7 +6382,7 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).duelInProgress != 0 {
-                (*pm).cmd.weapon = WP_SABER as i8;
+                (*pm).cmd.weapon = WP_SABER as u8;
                 (*ps).weapon = WP_SABER as c_int;
 
                 if (*ps).duelTime >= (*pm).cmd.serverTime {
@@ -6392,10 +6393,10 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).weapon == WP_SABER as c_int
-                && (*ps).saberMove != saberMoveName_t::LS_READY as c_int
-                && (*ps).saberMove != saberMoveName_t::LS_NONE as c_int
+                && (*ps).saberMove != LS_READY as c_int
+                && (*ps).saberMove != LS_NONE as c_int
             {
-                (*pm).cmd.weapon = WP_SABER as i8; //don't allow switching out mid-attack
+                (*pm).cmd.weapon = WP_SABER as u8; //don't allow switching out mid-attack
             }
 
             if (*ps).weapon == WP_SABER as c_int {
@@ -6521,12 +6522,12 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).weapon == WP_EMPLACED_GUN as c_int && (*ps).emplacedIndex != 0 {
-                (*pm).cmd.weapon = WP_EMPLACED_GUN as i8;
+                (*pm).cmd.weapon = WP_EMPLACED_GUN as u8;
                 self.PM_StartTorsoAnim(BOTH_GUNSIT1 as c_int);
             }
 
             if (*ps).isJediMaster != 0 || (*ps).duelInProgress != 0 || (*ps).trueJedi != 0 {
-                (*pm).cmd.weapon = WP_SABER as i8;
+                (*pm).cmd.weapon = WP_SABER as u8;
                 (*ps).weapon = WP_SABER as c_int;
 
                 if (*ps).isJediMaster != 0 || (*ps).trueJedi != 0 {
@@ -6692,7 +6693,7 @@ impl PmoveContext<'_> {
                 //we are a vehicle
                 veh = self.pm_entSelf;
             }
-            if !veh.is_null() && !(*veh).m_pVehicle.is_null() {
+            if !veh.is_null() && !((*veh).m_pVehicle as *mut Vehicle_t).is_null() {
                 let pv = (*veh).m_pVehicle as *mut Vehicle_t;
                 let id0 = (*(*pv).m_pVehicleInfo).weapon[0].ID as usize;
                 let id1 = (*(*pv).m_pVehicleInfo).weapon[1].ID as usize;
@@ -6789,8 +6790,8 @@ impl PmoveContext<'_> {
                             && BG_KickingAnim((*ps).legsAnim) == qfalse
                         {
                             let mut kickMove = self.PM_KickMoveForConditions();
-                            if kickMove == saberMoveName_t::LS_HILT_BASH as c_int {
-                                kickMove = saberMoveName_t::LS_KICK_F as c_int;
+                            if kickMove == LS_HILT_BASH as c_int {
+                                kickMove = LS_KICK_F as c_int;
                             }
 
                             if kickMove != -1 {
@@ -6802,14 +6803,14 @@ impl PmoveContext<'_> {
                                         && gDist > 64.0
                                         && gDist > (-(*ps).velocity[2]) - 64.0
                                     {
-                                        if kickMove == saberMoveName_t::LS_KICK_F as c_int {
-                                            kickMove = saberMoveName_t::LS_KICK_F_AIR as c_int;
-                                        } else if kickMove == saberMoveName_t::LS_KICK_B as c_int {
-                                            kickMove = saberMoveName_t::LS_KICK_B_AIR as c_int;
-                                        } else if kickMove == saberMoveName_t::LS_KICK_R as c_int {
-                                            kickMove = saberMoveName_t::LS_KICK_R_AIR as c_int;
-                                        } else if kickMove == saberMoveName_t::LS_KICK_L as c_int {
-                                            kickMove = saberMoveName_t::LS_KICK_L_AIR as c_int;
+                                        if kickMove == LS_KICK_F as c_int {
+                                            kickMove = LS_KICK_F_AIR as c_int;
+                                        } else if kickMove == LS_KICK_B as c_int {
+                                            kickMove = LS_KICK_B_AIR as c_int;
+                                        } else if kickMove == LS_KICK_R as c_int {
+                                            kickMove = LS_KICK_R_AIR as c_int;
+                                        } else if kickMove == LS_KICK_L as c_int {
+                                            kickMove = LS_KICK_L_AIR as c_int;
                                         } else {
                                             kickMove = -1;
                                         }
@@ -7219,9 +7220,10 @@ pub fn BG_CmdForRoll(
     ps: *mut playerState_t,
     anim: c_int,
     pCmd: *mut usercmd_t,
+    bg: &crate::bg_channel::BgState,
 ) {
     use animNumber_t::*;
-    use crate::bg_panimate::PM_AnimLength;
+    use crate::bg_panimate::BG_AnimLength;
     unsafe {
         if anim == BOTH_ROLL_F as c_int {
             (*pCmd).forwardmove = 127;
@@ -7264,7 +7266,7 @@ pub fn BG_CmdForRoll(
                 //end of anim
                 (*pCmd).forwardmove = 0;
                 (*pCmd).rightmove = 0;
-            } else if PM_AnimLength(0, (*ps).legsAnim) - (*ps).torsoTimer < 350 {
+            } else if BG_AnimLength(bg, 0, (*ps).legsAnim) - (*ps).torsoTimer < 350 {
                 //beginning of anim
                 (*pCmd).forwardmove = 0;
                 (*pCmd).rightmove = 0;
@@ -7276,7 +7278,7 @@ pub fn BG_CmdForRoll(
             if (*ps).torsoTimer <= 100 {
                 (*pCmd).forwardmove = 0;
                 (*pCmd).rightmove = 0;
-            } else if PM_AnimLength(0, (*ps).legsAnim) - (*ps).torsoTimer < 200 {
+            } else if BG_AnimLength(bg, 0, (*ps).legsAnim) - (*ps).torsoTimer < 200 {
                 (*pCmd).forwardmove = 0;
                 (*pCmd).rightmove = 0;
             } else {
@@ -7287,7 +7289,7 @@ pub fn BG_CmdForRoll(
             if (*ps).torsoTimer <= 550 {
                 (*pCmd).forwardmove = 0;
                 (*pCmd).rightmove = 0;
-            } else if PM_AnimLength(0, (*ps).legsAnim) - (*ps).torsoTimer < 150 {
+            } else if BG_AnimLength(bg, 0, (*ps).legsAnim) - (*ps).torsoTimer < 150 {
                 (*pCmd).forwardmove = 0;
                 (*pCmd).rightmove = 0;
             } else {
@@ -8946,19 +8948,20 @@ pub fn PM_VehicleViewAngles(
     ps: *mut playerState_t,
     veh: *mut bgEntity_t,
     ucmd: *mut usercmd_t,
+    bg: &BgState,
 ) {
     unsafe {
-        let pVeh: *mut Vehicle_t = (*veh).m_pVehicle;
+        let pVeh: *mut Vehicle_t = ((*veh).m_pVehicle as *mut Vehicle_t);
         let mut setAngles: qboolean = qtrue;
         let mut clampMin: vec3_t = [0.0; 3];
         let mut clampMax: vec3_t = [0.0; 3];
 
-        if !(*(*veh).m_pVehicle).m_pPilot.is_null()
-            && (*(*(*veh).m_pVehicle).m_pPilot).s.number == (*ps).clientNum
+        if !(*((*veh).m_pVehicle as *mut Vehicle_t)).m_pPilot.is_null()
+            && (*(*((*veh).m_pVehicle as *mut Vehicle_t)).m_pPilot).s.number == (*ps).clientNum
         {
             // set the pilot's viewangles to the vehicle's viewangles, but only if
             // not doing special free-roll/pitch control
-            if BG_UnrestrainedPitchRoll(ps, (*veh).m_pVehicle) == qfalse {
+            if BG_UnrestrainedPitchRoll(ps, ((*veh).m_pVehicle as *mut Vehicle_t), bg) == qfalse {
                 setAngles = qtrue;
                 clampMin[PITCH as usize] = -(*(*pVeh).m_pVehicleInfo).lookPitch;
                 clampMax[PITCH as usize] = (*(*pVeh).m_pVehicleInfo).lookPitch;
@@ -8970,7 +8973,7 @@ pub fn PM_VehicleViewAngles(
         } else {
             // passengers can look around freely, UNLESS they're controlling a turret!
             for i in 0..MAX_VEHICLE_TURRETS {
-                if (*(*(*veh).m_pVehicle).m_pVehicleInfo).turret[i as usize].passengerNum
+                if (*(*((*veh).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).turret[i as usize].passengerNum
                     == (*ps).generic1
                 {
                     // this turret is my station — don't clamp
@@ -9053,7 +9056,7 @@ impl PmoveContext<'_> {
             let mut yawD: f32;
             let mut dir: vec3_t = [0.0; 3];
 
-            if veh.is_null() || (*veh).m_pVehicle.is_null() {
+            if veh.is_null() || ((*veh).m_pVehicle as *mut Vehicle_t).is_null() {
                 return;
             }
 
@@ -9099,7 +9102,7 @@ impl PmoveContext<'_> {
 impl PmoveContext<'_> {
     pub fn PM_VehFaceHyperspacePoint(&mut self, veh: *mut bgEntity_t) {
         unsafe {
-            if veh.is_null() || (*veh).m_pVehicle.is_null() {
+            if veh.is_null() || ((*veh).m_pVehicle as *mut Vehicle_t).is_null() {
                 return;
             } else {
                 let pv = (*veh).m_pVehicle as *mut Vehicle_t;

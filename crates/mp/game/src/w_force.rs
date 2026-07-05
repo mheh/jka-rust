@@ -48,7 +48,7 @@ use crate::g_utils::{
 };
 use crate::g_weapon::WP_FireGenericBlasterMissile;
 use crate::NPC_senses::InFront;
-use crate::q_math::{AngleSubtract, AngleVectors, DirToByte, Q_irand, VectorLength, VectorNormalize, vectoangles};
+use crate::q_math::{AngleSubtract, AngleVectors, DirToByte, VectorLength, VectorNormalize, vectoangles};
 use crate::w_saber::HasSetSaberOnly;
 use crate::trap;
 use crate::world::GameContext;
@@ -1771,7 +1771,7 @@ pub fn ForceLightningDamage(
                     return;
                 }
                 if ForcePowerUsableOn(ctx, self_, traceEnt, FP_LIGHTNING) != 0 {
-                    let mut dmg = Q_irand(1, 2); //Q_irand( 1, 3 );
+                    let mut dmg = (*ctx.world).bg_state.rng.Q_irand(1, 2); //(*ctx.world).bg_state.rng.Q_irand( 1, 3 );
 
                     let mut modPowerLevel = -1;
 
@@ -1813,10 +1813,10 @@ pub fn ForceLightningDamage(
                         G_Damage(traceEnt, self_, self_, Some(&mut dir), impactPoint, dmg, 0, MOD_FORCE_DARK as c_int);
                     }
                     if !(*traceEnt).client.is_null() {
-                        if Q_irand(0, 2) == 0 {
+                        if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                             let snd = std::ffi::CString::new(format!(
                                 "sound/weapons/force/lightninghit{}",
-                                Q_irand(1, 3)
+                                (*ctx.world).bg_state.rng.Q_irand(1, 3)
                             ))
                             .unwrap();
                             G_Sound(ctx, traceEnt, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
@@ -1829,7 +1829,7 @@ pub fn ForceLightningDamage(
                         if (*tcl).ps.powerups[PW_CLOAKED as usize] != 0 {
                             //disable cloak temporarily
                             Jedi_Decloak(ctx, traceEnt);
-                            (*tcl).cloakToggleTime = level_time + Q_irand(3000, 10000);
+                            (*tcl).cloakToggleTime = level_time + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
                         }
                     }
                 }
@@ -2080,7 +2080,7 @@ pub fn ForceDrainDamage(
                 }
                 if ForcePowerUsableOn(ctx, self_, traceEnt, FP_DRAIN) != 0 {
                     let mut modPowerLevel = -1;
-                    let mut dmg = 0; //Q_irand( 1, 3 );
+                    let mut dmg = 0; //(*ctx.world).bg_state.rng.Q_irand( 1, 3 );
                     if (*scl).ps.fd.forcePowerLevel[FP_DRAIN as usize] == FORCE_LEVEL_1 {
                         dmg = 2; //because it's one-shot
                     } else if (*scl).ps.fd.forcePowerLevel[FP_DRAIN as usize] == FORCE_LEVEL_2 {
@@ -3622,7 +3622,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                             }
 
                             if OnSameTeam(ctx, self_, push_list[x]) == 0
-                                && Q_irand(1, 10) <= randfact
+                                && (*ctx.world).bg_state.rng.Q_irand(1, 10) <= randfact
                                 && canPullWeapon != 0
                             {
                                 let mut uorg: vec3_t = (*cl).ps.origin;
@@ -4143,7 +4143,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
                 G_Damage(gripEnt, self_, self_, None, [0.0; 3], 20, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
-                let snd = format!("*choke{}.wav", Q_irand(1, 3));
+                let snd = format!("*choke{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));
                 G_EntitySound(ctx, gripEnt, CHAN_VOICE, G_SoundIndex(cstr(&snd).as_ptr()));
 
                 (*gcl).ps.forceHandExtend = HANDEXTEND_CHOKE as c_int;
@@ -4227,7 +4227,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
                 G_Damage(gripEnt, self_, self_, None, [0.0; 3], 40, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
-                let snd = format!("*choke{}.wav", Q_irand(1, 3));
+                let snd = format!("*choke{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));
                 G_EntitySound(ctx, gripEnt, CHAN_VOICE, G_SoundIndex(cstr(&snd).as_ptr()));
 
                 (*gcl).ps.forceHandExtend = HANDEXTEND_CHOKE as c_int;
@@ -4939,7 +4939,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     let snd = std::ffi::CString::new("sound/weapons/bryar/fire.wav").unwrap();
                     G_SoundAtLoc(ctx, org, CHAN_WEAPON, G_SoundIndex(snd.as_ptr()));
 
-                    (*cl).ps.droneFireTime = level_time + Q_irand(400, 700);
+                    (*cl).ps.droneFireTime = level_time + (*ctx.world).bg_state.rng.Q_irand(400, 700);
                 }
             }
         }
@@ -5689,7 +5689,7 @@ pub fn Jedi_DodgeEvasion(
         }
 
         if g_forceDodge == 2 {
-            if Q_irand(1, 7) > (*cl).ps.fd.forcePowerLevel[FP_SPEED as usize] {
+            if (*ctx.world).bg_state.rng.Q_irand(1, 7) > (*cl).ps.fd.forcePowerLevel[FP_SPEED as usize] {
                 //more likely to fail on lower force speed level
                 return qfalse;
             }

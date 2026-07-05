@@ -13,7 +13,6 @@ use crate::NPC_combat::G_ClearEnemy;
 use crate::NPC_reactions::NPC_Pain;
 use crate::NPC_sounds::G_AddVoiceEvent;
 use crate::g_timer::TIMER_Set;
-use crate::q_math::Q_irand;
 use mp_bg::public::entity_event::entity_event_t::{EV_CONFUSE1, EV_CONFUSE3, EV_PUSHED1, EV_PUSHED3};
 use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 
@@ -97,7 +96,7 @@ pub fn NPC_Grenadier_PlayConfusionSound(
         if (*self_).health > 0 {
             G_AddVoiceEvent(ctx, 
                 self_,
-                Q_irand(EV_CONFUSE1 as c_int, EV_CONFUSE3 as c_int),
+                (*ctx.world).bg_state.rng.Q_irand(EV_CONFUSE1 as c_int, EV_CONFUSE3 as c_int),
                 2000,
             );
         }
@@ -134,7 +133,7 @@ pub fn NPC_Grenadier_Pain(
             // FIXME: better way to know I was pushed (Raven comment).
             G_AddVoiceEvent(ctx, 
                 self_,
-                Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int),
+                (*ctx.world).bg_state.rng.Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int),
                 2000,
             );
         }
@@ -285,7 +284,7 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
                             {
                                 // an enemy
                                 G_SetEnemy(ctx, npc_ptr, world.level.alertEvents[alertEvent as usize].owner);
-                                TIMER_Set(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char, Q_irand(500, 2500));
+                                TIMER_Set(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(500, 2500));
                             }
                         } else {
                             // Save the position for movement (if necessary)
@@ -293,10 +292,10 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
                                 world.level.alertEvents[alertEvent as usize].position,
                                 &mut (*npc_info_ptr).investigateGoal,
                             );
-                            (*npc_info_ptr).investigateDebounceTime = world.level.time + Q_irand(500, 1000);
+                            (*npc_info_ptr).investigateDebounceTime = world.level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1000);
                             if world.level.alertEvents[alertEvent as usize].level == alertEventLevel_e::AEL_SUSPICIOUS {
                                 // suspicious looks longer
-                                (*npc_info_ptr).investigateDebounceTime += Q_irand(500, 2500);
+                                (*npc_info_ptr).investigateDebounceTime += (*ctx.world).bg_state.rng.Q_irand(500, 2500);
                             }
                         }
                     }
@@ -397,12 +396,12 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                                 .map(|c| ((c.pers.maxHealth - (*npc_ptr).health) * 100) as c_int)
                                 .unwrap_or(0),
                         );
-                        TIMER_Set(ctx, npc_ptr, c"hideTime".as_ptr() as *const c_char, Q_irand(3000, 7000));
+                        TIMER_Set(ctx, npc_ptr, c"hideTime".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 7000));
                         (*npc_info_ptr).squadState = SQUAD_COVER;
                     }
                     SQUAD_TRANSITION => {
                         // was heading for a combat point
-                        TIMER_Set(ctx, npc_ptr, c"hideTime".as_ptr() as *const c_char, Q_irand(2000, 4000));
+                        TIMER_Set(ctx, npc_ptr, c"hideTime".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
                     }
                     SQUAD_SCOUT => {
                         // was running after player
@@ -411,9 +410,9 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                 }
                 NPC_ReachedGoal(ctx);
                 // don't attack right away
-                TIMER_Set(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char, Q_irand(250, 500));
+                TIMER_Set(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(250, 500));
                 // don't do something else just yet
-                TIMER_Set(ctx, npc_ptr, c"roamTime".as_ptr() as *const c_char, Q_irand(1000, 4000));
+                TIMER_Set(ctx, npc_ptr, c"roamTime".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(1000, 4000));
                 // stop fleeing
                 if (*npc_info_ptr).squadState == SQUAD_RETREAT {
                     TIMER_Set(ctx, npc_ptr, c"flee".as_ptr() as *const c_char, -world.level.time);
@@ -423,7 +422,7 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
             }
 
             // keep going, hold of roamTimer until we get there
-            TIMER_Set(ctx, npc_ptr, c"roamTime".as_ptr() as *const c_char, Q_irand(4000, 8000));
+            TIMER_Set(ctx, npc_ptr, c"roamTime".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(4000, 8000));
         }
 
         if (*npc_info_ptr).goalEntity.is_none() {

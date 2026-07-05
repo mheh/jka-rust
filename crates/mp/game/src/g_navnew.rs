@@ -210,7 +210,7 @@ pub fn NAVNEW_PushBlocker(
                 (*blocker).clipmask | CONTENTS_BOTCLIP,
             ),
         );
-        let leftSucc = if !tr.startsolid && !tr.allsolid {
+        let leftSucc = if tr.startsolid == 0 && tr.allsolid == 0 {
             tr.fraction
         } else {
             0.0f32
@@ -234,7 +234,7 @@ pub fn NAVNEW_PushBlocker(
                     (*blocker).clipmask | CONTENTS_BOTCLIP,
                 ),
             );
-            let rightSucc = if !tr.startsolid && !tr.allsolid {
+            let rightSucc = if tr.startsolid == 0 && tr.allsolid == 0 {
                 tr.fraction
             } else {
                 0.0f32
@@ -392,11 +392,11 @@ pub fn NAVNEW_SidestepBlocker(
                     (*self_).clipmask | CONTENTS_BOTCLIP,
                 ),
             );
-            return if tr.fraction == 1.0 && !tr.allsolid && !tr.startsolid { QTRUE } else { QFALSE };
+            return if tr.fraction == 1.0 && tr.allsolid == 0 && tr.startsolid == 0 { QTRUE } else { QFALSE };
         }
 
         //test right
-        avoidAngles[crate::q_shared::YAW] = crate::q_math::AngleNormalize360(yaw + arcAngle);
+        avoidAngles[crate::q_math::YAW] = crate::q_math::AngleNormalize360(yaw + arcAngle);
         let mut avoidRight_dir = [0.0f32; 3];
         crate::q_math::AngleVectors(avoidAngles, Some(&mut avoidRight_dir), None, None);
 
@@ -417,7 +417,7 @@ pub fn NAVNEW_SidestepBlocker(
             ),
         );
 
-        if !tr.allsolid && !tr.startsolid {
+        if tr.allsolid == 0 && tr.startsolid == 0 {
             if tr.fraction >= 1.0f32 {
                 //all clear, go for it (favor the right if both are equal)
                 crate::q_math::_VectorCopy(avoidRight_dir, movedir);
@@ -448,7 +448,7 @@ pub fn NAVNEW_SidestepBlocker(
                 ),
             );
 
-            if !tr.allsolid && !tr.startsolid {
+            if tr.allsolid == 0 && tr.startsolid == 0 {
                 if tr.fraction >= 1.0f32 {
                     //all clear, go for it (right side would have already succeeded if as good as this)
                     crate::q_math::_VectorCopy(avoidLeft_dir, movedir);
@@ -481,7 +481,7 @@ pub fn NAVNEW_SidestepBlocker(
         } else {
             //test left
             let mut arcAngle_neg = -arcAngle;
-            avoidAngles[crate::q_shared::YAW] = crate::q_math::AngleNormalize360(yaw + arcAngle_neg);
+            avoidAngles[crate::q_math::YAW] = crate::q_math::AngleNormalize360(yaw + arcAngle_neg);
             let mut avoidLeft_dir = [0.0f32; 3];
             crate::q_math::AngleVectors(avoidAngles, Some(&mut avoidLeft_dir), None, None);
 
@@ -500,7 +500,7 @@ pub fn NAVNEW_SidestepBlocker(
                 ),
             );
 
-            if !tr.allsolid && !tr.startsolid {
+            if tr.allsolid == 0 && tr.startsolid == 0 {
                 if tr.fraction >= 1.0f32 {
                     //all clear, go for it (right side would have already succeeded if as good as this)
                     crate::q_math::_VectorCopy(avoidLeft_dir, movedir);
@@ -782,7 +782,7 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
                 clipmask,
             ),
         );
-        if trace.fraction >= 1.0f32 || trace.entityNum == goalEntNum {
+        if trace.fraction >= 1.0f32 || trace.entityNum as c_int == goalEntNum {
             //clear or hit goal
             return QFALSE;
         }

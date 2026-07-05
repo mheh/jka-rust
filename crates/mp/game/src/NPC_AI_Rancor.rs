@@ -33,11 +33,25 @@ pub fn Rancor_SetBolts(
     ctx: GameContext<'_>,self_: *mut gentity_t) {
     unsafe {
         if !self_.is_null() && !(*self_).client.is_null() {
-            let ri = &mut (*(*self_).client).renderInfo;
-            ri.handRBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*r_hand".as_ptr());
-            ri.handLBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*l_hand".as_ptr());
-            ri.headBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"*head_eyes".as_ptr());
-            ri.torsoBolt = trap::G2API_AddBolt(ctx.engine, (*self_).ghoul2, 0, c"jaw_bone".as_ptr());
+            // `gentity_t.client` stays `*mut c_void` per the deferral; overlay-cast to
+            // `gclient_t` at the use site.
+            let ri = &mut (*((*self_).client as *mut gclient_t)).renderInfo;
+            ri.handRBolt = trap::G2API_AddBolt(
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2 as *mut c_void, 0, c"*r_hand".to_owned()),
+            );
+            ri.handLBolt = trap::G2API_AddBolt(
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2 as *mut c_void, 0, c"*l_hand".to_owned()),
+            );
+            ri.headBolt = trap::G2API_AddBolt(
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2 as *mut c_void, 0, c"*head_eyes".to_owned()),
+            );
+            ri.torsoBolt = trap::G2API_AddBolt(
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2 as *mut c_void, 0, c"jaw_bone".to_owned()),
+            );
         }
     }
 }

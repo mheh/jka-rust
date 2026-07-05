@@ -41,7 +41,9 @@ pub fn StringToFilter(ctx: GameContext<'_>, s: *mut c_char, f: *mut c_void) -> q
     for i_val in 0..4 {
         i = 0;
         if unsafe { *ptr } < b'0' as c_char || unsafe { *ptr } > b'9' as c_char {
-            G_Printf(ctx, c"Bad filter address: %s\n".as_ptr(), s);
+            let s_str = unsafe { cstr_to_str(s) };
+            let msg = format!("Bad filter address: {}\n", s_str);
+            G_Printf(ctx, cstr(&msg).as_ptr());
             return qfalse;
         }
 

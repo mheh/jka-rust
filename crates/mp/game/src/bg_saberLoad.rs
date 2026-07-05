@@ -15,7 +15,6 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::q_math::Q_irand;
 
 use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,

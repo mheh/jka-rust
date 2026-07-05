@@ -53,7 +53,7 @@ pub const MAX_TOKEN_CHARS: usize = 1024;
 /// `ent - g_entities` — the entity's slot index (client number for players).
 #[inline]
 unsafe fn ent_index(ctx: GameContext<'_>, ent: *const gentity_t) -> c_int {
-    ent.offset_from((*ctx.world).entities.as_ptr()) as c_int
+    ent.offset_from((*ctx.world).g_entities.as_ptr()) as c_int
 }
 
 /// Raven `DeathmatchScoreboardMessage`.
@@ -115,7 +115,7 @@ pub fn DeathmatchScoreboardMessage(
                 ping,
                 ((*world).level.time - (*cl).pers.enterTime) / 60000,
                 scoreFlags,
-                (*world).entities[sortedClientIdx as usize].s.powerups,
+                (*world).g_entities[sortedClientIdx as usize].s.powerups,
                 accuracy,
                 (*cl).ps.persistant[PERS_IMPRESSIVE_COUNT as usize],
                 (*cl).ps.persistant[PERS_EXCELLENT_COUNT as usize],
@@ -419,7 +419,7 @@ pub fn Cmd_Give_f(
                 return;
             }
 
-            ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
             if (*ent).inuse == qfalse || (*ent).client.is_null() {
                 crate::g_main::Com_Printf(cstr(&format!("{} is not an active client\n", i)).as_ptr());
@@ -945,7 +945,7 @@ pub fn G_GetDuelWinner(
                 && (*wCl).sess.sessionTeam != TEAM_SPECTATOR
             {
                 let cn = (*wCl).ps.clientNum;
-                return &mut (*world).entities[cn as usize] as *mut gentity_t;
+                return &mut (*world).g_entities[cn as usize] as *mut gentity_t;
             }
         }
 
@@ -1211,8 +1211,8 @@ pub fn SetTeam(
         if team == TEAM_RED || team == TEAM_BLUE {
             let teamLeader = crate::g_client::TeamLeader(ctx, team);
             if teamLeader == -1
-                || ((*world).entities[clientNum as usize].r.svFlags & SVF_BOT == 0
-                    && (*world).entities[teamLeader as usize].r.svFlags & SVF_BOT != 0)
+                || ((*world).g_entities[clientNum as usize].r.svFlags & SVF_BOT == 0
+                    && (*world).g_entities[teamLeader as usize].r.svFlags & SVF_BOT != 0)
             {
                 //SetLeader( team, clientNum );
             }
@@ -2065,7 +2065,7 @@ pub fn G_Say(
 
         // send it to all the apropriate clients
         for j in 0..(*world).level.maxclients {
-            let other = &mut (*world).entities[j as usize] as *mut gentity_t;
+            let other = &mut (*world).g_entities[j as usize] as *mut gentity_t;
             let lm = locMsg.clone().map(|s| { let mut b: Vec<c_char> = s.bytes().map(|c| c as c_char).collect(); b.push(0); b });
             let mut lm_buf = lm;
             let lm_ptr = lm_buf.as_mut().map(|v| v.as_mut_ptr()).unwrap_or(std::ptr::null_mut());
@@ -2127,7 +2127,7 @@ pub fn Cmd_Tell_f(
             return;
         }
 
-        let target = &mut (*world).entities[targetNum as usize] as *mut gentity_t;
+        let target = &mut (*world).g_entities[targetNum as usize] as *mut gentity_t;
         if target.is_null() || (*target).inuse == qfalse || (*target).client.is_null() {
             return;
         }
@@ -2249,7 +2249,7 @@ pub fn Cmd_GameCommand_f(
         if order < 0 || order as usize > gc_orders.len() {
             return;
         }
-        let target = &mut (*world).entities[player as usize] as *mut gentity_t;
+        let target = &mut (*world).g_entities[player as usize] as *mut gentity_t;
         G_Say(ctx, ent, target, SAY_TELL, gc_orders[order as usize]);
         G_Say(ctx, ent, ent, SAY_TELL, gc_orders[order as usize]);
     }
@@ -2510,7 +2510,7 @@ pub fn Cmd_CallVote_f(
                 return;
             }
 
-            let nclient = (*world).entities[n as usize].client as *mut gclient_t;
+            let nclient = (*world).g_entities[n as usize].client as *mut gclient_t;
             if (*nclient).pers.connected == crate::client::client_connected::CON_DISCONNECTED {
                 let msg = format!("print \"there is no client with the client number {}.\n\"", n);
                 trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
@@ -2531,7 +2531,7 @@ pub fn Cmd_CallVote_f(
             }
 
             write_cstr_field(&mut (*world).level.voteString, &format!("clientkick {}", clientid));
-            let ncl = (*world).entities[clientid as usize].client as *mut gclient_t;
+            let ncl = (*world).g_entities[clientid as usize].client as *mut gclient_t;
             write_cstr_field(&mut (*world).level.voteDisplayString, &format!("kick {}", cstr_to_str((*ncl).pers.netname.as_ptr())));
         } else if arg1_s.eq_ignore_ascii_case("nextmap") {
             let mut s = [0 as c_char; MAX_STRING_CHARS];
@@ -2721,7 +2721,7 @@ pub fn Cmd_CallTeamVote_f(
                         trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
                         return;
                     }
-                    if (*world).entities[targetClientNum as usize].inuse == qfalse {
+                    if (*world).g_entities[targetClientNum as usize].inuse == qfalse {
                         let msg = format!("print \"Client {} is not active\n\"", targetClientNum);
                         trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));
                         return;
@@ -2969,14 +2969,14 @@ pub fn G_ItemUsable(
             }
             HI_SEEKER => {
                 if (*ps).eFlags & EF_SEEKERDRONE != 0 {
-                    crate::g_utils::G_AddEvent(&mut (*world).entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SEEKER_ALREADYDEPLOYED);
+                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SEEKER_ALREADYDEPLOYED);
                     return 0;
                 }
                 1
             }
             HI_SENTRY_GUN => {
                 if (*ps).fd.sentryDeployed != 0 {
-                    crate::g_utils::G_AddEvent(&mut (*world).entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SENTRY_ALREADYPLACED);
+                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SENTRY_ALREADYPLACED);
                     return 0;
                 }
 
@@ -3017,7 +3017,7 @@ pub fn G_ItemUsable(
                 );
 
                 if (tr.fraction != 1.0 && tr.entityNum != (*ps).clientNum) || tr.startsolid != qfalse || tr.allsolid != qfalse {
-                    crate::g_utils::G_AddEvent(&mut (*world).entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SENTRY_NOROOM);
+                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SENTRY_NOROOM);
                     return 0;
                 }
 
@@ -3043,7 +3043,7 @@ pub fn G_ItemUsable(
                         &maxs as *const vec3_t,
                         &dest as *const vec3_t,
                         (*ps).clientNum,
-                        MASK_SHOT,
+                        mp_qshared::shared::surface_flags::MASK_SHOT,
                     ),
                 );
                 if tr.fraction > 0.9 && tr.startsolid == qfalse && tr.allsolid == qfalse {
@@ -3066,7 +3066,7 @@ pub fn G_ItemUsable(
                         return 1;
                     }
                 }
-                crate::g_utils::G_AddEvent(&mut (*world).entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SHIELD_NOROOM);
+                crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL, SHIELD_NOROOM);
                 0
             }
             HI_JETPACK | HI_HEALTHDISP | HI_AMMODISP | HI_EWEB | HI_CLOAK => 1,
@@ -3096,7 +3096,7 @@ pub fn Cmd_ToggleSaber_f(
         if (*client).ps.saberInFlight != qfalse {
             if (*client).ps.saberEntityNum != 0 {
                 // turn it off in midair
-                let saberent = &mut (*ctx.world).entities[(*client).ps.saberEntityNum as usize]
+                let saberent = &mut (*ctx.world).g_entities[(*client).ps.saberEntityNum as usize]
                     as *mut gentity_t;
                 crate::w_saber::saberKnockDown(ctx, saberent, ent, ent);
             }
@@ -3291,7 +3291,7 @@ pub fn Cmd_SaberAttackCycle_f(
 pub fn G_OtherPlayersDueling(ctx: GameContext<'_>) -> qboolean {
     unsafe {
         for i in 0..MAX_CLIENTS {
-            let ent = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             let client = (*ent).client as *mut gclient_t;
 
             if (*ent).inuse != qfalse
@@ -3395,7 +3395,7 @@ pub fn Cmd_EngageDuel_f(
         );
 
         if tr.fraction != 1.0 && tr.entityNum < MAX_CLIENTS as c_int {
-            let challenged = &mut (*world).entities[tr.entityNum as usize] as *mut gentity_t;
+            let challenged = &mut (*world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
             if challenged.is_null()
                 || (*challenged).client.is_null()
@@ -3592,7 +3592,7 @@ pub fn G_ClientNumFromNetname(
 ) -> c_int {
     unsafe {
         for i in 0..MAX_CLIENTS {
-            let ent = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             let client = (*ent).client as *mut gclient_t;
 
             if (*ent).inuse != qfalse
@@ -3686,7 +3686,7 @@ pub fn ClientCommand(
 ) {
     unsafe {
         let world = ctx.world;
-        let ent = &mut (*world).entities[clientNum as usize] as *mut gentity_t;
+        let ent = &mut (*world).g_entities[clientNum as usize] as *mut gentity_t;
         if (*ent).client.is_null() {
             return; // not fully in game yet
         }
@@ -3836,7 +3836,7 @@ pub fn ClientCommand(
                 let entNum = G_ClientNumFromNetname(ctx, sArg.as_mut_ptr());
 
                 if entNum >= 0 && (entNum as usize) < MAX_GENTITIES {
-                    let kEnt = &mut (*world).entities[entNum as usize] as *mut gentity_t;
+                    let kEnt = &mut (*world).g_entities[entNum as usize] as *mut gentity_t;
                     if (*kEnt).inuse != qfalse && !(*kEnt).client.is_null() {
                         let kClient = (*kEnt).client as *mut gclient_t;
                         (*kEnt).flags &= !FL_GODMODE;

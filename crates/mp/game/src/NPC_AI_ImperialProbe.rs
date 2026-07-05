@@ -7,8 +7,10 @@
 use crate::prelude::*;
 use crate::NPC_AI_Default::NPC_BSIdle;
 use crate::NPC_reactions::{NPC_GetPainChance, NPC_Pain};
-use crate::NPC_utils::{NPC_UpdateAngles, CalcEntitySpot, NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_FaceEnemy, NPC_GetMoveDirection, NPC_MoveToGoal};
-use crate::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon, BG_GiveMeVectorFromMatrix};
+use crate::NPC_utils::{NPC_UpdateAngles, CalcEntitySpot, NPC_CheckEnemyExt, NPC_ClearLOS4, NPC_FaceEnemy};
+use crate::NPC_move::{NPC_GetMoveDirection, NPC_MoveToGoal};
+use crate::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
+use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
 use crate::g_items::RegisterItem;
 use crate::g_missile::CreateMissile;
 use crate::g_utils::{G_EffectIndex, G_SoundIndex, G_Sound, G_SoundOnEnt, G_PlayEffectID, G_Damage};

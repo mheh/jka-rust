@@ -26,7 +26,7 @@ use crate::g_main::G_Printf;
 use crate::g_mover::SP_func_rotating;
 use crate::g_spawn::{G_SpawnFloat, G_SpawnInt, G_SpawnString};
 use crate::NPC_utils::G_ActivateBehavior;
-use crate::q_math::{flrand, vec3_origin, Q_irand};
+use crate::q_math::vec3_origin;
 use mp_qshared::shared::trajectory::trType_t::TR_LINEAR;
 use crate::q_shared::Q_stricmp;
 use crate::trap;
@@ -120,12 +120,12 @@ pub const INITIAL_SUFFOCATION_DELAY: c_int = 500;
 // and build the id at assignment sites.
 #[inline]
 unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
-    unsafe { (*ctx.world).entities.as_ptr() }
+    unsafe { (*ctx.world).g_entities.as_ptr() }
 }
 #[inline]
 unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
     match id {
-        Some(i) => unsafe { &mut (*ctx.world).entities[i.index()] as *mut gentity_t },
+        Some(i) => unsafe { &mut (*ctx.world).g_entities[i.index()] as *mut gentity_t },
         None => core::ptr::null_mut(),
     }
 }
@@ -336,7 +336,7 @@ pub fn multi_trigger(
                 && !(*ent).targetname.is_null()
                 && *(*ent).targetname != 0
             {
-                let obj_item = &mut (*ctx.world).entities
+                let obj_item = &mut (*ctx.world).g_entities
                     [(*((*activator).client as *mut gclient_t)).holdingObjectiveItem as usize]
                     as *mut gentity_t;
 
@@ -413,7 +413,7 @@ pub fn multi_trigger(
             while i < num_ents {
                 if entity_list[i as usize] < MAX_CLIENTS as c_int {
                     // only care about clients
-                    let cl = &mut (*ctx.world).entities[entity_list[i as usize] as usize]
+                    let cl = &mut (*ctx.world).g_entities[entity_list[i as usize] as usize]
                         as *mut gentity_t;
 
                     // the client is valid
@@ -838,8 +838,8 @@ pub fn Do_Strike(
 
         // choose a random point to strike within the bounds of the trigger
         let mut strike_point: vec3_t = [0.0; 3];
-        strike_point[0] = flrand((*ent).r.absmin[0], (*ent).r.absmax[0]);
-        strike_point[1] = flrand((*ent).r.absmin[1], (*ent).r.absmax[1]);
+        strike_point[0] = (*ctx.world).bg_state.rng.flrand((*ent).r.absmin[0], (*ent).r.absmax[0]);
+        strike_point[1] = (*ctx.world).bg_state.rng.flrand((*ent).r.absmin[1], (*ent).r.absmax[1]);
         // consider the bottom mins the ground level
         strike_point[2] = (*ent).r.absmin[2];
 
@@ -889,7 +889,7 @@ pub fn Do_Strike(
             );
         } else {
             // only damage individuals
-            let tr_hit = &mut (*ctx.world).entities[local_trace.entityNum as usize] as *mut gentity_t;
+            let tr_hit = &mut (*ctx.world).g_entities[local_trace.entityNum as usize] as *mut gentity_t;
 
             if (*tr_hit).inuse != 0 && (*tr_hit).takedamage != 0 {
                 // damage it then
@@ -923,7 +923,7 @@ pub fn Think_Strike(
         }
 
         (*ent).nextthink =
-            (*ctx.world).level.time + (*ent).wait as c_int + Q_irand(0, (*ent).random as c_int);
+            (*ctx.world).level.time + (*ent).wait as c_int + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).random as c_int);
         Do_Strike(ctx, ent);
     }
 }
@@ -1582,7 +1582,7 @@ pub fn space_touch(
             && (*other_client).ps.m_iVehicleNum >= MAX_CLIENTS as c_int
         {
             // a player client inside a vehicle
-            let veh = &mut (*ctx.world).entities[(*other_client).ps.m_iVehicleNum as usize]
+            let veh = &mut (*ctx.world).g_entities[(*other_client).ps.m_iVehicleNum as usize]
                 as *mut gentity_t;
 
             if (*veh).inuse != 0 && !(*veh).client.is_null() && !(*veh).m_pVehicle.is_null() {
@@ -1719,7 +1719,7 @@ pub fn shipboundary_think(
         let mut i = 0;
         while i < num_listed {
             let listed_ent =
-                &mut (*ctx.world).entities[entity_list[i as usize] as usize] as *mut gentity_t;
+                &mut (*ctx.world).g_entities[entity_list[i as usize] as usize] as *mut gentity_t;
             if (*listed_ent).inuse != 0
                 && !(*listed_ent).client.is_null()
                 && (*((*listed_ent).client as *mut gclient_t)).ps.m_iVehicleNum != 0
@@ -2064,7 +2064,7 @@ pub fn asteroid_pick_random_asteroid(
         }
 
         // FIXME: need a seed
-        let pick = Q_irand(1, t_count);
+        let pick = (*ctx.world).bg_state.rng.Q_irand(1, t_count);
         t_count = 0;
         t = core::ptr::null_mut();
         loop {
@@ -2100,11 +2100,11 @@ pub fn asteroid_count_num_asteroids(
         let mut count: c_int = 0;
         let mut i = MAX_CLIENTS as c_int;
         while i < ENTITYNUM_WORLD as c_int {
-            if (*ctx.world).entities[i as usize].inuse == 0 {
+            if (*ctx.world).g_entities[i as usize].inuse == 0 {
                 i += 1;
                 continue;
             }
-            if (*ctx.world).entities[i as usize].r.ownerNum == (*self_).s.number {
+            if (*ctx.world).g_entities[i as usize].r.ownerNum == (*self_).s.number {
                 count += 1;
             }
             i += 1;
@@ -2122,15 +2122,15 @@ pub fn asteroid_move_to_start2(
     unsafe {
         if !ownerTrigger.is_null() {
             // move it
-            let speed = flrand((*self_).speed * 0.25, (*self_).speed * 2.0);
-            let cap_axis = Q_irand(0, 2);
+            let speed = (*ctx.world).bg_state.rng.flrand((*self_).speed * 0.25, (*self_).speed * 2.0);
+            let cap_axis = (*ctx.world).bg_state.rng.Q_irand(0, 2);
 
             let mut start_spot: vec3_t = [0.0; 3];
             let mut end_spot: vec3_t = [0.0; 3];
 
             for axis in 0..3usize {
                 if axis as c_int == cap_axis {
-                    if Q_irand(0, 1) != 0 {
+                    if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                         start_spot[axis] = (*ownerTrigger).r.mins[axis];
                         end_spot[axis] = (*ownerTrigger).r.maxs[axis];
                     } else {
@@ -2139,9 +2139,9 @@ pub fn asteroid_move_to_start2(
                     }
                 } else {
                     start_spot[axis] = (*ownerTrigger).r.mins[axis]
-                        + (flrand(0.0, 1.0) * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
+                        + ((*ctx.world).bg_state.rng.flrand(0.0, 1.0) * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
                     end_spot[axis] = (*ownerTrigger).r.mins[axis]
-                        + (flrand(0.0, 1.0) * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
+                        + ((*ctx.world).bg_state.rng.flrand(0.0, 1.0) * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
                 }
             }
             // FIXME: maybe trace from start to end to make sure nothing is in
@@ -2154,12 +2154,12 @@ pub fn asteroid_move_to_start2(
 
             // spin it
             let start_angles: vec3_t = [
-                flrand(-360.0, 360.0),
-                flrand(-360.0, 360.0),
-                flrand(-360.0, 360.0),
+                (*ctx.world).bg_state.rng.flrand(-360.0, 360.0),
+                (*ctx.world).bg_state.rng.flrand(-360.0, 360.0),
+                (*ctx.world).bg_state.rng.flrand(-360.0, 360.0),
             ];
             G_SetAngles(self_, start_angles);
-            (*self_).s.apos.trDelta = [flrand(-100.0, 100.0), flrand(-100.0, 100.0), flrand(-100.0, 100.0)];
+            (*self_).s.apos.trDelta = [(*ctx.world).bg_state.rng.flrand(-100.0, 100.0), (*ctx.world).bg_state.rng.flrand(-100.0, 100.0), (*ctx.world).bg_state.rng.flrand(-100.0, 100.0)];
             (*self_).s.apos.trTime = (*ctx.world).level.time;
             (*self_).s.apos.trType = TR_LINEAR;
             // move it back to a new start when done
@@ -2181,7 +2181,7 @@ pub fn asteroid_move_to_start(
     ctx: GameContext<'_>,self_: *mut gentity_t) {
     unsafe {
         let owner_trigger =
-            &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+            &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
         asteroid_move_to_start2(ctx, self_, owner_trigger);
     }
 }

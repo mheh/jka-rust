@@ -9,7 +9,7 @@
 
 use crate::prelude::*;
 
-// Raven `#define VELOCITY_DECAY 0.7f` (oracle/oracle/codemp/game/NPC_AI_Seeker.c:8).
+// Raven `#define VELOCITY_DECAY 0.7f32` (oracle/oracle/codemp/game/NPC_AI_Seeker.c:8).
 const VELOCITY_DECAY: f32 = 0.7f32;
 
 // Raven `#define MIN_MELEE_RANGE 320` / `MIN_MELEE_RANGE_SQR`.
@@ -106,12 +106,12 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
             if crate::g_timer::TIMER_Done(ctx, NPC, c"heightChange".as_ptr()) != 0 {
                 let mut difFactor: f32 = 1.0f32;
 
-                crate::g_timer::TIMER_Set(ctx, NPC, c"heightChange".as_ptr(), crate::q_math::Q_irand(1000, 3000));
+                crate::g_timer::TIMER_Set(ctx, NPC, c"heightChange".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1000, 3000));
 
                 // Find the height difference
                 let enemy = &mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
                 let dif = ((*enemy).r.currentOrigin[2]
-                    + crate::q_math::flrand(
+                    + (*ctx.world).bg_state.rng.flrand(
                         (*enemy).r.maxs[2] / 2.0f32,
                         (*enemy).r.maxs[2] + 8.0f32,
                     ))
@@ -133,7 +133,7 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
                     (*(*NPC).client).ps.velocity[2] = ((*(*NPC).client).ps.velocity[2] + dif_capped) / 2.0f32;
                 }
                 if (*(*NPC).client).NPC_class == CLASS_BOBAFETT {
-                    (*(*NPC).client).ps.velocity[2] *= crate::q_math::flrand(0.85f32, 3.0f32);
+                    (*(*NPC).client).ps.velocity[2] *= (*ctx.world).bg_state.rng.flrand(0.85f32, 3.0f32);
                 }
             }
         } else {
@@ -429,7 +429,7 @@ pub fn Seeker_Ranged(
         if (*(*NPC).client).NPC_class != CLASS_BOBAFETT {
             if (*NPC).count > 0 {
                 if crate::g_timer::TIMER_Done(ctx, NPC, c"attackDelay".as_ptr()) != 0 {
-                    crate::g_timer::TIMER_Set(ctx, NPC, c"attackDelay".as_ptr(), crate::q_math::Q_irand(250, 2500));
+                    crate::g_timer::TIMER_Set(ctx, NPC, c"attackDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(250, 2500));
                     Seeker_Fire(ctx);
                     (*NPC).count -= 1;
                 }

@@ -159,7 +159,7 @@ pub fn VEH_TurretAim(
         // get the current absolute angles of the turret right now
         vectoangles((*pVeh).m_vMuzzleDir[curMuzzle as usize], &mut curAngles);
         // subtract out the vehicle's angles to get the relative alignment
-        AnglesSubtract(curAngles, (*pVeh).m_vOrientation, &mut curAngles);
+        AnglesSubtract(curAngles, *((*pVeh).m_vOrientation as *const vec3_t), &mut curAngles);
 
         if !turretEnemy.is_null() {
             aimCorrect = qtrue;
@@ -175,7 +175,7 @@ pub fn VEH_TurretAim(
             );
         }
         // subtract out the vehicle's angles to get the relative desired alignment
-        AnglesSubtract(*desiredAngles, (*pVeh).m_vOrientation, desiredAngles);
+        AnglesSubtract(*desiredAngles, *((*pVeh).m_vOrientation as *const vec3_t), desiredAngles);
         // Now clamp the desired relative angles
         // clamp yaw
         (*desiredAngles)[YAW] = AngleNormalize180((*desiredAngles)[YAW]);
@@ -319,7 +319,7 @@ pub fn VEH_TurretFindEnemies(
                 }
                 // else: we will shoot at bbrushes!
             } else if !(*target).client.is_null()
-                && (*(*target).client).sess.sessionTeam == crate::constants::TEAM_SPECTATOR
+                && (*(*target).client as *mut gclient_t).sess.sessionTeam == crate::constants::TEAM_SPECTATOR
             {
                 i += 1;
                 continue;
@@ -329,14 +329,14 @@ pub fn VEH_TurretFindEnemies(
                 i += 1;
                 continue;
             }
-            if !(*parent).client.is_null() && (*(*parent).client).sess.sessionTeam != 0 {
+            if !(*parent).client.is_null() && (*(*parent).client as *mut gclient_t).sess.sessionTeam != 0 {
                 if !(*target).client.is_null() {
-                    if (*(*target).client).sess.sessionTeam == (*(*parent).client).sess.sessionTeam {
+                    if (*(*target).client as *mut gclient_t).sess.sessionTeam == (*(*parent).client as *mut gclient_t).sess.sessionTeam {
                         // A bot/client/NPC we don't want to shoot
                         i += 1;
                         continue;
                     }
-                } else if (*target).teamnodmg == (*(*parent).client).sess.sessionTeam {
+                } else if (*target).teamnodmg == (*(*parent).client as *mut gclient_t).sess.sessionTeam {
                     // some other entity that's allied with us
                     i += 1;
                     continue;
@@ -362,8 +362,8 @@ pub fn VEH_TurretFindEnemies(
                 ),
             );
 
-            if tr.entityNum == (*target).s.number
-                || (!tr.allsolid && !tr.startsolid && tr.fraction == 1.0f32)
+            if tr.entityNum as c_int == (*target).s.number
+                || (tr.allsolid == 0 && tr.startsolid == 0 && tr.fraction == 1.0f32)
             {
                 // Only acquire if have a clear shot, Is it in range and closer than our best?
                 _VectorSubtract((*target).r.currentOrigin, org2, &mut enemyDir);
@@ -416,7 +416,7 @@ pub fn VEH_TurretObeyPassengerControl(
             let curMuzzle: c_int = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
             let mut aimAngles = [0f32; 3];
             _VectorCopy(
-                (*(*passenger).client).ps.viewangles,
+                (*(*passenger).client as *mut gclient_t).ps.viewangles,
                 &mut aimAngles,
             );
 
@@ -431,7 +431,7 @@ pub fn VEH_TurretObeyPassengerControl(
                 curMuzzle,
                 &mut aimAngles,
             );
-            if ((*(*passenger).client).pers.cmd.buttons
+            if ((*(*passenger).client as *mut gclient_t).pers.cmd.buttons
                 & (crate::constants::BUTTON_ATTACK | crate::constants::BUTTON_ALT_ATTACK))
                 != 0
             {
@@ -496,7 +496,7 @@ pub fn VEH_TurretThink(
         curMuzzle = (*pVeh).turretStatus[turretNum as usize].nextMuzzle;
 
         if (*pVeh).turretStatus[turretNum as usize].enemyEntNum < crate::constants::ENTITYNUM_WORLD {
-            turretEnemy = &mut (*(*ctx.world).entities.as_mut_ptr().add(
+            turretEnemy = &mut (*(*ctx.world).g_entities.as_mut_ptr().add(
                 (*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize,
             ));
             if (*turretEnemy).health < 0
@@ -506,7 +506,7 @@ pub fn VEH_TurretThink(
                 || turretEnemy == parent
                 || (*turretEnemy).r.ownerNum == (*parent).s.number // a passenger?
                 || (!(*turretEnemy).client.is_null()
-                    && (*(*turretEnemy).client).sess.sessionTeam == crate::constants::TEAM_SPECTATOR)
+                    && (*(*turretEnemy).client as *mut gclient_t).sess.sessionTeam == crate::constants::TEAM_SPECTATOR)
             {
                 // don't keep going after spectators, pilot, self, dead people, etc.
                 turretEnemy = core::ptr::null_mut();
@@ -517,14 +517,14 @@ pub fn VEH_TurretThink(
         if (*pVeh).turretStatus[turretNum as usize].enemyHoldTime < (*ctx.world).level.time {
             if VEH_TurretFindEnemies(ctx, pVeh, parent, turretStats, turretNum, curMuzzle) != qfalse
             {
-                turretEnemy = &mut (*(*ctx.world).entities.as_mut_ptr().add(
+                turretEnemy = &mut (*(*ctx.world).g_entities.as_mut_ptr().add(
                     (*pVeh).turretStatus[turretNum as usize].enemyEntNum as usize,
                 ));
                 doAim = qtrue;
             } else if !(*parent).enemy.is_none() {
                 if let Some(enemy_id) = (*parent).enemy {
                     let enemy_ptr = (*ctx.world)
-                        .entities
+                        .g_entities
                         .as_mut_ptr()
                         .add(enemy_id.0 as usize);
                     if (*enemy_ptr).s.number < crate::constants::ENTITYNUM_WORLD {
@@ -590,8 +590,8 @@ pub fn VEH_TurretThink(
                             ),
                         );
 
-                        if tr.entityNum == (*turretEnemy).s.number
-                            || (!tr.allsolid && !tr.startsolid)
+                        if tr.entityNum as c_int == (*turretEnemy).s.number
+                            || (tr.allsolid == 0 && tr.startsolid == 0)
                         {
                             doAim = qtrue; // Can see our enemy
                         }

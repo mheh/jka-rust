@@ -216,7 +216,7 @@ pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
         let mut n_highest_score: c_int = 0;
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).entities[i as usize];
+            let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
                 continue;
@@ -252,7 +252,7 @@ pub fn CalculateTeamMVPByRank(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
         let mut n_highest_score: c_int = 0;
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).entities[i as usize];
+            let player = &(*ctx.world).g_entities[i as usize];
             if player.inuse == QFALSE {
                 continue;
             }
@@ -289,7 +289,7 @@ pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
         let mut n_highest_score: c_int = 0;
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).entities[i as usize];
+            let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
                 continue;
@@ -323,7 +323,7 @@ pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
         let mut n_highest_score: c_int = 0;
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).entities[i as usize];
+            let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
                 continue;
@@ -357,7 +357,7 @@ pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
         let mut n_highest_score: c_int = 0;
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).entities[i as usize];
+            let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
                 continue;
@@ -391,7 +391,7 @@ pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: *mut gentity_t) -> qb
         let mut n_highest_score: c_int = 0;
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).entities[i as usize];
+            let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
                 continue;
@@ -426,7 +426,7 @@ pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
         let mut n_highest_score: c_int = 0;
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         for i in 0..maxclients {
-            let player = &(*ctx.world).entities[i as usize];
+            let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
             if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
                 continue;
@@ -524,7 +524,7 @@ pub fn CalculateSection31Award(
         let mut efficiency: c_int = 0;
         let mut frags: c_int = 0;
         for i in 0..maxclients {
-            let player = &(*ctx.world).entities[i as usize];
+            let player = &(*ctx.world).g_entities[i as usize];
             if player.inuse == QFALSE {
                 continue;
             }

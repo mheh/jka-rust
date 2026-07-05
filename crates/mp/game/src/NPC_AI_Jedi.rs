@@ -24,6 +24,9 @@ use crate::saber::evasion_type_t::evasionType_t;
 // imported here so call sites keep the bare Raven spelling.
 use crate::bg_slidemove::{SOLID_BMODEL, STEPSIZE};
 use crate::NPC_AI_Stormtrooper::MIN_ROCKET_DIST_SQUARED;
+// Explicit import to dedupe an E0659 glob ambiguity (known SFL_*/SVF_* debt);
+// canonical path per crate::saber::saber_flags.
+use crate::saber::saber_flags::SFL_NO_CARTWHEELS;
 
 
 /// Raven `G_StartMatrixEffect`.
@@ -3571,7 +3574,7 @@ pub fn Jedi_SaberBlock(
             (*enemy_client).renderInfo.muzzlePoint,
             &mut pointDir,
         );
-        pointDist = crate::g_client::VectorLength(pointDir);
+        pointDist = crate::q_math::VectorLength(pointDir);
 
         bladeLen = (*enemy_client).saber[saberNum as usize].blade[bladeNum as usize].length;
 

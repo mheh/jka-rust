@@ -17,7 +17,6 @@ use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 // `DAMAGE_*` dflag family (`g_local.h:1170-1190`).
 use crate::ent_fn_enums::EntThink;
 use crate::level::damage_flags::{DAMAGE_DEATH_KNOCKBACK, DAMAGE_HEAVY_WEAP_CLASS, DAMAGE_NO_KNOCKBACK, DAMAGE_NORMAL};
-use crate::q_math::Q_irand;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 const qtrue: qboolean = 1;
@@ -38,7 +37,7 @@ const DEFAULT_MINS_2: f32 = -24.0;
 const MAX_STRAFE_TIME: f32 = 2000.0;
 
 // Raven `MAX_XHAIR_DIST_ACCURACY` (`g_weapon.c:4049`).
-const MAX_XHAIR_DIST_ACCURACY: f32 = 20000.0;
+pub(crate) const MAX_XHAIR_DIST_ACCURACY: f32 = 20000.0;
 
 // Local mirrors of the same `surfaceflags.h` masks used across this file
 // (`g_items.rs`/`g_turret_G2.rs` precedent).
@@ -1124,7 +1123,7 @@ pub fn DEMP2_AltRadiusDamage(
                             }
                         {
                             // do some extra stuff to speeders/walkers
-                            (*(*gent).client).ps.electrifyTime = (*ctx.world).level.time + Q_irand(3000, 4000);
+                            (*(*gent).client).ps.electrifyTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(3000, 4000);
                         } else if (*gent).s.NPC_class != CLASS_VEHICLE
                             || (!(*gent).m_pVehicle.is_null() && {
                                 let veh = (*gent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
@@ -1132,13 +1131,13 @@ pub fn DEMP2_AltRadiusDamage(
                             })
                         {
                             // don't do this to fighters
-                            (*(*gent).client).ps.electrifyTime = (*ctx.world).level.time + Q_irand(300, 800);
+                            (*(*gent).client).ps.electrifyTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(300, 800);
                         }
                     }
                     if (*(*gent).client).ps.powerups[PW_CLOAKED as usize] != 0 {
                         // disable cloak temporarily
-                        crate::w_force::Jedi_Decloak(ctx, gent);
-                        (*(*gent).client).cloakToggleTime = (*ctx.world).level.time + Q_irand(3000, 10000);
+                        Jedi_Decloak(ctx, gent);
+                        (*(*gent).client).cloakToggleTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
                     }
                 }
             }
@@ -1308,7 +1307,7 @@ pub fn WP_FlechetteMainFire(
             (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
 
             // we don't want it to bounce forever
-            (*missile).bounceCount = Q_irand(5, 8);
+            (*missile).bounceCount = (*ctx.world).bg_state.rng.Q_irand(5, 8);
 
             (*missile).flags |= FL_BOUNCE_SHRAPNEL;
         }
@@ -2663,7 +2662,7 @@ pub fn DetPackPain(
     ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     unsafe {
         (*self_).think = Some(EntThink::DetPackBlow);
-        (*self_).nextthink = (*ctx.world).level.time + Q_irand(50, 100);
+        (*self_).nextthink = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(50, 100);
         (*self_).takedamage = qfalse;
     }
 }
@@ -2681,7 +2680,7 @@ pub fn DetPackDie(
 ) {
     unsafe {
         (*self_).think = Some(EntThink::DetPackBlow);
-        (*self_).nextthink = (*ctx.world).level.time + Q_irand(50, 100);
+        (*self_).nextthink = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(50, 100);
         (*self_).takedamage = qfalse;
     }
 }
@@ -3173,7 +3172,7 @@ pub fn WP_FireStunBaton(
                         || (*(*pVeh).m_pVehicleInfo).r#type == mp_bg::vehicles::vehicleType_t::VH_FLIER as c_int
                     {
                         // can zap animals
-                        (*(*tr_ent).client).ps.electrifyTime = (*ctx.world).level.time + Q_irand(3000, 4000);
+                        (*(*tr_ent).client).ps.electrifyTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(3000, 4000);
                     }
                 } else {
                     (*(*tr_ent).client).ps.electrifyTime = (*ctx.world).level.time + 700;
@@ -3892,30 +3891,30 @@ pub fn WP_VehLeadCrosshairVeh(
         if ctx.world.cvars.g_vehAutoAimLead.integer != 0 {
             if !camTraceEnt.is_null()
                 && !(*camTraceEnt).client.is_null()
-                && (*(*camTraceEnt).client).NPC_class == crate::shared::CLASS_VEHICLE
+                && (*((*camTraceEnt).client as *mut gclient_t)).NPC_class == crate::shared::CLASS_VEHICLE
             {
-                let dot = crate::q_math::DotProduct((*(*camTraceEnt).client).ps.velocity, dir);
+                let dot = crate::q_math::_DotProduct((*((*camTraceEnt).client as *mut gclient_t)).ps.velocity, dir);
                 let distAdjust = dot;
                 let mut predPos = [0.0f32; 3];
                 let mut predShotDir = [0.0f32; 3];
 
                 if distAdjust > 500.0f32
                     || crate::q_math::DistanceSquared(
-                        (*(*camTraceEnt).client).ps.origin,
+                        (*((*camTraceEnt).client as *mut gclient_t)).ps.origin,
                         shotStart,
                     ) > 7000000.0f32
                 {
-                    crate::q_math::VectorMA(newEnd, distAdjust, &dir, &mut predPos);
-                    crate::q_math::VectorSubtract(&predPos, &shotStart, &mut predShotDir);
+                    crate::q_math::_VectorMA(*newEnd, distAdjust, dir, &mut predPos);
+                    crate::q_math::_VectorSubtract(predPos, shotStart, &mut predShotDir);
                     crate::q_math::VectorNormalize(&mut predShotDir);
-                    let dot = crate::q_math::DotProduct(&predShotDir, shotDir);
+                    let dot = crate::q_math::_DotProduct(predShotDir, *shotDir);
                     if dot >= 0.75f32 {
-                        crate::q_math::VectorCopy(&predPos, newEnd);
+                        crate::q_math::_VectorCopy(predPos, newEnd);
                     }
                 }
             }
         }
-        crate::q_math::VectorSubtract(&newEnd, &shotStart, shotDir);
+        crate::q_math::_VectorSubtract(*newEnd, shotStart, shotDir);
         crate::q_math::VectorNormalize(shotDir);
     }
 }
@@ -4181,10 +4180,10 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
                             if pVeh.m_pVehicleInfo.as_ref().unwrap().vtype == VH_SPEEDER {
                                 crate::q_math::VectorSet(&mut ang, 0.0f32, pVeh.m_vOrientation[1], 0.0f32);
                             } else {
-                                crate::q_math::VectorCopy(&pVeh.m_vOrientation, &mut ang);
+                                crate::q_math::_VectorCopy(pVeh.m_vOrientation, &mut ang);
                             }
                             crate::q_math::AngleVectors(ang, Some(&mut fixedDir), None, None);
-                            crate::q_math::VectorMA(&(*ent).r.currentOrigin, 32768.0f32, &fixedDir, &mut end);
+                            crate::q_math::_VectorMA((*ent).r.currentOrigin, 32768.0f32, fixedDir, &mut end);
                             trap::Trace(
                                 ctx.engine,
                                 &mut trace,
@@ -4197,7 +4196,7 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
                             );
                             if trace.fraction < 1.0f32 && trace.allsolid == 0 && trace.startsolid == 0 {
                                 let mut newEnd = [0.0f32; 3];
-                                crate::q_math::VectorCopy(&trace.endpos, &mut newEnd);
+                                crate::q_math::_VectorCopy(trace.endpos, &mut newEnd);
                                 WP_VehLeadCrosshairVeh(
                                     ctx,
                                     &mut (*ctx.world).entities[trace.entityNum as usize].ent,
@@ -4342,7 +4341,7 @@ pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) 
                 let mut viewAngCap = [0.0f32; 3];
                 let mut override_val = 0;
 
-                crate::q_math::VectorCopy(&(*(*ent).client).ps.viewangles, &mut viewAngCap);
+                crate::q_math::_VectorCopy((*((*ent).client as *mut gclient_t)).ps.viewangles, &mut viewAngCap);
                 if viewAngCap[0] > 40.0f32 {
                     viewAngCap[0] = 40.0f32;
                 }
@@ -4375,10 +4374,10 @@ pub fn FireWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean) 
             let vehEnt = &mut (*ctx.world).entities[(*(*ent).client).ps.m_iVehicleNum as usize].ent;
 
             if (*vehEnt).inuse != 0 && !(*vehEnt).client.is_null() && !(*vehEnt).m_pVehicle.is_null() {
-                crate::q_math::VectorCopy(&(*(&mut *(*vehEnt).m_pVehicle)).m_vOrientation, &mut vehTurnAngles);
+                crate::q_math::_VectorCopy((*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_vOrientation, &mut vehTurnAngles);
                 vehTurnAngles[0] = (*(*ent).client).ps.viewangles[0];
             } else {
-                crate::q_math::VectorCopy(&(*(*ent).client).ps.viewangles, &mut vehTurnAngles);
+                crate::q_math::_VectorCopy((*((*ent).client as *mut gclient_t)).ps.viewangles, &mut vehTurnAngles);
             }
             if (*(*ent).client).pers.cmd.rightmove > 0 {
                 vehTurnAngles[1] -= 90.0f32;
@@ -4489,10 +4488,10 @@ pub fn WP_FireEmplaced(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qbool
 
         let mut side = 0;
         if (*gun).genericValue10 != 0 {
-            crate::q_math::VectorMA(&gunpoint, 10.0f32, &right, &mut gunpoint);
+            crate::q_math::_VectorMA(gunpoint, 10.0f32, right, &mut gunpoint);
             side = 0;
         } else {
-            crate::q_math::VectorMA(&gunpoint, -10.0f32, &right, &mut gunpoint);
+            crate::q_math::_VectorMA(gunpoint, -10.0f32, right, &mut gunpoint);
             side = 1;
         }
 
@@ -4556,7 +4555,7 @@ pub fn emplaced_gun_use(
         }
 
         let mut vLen = [0.0f32; 3];
-        crate::q_math::VectorSubtract(&(*self_).s.origin, &(*(*activator).client).ps.origin, &mut vLen);
+        crate::q_math::_VectorSubtract((*self_).s.origin, (*((*activator).client as *mut gclient_t)).ps.origin, &mut vLen);
         let ownLen = crate::g_client::VectorLength(vLen);
 
         if ownLen > 64.0f32 {
@@ -4568,17 +4567,17 @@ pub fn emplaced_gun_use(
         crate::q_math::AngleVectors((*(*activator).client).ps.viewangles, Some(&mut fwd1), None, None);
         crate::q_math::AngleVectors((*self_).pos1, Some(&mut fwd2), None, None);
 
-        let mut dot = crate::q_math::DotProduct(&fwd1, &fwd2);
+        let mut dot = crate::q_math::_DotProduct(fwd1, fwd2);
 
         if dot < -0.2f32 {
             TryHeal(ctx, activator, self_);
             return;
         }
 
-        crate::q_math::VectorSubtract(&(*self_).s.origin, &(*(*activator).client).ps.origin, &mut fwd1);
+        crate::q_math::_VectorSubtract((*self_).s.origin, (*((*activator).client as *mut gclient_t)).ps.origin, &mut fwd1);
         crate::q_math::VectorNormalize(&mut fwd1);
 
-        dot = crate::q_math::DotProduct(&fwd1, &fwd2);
+        dot = crate::q_math::_DotProduct(fwd1, fwd2);
 
         if dot < 0.6f32 {
             TryHeal(ctx, activator, self_);
@@ -4604,7 +4603,7 @@ pub fn emplaced_gun_use(
         (*self_).activator = activator;
 
         let mut anglesToOwner = [0.0f32; 3];
-        crate::q_math::VectorSubtract(&(*self_).r.currentOrigin, &(*(*activator).client).ps.origin, &mut anglesToOwner);
+        crate::q_math::_VectorSubtract((*self_).r.currentOrigin, (*((*activator).client as *mut gclient_t)).ps.origin, &mut anglesToOwner);
         crate::q_math::vectoangles(&anglesToOwner, &mut anglesToOwner);
     }
 }
@@ -4657,7 +4656,7 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             crate::q_math::VectorSet(&mut puffAngle, 0.0f32, 0.0f32, 1.0f32);
 
-            crate::q_math::VectorCopy(&(*self_).r.currentOrigin, &mut explOrg);
+            crate::q_math::_VectorCopy((*self_).r.currentOrigin, &mut explOrg);
             explOrg[2] += 16.0f32;
 
             G_PlayEffect(
@@ -4666,7 +4665,7 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 puffAngle,
             );
 
-            (*self_).genericValue3 = (*ctx.world).level.time + Q_irand(2500, 3500);
+            (*self_).genericValue3 = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(2500, 3500);
 
             G_RadiusDamage(
                 ctx,
@@ -4690,12 +4689,12 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 let mut smokeOrg = [0.0f32; 3];
 
                 crate::q_math::VectorSet(&mut puffAngle, 0.0f32, 0.0f32, 1.0f32);
-                crate::q_math::VectorCopy(&(*self_).r.currentOrigin, &mut smokeOrg);
+                crate::q_math::_VectorCopy((*self_).r.currentOrigin, &mut smokeOrg);
 
                 smokeOrg[2] += 60.0f32;
 
                 G_PlayEffect(crate::shared::EFFECT_SMOKE, smokeOrg, puffAngle);
-                (*self_).genericValue2 = (*ctx.world).level.time + Q_irand(250, 400);
+                (*self_).genericValue2 = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(250, 400);
             }
         }
 
@@ -4709,7 +4708,7 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
             && (*activator).inuse != 0
         {
             let mut vLen = [0.0f32; 3];
-            crate::q_math::VectorSubtract(&(*self_).s.origin, &(*((*activator).client as *mut gclient_t)).ps.origin, &mut vLen);
+            crate::q_math::_VectorSubtract((*self_).s.origin, (*((*activator).client as *mut gclient_t)).ps.origin, &mut vLen);
             let ownLen = crate::g_client::VectorLength(vLen);
 
             if ((*((*activator).client as *mut gclient_t)).pers.cmd.buttons & crate::shared::BUTTON_USE) == 0
@@ -4818,7 +4817,7 @@ pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
         );
 
         if tr.fraction != 1.0f32 && tr.allsolid == 0 && tr.startsolid == 0 {
-            crate::q_math::VectorCopy(&tr.endpos, &mut (*ent).s.origin);
+            crate::q_math::_VectorCopy(tr.endpos, &mut (*ent).s.origin);
         }
 
         (*ent).spawnflags |= 4; // deadsolid
@@ -4863,9 +4862,9 @@ pub fn SP_emplaced_gun(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         G_SetOrigin(ent, (*ent).s.origin);
 
-        crate::q_math::VectorCopy(&(*ent).s.angles, &mut (*ent).pos1);
-        crate::q_math::VectorCopy(&(*ent).s.angles, &mut (*ent).r.currentAngles);
-        crate::q_math::VectorCopy(&(*ent).s.angles, &mut (*ent).s.apos.trBase);
+        crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).pos1);
+        crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).r.currentAngles);
+        crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
 
         (*ent).think = Some(EntThink::emplaced_gun_update);
         (*ent).nextthink = (*ctx.world).level.time + 50;

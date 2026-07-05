@@ -95,7 +95,7 @@ pub fn G_FindTeams(ctx: GameContext<'_>) {
     unsafe {
         let world = &mut *ctx.world;
         let num_entities = world.level.num_entities;
-        let base: *mut gentity_t = world.entities.as_mut_ptr();
+        let base: *mut gentity_t = world.g_entities.as_mut_ptr();
         let mut i: c_int = 1;
         while i < num_entities {
             let e = &mut *base.add(i as usize);
@@ -310,7 +310,7 @@ pub fn AddTournamentPlayer(ctx: GameContext<'_>) {
 
         // set them to free-for-all team
         let idx = next_in_line.offset_from(clients) as usize;
-        let ent = (*ctx.world).entities.as_mut_ptr().add(idx);
+        let ent = (*ctx.world).g_entities.as_mut_ptr().add(idx);
         let s = CString::new("f").unwrap();
         SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
     }
@@ -332,7 +332,7 @@ pub fn RemoveTournamentLoser(ctx: GameContext<'_>) {
         }
 
         // make them a spectator
-        let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+        let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
         let s = CString::new("s").unwrap();
         SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
     }
@@ -350,7 +350,7 @@ pub fn G_PowerDuelCount(
     unsafe {
         let mut i: c_int = 0;
         while (i as usize) < MAX_CLIENTS {
-            let ent = (*ctx.world).entities.as_mut_ptr().add(i as usize);
+            let ent = (*ctx.world).g_entities.as_mut_ptr().add(i as usize);
             let cl = (*ent).client as *mut gclient_t;
 
             if (*ent).inuse != QFALSE
@@ -448,7 +448,7 @@ pub fn AddPowerDuelPlayers(ctx: GameContext<'_>) {
 
         // set them to free-for-all team
         let idx = next_in_line.offset_from(clients) as usize;
-        let ent = (*ctx.world).entities.as_mut_ptr().add(idx);
+        let ent = (*ctx.world).g_entities.as_mut_ptr().add(idx);
         let s = CString::new("f").unwrap();
         SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
 
@@ -491,7 +491,7 @@ pub fn RemovePowerDuelLosers(ctx: GameContext<'_>) {
         let mut j = 0;
         while j < remNum {
             // set them all to spectator
-            let ent = (*ctx.world).entities.as_mut_ptr().add(remClients[j] as usize);
+            let ent = (*ctx.world).g_entities.as_mut_ptr().add(remClients[j] as usize);
             let s = CString::new("s").unwrap();
             SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
             j += 1;
@@ -536,12 +536,12 @@ pub fn RemoveDuelDrawLoser(ctx: GameContext<'_>) {
         let s = CString::new("s").unwrap();
         if cl_failure != 2 {
             let clientNum = (*ctx.world).level.sortedClients[cl_failure as usize];
-            let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+            let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
             SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
         } else {
             // we could be more elegant about this, but oh well.
             let clientNum = (*ctx.world).level.sortedClients[1];
-            let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+            let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
             SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
         }
     }
@@ -563,7 +563,7 @@ pub fn RemoveTournamentWinner(ctx: GameContext<'_>) {
         }
 
         // make them a spectator
-        let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+        let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
         let s = CString::new("s").unwrap();
         SetTeam(ctx, ent, s.as_ptr() as *mut c_char);
     }
@@ -752,7 +752,7 @@ pub fn G_CanResetDuelists(ctx: GameContext<'_>) -> qboolean {
         while i < 3 {
             // precheck to make sure they are all respawnable
             let clientNum = (*ctx.world).level.sortedClients[i];
-            let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+            let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
             let cl = (*ent).client as *mut gclient_t;
 
             if (*ent).inuse == QFALSE
@@ -781,7 +781,7 @@ pub fn G_ResetDuelists(ctx: GameContext<'_>) {
         let mut i = 0;
         while i < 3 {
             let clientNum = (*ctx.world).level.sortedClients[i];
-            let ent = (*ctx.world).entities.as_mut_ptr().add(clientNum as usize);
+            let ent = (*ctx.world).g_entities.as_mut_ptr().add(clientNum as usize);
 
             (*ctx.world).globals.g_noPDuelCheck = QTRUE;
             crate::g_combat::player_die(ctx, ent, ent, ent, 999, MOD_SUICIDE);
@@ -846,7 +846,7 @@ pub fn CalculateRanks(ctx: GameContext<'_>) {
                         {
                             world.level.numPlayingClients += 1;
                         }
-                        if world.entities[i as usize].r.svFlags & SVF_BOT == 0 {
+                        if world.g_entities[i as usize].r.svFlags & SVF_BOT == 0 {
                             world.level.numVotingClients += 1;
                             if world.clients[i as usize].sess.sessionTeam == TEAM_RED {
                                 world.level.numteamVotingClients[0] += 1;
@@ -1029,7 +1029,7 @@ pub fn SendScoreboardMessageToAllClients(ctx: GameContext<'_>) {
     unsafe {
         let maxclients = (*ctx.world).level.maxclients;
         let clients = (*ctx.world).clients.as_mut_ptr();
-        let entities = (*ctx.world).entities.as_mut_ptr();
+        let entities = (*ctx.world).g_entities.as_mut_ptr();
         let mut i: c_int = 0;
         while i < maxclients {
             if (*clients.add(i as usize)).pers.connected == CON_CONNECTED {
@@ -1174,7 +1174,7 @@ pub fn BeginIntermission(ctx: GameContext<'_>) {
         // move all clients to the intermission point
         let mut i: c_int = 0;
         while i < world.level.maxclients {
-            let client = world.entities.as_mut_ptr().add(i as usize);
+            let client = world.g_entities.as_mut_ptr().add(i as usize);
             if (*client).inuse == QFALSE {
                 i += 1;
                 continue;
@@ -1464,7 +1464,7 @@ pub fn CheckIntermissionExit(ctx: GameContext<'_>) {
                 i += 1;
                 continue;
             }
-            if world.entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT != 0 {
+            if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT != 0 {
                 i += 1;
                 continue;
             }
@@ -1813,7 +1813,7 @@ pub fn CheckExitRules(ctx: GameContext<'_>) {
             let mut i: c_int = 0;
             let mut num_live_clients: c_int = 0;
             while (i as usize) < MAX_CLIENTS {
-                let ent = &world.entities[i as usize];
+                let ent = &world.g_entities[i as usize];
                 if ent.inuse != QFALSE && !ent.client.is_null() && ent.health > 0 {
                     let cl = &*ent.client;
                     if cl.sess.sessionTeam != TEAM_SPECTATOR && cl.ps.pm_flags & PMF_FOLLOW == 0 {
@@ -2025,7 +2025,7 @@ pub fn G_RemoveDuelist(
 ) {
     unsafe {
         let mut i: usize = 0;
-        let entities = (*ctx.world).entities.as_mut_ptr();
+        let entities = (*ctx.world).g_entities.as_mut_ptr();
         while i < MAX_CLIENTS {
             let ent = entities.add(i);
             let cl = (*ent).client as *mut gclient_t;
@@ -2324,7 +2324,7 @@ pub fn G_KickAllBots(ctx: GameContext<'_>) {
                 i += 1;
                 continue;
             }
-            if world.entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
+            if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
                 i += 1;
                 continue;
             }
@@ -2576,7 +2576,7 @@ pub fn CheckTeamLeader(
                     i += 1;
                     continue;
                 }
-                if world.entities[i as usize].r.svFlags & SVF_BOT == 0 {
+                if world.g_entities[i as usize].r.svFlags & SVF_BOT == 0 {
                     world.clients[i as usize].sess.teamLeader = QTRUE;
                     break;
                 }
@@ -2874,7 +2874,7 @@ pub fn G_RunFrame(
             // check for a respawn wave
             let mut i: c_int = 0;
             while (i as usize) < MAX_CLIENTS {
-                let cl_ent = world.entities.as_mut_ptr().add(i as usize);
+                let cl_ent = world.g_entities.as_mut_ptr().add(i as usize);
                 if (*cl_ent).inuse != QFALSE
                     && !(*cl_ent).client.is_null()
                     && (*(*cl_ent).client).tempSpectate > world.level.time
@@ -2982,7 +2982,7 @@ pub fn G_RunFrame(
             // remember last waypoint, clear current one
             let mut i: c_int = 0;
             while i < world.level.num_entities {
-                let ent = world.entities.as_mut_ptr().add(i as usize);
+                let ent = world.g_entities.as_mut_ptr().add(i as usize);
                 if (*ent).inuse == QFALSE {
                     i += 1;
                     continue;
@@ -3015,7 +3015,7 @@ pub fn G_RunFrame(
         //
         let mut i: c_int = 0;
         while i < world.level.num_entities {
-            let ent = world.entities.as_mut_ptr().add(i as usize);
+            let ent = world.g_entities.as_mut_ptr().add(i as usize);
             if (*ent).inuse == QFALSE {
                 i += 1;
                 continue;
@@ -3087,7 +3087,7 @@ pub fn G_RunFrame(
                 let client = (*ent).client;
                 if (*client).inSpaceIndex != 0 && (*client).inSpaceIndex != ENTITYNUM_NONE {
                     // we're in space, check for suffocating and for exiting
-                    let spacetrigger = world.entities.as_mut_ptr().add((*client).inSpaceIndex as usize);
+                    let spacetrigger = world.g_entities.as_mut_ptr().add((*client).inSpaceIndex as usize);
 
                     if (*spacetrigger).inuse == QFALSE
                         || G_PointInBounds((*client).ps.origin, (*spacetrigger).r.absmin, (*spacetrigger).r.absmax) == QFALSE
@@ -3122,7 +3122,7 @@ pub fn G_RunFrame(
 
                 if (*client).isHacking != 0 {
                     // hacking checks
-                    let hacked = world.entities.as_mut_ptr().add((*client).isHacking as usize);
+                    let hacked = world.g_entities.as_mut_ptr().add((*client).isHacking as usize);
                     let mut ang_dif: vec3_t = [0.0; 3];
 
                     crate::q_math::_VectorSubtract((*client).ps.viewangles, (*client).hackingAngles, &mut ang_dif);
@@ -3269,7 +3269,7 @@ pub fn G_RunFrame(
         // perform final fixups on the players
         let mut i: c_int = 0;
         while i < world.level.maxclients {
-            let ent = world.entities.as_mut_ptr().add(i as usize);
+            let ent = world.g_entities.as_mut_ptr().add(i as usize);
             if (*ent).inuse != QFALSE {
                 ClientEndFrame(ctx, ent);
             }
@@ -3298,7 +3298,7 @@ pub fn G_RunFrame(
         if world.cvars.g_listEntity.integer != 0 {
             let mut i: c_int = 0;
             while (i as usize) < MAX_GENTITIES {
-                let classname = world.entities[i as usize].classname;
+                let classname = world.g_entities[i as usize].classname;
                 let name = if classname.is_null() { String::new() } else { cstr_to_str(classname) };
                 G_Printf(ctx, cstr(&format!("{:4}: {}\n", i, name)).as_ptr());
                 i += 1;

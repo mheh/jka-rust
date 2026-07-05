@@ -18,7 +18,6 @@
 
 use crate::prelude::*;
 use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorNormalize2};
-use crate::bg_pmove::{PM_AddEvent, PM_AddTouchEnt};
 use crate::g_main::Com_Printf;
 use mp_qshared::shared::trajectory::trType_t;
 
@@ -49,7 +48,7 @@ impl PmoveContext<'_> {
     /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:49-557`
     pub fn PM_VehicleImpact(&mut self, pEnt: *mut bgEntity_t, trace: *mut trace_t) {
         unsafe {
-            let pSelfVeh = (*pEnt).m_pVehicle;
+            let pSelfVeh = ((*pEnt).m_pVehicle as *mut Vehicle_t);
             let pSelfVehInfo = (*pSelfVeh).m_pVehicleInfo;
             let ps = (*self.pm).ps;
             let velocity = (*ps).velocity;
@@ -61,7 +60,7 @@ impl PmoveContext<'_> {
             let mut forceSurfDestruction: qboolean = QFALSE;
 
             let hitEnt: *mut bgEntity_t = if !trace.is_null() {
-                self.PM_BGEntForNum((*trace).entityNum)
+                self.PM_BGEntForNum((*trace).entityNum as c_int)
             } else {
                 core::ptr::null_mut()
             };
@@ -99,7 +98,7 @@ impl PmoveContext<'_> {
                     );
                     return;
                 } else if (*trace).plane.normal != [0.0, 0.0, 0.0]
-                    && ((*trace).entityNum == ENTITYNUM_WORLD as c_int
+                    && ((*trace).entityNum as c_int == ENTITYNUM_WORLD as c_int
                         || (*hitEnt).r.bmodel != 0)
                 {
                     // have a valid hit plane and we hit a solid brush
@@ -125,7 +124,7 @@ impl PmoveContext<'_> {
                 }
             }
 
-            if (*trace).entityNum < ENTITYNUM_WORLD as c_int
+            if ((*trace).entityNum as c_int) < ENTITYNUM_WORLD as c_int
                 && (*hitEnt).s.eType == ET_MOVER as c_int
                 && (*hitEnt).s.apos.trType as c_int != trType_t::TR_STATIONARY as c_int
                 && ((*hitEnt).spawnflags & 16) != 0
@@ -151,7 +150,7 @@ impl PmoveContext<'_> {
                     || (*pSelfVehInfo).r#type as c_int == VH_FIGHTER as c_int)
                 && (magnitude >= 100.0 || forceSurfDestruction != 0)
             {
-                if (*(*pEnt).m_pVehicle).m_iHitDebounce < (*self.pm).cmd.serverTime
+                if (*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_iHitDebounce < (*self.pm).cmd.serverTime
                     || forceSurfDestruction != 0
                 {
                     let mut noDamage: qboolean = QFALSE;
@@ -165,7 +164,7 @@ impl PmoveContext<'_> {
                         let l0 = (*ps).speed * 0.5;
                         let mut bounceDir: vec3_t = [0.0; 3];
 
-                        if ((*trace).entityNum == ENTITYNUM_WORLD as c_int
+                        if ((*trace).entityNum as c_int == ENTITYNUM_WORLD as c_int
                             || (*hitEnt).s.solid == SOLID_BMODEL as c_int)
                             && (*trace).plane.normal != [0.0, 0.0, 0.0]
                         {
@@ -188,9 +187,9 @@ impl PmoveContext<'_> {
                         } else if (*pSelfVehInfo).r#type as c_int == VH_FIGHTER as c_int {
                             // check for impact with another fighter
                             if (*hitEnt).s.NPC_class == CLASS_VEHICLE as c_int
-                                && !(*hitEnt).m_pVehicle.is_null()
-                                && !(*(*hitEnt).m_pVehicle).m_pVehicleInfo.is_null()
-                                && (*(*(*hitEnt).m_pVehicle).m_pVehicleInfo).r#type as c_int
+                                && !((*hitEnt).m_pVehicle as *mut Vehicle_t).is_null()
+                                && !(*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo.is_null()
+                                && (*(*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type as c_int
                                     == VH_FIGHTER as c_int
                             {
                                 // two vehicles hit each other, turn away from the impact
@@ -218,8 +217,8 @@ impl PmoveContext<'_> {
                                 }
                             } else {
                                 // hit another fighter
-                                let hitSpeed = if !(*hitEnt).client.is_null() {
-                                    (*(*hitEnt).client).ps.speed
+                                let hitSpeed = if !((*hitEnt).client as *mut gclient_t).is_null() {
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.speed
                                 } else {
                                     (*hitEnt).s.speed
                                 };
@@ -292,11 +291,11 @@ impl PmoveContext<'_> {
                             // (client/spawnflags/m_pVehicle). Transcribed literally
                             // below; several field accesses are bg-tier gaps.
                             if turnHitEnt != 0
-                                && !(*hitEnt).client.is_null()
-                                && FighterIsLanded((*hitEnt).m_pVehicle, core::ptr::addr_of_mut!((*(*hitEnt).client).ps)) == 0
+                                && !((*hitEnt).client as *mut gclient_t).is_null()
+                                && FighterIsLanded(((*hitEnt).m_pVehicle as *mut Vehicle_t), core::ptr::addr_of_mut!((*((*hitEnt).client as *mut gclient_t)).ps)) == 0
                                 && ((*hitEnt).spawnflags & 2) == 0
                             {
-                                let l = (*(*hitEnt).client).ps.speed;
+                                let l = (*((*hitEnt).client as *mut gclient_t)).ps.speed;
                                 for i in 0..3 {
                                     bounceDir[i] = -bounceDir[i];
                                 }
@@ -305,13 +304,13 @@ impl PmoveContext<'_> {
                                 for i in 0..3 {
                                     pushDir2[i] = bounceDir[i] * scale;
                                 }
-                                let hitVehInfo = (*(*hitEnt).m_pVehicle).m_pVehicleInfo;
+                                let hitVehInfo = (*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo;
                                 let scale2 = l * 0.5 / (*hitVehInfo).mass as f32;
                                 for i in 0..3 {
                                     pushDir2[i] *= scale2;
                                 }
                                 let mut moveDir2: vec3_t = [0.0; 3];
-                                VectorNormalize2((*(*hitEnt).client).ps.velocity, &mut moveDir2);
+                                VectorNormalize2((*((*hitEnt).client as *mut gclient_t)).ps.velocity, &mut moveDir2);
                                 let mut bounceDot2 = -(moveDir2[0] * bounceDir[0]
                                     + moveDir2[1] * bounceDir[1]
                                     + moveDir2[2] * bounceDir[2]);
@@ -322,7 +321,7 @@ impl PmoveContext<'_> {
                                     pushDir2[i] *= bounceDot2;
                                 }
                                 for i in 0..3 {
-                                    (*(*hitEnt).client).ps.velocity[i] += pushDir2[i];
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity[i] += pushDir2[i];
                                 }
                                 let mut turnDivider2 = (*hitVehInfo).mass as f32 / 400.0;
                                 if turnHitEnt != 0 {
@@ -334,7 +333,7 @@ impl PmoveContext<'_> {
                                 let mut turnAwayAngles2: vec3_t = [0.0; 3];
                                 let mut turnDelta2: vec3_t = [0.0; 3];
                                 vectoangles(bounceDir, &mut turnAwayAngles2);
-                                let hitOrient = &mut *(*(*hitEnt).m_pVehicle).m_vOrientation.cast::<vec3_t>();
+                                let hitOrient = &mut *(*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_vOrientation.cast::<vec3_t>();
                                 AnglesSubtract(turnAwayAngles2, *hitOrient, &mut turnDelta2);
                                 if bounceDir[2] != 0.0 {
                                     let mut pitchTurnStrength2 = turnStrength * turnDelta2[PITCH as usize];
@@ -343,7 +342,7 @@ impl PmoveContext<'_> {
                                     } else if pitchTurnStrength2 < -MAX_IMPACT_TURN_ANGLE {
                                         pitchTurnStrength2 = -MAX_IMPACT_TURN_ANGLE;
                                     }
-                                    (*(*hitEnt).m_pVehicle).m_vFullAngleVelocity[PITCH as usize] =
+                                    (*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_vFullAngleVelocity[PITCH as usize] =
                                         AngleNormalize180(hitOrient[PITCH as usize] + pitchTurnStrength2 / turnDivider2 * (*pSelfVeh).m_fTimeModifier);
                                 }
                                 if bounceDir[0] != 0.0 || bounceDir[1] != 0.0 {
@@ -353,7 +352,7 @@ impl PmoveContext<'_> {
                                     } else if yawTurnStrength2 < -MAX_IMPACT_TURN_ANGLE {
                                         yawTurnStrength2 = -MAX_IMPACT_TURN_ANGLE;
                                     }
-                                    (*(*hitEnt).m_pVehicle).m_vFullAngleVelocity[ROLL as usize] =
+                                    (*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_vFullAngleVelocity[ROLL as usize] =
                                         AngleNormalize180(hitOrient[ROLL as usize] - yawTurnStrength2 / turnDivider2 * (*pSelfVeh).m_fTimeModifier);
                                 }
                             }
@@ -370,7 +369,7 @@ impl PmoveContext<'_> {
                         // tempent use bad! (Raven comment)
                         self.callbacks.add_event((*pEnt).s.number, EV_PLAY_EFFECT_ID as c_int, (*pSelfVehInfo).iImpactFX);
                     }
-                    (*(*pEnt).m_pVehicle).m_iHitDebounce = (*self.pm).cmd.serverTime + 200;
+                    (*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_iHitDebounce = (*self.pm).cmd.serverTime + 200;
                     magnitude /= (*pSelfVehInfo).toughness * 50.0;
 
                     if (*hitEnt).s.eType != ET_TERRAIN as c_int
@@ -388,7 +387,7 @@ impl PmoveContext<'_> {
                             if (*hitEnt).inuse != 0 && (*hitEnt).takedamage != 0 {
                                 if (*hitEnt).s.eType == ET_NPC as c_int
                                     && (*hitEnt).s.NPC_class == CLASS_VEHICLE as c_int
-                                    && !(*hitEnt).m_pVehicle.is_null()
+                                    && !((*hitEnt).m_pVehicle as *mut Vehicle_t).is_null()
                                 {
                                     mult = 1.5;
                                 } else {
@@ -449,26 +448,26 @@ impl PmoveContext<'_> {
                                 pmult = 40.0;
                             }
 
-                            if !(*hitEnt).client.is_null()
-                                && BG_KnockDownable(core::ptr::addr_of_mut!((*(*hitEnt).client).ps)) != 0
+                            if !((*hitEnt).client as *mut gclient_t).is_null()
+                                && BG_KnockDownable(core::ptr::addr_of_mut!((*((*hitEnt).client as *mut gclient_t)).ps)) != 0
                                 && self.callbacks.can_be_enemy((*pEnt).s.number, (*hitEnt).s.number) != 0
                             {
                                 // smash!
-                                if (*(*hitEnt).client).ps.forceHandExtend != HANDEXTEND_KNOCKDOWN as c_int {
-                                    (*(*hitEnt).client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
-                                    (*(*hitEnt).client).ps.forceHandExtendTime = (*self.pm).cmd.serverTime + 1100;
-                                    (*(*hitEnt).client).ps.forceDodgeAnim = 0;
+                                if (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_KNOCKDOWN as c_int {
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtendTime = (*self.pm).cmd.serverTime + 1100;
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.forceDodgeAnim = 0;
                                 }
-                                (*(*hitEnt).client).ps.otherKiller = (*pEnt).s.number;
-                                (*(*hitEnt).client).ps.otherKillerTime = (*self.pm).cmd.serverTime + 5000;
-                                (*(*hitEnt).client).ps.otherKillerDebounceTime = (*self.pm).cmd.serverTime + 100;
-                                (*(*hitEnt).client).otherKillerMOD = MOD_COLLISION as c_int;
-                                (*(*hitEnt).client).otherKillerVehWeapon = 0;
-                                (*(*hitEnt).client).otherKillerWeaponType = WP_NONE as c_int;
+                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKiller = (*pEnt).s.number;
+                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKillerTime = (*self.pm).cmd.serverTime + 5000;
+                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKillerDebounceTime = (*self.pm).cmd.serverTime + 100;
+                                (*((*hitEnt).client as *mut gclient_t)).otherKillerMOD = MOD_COLLISION as c_int;
+                                (*((*hitEnt).client as *mut gclient_t)).otherKillerVehWeapon = 0;
+                                (*((*hitEnt).client as *mut gclient_t)).otherKillerWeaponType = WP_NONE as c_int;
                                 for i in 0..3 {
-                                    (*(*hitEnt).client).ps.velocity[i] += (*ps).velocity[i];
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity[i] += (*ps).velocity[i];
                                 }
-                                (*(*hitEnt).client).ps.velocity[2] += 200.0;
+                                (*((*hitEnt).client as *mut gclient_t)).ps.velocity[2] += 200.0;
                             }
                         }
 
@@ -535,7 +534,7 @@ impl PmoveContext<'_> {
     /// Source: `oracle/oracle/codemp/game/bg_slidemove.c:590-623`
     pub fn PM_ClientImpact(&mut self, trace: *mut trace_t) -> qboolean {
         unsafe {
-            let otherEntityNum = (*trace).entityNum;
+            let otherEntityNum = (*trace).entityNum as c_int;
 
             if self.pm_entSelf.is_null() {
                 return QFALSE;
@@ -582,7 +581,7 @@ impl PmoveContext<'_> {
 
             if gravity != 0 {
                 endVelocity = (*ps).velocity;
-                endVelocity[2] -= (*ps).gravity * self.pml.frametime;
+                endVelocity[2] -= (*ps).gravity as f32 * self.pml.frametime;
                 (*ps).velocity[2] = ((*ps).velocity[2] + endVelocity[2]) * 0.5;
                 primal_velocity[2] = endVelocity[2];
                 if self.pml.groundPlane != 0 {
@@ -653,14 +652,14 @@ impl PmoveContext<'_> {
                 }
 
                 // save entity for contact
-                PM_AddTouchEnt(trace.entityNum);
+                self.PM_AddTouchEnt(trace.entityNum as c_int);
 
                 if (*ps).clientNum >= MAX_CLIENTS as c_int {
                     let pEnt = self.pm_entSelf;
                     if !pEnt.is_null()
                         && (*pEnt).s.eType == ET_NPC as c_int
                         && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int
-                        && !(*pEnt).m_pVehicle.is_null()
+                        && !((*pEnt).m_pVehicle as *mut Vehicle_t).is_null()
                     {
                         // do vehicle impact stuff then
                         self.PM_VehicleImpact(pEnt, &mut trace);
@@ -856,8 +855,8 @@ impl PmoveContext<'_> {
             if (*ps).clientNum >= MAX_CLIENTS as c_int
                 && !pEnt.is_null()
                 && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int
-                && !(*pEnt).m_pVehicle.is_null()
-                && (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).hoverHeight > 0.0
+                && !((*pEnt).m_pVehicle as *mut Vehicle_t).is_null()
+                && (*(*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).hoverHeight > 0.0
             {
                 return;
             }
@@ -897,8 +896,8 @@ impl PmoveContext<'_> {
                 if (!pEnt.is_null() && (*pEnt).s.NPC_class == CLASS_ATST as c_int)
                     || (!pEnt.is_null()
                         && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int
-                        && !(*pEnt).m_pVehicle.is_null()
-                        && (*(*(*pEnt).m_pVehicle).m_pVehicleInfo).r#type as c_int == VH_WALKER as c_int)
+                        && !((*pEnt).m_pVehicle as *mut Vehicle_t).is_null()
+                        && (*(*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type as c_int == VH_WALKER as c_int)
                 {
                     // AT-STs can step high
                     up[2] += 66.0;
@@ -974,7 +973,7 @@ impl PmoveContext<'_> {
             if trace.allsolid == 0 && skipStep == 0 {
                 if (*ps).clientNum >= MAX_CLIENTS as c_int
                     && isGiant != 0
-                    && trace.entityNum < MAX_CLIENTS as c_int
+                    && (trace.entityNum as c_int) < MAX_CLIENTS as c_int
                     && !pEnt.is_null()
                     && (*pEnt).s.NPC_class == CLASS_RANCOR as c_int
                 {
@@ -1019,7 +1018,7 @@ impl PmoveContext<'_> {
                 } else {
                     EV_STEP_16 as c_int
                 };
-                PM_AddEvent(ent);
+                self.PM_AddEvent(ent);
             }
             if (*self.pm).debugLevel != 0 {
                 // Com_Printf("%i:stepped\n", c_pmove);

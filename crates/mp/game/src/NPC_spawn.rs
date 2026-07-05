@@ -9,6 +9,9 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+// Dedupe SVF_NOCLIENT glob ambiguity (g_items::* / g_public_consts::* both
+// define it): the canonical home is g_public_consts, per house convention.
+use crate::g_public_consts::SVF_NOCLIENT;
 
 // Unported types referenced in this file (need porting before this compiles):
 // PAIN_FUNC, TOUCH_FUNC

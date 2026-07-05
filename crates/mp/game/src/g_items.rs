@@ -112,7 +112,9 @@ const MASK_SHOT: c_int = CONTENTS_SOLID
 // Raven `g_local.h` SVF_* svflags #defines — transcribed locally per the
 // `g_combat.rs:876` precedent (not yet ported).
 // Source: `oracle/oracle/codemp/game/g_local.h`
-pub(crate) const SVF_NOCLIENT: c_int = 0x0000_0001;
+// SVF_NOCLIENT canonicalized to `g_public_consts::SVF_NOCLIENT` (dedupe:
+// glob-import ambiguity, ruling per porting-rules known-debt list).
+use crate::g_public_consts::SVF_NOCLIENT;
 const SVF_BROADCAST: c_int = 0x0000_0020;
 const SVF_SINGLECLIENT: c_int = 0x0000_0040;
 
@@ -382,7 +384,7 @@ pub fn ShieldTouch(
 ) {
     unsafe {
         let parent = match (*self_).parent {
-            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
 
@@ -592,9 +594,9 @@ pub fn PlaceShield(
         let shieldItem = BG_FindItemForHoldable(HI_SHIELD);
 
         // can we place this in front of us?
-        AngleVectors((*(*playerent).client).ps.viewangles, Some(&mut fwd), None, None);
+        AngleVectors((*(*playerent).client as *mut gclient_t).ps.viewangles, Some(&mut fwd), None, None);
         fwd[2] = 0.0;
-        dest = (*(*playerent).client).ps.origin;
+        dest = (*(*playerent).client as *mut gclient_t).ps.origin;
         for i in 0..3 {
             dest[i] += SHIELD_PLACEDIST * fwd[i];
         }
@@ -602,7 +604,7 @@ pub fn PlaceShield(
             ctx.engine,
             GTraceArgs::new(
                 &mut tr as *mut trace_t,
-                &(*(*playerent).client).ps.origin as *const vec3_t,
+                &(*(*playerent).client as *mut gclient_t).ps.origin as *const vec3_t,
                 &mins as *const vec3_t,
                 &maxs as *const vec3_t,
                 &dest as *const vec3_t,
@@ -636,7 +638,7 @@ pub fn PlaceShield(
                 (*shield).parent = playerent;
 
                 // Set team number.
-                (*shield).s.otherEntityNum2 = (*(*playerent).client).sess.sessionTeam;
+                (*shield).s.otherEntityNum2 = (*(*playerent).client as *mut gclient_t).sess.sessionTeam;
 
                 (*shield).s.eType = ET_SPECIAL as c_int;
                 (*shield).s.modelindex = HI_SHIELD as c_int; // this'll be used in CG_Useable() for rendering.
@@ -661,7 +663,7 @@ pub fn PlaceShield(
                 (*shield).s.owner = (*playerent).s.number;
                 (*shield).s.shouldtarget = qtrue;
                 if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
-                    (*shield).s.teamowner = (*(*playerent).client).sess.sessionTeam;
+                    (*shield).s.teamowner = (*(*playerent).client as *mut gclient_t).sess.sessionTeam;
                 } else {
                     (*shield).s.teamowner = 16;
                 }
@@ -691,19 +693,19 @@ pub fn ItemUse_Binoculars(
             return;
         }
 
-        if (*(*ent).client).ps.weaponstate != WEAPON_READY {
+        if (*(*ent).client as *mut gclient_t).ps.weaponstate != WEAPON_READY {
             // So we can't fool it and reactivate while switching to the saber or something.
             return;
         }
 
-        if (*(*ent).client).ps.zoomMode == 0 {
+        if (*(*ent).client as *mut gclient_t).ps.zoomMode == 0 {
             // not zoomed or currently zoomed with the disruptor
-            (*(*ent).client).ps.zoomMode = 2;
-            (*(*ent).client).ps.zoomLocked = qfalse;
-            (*(*ent).client).ps.zoomFov = 40.0;
-        } else if (*(*ent).client).ps.zoomMode == 2 {
-            (*(*ent).client).ps.zoomMode = 0;
-            (*(*ent).client).ps.zoomTime = (*ctx.world).level.time;
+            (*(*ent).client as *mut gclient_t).ps.zoomMode = 2;
+            (*(*ent).client as *mut gclient_t).ps.zoomLocked = qfalse;
+            (*(*ent).client as *mut gclient_t).ps.zoomFov = 40.0;
+        } else if (*(*ent).client as *mut gclient_t).ps.zoomMode == 2 {
+            (*(*ent).client as *mut gclient_t).ps.zoomMode = 0;
+            (*(*ent).client as *mut gclient_t).ps.zoomTime = (*ctx.world).level.time;
         }
     }
 }
@@ -744,7 +746,7 @@ pub fn pas_fire(
 
         // Raven derefs `ent->enemy` unconditionally; callers only invoke
         // `pas_fire` when `ent->enemy` is non-null (see `pas_think`).
-        let enemy = &mut (*ctx.world).entities[(*ent).enemy.unwrap().index()] as *mut gentity_t;
+        let enemy = &mut (*ctx.world).g_entities[(*ent).enemy.unwrap().index()] as *mut gentity_t;
         let mut enOrg = (*((*enemy).client as *mut gclient_t)).ps.origin;
         enOrg[2] += 24.0;
 
@@ -755,7 +757,7 @@ pub fn pas_fire(
         myOrg[1] += fwd[1] * 16.0;
         myOrg[2] += fwd[2] * 16.0;
 
-        let target = &mut (*ctx.world).entities[(*ent).genericValue3 as usize] as *mut gentity_t;
+        let target = &mut (*ctx.world).g_entities[(*ent).genericValue3 as usize] as *mut gentity_t;
         WP_FireTurretMissile(ctx, target, myOrg, fwd, qfalse, 10, 2300, MOD_SENTRY as c_int, ent);
 
         G_RunObject(ctx, ent);
@@ -871,7 +873,7 @@ pub fn pas_adjust_enemy(
         let mut keep = qtrue;
         // Raven derefs `ent->enemy` unconditionally here; callers only invoke
         // `pas_adjust_enemy` when `ent->enemy` is non-null (see `pas_think`).
-        let enemy = &mut (*ctx.world).entities[(*ent).enemy.unwrap().index()] as *mut gentity_t;
+        let enemy = &mut (*ctx.world).g_entities[(*ent).enemy.unwrap().index()] as *mut gentity_t;
 
         if (*enemy).health <= 0 {
             keep = qfalse;
@@ -968,8 +970,8 @@ pub fn pas_think(
                 numListedEntities = trap::EntitiesInBox(
                     ctx.engine,
                     GEntitiesInBoxArgs::new(
-                        &(*ctx.world).entities[clNum as usize].r.absmin as *const vec3_t,
-                        &(*ctx.world).entities[clNum as usize].r.absmax as *const vec3_t,
+                        &(*ctx.world).g_entities[clNum as usize].r.absmin as *const vec3_t,
+                        &(*ctx.world).g_entities[clNum as usize].r.absmax as *const vec3_t,
                         iEntityList.as_mut_ptr(),
                         MAX_GENTITIES as c_int,
                     ),
@@ -999,9 +1001,9 @@ pub fn pas_think(
         }
 
         let ownerIdx = (*ent).genericValue3 as usize;
-        if (*ctx.world).entities[ownerIdx].inuse == 0
-            || (*ctx.world).entities[ownerIdx].client.is_null()
-            || (*((*ctx.world).entities[ownerIdx].client as *mut gclient_t)).sess.sessionTeam != (*ent).genericValue2
+        if (*ctx.world).g_entities[ownerIdx].inuse == 0
+            || (*ctx.world).g_entities[ownerIdx].client.is_null()
+            || (*((*ctx.world).g_entities[ownerIdx].client as *mut gclient_t)).sess.sessionTeam != (*ent).genericValue2
         {
             (*ent).think = Some(EntThink::G_FreeEntity);
             (*ent).nextthink = (*ctx.world).level.time;
@@ -1034,7 +1036,7 @@ pub fn pas_think(
         }
 
         if let Some(enemy_id) = (*ent).enemy {
-            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             if (*enemy).client.is_null() {
                 (*ent).enemy = None;
             } else if (*enemy).s.number == (*ent).s.number {
@@ -1049,7 +1051,7 @@ pub fn pas_think(
         }
 
         if let Some(enemy_id) = (*ent).enemy {
-            (*ent).s.bolt2 = (*ctx.world).entities[enemy_id.index()].s.number;
+            (*ent).s.bolt2 = (*ctx.world).g_entities[enemy_id.index()].s.number;
         } else {
             (*ent).s.bolt2 = ENTITYNUM_NONE;
         }
@@ -1064,7 +1066,7 @@ pub fn pas_think(
         if let Some(enemy_id) = (*ent).enemy {
             // ...then we'll calculate what new aim adjustments we should attempt to make this frame
             // Aim at enemy
-            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             let org = if !(*enemy).client.is_null() {
                 (*((*enemy).client as *mut gclient_t)).ps.origin
             } else {
@@ -1159,7 +1161,7 @@ pub fn turret_die(
             G_UseTargets(ctx, self_, attacker);
         }
 
-        let owner = &mut (*ctx.world).entities[(*self_).genericValue3 as usize] as *mut gentity_t;
+        let owner = &mut (*ctx.world).g_entities[(*self_).genericValue3 as usize] as *mut gentity_t;
         if (*owner).inuse == 0 || (*owner).client.is_null() {
             G_FreeEntity(ctx, self_);
             return;
@@ -1758,7 +1760,7 @@ pub fn EWebDie(
         G_PlayEffect(EFFECT_EXPLOSION_DETPACK as c_int, (*self_).r.currentOrigin, fxDir);
 
         if (*self_).r.ownerNum != ENTITYNUM_NONE {
-            let owner = &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+            let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
             if (*owner).inuse != 0 && !(*owner).client.is_null() {
                 EWebDisattach(ctx, owner, self_);
@@ -1793,7 +1795,7 @@ pub fn EWebPain(
     unsafe {
         // update the owner's health status of me
         if (*self_).r.ownerNum != ENTITYNUM_NONE {
-            let owner = &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+            let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
             if (*owner).inuse != 0 && !(*owner).client.is_null() {
                 (*((*owner).client as *mut gclient_t)).ewebHealth = (*self_).health;
@@ -2188,7 +2190,7 @@ pub fn EWebThink(
         if (*self_).r.ownerNum == ENTITYNUM_NONE {
             killMe = qtrue;
         } else {
-            let owner = &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+            let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
             if (*owner).inuse == 0
                 || (*owner).client.is_null()
@@ -2428,7 +2430,7 @@ pub fn ItemUse_UseEWeb(
 
         if (*((*ent).client as *mut gclient_t)).ewebIndex != 0 {
             // put it away
-            let eweb = &mut (*ctx.world).entities[(*((*ent).client as *mut gclient_t)).ewebIndex as usize] as *mut gentity_t;
+            let eweb = &mut (*ctx.world).g_entities[(*((*ent).client as *mut gclient_t)).ewebIndex as usize] as *mut gentity_t;
             EWebDisattach(ctx, ent, eweb);
         } else {
             // create it
@@ -2780,12 +2782,12 @@ pub fn RespawnItem(
 
             let mut count = 0;
             let mut e = match master {
-                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                 None => core::ptr::null_mut(),
             };
             while !e.is_null() {
                 e = match (*e).teamchain {
-                    Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                    Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                     None => core::ptr::null_mut(),
                 };
                 count += 1;
@@ -2795,12 +2797,12 @@ pub fn RespawnItem(
 
             let mut i = 0;
             e = match master {
-                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                 None => core::ptr::null_mut(),
             };
             while i < choice {
                 e = match (*e).teamchain {
-                    Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                    Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                     None => core::ptr::null_mut(),
                 };
                 i += 1;
@@ -2851,7 +2853,7 @@ pub fn CheckItemCanBePickedUpByNPC(
     unsafe {
         let npc = (*pickerupper).NPC as *mut gNPC_t;
         if ((*item).flags & FL_DROPPED_ITEM) != 0
-            && (*item).activator != &mut (*ctx.world).entities[0] as *mut gentity_t
+            && (*item).activator != &mut (*ctx.world).g_entities[0] as *mut gentity_t
             && (*pickerupper).s.number != 0
             && (*pickerupper).s.weapon == WP_NONE as c_int
             && !(*pickerupper).enemy.is_none()
@@ -2951,9 +2953,9 @@ pub fn Touch_Item(
             let npc = (*other).NPC as *mut gNPC_t;
             if !npc.is_null() {
                 if let Some(goal_id) = (*npc).goalEntity {
-                    let goal = &mut (*ctx.world).entities[goal_id.index()] as *mut gentity_t;
+                    let goal = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
                     let goal_enemy = match (*goal).enemy {
-                        Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                        Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                         None => core::ptr::null_mut(),
                     };
                     if goal_enemy == ent {
@@ -3606,7 +3608,7 @@ pub fn G_BounceItem(
         if (*ent).s.weapon == WP_DET_PACK as c_int && (*ent).s.eType == ET_GENERAL as c_int && (*ent).physicsObject != 0 {
             // detpacks only
             if let Some(touch) = (*ent).touch {
-                crate::ent_fn_enums::dispatch_touch(ctx, touch, ent, &mut (*ctx.world).entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
+                crate::ent_fn_enums::dispatch_touch(ctx, touch, ent, &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
                 return;
             }
         }
@@ -3631,7 +3633,7 @@ pub fn G_BounceItem(
         if (*ent).s.eType == ET_HOLOCRON as c_int || ((*ent).s.shouldtarget != 0 && (*ent).s.eType == ET_GENERAL as c_int && (*ent).physicsObject != 0) {
             // holocrons and sentry guns
             if let Some(touch) = (*ent).touch {
-                crate::ent_fn_enums::dispatch_touch(ctx, touch, ent, &mut (*ctx.world).entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
+                crate::ent_fn_enums::dispatch_touch(ctx, touch, ent, &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
             }
         }
     }

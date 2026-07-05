@@ -167,7 +167,7 @@ pub fn G_RunObject(
         ),
     );
 
-    if !tr.startsolid && !tr.allsolid && tr.fraction > 0.0f32 {
+    if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction > 0.0f32 {
         crate::q_math::_VectorCopy(tr.endpos, &mut unsafe { (*ent).r.currentOrigin });
         crate::trap::LinkEntity(ctx.engine, crate::trap::GLinkentityArgs::new(ent));
     } else {

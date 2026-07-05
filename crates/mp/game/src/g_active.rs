@@ -99,7 +99,7 @@ use crate::g_weapon::FireWeapon;
 use crate::ai_main::InFieldOfVision;
 use crate::bg_g2_utils::BG_AttachToRancor;
 use crate::npc_c::NPC_SetAnim;
-use crate::q_math::{vectoangles, AngleVectors, Q_irand, VectorLength, VectorLengthSquared, VectorNormalize};
+use crate::q_math::{vectoangles, AngleVectors, VectorLength, VectorLengthSquared, VectorNormalize};
 use mp_bg::public::pmove_t::Pmove;
 
 use crate::npc::g_npc_t::gNPC_t;
@@ -123,7 +123,7 @@ pub fn P_SetTwitchInfo(ctx: GameContext<'_>, client: *mut gclient_t) {
 pub fn P_DamageFeedback(ctx: GameContext<'_>, player: *mut gentity_t) {
     unsafe {
         let client = (*player).client as *mut gclient_t;
-        if (*client).ps.pm_type == PM_DEAD {
+        if (*client).ps.pm_type == PM_DEAD as c_int {
             return;
         }
 
@@ -540,7 +540,7 @@ pub fn ClientImpacts(ctx: GameContext<'_>, ent: *mut gentity_t, pm: *mut pmove_t
                 continue; // duplicated
             }
             let other =
-                &mut (*ctx.world).entities[(*pm).touchents[i as usize] as usize] as *mut gentity_t;
+                &mut (*ctx.world).g_entities[(*pm).touchents[i as usize] as usize] as *mut gentity_t;
 
             if (*ent).r.svFlags & SVF_BOT != 0 {
                 if let Some(t) = (*ent).touch {
@@ -604,7 +604,7 @@ pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let mut trace: trace_t = core::mem::zeroed();
         let mut i = 0;
         while i < num {
-            let hit = &mut (*ctx.world).entities[touch[i as usize] as usize] as *mut gentity_t;
+            let hit = &mut (*ctx.world).g_entities[touch[i as usize] as usize] as *mut gentity_t;
 
             if (*hit).touch.is_none() && (*ent).touch.is_none() {
                 i += 1;
@@ -724,7 +724,7 @@ pub fn G_MoverTouchPushTriggers(ctx: GameContext<'_>, ent: *mut gentity_t, oldOr
 
             let mut i = 0;
             while i < num {
-                let hit = &mut (*ctx.world).entities[touch[i as usize] as usize] as *mut gentity_t;
+                let hit = &mut (*ctx.world).g_entities[touch[i as usize] as usize] as *mut gentity_t;
 
                 if (*hit).s.eType != ET_PUSH_TRIGGER as c_int {
                     i += 1;
@@ -805,7 +805,7 @@ pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut user
             pm.nonHumanoid = qfalse;
 
             // Set up bg entity data
-            pm.baseEnt = (*ctx.world).entities.as_mut_ptr() as *mut _;
+            pm.baseEnt = (*ctx.world).g_entities.as_mut_ptr() as *mut _;
             pm.entSize = core::mem::size_of::<gentity_t>() as c_int;
 
             // perform a pmove
@@ -994,7 +994,7 @@ pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_active.c:857-895`
 pub fn G_CheapWeaponFire(ctx: GameContext<'_>, entNum: c_int, ev: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entNum as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entNum as usize] as *mut gentity_t;
 
         if (*ent).inuse == 0 || (*ent).client.is_null() {
             return;
@@ -1009,7 +1009,7 @@ pub fn G_CheapWeaponFire(ctx: GameContext<'_>, entNum: c_int, ev: c_int) {
                 && (*cl).ps.m_iVehicleNum != 0
             {
                 //a speeder with a pilot
-                let rider = &mut (*ctx.world).entities[((*cl).ps.m_iVehicleNum - 1) as usize]
+                let rider = &mut (*ctx.world).g_entities[((*cl).ps.m_iVehicleNum - 1) as usize]
                     as *mut gentity_t;
                 if (*rider).inuse != 0 && !(*rider).client.is_null() {
                     //pilot is valid...
@@ -1201,7 +1201,7 @@ pub fn G_UpdateForceSightBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t)
         let numConnectedClients = (*ctx.world).level.numConnectedClients;
         let selfCl = (*self_).client as *mut gclient_t;
         for i in 0..numConnectedClients {
-            let ent = &mut (*ctx.world).entities
+            let ent = &mut (*ctx.world).g_entities
                 [(*ctx.world).level.sortedClients[i as usize] as usize]
                 as *mut gentity_t;
             let dist: f32;
@@ -1264,7 +1264,7 @@ pub fn G_UpdateJediMasterBroadcasts(ctx: GameContext<'_>, self_: *mut gentity_t)
         // Broadcast ourself to all clients within range
         let numConnectedClients = (*ctx.world).level.numConnectedClients;
         for i in 0..numConnectedClients {
-            let ent = &mut (*ctx.world).entities
+            let ent = &mut (*ctx.world).g_entities
                 [(*ctx.world).level.sortedClients[i as usize] as usize]
                 as *mut gentity_t;
             let dist: f32;
@@ -1532,7 +1532,7 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
                 idleAnim = BOTH_STAND5IDLE1 as c_int;
             }
 
-            if idleAnim == BOTH_STAND2IDLE1 as c_int && Q_irand(1, 10) <= 5 {
+            if idleAnim == BOTH_STAND2IDLE1 as c_int && (*ctx.world).bg_state.rng.Q_irand(1, 10) <= 5 {
                 idleAnim = BOTH_STAND2IDLE2 as c_int;
             }
 
@@ -1547,7 +1547,7 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
                 );
 
                 //don't idle again after this anim for a while
-                (*cl).idleTime = level_time + (*cl).ps.legsTimer + Q_irand(0, 2000);
+                (*cl).idleTime = level_time + (*cl).ps.legsTimer + (*ctx.world).bg_state.rng.Q_irand(0, 2000);
             }
         }
     }
@@ -1710,7 +1710,7 @@ pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut *mu
         //NOTE: lookTarget is an entity number, so this presumes that client 0 is NOT a Rancor...
         if !ent.is_null() && !cl.is_null() && (*cl).ps.hasLookTarget != 0 {
             let monster =
-                &mut (*ctx.world).entities[(*cl).ps.lookTarget as usize] as *mut gentity_t;
+                &mut (*ctx.world).g_entities[(*cl).ps.lookTarget as usize] as *mut gentity_t;
             let mcl = (*monster).client as *mut gclient_t;
             if !monster.is_null() && !mcl.is_null() {
                 //take the monster's waypoint as your own
@@ -1963,11 +1963,11 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // g_synchronousClients being set to 1 when in vehicles.
         if (*ent).s.number < MAX_CLIENTS as c_int && (*client).ps.m_iVehicleNum != 0 {
             // driving a vehicle
-            if !(*ctx.world).entities[(*client).ps.m_iVehicleNum as usize]
+            if !(*ctx.world).g_entities[(*client).ps.m_iVehicleNum as usize]
                 .client
                 .is_null()
             {
-                let veh = &mut (*ctx.world).entities[(*client).ps.m_iVehicleNum as usize]
+                let veh = &mut (*ctx.world).g_entities[(*client).ps.m_iVehicleNum as usize]
                     as *mut gentity_t;
                 let vehVehicle = (*veh).m_pVehicle as *mut Vehicle_t;
 
@@ -2192,7 +2192,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         const MIN_NPC_SPEED: c_int = 16;
 
         if (*client).bodyGrabIndex != ENTITYNUM_NONE as c_int {
-            let grabbed = &mut (*ctx.world).entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
+            let grabbed = &mut (*ctx.world).g_entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
 
             if (*grabbed).inuse == qfalse
                 || (*grabbed).s.eType != ET_BODY as c_int
@@ -2408,7 +2408,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if (*client).ps.duelInProgress != qfalse {
-            let duelAgainst = &mut (*ctx.world).entities[(*client).ps.duelIndex as usize] as *mut gentity_t;
+            let duelAgainst = &mut (*ctx.world).g_entities[(*client).ps.duelIndex as usize] as *mut gentity_t;
 
             // Keep the time updated, so once this duel ends this player can't engage in a duel for another
             // 10 seconds. This will give other people a chance to engage in duels in case this player wants
@@ -2553,7 +2553,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if (*client).doingThrow > (*ctx.world).level.time {
-            let throwee = &mut (*ctx.world).entities[(*client).throwingIndex as usize] as *mut gentity_t;
+            let throwee = &mut (*ctx.world).g_entities[(*client).throwingIndex as usize] as *mut gentity_t;
 
             if (*throwee).inuse == qfalse
                 || (*throwee).client.is_null()
@@ -2578,7 +2578,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if (*client).beingThrown > (*ctx.world).level.time {
-            let thrower = &mut (*ctx.world).entities[(*client).throwingIndex as usize] as *mut gentity_t;
+            let thrower = &mut (*ctx.world).g_entities[(*client).throwingIndex as usize] as *mut gentity_t;
 
             if (*thrower).inuse == qfalse
                 || (*thrower).client.is_null()
@@ -2723,7 +2723,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                             ),
                         );
 
-                        if tr.fraction == 1.0 && tr.startsolid == qfalse && tr2.fraction == 1.0 && tr2.startsolid == qfalse {
+                        if tr.fraction == 1.0 && tr.startsolid == 0 && tr2.fraction == 1.0 && tr2.startsolid == 0 {
                             crate::q_math::_VectorCopy(intendedOrigin, &mut (*client).ps.origin);
 
                             if ((*client).beingThrown - (*ctx.world).level.time) < 4800 {
@@ -2772,7 +2772,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).ps.otherKillerTime > (*ctx.world).level.time
                     && (*client).ps.otherKiller != ENTITYNUM_NONE as c_int
                 {
-                    otherKiller = &mut (*ctx.world).entities[(*client).ps.otherKiller as usize] as *mut gentity_t;
+                    otherKiller = &mut (*ctx.world).g_entities[(*client).ps.otherKiller as usize] as *mut gentity_t;
 
                     if (*otherKiller).inuse == qfalse {
                         otherKiller = ent;
@@ -2877,11 +2877,11 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         crate::q_math::_VectorCopy((*client).ps.origin, &mut (*client).oldOrigin);
 
         // Set up bg entity data
-        pm.baseEnt = (*ctx.world).entities.as_mut_ptr() as *mut _;
+        pm.baseEnt = (*ctx.world).g_entities.as_mut_ptr() as *mut _;
         pm.entSize = core::mem::size_of::<gentity_t>() as c_int;
 
         if (*client).ps.saberLockTime > (*ctx.world).level.time {
-            let blockOpp = &mut (*ctx.world).entities[(*client).ps.saberLockEnemy as usize] as *mut gentity_t;
+            let blockOpp = &mut (*ctx.world).g_entities[(*client).ps.saberLockEnemy as usize] as *mut gentity_t;
 
             if !(*blockOpp).client.is_null() && (*blockOpp).inuse != qfalse {
                 let mut lockDir: vec3_t = [0.0; 3];
@@ -2991,7 +2991,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     if (*client).ps.groundEntityNum != ENTITYNUM_NONE as c_int {
                         // ATST crushes anything underneath it
                         let under =
-                            &mut (*ctx.world).entities[(*client).ps.groundEntityNum as usize] as *mut gentity_t;
+                            &mut (*ctx.world).g_entities[(*client).ps.groundEntityNum as usize] as *mut gentity_t;
                         if (*under).health != 0 && (*under).takedamage != qfalse {
                             let down: vec3_t = [0.0, 0.0, -1.0];
                             // FIXME: we'll be doing traces down from each foot, so we'll have a real impact origin
@@ -3036,10 +3036,10 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if pm.checkDuelLoss > 0
                 && (pm.checkDuelLoss <= MAX_CLIENTS as c_int
                     || (pm.checkDuelLoss < (mp_qshared::shared::MAX_GENTITIES as c_int - 1)
-                        && (*ctx.world).entities[(pm.checkDuelLoss - 1) as usize].s.eType == ET_NPC as c_int))
+                        && (*ctx.world).g_entities[(pm.checkDuelLoss - 1) as usize].s.eType == ET_NPC as c_int))
             {
                 let clientLost =
-                    &mut (*ctx.world).entities[(pm.checkDuelLoss - 1) as usize] as *mut gentity_t;
+                    &mut (*ctx.world).g_entities[(pm.checkDuelLoss - 1) as usize] as *mut gentity_t;
 
                 if !(*clientLost).client.is_null()
                     && (*clientLost).inuse != qfalse
@@ -3089,7 +3089,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     // if we didn't knock down it was a circle lock. So as punishment,
                     // make them lose their saber and go into a proper anim
                     let clClient = (*clientLost).client as *mut gclient_t;
-                    let saberEnt = &mut (*ctx.world).entities[(*clClient).ps.saberEntityNum as usize] as *mut gentity_t;
+                    let saberEnt = &mut (*ctx.world).g_entities[(*clClient).ps.saberEntityNum as usize] as *mut gentity_t;
                     saberCheckKnockdown_DuelLoss(ctx, saberEnt, clientLost, ent);
                 }
             }
@@ -3099,7 +3099,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if (*client).ps.groundEntityNum < ENTITYNUM_WORLD as c_int {
             // standing on an ent
-            let groundEnt = &mut (*ctx.world).entities[(*client).ps.groundEntityNum as usize] as *mut gentity_t;
+            let groundEnt = &mut (*ctx.world).g_entities[(*client).ps.groundEntityNum as usize] as *mut gentity_t;
             if (*groundEnt).s.eType == ET_NPC as c_int
                 && (*groundEnt).s.NPC_class == CLASS_VEHICLE as c_int
                 && (*groundEnt).inuse != qfalse
@@ -3363,7 +3363,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // Did we kick someone in our pmove sequence?
         if (*client).ps.forceKickFlip != 0 {
             let faceKicked =
-                &mut (*ctx.world).entities[((*client).ps.forceKickFlip - 1) as usize] as *mut gentity_t;
+                &mut (*ctx.world).g_entities[((*client).ps.forceKickFlip - 1) as usize] as *mut gentity_t;
 
             if !(*faceKicked).client.is_null()
                 && (OnSameTeam(ctx, ent, faceKicked) == qfalse || (*ctx.world).cvars.g_friendlyFire.integer != 0)
@@ -3483,7 +3483,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ent).s.number < MAX_CLIENTS as c_int && (*client).ps.m_iVehicleNum != 0 {
             // driving a vehicle
             // run it
-            let vehEnt = &mut (*ctx.world).entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
+            let vehEnt = &mut (*ctx.world).g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
             if (*vehEnt).inuse != qfalse && !(*vehEnt).client.is_null() {
                 let vehVehicle = (*vehEnt).m_pVehicle as *mut Vehicle_t;
                 ClientThink(ctx, (*client).ps.m_iVehicleNum, &mut (*vehVehicle).m_ucmd as *mut usercmd_t);
@@ -3528,7 +3528,7 @@ pub fn G_CheckClientTimeouts(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_active.c:3649-3720`
 pub fn ClientThink(ctx: GameContext<'_>, clientNum: c_int, ucmd: *mut usercmd_t) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[clientNum as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[clientNum as usize] as *mut gentity_t;
         let cl = (*ent).client as *mut gclient_t;
         if clientNum < MAX_CLIENTS {
             trap::GetUsercmd(

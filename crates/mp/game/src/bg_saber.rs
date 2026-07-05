@@ -58,12 +58,9 @@ pub const DIR_RIGHT: c_int = 0;
 pub const DIR_LEFT: c_int = 1;
 pub const DIR_FRONT: c_int = 2;
 pub const DIR_BACK: c_int = 3;
-/// `SFL_NO_*` saber flags. Source: `oracle/oracle/codemp/game/q_shared.h:703-712`
-pub const SFL_NO_STABDOWN: c_int = 1 << 12;
-pub const SFL_NO_CARTWHEELS: c_int = 1 << 18;
-pub const SFL_NO_KICKS: c_int = 1 << 19;
-pub const SFL_NO_MIRROR_ATTACKS: c_int = 1 << 20;
-pub const SFL_NO_ROLL_STAB: c_int = 1 << 21;
+// `SFL_NO_*` saber flags live canonically in `crate::saber::saber_flags`
+// (reached via the prelude glob); the duplicate local defs were removed to
+// resolve the SFL_* import ambiguity (E0659). Source: `oracle/oracle/codemp/game/q_shared.h:703-712`
 
 /// `SFL2_TRANSITION_DAMAGE`. If set, the blade does damage in start, transition and return anims (like strong style does).
 /// Source: `oracle/oracle/codemp/game/q_shared.h:723`
@@ -414,14 +411,14 @@ pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, bg: &BgState) -> *mut saber
         }
 
         // Check if the saber has a model
-        if (*(*ent).client).saber[saberNum as usize].model.is_null()
-            || (*(*ent).client).saber[saberNum as usize].model[0] as c_int == 0
+        if (*((*ent).client as *mut gclient_t)).saber[saberNum as usize].model.is_null()
+            || (*((*ent).client as *mut gclient_t)).saber[saberNum as usize].model[0] as c_int == 0
         {
             return core::ptr::null_mut();
         }
 
         // Return mutable pointer to the saber
-        &mut (*(*ent).client).saber[saberNum as usize]
+        &mut (*((*ent).client as *mut gclient_t)).saber[saberNum as usize]
     }
 }
 
@@ -2788,7 +2785,7 @@ impl PmoveContext<'_> {
                 return core::ptr::null_mut();
             }
             if (*ent).inuse != 0 && !(*ent).client.is_null() {
-                let saber = &mut (*(*ent).client).saber[saberNum as usize] as *mut saberInfo_t;
+                let saber = &mut (*((*ent).client as *mut gclient_t)).saber[saberNum as usize] as *mut saberInfo_t;
                 if (*saber).model[0] == 0 {
                     return core::ptr::null_mut();
                 }

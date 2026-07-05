@@ -208,7 +208,7 @@ pub use crate::teams::class::class_t::*;
 
 pub use mp_bg::public::animation::animation_t;
 pub use mp_bg::public::bg_field::BG_field_t;
-pub use mp_bg::public::holdable::holdable_t;
+pub use mp_bg::public::holdable::{holdable_t, HI_AMMODISP, HI_BINOCULARS, HI_CLOAK, HI_EWEB, HI_HEALTHDISP, HI_JETPACK, HI_MEDPAC, HI_MEDPAC_BIG, HI_NONE, HI_NUM_HOLDABLE, HI_SEEKER, HI_SENTRY_GUN, HI_SHIELD};
 pub use mp_bg::public::pmove_t::pmove_t;
 pub use mp_bg::public::powerup::powerup_t;
 pub use mp_bg::public::saber_move_name::saberMoveName_t;

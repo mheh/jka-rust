@@ -40,6 +40,10 @@ use mp_abi::game::syscalls::G_ROFF_CACHE::GRoffCacheArgs;
 use mp_abi::game::syscalls::G_ROFF_PLAY::GRoffPlayArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
+use mp_abi::game::syscalls::G_ICARUS_VARIABLEDECLARED::GIcarusVariabledeclaredArgs;
+use mp_abi::game::syscalls::G_ICARUS_GETFLOATVARIABLE::GIcarusGetfloatvariableArgs;
+use mp_abi::game::syscalls::G_ICARUS_GETVECTORVARIABLE::GIcarusGetvectorvariableArgs;
+use mp_abi::game::syscalls::G_ICARUS_GETSTRINGVARIABLE::GIcarusGetstringvariableArgs;
 use crate::g_client::SetClientViewAngle;
 
 
@@ -89,7 +93,7 @@ pub fn G_DebugPrint(
                 ent_num = 0;
             }
 
-            let targ = (*ctx.world).entities[ent_num as usize].script_targetname;
+            let targ = (*ctx.world).g_entities[ent_num as usize].script_targetname;
             let targ_str = if targ.is_null() {
                 String::new()
             } else {
@@ -199,9 +203,9 @@ pub fn Q3_PlaySound(
     channel: *const c_char,
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         let mut final_name = [0i8; MAX_QPATH as usize];
-        Q_strncpyz(final_name.as_mut_ptr(), name, MAX_QPATH);
+        Q_strncpyz(final_name.as_mut_ptr(), name, MAX_QPATH as c_int);
         Q_strupr(final_name.as_mut_ptr());
         COM_StripExtension(final_name.as_ptr(), final_name.as_mut_ptr());
 
@@ -280,7 +284,7 @@ pub fn Q3_Play(
     name: *const c_char,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(r#type, b"PLAY_ROFF\0".as_ptr() as *const c_char) == 0 {
             // Raven passes `name` (already a `char*`) straight to `trap_ROFF_Cache`;
@@ -398,6 +402,7 @@ pub fn Blocked_Mover(
             // `point` is still a by-value `vec3_t` (no null representation),
             // so the zero vector (`vec3_origin`) remains the stand-in there.
             G_Damage(
+                ctx,
                 other,
                 ent,
                 ent,
@@ -433,7 +438,7 @@ pub fn Q3_Lerp2Start(
     duration: f32,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
             || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
@@ -481,7 +486,7 @@ pub fn Q3_Lerp2End(
     duration: f32,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
             || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
@@ -531,7 +536,7 @@ pub fn Q3_Lerp2Pos(
     duration: f32,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
             || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
@@ -627,7 +632,7 @@ pub fn Q3_Lerp2Angles(
     duration: f32,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         (*ent).s.apos.trDuration = if duration > 0.0 { duration as c_int } else { 1 };
 
@@ -670,7 +675,7 @@ pub fn Q3_GetTag(
     info: &mut [f32; 3],
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).inuse == 0 {
             debug_assert!(false);
@@ -693,7 +698,7 @@ pub fn Q3_GetTag(
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:981-998`
 pub fn Q3_Use(ctx: GameContext<'_>, entID: c_int, target: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if target.is_null() || *target == 0 {
             G_DebugPrint(
@@ -717,14 +722,14 @@ pub fn Q3_Use(ctx: GameContext<'_>, entID: c_int, target: *const c_char) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1009-1052`
 pub fn Q3_Kill(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         let mut victim: *mut gentity_t = std::ptr::null_mut();
 
         if Q_stricmp(name, b"self\0".as_ptr() as *const c_char) == 0 {
             victim = ent;
         } else if Q_stricmp(name, b"enemy\0".as_ptr() as *const c_char) == 0 {
             if let Some(enemy_id) = (*ent).enemy {
-                victim = &mut (*ctx.world).entities[enemy_id.0 as usize] as *mut gentity_t;
+                victim = &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
             }
         } else {
             victim = G_Find(
@@ -801,7 +806,7 @@ pub fn Q3_RemoveEnt(ctx: GameContext<'_>, victim: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1128-1168`
 pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"self\0".as_ptr() as *const c_char, name) == 0 {
             Q3_RemoveEnt(ctx, ent);
@@ -858,14 +863,12 @@ pub fn Q3_GetFloat(
     value: *mut f32,
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
-        let toGet = GetIDForString(setTable, name);
+        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
 
         match toGet {
-            SET_PARM1 | SET_PARM2 | SET_PARM3 | SET_PARM4 | SET_PARM5 | SET_PARM6 | SET_PARM7
-            | SET_PARM8 | SET_PARM9 | SET_PARM10 | SET_PARM11 | SET_PARM12 | SET_PARM13
-            | SET_PARM14 | SET_PARM15 | SET_PARM16 => {
+            _ if toGet == SET_PARM1 as i32 || toGet == SET_PARM2 as i32 || toGet == SET_PARM3 as i32 || toGet == SET_PARM4 as i32 || toGet == SET_PARM5 as i32 || toGet == SET_PARM6 as i32 || toGet == SET_PARM7 as i32 || toGet == SET_PARM8 as i32 || toGet == SET_PARM9 as i32 || toGet == SET_PARM10 as i32 || toGet == SET_PARM11 as i32 || toGet == SET_PARM12 as i32 || toGet == SET_PARM13 as i32 || toGet == SET_PARM14 as i32 || toGet == SET_PARM15 as i32 || toGet == SET_PARM16 as i32 => {
                 if (*ent).parms.is_null() {
                     G_DebugPrint(
                         ctx,
@@ -879,12 +882,12 @@ pub fn Q3_GetFloat(
                     );
                     return 0;
                 }
-                *value = atof((*(*ent).parms).parm[(toGet - SET_PARM1) as usize].as_ptr()) as f32;
+                *value = atof((*(*ent).parms).parm[(toGet - SET_PARM1 as i32) as usize].as_ptr()) as f32;
             }
-            SET_COUNT => *value = (*ent).count as f32,
-            SET_HEALTH => *value = (*ent).health as f32,
-            SET_SKILL => return 0,
-            SET_XVELOCITY => {
+            _ if toGet == SET_COUNT as i32 => *value = (*ent).count as f32,
+            _ if toGet == SET_HEALTH as i32 => *value = (*ent).health as f32,
+            _ if toGet == SET_SKILL as i32 => return 0,
+            _ if toGet == SET_XVELOCITY as i32 => {
                 if (*ent).client.is_null() {
                     G_DebugPrint(
                         ctx,
@@ -899,7 +902,7 @@ pub fn Q3_GetFloat(
                 }
                 *value = (*((*ent).client as *mut gclient_t)).ps.velocity[0];
             }
-            SET_YVELOCITY => {
+            _ if toGet == SET_YVELOCITY as i32 => {
                 if (*ent).client.is_null() {
                     G_DebugPrint(
                         ctx,
@@ -914,7 +917,7 @@ pub fn Q3_GetFloat(
                 }
                 *value = (*((*ent).client as *mut gclient_t)).ps.velocity[1];
             }
-            SET_ZVELOCITY => {
+            _ if toGet == SET_ZVELOCITY as i32 => {
                 if (*ent).client.is_null() {
                     G_DebugPrint(
                         ctx,
@@ -929,18 +932,17 @@ pub fn Q3_GetFloat(
                 }
                 *value = (*((*ent).client as *mut gclient_t)).ps.velocity[2];
             }
-            SET_Z_OFFSET => *value = (*ent).r.currentOrigin[2] - (*ent).s.origin[2],
-            SET_DPITCH => return 0,
-            SET_DYAW => return 0,
-            SET_WIDTH => *value = (*ent).r.mins[0],
-            SET_TIMESCALE => return 0,
-            SET_CAMERA_GROUP_Z_OFS => return 0,
-            SET_VISRANGE => return 0,
-            SET_EARSHOT => return 0,
-            SET_VIGILANCE => return 0,
-            SET_GRAVITY => *value = (*ctx.world).cvars.g_gravity.value,
-            SET_FACEEYESCLOSED | SET_FACEEYESOPENED | SET_FACEAUX | SET_FACEBLINK
-            | SET_FACEBLINKFROWN | SET_FACEFROWN | SET_FACENORMAL => {
+            _ if toGet == SET_Z_OFFSET as i32 => *value = (*ent).r.currentOrigin[2] - (*ent).s.origin[2],
+            _ if toGet == SET_DPITCH as i32 => return 0,
+            _ if toGet == SET_DYAW as i32 => return 0,
+            _ if toGet == SET_WIDTH as i32 => *value = (*ent).r.mins[0],
+            _ if toGet == SET_TIMESCALE as i32 => return 0,
+            _ if toGet == SET_CAMERA_GROUP_Z_OFS as i32 => return 0,
+            _ if toGet == SET_VISRANGE as i32 => return 0,
+            _ if toGet == SET_EARSHOT as i32 => return 0,
+            _ if toGet == SET_VIGILANCE as i32 => return 0,
+            _ if toGet == SET_GRAVITY as i32 => *value = (*ctx.world).cvars.g_gravity.value,
+            _ if toGet == SET_FACEEYESCLOSED as i32 || toGet == SET_FACEEYESOPENED as i32 || toGet == SET_FACEAUX as i32 || toGet == SET_FACEBLINK as i32 || toGet == SET_FACEBLINKFROWN as i32 || toGet == SET_FACEFROWN as i32 || toGet == SET_FACENORMAL as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -948,9 +950,9 @@ pub fn Q3_GetFloat(
                 );
                 return 0;
             }
-            SET_WAIT => *value = (*ent).wait,
-            SET_FOLLOWDIST => return 0,
-            SET_ANIM_HOLDTIME_LOWER => {
+            _ if toGet == SET_WAIT as i32 => *value = (*ent).wait,
+            _ if toGet == SET_FOLLOWDIST as i32 => return 0,
+            _ if toGet == SET_ANIM_HOLDTIME_LOWER as i32 => {
                 if (*ent).client.is_null() {
                     G_DebugPrint(
                         ctx,
@@ -965,7 +967,7 @@ pub fn Q3_GetFloat(
                 }
                 *value = (*((*ent).client as *mut gclient_t)).ps.legsTimer as f32;
             }
-            SET_ANIM_HOLDTIME_UPPER => {
+            _ if toGet == SET_ANIM_HOLDTIME_UPPER as i32 => {
                 if (*ent).client.is_null() {
                     G_DebugPrint(
                         ctx,
@@ -980,7 +982,7 @@ pub fn Q3_GetFloat(
                 }
                 *value = (*((*ent).client as *mut gclient_t)).ps.torsoTimer as f32;
             }
-            SET_ANIM_HOLDTIME_BOTH => {
+            _ if toGet == SET_ANIM_HOLDTIME_BOTH as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -989,7 +991,7 @@ pub fn Q3_GetFloat(
                 );
                 return 0;
             }
-            SET_ARMOR => {
+            _ if toGet == SET_ARMOR as i32 => {
                 if (*ent).client.is_null() {
                     G_DebugPrint(
                         ctx,
@@ -1004,19 +1006,13 @@ pub fn Q3_GetFloat(
                 }
                 *value = (*((*ent).client as *mut gclient_t)).ps.stats[STAT_ARMOR as usize] as f32;
             }
-            SET_WALKSPEED | SET_RUNSPEED | SET_YAWSPEED | SET_AGGRESSION | SET_AIM
-            | SET_FRICTION | SET_SHOOTDIST | SET_HFOV | SET_VFOV | SET_DELAYSCRIPTTIME
-            | SET_FORWARDMOVE | SET_RIGHTMOVE | SET_STARTFRAME | SET_ENDFRAME | SET_ANIMFRAME
-            | SET_SHOT_SPACING | SET_MISSIONSTATUSTIME | SET_IGNOREPAIN | SET_IGNOREENEMIES
-            | SET_IGNOREALERTS | SET_DONTSHOOT => return 0,
-            SET_NOTARGET => *value = ((*ent).flags & FL_NOTARGET) as f32,
-            SET_DONTFIRE | SET_LOCKED_ENEMY | SET_CROUCHED | SET_WALKING | SET_RUNNING
-            | SET_CHASE_ENEMIES | SET_LOOK_FOR_ENEMIES | SET_FACE_MOVE_DIR | SET_FORCED_MARCH
-            | SET_UNDYING | SET_NOAVOID => return 0,
-            SET_SOLID => *value = (*ent).r.contents as f32,
-            SET_PLAYER_USABLE => *value = ((*ent).r.svFlags & SVF_PLAYER_USABLE) as f32,
-            SET_LOOP_ANIM => return 0,
-            SET_INTERFACE => {
+            _ if toGet == SET_WALKSPEED as i32 || toGet == SET_RUNSPEED as i32 || toGet == SET_YAWSPEED as i32 || toGet == SET_AGGRESSION as i32 || toGet == SET_AIM as i32 || toGet == SET_FRICTION as i32 || toGet == SET_SHOOTDIST as i32 || toGet == SET_HFOV as i32 || toGet == SET_VFOV as i32 || toGet == SET_DELAYSCRIPTTIME as i32 || toGet == SET_FORWARDMOVE as i32 || toGet == SET_RIGHTMOVE as i32 || toGet == SET_STARTFRAME as i32 || toGet == SET_ENDFRAME as i32 || toGet == SET_ANIMFRAME as i32 || toGet == SET_SHOT_SPACING as i32 || toGet == SET_MISSIONSTATUSTIME as i32 || toGet == SET_IGNOREPAIN as i32 || toGet == SET_IGNOREENEMIES as i32 || toGet == SET_IGNOREALERTS as i32 || toGet == SET_DONTSHOOT as i32 => return 0,
+            _ if toGet == SET_NOTARGET as i32 => *value = ((*ent).flags & FL_NOTARGET) as f32,
+            _ if toGet == SET_DONTFIRE as i32 || toGet == SET_LOCKED_ENEMY as i32 || toGet == SET_CROUCHED as i32 || toGet == SET_WALKING as i32 || toGet == SET_RUNNING as i32 || toGet == SET_CHASE_ENEMIES as i32 || toGet == SET_LOOK_FOR_ENEMIES as i32 || toGet == SET_FACE_MOVE_DIR as i32 || toGet == SET_FORCED_MARCH as i32 || toGet == SET_UNDYING as i32 || toGet == SET_NOAVOID as i32 => return 0,
+            _ if toGet == SET_SOLID as i32 => *value = (*ent).r.contents as f32,
+            _ if toGet == SET_PLAYER_USABLE as i32 => *value = ((*ent).r.svFlags & SVF_PLAYER_USABLE) as f32,
+            _ if toGet == SET_LOOP_ANIM as i32 => return 0,
+            _ if toGet == SET_INTERFACE as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1024,8 +1020,8 @@ pub fn Q3_GetFloat(
                 );
                 return 0;
             }
-            SET_SHIELDS | SET_VAMPIRE | SET_FORCE_INVINCIBLE | SET_GREET_ALLIES => return 0,
-            SET_VIDEO_FADE_IN => {
+            _ if toGet == SET_SHIELDS as i32 || toGet == SET_VAMPIRE as i32 || toGet == SET_FORCE_INVINCIBLE as i32 || toGet == SET_GREET_ALLIES as i32 => return 0,
+            _ if toGet == SET_VIDEO_FADE_IN as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1033,7 +1029,7 @@ pub fn Q3_GetFloat(
                 );
                 return 0;
             }
-            SET_VIDEO_FADE_OUT => {
+            _ if toGet == SET_VIDEO_FADE_OUT as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1042,20 +1038,17 @@ pub fn Q3_GetFloat(
                 );
                 return 0;
             }
-            SET_INVISIBLE => *value = ((*ent).s.eFlags & EF_NODRAW) as f32,
-            SET_PLAYER_LOCKED | SET_LOCK_PLAYER_WEAPONS | SET_NO_IMPACT_DAMAGE => return 0,
-            SET_NO_KNOCKBACK => *value = ((*ent).flags & FL_NO_KNOCKBACK) as f32,
-            SET_ALT_FIRE | SET_NO_RESPONSE => return 0,
-            SET_INVINCIBLE => *value = ((*ent).flags & FL_GODMODE) as f32,
-            SET_MISSIONSTATUSACTIVE | SET_NO_COMBAT_TALK | SET_NO_ALERT_TALK
-            | SET_USE_CP_NEAREST | SET_DISMEMBERABLE | SET_NO_FORCE | SET_NO_ACROBATICS
-            | SET_USE_SUBTITLES | SET_NO_FALLTODEATH | SET_MORELIGHT | SET_TREASONED
-            | SET_DISABLE_SHADER_ANIM | SET_SHADER_ANIM => return 0,
+            _ if toGet == SET_INVISIBLE as i32 => *value = ((*ent).s.eFlags & EF_NODRAW) as f32,
+            _ if toGet == SET_PLAYER_LOCKED as i32 || toGet == SET_LOCK_PLAYER_WEAPONS as i32 || toGet == SET_NO_IMPACT_DAMAGE as i32 => return 0,
+            _ if toGet == SET_NO_KNOCKBACK as i32 => *value = ((*ent).flags & FL_NO_KNOCKBACK) as f32,
+            _ if toGet == SET_ALT_FIRE as i32 || toGet == SET_NO_RESPONSE as i32 => return 0,
+            _ if toGet == SET_INVINCIBLE as i32 => *value = ((*ent).flags & FL_GODMODE) as f32,
+            _ if toGet == SET_MISSIONSTATUSACTIVE as i32 || toGet == SET_NO_COMBAT_TALK as i32 || toGet == SET_NO_ALERT_TALK as i32 || toGet == SET_USE_CP_NEAREST as i32 || toGet == SET_DISMEMBERABLE as i32 || toGet == SET_NO_FORCE as i32 || toGet == SET_NO_ACROBATICS as i32 || toGet == SET_USE_SUBTITLES as i32 || toGet == SET_NO_FALLTODEATH as i32 || toGet == SET_MORELIGHT as i32 || toGet == SET_TREASONED as i32 || toGet == SET_DISABLE_SHADER_ANIM as i32 || toGet == SET_SHADER_ANIM as i32 => return 0,
             _ => {
-                if trap::ICARUS_VariableDeclared(ctx.engine, name) != VTYPE_FLOAT {
+                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name)) != VTYPE_FLOAT {
                     return 0;
                 }
-                return trap::ICARUS_GetFloatVariable(ctx.engine, name, value);
+                return trap::ICARUS_GetFloatVariable(ctx.engine, GIcarusGetfloatvariableArgs::new(name, value));
             }
         }
 
@@ -1076,24 +1069,22 @@ pub fn Q3_GetVector(
     value: &mut [f32; 3],
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
-        let toGet = GetIDForString(setTable, name);
+        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
 
         match toGet {
-            SET_PARM1 | SET_PARM2 | SET_PARM3 | SET_PARM4 | SET_PARM5 | SET_PARM6 | SET_PARM7
-            | SET_PARM8 | SET_PARM9 | SET_PARM10 | SET_PARM11 | SET_PARM12 | SET_PARM13
-            | SET_PARM14 | SET_PARM15 | SET_PARM16 => {
+            _ if toGet == SET_PARM1 as i32 || toGet == SET_PARM2 as i32 || toGet == SET_PARM3 as i32 || toGet == SET_PARM4 as i32 || toGet == SET_PARM5 as i32 || toGet == SET_PARM6 as i32 || toGet == SET_PARM7 as i32 || toGet == SET_PARM8 as i32 || toGet == SET_PARM9 as i32 || toGet == SET_PARM10 as i32 || toGet == SET_PARM11 as i32 || toGet == SET_PARM12 as i32 || toGet == SET_PARM13 as i32 || toGet == SET_PARM14 as i32 || toGet == SET_PARM15 as i32 || toGet == SET_PARM16 as i32 => {
                 // Raven: sscanf(parm, "%f %f %f", &value[0], &value[1], &value[2])
-                let parm_str = cstr_to_str((*(*ent).parms).parm[(toGet - SET_PARM1) as usize].as_ptr());
+                let parm_str = cstr_to_str((*(*ent).parms).parm[(toGet - SET_PARM1 as i32) as usize].as_ptr());
                 let mut parts = parm_str.split_whitespace();
                 value[0] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
                 value[1] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
                 value[2] = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0.0);
             }
-            SET_ORIGIN => *value = (*ent).r.currentOrigin,
-            SET_ANGLES => *value = (*ent).r.currentAngles,
-            SET_TELEPORT_DEST => {
+            _ if toGet == SET_ORIGIN as i32 => *value = (*ent).r.currentOrigin,
+            _ if toGet == SET_ANGLES as i32 => *value = (*ent).r.currentAngles,
+            _ if toGet == SET_TELEPORT_DEST as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1103,10 +1094,10 @@ pub fn Q3_GetVector(
                 return 0;
             }
             _ => {
-                if trap::ICARUS_VariableDeclared(ctx.engine, name) != VTYPE_VECTOR {
+                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name)) != VTYPE_VECTOR {
                     return 0;
                 }
-                return trap::ICARUS_GetVectorVariable(ctx.engine, name, value);
+                return trap::ICARUS_GetVectorVariable(ctx.engine, GIcarusGetvectorvariableArgs::new(name, value as *mut vec3_t));
             }
         }
 
@@ -1127,22 +1118,20 @@ pub fn Q3_GetString(
     value: *mut *mut c_char,
 ) -> c_int {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
-        let toGet = GetIDForString(setTable, name);
+        let toGet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, name);
 
         match toGet {
-            SET_ANIM_BOTH => {
+            _ if toGet == SET_ANIM_BOTH as i32 => {
                 *value = Q3_GetAnimBoth(ctx, ent);
                 if value.is_null() || (*value).is_null() {
                     return 0;
                 }
             }
-            SET_PARM1 | SET_PARM2 | SET_PARM3 | SET_PARM4 | SET_PARM5 | SET_PARM6 | SET_PARM7
-            | SET_PARM8 | SET_PARM9 | SET_PARM10 | SET_PARM11 | SET_PARM12 | SET_PARM13
-            | SET_PARM14 | SET_PARM15 | SET_PARM16 => {
+            _ if toGet == SET_PARM1 as i32 || toGet == SET_PARM2 as i32 || toGet == SET_PARM3 as i32 || toGet == SET_PARM4 as i32 || toGet == SET_PARM5 as i32 || toGet == SET_PARM6 as i32 || toGet == SET_PARM7 as i32 || toGet == SET_PARM8 as i32 || toGet == SET_PARM9 as i32 || toGet == SET_PARM10 as i32 || toGet == SET_PARM11 as i32 || toGet == SET_PARM12 as i32 || toGet == SET_PARM13 as i32 || toGet == SET_PARM14 as i32 || toGet == SET_PARM15 as i32 || toGet == SET_PARM16 as i32 => {
                 if !(*ent).parms.is_null() {
-                    *value = (*(*ent).parms).parm[(toGet - SET_PARM1) as usize].as_mut_ptr();
+                    *value = (*(*ent).parms).parm[(toGet - SET_PARM1 as i32) as usize].as_mut_ptr();
                 } else {
                     G_DebugPrint(
                         ctx,
@@ -1156,26 +1145,26 @@ pub fn Q3_GetString(
                     return 0;
                 }
             }
-            SET_TARGET => *value = (*ent).target,
-            SET_LOCATION => return 0,
-            SET_SPAWNSCRIPT => *value = (*ent).behaviorSet[BSET_SPAWN as usize],
-            SET_USESCRIPT => *value = (*ent).behaviorSet[BSET_USE as usize],
-            SET_AWAKESCRIPT => *value = (*ent).behaviorSet[BSET_AWAKE as usize],
-            SET_ANGERSCRIPT => *value = (*ent).behaviorSet[BSET_ANGER as usize],
-            SET_ATTACKSCRIPT => *value = (*ent).behaviorSet[BSET_ATTACK as usize],
-            SET_VICTORYSCRIPT => *value = (*ent).behaviorSet[BSET_VICTORY as usize],
-            SET_LOSTENEMYSCRIPT => *value = (*ent).behaviorSet[BSET_LOSTENEMY as usize],
-            SET_PAINSCRIPT => *value = (*ent).behaviorSet[BSET_PAIN as usize],
-            SET_FLEESCRIPT => *value = (*ent).behaviorSet[BSET_FLEE as usize],
-            SET_DEATHSCRIPT => *value = (*ent).behaviorSet[BSET_DEATH as usize],
-            SET_DELAYEDSCRIPT => *value = (*ent).behaviorSet[BSET_DELAYED as usize],
-            SET_BLOCKEDSCRIPT => *value = (*ent).behaviorSet[BSET_BLOCKED as usize],
-            SET_FFIRESCRIPT => *value = (*ent).behaviorSet[BSET_FFIRE as usize],
-            SET_FFDEATHSCRIPT => *value = (*ent).behaviorSet[BSET_FFDEATH as usize],
-            SET_ENEMY | SET_LEADER | SET_CAPTURE => return 0,
-            SET_TARGETNAME => *value = (*ent).targetname,
-            SET_PAINTARGET | SET_CAMERA_GROUP | SET_CAMERA_GROUP_TAG => return 0,
-            SET_LOOK_TARGET => {
+            _ if toGet == SET_TARGET as i32 => *value = (*ent).target,
+            _ if toGet == SET_LOCATION as i32 => return 0,
+            _ if toGet == SET_SPAWNSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_SPAWN as usize],
+            _ if toGet == SET_USESCRIPT as i32 => *value = (*ent).behaviorSet[BSET_USE as usize],
+            _ if toGet == SET_AWAKESCRIPT as i32 => *value = (*ent).behaviorSet[BSET_AWAKE as usize],
+            _ if toGet == SET_ANGERSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_ANGER as usize],
+            _ if toGet == SET_ATTACKSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_ATTACK as usize],
+            _ if toGet == SET_VICTORYSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_VICTORY as usize],
+            _ if toGet == SET_LOSTENEMYSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_LOSTENEMY as usize],
+            _ if toGet == SET_PAINSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_PAIN as usize],
+            _ if toGet == SET_FLEESCRIPT as i32 => *value = (*ent).behaviorSet[BSET_FLEE as usize],
+            _ if toGet == SET_DEATHSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_DEATH as usize],
+            _ if toGet == SET_DELAYEDSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_DELAYED as usize],
+            _ if toGet == SET_BLOCKEDSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_BLOCKED as usize],
+            _ if toGet == SET_FFIRESCRIPT as i32 => *value = (*ent).behaviorSet[BSET_FFIRE as usize],
+            _ if toGet == SET_FFDEATHSCRIPT as i32 => *value = (*ent).behaviorSet[BSET_FFDEATH as usize],
+            _ if toGet == SET_ENEMY as i32 || toGet == SET_LEADER as i32 || toGet == SET_CAPTURE as i32 => return 0,
+            _ if toGet == SET_TARGETNAME as i32 => *value = (*ent).targetname,
+            _ if toGet == SET_PAINTARGET as i32 || toGet == SET_CAMERA_GROUP as i32 || toGet == SET_CAMERA_GROUP_TAG as i32 => return 0,
+            _ if toGet == SET_LOOK_TARGET as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1183,8 +1172,8 @@ pub fn Q3_GetString(
                         as *const c_char,
                 );
             }
-            SET_TARGET2 | SET_REMOVE_TARGET | SET_WEAPON | SET_ITEM | SET_MUSIC_STATE => return 0,
-            SET_NAVGOAL => {
+            _ if toGet == SET_TARGET2 as i32 || toGet == SET_REMOVE_TARGET as i32 || toGet == SET_WEAPON as i32 || toGet == SET_ITEM as i32 || toGet == SET_MUSIC_STATE as i32 => return 0,
+            _ if toGet == SET_NAVGOAL as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1192,7 +1181,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_VIEWTARGET => {
+            _ if toGet == SET_VIEWTARGET as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1200,8 +1189,8 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_WATCHTARGET => return 0,
-            SET_VIEWENTITY => {
+            _ if toGet == SET_WATCHTARGET as i32 => return 0,
+            _ if toGet == SET_VIEWENTITY as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1209,7 +1198,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_CAPTIONTEXTCOLOR => {
+            _ if toGet == SET_CAPTIONTEXTCOLOR as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1218,7 +1207,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_CENTERTEXTCOLOR => {
+            _ if toGet == SET_CENTERTEXTCOLOR as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1227,7 +1216,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_SCROLLTEXTCOLOR => {
+            _ if toGet == SET_SCROLLTEXTCOLOR as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1236,7 +1225,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_COPY_ORIGIN => {
+            _ if toGet == SET_COPY_ORIGIN as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1244,7 +1233,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_DEFEND_TARGET => {
+            _ if toGet == SET_DEFEND_TARGET as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1252,7 +1241,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_VIDEO_PLAY => {
+            _ if toGet == SET_VIDEO_PLAY as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1260,7 +1249,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_LOADGAME => {
+            _ if toGet == SET_LOADGAME as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1268,7 +1257,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_LOCKYAW => {
+            _ if toGet == SET_LOCKYAW as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1276,7 +1265,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_SCROLLTEXT => {
+            _ if toGet == SET_SCROLLTEXT as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1284,7 +1273,7 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_LCARSTEXT => {
+            _ if toGet == SET_LCARSTEXT as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -1292,12 +1281,12 @@ pub fn Q3_GetString(
                 );
                 return 0;
             }
-            SET_FULLNAME => *value = (*ent).fullName,
+            _ if toGet == SET_FULLNAME as i32 => *value = (*ent).fullName,
             _ => {
-                if trap::ICARUS_VariableDeclared(ctx.engine, name) != VTYPE_STRING {
+                if trap::ICARUS_VariableDeclared(ctx.engine, GIcarusVariabledeclaredArgs::new(name)) != VTYPE_STRING {
                     return 0;
                 }
-                return trap::ICARUS_GetStringVariable(ctx.engine, name, *value as *const c_char);
+                return trap::ICARUS_GetStringVariable(ctx.engine, GIcarusGetstringvariableArgs::new(name, *value as *const c_char));
             }
         }
 
@@ -1310,7 +1299,7 @@ pub fn Q3_GetString(
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1865-1886`
 pub fn MoveOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        let owner = &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+        let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
         (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
         (*self_).think = Some(EntThink::G_FreeEntity);
@@ -1337,7 +1326,7 @@ pub fn MoveOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1895-1920`
 pub fn Q3_SetTeleportDest(ctx: GameContext<'_>, entID: c_int, org: vec3_t) -> qboolean {
     unsafe {
-        let tele_ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let tele_ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if SpotWouldTelefrag2(ctx, tele_ent, org) != 0 {
             let teleporter = G_Spawn(ctx);
@@ -1364,7 +1353,7 @@ pub fn Q3_SetTeleportDest(ctx: GameContext<'_>, entID: c_int, org: vec3_t) -> qb
 // (`G_SetOrigin`) branch is faithful, the client branch panics loudly.
 pub fn Q3_SetOrigin(ctx: GameContext<'_>, entID: c_int, origin: vec3_t) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(ent));
 
@@ -1401,7 +1390,7 @@ pub fn Q3_SetCopyOrigin(ctx: GameContext<'_>, entID: c_int, name: *const c_char)
 
         if !found.is_null() {
             Q3_SetOrigin(ctx, entID, (*found).r.currentOrigin);
-            let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
             SetClientViewAngle(ent, (*found).s.angles);
         } else {
             G_DebugPrint(
@@ -1418,7 +1407,7 @@ pub fn Q3_SetCopyOrigin(ctx: GameContext<'_>, entID: c_int, name: *const c_char)
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1992-2013`
 pub fn Q3_SetVelocity(ctx: GameContext<'_>, entID: c_int, axis: c_int, speed: f32) {
     unsafe {
-        let found = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let found = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*found).client.is_null() {
             G_DebugPrint(
@@ -1444,7 +1433,7 @@ pub fn Q3_SetVelocity(ctx: GameContext<'_>, entID: c_int, axis: c_int, speed: f3
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2022-2042`
 pub fn Q3_SetAngles(ctx: GameContext<'_>, entID: c_int, angles: vec3_t) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             (*ent).s.angles = angles;
@@ -1466,7 +1455,7 @@ pub fn Q3_Lerp2Origin(
     duration: f32,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if !(*ent).client.is_null()
             || Q_stricmp((*ent).classname, b"target_scriptrunner\0".as_ptr() as *const c_char) == 0
@@ -1525,7 +1514,7 @@ pub fn Q3_Lerp2Origin(
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2114-2140`
 pub fn Q3_SetOriginOffset(ctx: GameContext<'_>, entID: c_int, axis: c_int, offset: f32) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         let mut origin = (*ent).s.origin;
         origin[axis as usize] += offset;
@@ -1543,7 +1532,7 @@ pub fn Q3_SetOriginOffset(ctx: GameContext<'_>, entID: c_int, axis: c_int, offse
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2149-2197`
 pub fn Q3_SetEnemy(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NONE\0".as_ptr() as *const c_char, name) == 0
             || Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
@@ -1583,7 +1572,7 @@ pub fn Q3_SetEnemy(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2207-2246`
 pub fn Q3_SetLeader(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             G_DebugPrint(
@@ -1623,7 +1612,7 @@ pub fn Q3_SetLeader(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2255-2320`
 pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         let mut goalPos: vec3_t = [0.0, 0.0, 0.0];
 
         if (*ent).health == 0 {
@@ -1667,7 +1656,7 @@ pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) ->
             return qfalse;
         }
         let temp_goal_id = (*npc).tempGoal.unwrap();
-        let temp_goal = &mut (*ctx.world).entities[temp_goal_id.0 as usize] as *mut gentity_t;
+        let temp_goal = &mut (*ctx.world).g_entities[temp_goal_id.0 as usize] as *mut gentity_t;
         if (*temp_goal).inuse == 0 {
             G_DebugPrint(
                 ctx,
@@ -1721,7 +1710,7 @@ pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) ->
             let goalRadius = TAG_GetRadius(ctx, std::ptr::null(), name);
             NPC_SetMoveGoal(ctx, ent, goalPos, goalRadius, qtrue, -1, std::ptr::null_mut());
             let goal_id = (*npc).goalEntity.unwrap();
-            let goal_ent = &mut (*ctx.world).entities[goal_id.0 as usize] as *mut gentity_t;
+            let goal_ent = &mut (*ctx.world).g_entities[goal_id.0 as usize] as *mut gentity_t;
             (*goal_ent).lastWaypoint = WAYPOINT_NONE;
             (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
             // Raven's `#ifdef _DEBUG` block (tempGoal->target = G_NewString(name))
@@ -1737,7 +1726,7 @@ pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) ->
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2330-2347`
 pub fn SetLowerAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             G_DebugPrint(
@@ -1765,7 +1754,7 @@ pub fn SetLowerAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2358-2375`
 pub fn SetUpperAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             G_DebugPrint(
@@ -1794,7 +1783,7 @@ pub fn SetUpperAnim(ctx: GameContext<'_>, entID: c_int, animID: c_int) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2384-2405`
 pub fn Q3_SetAnimUpper(ctx: GameContext<'_>, entID: c_int, anim_name: *const c_char) -> qboolean {
     unsafe {
-        let animID = GetIDForString(animTable, anim_name);
+        let animID = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, anim_name);
 
         if animID == -1 {
             G_DebugPrint(
@@ -1820,7 +1809,7 @@ pub fn Q3_SetAnimUpper(ctx: GameContext<'_>, entID: c_int, anim_name: *const c_c
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2414-2437`
 pub fn Q3_SetAnimLower(ctx: GameContext<'_>, entID: c_int, anim_name: *const c_char) -> qboolean {
     unsafe {
-        let animID = GetIDForString(animTable, anim_name);
+        let animID = GetIDForString(animTable.as_ptr() as *mut stringID_table_t, anim_name);
 
         if animID == -1 {
             G_DebugPrint(
@@ -1867,7 +1856,7 @@ pub fn Q3_SetHealth(
     data: c_int,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         let mut data = data;
 
         if data < 0 {
@@ -1911,7 +1900,7 @@ pub fn Q3_SetArmor(
     data: c_int,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).client.is_null() {
             return;
@@ -1938,7 +1927,7 @@ pub fn Q3_SetBState(
     bs_name: *const c_char,
 ) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -1954,7 +1943,7 @@ pub fn Q3_SetBState(
         }
         let npc = (*ent).NPC as *mut gNPC_t;
 
-        let bSID = GetIDForString(BSTable, bs_name);
+        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         if bSID > -1 {
             if bSID == BS_SEARCH || bSID == BS_WANDER {
                 if (*ent).waypoint != WAYPOINT_NONE {
@@ -2020,7 +2009,7 @@ pub fn Q3_SetTempBState(
     bs_name: *const c_char,
 ) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -2036,7 +2025,7 @@ pub fn Q3_SetTempBState(
         }
         let npc = (*ent).NPC as *mut gNPC_t;
 
-        let bSID = GetIDForString(BSTable, bs_name);
+        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         if bSID > -1 {
             (*npc).tempBehavior = bSID;
         }
@@ -2055,7 +2044,7 @@ pub fn Q3_SetDefaultBState(
     bs_name: *const c_char,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -2071,7 +2060,7 @@ pub fn Q3_SetDefaultBState(
         }
         let npc = (*ent).NPC as *mut gNPC_t;
 
-        let bSID = GetIDForString(BSTable, bs_name);
+        let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         if bSID > -1 {
             (*npc).defaultBehavior = bSID;
         }
@@ -2202,7 +2191,7 @@ pub fn Q3_SetInvisible(
     invisible: qboolean,
 ) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if invisible != 0 {
             (*self_).s.eFlags |= EF_NODRAW;
@@ -2268,7 +2257,7 @@ pub fn Q3_SetWatchTarget(ctx: GameContext<'_>, entID: c_int, name: *const c_char
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3031-3054`
 pub fn Q3_SetLoopSound(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, name) == 0
             || Q_stricmp(b"NONE\0".as_ptr() as *const c_char, name) == 0
@@ -2358,8 +2347,8 @@ pub fn Q3_SetViewEntity(ctx: GameContext<'_>, entID: c_int, name: *const c_char)
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3104-3111`
 pub fn Q3_SetWeapon(ctx: GameContext<'_>, entID: c_int, wp_name: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
-        let wp = GetIDForString(WPTable, wp_name);
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
+        let wp = GetIDForString(WPTable.as_ptr() as *mut stringID_table_t, wp_name);
 
         (*((*ent).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 1 << wp;
         ChangeWeapon(ctx, ent, wp);
@@ -2383,7 +2372,7 @@ pub fn Q3_SetItem(ctx: GameContext<'_>, entID: c_int, item_name: *const c_char) 
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3139-3161`
 pub fn Q3_SetWalkSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*self_).NPC.is_null() {
             G_DebugPrint(
@@ -2415,7 +2404,7 @@ pub fn Q3_SetWalkSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:3173-3195`
 pub fn Q3_SetRunSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*self_).NPC.is_null() {
             G_DebugPrint(
@@ -2496,7 +2485,7 @@ pub fn Q3_SetFriction(
     int_data: c_int,
 ) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*self_).client.is_null() {
             G_DebugPrint(
@@ -2528,7 +2517,7 @@ pub fn Q3_SetGravity(
     float_data: f32,
 ) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*self_).client.is_null() {
             G_DebugPrint(
@@ -2561,7 +2550,7 @@ pub fn Q3_SetWait(
     float_data: f32,
 ) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         (*self_).wait = float_data;
     }
 }
@@ -2605,7 +2594,7 @@ pub fn Q3_SetScale(
     float_data: f32,
 ) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if !(*self_).client.is_null() {
             let client = (*self_).client as *mut gclient_t;
@@ -2657,7 +2646,7 @@ pub fn Q3_SetCount(
     data: *const c_char,
 ) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         let val = Q3_GameSideCheckStringCounterIncrement(data);
         if val != 0.0 {
@@ -2677,7 +2666,7 @@ pub fn Q3_SetTargetName(
     targetname: *const c_char,
 ) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, targetname) == 0 {
             (*self_).targetname = std::ptr::null_mut();
@@ -2696,7 +2685,7 @@ pub fn Q3_SetTarget(
     target: *const c_char,
 ) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, target) == 0 {
             (*self_).target = std::ptr::null_mut();
@@ -2760,7 +2749,7 @@ pub fn Q3_SetFullName(
     fullName: *const c_char,
 ) {
     unsafe {
-        let self_ = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let self_ = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, fullName) == 0 {
             (*self_).fullName = std::ptr::null_mut();
@@ -2932,7 +2921,7 @@ pub fn Q3_SetNoTarget(
     data: qboolean,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if data != 0 {
             (*ent).flags |= FL_NOTARGET;
@@ -2996,7 +2985,7 @@ pub fn Q3_SetInactive(
     add: qboolean,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if add != 0 {
             (*ent).flags |= FL_INACTIVE;
@@ -3015,7 +3004,7 @@ pub fn Q3_SetFuncUsableVisible(
     visible: qboolean,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if visible != 0 {
             (*ent).r.svFlags &= !SVF_NOCLIENT;
@@ -3095,7 +3084,7 @@ pub fn Q3_SetWalking(
     add: qboolean,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -3430,7 +3419,7 @@ pub fn Q3_SetNoAvoid(
     noAvoid: qboolean,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if (*ent).NPC.is_null() {
             G_DebugPrint(
@@ -3462,7 +3451,7 @@ pub fn SolidifyOwner(
     self_: *mut gentity_t,
 ) {
     unsafe {
-        let owner = &mut (*ctx.world).entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+        let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
         (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
         (*self_).think = Some(EntThink::G_FreeEntity);
@@ -3494,7 +3483,7 @@ pub fn Q3_SetSolid(
     solid: qboolean,
 ) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if ent.is_null() || (*ent).inuse == 0 {
             G_DebugPrint(
@@ -3543,7 +3532,7 @@ pub fn Q3_SetForwardMove(
     fmoveVal: c_int,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if ent.is_null() {
             G_DebugPrint(
@@ -3584,7 +3573,7 @@ pub fn Q3_SetForwardMove(
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4381-4399`
 pub fn Q3_SetRightMove(ctx: GameContext<'_>, entID: c_int, rmoveVal: c_int) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         if (*ent).client.is_null() {
             G_DebugPrint(
                 ctx,
@@ -3608,7 +3597,7 @@ pub fn Q3_SetRightMove(ctx: GameContext<'_>, entID: c_int, rmoveVal: c_int) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4408-4445`
 pub fn Q3_SetLockAngle(ctx: GameContext<'_>, entID: c_int, lockAngle: *const c_char) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         if (*ent).client.is_null() {
             G_DebugPrint(
                 ctx,
@@ -3780,7 +3769,7 @@ pub fn Q3_SetBehaviorSet(
     scriptname: *const c_char,
 ) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         let mut bSet = bSet_t::BSET_INVALID;
 
         if ent.is_null() {
@@ -3797,21 +3786,21 @@ pub fn Q3_SetBehaviorSet(
             // ids) are not ported anywhere in the worktree — matches the
             // `setTable`/`BSTable`/`WPTable` unported-global precedent above
             // (g_ICARUScb.c:1189/1573/1642/1839); missing_symbols.
-            SET_SPAWNSCRIPT => bSet_t::BSET_SPAWN,
-            SET_USESCRIPT => bSet_t::BSET_USE,
-            SET_AWAKESCRIPT => bSet_t::BSET_AWAKE,
-            SET_ANGERSCRIPT => bSet_t::BSET_ANGER,
-            SET_ATTACKSCRIPT => bSet_t::BSET_ATTACK,
-            SET_VICTORYSCRIPT => bSet_t::BSET_VICTORY,
-            SET_LOSTENEMYSCRIPT => bSet_t::BSET_LOSTENEMY,
-            SET_PAINSCRIPT => bSet_t::BSET_PAIN,
-            SET_FLEESCRIPT => bSet_t::BSET_FLEE,
-            SET_DEATHSCRIPT => bSet_t::BSET_DEATH,
-            SET_DELAYEDSCRIPT => bSet_t::BSET_DELAYED,
-            SET_BLOCKEDSCRIPT => bSet_t::BSET_BLOCKED,
-            SET_FFIRESCRIPT => bSet_t::BSET_FFIRE,
-            SET_FFDEATHSCRIPT => bSet_t::BSET_FFDEATH,
-            SET_MINDTRICKSCRIPT => bSet_t::BSET_MINDTRICK,
+            _ if toSet == SET_SPAWNSCRIPT as i32 => bSet_t::BSET_SPAWN,
+            _ if toSet == SET_USESCRIPT as i32 => bSet_t::BSET_USE,
+            _ if toSet == SET_AWAKESCRIPT as i32 => bSet_t::BSET_AWAKE,
+            _ if toSet == SET_ANGERSCRIPT as i32 => bSet_t::BSET_ANGER,
+            _ if toSet == SET_ATTACKSCRIPT as i32 => bSet_t::BSET_ATTACK,
+            _ if toSet == SET_VICTORYSCRIPT as i32 => bSet_t::BSET_VICTORY,
+            _ if toSet == SET_LOSTENEMYSCRIPT as i32 => bSet_t::BSET_LOSTENEMY,
+            _ if toSet == SET_PAINSCRIPT as i32 => bSet_t::BSET_PAIN,
+            _ if toSet == SET_FLEESCRIPT as i32 => bSet_t::BSET_FLEE,
+            _ if toSet == SET_DEATHSCRIPT as i32 => bSet_t::BSET_DEATH,
+            _ if toSet == SET_DELAYEDSCRIPT as i32 => bSet_t::BSET_DELAYED,
+            _ if toSet == SET_BLOCKEDSCRIPT as i32 => bSet_t::BSET_BLOCKED,
+            _ if toSet == SET_FFIRESCRIPT as i32 => bSet_t::BSET_FFIRE,
+            _ if toSet == SET_FFDEATHSCRIPT as i32 => bSet_t::BSET_FFDEATH,
+            _ if toSet == SET_MINDTRICKSCRIPT as i32 => bSet_t::BSET_MINDTRICK,
             _ => bSet,
         };
 
@@ -3850,7 +3839,7 @@ pub fn Q3_SetDelayScriptTime(ctx: GameContext<'_>, entID: c_int, delayTime: c_in
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4734-4752`
 pub fn Q3_SetPlayerUsable(ctx: GameContext<'_>, entID: c_int, usable: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if ent.is_null() {
             G_DebugPrint(
@@ -3954,7 +3943,7 @@ pub fn Q3_SetShields(ctx: GameContext<'_>, entID: c_int, shields: qboolean) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4866-4889`
 pub fn Q3_SetSaberActive(ctx: GameContext<'_>, entID: c_int, active: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
 
         if ent.is_null() || (*ent).inuse == 0 {
             return;
@@ -3983,7 +3972,7 @@ pub fn Q3_SetSaberActive(ctx: GameContext<'_>, entID: c_int, active: qboolean) {
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:4900-4918`
 pub fn Q3_SetNoKnockback(ctx: GameContext<'_>, entID: c_int, noKnockback: qboolean) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         if noKnockback != 0 {
             (*ent).flags |= FL_NO_KNOCKBACK;
         } else {
@@ -4081,7 +4070,7 @@ pub fn Q3_LCARSText(ctx: GameContext<'_>, id: *const c_char) {
 }
 
 // PORT-NOTE(unported-consts): the entire 150-case switch keys off the ICARUS
-// `SET_*` field-id enum (`toSet = GetIDForString(setTable, type_name)`) —
+// `SET_*` field-id enum (`toSet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, type_name)`) —
 // `setTable`/`SET_*` are not ported anywhere in the worktree (same gap as
 // `Q3_SetBehaviorSet`/`Q3_GetString` above); missing_symbols. Bodies of
 // dozens of `Q3_Set*` helpers are transcribed literally against those bare
@@ -4097,13 +4086,13 @@ pub fn Q3_Set(
     data: *const c_char,
 ) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entID as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entID as usize] as *mut gentity_t;
         let mut float_data: f32;
         let mut int_data: c_int;
         let mut vector_data: vec3_t = [0.0, 0.0, 0.0];
 
         // Set this for callbacks
-        let toSet = GetIDForString(setTable, type_name);
+        let toSet = GetIDForString(setTable.as_ptr() as *mut stringID_table_t, type_name);
 
         // PORT-NOTE(sscanf): Raven's `sscanf(data, "%f %f %f", ...)` has no
         // ported dual in this crate (g_spawn.rs's `sscanf_3f` is a private
@@ -4111,7 +4100,7 @@ pub fn Q3_Set(
         // float-parse literally at each of the two call sites below rather
         // than defining a new shared shim.
         match toSet {
-            SET_ORIGIN => {
+            _ if toSet == SET_ORIGIN as i32 => {
                 {
                     let s = cstr_to_str(data);
                     let mut it = s.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
@@ -4126,7 +4115,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_TELEPORT_DEST => {
+            _ if toSet == SET_TELEPORT_DEST as i32 => {
                 {
                     let s = cstr_to_str(data);
                     let mut it = s.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
@@ -4143,9 +4132,9 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_COPY_ORIGIN => Q3_SetCopyOrigin(ctx, entID, data),
+            _ if toSet == SET_COPY_ORIGIN as i32 => Q3_SetCopyOrigin(ctx, entID, data),
 
-            SET_ANGLES => {
+            _ if toSet == SET_ANGLES as i32 => {
                 let s = cstr_to_str(data);
                 let mut it = s.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
                 vector_data[0] = it.next().unwrap_or(0.0);
@@ -4154,28 +4143,28 @@ pub fn Q3_Set(
                 Q3_SetAngles(ctx, entID, vector_data);
             }
 
-            SET_XVELOCITY => {
+            _ if toSet == SET_XVELOCITY as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetVelocity(ctx, entID, 0, float_data);
             }
-            SET_YVELOCITY => {
+            _ if toSet == SET_YVELOCITY as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetVelocity(ctx, entID, 1, float_data);
             }
-            SET_ZVELOCITY => {
+            _ if toSet == SET_ZVELOCITY as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetVelocity(ctx, entID, 2, float_data);
             }
 
-            SET_Z_OFFSET => {
+            _ if toSet == SET_Z_OFFSET as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetOriginOffset(ctx, entID, 2, float_data);
             }
 
-            SET_ENEMY => Q3_SetEnemy(ctx, entID, data),
-            SET_LEADER => Q3_SetLeader(ctx, entID, data),
+            _ if toSet == SET_ENEMY as i32 => Q3_SetEnemy(ctx, entID, data),
+            _ if toSet == SET_LEADER as i32 => Q3_SetLeader(ctx, entID, data),
 
-            SET_NAVGOAL => {
+            _ if toSet == SET_NAVGOAL as i32 => {
                 if Q3_SetNavGoal(ctx, entID, data) != qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
@@ -4185,7 +4174,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_ANIM_UPPER => {
+            _ if toSet == SET_ANIM_UPPER as i32 => {
                 if Q3_SetAnimUpper(ctx, entID, data) != qfalse {
                     Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the top
                     trap::ICARUS_TaskIDSet(
@@ -4196,7 +4185,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_ANIM_LOWER => {
+            _ if toSet == SET_ANIM_LOWER as i32 => {
                 if Q3_SetAnimLower(ctx, entID, data) != qfalse {
                     Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the bottom
                     trap::ICARUS_TaskIDSet(
@@ -4207,7 +4196,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_ANIM_BOTH => {
+            _ if toSet == SET_ANIM_BOTH as i32 => {
                 let mut both: c_int = 0;
                 if Q3_SetAnimUpper(ctx, entID, data) != qfalse {
                     trap::ICARUS_TaskIDSet(
@@ -4256,7 +4245,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_ANIM_HOLDTIME_LOWER => {
+            _ if toSet == SET_ANIM_HOLDTIME_LOWER as i32 => {
                 int_data = atoi(data);
                 Q3_SetAnimHoldTime(ctx, entID, int_data, qtrue);
                 Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the bottom
@@ -4267,7 +4256,7 @@ pub fn Q3_Set(
                 return qfalse; //Don't call it back
             }
 
-            SET_ANIM_HOLDTIME_UPPER => {
+            _ if toSet == SET_ANIM_HOLDTIME_UPPER as i32 => {
                 int_data = atoi(data);
                 Q3_SetAnimHoldTime(ctx, entID, int_data, qfalse);
                 Q3_TaskIDClear(&mut (*ent).taskID[taskID_t::TID_ANIM_BOTH as usize]); //We only want to wait for the top
@@ -4278,7 +4267,7 @@ pub fn Q3_Set(
                 return qfalse; //Don't call it back
             }
 
-            SET_ANIM_HOLDTIME_BOTH => {
+            _ if toSet == SET_ANIM_HOLDTIME_BOTH as i32 => {
                 int_data = atoi(data);
                 Q3_SetAnimHoldTime(ctx, entID, int_data, qfalse);
                 Q3_SetAnimHoldTime(ctx, entID, int_data, qtrue);
@@ -4297,7 +4286,7 @@ pub fn Q3_Set(
                 return qfalse; //Don't call it back
             }
 
-            SET_PLAYER_TEAM => {
+            _ if toSet == SET_PLAYER_TEAM as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -4305,7 +4294,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_ENEMY_TEAM => {
+            _ if toSet == SET_ENEMY_TEAM as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -4313,17 +4302,17 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_HEALTH => {
+            _ if toSet == SET_HEALTH as i32 => {
                 int_data = atoi(data);
                 Q3_SetHealth(ctx, entID, int_data);
             }
 
-            SET_ARMOR => {
+            _ if toSet == SET_ARMOR as i32 => {
                 int_data = atoi(data);
                 Q3_SetArmor(ctx, entID, int_data);
             }
 
-            SET_BEHAVIOR_STATE => {
+            _ if toSet == SET_BEHAVIOR_STATE as i32 => {
                 if Q3_SetBState(ctx, entID, data) == qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
@@ -4333,9 +4322,9 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_DEFAULT_BSTATE => Q3_SetDefaultBState(ctx, entID, data),
+            _ if toSet == SET_DEFAULT_BSTATE as i32 => Q3_SetDefaultBState(ctx, entID, data),
 
-            SET_TEMP_BSTATE => {
+            _ if toSet == SET_TEMP_BSTATE as i32 => {
                 if Q3_SetTempBState(ctx, entID, data) == qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
@@ -4345,9 +4334,9 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_CAPTURE => Q3_SetCaptureGoal(ctx, entID, data),
+            _ if toSet == SET_CAPTURE as i32 => Q3_SetCaptureGoal(ctx, entID, data),
 
-            SET_DPITCH => {
+            _ if toSet == SET_DPITCH as i32 => {
                 //FIXME: make these set tempBehavior to BS_FACE and await completion?  Or set lockedDesiredPitch/Yaw and aimTime?
                 float_data = atof(data) as f32;
                 Q3_SetDPitch(ctx, entID, float_data);
@@ -4358,7 +4347,7 @@ pub fn Q3_Set(
                 return qfalse;
             }
 
-            SET_DYAW => {
+            _ if toSet == SET_DYAW as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetDYaw(ctx, entID, float_data);
                 trap::ICARUS_TaskIDSet(
@@ -4368,9 +4357,9 @@ pub fn Q3_Set(
                 return qfalse;
             }
 
-            SET_EVENT => Q3_SetEvent(ctx, entID, data),
+            _ if toSet == SET_EVENT as i32 => Q3_SetEvent(ctx, entID, data),
 
-            SET_VIEWTARGET => {
+            _ if toSet == SET_VIEWTARGET as i32 => {
                 Q3_SetViewTarget(ctx, entID, data);
                 trap::ICARUS_TaskIDSet(
                     ctx.engine,
@@ -4379,81 +4368,81 @@ pub fn Q3_Set(
                 return qfalse;
             }
 
-            SET_WATCHTARGET => Q3_SetWatchTarget(ctx, entID, data),
-            SET_VIEWENTITY => Q3_SetViewEntity(ctx, entID, data),
-            SET_LOOPSOUND => Q3_SetLoopSound(ctx, entID, data),
+            _ if toSet == SET_WATCHTARGET as i32 => Q3_SetWatchTarget(ctx, entID, data),
+            _ if toSet == SET_VIEWENTITY as i32 => Q3_SetViewEntity(ctx, entID, data),
+            _ if toSet == SET_LOOPSOUND as i32 => Q3_SetLoopSound(ctx, entID, data),
 
-            SET_ICARUS_FREEZE | SET_ICARUS_UNFREEZE => {
+            _ if toSet == SET_ICARUS_FREEZE as i32 || toSet == SET_ICARUS_UNFREEZE as i32 => {
                 Q3_SetICARUSFreeze(ctx, entID, data, if toSet == SET_ICARUS_FREEZE { qtrue } else { qfalse });
             }
 
-            SET_WEAPON => Q3_SetWeapon(ctx, entID, data),
-            SET_ITEM => Q3_SetItem(ctx, entID, data),
+            _ if toSet == SET_WEAPON as i32 => Q3_SetWeapon(ctx, entID, data),
+            _ if toSet == SET_ITEM as i32 => Q3_SetItem(ctx, entID, data),
 
-            SET_WALKSPEED => {
+            _ if toSet == SET_WALKSPEED as i32 => {
                 int_data = atoi(data);
                 Q3_SetWalkSpeed(ctx, entID, int_data);
             }
 
-            SET_RUNSPEED => {
+            _ if toSet == SET_RUNSPEED as i32 => {
                 int_data = atoi(data);
                 Q3_SetRunSpeed(ctx, entID, int_data);
             }
 
-            SET_WIDTH => {
+            _ if toSet == SET_WIDTH as i32 => {
                 int_data = atoi(data);
                 Q3_SetWidth(ctx, entID, int_data);
                 return qfalse;
             }
 
-            SET_YAWSPEED => {
+            _ if toSet == SET_YAWSPEED as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetYawSpeed(ctx, entID, float_data);
             }
 
-            SET_AGGRESSION => {
+            _ if toSet == SET_AGGRESSION as i32 => {
                 int_data = atoi(data);
                 Q3_SetAggression(ctx, entID, int_data);
             }
 
-            SET_AIM => {
+            _ if toSet == SET_AIM as i32 => {
                 int_data = atoi(data);
                 Q3_SetAim(ctx, entID, int_data);
             }
 
-            SET_FRICTION => {
+            _ if toSet == SET_FRICTION as i32 => {
                 int_data = atoi(data);
                 Q3_SetFriction(ctx, entID, int_data);
             }
 
-            SET_GRAVITY => {
+            _ if toSet == SET_GRAVITY as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetGravity(ctx, entID, float_data);
             }
 
-            SET_WAIT => {
+            _ if toSet == SET_WAIT as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetWait(ctx, entID, float_data);
             }
 
-            SET_FOLLOWDIST => {
+            _ if toSet == SET_FOLLOWDIST as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetFollowDist(ctx, entID, float_data);
             }
 
-            SET_SCALE => {
+            _ if toSet == SET_SCALE as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetScale(ctx, entID, float_data);
             }
 
-            SET_COUNT => Q3_SetCount(ctx, entID, data),
+            _ if toSet == SET_COUNT as i32 => Q3_SetCount(ctx, entID, data),
 
-            SET_SHOT_SPACING => {
+            _ if toSet == SET_SHOT_SPACING as i32 => {
                 int_data = atoi(data);
                 Q3_SetShotSpacing(ctx, entID, int_data);
             }
 
-            SET_IGNOREPAIN => {
+            _ if toSet == SET_IGNOREPAIN as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetIgnorePain(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
@@ -4461,7 +4450,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_IGNOREENEMIES => {
+            _ if toSet == SET_IGNOREENEMIES as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetIgnoreEnemies(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
@@ -4469,7 +4458,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_IGNOREALERTS => {
+            _ if toSet == SET_IGNOREALERTS as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetIgnoreAlerts(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
@@ -4477,7 +4466,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_DONTSHOOT => {
+            _ if toSet == SET_DONTSHOOT as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetDontShoot(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
@@ -4485,7 +4474,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_DONTFIRE => {
+            _ if toSet == SET_DONTFIRE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetDontFire(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
@@ -4493,7 +4482,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_LOCKED_ENEMY => {
+            _ if toSet == SET_LOCKED_ENEMY as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetLockedEnemy(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
@@ -4501,7 +4490,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NOTARGET => {
+            _ if toSet == SET_NOTARGET as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetNoTarget(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
@@ -4509,7 +4498,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_LEAN => {
+            _ if toSet == SET_LEAN as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -4517,43 +4506,43 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_SHOOTDIST => {
+            _ if toSet == SET_SHOOTDIST as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetShootDist(ctx, entID, float_data);
             }
 
-            SET_TIMESCALE => Q3_SetTimeScale(ctx, entID, data),
+            _ if toSet == SET_TIMESCALE as i32 => Q3_SetTimeScale(ctx, entID, data),
 
-            SET_VISRANGE => {
+            _ if toSet == SET_VISRANGE as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetVisrange(ctx, entID, float_data);
             }
 
-            SET_EARSHOT => {
+            _ if toSet == SET_EARSHOT as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetEarshot(ctx, entID, float_data);
             }
 
-            SET_VIGILANCE => {
+            _ if toSet == SET_VIGILANCE as i32 => {
                 float_data = atof(data) as f32;
                 Q3_SetVigilance(ctx, entID, float_data);
             }
 
-            SET_VFOV => {
+            _ if toSet == SET_VFOV as i32 => {
                 int_data = atoi(data);
                 Q3_SetVFOV(ctx, entID, int_data);
             }
 
-            SET_HFOV => {
+            _ if toSet == SET_HFOV as i32 => {
                 int_data = atoi(data);
                 Q3_SetHFOV(ctx, entID, int_data);
             }
 
-            SET_TARGETNAME => Q3_SetTargetName(ctx, entID, data),
-            SET_TARGET => Q3_SetTarget(ctx, entID, data),
-            SET_TARGET2 => Q3_SetTarget2(ctx, entID, data),
+            _ if toSet == SET_TARGETNAME as i32 => Q3_SetTargetName(ctx, entID, data),
+            _ if toSet == SET_TARGET as i32 => Q3_SetTarget(ctx, entID, data),
+            _ if toSet == SET_TARGET2 as i32 => Q3_SetTarget2(ctx, entID, data),
 
-            SET_LOCATION => {
+            _ if toSet == SET_LOCATION as i32 => {
                 if Q3_SetLocation(ctx, entID, data) == qfalse {
                     trap::ICARUS_TaskIDSet(
                         ctx.engine,
@@ -4563,9 +4552,9 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_PAINTARGET => Q3_SetPainTarget(ctx, entID, data),
+            _ if toSet == SET_PAINTARGET as i32 => Q3_SetPainTarget(ctx, entID, data),
 
-            SET_DEFEND_TARGET => {
+            _ if toSet == SET_DEFEND_TARGET as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -4574,16 +4563,11 @@ pub fn Q3_Set(
                 //Q3_SetEnemy( entID, (char *) data);
             }
 
-            SET_PARM1 | SET_PARM2 | SET_PARM3 | SET_PARM4 | SET_PARM5 | SET_PARM6 | SET_PARM7
-            | SET_PARM8 | SET_PARM9 | SET_PARM10 | SET_PARM11 | SET_PARM12 | SET_PARM13
-            | SET_PARM14 | SET_PARM15 | SET_PARM16 => {
-                Q3_SetParm(entID, toSet - SET_PARM1, data);
+            _ if toSet == SET_PARM1 as i32 || toSet == SET_PARM2 as i32 || toSet == SET_PARM3 as i32 || toSet == SET_PARM4 as i32 || toSet == SET_PARM5 as i32 || toSet == SET_PARM6 as i32 || toSet == SET_PARM7 as i32 || toSet == SET_PARM8 as i32 || toSet == SET_PARM9 as i32 || toSet == SET_PARM10 as i32 || toSet == SET_PARM11 as i32 || toSet == SET_PARM12 as i32 || toSet == SET_PARM13 as i32 || toSet == SET_PARM14 as i32 || toSet == SET_PARM15 as i32 || toSet == SET_PARM16 as i32 => {
+                Q3_SetParm(entID, toSet - SET_PARM1 as i32, data);
             }
 
-            SET_SPAWNSCRIPT | SET_USESCRIPT | SET_AWAKESCRIPT | SET_ANGERSCRIPT
-            | SET_ATTACKSCRIPT | SET_VICTORYSCRIPT | SET_PAINSCRIPT | SET_FLEESCRIPT
-            | SET_DEATHSCRIPT | SET_DELAYEDSCRIPT | SET_BLOCKEDSCRIPT | SET_FFIRESCRIPT
-            | SET_FFDEATHSCRIPT | SET_MINDTRICKSCRIPT => {
+            _ if toSet == SET_SPAWNSCRIPT as i32 || toSet == SET_USESCRIPT as i32 || toSet == SET_AWAKESCRIPT as i32 || toSet == SET_ANGERSCRIPT as i32 || toSet == SET_ATTACKSCRIPT as i32 || toSet == SET_VICTORYSCRIPT as i32 || toSet == SET_PAINSCRIPT as i32 || toSet == SET_FLEESCRIPT as i32 || toSet == SET_DEATHSCRIPT as i32 || toSet == SET_DELAYEDSCRIPT as i32 || toSet == SET_BLOCKEDSCRIPT as i32 || toSet == SET_FFIRESCRIPT as i32 || toSet == SET_FFDEATHSCRIPT as i32 || toSet == SET_MINDTRICKSCRIPT as i32 => {
                 if Q3_SetBehaviorSet(ctx, entID, toSet, data) == qfalse {
                     G_DebugPrint(
                         ctx,
@@ -4597,7 +4581,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NO_MINDTRICK => {
+            _ if toSet == SET_NO_MINDTRICK as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetNoMindTrick(ctx, entID, qtrue);
                 } else {
@@ -4605,16 +4589,16 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_CINEMATIC_SKIPSCRIPT => {
+            _ if toSet == SET_CINEMATIC_SKIPSCRIPT as i32 => {
                 Q3_SetCinematicSkipScript(ctx, data as *mut c_char);
             }
 
-            SET_DELAYSCRIPTTIME => {
+            _ if toSet == SET_DELAYSCRIPTTIME as i32 => {
                 int_data = atoi(data);
                 Q3_SetDelayScriptTime(ctx, entID, int_data);
             }
 
-            SET_CROUCHED => {
+            _ if toSet == SET_CROUCHED as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetCrouched(ctx, entID, qtrue);
                 } else {
@@ -4622,7 +4606,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_WALKING => {
+            _ if toSet == SET_WALKING as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetWalking(ctx, entID, qtrue);
                 } else {
@@ -4630,7 +4614,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_RUNNING => {
+            _ if toSet == SET_RUNNING as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetRunning(ctx, entID, qtrue);
                 } else {
@@ -4638,7 +4622,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_CHASE_ENEMIES => {
+            _ if toSet == SET_CHASE_ENEMIES as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetChaseEnemies(ctx, entID, qtrue);
                 } else {
@@ -4646,7 +4630,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_LOOK_FOR_ENEMIES => {
+            _ if toSet == SET_LOOK_FOR_ENEMIES as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetLookForEnemies(ctx, entID, qtrue);
                 } else {
@@ -4654,7 +4638,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_FACE_MOVE_DIR => {
+            _ if toSet == SET_FACE_MOVE_DIR as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetFaceMoveDir(ctx, entID, qtrue);
                 } else {
@@ -4662,7 +4646,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_ALT_FIRE => {
+            _ if toSet == SET_ALT_FIRE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetAltFire(ctx, entID, qtrue);
                 } else {
@@ -4670,7 +4654,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_DONT_FLEE => {
+            _ if toSet == SET_DONT_FLEE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetDontFlee(ctx, entID, qtrue);
                 } else {
@@ -4678,7 +4662,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_FORCED_MARCH => {
+            _ if toSet == SET_FORCED_MARCH as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetForcedMarch(ctx, entID, qtrue);
                 } else {
@@ -4686,7 +4670,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NO_RESPONSE => {
+            _ if toSet == SET_NO_RESPONSE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetNoResponse(ctx, entID, qtrue);
                 } else {
@@ -4694,7 +4678,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NO_COMBAT_TALK => {
+            _ if toSet == SET_NO_COMBAT_TALK as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetCombatTalk(ctx, entID, qtrue);
                 } else {
@@ -4702,7 +4686,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NO_ALERT_TALK => {
+            _ if toSet == SET_NO_ALERT_TALK as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetAlertTalk(ctx, entID, qtrue);
                 } else {
@@ -4710,7 +4694,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_USE_CP_NEAREST => {
+            _ if toSet == SET_USE_CP_NEAREST as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetUseCpNearest(ctx, entID, qtrue);
                 } else {
@@ -4718,7 +4702,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NO_FORCE => {
+            _ if toSet == SET_NO_FORCE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetNoForce(ctx, entID, qtrue);
                 } else {
@@ -4726,7 +4710,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NO_ACROBATICS => {
+            _ if toSet == SET_NO_ACROBATICS as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetNoAcrobatics(ctx, entID, qtrue);
                 } else {
@@ -4734,7 +4718,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_USE_SUBTITLES => {
+            _ if toSet == SET_USE_SUBTITLES as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetUseSubtitles(ctx, entID, qtrue);
                 } else {
@@ -4742,7 +4726,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NO_FALLTODEATH => {
+            _ if toSet == SET_NO_FALLTODEATH as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetNoFallToDeath(ctx, entID, qtrue);
                 } else {
@@ -4750,7 +4734,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_DISMEMBERABLE => {
+            _ if toSet == SET_DISMEMBERABLE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetDismemberable(ctx, entID, qtrue);
                 } else {
@@ -4758,7 +4742,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_MORELIGHT => {
+            _ if toSet == SET_MORELIGHT as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetMoreLight(ctx, entID, qtrue);
                 } else {
@@ -4766,7 +4750,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_TREASONED => {
+            _ if toSet == SET_TREASONED as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_VERBOSE as c_int,
@@ -4778,7 +4762,7 @@ pub fn Q3_Set(
                 */
             }
 
-            SET_UNDYING => {
+            _ if toSet == SET_UNDYING as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetUndying(ctx, entID, qtrue);
                 } else {
@@ -4786,7 +4770,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_INVINCIBLE => {
+            _ if toSet == SET_INVINCIBLE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetInvincible(ctx, entID, qtrue);
                 } else {
@@ -4794,7 +4778,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NOAVOID => {
+            _ if toSet == SET_NOAVOID as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetNoAvoid(ctx, entID, qtrue);
                 } else {
@@ -4802,7 +4786,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_SOLID => {
+            _ if toSet == SET_SOLID as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     if Q3_SetSolid(ctx, entID, qtrue) == qfalse {
                         trap::ICARUS_TaskIDSet(
@@ -4816,7 +4800,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_INVISIBLE => {
+            _ if toSet == SET_INVISIBLE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetInvisible(ctx, entID, qtrue);
                 } else {
@@ -4824,7 +4808,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_VAMPIRE => {
+            _ if toSet == SET_VAMPIRE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetVampire(ctx, entID, qtrue);
                 } else {
@@ -4832,7 +4816,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_FORCE_INVINCIBLE => {
+            _ if toSet == SET_FORCE_INVINCIBLE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetForceInvincible(ctx, entID, qtrue);
                 } else {
@@ -4840,7 +4824,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_GREET_ALLIES => {
+            _ if toSet == SET_GREET_ALLIES as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetGreetAllies(ctx, entID, qtrue);
                 } else {
@@ -4848,7 +4832,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_PLAYER_LOCKED => {
+            _ if toSet == SET_PLAYER_LOCKED as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetPlayerLocked(ctx, entID, qtrue);
                 } else {
@@ -4856,7 +4840,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_LOCK_PLAYER_WEAPONS => {
+            _ if toSet == SET_LOCK_PLAYER_WEAPONS as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetLockPlayerWeapons(ctx, entID, qtrue);
                 } else {
@@ -4864,7 +4848,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NO_IMPACT_DAMAGE => {
+            _ if toSet == SET_NO_IMPACT_DAMAGE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetNoImpactDamage(ctx, entID, qtrue);
                 } else {
@@ -4872,45 +4856,44 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_FORWARDMOVE => {
+            _ if toSet == SET_FORWARDMOVE as i32 => {
                 int_data = atoi(data);
                 Q3_SetForwardMove(ctx, entID, int_data);
             }
 
-            SET_RIGHTMOVE => {
+            _ if toSet == SET_RIGHTMOVE as i32 => {
                 int_data = atoi(data);
                 Q3_SetRightMove(ctx, entID, int_data);
             }
 
-            SET_LOCKYAW => Q3_SetLockAngle(ctx, entID, data),
+            _ if toSet == SET_LOCKYAW as i32 => Q3_SetLockAngle(ctx, entID, data),
 
-            SET_CAMERA_GROUP => Q3_CameraGroup(ctx, entID, data as *mut c_char),
-            SET_CAMERA_GROUP_Z_OFS => {
+            _ if toSet == SET_CAMERA_GROUP as i32 => Q3_CameraGroup(ctx, entID, data as *mut c_char),
+            _ if toSet == SET_CAMERA_GROUP_Z_OFS as i32 => {
                 float_data = atof(data) as f32;
                 Q3_CameraGroupZOfs(ctx, float_data);
             }
-            SET_CAMERA_GROUP_TAG => Q3_CameraGroupTag(ctx, data as *mut c_char),
+            _ if toSet == SET_CAMERA_GROUP_TAG as i32 => Q3_CameraGroupTag(ctx, data as *mut c_char),
 
             //FIXME: put these into camera commands
-            SET_LOOK_TARGET => Q3_LookTarget(ctx, entID, data as *mut c_char),
-            SET_ADDRHANDBOLT_MODEL => Q3_AddRHandModel(ctx, entID, data as *mut c_char),
-            SET_REMOVERHANDBOLT_MODEL => Q3_RemoveRHandModel(ctx, entID, data as *mut c_char),
-            SET_ADDLHANDBOLT_MODEL => Q3_AddLHandModel(ctx, entID, data as *mut c_char),
-            SET_REMOVELHANDBOLT_MODEL => Q3_RemoveLHandModel(ctx, entID, data as *mut c_char),
+            _ if toSet == SET_LOOK_TARGET as i32 => Q3_LookTarget(ctx, entID, data as *mut c_char),
+            _ if toSet == SET_ADDRHANDBOLT_MODEL as i32 => Q3_AddRHandModel(ctx, entID, data as *mut c_char),
+            _ if toSet == SET_REMOVERHANDBOLT_MODEL as i32 => Q3_RemoveRHandModel(ctx, entID, data as *mut c_char),
+            _ if toSet == SET_ADDLHANDBOLT_MODEL as i32 => Q3_AddLHandModel(ctx, entID, data as *mut c_char),
+            _ if toSet == SET_REMOVELHANDBOLT_MODEL as i32 => Q3_RemoveLHandModel(ctx, entID, data as *mut c_char),
 
-            SET_FACEEYESCLOSED | SET_FACEEYESOPENED | SET_FACEAUX | SET_FACEBLINK
-            | SET_FACEBLINKFROWN | SET_FACEFROWN | SET_FACENORMAL => {
+            _ if toSet == SET_FACEEYESCLOSED as i32 || toSet == SET_FACEEYESOPENED as i32 || toSet == SET_FACEAUX as i32 || toSet == SET_FACEBLINK as i32 || toSet == SET_FACEBLINKFROWN as i32 || toSet == SET_FACEFROWN as i32 || toSet == SET_FACENORMAL as i32 => {
                 float_data = atof(data) as f32;
                 Q3_Face(ctx, entID, toSet, float_data);
             }
 
-            SET_SCROLLTEXT => Q3_ScrollText(ctx, data),
-            SET_LCARSTEXT => Q3_LCARSText(ctx, data),
-            SET_CAPTIONTEXTCOLOR => Q3_SetCaptionTextColor(ctx, data),
-            SET_CENTERTEXTCOLOR => Q3_SetCenterTextColor(ctx, data),
-            SET_SCROLLTEXTCOLOR => Q3_SetScrollTextColor(ctx, data),
+            _ if toSet == SET_SCROLLTEXT as i32 => Q3_ScrollText(ctx, data),
+            _ if toSet == SET_LCARSTEXT as i32 => Q3_LCARSText(ctx, data),
+            _ if toSet == SET_CAPTIONTEXTCOLOR as i32 => Q3_SetCaptionTextColor(ctx, data),
+            _ if toSet == SET_CENTERTEXTCOLOR as i32 => Q3_SetCenterTextColor(ctx, data),
+            _ if toSet == SET_SCROLLTEXTCOLOR as i32 => Q3_SetScrollTextColor(ctx, data),
 
-            SET_PLAYER_USABLE => {
+            _ if toSet == SET_PLAYER_USABLE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetPlayerUsable(ctx, entID, qtrue);
                 } else {
@@ -4918,12 +4901,12 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_STARTFRAME => {
+            _ if toSet == SET_STARTFRAME as i32 => {
                 int_data = atoi(data);
                 Q3_SetStartFrame(ctx, entID, int_data);
             }
 
-            SET_ENDFRAME => {
+            _ if toSet == SET_ENDFRAME as i32 => {
                 int_data = atoi(data);
                 Q3_SetEndFrame(ctx, entID, int_data);
 
@@ -4934,13 +4917,13 @@ pub fn Q3_Set(
                 return qfalse;
             }
 
-            SET_ANIMFRAME => {
+            _ if toSet == SET_ANIMFRAME as i32 => {
                 int_data = atoi(data);
                 Q3_SetAnimFrame(ctx, entID, int_data);
                 return qfalse;
             }
 
-            SET_LOOP_ANIM => {
+            _ if toSet == SET_LOOP_ANIM as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetLoopAnim(ctx, entID, qtrue);
                 } else {
@@ -4948,7 +4931,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_INTERFACE => {
+            _ if toSet == SET_INTERFACE as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -4956,7 +4939,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_SHIELDS => {
+            _ if toSet == SET_SHIELDS as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetShields(ctx, entID, qtrue);
                 } else {
@@ -4964,7 +4947,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_SABERACTIVE => {
+            _ if toSet == SET_SABERACTIVE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetSaberActive(ctx, entID, qtrue);
                 } else {
@@ -4972,7 +4955,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_ADJUST_AREA_PORTALS => {
+            _ if toSet == SET_ADJUST_AREA_PORTALS as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -4980,7 +4963,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_DMG_BY_HEAVY_WEAP_ONLY => {
+            _ if toSet == SET_DMG_BY_HEAVY_WEAP_ONLY as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -4988,7 +4971,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_SHIELDED => {
+            _ if toSet == SET_SHIELDED as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -4996,7 +4979,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_NO_GROUPS => {
+            _ if toSet == SET_NO_GROUPS as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5004,7 +4987,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_FIRE_WEAPON => {
+            _ if toSet == SET_FIRE_WEAPON as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetFireWeapon(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
@@ -5012,19 +4995,19 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_INACTIVE => {
+            _ if toSet == SET_INACTIVE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetInactive(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetInactive(ctx, entID, qfalse);
                 } else if Q_stricmp(b"unlocked\0".as_ptr() as *const c_char, data) == 0 {
-                    UnLockDoors(&(*ctx.world).entities[entID as usize] as *const gentity_t);
+                    UnLockDoors(&(*ctx.world).g_entities[entID as usize] as *const gentity_t);
                 } else if Q_stricmp(b"locked\0".as_ptr() as *const c_char, data) == 0 {
-                    LockDoors(&(*ctx.world).entities[entID as usize] as *const gentity_t);
+                    LockDoors(&(*ctx.world).g_entities[entID as usize] as *const gentity_t);
                 }
             }
 
-            SET_END_SCREENDISSOLVE => {
+            _ if toSet == SET_END_SCREENDISSOLVE as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5032,7 +5015,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_MISSION_STATUS_SCREEN => {
+            _ if toSet == SET_MISSION_STATUS_SCREEN as i32 => {
                 //Cvar_Set("cg_missionstatusscreen", "1");
                 G_DebugPrint(
                     ctx,
@@ -5041,7 +5024,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_FUNC_USABLE_VISIBLE => {
+            _ if toSet == SET_FUNC_USABLE_VISIBLE as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetFuncUsableVisible(ctx, entID, qtrue);
                 } else if Q_stricmp(b"false\0".as_ptr() as *const c_char, data) == 0 {
@@ -5049,7 +5032,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_NO_KNOCKBACK => {
+            _ if toSet == SET_NO_KNOCKBACK as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetNoKnockback(ctx, entID, qtrue);
                 } else {
@@ -5057,7 +5040,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_VIDEO_PLAY => {
+            _ if toSet == SET_VIDEO_PLAY as i32 => {
                 // don't do this check now, James doesn't want a scripted cinematic to also skip any Video cinematics as well,
                 //	the "timescale" and "skippingCinematic" cvars will be set back to normal in the Video code, so doing a
                 //	skip will now only skip one section of a multiple-part story (eg VOY1 bridge sequence)
@@ -5073,7 +5056,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_VIDEO_FADE_IN => {
+            _ if toSet == SET_VIDEO_FADE_IN as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5081,7 +5064,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_VIDEO_FADE_OUT => {
+            _ if toSet == SET_VIDEO_FADE_OUT as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5089,9 +5072,9 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_REMOVE_TARGET => Q3_SetRemoveTarget(ctx, entID, data),
+            _ if toSet == SET_REMOVE_TARGET as i32 => Q3_SetRemoveTarget(ctx, entID, data),
 
-            SET_LOADGAME => {
+            _ if toSet == SET_LOADGAME as i32 => {
                 //gi.SendConsoleCommand( va("load %s\n", (const char *) data ) );
                 G_DebugPrint(
                     ctx,
@@ -5100,32 +5083,32 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_MENU_SCREEN => {
+            _ if toSet == SET_MENU_SCREEN as i32 => {
                 //UI_SetActiveMenu( (const char *) data );
             }
 
-            SET_OBJECTIVE_SHOW => {
+            _ if toSet == SET_OBJECTIVE_SHOW as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
                     b"SET_OBJECTIVE_SHOW: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
                 );
             }
-            SET_OBJECTIVE_HIDE => {
+            _ if toSet == SET_OBJECTIVE_HIDE as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
                     b"SET_OBJECTIVE_HIDE: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
                 );
             }
-            SET_OBJECTIVE_SUCCEEDED => {
+            _ if toSet == SET_OBJECTIVE_SUCCEEDED as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
                     b"SET_OBJECTIVE_SUCCEEDED: NOT SUPPORTED IN MP\n\0".as_ptr() as *const c_char,
                 );
             }
-            SET_OBJECTIVE_FAILED => {
+            _ if toSet == SET_OBJECTIVE_FAILED as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5133,7 +5116,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_OBJECTIVE_CLEARALL => {
+            _ if toSet == SET_OBJECTIVE_CLEARALL as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5141,7 +5124,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_MISSIONFAILED => {
+            _ if toSet == SET_MISSIONFAILED as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5149,7 +5132,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_MISSIONSTATUSTEXT => {
+            _ if toSet == SET_MISSIONSTATUSTEXT as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5157,7 +5140,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_MISSIONSTATUSTIME => {
+            _ if toSet == SET_MISSIONSTATUSTIME as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5165,7 +5148,7 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_CLOSINGCREDITS => {
+            _ if toSet == SET_CLOSINGCREDITS as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5173,13 +5156,13 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_SKILL => {
+            _ if toSet == SET_SKILL as i32 => {
                 //		//can never be set
             }
 
-            SET_FULLNAME => Q3_SetFullName(ctx, entID, data),
+            _ if toSet == SET_FULLNAME as i32 => Q3_SetFullName(ctx, entID, data),
 
-            SET_DISABLE_SHADER_ANIM => {
+            _ if toSet == SET_DISABLE_SHADER_ANIM as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetDisableShaderAnims(ctx, entID, qtrue);
                 } else {
@@ -5187,7 +5170,7 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_SHADER_ANIM => {
+            _ if toSet == SET_SHADER_ANIM as i32 => {
                 if Q_stricmp(b"true\0".as_ptr() as *const c_char, data) == 0 {
                     Q3_SetShaderAnim(ctx, entID, qtrue);
                 } else {
@@ -5195,10 +5178,10 @@ pub fn Q3_Set(
                 }
             }
 
-            SET_MUSIC_STATE => Q3_SetMusicState(ctx, data),
-            SET_CLEAN_DAMAGING_ENTS => Q3_SetCleanDamagingEnts(ctx),
+            _ if toSet == SET_MUSIC_STATE as i32 => Q3_SetMusicState(ctx, data),
+            _ if toSet == SET_CLEAN_DAMAGING_ENTS as i32 => Q3_SetCleanDamagingEnts(ctx),
 
-            SET_HUD => {
+            _ if toSet == SET_HUD as i32 => {
                 G_DebugPrint(
                     ctx,
                     WL_WARNING as c_int,
@@ -5206,12 +5189,9 @@ pub fn Q3_Set(
                 );
             }
 
-            SET_FORCE_HEAL_LEVEL | SET_FORCE_JUMP_LEVEL | SET_FORCE_SPEED_LEVEL
-            | SET_FORCE_PUSH_LEVEL | SET_FORCE_PULL_LEVEL | SET_FORCE_MINDTRICK_LEVEL
-            | SET_FORCE_GRIP_LEVEL | SET_FORCE_LIGHTNING_LEVEL | SET_SABER_THROW
-            | SET_SABER_DEFENSE | SET_SABER_OFFENSE => {
+            _ if toSet == SET_FORCE_HEAL_LEVEL as i32 || toSet == SET_FORCE_JUMP_LEVEL as i32 || toSet == SET_FORCE_SPEED_LEVEL as i32 || toSet == SET_FORCE_PUSH_LEVEL as i32 || toSet == SET_FORCE_PULL_LEVEL as i32 || toSet == SET_FORCE_MINDTRICK_LEVEL as i32 || toSet == SET_FORCE_GRIP_LEVEL as i32 || toSet == SET_FORCE_LIGHTNING_LEVEL as i32 || toSet == SET_SABER_THROW as i32 || toSet == SET_SABER_DEFENSE as i32 || toSet == SET_SABER_OFFENSE as i32 => {
                 int_data = atoi(data);
-                Q3_SetForcePowerLevel(ctx, entID, toSet - SET_FORCE_HEAL_LEVEL, int_data);
+                Q3_SetForcePowerLevel(ctx, entID, toSet - SET_FORCE_HEAL_LEVEL as i32, int_data);
             }
 
             _ => {

@@ -10,7 +10,6 @@
 
 use crate::prelude::*;
 use crate::g_utils::{G_EffectIndex, G_SoundIndex};
-use crate::q_math::Q_irand;
 use crate::trap;
 
 /// Local state enums for Interrogator blade movement.
@@ -89,8 +88,8 @@ pub fn Interrogator_die(
 
                 // Clear flying flag and set random horizontal velocity
                 client.ps.eFlags2 &= !(crate::prelude::EF2_FLYING as c_int);
-                client.ps.velocity[0] = Q_irand(-20, -10) as f32;
-                client.ps.velocity[1] = Q_irand(-20, -10) as f32;
+                client.ps.velocity[0] = (*ctx.world).bg_state.rng.Q_irand(-20, -10) as f32;
+                client.ps.velocity[1] = (*ctx.world).bg_state.rng.Q_irand(-20, -10) as f32;
                 client.ps.velocity[2] = -100.0;
             }
         });

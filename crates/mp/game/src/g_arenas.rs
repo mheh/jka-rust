@@ -34,12 +34,12 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
     player = std::ptr::null_mut();
     i = 0;
     while i < (*ctx.world).level.maxclients {
-        player = (*ctx.world).entities.as_mut_ptr().add(i as usize);
+        player = (*ctx.world).g_entities.as_mut_ptr().add(i as usize);
         if (*player).inuse == 0 {
             i += 1;
             continue;
         }
-        if (*player).r.svFlags & SVF_BOT as c_uint == 0 {
+        if (*player).r.svFlags & SVF_BOT == 0 {
             break;
         }
         i += 1;

@@ -35,10 +35,10 @@ use crate::g_combat::AddScore;
 use crate::g_items::RegisterItem;
 use crate::g_main::LogExit;
 use crate::g_utils::{
-    G_Find, G_PlayEffectID, G_RunExPhys, G_SetOrigin, G_Sound, G_TempEntity, G_UseTargets2,
+    G_Find, G_PlayEffectID, G_SetOrigin, G_Sound, G_TempEntity, G_UseTargets2,
     GlobalUse,
 };
-use crate::q_math::Q_irand;
+use crate::g_exphysics::G_RunExPhys;
 use crate::q_shared::Info_SetValueForKey;
 use mp_qshared::shared::surface_flags::{CONTENTS_SOLID, CONTENTS_TERRAIN};
 use std::ffi::CString;
@@ -73,7 +73,7 @@ pub fn G_SiegeRegisterWeaponsAndHoldables(
     team: c_int,
 ) {
     unsafe {
-        let stm = BG_SiegeFindThemeForTeam(team);
+        let stm = BG_SiegeFindThemeForTeam(team, &(*ctx.world).bg_state);
 
         if !stm.is_null() {
             let mut i = 0;
@@ -739,15 +739,15 @@ pub fn BroadcastObjectiveCompletion(
         // PORT-NOTE(unported-const): `SIEGE_POINTS_OBJECTIVECOMPLETED` has no
         // ported home yet; referenced verbatim (missing_symbols).
         if client != ENTITYNUM_NONE
-            && !(*ctx.world).entities[client as usize].client.is_null()
-            && (*((*ctx.world).entities[client as usize].client as *mut gclient_t)).sess.sessionTeam == team
+            && !(*ctx.world).g_entities[client as usize].client.is_null()
+            && (*((*ctx.world).g_entities[client as usize].client as *mut gclient_t)).sess.sessionTeam == team
         {
             // guy who completed this objective gets points, providing he's on
             // the opposing team
             AddScore(
                 ctx,
-                &mut (*ctx.world).entities[client as usize] as *mut gentity_t,
-                (*((*ctx.world).entities[client as usize].client as *mut gclient_t)).ps.origin,
+                &mut (*ctx.world).g_entities[client as usize] as *mut gentity_t,
+                (*((*ctx.world).g_entities[client as usize].client as *mut gclient_t)).ps.origin,
                 SIEGE_POINTS_OBJECTIVECOMPLETED,
             );
         }
@@ -772,7 +772,7 @@ pub fn AddSiegeWinningTeamPoints(
         let mut i: c_int = 0;
 
         while i < MAX_CLIENTS {
-            let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
             if !(*ent).client.is_null() && (*((*ent).client as *mut gclient_t)).sess.sessionTeam == team {
                 if i == winner {
@@ -829,7 +829,7 @@ pub fn SiegeDoTeamAssign(ctx: GameContext<'_>) {
 
         // yeah, this is great...
         while i < MAX_CLIENTS {
-            let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
             if (*ent).inuse != 0 && !(*ent).client.is_null()
                 && (*((*ent).client as *mut gclient_t)).pers.connected == CON_CONNECTED
@@ -915,8 +915,8 @@ pub fn SiegeRoundComplete(
         let mut winningclient = winningclient;
 
         if winningclient != ENTITYNUM_NONE
-            && !(*ctx.world).entities[winningclient as usize].client.is_null()
-            && (*((*ctx.world).entities[winningclient as usize].client as *mut gclient_t)).sess.sessionTeam != winningteam
+            && !(*ctx.world).g_entities[winningclient as usize].client.is_null()
+            && (*((*ctx.world).g_entities[winningclient as usize].client as *mut gclient_t)).sess.sessionTeam != winningteam
         {
             // this person just won the round for the other team..
             winningclient = ENTITYNUM_NONE;
@@ -969,7 +969,7 @@ pub fn SiegeRoundComplete(
                 let mut i: c_int = 0;
 
                 while i < MAX_CLIENTS {
-                    let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+                    let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                     if (*ent).inuse != 0 {
                         // sure, you'll do.
@@ -982,8 +982,8 @@ pub fn SiegeRoundComplete(
             }
             G_UseTargets2(
                 ctx,
-                &mut (*ctx.world).entities[originalWinningClient as usize] as *mut gentity_t,
-                &mut (*ctx.world).entities[originalWinningClient as usize] as *mut gentity_t,
+                &mut (*ctx.world).g_entities[originalWinningClient as usize] as *mut gentity_t,
+                &mut (*ctx.world).g_entities[originalWinningClient as usize] as *mut gentity_t,
                 teamstr.as_ptr(),
             );
         }
@@ -1031,7 +1031,7 @@ pub fn G_ValidateSiegeClassForTeam(
 
         let scl = &mut (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize] as *mut siegeClass_t;
 
-        let stm = BG_SiegeFindThemeForTeam(team);
+        let stm = BG_SiegeFindThemeForTeam(team, &(*ctx.world).bg_state);
         if !stm.is_null() {
             let mut i = 0;
 
@@ -1174,7 +1174,7 @@ pub fn SiegeBeginRound(
 
             // respawn everyone now
             while i < MAX_CLIENTS {
-                let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+                let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                 if (*ent).inuse != 0 && !(*ent).client.is_null() {
                     let cl = (*ent).client as *mut gclient_t;
@@ -1208,8 +1208,8 @@ pub fn SiegeBeginRound(
             if targname[0] != 0 {
                 G_UseTargets2(
                     ctx,
-                    &mut (*ctx.world).entities[entNum as usize] as *mut gentity_t,
-                    &mut (*ctx.world).entities[entNum as usize] as *mut gentity_t,
+                    &mut (*ctx.world).g_entities[entNum as usize] as *mut gentity_t,
+                    &mut (*ctx.world).g_entities[entNum as usize] as *mut gentity_t,
                     targname.as_ptr(),
                 );
             }
@@ -1258,7 +1258,7 @@ pub fn SiegeCheckTimers(ctx: GameContext<'_>) {
             i = 0;
 
             while i < MAX_CLIENTS {
-                let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+                let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                 if !(*ent).client.is_null()
                     && (*ent).inuse != 0
@@ -1273,7 +1273,7 @@ pub fn SiegeCheckTimers(ctx: GameContext<'_>) {
             i = 0;
 
             while i < MAX_CLIENTS {
-                let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+                let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
                 if !(*ent).client.is_null()
                     && (*ent).inuse != 0
@@ -1803,7 +1803,7 @@ pub fn SiegeItemThink(
         if (*ent).genericValue8 != ENTITYNUM_NONE {
             // Just keep sticking it on top of the owner. We need it in the
             // same PVS as him so it will render bolted onto him properly.
-            carrier = &mut (*ctx.world).entities[(*ent).genericValue8 as usize] as *mut gentity_t;
+            carrier = &mut (*ctx.world).g_entities[(*ent).genericValue8 as usize] as *mut gentity_t;
 
             if (*carrier).inuse != 0 && !(*carrier).client.is_null() {
                 let mut new_origin = (*((*carrier).client as *mut gclient_t)).ps.origin;
@@ -1826,7 +1826,7 @@ pub fn SiegeItemThink(
         }
 
         if !carrier.is_null() {
-            let carrier = &mut (*ctx.world).entities[(*ent).genericValue8 as usize] as *mut gentity_t;
+            let carrier = &mut (*ctx.world).g_entities[(*ent).genericValue8 as usize] as *mut gentity_t;
 
             // This checking can be a bit iffy on the death stuff, but in
             // theory we should always get a think in before the default
@@ -2267,7 +2267,7 @@ pub fn G_SiegeClientExData(
         let mut scratch: [c_char; MAX_STRING_CHARS] = [0; MAX_STRING_CHARS];
 
         while i < (*ctx.world).level.num_entities && count < MAX_EXDATA_ENTS_TO_SEND {
-            let ent = &mut (*ctx.world).entities[i as usize] as *mut gentity_t;
+            let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
             if (*ent).inuse != 0
                 && !(*ent).client.is_null()

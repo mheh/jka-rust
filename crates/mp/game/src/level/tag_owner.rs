@@ -35,3 +35,8 @@ pub struct tagOwner_t {
     pub tags: [reference_tag_t; MAX_TAGS],
     pub inuse: qboolean,
 }
+
+// All-zero bytes are a valid tagOwner_t (name/tags/inuse are all zero-valid
+// #[repr(C)] fields) — the property `GameWorld::zeroed`'s `zeroed_box` relies on.
+// Source: oracle/oracle/codemp/game/g_misc.c:2879-2884 (Raven zero-inits refTagOwnerMap)
+unsafe impl native_platform::ZeroValid for tagOwner_t {}

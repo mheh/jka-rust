@@ -668,7 +668,7 @@ pub fn GlobalUse(
     // dispatch system, which requires ctx. The function pointer dispatch architecture cannot
     // be completed without either adding ctx to GlobalUse or having a separate dispatch path.
     unsafe {
-        if self_.is_null() || ((*self_).flags & crate::game_globals::FL_INACTIVE) != 0 {
+        if self_.is_null() || ((*self_).flags & crate::entity::flags::FL_INACTIVE) != 0 {
             return;
         }
 
@@ -1557,7 +1557,7 @@ pub fn ValidUseTarget(
             return qfalse;
         }
 
-        if ((*ent).flags & crate::game_globals::FL_INACTIVE) != 0 {
+        if ((*ent).flags & crate::entity::flags::FL_INACTIVE) != 0 {
             return qfalse;
         }
 
@@ -1871,8 +1871,8 @@ pub fn TryUse(
         }
 
         // Check for dispenser usage
-        if ((*client).ps.stats[crate::q_shared::STAT_HOLDABLE_ITEMS as usize] & (1 << HI_HEALTHDISP)) != 0
-            || ((*client).ps.stats[crate::q_shared::STAT_HOLDABLE_ITEMS as usize] & (1 << HI_AMMODISP)) != 0
+        if ((*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_HEALTHDISP)) != 0
+            || ((*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_AMMODISP)) != 0
         {
             if !target.is_null() && (*target).inuse != qfalse && !(*target).client.is_null()
                 && (*target).health > 0
@@ -1957,7 +1957,7 @@ fn goto_tryJetPack(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let client = (*ent).client as *mut gclient_t;
 
         // Jetpack check
-        if ((*client).ps.stats[crate::q_shared::STAT_HOLDABLE_ITEMS as usize] & (1 << HI_JETPACK)) != 0 {
+        if ((*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_JETPACK)) != 0 {
             if (*client).jetPackOn != qfalse || (*client).ps.groundEntityNum == ENTITYNUM_NONE {
                 ItemUse_Jetpack(ctx, ent);
                 return;
@@ -1965,7 +1965,7 @@ fn goto_tryJetPack(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         // Ammo dispenser check
-        if ((*client).ps.stats[crate::q_shared::STAT_HOLDABLE_ITEMS as usize] & (1 << HI_AMMODISP)) != 0 {
+        if ((*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_AMMODISP)) != 0 {
             let mut tr_toss: trace_t = core::mem::zeroed();
             let mut f_ang = [0.0f32; 3];
             let mut fwd = [0.0f32; 3];

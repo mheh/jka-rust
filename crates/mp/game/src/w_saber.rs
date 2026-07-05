@@ -45,7 +45,7 @@ use crate::bg_saberLoad::WP_SaberBladeUseSecondBladeStyle;
 use crate::g_combat::{G_Damage, G_Knockdown};
 use crate::g_mover::G_EntIsBreakable;
 use crate::g_utils::{G_Sound, G_SoundIndex, G_Throw};
-use crate::q_math::{vec3_origin, Q_irand, VectorLength, VectorNormalize, PITCH};
+use crate::q_math::{vec3_origin, VectorLength, VectorNormalize, PITCH};
 use crate::trap;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs;
@@ -4219,7 +4219,7 @@ pub fn WP_SaberBounceSound(
         if ent.is_null() || (*ent).client.is_null() {
             return;
         }
-        index = Q_irand(1, 9);
+        index = (*ctx.world).bg_state.rng.Q_irand(1, 9);
         let client = (*ent).client as *mut gclient_t;
         let saber = &mut (*client).saber[saberNum as usize] as *mut saberInfo_t;
 
@@ -4228,7 +4228,7 @@ pub fn WP_SaberBounceSound(
                 ctx,
                 ent,
                 CHAN_AUTO as c_int,
-                (*saber).bounceSound[Q_irand(0, 2) as usize],
+                (*saber).bounceSound[(*ctx.world).bg_state.rng.Q_irand(0, 2) as usize],
             );
         } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != 0
             && (*saber).bounce2Sound[0] != 0
@@ -4237,7 +4237,7 @@ pub fn WP_SaberBounceSound(
                 ctx,
                 ent,
                 CHAN_AUTO as c_int,
-                (*saber).bounce2Sound[Q_irand(0, 2) as usize],
+                (*saber).bounce2Sound[(*ctx.world).bg_state.rng.Q_irand(0, 2) as usize],
             );
         } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) == 0
             && (*saber).blockSound[0] != 0
@@ -4246,7 +4246,7 @@ pub fn WP_SaberBounceSound(
                 ctx,
                 ent,
                 CHAN_AUTO as c_int,
-                (*saber).blockSound[Q_irand(0, 2) as usize],
+                (*saber).blockSound[(*ctx.world).bg_state.rng.Q_irand(0, 2) as usize],
             );
         } else if WP_SaberBladeUseSecondBladeStyle(saber, bladeNum) != 0
             && (*saber).block2Sound[0] != 0
@@ -4255,7 +4255,7 @@ pub fn WP_SaberBounceSound(
                 ctx,
                 ent,
                 CHAN_AUTO as c_int,
-                (*saber).block2Sound[Q_irand(0, 2) as usize],
+                (*saber).block2Sound[(*ctx.world).bg_state.rng.Q_irand(0, 2) as usize],
             );
         } else {
             // `va("sound/weapons/saber/saberblock%d.wav", index)` — rendered as an
@@ -8567,7 +8567,7 @@ pub fn G_KickTrace(
                     } else {
                         /*
                         G_Throw( hitEnt, kickDir, kickPush );
-                        if ( kickPush >= 75.0f && !Q_irand( 0, 2 ) )
+                        if ( kickPush >= 75.0f && !(*ctx.world).bg_state.rng.Q_irand( 0, 2 ) )
                         {
                             G_Knockdown( hitEnt, ent, kickDir, 300, qtrue );
                         }
@@ -8611,7 +8611,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let elapsedTime: f32 = animLength - (*client).ps.legsTimer as f32;
         let remainingTime: f32 = animLength - elapsedTime;
         let mut kickDist: f32 = ((*ent).r.maxs[0] * 1.5f32) + STAFF_KICK_RANGE as f32 + 8.0f32; //fudge factor of 8
-        let kickDamage: c_int = (*ctx.world).bg_state.rng.Q_irand(10, 15); //Q_irand( 3, 8 ); //since it can only hit a guy once now
+        let kickDamage: c_int = (*ctx.world).bg_state.rng.Q_irand(10, 15); //(*ctx.world).bg_state.rng.Q_irand( 3, 8 ); //since it can only hit a guy once now
         let mut kickPush: c_int = (*ctx.world).bg_state.rng.flrand(50.0f32, 100.0f32) as c_int;
         let mut doKick: qboolean = 0;
 
@@ -9687,7 +9687,7 @@ pub fn WP_SaberPositionUpdate(
                     && !(*vehEnt).client.is_null()
                     && !(*vehEnt).m_pVehicle.is_null()
                 {
-                    properAngles[1] = (*(*vehEnt).m_pVehicle).m_vOrientation[YAW as usize];
+                    properAngles[1] = (*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_vOrientation[YAW as usize];
                 } else {
                     properAngles[1] = (*client).ps.viewangles[YAW as usize];
                     vehEnt = core::ptr::null_mut();
@@ -9707,7 +9707,7 @@ pub fn WP_SaberPositionUpdate(
             }
 
             if !vehEnt.is_null() {
-                properAngles[1] = (*(*vehEnt).m_pVehicle).m_vOrientation[YAW as usize];
+                properAngles[1] = (*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_vOrientation[YAW as usize];
             }
 
             if returnAfterUpdate != 0 && saberNum != 0 {
@@ -10678,12 +10678,12 @@ pub fn WP_SaberBlock(
 
         let rightdot = (right[0] * diff[0] + right[1] * diff[1] + right[2] * diff[2])
             + RandFloat(ctx, -0.2, 0.2);
-        let zdiff = hitloc[2] - (*client).ps.origin[2] + Q_irand(-8, 8) as f32;
+        let zdiff = hitloc[2] - (*client).ps.origin[2] + (*ctx.world).bg_state.rng.Q_irand(-8, 8) as f32;
 
         // Figure out what quadrant the block was in.
         if zdiff > 24.0 {
             // Attack from above
-            if Q_irand(0, 1) != 0 {
+            if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                 (*client).ps.saberBlocked = BLOCKED_TOP;
             } else {
                 (*client).ps.saberBlocked = BLOCKED_UPPER_LEFT;
@@ -10692,13 +10692,13 @@ pub fn WP_SaberBlock(
             // The upper half has three viable blocks...
             if rightdot > 0.25 {
                 // In the right quadrant...
-                if Q_irand(0, 1) != 0 {
+                if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                     (*client).ps.saberBlocked = BLOCKED_UPPER_LEFT;
                 } else {
                     (*client).ps.saberBlocked = BLOCKED_LOWER_LEFT;
                 }
             } else {
-                match Q_irand(0, 3) {
+                match (*ctx.world).bg_state.rng.Q_irand(0, 3) {
                     0 => (*client).ps.saberBlocked = BLOCKED_UPPER_RIGHT,
                     1 | 2 => (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT,
                     3 => (*client).ps.saberBlocked = BLOCKED_TOP,
@@ -10708,7 +10708,7 @@ pub fn WP_SaberBlock(
         } else {
             // The lower half is a bit iffy as far as block coverage.  Pick one of
             // the "low" ones at random.
-            if Q_irand(0, 1) != 0 {
+            if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                 (*client).ps.saberBlocked = BLOCKED_LOWER_RIGHT;
             } else {
                 (*client).ps.saberBlocked = BLOCKED_LOWER_LEFT;

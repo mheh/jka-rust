@@ -9,6 +9,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
 
 
 /// Raven `G_WriteClientSessionData`.
@@ -77,7 +78,7 @@ pub fn G_WriteClientSessionData(
     let saber2_type_str = unsafe { cstr_to_str(saber2_type.as_ptr()) };
 
     let client_idx = unsafe {
-        let base = (*ctx.world).level.clients.as_ptr();
+        let base = (*ctx.world).level.clients;
         if client >= base {
             (client as usize - base as usize) / std::mem::size_of::<gclient_t>()
         } else {
@@ -105,7 +106,7 @@ pub fn G_WriteClientSessionData(
     );
 
     let var = format!("session{}", client_idx);
-    trap::Cvar_Set(ctx.engine, cstr(&var).as_ptr(), cstr(&s).as_ptr());
+    trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr(&var), cstr(&s)));
 }
 
 /// Raven `G_ReadSessionData`.
@@ -115,8 +116,9 @@ pub fn G_ReadSessionData(
     ctx: GameContext<'_>,
     client: *mut gclient_t,
 ) {
-    let client_idx = unsafe {
-        let base = (*ctx.world).level.clients.as_ptr();
+  unsafe {
+    let client_idx = {
+        let base = (*ctx.world).level.clients;
         if client >= base {
             (client as usize - base as usize) / std::mem::size_of::<gclient_t>()
         } else {
@@ -189,6 +191,7 @@ pub fn G_ReadSessionData(
     (*client).ps.fd.saberAnimLevel = (*client).sess.saberLevel;
     (*client).ps.fd.saberDrawAnimLevel = (*client).sess.saberLevel;
     (*client).ps.fd.forcePowerSelected = (*client).sess.selectedFP;
+  }
 }
 
 /// Raven `G_InitSessionData`.
@@ -200,6 +203,7 @@ pub fn G_InitSessionData(
     userinfo: *mut c_char,
     isBot: qboolean,
 ) {
+  unsafe {
     (*client).sess.siegeDesiredTeam = TEAM_FREE;
 
     if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM as i32 {
@@ -276,6 +280,7 @@ pub fn G_InitSessionData(
     (*client).sess.saber2Type[0] = 0;
 
     G_WriteClientSessionData(ctx, client);
+  }
 }
 
 /// Raven `G_InitWorldSession`.
@@ -294,9 +299,11 @@ pub fn G_InitWorldSession(ctx: GameContext<'_>) {
     let s_str = unsafe { cstr_to_str(s.as_ptr()) };
     let gt: i32 = s_str.parse().unwrap_or(0);
 
-    if (*ctx.world).cvars.g_gametype.integer != gt {
-        (*ctx.world).level.newSession = qtrue;
-        G_Printf(ctx, cstr("Gametype changed, clearing session data.\n").as_ptr());
+    unsafe {
+        if (*ctx.world).cvars.g_gametype.integer != gt {
+            (*ctx.world).level.newSession = qtrue;
+            G_Printf(ctx, cstr("Gametype changed, clearing session data.\n").as_ptr());
+        }
     }
 }
 
@@ -304,12 +311,15 @@ pub fn G_InitWorldSession(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_session.c:312-322`
 pub fn G_WriteSessionData(ctx: GameContext<'_>) {
-    let s = format!("{}", (*ctx.world).cvars.g_gametype.integer);
-    trap::Cvar_Set(ctx.engine, cstr("session").as_ptr(), cstr(&s).as_ptr());
+    unsafe {
+        let s = format!("{}", (*ctx.world).cvars.g_gametype.integer);
+        trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(cstr("session"), cstr(&s)));
 
-    for i in 0..(*ctx.world).level.maxclients {
-        if (*ctx.world).level.clients[i as usize].pers.connected == CON_CONNECTED {
-            G_WriteClientSessionData(ctx, &mut (*ctx.world).level.clients[i as usize] as *mut gclient_t);
+        for i in 0..(*ctx.world).level.maxclients {
+            let client = (*ctx.world).level.clients.add(i as usize);
+            if (*client).pers.connected == CON_CONNECTED {
+                G_WriteClientSessionData(ctx, client);
+            }
         }
     }
 }

@@ -27,7 +27,7 @@ use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
 use crate::NPC_combat::G_SetEnemy;
 use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
 use crate::q_math::{
-    flrand, vectoangles, AngleNormalize360, AngleSubtract, AngleVectors, VectorLengthSquared,
+    vectoangles, AngleNormalize360, AngleSubtract, AngleVectors, VectorLengthSquared,
     VectorNormalize,
 };
 use crate::q_shared::Q_stricmp;
@@ -196,7 +196,7 @@ pub fn turretG2_set_models(
             trap::G2API_RemoveGhoul2Model(
                 ctx.engine,
                 mp_abi::game::syscalls::G_G2_REMOVEGHOUL2MODEL::GG2Removeghoul2ModelArgs::new(
-                    &mut (*self_).ghoul2 as *mut *mut c_void,
+                    (*self_).ghoul2,
                     0,
                 ),
             );
@@ -499,7 +499,7 @@ pub fn turretG2_fire(
             (*bolt).classname = c"turret_proj".as_ptr() as *mut c_char;
             (*bolt).nextthink = (*ctx.world).level.time + 10000;
             (*bolt).think = Some(crate::ent_fn_enums::EntThink::G_FreeEntity);
-            (*bolt).s.eType = ET_MISSILE;
+            (*bolt).s.eType = ET_MISSILE as c_int;
             (*bolt).s.weapon = WP_BLASTER as c_int;
             (*bolt).r.ownerNum = (*ent).s.number;
             (*bolt).damage = (*ent).damage;
@@ -655,7 +655,7 @@ pub fn turretG2_aim(
         (*self_).speed = AngleNormalize360((*self_).speed);
 
         if let Some(enemy_id) = (*self_).enemy {
-            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
             // ...then we'll calculate what new aim adjustments we should attempt to make this frame
             // Aim at enemy
@@ -979,7 +979,7 @@ pub fn turretG2_base_think(
         }
 
         if let Some(enemy_id) = (*self_).enemy {
-            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             if (*enemy).health < 0 || (*enemy).inuse == 0 {
                 (*self_).enemy = None;
             }
@@ -990,7 +990,7 @@ pub fn turretG2_base_think(
             if turretG2_find_enemies(ctx, self_) != 0 {
                 // found one
                 turnOff = qfalse;
-                let enemy = &mut (*ctx.world).entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
+                let enemy = &mut (*ctx.world).g_entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
                 if !(*enemy).client.is_null() {
                     // hold on to clients for a min of 3 seconds
                     (*self_).last_move_time = (*ctx.world).level.time + 3000;
@@ -1002,7 +1002,7 @@ pub fn turretG2_base_think(
         }
 
         if let Some(enemy_id) = (*self_).enemy {
-            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             if !(*enemy).client.is_null()
                 && (*((*enemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR as c_int
             {

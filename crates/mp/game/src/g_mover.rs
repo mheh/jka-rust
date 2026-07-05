@@ -28,7 +28,7 @@ use crate::g_utils::{
     G_ScaleNetHealth, G_SetAngles, G_SetMovedir, G_SetOrigin, G_SoundIndex, G_SoundSetIndex,
     G_Spawn, G_TempEntity, G_UseTargets, G_UseTargets2, GlobalUse, vtos,
 };
-use crate::q_math::{AngleVectors, Q_irand};
+use crate::q_math::AngleVectors;
 use crate::NPC_utils::G_ActivateBehavior;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::means_of_death::meansOfDeath_t;
@@ -182,7 +182,7 @@ pub fn G_TestEntityPosition(
         }
 
         if tr.startsolid != 0 {
-            &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t
+            &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t
         } else {
             core::ptr::null_mut()
         }
@@ -269,7 +269,7 @@ pub fn G_TryPushingEntity(
     unsafe {
         // This was only serverside not to mention it was never set (Raven
         // comment — the EF_MOVER_STOP branch is `#if 0`'d out, g_mover.c:164-172).
-        if (*pusher).apos.trType != trType_t::TR_STATIONARY
+        if (*pusher).s.apos.trType != trType_t::TR_STATIONARY
             && ((*pusher).spawnflags & 16) != 0
             && crate::q_shared::Q_stricmp((*pusher).classname, c"func_rotating".as_ptr()) == 0
         {
@@ -478,7 +478,7 @@ pub fn G_MoverPush(
 
         // see if any solid entities are inside the final position
         for e in 0..listed_entities {
-            let check = &mut (*ctx.world).entities[entity_list[e as usize] as usize] as *mut gentity_t;
+            let check = &mut (*ctx.world).g_entities[entity_list[e as usize] as usize] as *mut gentity_t;
 
             // only push items and players
             if (*check).s.eType != entityType_t::ET_PLAYER as c_int
@@ -717,7 +717,7 @@ pub fn CalcTeamDoorCenter(
         }
         let mut slave = (*ent).teamchain;
         while let Some(slave_id) = slave {
-            let slave_ptr = &mut (*ctx.world).entities[slave_id.index()] as *mut gentity_t;
+            let slave_ptr = &mut (*ctx.world).g_entities[slave_id.index()] as *mut gentity_t;
             // find slave's center
             let mut slave_center = [0.0f32; 3];
             for i in 0..3 {
@@ -1308,7 +1308,7 @@ pub fn Touch_DoorTrigger(
     unsafe {
         let mut relock_ent: *mut gentity_t = core::ptr::null_mut();
         let parent = match (*ent).parent {
-            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
 
@@ -1357,7 +1357,7 @@ pub fn Touch_DoorTrigger(
                 // doesn't unlock all the doors in this team)
                 if (*parent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
                     relock_ent = match (*parent).teammaster {
-                        Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                        Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                         None => core::ptr::null_mut(),
                     };
                 } else {
@@ -1404,14 +1404,14 @@ pub fn Think_SpawnNewDoorTrigger(
         let mut maxs = (*ent).r.absmax;
 
         let mut other = match (*ent).teamchain {
-            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
         while !other.is_null() {
             AddPointToBounds((*other).r.absmin, &mut mins, &mut maxs);
             AddPointToBounds((*other).r.absmax, &mut mins, &mut maxs);
             other = match (*other).teamchain {
-                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                 None => core::ptr::null_mut(),
             };
         }
@@ -1466,7 +1466,7 @@ pub fn G_EntIsDoor(
             return qfalse;
         }
 
-        let ent = &mut (*ctx.world).entities[entityNum as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entityNum as usize] as *mut gentity_t;
         if crate::q_shared::Q_stricmp((*ent).classname, c"func_door".as_ptr()) == 0 {
             // blocked by a door
             return qtrue;
@@ -1542,7 +1542,7 @@ pub fn G_EntIsUnlockedDoor(
         }
 
         if G_EntIsDoor(ctx, entityNum) != 0 {
-            let mut ent = &mut (*ctx.world).entities[entityNum as usize] as *mut gentity_t;
+            let mut ent = &mut (*ctx.world).g_entities[entityNum as usize] as *mut gentity_t;
             let mut owner: *mut gentity_t;
             if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
                 // not the master door, get the master door
@@ -1742,7 +1742,7 @@ pub fn Touch_PlatCenterTrigger(
         }
 
         let parent = match (*ent).parent {
-            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
         if (*parent).moverState == MOVER_POS1 {
@@ -1948,7 +1948,7 @@ pub fn Reached_Train(
     unsafe {
         // copy the appropriate values
         let next = match (*ent).nextTrain {
-            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => return, // just stop
         };
         if (*next).nextTrain.is_none() {
@@ -1961,7 +1961,7 @@ pub fn Reached_Train(
         // set the new trajectory
         (*ent).nextTrain = (*next).nextTrain;
         (*ent).pos1 = (*next).s.origin;
-        let next_next = &mut (*ctx.world).entities[(*next).nextTrain.unwrap().index()] as *mut gentity_t;
+        let next_next = &mut (*ctx.world).g_entities[(*next).nextTrain.unwrap().index()] as *mut gentity_t;
         (*ent).pos2 = (*next_next).s.origin;
 
         // if the path_corner has a speed, use that
@@ -2024,7 +2024,7 @@ pub fn Think_SetupTrainTargets(
         //           \_____|
         let mut start: *mut gentity_t = core::ptr::null_mut();
         let mut path = match (*ent).nextTrain {
-            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
             None => core::ptr::null_mut(),
         };
         while path != start {
@@ -2060,7 +2060,7 @@ pub fn Think_SetupTrainTargets(
             }
 
             if !next.is_null() {
-                (*path).nextTrain = ent_id_opt((*ctx.world).entities.as_mut_ptr(), next);
+                (*path).nextTrain = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), next);
             } else {
                 break;
             }
@@ -2533,7 +2533,7 @@ pub fn funcBBrushDieGo(
 
         // if a missile is stuck to us, blow it up so we don't look dumb
         for i in 0..mp_qshared::shared::MAX_GENTITIES {
-            let other = &mut (*ctx.world).entities[i] as *mut gentity_t;
+            let other = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             //TODO: Port EF_MISSILE_STICK
             // Source: oracle/oracle/codemp/game/g_mover.c:2409 — the
             // `EF_MISSILE_STICK` eFlags bit isn't type-ported anywhere in
@@ -2601,7 +2601,7 @@ pub fn funcBBrushDieGo(
         }
 
         let dir = if let Some(attacker_id) = attacker {
-            let attacker_ptr = &mut (*ctx.world).entities[attacker_id.index()] as *mut gentity_t;
+            let attacker_ptr = &mut (*ctx.world).g_entities[attacker_id.index()] as *mut gentity_t;
             if !(*attacker_ptr).client.is_null() {
                 let mut d = [
                     org[0] - (*attacker_ptr).r.currentOrigin[0],
@@ -2911,7 +2911,7 @@ pub fn G_EntIsBreakable(
             return qfalse;
         }
 
-        let ent = &mut (*ctx.world).entities[entityNum as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entityNum as usize] as *mut gentity_t;
 
         //TODO: Port SVF_GLASS_BRUSH
         // Source: oracle/oracle/codemp/game/g_mover.c:2841-2844
@@ -3161,7 +3161,7 @@ pub fn G_EntIsRemovableUsable(
     entNum: c_int,
 ) -> qboolean {
     unsafe {
-        let ent = &mut (*ctx.world).entities[entNum as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[entNum as usize] as *mut gentity_t;
         if !(*ent).classname.is_null()
             && crate::q_shared::Q_stricmp((*ent).classname, c"func_usable".as_ptr()) == 0
         {

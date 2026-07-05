@@ -61,7 +61,9 @@ pub fn G_Alloc(size: c_int) -> *mut c_void {
 /// Source: `oracle/oracle/codemp/game/g_mem.c:35-37`
 pub fn G_InitMemory(ctx: GameContext<'_>) {
     // Raven: allocPoint = 0;
-    (*ctx.world).allocPoint = 0;
+    unsafe {
+        (*ctx.world).allocPoint = 0;
+    }
 }
 
 /// Raven `Svcmd_GameMem_f`.
@@ -73,7 +75,7 @@ pub fn Svcmd_GameMem_f(ctx: GameContext<'_>) {
     let poolsize: c_int = 262144; // POOLSIZE = 256 * 1024
     let msg = format!(
         "Game memory status: {} out of {} bytes allocated\n",
-        (*ctx.world).allocPoint,
+        unsafe { (*ctx.world).allocPoint },
         poolsize
     );
     let msg_cstr = cstr(&msg);

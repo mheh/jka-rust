@@ -32,7 +32,9 @@ pub fn G_RunExPhys(
     use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
     use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
 
-    let mut tr: trace_t = Default::default();
+    unsafe {
+
+    let mut tr: trace_t = core::mem::zeroed();
     let mut projectedOrigin: vec3_t = [0.0; 3];
     let mut vNorm: vec3_t = [0.0; 3];
     let mut ground: vec3_t = [0.0; 3];
@@ -61,7 +63,7 @@ pub fn G_RunExPhys(
         if tr.fraction == 1.0f32 {
             (*ent).s.groundEntityNum = ENTITYNUM_NONE;
         } else {
-            (*ent).s.groundEntityNum = tr.entityNum;
+            (*ent).s.groundEntityNum = tr.entityNum as c_int;
         }
 
         if (*ent).s.groundEntityNum == ENTITYNUM_NONE {
@@ -91,9 +93,9 @@ pub fn G_RunExPhys(
                     (*ent).clipmask,
                 ),
             );
-            if tr.startsolid || tr.allsolid {
+            if tr.startsolid != 0 || tr.allsolid != 0 {
                 if let Some(touch_fn) = (*ent).touch {
-                    crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t, &tr);
+                    crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t, &tr);
                 }
             }
         }
@@ -167,19 +169,19 @@ pub fn G_RunExPhys(
                 ),
             );
 
-            if tr.fraction != 1.0f32 || tr.startsolid || tr.allsolid {
+            if tr.fraction != 1.0f32 || tr.startsolid != 0 || tr.allsolid != 0 {
                 if hasFirstCollision == qfalse {
                     bestCollision = tr;
                     _VectorCopy(boneOrg, &mut collisionRootPos);
                     hasFirstCollision = qtrue;
                 } else {
-                    if tr.allsolid && !bestCollision.allsolid {
+                    if tr.allsolid != 0 && bestCollision.allsolid == 0 {
                         bestCollision = tr;
                         _VectorCopy(boneOrg, &mut collisionRootPos);
-                    } else if tr.startsolid && !bestCollision.startsolid && !bestCollision.allsolid {
+                    } else if tr.startsolid != 0 && bestCollision.startsolid == 0 && bestCollision.allsolid == 0 {
                         bestCollision = tr;
                         _VectorCopy(boneOrg, &mut collisionRootPos);
-                    } else if !bestCollision.startsolid && !bestCollision.allsolid &&
+                    } else if bestCollision.startsolid == 0 && bestCollision.allsolid == 0 &&
                         tr.fraction < bestCollision.fraction {
                         bestCollision = tr;
                         _VectorCopy(boneOrg, &mut collisionRootPos);
@@ -210,7 +212,7 @@ pub fn G_RunExPhys(
         ),
     );
 
-    if tr.startsolid || tr.allsolid {
+    if tr.startsolid != 0 || tr.allsolid != 0 {
         if autoKill != qfalse {
             (*ent).think = Some(EntThink::G_FreeEntity);
             (*ent).nextthink = (*ctx.world).level.time;
@@ -239,7 +241,7 @@ pub fn G_RunExPhys(
 
         if tr.entityNum != ENTITYNUM_NONE && (*ent).touch.is_some() {
             if let Some(touch_fn) = (*ent).touch {
-                crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t, &tr);
+                crate::ent_fn_enums::dispatch_touch(ctx, touch_fn, ent, &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t, &tr);
             }
         }
 
@@ -252,4 +254,5 @@ pub fn G_RunExPhys(
             (*ent).epVelocity[2] = 0.0;
         }
     }
+}
 }

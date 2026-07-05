@@ -15,7 +15,7 @@ use crate::entity::hit_location::*;
 use crate::g_main::CalculateRanks;
 use crate::g_timer::TIMER_Set;
 use crate::g_utils::{G_AddEvent, G_FreeEntity, G_TempEntity, G_UseTargets};
-use crate::q_math::{AngleVectors, Q_irand, VectorLengthSquared, VectorNormalize};
+use crate::q_math::{AngleVectors, VectorLengthSquared, VectorNormalize};
 use crate::q_shared::Q_stricmp;
 use crate::teams::class::class_t;
 use crate::trap;
@@ -428,7 +428,7 @@ pub fn TossClientWeapon(ctx: GameContext<'_>, self_: *mut gentity_t, direction: 
             crate::bg_misc::BG_FindItemForWeapon(core::mem::transmute::<c_int, weapon_t>(weapon));
 
         let mut ammoSub = (*client).ps.ammo
-            [crate::bg_misc::weaponData[weapon as usize].ammoIndex as usize]
+            [weaponData[weapon as usize].ammoIndex as usize]
             - crate::bg_misc::bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
                 weapon,
                 itemType_t::IT_WEAPON as c_int,
@@ -460,20 +460,20 @@ pub fn TossClientWeapon(ctx: GameContext<'_>, self_: *mut gentity_t, direction: 
         ) as usize]
         .quantity;
 
-        (*client).ps.ammo[crate::bg_misc::weaponData[weapon as usize].ammoIndex as usize] -=
+        (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] -=
             crate::bg_misc::bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
                 weapon,
                 itemType_t::IT_WEAPON as c_int,
             ) as usize]
             .quantity;
 
-        if (*client).ps.ammo[crate::bg_misc::weaponData[weapon as usize].ammoIndex as usize] < 0 {
+        if (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] < 0 {
             (*launched).count -=
-                -(*client).ps.ammo[crate::bg_misc::weaponData[weapon as usize].ammoIndex as usize];
-            (*client).ps.ammo[crate::bg_misc::weaponData[weapon as usize].ammoIndex as usize] = 0;
+                -(*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize];
+            (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] = 0;
         }
 
-        if ((*client).ps.ammo[crate::bg_misc::weaponData[weapon as usize].ammoIndex as usize] < 1
+        if ((*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] < 1
             && weapon != WP_DET_PACK as c_int)
             || (weapon != WP_THERMAL as c_int
                 && weapon != WP_DET_PACK as c_int
@@ -541,7 +541,7 @@ pub fn TossClientItems(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if weapon > WP_BRYAR_PISTOL as c_int
             && weapon != WP_EMPLACED_GUN as c_int
             && weapon != WP_TURRET as c_int
-            && (*client).ps.ammo[crate::bg_misc::weaponData[weapon as usize].ammoIndex as usize] != 0
+            && (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] != 0
         {
             // find the item type for this weapon
             let item =
@@ -1149,19 +1149,19 @@ pub fn G_PickDeathAnim(
                 let mh = max_health as f32;
                 // death anims
                 if hitLoc == HL_FOOT_RT || hitLoc == HL_FOOT_LT {
-                    if r#mod == meansOfDeath_t::MOD_SABER as c_int && Q_irand(0, 2) == 0 {
+                    if r#mod == meansOfDeath_t::MOD_SABER as c_int && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                         return BOTH_DEATH10 as c_int; // chest: back flip
-                    } else if Q_irand(0, 2) == 0 {
+                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                         deathAnim = BOTH_DEATH4 as c_int;
-                    } else if Q_irand(0, 1) == 0 {
+                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                         deathAnim = BOTH_DEATH5 as c_int;
                     } else {
                         deathAnim = BOTH_DEATH15 as c_int;
                     }
                 } else if hitLoc == HL_LEG_RT || hitLoc == HL_LEG_LT {
-                    if Q_irand(0, 2) == 0 {
+                    if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                         deathAnim = BOTH_DEATH4 as c_int;
-                    } else if Q_irand(0, 1) == 0 {
+                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                         deathAnim = BOTH_DEATH5 as c_int;
                     } else {
                         deathAnim = BOTH_DEATH15 as c_int;
@@ -1169,9 +1169,9 @@ pub fn G_PickDeathAnim(
                 } else if hitLoc == HL_BACK {
                     if VectorLengthSquared(objVelocity) == 0.0 {
                         deathAnim = BOTH_DEATH17 as c_int; // head/back: croak
-                    } else if Q_irand(0, 2) == 0 {
+                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                         deathAnim = BOTH_DEATH4 as c_int;
-                    } else if Q_irand(0, 1) == 0 {
+                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                         deathAnim = BOTH_DEATH5 as c_int;
                     } else {
                         deathAnim = BOTH_DEATH15 as c_int;
@@ -1187,10 +1187,10 @@ pub fn G_PickDeathAnim(
                         deathAnim = BOTH_DEATH3 as c_int;
                     } else if dmg <= mh * 0.75 {
                         deathAnim = BOTH_DEATH6 as c_int;
-                    } else if Q_irand(0, 1) != 0 {
+                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                         deathAnim = BOTH_DEATH8 as c_int; // TEMP HACK: play spinny deaths less often
                     } else {
-                        deathAnim = match Q_irand(0, 2) {
+                        deathAnim = match (*ctx.world).bg_state.rng.Q_irand(0, 2) {
                             1 => BOTH_DEATH3 as c_int,
                             2 => BOTH_DEATH6 as c_int,
                             _ => BOTH_DEATH9 as c_int,
@@ -1207,10 +1207,10 @@ pub fn G_PickDeathAnim(
                         deathAnim = BOTH_DEATH7 as c_int;
                     } else if dmg <= mh * 0.75 {
                         deathAnim = BOTH_DEATH12 as c_int;
-                    } else if Q_irand(0, 1) != 0 {
+                    } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                         deathAnim = BOTH_DEATH14 as c_int;
                     } else {
-                        deathAnim = match Q_irand(0, 2) {
+                        deathAnim = match (*ctx.world).bg_state.rng.Q_irand(0, 2) {
                             1 => BOTH_DEATH7 as c_int,
                             2 => BOTH_DEATH12 as c_int,
                             _ => BOTH_DEATH11 as c_int,
@@ -1218,7 +1218,7 @@ pub fn G_PickDeathAnim(
                     }
                 } else if hitLoc == HL_CHEST || hitLoc == HL_WAIST {
                     if dmg <= mh * 0.25 || VectorLengthSquared(objVelocity) == 0.0 {
-                        if Q_irand(0, 1) == 0 {
+                        if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                             deathAnim = BOTH_DEATH18 as c_int; // gut: fall right
                         } else {
                             deathAnim = BOTH_DEATH19 as c_int; // gut: fall left
@@ -1226,7 +1226,7 @@ pub fn G_PickDeathAnim(
                     } else if dmg <= mh * 0.5 {
                         deathAnim = BOTH_DEATH2 as c_int;
                     } else if dmg <= mh * 0.75 {
-                        if Q_irand(0, 1) == 0 {
+                        if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
                             deathAnim = BOTH_DEATH1 as c_int;
                         } else {
                             deathAnim = BOTH_DEATH16 as c_int;
@@ -1635,7 +1635,7 @@ pub fn G_CheckVictoryScript(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
             (*self_).wait = 1.0;
-            TIMER_Set(ctx, self_, c"gloatTime".as_ptr(), Q_irand(5000, 8000));
+            TIMER_Set(ctx, self_, c"gloatTime".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(5000, 8000));
             (*npc).blockedSpeechDebounceTime = 0; // get him ready to taunt
             return;
         }
@@ -1646,13 +1646,13 @@ pub fn G_CheckVictoryScript(ctx: GameContext<'_>, self_: *mut gentity_t) {
             && !(*(*npc).group).commander.is_null()
             && !((*(*(*npc).group).commander).NPC as *mut gNPC_t).is_null()
             && (*((*(*(*npc).group).commander).NPC as *mut gNPC_t)).rank > (*npc).rank
-            && Q_irand(0, 2) == 0
+            && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0
         {
             // sometimes have the group commander speak instead
             let cmdr_npc = (*(*(*npc).group).commander).NPC as *mut gNPC_t;
-            (*cmdr_npc).greetingDebounceTime = level_time + Q_irand(2000, 5000);
+            (*cmdr_npc).greetingDebounceTime = level_time + (*ctx.world).bg_state.rng.Q_irand(2000, 5000);
         } else if !npc.is_null() {
-            (*npc).greetingDebounceTime = level_time + Q_irand(2000, 5000);
+            (*npc).greetingDebounceTime = level_time + (*ctx.world).bg_state.rng.Q_irand(2000, 5000);
         }
     }
 }

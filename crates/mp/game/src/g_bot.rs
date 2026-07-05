@@ -467,7 +467,7 @@ pub fn G_AddRandomBot(
                     i += 1;
                     continue;
                 }
-                if world.entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
+                if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
                     i += 1;
                     continue;
                 }
@@ -501,7 +501,7 @@ pub fn G_AddRandomBot(
                     i += 1;
                     continue;
                 }
-                if world.entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
+                if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
                     i += 1;
                     continue;
                 }
@@ -565,7 +565,7 @@ pub fn G_RemoveRandomBot(
             if cl.pers.connected != CON_CONNECTED {
                 continue;
             }
-            if world.entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
+            if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
                 continue;
             }
             if world.cvars.g_gametype.integer == GT_SIEGE {
@@ -602,7 +602,7 @@ pub fn G_CountHumanPlayers(ctx: GameContext<'_>, team: c_int) -> c_int {
             if cl.pers.connected != CON_CONNECTED {
                 continue;
             }
-            if world.entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT != 0 {
+            if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT != 0 {
                 continue;
             }
             if team >= 0 && cl.sess.sessionTeam as c_int != team {
@@ -629,7 +629,7 @@ pub fn G_CountBotPlayers(
             if cl.pers.connected != CON_CONNECTED {
                 continue;
             }
-            if world.entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
+            if world.g_entities[cl.ps.clientNum as usize].r.svFlags & SVF_BOT == 0 {
                 continue;
             }
             if world.cvars.g_gametype.integer == GT_SIEGE {
@@ -944,7 +944,7 @@ pub fn G_AddBot(
         );
         Info_SetValueForKey(userinfo.as_mut_ptr(), cstr("team").as_ptr(), cstr(&team_owned).as_ptr());
 
-        let bot = &mut (*ctx.world).entities[clientNum as usize] as *mut gentity_t;
+        let bot = &mut (*ctx.world).g_entities[clientNum as usize] as *mut gentity_t;
         (*bot).r.svFlags |= SVF_BOT;
         (*bot).inuse = qtrue;
 

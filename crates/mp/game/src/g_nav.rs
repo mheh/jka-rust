@@ -166,7 +166,7 @@ pub fn NPC_Blocked(
         // Attempt to run any blocked scripts
         // PORT-NOTE(missing-const): BSET_BLOCKED (bset_t enum value) not
         // resolved anywhere in the crate graph; written as cited.
-        if G_ActivateBehavior(ctx, self_, BSET_BLOCKED) != 0 {
+        if G_ActivateBehavior(ctx, self_, BSET_BLOCKED as c_int) != 0 {
             return;
         }
 
@@ -213,8 +213,8 @@ pub fn NPC_SetMoveGoal(
             Some(id) => id, // must still have a goal
             None => return,
         };
-        let base = (*ctx.world).entities.as_mut_ptr() as *const gentity_t;
-        let temp_goal = &mut (*ctx.world).entities[temp_goal_id.index()] as *mut gentity_t;
+        let base = (*ctx.world).g_entities.as_mut_ptr() as *const gentity_t;
+        let temp_goal = &mut (*ctx.world).g_entities[temp_goal_id.index()] as *mut gentity_t;
 
         // Copy the origin
         crate::q_math::_VectorCopy(point, &mut (*temp_goal).r.currentOrigin);
@@ -324,7 +324,7 @@ pub fn NAV_ClearPathToPoint(
 
         if (*self_).flags & FL_NAVGOAL != 0 {
             let parent = match (*self_).parent {
-                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                 None => {
                     // SHOULD NEVER HAPPEN!!!
                     debug_assert!((*self_).parent.is_some());
@@ -350,7 +350,7 @@ pub fn NAV_ClearPathToPoint(
 
         if (*self_).flags & FL_NAVGOAL != 0 {
             let parent = match (*self_).parent {
-                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
                 None => return qfalse,
             };
             // Trace from point to navgoal
@@ -409,9 +409,9 @@ pub fn NAV_ClearPathToPoint(
                 return qtrue;
             } else if (*ctx.world).globals.NAVDEBUG_showCollision != 0 {
                 if (trace.entityNum as c_int) < ENTITYNUM_WORLD
-                    && (*ctx.world).entities[trace.entityNum as usize].s.eType != ET_MOVER as c_int
+                    && (*ctx.world).g_entities[trace.entityNum as usize].s.eType != ET_MOVER as c_int
                 {
-                    let blocker = &mut (*ctx.world).entities[trace.entityNum as usize] as *mut gentity_t;
+                    let blocker = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
                     let mut p1 = [0.0f32; 3];
                     let mut p2 = [0.0f32; 3];
                     G_DrawEdge(point, trace.endpos, EDGE_PATH);
@@ -459,9 +459,9 @@ pub fn NAV_ClearPathToPoint(
 
             if (*ctx.world).globals.NAVDEBUG_showCollision != 0
                 && (trace.entityNum as c_int) < ENTITYNUM_WORLD
-                && (*ctx.world).entities[trace.entityNum as usize].s.eType != ET_MOVER as c_int
+                && (*ctx.world).g_entities[trace.entityNum as usize].s.eType != ET_MOVER as c_int
             {
-                let blocker = &mut (*ctx.world).entities[trace.entityNum as usize] as *mut gentity_t;
+                let blocker = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
                 let mut p1 = [0.0f32; 3];
                 let mut p2 = [0.0f32; 3];
                 G_DrawEdge((*self_).r.currentOrigin, trace.endpos, EDGE_PATH);
@@ -704,7 +704,7 @@ pub fn NAV_CheckAhead(
 
         // Do a special check for doors
         if ((*trace).entityNum as c_int) < ENTITYNUM_WORLD {
-            let blocker = &mut (*ctx.world).entities[(*trace).entityNum as usize] as *mut gentity_t;
+            let blocker = &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t;
 
             if !(*blocker).classname.is_null() && *(*blocker).classname != 0 {
                 if G_EntIsUnlockedDoor(ctx, (*blocker).s.number) != 0 {
@@ -1133,7 +1133,7 @@ pub fn NAV_AvoidCollision(
         // Now test against entities
         if NAV_CheckAhead(ctx, self_, movepos, &mut (*info).trace as *mut trace_t, CONTENTS_BODY) == 0 {
             // Get the blocker
-            (*info).blocker = &mut (*ctx.world).entities[(*info).trace.entityNum as usize] as *mut gentity_t;
+            (*info).blocker = &mut (*ctx.world).g_entities[(*info).trace.entityNum as usize] as *mut gentity_t;
             (*info).flags |= NIF_COLLISION;
 
             // Ok to hit our goal entity
@@ -1226,7 +1226,7 @@ pub fn NAV_TestBestNode(
 
         // Do a special check for doors
         if (trace.entityNum as c_int) < ENTITYNUM_WORLD {
-            let blocker = &mut (*ctx.world).entities[trace.entityNum as usize] as *mut gentity_t;
+            let blocker = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
 
             if !(*blocker).classname.is_null() && *(*blocker).classname != 0 {
                 // special case: doors are architecture, but are dynamic, like entities
@@ -1318,7 +1318,7 @@ pub fn NAV_MoveToGoal(
             Some(id) => id,
             None => return WAYPOINT_NONE,
         };
-        let goal_ent = &mut (*ctx.world).entities[goal_id.index()] as *mut gentity_t;
+        let goal_ent = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
 
         // Check special player optimizations
         if (*goal_ent).s.number == 0 {
@@ -1710,7 +1710,7 @@ pub fn Svcmd_Nav_f(ctx: GameContext<'_>) {
             trap::Argv(ctx.engine, GArgvArgs::new(2, cmd.as_mut_ptr(), 1024));
 
             if Q_stricmp(cmd.as_ptr(), c"testgoal".as_ptr()) == 0 {
-                let ent0 = &mut (*ctx.world).entities[0] as *mut gentity_t;
+                let ent0 = &mut (*ctx.world).g_entities[0] as *mut gentity_t;
                 (*ctx.world).globals.NAVDEBUG_curGoal = trap::Nav_GetNearestNode(
                     ctx.engine,
                     GNavGetnearestnodeArgs::new(ent0, (*ent0).waypoint, NF_CLEAR_PATH, WAYPOINT_NONE),
@@ -1931,7 +1931,7 @@ pub fn NAV_ShowDebugInfo(ctx: GameContext<'_>) {
         }
 
         if (*ctx.world).globals.NAVDEBUG_showTestPath != 0 {
-            let ent0 = &mut (*ctx.world).entities[0] as *mut gentity_t;
+            let ent0 = &mut (*ctx.world).g_entities[0] as *mut gentity_t;
             // Get the nearest node to the player
             let mut nearestNode = trap::Nav_GetNearestNode(ctx.engine, GNavGetnearestnodeArgs::new(ent0, (*ent0).waypoint, NF_ANY, WAYPOINT_NONE));
             let testNode = trap::Nav_GetBestNode(ctx.engine, GNavGetbestnodeArgs::new(nearestNode, (*ctx.world).globals.NAVDEBUG_curGoal, NODE_NONE));
@@ -1969,7 +1969,7 @@ pub fn NAV_FindPlayerWaypoint(
     clNum: c_int,
 ) {
     unsafe {
-        let ent = &mut (*ctx.world).entities[clNum as usize] as *mut gentity_t;
+        let ent = &mut (*ctx.world).g_entities[clNum as usize] as *mut gentity_t;
         (*ent).waypoint = trap::Nav_GetNearestNode(ctx.engine, GNavGetnearestnodeArgs::new(ent, (*ent).lastWaypoint, NF_CLEAR_PATH, WAYPOINT_NONE));
     }
 }

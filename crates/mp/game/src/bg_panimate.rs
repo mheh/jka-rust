@@ -755,12 +755,17 @@ pub fn BG_BrokenParryForParry(r#move: c_int) -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:763-787`
 pub fn BG_KnockawayForParry(r#move: c_int) -> c_int {
-    match r#move {
-        BLOCKED_TOP => LS_K1_T_,                       //push up
-        BLOCKED_UPPER_LEFT => LS_K1_TL,                //push up and to left
-        BLOCKED_LOWER_RIGHT => LS_K1_BR,               //push down and to left
-        BLOCKED_LOWER_LEFT => LS_K1_BL,                //push down and to right
-        _ /* BLOCKED_UPPER_RIGHT and default */ => LS_K1_TR, //push up, slightly to right
+    if r#move == BLOCKED_TOP as c_int {
+        LS_K1_T_ //push up
+    } else if r#move == BLOCKED_UPPER_LEFT as c_int {
+        LS_K1_TL //push up and to left
+    } else if r#move == BLOCKED_LOWER_RIGHT as c_int {
+        LS_K1_BR //push down and to left
+    } else if r#move == BLOCKED_LOWER_LEFT as c_int {
+        LS_K1_BL //push down and to right
+    } else {
+        /* BLOCKED_UPPER_RIGHT and default */
+        LS_K1_TR //push up, slightly to right
     }
 }
 
@@ -1020,44 +1025,35 @@ pub fn PM_InCartwheel(anim: c_int) -> qboolean {
 impl PmoveContext<'_> {
     pub fn BG_InKnockDownOnGround(&mut self, ps: *mut playerState_t) -> qboolean {
         unsafe {
-            match (*ps).legsAnim {
-                BOTH_KNOCKDOWN1 | BOTH_KNOCKDOWN2 | BOTH_KNOCKDOWN3 | BOTH_KNOCKDOWN4
-                | BOTH_KNOCKDOWN5 | BOTH_RELEASED => 1,
-                BOTH_GETUP1 | BOTH_GETUP2 | BOTH_GETUP3 | BOTH_GETUP4 | BOTH_GETUP5
-                | BOTH_GETUP_CROUCH_F1 | BOTH_GETUP_CROUCH_B1 | BOTH_FORCE_GETUP_F1
-                | BOTH_FORCE_GETUP_F2 | BOTH_FORCE_GETUP_B1 | BOTH_FORCE_GETUP_B2
-                | BOTH_FORCE_GETUP_B3 | BOTH_FORCE_GETUP_B4 | BOTH_FORCE_GETUP_B5
-                | BOTH_FORCE_GETUP_B6 => {
-                    if self.BG_AnimLength(0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
-                        1
-                    } else {
-                        0
-                    }
+            let v = (*ps).legsAnim;
+            if v == BOTH_KNOCKDOWN1 as c_int || v == BOTH_KNOCKDOWN2 as c_int || v == BOTH_KNOCKDOWN3 as c_int || v == BOTH_KNOCKDOWN4 as c_int || v == BOTH_KNOCKDOWN5 as c_int || v == BOTH_RELEASED as c_int {
+                1
+            } else if v == BOTH_GETUP1 as c_int || v == BOTH_GETUP2 as c_int || v == BOTH_GETUP3 as c_int || v == BOTH_GETUP4 as c_int || v == BOTH_GETUP5 as c_int || v == BOTH_GETUP_CROUCH_F1 as c_int || v == BOTH_GETUP_CROUCH_B1 as c_int || v == BOTH_FORCE_GETUP_F1 as c_int || v == BOTH_FORCE_GETUP_F2 as c_int || v == BOTH_FORCE_GETUP_B1 as c_int || v == BOTH_FORCE_GETUP_B2 as c_int || v == BOTH_FORCE_GETUP_B3 as c_int || v == BOTH_FORCE_GETUP_B4 as c_int || v == BOTH_FORCE_GETUP_B5 as c_int || v == BOTH_FORCE_GETUP_B6 as c_int {
+                if self.BG_AnimLength(0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
+                    1
+                } else {
+                    0
                 }
-                BOTH_GETUP_BROLL_B | BOTH_GETUP_BROLL_F | BOTH_GETUP_BROLL_L | BOTH_GETUP_BROLL_R
-                | BOTH_GETUP_FROLL_B | BOTH_GETUP_FROLL_F | BOTH_GETUP_FROLL_L
-                | BOTH_GETUP_FROLL_R => {
-                    if self.BG_AnimLength(0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
-                        1
-                    } else {
-                        0
-                    }
+            } else if v == BOTH_GETUP_BROLL_B as c_int || v == BOTH_GETUP_BROLL_F as c_int || v == BOTH_GETUP_BROLL_L as c_int || v == BOTH_GETUP_BROLL_R as c_int || v == BOTH_GETUP_FROLL_B as c_int || v == BOTH_GETUP_FROLL_F as c_int || v == BOTH_GETUP_FROLL_L as c_int || v == BOTH_GETUP_FROLL_R as c_int {
+                if self.BG_AnimLength(0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
+                    1
+                } else {
+                    0
                 }
-                BOTH_LK_DL_ST_T_SB_1_L => {
-                    if (*ps).legsTimer < 1000 {
-                        1
-                    } else {
-                        0
-                    }
+            } else if v == BOTH_LK_DL_ST_T_SB_1_L as c_int {
+                if (*ps).legsTimer < 1000 {
+                    1
+                } else {
+                    0
                 }
-                BOTH_PLAYER_PA_3_FLY => {
-                    if (*ps).legsTimer < 300 {
-                        1
-                    } else {
-                        0
-                    }
+            } else if v == BOTH_PLAYER_PA_3_FLY as c_int {
+                if (*ps).legsTimer < 300 {
+                    1
+                } else {
+                    0
                 }
-                _ => 0,
+            } else {
+                0
             }
         }
     }
@@ -1075,44 +1071,35 @@ pub fn BG_InKnockDownOnGround(
     ps: *mut playerState_t,
 ) -> qboolean {
     unsafe {
-        match (*ps).legsAnim {
-            BOTH_KNOCKDOWN1 | BOTH_KNOCKDOWN2 | BOTH_KNOCKDOWN3 | BOTH_KNOCKDOWN4
-            | BOTH_KNOCKDOWN5 | BOTH_RELEASED => 1,
-            BOTH_GETUP1 | BOTH_GETUP2 | BOTH_GETUP3 | BOTH_GETUP4 | BOTH_GETUP5
-            | BOTH_GETUP_CROUCH_F1 | BOTH_GETUP_CROUCH_B1 | BOTH_FORCE_GETUP_F1
-            | BOTH_FORCE_GETUP_F2 | BOTH_FORCE_GETUP_B1 | BOTH_FORCE_GETUP_B2
-            | BOTH_FORCE_GETUP_B3 | BOTH_FORCE_GETUP_B4 | BOTH_FORCE_GETUP_B5
-            | BOTH_FORCE_GETUP_B6 => {
-                if BG_AnimLength(bg_state, 0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
-                    1
-                } else {
-                    0
-                }
+        let v = (*ps).legsAnim;
+        if v == BOTH_KNOCKDOWN1 as c_int || v == BOTH_KNOCKDOWN2 as c_int || v == BOTH_KNOCKDOWN3 as c_int || v == BOTH_KNOCKDOWN4 as c_int || v == BOTH_KNOCKDOWN5 as c_int || v == BOTH_RELEASED as c_int {
+            1
+        } else if v == BOTH_GETUP1 as c_int || v == BOTH_GETUP2 as c_int || v == BOTH_GETUP3 as c_int || v == BOTH_GETUP4 as c_int || v == BOTH_GETUP5 as c_int || v == BOTH_GETUP_CROUCH_F1 as c_int || v == BOTH_GETUP_CROUCH_B1 as c_int || v == BOTH_FORCE_GETUP_F1 as c_int || v == BOTH_FORCE_GETUP_F2 as c_int || v == BOTH_FORCE_GETUP_B1 as c_int || v == BOTH_FORCE_GETUP_B2 as c_int || v == BOTH_FORCE_GETUP_B3 as c_int || v == BOTH_FORCE_GETUP_B4 as c_int || v == BOTH_FORCE_GETUP_B5 as c_int || v == BOTH_FORCE_GETUP_B6 as c_int {
+            if BG_AnimLength(bg_state, 0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
+                1
+            } else {
+                0
             }
-            BOTH_GETUP_BROLL_B | BOTH_GETUP_BROLL_F | BOTH_GETUP_BROLL_L | BOTH_GETUP_BROLL_R
-            | BOTH_GETUP_FROLL_B | BOTH_GETUP_FROLL_F | BOTH_GETUP_FROLL_L
-            | BOTH_GETUP_FROLL_R => {
-                if BG_AnimLength(bg_state, 0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
-                    1
-                } else {
-                    0
-                }
+        } else if v == BOTH_GETUP_BROLL_B as c_int || v == BOTH_GETUP_BROLL_F as c_int || v == BOTH_GETUP_BROLL_L as c_int || v == BOTH_GETUP_BROLL_R as c_int || v == BOTH_GETUP_FROLL_B as c_int || v == BOTH_GETUP_FROLL_F as c_int || v == BOTH_GETUP_FROLL_L as c_int || v == BOTH_GETUP_FROLL_R as c_int {
+            if BG_AnimLength(bg_state, 0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
+                1
+            } else {
+                0
             }
-            BOTH_LK_DL_ST_T_SB_1_L => {
-                if (*ps).legsTimer < 1000 {
-                    1
-                } else {
-                    0
-                }
+        } else if v == BOTH_LK_DL_ST_T_SB_1_L as c_int {
+            if (*ps).legsTimer < 1000 {
+                1
+            } else {
+                0
             }
-            BOTH_PLAYER_PA_3_FLY => {
-                if (*ps).legsTimer < 300 {
-                    1
-                } else {
-                    0
-                }
+        } else if v == BOTH_PLAYER_PA_3_FLY as c_int {
+            if (*ps).legsTimer < 300 {
+                1
+            } else {
+                0
             }
-            _ => 0,
+        } else {
+            0
         }
     }
 }
@@ -1659,7 +1646,7 @@ pub fn BG_FullBodyTauntAnim(anim: c_int) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1573-1581`
 impl PmoveContext<'_> {
     pub fn BG_AnimLength(&mut self, index: c_int, anim: c_int) -> c_int {
-        if anim >= MAX_ANIMATIONS {
+        if anim >= MAX_ANIMATIONS as c_int {
             return -1;
         }
         (self.bg.bgAllAnims[index as usize].anims[anim as usize].numFrames as f32
@@ -1679,7 +1666,7 @@ impl PmoveContext<'_> {
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1573-1581`
 pub fn BG_AnimLength(bg_state: &crate::bg_channel::BgState, index: c_int, anim: c_int) -> c_int {
-    if anim >= MAX_ANIMATIONS {
+    if anim >= MAX_ANIMATIONS as c_int {
         return -1;
     }
     if (index as usize) >= bg_state.bgAllAnims.len() {
@@ -1697,16 +1684,16 @@ pub fn BG_AnimLength(bg_state: &crate::bg_channel::BgState, index: c_int, anim: 
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1584-1595`
 impl PmoveContext<'_> {
     pub fn PM_AnimLength(&mut self, index: c_int, anim: c_int) -> c_int {
-        if anim >= MAX_ANIMATIONS || self.pm.animations.is_null() {
+        if anim >= MAX_ANIMATIONS as c_int || (*self.pm).animations.is_null() {
             return -1;
         }
         if anim < 0 {
             let s = format!("ERROR: anim {} < 0\n", anim);
-            self.traps.Com_Error(ERR_DROP, cstr(&s));
+            crate::g_main::Com_Error(ERR_DROP, cstr(&s).as_ptr());
         }
         unsafe {
-            ((*self.pm.animations.offset(anim as isize)).numFrames as f32
-                * ((*self.pm.animations.offset(anim as isize)).frameLerp as f32).abs())
+            ((*(*self.pm).animations.offset(anim as isize)).numFrames as f32
+                * ((*(*self.pm).animations.offset(anim as isize)).frameLerp as f32).abs())
                 as c_int
         }
     }
@@ -1718,16 +1705,16 @@ impl PmoveContext<'_> {
 impl PmoveContext<'_> {
     pub fn PM_DebugLegsAnim(&mut self, anim: c_int) {
         unsafe {
-            let oldAnim = (*self.pm.ps).legsAnim;
+            let oldAnim = (*(*self.pm).ps).legsAnim;
             let newAnim = anim;
 
             if oldAnim < MAX_TOTALANIMATIONS && oldAnim >= BOTH_DEATH1 as c_int
                 && newAnim < MAX_TOTALANIMATIONS && newAnim >= BOTH_DEATH1 as c_int
             {
-                let old_str = format!("OLD: {}\n", cstr_to_str(animTable[oldAnim as usize].as_ptr()));
-                let new_str = format!("NEW: {}\n", cstr_to_str(animTable[newAnim as usize].as_ptr()));
-                self.traps.Com_Printf(cstr(&old_str));
-                self.traps.Com_Printf(cstr(&new_str));
+                let old_str = format!("OLD: {}\n", cstr_to_str(animTable[oldAnim as usize].name));
+                let new_str = format!("NEW: {}\n", cstr_to_str(animTable[newAnim as usize].name));
+                crate::g_main::Com_Printf(cstr(&old_str).as_ptr());
+                crate::g_main::Com_Printf(cstr(&new_str).as_ptr());
             }
         }
     }
@@ -1797,9 +1784,10 @@ pub fn BG_ClearAnimsets() {}
 impl PmoveContext<'_> {
     pub fn BG_AnimsetAlloc(&mut self) -> *mut animation_t {
         debug_assert!(self.bg.bgNumAllAnims < MAX_ANIM_FILES as c_int);
-        let anims_ptr = self
-            .BG_Alloc((std::mem::size_of::<animation_t>() * MAX_TOTALANIMATIONS as usize) as c_int)
-            as *mut animation_t;
+        let anims_ptr = crate::bg_misc::BG_Alloc(
+            (std::mem::size_of::<animation_t>() * MAX_TOTALANIMATIONS as usize) as c_int,
+            self.bg,
+        ) as *mut animation_t;
         self.bg.bgAllAnims[self.bg.bgNumAllAnims as usize].anims = anims_ptr;
         anims_ptr
     }
@@ -1855,7 +1843,7 @@ impl PmoveContext<'_> {
             if animset.is_null() {
                 let filename_str = cstr_to_str(filename);
                 if filename_str.contains("players/_humanoid/") {
-                    animset = self.bg.bgHumanoidAnimations;
+                    animset = self.bg.bgHumanoidAnimations.as_mut_ptr();
                     nextIndex = 0;
                 } else if filename_str.contains("players/rockettrooper/") {
                     nextIndex = 1;
@@ -1889,12 +1877,12 @@ impl PmoveContext<'_> {
                         "{} exceeds the allowed game-side animation buffer!",
                         cstr_to_str(filename)
                     );
-                    self.traps.Com_Error(ERR_DROP, cstr(&s));
+                    crate::g_main::Com_Error(ERR_DROP, cstr(&s).as_ptr());
                 }
                 return -1;
             }
 
-            self.traps.fs_read(BGPAFtext.as_mut_ptr(), len, f);
+            self.traps.fs_read(BGPAFtext.as_mut_ptr() as *mut c_void, len, f);
             BGPAFtext[len as usize] = 0;
             self.traps.fs_fclose(f);
         } else {
@@ -1907,7 +1895,7 @@ impl PmoveContext<'_> {
 
         text_p = BGPAFtext.as_ptr();
 
-        for i in 0..MAX_ANIMATIONS {
+        for i in 0..MAX_ANIMATIONS as c_int {
             unsafe {
                 (*animset.offset(i as isize)).firstFrame = 0;
                 (*animset.offset(i as isize)).numFrames = 0;
@@ -1941,7 +1929,7 @@ impl PmoveContext<'_> {
                 break;
             }
             unsafe {
-                (*animset.offset(animNum as isize)).numFrames = atoi(token) as c_int;
+                (*animset.offset(animNum as isize)).numFrames = atoi(token) as u16;
             }
 
             token = COM_Parse(&mut text_p);
@@ -1949,7 +1937,7 @@ impl PmoveContext<'_> {
                 break;
             }
             unsafe {
-                (*animset.offset(animNum as isize)).loopFrames = atoi(token) as c_int;
+                (*animset.offset(animNum as isize)).loopFrames = atoi(token) as i8;
             }
 
             token = COM_Parse(&mut text_p);
@@ -1963,12 +1951,12 @@ impl PmoveContext<'_> {
             if fps < 0.0 {
                 unsafe {
                     (*animset.offset(animNum as isize)).frameLerp =
-                        (1000.0 / fps).floor() as c_int;
+                        (1000.0 / fps).floor() as i16;
                 }
             } else {
                 unsafe {
                     (*animset.offset(animNum as isize)).frameLerp =
-                        (1000.0 / fps).ceil() as c_int;
+                        (1000.0 / fps).ceil() as i16;
                 }
             }
         }
@@ -2027,7 +2015,7 @@ pub fn BG_ParseAnimationFile(
 impl PmoveContext<'_> {
     pub fn BG_StartLegsAnim(&mut self, ps: *mut playerState_t, anim: c_int) {
         unsafe {
-            if (*ps).pm_type >= PM_DEAD {
+            if (*ps).pm_type >= PM_DEAD as c_int {
                 debug_assert!(!BG_InDeathAnim(anim) != 0);
                 if (*ps).clientNum < MAX_CLIENTS as c_int || anim != BOTH_VT_DEATH1 as c_int {
                     return;
@@ -2063,14 +2051,14 @@ impl PmoveContext<'_> {
 impl PmoveContext<'_> {
     pub fn PM_ContinueLegsAnim(&mut self, anim: c_int) {
         unsafe {
-            if (*self.pm.ps).legsAnim == anim {
+            if (*(*self.pm).ps).legsAnim == anim {
                 return;
             }
-            if (*self.pm.ps).legsTimer > 0 {
+            if (*(*self.pm).ps).legsTimer > 0 {
                 return;
             }
 
-            self.BG_StartLegsAnim(self.pm.ps, anim);
+            self.BG_StartLegsAnim((*self.pm).ps, anim);
         }
     }
 }
@@ -2081,22 +2069,22 @@ impl PmoveContext<'_> {
 impl PmoveContext<'_> {
     pub fn PM_ForceLegsAnim(&mut self, anim: c_int) {
         unsafe {
-            if BG_InSpecialJump((*self.pm.ps).legsAnim) != 0
-                && (*self.pm.ps).legsTimer > 0
+            if BG_InSpecialJump((*(*self.pm).ps).legsAnim) != 0
+                && (*(*self.pm).ps).legsTimer > 0
                 && BG_InSpecialJump(anim) == 0
             {
                 return;
             }
 
-            if BG_InRoll(self.pm.ps, (*self.pm.ps).legsAnim) != 0
-                && (*self.pm.ps).legsTimer > 0
-                && BG_InRoll(self.pm.ps, anim) == 0
+            if BG_InRoll((*self.pm).ps, (*(*self.pm).ps).legsAnim) != 0
+                && (*(*self.pm).ps).legsTimer > 0
+                && BG_InRoll((*self.pm).ps, anim) == 0
             {
                 return;
             }
 
-            (*self.pm.ps).legsTimer = 0;
-            self.BG_StartLegsAnim(self.pm.ps, anim);
+            (*(*self.pm).ps).legsTimer = 0;
+            self.BG_StartLegsAnim((*self.pm).ps, anim);
         }
     }
 }
@@ -2107,7 +2095,7 @@ impl PmoveContext<'_> {
 impl PmoveContext<'_> {
     pub fn BG_StartTorsoAnim(&mut self, ps: *mut playerState_t, anim: c_int) {
         unsafe {
-            if (*ps).pm_type >= PM_DEAD {
+            if (*ps).pm_type >= PM_DEAD as c_int {
                 debug_assert!(!BG_InDeathAnim(anim) != 0);
                 return;
             }
@@ -2135,7 +2123,7 @@ impl PmoveContext<'_> {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2687-2690`
 impl PmoveContext<'_> {
     pub fn PM_StartTorsoAnim(&mut self, anim: c_int) {
-        self.BG_StartTorsoAnim(self.pm.ps, anim);
+        self.BG_StartTorsoAnim((*self.pm).ps, anim);
     }
 }
 
@@ -2158,7 +2146,7 @@ pub fn BG_SetLegsAnimTimer(ps: *mut playerState_t, time: c_int) {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2708-2711`
 impl PmoveContext<'_> {
     pub fn PM_SetLegsAnimTimer(&mut self, time: c_int) {
-        BG_SetLegsAnimTimer(self.pm.ps, time);
+        BG_SetLegsAnimTimer((*self.pm).ps, time);
     }
 }
 
@@ -2181,7 +2169,7 @@ pub fn BG_SetTorsoAnimTimer(ps: *mut playerState_t, time: c_int) {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2728-2731`
 impl PmoveContext<'_> {
     pub fn PM_SetTorsoAnimTimer(&mut self, time: c_int) {
-        BG_SetTorsoAnimTimer(self.pm.ps, time);
+        BG_SetTorsoAnimTimer((*self.pm).ps, time);
     }
 }
 
@@ -2365,7 +2353,7 @@ pub fn BG_SetAnimFinal(
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2926-2930`
 impl PmoveContext<'_> {
     pub fn PM_SetAnimFinal(&mut self, setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
-        self.BG_SetAnimFinal(self.pm.ps, self.pm.animations, setAnimParts, anim, setAnimFlags, blendTime);
+        self.BG_SetAnimFinal((*self.pm).ps, (*self.pm).animations, setAnimParts, anim, setAnimFlags, blendTime);
     }
 }
 
@@ -2374,7 +2362,7 @@ impl PmoveContext<'_> {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2933-2955`
 impl PmoveContext<'_> {
     pub fn BG_HasAnimation(&mut self, animIndex: c_int, animation: c_int) -> qboolean {
-        if animation < 0 || animation >= MAX_ANIMATIONS {
+        if animation < 0 || animation >= MAX_ANIMATIONS as c_int {
             return 0;
         }
 
@@ -2479,6 +2467,6 @@ impl PmoveContext<'_> {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:3037-3040`
 impl PmoveContext<'_> {
     pub fn PM_SetAnim(&mut self, setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
-        self.BG_SetAnim(self.pm.ps, self.pm.animations, setAnimParts, anim, setAnimFlags, blendTime);
+        self.BG_SetAnim((*self.pm).ps, (*self.pm).animations, setAnimParts, anim, setAnimFlags, blendTime);
     }
 }

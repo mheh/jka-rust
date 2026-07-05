@@ -563,7 +563,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
                     *data_p = data as *const c_char;
                     return COM_TOKEN.as_mut_ptr();
                 }
-                if len < MAX_TOKEN_CHARS {
+                if len < MAX_TOKEN_CHARS as c_int {
                     COM_TOKEN[len as usize] = c as c_char;
                     len += 1;
                 }
@@ -572,7 +572,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
 
         // parse a regular word
         loop {
-            if len < MAX_TOKEN_CHARS {
+            if len < MAX_TOKEN_CHARS as c_int {
                 COM_TOKEN[len as usize] = c as c_char;
                 len += 1;
             }
@@ -586,7 +586,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
             }
         }
 
-        if len == MAX_TOKEN_CHARS {
+        if len == MAX_TOKEN_CHARS as c_int {
             len = 0;
         }
         COM_TOKEN[len as usize] = 0;

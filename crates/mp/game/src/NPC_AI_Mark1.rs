@@ -25,9 +25,10 @@ use crate::entity::hit_location::*;
 use crate::npc::spot_t::spot_t;
 use mp_bg::public::anim_number::animNumber_t::*;
 
-// Distance constants for combat
-pub const DIST_MELEE: c_int = 0;
-pub const DIST_LONG: c_int = 1;
+// `DIST_MELEE`/`DIST_LONG` are the canonical `crate::ai::distance` enum variants,
+// reached via the prelude glob (the former per-file duplicate `pub const`
+// copies caused a glob-glob ambiguity with the canonical import at every call
+// site through `crate::prelude::*`; porting-rules §E dedupe-at-import rule).
 
 // Raven's file-scope `#define`s (`NPC_AI_Mark1.c:4-22`) — not central
 // constants, ported as file-local consts matching the C values.
@@ -59,9 +60,10 @@ pub const LSTATE_FIRED2: c_int = 5;
 pub const LSTATE_FIRED3: c_int = 6;
 pub const LSTATE_FIRED4: c_int = 7;
 
-// Shot mask constant (collision mask for projectiles)
-pub(crate) const MASK_SHOT: c_int = 0x00000001 | 0x00000100 | 0x00000200 | 0x00040000; // CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE|CONTENTS_TERRAIN
-pub(crate) const CONTENTS_LIGHTSABER: c_int = 0x00040000;
+// `MASK_SHOT`/`CONTENTS_LIGHTSABER` are the canonical `mp_qshared::shared::surface_flags`
+// consts, reached via the prelude glob (the former per-file duplicate `pub(crate)`
+// copies caused a glob-glob ambiguity with the canonical import at every call site
+// through `crate::prelude::*`; porting-rules §E dedupe-at-import rule).
 
 // PORT-NOTE(ambient-state): needs `level.time` (via
 // `trap_G2API_GetBoltMatrix`); no channel from this context-free faithful
@@ -285,10 +287,10 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
 }
 
 // PORT-NOTE(variadic-c-abi): the live body's only non-trivial call is
-// `G_SoundIndex(va("...death%d.wav", Q_irand(1,2)))` — `va`'s packet-resolved
+// `G_SoundIndex(va("...death%d.wav", (*ctx.world).bg_state.rng.Q_irand(1,2)))` — `va`'s packet-resolved
 // signature is the parked `fn va(format: *const c_char) -> *mut c_char`
 // stub with C varargs dropped (seam decision pending, see `q_shared.rs`), so
-// there is no channel to pass the `Q_irand(1,2)` substitution argument
+// there is no channel to pass the `(*ctx.world).bg_state.rng.Q_irand(1,2)` substitution argument
 // through it.
 /// Raven `Mark1_die`.
 ///
@@ -314,12 +316,12 @@ pub fn Mark1_die(
             CHAN_AUTO,
             crate::g_utils::G_SoundIndex(crate::q_shared::va(
                 c"sound/chars/mark1/misc/death%d.wav".as_ptr(),
-                crate::q_math::Q_irand(1, 2),
+                (*ctx.world).bg_state.rng.Q_irand(1, 2),
             )),
         );
 
         // Choose a death anim
-        if crate::q_math::Q_irand(1, 10) > 5 {
+        if (*ctx.world).bg_state.rng.Q_irand(1, 10) > 5 {
             NPC_SetAnim(
                 self_,
                 SETANIM_BOTH,
@@ -353,11 +355,11 @@ pub fn Mark1_dying(
 
         if (*(*self_).client).ps.torsoTimer > 0 {
             if crate::g_timer::TIMER_Done(ctx, self_, c"dyingExplosion".as_ptr()) != 0 {
-                let num = crate::q_math::Q_irand(1, 3);
+                let num = (*ctx.world).bg_state.rng.Q_irand(1, 3);
 
                 // Find place to generate explosion
                 if num == 1 {
-                    let random_num = crate::q_math::Q_irand(8, 10);
+                    let random_num = (*ctx.world).bg_state.rng.Q_irand(8, 10);
                     let newBolt = trap::G2API_AddBolt(
                         ctx.engine,
                         (*self_).ghoul2,
@@ -366,7 +368,7 @@ pub fn Mark1_dying(
                     );
                     NPC_Mark1_Part_Explode(ctx, self_, newBolt);
                 } else {
-                    let random_num = crate::q_math::Q_irand(1, 6);
+                    let random_num = (*ctx.world).bg_state.rng.Q_irand(1, 6);
                     let newBolt = trap::G2API_AddBolt(
                         ctx.engine,
                         (*self_).ghoul2,
@@ -382,13 +384,13 @@ pub fn Mark1_dying(
                     );
                 }
 
-                crate::g_timer::TIMER_Set(ctx, self_, c"dyingExplosion".as_ptr(), crate::q_math::Q_irand(300, 1000));
+                crate::g_timer::TIMER_Set(ctx, self_, c"dyingExplosion".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(300, 1000));
             }
 
             // See which weapons are there
             // Randomly fire blaster
             if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"l_arm".as_ptr()) == 0 {
-                if crate::q_math::Q_irand(1, 5) == 1 {
+                if (*ctx.world).bg_state.rng.Q_irand(1, 5) == 1 {
                     crate::npc_c::SaveNPCGlobals(ctx);
                     crate::npc_c::SetNPCGlobals(ctx, self_);
                     Mark1Dead_FireBlaster(ctx);
@@ -398,7 +400,7 @@ pub fn Mark1_dying(
 
             // Randomly fire rocket
             if trap::G2API_GetSurfaceRenderStatus(ctx.engine, (*self_).ghoul2, 0, c"r_arm".as_ptr()) == 0 {
-                if crate::q_math::Q_irand(1, 10) == 1 {
+                if (*ctx.world).bg_state.rng.Q_irand(1, 10) == 1 {
                     crate::npc_c::SaveNPCGlobals(ctx);
                     crate::npc_c::SetNPCGlobals(ctx, self_);
                     Mark1Dead_FireRocket(ctx);
@@ -430,7 +432,7 @@ pub fn NPC_Mark1_Pain(
 
         // Hit in the CHEST???
         if hitLoc == HL_CHEST {
-            let chance = crate::q_math::Q_irand(1, 4);
+            let chance = (*ctx.world).bg_state.rng.Q_irand(1, 4);
 
             if chance == 1 && damage > 5 {
                 NPC_SetAnim(
@@ -646,7 +648,7 @@ pub fn Mark1_BlasterAttack(
         }
 
         if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
-            let mut chance = crate::q_math::Q_irand(1, 5);
+            let mut chance = (*ctx.world).bg_state.rng.Q_irand(1, 5);
 
             (*npc_info).burstCount += 1;
 
@@ -662,11 +664,11 @@ pub fn Mark1_BlasterAttack(
             // Stop firing.
             if chance == 1 {
                 (*npc_info).burstCount = 0;
-                crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), crate::q_math::Q_irand(1000, 3000));
+                crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1000, 3000));
                 (*(*npc).client).ps.torsoTimer = 0;
             } else {
                 if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay2".as_ptr()) != 0 {
-                    crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay2".as_ptr(), crate::q_math::Q_irand(50, 50));
+                    crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay2".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(50, 50));
                     Mark1_FireBlaster(ctx);
                     NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                 }
@@ -774,7 +776,7 @@ pub fn Mark1_RocketAttack(
         }
 
         if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
-            crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), crate::q_math::Q_irand(1000, 3000));
+            crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1000, 3000));
             NPC_SetAnim(npc, SETANIM_TORSO, BOTH_ATTACK2, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
             Mark1_FireRocket(ctx);
         } else if advance != 0 {
@@ -801,7 +803,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
         // Randomly talk
         if crate::g_timer::TIMER_Done(ctx, npc, c"patrolNoise".as_ptr()) != 0 {
             if crate::g_timer::TIMER_Done(ctx, npc, c"angerNoise".as_ptr()) != 0 {
-                crate::g_timer::TIMER_Set(ctx, npc, c"patrolNoise".as_ptr(), crate::q_math::Q_irand(4000, 10000));
+                crate::g_timer::TIMER_Set(ctx, npc, c"patrolNoise".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(4000, 10000));
             }
         }
 

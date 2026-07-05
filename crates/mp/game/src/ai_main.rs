@@ -9,6 +9,9 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+// Dedupe SVF_NOCLIENT glob ambiguity (g_items::* / g_public_consts::* both
+// define it): the canonical home is g_public_consts, per house convention.
+use crate::g_public_consts::SVF_NOCLIENT;
 // Weapon-id constants (Raven `weapon_t` values) used by the ported
 // pure-logic functions below; prelude re-exports only the type.
 use mp_bg::weapons::weapon_t::{
@@ -111,6 +114,7 @@ const qfalse: qboolean = 0;
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:128-155`
 pub fn BotStraightTPOrderCheck(
+    base: *const gentity_t,
     ent: *mut gentity_t,
     ordernum: c_int,
     bs: *mut bot_state_t,
@@ -118,7 +122,7 @@ pub fn BotStraightTPOrderCheck(
     unsafe {
         match ordernum {
             0 => {
-                if (*bs).squadLeader == ent {
+                if (*bs).squadLeader == ent_id_opt(base, ent) {
                     (*bs).teamplayState = 0;
                     (*bs).squadLeader = None;
                 }
@@ -126,13 +130,13 @@ pub fn BotStraightTPOrderCheck(
             x if x == bot_teamplay_state_t::TEAMPLAYSTATE_FOLLOWING as c_int => {
                 (*bs).teamplayState = ordernum;
                 (*bs).isSquadLeader = 0;
-                (*bs).squadLeader = ent;
+                (*bs).squadLeader = ent_id_opt(base, ent);
                 (*bs).wpDestSwitchTime = 0.0;
             }
             x if x == bot_teamplay_state_t::TEAMPLAYSTATE_ASSISTING as c_int => {
                 (*bs).teamplayState = ordernum;
                 (*bs).isSquadLeader = 0;
-                (*bs).squadLeader = ent;
+                (*bs).squadLeader = ent_id_opt(base, ent);
                 (*bs).wpDestSwitchTime = 0.0;
             }
             _ => {
@@ -243,7 +247,7 @@ pub fn BotOrder(
             if ordernum == -1 {
                 BotReportStatus(ctx, bi);
             } else {
-                BotStraightTPOrderCheck(ent, ordernum, bi);
+                BotStraightTPOrderCheck(base, ent, ordernum, bi);
                 (*bi).state_Forced = ordernum;
                 (*bi).chatObject = Some(ent_id(base, ent));
                 (*bi).chatAltObject = None;
@@ -260,7 +264,7 @@ pub fn BotOrder(
                     if ordernum == -1 {
                         BotReportStatus(ctx, bi);
                     } else {
-                        BotStraightTPOrderCheck(ent, ordernum, bi);
+                        BotStraightTPOrderCheck(base, ent, ordernum, bi);
                         (*bi).state_Forced = ordernum;
                         (*bi).chatObject = Some(ent_id(base, ent));
                         (*bi).chatAltObject = None;

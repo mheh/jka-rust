@@ -7,6 +7,11 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+// Explicit imports to dedupe E0659 glob ambiguities (known MASK_*/CONTENTS_* debt,
+// the SFL_*/SVF_* pattern extended to surface-flag consts): several game-tier
+// modules glob-export local duplicates of these; the canonical definition is
+// `mp_qshared::shared::surface_flags`.
+use mp_qshared::shared::surface_flags::{MASK_SHOT, CONTENTS_LIGHTSABER};
 
 /// Sentry hover height constants.
 const SENTRY_HOVER_HEIGHT: f32 = 50.0f32;
@@ -209,7 +214,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             ),
         );
 
-        crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN, &mut muzzle);
+        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN, &mut muzzle);
 
         crate::q_math::AngleVectors(
             (*NPC).r.currentAngles,

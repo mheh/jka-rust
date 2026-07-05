@@ -616,7 +616,7 @@ pub fn BG_FindItemForPowerup(pw: powerup_t) -> *mut gitem_t {
         if (bg_itemlist[i as usize].giType == IT_POWERUP || bg_itemlist[i as usize].giType == IT_TEAM)
             && bg_itemlist[i as usize].giTag == pw
         {
-            return &mut bg_itemlist[i as usize];
+            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
         }
     }
     std::ptr::null_mut()
@@ -628,7 +628,7 @@ pub fn BG_FindItemForPowerup(pw: powerup_t) -> *mut gitem_t {
 pub fn BG_FindItemForHoldable(pw: holdable_t) -> *mut gitem_t {
     for i in 0..bg_numItems {
         if bg_itemlist[i as usize].giType == IT_HOLDABLE && bg_itemlist[i as usize].giTag == pw {
-            return &mut bg_itemlist[i as usize];
+            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
         }
     }
     panic!("HoldableItem not found");
@@ -644,7 +644,7 @@ pub fn BG_FindItemForWeapon(weapon: weapon_t) -> *mut gitem_t {
             && bg_itemlist[i as usize].giType == IT_WEAPON
             && bg_itemlist[i as usize].giTag == weapon
         {
-            return &mut bg_itemlist[i as usize];
+            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
         }
         i += 1;
     }
@@ -659,9 +659,9 @@ pub fn BG_FindItemForAmmo(ammo: ammo_t) -> *mut gitem_t {
     while i < bg_numItems {
         if !bg_itemlist[i as usize].classname.is_null()
             && bg_itemlist[i as usize].giType == IT_AMMO
-            && bg_itemlist[i as usize].giTag == ammo
+            && bg_itemlist[i as usize].giTag == ammo as c_int
         {
-            return &mut bg_itemlist[i as usize];
+            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
         }
         i += 1;
     }
@@ -677,7 +677,7 @@ pub fn BG_FindItem(classname: *const c_char) -> *mut gitem_t {
         if !bg_itemlist[i as usize].classname.is_null()
             && Q_stricmp(bg_itemlist[i as usize].classname, classname) == 0
         {
-            return &mut bg_itemlist[i as usize];
+            return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
         }
         i += 1;
     }
@@ -987,14 +987,14 @@ pub fn BG_CanItemBeGrabbed(
             }
             IT_TEAM => {
                 if gametype == GT_CTF || gametype == GT_CTY {
-                    if (*ps).persistant[statIndex_t::PERS_TEAM as usize] == TEAM_RED {
+                    if (*ps).persistant[persEnum_t::PERS_TEAM as usize] == TEAM_RED {
                         if item.giTag == PW_BLUEFLAG
                             || (item.giTag == PW_REDFLAG && (*ent).modelindex2 != 0)
                             || (item.giTag == PW_REDFLAG && (*ps).powerups[PW_BLUEFLAG as usize] != 0)
                         {
                             return qtrue;
                         }
-                    } else if (*ps).persistant[statIndex_t::PERS_TEAM as usize] == TEAM_BLUE {
+                    } else if (*ps).persistant[persEnum_t::PERS_TEAM as usize] == TEAM_BLUE {
                         if item.giTag == PW_REDFLAG
                             || (item.giTag == PW_BLUEFLAG && (*ent).modelindex2 != 0)
                             || (item.giTag == PW_BLUEFLAG && (*ps).powerups[PW_REDFLAG as usize] != 0)

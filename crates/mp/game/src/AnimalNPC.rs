@@ -78,7 +78,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 
         if !(*pVeh).m_pPilot.is_null()
             && ((*pVeh).m_ucmd.buttons & BUTTON_ALT_ATTACK) != 0
-            && (*(*pVeh).m_pVehicleInfo).turboSpeed > 0.0f {
+            && (*(*pVeh).m_pVehicleInfo).turboSpeed > 0.0f32 {
             if (curTime - (*pVeh).m_iTurboTime) > (*(*pVeh).m_pVehicleInfo).turboRecharge {
                 (*pVeh).m_iTurboTime = curTime + (*(*pVeh).m_pVehicleInfo).turboDuration;
                 (*parentPS).speed = (*(*pVeh).m_pVehicleInfo).turboSpeed;
@@ -94,14 +94,14 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
         if !(*parentPS).m_iVehicleNum == 0 {
             speedInc = speedIdle * (*pVeh).m_fTimeModifier;
             crate::q_math::VectorClear(&mut (*parentPS).moveDir);
-            (*parentPS).speed = 0.0f;
+            (*parentPS).speed = 0.0f32;
         } else {
             speedInc = (*(*pVeh).m_pVehicleInfo).acceleration * (*pVeh).m_fTimeModifier;
         }
 
-        if (*parentPS).speed != 0.0f || (*parentPS).groundEntityNum == ENTITYNUM_NONE as u32
+        if (*parentPS).speed != 0.0f32 || (*parentPS).groundEntityNum == ENTITYNUM_NONE as u32
             || (*pVeh).m_ucmd.forwardmove != 0 || (*pVeh).m_ucmd.upmove > 0 {
-            if (*pVeh).m_ucmd.forwardmove > 0 && speedInc != 0.0f {
+            if (*pVeh).m_ucmd.forwardmove > 0 && speedInc != 0.0f32 {
                 (*parentPS).speed += speedInc;
             } else if (*pVeh).m_ucmd.forwardmove < 0 {
                 if (*parentPS).speed > speedIdle {
@@ -109,15 +109,15 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
                 } else if (*parentPS).speed > speedMin {
                     (*parentPS).speed -= speedIdleDec;
                 }
-            } else if (*parentPS).speed > 0.0f {
+            } else if (*parentPS).speed > 0.0f32 {
                 (*parentPS).speed -= speedIdleDec;
-                if (*parentPS).speed < 0.0f {
-                    (*parentPS).speed = 0.0f;
+                if (*parentPS).speed < 0.0f32 {
+                    (*parentPS).speed = 0.0f32;
                 }
-            } else if (*parentPS).speed < 0.0f {
+            } else if (*parentPS).speed < 0.0f32 {
                 (*parentPS).speed += speedIdleDec;
-                if (*parentPS).speed > 0.0f {
-                    (*parentPS).speed = 0.0f;
+                if (*parentPS).speed > 0.0f32 {
+                    (*parentPS).speed = 0.0f32;
                 }
             }
         } else {
@@ -168,10 +168,10 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
                         (*pVeh).m_vOrientation[YAW],
                         (*riderPS).viewangles[YAW],
                     );
-                if !parentPS.is_null() && (*parentPS).speed > 0.0f {
+                if !parentPS.is_null() && (*parentPS).speed > 0.0f32 {
                     let mut s = (*parentPS).speed;
                     let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
-                    if s < 0.0f {
+                    if s < 0.0f32 {
                         s = -s;
                     }
                     angDif *= s / (*(*pVeh).m_pVehicleInfo).speedMax;
@@ -193,10 +193,10 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
                         (*pVeh).m_vOrientation[YAW],
                         (*riderPS).viewangles[YAW],
                     );
-                if !parentPS.is_null() && (*parentPS).speed > 0.0f {
+                if !parentPS.is_null() && (*parentPS).speed > 0.0f32 {
                     let mut s = (*parentPS).speed;
                     let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
-                    if s < 0.0f {
+                    if s < 0.0f32 {
                         s = -s;
                     }
                     angDif *= s / (*(*pVeh).m_pVehicleInfo).speedMax;
@@ -288,17 +288,17 @@ pub extern "C" fn AnimateVehicle(pVeh: *mut Vehicle_t) {
         let fSpeedPercToMax = if !(*parent).client.is_null() {
             (*(*parent).client).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
         } else {
-            0.0f
+            0.0f32
         };
 
         if fSpeedPercToMax < -0.01f32 {
             anim = BOTH_VT_WALK_REV;
             iBlend = 600;
         } else {
-            let turbo = fSpeedPercToMax > 0.0f && level_time < (*pVeh).m_iTurboTime;
+            let turbo = fSpeedPercToMax > 0.0f32 && level_time < (*pVeh).m_iTurboTime;
             let walking = if !(*parent).client.is_null() {
-                fSpeedPercToMax > 0.0f
-                    && (((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0 || fSpeedPercToMax <= 0.275f)
+                fSpeedPercToMax > 0.0f32
+                    && (((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0 || fSpeedPercToMax <= 0.275f32)
             } else {
                 false
             };
@@ -352,7 +352,7 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
         let fSpeedPercToMax = if !(*parent).client.is_null() {
             (*(*parent).client).ps.speed / (*(*pVeh).m_pVehicleInfo).speedMax
         } else {
-            0.0f
+            0.0f32
         };
 
         if fSpeedPercToMax < -0.01f32 {
@@ -369,8 +369,8 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
                 && ((*pilotPS.unwrap()).weaponTime > 0 || ((*pVeh).m_ucmd.buttons & BUTTON_ATTACK) != 0);
             let right = (*pVeh).m_ucmd.rightmove > 0;
             let left = (*pVeh).m_ucmd.rightmove < 0;
-            let turbo = fSpeedPercToMax > 0.0f && level_time < (*pVeh).m_iTurboTime;
-            let walking = fSpeedPercToMax > 0.0f
+            let turbo = fSpeedPercToMax > 0.0f32 && level_time < (*pVeh).m_iTurboTime;
+            let walking = fSpeedPercToMax > 0.0f32
                 && (((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0 || fSpeedPercToMax <= 0.275f32);
             let running = fSpeedPercToMax > 0.275f32;
             let mut weapon_pose: EWeaponPose = WPOSE_NONE;
@@ -415,8 +415,8 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
                 if !left_mut && !right_mut {
                     if !pilot.is_null() && !(*pilot).enemy.is_none() {
                         let to_enemy_dist: f32;
-                        let mut to_enemy: [f32; 3] = [0.0f; 3];
-                        let mut actor_right: [f32; 3] = [0.0f; 3];
+                        let mut to_enemy: [f32; 3] = [0.0f32; 3];
+                        let mut actor_right: [f32; 3] = [0.0f32; 3];
                         let actor_right_dot: f32;
 
                         crate::q_math::_VectorSubtract(

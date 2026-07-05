@@ -175,7 +175,7 @@ pub fn G_IsRidingVehicle(
             let client = (*ent).client as *mut gclient_t;
             if (*client).NPC_class != CLASS_VEHICLE && (*ent).s.m_iVehicleNum != 0 {
                 let vehNum = (*ent).s.m_iVehicleNum as usize;
-                return (*ctx.world).entities[vehNum].m_pVehicle as *mut Vehicle_t;
+                return (*ctx.world).g_entities[vehNum].m_pVehicle as *mut Vehicle_t;
             }
         }
         core::ptr::null_mut()
@@ -258,7 +258,7 @@ pub fn G_AttachToVehicle(
 
         // MP: vehEnt = &g_entities[ent->r.ownerNum];
         let vehEnt = (*ctx.world)
-            .entities
+            .g_entities
             .as_mut_ptr()
             .add((*ent).r.ownerNum as usize);
         (*ent).waypoint = (*vehEnt).waypoint; // take the veh's waypoint as your own
@@ -290,7 +290,7 @@ pub fn G_AttachToVehicle(
                 &(*vehEnt).modelScale as *const vec3_t,
             ),
         );
-        crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+        BG_GiveMeVectorFromMatrix(
             &boltMatrix,
             ORIGIN,
             &mut (*entClient).ps.origin,
@@ -1083,7 +1083,7 @@ pub fn Update(
             } else if (*pVeh).m_iPilotTime != 0 {
                 // die
                 let oldPilot = (*ctx.world)
-                    .entities
+                    .g_entities
                     .as_mut_ptr()
                     .add((*pVeh).m_iPilotLastIndex as usize);
                 let oldPilotConnected = !(*oldPilot).client.is_null()
@@ -1105,7 +1105,7 @@ pub fn Update(
                     let oc = (*oldPilot).client as *mut gclient_t;
                     let mut v: vec3_t = [0.0; 3];
                     _VectorSubtract((*pclient).ps.origin, (*oc).ps.origin, &mut v);
-                    if crate::g_client::VectorLength(v) < (*parent).speed {
+                    if VectorLength(v) < (*parent).speed {
                         // still within the minimum distance to their vehicle
                         (*pVeh).m_iPilotTime = (*ctx.world).level.time + (*parent).damage;
                     } else if (*pVeh).m_iPilotTime < (*ctx.world).level.time {
@@ -1606,7 +1606,7 @@ pub fn AttachRiders(
                     ),
                 );
                 let ppc = (*pilot).client as *mut gclient_t;
-                crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                BG_GiveMeVectorFromMatrix(
                     &boltMatrix,
                     ORIGIN,
                     &mut (*ppc).ps.origin,
@@ -1648,12 +1648,12 @@ pub fn AttachRiders(
                     ),
                 );
                 let mut fwd: vec3_t = [0.0; 3];
-                crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
+                BG_GiveMeVectorFromMatrix(
                     &boltMatrix,
                     ORIGIN,
                     &mut (*dcl).ps.origin,
                 );
-                crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y, &mut fwd);
+                BG_GiveMeVectorFromMatrix(&boltMatrix, NEGATIVE_Y, &mut fwd);
                 vectoangles(fwd, &mut (*dcl).ps.viewangles);
 
                 crate::g_utils::G_SetOrigin(droid, (*dcl).ps.origin);
@@ -2009,7 +2009,7 @@ pub fn G_SetVehDamageFlags(
                             (*droidEnt).flags &= !FL_UNDYING;
                             // resolve veh->enemy (Option<EntityId>) to a raw ptr
                             let enemy_ptr = match (*veh).enemy {
-                                Some(id) => (*ctx.world).entities.as_mut_ptr().add(id.0 as usize),
+                                Some(id) => (*ctx.world).g_entities.as_mut_ptr().add(id.0 as usize),
                                 None => core::ptr::null_mut(),
                             };
                             // PORT-NOTE(G_Damage-null-dir/point): Raven passes NULL for both
