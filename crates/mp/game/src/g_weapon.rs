@@ -574,8 +574,8 @@ pub fn WP_DisruptorMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs::new(
                         &mut tr,
                         &start as *const vec3_t,
-                        &[0.0; 3] as *const vec3_t,
-                        &[0.0; 3] as *const vec3_t,
+                        &[0.0f32; 3] as *const vec3_t,
+                        &[0.0f32; 3] as *const vec3_t,
                         &end as *const vec3_t,
                         ignore,
                         MASK_SHOT,
@@ -797,16 +797,17 @@ pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
             start = (*((*ent).client as *mut gclient_t)).ps.origin;
             start[2] += (*((*ent).client as *mut gclient_t)).ps.viewheight as f32;
 
-            count = ((*ctx.world).level.time
+            count = (((*ctx.world).level.time
                 - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime)
-                / DISRUPTOR_CHARGE_UNIT;
+                as f32
+                / DISRUPTOR_CHARGE_UNIT) as c_int;
             if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
                 maxCount = 200;
             }
         } else {
             start = (*ent).r.currentOrigin;
             start[2] += 24.0;
-            count = 100 / DISRUPTOR_CHARGE_UNIT;
+            count = (100 as f32 / DISRUPTOR_CHARGE_UNIT) as c_int;
         }
 
         count *= 2;
@@ -1139,9 +1140,10 @@ pub fn WP_BowcasterMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ent).client.is_null() {
             count = 1;
         } else {
-            count = ((*ctx.world).level.time
+            count = (((*ctx.world).level.time
                 - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime)
-                / BOWCASTER_CHARGE_UNIT;
+                as f32
+                / BOWCASTER_CHARGE_UNIT) as c_int;
         }
 
         if count < 1 {
@@ -1564,12 +1566,13 @@ pub fn WP_DEMP2_AltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let mut tr: trace_t = std::mem::zeroed();
 
         for i in 0..3 {
-            end[i] = start[i] + DEMP2_ALT_RANGE * (*ctx.world).globals.forward[i];
+            end[i] = start[i] + DEMP2_ALT_RANGE as f32 * (*ctx.world).globals.forward[i];
         }
 
-        count = ((*ctx.world).level.time
+        count = (((*ctx.world).level.time
             - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime)
-            / DEMP2_CHARGE_UNIT;
+            as f32
+            / DEMP2_CHARGE_UNIT) as c_int;
 
         origcount = count;
 
@@ -2655,7 +2658,7 @@ pub fn laserTrapDelayedExplode(
         if !attacker.is_null() && (*attacker).s.number == 0 {
             // less damage when shot by player
             (*self_).splashDamage /= 3;
-            (*self_).splashRadius /= 3.0;
+            (*self_).splashRadius /= 3;
         }
     }
 }
@@ -2755,7 +2758,7 @@ pub fn proxMineThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         (*((*cl).client as *mut gclient_t)).ps.origin,
                         &mut v,
                     );
-                    if crate::q_math::VectorLength(v) < (*ent).splashRadius / 2.0 {
+                    if crate::q_math::VectorLength(v) < (*ent).splashRadius as f32 / 2.0f32 {
                         (*ent).think = Some(EntThink::laserTrapExplode);
                         return;
                     }
@@ -3968,12 +3971,16 @@ pub fn WP_FireMelee(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolea
             && (*((*ent).client as *mut gclient_t)).ps.torsoAnim == (BOTH_MELEE2) as i32
         {
             // right
-            if (*((*ent).client as *mut gclient_t)).ps.brokenLimbs & (1 << BROKENLIMB_RARM) != 0 {
+            if (*((*ent).client as *mut gclient_t)).ps.brokenLimbs & (1 << (BROKENLIMB_RARM as i32))
+                != 0
+            {
                 return;
             }
         } else {
             // left
-            if (*((*ent).client as *mut gclient_t)).ps.brokenLimbs & (1 << BROKENLIMB_LARM) != 0 {
+            if (*((*ent).client as *mut gclient_t)).ps.brokenLimbs & (1 << (BROKENLIMB_LARM as i32))
+                != 0
+            {
                 return;
             }
         }
@@ -4907,8 +4914,8 @@ pub fn WP_VehCheckTraceFromCamPos(
                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                     &mut trace,
                     &start as *const vec3_t,
-                    &[0.0, 0.0, 0.0] as *const vec3_t,
-                    &[0.0, 0.0, 0.0] as *const vec3_t,
+                    &[0.0f32, 0.0f32, 0.0f32] as *const vec3_t,
+                    &[0.0f32, 0.0f32, 0.0f32] as *const vec3_t,
                     &end as *const vec3_t,
                     (*ent).s.number,
                     CONTENTS_SOLID | CONTENTS_BODY,
@@ -4980,7 +4987,7 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
 
         if !pVeh.m_pVehicleInfo.is_null()
             && (pVeh.m_pVehicleInfo.as_ref().unwrap().r#type != VH_FIGHTER
-                || (pVeh.m_ulFlags & VEH_WINGSOPEN) != 0)
+                || (pVeh.m_ulFlags & (VEH_WINGSOPEN as u64)) != 0)
         {
             let mut weaponNum: c_int = 0;
             let mut vehWeaponIndex = VEH_WEAPON_NONE;
@@ -5128,11 +5135,14 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
                                 crate::q_math::VectorSet(
                                     &mut ang,
                                     0.0f32,
-                                    pVeh.m_vOrientation[1],
+                                    *pVeh.m_vOrientation.add(1),
                                     0.0f32,
                                 );
                             } else {
-                                crate::q_math::_VectorCopy(pVeh.m_vOrientation, &mut ang);
+                                crate::q_math::_VectorCopy(
+                                    *(pVeh.m_vOrientation as *const vec3_t),
+                                    &mut ang,
+                                );
                             }
                             crate::q_math::AngleVectors(ang, Some(&mut fixedDir), None, None);
                             crate::q_math::_VectorMA(

@@ -788,7 +788,7 @@ pub fn HolocronTouch(
         }
 
         //G_Sound(other, CHAN_AUTO, G_SoundIndex("sound/weapons/w_pkup.wav"));
-        G_AddEvent(ctx, other, mp_bg::public::entity_event::entity_event_t::EV_ITEM_PICKUP as c_int, (*self_).s.number);
+        G_AddEvent(other, mp_bg::public::entity_event::entity_event_t::EV_ITEM_PICKUP as c_int, (*self_).s.number);
 
         (*((*other).client as *mut gclient_t)).ps.holocronsCarried[(*self_).count as usize] = (*ctx.world).level.time as f32;
         (*self_).s.modelindex = 0;
@@ -798,7 +798,7 @@ pub fn HolocronTouch(
         (*self_).pos2[1] = ((*ctx.world).level.time + HOLOCRON_RESPAWN_TIME) as f32;
 
         if force_reselect != WP_NONE {
-            G_AddEvent(ctx, other, mp_bg::public::entity_event::entity_event_t::EV_NOAMMO as c_int, force_reselect);
+            G_AddEvent(other, mp_bg::public::entity_event::entity_event_t::EV_NOAMMO as c_int, force_reselect);
         }
 
         //G_Printf("DON'T TOUCH ME\n");
@@ -981,7 +981,7 @@ pub fn SP_misc_holocron(
 
         (*ent).s.modelindex = (*ent).count - 128; //G_ModelIndex(holocronTypeModels[ent->count]);
         (*ent).s.eType = entityType_t::ET_HOLOCRON as c_int;
-        (*ent).s.pos.trType = TR_GRAVITY as c_int;
+        (*ent).s.pos.trType = TR_GRAVITY;
         (*ent).s.pos.trTime = (*ctx.world).level.time;
 
         (*ent).r.contents = mp_qshared::shared::surface_flags::CONTENTS_TRIGGER;
@@ -1053,7 +1053,7 @@ pub fn Use_Shooter(
             _ => {}
         }
 
-        G_AddEvent(ctx, ent, mp_bg::public::entity_event::entity_event_t::EV_FIRE_WEAPON as c_int, 0);
+        G_AddEvent(ent, mp_bg::public::entity_event::entity_event_t::EV_FIRE_WEAPON as c_int, 0);
     }
 }
 
@@ -1888,7 +1888,7 @@ pub fn fx_runner_think(
         if (*ent).spawnflags & 2 == 0 && (*ent).s.loopSound == 0 {
             // NOT ONESHOT...this is an assy thing to do
             if !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
-                (*ent).s.soundSetIndex = G_SoundSetIndex((*ent).soundSet);
+                (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, (*ent).soundSet);
                 (*ent).s.loopIsSoundset = qtrue;
                 (*ent).s.loopSound = BMS_MID;
             }
@@ -1927,8 +1927,8 @@ pub fn fx_runner_use(
             }
 
             if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
-                (*self_).s.soundSetIndex = G_SoundSetIndex((*self_).soundSet);
-                G_AddEvent(ctx, self_, mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int, BMS_START);
+                (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
+                G_AddEvent(self_, mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int, BMS_START);
             }
         } else {
             // ensure we are working with the right think function
@@ -1941,8 +1941,8 @@ pub fn fx_runner_use(
                 fx_runner_think(ctx, self_);
 
                 if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
-                    (*self_).s.soundSetIndex = G_SoundSetIndex((*self_).soundSet);
-                    G_AddEvent(ctx, self_, mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int, BMS_START);
+                    (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
+                    G_AddEvent(self_, mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int, BMS_START);
                     (*self_).s.loopSound = BMS_MID;
                     (*self_).s.loopIsSoundset = qtrue;
                 }
@@ -1954,8 +1954,8 @@ pub fn fx_runner_use(
                 (*self_).s.modelindex2 = FX_STATE_OFF;
 
                 if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
-                    (*self_).s.soundSetIndex = G_SoundSetIndex((*self_).soundSet);
-                    G_AddEvent(ctx, self_, mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int, BMS_END);
+                    (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
+                    G_AddEvent(self_, mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int, BMS_END);
                     (*self_).s.loopSound = 0;
                     (*self_).s.loopIsSoundset = qfalse;
                 }
@@ -2007,7 +2007,7 @@ pub fn fx_runner_link(
             (*ent).nextthink = -1;
         } else {
             if !(*ent).soundSet.is_null() && *(*ent).soundSet != 0 {
-                (*ent).s.soundSetIndex = G_SoundSetIndex((*ent).soundSet);
+                (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, (*ent).soundSet);
                 (*ent).s.loopSound = BMS_MID;
                 (*ent).s.loopIsSoundset = qtrue;
             }
@@ -2953,7 +2953,7 @@ pub fn SP_misc_weapon_shooter(
     ctx: GameContext<'_>,self_: *mut gentity_t) {
     unsafe {
         // alloc a client just for the weapon code to use
-        (*self_).client = G_ClientForShooter(ctx);
+        (*self_).client = G_ClientForShooter(ctx) as *mut c_void;
 
         let mut s: *mut c_char = core::ptr::null_mut();
         G_SpawnString(ctx, c"weapon".as_ptr(), c"".as_ptr(), &mut s);
@@ -2963,7 +2963,7 @@ pub fn SP_misc_weapon_shooter(
         (*((*self_).client as *mut gclient_t)).ps.weapon = mp_bg::weapons::weapon_t::WP_BLASTER;
         if !s.is_null() && *s != 0 {
             // use a different weapon
-            let w = crate::q_shared::GetIDForString(WPTable.as_ptr(), s);
+            let w = crate::q_shared::GetIDForString(WPTable.as_ptr() as *mut _, s);
             (*self_).s.weapon = w;
             (*((*self_).client as *mut gclient_t)).ps.weapon = w;
         }

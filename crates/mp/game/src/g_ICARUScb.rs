@@ -91,9 +91,16 @@ pub fn G_DebugPrint(
         let text = cstr_to_str(format);
 
         if level == WL_ERROR as c_int {
-            Com_Printf(cstr(&format!("{}ERROR: {}", S_COLOR_RED, text)).as_ptr());
+            Com_Printf(cstr(&format!("{}ERROR: {}", S_COLOR_RED.to_string_lossy(), text)).as_ptr());
         } else if level == WL_WARNING as c_int {
-            Com_Printf(cstr(&format!("{}WARNING: {}", S_COLOR_YELLOW, text)).as_ptr());
+            Com_Printf(
+                cstr(&format!(
+                    "{}WARNING: {}",
+                    S_COLOR_YELLOW.to_string_lossy(),
+                    text
+                ))
+                .as_ptr(),
+            );
         } else if level == WL_DEBUG as c_int {
             let mut ent_num: c_int = text
                 .split_whitespace()
@@ -115,13 +122,18 @@ pub fn G_DebugPrint(
             Com_Printf(
                 cstr(&format!(
                     "{}DEBUG: {}({}): {}\n",
-                    S_COLOR_BLUE, targ_str, ent_num, buffer
+                    S_COLOR_BLUE.to_string_lossy(),
+                    targ_str,
+                    ent_num,
+                    buffer
                 ))
                 .as_ptr(),
             );
         } else {
             // default / WL_VERBOSE
-            Com_Printf(cstr(&format!("{}INFO: {}", S_COLOR_GREEN, text)).as_ptr());
+            Com_Printf(
+                cstr(&format!("{}INFO: {}", S_COLOR_GREEN.to_string_lossy(), text)).as_ptr(),
+            );
         }
     }
 }
@@ -1973,12 +1985,20 @@ pub fn Q3_SetBState(
         if bSID > -1 {
             if bSID == (BS_SEARCH) as i32 || bSID == (BS_WANDER) as i32 {
                 if (*ent).waypoint != WAYPOINT_NONE {
-                    NPC_BSSearchStart(ctx, (*ent).waypoint, bSID);
+                    NPC_BSSearchStart(
+                        ctx,
+                        (*ent).waypoint,
+                        core::mem::transmute::<c_int, bState_t>(bSID),
+                    );
                 } else {
                     (*ent).waypoint = NAV_FindClosestWaypointForEnt(ctx, ent, WAYPOINT_NONE);
 
                     if (*ent).waypoint != WAYPOINT_NONE {
-                        NPC_BSSearchStart(ctx, (*ent).waypoint, bSID);
+                        NPC_BSSearchStart(
+                            ctx,
+                            (*ent).waypoint,
+                            core::mem::transmute::<c_int, bState_t>(bSID),
+                        );
                     } else {
                         G_DebugPrint(
                             ctx,
@@ -1999,9 +2019,9 @@ pub fn Q3_SetBState(
                 (*ent).r.currentOrigin[2] += 0.125;
                 G_SetOrigin(ent, (*ent).r.currentOrigin);
             }
-            (*npc).behaviorState = bSID;
+            (*npc).behaviorState = core::mem::transmute::<c_int, bState_t>(bSID);
             if bSID == (BS_DEFAULT) as i32 {
-                (*npc).defaultBehavior = bSID;
+                (*npc).defaultBehavior = core::mem::transmute::<c_int, bState_t>(bSID);
             }
         }
 
@@ -2053,7 +2073,7 @@ pub fn Q3_SetTempBState(
 
         let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         if bSID > -1 {
-            (*npc).tempBehavior = bSID;
+            (*npc).tempBehavior = core::mem::transmute::<c_int, bState_t>(bSID);
         }
 
         qtrue
@@ -2088,7 +2108,7 @@ pub fn Q3_SetDefaultBState(
 
         let bSID = GetIDForString(BSTable.as_ptr() as *mut stringID_table_t, bs_name);
         if bSID > -1 {
-            (*npc).defaultBehavior = bSID;
+            (*npc).defaultBehavior = core::mem::transmute::<c_int, bState_t>(bSID);
         }
     }
 }
@@ -3827,7 +3847,10 @@ pub fn Q3_SetBehaviorSet(
             _ => bSet,
         };
 
-        if (bSet as c_int) < (bSet_t::BSET_SPAWN as c_int) || (bSet as c_int) >= (bSet_t::NUM_BSETS as c_int) {
+        // `bSet_t` is not `Copy`; use its discriminant from here on (Raven
+        // indexes `behaviorSet[]` with it as an int anyway).
+        let bSet = bSet as c_int;
+        if bSet < (bSet_t::BSET_SPAWN as c_int) || bSet >= (bSet_t::NUM_BSETS as c_int) {
             return qfalse;
         }
 

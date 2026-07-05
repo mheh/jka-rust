@@ -580,15 +580,15 @@ pub fn NPC_Begin(
                 if (*ent).wait < (0) as f32 {
                     let t3 = if (*ent).target3.is_null() { String::new() } else { cstr_to_str((*ent).target3 as *const c_char) };
                     let tn = if (*ent).targetname.is_null() { String::new() } else { cstr_to_str((*ent).targetname as *const c_char) };
-                    G_DebugPrint(ctx, WL_DEBUG, cstr(&format!("NPC {} could not spawn, firing target3 ({}) and removing self\n", tn, t3)).as_ptr());
+                    G_DebugPrint(ctx, WL_DEBUG as i32, cstr(&format!("NPC {} could not spawn, firing target3 ({}) and removing self\n", tn, t3)).as_ptr());
                     crate::g_utils::G_UseTargets2(ctx, ent, ent, (*ent).target3 as *const c_char);
                     (*ent).think = Some(EntThink::G_FreeEntity);
                     (*ent).nextthink = (*ctx.world).level.time + 100;
                 } else {
                     let tn = if (*ent).targetname.is_null() { String::new() } else { cstr_to_str((*ent).targetname as *const c_char) };
-                    G_DebugPrint(ctx, WL_DEBUG, cstr(&format!("NPC {} could not spawn, waiting {:.2} secs to try again\n", tn, (*ent).wait as f32 / 1000.0f32)).as_ptr());
+                    G_DebugPrint(ctx, WL_DEBUG as i32, cstr(&format!("NPC {} could not spawn, waiting {:.2} secs to try again\n", tn, (*ent).wait as f32 / 1000.0f32)).as_ptr());
                     (*ent).think = Some(EntThink::NPC_Begin);
-                    (*ent).nextthink = (*ctx.world).level.time + (*ent).wait;
+                    (*ent).nextthink = (((*ctx.world).level.time as f32) + (*ent).wait) as i32;
                 }
                 return;
             }
@@ -641,18 +641,18 @@ pub fn NPC_Begin(
                     0 => {
                         (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed = ((*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed as f64 * 0.75) as f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
-                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(3, 6) as f32;
+                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(3, 6);
                         }
                     }
                     1 => {
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
-                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(2, 4) as f32;
+                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(2, 4);
                         }
                     }
                     2 => {
                         (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.5f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
-                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(0, 2) as f32;
+                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(0, 2);
                         }
                     }
                     _ => {}
@@ -761,7 +761,7 @@ pub fn NPC_Begin(
         (*ent).pain = NPC_PainFunc(ent);
         (*ent).touch = NPC_TouchFunc(ent);
 
-        (*client).ps.ping = ((*((*ent).NPC as *mut gNPC_t)).stats.reactions * 50.0) as c_int;
+        (*client).ps.ping = (*((*ent).NPC as *mut gNPC_t)).stats.reactions * 50;
 
         if (*ent).s.NPC_class != CLASS_VEHICLE as c_int || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
             (*client).ps.persistant[PERS_TEAM as usize] = (*client).playerTeam;
@@ -845,7 +845,10 @@ pub fn NPC_Begin(
                             (*droid_ent).s.m_iVehicleNum = (*ent).s.number;
                             (*droid_ent).s.owner = (*ent).s.number;
                             (*droid_ent).r.ownerNum = (*ent).s.number;
-                            (*((*ent).m_pVehicle as *mut Vehicle_t)).m_pDroidUnit = droid_ent as *mut bgEntity_t;
+                            // `Vehicle_t.m_pDroidUnit` is `mp_bg`'s own `bgEntity_t`; this crate's
+                            // `bgEntity_t` name is the `gentity_t` alias (prelude), so the overlay
+                            // cast targets the bg type fully qualified.
+                            (*((*ent).m_pVehicle as *mut Vehicle_t)).m_pDroidUnit = droid_ent as *mut mp_bg::public::bg_entity::bgEntity_t;
                             (*droid_ent).alliedTeam = (*ent).alliedTeam;
                             (*droid_ent).teamnodmg = (*ent).teamnodmg;
                             (*((*droid_ent).client as *mut gclient_t)).sess.sessionTeam = (*client).sess.sessionTeam;
@@ -1056,7 +1059,9 @@ pub fn NPC_Spawn_Do(
 
             (*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation = &mut (*((*newent).client as *mut gclient_t)).ps.vehOrientation[0] as *mut f32;
 
-            (*((*newent).m_pVehicle as *mut Vehicle_t)).m_pParentEntity = newent as *mut bgEntity_t;
+            // Overlay cast to `mp_bg`'s `bgEntity_t` (this crate's `bgEntity_t` is the
+            // prelude `gentity_t` alias).
+            (*((*newent).m_pVehicle as *mut Vehicle_t)).m_pParentEntity = newent as *mut mp_bg::public::bg_entity::bgEntity_t;
             crate::veh_dispatch::initialize(ctx, (*newent).m_pVehicle as *mut Vehicle_t);
 
             crate::veh_dispatch::register_assets(ctx, (*newent).m_pVehicle as *mut Vehicle_t);

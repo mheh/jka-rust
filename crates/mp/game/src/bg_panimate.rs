@@ -1852,7 +1852,7 @@ impl PmoveContext<'_> {
             }
 
             if animset.is_null() {
-                let filename_str = cstr_to_str(filename);
+                let filename_str = unsafe { cstr_to_str(filename) };
                 if filename_str.contains("players/_humanoid/") {
                     animset = self.bg.bgHumanoidAnimations.as_mut_ptr();
                     nextIndex = 0;

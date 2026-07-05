@@ -2199,14 +2199,14 @@ pub fn G_UpdateClientAnims(
         let all_anims = &(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize];
 
         let skip_legs = (*self_).localAnimIndex > 1
-            && all_anims.anims[legs_anim as usize].firstFrame == 0
-            && all_anims.anims[legs_anim as usize].numFrames == 0;
+            && (*all_anims.anims.add(legs_anim as usize)).firstFrame == 0
+            && (*all_anims.anims.add(legs_anim as usize)).numFrames == 0;
 
         if !skip_legs {
             if (*((*self_).client as *mut gclient_t)).legsAnimExecute != legs_anim
                 || (*((*self_).client as *mut gclient_t)).legsLastFlip != (*((*self_).client as *mut gclient_t)).ps.legsFlip
             {
-                let anim = &all_anims.anims[legs_anim as usize];
+                let anim = &*all_anims.anims.add(legs_anim as usize);
                 anim_speed = 50.0f32 as f64 / anim.frameLerp as f64;
                 anim_speed *= animSpeedScale as f64;
                 l_anim_speed_scale = anim_speed as f32;
@@ -2242,8 +2242,8 @@ pub fn G_UpdateClientAnims(
         // tryTorso:
         let all_anims = &(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize];
         if (*self_).localAnimIndex > 1
-            && all_anims.anims[torso_anim as usize].firstFrame == 0
-            && all_anims.anims[torso_anim as usize].numFrames == 0
+            && (*all_anims.anims.add(torso_anim as usize)).firstFrame == 0
+            && (*all_anims.anims.add(torso_anim as usize)).numFrames == 0
         {
             // If this fails as well just return.
             return;
@@ -2273,7 +2273,7 @@ pub fn G_UpdateClientAnims(
             );
 
             let all_anims = &(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize];
-            let anim = &all_anims.anims[f as usize];
+            let anim = &*all_anims.anims.add(f as usize);
             anim_speed = 50.0f32 as f64 / anim.frameLerp as f64;
             anim_speed *= animSpeedScale as f64;
             speed2 = anim_speed as f32;
@@ -2992,7 +2992,8 @@ pub fn ClientSpawn(
         trap::GetUsercmd(
             ctx.engine,
             mp_abi::game::syscalls::G_GET_USERCMD::GGetUsercmdArgs::new(
-                ent_id((*ctx.world).clients.as_ptr() as *const _, client as *const _),
+                ent_id((*ctx.world).clients.as_ptr() as *const _, client as *const _).index()
+                    as c_int,
                 &mut (*client).pers.cmd,
             ),
         );
@@ -3379,13 +3380,13 @@ pub fn SetupGameGhoul2Model(
                 // PORT-NOTE(vehicle-pointer-overlay): ruling 14 uses the bgEntity_t -> *mut gentity_t
                 // overlay pattern; m_pVehicle is accessed safely through the overlay cast in this context.
                 if !(*ent).client.is_null() && (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE {
-                    write_cstr_field(&mut vehicleName, cstr_to_str(modelname));
+                    write_cstr_field(&mut vehicleName, &cstr_to_str(modelname));
                     BG_GetVehicleModelName(
                         modelname,
                         &mut (*ctx.world).bg_state,
                         &crate::bg_channel::GameBgTraps::new(ctx.engine),
                     );
-                    write_cstr_field(&mut truncModelName, cstr_to_str(modelname));
+                    write_cstr_field(&mut truncModelName, &cstr_to_str(modelname));
                     skin[0] = 0;
                     if !(*ent).m_pVehicle.is_null()
                         && !(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo.is_null()
@@ -3416,11 +3417,11 @@ pub fn SetupGameGhoul2Model(
                     }
                 } else {
                     if !skinName.is_null() && *skinName as c_int != 0 {
-                        write_cstr_field(&mut skin, cstr_to_str(skinName));
-                        write_cstr_field(&mut truncModelName, cstr_to_str(modelname));
+                        write_cstr_field(&mut skin, &cstr_to_str(skinName));
+                        write_cstr_field(&mut truncModelName, &cstr_to_str(modelname));
                     } else {
                         write_cstr_field(&mut skin, "default");
-                        write_cstr_field(&mut truncModelName, cstr_to_str(modelname));
+                        write_cstr_field(&mut truncModelName, &cstr_to_str(modelname));
                         p = crate::q_shared::Q_strrchr(truncModelName.as_ptr(), '/' as c_int);
 
                         if !p.is_null() {
@@ -3459,7 +3460,7 @@ pub fn SetupGameGhoul2Model(
                                     .bg_state
                                     .bgSiegeClasses[(*((*ent).client as *mut gclient_t)).siegeClass as usize];
                                 if scl.forcedSkin[0] as c_int != 0 {
-                                    write_cstr_field(&mut skin, cstr_to_str(scl.forcedSkin.as_ptr()));
+                                    write_cstr_field(&mut skin, &cstr_to_str(scl.forcedSkin.as_ptr()));
                                 }
                             }
                         }
@@ -3615,9 +3616,13 @@ pub fn SetupGameGhoul2Model(
         GLAName[0] = 0;
 
         if (*ctx.world).bg_state.BGPAFtextLoaded == qfalse {
+            let humanoid_anims = (*ctx.world).bg_state.bgHumanoidAnimations.as_mut_ptr();
             if crate::bg_panimate::BG_ParseAnimationFile(
+                &mut (*ctx.world).bg_state,
+                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                &mut crate::bg_channel::GameCallbacksImpl { world: ctx.world, engine: ctx.engine },
                 cstr("models/players/_humanoid/animation.cfg").as_ptr(),
-                (*ctx.world).bg_state.bgHumanoidAnimations.as_mut_ptr(),
+                humanoid_anims,
                 qtrue,
             ) == -1
             {
@@ -3650,6 +3655,12 @@ pub fn SetupGameGhoul2Model(
                     write_cstr_field(&mut GLAName, "/animation.cfg");
 
                     (*ent).localAnimIndex = crate::bg_panimate::BG_ParseAnimationFile(
+                        &mut (*ctx.world).bg_state,
+                        &crate::bg_channel::GameBgTraps::new(ctx.engine),
+                        &mut crate::bg_channel::GameCallbacksImpl {
+                            world: ctx.world,
+                            engine: ctx.engine,
+                        },
                         GLAName.as_ptr(),
                         core::ptr::null_mut(),
                         qfalse,
@@ -3953,7 +3964,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
 
         // check the item prediction
         s = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"cg_predictItems".as_ptr());
-        if crate::q_shared::cstr_to_int(s) == 0 {
+        if crate::bg_lib::atoi(s) == 0 {
             (*client).pers.predictItemPickup = qfalse;
         } else {
             (*client).pers.predictItemPickup = qtrue;
@@ -4010,7 +4021,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
                             cstr(&cstr_to_str(userinfo.as_ptr())),
                         ),
                     );
-                    write_cstr_field(&mut (*client).pers.netname, cstr_to_str(oldname.as_ptr()));
+                    write_cstr_field(&mut (*client).pers.netname, &cstr_to_str(oldname.as_ptr()));
                 } else {
                     let msg = format!(
                         "print \"{}{} {} {}\n\"",
@@ -4041,7 +4052,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
 
         if (*ctx.world).cvars.d_perPlayerGhoul2.integer != 0 {
             if crate::q_shared::Q_stricmp(model.as_ptr(), (*client).modelname.as_ptr()) != 0 {
-                write_cstr_field(&mut (*client).modelname, cstr_to_str(model.as_ptr()));
+                write_cstr_field(&mut (*client).modelname, &cstr_to_str(model.as_ptr()));
                 modelChanged = qtrue;
             }
         }
@@ -4049,21 +4060,21 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
         // Get the skin RGB based on his userinfo
         value = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"char_color_red".as_ptr());
         if !value.is_null() && *value as c_int != 0 {
-            (*client).ps.customRGBA[0] = crate::q_shared::cstr_to_int(value) as c_int;
+            (*client).ps.customRGBA[0] = crate::bg_lib::atoi(value) as c_int;
         } else {
             (*client).ps.customRGBA[0] = 255;
         }
 
         value = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"char_color_green".as_ptr());
         if !value.is_null() && *value as c_int != 0 {
-            (*client).ps.customRGBA[1] = crate::q_shared::cstr_to_int(value) as c_int;
+            (*client).ps.customRGBA[1] = crate::bg_lib::atoi(value) as c_int;
         } else {
             (*client).ps.customRGBA[1] = 255;
         }
 
         value = crate::q_shared::Info_ValueForKey(userinfo.as_ptr(), c"char_color_blue".as_ptr());
         if !value.is_null() && *value as c_int != 0 {
-            (*client).ps.customRGBA[2] = crate::q_shared::cstr_to_int(value) as c_int;
+            (*client).ps.customRGBA[2] = crate::bg_lib::atoi(value) as c_int;
         } else {
             (*client).ps.customRGBA[2] = 255;
         }
@@ -4108,7 +4119,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
 
         // Set the siege class
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
-            write_cstr_field(&mut className, cstr_to_str((*client).sess.siegeClass.as_ptr()));
+            write_cstr_field(&mut className, &cstr_to_str((*client).sess.siegeClass.as_ptr()));
 
             // This function will see if the given class is legal for the given team.
             // If not className will be filled in with the first legal class for this team.
@@ -4118,13 +4129,13 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
             if (*client).siegeClass == -1 {
                 // ok, get the first valid class for the team you're on then, I guess.
                 BG_SiegeCheckClassLegality(team, className.as_mut_ptr(), &(*ctx.world).bg_state);
-                write_cstr_field(&mut (*client).sess.siegeClass, cstr_to_str(className.as_ptr()));
+                write_cstr_field(&mut (*client).sess.siegeClass, &cstr_to_str(className.as_ptr()));
                 (*client).siegeClass =
                     BG_SiegeFindClassIndexByName(className.as_ptr(), &(*ctx.world).bg_state);
             } else {
                 // otherwise, make sure the class we are using is legal.
                 G_ValidateSiegeClassForTeam(ctx, ent, team);
-                write_cstr_field(&mut className, cstr_to_str((*client).sess.siegeClass.as_ptr()));
+                write_cstr_field(&mut className, &cstr_to_str((*client).sess.siegeClass.as_ptr()));
             }
 
             // Set the sabers if the class dictates
@@ -4161,12 +4172,12 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
 
                 if scl.forcedModel[0] as c_int != 0 {
                     // be sure to override the model we actually use
-                    write_cstr_field(&mut model, cstr_to_str(scl.forcedModel.as_ptr()));
+                    write_cstr_field(&mut model, &cstr_to_str(scl.forcedModel.as_ptr()));
                     if (*ctx.world).cvars.d_perPlayerGhoul2.integer != 0 {
                         if crate::q_shared::Q_stricmp(model.as_ptr(), (*client).modelname.as_ptr())
                             != 0
                         {
-                            write_cstr_field(&mut (*client).modelname, cstr_to_str(model.as_ptr()));
+                            write_cstr_field(&mut (*client).modelname, &cstr_to_str(model.as_ptr()));
                             modelChanged = qtrue;
                         }
                     }
@@ -4178,7 +4189,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
                         != 0
                         || (*ent).localAnimIndex == 0
                     {
-                        write_cstr_field(&mut (*client).modelname, cstr_to_str(model.as_ptr()));
+                        write_cstr_field(&mut (*client).modelname, &cstr_to_str(model.as_ptr()));
                         modelChanged = qtrue;
                     }
                 }
@@ -4188,8 +4199,8 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
         }
 
         // Set the saber name
-        write_cstr_field(&mut saberName, cstr_to_str((*client).sess.saberType.as_ptr()));
-        write_cstr_field(&mut saber2Name, cstr_to_str((*client).sess.saber2Type.as_ptr()));
+        write_cstr_field(&mut saberName, &cstr_to_str((*client).sess.saberType.as_ptr()));
+        write_cstr_field(&mut saber2Name, &cstr_to_str((*client).sess.saber2Type.as_ptr()));
 
         // set max health
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE && (*client).siegeClass != -1 {

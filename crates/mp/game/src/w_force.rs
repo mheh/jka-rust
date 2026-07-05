@@ -1462,9 +1462,9 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
         let mut fwd: vec3_t = [0.0; 3];
         AngleVectors((*cl).ps.viewangles, Some(&mut fwd), None, None);
         let tto: vec3_t = [
-            tfrom[0] + fwd[0] * MAX_GRIP_DISTANCE,
-            tfrom[1] + fwd[1] * MAX_GRIP_DISTANCE,
-            tfrom[2] + fwd[2] * MAX_GRIP_DISTANCE,
+            tfrom[0] + fwd[0] * MAX_GRIP_DISTANCE as f32,
+            tfrom[1] + fwd[1] * MAX_GRIP_DISTANCE as f32,
+            tfrom[2] + fwd[2] * MAX_GRIP_DISTANCE as f32,
         ];
 
         let mut tr: trace_t = core::mem::zeroed();
@@ -3959,9 +3959,9 @@ pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower
                     && !(*gripEnt).client.is_null()
                     && (*gripEnt).health > 0
                     && (*gripEnt).inuse != 0
-                    && (level_time
+                    && (level_time as f32
                         - (*((*gripEnt).client as *mut gclient_t)).ps.fd.forceGripStarted)
-                        > 500
+                        > 500.0
                 {
                     //if we had our throat crushed in for more than half a second, gasp for air when we're let go
                     if wasActive & (1 << FP_GRIP) != 0 {
@@ -4845,7 +4845,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
 
         if (*cl).ps.droneExistTime >= (level_time) as f32 && (*cl).ps.droneExistTime < ((level_time + 5000)) as f32 {
-            (*cl).ps.genericEnemyIndex = 1024 + (*cl).ps.droneExistTime;
+            (*cl).ps.genericEnemyIndex = (1024.0 + (*cl).ps.droneExistTime) as c_int;
             if (*cl).ps.droneFireTime < (level_time) as f32 {
                 let snd = std::ffi::CString::new("sound/weapons/laser_trap/warning.wav").unwrap();
                 G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
@@ -4856,15 +4856,15 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
             let mut elevated: vec3_t = (*cl).ps.origin;
             elevated[2] += 40.0;
 
-            let mut prefig = ((*cl).ps.droneExistTime - level_time) / 80;
+            let mut prefig = ((*cl).ps.droneExistTime - level_time as f32) / 80.0;
 
-            if prefig > 55 {
-                prefig = 55;
-            } else if prefig < 1 {
-                prefig = 1;
+            if prefig > 55.0 {
+                prefig = 55.0;
+            } else if prefig < 1.0 {
+                prefig = 1.0;
             }
 
-            elevated[2] -= (55 - prefig) as f32;
+            elevated[2] -= 55.0 - prefig;
 
             let angle = ((level_time / 12) & 255) as f64 * (M_PI * 2.0) / 255.0;
             let dir: vec3_t = [
@@ -5620,7 +5620,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                             (*cl).ps.fd.forcePowerRegenDebounceTime = level_time + 7000;
                         } else if (*cl).siegeClass != -1
                             // MISSING-SYMBOL: `bgSiegeClasses`.
-                            && (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize].classflags & (1 << CFL_FASTFORCEREGEN) != 0
+                            && (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize].classflags & (1 << CFL_FASTFORCEREGEN as c_int) != 0
                         {
                             //if this is siege and our player class has the fast force regen ability, then recharge with 1/5th the usual delay
                             (*cl).ps.fd.forcePowerRegenDebounceTime =

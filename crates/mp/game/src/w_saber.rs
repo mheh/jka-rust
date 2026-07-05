@@ -7934,14 +7934,14 @@ pub fn saberFirstThrown(
                 }
             }
 
-            if BG_HasYsalamiri((*ctx.world).cvars.g_gametype.integer, &(*soc).ps) != 0 {
+            if BG_HasYsalamiri((*ctx.world).cvars.g_gametype.integer, &mut (*soc).ps) != 0 {
                 thrownSaberTouch(ctx, saberent, saberent, core::ptr::null_mut());
                 break 'body;
             }
 
             if BG_CanUseFPNow(
                 (*ctx.world).cvars.g_gametype.integer,
-                &(*soc).ps,
+                &mut (*soc).ps,
                 level_time,
                 FP_SABERTHROW,
             ) == 0
@@ -9088,7 +9088,7 @@ pub fn G_GrabSomeMofos(
                 &(*client).ps.origin as *const vec3_t,
                 (*ctx.world).level.time,
                 core::ptr::null_mut(),
-                (*self_).modelScale,
+                &(*self_).modelScale as *const vec3_t,
             ),
         );
         let mut pos: vec3_t = [0.0; 3];
@@ -9732,7 +9732,10 @@ pub fn WP_SaberPositionUpdate(
                     && !(*vehEnt).client.is_null()
                     && !(*vehEnt).m_pVehicle.is_null()
                 {
-                    properAngles[1] = (*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_vOrientation[YAW as usize];
+                    properAngles[1] = *(*((*vehEnt).m_pVehicle
+                        as *mut mp_bg::vehicles::Vehicle_t))
+                        .m_vOrientation
+                        .add(YAW as usize);
                 } else {
                     properAngles[1] = (*client).ps.viewangles[YAW as usize];
                     vehEnt = core::ptr::null_mut();
@@ -9752,7 +9755,9 @@ pub fn WP_SaberPositionUpdate(
             }
 
             if !vehEnt.is_null() {
-                properAngles[1] = (*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_vOrientation[YAW as usize];
+                properAngles[1] = *(*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t))
+                    .m_vOrientation
+                    .add(YAW as usize);
             }
 
             if returnAfterUpdate != 0 && saberNum != 0 {

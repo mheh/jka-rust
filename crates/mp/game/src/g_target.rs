@@ -1164,7 +1164,13 @@ pub fn target_play_music_use(
 ) {
     unsafe {
         G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
-        trap::SetConfigstring(ctx.engine, mp_bg::public::configstring::CS_MUSIC, (*self_).message);
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                mp_bg::public::configstring::CS_MUSIC,
+                core::ffi::CStr::from_ptr((*self_).message).to_owned(),
+            ),
+        );
     }
 }
 
