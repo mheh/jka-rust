@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 /// `GAME_GETITEMINDEXBYTAG` MP game exports vmMain ABI token.
 ///
@@ -38,4 +40,18 @@ impl InboundVmCall for GameGetitemindexbytag {
     type Output = c_int;
 
     const COMMAND: MpGameExport = MpGameExport::GAME_GETITEMINDEXBYTAG;
+}
+
+impl DecodeVmMain for GameGetitemindexbytag {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `BG_GetItemIndexByTag(arg0, arg1)` — g_main.c:691.
+        GameGetitemindexbytagArgs::new(word_to_c_int(t.arg(0)), word_to_c_int(t.arg(1)))
+    }
+}
+
+impl EncodeVmMainReturn for GameGetitemindexbytag {
+    fn encode_return(output: Self::Output) -> isize {
+        // `return BG_GetItemIndexByTag(arg0, arg1);` — g_main.c:691.
+        output as isize
+    }
 }

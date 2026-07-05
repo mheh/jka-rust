@@ -72,12 +72,9 @@ pub fn Remote_MaintainHeight(ctx: GameContext<'_>) {
     // If we have an enemy, we should try to hover at or a little below enemy eye level
     if unsafe { (*npc).enemy }.is_some() {
         if crate::g_timer::TIMER_Done(ctx, npc, c"heightChange".as_ptr()) != 0 {
-            crate::g_timer::TIMER_Set(
-                ctx,
-                npc,
-                c"heightChange".as_ptr(),
-                unsafe { (*ctx.world).bg_state.rng.Q_irand(1000, 3000) },
-            );
+            crate::g_timer::TIMER_Set(ctx, npc, c"heightChange".as_ptr(), unsafe {
+                (*ctx.world).bg_state.rng.Q_irand(1000, 3000)
+            });
 
             // Find the height difference
             let enemy_ent = unsafe {
@@ -86,7 +83,10 @@ pub fn Remote_MaintainHeight(ctx: GameContext<'_>) {
             };
             dif = unsafe {
                 ((*enemy_ent).r.currentOrigin[2]
-                    + (*ctx.world).bg_state.rng.Q_irand(0, (*enemy_ent).r.maxs[2] as c_int + 8)
+                    + (*ctx.world)
+                        .bg_state
+                        .rng
+                        .Q_irand(0, (*enemy_ent).r.maxs[2] as c_int + 8)
                         as f32)
                     - (*npc).r.currentOrigin[2]
             };
@@ -97,7 +97,10 @@ pub fn Remote_MaintainHeight(ctx: GameContext<'_>) {
                     dif = if dif < 0.0 { -24.0 } else { 24.0 };
                 }
                 dif *= 10.0;
-                unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[2] = ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0 };
+                unsafe {
+                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] =
+                        ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0
+                };
                 crate::g_utils::G_Sound(
                     ctx,
                     npc,
@@ -126,7 +129,10 @@ pub fn Remote_MaintainHeight(ctx: GameContext<'_>) {
 
             if dif.abs() > 24.0 {
                 dif = if dif < 0.0 { -24.0 } else { 24.0 };
-                unsafe { (*((*npc).client as *mut gclient_t)).ps.velocity[2] = ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0 };
+                unsafe {
+                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] =
+                        ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0
+                };
             }
         }
     }
@@ -171,7 +177,11 @@ pub fn Remote_Strafe(ctx: GameContext<'_>) {
     );
 
     // Pick a random strafe direction, then check to see if doing a strafe would be reasonable valid
-    dir = if unsafe { (*ctx.world).bg_state.rng.rand() } & 1 != 0 { -1 } else { 1 };
+    dir = if unsafe { (*ctx.world).bg_state.rng.rand() } & 1 != 0 {
+        -1
+    } else {
+        1
+    };
     crate::q_math::_VectorMA(
         unsafe { (*npc).r.currentOrigin },
         REMOTE_STRAFE_DIS * dir as f32,
@@ -224,12 +234,7 @@ pub fn Remote_Strafe(ctx: GameContext<'_>) {
 /// Raven `Remote_Hunt`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Remote.c:178-221`
-pub fn Remote_Hunt(
-    ctx: GameContext<'_>,
-    visible: qboolean,
-    advance: qboolean,
-    retreat: qboolean,
-) {
+pub fn Remote_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean, retreat: qboolean) {
     let npc = unsafe { (*ctx.world).globals.NPC };
     let npc_info = unsafe { (*ctx.world).globals.NPCInfo };
 
@@ -279,14 +284,20 @@ pub fn Remote_Hunt(
         }
     }
 
-    speed = REMOTE_FORWARD_BASE_SPEED + REMOTE_FORWARD_MULTIPLIER * unsafe { (*ctx.world).cvars.g_spskill.integer } as f32;
+    speed = REMOTE_FORWARD_BASE_SPEED
+        + REMOTE_FORWARD_MULTIPLIER * unsafe { (*ctx.world).cvars.g_spskill.integer } as f32;
     if retreat != 0 {
         speed *= -1.0;
     }
 
     unsafe {
         let client_ref = &mut *((*npc).client as *mut gclient_t);
-        crate::q_math::_VectorMA(client_ref.ps.velocity, speed, forward, &mut client_ref.ps.velocity);
+        crate::q_math::_VectorMA(
+            client_ref.ps.velocity,
+            speed,
+            forward,
+            &mut client_ref.ps.velocity,
+        );
     }
 }
 
@@ -317,7 +328,12 @@ pub fn Remote_Fire(ctx: GameContext<'_>) {
     crate::q_math::_VectorSubtract(enemy_org1, muzzle1, &mut delta1);
 
     crate::q_math::vectoangles(delta1, &mut angleToEnemy1);
-    crate::q_math::AngleVectors(angleToEnemy1, Some(&mut forward), Some(&mut vright), Some(&mut up));
+    crate::q_math::AngleVectors(
+        angleToEnemy1,
+        Some(&mut forward),
+        Some(&mut vright),
+        Some(&mut up),
+    );
 
     let missile = crate::g_missile::CreateMissile(
         ctx,
@@ -359,12 +375,9 @@ pub fn Remote_Ranged(
     let npc_info = unsafe { (*ctx.world).globals.NPCInfo };
 
     if crate::g_timer::TIMER_Done(ctx, npc, c"attackDelay".as_ptr()) != 0 {
-        crate::g_timer::TIMER_Set(
-            ctx,
-            npc,
-            c"attackDelay".as_ptr(),
-            unsafe { (*ctx.world).bg_state.rng.Q_irand(500, 3000) },
-        );
+        crate::g_timer::TIMER_Set(ctx, npc, c"attackDelay".as_ptr(), unsafe {
+            (*ctx.world).bg_state.rng.Q_irand(500, 3000)
+        });
         Remote_Fire(ctx);
     }
 
@@ -387,7 +400,9 @@ pub fn Remote_Attack(ctx: GameContext<'_>) {
     let mut retreat: qboolean;
 
     if crate::g_timer::TIMER_Done(ctx, npc, c"spin".as_ptr()) != 0 {
-        crate::g_timer::TIMER_Set(ctx, npc, c"spin".as_ptr(), unsafe { (*ctx.world).bg_state.rng.Q_irand(250, 1500) });
+        crate::g_timer::TIMER_Set(ctx, npc, c"spin".as_ptr(), unsafe {
+            (*ctx.world).bg_state.rng.Q_irand(250, 1500)
+        });
         unsafe {
             (*npc_info).desiredYaw += (*ctx.world).bg_state.rng.Q_irand(-200, 200) as f32;
         }
@@ -406,17 +421,33 @@ pub fn Remote_Attack(ctx: GameContext<'_>) {
     unsafe {
         if let Some(enemy_id) = (*npc).enemy {
             let enemy_ent = &mut (*ctx.world).g_entities[enemy_id.0 as usize] as *mut gentity_t;
-            distance = crate::q_math::DistanceHorizontalSquared((*npc).r.currentOrigin, (*enemy_ent).r.currentOrigin) as c_int as f32;
-            visible = if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy_ent) != 0 { qtrue } else { qfalse };
+            distance = crate::q_math::DistanceHorizontalSquared(
+                (*npc).r.currentOrigin,
+                (*enemy_ent).r.currentOrigin,
+            ) as c_int as f32;
+            visible = if crate::NPC_utils::NPC_ClearLOS4(ctx, enemy_ent) != 0 {
+                qtrue
+            } else {
+                qfalse
+            };
         } else {
             distance = 0.0;
             visible = qfalse;
         }
     }
 
-    idealDist = MIN_DISTANCE_SQR + (MIN_DISTANCE_SQR * unsafe { (*ctx.world).bg_state.rng.flrand(0.0, 1.0) });
-    advance = if distance > idealDist * 1.25 { qtrue } else { qfalse };
-    retreat = if distance < idealDist * 0.75 { qtrue } else { qfalse };
+    idealDist = MIN_DISTANCE_SQR
+        + (MIN_DISTANCE_SQR * unsafe { (*ctx.world).bg_state.rng.flrand(0.0, 1.0) });
+    advance = if distance > idealDist * 1.25 {
+        qtrue
+    } else {
+        qfalse
+    };
+    retreat = if distance < idealDist * 0.75 {
+        qtrue
+    } else {
+        qfalse
+    };
 
     // If we cannot see our target, move to see it
     if visible == qfalse {

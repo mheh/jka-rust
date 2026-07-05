@@ -23,17 +23,16 @@
 //! `PORT-NOTE(missing-const)` /`PORT-NOTE(missing-global)` tag.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::ai_main::{GetNearestVisibleWP, OrgVisible, OrgVisibleBox};
 use crate::ai_util::{B_Alloc, B_TempAlloc, B_TempFree};
 use crate::g_cmds::ConcatArgs;
 use crate::g_main::G_Printf;
 use crate::g_utils::{G_Find, G_TempEntity};
+use crate::prelude::*;
 use crate::q_math::VectorLength;
 use crate::q_shared::Q_stricmp;
 use crate::trap;
 use core::mem::size_of;
-use std::ffi::CString;
 use mp_abi::game::syscalls::G_BOT_CALCULATEPATHS::GBotCalculatepathsArgs;
 use mp_abi::game::syscalls::G_BOT_UPDATEWAYPOINTS::GBotUpdatewaypointsArgs;
 use mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs;
@@ -46,6 +45,7 @@ use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_qshared::common::mp::trace_t::trace_t;
 use mp_qshared::shared::cvar::vmCvar_t;
+use std::ffi::CString;
 
 /// Raven `botGlobalNavWeaponWeights[WP_NUM_WEAPONS]` — per-weapon-index bot
 /// pickup weighting table used by nav item scoring. C's brace initializer is
@@ -139,8 +139,7 @@ unsafe fn wp_trace(
 /// this function touches no file-scope globals itself.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:25-210`
-pub fn GetFlagStr(
-    ctx: GameContext<'_>,flags: c_int) -> *mut c_char {
+pub fn GetFlagStr(ctx: GameContext<'_>, flags: c_int) -> *mut c_char {
     // Raven flag bit values (`ai_main.h:22-38`); not yet ported anywhere else
     // in the crate graph, so defined locally, verbatim.
     const WPFLAG_JUMP: c_int = 0x00000010;
@@ -261,8 +260,7 @@ pub fn GetFlagStr(
 /// Raven `G_TestLine`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:212-222`
-pub fn G_TestLine(
-    ctx: GameContext<'_>,start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
+pub fn G_TestLine(ctx: GameContext<'_>, start: vec3_t, end: vec3_t, color: c_int, time: c_int) {
     let ev_testline = mp_bg::public::entity_event::entity_event_t::EV_TESTLINE as c_int;
     // `SVF_BROADCAST` (svflags #define) is not yet ported anywhere in the
     // crate graph; defined locally, verbatim.
@@ -314,7 +312,8 @@ pub fn BotWaypointRender(ctx: GameContext<'_>) {
                         let mut n: c_int = 0;
                         while n < (*p).neighbornum {
                             let nb = (*p).neighbors[n as usize];
-                            if nb.forceJumpTo != 0 && !(*w).globals.gWPArray.0[nb.num as usize].is_null()
+                            if nb.forceJumpTo != 0
+                                && !(*w).globals.gWPArray.0[nb.num as usize].is_null()
                             {
                                 let dest = (*w).globals.gWPArray.0[nb.num as usize];
                                 G_TestLine(ctx, (*p).origin, (*dest).origin, 0x0000ff, 5000);
@@ -363,7 +362,11 @@ pub fn BotWaypointRender(ctx: GameContext<'_>) {
                 let p = (*w).globals.gWPArray.0[i as usize];
                 if !p.is_null() && (*p).inuse != 0 {
                     let vo = (*((*viewent).client as *mut gclient_t)).ps.origin;
-                    let a = [vo[0] - (*p).origin[0], vo[1] - (*p).origin[1], vo[2] - (*p).origin[2]];
+                    let a = [
+                        vo[0] - (*p).origin[0],
+                        vo[1] - (*p).origin[1],
+                        vo[2] - (*p).origin[2],
+                    ];
                     let checkdist = VectorLength(a);
 
                     if checkdist < bestdist {
@@ -460,7 +463,10 @@ pub fn CreateNewWP(ctx: GameContext<'_>, origin: vec3_t, flags: c_int) {
         }
 
         if (*w).globals.gWPArray.0[n].is_null() {
-            G_Printf(ctx, c"^1ERROR: Could not allocated memory for waypoint\n".as_ptr());
+            G_Printf(
+                ctx,
+                c"^1ERROR: Could not allocated memory for waypoint\n".as_ptr(),
+            );
         }
 
         let p = (*w).globals.gWPArray.0[n];
@@ -496,7 +502,10 @@ pub fn CreateNewWP_FromObject(ctx: GameContext<'_>, wp: *mut wpobject_t) {
         }
 
         if (*w).globals.gWPArray.0[n].is_null() {
-            G_Printf(ctx, c"^1ERROR: Could not allocated memory for waypoint\n".as_ptr());
+            G_Printf(
+                ctx,
+                c"^1ERROR: Could not allocated memory for waypoint\n".as_ptr(),
+            );
         }
 
         let p = (*w).globals.gWPArray.0[n];
@@ -599,7 +608,10 @@ pub fn RemoveWP_InTrail(ctx: GameContext<'_>, afterindex: c_int) {
         }
 
         if foundanindex == 0 {
-            G_Printf(ctx, c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr());
+            G_Printf(
+                ctx,
+                c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr(),
+            );
             return;
         }
 
@@ -662,7 +674,10 @@ pub fn CreateNewWP_InTrail(
         }
 
         if foundanindex == 0 {
-            G_Printf(ctx, c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr());
+            G_Printf(
+                ctx,
+                c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr(),
+            );
             return 0;
         }
 
@@ -741,7 +756,10 @@ pub fn CreateNewWP_InsertUnder(
         }
 
         if foundanindex == 0 {
-            G_Printf(ctx, c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr());
+            G_Printf(
+                ctx,
+                c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr(),
+            );
             return 0;
         }
 
@@ -808,7 +826,10 @@ pub fn TeleportToWP(ctx: GameContext<'_>, pl: *mut gentity_t, afterindex: c_int)
         }
 
         if foundanindex == 0 {
-            G_Printf(ctx, c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr());
+            G_Printf(
+                ctx,
+                c"^3Waypoint index %i should exist, but does not (?)\n".as_ptr(),
+            );
             return;
         }
 
@@ -830,7 +851,10 @@ pub fn WPFlagsModify(ctx: GameContext<'_>, wpnum: c_int, flags: c_int) {
         };
 
         if wpnum < 0 || wpnum >= (*w).globals.gWPNum || p.is_null() || (*p).inuse == 0 {
-            G_Printf(ctx, c"^3WPFlagsModify: Waypoint %i does not exist\n".as_ptr());
+            G_Printf(
+                ctx,
+                c"^3WPFlagsModify: Waypoint %i does not exist\n".as_ptr(),
+            );
             return;
         }
 
@@ -892,13 +916,26 @@ pub fn NodeHere(ctx: GameContext<'_>, spot: vec3_t) -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:812-824`
 pub fn CanGetToVector(
-    ctx: GameContext<'_>,org1: vec3_t, org2: vec3_t, mins: vec3_t, maxs: vec3_t) -> c_int {
+    ctx: GameContext<'_>,
+    org1: vec3_t,
+    org2: vec3_t,
+    mins: vec3_t,
+    maxs: vec3_t,
+) -> c_int {
     // `ENTITYNUM_NONE` comes from `mp_qshared::shared::limits` (prelude glob).
     unsafe {
         let mut tr: trace_t = core::mem::zeroed();
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut tr, &org1, &mins, &maxs, &org2, ENTITYNUM_NONE, MASK_SOLID),
+            GTraceArgs::new(
+                &mut tr,
+                &org1,
+                &mins,
+                &maxs,
+                &org2,
+                ENTITYNUM_NONE,
+                MASK_SOLID,
+            ),
         );
 
         if tr.fraction == 1.0 && tr.startsolid == 0 && tr.allsolid == 0 {
@@ -954,7 +991,16 @@ pub fn CanGetToVectorTravel(
                 working_org[2] + step_sub[2] * step_size,
             ];
 
-            wp_trace(ctx, &mut tr, &working_org, &mins, &maxs, &step_goal, ENTITYNUM_NONE, trace_mask);
+            wp_trace(
+                ctx,
+                &mut tr,
+                &working_org,
+                &mins,
+                &maxs,
+                &step_goal,
+                ENTITYNUM_NONE,
+                trace_mask,
+            );
 
             if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction != 0.0 {
                 let vec_sub: vec3_t = [
@@ -995,7 +1041,16 @@ pub fn CanGetToVectorTravel(
                 ];
 
                 if VectorLength(vec_measure) > 1.0 {
-                    wp_trace(ctx, &mut tr, &tr_from, &mins, &maxs, &tr_to, ENTITYNUM_NONE, trace_mask);
+                    wp_trace(
+                        ctx,
+                        &mut tr,
+                        &tr_from,
+                        &mins,
+                        &maxs,
+                        &tr_to,
+                        ENTITYNUM_NONE,
+                        trace_mask,
+                    );
 
                     if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction == 1.0 {
                         // clear trace here, probably up a step
@@ -1003,7 +1058,16 @@ pub fn CanGetToVectorTravel(
                         let mut tr_down: vec3_t = tr.endpos;
                         tr_down[2] -= 16.0;
 
-                        wp_trace(ctx, &mut tr, &tr_from, &mins, &maxs, &tr_to, ENTITYNUM_NONE, trace_mask);
+                        wp_trace(
+                            ctx,
+                            &mut tr,
+                            &tr_from,
+                            &mins,
+                            &maxs,
+                            &tr_to,
+                            ENTITYNUM_NONE,
+                            trace_mask,
+                        );
 
                         if tr.startsolid == 0 && tr.allsolid == 0 {
                             working_org = tr.endpos;
@@ -1096,7 +1160,8 @@ pub fn ConnectTrail(
             (*w).globals.nodetable.0[nn].inuse = 1;
             (*w).globals.nodetable.0[nn].weight = (*w).globals.nodetable.0[i as usize].weight + 1.0;
             (*w).globals.nodetable.0[nn].neighbornum = i;
-            if (*w).globals.nodetable.0[i as usize].origin[2] - (*w).globals.nodetable.0[nn].origin[2]
+            if (*w).globals.nodetable.0[i as usize].origin[2]
+                - (*w).globals.nodetable.0[nn].origin[2]
                 > 50.0
             {
                 // big drop — can't magically fly back up
@@ -1166,7 +1231,10 @@ pub fn ConnectTrail(
         i = 0;
 
         if behindTheScenes == 0 {
-            G_Printf(ctx, c"^3Point %i is not connected to %i - Repairing...\n".as_ptr());
+            G_Printf(
+                ctx,
+                c"^3Point %i is not connected to %i - Repairing...\n".as_ptr(),
+            );
         }
 
         let startplace = (*(*w).globals.gWPArray.0[startindex as usize]).origin;
@@ -1334,7 +1402,11 @@ pub fn ConnectTrail(
 
         while failsafe < MAX_NODETABLE_SIZE && i < MAX_NODETABLE_SIZE && i >= 0 {
             let no = (*w).globals.nodetable.0[i as usize].origin;
-            let a = [validspotpos[0] - no[0], validspotpos[1] - no[1], validspotpos[2] - no[2]];
+            let a = [
+                validspotpos[0] - no[0],
+                validspotpos[1] - no[1],
+                validspotpos[2] - no[2],
+            ];
             let neigh = (*w).globals.nodetable.0[i as usize].neighbornum;
             let eo = (*(*w).globals.gWPArray.0[endindex as usize]).origin;
 
@@ -1414,8 +1486,14 @@ pub fn DoorBlockingSection(ctx: GameContext<'_>, start: c_int, end: c_int) -> c_
         let s_org = (*sp).origin;
         let e_org = (*ep).origin;
         wp_trace(
-            ctx, &mut tr, &s_org, core::ptr::null(), core::ptr::null(), &e_org,
-            ENTITYNUM_NONE, MASK_SOLID,
+            ctx,
+            &mut tr,
+            &s_org,
+            core::ptr::null(),
+            core::ptr::null(),
+            &e_org,
+            ENTITYNUM_NONE,
+            MASK_SOLID,
         );
 
         if tr.fraction == 1.0 {
@@ -1436,8 +1514,14 @@ pub fn DoorBlockingSection(ctx: GameContext<'_>, start: c_int, end: c_int) -> c_
         let start_trace_index = tr.entityNum;
 
         wp_trace(
-            ctx, &mut tr, &e_org, core::ptr::null(), core::ptr::null(), &s_org,
-            ENTITYNUM_NONE, MASK_SOLID,
+            ctx,
+            &mut tr,
+            &e_org,
+            core::ptr::null(),
+            core::ptr::null(),
+            &s_org,
+            ENTITYNUM_NONE,
+            MASK_SOLID,
         );
 
         if tr.fraction == 1.0 {
@@ -1506,7 +1590,8 @@ pub fn RepairPaths(ctx: GameContext<'_>, behindTheScenes: qboolean) -> c_int {
                     && (*pn).flags & WPFLAG_JUMP == 0
                     && (*p).flags & WPFLAG_CALCULATED == 0
                     && OpposingEnds(ctx, i, i + 1) == 0
-                    && (((*w).cvars.bot_wp_distconnect.value != 0.0 && VectorLength(a) > max_dist_factor)
+                    && (((*w).cvars.bot_wp_distconnect.value != 0.0
+                        && VectorLength(a) > max_dist_factor)
                         || (OrgVisible(ctx, (*p).origin, (*pn).origin, ENTITYNUM_NONE) == 0
                             && (*w).cvars.bot_wp_visconnect.value != 0.0))
                     && DoorBlockingSection(ctx, i, i + 1) == 0
@@ -1538,7 +1623,13 @@ pub fn RepairPaths(ctx: GameContext<'_>, behindTheScenes: qboolean) -> c_int {
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1526-1547`
 pub fn OrgVisibleCurve(
-    ctx: GameContext<'_>,org1: vec3_t, mins: vec3_t, maxs: vec3_t, org2: vec3_t, ignore: c_int) -> c_int {
+    ctx: GameContext<'_>,
+    org1: vec3_t,
+    mins: vec3_t,
+    maxs: vec3_t,
+    org2: vec3_t,
+    ignore: c_int,
+) -> c_int {
     unsafe {
         let mut tr: trace_t = core::mem::zeroed();
         let mut evenorg1: vec3_t = org1;
@@ -1583,7 +1674,8 @@ pub fn CanForceJumpTo(
         let wp_base = (*w).globals.gWPArray.0[baseindex as usize];
         let wp_test = (*w).globals.gWPArray.0[testingindex as usize];
 
-        if wp_base.is_null() || (*wp_base).inuse == 0 || wp_test.is_null() || (*wp_test).inuse == 0 {
+        if wp_base.is_null() || (*wp_base).inuse == 0 || wp_test.is_null() || (*wp_test).inuse == 0
+        {
             return 0;
         }
 
@@ -1595,7 +1687,11 @@ pub fn CanForceJumpTo(
         let xy_test = (*wp_test).origin;
         xy_base[2] = xy_test[2];
 
-        let v = [xy_base[0] - xy_test[0], xy_base[1] - xy_test[1], xy_base[2] - xy_test[2]];
+        let v = [
+            xy_base[0] - xy_test[0],
+            xy_base[1] - xy_test[1],
+            xy_base[2] - xy_test[2],
+        ];
         if VectorLength(v) > MAX_NEIGHBOR_LINK_DISTANCE {
             return 0;
         }
@@ -1614,7 +1710,14 @@ pub fn CanForceJumpTo(
             return 0; // too high
         }
 
-        if OrgVisibleCurve(ctx, (*wp_base).origin, mins, maxs, (*wp_test).origin, ENTITYNUM_NONE) == 0
+        if OrgVisibleCurve(
+            ctx,
+            (*wp_base).origin,
+            mins,
+            maxs,
+            (*wp_test).origin,
+            ENTITYNUM_NONE,
+        ) == 0
         {
             return 0;
         }
@@ -1681,8 +1784,16 @@ pub fn CalculatePaths(ctx: GameContext<'_>) {
                         let force_jumpable = CanForceJumpTo(ctx, i, c, n_l_dist);
 
                         if (n_l_dist < max_neighbor_dist || force_jumpable != 0)
-                            && ((*p).origin[2] as c_int == (*cp).origin[2] as c_int || force_jumpable != 0)
-                            && (OrgVisibleBox(ctx, (*p).origin, mins, maxs, (*cp).origin, ENTITYNUM_NONE) != 0
+                            && ((*p).origin[2] as c_int == (*cp).origin[2] as c_int
+                                || force_jumpable != 0)
+                            && (OrgVisibleBox(
+                                ctx,
+                                (*p).origin,
+                                mins,
+                                maxs,
+                                (*cp).origin,
+                                ENTITYNUM_NONE,
+                            ) != 0
                                 || force_jumpable != 0)
                         {
                             (*p).neighbors[(*p).neighbornum as usize].num = c;
@@ -1690,7 +1801,8 @@ pub fn CalculatePaths(ctx: GameContext<'_>) {
                                 && ((*p).origin[2] as c_int != (*cp).origin[2] as c_int
                                     || n_l_dist < max_neighbor_dist)
                             {
-                                (*p).neighbors[(*p).neighbornum as usize].forceJumpTo = 999; // forceJumpable; //FJSR
+                                (*p).neighbors[(*p).neighbornum as usize].forceJumpTo = 999;
+                            // forceJumpable; //FJSR
                             } else {
                                 (*p).neighbors[(*p).neighbornum as usize].forceJumpTo = 0;
                             }
@@ -1744,7 +1856,10 @@ pub fn CalculateSiegeGoals(ctx: GameContext<'_>) {
 
             let mut tent: *mut gentity_t = core::ptr::null_mut();
 
-            if !ent.is_null() && !(*ent).classname.is_null() && c_str_eq((*ent).classname, b"info_siege_objective") {
+            if !ent.is_null()
+                && !(*ent).classname.is_null()
+                && c_str_eq((*ent).classname, b"info_siege_objective")
+            {
                 tent = ent;
                 let mut t2ent = GetObjectThatTargets(ctx, tent);
                 let mut looptracker: c_int = 0;
@@ -1814,7 +1929,11 @@ pub fn GetNearestVisibleWPToItem(ctx: GameContext<'_>, org: vec3_t, ignore: c_in
                 && (*p).origin[2] - 15.0 < org[2]
                 && (*p).origin[2] + 15.0 > org[2]
             {
-                let a = [org[0] - (*p).origin[0], org[1] - (*p).origin[1], org[2] - (*p).origin[2]];
+                let a = [
+                    org[0] - (*p).origin[0],
+                    org[1] - (*p).origin[1],
+                    org[2] - (*p).origin[2],
+                ];
                 let fl_len = VectorLength(a);
 
                 if fl_len < bestdist {
@@ -1822,7 +1941,8 @@ pub fn GetNearestVisibleWPToItem(ctx: GameContext<'_>, org: vec3_t, ignore: c_in
                         ctx.engine,
                         GInPvsArgs::new(&org as *const vec3_t, &(*p).origin as *const vec3_t),
                     );
-                    if in_pvs != 0 && OrgVisibleBox(ctx, org, mins, maxs, (*p).origin, ignore) != 0 {
+                    if in_pvs != 0 && OrgVisibleBox(ctx, org, mins, maxs, (*p).origin, ignore) != 0
+                    {
                         bestdist = fl_len;
                         bestindex = i;
                     }
@@ -2037,10 +2157,7 @@ pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
         let file_string = B_TempAlloc(ctx, 524288) as *mut c_char;
         let current_var = B_TempAlloc(ctx, 2048) as *mut c_char;
 
-        trap::FS_Read(
-            ctx.engine,
-            GFsReadArgs::new(file_string as *mut u8, len, f),
-        );
+        trap::FS_Read(ctx.engine, GFsReadArgs::new(file_string as *mut u8, len, f));
 
         if *file_string.offset(i) == b'l' as c_char {
             // contains a "levelflags" entry..
@@ -2145,14 +2262,17 @@ pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
 
             while *file_string.offset(i) != b'}' as c_char {
                 i_cv = 0;
-                while *file_string.offset(i) != b' ' as c_char && *file_string.offset(i) != b'-' as c_char {
+                while *file_string.offset(i) != b' ' as c_char
+                    && *file_string.offset(i) != b'-' as c_char
+                {
                     *current_var.offset(i_cv) = *file_string.offset(i);
                     i_cv += 1;
                     i += 1;
                 }
                 *current_var.offset(i_cv) = 0;
 
-                thiswp.neighbors[thiswp.neighbornum as usize].num = crate::bg_lib::atoi(current_var);
+                thiswp.neighbors[thiswp.neighbornum as usize].num =
+                    crate::bg_lib::atoi(current_var);
 
                 if *file_string.offset(i) == b'-' as c_char {
                     i_cv = 0;
@@ -2165,7 +2285,8 @@ pub fn LoadPathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
                     }
                     *current_var.offset(i_cv) = 0;
 
-                    thiswp.neighbors[thiswp.neighbornum as usize].forceJumpTo = 999; // atoi(currentVar); //FJSR
+                    thiswp.neighbors[thiswp.neighbornum as usize].forceJumpTo = 999;
+                // atoi(currentVar); //FJSR
                 } else {
                     thiswp.neighbors[thiswp.neighbornum as usize].forceJumpTo = 0;
                 }
@@ -2264,7 +2385,14 @@ pub fn FlagObjects(ctx: GameContext<'_>) {
 
                 if tlen < bestdist {
                     wp_trace(
-                        ctx, &mut tr, &rb, &mins, &maxs, &po, (*flag_red).s.number, MASK_SOLID,
+                        ctx,
+                        &mut tr,
+                        &rb,
+                        &mins,
+                        &maxs,
+                        &po,
+                        (*flag_red).s.number,
+                        MASK_SOLID,
                     );
 
                     if tr.fraction == 1.0 || tr.entityNum as c_int == (*flag_red).s.number {
@@ -2299,7 +2427,14 @@ pub fn FlagObjects(ctx: GameContext<'_>) {
 
                 if tlen < bestdist {
                     wp_trace(
-                        ctx, &mut tr, &bb, &mins, &maxs, &po, (*flag_blue).s.number, MASK_SOLID,
+                        ctx,
+                        &mut tr,
+                        &bb,
+                        &mins,
+                        &maxs,
+                        &po,
+                        (*flag_blue).s.number,
+                        MASK_SOLID,
                     );
 
                     if tr.fraction == 1.0 || tr.entityNum as c_int == (*flag_blue).s.number {
@@ -2357,7 +2492,10 @@ pub fn SavePathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
         );
 
         if f == 0 {
-            G_Printf(ctx, cstr("^1ERROR: Could not open file to write path data\n").as_ptr());
+            G_Printf(
+                ctx,
+                cstr("^1ERROR: Could not open file to write path data\n").as_ptr(),
+            );
             return 0;
         }
 
@@ -2425,7 +2563,12 @@ pub fn SavePathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
             let p = (*w).globals.gWPArray.0[i as usize];
             let mut store_string = format!(
                 "{} {} {} ({} {} {}) {{ ",
-                (*p).index, (*p).flags, (*p).weight, (*p).origin[0], (*p).origin[1], (*p).origin[2],
+                (*p).index,
+                (*p).flags,
+                (*p).weight,
+                (*p).origin[0],
+                (*p).origin[1],
+                (*p).origin[2],
             );
 
             let mut n: c_int = 0;
@@ -2666,8 +2809,14 @@ pub fn G_RecursiveConnection(
                 let a = (*w).globals.nodetable.0[start as usize].origin;
                 let b = (*w).globals.nodetable.0[d as usize].origin;
                 wp_trace(
-                    ctx, &mut tr, &a, core::ptr::null(), core::ptr::null(), &b,
-                    ENTITYNUM_NONE, CONTENTS_SOLID,
+                    ctx,
+                    &mut tr,
+                    &a,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &b,
+                    ENTITYNUM_NONE,
+                    CONTENTS_SOLID,
                 );
                 if tr.fraction != 1.0 {
                     index_directions[i as usize] = -1;
@@ -2677,7 +2826,8 @@ pub fn G_RecursiveConnection(
             let d = index_directions[i as usize];
             if d != -1 {
                 // still valid — keep connecting via this point
-                recursive_index = G_RecursiveConnection(ctx, d, end, pass_weight, traceCheck, baseHeight);
+                recursive_index =
+                    G_RecursiveConnection(ctx, d, end, pass_weight, traceCheck, baseHeight);
             }
 
             if recursive_index != -1 {
@@ -2713,20 +2863,36 @@ pub fn G_BackwardAttachment(
         let sorg = (*w).globals.nodetable.0[start as usize].origin;
 
         let mut given_xy: [f32; 2] = [sorg[0] - DEFAULT_GRID_SPACING, sorg[1]];
-        index_directions[0] =
-            G_NodeMatchingXY_BA(ctx, given_xy[0] as c_int, given_xy[1] as c_int, finalDestination);
+        index_directions[0] = G_NodeMatchingXY_BA(
+            ctx,
+            given_xy[0] as c_int,
+            given_xy[1] as c_int,
+            finalDestination,
+        );
 
         given_xy = [sorg[0] + DEFAULT_GRID_SPACING, sorg[1]];
-        index_directions[1] =
-            G_NodeMatchingXY_BA(ctx, given_xy[0] as c_int, given_xy[1] as c_int, finalDestination);
+        index_directions[1] = G_NodeMatchingXY_BA(
+            ctx,
+            given_xy[0] as c_int,
+            given_xy[1] as c_int,
+            finalDestination,
+        );
 
         given_xy = [sorg[0], sorg[1] - DEFAULT_GRID_SPACING];
-        index_directions[2] =
-            G_NodeMatchingXY_BA(ctx, given_xy[0] as c_int, given_xy[1] as c_int, finalDestination);
+        index_directions[2] = G_NodeMatchingXY_BA(
+            ctx,
+            given_xy[0] as c_int,
+            given_xy[1] as c_int,
+            finalDestination,
+        );
 
         given_xy = [sorg[0], sorg[1] + DEFAULT_GRID_SPACING];
-        index_directions[3] =
-            G_NodeMatchingXY_BA(ctx, given_xy[0] as c_int, given_xy[1] as c_int, finalDestination);
+        index_directions[3] = G_NodeMatchingXY_BA(
+            ctx,
+            given_xy[0] as c_int,
+            given_xy[1] as c_int,
+            finalDestination,
+        );
 
         while i < 4 {
             let d = index_directions[i as usize];
@@ -2892,8 +3058,14 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
 
             // For now I am going to branch out mindlessly, but I will probably want to use some sort of A* algorithm
             // here to lessen the time taken.
-            if G_RecursiveConnection(ctx, nearest_index, nearest_index_for_next, 0, QTRUE, (*terrain).r.absmin[2])
-                != nearest_index_for_next
+            if G_RecursiveConnection(
+                ctx,
+                nearest_index,
+                nearest_index_for_next,
+                0,
+                QTRUE,
+                (*terrain).r.absmin[2],
+            ) != nearest_index_for_next
             {
                 // failed to branch to where we want. Oh well, try it without trace checks.
                 G_NodeClearForNext(ctx);
@@ -2918,13 +3090,24 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
             // so trace back to that point.
             G_NodeClearFlags(ctx);
 
-            if G_BackwardAttachment(ctx, nearest_index_for_next, nearest_index, (*w).globals.gWPNum - 1) != 0 {
+            if G_BackwardAttachment(
+                ctx,
+                nearest_index_for_next,
+                nearest_index,
+                (*w).globals.gWPNum - 1,
+            ) != 0
+            {
                 // successfully connected the trail from nearestIndex to nearestIndexForNext
                 if (*sp1).inuse != 0 && !(*sp1).item.is_null() && (*(*sp1).item).giType == IT_TEAM {
                     // This point is actually a CTF flag.
                     if (*(*sp1).item).giTag == PW_REDFLAG || (*(*sp1).item).giTag == PW_BLUEFLAG {
                         // Place a waypoint on the flag next in the trail, so the nearest grid point will link to it.
-                        CreateNewWP_InsertUnder(ctx, (*sp1).s.origin, WPFLAG_NEVERONEWAY, (*w).globals.gWPNum - 1);
+                        CreateNewWP_InsertUnder(
+                            ctx,
+                            (*sp1).s.origin,
+                            WPFLAG_NEVERONEWAY,
+                            (*w).globals.gWPNum - 1,
+                        );
                     }
                 }
             } else {
@@ -2999,7 +3182,10 @@ pub fn BeginAutoPathRoutine(ctx: GameContext<'_>) {
                 (*w).globals.gWPArray.0.as_mut_ptr() as *mut *mut c_void,
             ),
         );
-        trap::Bot_CalculatePaths(ctx.engine, GBotCalculatepathsArgs::new((*w).cvars.g_RMG.integer));
+        trap::Bot_CalculatePaths(
+            ctx.engine,
+            GBotCalculatepathsArgs::new((*w).cvars.g_RMG.integer),
+        );
         // CalculatePaths(); //make everything nice and connected
 
         FlagObjects(ctx); // currently only used for flagging waypoints nearest CTF flags
@@ -3096,9 +3282,13 @@ pub fn LoadPath_ThisLevel(ctx: GameContext<'_>) {
             let ent: *mut gentity_t = &mut (*w).g_entities[i as usize];
 
             if !ent.is_null() && (*ent).inuse != 0 && !(*ent).classname.is_null() {
-                if (*w).globals.eFlagRed.is_null() && c_str_eq((*ent).classname, b"team_CTF_redflag") {
+                if (*w).globals.eFlagRed.is_null()
+                    && c_str_eq((*ent).classname, b"team_CTF_redflag")
+                {
                     (*w).globals.eFlagRed = ent;
-                } else if (*w).globals.eFlagBlue.is_null() && c_str_eq((*ent).classname, b"team_CTF_blueflag") {
+                } else if (*w).globals.eFlagBlue.is_null()
+                    && c_str_eq((*ent).classname, b"team_CTF_blueflag")
+                {
                     (*w).globals.eFlagBlue = ent;
                 }
 
@@ -3154,10 +3344,7 @@ pub fn GetClosestSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentit
 /// `MAX_CLIENTS` if none follows.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3459-3499`
-pub fn GetNextSpawnInIndex(
-    ctx: GameContext<'_>,
-    currentSpawn: *mut gentity_t,
-) -> *mut gentity_t {
+pub fn GetNextSpawnInIndex(ctx: GameContext<'_>, currentSpawn: *mut gentity_t) -> *mut gentity_t {
     unsafe {
         let w = ctx.world;
         let mut next_spawn: *mut gentity_t = core::ptr::null_mut();
@@ -3227,9 +3414,17 @@ pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity
             G_Printf(ctx, cstr("^3bot_wp_rem^7 - Remove a waypoint (removes last unless waypoint index is specified as a parameter)\n\n").as_ptr());
             G_Printf(ctx, cstr("^3bot_wp_addflagged^7 - Same as wp_add, but adds a flagged point (type bot_wp_addflagged for help)\n\n").as_ptr());
             G_Printf(ctx, cstr("^3bot_wp_switchflags^7 - Switches flags on an existing waypoint (type bot_wp_switchflags for help)\n\n").as_ptr());
-            G_Printf(ctx, cstr("^3bot_wp_tele^7 - Teleport yourself to the specified waypoint's location\n").as_ptr());
+            G_Printf(
+                ctx,
+                cstr("^3bot_wp_tele^7 - Teleport yourself to the specified waypoint's location\n")
+                    .as_ptr(),
+            );
             G_Printf(ctx, cstr("^3bot_wp_killoneways^7 - Removes oneway (backward and forward) flags on all waypoints in the level\n\n").as_ptr());
-            G_Printf(ctx, cstr("^3bot_wp_save^7 - Saves all waypoint data into a file for later use\n").as_ptr());
+            G_Printf(
+                ctx,
+                cstr("^3bot_wp_save^7 - Saves all waypoint data into a file for later use\n")
+                    .as_ptr(),
+            );
 
             return 1;
         }
@@ -3284,7 +3479,10 @@ pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity
             if !optional_s_argument.is_null() && *optional_s_argument != 0 {
                 TeleportToWP(ctx, pl, optional_argument);
             } else {
-                G_Printf(ctx, cstr("^3You didn't specify an index. Assuming last.\n").as_ptr());
+                G_Printf(
+                    ctx,
+                    cstr("^3You didn't specify an index. Assuming last.\n").as_ptr(),
+                );
                 TeleportToWP(ctx, pl, (*w).globals.gWPNum - 1);
             }
             return 1;
@@ -3357,7 +3555,11 @@ pub fn AcceptBotCommand(ctx: GameContext<'_>, cmd: *mut c_char, pl: *mut gentity
                     optional_argument,
                 );
             } else {
-                CreateNewWP(ctx, (*((*pl).client as *mut gclient_t)).ps.origin, flags_from_argument);
+                CreateNewWP(
+                    ctx,
+                    (*((*pl).client as *mut gclient_t)).ps.origin,
+                    flags_from_argument,
+                );
             }
             return 1;
         }

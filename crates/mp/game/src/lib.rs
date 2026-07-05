@@ -28,7 +28,6 @@ pub mod teams;
 // --- jampgame function skeletons + generated boilerplate (mega-pass) ---
 pub mod AnimalNPC;
 pub mod FighterNPC;
-pub mod npc_c;
 pub mod NPC_AI_Atst;
 pub mod NPC_AI_Default;
 pub mod NPC_AI_Droid;
@@ -81,8 +80,8 @@ pub mod bg_vehicleLoad;
 pub mod bg_vehicleLoad_tables;
 pub mod cstr_util;
 pub mod ent_fn_enums;
+pub mod ent_id;
 pub mod g_ICARUScb;
-pub mod g_icarus_set_type;
 pub mod g_active;
 pub mod g_arenas;
 pub mod g_bot;
@@ -90,7 +89,9 @@ pub mod g_client;
 pub mod g_cmds;
 pub mod g_combat;
 pub mod g_exphysics;
+pub mod g_icarus_set_type;
 pub mod g_items;
+pub mod g_local_consts;
 pub mod g_log;
 pub mod g_main;
 pub mod g_mem;
@@ -98,12 +99,10 @@ pub mod g_misc;
 pub mod g_missile;
 pub mod g_mover;
 pub mod g_nav;
-pub mod g_local_consts;
 pub mod g_nav_consts;
-pub mod g_public_consts;
-pub mod q_shared_cvar_flags;
 pub mod g_navnew;
 pub mod g_object;
+pub mod g_public_consts;
 pub mod g_saga;
 pub mod g_session;
 pub mod g_spawn;
@@ -121,14 +120,15 @@ pub mod g_vehicles;
 pub mod g_weapon;
 pub mod game_cvars;
 pub mod game_globals;
+pub mod npc_c;
 pub mod q_math;
-pub mod veh_dispatch;
-pub mod ent_id;
 pub mod q_shared;
+pub mod q_shared_cvar_flags;
+pub mod trap;
 pub mod tri_coll_test;
+pub mod veh_dispatch;
 pub mod w_force;
 pub mod w_saber;
-pub mod trap;
 pub mod world;
 
 pub use world::{EntityId, GameContext, GameWorld};
@@ -138,9 +138,9 @@ pub use world::{EntityId, GameContext, GameWorld};
 // `crate::trajectory::…` (the module lives in `mp_qshared`, but the game tier is
 // its logical home in those transcriptions). Re-homing under `crate::` resolves
 // the absolute-path references without touching each call site.
+pub use mp_qshared::common::mp::qcommon::taskID_t;
 pub use mp_qshared::shared;
 pub use mp_qshared::shared::trajectory;
-pub use mp_qshared::common::mp::qcommon::taskID_t;
 
 // The export-command enum, re-exported so the jampgame shell names it through
 // its existing two edges (round-7 item 25; SEAM-D10's exactly-two-edges shell
@@ -151,6 +151,27 @@ pub use mp_abi::game::exports::MpGameExport;
 // through the logic crate on the same item-25 principle (checkpoint-7 finding:
 // mechanical extension — the shell's arms need the C marker/Args types).
 pub mod vmcalls {
+    pub use mp_abi::game::vmcalls::BOTAI_START_FRAME::BotAiStartFrame;
+    pub use mp_abi::game::vmcalls::GAME_CLIENT_BEGIN::GameClientBegin;
+    pub use mp_abi::game::vmcalls::GAME_CLIENT_COMMAND::GameClientCommand;
+    pub use mp_abi::game::vmcalls::GAME_CLIENT_CONNECT::GameClientConnect;
+    pub use mp_abi::game::vmcalls::GAME_CLIENT_DISCONNECT::GameClientDisconnect;
+    pub use mp_abi::game::vmcalls::GAME_CLIENT_THINK::GameClientThink;
+    pub use mp_abi::game::vmcalls::GAME_CLIENT_USERINFO_CHANGED::GameClientUserinfoChanged;
+    pub use mp_abi::game::vmcalls::GAME_CONSOLE_COMMAND::GameConsoleCommand;
+    pub use mp_abi::game::vmcalls::GAME_GETITEMINDEXBYTAG::GameGetitemindexbytag;
     pub use mp_abi::game::vmcalls::GAME_INIT::GameInit;
+    pub use mp_abi::game::vmcalls::GAME_NAV_CHECKNODEFAILEDFORENT::GameNavChecknodefailedforent;
+    pub use mp_abi::game::vmcalls::GAME_NAV_CLEARLOS::GameNavClearlos;
+    pub use mp_abi::game::vmcalls::GAME_NAV_CLEARPATHBETWEENPOINTS::GameNavClearpathbetweenpoints;
+    pub use mp_abi::game::vmcalls::GAME_NAV_CLEARPATHTOPOINT::GameNavClearpathtopoint;
+    pub use mp_abi::game::vmcalls::GAME_NAV_ENTISBREAKABLE::GameNavEntIsBreakable;
+    pub use mp_abi::game::vmcalls::GAME_NAV_ENTISDOOR::GameNavEntIsDoor;
+    pub use mp_abi::game::vmcalls::GAME_NAV_ENTISREMOVABLEUSABLE::GameNavEntIsRemovableUsable;
+    pub use mp_abi::game::vmcalls::GAME_NAV_ENTISUNLOCKEDDOOR::GameNavEntIsUnlockedDoor;
+    pub use mp_abi::game::vmcalls::GAME_NAV_FINDCOMBATPOINTWAYPOINTS::GameNavFindcombatpointwaypoints;
+    pub use mp_abi::game::vmcalls::GAME_ROFF_NOTETRACK_CALLBACK::GameRoffNotetrackCallback;
+    pub use mp_abi::game::vmcalls::GAME_RUN_FRAME::GameRunFrame;
     pub use mp_abi::game::vmcalls::GAME_SHUTDOWN::GameShutdown;
+    pub use mp_abi::game::vmcalls::GAME_SPAWN_RMG_ENTITY::GameSpawnRmgEntity;
 }

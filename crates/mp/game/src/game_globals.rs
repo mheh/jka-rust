@@ -9,9 +9,9 @@
 //! intentionally excluded — not GameWorld state).
 #![allow(non_snake_case, non_camel_case_types, unused)]
 
-use crate::prelude::*;
 use crate::botai::nodeobject_s::nodeobject_t;
 use crate::g_svcmds::ipFilter_t;
+use crate::prelude::*;
 
 /// `ipFilter_t ipFilters[MAX_IPFILTERS]` (`g_svcmds.c:54`). Newtype because a
 /// 1024-element array has no library `Default` impl (only arrays up to 32
@@ -21,7 +21,12 @@ pub struct IpFilters(pub [ipFilter_t; MAX_IPFILTERS]);
 
 impl Default for IpFilters {
     fn default() -> Self {
-        IpFilters([ipFilter_t { mask: 0, compare: 0 }; MAX_IPFILTERS])
+        IpFilters(
+            [ipFilter_t {
+                mask: 0,
+                compare: 0,
+            }; MAX_IPFILTERS],
+        )
     }
 }
 
@@ -120,7 +125,9 @@ impl core::ops::IndexMut<usize> for BotInfos {
 /// (`ai_main.c` file-scope global). Newtype because a raw-pointer array has no
 /// library `Default` impl.
 /// Source: `oracle/oracle/codemp/game/ai_main.c:46`
-pub struct BotStates(pub [*mut crate::botai::bot_state_s::bot_state_t; mp_qshared::shared::MAX_CLIENTS]);
+pub struct BotStates(
+    pub [*mut crate::botai::bot_state_s::bot_state_t; mp_qshared::shared::MAX_CLIENTS],
+);
 
 impl Default for BotStates {
     fn default() -> Self {
@@ -694,7 +701,8 @@ pub struct GameGlobals {
     pub flagRed: *mut wpobject_t,
     /// `boteventtracker_t gBotEventTracker[MAX_CLIENTS]`.
     /// Source: `oracle/oracle/codemp/game/ai_main.c:59`
-    pub gBotEventTracker: [crate::botai::boteventtracker_s::boteventtracker_t; mp_qshared::shared::MAX_CLIENTS],
+    pub gBotEventTracker:
+        [crate::botai::boteventtracker_s::boteventtracker_t; mp_qshared::shared::MAX_CLIENTS],
     /// `gUpdateVars`. Source: `oracle/oracle/codemp/game/ai_main.c:7485`
     pub gUpdateVars: c_int,
     /// `static int lastbotthink_time` — bot-think cadence latch (function-scope

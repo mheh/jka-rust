@@ -6,25 +6,25 @@
 /// Type definition source: `oracle/oracle/codemp/game/b_public.h:86-107`
 #[repr(C)]
 pub struct gNPCstats_t {
-	//AI
-	pub aggression: i32,    //			"
-	pub aim: i32,            //			"
-	pub earshot: f32,        //			"
-	pub evasion: i32,        //			"
-	pub hfov: i32,            // horizontal field of view
-	pub intelligence: i32,   //			"
-	pub r#move: i32,          //			"
-	pub reactions: i32,       // 1-5, higher is better
-	pub shootDistance: f32,  //Maximum range- overrides range set for weapon if nonzero
-	pub vfov: i32,            // vertical field of view
-	pub vigilance: f32,      //			"
-	pub visrange: f32,       //			"
-	//Movement
-	pub runSpeed: i32,
-	pub walkSpeed: i32,
-	pub yawSpeed: f32, // 1 - whatever, default is 50
-	pub health: i32,
-	pub acceleration: i32,
+    //AI
+    pub aggression: i32,    //			"
+    pub aim: i32,           //			"
+    pub earshot: f32,       //			"
+    pub evasion: i32,       //			"
+    pub hfov: i32,          // horizontal field of view
+    pub intelligence: i32,  //			"
+    pub r#move: i32,        //			"
+    pub reactions: i32,     // 1-5, higher is better
+    pub shootDistance: f32, //Maximum range- overrides range set for weapon if nonzero
+    pub vfov: i32,          // vertical field of view
+    pub vigilance: f32,     //			"
+    pub visrange: f32,      //			"
+    //Movement
+    pub runSpeed: i32,
+    pub walkSpeed: i32,
+    pub yawSpeed: f32, // 1 - whatever, default is 50
+    pub health: i32,
+    pub acceleration: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<gNPCstats_t>() == 68);

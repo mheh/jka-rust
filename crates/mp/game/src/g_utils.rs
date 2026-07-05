@@ -23,9 +23,9 @@
 use crate::prelude::*;
 
 use crate::client::gclient_t;
-use crate::trap;
 use crate::g_main::G_Printf;
 use crate::q_shared::Q_strcat;
+use crate::trap;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 
 /// Raven `EV_EVENT_BIT1`.
@@ -109,10 +109,7 @@ pub fn AddRemap(
         for i in 0..world.globals.remapCount as usize {
             let existing = world.globals.remappedShaders.0[i].oldShader.as_ptr();
             if Q_stricmp(oldShader, existing) == 0 {
-                strcpy_buf(
-                    &mut world.globals.remappedShaders.0[i].newShader,
-                    newShader,
-                );
+                strcpy_buf(&mut world.globals.remappedShaders.0[i].newShader, newShader);
                 world.globals.remappedShaders.0[i].timeOffset = timeOffset;
                 return;
             }
@@ -143,13 +140,21 @@ pub fn BuildShaderStateConfig(ctx: GameContext<'_>) -> *const c_char {
 
         let world = &*ctx.world;
         for i in 0..world.globals.remapCount as usize {
-            let old_shader_str = CStr::from_ptr(world.globals.remappedShaders.0[i].oldShader.as_ptr()).to_string_lossy();
-            let new_shader_str = CStr::from_ptr(world.globals.remappedShaders.0[i].newShader.as_ptr()).to_string_lossy();
+            let old_shader_str =
+                CStr::from_ptr(world.globals.remappedShaders.0[i].oldShader.as_ptr())
+                    .to_string_lossy();
+            let new_shader_str =
+                CStr::from_ptr(world.globals.remappedShaders.0[i].newShader.as_ptr())
+                    .to_string_lossy();
             let time_offset = world.globals.remappedShaders.0[i].timeOffset;
 
             let formatted = format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset);
             let out_cstr = CString::new(formatted).unwrap_or_else(|_| CString::new("").unwrap());
-            Q_strcat(buff.as_mut_ptr(), (MAX_STRING_CHARS * 4) as c_int, out_cstr.as_ptr());
+            Q_strcat(
+                buff.as_mut_ptr(),
+                (MAX_STRING_CHARS * 4) as c_int,
+                out_cstr.as_ptr(),
+            );
         }
 
         buff.as_ptr()
@@ -211,19 +216,14 @@ pub fn G_FindConfigstringIndex(
 /// Raven `G_BoneIndex`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:101-103`
-pub fn G_BoneIndex(
-    ctx: GameContext<'_>,
-    name: *const c_char,
-) -> c_int {
+pub fn G_BoneIndex(ctx: GameContext<'_>, name: *const c_char) -> c_int {
     G_FindConfigstringIndex(ctx, name, CS_G2BONES, MAX_G2BONES, qtrue)
 }
 
 /// Raven `G_ModelIndex`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:108-130`
-pub fn G_ModelIndex(
-    name: *const c_char,
-) -> c_int {
+pub fn G_ModelIndex(name: *const c_char) -> c_int {
     // PORT-NOTE(ctx-free-boundary-callee-mismatch): This function is part of the bg-callable
     // boundary set and has no ctx parameter, but the oracle body calls G_FindConfigstringIndex
     // which requires ctx in the Rust port. The architectural resolution (either adding ctx to
@@ -242,10 +242,7 @@ pub fn G_ModelIndex(
 /// Raven `G_IconIndex`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:132-136`
-pub fn G_IconIndex(
-    ctx: GameContext<'_>,
-    name: *const c_char,
-) -> c_int {
+pub fn G_IconIndex(ctx: GameContext<'_>, name: *const c_char) -> c_int {
     debug_assert!(!name.is_null() && unsafe { *name != 0 });
     G_FindConfigstringIndex(ctx, name, CS_ICONS, MAX_ICONS, qtrue)
 }
@@ -253,9 +250,7 @@ pub fn G_IconIndex(
 /// Raven `G_SoundIndex`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:138-141`
-pub fn G_SoundIndex(
-    name: *const c_char,
-) -> c_int {
+pub fn G_SoundIndex(name: *const c_char) -> c_int {
     // PORT-NOTE(ctx-free-boundary-callee-mismatch): Same issue as G_ModelIndex - this function
     // is ctx-free but needs ctx to call G_FindConfigstringIndex. See G_ModelIndex for details.
     debug_assert!(!name.is_null() && unsafe { *name != 0 });
@@ -266,19 +261,14 @@ pub fn G_SoundIndex(
 /// Raven `G_SoundSetIndex`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:143-146`
-pub fn G_SoundSetIndex(
-    ctx: GameContext<'_>,
-    name: *const c_char,
-) -> c_int {
+pub fn G_SoundSetIndex(ctx: GameContext<'_>, name: *const c_char) -> c_int {
     G_FindConfigstringIndex(ctx, name, CS_AMBIENT_SET, MAX_AMBIENT_SETS, qtrue)
 }
 
 /// Raven `G_EffectIndex`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:148-151`
-pub fn G_EffectIndex(
-    name: *const c_char,
-) -> c_int {
+pub fn G_EffectIndex(name: *const c_char) -> c_int {
     // PORT-NOTE(ctx-free-boundary-callee-mismatch): Same issue as G_ModelIndex and G_SoundIndex.
     // Placeholder pending architectural resolution:
     0
@@ -287,10 +277,7 @@ pub fn G_EffectIndex(
 /// Raven `G_BSPIndex`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:153-156`
-pub fn G_BSPIndex(
-    ctx: GameContext<'_>,
-    name: *const c_char,
-) -> c_int {
+pub fn G_BSPIndex(ctx: GameContext<'_>, name: *const c_char) -> c_int {
     G_FindConfigstringIndex(ctx, name, CS_BSP_MODELS, MAX_SUB_BSP, qtrue)
 }
 
@@ -299,20 +286,14 @@ pub fn G_BSPIndex(
 /// Raven: the real siege-class-flag body is `#if 0`'d out upstream; the live
 /// function unconditionally returns `qfalse` — ported faithfully as-is.
 /// Source: `oracle/oracle/codemp/game/g_utils.c:162-188`
-pub fn G_PlayerHasCustomSkeleton(
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn G_PlayerHasCustomSkeleton(ent: *mut gentity_t) -> qboolean {
     qfalse
 }
 
 /// Raven `G_TeamCommand`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:197-207`
-pub fn G_TeamCommand(
-    ctx: GameContext<'_>,
-    team: team_t,
-    cmd: *mut c_char,
-) {
+pub fn G_TeamCommand(ctx: GameContext<'_>, team: team_t, cmd: *mut c_char) {
     use crate::client::client_connected::CON_CONNECTED;
 
     unsafe {
@@ -344,11 +325,7 @@ pub fn G_Find(
         let base = world.g_entities.as_mut_ptr();
         let num_entities = world.level.num_entities;
 
-        let mut cur = if from.is_null() {
-            base
-        } else {
-            from.add(1)
-        };
+        let mut cur = if from.is_null() { base } else { from.add(1) };
 
         while cur < base.add(num_entities as usize) {
             if (*cur).inuse != qfalse {
@@ -434,12 +411,7 @@ pub fn G_RadiusList(
 /// `(*ent).client as *mut gclient_t` cast (see `g_combat.rs`/`g_items.rs`).
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:315-370`
-pub fn G_Throw(
-    ctx: GameContext<'_>,
-    targ: *mut gentity_t,
-    newDir: vec3_t,
-    push: f32,
-) {
+pub fn G_Throw(ctx: GameContext<'_>, targ: *mut gentity_t, newDir: vec3_t, push: f32) {
     unsafe {
         let world = &mut *ctx.world;
 
@@ -505,18 +477,12 @@ pub fn G_Throw(
 /// dynamic stuff is busted somehow at the moment"); the live function body
 /// is empty — ported faithfully as a no-op.
 /// Source: `oracle/oracle/codemp/game/g_utils.c:376-381`
-pub fn G_FreeFakeClient(
-    cl: *mut *mut gclient_t,
-) {
-}
+pub fn G_FreeFakeClient(cl: *mut *mut gclient_t) {}
 
 /// Raven `G_AllocateVehicleObject`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:388-410`
-pub fn G_AllocateVehicleObject(
-    ctx: GameContext<'_>,
-    pVeh: *mut *mut Vehicle_t,
-) {
+pub fn G_AllocateVehicleObject(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t) {
     // PORT-NOTE(missing-vehicle-pool-storage): g_vehiclePool array is not ported to GameWorld.
     // This function allocates from that missing storage. Implementing with available globals only.
     unsafe {
@@ -551,10 +517,7 @@ pub fn G_AllocateVehicleObject(
 /// Raven `G_FreeVehicleObject`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:413-426`
-pub fn G_FreeVehicleObject(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-) {
+pub fn G_FreeVehicleObject(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     // PORT-NOTE(missing-vehicle-pool-storage): Same limitation as G_AllocateVehicleObject.
     unsafe {
         let world = &mut *ctx.world;
@@ -575,11 +538,7 @@ pub fn G_FreeVehicleObject(
 /// rest of this pass follows.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:430-438`
-pub fn G_CreateFakeClient(
-    ctx: GameContext<'_>,
-    entNum: c_int,
-    cl: *mut *mut gclient_t,
-) {
+pub fn G_CreateFakeClient(ctx: GameContext<'_>, entNum: c_int, cl: *mut *mut gclient_t) {
     unsafe {
         let world = &mut *ctx.world;
         if world.globals.gClPtrs.0[entNum as usize].is_null() {
@@ -601,7 +560,9 @@ pub fn G_CleanAllFakeClients(ctx: GameContext<'_>) {
         let mut i = MAX_CLIENTS as usize;
         while i < mp_qshared::shared::MAX_GENTITIES {
             let ent = &mut world.g_entities[i] as *mut gentity_t;
-            if (*ent).inuse != qfalse && (*ent).s.eType == ET_NPC as c_int && !(*ent).client.is_null()
+            if (*ent).inuse != qfalse
+                && (*ent).s.eType == ET_NPC as c_int
+                && !(*ent).client.is_null()
             {
                 G_FreeFakeClient(&mut (*ent).client as *mut *mut c_void as *mut *mut gclient_t);
             }
@@ -636,8 +597,11 @@ pub fn G_SetAnim(
             world: ctx.world,
             engine: ctx.engine,
         };
-        let mut pmc =
-            crate::bg_channel::PmoveContext::new(&mut (*ctx.world).bg_state, &traps, &mut callbacks);
+        let mut pmc = crate::bg_channel::PmoveContext::new(
+            &mut (*ctx.world).bg_state,
+            &traps,
+            &mut callbacks,
+        );
         pmc.BG_SetAnim(ps, anims, setAnimParts, anim, setAnimFlags, blendTime);
     }
 }
@@ -645,17 +609,17 @@ pub fn G_SetAnim(
 /// Raven `G_PickTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:521-550`
-pub fn G_PickTarget(
-    ctx: GameContext<'_>,
-    targetname: *mut c_char,
-) -> *mut gentity_t {
+pub fn G_PickTarget(ctx: GameContext<'_>, targetname: *mut c_char) -> *mut gentity_t {
     const MAXCHOICES: usize = 8;
     let mut choice: [*mut gentity_t; MAXCHOICES] = [core::ptr::null_mut(); MAXCHOICES];
     let mut num_choices: usize = 0;
 
     unsafe {
         if targetname.is_null() {
-            G_Printf(ctx, cstr("G_PickTarget called with NULL targetname\n").as_ptr());
+            G_Printf(
+                ctx,
+                cstr("G_PickTarget called with NULL targetname\n").as_ptr(),
+            );
             return core::ptr::null_mut();
         }
 
@@ -673,7 +637,10 @@ pub fn G_PickTarget(
         }
 
         if num_choices == 0 {
-            let msg = format!("G_PickTarget: target {} not found\n", CStr::from_ptr(targetname).to_string_lossy());
+            let msg = format!(
+                "G_PickTarget: target {} not found\n",
+                CStr::from_ptr(targetname).to_string_lossy()
+            );
             G_Printf(ctx, cstr(&msg).as_ptr());
             return core::ptr::null_mut();
         }
@@ -687,11 +654,7 @@ pub fn G_PickTarget(
 /// Raven `GlobalUse`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:552-564`
-pub fn GlobalUse(
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
-) {
+pub fn GlobalUse(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     // PORT-NOTE(fn-pointer-dispatch-no-ctx): This function is a pure fn with no ctx parameter,
     // but the oracle calls self->use() which needs to be dispatched through the enum-based
     // dispatch system, which requires ctx. The function pointer dispatch architecture cannot
@@ -759,7 +722,10 @@ pub fn G_UseTargets2(
             }
 
             if (*ent).inuse == qfalse {
-                G_Printf(ctx, cstr("entity was removed while using targets\n").as_ptr());
+                G_Printf(
+                    ctx,
+                    cstr("entity was removed while using targets\n").as_ptr(),
+                );
                 return;
             }
         }
@@ -772,11 +738,7 @@ pub fn G_UseTargets2(
 /// `ent->target` as the search string (itself parked pending a GameWorld
 /// handle — see its PORT-NOTE note).
 /// Source: `oracle/oracle/codemp/game/g_utils.c:609-616`
-pub fn G_UseTargets(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    activator: *mut gentity_t,
-) {
+pub fn G_UseTargets(ctx: GameContext<'_>, ent: *mut gentity_t, activator: *mut gentity_t) {
     if ent.is_null() {
         return;
     }
@@ -788,11 +750,7 @@ pub fn G_UseTargets(
 /// Raven `tv`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:627-642`
-pub fn tv(
-    x: f32,
-    y: f32,
-    z: f32,
-) -> *mut f32 {
+pub fn tv(x: f32, y: f32, z: f32) -> *mut f32 {
     unsafe {
         #[allow(non_upper_case_globals)] // Raven `static int index` spelling
         static mut index: c_int = 0;
@@ -813,10 +771,7 @@ pub fn tv(
 /// Raven `vtos`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:653-665`
-pub fn vtos(
-    ctx: GameContext<'_>,
-    v: vec3_t,
-) -> *mut c_char {
+pub fn vtos(ctx: GameContext<'_>, v: vec3_t) -> *mut c_char {
     unsafe {
         #[allow(non_upper_case_globals)] // Raven `static int index` spelling
         static mut index: c_int = 0;
@@ -843,10 +798,7 @@ pub fn vtos(
 /// same-file callers to fix up).
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:678-692`
-pub fn G_SetMovedir(
-    angles: &mut vec3_t,
-    movedir: &mut vec3_t,
-) {
+pub fn G_SetMovedir(angles: &mut vec3_t, movedir: &mut vec3_t) {
     const VEC_UP: vec3_t = [0.0, -1.0, 0.0];
     const MOVEDIR_UP: vec3_t = [0.0, 0.0, 1.0];
     const VEC_DOWN: vec3_t = [0.0, -2.0, 0.0];
@@ -865,10 +817,7 @@ pub fn G_SetMovedir(
 /// Raven `G_InitGentity`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:694-702`
-pub fn G_InitGentity(
-    ctx: GameContext<'_>,
-    e: *mut gentity_t,
-) {
+pub fn G_InitGentity(ctx: GameContext<'_>, e: *mut gentity_t) {
     unsafe {
         let world = &mut *ctx.world;
         let base = world.g_entities.as_mut_ptr();
@@ -1034,10 +983,7 @@ pub fn G_SendG2KillQueue(ctx: GameContext<'_>) {
 /// Raven `G_KillG2Queue`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:909-923`
-pub fn G_KillG2Queue(
-    ctx: GameContext<'_>,
-    entNum: c_int,
-) {
+pub fn G_KillG2Queue(ctx: GameContext<'_>, entNum: c_int) {
     unsafe {
         let world = &mut *ctx.world;
         if world.globals.gG2KillNum >= crate::game_globals::MAX_G2_KILL_QUEUE as c_int {
@@ -1060,10 +1006,7 @@ pub fn G_KillG2Queue(
 /// `(*ent).client as *mut gclient_t` cast.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:932-1043`
-pub fn G_FreeEntity(
-    ctx: GameContext<'_>,
-    ed: *mut gentity_t,
-) {
+pub fn G_FreeEntity(ctx: GameContext<'_>, ed: *mut gentity_t) {
     unsafe {
         if (*ed).isSaberEntity != qfalse {
             return;
@@ -1126,7 +1069,9 @@ pub fn G_FreeEntity(
                     if have != qfalse {
                         trap::G2API_CleanGhoul2Models(
                             ctx.engine,
-                            GG2CleanmodelsArgs::new(&mut (*client).weaponGhoul2[i] as *mut *mut c_void),
+                            GG2CleanmodelsArgs::new(
+                                &mut (*client).weaponGhoul2[i] as *mut *mut c_void,
+                            ),
                         );
                     }
                 }
@@ -1158,7 +1103,12 @@ pub fn G_FreeEntity(
                 ctx.engine,
                 GSendServerCommandArgs::new(
                     -1,
-                    CString::new(format!("kls {} {}", (*ed).s.trickedentindex, (*ed).s.number)).unwrap(),
+                    CString::new(format!(
+                        "kls {} {}",
+                        (*ed).s.trickedentindex,
+                        (*ed).s.number
+                    ))
+                    .unwrap(),
                 ),
             );
         }
@@ -1173,11 +1123,7 @@ pub fn G_FreeEntity(
 /// Raven `G_TempEntity`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1054-1077`
-pub fn G_TempEntity(
-    ctx: GameContext<'_>,
-    origin: vec3_t,
-    event: c_int,
-) -> *mut gentity_t {
+pub fn G_TempEntity(ctx: GameContext<'_>, origin: vec3_t, event: c_int) -> *mut gentity_t {
     unsafe {
         let e = G_Spawn(ctx);
         (*e).s.eType = mp_bg::public::entity_type::entityType_t::ET_EVENTS as c_int + event;
@@ -1239,9 +1185,7 @@ pub fn G_SoundTempEntity(
 /// Raven `G_ScaleNetHealth`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1112-1142`
-pub fn G_ScaleNetHealth(
-    self_: *mut gentity_t,
-) {
+pub fn G_ScaleNetHealth(self_: *mut gentity_t) {
     unsafe {
         let maxHealth = (*self_).maxHealth;
 
@@ -1279,10 +1223,7 @@ pub fn G_ScaleNetHealth(
 /// dependency chain the rest of this pass follows.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1162-1193`
-pub fn G_KillBox(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn G_KillBox(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
         let mut mins = [0.0f32; 3];
@@ -1340,27 +1281,23 @@ pub fn G_KillBox(
 /// Raven `G_AddPredictableEvent`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1206-1211`
-pub fn G_AddPredictableEvent(
-    ent: *mut gentity_t,
-    event: c_int,
-    eventParm: c_int,
-) {
+pub fn G_AddPredictableEvent(ent: *mut gentity_t, event: c_int, eventParm: c_int) {
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
             return;
         }
-        crate::bg_misc::BG_AddPredictableEventToPlayerstate(event, eventParm, &mut (*((*ent).client as *mut gclient_t)).ps);
+        crate::bg_misc::BG_AddPredictableEventToPlayerstate(
+            event,
+            eventParm,
+            &mut (*((*ent).client as *mut gclient_t)).ps,
+        );
     }
 }
 
 /// Raven `G_AddEvent`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1221-1243`
-pub fn G_AddEvent(
-    ent: *mut gentity_t,
-    event: c_int,
-    eventParm: c_int,
-) {
+pub fn G_AddEvent(ent: *mut gentity_t, event: c_int, eventParm: c_int) {
     // PORT-NOTE(ctx-free-boundary-needs-worldstate): G_AddEvent is in the ctx-free boundary set
     // but the oracle body needs level.time from GameWorld. Without ctx, cannot access level.time.
     unsafe {
@@ -1389,11 +1326,7 @@ pub fn G_AddEvent(
 /// Raven `G_PlayEffect`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1250-1260`
-pub fn G_PlayEffect(
-    fxID: c_int,
-    org: vec3_t,
-    ang: vec3_t,
-) -> *mut gentity_t {
+pub fn G_PlayEffect(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
     // PORT-NOTE(ctx-free-boundary-needs-entity-alloc): This function is in the ctx-free boundary set
     // but needs ctx to call G_TempEntity for entity allocation. Without ctx, cannot create entities.
     // Architectural resolution pending (either add ctx or provide GameCallbacks upcall).
@@ -1412,11 +1345,7 @@ pub fn G_PlayEffect(
 /// Raven `G_PlayEffectID`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1267-1284`
-pub fn G_PlayEffectID(
-    fxID: c_int,
-    org: vec3_t,
-    ang: vec3_t,
-) -> *mut gentity_t {
+pub fn G_PlayEffectID(fxID: c_int, org: vec3_t, ang: vec3_t) -> *mut gentity_t {
     // PORT-NOTE(ctx-free-boundary-needs-entity-alloc): Same architectural issue as G_PlayEffect.
     unsafe {
         // The oracle body would be:
@@ -1467,11 +1396,7 @@ pub fn G_ScreenShake(
 /// Raven `G_MuteSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1322-1338`
-pub fn G_MuteSound(
-    ctx: GameContext<'_>,
-    entnum: c_int,
-    channel: c_int,
-) {
+pub fn G_MuteSound(ctx: GameContext<'_>, entnum: c_int, channel: c_int) {
     unsafe {
         let te = G_TempEntity(ctx, vec3_origin, EV_MUTE_SOUND as c_int);
         (*te).r.svFlags = SVF_BROADCAST;
@@ -1491,31 +1416,37 @@ pub fn G_MuteSound(
 /// `(*ent).client as *mut gclient_t` cast.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1345-1372`
-pub fn G_Sound(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    channel: c_int,
-    soundIndex: c_int,
-) {
+pub fn G_Sound(ctx: GameContext<'_>, ent: *mut gentity_t, channel: c_int, soundIndex: c_int) {
     debug_assert!(soundIndex != 0);
 
     unsafe {
-        let te = G_SoundTempEntity(ctx, (*ent).r.currentOrigin, EV_GENERAL_SOUND as c_int, channel);
+        let te = G_SoundTempEntity(
+            ctx,
+            (*ent).r.currentOrigin,
+            EV_GENERAL_SOUND as c_int,
+            channel,
+        );
         (*te).s.eventParm = soundIndex;
         (*te).s.saberEntityNum = channel;
 
-        if !ent.is_null() && !(*ent).client.is_null() && channel > trackchan_t::TRACK_CHANNEL_NONE as c_int {
+        if !ent.is_null()
+            && !(*ent).client.is_null()
+            && channel > trackchan_t::TRACK_CHANNEL_NONE as c_int
+        {
             // let the client remember the index of the player entity so he
             // can kill the most recent sound on request
             let client = (*ent).client as *mut gclient_t;
             let idx = (channel - 50) as usize;
             let world = &mut *ctx.world;
             let killIdx = (*client).ps.fd.killSoundEntIndex[idx];
-            if world.g_entities[killIdx as usize].inuse != qfalse && killIdx > MAX_CLIENTS as c_int {
+            if world.g_entities[killIdx as usize].inuse != qfalse && killIdx > MAX_CLIENTS as c_int
+            {
                 G_MuteSound(ctx, killIdx, mp_qshared::shared::sound_channel::CHAN_VOICE);
                 let client = (*ent).client as *mut gclient_t;
                 let killIdx = (*client).ps.fd.killSoundEntIndex[idx];
-                if killIdx > MAX_CLIENTS as c_int && world.g_entities[killIdx as usize].inuse != qfalse {
+                if killIdx > MAX_CLIENTS as c_int
+                    && world.g_entities[killIdx as usize].inuse != qfalse
+                {
                     let e = &mut world.g_entities[killIdx as usize] as *mut gentity_t;
                     G_FreeEntity(ctx, e);
                 }
@@ -1533,12 +1464,7 @@ pub fn G_Sound(
 /// `G_TempEntity`, never written), so kept by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1379-1385`
-pub fn G_SoundAtLoc(
-    ctx: GameContext<'_>,
-    loc: vec3_t,
-    channel: c_int,
-    soundIndex: c_int,
-) {
+pub fn G_SoundAtLoc(ctx: GameContext<'_>, loc: vec3_t, channel: c_int, soundIndex: c_int) {
     unsafe {
         let te = G_TempEntity(ctx, loc, EV_GENERAL_SOUND as c_int);
         (*te).s.eventParm = soundIndex;
@@ -1549,12 +1475,7 @@ pub fn G_SoundAtLoc(
 /// Raven `G_EntitySound`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1392-1399`
-pub fn G_EntitySound(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    channel: c_int,
-    soundIndex: c_int,
-) {
+pub fn G_EntitySound(ctx: GameContext<'_>, ent: *mut gentity_t, channel: c_int, soundIndex: c_int) {
     unsafe {
         let te = G_TempEntity(ctx, (*ent).r.currentOrigin, EV_ENTITY_SOUND as c_int);
         (*te).s.eventParm = soundIndex;
@@ -1583,9 +1504,7 @@ pub fn G_SoundOnEnt(
 /// Raven `ValidUseTarget`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1453-1471`
-pub fn ValidUseTarget(
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn ValidUseTarget(ent: *mut gentity_t) -> qboolean {
     unsafe {
         if ent.is_null() || (*ent).use_.is_none() {
             return qfalse;
@@ -1650,11 +1569,7 @@ pub fn G_UseDispenserOn(
 /// Raven `G_CanUseDispOn`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1508-1544`
-pub fn G_CanUseDispOn(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    dispType: c_int,
-) -> c_int {
+pub fn G_CanUseDispOn(ctx: GameContext<'_>, ent: *mut gentity_t, dispType: c_int) -> c_int {
     unsafe {
         const HI_HEALTHDISP: c_int = 0;
         const HI_AMMODISP: c_int = 1;
@@ -1663,9 +1578,7 @@ pub fn G_CanUseDispOn(
         const WP_NONE: c_int = 0;
         const LAST_USEABLE_WEAPON: c_int = 16; // placeholder
 
-        if ent.is_null() || (*ent).client.is_null() || (*ent).inuse == qfalse
-            || (*ent).health < 1
-        {
+        if ent.is_null() || (*ent).client.is_null() || (*ent).inuse == qfalse || (*ent).health < 1 {
             let client = (*ent).client as *mut gclient_t;
             if !client.is_null() && (*client).ps.stats[STAT_HEALTH] < 1 {
                 return 0;
@@ -1696,11 +1609,7 @@ pub fn G_CanUseDispOn(
 /// Raven `TryHeal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1546-1602`
-pub fn TryHeal(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    target: *mut gentity_t,
-) -> qboolean {
+pub fn TryHeal(ctx: GameContext<'_>, ent: *mut gentity_t, target: *mut gentity_t) -> qboolean {
     const GT_SIEGE: c_int = 4; // placeholder
     const SOLID_BMODEL: c_int = 3; // placeholder
     const CHAN_AUTO: c_int = 0; // placeholder
@@ -1772,10 +1681,7 @@ pub fn TryHeal(
 /// Raven `TryUse`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1618-1875`
-pub fn TryUse(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn TryUse(ctx: GameContext<'_>, ent: *mut gentity_t) {
     const GT_SIEGE: c_int = 4;
     const HANDEXTEND_NONE: c_int = 0;
     const HANDEXTEND_DRAGGING: c_int = 0;
@@ -1801,11 +1707,14 @@ pub fn TryUse(
     unsafe {
         let world = &mut *ctx.world;
 
-        if world.globals.gSiegeRoundBegun == qfalse && world.cvars.g_gametype.value as c_int == GT_SIEGE {
+        if world.globals.gSiegeRoundBegun == qfalse
+            && world.cvars.g_gametype.value as c_int == GT_SIEGE
+        {
             return;
         }
 
-        if ent.is_null() || (*ent).client.is_null()
+        if ent.is_null()
+            || (*ent).client.is_null()
             || ((*ent).client as *mut gclient_t != core::ptr::null_mut()
                 && ((*((*ent).client as *mut gclient_t)).ps.weaponTime > 0
                     && (*((*ent).client as *mut gclient_t)).ps.torsoAnim != BOTH_BUTTON_HOLD
@@ -1813,8 +1722,8 @@ pub fn TryUse(
             || (*ent).health < 1
             || (((*((*ent).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW) != 0)
             || ((*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR)
-            || (((*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE
-                && (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_DRAGGING))
+            || ((*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE
+                && (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_DRAGGING)
         {
             return;
         }
@@ -1827,7 +1736,8 @@ pub fn TryUse(
 
         // Check if in a vehicle
         if (*ent).s.number < MAX_CLIENTS as c_int && (*client).ps.m_iVehicleNum != 0 {
-            let current_veh = &mut world.g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
+            let current_veh =
+                &mut world.g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
             if (*current_veh).inuse != qfalse && !(*current_veh).m_pVehicle.is_null() {
                 // PORT-NOTE(vehicle-dispatch-not-wired): Vehicle vtable (Eject/Board) dispatch is not wired.
                 // Skipping vehicle eject/board logic pending vehicle subsystem completion.
@@ -1846,7 +1756,8 @@ pub fn TryUse(
         // Check body grab
         if (*client).bodyGrabIndex != ENTITYNUM_NONE {
             if (*client).bodyGrabTime < world.level.time {
-                let grabbed = &mut world.g_entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
+                let grabbed =
+                    &mut world.g_entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
                 if (*grabbed).inuse != qfalse {
                     if !(*grabbed).client.is_null() {
                         let grabbed_client = (*grabbed).client as *mut gclient_t;
@@ -1895,7 +1806,9 @@ pub fn TryUse(
         let target = &mut world.g_entities[trace.entityNum as usize] as *mut gentity_t;
 
         // Check for vehicle target
-        if !target.is_null() && !(*target).m_pVehicle.is_null() && !(*target).client.is_null()
+        if !target.is_null()
+            && !(*target).m_pVehicle.is_null()
+            && !(*target).client.is_null()
             && (*target).s.NPC_class == CLASS_VEHICLE
             && ((*client).ps.zoomMode == qfalse)
         {
@@ -1908,7 +1821,9 @@ pub fn TryUse(
         if ((*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_HEALTHDISP)) != 0
             || ((*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_AMMODISP)) != 0
         {
-            if !target.is_null() && (*target).inuse != qfalse && !(*target).client.is_null()
+            if !target.is_null()
+                && (*target).inuse != qfalse
+                && !(*target).client.is_null()
                 && (*target).health > 0
                 && OnSameTeam(ctx, ent, target) != qfalse
                 && (G_CanUseDispOn(ctx, target, HI_HEALTHDISP) != 0
@@ -1924,7 +1839,8 @@ pub fn TryUse(
                 if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD {
                     (*client).ps.torsoTimer = 500;
                 } else {
-                    G_SetAnim(ctx,
+                    G_SetAnim(
+                        ctx,
                         ent,
                         core::ptr::null_mut(),
                         SETANIM_TORSO,
@@ -1945,10 +1861,12 @@ pub fn TryUse(
                 || (*target).alliedTeam != (*client).sess.sessionTeam
                 || (world.cvars.g_ff_objectives.value as c_int) != 0)
         {
-            if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD || (*client).ps.torsoAnim == BOTH_CONSOLE1 {
+            if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD || (*client).ps.torsoAnim == BOTH_CONSOLE1
+            {
                 (*client).ps.torsoTimer = 500;
             } else {
-                G_SetAnim(ctx,
+                G_SetAnim(
+                    ctx,
                     ent,
                     core::ptr::null_mut(),
                     SETANIM_TORSO,
@@ -2024,7 +1942,12 @@ fn goto_tryJetPack(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
             if tr_toss.fraction == 1.0f32 && tr_toss.allsolid == 0 && tr_toss.startsolid == 0 {
                 ItemUse_UseDisp(ctx, ent, HI_AMMODISP);
-                G_AddEvent(ent, mp_bg::public::entity_event::entity_event_t::EV_USE_ITEM0 as c_int + HI_AMMODISP, 0);
+                G_AddEvent(
+                    ent,
+                    mp_bg::public::entity_event::entity_event_t::EV_USE_ITEM0 as c_int
+                        + HI_AMMODISP,
+                    0,
+                );
             }
         }
     }
@@ -2033,11 +1956,7 @@ fn goto_tryJetPack(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `G_PointInBounds`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1877-1894`
-pub fn G_PointInBounds(
-    point: vec3_t,
-    mins: vec3_t,
-    maxs: vec3_t,
-) -> qboolean {
+pub fn G_PointInBounds(point: vec3_t, mins: vec3_t, maxs: vec3_t) -> qboolean {
     for i in 0..3 {
         if point[i] < mins[i] {
             return qfalse;
@@ -2088,10 +2007,7 @@ pub fn G_BoxInBounds(
 /// Raven `G_SetAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1927-1932`
-pub fn G_SetAngles(
-    ent: *mut gentity_t,
-    angles: vec3_t,
-) {
+pub fn G_SetAngles(ent: *mut gentity_t, angles: vec3_t) {
     unsafe {
         (*ent).r.currentAngles = angles;
         (*ent).s.angles = angles;
@@ -2139,10 +2055,7 @@ pub fn G_ClearTrace(
 /// out, never written back), so kept by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1955-1963`
-pub fn G_SetOrigin(
-    ent: *mut gentity_t,
-    origin: vec3_t,
-) {
+pub fn G_SetOrigin(ent: *mut gentity_t, origin: vec3_t) {
     unsafe {
         (*ent).s.pos.trBase = origin;
         (*ent).s.pos.trType = trType_t::TR_STATIONARY;
@@ -2157,11 +2070,7 @@ pub fn G_SetOrigin(
 /// Raven `G_CheckInSolid`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:1965-2001`
-pub fn G_CheckInSolid(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    fix: qboolean,
-) -> qboolean {
+pub fn G_CheckInSolid(ctx: GameContext<'_>, self_: *mut gentity_t, fix: qboolean) -> qboolean {
     unsafe {
         let mut end = (*self_).r.currentOrigin;
         end[2] += (*self_).r.mins[2];
@@ -2208,12 +2117,7 @@ pub fn G_CheckInSolid(
 /// written), so kept by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:2011-2037`
-pub fn DebugLine(
-    ctx: GameContext<'_>,
-    start: vec3_t,
-    end: vec3_t,
-    color: c_int,
-) -> c_int {
+pub fn DebugLine(ctx: GameContext<'_>, start: vec3_t, end: vec3_t, color: c_int) -> c_int {
     let mut points = [[0.0f32; 3]; 4];
     points[0] = start;
     points[1] = start;
@@ -2306,11 +2210,7 @@ pub fn G_ROFF_NotetrackCallback(
 /// Raven `G_SpeechEvent`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:2082-2085`
-pub fn G_SpeechEvent(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    event: c_int,
-) {
+pub fn G_SpeechEvent(ctx: GameContext<'_>, self_: *mut gentity_t, event: c_int) {
     G_AddEvent(self_, event, 0);
 }
 
@@ -2535,11 +2435,7 @@ pub fn ShortestLineSegBewteen2LineSegs(
 /// by-value (no same-file callers to fix up).
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:2309-2315`
-pub fn GetAnglesForDirection(
-    p1: vec3_t,
-    p2: vec3_t,
-    out: &mut vec3_t,
-) {
+pub fn GetAnglesForDirection(p1: vec3_t, p2: vec3_t, out: &mut vec3_t) {
     let v = [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]];
     vectoangles(v, out);
 }

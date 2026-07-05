@@ -8,19 +8,21 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
-use crate::NPC_reactions::{NPC_GetPainChance, NPC_Pain};
-use crate::NPC_utils::NPC_SetSurfaceOnOff;
+use crate::cstr_util::cstr;
 use crate::g_timer::{TIMER_Done, TIMER_Set};
 use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_SoundIndex, G_SoundOnEnt};
 use crate::npc_c::NPC_SetAnim;
-use crate::q_math::{AngleDelta, AngleNormalize360, AngleVectors, VectorNormalize, _VectorSubtract, _VectorMA};
+use crate::prelude::*;
+use crate::q_math::{
+    _VectorMA, _VectorSubtract, AngleDelta, AngleNormalize360, AngleVectors, VectorNormalize,
+};
 use crate::q_shared::va;
-use crate::NPC_utils::{NPC_UpdateAngles, NPC_SetBoneAngles};
 use crate::NPC_goal::UpdateGoal;
 use crate::NPC_move::NPC_MoveToGoal;
+use crate::NPC_reactions::{NPC_GetPainChance, NPC_Pain};
+use crate::NPC_utils::NPC_SetSurfaceOnOff;
+use crate::NPC_utils::{NPC_SetBoneAngles, NPC_UpdateAngles};
 use std::ffi::CStr;
-use crate::cstr_util::cstr;
 
 /// Local state enums.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Droid.c:10-17`
@@ -59,7 +61,12 @@ pub fn R2D2_PartsMove(ctx: GameContext<'_>) {
 
             NPC_SetBoneAngles(ctx, npc, b"f_eye\0".as_ptr() as *mut c_char, (*npc).pos1);
 
-            TIMER_Set(ctx, npc, b"eyeDelay\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(100, 1000));
+            TIMER_Set(
+                ctx,
+                npc,
+                b"eyeDelay\0".as_ptr() as *const c_char,
+                (*ctx.world).bg_state.rng.Q_irand(100, 1000),
+            );
         }
     }
 }
@@ -85,20 +92,41 @@ pub fn R2D2_TurnAnims(ctx: GameContext<'_>) {
         let turndelta = AngleDelta((*npc).r.currentAngles[1], (*npc_info).desiredYaw); // YAW = 1
         let anim: c_int;
 
-        if (turndelta.abs() > 20.0) && (((*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2) || ((*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2)) {
+        if (turndelta.abs() > 20.0)
+            && (((*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2)
+                || ((*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2))
+        {
             // CLASS_R2D2 = 2, CLASS_R5D2 = 3 (or check from globals)
             anim = (*((*npc).client as *mut gclient_t)).ps.legsAnim;
             if turndelta < 0.0 {
                 if anim != BOTH_TURN_LEFT1 as c_int {
-                    NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_TURN_LEFT1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    NPC_SetAnim(
+                        ctx,
+                        npc,
+                        SETANIM_BOTH,
+                        BOTH_TURN_LEFT1 as c_int,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    );
                 }
             } else {
                 if anim != BOTH_TURN_RIGHT1 as c_int {
-                    NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_TURN_RIGHT1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    NPC_SetAnim(
+                        ctx,
+                        npc,
+                        SETANIM_BOTH,
+                        BOTH_TURN_RIGHT1 as c_int,
+                        SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    );
                 }
             }
         } else {
-            NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_RUN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+            NPC_SetAnim(
+                ctx,
+                npc,
+                SETANIM_BOTH,
+                BOTH_RUN1 as c_int,
+                SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+            );
         }
     }
 }
@@ -117,8 +145,12 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
 
         (*npc).pos1[1] = AngleNormalize360((*npc).pos1[1]);
 
-        if !(*npc).client.is_null() && (*((*npc).client as *mut gclient_t)).NPC_class != class_t::CLASS_GONK { // CLASS_GONK
-            if (*((*npc).client as *mut gclient_t)).NPC_class != class_t::CLASS_R5D2 { // CLASS_R5D2
+        if !(*npc).client.is_null()
+            && (*((*npc).client as *mut gclient_t)).NPC_class != class_t::CLASS_GONK
+        {
+            // CLASS_GONK
+            if (*((*npc).client as *mut gclient_t)).NPC_class != class_t::CLASS_R5D2 {
+                // CLASS_R5D2
                 R2D2_PartsMove(ctx);
             }
             R2D2_TurnAnims(ctx);
@@ -128,7 +160,10 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
             ucmd.buttons |= 1; // BUTTON_WALKING
             NPC_MoveToGoal(ctx, 1 as qboolean); // qtrue
 
-            if !(*npc).client.is_null() && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_MOUSE { // CLASS_MOUSE
+            if !(*npc).client.is_null()
+                && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_MOUSE
+            {
+                // CLASS_MOUSE
                 (*npc_info).desiredYaw += ((*ctx.world).level.time as f32 * 0.5).sin() * 25.0;
 
                 if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
@@ -136,32 +171,61 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                     let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", idx);
                     G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr()); // CHAN_AUTO = 0
 
-                    TIMER_Set(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                    TIMER_Set(
+                        ctx,
+                        npc,
+                        b"patrolNoise\0".as_ptr() as *const c_char,
+                        (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
+                    );
                 }
-            } else if !(*npc).client.is_null() && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2 { // CLASS_R2D2
+            } else if !(*npc).client.is_null()
+                && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2
+            {
+                // CLASS_R2D2
                 if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
                     let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", idx);
                     G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr());
 
-                    TIMER_Set(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                    TIMER_Set(
+                        ctx,
+                        npc,
+                        b"patrolNoise\0".as_ptr() as *const c_char,
+                        (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
+                    );
                 }
-            } else if !(*npc).client.is_null() && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2 { // CLASS_R5D2
+            } else if !(*npc).client.is_null()
+                && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2
+            {
+                // CLASS_R5D2
                 if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 4);
                     let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", idx);
                     G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr());
 
-                    TIMER_Set(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                    TIMER_Set(
+                        ctx,
+                        npc,
+                        b"patrolNoise\0".as_ptr() as *const c_char,
+                        (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
+                    );
                 }
             }
-            if !(*npc).client.is_null() && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_GONK { // CLASS_GONK
+            if !(*npc).client.is_null()
+                && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_GONK
+            {
+                // CLASS_GONK
                 if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 2);
                     let sound_path = format!("sound/chars/gonk/misc/gonktalk{}.wav", idx);
                     G_SoundOnEnt(ctx, npc, 0, cstr(&sound_path).as_ptr());
 
-                    TIMER_Set(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                    TIMER_Set(
+                        ctx,
+                        npc,
+                        b"patrolNoise\0".as_ptr() as *const c_char,
+                        (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
+                    );
                 }
             }
         }
@@ -192,7 +256,8 @@ pub fn Droid_Run(ctx: GameContext<'_>) {
         } else {
             ucmd.forwardmove = 64;
             if !UpdateGoal(ctx).is_null() {
-                if NPC_MoveToGoal(ctx, 0 as qboolean) != 0 { // qfalse
+                if NPC_MoveToGoal(ctx, 0 as qboolean) != 0 {
+                    // qfalse
                     (*npc_info).desiredYaw += ((*ctx.world).level.time as f32 * 0.5).sin() * 5.0;
                 }
             }
@@ -218,7 +283,10 @@ pub fn Droid_Spin(ctx: GameContext<'_>) {
 
         R2D2_TurnAnims(ctx);
 
-        if (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2 || (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2 { // CLASS_R5D2, CLASS_R2D2
+        if (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2
+            || (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2
+        {
+            // CLASS_R5D2, CLASS_R2D2
             // No head?
             if trap::G2API_GetSurfaceRenderStatus(
                 ctx.engine,
@@ -277,13 +345,24 @@ pub fn NPC_Droid_Pain(
         let mut pain_chance: f32;
 
         // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
-        crate::q_math::_VectorCopy((*((*self_).NPC as *mut gNPC_t)).lastPathAngles, &mut (*self_).s.angles);
+        crate::q_math::_VectorCopy(
+            (*((*self_).NPC as *mut gNPC_t)).lastPathAngles,
+            &mut (*self_).s.angles,
+        );
 
-        if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2 { // CLASS_R5D2
+        if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_R5D2 {
+            // CLASS_R5D2
             pain_chance = NPC_GetPainChance(ctx, self_, damage);
 
-            if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int || (*ctx.world).bg_state.rng.random() < pain_chance {
-                if (*self_).s.m_iVehicleNum == 0 && ((*self_).health < 30 || mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int) {
+            if mod_ == MOD_DEMP2 as c_int
+                || mod_ == MOD_DEMP2_ALT as c_int
+                || (*ctx.world).bg_state.rng.random() < pain_chance
+            {
+                if (*self_).s.m_iVehicleNum == 0
+                    && ((*self_).health < 30
+                        || mod_ == MOD_DEMP2 as c_int
+                        || mod_ == MOD_DEMP2_ALT as c_int)
+                {
                     if ((*self_).spawnflags & 2) == 0 {
                         if ((*((*self_).NPC as *mut gNPC_t)).localState != LSTATE_SPINNING) &&
                            (trap::G2API_GetSurfaceRenderStatus(
@@ -316,29 +395,56 @@ pub fn NPC_Droid_Pain(
                     let anim = (*((*self_).client as *mut gclient_t)).ps.legsAnim;
 
                     if anim == BOTH_STAND2 as c_int {
-                        NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        NPC_SetAnim(
+                            ctx,
+                            self_,
+                            SETANIM_BOTH,
+                            BOTH_PAIN1 as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        );
                     } else {
-                        NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_PAIN2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        NPC_SetAnim(
+                            ctx,
+                            self_,
+                            SETANIM_BOTH,
+                            BOTH_PAIN2 as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        );
                     }
 
                     (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
-                    TIMER_Set(ctx, self_, b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(1000, 2000));
+                    TIMER_Set(
+                        ctx,
+                        self_,
+                        b"roam\0".as_ptr() as *const c_char,
+                        (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
+                    );
                 }
             }
-        } else if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_MOUSE { // CLASS_MOUSE
+        } else if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_MOUSE {
+            // CLASS_MOUSE
             if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
                 (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
-                (*((*self_).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world).level.time + 3000;
+                (*((*self_).client as *mut gclient_t)).ps.electrifyTime =
+                    (*ctx.world).level.time + 3000;
             } else {
                 (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_BACKINGUP;
             }
 
             (*((*self_).NPC as *mut gNPC_t)).scriptFlags &= !SCF_LOOK_FOR_ENEMIES;
-        } else if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2 { // CLASS_R2D2
+        } else if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_R2D2 {
+            // CLASS_R2D2
             pain_chance = NPC_GetPainChance(ctx, self_, damage);
 
-            if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int || (*ctx.world).bg_state.rng.random() < pain_chance {
-                if (*self_).s.m_iVehicleNum == 0 && ((*self_).health < 30 || mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int) {
+            if mod_ == MOD_DEMP2 as c_int
+                || mod_ == MOD_DEMP2_ALT as c_int
+                || (*ctx.world).bg_state.rng.random() < pain_chance
+            {
+                if (*self_).s.m_iVehicleNum == 0
+                    && ((*self_).health < 30
+                        || mod_ == MOD_DEMP2 as c_int
+                        || mod_ == MOD_DEMP2_ALT as c_int)
+                {
                     if ((*self_).spawnflags & 2) == 0 {
                         if ((*((*self_).NPC as *mut gNPC_t)).localState != LSTATE_SPINNING) &&
                            (trap::G2API_GetSurfaceRenderStatus(
@@ -371,21 +477,51 @@ pub fn NPC_Droid_Pain(
                     let anim = (*((*self_).client as *mut gclient_t)).ps.legsAnim;
 
                     if anim == BOTH_STAND2 as c_int {
-                        NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        NPC_SetAnim(
+                            ctx,
+                            self_,
+                            SETANIM_BOTH,
+                            BOTH_PAIN1 as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        );
                     } else {
-                        NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_PAIN2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        NPC_SetAnim(
+                            ctx,
+                            self_,
+                            SETANIM_BOTH,
+                            BOTH_PAIN2 as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        );
                     }
 
                     (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
-                    TIMER_Set(ctx, self_, b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(1000, 2000));
+                    TIMER_Set(
+                        ctx,
+                        self_,
+                        b"roam\0".as_ptr() as *const c_char,
+                        (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
+                    );
                 }
             }
-        } else if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_INTERROGATOR && (mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int) && !attacker.is_null() { // CLASS_INTERROGATOR
+        } else if (*((*self_).client as *mut gclient_t)).NPC_class == class_t::CLASS_INTERROGATOR
+            && (mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int)
+            && !attacker.is_null()
+        {
+            // CLASS_INTERROGATOR
             let mut dir = [0.0f32; 3];
-            crate::q_math::_VectorSubtract((*self_).r.currentOrigin, (*attacker).r.currentOrigin, &mut dir);
+            crate::q_math::_VectorSubtract(
+                (*self_).r.currentOrigin,
+                (*attacker).r.currentOrigin,
+                &mut dir,
+            );
             VectorNormalize(&mut dir);
 
-            crate::q_math::_VectorMA((*((*self_).client as *mut gclient_t)).ps.velocity, 550.0, dir, &mut (*((*self_).client as *mut gclient_t)).ps.velocity);
+            crate::q_math::_VectorMA(
+                (*((*self_).client as *mut gclient_t)).ps.velocity,
+                550.0,
+                dir,
+                &mut (*((*self_).client as *mut gclient_t)).ps.velocity,
+            );
             (*((*self_).client as *mut gclient_t)).ps.velocity[2] -= 127.0;
         }
 
@@ -510,7 +646,8 @@ pub fn NPC_BSDroid_Default(ctx: GameContext<'_>) {
             Droid_Pain(ctx);
         } else if (*npc_info).localState == LSTATE_DROP {
             NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
-            (*ctx.world).globals.ucmd.upmove = ((*ctx.world).bg_state.rng.crandom() * 64.0) as c_int as i8;
+            (*ctx.world).globals.ucmd.upmove =
+                ((*ctx.world).bg_state.rng.crandom() * 64.0) as c_int as i8;
         } else if ((*npc_info).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
             Droid_Patrol(ctx);
         } else {

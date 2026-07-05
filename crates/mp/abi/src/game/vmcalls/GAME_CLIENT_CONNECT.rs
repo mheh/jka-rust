@@ -3,7 +3,9 @@ use core::ffi::{c_char, c_int};
 use super::super::MpGameExport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 // Flow:
 //
@@ -55,4 +57,24 @@ impl InboundVmCall for GameClientConnect {
     type Output = *const c_char;
 
     const COMMAND: MpGameExport = MpGameExport::GAME_CLIENT_CONNECT;
+}
+
+impl DecodeVmMain for GameClientConnect {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `ClientConnect( arg0, arg1, arg2 )` — g_main.c:524. `firstTime`/`isBot`
+        // are `qboolean` (= `c_int`), carried through the plain int words.
+        GameClientConnectArgs::new(
+            word_to_c_int(t.arg(0)),
+            word_to_c_int(t.arg(1)),
+            word_to_c_int(t.arg(2)),
+        )
+    }
+}
+
+impl EncodeVmMainReturn for GameClientConnect {
+    fn encode_return(output: Self::Output) -> isize {
+        // `return (int)ClientConnect( ... );` — g_main.c:524. The denial-string
+        // pointer (or NULL) crosses back as its `intptr_t`-width bit pattern.
+        output as isize
+    }
 }

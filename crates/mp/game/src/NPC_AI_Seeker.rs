@@ -49,7 +49,6 @@ const MOD_UNKNOWN: c_int = 0;
 const MOD_TELEFRAG: c_int = 37;
 const SCF_CHASE_ENEMIES: i32 = 0x00000400;
 
-
 /// Raven `NPC_Seeker_Precache`.
 ///
 /// Caches sound and effect resources for Seeker NPCs at map load time.
@@ -71,7 +70,9 @@ pub fn NPC_Seeker_Pain(
     damage: c_int,
 ) {
     unsafe {
-        if (*((*self_).NPC as *mut gNPC_t)).aiFlags & crate::npc::ai_flags::NPCAI_CUSTOM_GRAVITY == 0 {
+        if (*((*self_).NPC as *mut gNPC_t)).aiFlags & crate::npc::ai_flags::NPCAI_CUSTOM_GRAVITY
+            == 0
+        {
             crate::g_combat::G_Damage(
                 ctx,
                 self_,
@@ -110,15 +111,20 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
             if crate::g_timer::TIMER_Done(ctx, NPC, c"heightChange".as_ptr()) != 0 {
                 let mut difFactor: f32 = 1.0f32;
 
-                crate::g_timer::TIMER_Set(ctx, NPC, c"heightChange".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1000, 3000));
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    NPC,
+                    c"heightChange".as_ptr(),
+                    (*ctx.world).bg_state.rng.Q_irand(1000, 3000),
+                );
 
                 // Find the height difference
                 let enemy = &mut world.g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
                 let dif = ((*enemy).r.currentOrigin[2]
-                    + (*ctx.world).bg_state.rng.flrand(
-                        (*enemy).r.maxs[2] / 2.0f32,
-                        (*enemy).r.maxs[2] + 8.0f32,
-                    ))
+                    + (*ctx.world)
+                        .bg_state
+                        .rng
+                        .flrand((*enemy).r.maxs[2] / 2.0f32, (*enemy).r.maxs[2] + 8.0f32))
                     - (*NPC).r.currentOrigin[2];
 
                 if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
@@ -131,13 +137,19 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
                 if dif.abs() > 2.0f32 * difFactor {
                     let mut dif_capped = dif;
                     if dif_capped.abs() > 24.0f32 * difFactor {
-                        dif_capped = if dif < 0.0f32 { -24.0f32 * difFactor } else { 24.0f32 * difFactor };
+                        dif_capped = if dif < 0.0f32 {
+                            -24.0f32 * difFactor
+                        } else {
+                            24.0f32 * difFactor
+                        };
                     }
 
-                    (*((*NPC).client as *mut gclient_t)).ps.velocity[2] = ((*((*NPC).client as *mut gclient_t)).ps.velocity[2] + dif_capped) / 2.0f32;
+                    (*((*NPC).client as *mut gclient_t)).ps.velocity[2] =
+                        ((*((*NPC).client as *mut gclient_t)).ps.velocity[2] + dif_capped) / 2.0f32;
                 }
                 if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
-                    (*((*NPC).client as *mut gclient_t)).ps.velocity[2] *= (*ctx.world).bg_state.rng.flrand(0.85f32, 3.0f32);
+                    (*((*NPC).client as *mut gclient_t)).ps.velocity[2] *=
+                        (*ctx.world).bg_state.rng.flrand(0.85f32, 3.0f32);
                 }
             }
         } else {
@@ -147,7 +159,10 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
                 // Is there a goal?
                 goal = crate::ent_id::resolve(world.g_entities.as_mut_ptr(), (*NPCInfo).goalEntity);
             } else {
-                goal = crate::ent_id::resolve(world.g_entities.as_mut_ptr(), (*NPCInfo).lastGoalEntity);
+                goal = crate::ent_id::resolve(
+                    world.g_entities.as_mut_ptr(),
+                    (*NPCInfo).lastGoalEntity,
+                );
             }
             if !goal.is_null() {
                 let dif = (*goal).r.currentOrigin[2] - (*NPC).r.currentOrigin[2];
@@ -202,7 +217,9 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
 
         if (*ctx.world).bg_state.rng.random() > 0.7f32
             || (*NPC).enemy.is_none()
-            || (*(&mut world.g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t)).client.is_null()
+            || (*(&mut world.g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t))
+                .client
+                .is_null()
         {
             // Do a regular style strafe
             crate::q_math::AngleVectors(
@@ -214,7 +231,11 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
 
             // Pick a random strafe direction, then check to see if doing a strafe would be
             // reasonably valid
-            side = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 { -1 } else { 1 };
+            side = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 {
+                -1
+            } else {
+                1
+            };
             // Inline VectorMA: end = origin + scalar * right
             for i in 0..3 {
                 end[i] = (*NPC).r.currentOrigin[i] + SEEKER_STRAFE_DIS * side as f32 * right[i];
@@ -250,12 +271,15 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
                 }
                 // Inline VectorMA: velocity += vel * side * right
                 for i in 0..3 {
-                    (*((*NPC).client as *mut gclient_t)).ps.velocity[i] += vel * side as f32 * right[i];
+                    (*((*NPC).client as *mut gclient_t)).ps.velocity[i] +=
+                        vel * side as f32 * right[i];
                 }
                 // Add a slight upward push
                 (*((*NPC).client as *mut gclient_t)).ps.velocity[2] += upPush;
 
-                (*NPCInfo).standTime = world.level.time + 1000 + ((*ctx.world).bg_state.rng.random() * 500.0f32) as c_int;
+                (*NPCInfo).standTime = world.level.time
+                    + 1000
+                    + ((*ctx.world).bg_state.rng.random() * 500.0f32) as c_int;
             }
         } else {
             let mut stDis: f32;
@@ -271,7 +295,11 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
             );
 
             // Pick a random side
-            side = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 { -1 } else { 1 };
+            side = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 {
+                -1
+            } else {
+                1
+            };
             stDis = SEEKER_STRAFE_DIS;
             if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
                 stDis *= 2.0f32;
@@ -331,7 +359,9 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
                 // Add a slight upward push
                 (*((*NPC).client as *mut gclient_t)).ps.velocity[2] += upPush;
 
-                (*NPCInfo).standTime = world.level.time + 2500 + ((*ctx.world).bg_state.rng.random() * 500.0f32) as c_int;
+                (*NPCInfo).standTime = world.level.time
+                    + 2500
+                    + ((*ctx.world).bg_state.rng.random() * 500.0f32) as c_int;
             }
         }
     }
@@ -340,11 +370,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
 /// Raven `Seeker_Hunt`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:242-287`
-pub fn Seeker_Hunt(
-    ctx: GameContext<'_>,
-    visible: qboolean,
-    advance: qboolean,
-) {
+pub fn Seeker_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let world = &mut *ctx.world;
         let NPC = world.globals.NPC;
@@ -379,7 +405,8 @@ pub fn Seeker_Hunt(
                 return;
             }
 
-            let speed = SEEKER_FORWARD_BASE_SPEED + SEEKER_FORWARD_MULTIPLIER * world.cvars.g_spskill.integer as f32;
+            let speed = SEEKER_FORWARD_BASE_SPEED
+                + SEEKER_FORWARD_MULTIPLIER * world.cvars.g_spskill.integer as f32;
             for i in 0..3 {
                 (*((*NPC).client as *mut gclient_t)).ps.velocity[i] += speed * forward[i];
             }
@@ -391,7 +418,8 @@ pub fn Seeker_Hunt(
             forward[2] = (*enemy).r.currentOrigin[2] - (*NPC).r.currentOrigin[2];
             let _distance = crate::q_math::VectorNormalize(&mut forward);
 
-            let speed = SEEKER_FORWARD_BASE_SPEED + SEEKER_FORWARD_MULTIPLIER * world.cvars.g_spskill.integer as f32;
+            let speed = SEEKER_FORWARD_BASE_SPEED
+                + SEEKER_FORWARD_MULTIPLIER * world.cvars.g_spskill.integer as f32;
             for i in 0..3 {
                 (*((*NPC).client as *mut gclient_t)).ps.velocity[i] += speed * forward[i];
             }
@@ -410,7 +438,12 @@ pub fn Seeker_Fire(ctx: GameContext<'_>) {
         let mut enemy_org: vec3_t = [0.0f32; 3];
         let mut muzzle: vec3_t = [0.0f32; 3];
 
-        crate::NPC_utils::CalcEntitySpot(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*NPC).enemy), spot_t::SPOT_HEAD, &mut enemy_org);
+        crate::NPC_utils::CalcEntitySpot(
+            ctx,
+            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*NPC).enemy),
+            spot_t::SPOT_HEAD,
+            &mut enemy_org,
+        );
         // Inline VectorSubtract: dir = enemy_org - origin
         for i in 0..3 {
             dir[i] = enemy_org[i] - (*NPC).r.currentOrigin[i];
@@ -423,9 +456,14 @@ pub fn Seeker_Fire(ctx: GameContext<'_>) {
             muzzle[i] = (*NPC).r.currentOrigin[i] + 15.0f32 * dir[i];
         }
 
-        let missile = crate::g_missile::CreateMissile(ctx, muzzle, dir, 1000.0f32, 10000, NPC, qfalse);
+        let missile =
+            crate::g_missile::CreateMissile(ctx, muzzle, dir, 1000.0f32, 10000, NPC, qfalse);
 
-        crate::g_utils::G_PlayEffectID(crate::g_utils::G_EffectIndex(c"blaster/muzzle_flash".as_ptr()), (*NPC).r.currentOrigin, dir);
+        crate::g_utils::G_PlayEffectID(
+            crate::g_utils::G_EffectIndex(c"blaster/muzzle_flash".as_ptr()),
+            (*NPC).r.currentOrigin,
+            dir,
+        );
 
         (*missile).classname = c"blaster".as_ptr().cast_mut();
         (*missile).s.weapon = WP_BLASTER as c_int;
@@ -443,11 +481,7 @@ pub fn Seeker_Fire(ctx: GameContext<'_>) {
 /// Raven `Seeker_Ranged`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Seeker.c:320-347`
-pub fn Seeker_Ranged(
-    ctx: GameContext<'_>,
-    visible: qboolean,
-    advance: qboolean,
-) {
+pub fn Seeker_Ranged(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         let NPC = (*ctx.world).globals.NPC;
         let NPCInfo = (*ctx.world).globals.NPCInfo;
@@ -455,7 +489,12 @@ pub fn Seeker_Ranged(
         if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT {
             if (*NPC).count > 0 {
                 if crate::g_timer::TIMER_Done(ctx, NPC, c"attackDelay".as_ptr()) != 0 {
-                    crate::g_timer::TIMER_Set(ctx, NPC, c"attackDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(250, 2500));
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        NPC,
+                        c"attackDelay".as_ptr(),
+                        (*ctx.world).bg_state.rng.Q_irand(250, 2500),
+                    );
                     Seeker_Fire(ctx);
                     (*NPC).count -= 1;
                 }
@@ -494,12 +533,26 @@ pub fn Seeker_Attack(ctx: GameContext<'_>) {
 
         // Rate our distance to the target, and our visibilty
         let enemy = &mut (*ctx.world).g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
-        let distance = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, (*enemy).r.currentOrigin);
-        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*NPC).enemy));
-        let mut advance = if distance > MIN_DISTANCE_SQR as f32 { qtrue } else { qfalse };
+        let distance = crate::q_math::DistanceHorizontalSquared(
+            (*NPC).r.currentOrigin,
+            (*enemy).r.currentOrigin,
+        );
+        let visible = crate::NPC_utils::NPC_ClearLOS4(
+            ctx,
+            crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*NPC).enemy),
+        );
+        let mut advance = if distance > MIN_DISTANCE_SQR as f32 {
+            qtrue
+        } else {
+            qfalse
+        };
 
         if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
-            advance = if distance > (200.0f32 * 200.0f32) { qtrue } else { qfalse };
+            advance = if distance > (200.0f32 * 200.0f32) {
+                qtrue
+            } else {
+                qfalse
+            };
         }
 
         // If we cannot see our target, move to see it
@@ -527,7 +580,8 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
         let mut bestDis: f32 = SEEKER_SEEK_RADIUS * SEEKER_SEEK_RADIUS + 1.0f32;
         let mut mins: vec3_t = [-SEEKER_SEEK_RADIUS; 3];
         let mut maxs: vec3_t = [SEEKER_SEEK_RADIUS; 3];
-        let mut entityList: [c_int; mp_qshared::shared::MAX_GENTITIES] = [0; mp_qshared::shared::MAX_GENTITIES];
+        let mut entityList: [c_int; mp_qshared::shared::MAX_GENTITIES] =
+            [0; mp_qshared::shared::MAX_GENTITIES];
         let mut best: *mut gentity_t = core::ptr::null_mut();
 
         numFound = crate::trap::EntitiesInBox(
@@ -543,11 +597,19 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
         for i in 0..numFound {
             let ent = &mut world.g_entities[entityList[i as usize] as usize];
 
-            if ent.s.number == (*NPC).s.number || ent.client.is_null() || ent.health <= 0 || ent.inuse == 0 {
+            if ent.s.number == (*NPC).s.number
+                || ent.client.is_null()
+                || ent.health <= 0
+                || ent.inuse == 0
+            {
                 continue;
             }
 
-            if (*(ent.client as *mut gclient_t)).playerTeam == (*((*NPC).client as *mut gclient_t)).playerTeam || (*(ent.client as *mut gclient_t)).playerTeam == crate::teams::npcteam::NPCTEAM_NEUTRAL {
+            if (*(ent.client as *mut gclient_t)).playerTeam
+                == (*((*NPC).client as *mut gclient_t)).playerTeam
+                || (*(ent.client as *mut gclient_t)).playerTeam
+                    == crate::teams::npcteam::NPCTEAM_NEUTRAL
+            {
                 // don't attack same team or bots
                 continue;
             }
@@ -557,7 +619,10 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
                 continue;
             }
 
-            dis = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, ent.r.currentOrigin);
+            dis = crate::q_math::DistanceHorizontalSquared(
+                (*NPC).r.currentOrigin,
+                ent.r.currentOrigin,
+            );
 
             if dis <= bestDis {
                 bestDis = dis;
@@ -601,7 +666,10 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
             return;
         }
         //rwwFIXMEFIXME: Care about all clients not just 0
-        dis = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, (*owner).r.currentOrigin);
+        dis = crate::q_math::DistanceHorizontalSquared(
+            (*NPC).r.currentOrigin,
+            (*owner).r.currentOrigin,
+        );
 
         minDistSqr = MIN_DISTANCE_SQR as f32;
 
@@ -614,16 +682,20 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
         if dis < minDistSqr {
             // generally circle the player closely till we take an enemy..this is our target point
             if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
-                pt[0] = (*owner).r.currentOrigin[0] + (world.level.time as f32 * 0.001f32 + (*NPC).random).cos() * 250.0f32;
-                pt[1] = (*owner).r.currentOrigin[1] + (world.level.time as f32 * 0.001f32 + (*NPC).random).sin() * 250.0f32;
+                pt[0] = (*owner).r.currentOrigin[0]
+                    + (world.level.time as f32 * 0.001f32 + (*NPC).random).cos() * 250.0f32;
+                pt[1] = (*owner).r.currentOrigin[1]
+                    + (world.level.time as f32 * 0.001f32 + (*NPC).random).sin() * 250.0f32;
                 if (*((*NPC).client as *mut gclient_t)).jetPackTime < world.level.time {
                     pt[2] = (*NPC).r.currentOrigin[2] - 64.0f32;
                 } else {
                     pt[2] = (*owner).r.currentOrigin[2] + 200.0f32;
                 }
             } else {
-                pt[0] = (*owner).r.currentOrigin[0] + (world.level.time as f32 * 0.001f32 + (*NPC).random).cos() * 56.0f32;
-                pt[1] = (*owner).r.currentOrigin[1] + (world.level.time as f32 * 0.001f32 + (*NPC).random).sin() * 56.0f32;
+                pt[0] = (*owner).r.currentOrigin[0]
+                    + (world.level.time as f32 * 0.001f32 + (*NPC).random).cos() * 56.0f32;
+                pt[1] = (*owner).r.currentOrigin[1]
+                    + (world.level.time as f32 * 0.001f32 + (*NPC).random).sin() * 56.0f32;
                 pt[2] = (*owner).r.currentOrigin[2] + 40.0f32;
             }
 
@@ -638,7 +710,12 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
         } else {
             if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT {
                 if crate::g_timer::TIMER_Done(ctx, NPC, c"seekerhiss".as_ptr()) != 0 {
-                    crate::g_timer::TIMER_Set(ctx, NPC, c"seekerhiss".as_ptr(), (1000.0f32 + (*ctx.world).bg_state.rng.random() * 1000.0f32) as c_int);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        NPC,
+                        c"seekerhiss".as_ptr(),
+                        (1000.0f32 + (*ctx.world).bg_state.rng.random() * 1000.0f32) as c_int,
+                    );
                     crate::g_utils::G_Sound(
                         ctx,
                         NPC,
@@ -677,7 +754,11 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
         //N/A for MP.
         if (*NPC).r.ownerNum < ENTITYNUM_NONE {
             let owner = &mut world.g_entities[0];
-            if (*owner).health <= 0 || (!(*owner).client.is_null() && (*((*owner).client as *mut gclient_t)).pers.connected == crate::client::client_connected::CON_DISCONNECTED) {
+            if (*owner).health <= 0
+                || (!(*owner).client.is_null()
+                    && (*((*owner).client as *mut gclient_t)).pers.connected
+                        == crate::client::client_connected::CON_DISCONNECTED)
+            {
                 //owner is dead or gone
                 //remove me
                 crate::g_combat::G_Damage(
@@ -704,20 +785,20 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
             let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             // Oracle tests `NPC->enemy->health` truthy (`!= 0`), not `> 0`.
             if (*enemy).health != 0 && (*enemy).inuse != 0 {
-            if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT
-                && ((*enemy).s.number == 0
-                    || (!(*enemy).client.is_null()
-                        && (*((*enemy).client as *mut gclient_t)).NPC_class == CLASS_SEEKER))
-            {
-                //hacked to never take the player as an enemy, even if the player shoots at it
-                (*NPC).enemy = None;
-            } else {
-                Seeker_Attack(ctx);
-                if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
-                    crate::NPC_AI_Jedi::Boba_FireDecide(ctx);
+                if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT
+                    && ((*enemy).s.number == 0
+                        || (!(*enemy).client.is_null()
+                            && (*((*enemy).client as *mut gclient_t)).NPC_class == CLASS_SEEKER))
+                {
+                    //hacked to never take the player as an enemy, even if the player shoots at it
+                    (*NPC).enemy = None;
+                } else {
+                    Seeker_Attack(ctx);
+                    if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
+                        crate::NPC_AI_Jedi::Boba_FireDecide(ctx);
+                    }
+                    return;
                 }
-                return;
-            }
             }
         }
 

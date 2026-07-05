@@ -15,7 +15,9 @@
 use crate::prelude::*;
 
 use crate::bg_misc::{
-    BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_EmplacedView, BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_FindItem, BG_FindItemForHoldable, BG_FindItemForWeapon,
+    BG_AddPredictableEventToPlayerstate, BG_CanItemBeGrabbed, BG_EmplacedView,
+    BG_EvaluateTrajectory, BG_EvaluateTrajectoryDelta, BG_FindItem, BG_FindItemForHoldable,
+    BG_FindItemForWeapon,
 };
 use crate::client::gclient::gclient_t;
 
@@ -28,7 +30,6 @@ pub const ITMSF_NOTSOLID: c_int = 8;
 pub const ITMSF_VERTICAL: c_int = 16;
 pub const ITMSF_INVISIBLE: c_int = 32;
 use crate::client::{CON_CONNECTED, CON_DISCONNECTED};
-use crate::w_saber::HasSetSaberOnly;
 use crate::entity::flags::{FL_DROPPED_ITEM, FL_NOTARGET, FL_TEAMSLAVE};
 use crate::g_combat::G_RadiusDamage;
 use crate::g_exphysics::G_RunExPhys;
@@ -39,13 +40,17 @@ use crate::g_object::G_RunObject;
 use crate::g_spawn::G_SpawnFloat;
 use crate::g_team::{OnSameTeam, Pickup_Team, Team_FreeEntity};
 use crate::g_utils::{
-    G_AddEvent, G_AddPredictableEvent, G_BoneIndex, G_EffectIndex, G_FreeEntity, G_ModelIndex, G_PlayEffect, G_PlayEffectID, G_RadiusList, G_ScaleNetHealth, G_SetAnim, G_SetOrigin, G_Sound,
+    G_AddEvent, G_AddPredictableEvent, G_BoneIndex, G_EffectIndex, G_FreeEntity, G_ModelIndex,
+    G_PlayEffect, G_PlayEffectID, G_RadiusList, G_ScaleNetHealth, G_SetAnim, G_SetOrigin, G_Sound,
     G_SoundIndex, G_Spawn, G_TempEntity, G_UseTargets,
 };
 use crate::g_weapon::WP_FireTurretMissile;
-use crate::q_math::{AngleNormalize360, AngleSubtract, VectorLength, VectorLengthSquared, VectorNormalize};
+use crate::q_math::{
+    AngleNormalize360, AngleSubtract, VectorLength, VectorLengthSquared, VectorNormalize,
+};
 use crate::teams::npcteam::{NPCTEAM_ENEMY, NPCTEAM_NEUTRAL, NPCTEAM_PLAYER};
 use crate::trap;
+use crate::w_saber::HasSetSaberOnly;
 use crate::NPC_AI_Jedi::{Jedi_Cloak, Jedi_Decloak};
 use crate::NPC_combat::G_SetEnemy;
 use crate::NPC_spawn::NPC_SpawnType;
@@ -110,7 +115,10 @@ const CONTENTS_WATER: c_int = 0x0000_0004;
 const CONTENTS_PLAYERCLIP: c_int = 0x0000_0010;
 const CONTENTS_SHOTCLIP: c_int = 0x0000_0080;
 const CONTENTS_LIGHTSABER: c_int = 0x0004_0000;
-const MASK_PLAYERSOLID: c_int = CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_BODY | mp_qshared::shared::surface_flags::CONTENTS_TERRAIN;
+const MASK_PLAYERSOLID: c_int = CONTENTS_SOLID
+    | CONTENTS_PLAYERCLIP
+    | CONTENTS_BODY
+    | mp_qshared::shared::surface_flags::CONTENTS_TERRAIN;
 const MASK_SHOT: c_int = CONTENTS_SOLID
     | CONTENTS_BODY
     | mp_qshared::shared::surface_flags::CONTENTS_CORPSE
@@ -175,7 +183,9 @@ pub fn adjustRespawnTime(
 
     let mut respawnTime = preRespawnTime;
 
-    if itemType == IT_WEAPON && (itemTag == WP_THERMAL || itemTag == WP_TRIP_MINE || itemTag == WP_DET_PACK) {
+    if itemType == IT_WEAPON
+        && (itemTag == WP_THERMAL || itemTag == WP_TRIP_MINE || itemTag == WP_DET_PACK)
+    {
         // special case for these, use ammo respawn rate
         respawnTime = RESPAWN_AMMO;
     }
@@ -214,16 +224,17 @@ pub fn adjustRespawnTime(
 /// Raven `ShieldRemove`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:108-119`
-pub fn ShieldRemove(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn ShieldRemove(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).think = Some(EntThink::G_FreeEntity);
         (*self_).nextthink = (*ctx.world).level.time + 100;
 
         // Play kill sound...
-        G_AddEvent(self_, entity_event_t::EV_GENERAL_SOUND as c_int, (*ctx.world).globals.shieldDeactivateSound);
+        G_AddEvent(
+            self_,
+            entity_event_t::EV_GENERAL_SOUND as c_int,
+            (*ctx.world).globals.shieldDeactivateSound,
+        );
         (*self_).s.loopSound = 0;
         (*self_).s.loopIsSoundset = qfalse;
     }
@@ -234,10 +245,7 @@ pub fn ShieldRemove(
 /// Raven `ShieldThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:123-141`
-pub fn ShieldThink(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn ShieldThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
     // Raven `#define SHIELD_HEALTH_DEC 10` / `SHIELD_SIEGE_HEALTH_DEC (2000/25)` (`g_items.c:92,99`).
     pub const SHIELD_SIEGE_HEALTH_DEC: c_int = 2000 / 25;
     pub const SHIELD_HEALTH_DEC: c_int = 10;
@@ -272,7 +280,11 @@ pub fn ShieldDie(
 ) {
     unsafe {
         // Play damaging sound...
-        G_AddEvent(self_, entity_event_t::EV_GENERAL_SOUND as c_int, (*ctx.world).globals.shieldDamageSound);
+        G_AddEvent(
+            self_,
+            entity_event_t::EV_GENERAL_SOUND as c_int,
+            (*ctx.world).globals.shieldDamageSound,
+        );
 
         ShieldRemove(ctx, self_);
     }
@@ -295,7 +307,11 @@ pub fn ShieldPain(
         (*self_).nextthink = (*ctx.world).level.time + 400;
 
         // Play damaging sound...
-        G_AddEvent(self_, entity_event_t::EV_GENERAL_SOUND as c_int, (*ctx.world).globals.shieldDamageSound);
+        G_AddEvent(
+            self_,
+            entity_event_t::EV_GENERAL_SOUND as c_int,
+            (*ctx.world).globals.shieldDamageSound,
+        );
 
         (*self_).s.trickedentindex = 1;
     }
@@ -307,10 +323,7 @@ pub fn ShieldPain(
 /// Raven `ShieldGoSolid`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:171-207`
-pub fn ShieldGoSolid(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn ShieldGoSolid(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut tr: trace_t = core::mem::zeroed();
 
@@ -349,7 +362,11 @@ pub fn ShieldGoSolid(
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
 
             // Play raising sound...
-            G_AddEvent(self_, entity_event_t::EV_GENERAL_SOUND as c_int, (*ctx.world).globals.shieldActivateSound);
+            G_AddEvent(
+                self_,
+                entity_event_t::EV_GENERAL_SOUND as c_int,
+                (*ctx.world).globals.shieldActivateSound,
+            );
             (*self_).s.loopSound = (*ctx.world).globals.shieldLoopSound;
             (*self_).s.loopIsSoundset = qfalse;
         }
@@ -361,10 +378,7 @@ pub fn ShieldGoSolid(
 /// Raven `ShieldGoNotSolid`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:211-226`
-pub fn ShieldGoNotSolid(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn ShieldGoNotSolid(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // make the shield non-solid very briefly
         (*self_).r.contents = 0;
@@ -376,7 +390,11 @@ pub fn ShieldGoNotSolid(
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
 
         // Play kill sound...
-        G_AddEvent(self_, entity_event_t::EV_GENERAL_SOUND as c_int, (*ctx.world).globals.shieldDeactivateSound);
+        G_AddEvent(
+            self_,
+            entity_event_t::EV_GENERAL_SOUND as c_int,
+            (*ctx.world).globals.shieldDeactivateSound,
+        );
         (*self_).s.loopSound = 0;
         (*self_).s.loopIsSoundset = qfalse;
     }
@@ -422,10 +440,7 @@ pub fn ShieldTouch(
 /// Raven `CreateShield`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:254-380`
-pub fn CreateShield(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn CreateShield(ctx: GameContext<'_>, ent: *mut gentity_t) {
     // Raven `g_items.c:91-99` shield #defines.
     pub const SHIELD_HEALTH: f32 = 250.0;
     pub const SHIELD_SIEGE_HEALTH: f32 = 2000.0;
@@ -478,31 +493,57 @@ pub fn CreateShield(
         start[2] += (height >> 1) as f32;
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut tr as *mut trace_t, &start as *const vec3_t, core::ptr::null(), core::ptr::null(), &posTraceEnd as *const vec3_t, (*ent).s.number, MASK_SHOT),
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &start as *const vec3_t,
+                core::ptr::null(),
+                core::ptr::null(),
+                &posTraceEnd as *const vec3_t,
+                (*ent).s.number,
+                MASK_SHOT,
+            ),
         );
         let posWidth = (MAX_SHIELD_HALFWIDTH * tr.fraction) as c_int;
         // negative trace
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut tr as *mut trace_t, &start as *const vec3_t, core::ptr::null(), core::ptr::null(), &negTraceEnd as *const vec3_t, (*ent).s.number, MASK_SHOT),
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &start as *const vec3_t,
+                core::ptr::null(),
+                core::ptr::null(),
+                &negTraceEnd as *const vec3_t,
+                (*ent).s.number,
+                MASK_SHOT,
+            ),
         );
         let negWidth = (MAX_SHIELD_HALFWIDTH * tr.fraction) as c_int;
 
         // kef -- monkey with dimensions and place origin in center
         let halfWidth = (posWidth + negWidth) >> 1;
         if xaxis != 0 {
-            (*ent).r.currentOrigin[0] = (*ent).r.currentOrigin[0] - negWidth as f32 + halfWidth as f32;
+            (*ent).r.currentOrigin[0] =
+                (*ent).r.currentOrigin[0] - negWidth as f32 + halfWidth as f32;
         } else {
-            (*ent).r.currentOrigin[1] = (*ent).r.currentOrigin[1] - negWidth as f32 + halfWidth as f32;
+            (*ent).r.currentOrigin[1] =
+                (*ent).r.currentOrigin[1] - negWidth as f32 + halfWidth as f32;
         }
         (*ent).r.currentOrigin[2] += (height >> 1) as f32;
 
         // set entity's mins and maxs to new values, make it solid, and link it
         if xaxis != 0 {
-            (*ent).r.mins = [-(halfWidth as f32), -SHIELD_HALFTHICKNESS, -((height >> 1) as f32)];
+            (*ent).r.mins = [
+                -(halfWidth as f32),
+                -SHIELD_HALFTHICKNESS,
+                -((height >> 1) as f32),
+            ];
             (*ent).r.maxs = [halfWidth as f32, SHIELD_HALFTHICKNESS, (height >> 1) as f32];
         } else {
-            (*ent).r.mins = [-SHIELD_HALFTHICKNESS, -(halfWidth as f32), -((height >> 1) as f32)];
+            (*ent).r.mins = [
+                -SHIELD_HALFTHICKNESS,
+                -(halfWidth as f32),
+                -((height >> 1) as f32),
+            ];
             (*ent).r.maxs = [SHIELD_HALFTHICKNESS, halfWidth as f32, height as f32];
         }
         (*ent).clipmask = MASK_SHOT;
@@ -561,7 +602,11 @@ pub fn CreateShield(
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
             // Play raising sound...
-            G_AddEvent(ent, entity_event_t::EV_GENERAL_SOUND as c_int, (*ctx.world).globals.shieldActivateSound);
+            G_AddEvent(
+                ent,
+                entity_event_t::EV_GENERAL_SOUND as c_int,
+                (*ctx.world).globals.shieldActivateSound,
+            );
             (*ent).s.loopSound = (*ctx.world).globals.shieldLoopSound;
             (*ent).s.loopIsSoundset = qfalse;
         }
@@ -577,10 +622,7 @@ pub fn CreateShield(
 /// Raven `PlaceShield`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:382-470`
-pub fn PlaceShield(
-    ctx: GameContext<'_>,
-    playerent: *mut gentity_t,
-) -> qboolean {
+pub fn PlaceShield(ctx: GameContext<'_>, playerent: *mut gentity_t) -> qboolean {
     pub const SHIELD_PLACEDIST: f32 = 64.0;
 
     unsafe {
@@ -593,11 +635,16 @@ pub fn PlaceShield(
         let maxs: vec3_t = [4.0, 4.0, 4.0];
 
         if (*ctx.world).globals.shieldAttachSound == 0 {
-            (*ctx.world).globals.shieldLoopSound = G_SoundIndex(c"sound/movers/doors/forcefield_lp.wav".as_ptr());
-            (*ctx.world).globals.shieldAttachSound = G_SoundIndex(c"sound/weapons/detpack/stick.wav".as_ptr());
-            (*ctx.world).globals.shieldActivateSound = G_SoundIndex(c"sound/movers/doors/forcefield_on.wav".as_ptr());
-            (*ctx.world).globals.shieldDeactivateSound = G_SoundIndex(c"sound/movers/doors/forcefield_off.wav".as_ptr());
-            (*ctx.world).globals.shieldDamageSound = G_SoundIndex(c"sound/effects/bumpfield.wav".as_ptr());
+            (*ctx.world).globals.shieldLoopSound =
+                G_SoundIndex(c"sound/movers/doors/forcefield_lp.wav".as_ptr());
+            (*ctx.world).globals.shieldAttachSound =
+                G_SoundIndex(c"sound/weapons/detpack/stick.wav".as_ptr());
+            (*ctx.world).globals.shieldActivateSound =
+                G_SoundIndex(c"sound/movers/doors/forcefield_on.wav".as_ptr());
+            (*ctx.world).globals.shieldDeactivateSound =
+                G_SoundIndex(c"sound/movers/doors/forcefield_off.wav".as_ptr());
+            (*ctx.world).globals.shieldDamageSound =
+                G_SoundIndex(c"sound/effects/bumpfield.wav".as_ptr());
             // `shieldItem` (`static const gitem_t *`) is a function-scope
             // cache; recomputed each call here since the fn-scope caching
             // scheme isn't threaded through GameWorld for this local.
@@ -605,7 +652,12 @@ pub fn PlaceShield(
         let shieldItem = BG_FindItemForHoldable(HI_SHIELD);
 
         // can we place this in front of us?
-        AngleVectors((*((*playerent).client as *mut gclient_t)).ps.viewangles, Some(&mut fwd), None, None);
+        AngleVectors(
+            (*((*playerent).client as *mut gclient_t)).ps.viewangles,
+            Some(&mut fwd),
+            None,
+            None,
+        );
         fwd[2] = 0.0;
         dest = (*((*playerent).client as *mut gclient_t)).ps.origin;
         for i in 0..3 {
@@ -630,7 +682,15 @@ pub fn PlaceShield(
             dest = [pos[0], pos[1], pos[2] - 4096.0];
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut tr as *mut trace_t, &pos as *const vec3_t, &mins as *const vec3_t, &maxs as *const vec3_t, &dest as *const vec3_t, (*playerent).s.number, MASK_SOLID),
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &pos as *const vec3_t,
+                    &mins as *const vec3_t,
+                    &maxs as *const vec3_t,
+                    &dest as *const vec3_t,
+                    (*playerent).s.number,
+                    MASK_SOLID,
+                ),
             );
             if tr.startsolid == 0 && tr.allsolid == 0 {
                 // got enough room so place the portable shield
@@ -649,7 +709,8 @@ pub fn PlaceShield(
                 (*shield).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), playerent);
 
                 // Set team number.
-                (*shield).s.otherEntityNum2 = (*((*playerent).client as *mut gclient_t)).sess.sessionTeam;
+                (*shield).s.otherEntityNum2 =
+                    (*((*playerent).client as *mut gclient_t)).sess.sessionTeam;
 
                 (*shield).s.eType = ET_SPECIAL as c_int;
                 (*shield).s.modelindex = HI_SHIELD as c_int; // this'll be used in CG_Useable() for rendering.
@@ -674,13 +735,18 @@ pub fn PlaceShield(
                 (*shield).s.owner = (*playerent).s.number;
                 (*shield).s.shouldtarget = qtrue;
                 if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
-                    (*shield).s.teamowner = (*((*playerent).client as *mut gclient_t)).sess.sessionTeam;
+                    (*shield).s.teamowner =
+                        (*((*playerent).client as *mut gclient_t)).sess.sessionTeam;
                 } else {
                     (*shield).s.teamowner = 16;
                 }
 
                 // Play placing sound...
-                G_AddEvent(shield, entity_event_t::EV_GENERAL_SOUND as c_int, (*ctx.world).globals.shieldAttachSound);
+                G_AddEvent(
+                    shield,
+                    entity_event_t::EV_GENERAL_SOUND as c_int,
+                    (*ctx.world).globals.shieldAttachSound,
+                );
 
                 return qtrue;
             }
@@ -695,10 +761,7 @@ pub fn PlaceShield(
 /// Raven `ItemUse_Binoculars`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:472-502`
-pub fn ItemUse_Binoculars(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn ItemUse_Binoculars(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
             return;
@@ -724,21 +787,14 @@ pub fn ItemUse_Binoculars(
 /// Raven `ItemUse_Shield`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:504-507`
-pub fn ItemUse_Shield(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn ItemUse_Shield(ctx: GameContext<'_>, ent: *mut gentity_t) {
     PlaceShield(ctx, ent);
 }
 
 /// Raven `SentryTouch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:515-518`
-pub fn SentryTouch(
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    trace: *mut trace_t,
-) {
+pub fn SentryTouch(ent: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     return;
 }
 
@@ -747,10 +803,7 @@ pub fn SentryTouch(
 /// Raven `pas_fire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:521-542`
-pub fn pas_fire(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn pas_fire(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut myOrg = (*ent).r.currentOrigin;
         myOrg[2] += 24.0;
@@ -761,7 +814,11 @@ pub fn pas_fire(
         let mut enOrg = (*((*enemy).client as *mut gclient_t)).ps.origin;
         enOrg[2] += 24.0;
 
-        let mut fwd = [enOrg[0] - myOrg[0], enOrg[1] - myOrg[1], enOrg[2] - myOrg[2]];
+        let mut fwd = [
+            enOrg[0] - myOrg[0],
+            enOrg[1] - myOrg[1],
+            enOrg[2] - myOrg[2],
+        ];
         VectorNormalize(&mut fwd);
 
         myOrg[0] += fwd[0] * 16.0;
@@ -769,7 +826,17 @@ pub fn pas_fire(
         myOrg[2] += fwd[2] * 16.0;
 
         let target = &mut (*ctx.world).g_entities[(*ent).genericValue3 as usize] as *mut gentity_t;
-        WP_FireTurretMissile(ctx, target, myOrg, fwd, qfalse, 10, 2300, MOD_SENTRY as c_int, ent);
+        WP_FireTurretMissile(
+            ctx,
+            target,
+            myOrg,
+            fwd,
+            qfalse,
+            10,
+            2300,
+            MOD_SENTRY as c_int,
+            ent,
+        );
 
         G_RunObject(ctx, ent);
     }
@@ -780,10 +847,7 @@ pub fn pas_fire(
 /// Raven `pas_find_enemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:547-639`
-pub fn pas_find_enemies(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) -> qboolean {
+pub fn pas_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
     // Raven `#define TURRET_RADIUS 800` (`g_items.c:544`).
     pub const TURRET_RADIUS: f32 = 800.0;
     const MAX_GENTITIES: usize = mp_qshared::shared::MAX_GENTITIES;
@@ -795,7 +859,12 @@ pub fn pas_find_enemies(
         if (*self_).aimDebounceTime > (*ctx.world).level.time {
             // time since we've been shut off
             if (*self_).painDebounceTime < (*ctx.world).level.time {
-                G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(c"sound/chars/turret/ping.wav".as_ptr()));
+                G_Sound(
+                    ctx,
+                    self_,
+                    CHAN_BODY,
+                    G_SoundIndex(c"sound/chars/turret/ping.wav".as_ptr()),
+                );
                 (*self_).painDebounceTime = (*ctx.world).level.time + 1000;
             }
         }
@@ -803,7 +872,14 @@ pub fn pas_find_enemies(
         let org2 = (*self_).s.pos.trBase;
 
         let mut entity_list: Vec<*mut gentity_t> = vec![core::ptr::null_mut(); MAX_GENTITIES];
-        let count = G_RadiusList(ctx, org2, TURRET_RADIUS, self_, qtrue, entity_list.as_mut_ptr());
+        let count = G_RadiusList(
+            ctx,
+            org2,
+            TURRET_RADIUS,
+            self_,
+            qtrue,
+            entity_list.as_mut_ptr(),
+        );
 
         for i in 0..count {
             let target = entity_list[i as usize];
@@ -811,20 +887,35 @@ pub fn pas_find_enemies(
             if (*target).client.is_null() {
                 continue;
             }
-            if target == self_ || (*target).takedamage == 0 || (*target).health <= 0 || ((*target).flags & FL_NOTARGET) != 0 {
+            if target == self_
+                || (*target).takedamage == 0
+                || (*target).health <= 0
+                || ((*target).flags & FL_NOTARGET) != 0
+            {
                 continue;
             }
-            if (*self_).alliedTeam != 0 && (*((*target).client as *mut gclient_t)).sess.sessionTeam == (*self_).alliedTeam {
+            if (*self_).alliedTeam != 0
+                && (*((*target).client as *mut gclient_t)).sess.sessionTeam == (*self_).alliedTeam
+            {
                 continue;
             }
             if (*self_).genericValue3 == (*target).s.number {
                 continue;
             }
-            if trap::InPVS(ctx.engine, GInPvsArgs::new(&org2 as *const vec3_t, &(*target).r.currentOrigin as *const vec3_t)) == 0 {
+            if trap::InPVS(
+                ctx.engine,
+                GInPvsArgs::new(
+                    &org2 as *const vec3_t,
+                    &(*target).r.currentOrigin as *const vec3_t,
+                ),
+            ) == 0
+            {
                 continue;
             }
 
-            if (*target).s.eType == ET_NPC as c_int && (*target).s.NPC_class == CLASS_VEHICLE as c_int {
+            if (*target).s.eType == ET_NPC as c_int
+                && (*target).s.NPC_class == CLASS_VEHICLE as c_int
+            {
                 // don't get mad at vehicles, silly.
                 continue;
             }
@@ -838,10 +929,21 @@ pub fn pas_find_enemies(
             let mut tr: trace_t = core::mem::zeroed();
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut tr as *mut trace_t, &org2 as *const vec3_t, core::ptr::null(), core::ptr::null(), &org as *const vec3_t, (*self_).s.number, MASK_SHOT),
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &org2 as *const vec3_t,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &org as *const vec3_t,
+                    (*self_).s.number,
+                    MASK_SHOT,
+                ),
             );
 
-            if tr.allsolid == 0 && tr.startsolid == 0 && (tr.fraction == 1.0 || tr.entityNum as c_int == (*target).s.number) {
+            if tr.allsolid == 0
+                && tr.startsolid == 0
+                && (tr.fraction == 1.0 || tr.entityNum as c_int == (*target).s.number)
+            {
                 // Only acquire if have a clear shot, Is it in range and closer than our best?
                 let enemyDir = [
                     (*target).r.currentOrigin[0] - (*self_).r.currentOrigin[0],
@@ -854,10 +956,17 @@ pub fn pas_find_enemies(
                     // all things equal, keep current
                     if (*self_).attackDebounceTime + 100 < (*ctx.world).level.time {
                         // We haven't fired or acquired an enemy in the last 2 seconds-start-up sound
-                        G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()));
+                        G_Sound(
+                            ctx,
+                            self_,
+                            CHAN_BODY,
+                            G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()),
+                        );
 
                         // Wind up turrets for a bit
-                        (*self_).attackDebounceTime = (*ctx.world).level.time + 900 + ((*ctx.world).bg_state.rng.random() * 200.0) as c_int;
+                        (*self_).attackDebounceTime = (*ctx.world).level.time
+                            + 900
+                            + ((*ctx.world).bg_state.rng.random() * 200.0) as c_int;
                     }
 
                     G_SetEnemy(ctx, self_, target);
@@ -876,10 +985,7 @@ pub fn pas_find_enemies(
 /// Raven `pas_adjust_enemy`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:642-695`
-pub fn pas_adjust_enemy(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn pas_adjust_enemy(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut keep = qtrue;
         // Raven derefs `ent->enemy` unconditionally here; callers only invoke
@@ -901,10 +1007,22 @@ pub fn pas_adjust_enemy(
             let mut tr: trace_t = core::mem::zeroed();
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut tr as *mut trace_t, &org2 as *const vec3_t, core::ptr::null(), core::ptr::null(), &org as *const vec3_t, (*ent).s.number, MASK_SHOT),
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &org2 as *const vec3_t,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &org as *const vec3_t,
+                    (*ent).s.number,
+                    MASK_SHOT,
+                ),
             );
 
-            if tr.allsolid != 0 || tr.startsolid != 0 || tr.fraction < 0.9 || tr.entityNum as c_int == (*ent).s.number {
+            if tr.allsolid != 0
+                || tr.startsolid != 0
+                || tr.fraction < 0.9
+                || tr.entityNum as c_int == (*ent).s.number
+            {
                 if tr.entityNum as c_int != (*enemy).s.number {
                     // trace failed
                     keep = qfalse;
@@ -918,9 +1036,16 @@ pub fn pas_adjust_enemy(
             // don't ping pong on and off
             (*ent).enemy = None;
             // shut-down sound
-            G_Sound(ctx, ent, CHAN_BODY, G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()));
+            G_Sound(
+                ctx,
+                ent,
+                CHAN_BODY,
+                G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
+            );
 
-            (*ent).bounceCount = (*ctx.world).level.time + 500 + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
+            (*ent).bounceCount = (*ctx.world).level.time
+                + 500
+                + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
 
             // make turret play ping sound for 5 seconds
             (*ent).aimDebounceTime = (*ctx.world).level.time + 5000;
@@ -934,10 +1059,7 @@ pub fn pas_adjust_enemy(
 /// Raven `sentryExpire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:702-705`
-pub fn sentryExpire(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn sentryExpire(ctx: GameContext<'_>, self_: *mut gentity_t) {
     turret_die(ctx, self_, self_, self_, 1000, MOD_UNKNOWN as c_int);
 }
 
@@ -947,10 +1069,7 @@ pub fn sentryExpire(
 /// Raven `pas_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:708-937`
-pub fn pas_think(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
     const MAX_GENTITIES: usize = mp_qshared::shared::MAX_GENTITIES;
 
     unsafe {
@@ -968,7 +1087,12 @@ pub fn pas_think(
         let mut iEntityList: Vec<c_int> = vec![0; MAX_GENTITIES];
         let mut numListedEntities = trap::EntitiesInBox(
             ctx.engine,
-            GEntitiesInBoxArgs::new(&testMins as *const vec3_t, &testMaxs as *const vec3_t, iEntityList.as_mut_ptr(), MAX_GENTITIES as c_int),
+            GEntitiesInBoxArgs::new(
+                &testMins as *const vec3_t,
+                &testMaxs as *const vec3_t,
+                iEntityList.as_mut_ptr(),
+                MAX_GENTITIES as c_int,
+            ),
         );
 
         let mut i = 0;
@@ -1014,7 +1138,10 @@ pub fn pas_think(
         let ownerIdx = (*ent).genericValue3 as usize;
         if (*ctx.world).g_entities[ownerIdx].inuse == 0
             || (*ctx.world).g_entities[ownerIdx].client.is_null()
-            || (*((*ctx.world).g_entities[ownerIdx].client as *mut gclient_t)).sess.sessionTeam != (*ent).genericValue2
+            || (*((*ctx.world).g_entities[ownerIdx].client as *mut gclient_t))
+                .sess
+                .sessionTeam
+                != (*ent).genericValue2
         {
             (*ent).think = Some(EntThink::G_FreeEntity);
             (*ent).nextthink = (*ctx.world).level.time;
@@ -1030,7 +1157,12 @@ pub fn pas_think(
         }
 
         if (*ent).genericValue8 + TURRET_LIFETIME < (*ctx.world).level.time {
-            G_Sound(ctx, ent, CHAN_BODY, G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()));
+            G_Sound(
+                ctx,
+                ent,
+                CHAN_BODY,
+                G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
+            );
             (*ent).s.bolt2 = ENTITYNUM_NONE;
             (*ent).s.fireflag = 2;
 
@@ -1084,7 +1216,11 @@ pub fn pas_think(
                 (*enemy).r.currentOrigin
             };
 
-            let enemyDir = [org[0] - (*ent).r.currentOrigin[0], org[1] - (*ent).r.currentOrigin[1], org[2] - (*ent).r.currentOrigin[2]];
+            let enemyDir = [
+                org[0] - (*ent).r.currentOrigin[0],
+                org[1] - (*ent).r.currentOrigin[1],
+                org[2] - (*ent).r.currentOrigin[2],
+            ];
             let mut desiredAngles: vec3_t = [0.0; 3];
             vectoangles(enemyDir, &mut desiredAngles);
 
@@ -1139,7 +1275,12 @@ pub fn pas_think(
                 (*ent).attackDebounceTime = (*ctx.world).level.time + 200;
             } else {
                 //ent->nextthink = 0;
-                G_Sound(ctx, ent, CHAN_BODY, G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()));
+                G_Sound(
+                    ctx,
+                    ent,
+                    CHAN_BODY,
+                    G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
+                );
                 (*ent).s.bolt2 = ENTITYNUM_NONE;
                 (*ent).s.fireflag = 2;
                 (*ent).nextthink = (*ctx.world).level.time + TURRET_DEATH_DELAY;
@@ -1186,8 +1327,21 @@ pub fn turret_die(
         // hack the effect angle so that explode death can orient the effect properly
         (*self_).s.angles = [0.0, 0.0, 1.0];
 
-        G_PlayEffect(EFFECT_EXPLOSION_PAS as c_int, (*self_).s.pos.trBase, (*self_).s.angles);
-        G_RadiusDamage(ctx, (*self_).s.pos.trBase, owner, 30.0, 256.0, self_, self_, MOD_UNKNOWN as c_int);
+        G_PlayEffect(
+            EFFECT_EXPLOSION_PAS as c_int,
+            (*self_).s.pos.trBase,
+            (*self_).s.angles,
+        );
+        G_RadiusDamage(
+            ctx,
+            (*self_).s.pos.trBase,
+            owner,
+            30.0,
+            256.0,
+            self_,
+            self_,
+            MOD_UNKNOWN as c_int,
+        );
 
         (*((*owner).client as *mut gclient_t)).ps.fd.sentryDeployed = qfalse;
 
@@ -1201,10 +1355,7 @@ pub fn turret_die(
 /// Raven `SP_PAS`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:978-1011`
-pub fn SP_PAS(
-    ctx: GameContext<'_>,
-    base: *mut gentity_t,
-) {
+pub fn SP_PAS(ctx: GameContext<'_>, base: *mut gentity_t) {
     // Raven `#define TURRET_AMMO_COUNT 40` (`g_items.c:975`).
     pub const TURRET_AMMO_COUNT: c_int = 40;
 
@@ -1236,7 +1387,12 @@ pub fn SP_PAS(
 
         (*base).physicsObject = qtrue;
 
-        G_Sound(ctx, base, CHAN_BODY, G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()));
+        G_Sound(
+            ctx,
+            base,
+            CHAN_BODY,
+            G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()),
+        );
     }
 }
 
@@ -1245,10 +1401,7 @@ pub fn SP_PAS(
 /// Raven `ItemUse_Sentry`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1014-1093`
-pub fn ItemUse_Sentry(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn ItemUse_Sentry(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
             return;
@@ -1328,14 +1481,19 @@ pub fn ItemUse_Sentry(
 /// Raven `ItemUse_Seeker`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1096-1125`
-pub fn ItemUse_Seeker(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn ItemUse_Seeker(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE && (*ctx.world).cvars.d_siegeSeekerNPC.integer != 0 {
+        if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
+            && (*ctx.world).cvars.d_siegeSeekerNPC.integer != 0
+        {
             // actualy spawn a remote NPC
-            let remote = NPC_SpawnType(ctx, ent, c"remote".as_ptr() as *mut c_char, core::ptr::null_mut(), qfalse);
+            let remote = NPC_SpawnType(
+                ctx,
+                ent,
+                c"remote".as_ptr() as *mut c_char,
+                core::ptr::null_mut(),
+                qfalse,
+            );
             if !remote.is_null() && !(*remote).client.is_null() {
                 // set it to my team
                 (*remote).r.ownerNum = (*ent).s.number;
@@ -1351,8 +1509,10 @@ pub fn ItemUse_Seeker(
             }
         } else {
             (*((*ent).client as *mut gclient_t)).ps.eFlags |= EF_SEEKERDRONE;
-            (*((*ent).client as *mut gclient_t)).ps.droneExistTime = ((*ctx.world).level.time + 30000) as f32;
-            (*((*ent).client as *mut gclient_t)).ps.droneFireTime = ((*ctx.world).level.time + 1500) as f32;
+            (*((*ent).client as *mut gclient_t)).ps.droneExistTime =
+                ((*ctx.world).level.time + 30000) as f32;
+            (*((*ent).client as *mut gclient_t)).ps.droneFireTime =
+                ((*ctx.world).level.time + 1500) as f32;
         }
     }
 }
@@ -1360,10 +1520,7 @@ pub fn ItemUse_Seeker(
 /// Raven `MedPackGive`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1127-1152`
-pub fn MedPackGive(
-    ent: *mut gentity_t,
-    amount: c_int,
-) {
+pub fn MedPackGive(ent: *mut gentity_t, amount: c_int) {
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
             return;
@@ -1392,27 +1549,21 @@ pub fn MedPackGive(
 /// Raven `ItemUse_MedPack_Big`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1154-1157`
-pub fn ItemUse_MedPack_Big(
-    ent: *mut gentity_t,
-) {
+pub fn ItemUse_MedPack_Big(ent: *mut gentity_t) {
     MedPackGive(ent, MAX_MEDPACK_BIG_HEAL_AMOUNT);
 }
 
 /// Raven `ItemUse_MedPack`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1159-1162`
-pub fn ItemUse_MedPack(
-    ent: *mut gentity_t,
-) {
+pub fn ItemUse_MedPack(ent: *mut gentity_t) {
     MedPackGive(ent, MAX_MEDPACK_HEAL_AMOUNT);
 }
 
 /// Raven `Jetpack_Off`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1165-1175`
-pub fn Jetpack_Off(
-    ent: *mut gentity_t,
-) {
+pub fn Jetpack_Off(ent: *mut gentity_t) {
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
@@ -1430,10 +1581,7 @@ pub fn Jetpack_Off(
 /// Raven `Jetpack_On`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1177-1199`
-pub fn Jetpack_On(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Jetpack_On(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
 
@@ -1442,7 +1590,12 @@ pub fn Jetpack_On(
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.fd.forceGripBeingGripped >= (*ctx.world).level.time as f32 {
+        if (*((*ent).client as *mut gclient_t))
+            .ps
+            .fd
+            .forceGripBeingGripped
+            >= (*ctx.world).level.time as f32
+        {
             // can't turn on during grip interval
             return;
         }
@@ -1452,7 +1605,12 @@ pub fn Jetpack_On(
             return;
         }
 
-        G_Sound(ctx, ent, CHAN_AUTO, G_SoundIndex(c"sound/boba/JETON".as_ptr()));
+        G_Sound(
+            ctx,
+            ent,
+            CHAN_AUTO,
+            G_SoundIndex(c"sound/boba/JETON".as_ptr()),
+        );
 
         (*((*ent).client as *mut gclient_t)).jetPackOn = qtrue;
     }
@@ -1463,10 +1621,7 @@ pub fn Jetpack_On(
 /// Raven `ItemUse_Jetpack`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1201-1234`
-pub fn ItemUse_Jetpack(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn ItemUse_Jetpack(ctx: GameContext<'_>, ent: *mut gentity_t) {
     // Raven `#define JETPACK_TOGGLE_TIME` (`g_items.c`).
     pub const JETPACK_TOGGLE_TIME: c_int = 500;
 
@@ -1486,7 +1641,9 @@ pub fn ItemUse_Jetpack(
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).jetPackOn == qfalse && (*((*ent).client as *mut gclient_t)).ps.jetpackFuel < 5 {
+        if (*((*ent).client as *mut gclient_t)).jetPackOn == qfalse
+            && (*((*ent).client as *mut gclient_t)).ps.jetpackFuel < 5
+        {
             // too low on fuel to start it up
             return;
         }
@@ -1497,7 +1654,8 @@ pub fn ItemUse_Jetpack(
             Jetpack_On(ctx, ent);
         }
 
-        (*((*ent).client as *mut gclient_t)).jetPackToggleTime = (*ctx.world).level.time + JETPACK_TOGGLE_TIME;
+        (*((*ent).client as *mut gclient_t)).jetPackToggleTime =
+            (*ctx.world).level.time + JETPACK_TOGGLE_TIME;
     }
 }
 
@@ -1506,10 +1664,7 @@ pub fn ItemUse_Jetpack(
 /// Raven `ItemUse_UseCloak`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1239-1272`
-pub fn ItemUse_UseCloak(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn ItemUse_UseCloak(ctx: GameContext<'_>, ent: *mut gentity_t) {
     // Raven `#define CLOAK_TOGGLE_TIME` (`g_items.c`).
     pub const CLOAK_TOGGLE_TIME: c_int = 500;
 
@@ -1529,7 +1684,9 @@ pub fn ItemUse_UseCloak(
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] == 0 && (*((*ent).client as *mut gclient_t)).ps.cloakFuel < 5 {
+        if (*((*ent).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] == 0
+            && (*((*ent).client as *mut gclient_t)).ps.cloakFuel < 5
+        {
             // too low on fuel to start it up
             return;
         }
@@ -1542,7 +1699,8 @@ pub fn ItemUse_UseCloak(
             Jedi_Cloak(ctx, ent);
         }
 
-        (*((*ent).client as *mut gclient_t)).cloakToggleTime = (*ctx.world).level.time + CLOAK_TOGGLE_TIME;
+        (*((*ent).client as *mut gclient_t)).cloakToggleTime =
+            (*ctx.world).level.time + CLOAK_TOGGLE_TIME;
     }
 }
 
@@ -1551,10 +1709,7 @@ pub fn ItemUse_UseCloak(
 /// Raven `SpecialItemThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1277-1293`
-pub fn SpecialItemThink(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SpecialItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
     let gravity: f32 = 3.0;
     let mass: f32 = 0.09;
     let bounce: f32 = 1.1;
@@ -1566,7 +1721,16 @@ pub fn SpecialItemThink(
             return;
         }
 
-        G_RunExPhys(ctx, ent, gravity, mass, bounce, qfalse, core::ptr::null_mut(), 0);
+        G_RunExPhys(
+            ctx,
+            ent,
+            gravity,
+            mass,
+            bounce,
+            qfalse,
+            core::ptr::null_mut(),
+            0,
+        );
         (*ent).s.origin = (*ent).r.currentOrigin;
         (*ent).nextthink = (*ctx.world).level.time + 50;
     }
@@ -1581,11 +1745,7 @@ pub fn SpecialItemThink(
 // bg-owned `bg_itemlist` table (not ported anywhere in the crate graph —
 // even `BG_FindItem`/`BG_FindItemForWeapon` etc. are themselves parked on
 // it; see `bg_misc.rs`). Not decidable from this packet.
-pub fn G_SpecialSpawnItem(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    item: *mut gitem_t,
-) {
+pub fn G_SpecialSpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut gitem_t) {
     unsafe {
         RegisterItem(ctx, item);
         (*ent).item = item;
@@ -1657,26 +1817,27 @@ pub fn G_PrecacheDispensers(ctx: GameContext<'_>) {
 /// Raven `ItemUse_UseDisp`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1353-1410`
-pub fn ItemUse_UseDisp(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    r#type: c_int,
-) {
+pub fn ItemUse_UseDisp(ctx: GameContext<'_>, ent: *mut gentity_t, r#type: c_int) {
     // Raven `#define TOSS_DEBOUNCE_TIME 5000` (`bg_public.h:181`).
     pub const TOSS_DEBOUNCE_TIME: c_int = 5000;
 
     unsafe {
-        if (*ent).client.is_null() || (*((*ent).client as *mut gclient_t)).tossableItemDebounce > (*ctx.world).level.time {
+        if (*ent).client.is_null()
+            || (*((*ent).client as *mut gclient_t)).tossableItemDebounce > (*ctx.world).level.time
+        {
             // can't use it again yet
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.weaponTime > 0 || (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE as c_int {
+        if (*((*ent).client as *mut gclient_t)).ps.weaponTime > 0
+            || (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE as c_int
+        {
             // busy doing something else
             return;
         }
 
-        (*((*ent).client as *mut gclient_t)).tossableItemDebounce = (*ctx.world).level.time + TOSS_DEBOUNCE_TIME;
+        (*((*ent).client as *mut gclient_t)).tossableItemDebounce =
+            (*ctx.world).level.time + TOSS_DEBOUNCE_TIME;
 
         let item = if r#type == HI_HEALTHDISP as c_int {
             BG_FindItem(c"item_medpak_instant".as_ptr())
@@ -1699,13 +1860,22 @@ pub fn ItemUse_UseDisp(
             G_SpecialSpawnItem(ctx, eItem, item);
 
             let mut fwd: vec3_t = [0.0; 3];
-            AngleVectors((*((*ent).client as *mut gclient_t)).ps.viewangles, Some(&mut fwd), None, None);
+            AngleVectors(
+                (*((*ent).client as *mut gclient_t)).ps.viewangles,
+                Some(&mut fwd),
+                None,
+                None,
+            );
             (*eItem).epVelocity = [fwd[0] * 128.0, fwd[1] * 128.0, fwd[2] * 128.0];
             (*eItem).epVelocity[2] = 16.0;
 
             //	G_SetAnim( ent, NULL, SETANIM_TORSO, BOTH_THERMAL_THROW, SETANIM_FLAG_OVERRIDE|SETANIM_FLAG_HOLD, 0 );
 
-            let te = G_TempEntity(ctx, (*((*ent).client as *mut gclient_t)).ps.origin, entity_event_t::EV_LOCALTIMER as c_int);
+            let te = G_TempEntity(
+                ctx,
+                (*((*ent).client as *mut gclient_t)).ps.origin,
+                entity_event_t::EV_LOCALTIMER as c_int,
+            );
             (*te).s.time = (*ctx.world).level.time;
             (*te).s.time2 = TOSS_DEBOUNCE_TIME;
             (*te).s.owner = (*((*ent).client as *mut gclient_t)).ps.clientNum;
@@ -1718,16 +1888,13 @@ pub fn ItemUse_UseDisp(
 /// Raven `EWebDisattach`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1417-1431`
-pub fn EWebDisattach(
-    ctx: GameContext<'_>,
-    owner: *mut gentity_t,
-    eweb: *mut gentity_t,
-) {
+pub fn EWebDisattach(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_t) {
     unsafe {
         (*((*owner).client as *mut gclient_t)).ewebIndex = 0;
         (*((*owner).client as *mut gclient_t)).ps.emplacedIndex = 0;
         if (*owner).health > 0 {
-            (*((*owner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = (*eweb).genericValue11;
+            (*((*owner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] =
+                (*eweb).genericValue11;
         } else {
             (*((*owner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 0;
         }
@@ -1765,13 +1932,27 @@ pub fn EWebDie(
     pub const EWEB_DEATH_RADIUS: f32 = 128.0;
 
     unsafe {
-        G_RadiusDamage(ctx, (*self_).r.currentOrigin, self_, EWEB_DEATH_DMG, EWEB_DEATH_RADIUS, self_, self_, MOD_SUICIDE as c_int);
+        G_RadiusDamage(
+            ctx,
+            (*self_).r.currentOrigin,
+            self_,
+            EWEB_DEATH_DMG,
+            EWEB_DEATH_RADIUS,
+            self_,
+            self_,
+            MOD_SUICIDE as c_int,
+        );
 
         let fxDir: vec3_t = [1.0, 0.0, 0.0];
-        G_PlayEffect(EFFECT_EXPLOSION_DETPACK as c_int, (*self_).r.currentOrigin, fxDir);
+        G_PlayEffect(
+            EFFECT_EXPLOSION_DETPACK as c_int,
+            (*self_).r.currentOrigin,
+            fxDir,
+        );
 
         if (*self_).r.ownerNum != ENTITYNUM_NONE {
-            let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+            let owner =
+                &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
             if (*owner).inuse != 0 && !(*owner).client.is_null() {
                 EWebDisattach(ctx, owner, self_);
@@ -1780,7 +1961,8 @@ pub fn EWebDie(
                 (*((*owner).client as *mut gclient_t)).ewebHealth = -1;
 
                 // take it away from him, it is gone forever.
-                (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_EWEB);
+                (*((*owner).client as *mut gclient_t)).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
+                    !(1 << HI_EWEB);
 
                 //TODO: Port bg_itemlist
                 // Source: oracle/oracle/codemp/game/g_items.c:1473-1478 — the
@@ -1806,7 +1988,8 @@ pub fn EWebPain(
     unsafe {
         // update the owner's health status of me
         if (*self_).r.ownerNum != ENTITYNUM_NONE {
-            let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+            let owner =
+                &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
             if (*owner).inuse != 0 && !(*owner).client.is_null() {
                 (*((*owner).client as *mut gclient_t)).ewebHealth = (*self_).health;
@@ -1969,11 +2152,7 @@ pub fn EWeb_SetBoneAnim(
 /// Raven `EWebFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1624-1664`
-pub fn EWebFire(
-    ctx: GameContext<'_>,
-    owner: *mut gentity_t,
-    eweb: *mut gentity_t,
-) {
+pub fn EWebFire(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_t) {
     // Raven `#define EWEB_MISSILE_DAMAGE 20` (`g_items.c:1623`).
     pub const EWEB_MISSILE_DAMAGE: c_int = 20;
     // Raven `DAMAGE_DEATH_KNOCKBACK` (`g_local.h`) — not yet ported; transcribed locally.
@@ -2005,7 +2184,11 @@ pub fn EWebFire(
         let mut p: vec3_t = [0.0; 3];
         let mut d: vec3_t = [0.0; 3];
         BG_GiveMeVectorFromMatrix(&boltMatrix as *const mdxaBone_t, ORIGIN as c_int, &mut p);
-        BG_GiveMeVectorFromMatrix(&boltMatrix as *const mdxaBone_t, NEGATIVE_Y as c_int, &mut d);
+        BG_GiveMeVectorFromMatrix(
+            &boltMatrix as *const mdxaBone_t,
+            NEGATIVE_Y as c_int,
+            &mut d,
+        );
 
         // Start the thing backwards into the bounding box so it can't start inside other solid things
         let bPoint = [p[0] - 16.0 * d[0], p[1] - 16.0 * d[1], p[2] - 16.0 * d[2]];
@@ -2041,11 +2224,7 @@ pub fn EWebFire(
 /// Raven `EWebPositionUser`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1667-1732`
-pub fn EWebPositionUser(
-    ctx: GameContext<'_>,
-    owner: *mut gentity_t,
-    eweb: *mut gentity_t,
-) {
+pub fn EWebPositionUser(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_t) {
     unsafe {
         let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
         trap::G2API_GetBoltMatrix(
@@ -2065,7 +2244,11 @@ pub fn EWebPositionUser(
         let mut p: vec3_t = [0.0; 3];
         let mut d: vec3_t = [0.0; 3];
         BG_GiveMeVectorFromMatrix(&boltMatrix as *const mdxaBone_t, ORIGIN as c_int, &mut p);
-        BG_GiveMeVectorFromMatrix(&boltMatrix as *const mdxaBone_t, NEGATIVE_X as c_int, &mut d);
+        BG_GiveMeVectorFromMatrix(
+            &boltMatrix as *const mdxaBone_t,
+            NEGATIVE_X as c_int,
+            &mut d,
+        );
 
         p[0] += 32.0 * d[0];
         p[1] += 32.0 * d[1];
@@ -2094,7 +2277,15 @@ pub fn EWebPositionUser(
             pDown[2] -= 7.0;
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut tr as *mut trace_t, &p as *const vec3_t, &(*owner).r.mins as *const vec3_t, &(*owner).r.maxs as *const vec3_t, &pDown as *const vec3_t, (*owner).s.number, MASK_PLAYERSOLID),
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &p as *const vec3_t,
+                    &(*owner).r.mins as *const vec3_t,
+                    &(*owner).r.maxs as *const vec3_t,
+                    &pDown as *const vec3_t,
+                    (*owner).s.number,
+                    MASK_PLAYERSOLID,
+                ),
             );
 
             if tr.startsolid == 0 && tr.allsolid == 0 {
@@ -2109,21 +2300,48 @@ pub fn EWebPositionUser(
                     let mut aFlags = SETANIM_FLAG_HOLD as c_int;
 
                     vectoangles(d2, &mut dAng);
-                    dAng[YAW] = AngleSubtract((*((*owner).client as *mut gclient_t)).ps.viewangles[YAW], dAng[YAW]);
+                    dAng[YAW] = AngleSubtract(
+                        (*((*owner).client as *mut gclient_t)).ps.viewangles[YAW],
+                        dAng[YAW],
+                    );
                     if dAng[YAW] > 0.0 {
-                        if (*((*owner).client as *mut gclient_t)).ps.legsAnim == BOTH_STRAFE_RIGHT1 as c_int {
+                        if (*((*owner).client as *mut gclient_t)).ps.legsAnim
+                            == BOTH_STRAFE_RIGHT1 as c_int
+                        {
                             // reset to change direction
                             aFlags |= SETANIM_FLAG_OVERRIDE as c_int;
                         }
-                        G_SetAnim(ctx, owner, &mut (*((*owner).client as *mut gclient_t)).pers.cmd, SETANIM_LEGS as c_int, BOTH_STRAFE_LEFT1 as c_int, aFlags, 0);
+                        G_SetAnim(
+                            ctx,
+                            owner,
+                            &mut (*((*owner).client as *mut gclient_t)).pers.cmd,
+                            SETANIM_LEGS as c_int,
+                            BOTH_STRAFE_LEFT1 as c_int,
+                            aFlags,
+                            0,
+                        );
                     } else {
-                        if (*((*owner).client as *mut gclient_t)).ps.legsAnim == BOTH_STRAFE_LEFT1 as c_int {
+                        if (*((*owner).client as *mut gclient_t)).ps.legsAnim
+                            == BOTH_STRAFE_LEFT1 as c_int
+                        {
                             // reset to change direction
                             aFlags |= SETANIM_FLAG_OVERRIDE as c_int;
                         }
-                        G_SetAnim(ctx, owner, &mut (*((*owner).client as *mut gclient_t)).pers.cmd, SETANIM_LEGS as c_int, BOTH_STRAFE_RIGHT1 as c_int, aFlags, 0);
+                        G_SetAnim(
+                            ctx,
+                            owner,
+                            &mut (*((*owner).client as *mut gclient_t)).pers.cmd,
+                            SETANIM_LEGS as c_int,
+                            BOTH_STRAFE_RIGHT1 as c_int,
+                            aFlags,
+                            0,
+                        );
                     }
-                } else if (*((*owner).client as *mut gclient_t)).ps.legsAnim == BOTH_STRAFE_RIGHT1 as c_int || (*((*owner).client as *mut gclient_t)).ps.legsAnim == BOTH_STRAFE_LEFT1 as c_int {
+                } else if (*((*owner).client as *mut gclient_t)).ps.legsAnim
+                    == BOTH_STRAFE_RIGHT1 as c_int
+                    || (*((*owner).client as *mut gclient_t)).ps.legsAnim
+                        == BOTH_STRAFE_LEFT1 as c_int
+                {
                     // don't keep animating in place
                     (*((*owner).client as *mut gclient_t)).ps.legsTimer = 0;
                 }
@@ -2141,11 +2359,7 @@ pub fn EWebPositionUser(
 /// Raven `EWebUpdateBoneAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1735-1769`
-pub fn EWebUpdateBoneAngles(
-    ctx: GameContext<'_>,
-    owner: *mut gentity_t,
-    eweb: *mut gentity_t,
-) {
+pub fn EWebUpdateBoneAngles(ctx: GameContext<'_>, owner: *mut gentity_t, eweb: *mut gentity_t) {
     unsafe {
         let turnCap: f32 = 4.0;
 
@@ -2188,10 +2402,7 @@ pub fn EWebUpdateBoneAngles(
 /// Raven `EWebThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1776-1854`
-pub fn EWebThink(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn EWebThink(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut killMe = qfalse;
         let gravity: f32 = 3.0;
@@ -2201,7 +2412,8 @@ pub fn EWebThink(
         if (*self_).r.ownerNum == ENTITYNUM_NONE {
             killMe = qtrue;
         } else {
-            let owner = &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
+            let owner =
+                &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
 
             if (*owner).inuse == 0
                 || (*owner).client.is_null()
@@ -2219,11 +2431,18 @@ pub fn EWebThink(
             if killMe == qfalse {
                 let mut yaw: f32 = 0.0;
 
-                if BG_EmplacedView((*((*owner).client as *mut gclient_t)).ps.viewangles, (*self_).s.angles, &mut yaw as *mut f32, (*self_).s.origin2[0]) != 0 {
+                if BG_EmplacedView(
+                    (*((*owner).client as *mut gclient_t)).ps.viewangles,
+                    (*self_).s.angles,
+                    &mut yaw as *mut f32,
+                    (*self_).s.origin2[0],
+                ) != 0
+                {
                     (*((*owner).client as *mut gclient_t)).ps.viewangles[YAW] = yaw;
                 }
                 (*((*owner).client as *mut gclient_t)).ps.weapon = WP_EMPLACED_GUN as c_int;
-                (*((*owner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = WP_EMPLACED_GUN as c_int;
+                (*((*owner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] =
+                    WP_EMPLACED_GUN as c_int;
 
                 if (*self_).genericValue8 < (*ctx.world).level.time {
                     // make sure the anim timer is done
@@ -2233,7 +2452,9 @@ pub fn EWebThink(
                         return;
                     }
 
-                    if ((*((*owner).client as *mut gclient_t)).pers.cmd.buttons & BUTTON_ATTACK) != 0 {
+                    if ((*((*owner).client as *mut gclient_t)).pers.cmd.buttons & BUTTON_ATTACK)
+                        != 0
+                    {
                         if (*self_).genericValue5 < (*ctx.world).level.time {
                             // we can fire another shot off
                             EWebFire(ctx, owner, self_);
@@ -2245,7 +2466,9 @@ pub fn EWebThink(
                             // set fire debounce time
                             (*self_).genericValue5 = (*ctx.world).level.time + 100;
                         }
-                    } else if (*self_).genericValue5 < (*ctx.world).level.time && (*self_).genericValue3 != 0 {
+                    } else if (*self_).genericValue5 < (*ctx.world).level.time
+                        && (*self_).genericValue3 != 0
+                    {
                         // reset the anim back to non-firing
                         EWeb_SetBoneAnim(ctx, self_, 0, 1);
                         (*self_).genericValue3 = 0;
@@ -2261,7 +2484,16 @@ pub fn EWebThink(
         }
 
         // run some physics on it real quick so it falls and stuff properly
-        G_RunExPhys(ctx, self_, gravity, mass, bounce, qfalse, core::ptr::null_mut(), 0);
+        G_RunExPhys(
+            ctx,
+            self_,
+            gravity,
+            mass,
+            bounce,
+            qfalse,
+            core::ptr::null_mut(),
+            0,
+        );
 
         (*self_).nextthink = (*ctx.world).level.time;
     }
@@ -2273,10 +2505,7 @@ pub fn EWebThink(
 /// Raven `EWeb_Create`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1859-1980`
-pub fn EWeb_Create(
-    ctx: GameContext<'_>,
-    spawner: *mut gentity_t,
-) -> *mut gentity_t {
+pub fn EWeb_Create(ctx: GameContext<'_>, spawner: *mut gentity_t) -> *mut gentity_t {
     // Raven `#define EWEB_HEALTH 200` (`g_items.c:1856`).
     pub const EWEB_HEALTH: c_int = 200;
 
@@ -2287,7 +2516,11 @@ pub fn EWeb_Create(
         let mins: vec3_t = [-32.0, -32.0, -24.0];
         let maxs: vec3_t = [32.0, 32.0, 24.0];
 
-        let fAng: vec3_t = [0.0, (*((*spawner).client as *mut gclient_t)).ps.viewangles[1], 0.0];
+        let fAng: vec3_t = [
+            0.0,
+            (*((*spawner).client as *mut gclient_t)).ps.viewangles[1],
+            0.0,
+        ];
         let mut fwd: vec3_t = [0.0; 3];
         AngleVectors(fAng, Some(&mut fwd), None, None);
 
@@ -2295,12 +2528,24 @@ pub fn EWeb_Create(
         // allow some fudge
         s[2] += 12.0;
 
-        let pos = [s[0] + 48.0 * fwd[0], s[1] + 48.0 * fwd[1], s[2] + 48.0 * fwd[2]];
+        let pos = [
+            s[0] + 48.0 * fwd[0],
+            s[1] + 48.0 * fwd[1],
+            s[2] + 48.0 * fwd[2],
+        ];
 
         let mut tr: trace_t = core::mem::zeroed();
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut tr as *mut trace_t, &s as *const vec3_t, &mins as *const vec3_t, &maxs as *const vec3_t, &pos as *const vec3_t, (*spawner).s.number, MASK_PLAYERSOLID),
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &s as *const vec3_t,
+                &mins as *const vec3_t,
+                &maxs as *const vec3_t,
+                &pos as *const vec3_t,
+                (*spawner).s.number,
+                MASK_PLAYERSOLID,
+            ),
         );
 
         if tr.allsolid != 0 || tr.startsolid != 0 || tr.fraction != 1.0 {
@@ -2323,10 +2568,22 @@ pub fn EWeb_Create(
         downPos[2] -= 18.0;
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut tr as *mut trace_t, &pos as *const vec3_t, &mins as *const vec3_t, &maxs as *const vec3_t, &downPos as *const vec3_t, (*spawner).s.number, MASK_PLAYERSOLID),
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &pos as *const vec3_t,
+                &mins as *const vec3_t,
+                &maxs as *const vec3_t,
+                &downPos as *const vec3_t,
+                (*spawner).s.number,
+                MASK_PLAYERSOLID,
+            ),
         );
 
-        if tr.startsolid != 0 || tr.allsolid != 0 || tr.fraction == 1.0 || (tr.entityNum as c_int) < ENTITYNUM_WORLD {
+        if tr.startsolid != 0
+            || tr.allsolid != 0
+            || tr.fraction == 1.0
+            || (tr.entityNum as c_int) < ENTITYNUM_WORLD
+        {
             // didn't hit ground.
             G_FreeEntity(ctx, ent);
             G_Sound(ctx, spawner, CHAN_AUTO, failSound);
@@ -2368,7 +2625,15 @@ pub fn EWeb_Create(
 
         trap::G2API_InitGhoul2Model(
             ctx.engine,
-            mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(&mut (*ent).ghoul2 as *mut *mut c_void, modelName.to_owned(), 0, 0, 0, 0, 0),
+            mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
+                &mut (*ent).ghoul2 as *mut *mut c_void,
+                modelName.to_owned(),
+                0,
+                0,
+                0,
+                0,
+                0,
+            ),
         );
 
         if (*ent).ghoul2.is_null() {
@@ -2379,11 +2644,35 @@ pub fn EWeb_Create(
 
         // initialize bone angles (Raven `vec3_origin` — now resolved via the
         // crate prelude, pass-3 symbol backfill).
-        EWeb_SetBoneAngles(ctx, ent, c"cannon_Yrot".as_ptr() as *mut c_char, vec3_origin);
-        EWeb_SetBoneAngles(ctx, ent, c"cannon_Xrot".as_ptr() as *mut c_char, vec3_origin);
+        EWeb_SetBoneAngles(
+            ctx,
+            ent,
+            c"cannon_Yrot".as_ptr() as *mut c_char,
+            vec3_origin,
+        );
+        EWeb_SetBoneAngles(
+            ctx,
+            ent,
+            c"cannon_Xrot".as_ptr() as *mut c_char,
+            vec3_origin,
+        );
 
-        (*ent).genericValue10 = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*cannonflash".to_owned())); // muzzle bolt
-        (*ent).genericValue9 = trap::G2API_AddBolt(ctx.engine, mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"cannon_Yrot".to_owned())); // for placing the owner relative to rotation
+        (*ent).genericValue10 = trap::G2API_AddBolt(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                (*ent).ghoul2,
+                0,
+                c"*cannonflash".to_owned(),
+            ),
+        ); // muzzle bolt
+        (*ent).genericValue9 = trap::G2API_AddBolt(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                (*ent).ghoul2,
+                0,
+                c"cannon_Yrot".to_owned(),
+            ),
+        ); // for placing the owner relative to rotation
 
         // set the constraints for this guy as an emplaced weapon, and his constraint angles
         (*ent).s.origin2[0] = 360.0; // 360 degrees in either direction
@@ -2397,7 +2686,8 @@ pub fn EWeb_Create(
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
 
         // store off the owner's current weapons, we will be forcing him to use the "emplaced" weapon
-        (*ent).genericValue11 = (*((*spawner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize];
+        (*ent).genericValue11 =
+            (*((*spawner).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize];
 
         // start the "unfolding" anim
         EWeb_SetBoneAnim(ctx, ent, 4, 20);
@@ -2416,10 +2706,7 @@ pub fn EWeb_Create(
 /// Raven `ItemUse_UseEWeb`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:1984-2018`
-pub fn ItemUse_UseEWeb(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn ItemUse_UseEWeb(ctx: GameContext<'_>, ent: *mut gentity_t) {
     // Raven `#define EWEB_USE_DEBOUNCE 1000` (`g_items.c:1982`).
     pub const EWEB_USE_DEBOUNCE: c_int = 1000;
 
@@ -2429,19 +2716,25 @@ pub fn ItemUse_UseEWeb(
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.weaponTime > 0 || (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE as c_int {
+        if (*((*ent).client as *mut gclient_t)).ps.weaponTime > 0
+            || (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE as c_int
+        {
             // busy doing something else
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.emplacedIndex != 0 && (*((*ent).client as *mut gclient_t)).ewebIndex == 0 {
+        if (*((*ent).client as *mut gclient_t)).ps.emplacedIndex != 0
+            && (*((*ent).client as *mut gclient_t)).ewebIndex == 0
+        {
             // using an emplaced gun already that isn't our own e-web
             return;
         }
 
         if (*((*ent).client as *mut gclient_t)).ewebIndex != 0 {
             // put it away
-            let eweb = &mut (*ctx.world).g_entities[(*((*ent).client as *mut gclient_t)).ewebIndex as usize] as *mut gentity_t;
+            let eweb = &mut (*ctx.world).g_entities
+                [(*((*ent).client as *mut gclient_t)).ewebIndex as usize]
+                as *mut gentity_t;
             EWebDisattach(ctx, ent, eweb);
         } else {
             // create it
@@ -2464,11 +2757,7 @@ pub fn ItemUse_UseEWeb(
 /// Raven `Pickup_Powerup`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2024-2100`
-pub fn Pickup_Powerup(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-) -> c_int {
+pub fn Pickup_Powerup(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
     // Raven `#define RESPAWN_POWERUP 120` (`g_items.c:27`).
     pub const RESPAWN_POWERUP: c_int = 120;
     // Raven `PLAYEREVENT_DENIEDREWARD` (`bg_public.h:716`) — not yet ported; transcribed locally.
@@ -2479,18 +2768,25 @@ pub fn Pickup_Powerup(
         if (*((*other).client as *mut gclient_t)).ps.powerups[giTag as usize] == 0 {
             // round timing to seconds to make multiple powerup timers
             // count in sync
-            (*((*other).client as *mut gclient_t)).ps.powerups[giTag as usize] = (*ctx.world).level.time - ((*ctx.world).level.time % 1000);
+            (*((*other).client as *mut gclient_t)).ps.powerups[giTag as usize] =
+                (*ctx.world).level.time - ((*ctx.world).level.time % 1000);
 
             G_LogWeaponPowerup(ctx, (*other).s.number, giTag);
         }
 
-        let quantity = if (*ent).count != 0 { (*ent).count } else { (*(*ent).item).quantity };
+        let quantity = if (*ent).count != 0 {
+            (*ent).count
+        } else {
+            (*(*ent).item).quantity
+        };
 
         (*((*other).client as *mut gclient_t)).ps.powerups[giTag as usize] += quantity * 1000;
 
         if giTag == PW_YSALAMIRI as c_int {
-            (*((*other).client as *mut gclient_t)).ps.powerups[PW_FORCE_ENLIGHTENED_LIGHT as usize] = 0;
-            (*((*other).client as *mut gclient_t)).ps.powerups[PW_FORCE_ENLIGHTENED_DARK as usize] = 0;
+            (*((*other).client as *mut gclient_t)).ps.powerups
+                [PW_FORCE_ENLIGHTENED_LIGHT as usize] = 0;
+            (*((*other).client as *mut gclient_t)).ps.powerups
+                [PW_FORCE_ENLIGHTENED_DARK as usize] = 0;
             (*((*other).client as *mut gclient_t)).ps.powerups[PW_FORCE_BOON as usize] = 0;
         }
 
@@ -2509,7 +2805,10 @@ pub fn Pickup_Powerup(
 
             // if same team in team game, no sound
             // cannot use OnSameTeam as it expects to g_entities, not clients
-            if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM && (*((*other).client as *mut gclient_t)).sess.sessionTeam == (*client).sess.sessionTeam {
+            if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM
+                && (*((*other).client as *mut gclient_t)).sess.sessionTeam
+                    == (*client).sess.sessionTeam
+            {
                 continue;
             }
 
@@ -2536,7 +2835,15 @@ pub fn Pickup_Powerup(
             let mut tr: trace_t = core::mem::zeroed();
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut tr as *mut trace_t, &(*client).ps.origin as *const vec3_t, core::ptr::null(), core::ptr::null(), &(*ent).s.pos.trBase as *const vec3_t, ENTITYNUM_NONE, CONTENTS_SOLID),
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &(*client).ps.origin as *const vec3_t,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &(*ent).s.pos.trBase as *const vec3_t,
+                    ENTITYNUM_NONE,
+                    CONTENTS_SOLID,
+                ),
             );
             if tr.fraction != 1.0 {
                 continue;
@@ -2554,23 +2861,26 @@ pub fn Pickup_Powerup(
 /// Raven `Pickup_Holdable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2104-2113`
-pub fn Pickup_Holdable(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-) -> c_int {
+pub fn Pickup_Holdable(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
     unsafe {
         //TODO: Port bg_itemlist
         // Source: oracle/oracle/codemp/game/g_items.c:2106 — `ent->item - bg_itemlist`
         // needs the bg-owned `bg_itemlist` table (unported anywhere in the
         // crate graph; see `bg_misc.rs`).
-        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] = (*ent).item.offset_from(bg_itemlist.as_ptr()) as c_int;
+        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] =
+            (*ent).item.offset_from(bg_itemlist.as_ptr()) as c_int;
 
-        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] |= 1 << (*(*ent).item).giTag;
+        (*((*other).client as *mut gclient_t)).ps.stats
+            [statIndex_t::STAT_HOLDABLE_ITEMS as usize] |= 1 << (*(*ent).item).giTag;
 
         G_LogWeaponItem(ctx, (*other).s.number, (*(*ent).item).giTag);
 
-        adjustRespawnTime(ctx, RESPAWN_HOLDABLE, (*(*ent).item).giType as c_int, (*(*ent).item).giTag)
+        adjustRespawnTime(
+            ctx,
+            RESPAWN_HOLDABLE,
+            (*(*ent).item).giType as c_int,
+            (*(*ent).item).giTag,
+        )
     }
 }
 
@@ -2582,20 +2892,20 @@ pub fn Pickup_Holdable(
 /// Raven `Add_Ammo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2118-2128`
-pub fn Add_Ammo(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    weapon: c_int,
-    count: c_int,
-) {
+pub fn Add_Ammo(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int, count: c_int) {
     unsafe {
         //TODO: Port ammoData
         // Source: oracle/oracle/codemp/game/g_items.c:2120-2126 — needs the
         // bg-owned `ammoData` table (unported anywhere in the crate graph).
-        if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] < ammoData[weapon as usize].max {
+        if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize]
+            < ammoData[weapon as usize].max
+        {
             (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] += count;
-            if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] > ammoData[weapon as usize].max {
-                (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] = ammoData[weapon as usize].max;
+            if (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize]
+                > ammoData[weapon as usize].max
+            {
+                (*((*ent).client as *mut gclient_t)).ps.ammo[weapon as usize] =
+                    ammoData[weapon as usize].max;
             }
         }
     }
@@ -2606,16 +2916,16 @@ pub fn Add_Ammo(
 /// Raven `Pickup_Ammo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2130-2175`
-pub fn Pickup_Ammo(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-) -> c_int {
+pub fn Pickup_Ammo(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
     // Raven `#define RESPAWN_AMMO 40` (`g_items.c:26`).
     const RESPAWN_AMMO: f32 = 40.0;
 
     unsafe {
-        let quantity = if (*ent).count != 0 { (*ent).count } else { (*(*ent).item).quantity };
+        let quantity = if (*ent).count != 0 {
+            (*ent).count
+        } else {
+            (*(*ent).item).quantity
+        };
 
         if (*(*ent).item).giTag == -1 {
             // an ammo_all, give them a bit of everything
@@ -2625,13 +2935,22 @@ pub fn Pickup_Ammo(
                 Add_Ammo(ctx, other, AMMO_POWERCELL as c_int, 100);
                 Add_Ammo(ctx, other, AMMO_METAL_BOLTS as c_int, 100);
                 Add_Ammo(ctx, other, AMMO_ROCKETS as c_int, 5);
-                if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] & (1 << WP_DET_PACK as c_int)) != 0 {
+                if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
+                    & (1 << WP_DET_PACK as c_int))
+                    != 0
+                {
                     Add_Ammo(ctx, other, AMMO_DETPACK as c_int, 2);
                 }
-                if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] & (1 << WP_THERMAL as c_int)) != 0 {
+                if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
+                    & (1 << WP_THERMAL as c_int))
+                    != 0
+                {
                     Add_Ammo(ctx, other, AMMO_THERMAL as c_int, 2);
                 }
-                if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] & (1 << WP_TRIP_MINE as c_int)) != 0 {
+                if ((*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
+                    & (1 << WP_TRIP_MINE as c_int))
+                    != 0
+                {
                     Add_Ammo(ctx, other, AMMO_TRIPMINE as c_int, 2);
                 }
             } else {
@@ -2644,7 +2963,12 @@ pub fn Pickup_Ammo(
             Add_Ammo(ctx, other, (*(*ent).item).giTag, quantity);
         }
 
-        adjustRespawnTime(ctx, RESPAWN_AMMO, (*(*ent).item).giType as c_int, (*(*ent).item).giTag)
+        adjustRespawnTime(
+            ctx,
+            RESPAWN_AMMO,
+            (*(*ent).item).giType as c_int,
+            (*(*ent).item).giTag,
+        )
     }
 }
 
@@ -2653,28 +2977,34 @@ pub fn Pickup_Ammo(
 /// Raven `Pickup_Weapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2180-2232`
-pub fn Pickup_Weapon(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-) -> c_int {
+pub fn Pickup_Weapon(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
     unsafe {
         let mut quantity: c_int;
 
         if (*ent).count < 0 {
             quantity = 0; // None for you, sir!
         } else {
-            quantity = if (*ent).count != 0 { (*ent).count } else { (*(*ent).item).quantity };
+            quantity = if (*ent).count != 0 {
+                (*ent).count
+            } else {
+                (*(*ent).item).quantity
+            };
 
             // dropped items and teamplay weapons always have full ammo
-            if ((*ent).flags & FL_DROPPED_ITEM) == 0 && (*ctx.world).cvars.g_gametype.integer != GT_TEAM {
+            if ((*ent).flags & FL_DROPPED_ITEM) == 0
+                && (*ctx.world).cvars.g_gametype.integer != GT_TEAM
+            {
                 // respawning rules
 
                 // New method:  If the player has less than half the minimum, give them the minimum, else add 1/2 the min.
 
                 // drop the quantity if the already have over the minimum
-                if ((*((*other).client as *mut gclient_t)).ps.ammo[(*(*ent).item).giTag as usize] as f32) < quantity as f32 * 0.5 {
-                    quantity -= (*((*other).client as *mut gclient_t)).ps.ammo[(*(*ent).item).giTag as usize];
+                if ((*((*other).client as *mut gclient_t)).ps.ammo[(*(*ent).item).giTag as usize]
+                    as f32)
+                    < quantity as f32 * 0.5
+                {
+                    quantity -= (*((*other).client as *mut gclient_t)).ps.ammo
+                        [(*(*ent).item).giTag as usize];
                 } else {
                     quantity = (quantity as f32 * 0.5) as c_int; // only add half the value.
                 }
@@ -2682,21 +3012,37 @@ pub fn Pickup_Weapon(
         }
 
         // add the weapon
-        (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |= 1 << (*(*ent).item).giTag;
+        (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |=
+            1 << (*(*ent).item).giTag;
 
         //TODO: Port weaponData
         // Source: oracle/oracle/codemp/game/g_items.c:2221 — needs the
         // bg-owned `weaponData` table (unported anywhere in the crate graph).
-        Add_Ammo(ctx, other, weaponData[(*(*ent).item).giTag as usize].ammoIndex, quantity);
+        Add_Ammo(
+            ctx,
+            other,
+            weaponData[(*(*ent).item).giTag as usize].ammoIndex,
+            quantity,
+        );
 
         G_LogWeaponPickup(ctx, (*other).s.number, (*(*ent).item).giTag);
 
         // team deathmatch has slow weapon respawns
         if (*ctx.world).cvars.g_gametype.integer == GT_TEAM {
-            return adjustRespawnTime(ctx, RESPAWN_TEAM_WEAPON, (*(*ent).item).giType as c_int, (*(*ent).item).giTag);
+            return adjustRespawnTime(
+                ctx,
+                RESPAWN_TEAM_WEAPON,
+                (*(*ent).item).giType as c_int,
+                (*(*ent).item).giTag,
+            );
         }
 
-        adjustRespawnTime(ctx, (*ctx.world).cvars.g_weaponRespawn.integer as f32, (*(*ent).item).giType as c_int, (*(*ent).item).giTag)
+        adjustRespawnTime(
+            ctx,
+            (*ctx.world).cvars.g_weaponRespawn.integer as f32,
+            (*(*ent).item).giType as c_int,
+            (*(*ent).item).giTag,
+        )
     }
 }
 
@@ -2706,11 +3052,7 @@ pub fn Pickup_Weapon(
 /// Raven `Pickup_Health`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2237-2266`
-pub fn Pickup_Health(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-) -> c_int {
+pub fn Pickup_Health(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
     // Raven local `#define`s (`g_items.c:23-27`).
     pub const RESPAWN_HEALTH: f32 = 30.0;
     pub const RESPAWN_MEGAHEALTH: c_int = 120;
@@ -2722,7 +3064,8 @@ pub fn Pickup_Health(
         let max = if (*item).quantity != 5 && (*item).quantity != 100 {
             (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize]
         } else {
-            (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] * 2
+            (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize]
+                * 2
         };
 
         let quantity = if (*ent).count != 0 {
@@ -2736,7 +3079,8 @@ pub fn Pickup_Health(
         if (*other).health > max {
             (*other).health = max;
         }
-        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HEALTH as usize] = (*other).health;
+        (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HEALTH as usize] =
+            (*other).health;
 
         if (*item).quantity == 100 {
             // mega health respawns slow
@@ -2750,11 +3094,7 @@ pub fn Pickup_Health(
 /// Raven `Pickup_Armor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2270-2279`
-pub fn Pickup_Armor(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-) -> c_int {
+pub fn Pickup_Armor(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) -> c_int {
     // Raven local `#define` (`g_items.c:21`).
     pub const RESPAWN_ARMOR: f32 = 20.0;
 
@@ -2778,10 +3118,7 @@ pub fn Pickup_Armor(
 /// Raven `RespawnItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2288-2334`
-pub fn RespawnItem(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn RespawnItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut ent = ent;
         // randomly select from teamed entities
@@ -2833,9 +3170,17 @@ pub fn RespawnItem(
 
             // if the powerup respawn sound should Not be global
             if (*ent).speed != 0.0 {
-                te = G_TempEntity(ctx, (*ent).s.pos.trBase, entity_event_t::EV_GENERAL_SOUND as c_int);
+                te = G_TempEntity(
+                    ctx,
+                    (*ent).s.pos.trBase,
+                    entity_event_t::EV_GENERAL_SOUND as c_int,
+                );
             } else {
-                te = G_TempEntity(ctx, (*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_SOUND as c_int);
+                te = G_TempEntity(
+                    ctx,
+                    (*ent).s.pos.trBase,
+                    entity_event_t::EV_GLOBAL_SOUND as c_int,
+                );
             }
             (*te).s.eventParm = G_SoundIndex(c"sound/items/respawn1".as_ptr());
             (*te).r.svFlags |= SVF_BROADCAST;
@@ -2897,7 +3242,10 @@ pub fn Touch_Item(
     trace: *mut trace_t,
 ) {
     unsafe {
-        if (*ent).genericValue10 > (*ctx.world).level.time && !other.is_null() && (*other).s.number == (*ent).genericValue11 {
+        if (*ent).genericValue10 > (*ctx.world).level.time
+            && !other.is_null()
+            && (*other).s.number == (*ent).genericValue11
+        {
             // this is the ent that we don't want to be able to touch us for x seconds
             return;
         }
@@ -2910,7 +3258,10 @@ pub fn Touch_Item(
             return;
         }
 
-        if (*(*ent).item).giType == IT_WEAPON && (*ent).s.powerups != 0 && (*ent).s.powerups < (*ctx.world).level.time {
+        if (*(*ent).item).giType == IT_WEAPON
+            && (*ent).s.powerups != 0
+            && (*ent).s.powerups < (*ctx.world).level.time
+        {
             (*ent).s.generic1 = 0;
             (*ent).s.powerups = 0;
         }
@@ -2922,18 +3273,30 @@ pub fn Touch_Item(
             return; // dead people can't pickup
         }
 
-        if (*(*ent).item).giType == IT_POWERUP && ((*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int) {
+        if (*(*ent).item).giType == IT_POWERUP
+            && ((*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int
+                || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int)
+        {
             if (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int {
-                if (*((*other).client as *mut gclient_t)).ps.fd.forceSide != FORCE_LIGHTSIDE as c_int {
+                if (*((*other).client as *mut gclient_t)).ps.fd.forceSide
+                    != FORCE_LIGHTSIDE as c_int
+                {
                     return;
                 }
-            } else if (*((*other).client as *mut gclient_t)).ps.fd.forceSide != FORCE_DARKSIDE as c_int {
+            } else if (*((*other).client as *mut gclient_t)).ps.fd.forceSide
+                != FORCE_DARKSIDE as c_int
+            {
                 return;
             }
         }
 
         // the same pickup rules are used for client side and server side
-        if BG_CanItemBeGrabbed((*ctx.world).cvars.g_gametype.integer, &(*ent).s as *const entityState_t, &(*((*other).client as *mut gclient_t)).ps as *const playerState_t) == 0 {
+        if BG_CanItemBeGrabbed(
+            (*ctx.world).cvars.g_gametype.integer,
+            &(*ent).s as *const entityState_t,
+            &(*((*other).client as *mut gclient_t)).ps as *const playerState_t,
+        ) == 0
+        {
             return;
         }
 
@@ -2985,7 +3348,8 @@ pub fn Touch_Item(
                     && (*(*ent).item).giTag == -1
                     && (*other).s.NPC_class == CLASS_VEHICLE as c_int
                     && !(*other).m_pVehicle.is_null()
-                    && (*(*((*other).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type == VH_WALKER
+                    && (*(*((*other).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type
+                        == VH_WALKER
                 {
                     // yeah, uh, atst gets healed by these things
                     if (*other).maxHealth != 0 && (*other).health < (*other).maxHealth {
@@ -3006,7 +3370,9 @@ pub fn Touch_Item(
 
         G_LogPrintf(ctx, c"Item: %i %s\n".as_ptr());
 
-        let mut predict = (*((*other).client as *mut gclient_t)).pers.predictItemPickup;
+        let mut predict = (*((*other).client as *mut gclient_t))
+            .pers
+            .predictItemPickup;
 
         // call the item-specific pickup function
         let mut respawn: c_int;
@@ -3017,7 +3383,10 @@ pub fn Touch_Item(
             }
             x if x == IT_AMMO => {
                 respawn = Pickup_Ammo(ctx, ent, other);
-                if (*(*ent).item).giTag == AMMO_THERMAL as c_int || (*(*ent).item).giTag == AMMO_TRIPMINE as c_int || (*(*ent).item).giTag == AMMO_DETPACK as c_int {
+                if (*(*ent).item).giTag == AMMO_THERMAL as c_int
+                    || (*(*ent).item).giTag == AMMO_TRIPMINE as c_int
+                    || (*(*ent).item).giTag == AMMO_DETPACK as c_int
+                {
                     //TODO: Port weaponData
                     // Source: oracle/oracle/codemp/game/g_items.c:2511-2514 — the
                     // `weaponData[weapForAmmo].ammoIndex` ammo check needs the
@@ -3054,24 +3423,46 @@ pub fn Touch_Item(
         // play the normal pickup sound
         if predict != 0 {
             if !(*other).client.is_null() {
-                BG_AddPredictableEventToPlayerstate(entity_event_t::EV_ITEM_PICKUP as c_int, (*ent).s.number, &mut (*((*other).client as *mut gclient_t)).ps as *mut playerState_t);
+                BG_AddPredictableEventToPlayerstate(
+                    entity_event_t::EV_ITEM_PICKUP as c_int,
+                    (*ent).s.number,
+                    &mut (*((*other).client as *mut gclient_t)).ps as *mut playerState_t,
+                );
             } else {
-                G_AddPredictableEvent(other, entity_event_t::EV_ITEM_PICKUP as c_int, (*ent).s.number);
+                G_AddPredictableEvent(
+                    other,
+                    entity_event_t::EV_ITEM_PICKUP as c_int,
+                    (*ent).s.number,
+                );
             }
         } else {
-            G_AddEvent(other, entity_event_t::EV_ITEM_PICKUP as c_int, (*ent).s.number);
+            G_AddEvent(
+                other,
+                entity_event_t::EV_ITEM_PICKUP as c_int,
+                (*ent).s.number,
+            );
         }
 
         // powerup pickups are global broadcasts
-        if /*(*(*ent).item).giType == IT_POWERUP ||*/ (*(*ent).item).giType == IT_TEAM {
+        if
+        /*(*(*ent).item).giType == IT_POWERUP ||*/
+        (*(*ent).item).giType == IT_TEAM {
             // if we want the global sound to play
             let te;
             if (*ent).speed == 0.0 {
-                te = G_TempEntity(ctx, (*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_ITEM_PICKUP as c_int);
+                te = G_TempEntity(
+                    ctx,
+                    (*ent).s.pos.trBase,
+                    entity_event_t::EV_GLOBAL_ITEM_PICKUP as c_int,
+                );
                 (*te).s.eventParm = (*ent).s.modelindex;
                 (*te).r.svFlags |= SVF_BROADCAST;
             } else {
-                te = G_TempEntity(ctx, (*ent).s.pos.trBase, entity_event_t::EV_GLOBAL_ITEM_PICKUP as c_int);
+                te = G_TempEntity(
+                    ctx,
+                    (*ent).s.pos.trBase,
+                    entity_event_t::EV_GLOBAL_ITEM_PICKUP as c_int,
+                );
                 (*te).s.eventParm = (*ent).s.modelindex;
                 // only send this temp entity to a single client
                 (*te).r.svFlags |= SVF_SINGLECLIENT;
@@ -3112,7 +3503,9 @@ pub fn Touch_Item(
         // picked up items still stay around, they just don't
         // draw anything.  This allows respawnable items
         // to be placed on movers.
-        if ((*ent).flags & FL_DROPPED_ITEM) == 0 && ((*(*ent).item).giType == IT_WEAPON || (*(*ent).item).giType == IT_POWERUP) {
+        if ((*ent).flags & FL_DROPPED_ITEM) == 0
+            && ((*(*ent).item).giType == IT_WEAPON || (*(*ent).item).giType == IT_POWERUP)
+        {
             (*ent).s.eFlags |= EF_ITEMPLACEHOLDER;
             (*ent).s.eFlags &= !EF_NODRAW;
         } else {
@@ -3184,7 +3577,10 @@ pub fn LaunchItem(
         (*dropped).s.pos.trDelta = velocity;
 
         (*dropped).flags |= FL_BOUNCE_HALF;
-        if ((*ctx.world).cvars.g_gametype.integer == GT_CTF || (*ctx.world).cvars.g_gametype.integer == GT_CTY) && (*item).giType == IT_TEAM {
+        if ((*ctx.world).cvars.g_gametype.integer == GT_CTF
+            || (*ctx.world).cvars.g_gametype.integer == GT_CTY)
+            && (*item).giType == IT_TEAM
+        {
             // Special case for CTF flags
             (*dropped).think = Some(EntThink::Team_DroppedFlagThink);
             (*dropped).nextthink = (*ctx.world).level.time + 30000;
@@ -3216,7 +3612,10 @@ pub fn LaunchItem(
             (*dropped).s.angles[PITCH] = -90.0;
         }
 
-        if (*item).giTag != WP_BOWCASTER as c_int && (*item).giTag != WP_DET_PACK as c_int && (*item).giTag != WP_THERMAL as c_int {
+        if (*item).giTag != WP_BOWCASTER as c_int
+            && (*item).giTag != WP_DET_PACK as c_int
+            && (*item).giTag != WP_THERMAL as c_int
+        {
             (*dropped).s.angles[ROLL] = -90.0;
         }
 
@@ -3278,10 +3677,7 @@ pub fn Use_Item(
 /// Raven `FinishSpawningItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:2779-2963`
-pub fn FinishSpawningItem(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn FinishSpawningItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
             // in siege remove all powerups
@@ -3299,7 +3695,10 @@ pub fn FinishSpawningItem(
                 }
 
                 if (*(*ent).item).giType == IT_HOLDABLE {
-                    if (*(*ent).item).giTag == HI_SEEKER as c_int || (*(*ent).item).giTag == HI_SHIELD as c_int || (*(*ent).item).giTag == HI_SENTRY_GUN as c_int {
+                    if (*(*ent).item).giTag == HI_SEEKER as c_int
+                        || (*(*ent).item).giTag == HI_SHIELD as c_int
+                        || (*(*ent).item).giTag == HI_SENTRY_GUN as c_int
+                    {
                         G_FreeEntity(ctx, ent);
                         return;
                     }
@@ -3315,7 +3714,9 @@ pub fn FinishSpawningItem(
 
         if (*ctx.world).cvars.g_gametype.integer == GT_HOLOCRON {
             if (*(*ent).item).giType == IT_POWERUP {
-                if (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int {
+                if (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int
+                    || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int
+                {
                     G_FreeEntity(ctx, ent);
                     return;
                 }
@@ -3325,24 +3726,34 @@ pub fn FinishSpawningItem(
         if (*ctx.world).cvars.g_forcePowerDisable.integer != 0 {
             // if force powers disabled, don't add force powerups
             if (*(*ent).item).giType == IT_POWERUP {
-                if (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int || (*(*ent).item).giTag == PW_FORCE_BOON as c_int {
+                if (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_LIGHT as c_int
+                    || (*(*ent).item).giTag == PW_FORCE_ENLIGHTENED_DARK as c_int
+                    || (*(*ent).item).giTag == PW_FORCE_BOON as c_int
+                {
                     G_FreeEntity(ctx, ent);
                     return;
                 }
             }
         }
 
-        if (*ctx.world).cvars.g_gametype.integer == GT_DUEL || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL {
+        if (*ctx.world).cvars.g_gametype.integer == GT_DUEL
+            || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
+        {
             if (*(*ent).item).giType == IT_ARMOR
                 || (*(*ent).item).giType == IT_HEALTH
-                || ((*(*ent).item).giType == IT_HOLDABLE && ((*(*ent).item).giTag == HI_MEDPAC as c_int || (*(*ent).item).giTag == HI_MEDPAC_BIG as c_int))
+                || ((*(*ent).item).giType == IT_HOLDABLE
+                    && ((*(*ent).item).giTag == HI_MEDPAC as c_int
+                        || (*(*ent).item).giTag == HI_MEDPAC_BIG as c_int))
             {
                 G_FreeEntity(ctx, ent);
                 return;
             }
         }
 
-        if (*ctx.world).cvars.g_gametype.integer != GT_CTF && (*ctx.world).cvars.g_gametype.integer != GT_CTY && (*(*ent).item).giType == IT_TEAM {
+        if (*ctx.world).cvars.g_gametype.integer != GT_CTF
+            && (*ctx.world).cvars.g_gametype.integer != GT_CTY
+            && (*(*ent).item).giType == IT_TEAM
+        {
             let mut killMe = false;
 
             match (*(*ent).item).giTag {
@@ -3385,11 +3796,23 @@ pub fn FinishSpawningItem(
             (*ent).s.origin[2] += 0.1;
             (*ent).r.maxs[2] -= 0.1;
 
-            let dest: vec3_t = [(*ent).s.origin[0], (*ent).s.origin[1], (*ent).s.origin[2] - 4096.0];
+            let dest: vec3_t = [
+                (*ent).s.origin[0],
+                (*ent).s.origin[1],
+                (*ent).s.origin[2] - 4096.0,
+            ];
             let mut tr: trace_t = core::mem::zeroed();
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut tr as *mut trace_t, &(*ent).s.origin as *const vec3_t, &(*ent).r.mins as *const vec3_t, &(*ent).r.maxs as *const vec3_t, &dest as *const vec3_t, (*ent).s.number, MASK_SOLID),
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &(*ent).s.origin as *const vec3_t,
+                    &(*ent).r.mins as *const vec3_t,
+                    &(*ent).r.maxs as *const vec3_t,
+                    &dest as *const vec3_t,
+                    (*ent).s.number,
+                    MASK_SOLID,
+                ),
             );
             if tr.startsolid != 0 {
                 G_Printf(ctx, c"FinishSpawningItem: %s startsolid at %s\n".as_ptr());
@@ -3427,18 +3850,28 @@ pub fn G_CheckTeamItems(ctx: GameContext<'_>) {
         // Set up team stuff
         Team_InitGame(ctx);
 
-        if (*ctx.world).cvars.g_gametype.integer == GT_CTF || (*ctx.world).cvars.g_gametype.integer == GT_CTY {
+        if (*ctx.world).cvars.g_gametype.integer == GT_CTF
+            || (*ctx.world).cvars.g_gametype.integer == GT_CTY
+        {
             // check for the two flags
             let mut item = BG_FindItem(c"team_CTF_redflag".as_ptr());
             //TODO: Port bg_itemlist
             // Source: oracle/oracle/codemp/game/g_items.c:2983 — `item - bg_itemlist`
             // needs the bg-owned `bg_itemlist` table (unported anywhere in the
             // crate graph; see `bg_misc.rs`).
-            if item.is_null() || (*ctx.world).globals.itemRegistered.0[item.offset_from(bg_itemlist.as_ptr()) as usize] == 0 {
+            if item.is_null()
+                || (*ctx.world).globals.itemRegistered.0
+                    [item.offset_from(bg_itemlist.as_ptr()) as usize]
+                    == 0
+            {
                 G_Printf(ctx, c"WARNING: No team_CTF_redflag in map".as_ptr());
             }
             item = BG_FindItem(c"team_CTF_blueflag".as_ptr());
-            if item.is_null() || (*ctx.world).globals.itemRegistered.0[item.offset_from(bg_itemlist.as_ptr()) as usize] == 0 {
+            if item.is_null()
+                || (*ctx.world).globals.itemRegistered.0
+                    [item.offset_from(bg_itemlist.as_ptr()) as usize]
+                    == 0
+            {
                 G_Printf(ctx, c"WARNING: No team_CTF_blueflag in map".as_ptr());
             }
         }
@@ -3474,10 +3907,7 @@ pub fn ClearRegisteredItems(ctx: GameContext<'_>) {
 /// Raven `RegisterItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3020-3025`
-pub fn RegisterItem(
-    ctx: GameContext<'_>,
-    item: *mut gitem_t,
-) {
+pub fn RegisterItem(ctx: GameContext<'_>, item: *mut gitem_t) {
     unsafe {
         if item.is_null() {
             G_Error(ctx, c"RegisterItem: NULL".as_ptr());
@@ -3486,7 +3916,8 @@ pub fn RegisterItem(
         // Source: oracle/oracle/codemp/game/g_items.c:3024 — `item - bg_itemlist`
         // needs the bg-owned `bg_itemlist` table (unported anywhere in the
         // crate graph; see `bg_misc.rs`).
-        (*ctx.world).globals.itemRegistered.0[item.offset_from(bg_itemlist.as_ptr()) as usize] = qtrue;
+        (*ctx.world).globals.itemRegistered.0[item.offset_from(bg_itemlist.as_ptr()) as usize] =
+            qtrue;
     }
 }
 
@@ -3515,7 +3946,10 @@ pub fn SaveRegisteredItems(ctx: GameContext<'_>) {
 
         //	G_Printf( "%i items registered\n", count );
         let s = core::ffi::CStr::from_ptr(string.as_ptr()).to_owned();
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_ITEMS, s));
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_ITEMS, s),
+        );
     }
 }
 
@@ -3524,13 +3958,11 @@ pub fn SaveRegisteredItems(ctx: GameContext<'_>) {
 /// Raven `G_ItemDisabled`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3061-3067`
-pub fn G_ItemDisabled(
-    ctx: GameContext<'_>,
-    item: *mut gitem_t,
-) -> c_int {
+pub fn G_ItemDisabled(ctx: GameContext<'_>, item: *mut gitem_t) -> c_int {
     unsafe {
         let classname = core::ffi::CStr::from_ptr((*item).classname);
-        let name = std::ffi::CString::new(format!("disable_{}", classname.to_string_lossy())).unwrap();
+        let name =
+            std::ffi::CString::new(format!("disable_{}", classname.to_string_lossy())).unwrap();
         trap::Cvar_VariableIntegerValue(ctx.engine, mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(name))
     }
 }
@@ -3541,16 +3973,24 @@ pub fn G_ItemDisabled(
 /// Raven `G_SpawnItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3079-3121`
-pub fn G_SpawnItem(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    item: *mut gitem_t,
-) {
+pub fn G_SpawnItem(ctx: GameContext<'_>, ent: *mut gentity_t, item: *mut gitem_t) {
     unsafe {
-        G_SpawnFloat(ctx, c"random".as_ptr(), c"0".as_ptr(), &mut (*ent).random as *mut f32);
-        G_SpawnFloat(ctx, c"wait".as_ptr(), c"0".as_ptr(), &mut (*ent).wait as *mut f32);
+        G_SpawnFloat(
+            ctx,
+            c"random".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).random as *mut f32,
+        );
+        G_SpawnFloat(
+            ctx,
+            c"wait".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).wait as *mut f32,
+        );
 
-        let wDisable = if (*ctx.world).cvars.g_gametype.integer == GT_DUEL || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL {
+        let wDisable = if (*ctx.world).cvars.g_gametype.integer == GT_DUEL
+            || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
+        {
             (*ctx.world).cvars.g_duelWeaponDisable.integer
         } else {
             (*ctx.world).cvars.g_weaponDisable.integer
@@ -3578,7 +4018,12 @@ pub fn G_SpawnItem(
 
         if (*item).giType == IT_POWERUP {
             G_SoundIndex(c"sound/items/respawn1".as_ptr());
-            G_SpawnFloat(ctx, c"noglobalsound".as_ptr(), c"0".as_ptr(), &mut (*ent).speed as *mut f32);
+            G_SpawnFloat(
+                ctx,
+                c"noglobalsound".as_ptr(),
+                c"0".as_ptr(),
+                &mut (*ent).speed as *mut f32,
+            );
         }
     }
 }
@@ -3588,17 +4033,17 @@ pub fn G_SpawnItem(
 /// Raven `G_BounceItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3130-3174`
-pub fn G_BounceItem(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    trace: *mut trace_t,
-) {
+pub fn G_BounceItem(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut trace_t) {
     unsafe {
         // reflect the velocity on the trace plane
-        let hitTime = (*ctx.world).level.previousTime + (((*ctx.world).level.time - (*ctx.world).level.previousTime) as f32 * (*trace).fraction) as c_int;
+        let hitTime = (*ctx.world).level.previousTime
+            + (((*ctx.world).level.time - (*ctx.world).level.previousTime) as f32
+                * (*trace).fraction) as c_int;
         let mut velocity: vec3_t = [0.0; 3];
         BG_EvaluateTrajectoryDelta(&(*ent).s.pos as *const trajectory_t, hitTime, &mut velocity);
-        let dot = velocity[0] * (*trace).plane.normal[0] + velocity[1] * (*trace).plane.normal[1] + velocity[2] * (*trace).plane.normal[2];
+        let dot = velocity[0] * (*trace).plane.normal[0]
+            + velocity[1] * (*trace).plane.normal[1]
+            + velocity[2] * (*trace).plane.normal[2];
         (*ent).s.pos.trDelta = [
             velocity[0] + -2.0 * dot * (*trace).plane.normal[0],
             velocity[1] + -2.0 * dot * (*trace).plane.normal[1],
@@ -3612,10 +4057,19 @@ pub fn G_BounceItem(
             (*ent).s.pos.trDelta[2] * (*ent).physicsBounce,
         ];
 
-        if (*ent).s.weapon == WP_DET_PACK as c_int && (*ent).s.eType == ET_GENERAL as c_int && (*ent).physicsObject != 0 {
+        if (*ent).s.weapon == WP_DET_PACK as c_int
+            && (*ent).s.eType == ET_GENERAL as c_int
+            && (*ent).physicsObject != 0
+        {
             // detpacks only
             if let Some(touch) = (*ent).touch {
-                crate::ent_fn_enums::dispatch_touch(ctx, touch, ent, &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
+                crate::ent_fn_enums::dispatch_touch(
+                    ctx,
+                    touch,
+                    ent,
+                    &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t,
+                    trace,
+                );
                 return;
             }
         }
@@ -3623,7 +4077,12 @@ pub fn G_BounceItem(
         // check for stop
         if (*trace).plane.normal[2] > 0.0 && (*ent).s.pos.trDelta[2] < 40.0 {
             (*trace).endpos[2] += 1.0; // make sure it is off ground
-            trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut (*trace).endpos as *mut vec3_t));
+            trap::SnapVector(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
+                    &mut (*trace).endpos as *mut vec3_t,
+                ),
+            );
             G_SetOrigin(ent, (*trace).endpos);
             (*ent).s.groundEntityNum = (*trace).entityNum as c_int;
             return;
@@ -3637,10 +4096,20 @@ pub fn G_BounceItem(
         (*ent).s.pos.trBase = (*ent).r.currentOrigin;
         (*ent).s.pos.trTime = (*ctx.world).level.time;
 
-        if (*ent).s.eType == ET_HOLOCRON as c_int || ((*ent).s.shouldtarget != 0 && (*ent).s.eType == ET_GENERAL as c_int && (*ent).physicsObject != 0) {
+        if (*ent).s.eType == ET_HOLOCRON as c_int
+            || ((*ent).s.shouldtarget != 0
+                && (*ent).s.eType == ET_GENERAL as c_int
+                && (*ent).physicsObject != 0)
+        {
             // holocrons and sentry guns
             if let Some(touch) = (*ent).touch {
-                crate::ent_fn_enums::dispatch_touch(ctx, touch, ent, &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t, trace);
+                crate::ent_fn_enums::dispatch_touch(
+                    ctx,
+                    touch,
+                    ent,
+                    &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t,
+                    trace,
+                );
             }
         }
     }
@@ -3652,10 +4121,7 @@ pub fn G_BounceItem(
 /// Raven `G_RunItem`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:3183-3242`
-pub fn G_RunItem(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn G_RunItem(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // if groundentity has been set to -1, it may have been pushed off an edge
         if (*ent).s.groundEntityNum == -1 && (*ent).s.pos.trType != trType_t::TR_GRAVITY {
@@ -3678,11 +4144,23 @@ pub fn G_RunItem(
         );
 
         // trace a line from the previous position to the current position
-        let mask = if (*ent).clipmask != 0 { (*ent).clipmask } else { MASK_PLAYERSOLID & !CONTENTS_BODY };
+        let mask = if (*ent).clipmask != 0 {
+            (*ent).clipmask
+        } else {
+            MASK_PLAYERSOLID & !CONTENTS_BODY
+        };
         let mut tr: trace_t = core::mem::zeroed();
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut tr as *mut trace_t, &(*ent).r.currentOrigin as *const vec3_t, &(*ent).r.mins as *const vec3_t, &(*ent).r.maxs as *const vec3_t, &origin as *const vec3_t, (*ent).r.ownerNum, mask),
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &(*ent).r.currentOrigin as *const vec3_t,
+                &(*ent).r.mins as *const vec3_t,
+                &(*ent).r.maxs as *const vec3_t,
+                &origin as *const vec3_t,
+                (*ent).r.ownerNum,
+                mask,
+            ),
         );
 
         (*ent).r.currentOrigin = tr.endpos;
@@ -3701,7 +4179,13 @@ pub fn G_RunItem(
         }
 
         // if it is in a nodrop volume, remove it
-        let contents = trap::PointContents(ctx.engine, mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(&(*ent).r.currentOrigin as *const vec3_t, -1));
+        let contents = trap::PointContents(
+            ctx.engine,
+            mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(
+                &(*ent).r.currentOrigin as *const vec3_t,
+                -1,
+            ),
+        );
         if (contents & CONTENTS_NODROP) != 0 {
             if !(*ent).item.is_null() && (*(*ent).item).giType == IT_TEAM {
                 Team_FreeEntity(ctx, ent);

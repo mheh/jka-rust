@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameExport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 // Flow:
 //
@@ -41,4 +43,18 @@ impl InboundVmCall for GameNavEntIsRemovableUsable {
     type Output = qboolean;
 
     const COMMAND: MpGameExport = MpGameExport::GAME_NAV_ENTISREMOVABLEUSABLE;
+}
+
+impl DecodeVmMain for GameNavEntIsRemovableUsable {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `G_EntIsRemovableUsable(arg0)` — g_main.c:687.
+        GameNavEntIsRemovableUsableArgs::new(word_to_c_int(t.arg(0)))
+    }
+}
+
+impl EncodeVmMainReturn for GameNavEntIsRemovableUsable {
+    fn encode_return(output: Self::Output) -> isize {
+        // `return G_EntIsRemovableUsable(arg0);` — g_main.c:687. `qboolean`.
+        output as isize
+    }
 }

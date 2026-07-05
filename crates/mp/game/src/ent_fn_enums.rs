@@ -15,43 +15,6 @@
 // Dispatch targets are the entity fn-pointer handlers, each defined in one
 // landed skeleton module; glob-import every module so the central match
 // arms name them unqualified (a Raven fn name is globally unique).
-use crate::prelude::*;
-use crate::AnimalNPC::*;
-use crate::FighterNPC::*;
-use crate::npc_c::*;
-use crate::NPC_AI_Atst::*;
-use crate::NPC_AI_Default::*;
-use crate::NPC_AI_Droid::*;
-use crate::NPC_AI_GalakMech::*;
-use crate::NPC_AI_Grenadier::*;
-use crate::NPC_AI_Howler::*;
-use crate::NPC_AI_ImperialProbe::*;
-use crate::NPC_AI_Interrogator::*;
-use crate::NPC_AI_Jedi::*;
-use crate::NPC_AI_Mark1::*;
-use crate::NPC_AI_Mark2::*;
-use crate::NPC_AI_MineMonster::*;
-use crate::NPC_AI_Rancor::*;
-use crate::NPC_AI_Remote::*;
-use crate::NPC_AI_Seeker::*;
-use crate::NPC_AI_Sentry::*;
-use crate::NPC_AI_Sniper::*;
-use crate::NPC_AI_Stormtrooper::*;
-use crate::NPC_AI_Utils::*;
-use crate::NPC_AI_Wampa::*;
-use crate::NPC_behavior::*;
-use crate::NPC_combat::*;
-use crate::NPC_goal::*;
-use crate::NPC_misc::*;
-use crate::NPC_move::*;
-use crate::NPC_reactions::*;
-use crate::NPC_senses::*;
-use crate::NPC_sounds::*;
-use crate::NPC_spawn::*;
-use crate::NPC_stats::*;
-use crate::NPC_utils::*;
-use crate::SpeederNPC::*;
-use crate::WalkerNPC::*;
 use crate::ai_main::*;
 use crate::ai_util::*;
 use crate::ai_wpnav::*;
@@ -98,11 +61,48 @@ use crate::g_utils::*;
 use crate::g_vehicleTurret::*;
 use crate::g_vehicles::*;
 use crate::g_weapon::*;
+use crate::npc_c::*;
+use crate::prelude::*;
 use crate::q_math::*;
 use crate::q_shared::*;
 use crate::tri_coll_test::*;
 use crate::w_force::*;
 use crate::w_saber::*;
+use crate::AnimalNPC::*;
+use crate::FighterNPC::*;
+use crate::NPC_AI_Atst::*;
+use crate::NPC_AI_Default::*;
+use crate::NPC_AI_Droid::*;
+use crate::NPC_AI_GalakMech::*;
+use crate::NPC_AI_Grenadier::*;
+use crate::NPC_AI_Howler::*;
+use crate::NPC_AI_ImperialProbe::*;
+use crate::NPC_AI_Interrogator::*;
+use crate::NPC_AI_Jedi::*;
+use crate::NPC_AI_Mark1::*;
+use crate::NPC_AI_Mark2::*;
+use crate::NPC_AI_MineMonster::*;
+use crate::NPC_AI_Rancor::*;
+use crate::NPC_AI_Remote::*;
+use crate::NPC_AI_Seeker::*;
+use crate::NPC_AI_Sentry::*;
+use crate::NPC_AI_Sniper::*;
+use crate::NPC_AI_Stormtrooper::*;
+use crate::NPC_AI_Utils::*;
+use crate::NPC_AI_Wampa::*;
+use crate::NPC_behavior::*;
+use crate::NPC_combat::*;
+use crate::NPC_goal::*;
+use crate::NPC_misc::*;
+use crate::NPC_move::*;
+use crate::NPC_reactions::*;
+use crate::NPC_senses::*;
+use crate::NPC_sounds::*;
+use crate::NPC_spawn::*;
+use crate::NPC_stats::*;
+use crate::NPC_utils::*;
+use crate::SpeederNPC::*;
+use crate::WalkerNPC::*;
 
 // fn-ID enums hoisted to `mp_qshared` (below `mp_game`) so
 // `gentity_t`'s dispatch fields can name them; the central match dispatch
@@ -116,8 +116,7 @@ pub use mp_qshared::common::mp::ent_fn_ids::{
 /// Central `think` dispatch (replaces `ent->think(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
-pub fn dispatch_think(
-    ctx: GameContext<'_>,id: EntThink, self_: *mut gentity_t) {
+pub fn dispatch_think(ctx: GameContext<'_>, id: EntThink, self_: *mut gentity_t) {
     match id {
         EntThink::AimAtTarget => AimAtTarget(ctx, self_),
         EntThink::BodyRid => BodyRid(ctx, self_),
@@ -209,8 +208,7 @@ pub fn dispatch_think(
 /// Central `reached` dispatch (replaces `ent->reached(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
-pub fn dispatch_reached(
-    ctx: GameContext<'_>,id: EntReached, self_: *mut gentity_t) {
+pub fn dispatch_reached(ctx: GameContext<'_>, id: EntReached, self_: *mut gentity_t) {
     match id {
         EntReached::Reached_BinaryMover => Reached_BinaryMover(ctx, self_),
         EntReached::Reached_Train => Reached_Train(ctx, self_),
@@ -223,7 +221,11 @@ pub fn dispatch_reached(
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_blocked(
-    ctx: GameContext<'_>,id: EntBlocked, self_: *mut gentity_t, other: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    id: EntBlocked,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+) {
     match id {
         EntBlocked::Blocked_Door => Blocked_Door(ctx, self_, other),
         EntBlocked::Blocked_Mover => Blocked_Mover(ctx, self_, other),
@@ -234,7 +236,12 @@ pub fn dispatch_blocked(
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_touch(
-    ctx: GameContext<'_>,id: EntTouch, self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    id: EntTouch,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     match id {
         EntTouch::HolocronTouch => HolocronTouch(ctx, self_, other, trace),
         EntTouch::NPC_Touch => NPC_Touch(ctx, self_, other, trace),
@@ -271,7 +278,12 @@ pub fn dispatch_touch(
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_use(
-    ctx: GameContext<'_>,id: EntUse, self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    id: EntUse,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     match id {
         EntUse::GlassUse => GlassUse(ctx, self_, other, activator),
         EntUse::NPC_Spawn => NPC_Spawn(ctx, self_, other, activator),
@@ -293,8 +305,12 @@ pub fn dispatch_use(
         EntUse::Use_Target_Screenshake => Use_Target_Screenshake(ctx, self_, other, activator),
         EntUse::Use_Target_Speaker => Use_Target_Speaker(ctx, self_, other, activator),
         EntUse::Use_target_push => Use_target_push(ctx, self_, other, activator),
-        EntUse::Use_target_remove_powerups => Use_target_remove_powerups(ctx, self_, other, activator),
-        EntUse::ammo_generic_power_converter_use => ammo_generic_power_converter_use(ctx, self_, other, activator),
+        EntUse::Use_target_remove_powerups => {
+            Use_target_remove_powerups(ctx, self_, other, activator)
+        }
+        EntUse::ammo_generic_power_converter_use => {
+            ammo_generic_power_converter_use(ctx, self_, other, activator)
+        }
         EntUse::ammo_power_converter_use => ammo_power_converter_use(ctx, self_, other, activator),
         EntUse::decompTriggerUse => decompTriggerUse(ctx, self_, other, activator),
         EntUse::emplaced_gun_realuse => emplaced_gun_realuse(ctx, self_, other, activator),
@@ -303,13 +319,17 @@ pub fn dispatch_use(
         EntUse::func_timer_use => func_timer_use(ctx, self_, other, activator),
         EntUse::func_usable_use => func_usable_use(ctx, self_, other, activator),
         EntUse::fx_runner_use => fx_runner_use(ctx, self_, other, activator),
-        EntUse::health_power_converter_use => health_power_converter_use(ctx, self_, other, activator),
+        EntUse::health_power_converter_use => {
+            health_power_converter_use(ctx, self_, other, activator)
+        }
         EntUse::hurt_use => hurt_use(ctx, self_, other, activator),
         EntUse::misc_dlight_use => misc_dlight_use(ctx, self_, other, activator),
         EntUse::misc_faller_create => misc_faller_create(ctx, self_, other, activator),
         EntUse::misc_weapon_shooter_use => misc_weapon_shooter_use(ctx, self_, other, activator),
         EntUse::sentry_use => sentry_use(ctx, self_, other, activator),
-        EntUse::shield_power_converter_use => shield_power_converter_use(ctx, self_, other, activator),
+        EntUse::shield_power_converter_use => {
+            shield_power_converter_use(ctx, self_, other, activator)
+        }
         EntUse::siegeEndUse => siegeEndUse(ctx, self_, other, activator),
         EntUse::siegeTriggerUse => siegeTriggerUse(ctx, self_, other, activator),
         EntUse::target_activate_use => target_activate_use(ctx, self_, other, activator),
@@ -333,7 +353,12 @@ pub fn dispatch_use(
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_pain(
-    ctx: GameContext<'_>,id: EntPain, self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
+    ctx: GameContext<'_>,
+    id: EntPain,
+    self_: *mut gentity_t,
+    attacker: *mut gentity_t,
+    damage: c_int,
+) {
     match id {
         EntPain::DetPackPain => DetPackPain(ctx, self_, attacker, damage),
         EntPain::EWebPain => EWebPain(ctx, self_, attacker, damage),
@@ -369,7 +394,14 @@ pub fn dispatch_pain(
 /// Faithful raw-pointer params for staging; the Land phase
 /// re-shapes to (world, EntityId, …).
 pub fn dispatch_die(
-    ctx: GameContext<'_>,id: EntDie, self_: *mut gentity_t, inflictor: *mut gentity_t, attacker: *mut gentity_t, damage: c_int, r#mod: c_int) {
+    ctx: GameContext<'_>,
+    id: EntDie,
+    self_: *mut gentity_t,
+    inflictor: *mut gentity_t,
+    attacker: *mut gentity_t,
+    damage: c_int,
+    r#mod: c_int,
+) {
     match id {
         EntDie::DetPackDie => DetPackDie(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::EWebDie => EWebDie(ctx, self_, inflictor, attacker, damage, r#mod),
@@ -380,10 +412,14 @@ pub fn dispatch_die(
         EntDie::auto_turret_die => auto_turret_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::body_die => body_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::bottom_die => bottom_die(ctx, self_, inflictor, attacker, damage, r#mod),
-        EntDie::emplaced_gun_die => emplaced_gun_die(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::emplaced_gun_die => {
+            emplaced_gun_die(ctx, self_, inflictor, attacker, damage, r#mod)
+        }
         EntDie::funcBBrushDie => funcBBrushDie(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::func_usable_die => func_usable_die(self_, inflictor, attacker, damage, r#mod),
-        EntDie::laserTrapDelayedExplode => laserTrapDelayedExplode(ctx, self_, inflictor, attacker, damage, r#mod),
+        EntDie::laserTrapDelayedExplode => {
+            laserTrapDelayedExplode(ctx, self_, inflictor, attacker, damage, r#mod)
+        }
         EntDie::maglock_die => maglock_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::player_die => player_die(ctx, self_, inflictor, attacker, damage, r#mod),
         EntDie::turretG2_die => turretG2_die(ctx, self_, inflictor, attacker, damage, r#mod),
@@ -770,9 +806,18 @@ pub static SPAWNS: &[(&str, EntSpawn)] = &[
     ("info_player_deathmatch", EntSpawn::info_player_deathmatch),
     ("info_player_siegeteam1", EntSpawn::info_player_siegeteam1),
     ("info_player_siegeteam2", EntSpawn::info_player_siegeteam2),
-    ("info_player_intermission", EntSpawn::info_player_intermission),
-    ("info_player_intermission_red", EntSpawn::info_player_intermission_red),
-    ("info_player_intermission_blue", EntSpawn::info_player_intermission_blue),
+    (
+        "info_player_intermission",
+        EntSpawn::info_player_intermission,
+    ),
+    (
+        "info_player_intermission_red",
+        EntSpawn::info_player_intermission_red,
+    ),
+    (
+        "info_player_intermission_blue",
+        EntSpawn::info_player_intermission_blue,
+    ),
     ("info_jedimaster_start", EntSpawn::info_jedimaster_start),
     ("info_player_start_red", EntSpawn::info_player_start_red),
     ("info_player_start_blue", EntSpawn::info_player_start_blue),
@@ -846,9 +891,18 @@ pub static SPAWNS: &[(&str, EntSpawn)] = &[
     ("gametype_item", EntSpawn::gametype_item),
     ("misc_ammo_floor_unit", EntSpawn::misc_ammo_floor_unit),
     ("misc_shield_floor_unit", EntSpawn::misc_shield_floor_unit),
-    ("misc_model_shield_power_converter", EntSpawn::misc_model_shield_power_converter),
-    ("misc_model_ammo_power_converter", EntSpawn::misc_model_ammo_power_converter),
-    ("misc_model_health_power_converter", EntSpawn::misc_model_health_power_converter),
+    (
+        "misc_model_shield_power_converter",
+        EntSpawn::misc_model_shield_power_converter,
+    ),
+    (
+        "misc_model_ammo_power_converter",
+        EntSpawn::misc_model_ammo_power_converter,
+    ),
+    (
+        "misc_model_health_power_converter",
+        EntSpawn::misc_model_health_power_converter,
+    ),
     ("fx_runner", EntSpawn::fx_runner),
     ("target_screenshake", EntSpawn::target_screenshake),
     ("target_escapetrig", EntSpawn::target_escapetrig),
@@ -920,7 +974,10 @@ pub static SPAWNS: &[(&str, EntSpawn)] = &[
     ("NPC_Reborn_New", EntSpawn::NPC_Reborn_New),
     ("NPC_Cultist", EntSpawn::NPC_Cultist),
     ("NPC_Cultist_Saber", EntSpawn::NPC_Cultist_Saber),
-    ("NPC_Cultist_Saber_Powers", EntSpawn::NPC_Cultist_Saber_Powers),
+    (
+        "NPC_Cultist_Saber_Powers",
+        EntSpawn::NPC_Cultist_Saber_Powers,
+    ),
     ("NPC_Cultist_Destroyer", EntSpawn::NPC_Cultist_Destroyer),
     ("NPC_Cultist_Commando", EntSpawn::NPC_Cultist_Commando),
     ("NPC_Colombian_Soldier", EntSpawn::NPC_Reborn),
@@ -953,7 +1010,10 @@ pub static SPAWNS: &[(&str, EntSpawn)] = &[
 /// Classname -> `EntSpawn` lookup (the `G_CallSpawn` strcmp loop).
 /// Returns `None` when no classname matches (Raven's fall-through).
 pub fn spawn_for_classname(classname: &str) -> Option<EntSpawn> {
-    SPAWNS.iter().find(|(name, _)| *name == classname).map(|(_, sp)| *sp)
+    SPAWNS
+        .iter()
+        .find(|(name, _)| *name == classname)
+        .map(|(_, sp)| *sp)
 }
 
 /// Central spawn dispatch (replaces the `spawns[].spawn(ent)` call in
@@ -1044,9 +1104,13 @@ pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
         EntSpawn::gametype_item => SP_gametype_item(ctx, ent),
         EntSpawn::misc_ammo_floor_unit => SP_misc_ammo_floor_unit(ctx, ent),
         EntSpawn::misc_shield_floor_unit => SP_misc_shield_floor_unit(ctx, ent),
-        EntSpawn::misc_model_shield_power_converter => SP_misc_model_shield_power_converter(ctx, ent),
+        EntSpawn::misc_model_shield_power_converter => {
+            SP_misc_model_shield_power_converter(ctx, ent)
+        }
         EntSpawn::misc_model_ammo_power_converter => SP_misc_model_ammo_power_converter(ctx, ent),
-        EntSpawn::misc_model_health_power_converter => SP_misc_model_health_power_converter(ctx, ent),
+        EntSpawn::misc_model_health_power_converter => {
+            SP_misc_model_health_power_converter(ctx, ent)
+        }
         EntSpawn::fx_runner => SP_fx_runner(ctx, ent),
         EntSpawn::target_screenshake => SP_target_screenshake(ctx, ent),
         EntSpawn::target_escapetrig => SP_target_escapetrig(ctx, ent),

@@ -30,22 +30,22 @@
 //! integrator wires the const, the name preserves intent).
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::bg_channel::GameBgTraps;
+use crate::g_utils::G_SoundIndex;
 use crate::prelude::*;
+use crate::q_math::{
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
+    AngleSubtract, AngleVectors, VectorNormalize,
+};
 use crate::q_shared::Q_strncmp;
 use crate::trap;
 use crate::NPC_spawn::NPC_Spawn_Do;
-use crate::g_utils::G_SoundIndex;
-use crate::q_math::{
-    AngleSubtract, AngleVectors, VectorNormalize, _DotProduct, _VectorAdd, _VectorCopy,
-    _VectorMA, _VectorScale, _VectorSubtract, vectoangles,
-};
 use mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs;
 use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::vehicles::vehicleType_t;
-use crate::bg_channel::GameBgTraps;
 
 // Raven vehicle constants spelled locally per this file's staging convention
 // (the integrator wires the const home later; the name preserves intent).
@@ -166,10 +166,7 @@ pub fn G_VehicleTrace(
 /// Raven `G_IsRidingVehicle`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:111-120`
-pub fn G_IsRidingVehicle(
-    ctx: GameContext<'_>,
-    pEnt: *mut gentity_t,
-) -> *mut Vehicle_t {
+pub fn G_IsRidingVehicle(ctx: GameContext<'_>, pEnt: *mut gentity_t) -> *mut Vehicle_t {
     unsafe {
         let ent = pEnt;
         if !ent.is_null() && !(*ent).client.is_null() {
@@ -188,20 +185,14 @@ pub fn G_IsRidingVehicle(
 /// Raven: the entire body is `#ifndef _JK2MP`; in the MP (`_JK2MP`) compile it
 /// reduces to `return 0.0f;`.
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:124-183`
-pub fn G_CanJumpToEnemyVeh(
-    pVeh: *mut Vehicle_t,
-    pUcmd: *const usercmd_t,
-) -> f32 {
+pub fn G_CanJumpToEnemyVeh(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> f32 {
     0.0
 }
 
 /// Raven `G_VehicleSpawn`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:186-244`
-pub fn G_VehicleSpawn(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn G_VehicleSpawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).s.origin = (*self_).r.currentOrigin;
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
@@ -245,11 +236,7 @@ pub fn G_VehicleSpawn(
 /// Raven `G_AttachToVehicle`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:247-289`
-pub fn G_AttachToVehicle(
-    ctx: GameContext<'_>,
-    pEnt: *mut gentity_t,
-    ucmd: *mut *mut usercmd_t,
-) {
+pub fn G_AttachToVehicle(ctx: GameContext<'_>, pEnt: *mut gentity_t, ucmd: *mut *mut usercmd_t) {
     unsafe {
         if pEnt.is_null() || ucmd.is_null() {
             return;
@@ -296,7 +283,7 @@ pub fn G_AttachToVehicle(
         );
         BG_GiveMeVectorFromMatrix(
             &boltMatrix,
-                Eorientations::ORIGIN as c_int,
+            Eorientations::ORIGIN as c_int,
             &mut (*entClient).ps.origin,
         );
         crate::g_utils::G_SetOrigin(ent, (*entClient).ps.origin);
@@ -307,10 +294,7 @@ pub fn G_AttachToVehicle(
 /// Raven `Animate` — animate the vehicle and its riders.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:481-493`
-pub fn Animate(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-) {
+pub fn Animate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         // Validate a pilot rider. (The per-type dispatch no-ops for
         // vehicle types that leave the slot null, matching Raven's `if`-guard.)
@@ -374,7 +358,11 @@ pub fn ValidateBoard(
 
         // Vector from Entity to Vehicle.
         let mut vVehToEnt: vec3_t = [0.0; 3];
-        _VectorSubtract((*ent).r.currentOrigin, (*parent).r.currentOrigin, &mut vVehToEnt);
+        _VectorSubtract(
+            (*ent).r.currentOrigin,
+            (*parent).r.currentOrigin,
+            &mut vVehToEnt,
+        );
         vVehToEnt[2] = 0.0;
         VectorNormalize(&mut vVehToEnt);
 
@@ -409,11 +397,7 @@ pub fn ValidateBoard(
 /// Raven `Board`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:630-872`
-pub fn Board(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-    pEnt: *mut bgEntity_t,
-) -> qboolean {
+pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean {
     unsafe {
         let ent = pEnt as *mut gentity_t;
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
@@ -429,10 +413,7 @@ pub fn Board(
         // `vec3_t` value field (VectorClear/VectorCopy/VectorSet usage throughout
         // this TU treats it as a 3-float array). If the type port modeled it as a
         // `*mut f32` a fixer adjusts the copy sites here and in Update/Initialize.
-        if (*parent).health <= 0
-            || (*pVeh).m_iBoarding > 0
-            || (*entClient).ps.m_iVehicleNum != 0
-        {
+        if (*parent).health <= 0 || (*pVeh).m_iBoarding > 0 || (*entClient).ps.m_iVehicleNum != 0 {
             return qfalse;
         }
 
@@ -634,9 +615,9 @@ pub fn VEH_TryEject(
             fBias += 0.2;
         }
         _VectorCopy((*ent).r.currentOrigin, vExitPos);
-        let fVehDiag =
-            ((*parent).r.maxs[0] * (*parent).r.maxs[0] + (*parent).r.maxs[1] * (*parent).r.maxs[1])
-                .sqrt();
+        let fVehDiag = ((*parent).r.maxs[0] * (*parent).r.maxs[0]
+            + (*parent).r.maxs[1] * (*parent).r.maxs[1])
+            .sqrt();
         let mut vEntMaxs: vec3_t = (*ent).r.maxs;
         if (*ent).s.number < MAX_CLIENTS as c_int {
             // in MP, player client mins/maxs are never stored permanently, just set
@@ -687,11 +668,7 @@ pub fn VEH_TryEject(
 /// Raven `G_EjectDroidUnit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:989-1016`
-pub fn G_EjectDroidUnit(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-    kill: qboolean,
-) {
+pub fn G_EjectDroidUnit(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, kill: qboolean) {
     unsafe {
         let droid = (*pVeh).m_pDroidUnit as *mut gentity_t;
         (*droid).s.m_iVehicleNum = ENTITYNUM_NONE;
@@ -731,10 +708,7 @@ pub fn G_EjectDroidUnit(
 /// Raven `EjectAll`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1377-1448`
-pub fn EjectAll(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-) -> qboolean {
+pub fn EjectAll(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
     unsafe {
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
 
@@ -785,7 +759,8 @@ pub fn EjectAll(
             let mut i: c_int = 0;
             while i < (*vi).maxPassengers {
                 if !(*(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)).is_null() {
-                    let rider = *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t;
+                    let rider =
+                        *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t;
                     crate::veh_dispatch::eject(
                         ctx,
                         pVeh,
@@ -823,11 +798,7 @@ pub fn EjectAll(
 /// Raven `StartDeathDelay`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1451-1482`
-pub fn StartDeathDelay(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-    iDelayTimeOverride: c_int,
-) {
+pub fn StartDeathDelay(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, iDelayTimeOverride: c_int) {
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
@@ -851,10 +822,7 @@ pub fn StartDeathDelay(
 /// Raven `Initialize`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1626-1757`
-pub fn Initialize(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-) -> qboolean {
+pub fn Initialize(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
@@ -956,13 +924,13 @@ pub fn Initialize(
             let iBlend = 300;
             let _ = (iFlags, iBlend);
             (*pVeh).m_ulFlags |= (VEH_GEARSOPEN as u64); // MP
-            // PORT-NOTE(bg-channel): MP path is
-            //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
-            //              bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
-            //              SETANIM_BOTH, BOTH_VS_IDLE, iFlags, iBlend)
-            // BG_SetAnim is a `PmoveContext<'_>` method (bgAllAnims off BgState +
-            // receiver); no PmoveContext is constructed in this game-tier fn, so the
-            // call is staged pending the bg-channel retrofit.
+                                                         // PORT-NOTE(bg-channel): MP path is
+                                                         //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
+                                                         //              bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
+                                                         //              SETANIM_BOTH, BOTH_VS_IDLE, iFlags, iBlend)
+                                                         // BG_SetAnim is a `PmoveContext<'_>` method (bgAllAnims off BgState +
+                                                         // receiver); no PmoveContext is constructed in this game-tier fn, so the
+                                                         // call is staged pending the bg-channel retrofit.
         }
 
         qtrue
@@ -980,11 +948,7 @@ pub fn Initialize(
 /// vtable-dispatch retrofit (see shape_mismatch). All other logic is faithful MP+QAGAME.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1763-2334`
-pub fn Update(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-    pUmcd: *const usercmd_t,
-) -> qboolean {
+pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUmcd: *const usercmd_t) -> qboolean {
     unsafe {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let vi = (*pVeh).m_pVehicleInfo as *mut vehicleInfo_t;
@@ -1060,17 +1024,28 @@ pub fn Update(
         // See whether this vehicle should be dieing or dead. (MP: `m_iDieTime != 0`)
         if (*pVeh).m_iDieTime != 0 {
             // Keep track of the old orientation.
-            _VectorCopy(*((*pVeh).m_vOrientation as *const vec3_t), &mut (*pVeh).m_vPrevOrientation);
+            _VectorCopy(
+                *((*pVeh).m_vOrientation as *const vec3_t),
+                &mut (*pVeh).m_vPrevOrientation,
+            );
             crate::veh_dispatch::process_orient_commands(ctx, pVeh);
             //TODO: Port SetClientViewAngle
             // Source: oracle/oracle/codemp/game/g_client.c (fn not yet ported to g_client.rs)
             SetClientViewAngle(parent, *((*pVeh).m_vOrientation as *const vec3_t));
             if !(*pVeh).m_pPilot.is_null() {
-                SetClientViewAngle((*pVeh).m_pPilot as *mut gentity_t, *((*pVeh).m_vOrientation as *const vec3_t));
+                SetClientViewAngle(
+                    (*pVeh).m_pPilot as *mut gentity_t,
+                    *((*pVeh).m_vOrientation as *const vec3_t),
+                );
             }
             crate::veh_dispatch::process_move_commands(ctx, pVeh);
             if (*vi).r#type == vehicleType_t::VH_FIGHTER {
-                AngleVectors(*((*pVeh).m_vOrientation as *const vec3_t), Some(&mut (*pclient).ps.moveDir), None, None);
+                AngleVectors(
+                    *((*pVeh).m_vOrientation as *const vec3_t),
+                    Some(&mut (*pclient).ps.moveDir),
+                    None,
+                    None,
+                );
             } else {
                 let vVehAngles: vec3_t = [0.0, *(*pVeh).m_vOrientation.add(YAW as usize), 0.0];
                 AngleVectors(vVehAngles, Some(&mut (*pclient).ps.moveDir), None, None);
@@ -1158,7 +1133,12 @@ pub fn Update(
                     || (*pilotEnt).health <= 0
                     || (*pec).pers.connected != CON_CONNECTED
                 {
-                    crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pPilot as *mut bgEntity_t, qtrue);
+                    crate::veh_dispatch::eject(
+                        ctx,
+                        pVeh,
+                        (*pVeh).m_pPilot as *mut bgEntity_t,
+                        qtrue,
+                    );
                     return qfalse;
                 }
             }
@@ -1197,14 +1177,20 @@ pub fn Update(
                     || (*pilotEnt).health <= 0
                     || (*pec).pers.connected != CON_CONNECTED
                 {
-                    crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pPilot as *mut bgEntity_t, qtrue);
+                    crate::veh_dispatch::eject(
+                        ctx,
+                        pVeh,
+                        (*pVeh).m_pPilot as *mut bgEntity_t,
+                        qtrue,
+                    );
                 }
             }
             // If we're not empty...
             if (*pVeh).m_iNumPassengers > 0 {
                 let mut i: c_int = 0;
                 while i < (*vi).maxPassengers {
-                    let psngr = *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t;
+                    let psngr =
+                        *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t;
                     if !psngr.is_null() {
                         let sc = (*psngr).client as *mut gclient_t;
                         if (*psngr).inuse == qfalse
@@ -1215,7 +1201,8 @@ pub fn Update(
                             crate::veh_dispatch::eject(
                                 ctx,
                                 pVeh,
-                                *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t,
+                                *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)
+                                    as *mut gentity_t,
                                 qtrue,
                             );
                             (*pVeh).m_iNumPassengers -= 1;
@@ -1249,7 +1236,11 @@ pub fn Update(
                         if (*vi).weapon[iu].linkable == 1 {
                             // link-toggleable
                             (*pVeh).weaponStatus[iu].linked =
-                                if (*pVeh).weaponStatus[iu].linked != qfalse { qfalse } else { qtrue };
+                                if (*pVeh).weaponStatus[iu].linked != qfalse {
+                                    qfalse
+                                } else {
+                                    qtrue
+                                };
                         }
                     }
                     linkHeld = qtrue;
@@ -1285,7 +1276,10 @@ pub fn Update(
             && (*pVeh).m_iBoarding != 0
         {
             let pilotPS = (*(*pVeh).m_pPilot).playerState;
-            _VectorCopy(*((*pVeh).m_vOrientation as *const vec3_t), &mut (*pilotPS).viewangles);
+            _VectorCopy(
+                *((*pVeh).m_vOrientation as *const vec3_t),
+                &mut (*pilotPS).viewangles,
+            );
             (*pVeh).m_ucmd.buttons = 0;
             (*pVeh).m_ucmd.forwardmove = 0;
             (*pVeh).m_ucmd.rightmove = 0;
@@ -1293,7 +1287,10 @@ pub fn Update(
         }
 
         // Keep track of the old orientation.
-        _VectorCopy(*((*pVeh).m_vOrientation as *const vec3_t), &mut (*pVeh).m_vPrevOrientation);
+        _VectorCopy(
+            *((*pVeh).m_vOrientation as *const vec3_t),
+            &mut (*pVeh).m_vPrevOrientation,
+        );
 
         // Process the orient commands.
         crate::veh_dispatch::process_orient_commands(ctx, pVeh);
@@ -1323,7 +1320,9 @@ pub fn Update(
         // Shifting Sounds
         if (*pVeh).m_iTurboTime < curTime
             && (*pVeh).m_iSoundDebounceTimer < curTime
-            && ((nextSpeed > prevSpeed && nextSpeed > (halfMaxSpeed) as f32 && prevSpeed < (halfMaxSpeed) as f32)
+            && ((nextSpeed > prevSpeed
+                && nextSpeed > (halfMaxSpeed) as f32
+                && prevSpeed < (halfMaxSpeed) as f32)
                 || (nextSpeed > (halfMaxSpeed) as f32
                     && (*ctx.world).bg_state.rng.Q_irand(0, 1000) == 0))
         {
@@ -1344,7 +1343,12 @@ pub fn Update(
 
         // Setup the move direction.
         if (*vi).r#type == vehicleType_t::VH_FIGHTER {
-            AngleVectors(*((*pVeh).m_vOrientation as *const vec3_t), Some(&mut (*pclient).ps.moveDir), None, None);
+            AngleVectors(
+                *((*pVeh).m_vOrientation as *const vec3_t),
+                Some(&mut (*pclient).ps.moveDir),
+                None,
+                None,
+            );
         } else {
             let vVehAngles: vec3_t = [0.0, *(*pVeh).m_vOrientation.add(YAW as usize), 0.0];
             AngleVectors(vVehAngles, Some(&mut (*pclient).ps.moveDir), None, None);
@@ -1411,7 +1415,10 @@ pub fn UpdateRider(
         let rc = (*rider).client as *mut gclient_t;
 
         // MP: so they know who we're locking onto with our rockets, if anyone
-        if !rider.is_null() && !(*rider).client.is_null() && !parent.is_null() && !(*parent).client.is_null()
+        if !rider.is_null()
+            && !(*rider).client.is_null()
+            && !parent.is_null()
+            && !(*parent).client.is_null()
         {
             (*rc).ps.rocketLockIndex = (*pc).ps.rocketLockIndex;
             (*rc).ps.rocketLockTime = (*pc).ps.rocketLockTime;
@@ -1430,7 +1437,8 @@ pub fn UpdateRider(
                 // If going too fast, roll off.
                 if (*pc).ps.speed <= (600) as f32 && (*pUmcd).rightmove != 0 {
                     if crate::veh_dispatch::eject(ctx, pVeh, pRider, qfalse) != qfalse {
-                        let iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS;
+                        let iFlags =
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS;
                         let iBlend = 300;
                         let Anim: c_int;
                         if (*pUmcd).rightmove > 0 {
@@ -1471,7 +1479,7 @@ pub fn UpdateRider(
                         (*pVeh).m_iBoarding = (*ctx.world).level.time + iAnimLen;
                         // reuse flags: this should never be set in an entity
                         (*rider).flags |= FL_VEH_BOARDING; // MP
-                        // Make sure they can't fire when leaving.
+                                                           // Make sure they can't fire when leaving.
                         (*rc).ps.weaponTime = iAnimLen;
                     }
 
@@ -1488,7 +1496,8 @@ pub fn UpdateRider(
         }
 
         // Getting off animation complete (if we had one going)? (MP)
-        if (*pVeh).m_iBoarding < (*ctx.world).level.time && ((*rider).flags & FL_VEH_BOARDING) != 0 {
+        if (*pVeh).m_iBoarding < (*ctx.world).level.time && ((*rider).flags & FL_VEH_BOARDING) != 0
+        {
             (*rider).flags &= !FL_VEH_BOARDING;
             // Eject this guy now.
             if crate::veh_dispatch::eject(ctx, pVeh, pRider, qfalse) != qfalse {
@@ -1569,14 +1578,15 @@ pub fn UpdateRider(
 /// Raven `AttachRiders`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2598-2731`
-pub fn AttachRiders(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-) {
+pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let mut i: c_int = 0;
 
-        crate::bg_vehicleLoad::AttachRidersGeneric(pVeh, &(*ctx.world).bg_state, &GameBgTraps::new(ctx.engine));
+        crate::bg_vehicleLoad::AttachRidersGeneric(
+            pVeh,
+            &(*ctx.world).bg_state,
+            &GameBgTraps::new(ctx.engine),
+        );
 
         if !(*pVeh).m_pPilot.is_null() {
             let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
@@ -1635,7 +1645,7 @@ pub fn AttachRiders(
                 let ppc = (*pilot).client as *mut gclient_t;
                 BG_GiveMeVectorFromMatrix(
                     &boltMatrix,
-                        Eorientations::ORIGIN as c_int,
+                    Eorientations::ORIGIN as c_int,
                     &mut (*ppc).ps.origin,
                 );
 
@@ -1677,10 +1687,14 @@ pub fn AttachRiders(
                 let mut fwd: vec3_t = [0.0; 3];
                 BG_GiveMeVectorFromMatrix(
                     &boltMatrix,
-                        Eorientations::ORIGIN as c_int,
+                    Eorientations::ORIGIN as c_int,
                     &mut (*dcl).ps.origin,
                 );
-                BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut fwd);
+                BG_GiveMeVectorFromMatrix(
+                    &boltMatrix,
+                    Eorientations::NEGATIVE_Y as c_int,
+                    &mut fwd,
+                );
                 vectoangles(fwd, &mut (*dcl).ps.viewangles);
 
                 crate::g_utils::G_SetOrigin(droid, (*dcl).ps.origin);
@@ -1689,7 +1703,8 @@ pub fn AttachRiders(
                 trap::LinkEntity(ctx.engine, GLinkentityArgs::new(droid));
 
                 if !(*droid).NPC.is_null() {
-                    crate::npc_c::NPC_SetAnim(ctx,
+                    crate::npc_c::NPC_SetAnim(
+                        ctx,
                         droid,
                         SETANIM_BOTH,
                         animNumber_t::BOTH_STAND2 as c_int,
@@ -1706,11 +1721,7 @@ pub fn AttachRiders(
 /// Raven `Ghost` — make someone invisible and un-collidable.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2734-2756`
-pub fn Ghost(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-    pEnt: *mut bgEntity_t,
-) {
+pub fn Ghost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
     unsafe {
         if pEnt.is_null() {
             return;
@@ -1732,11 +1743,7 @@ pub fn Ghost(
 /// Raven `UnGhost` — make someone visible and collidable.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2759-2781`
-pub fn UnGhost(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-    pEnt: *mut bgEntity_t,
-) {
+pub fn UnGhost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
     unsafe {
         if pEnt.is_null() {
             return;
@@ -1758,10 +1765,7 @@ pub fn UnGhost(
 /// Raven `G_VehicleDamageBoxSizing`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2785-2840`
-pub fn G_VehicleDamageBoxSizing(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-) {
+pub fn G_VehicleDamageBoxSizing(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let fDist = 256.0f32; // estimated distance to nose from origin
         let bDist = 256.0f32; // estimated distance to back from origin
@@ -1769,7 +1773,9 @@ pub fn G_VehicleDamageBoxSizing(
         let hDist = 32.0f32; // height on each side from origin
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
 
-        if (*parent).ghoul2.is_null() || (*parent).m_pVehicle.is_null() || (*parent).client.is_null()
+        if (*parent).ghoul2.is_null()
+            || (*parent).m_pVehicle.is_null()
+            || (*parent).client.is_null()
         {
             // shouldn't have gotten in here then
             return;
@@ -1920,7 +1926,9 @@ pub fn G_FlyVehicleImpactDir(
                         (*veh).clipmask,
                     ),
                 );
-                if localTrace.startsolid != 0 || localTrace.allsolid != 0 || localTrace.fraction != 1.0
+                if localTrace.startsolid != 0
+                    || localTrace.allsolid != 0
+                    || localTrace.fraction != 1.0
                 {
                     return SHIPSURF_RIGHT;
                 }
@@ -1943,7 +1951,9 @@ pub fn G_FlyVehicleImpactDir(
                         (*veh).clipmask,
                     ),
                 );
-                if localTrace.startsolid != 0 || localTrace.allsolid != 0 || localTrace.fraction != 1.0
+                if localTrace.startsolid != 0
+                    || localTrace.allsolid != 0
+                    || localTrace.fraction != 1.0
                 {
                     return SHIPSURF_LEFT;
                 }
@@ -1970,9 +1980,7 @@ pub fn G_FlyVehicleImpactDir(
 /// Raven `G_ShipSurfaceForSurfName` — map a surface name to its ship surface id.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2930-2959`
-pub fn G_ShipSurfaceForSurfName(
-    surfaceName: *const c_char,
-) -> c_int {
+pub fn G_ShipSurfaceForSurfName(surfaceName: *const c_char) -> c_int {
     unsafe {
         if surfaceName.is_null() {
             return -1;
@@ -2355,14 +2363,9 @@ pub fn G_FlyVehicleSurfaceDestruction(
 /// Raven `G_VehUpdateShields`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3261-3273`
-pub fn G_VehUpdateShields(
-    targ: *mut gentity_t,
-) {
+pub fn G_VehUpdateShields(targ: *mut gentity_t) {
     unsafe {
-        if targ.is_null()
-            || (*targ).client.is_null()
-            || (*targ).m_pVehicle.is_null()
-        {
+        if targ.is_null() || (*targ).client.is_null() || (*targ).m_pVehicle.is_null() {
             return;
         }
         let vp = (*targ).m_pVehicle as *mut Vehicle_t;
@@ -2383,11 +2386,7 @@ pub fn G_VehUpdateShields(
 /// Raven `SetParent` — set the parent entity of this Vehicle NPC.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3277-3277`
-pub fn SetParent(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-    pParentEntity: *mut bgEntity_t,
-) {
+pub fn SetParent(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pParentEntity: *mut bgEntity_t) {
     unsafe {
         (*pVeh).m_pParentEntity = pParentEntity as *mut mp_bg::public::bg_entity::bgEntity_t;
     }
@@ -2396,11 +2395,7 @@ pub fn SetParent(
 /// Raven `SetPilot` — add a pilot to the vehicle.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3280-3280`
-pub fn SetPilot(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-    pPilot: *mut bgEntity_t,
-) {
+pub fn SetPilot(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pPilot: *mut bgEntity_t) {
     unsafe {
         (*pVeh).m_pPilot = pPilot as *mut mp_bg::public::bg_entity::bgEntity_t;
     }
@@ -2410,19 +2405,14 @@ pub fn SetPilot(
 ///
 /// Raven: the generic implementation always returns false.
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3283-3283`
-pub fn AddPassenger(
-    pVeh: *mut Vehicle_t,
-) -> qboolean {
+pub fn AddPassenger(pVeh: *mut Vehicle_t) -> qboolean {
     qfalse
 }
 
 /// Raven `Inhabited` — whether this vehicle is currently inhabited (by anyone).
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3286-3286`
-pub fn Inhabited(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-) -> qboolean {
+pub fn Inhabited(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
     unsafe {
         if !(*pVeh).m_pPilot.is_null() || (*pVeh).m_iNumPassengers != 0 {
             qtrue
@@ -2553,7 +2543,8 @@ pub fn Eject(
                         pVeh,
                         *(*pVeh).m_ppPassengers.as_mut_ptr().add(j as usize) as *mut gentity_t,
                     );
-                    let newPilot = *(*pVeh).m_ppPassengers.as_mut_ptr().add(j as usize) as *mut gentity_t;
+                    let newPilot =
+                        *(*pVeh).m_ppPassengers.as_mut_ptr().add(j as usize) as *mut gentity_t;
                     (*parent).r.ownerNum = (*newPilot).s.number;
                     (*parent).s.owner = (*parent).r.ownerNum; // for prediction
                     (*pc).ps.m_iVehicleNum = (*newPilot).s.number + 1;
@@ -2569,10 +2560,11 @@ pub fn Eject(
                             // move down
                             *(*pVeh).m_ppPassengers.as_mut_ptr().add((k - 1) as usize) =
                                 *(*pVeh).m_ppPassengers.as_mut_ptr().add(k as usize);
-                            *(*pVeh).m_ppPassengers.as_mut_ptr().add(k as usize) = core::ptr::null_mut();
+                            *(*pVeh).m_ppPassengers.as_mut_ptr().add(k as usize) =
+                                core::ptr::null_mut();
                             // QAGAME: server just needs to tell client which passenger he is
-                            let moved =
-                                *(*pVeh).m_ppPassengers.as_mut_ptr().add((k - 1) as usize) as *mut gentity_t;
+                            let moved = *(*pVeh).m_ppPassengers.as_mut_ptr().add((k - 1) as usize)
+                                as *mut gentity_t;
                             if !(*moved).client.is_null() {
                                 (*((*moved).client as *mut gclient_t)).ps.generic1 = k;
                             }
@@ -2706,7 +2698,8 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                                 //FIXME: does this give proper credit to the enemy who shot you down?
                                 crate::g_combat::G_Damage(
                                     ctx,
-                                    *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize) as *mut gentity_t,
+                                    *(*pVeh).m_ppPassengers.as_mut_ptr().add(i as usize)
+                                        as *mut gentity_t,
                                     parent,
                                     parent,
                                     None,

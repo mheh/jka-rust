@@ -1,6 +1,6 @@
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport};
 
 /// `GAME_NAV_FINDCOMBATPOINTWAYPOINTS` MP game exports vmMain ABI token.
 ///
@@ -16,4 +16,16 @@ impl InboundVmCall for GameNavFindcombatpointwaypoints {
     type Output = ();
 
     const COMMAND: MpGameExport = MpGameExport::GAME_NAV_FINDCOMBATPOINTWAYPOINTS;
+}
+
+impl DecodeVmMain for GameNavFindcombatpointwaypoints {
+    // Takes no vmMain arg words — g_main.c:688-689.
+    fn decode_vm_main(_t: VmMainTransport) -> Self::Args {}
+}
+
+impl EncodeVmMainReturn for GameNavFindcombatpointwaypoints {
+    fn encode_return(_output: Self::Output) -> isize {
+        // `CP_FindCombatPointWaypoints(); return 0;` — g_main.c:688-689.
+        0
+    }
 }

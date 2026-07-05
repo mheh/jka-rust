@@ -17,5 +17,5 @@ pub use gclient::{gclient_s, gclient_t};
 pub use render_info::renderInfo_t;
 // `spectatorState_t` / `playerTeamStateState_t` are named enums (per oracle), so
 // their members are `T::VARIANT`, not free consts.
-pub use player_team_state::{playerTeamState_t, playerTeamStateState_t};
+pub use player_team_state::{playerTeamStateState_t, playerTeamState_t};
 pub use spectator_state::spectatorState_t;

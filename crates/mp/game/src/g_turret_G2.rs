@@ -11,26 +11,26 @@
 //! what `gentity_t` actually carries. See each fn's PORT-NOTE marker.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
+use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
 use crate::entity::flags::{FL_BBRUSH, FL_NOTARGET};
 use crate::g_combat::{AddScore, G_RadiusDamage, ObjectDie};
+use crate::g_items::RegisterItem;
+use crate::g_spawn::{G_SpawnFloat, G_SpawnInt, G_SpawnString};
 use crate::g_team::OnSameTeam;
 use crate::g_utils::{
     G_BoneIndex, G_EffectIndex, G_IconIndex, G_KillG2Queue, G_ModelIndex, G_PlayEffect,
     G_PlayEffectID, G_RadiusList, G_ScaleNetHealth, G_SetAngles, G_SetOrigin, G_Sound,
     G_SoundIndex, G_Spawn, G_UseTargets, G_UseTargets2,
 };
-use crate::g_spawn::{G_SpawnFloat, G_SpawnInt, G_SpawnString};
 use crate::g_weapon::WP_FireTurboLaserMissile;
-use crate::g_items::RegisterItem;
-use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
-use crate::NPC_combat::G_SetEnemy;
-use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
+use crate::prelude::*;
 use crate::q_math::{
     vectoangles, AngleNormalize360, AngleSubtract, AngleVectors, VectorLengthSquared,
     VectorNormalize,
 };
 use crate::q_shared::Q_stricmp;
+use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
+use crate::NPC_combat::G_SetEnemy;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
@@ -176,11 +176,7 @@ pub fn G2Tur_SetBoneAngles(
 /// Raven `turretG2_set_models`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:125-207`
-pub fn turretG2_set_models(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    dying: qboolean,
-) {
+pub fn turretG2_set_models(ctx: GameContext<'_>, self_: *mut gentity_t, dying: qboolean) {
     // Raven `#define name .../name2 .../name3 ...` (`g_turret_G2.c:19-22`).
     const NAME: &core::ffi::CStr = c"models/map_objects/imp_mine/turret_canon.glm";
     const NAME2: &core::ffi::CStr = c"models/map_objects/imp_mine/turret_damage.md3";
@@ -266,7 +262,12 @@ pub fn turretG2_set_models(
                     ),
                 );
             } else {
-                G2Tur_SetBoneAngles(ctx, self_, c"Bone_body".as_ptr() as *mut c_char, vec3_origin);
+                G2Tur_SetBoneAngles(
+                    ctx,
+                    self_,
+                    c"Bone_body".as_ptr() as *mut c_char,
+                    vec3_origin,
+                );
                 (*self_).genericValue11 = trap::G2API_AddBolt(
                     ctx.engine,
                     mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
@@ -300,8 +301,9 @@ pub fn TurretG2Pain(
         if !(*attacker).client.is_null()
             && (*((*attacker).client as *mut gclient_t)).ps.weapon == WP_DEMP2 as c_int
         {
-            (*self_).attackDebounceTime =
-                (*ctx.world).level.time + 2000 + ((*ctx.world).bg_state.rng.random() * 500.0) as c_int;
+            (*self_).attackDebounceTime = (*ctx.world).level.time
+                + 2000
+                + ((*ctx.world).bg_state.rng.random() * 500.0) as c_int;
             (*self_).painDebounceTime = (*self_).attackDebounceTime;
         }
         if (*self_).enemy.is_none() {
@@ -454,15 +456,18 @@ pub fn TurboLaser_SetBoneAnim(
 /// Raven `turretG2_fire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:344-412`
-pub fn turretG2_fire(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    start: vec3_t,
-    dir: &mut vec3_t,
-) {
+pub fn turretG2_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, dir: &mut vec3_t) {
     unsafe {
         // Check if start position is inside a wall
-        if (trap::PointContents(ctx.engine, mp_abi::game::syscalls::G_POINTCONTENTS::GPointcontentsArgs::new(&start as *const vec3_t, (*ent).s.number)) & MASK_SHOT) != 0 {
+        if (trap::PointContents(
+            ctx.engine,
+            mp_abi::game::syscalls::G_POINTCONTENTS::GPointcontentsArgs::new(
+                &start as *const vec3_t,
+                (*ent).s.number,
+            ),
+        ) & MASK_SHOT)
+            != 0
+        {
             return;
         }
 
@@ -475,8 +480,14 @@ pub fn turretG2_fire(
         // Add random error if needed
         if (*ent).random != 0.0 {
             crate::q_math::vectoangles(*dir, &mut ang);
-            ang[PITCH as usize] += (*ctx.world).bg_state.rng.flrand(-(*ent).random, (*ent).random);
-            ang[YAW as usize] += (*ctx.world).bg_state.rng.flrand(-(*ent).random, (*ent).random);
+            ang[PITCH as usize] += (*ctx.world)
+                .bg_state
+                .rng
+                .flrand(-(*ent).random, (*ent).random);
+            ang[YAW as usize] += (*ctx.world)
+                .bg_state
+                .rng
+                .flrand(-(*ent).random, (*ent).random);
             crate::q_math::AngleVectors(ang, Some(&mut *dir), None, None);
         }
 
@@ -521,7 +532,12 @@ pub fn turretG2_fire(
             (*bolt).s.pos.trTime = (*ctx.world).level.time;
             crate::q_math::_VectorCopy(start, &mut (*bolt).s.pos.trBase);
             crate::q_math::_VectorScale(*dir, (*ent).mass, &mut (*bolt).s.pos.trDelta);
-            trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut (*bolt).s.pos.trDelta as *mut vec3_t));
+            trap::SnapVector(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
+                    &mut (*bolt).s.pos.trDelta as *mut vec3_t,
+                ),
+            );
             crate::q_math::_VectorCopy(start, &mut (*bolt).r.currentOrigin);
         }
     }
@@ -530,10 +546,7 @@ pub fn turretG2_fire(
 /// Raven `turretG2_respawn`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:414-434`
-pub fn turretG2_respawn(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turretG2_respawn(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).use_ = Some(crate::ent_fn_enums::EntUse::turretG2_base_use);
         (*self_).pain = Some(crate::ent_fn_enums::EntPain::TurretG2Pain);
@@ -563,10 +576,7 @@ pub fn turretG2_respawn(
 /// Raven `turretG2_head_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:437-482`
-pub fn turretG2_head_think(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turretG2_head_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // if it's time to fire and we have an enemy, then gun 'em down!
         // pushDebounce time controls next fire time
@@ -634,10 +644,7 @@ pub fn turretG2_head_think(
 /// Raven `turretG2_aim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:485-648`
-pub fn turretG2_aim(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turretG2_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut enemyDir: vec3_t;
         let mut org: vec3_t;
@@ -646,12 +653,25 @@ pub fn turretG2_aim(
         let mut setAngle: vec3_t;
         let mut diffYaw: f32 = 0.0;
         let mut diffPitch: f32 = 0.0;
-        let maxYawSpeed = if (*self_).spawnflags & SPF_TURRETG2_TURBO != 0 { 30.0 } else { 14.0 };
-        let maxPitchSpeed = if (*self_).spawnflags & SPF_TURRETG2_TURBO != 0 { 15.0 } else { 3.0 };
+        let maxYawSpeed = if (*self_).spawnflags & SPF_TURRETG2_TURBO != 0 {
+            30.0
+        } else {
+            14.0
+        };
+        let maxPitchSpeed = if (*self_).spawnflags & SPF_TURRETG2_TURBO != 0 {
+            15.0
+        } else {
+            3.0
+        };
 
         // move our gun base yaw to where we should be at this time....
-        BG_EvaluateTrajectory(&(*self_).s.apos as *const trajectory_t, (*ctx.world).level.time, &mut (*self_).r.currentAngles);
-        (*self_).r.currentAngles[YAW as usize] = AngleNormalize360((*self_).r.currentAngles[YAW as usize]);
+        BG_EvaluateTrajectory(
+            &(*self_).s.apos as *const trajectory_t,
+            (*ctx.world).level.time,
+            &mut (*self_).r.currentAngles,
+        );
+        (*self_).r.currentAngles[YAW as usize] =
+            AngleNormalize360((*self_).r.currentAngles[YAW as usize]);
         (*self_).speed = AngleNormalize360((*self_).speed);
 
         if let Some(enemy_id) = (*self_).enemy {
@@ -712,12 +732,19 @@ pub fn turretG2_aim(
             );
 
             let mut org2v: vec3_t = [0.0; 3];
-            BG_GiveMeVectorFromMatrix(&boltMatrix as *const mdxaBone_t, ORIGIN as c_int, &mut org2v);
+            BG_GiveMeVectorFromMatrix(
+                &boltMatrix as *const mdxaBone_t,
+                ORIGIN as c_int,
+                &mut org2v,
+            );
 
             enemyDir = [org[0] - org2v[0], org[1] - org2v[1], org[2] - org2v[2]];
             vectoangles(enemyDir, &mut desiredAngles);
 
-            diffYaw = AngleSubtract((*self_).r.currentAngles[YAW as usize], desiredAngles[YAW as usize]);
+            diffYaw = AngleSubtract(
+                (*self_).r.currentAngles[YAW as usize],
+                desiredAngles[YAW as usize],
+            );
             diffPitch = AngleSubtract((*self_).speed, desiredAngles[PITCH as usize]);
         }
         // else: no enemy, so make us slowly sweep back and forth as if
@@ -726,7 +753,11 @@ pub fn turretG2_aim(
         if diffYaw != 0.0 {
             // cap max speed....
             if diffYaw.abs() > maxYawSpeed {
-                diffYaw = if diffYaw >= 0.0 { maxYawSpeed } else { -maxYawSpeed };
+                diffYaw = if diffYaw >= 0.0 {
+                    maxYawSpeed
+                } else {
+                    -maxYawSpeed
+                };
             }
 
             // ...then set up our desired yaw
@@ -741,7 +772,11 @@ pub fn turretG2_aim(
         if diffPitch != 0.0 {
             if diffPitch.abs() > maxPitchSpeed {
                 // cap max speed
-                (*self_).speed += if diffPitch > 0.0 { -maxPitchSpeed } else { maxPitchSpeed };
+                (*self_).speed += if diffPitch > 0.0 {
+                    -maxPitchSpeed
+                } else {
+                    maxPitchSpeed
+                };
             } else {
                 // small enough, so just add half the diff so we smooth out the stopping
                 (*self_).speed -= diffPitch;
@@ -762,7 +797,12 @@ pub fn turretG2_aim(
                 } else {
                     desiredAngles = [-(*self_).speed, 0.0, 0.0];
                 }
-                G2Tur_SetBoneAngles(ctx, self_, c"Bone_body".as_ptr() as *mut c_char, desiredAngles);
+                G2Tur_SetBoneAngles(
+                    ctx,
+                    self_,
+                    c"Bone_body".as_ptr() as *mut c_char,
+                    desiredAngles,
+                );
             }
         }
 
@@ -783,10 +823,7 @@ pub fn turretG2_aim(
 /// Raven `turretG2_turnoff`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:651-674`
-pub fn turretG2_turnoff(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turretG2_turnoff(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).enemy.is_none() {
             // we don't need to turnoff
@@ -797,7 +834,12 @@ pub fn turretG2_turnoff(
         }
         // shut-down sound
         if (*self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-            G_Sound(ctx, self_, CHAN_BODY as c_int, G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()));
+            G_Sound(
+                ctx,
+                self_,
+                CHAN_BODY as c_int,
+                G_SoundIndex(c"sound/chars/turret/shutdown.wav".as_ptr()),
+            );
         }
 
         // make turret play ping sound for 5 seconds
@@ -811,10 +853,7 @@ pub fn turretG2_turnoff(
 /// Raven `turretG2_find_enemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:677-826`
-pub fn turretG2_find_enemies(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) -> qboolean {
+pub fn turretG2_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
     const MAX_GENTITIES: usize = mp_qshared::shared::MAX_GENTITIES;
 
     unsafe {
@@ -827,7 +866,12 @@ pub fn turretG2_find_enemies(
             // We were active and alert, i.e. had an enemy in the last 3 secs
             if (*self_).painDebounceTime < (*ctx.world).level.time {
                 if (*self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-                    G_Sound(ctx, self_, CHAN_BODY as c_int, G_SoundIndex(c"sound/chars/turret/ping.wav".as_ptr()));
+                    G_Sound(
+                        ctx,
+                        self_,
+                        CHAN_BODY as c_int,
+                        G_SoundIndex(c"sound/chars/turret/ping.wav".as_ptr()),
+                    );
                 }
                 (*self_).painDebounceTime = (*ctx.world).level.time + 1000;
             }
@@ -841,7 +885,14 @@ pub fn turretG2_find_enemies(
         }
 
         let mut entity_list: Vec<*mut gentity_t> = vec![core::ptr::null_mut(); MAX_GENTITIES];
-        let count = G_RadiusList(ctx, org2, (*self_).radius, self_, qtrue, entity_list.as_mut_ptr());
+        let count = G_RadiusList(
+            ctx,
+            org2,
+            (*self_).radius,
+            self_,
+            qtrue,
+            entity_list.as_mut_ptr(),
+        );
 
         for i in 0..count {
             let target = entity_list[i as usize];
@@ -852,23 +903,33 @@ pub fn turretG2_find_enemies(
                     || (*target).takedamage == 0
                     || (!(*target).NPC_targetname.is_null()
                         && !(*self_).targetname.is_null()
-                        && Q_stricmp((*target).NPC_targetname as *const c_char, (*self_).targetname as *const c_char) != 0)
+                        && Q_stricmp(
+                            (*target).NPC_targetname as *const c_char,
+                            (*self_).targetname as *const c_char,
+                        ) != 0)
                 {
                     continue;
                 }
                 // else: we will shoot at bbrushes!
             }
-            if target == self_ || (*target).takedamage == 0 || (*target).health <= 0 || ((*target).flags & FL_NOTARGET) != 0 {
+            if target == self_
+                || (*target).takedamage == 0
+                || (*target).health <= 0
+                || ((*target).flags & FL_NOTARGET) != 0
+            {
                 continue;
             }
             if !(*target).client.is_null()
-                && (*((*target).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR as c_int
+                && (*((*target).client as *mut gclient_t)).sess.sessionTeam
+                    == TEAM_SPECTATOR as c_int
             {
                 continue;
             }
             if (*self_).alliedTeam != 0 {
                 if !(*target).client.is_null() {
-                    if (*((*target).client as *mut gclient_t)).sess.sessionTeam == (*self_).alliedTeam {
+                    if (*((*target).client as *mut gclient_t)).sess.sessionTeam
+                        == (*self_).alliedTeam
+                    {
                         // A bot/client/NPC we don't want to shoot
                         continue;
                     }
@@ -877,7 +938,14 @@ pub fn turretG2_find_enemies(
                     continue;
                 }
             }
-            if trap::InPVS(ctx.engine, GInPvsArgs::new(&org2 as *const vec3_t, &(*target).r.currentOrigin as *const vec3_t)) == 0 {
+            if trap::InPVS(
+                ctx.engine,
+                GInPvsArgs::new(
+                    &org2 as *const vec3_t,
+                    &(*target).r.currentOrigin as *const vec3_t,
+                ),
+            ) == 0
+            {
                 continue;
             }
 
@@ -896,10 +964,21 @@ pub fn turretG2_find_enemies(
             let mut tr: trace_t = core::mem::zeroed();
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut tr as *mut trace_t, &org2 as *const vec3_t, core::ptr::null(), core::ptr::null(), &org as *const vec3_t, (*self_).s.number, MASK_SHOT),
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &org2 as *const vec3_t,
+                    core::ptr::null(),
+                    core::ptr::null(),
+                    &org as *const vec3_t,
+                    (*self_).s.number,
+                    MASK_SHOT,
+                ),
             );
 
-            if tr.allsolid == 0 && tr.startsolid == 0 && (tr.fraction == 1.0 || tr.entityNum as c_int == (*target).s.number) {
+            if tr.allsolid == 0
+                && tr.startsolid == 0
+                && (tr.fraction == 1.0 || tr.entityNum as c_int == (*target).s.number)
+            {
                 // Only acquire if have a clear shot, Is it in range and closer than our best?
                 let enemyDir = [
                     (*target).r.currentOrigin[0] - (*self_).r.currentOrigin[0],
@@ -914,7 +993,12 @@ pub fn turretG2_find_enemies(
                         // We haven't fired or acquired an enemy in the last 2
                         // seconds-start-up sound
                         if (*self_).spawnflags & SPF_TURRETG2_TURBO == 0 {
-                            G_Sound(ctx, self_, CHAN_BODY as c_int, G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()));
+                            G_Sound(
+                                ctx,
+                                self_,
+                                CHAN_BODY as c_int,
+                                G_SoundIndex(c"sound/chars/turret/startup.wav".as_ptr()),
+                            );
                         }
 
                         // Wind up turrets for a bit
@@ -946,10 +1030,7 @@ pub fn turretG2_find_enemies(
 /// Raven `turretG2_base_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:829-956`
-pub fn turretG2_base_think(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turretG2_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut turnOff = qtrue;
 
@@ -990,7 +1071,8 @@ pub fn turretG2_base_think(
             if turretG2_find_enemies(ctx, self_) != 0 {
                 // found one
                 turnOff = qfalse;
-                let enemy = &mut (*ctx.world).g_entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
+                let enemy =
+                    &mut (*ctx.world).g_entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
                 if !(*enemy).client.is_null() {
                     // hold on to clients for a min of 3 seconds
                     (*self_).last_move_time = (*ctx.world).level.time + 3000;
@@ -1004,7 +1086,8 @@ pub fn turretG2_base_think(
         if let Some(enemy_id) = (*self_).enemy {
             let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             if !(*enemy).client.is_null()
-                && (*((*enemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR as c_int
+                && (*((*enemy).client as *mut gclient_t)).sess.sessionTeam
+                    == TEAM_SPECTATOR as c_int
             {
                 // don't keep going after spectators
                 (*self_).enemy = None;
@@ -1020,7 +1103,14 @@ pub fn turretG2_base_think(
 
                 if enemyDist < (*self_).radius * (*self_).radius {
                     // was in valid radius
-                    if trap::InPVS(ctx.engine, GInPvsArgs::new(&(*self_).r.currentOrigin as *const vec3_t, &(*enemy).r.currentOrigin as *const vec3_t)) != 0 {
+                    if trap::InPVS(
+                        ctx.engine,
+                        GInPvsArgs::new(
+                            &(*self_).r.currentOrigin as *const vec3_t,
+                            &(*enemy).r.currentOrigin as *const vec3_t,
+                        ),
+                    ) != 0
+                    {
                         // Every now and again, check to see if we can even trace to the enemy
                         let mut tr: trace_t = core::mem::zeroed();
 
@@ -1037,10 +1127,21 @@ pub fn turretG2_base_think(
                         }
                         trap::Trace(
                             ctx.engine,
-                            GTraceArgs::new(&mut tr as *mut trace_t, &org2 as *const vec3_t, core::ptr::null(), core::ptr::null(), &org as *const vec3_t, (*self_).s.number, MASK_SHOT),
+                            GTraceArgs::new(
+                                &mut tr as *mut trace_t,
+                                &org2 as *const vec3_t,
+                                core::ptr::null(),
+                                core::ptr::null(),
+                                &org as *const vec3_t,
+                                (*self_).s.number,
+                                MASK_SHOT,
+                            ),
                         );
 
-                        if tr.allsolid == 0 && tr.startsolid == 0 && tr.entityNum as c_int == (*enemy).s.number {
+                        if tr.allsolid == 0
+                            && tr.startsolid == 0
+                            && tr.entityNum as c_int == (*enemy).s.number
+                        {
                             turnOff = qfalse; // Can see our enemy
                         }
                     }
@@ -1055,7 +1156,9 @@ pub fn turretG2_base_think(
             }
         } else {
             // keep our enemy for a minimum of 2 seconds from now
-            (*self_).bounceCount = (*ctx.world).level.time + 2000 + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
+            (*self_).bounceCount = (*ctx.world).level.time
+                + 2000
+                + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
         }
 
         turretG2_aim(ctx, self_);
@@ -1068,11 +1171,7 @@ pub fn turretG2_base_think(
 /// Raven `turretG2_base_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:959-973`
-pub fn turretG2_base_use(
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
-) {
+pub fn turretG2_base_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     unsafe {
         // Toggle on and off
         (*self_).spawnflags ^= 1;
@@ -1089,18 +1188,25 @@ pub fn turretG2_base_use(
 /// Raven `SP_misc_turretG2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:1029-1081`
-pub fn SP_misc_turretG2(
-    ctx: GameContext<'_>,
-    base: *mut gentity_t,
-) {
+pub fn SP_misc_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
     unsafe {
         turretG2_set_models(ctx, base, qfalse);
 
-        G_SpawnInt(ctx, c"painwait".as_ptr(), c"0".as_ptr(), &mut (*base).genericValue4 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"painwait".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*base).genericValue4 as *mut c_int,
+        );
         (*base).genericValue8 = 0;
 
         let mut customscaleVal: c_int = 0;
-        G_SpawnInt(ctx, c"customscale".as_ptr(), c"0".as_ptr(), &mut customscaleVal as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"customscale".as_ptr(),
+            c"0".as_ptr(),
+            &mut customscaleVal as *mut c_int,
+        );
         (*base).s.iModelScale = customscaleVal;
         if (*base).s.iModelScale != 0 {
             if (*base).s.iModelScale > 1023 {
@@ -1111,7 +1217,12 @@ pub fn SP_misc_turretG2(
         }
 
         let mut s: *mut c_char = core::ptr::null_mut();
-        G_SpawnString(ctx, c"icon".as_ptr(), c"".as_ptr(), &mut s as *mut *mut c_char);
+        G_SpawnString(
+            ctx,
+            c"icon".as_ptr(),
+            c"".as_ptr(),
+            &mut s as *mut *mut c_char,
+        );
         if !s.is_null() && VALIDSTRING(s as *const c_char) {
             // We have an icon, so index it now.  We are reusing the
             // genericenemyindex variable rather than adding a new one to the
@@ -1140,10 +1251,7 @@ pub fn SP_misc_turretG2(
 /// Raven `finish_spawning_turretG2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:1084-1297`
-pub fn finish_spawning_turretG2(
-    ctx: GameContext<'_>,
-    base: *mut gentity_t,
-) {
+pub fn finish_spawning_turretG2(ctx: GameContext<'_>, base: *mut gentity_t) {
     unsafe {
         let mut fwd: vec3_t = [0.0; 3];
         let mut t: c_int = 0;
@@ -1164,7 +1272,8 @@ pub fn finish_spawning_turretG2(
         // Handle team damage immunity
         if !(*base).team.is_null() && *(*base).team != 0 && (*base).teamnodmg == 0 {
             // PORT-NOTE(atoi-usage): Raven uses atoi() to parse team string; we convert directly
-            let team_str = core::ffi::CStr::from_ptr((*base).team as *const c_char).to_string_lossy();
+            let team_str =
+                core::ffi::CStr::from_ptr((*base).team as *const c_char).to_string_lossy();
             (*base).teamnodmg = team_str.parse::<c_int>().unwrap_or(0);
         }
         (*base).team = core::ptr::null_mut();
@@ -1189,7 +1298,12 @@ pub fn finish_spawning_turretG2(
             (*base).count = 20000;
         }
 
-        G_SpawnFloat(ctx, c"shotspeed".as_ptr(), c"0".as_ptr(), &mut (*base).mass as *mut f32);
+        G_SpawnFloat(
+            ctx,
+            c"shotspeed".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*base).mass as *mut f32,
+        );
 
         if (*base).spawnflags & SPF_TURRETG2_TURBO != 0 {
             // TURBO LASER configuration
@@ -1293,7 +1407,12 @@ pub fn finish_spawning_turretG2(
         // stash health off for respawn
         (*base).genericValue6 = (*base).health;
 
-        G_SpawnInt(ctx, c"showhealth".as_ptr(), c"0".as_ptr(), &mut t as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"showhealth".as_ptr(),
+            c"0".as_ptr(),
+            &mut t as *mut c_int,
+        );
         if t != 0 {
             // a non-0 maxhealth value will mean we want to show the health on the hud
             (*base).maxHealth = (*base).health;
@@ -1321,7 +1440,8 @@ pub fn finish_spawning_turretG2(
             G_SoundIndex(c"sound/chars/turret/move.wav".as_ptr());
         }
 
-        (*base).r.contents = CONTENTS_BODY | CONTENTS_PLAYERCLIP | CONTENTS_MONSTERCLIP | CONTENTS_SHOTCLIP;
+        (*base).r.contents =
+            CONTENTS_BODY | CONTENTS_PLAYERCLIP | CONTENTS_MONSTERCLIP | CONTENTS_SHOTCLIP;
 
         (*base).takedamage = qtrue;
         (*base).die = Some(crate::ent_fn_enums::EntDie::turretG2_die);
@@ -1334,6 +1454,9 @@ pub fn finish_spawning_turretG2(
         // But set us as a turret so that we can be identified as a turret
         (*base).s.weapon = WP_TURRET as c_int;
 
-        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base));
+        trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base),
+        );
     }
 }

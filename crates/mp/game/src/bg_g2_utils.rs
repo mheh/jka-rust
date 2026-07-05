@@ -6,7 +6,6 @@
 
 use crate::prelude::*;
 
-
 /// Raven `BG_AttachToRancor`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_g2_utils.c:25-98`
@@ -161,7 +160,8 @@ pub fn BG_GetRootSurfNameWithVariant(
 ) -> qboolean {
     const MAX_VARIANTS: c_int = 8;
 
-    if ghoul2.is_null() || traps.g2api_get_surface_render_status(ghoul2, 0, rootSurfName) == qfalse {
+    if ghoul2.is_null() || traps.g2api_get_surface_render_status(ghoul2, 0, rootSurfName) == qfalse
+    {
         // see if the basic name without variants is on
         unsafe {
             Q_strncpyz(returnSurfName, rootSurfName, returnSize);

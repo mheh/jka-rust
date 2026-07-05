@@ -5,19 +5,16 @@
 //! initialization for the Walker vehicle type.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::ent_fn_enums::EntThink;
 use crate::prelude::*;
 use crate::q_math::{PITCH, YAW};
-use crate::ent_fn_enums::EntThink;
 use crate::trap;
 
 /// Raven `RegisterAssets`.
 ///
 /// Registers the turret weapon used by the Walker vehicle.
 /// Source: `oracle/oracle/codemp/game/WalkerNPC.c:84-95`
-pub fn RegisterAssets(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-) {
+pub fn RegisterAssets(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         // atst uses turret weapon (#ifdef _JK2MP path — both MP/SP port to same)
         let weapon = crate::bg_misc::BG_FindItemForWeapon(WP_TURRET);
@@ -47,19 +44,29 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         }
         let parent_ps = &mut *parent_ps;
 
-        let speed_idle_dec = pVeh.m_pVehicleInfo.as_ref()
+        let speed_idle_dec = pVeh
+            .m_pVehicleInfo
+            .as_ref()
             .map(|v| v.decelIdle * pVeh.m_fTimeModifier)
             .unwrap_or(0.0);
-        let speed_max = pVeh.m_pVehicleInfo.as_ref()
+        let speed_max = pVeh
+            .m_pVehicleInfo
+            .as_ref()
             .map(|v| v.speedMax)
             .unwrap_or(100.0);
-        let speed_idle = pVeh.m_pVehicleInfo.as_ref()
+        let speed_idle = pVeh
+            .m_pVehicleInfo
+            .as_ref()
             .map(|v| v.speedIdle)
             .unwrap_or(0.0);
-        let speed_idle_accel = pVeh.m_pVehicleInfo.as_ref()
+        let speed_idle_accel = pVeh
+            .m_pVehicleInfo
+            .as_ref()
             .map(|v| v.accelIdle * pVeh.m_fTimeModifier)
             .unwrap_or(0.0);
-        let speed_min = pVeh.m_pVehicleInfo.as_ref()
+        let speed_min = pVeh
+            .m_pVehicleInfo
+            .as_ref()
             .map(|v| v.speedMin)
             .unwrap_or(0.0);
 
@@ -74,12 +81,15 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             }
             parent_ps.speed = 0.0;
         } else {
-            speed_inc = pVeh.m_pVehicleInfo.as_ref()
+            speed_inc = pVeh
+                .m_pVehicleInfo
+                .as_ref()
                 .map(|v| v.acceleration * pVeh.m_fTimeModifier)
                 .unwrap_or(0.0);
         }
 
-        if parent_ps.speed != 0.0 || parent_ps.groundEntityNum == ENTITYNUM_NONE as c_int
+        if parent_ps.speed != 0.0
+            || parent_ps.groundEntityNum == ENTITYNUM_NONE as c_int
             || pVeh.m_ucmd.forwardmove != 0
             || pVeh.m_ucmd.upmove > 0
         {
@@ -124,7 +134,9 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         }
 
         let f_walk_speed_max = speed_max * 0.275;
-        if (pVeh.m_ucmd.buttons & BUTTON_WALKING as c_int) != 0 && parent_ps.speed > f_walk_speed_max {
+        if (pVeh.m_ucmd.buttons & BUTTON_WALKING as c_int) != 0
+            && parent_ps.speed > f_walk_speed_max
+        {
             parent_ps.speed = f_walk_speed_max;
         } else if parent_ps.speed > speed_max {
             parent_ps.speed = speed_max;
@@ -160,14 +172,18 @@ pub fn WalkerYawAdjust(
 
         if parent_ps.speed != 0.0 {
             let mut s = parent_ps.speed;
-            let max_dif = pVeh.m_pVehicleInfo.as_ref()
+            let max_dif = pVeh
+                .m_pVehicleInfo
+                .as_ref()
                 .map(|v| v.turningSpeed * 1.5)
                 .unwrap_or(0.0);
 
             if s < 0.0 {
                 s = -s;
             }
-            ang_dif *= s / pVeh.m_pVehicleInfo.as_ref()
+            ang_dif *= s / pVeh
+                .m_pVehicleInfo
+                .as_ref()
                 .map(|v| v.speedMax)
                 .unwrap_or(1.0);
 
@@ -233,11 +249,15 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             *pVeh.m_vOrientation.add(PITCH as usize) = (*rider_ps).viewangles[PITCH as usize];
         } else {
             // NPC or no rider
-            let mut turn_speed = pVeh.m_pVehicleInfo.as_ref()
+            let mut turn_speed = pVeh
+                .m_pVehicleInfo
+                .as_ref()
                 .map(|v| v.turningSpeed)
                 .unwrap_or(0.0);
 
-            if !pVeh.m_pVehicleInfo.as_ref()
+            if !pVeh
+                .m_pVehicleInfo
+                .as_ref()
                 .map(|v| v.turnWhenStopped != 0)
                 .unwrap_or(false)
                 && (*parent_ps).speed == 0.0
@@ -263,11 +283,15 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             }
 
             // Malfunction handling — no-op per oracle (empty block)
-            if pVeh.m_pVehicleInfo.as_ref()
+            if pVeh
+                .m_pVehicleInfo
+                .as_ref()
                 .map(|v| v.malfunctionArmorLevel != 0)
                 .unwrap_or(false)
                 && pVeh.m_iArmor
-                    <= pVeh.m_pVehicleInfo.as_ref()
+                    <= pVeh
+                        .m_pVehicleInfo
+                        .as_ref()
                         .map(|v| v.malfunctionArmorLevel)
                         .unwrap_or(0)
             {
@@ -302,7 +326,9 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         }
 
         // Percentage of maximum speed relative to current speed
-        let speed_max = pVeh.m_pVehicleInfo.as_ref()
+        let speed_max = pVeh
+            .m_pVehicleInfo
+            .as_ref()
             .map(|v| v.speedMax)
             .unwrap_or(100.0);
         let f_speed_perc_to_max = if !(*parent).client.is_null() {
@@ -316,7 +342,8 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             i_blend = 300;
             i_flags = SETANIM_FLAG_OVERRIDE;
 
-            let f_yaw_delta = pVeh.m_vPrevOrientation[YAW as usize] - *pVeh.m_vOrientation.add(YAW as usize);
+            let f_yaw_delta =
+                pVeh.m_vPrevOrientation[YAW as usize] - *pVeh.m_vOrientation.add(YAW as usize);
 
             // If we're walking (or our speed is less than 27.5%)...
             if (pVeh.m_ucmd.buttons & BUTTON_WALKING as c_int) != 0 || f_speed_perc_to_max < 0.275 {

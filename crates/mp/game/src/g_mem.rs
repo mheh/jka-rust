@@ -22,7 +22,6 @@
 
 use crate::prelude::*;
 
-
 /// Raven `G_Alloc`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mem.c:16-33`

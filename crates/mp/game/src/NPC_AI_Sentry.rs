@@ -11,7 +11,7 @@ use crate::prelude::*;
 // the SFL_*/SVF_* pattern extended to surface-flag consts): several game-tier
 // modules glob-export local duplicates of these; the canonical definition is
 // `mp_qshared::shared::surface_flags`.
-use mp_qshared::shared::surface_flags::{MASK_SHOT, CONTENTS_LIGHTSABER};
+use mp_qshared::shared::surface_flags::{CONTENTS_LIGHTSABER, MASK_SHOT};
 
 /// Sentry hover height constants.
 const SENTRY_HOVER_HEIGHT: f32 = 24.0f32;
@@ -72,7 +72,8 @@ pub fn sentry_use(
         crate::NPC_utils::G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
 
         (*self_).flags &= !FL_SHIELDED;
-        crate::npc_c::NPC_SetAnim(ctx,
+        crate::npc_c::NPC_SetAnim(
+            ctx,
             self_,
             SETANIM_BOTH,
             BOTH_POWERUP1 as c_int,
@@ -106,7 +107,8 @@ pub fn NPC_Sentry_Pain(
                 (*world).bg_state.rng.Q_irand(9000, 12000),
             );
             (*self_).flags |= FL_SHIELDED;
-            crate::npc_c::NPC_SetAnim(ctx,
+            crate::npc_c::NPC_SetAnim(
+                ctx,
                 self_,
                 SETANIM_BOTH,
                 BOTH_FLY_SHIELDED as c_int,
@@ -142,14 +144,10 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
         (*NPC).flags &= !FL_SHIELDED;
 
         if (*NPCInfo).localState == LSTATE_POWERING_UP {
-            if crate::g_timer::TIMER_Done(
-                ctx,
-                NPC,
-                cstr("powerup").as_ptr(),
-            ) != 0
-            {
+            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("powerup").as_ptr()) != 0 {
                 (*NPCInfo).localState = LSTATE_ATTACKING;
-                crate::npc_c::NPC_SetAnim(ctx,
+                crate::npc_c::NPC_SetAnim(
+                    ctx,
                     NPC,
                     SETANIM_BOTH,
                     BOTH_ATTACK1 as c_int,
@@ -165,9 +163,12 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
                 ctx,
                 NPC,
                 CHAN_AUTO,
-                crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_shield_open").as_ptr()),
+                crate::g_utils::G_SoundIndex(
+                    cstr("sound/chars/sentry/misc/sentry_shield_open").as_ptr(),
+                ),
             );
-            crate::npc_c::NPC_SetAnim(ctx,
+            crate::npc_c::NPC_SetAnim(
+                ctx,
                 NPC,
                 SETANIM_BOTH,
                 BOTH_POWERUP1 as c_int,
@@ -243,7 +244,8 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             forward,
         );
 
-        let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, 1600.0, 10000, NPC, qfalse);
+        let missile =
+            crate::g_missile::CreateMissile(ctx, muzzle, forward, 1600.0, 10000, NPC, qfalse);
 
         (*missile).classname = cstr("bryar_proj").as_ptr().cast_mut();
         (*missile).s.weapon = WP_BRYAR_PISTOL;
@@ -277,7 +279,9 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
         let NPCInfo = world.globals.NPCInfo;
         let ucmd = &mut world.globals.ucmd;
 
-        (*NPC).s.loopSound = crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_hover_1_lp").as_ptr());
+        (*NPC).s.loopSound = crate::g_utils::G_SoundIndex(
+            cstr("sound/chars/sentry/misc/sentry_hover_1_lp").as_ptr(),
+        );
 
         // Update our angles regardless
         crate::NPC_utils::NPC_UpdateAngles(ctx, qtrue, qtrue);
@@ -285,7 +289,8 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
         // If we have an enemy, we should try to hover at about enemy eye level
         if let Some(enemy_id) = (*NPC).enemy {
             let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
-            let mut dif: f32 = (enemy.r.currentOrigin[2] + enemy.r.maxs[2]) - (*NPC).r.currentOrigin[2];
+            let mut dif: f32 =
+                (enemy.r.currentOrigin[2] + enemy.r.maxs[2]) - (*NPC).r.currentOrigin[2];
 
             // cap to prevent dramatic height shifts
             if dif.abs() > 8.0 {
@@ -293,13 +298,16 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
                     dif = if dif < 0.0 { -24.0 } else { 24.0 };
                 }
 
-                (*((*NPC).client as *mut gclient_t)).ps.velocity[2] = ((*((*NPC).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
+                (*((*NPC).client as *mut gclient_t)).ps.velocity[2] =
+                    ((*((*NPC).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
             }
         } else {
             let goal: *mut gentity_t = if let Some(goal_id) = (*NPCInfo).goalEntity {
-                (unsafe { &*(*world).g_entities.as_ptr().add(goal_id.0 as usize) }) as *const gentity_t as *mut gentity_t
+                (unsafe { &*(*world).g_entities.as_ptr().add(goal_id.0 as usize) })
+                    as *const gentity_t as *mut gentity_t
             } else if let Some(last_goal_id) = (*NPCInfo).lastGoalEntity {
-                (unsafe { &*(*world).g_entities.as_ptr().add(last_goal_id.0 as usize) }) as *const gentity_t as *mut gentity_t
+                (unsafe { &*(*world).g_entities.as_ptr().add(last_goal_id.0 as usize) })
+                    as *const gentity_t as *mut gentity_t
             } else {
                 core::ptr::null_mut()
             };
@@ -311,7 +319,8 @@ pub fn Sentry_MaintainHeight(ctx: GameContext<'_>) {
                     ucmd.upmove = if ucmd.upmove < 0 { -4 } else { 4 };
                 } else {
                     if (*((*NPC).client as *mut gclient_t)).ps.velocity[2] != 0.0 {
-                        (*((*NPC).client as *mut gclient_t)).ps.velocity[2] *= SENTRY_VELOCITY_DECAY;
+                        (*((*NPC).client as *mut gclient_t)).ps.velocity[2] *=
+                            SENTRY_VELOCITY_DECAY;
 
                         if (*((*NPC).client as *mut gclient_t)).ps.velocity[2].abs() < 2.0 {
                             (*((*NPC).client as *mut gclient_t)).ps.velocity[2] = 0.0;
@@ -366,7 +375,8 @@ pub fn Sentry_Idle(ctx: GameContext<'_>) {
                 (*NPCInfo).burstCount = 0;
             }
         } else {
-            crate::npc_c::NPC_SetAnim(ctx,
+            crate::npc_c::NPC_SetAnim(
+                ctx,
                 NPC,
                 SETANIM_BOTH,
                 BOTH_SLEEP1 as c_int,
@@ -401,8 +411,17 @@ pub fn Sentry_Strafe(ctx: GameContext<'_>) {
 
         // Pick a random strafe direction, then check to see if doing a strafe would be
         // reasonable valid
-        let dir = if (world.bg_state.rng.rand() & 1) != 0 { -1 } else { 1 };
-        crate::q_math::_VectorMA((*NPC).r.currentOrigin, (SENTRY_STRAFE_DIS * dir as f32), right, &mut end);
+        let dir = if (world.bg_state.rng.rand() & 1) != 0 {
+            -1
+        } else {
+            1
+        };
+        crate::q_math::_VectorMA(
+            (*NPC).r.currentOrigin,
+            (SENTRY_STRAFE_DIS * dir as f32),
+            right,
+            &mut end,
+        );
 
         crate::trap::Trace(
             ctx.engine,
@@ -430,7 +449,8 @@ pub fn Sentry_Strafe(ctx: GameContext<'_>) {
             (*((*NPC).client as *mut gclient_t)).ps.velocity[2] += SENTRY_UPWARD_PUSH;
 
             // Set the strafe start time so we can do a controlled roll
-            (*NPCInfo).standTime = world.level.time + 3000 + (world.bg_state.rng.random() * 500.0) as c_int;
+            (*NPCInfo).standTime =
+                world.level.time + 3000 + (world.bg_state.rng.random() * 500.0) as c_int;
         }
     }
 }
@@ -476,12 +496,17 @@ pub fn Sentry_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
         } else {
             if let Some(enemy_id) = (*NPC).enemy {
                 let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
-                crate::q_math::_VectorSubtract(enemy.r.currentOrigin, (*NPC).r.currentOrigin, &mut forward);
+                crate::q_math::_VectorSubtract(
+                    enemy.r.currentOrigin,
+                    (*NPC).r.currentOrigin,
+                    &mut forward,
+                );
                 distance = crate::q_math::VectorNormalize(&mut forward);
             }
         }
 
-        let speed = SENTRY_FORWARD_BASE_SPEED + (SENTRY_FORWARD_MULTIPLIER * world.cvars.g_spskill.integer as f32);
+        let speed = SENTRY_FORWARD_BASE_SPEED
+            + (SENTRY_FORWARD_MULTIPLIER * world.cvars.g_spskill.integer as f32);
         crate::q_math::_VectorMA(
             (*((*NPC).client as *mut gclient_t)).ps.velocity,
             speed,
@@ -507,7 +532,8 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
             if (*NPCInfo).burstCount > 6 {
                 if (*NPC).fly_sound_debounce_time == 0 {
                     // delay closing down to give the player an opening
-                    (*NPC).fly_sound_debounce_time = world.level.time + world.bg_state.rng.Q_irand(500, 2000);
+                    (*NPC).fly_sound_debounce_time =
+                        world.level.time + world.bg_state.rng.Q_irand(500, 2000);
                 } else if (*NPC).fly_sound_debounce_time < world.level.time {
                     (*NPCInfo).localState = LSTATE_ACTIVE;
                     (*NPC).fly_sound_debounce_time = 0;
@@ -519,7 +545,8 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
                         world.bg_state.rng.Q_irand(2000, 3500),
                     );
                     (*NPC).flags |= FL_SHIELDED;
-                    crate::npc_c::NPC_SetAnim(ctx,
+                    crate::npc_c::NPC_SetAnim(
+                        ctx,
                         NPC,
                         SETANIM_BOTH,
                         BOTH_FLY_SHIELDED as c_int,
@@ -559,7 +586,9 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
         // Always keep a good height off the ground
         Sentry_MaintainHeight(ctx);
 
-        (*NPC).s.loopSound = crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_hover_2_lp").as_ptr());
+        (*NPC).s.loopSound = crate::g_utils::G_SoundIndex(
+            cstr("sound/chars/sentry/misc/sentry_hover_2_lp").as_ptr(),
+        );
 
         // randomly talk
         if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) != qfalse {
@@ -596,9 +625,17 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
         // Rate our distance to the target and visibilty
         if let Some(enemy_id) = (*NPC).enemy {
             let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
-            distance = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, enemy.r.currentOrigin);
-            visible = crate::NPC_utils::NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
-            advance = if distance > MIN_DISTANCE_SQR { qtrue } else { qfalse };
+            distance = crate::q_math::DistanceHorizontalSquared(
+                (*NPC).r.currentOrigin,
+                enemy.r.currentOrigin,
+            );
+            visible =
+                crate::NPC_utils::NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
+            advance = if distance > MIN_DISTANCE_SQR {
+                qtrue
+            } else {
+                qfalse
+            };
         } else {
             visible = qfalse;
             advance = qfalse;

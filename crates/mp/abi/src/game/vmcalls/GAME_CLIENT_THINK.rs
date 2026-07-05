@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 // Flow:
 //
@@ -41,4 +43,19 @@ impl InboundVmCall for GameClientThink {
     type Output = ();
 
     const COMMAND: MpGameExport = MpGameExport::GAME_CLIENT_THINK;
+}
+
+impl DecodeVmMain for GameClientThink {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `ClientThink( arg0, NULL )` — g_main.c:526. The NULL `ucmd` is supplied
+        // at the dispatch call site, not carried in the args.
+        GameClientThinkArgs::new(word_to_c_int(t.arg(0)))
+    }
+}
+
+impl EncodeVmMainReturn for GameClientThink {
+    fn encode_return(_output: Self::Output) -> isize {
+        // `ClientThink(...); return 0;` — g_main.c:526-527.
+        0
+    }
 }

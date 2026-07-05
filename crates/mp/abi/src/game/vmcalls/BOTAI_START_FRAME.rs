@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 // Flow:
 //
@@ -41,4 +43,18 @@ impl InboundVmCall for BotAiStartFrame {
     type Output = c_int;
 
     const COMMAND: MpGameExport = MpGameExport::BOTAI_START_FRAME;
+}
+
+impl DecodeVmMain for BotAiStartFrame {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `BotAIStartFrame( arg0 )` — g_main.c:546.
+        BotAiStartFrameArgs::new(word_to_c_int(t.arg(0)))
+    }
+}
+
+impl EncodeVmMainReturn for BotAiStartFrame {
+    fn encode_return(output: Self::Output) -> isize {
+        // `return BotAIStartFrame( arg0 );` — g_main.c:546.
+        output as isize
+    }
 }

@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 // Flow:
 //
@@ -41,4 +43,18 @@ impl InboundVmCall for GameClientUserinfoChanged {
     type Output = ();
 
     const COMMAND: MpGameExport = MpGameExport::GAME_CLIENT_USERINFO_CHANGED;
+}
+
+impl DecodeVmMain for GameClientUserinfoChanged {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `ClientUserinfoChanged( arg0 )` — g_main.c:529.
+        GameClientUserinfoChangedArgs::new(word_to_c_int(t.arg(0)))
+    }
+}
+
+impl EncodeVmMainReturn for GameClientUserinfoChanged {
+    fn encode_return(_output: Self::Output) -> isize {
+        // `ClientUserinfoChanged(...); return 0;` — g_main.c:529-530.
+        0
+    }
 }

@@ -67,7 +67,10 @@ impl BgTraps for GameBgTraps<'_> {
         // Real delegation — the pmove slice's PM_SetWaterLevel drives this.
         // Raven: `trap_PointContents` (`G_POINT_CONTENTS`).
         use mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs;
-        crate::trap::PointContents(self.ctx.engine, GPointContentsArgs::new(point, passEntityNum))
+        crate::trap::PointContents(
+            self.ctx.engine,
+            GPointContentsArgs::new(point, passEntityNum),
+        )
     }
 
     fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
@@ -88,7 +91,10 @@ impl BgTraps for GameBgTraps<'_> {
     fn fs_write(&self, buffer: *const c_void, len: c_int, f: fileHandle_t) {
         // Raven: `trap_FS_Write` (`G_FS_WRITE`).
         use mp_abi::game::syscalls::G_FS_WRITE::GFsWriteArgs;
-        crate::trap::FS_Write(self.ctx.engine, GFsWriteArgs::new(buffer as *const u8, len, f))
+        crate::trap::FS_Write(
+            self.ctx.engine,
+            GFsWriteArgs::new(buffer as *const u8, len, f),
+        )
     }
     fn fs_fclose(&self, f: fileHandle_t) {
         // Raven: `trap_FS_FCloseFile` (`G_FS_FCLOSE_FILE`).
@@ -156,14 +162,21 @@ impl BgTraps for GameBgTraps<'_> {
             mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs::new(ghoul2Ptr),
         )
     }
-    fn g2api_add_bolt(&self, ghoul2: *mut c_void, modelIndex: c_int, boneName: *const c_char) -> c_int {
+    fn g2api_add_bolt(
+        &self,
+        ghoul2: *mut c_void,
+        modelIndex: c_int,
+        boneName: *const c_char,
+    ) -> c_int {
         // Real delegation to the already-wired `trap_G2API_AddBolt` seam
         // (`G_G2_ADDBOLT`); bg-visible callers (e.g. `AttachRidersGeneric`)
         // only carry `&dyn BgTraps`, not `&Engine`.
         let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
         crate::trap::G2API_AddBolt(
             self.ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(ghoul2, modelIndex, bone_name),
+            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                ghoul2, modelIndex, bone_name,
+            ),
         )
     }
     fn g2api_get_bolt_matrix(
@@ -183,15 +196,7 @@ impl BgTraps for GameBgTraps<'_> {
         crate::trap::G2API_GetBoltMatrix(
             self.ctx.engine,
             GG2GetboltArgs::new(
-                ghoul2,
-                modelIndex,
-                boltIndex,
-                matrix,
-                angles,
-                position,
-                frameNum,
-                modelList,
-                scale,
+                ghoul2, modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale,
             ),
         )
     }
@@ -243,15 +248,7 @@ impl BgTraps for GameBgTraps<'_> {
         crate::trap::G2API_GetBoltMatrix_NoRecNoRot(
             self.ctx.engine,
             GG2GetboltNorecNorotArgs::new(
-                ghoul2,
-                modelIndex,
-                boltIndex,
-                matrix,
-                angles,
-                position,
-                frameNum,
-                modelList,
-                scale,
+                ghoul2, modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale,
             ),
         )
     }
@@ -275,8 +272,17 @@ impl BgTraps for GameBgTraps<'_> {
         crate::trap::G2API_SetBoneAngles(
             self.ctx.engine,
             GG2AngleoverrideArgs::new(
-                ghoul2, modelIndex, bone_name, angles, flags, up, right, forward, modelList,
-                blendTime, currentTime,
+                ghoul2,
+                modelIndex,
+                bone_name,
+                angles,
+                flags,
+                up,
+                right,
+                forward,
+                modelList,
+                blendTime,
+                currentTime,
             ),
         )
     }
@@ -298,8 +304,16 @@ impl BgTraps for GameBgTraps<'_> {
         crate::trap::G2API_SetBoneAnim(
             self.ctx.engine,
             GG2PlayanimArgs::new(
-                ghoul2, modelIndex, boneName, startFrame, endFrame, flags, animSpeed, currentTime,
-                setFrame, blendTime,
+                ghoul2,
+                modelIndex,
+                boneName,
+                startFrame,
+                endFrame,
+                flags,
+                animSpeed,
+                currentTime,
+                setFrame,
+                blendTime,
             ),
         )
     }
@@ -322,8 +336,16 @@ impl BgTraps for GameBgTraps<'_> {
         crate::trap::G2API_GetBoneAnim(
             self.ctx.engine,
             GG2GetboneanimArgs::new(
-                ghoul2, bone_name, currentTime, currentFrame, startFrame, endFrame, flags,
-                animSpeed, modelList, modelIndex,
+                ghoul2,
+                bone_name,
+                currentTime,
+                currentFrame,
+                startFrame,
+                endFrame,
+                flags,
+                animSpeed,
+                modelList,
+                modelIndex,
             ),
         )
     }
@@ -402,7 +424,9 @@ impl BgTraps for GameBgTraps<'_> {
         // `G_FX_PLAY_EFFECT_ID` in the game syscall table, so this method is dead
         // surface on the game side and must never be reached here.
         // Source: `oracle/oracle/codemp/game/bg_slidemove.c:37-39,116-124`
-        unreachable!("trap_FX_PlayEffectID is cgame-only (#ifndef QAGAME); QAGAME uses G_PlayEffectID")
+        unreachable!(
+            "trap_FX_PlayEffectID is cgame-only (#ifndef QAGAME); QAGAME uses G_PlayEffectID"
+        )
     }
     fn snap_vector(&self, v: *mut f32) {
         // Raven: `trap_SnapVector` (`G_SNAPVECTOR`); the `vec3_t*` is the caller's
@@ -642,7 +666,12 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             crate::npc_c::NPC_SetAnim(ctx, ent, type_, anim, priority);
         }
     }
-    fn wp_get_vehicle_cam_pos(&mut self, vehEntNum: c_int, pilotEntNum: c_int, camPos: *mut vec3_t) {
+    fn wp_get_vehicle_cam_pos(
+        &mut self,
+        vehEntNum: c_int,
+        pilotEntNum: c_int,
+        camPos: *mut vec3_t,
+    ) {
         // Resolves the vehicle + pilot nums against the world arena, rebuilds the
         // module `GameContext`, and delegates to the ported `WP_GetVehicleCamPos`.
         // Source: `oracle/oracle/codemp/game/g_weapon.c:3961-4020`.
@@ -708,8 +737,8 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
             };
             let vehEnt = &mut (*self.world).g_entities[vehEntNum as usize] as *mut gentity_t;
             let pVeh = (*vehEnt).m_pVehicle as *mut Vehicle_t;
-            let pEnt = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t
-                as *mut bgEntity_t;
+            let pEnt =
+                &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t as *mut bgEntity_t;
             crate::veh_dispatch::board(ctx, pVeh, pEnt)
         }
     }

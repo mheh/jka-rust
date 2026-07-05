@@ -17,9 +17,9 @@
 //! `pmove_t *pm` and the bare `g_entities` global respectively.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};
 use crate::bg_saber::BG_MySaber;
+use crate::prelude::*;
 use crate::q_shared::COM_Parse;
 
 // Raven `#define MAX_ANIM_FILES 64`.
@@ -28,23 +28,23 @@ pub const MAX_ANIM_FILES: c_int = 64;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::broken_limb::brokenLimb_t;
 use mp_bg::public::saber_move_name::{
-    LS_A_BACK, LS_A_BACK_CR, LS_A_BACKFLIP_ATK, LS_A_BACKSTAB, LS_A_FLIP_SLASH, LS_A_FLIP_STAB,
-    LS_A_JUMP_T__B_, LS_A_LUNGE, LS_A_T2B, LS_A_TL2BR, LS_A1_SPECIAL, LS_A2_SPECIAL,
-    LS_A3_SPECIAL, LS_B1__L, LS_B1__R, LS_B1_BL, LS_B1_BR, LS_B1_T_, LS_B1_TL, LS_B1_TR,
-    LS_BUTTERFLY_LEFT, LS_BUTTERFLY_RIGHT, LS_D1__L, LS_D1__R, LS_D1_B_, LS_D1_BL, LS_D1_BR,
-    LS_D1_T_, LS_D1_TL, LS_D1_TR, LS_DRAW, LS_DUAL_FB, LS_DUAL_LR, LS_DUAL_SPIN_PROTECT,
-    LS_H1_B_, LS_H1_BL, LS_H1_BR, LS_H1_T_, LS_H1_TL, LS_H1_TR, LS_HILT_BASH,
-    LS_JUMPATTACK_ARIAL_LEFT, LS_JUMPATTACK_ARIAL_RIGHT, LS_JUMPATTACK_CART_LEFT,
-    LS_JUMPATTACK_CART_RIGHT, LS_JUMPATTACK_DUAL, LS_JUMPATTACK_STAFF_LEFT, LS_JUMPATTACK_STAFF_RIGHT,
-    LS_K1_BL, LS_K1_BR, LS_K1_T_, LS_K1_TL, LS_K1_TR, LS_KICK_B, LS_KICK_B_AIR, LS_KICK_BF,
-    LS_KICK_F, LS_KICK_F_AIR, LS_KICK_L, LS_KICK_L_AIR, LS_KICK_R, LS_KICK_R_AIR, LS_KICK_RL,
-    LS_KICK_S, LS_LEAP_ATTACK, LS_NONE, LS_PARRY_LL, LS_PARRY_LR, LS_PARRY_UL, LS_PARRY_UP,
-    LS_PARRY_UR, LS_PULL_ATTACK_STAB, LS_PULL_ATTACK_SWING, LS_PUTAWAY, LS_R_T2B, LS_R_TL2BR,
-    LS_READY, LS_REFLECT_LL, LS_REFLECT_UP, LS_ROLL_STAB, LS_S_T2B, LS_S_TL2BR, LS_SPINATTACK,
-    LS_SPINATTACK_ALORA, LS_SPINATTACK_DUAL, LS_STABDOWN, LS_STABDOWN_DUAL, LS_STABDOWN_STAFF,
-    LS_STAFF_SOULCAL, LS_SWOOP_ATTACK_LEFT, LS_SWOOP_ATTACK_RIGHT, LS_T1_BL__L, LS_T1_BR__R,
-    LS_TAUNTAUN_ATTACK_LEFT, LS_TAUNTAUN_ATTACK_RIGHT, LS_UPSIDE_DOWN_ATTACK, LS_V1__L, LS_V1__R,
-    LS_V1_B_, LS_V1_BL, LS_V1_BR, LS_V1_T_, LS_V1_TL, LS_V1_TR,
+    LS_A1_SPECIAL, LS_A2_SPECIAL, LS_A3_SPECIAL, LS_A_BACK, LS_A_BACKFLIP_ATK, LS_A_BACKSTAB,
+    LS_A_BACK_CR, LS_A_FLIP_SLASH, LS_A_FLIP_STAB, LS_A_JUMP_T__B_, LS_A_LUNGE, LS_A_T2B,
+    LS_A_TL2BR, LS_B1_BL, LS_B1_BR, LS_B1_TL, LS_B1_TR, LS_B1_T_, LS_B1__L, LS_B1__R,
+    LS_BUTTERFLY_LEFT, LS_BUTTERFLY_RIGHT, LS_D1_BL, LS_D1_BR, LS_D1_B_, LS_D1_TL, LS_D1_TR,
+    LS_D1_T_, LS_D1__L, LS_D1__R, LS_DRAW, LS_DUAL_FB, LS_DUAL_LR, LS_DUAL_SPIN_PROTECT, LS_H1_BL,
+    LS_H1_BR, LS_H1_B_, LS_H1_TL, LS_H1_TR, LS_H1_T_, LS_HILT_BASH, LS_JUMPATTACK_ARIAL_LEFT,
+    LS_JUMPATTACK_ARIAL_RIGHT, LS_JUMPATTACK_CART_LEFT, LS_JUMPATTACK_CART_RIGHT,
+    LS_JUMPATTACK_DUAL, LS_JUMPATTACK_STAFF_LEFT, LS_JUMPATTACK_STAFF_RIGHT, LS_K1_BL, LS_K1_BR,
+    LS_K1_TL, LS_K1_TR, LS_K1_T_, LS_KICK_B, LS_KICK_BF, LS_KICK_B_AIR, LS_KICK_F, LS_KICK_F_AIR,
+    LS_KICK_L, LS_KICK_L_AIR, LS_KICK_R, LS_KICK_RL, LS_KICK_R_AIR, LS_KICK_S, LS_LEAP_ATTACK,
+    LS_NONE, LS_PARRY_LL, LS_PARRY_LR, LS_PARRY_UL, LS_PARRY_UP, LS_PARRY_UR, LS_PULL_ATTACK_STAB,
+    LS_PULL_ATTACK_SWING, LS_PUTAWAY, LS_READY, LS_REFLECT_LL, LS_REFLECT_UP, LS_ROLL_STAB,
+    LS_R_T2B, LS_R_TL2BR, LS_SPINATTACK, LS_SPINATTACK_ALORA, LS_SPINATTACK_DUAL, LS_STABDOWN,
+    LS_STABDOWN_DUAL, LS_STABDOWN_STAFF, LS_STAFF_SOULCAL, LS_SWOOP_ATTACK_LEFT,
+    LS_SWOOP_ATTACK_RIGHT, LS_S_T2B, LS_S_TL2BR, LS_T1_BL__L, LS_T1_BR__R, LS_TAUNTAUN_ATTACK_LEFT,
+    LS_TAUNTAUN_ATTACK_RIGHT, LS_UPSIDE_DOWN_ATTACK, LS_V1_BL, LS_V1_BR, LS_V1_B_, LS_V1_TL,
+    LS_V1_TR, LS_V1_T_, LS_V1__L, LS_V1__R,
 };
 use mp_bg::public::saber_quadrant::{Q_B, Q_BL, Q_BR, Q_L, Q_R, Q_T, Q_TL, Q_TR};
 
@@ -250,8 +250,12 @@ pub fn BG_InReboundRelease(anim: c_int) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:191-202`
 pub fn BG_InBackFlip(anim: c_int) -> qboolean {
     use animNumber_t::*;
-    if [BOTH_FLIP_BACK1 as c_int, BOTH_FLIP_BACK2 as c_int, BOTH_FLIP_BACK3 as c_int]
-        .contains(&anim)
+    if [
+        BOTH_FLIP_BACK1 as c_int,
+        BOTH_FLIP_BACK2 as c_int,
+        BOTH_FLIP_BACK3 as c_int,
+    ]
+    .contains(&anim)
     {
         1
     } else {
@@ -296,18 +300,56 @@ pub fn BG_SaberInAttack(r#move: c_int) -> qboolean {
         return 1;
     }
     match r#move {
-        LS_A_BACK | LS_A_BACK_CR | LS_A_BACKSTAB | LS_ROLL_STAB | LS_A_LUNGE
-        | LS_A_JUMP_T__B_ | LS_A_FLIP_STAB | LS_A_FLIP_SLASH | LS_JUMPATTACK_DUAL
-        | LS_JUMPATTACK_ARIAL_LEFT | LS_JUMPATTACK_ARIAL_RIGHT | LS_JUMPATTACK_CART_LEFT
-        | LS_JUMPATTACK_CART_RIGHT | LS_JUMPATTACK_STAFF_LEFT | LS_JUMPATTACK_STAFF_RIGHT
-        | LS_BUTTERFLY_LEFT | LS_BUTTERFLY_RIGHT | LS_A_BACKFLIP_ATK | LS_SPINATTACK_DUAL
-        | LS_SPINATTACK | LS_LEAP_ATTACK | LS_SWOOP_ATTACK_RIGHT | LS_SWOOP_ATTACK_LEFT
-        | LS_TAUNTAUN_ATTACK_RIGHT | LS_TAUNTAUN_ATTACK_LEFT | LS_KICK_F | LS_KICK_B
-        | LS_KICK_R | LS_KICK_L | LS_KICK_S | LS_KICK_BF | LS_KICK_RL | LS_KICK_F_AIR
-        | LS_KICK_B_AIR | LS_KICK_R_AIR | LS_KICK_L_AIR | LS_STABDOWN | LS_STABDOWN_STAFF
-        | LS_STABDOWN_DUAL | LS_DUAL_SPIN_PROTECT | LS_STAFF_SOULCAL | LS_A1_SPECIAL
-        | LS_A2_SPECIAL | LS_A3_SPECIAL | LS_UPSIDE_DOWN_ATTACK | LS_PULL_ATTACK_STAB
-        | LS_PULL_ATTACK_SWING | LS_SPINATTACK_ALORA | LS_DUAL_FB | LS_DUAL_LR
+        LS_A_BACK
+        | LS_A_BACK_CR
+        | LS_A_BACKSTAB
+        | LS_ROLL_STAB
+        | LS_A_LUNGE
+        | LS_A_JUMP_T__B_
+        | LS_A_FLIP_STAB
+        | LS_A_FLIP_SLASH
+        | LS_JUMPATTACK_DUAL
+        | LS_JUMPATTACK_ARIAL_LEFT
+        | LS_JUMPATTACK_ARIAL_RIGHT
+        | LS_JUMPATTACK_CART_LEFT
+        | LS_JUMPATTACK_CART_RIGHT
+        | LS_JUMPATTACK_STAFF_LEFT
+        | LS_JUMPATTACK_STAFF_RIGHT
+        | LS_BUTTERFLY_LEFT
+        | LS_BUTTERFLY_RIGHT
+        | LS_A_BACKFLIP_ATK
+        | LS_SPINATTACK_DUAL
+        | LS_SPINATTACK
+        | LS_LEAP_ATTACK
+        | LS_SWOOP_ATTACK_RIGHT
+        | LS_SWOOP_ATTACK_LEFT
+        | LS_TAUNTAUN_ATTACK_RIGHT
+        | LS_TAUNTAUN_ATTACK_LEFT
+        | LS_KICK_F
+        | LS_KICK_B
+        | LS_KICK_R
+        | LS_KICK_L
+        | LS_KICK_S
+        | LS_KICK_BF
+        | LS_KICK_RL
+        | LS_KICK_F_AIR
+        | LS_KICK_B_AIR
+        | LS_KICK_R_AIR
+        | LS_KICK_L_AIR
+        | LS_STABDOWN
+        | LS_STABDOWN_STAFF
+        | LS_STABDOWN_DUAL
+        | LS_DUAL_SPIN_PROTECT
+        | LS_STAFF_SOULCAL
+        | LS_A1_SPECIAL
+        | LS_A2_SPECIAL
+        | LS_A3_SPECIAL
+        | LS_UPSIDE_DOWN_ATTACK
+        | LS_PULL_ATTACK_STAB
+        | LS_PULL_ATTACK_SWING
+        | LS_SPINATTACK_ALORA
+        | LS_DUAL_FB
+        | LS_DUAL_LR
         | LS_HILT_BASH => 1,
         _ => 0,
     }
@@ -318,8 +360,9 @@ pub fn BG_SaberInAttack(r#move: c_int) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:292-304`
 pub fn BG_SaberInKata(saberMove: c_int) -> qboolean {
     match saberMove {
-        LS_A1_SPECIAL | LS_A2_SPECIAL | LS_A3_SPECIAL | LS_DUAL_SPIN_PROTECT
-        | LS_STAFF_SOULCAL => 1,
+        LS_A1_SPECIAL | LS_A2_SPECIAL | LS_A3_SPECIAL | LS_DUAL_SPIN_PROTECT | LS_STAFF_SOULCAL => {
+            1
+        }
         _ => 0,
     }
 }
@@ -349,18 +392,56 @@ pub fn BG_InKataAnim(anim: c_int) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:320-378`
 pub fn BG_SaberInSpecial(r#move: c_int) -> qboolean {
     match r#move {
-        LS_A_BACK | LS_A_BACK_CR | LS_A_BACKSTAB | LS_ROLL_STAB | LS_A_LUNGE
-        | LS_A_JUMP_T__B_ | LS_A_FLIP_STAB | LS_A_FLIP_SLASH | LS_JUMPATTACK_DUAL
-        | LS_JUMPATTACK_ARIAL_LEFT | LS_JUMPATTACK_ARIAL_RIGHT | LS_JUMPATTACK_CART_LEFT
-        | LS_JUMPATTACK_CART_RIGHT | LS_JUMPATTACK_STAFF_LEFT | LS_JUMPATTACK_STAFF_RIGHT
-        | LS_BUTTERFLY_LEFT | LS_BUTTERFLY_RIGHT | LS_A_BACKFLIP_ATK | LS_SPINATTACK_DUAL
-        | LS_SPINATTACK | LS_LEAP_ATTACK | LS_SWOOP_ATTACK_RIGHT | LS_SWOOP_ATTACK_LEFT
-        | LS_TAUNTAUN_ATTACK_RIGHT | LS_TAUNTAUN_ATTACK_LEFT | LS_KICK_F | LS_KICK_B
-        | LS_KICK_R | LS_KICK_L | LS_KICK_S | LS_KICK_BF | LS_KICK_RL | LS_KICK_F_AIR
-        | LS_KICK_B_AIR | LS_KICK_R_AIR | LS_KICK_L_AIR | LS_STABDOWN | LS_STABDOWN_STAFF
-        | LS_STABDOWN_DUAL | LS_DUAL_SPIN_PROTECT | LS_STAFF_SOULCAL | LS_A1_SPECIAL
-        | LS_A2_SPECIAL | LS_A3_SPECIAL | LS_UPSIDE_DOWN_ATTACK | LS_PULL_ATTACK_STAB
-        | LS_PULL_ATTACK_SWING | LS_SPINATTACK_ALORA | LS_DUAL_FB | LS_DUAL_LR
+        LS_A_BACK
+        | LS_A_BACK_CR
+        | LS_A_BACKSTAB
+        | LS_ROLL_STAB
+        | LS_A_LUNGE
+        | LS_A_JUMP_T__B_
+        | LS_A_FLIP_STAB
+        | LS_A_FLIP_SLASH
+        | LS_JUMPATTACK_DUAL
+        | LS_JUMPATTACK_ARIAL_LEFT
+        | LS_JUMPATTACK_ARIAL_RIGHT
+        | LS_JUMPATTACK_CART_LEFT
+        | LS_JUMPATTACK_CART_RIGHT
+        | LS_JUMPATTACK_STAFF_LEFT
+        | LS_JUMPATTACK_STAFF_RIGHT
+        | LS_BUTTERFLY_LEFT
+        | LS_BUTTERFLY_RIGHT
+        | LS_A_BACKFLIP_ATK
+        | LS_SPINATTACK_DUAL
+        | LS_SPINATTACK
+        | LS_LEAP_ATTACK
+        | LS_SWOOP_ATTACK_RIGHT
+        | LS_SWOOP_ATTACK_LEFT
+        | LS_TAUNTAUN_ATTACK_RIGHT
+        | LS_TAUNTAUN_ATTACK_LEFT
+        | LS_KICK_F
+        | LS_KICK_B
+        | LS_KICK_R
+        | LS_KICK_L
+        | LS_KICK_S
+        | LS_KICK_BF
+        | LS_KICK_RL
+        | LS_KICK_F_AIR
+        | LS_KICK_B_AIR
+        | LS_KICK_R_AIR
+        | LS_KICK_L_AIR
+        | LS_STABDOWN
+        | LS_STABDOWN_STAFF
+        | LS_STABDOWN_DUAL
+        | LS_DUAL_SPIN_PROTECT
+        | LS_STAFF_SOULCAL
+        | LS_A1_SPECIAL
+        | LS_A2_SPECIAL
+        | LS_A3_SPECIAL
+        | LS_UPSIDE_DOWN_ATTACK
+        | LS_PULL_ATTACK_STAB
+        | LS_PULL_ATTACK_SWING
+        | LS_SPINATTACK_ALORA
+        | LS_DUAL_FB
+        | LS_DUAL_LR
         | LS_HILT_BASH => 1,
         _ => 0,
     }
@@ -1030,15 +1111,44 @@ impl PmoveContext<'_> {
     pub fn BG_InKnockDownOnGround(&mut self, ps: *mut playerState_t) -> qboolean {
         unsafe {
             let v = (*ps).legsAnim;
-            if v == BOTH_KNOCKDOWN1 as c_int || v == BOTH_KNOCKDOWN2 as c_int || v == BOTH_KNOCKDOWN3 as c_int || v == BOTH_KNOCKDOWN4 as c_int || v == BOTH_KNOCKDOWN5 as c_int || v == BOTH_RELEASED as c_int {
+            if v == BOTH_KNOCKDOWN1 as c_int
+                || v == BOTH_KNOCKDOWN2 as c_int
+                || v == BOTH_KNOCKDOWN3 as c_int
+                || v == BOTH_KNOCKDOWN4 as c_int
+                || v == BOTH_KNOCKDOWN5 as c_int
+                || v == BOTH_RELEASED as c_int
+            {
                 1
-            } else if v == BOTH_GETUP1 as c_int || v == BOTH_GETUP2 as c_int || v == BOTH_GETUP3 as c_int || v == BOTH_GETUP4 as c_int || v == BOTH_GETUP5 as c_int || v == BOTH_GETUP_CROUCH_F1 as c_int || v == BOTH_GETUP_CROUCH_B1 as c_int || v == BOTH_FORCE_GETUP_F1 as c_int || v == BOTH_FORCE_GETUP_F2 as c_int || v == BOTH_FORCE_GETUP_B1 as c_int || v == BOTH_FORCE_GETUP_B2 as c_int || v == BOTH_FORCE_GETUP_B3 as c_int || v == BOTH_FORCE_GETUP_B4 as c_int || v == BOTH_FORCE_GETUP_B5 as c_int || v == BOTH_FORCE_GETUP_B6 as c_int {
+            } else if v == BOTH_GETUP1 as c_int
+                || v == BOTH_GETUP2 as c_int
+                || v == BOTH_GETUP3 as c_int
+                || v == BOTH_GETUP4 as c_int
+                || v == BOTH_GETUP5 as c_int
+                || v == BOTH_GETUP_CROUCH_F1 as c_int
+                || v == BOTH_GETUP_CROUCH_B1 as c_int
+                || v == BOTH_FORCE_GETUP_F1 as c_int
+                || v == BOTH_FORCE_GETUP_F2 as c_int
+                || v == BOTH_FORCE_GETUP_B1 as c_int
+                || v == BOTH_FORCE_GETUP_B2 as c_int
+                || v == BOTH_FORCE_GETUP_B3 as c_int
+                || v == BOTH_FORCE_GETUP_B4 as c_int
+                || v == BOTH_FORCE_GETUP_B5 as c_int
+                || v == BOTH_FORCE_GETUP_B6 as c_int
+            {
                 if self.BG_AnimLength(0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
                     1
                 } else {
                     0
                 }
-            } else if v == BOTH_GETUP_BROLL_B as c_int || v == BOTH_GETUP_BROLL_F as c_int || v == BOTH_GETUP_BROLL_L as c_int || v == BOTH_GETUP_BROLL_R as c_int || v == BOTH_GETUP_FROLL_B as c_int || v == BOTH_GETUP_FROLL_F as c_int || v == BOTH_GETUP_FROLL_L as c_int || v == BOTH_GETUP_FROLL_R as c_int {
+            } else if v == BOTH_GETUP_BROLL_B as c_int
+                || v == BOTH_GETUP_BROLL_F as c_int
+                || v == BOTH_GETUP_BROLL_L as c_int
+                || v == BOTH_GETUP_BROLL_R as c_int
+                || v == BOTH_GETUP_FROLL_B as c_int
+                || v == BOTH_GETUP_FROLL_F as c_int
+                || v == BOTH_GETUP_FROLL_L as c_int
+                || v == BOTH_GETUP_FROLL_R as c_int
+            {
                 if self.BG_AnimLength(0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
                     1
                 } else {
@@ -1076,15 +1186,44 @@ pub fn BG_InKnockDownOnGround(
 ) -> qboolean {
     unsafe {
         let v = (*ps).legsAnim;
-        if v == BOTH_KNOCKDOWN1 as c_int || v == BOTH_KNOCKDOWN2 as c_int || v == BOTH_KNOCKDOWN3 as c_int || v == BOTH_KNOCKDOWN4 as c_int || v == BOTH_KNOCKDOWN5 as c_int || v == BOTH_RELEASED as c_int {
+        if v == BOTH_KNOCKDOWN1 as c_int
+            || v == BOTH_KNOCKDOWN2 as c_int
+            || v == BOTH_KNOCKDOWN3 as c_int
+            || v == BOTH_KNOCKDOWN4 as c_int
+            || v == BOTH_KNOCKDOWN5 as c_int
+            || v == BOTH_RELEASED as c_int
+        {
             1
-        } else if v == BOTH_GETUP1 as c_int || v == BOTH_GETUP2 as c_int || v == BOTH_GETUP3 as c_int || v == BOTH_GETUP4 as c_int || v == BOTH_GETUP5 as c_int || v == BOTH_GETUP_CROUCH_F1 as c_int || v == BOTH_GETUP_CROUCH_B1 as c_int || v == BOTH_FORCE_GETUP_F1 as c_int || v == BOTH_FORCE_GETUP_F2 as c_int || v == BOTH_FORCE_GETUP_B1 as c_int || v == BOTH_FORCE_GETUP_B2 as c_int || v == BOTH_FORCE_GETUP_B3 as c_int || v == BOTH_FORCE_GETUP_B4 as c_int || v == BOTH_FORCE_GETUP_B5 as c_int || v == BOTH_FORCE_GETUP_B6 as c_int {
+        } else if v == BOTH_GETUP1 as c_int
+            || v == BOTH_GETUP2 as c_int
+            || v == BOTH_GETUP3 as c_int
+            || v == BOTH_GETUP4 as c_int
+            || v == BOTH_GETUP5 as c_int
+            || v == BOTH_GETUP_CROUCH_F1 as c_int
+            || v == BOTH_GETUP_CROUCH_B1 as c_int
+            || v == BOTH_FORCE_GETUP_F1 as c_int
+            || v == BOTH_FORCE_GETUP_F2 as c_int
+            || v == BOTH_FORCE_GETUP_B1 as c_int
+            || v == BOTH_FORCE_GETUP_B2 as c_int
+            || v == BOTH_FORCE_GETUP_B3 as c_int
+            || v == BOTH_FORCE_GETUP_B4 as c_int
+            || v == BOTH_FORCE_GETUP_B5 as c_int
+            || v == BOTH_FORCE_GETUP_B6 as c_int
+        {
             if BG_AnimLength(bg_state, 0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
                 1
             } else {
                 0
             }
-        } else if v == BOTH_GETUP_BROLL_B as c_int || v == BOTH_GETUP_BROLL_F as c_int || v == BOTH_GETUP_BROLL_L as c_int || v == BOTH_GETUP_BROLL_R as c_int || v == BOTH_GETUP_FROLL_B as c_int || v == BOTH_GETUP_FROLL_F as c_int || v == BOTH_GETUP_FROLL_L as c_int || v == BOTH_GETUP_FROLL_R as c_int {
+        } else if v == BOTH_GETUP_BROLL_B as c_int
+            || v == BOTH_GETUP_BROLL_F as c_int
+            || v == BOTH_GETUP_BROLL_L as c_int
+            || v == BOTH_GETUP_BROLL_R as c_int
+            || v == BOTH_GETUP_FROLL_B as c_int
+            || v == BOTH_GETUP_FROLL_F as c_int
+            || v == BOTH_GETUP_FROLL_L as c_int
+            || v == BOTH_GETUP_FROLL_R as c_int
+        {
             if BG_AnimLength(bg_state, 0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
                 1
             } else {
@@ -1296,14 +1435,14 @@ pub fn PM_InKnockDown(ps: *mut playerState_t) -> qboolean {
 pub fn PM_PainAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     if [
-        BOTH_PAIN1 as c_int,  //# First take pain anim
-        BOTH_PAIN2 as c_int,  //# Second take pain anim
-        BOTH_PAIN3 as c_int,  //# Third take pain anim
-        BOTH_PAIN4 as c_int,  //# Fourth take pain anim
-        BOTH_PAIN5 as c_int,  //# Fifth take pain anim - from behind
-        BOTH_PAIN6 as c_int,  //# Sixth take pain anim - from behind
-        BOTH_PAIN7 as c_int,  //# Seventh take pain anim - from behind
-        BOTH_PAIN8 as c_int,  //# Eigth take pain anim - from behind
+        BOTH_PAIN1 as c_int, //# First take pain anim
+        BOTH_PAIN2 as c_int, //# Second take pain anim
+        BOTH_PAIN3 as c_int, //# Third take pain anim
+        BOTH_PAIN4 as c_int, //# Fourth take pain anim
+        BOTH_PAIN5 as c_int, //# Fifth take pain anim - from behind
+        BOTH_PAIN6 as c_int, //# Sixth take pain anim - from behind
+        BOTH_PAIN7 as c_int, //# Seventh take pain anim - from behind
+        BOTH_PAIN8 as c_int, //# Eigth take pain anim - from behind
         BOTH_PAIN9 as c_int,
         BOTH_PAIN10 as c_int,
         BOTH_PAIN11 as c_int,
@@ -1683,8 +1822,7 @@ pub fn BG_AnimLength(bg_state: &crate::bg_channel::BgState, index: c_int, anim: 
     unsafe {
         let anims = bg_state.bgAllAnims[index as usize].anims;
         ((*anims.offset(anim as isize)).numFrames as f32
-            * ((*anims.offset(anim as isize)).frameLerp as f32).abs())
-            as c_int
+            * ((*anims.offset(anim as isize)).frameLerp as f32).abs()) as c_int
     }
 }
 
@@ -1719,8 +1857,10 @@ impl PmoveContext<'_> {
             let oldAnim = (*(*self.pm).ps).legsAnim;
             let newAnim = anim;
 
-            if oldAnim < (MAX_TOTALANIMATIONS) as i32 && oldAnim >= BOTH_DEATH1 as c_int
-                && newAnim < (MAX_TOTALANIMATIONS) as i32 && newAnim >= BOTH_DEATH1 as c_int
+            if oldAnim < (MAX_TOTALANIMATIONS) as i32
+                && oldAnim >= BOTH_DEATH1 as c_int
+                && newAnim < (MAX_TOTALANIMATIONS) as i32
+                && newAnim >= BOTH_DEATH1 as c_int
             {
                 let old_str = format!("OLD: {}\n", cstr_to_str(animTable[oldAnim as usize].name));
                 let new_str = format!("NEW: {}\n", cstr_to_str(animTable[newAnim as usize].name));
@@ -1840,11 +1980,7 @@ impl PmoveContext<'_> {
         if isHumanoid == 0 {
             i = 0;
             while i < self.bg.bgNumAllAnims {
-                if Q_stricmp(
-                    self.bg.bgAllAnims[i as usize].filename.as_ptr(),
-                    filename,
-                ) == 0
-                {
+                if Q_stricmp(self.bg.bgAllAnims[i as usize].filename.as_ptr(), filename) == 0 {
                     animset = self.bg.bgAllAnims[i as usize].anims;
                     return i;
                 }
@@ -1893,7 +2029,8 @@ impl PmoveContext<'_> {
                 return -1;
             }
 
-            self.traps.fs_read(BGPAFtext.as_mut_ptr() as *mut c_void, len, f);
+            self.traps
+                .fs_read(BGPAFtext.as_mut_ptr() as *mut c_void, len, f);
             BGPAFtext[len as usize] = 0;
             self.traps.fs_fclose(f);
         } else {
@@ -1961,13 +2098,11 @@ impl PmoveContext<'_> {
             }
             if fps < 0.0 {
                 unsafe {
-                    (*animset.offset(animNum as isize)).frameLerp =
-                        (1000.0 / fps).floor() as i16;
+                    (*animset.offset(animNum as isize)).frameLerp = (1000.0 / fps).floor() as i16;
                 }
             } else {
                 unsafe {
-                    (*animset.offset(animNum as isize)).frameLerp =
-                        (1000.0 / fps).ceil() as i16;
+                    (*animset.offset(animNum as isize)).frameLerp = (1000.0 / fps).ceil() as i16;
                 }
             }
         }
@@ -1975,10 +2110,9 @@ impl PmoveContext<'_> {
         wasLoaded = self.bg.BGPAFtextLoaded;
 
         if isHumanoid != 0 {
-            write_cstr_field(
-                &mut self.bg.bgAllAnims[0].filename,
-                &unsafe { cstr_to_str(filename) },
-            );
+            write_cstr_field(&mut self.bg.bgAllAnims[0].filename, &unsafe {
+                cstr_to_str(filename)
+            });
             self.bg.bgAllAnims[0].anims = animset;
             self.bg.BGPAFtextLoaded = 1;
 
@@ -2233,153 +2367,168 @@ pub fn BG_SaberStartTransAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2800-2924`
 impl PmoveContext<'_> {
-pub fn BG_SetAnimFinal(
-    &mut self,
-    ps: *mut playerState_t,
-    animations: *mut animation_t,
-    setAnimParts: c_int,
-    anim: c_int,
-    setAnimFlags: c_int,
-    // default blendTime=350
-    mut blendTime: c_int,
-) {
-    let mut editAnimSpeed: f32 = 1.0;
+    pub fn BG_SetAnimFinal(
+        &mut self,
+        ps: *mut playerState_t,
+        animations: *mut animation_t,
+        setAnimParts: c_int,
+        anim: c_int,
+        setAnimFlags: c_int,
+        // default blendTime=350
+        mut blendTime: c_int,
+    ) {
+        let mut editAnimSpeed: f32 = 1.0;
 
-    if animations.is_null() {
-        return;
-    }
-
-    unsafe {
-        debug_assert!(anim > -1);
-        debug_assert!((*animations.offset(anim as isize)).firstFrame > 0
-            || (*animations.offset(anim as isize)).numFrames > 0);
-
-        // NOTE: Setting blendTime here breaks actual blending..
-        blendTime = 0;
-
-        // Raven's `BG_SetAnim` contract is pm-free (bg_panimate.c:2984 "do not
-        // reference pm in this function"), and `BG_MySaber` (the sole consumer of
-        // this arg) null-checks ents. Game-tier callers build a pm-null
-        // `PmoveContext` to reach `BG_SetAnim`, so guard here: a null `pm`/`baseEnt`
-        // degrades to a missing-saber lookup rather than a null-deref.
-        let baseEnt = if self.pm.is_null() || (*self.pm).baseEnt.is_null() {
-            core::ptr::null_mut()
-        } else {
-            (*self.pm).baseEnt as *mut gentity_t
-        };
-        BG_SaberStartTransAnim(
-            (*ps).clientNum,
-            (*ps).fd.saberAnimLevel,
-            (*ps).weapon,
-            anim,
-            &mut editAnimSpeed,
-            (*ps).brokenLimbs,
-            baseEnt,
-        );
-
-        // Set torso anim
-        'torso: {
-            if setAnimParts & SETANIM_TORSO != 0 {
-                // Don't reset if it's already running the anim
-                if setAnimFlags & SETANIM_FLAG_RESTART == 0 && (*ps).torsoAnim == anim {
-                    break 'torso;
-                }
-                // or if a more important anim is running
-                if setAnimFlags & SETANIM_FLAG_OVERRIDE == 0
-                    && ((*ps).torsoTimer > 0 || (*ps).torsoTimer == -1)
-                {
-                    break 'torso;
-                }
-
-                self.BG_StartTorsoAnim(ps, anim);
-
-                if setAnimFlags & SETANIM_FLAG_HOLD != 0 {
-                    let frame = &*animations.offset(anim as isize);
-                    if setAnimFlags & SETANIM_FLAG_HOLDLESS != 0 {
-                        // Make sure to only wait in full 1/20 sec server frame intervals.
-                        // Oracle: `int dur; int speedDif;` — both truncate to int
-                        // before the add (bg_panimate.c:2839-2844).
-                        let dur0 = ((frame.numFrames - 1) as f32
-                            * (frame.frameLerp as f32).abs())
-                            as c_int;
-                        let speedDif = (dur0 as f32 - (dur0 as f32 * editAnimSpeed)) as c_int;
-                        let dur = dur0 + speedDif;
-                        if dur > 1 {
-                            (*ps).torsoTimer = dur - 1;
-                        } else {
-                            (*ps).torsoTimer = (frame.frameLerp as f32).abs() as c_int;
-                        }
-                    } else {
-                        (*ps).torsoTimer =
-                            (frame.numFrames as f32 * (frame.frameLerp as f32).abs()) as c_int;
-                    }
-
-                    if (*ps).fd.forcePowersActive & (1 << FP_RAGE) != 0 {
-                        (*ps).torsoTimer = ((*ps).torsoTimer as f32 / 1.7) as c_int;
-                    }
-                }
-            }
+        if animations.is_null() {
+            return;
         }
 
-        // Set legs anim
-        'legs: {
-            if setAnimParts & SETANIM_LEGS != 0 {
-                // Don't reset if it's already running the anim
-                if setAnimFlags & SETANIM_FLAG_RESTART == 0 && (*ps).legsAnim == anim {
-                    break 'legs;
-                }
-                // or if a more important anim is running
-                if setAnimFlags & SETANIM_FLAG_OVERRIDE == 0
-                    && ((*ps).legsTimer > 0 || (*ps).legsTimer == -1)
-                {
-                    break 'legs;
-                }
+        unsafe {
+            debug_assert!(anim > -1);
+            debug_assert!(
+                (*animations.offset(anim as isize)).firstFrame > 0
+                    || (*animations.offset(anim as isize)).numFrames > 0
+            );
 
-                self.BG_StartLegsAnim(ps, anim);
+            // NOTE: Setting blendTime here breaks actual blending..
+            blendTime = 0;
 
-                if setAnimFlags & SETANIM_FLAG_HOLD != 0 {
-                    let frame = &*animations.offset(anim as isize);
-                    if setAnimFlags & SETANIM_FLAG_HOLDLESS != 0 {
-                        // Make sure to only wait in full 1/20 sec server frame intervals.
-                        // Oracle: `int dur; int speedDif;` — both truncate to int
-                        // before the add (bg_panimate.c:2887-2892).
-                        let dur0 = ((frame.numFrames - 1) as f32
-                            * (frame.frameLerp as f32).abs())
-                            as c_int;
-                        let speedDif = (dur0 as f32 - (dur0 as f32 * editAnimSpeed)) as c_int;
-                        let dur = dur0 + speedDif;
-                        if dur > 1 {
-                            (*ps).legsTimer = dur - 1;
-                        } else {
-                            (*ps).legsTimer = (frame.frameLerp as f32).abs() as c_int;
-                        }
-                    } else {
-                        (*ps).legsTimer =
-                            (frame.numFrames as f32 * (frame.frameLerp as f32).abs()) as c_int;
+            // Raven's `BG_SetAnim` contract is pm-free (bg_panimate.c:2984 "do not
+            // reference pm in this function"), and `BG_MySaber` (the sole consumer of
+            // this arg) null-checks ents. Game-tier callers build a pm-null
+            // `PmoveContext` to reach `BG_SetAnim`, so guard here: a null `pm`/`baseEnt`
+            // degrades to a missing-saber lookup rather than a null-deref.
+            let baseEnt = if self.pm.is_null() || (*self.pm).baseEnt.is_null() {
+                core::ptr::null_mut()
+            } else {
+                (*self.pm).baseEnt as *mut gentity_t
+            };
+            BG_SaberStartTransAnim(
+                (*ps).clientNum,
+                (*ps).fd.saberAnimLevel,
+                (*ps).weapon,
+                anim,
+                &mut editAnimSpeed,
+                (*ps).brokenLimbs,
+                baseEnt,
+            );
+
+            // Set torso anim
+            'torso: {
+                if setAnimParts & SETANIM_TORSO != 0 {
+                    // Don't reset if it's already running the anim
+                    if setAnimFlags & SETANIM_FLAG_RESTART == 0 && (*ps).torsoAnim == anim {
+                        break 'torso;
+                    }
+                    // or if a more important anim is running
+                    if setAnimFlags & SETANIM_FLAG_OVERRIDE == 0
+                        && ((*ps).torsoTimer > 0 || (*ps).torsoTimer == -1)
+                    {
+                        break 'torso;
                     }
 
-                    // these guys are ok, they don't actually reference pm
-                    if PM_RunningAnim(anim) != 0 || PM_WalkingAnim(anim) != 0 {
+                    self.BG_StartTorsoAnim(ps, anim);
+
+                    if setAnimFlags & SETANIM_FLAG_HOLD != 0 {
+                        let frame = &*animations.offset(anim as isize);
+                        if setAnimFlags & SETANIM_FLAG_HOLDLESS != 0 {
+                            // Make sure to only wait in full 1/20 sec server frame intervals.
+                            // Oracle: `int dur; int speedDif;` — both truncate to int
+                            // before the add (bg_panimate.c:2839-2844).
+                            let dur0 = ((frame.numFrames - 1) as f32
+                                * (frame.frameLerp as f32).abs())
+                                as c_int;
+                            let speedDif = (dur0 as f32 - (dur0 as f32 * editAnimSpeed)) as c_int;
+                            let dur = dur0 + speedDif;
+                            if dur > 1 {
+                                (*ps).torsoTimer = dur - 1;
+                            } else {
+                                (*ps).torsoTimer = (frame.frameLerp as f32).abs() as c_int;
+                            }
+                        } else {
+                            (*ps).torsoTimer =
+                                (frame.numFrames as f32 * (frame.frameLerp as f32).abs()) as c_int;
+                        }
+
                         if (*ps).fd.forcePowersActive & (1 << FP_RAGE) != 0 {
-                            (*ps).legsTimer = ((*ps).legsTimer as f32 / 1.3) as c_int;
-                        } else if (*ps).fd.forcePowersActive & (1 << FP_SPEED) != 0 {
-                            (*ps).legsTimer = ((*ps).legsTimer as f32 / 1.7) as c_int;
+                            (*ps).torsoTimer = ((*ps).torsoTimer as f32 / 1.7) as c_int;
+                        }
+                    }
+                }
+            }
+
+            // Set legs anim
+            'legs: {
+                if setAnimParts & SETANIM_LEGS != 0 {
+                    // Don't reset if it's already running the anim
+                    if setAnimFlags & SETANIM_FLAG_RESTART == 0 && (*ps).legsAnim == anim {
+                        break 'legs;
+                    }
+                    // or if a more important anim is running
+                    if setAnimFlags & SETANIM_FLAG_OVERRIDE == 0
+                        && ((*ps).legsTimer > 0 || (*ps).legsTimer == -1)
+                    {
+                        break 'legs;
+                    }
+
+                    self.BG_StartLegsAnim(ps, anim);
+
+                    if setAnimFlags & SETANIM_FLAG_HOLD != 0 {
+                        let frame = &*animations.offset(anim as isize);
+                        if setAnimFlags & SETANIM_FLAG_HOLDLESS != 0 {
+                            // Make sure to only wait in full 1/20 sec server frame intervals.
+                            // Oracle: `int dur; int speedDif;` — both truncate to int
+                            // before the add (bg_panimate.c:2887-2892).
+                            let dur0 = ((frame.numFrames - 1) as f32
+                                * (frame.frameLerp as f32).abs())
+                                as c_int;
+                            let speedDif = (dur0 as f32 - (dur0 as f32 * editAnimSpeed)) as c_int;
+                            let dur = dur0 + speedDif;
+                            if dur > 1 {
+                                (*ps).legsTimer = dur - 1;
+                            } else {
+                                (*ps).legsTimer = (frame.frameLerp as f32).abs() as c_int;
+                            }
+                        } else {
+                            (*ps).legsTimer =
+                                (frame.numFrames as f32 * (frame.frameLerp as f32).abs()) as c_int;
+                        }
+
+                        // these guys are ok, they don't actually reference pm
+                        if PM_RunningAnim(anim) != 0 || PM_WalkingAnim(anim) != 0 {
+                            if (*ps).fd.forcePowersActive & (1 << FP_RAGE) != 0 {
+                                (*ps).legsTimer = ((*ps).legsTimer as f32 / 1.3) as c_int;
+                            } else if (*ps).fd.forcePowersActive & (1 << FP_SPEED) != 0 {
+                                (*ps).legsTimer = ((*ps).legsTimer as f32 / 1.7) as c_int;
+                            }
                         }
                     }
                 }
             }
         }
     }
-}
 }
 
 /// Raven `PM_SetAnimFinal`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2926-2930`
 impl PmoveContext<'_> {
-    pub fn PM_SetAnimFinal(&mut self, setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
+    pub fn PM_SetAnimFinal(
+        &mut self,
+        setAnimParts: c_int,
+        anim: c_int,
+        setAnimFlags: c_int,
+        blendTime: c_int,
+    ) {
         unsafe {
-            self.BG_SetAnimFinal((*self.pm).ps, (*self.pm).animations, setAnimParts, anim, setAnimFlags, blendTime);
+            self.BG_SetAnimFinal(
+                (*self.pm).ps,
+                (*self.pm).animations,
+                setAnimParts,
+                anim,
+                setAnimFlags,
+                blendTime,
+            );
         }
     }
 }
@@ -2526,7 +2675,13 @@ impl PmoveContext<'_> {
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:3037-3040`
 impl PmoveContext<'_> {
-    pub fn PM_SetAnim(&mut self, setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
+    pub fn PM_SetAnim(
+        &mut self,
+        setAnimParts: c_int,
+        anim: c_int,
+        setAnimFlags: c_int,
+        blendTime: c_int,
+    ) {
         let (ps, animations) = unsafe { ((*self.pm).ps, (*self.pm).animations) };
         self.BG_SetAnim(ps, animations, setAnimParts, anim, setAnimFlags, blendTime);
     }

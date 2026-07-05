@@ -13,20 +13,22 @@
 //! established `vec3-outparam-seam` park reason).
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
-use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
-use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
-use crate::q_math::{
-    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleDelta,
-    AngleVectors, VectorLength, VectorLengthSquared, VectorNormalize, VectorNormalize2,
-    vec3_origin, vectoangles,
-};
 use crate::level::alert_event::{
-    alertEvent_t, alertEventLevel_e, alertEventLevel_e::AEL_DANGER, alertEventType_e,
+    alertEventLevel_e, alertEventLevel_e::AEL_DANGER, alertEventType_e, alertEvent_t,
     MAX_ALERT_EVENTS,
 };
 use crate::level::interest_point::MAX_INTEREST_POINTS;
-use mp_qshared::shared::{CONTENTS_OPAQUE, MASK_OPAQUE, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_GENTITIES};
+use crate::prelude::*;
+use crate::q_math::{
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, vec3_origin,
+    vectoangles, AngleDelta, AngleVectors, VectorLength, VectorLengthSquared, VectorNormalize,
+    VectorNormalize2,
+};
+use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_qshared::shared::{
+    CONTENTS_OPAQUE, ENTITYNUM_NONE, ENTITYNUM_WORLD, MASK_OPAQUE, MAX_GENTITIES,
+};
 
 // SVF flags (from g_public.h)
 const SVF_GLASS_BRUSH: c_int = 0x08000000; // Ent is a glass brush
@@ -55,13 +57,13 @@ pub fn G_ClearLineOfSight(
     trap::Trace(
         ctx.engine,
         GTraceArgs::new(
-&mut tr as *mut trace_t,
-        &point1 as *const vec3_t,
-        core::ptr::null(),
-        core::ptr::null(),
-        &point2 as *const vec3_t,
-        ignore,
-        clipmask,
+            &mut tr as *mut trace_t,
+            &point1 as *const vec3_t,
+            core::ptr::null(),
+            core::ptr::null(),
+            &point2 as *const vec3_t,
+            ignore,
+            clipmask,
         ),
     );
 
@@ -74,17 +76,17 @@ pub fn G_ClearLineOfSight(
     if EntIsGlass(hit) != 0 {
         let mut newpoint1 = tr.endpos;
         trap::Trace(
-        ctx.engine,
-        GTraceArgs::new(
-&mut tr as *mut trace_t,
-            &newpoint1 as *const vec3_t,
-            core::ptr::null(),
-            core::ptr::null(),
-            &point2 as *const vec3_t,
-            unsafe { (*hit).s.number },
-            clipmask,
-        ),
-    );
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &newpoint1 as *const vec3_t,
+                core::ptr::null(),
+                core::ptr::null(),
+                &point2 as *const vec3_t,
+                unsafe { (*hit).s.number },
+                clipmask,
+            ),
+        );
 
         if tr.fraction == 1.0 {
             return 1;
@@ -100,10 +102,7 @@ pub fn G_ClearLineOfSight(
 /// check. This function does not look at PVS or FOV, or take any AI related
 /// factors (for example, the NPC's reaction time) into account.
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:47-80`
-pub fn CanSee(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn CanSee(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     let mut tr: trace_t = unsafe { core::mem::zeroed() };
     let mut eyes = [0.0; 3];
     let mut spot = [0.0; 3];
@@ -115,13 +114,13 @@ pub fn CanSee(
     trap::Trace(
         ctx.engine,
         GTraceArgs::new(
-&mut tr as *mut trace_t,
-        &eyes as *const vec3_t,
-        core::ptr::null(),
-        core::ptr::null(),
-        &spot as *const vec3_t,
-        unsafe { (*npc).s.number },
-        MASK_OPAQUE,
+            &mut tr as *mut trace_t,
+            &eyes as *const vec3_t,
+            core::ptr::null(),
+            core::ptr::null(),
+            &spot as *const vec3_t,
+            unsafe { (*npc).s.number },
+            MASK_OPAQUE,
         ),
     );
     ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_OPAQUE);
@@ -133,13 +132,13 @@ pub fn CanSee(
     trap::Trace(
         ctx.engine,
         GTraceArgs::new(
-&mut tr as *mut trace_t,
-        &eyes as *const vec3_t,
-        core::ptr::null(),
-        core::ptr::null(),
-        &spot as *const vec3_t,
-        unsafe { (*npc).s.number },
-        MASK_OPAQUE,
+            &mut tr as *mut trace_t,
+            &eyes as *const vec3_t,
+            core::ptr::null(),
+            core::ptr::null(),
+            &spot as *const vec3_t,
+            unsafe { (*npc).s.number },
+            MASK_OPAQUE,
         ),
     );
     ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_OPAQUE);
@@ -151,13 +150,13 @@ pub fn CanSee(
     trap::Trace(
         ctx.engine,
         GTraceArgs::new(
-&mut tr as *mut trace_t,
-        &eyes as *const vec3_t,
-        core::ptr::null(),
-        core::ptr::null(),
-        &spot as *const vec3_t,
-        unsafe { (*npc).s.number },
-        MASK_OPAQUE,
+            &mut tr as *mut trace_t,
+            &eyes as *const vec3_t,
+            core::ptr::null(),
+            core::ptr::null(),
+            &spot as *const vec3_t,
+            unsafe { (*npc).s.number },
+            MASK_OPAQUE,
         ),
     );
     ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_OPAQUE);
@@ -171,12 +170,7 @@ pub fn CanSee(
 /// Raven `InFront`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:82-98`
-pub fn InFront(
-    spot: vec3_t,
-    from: vec3_t,
-    fromAngles: vec3_t,
-    threshHold: f32,
-) -> qboolean {
+pub fn InFront(spot: vec3_t, from: vec3_t, fromAngles: vec3_t, threshHold: f32) -> qboolean {
     let mut dir = [0.0; 3];
     let mut forward = [0.0; 3];
     let mut angles = [0.0; 3];
@@ -192,7 +186,11 @@ pub fn InFront(
 
     dot = _DotProduct(dir, forward);
 
-    if dot > threshHold { 1 } else { 0 }
+    if dot > threshHold {
+        1
+    } else {
+        0
+    }
 }
 
 /// Raven `InFOV3`.
@@ -331,10 +329,7 @@ pub fn InFOV(
 /// account lighting, movement, turning, crouch/stand up, other anims, hide
 /// brushes, etc.
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:210-251`
-pub fn InVisrange(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn InVisrange(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     let mut eyes = [0.0; 3];
     let mut spot = [0.0; 3];
     let mut deltaVector = [0.0; 3];
@@ -414,13 +409,9 @@ pub fn NPC_CheckVisibility(
 
     // check FOV
     if (flags & CHECK_FOV) != 0 {
-        if InFOV(
-            ctx,
-            ent,
-            npc,
-            unsafe { (*npcinfo).stats.hfov },
-            unsafe { (*npcinfo).stats.vfov },
-        ) == 0
+        if InFOV(ctx, ent, npc, unsafe { (*npcinfo).stats.hfov }, unsafe {
+            (*npcinfo).stats.vfov
+        }) == 0
         {
             return visibility_t::VIS_360;
         }
@@ -519,10 +510,7 @@ pub fn G_CheckSoundEvents(
 /// server BSP data, or load the lightmap along with collision data and
 /// whatnot, but is it worth it? Presently a stub returning full brightness.
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:388-402`
-pub fn G_GetLightLevel(
-    pos: vec3_t,
-    fromDir: vec3_t,
-) -> f32 {
+pub fn G_GetLightLevel(pos: vec3_t, fromDir: vec3_t) -> f32 {
     // rwwFIXMEFIXME: ...this is evil. We can possibly read from the server BSP
     // data, or load the lightmap along with collision data and whatnot, but is
     // it worth it?
@@ -757,8 +745,7 @@ pub fn G_CheckForDanger(
         let should_flee = if let Some(team) = owner_team {
             !owner.is_null()
                 && owner != self_
-                && unsafe { (*self_).client.is_null() }
-                    == false
+                && unsafe { (*self_).client.is_null() } == false
                 && team != unsafe { (*((*self_).client as *mut gclient_t)).playerTeam }
         } else {
             owner.is_null()
@@ -792,10 +779,7 @@ pub fn G_CheckForDanger(
 ///
 /// Raven: FIXME: more bStates need to call this?
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:568-571`
-pub fn NPC_CheckForDanger(
-    ctx: GameContext<'_>,
-    alertEvent: c_int,
-) -> qboolean {
+pub fn NPC_CheckForDanger(ctx: GameContext<'_>, alertEvent: c_int) -> qboolean {
     let npc = unsafe { (&mut *ctx.world).globals.NPC };
     G_CheckForDanger(ctx, npc, alertEvent)
 }
@@ -833,7 +817,8 @@ pub fn AddSoundEvent(
 
     world.level.alertEvents[world.level.numAlertEvents as usize].radius = radius;
     world.level.alertEvents[world.level.numAlertEvents as usize].level = alertLevel;
-    world.level.alertEvents[world.level.numAlertEvents as usize].r#type = alertEventType_e::AET_SOUND;
+    world.level.alertEvents[world.level.numAlertEvents as usize].r#type =
+        alertEventType_e::AET_SOUND;
     world.level.alertEvents[world.level.numAlertEvents as usize].owner = owner;
     if needLOS != 0 {
         // a very low-level sound, when check this sound event, check for LOS
@@ -881,7 +866,8 @@ pub fn AddSightEvent(
 
     world.level.alertEvents[world.level.numAlertEvents as usize].radius = radius;
     world.level.alertEvents[world.level.numAlertEvents as usize].level = alertLevel;
-    world.level.alertEvents[world.level.numAlertEvents as usize].r#type = alertEventType_e::AET_SIGHT;
+    world.level.alertEvents[world.level.numAlertEvents as usize].r#type =
+        alertEventType_e::AET_SIGHT;
     world.level.alertEvents[world.level.numAlertEvents as usize].owner = owner;
     world.level.alertEvents[world.level.numAlertEvents as usize].addLight = addLight;
     world.level.alertEvents[world.level.numAlertEvents as usize].ID = world.level.curAlertID;
@@ -1006,13 +992,13 @@ pub fn G_ClearLOS(
     trap::Trace(
         ctx.engine,
         GTraceArgs::new(
-&mut tr as *mut trace_t,
-        &start as *const vec3_t,
-        core::ptr::null(),
-        core::ptr::null(),
-        &end as *const vec3_t,
-        ENTITYNUM_NONE,
-        CONTENTS_OPAQUE,
+            &mut tr as *mut trace_t,
+            &start as *const vec3_t,
+            core::ptr::null(),
+            core::ptr::null(),
+            &end as *const vec3_t,
+            ENTITYNUM_NONE,
+            CONTENTS_OPAQUE,
         ),
     );
     while tr.fraction < 1.0 && trace_count < 3 {
@@ -1020,23 +1006,22 @@ pub fn G_ClearLOS(
         if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
             let world = unsafe { (&mut *ctx.world) };
             if tr.entityNum < (MAX_GENTITIES as u32) as i16 {
-                if world.g_entities[tr.entityNum as usize].r.svFlags
-                    & (SVF_GLASS_BRUSH as c_int)
+                if world.g_entities[tr.entityNum as usize].r.svFlags & (SVF_GLASS_BRUSH as c_int)
                     != 0
                 {
                     // can see through glass, trace again, ignoring me
                     trap::Trace(
-        ctx.engine,
-        GTraceArgs::new(
-&mut tr as *mut trace_t,
-                        &tr.endpos as *const vec3_t,
-                        core::ptr::null(),
-                        core::ptr::null(),
-                        &end as *const vec3_t,
-                        tr.entityNum as c_int,
-                        MASK_OPAQUE,
-        ),
-    );
+                        ctx.engine,
+                        GTraceArgs::new(
+                            &mut tr as *mut trace_t,
+                            &tr.endpos as *const vec3_t,
+                            core::ptr::null(),
+                            core::ptr::null(),
+                            &end as *const vec3_t,
+                            tr.entityNum as c_int,
+                            MASK_OPAQUE,
+                        ),
+                    );
                     trace_count += 1;
                     continue;
                 }
@@ -1102,11 +1087,7 @@ pub fn G_ClearLOS3(
 ///
 /// Raven: NPC's eyes to entity.
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:797-805`
-pub fn G_ClearLOS4(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn G_ClearLOS4(ctx: GameContext<'_>, self_: *mut gentity_t, ent: *mut gentity_t) -> qboolean {
     let mut eyes = [0.0; 3];
 
     // Calculate my position
@@ -1119,11 +1100,7 @@ pub fn G_ClearLOS4(
 ///
 /// Raven: NPC's eyes to position.
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:808-816`
-pub fn G_ClearLOS5(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    end: vec3_t,
-) -> qboolean {
+pub fn G_ClearLOS5(ctx: GameContext<'_>, self_: *mut gentity_t, end: vec3_t) -> qboolean {
     let mut eyes = [0.0; 3];
 
     // Calculate the my position
@@ -1135,12 +1112,7 @@ pub fn G_ClearLOS5(
 /// Raven `NPC_GetHFOVPercentage`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:824-839`
-pub fn NPC_GetHFOVPercentage(
-    spot: vec3_t,
-    from: vec3_t,
-    facing: vec3_t,
-    hFOV: f32,
-) -> f32 {
+pub fn NPC_GetHFOVPercentage(spot: vec3_t, from: vec3_t, facing: vec3_t, hFOV: f32) -> f32 {
     let mut deltaVector = [0.0; 3];
     let mut angles = [0.0; 3];
 
@@ -1160,12 +1132,7 @@ pub fn NPC_GetHFOVPercentage(
 /// Raven `NPC_GetVFOVPercentage`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:847-862`
-pub fn NPC_GetVFOVPercentage(
-    spot: vec3_t,
-    from: vec3_t,
-    facing: vec3_t,
-    vFOV: f32,
-) -> f32 {
+pub fn NPC_GetVFOVPercentage(spot: vec3_t, from: vec3_t, facing: vec3_t, vFOV: f32) -> f32 {
     let mut deltaVector = [0.0; 3];
     let mut angles = [0.0; 3];
 
@@ -1185,10 +1152,7 @@ pub fn NPC_GetVFOVPercentage(
 /// Raven `G_FindLocalInterestPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:871-907`
-pub fn G_FindLocalInterestPoint(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) -> c_int {
+pub fn G_FindLocalInterestPoint(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
     pub const MAX_INTEREST_DIST: f32 = 256.0 * 256.0; // 65536.0
 
     let mut best_point = ENTITYNUM_NONE;
@@ -1234,8 +1198,17 @@ pub fn G_FindLocalInterestPoint(
             }
         }
     }
-    if best_point != ENTITYNUM_NONE && !world.level.interestPoints[best_point as usize].target.is_null() {
-        G_UseTargets2(ctx, self_, self_, world.level.interestPoints[best_point as usize].target);
+    if best_point != ENTITYNUM_NONE
+        && !world.level.interestPoints[best_point as usize]
+            .target
+            .is_null()
+    {
+        G_UseTargets2(
+            ctx,
+            self_,
+            self_,
+            world.level.interestPoints[best_point as usize].target,
+        );
     }
     best_point
 }
@@ -1246,15 +1219,18 @@ pub fn G_FindLocalInterestPoint(
 /// point that a squadmate will look at if standing still. `target` fires
 /// when someone looks at this thing. FIXME: rename point_interest.
 /// Source: `oracle/oracle/codemp/game/NPC_senses.c:915-934`
-pub fn SP_target_interest(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_target_interest(ctx: GameContext<'_>, self_: *mut gentity_t) {
     let world = unsafe { (&mut *ctx.world) };
 
     if world.level.numInterestPoints >= MAX_INTEREST_POINTS as c_int {
         // ERROR: Too many interest points, limit is MAX_INTEREST_POINTS
-        Com_Printf(cstr(&format!("ERROR:  Too many interest points, limit is {}\n", MAX_INTEREST_POINTS as c_int)).as_ptr());
+        Com_Printf(
+            cstr(&format!(
+                "ERROR:  Too many interest points, limit is {}\n",
+                MAX_INTEREST_POINTS as c_int
+            ))
+            .as_ptr(),
+        );
         G_FreeEntity(ctx, self_);
         return;
     }

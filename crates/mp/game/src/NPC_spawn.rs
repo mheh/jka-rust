@@ -11,9 +11,9 @@
 use crate::prelude::*;
 // Dedupe SVF_NOCLIENT glob ambiguity (g_items::* / g_public_consts::* both
 // define it): the canonical home is g_public_consts, per house convention.
-use crate::g_public_consts::SVF_NOCLIENT;
 use crate::g_ICARUScb::G_DebugPrint;
 use crate::g_ICARUScb::Q3_SetParm;
+use crate::g_public_consts::SVF_NOCLIENT;
 use mp_qshared::common::mp::gentity::BSET_FIRST;
 
 // Unported types referenced in this file (need porting before this compiles):
@@ -65,19 +65,14 @@ pub const SFB_STARTINSOLID: c_int = 128;
 ///
 /// Raven: rwwFIXMEFIXME: Do something here, need to let the client know.
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:90-94`
-pub fn WP_SetSaberModel(
-    client: *mut gclient_t,
-    npcClass: class_t,
-) -> c_int {
+pub fn WP_SetSaberModel(client: *mut gclient_t, npcClass: class_t) -> c_int {
     1
 }
 
 /// Raven `NPC_PainFunc`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:103-189`
-pub fn NPC_PainFunc(
-    ent: *mut gentity_t,
-) -> Option<crate::ent_fn_enums::EntPain> {
+pub fn NPC_PainFunc(ent: *mut gentity_t) -> Option<crate::ent_fn_enums::EntPain> {
     // Raven returns the selected pain fn-ptr; fn-ptr fields are the
     // `Option<EntPain>` fn-ID enum directly (no *mut c_void encoding).
     let pain = unsafe {
@@ -85,14 +80,15 @@ pub fn NPC_PainFunc(
             crate::ent_fn_enums::EntPain::NPC_Jedi_Pain
         } else {
             match (*((*ent).client as *mut gclient_t)).NPC_class {
-                CLASS_STORMTROOPER | CLASS_SWAMPTROOPER => crate::ent_fn_enums::EntPain::NPC_ST_Pain,
+                CLASS_STORMTROOPER | CLASS_SWAMPTROOPER => {
+                    crate::ent_fn_enums::EntPain::NPC_ST_Pain
+                }
                 CLASS_SEEKER => crate::ent_fn_enums::EntPain::NPC_Seeker_Pain,
                 CLASS_REMOTE => crate::ent_fn_enums::EntPain::NPC_Remote_Pain,
                 CLASS_MINEMONSTER => crate::ent_fn_enums::EntPain::NPC_MineMonster_Pain,
                 CLASS_HOWLER => crate::ent_fn_enums::EntPain::NPC_Howler_Pain,
-                CLASS_GONK | CLASS_R2D2 | CLASS_R5D2 | CLASS_MOUSE | CLASS_PROTOCOL | CLASS_INTERROGATOR => {
-                    crate::ent_fn_enums::EntPain::NPC_Droid_Pain
-                }
+                CLASS_GONK | CLASS_R2D2 | CLASS_R5D2 | CLASS_MOUSE | CLASS_PROTOCOL
+                | CLASS_INTERROGATOR => crate::ent_fn_enums::EntPain::NPC_Droid_Pain,
                 CLASS_PROBE => crate::ent_fn_enums::EntPain::NPC_Probe_Pain,
                 CLASS_SENTRY => crate::ent_fn_enums::EntPain::NPC_Sentry_Pain,
                 CLASS_MARK1 => crate::ent_fn_enums::EntPain::NPC_Mark1_Pain,
@@ -111,9 +107,7 @@ pub fn NPC_PainFunc(
 /// Raven `NPC_TouchFunc`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:199-206`
-pub fn NPC_TouchFunc(
-    _ent: *mut gentity_t,
-) -> Option<crate::ent_fn_enums::EntTouch> {
+pub fn NPC_TouchFunc(_ent: *mut gentity_t) -> Option<crate::ent_fn_enums::EntTouch> {
     // Raven always returns `NPC_Touch`, returned here as `Option<EntTouch>` directly.
     Some(crate::ent_fn_enums::EntTouch::NPC_Touch)
 }
@@ -121,10 +115,7 @@ pub fn NPC_TouchFunc(
 /// Raven `NPC_SetMiscDefaultData`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:215-501`
-pub fn NPC_SetMiscDefaultData(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn NPC_SetMiscDefaultData(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ent).spawnflags & SFB_CINEMATIC != 0 {
             (*((*ent).NPC as *mut gNPC_t)).behaviorState = BS_CINEMATIC;
@@ -132,11 +123,14 @@ pub fn NPC_SetMiscDefaultData(
         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
             crate::NPC_AI_Jedi::Boba_Precache(ctx);
             (*((*ent).client as *mut gclient_t)).ps.fd.forcePowersKnown |= 1 << FP_LEVITATION;
-            (*((*ent).client as *mut gclient_t)).ps.fd.forcePowerLevel[FP_LEVITATION as usize] = FORCE_LEVEL_3;
+            (*((*ent).client as *mut gclient_t)).ps.fd.forcePowerLevel[FP_LEVITATION as usize] =
+                FORCE_LEVEL_3;
             (*((*ent).client as *mut gclient_t)).ps.fd.forcePower = 100;
             (*((*ent).NPC as *mut gNPC_t)).scriptFlags |= SCF_ALT_FIRE | SCF_NO_GROUPS;
         }
-        if (*ent).s.NPC_class == CLASS_VEHICLE as c_int && (*ent).m_pVehicle != core::ptr::null_mut() {
+        if (*ent).s.NPC_class == CLASS_VEHICLE as c_int
+            && (*ent).m_pVehicle != core::ptr::null_mut()
+        {
             (*ent).s.g2radius = 255;
             if (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type == VH_WALKER {
                 (*ent).mass = 2000.0;
@@ -195,7 +189,9 @@ pub fn NPC_SetMiscDefaultData(
         }
         match (*((*ent).client as *mut gclient_t)).playerTeam {
             NPCTEAM_PLAYER => {
-                if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_JEDI || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_LUKE {
+                if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_JEDI
+                    || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_LUKE
+                {
                     (*((*ent).client as *mut gclient_t)).enemyTeam = NPCTEAM_ENEMY;
                     if (*ent).spawnflags & JSF_AMBUSH != 0 {
                         (*((*ent).NPC as *mut gNPC_t)).scriptFlags |= SCF_IGNORE_ALERTS;
@@ -205,7 +201,9 @@ pub fn NPC_SetMiscDefaultData(
                     match (*((*ent).client as *mut gclient_t)).ps.weapon {
                         WP_THERMAL | WP_BLASTER => {
                             crate::NPC_AI_Stormtrooper::ST_ClearTimers(ctx, ent);
-                            if (*((*ent).NPC as *mut gNPC_t)).rank >= RANK_LT || (*((*ent).client as *mut gclient_t)).ps.weapon == WP_THERMAL {
+                            if (*((*ent).NPC as *mut gNPC_t)).rank >= RANK_LT
+                                || (*((*ent).client as *mut gclient_t)).ps.weapon == WP_THERMAL
+                            {
                                 // officers/thermal alt-fire: commented out in oracle
                             }
                         }
@@ -262,9 +260,13 @@ pub fn NPC_SetMiscDefaultData(
             _ => {}
         }
 
-        if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SEEKER && (*ent).activator.is_some() {
+        if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SEEKER
+            && (*ent).activator.is_some()
+        {
             // teams already set correctly
-        } else if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE && (*ent).s.NPC_class != CLASS_VEHICLE as c_int {
+        } else if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
+            && (*ent).s.NPC_class != CLASS_VEHICLE as c_int
+        {
             if (*((*ent).client as *mut gclient_t)).enemyTeam == NPCTEAM_PLAYER {
                 (*((*ent).client as *mut gclient_t)).sess.sessionTeam = SIEGETEAM_TEAM1;
             } else if (*((*ent).client as *mut gclient_t)).enemyTeam == NPCTEAM_ENEMY {
@@ -274,7 +276,9 @@ pub fn NPC_SetMiscDefaultData(
             }
         }
 
-        if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_ATST || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_MARK1 {
+        if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_ATST
+            || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_MARK1
+        {
             (*ent).flags |= FL_SHIELDED | FL_NO_KNOCKBACK;
         }
     }
@@ -285,11 +289,7 @@ pub fn NPC_SetMiscDefaultData(
 /// Raven: not sure how to handle this, should I pass in class instead of team
 /// and go from there? - dmv
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:509-749`
-pub fn NPC_WeaponsForTeam(
-    team: team_t,
-    spawnflags: c_int,
-    NPC_type: *const c_char,
-) -> c_int {
+pub fn NPC_WeaponsForTeam(team: team_t, spawnflags: c_int, NPC_type: *const c_char) -> c_int {
     // Faithful transcription of the C string-compare cascade. Q_stricmp /
     // Q_strncmp are pure string helpers (bg-shared); NPC_type is a NUL
     // terminated C string handed to us by the (unported) caller — safe to
@@ -370,7 +370,10 @@ pub fn NPC_WeaponsForTeam(
             if stricmp(name, "rodian2") {
                 return 1 << WP_BLASTER;
             }
-            if stricmp(name, "interrogator") || stricmp(name, "sentry") || strncmp(name, "protocol", 8) {
+            if stricmp(name, "interrogator")
+                || stricmp(name, "sentry")
+                || strncmp(name, "protocol", 8)
+            {
                 return WP_NONE;
             }
             if strncmp(name, "weequay", 7) {
@@ -456,19 +459,21 @@ pub fn NPC_WeaponsForTeam(
 /// Raven `NPC_SetWeapons`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:759-797`
-pub fn NPC_SetWeapons(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn NPC_SetWeapons(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut bestWeap: c_int = WP_NONE;
-        let weapons = NPC_WeaponsForTeam((*((*ent).client as *mut gclient_t)).playerTeam, (*ent).spawnflags, (*ent).NPC_type as *const c_char);
+        let weapons = NPC_WeaponsForTeam(
+            (*((*ent).client as *mut gclient_t)).playerTeam,
+            (*ent).spawnflags,
+            (*ent).NPC_type as *const c_char,
+        );
 
         (*((*ent).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] = 0;
         let mut curWeap = WP_SABER;
         while curWeap < WP_NUM_WEAPONS {
             if weapons & (1 << curWeap) != 0 {
-                (*((*ent).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |= 1 << curWeap;
+                (*((*ent).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |=
+                    1 << curWeap;
                 // PORT-NOTE(weaponData): `weaponData` global table isn't resolved
                 // in this packet; ammoIndex lookup left as the literal Raven
                 // subject until that global lands.
@@ -501,22 +506,18 @@ pub fn NPC_SetWeapons(
 /// Raven: NOTE: Make sure any effects called here have their models, tga's
 /// and sounds precached in CG_RegisterNPCEffects in cg_player.cpp.
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:808-810`
-pub fn NPC_SpawnEffect(
-    ent: *mut gentity_t,
-) {
+pub fn NPC_SpawnEffect(ent: *mut gentity_t) {
     // Empty body in the oracle (effect hook, never filled in).
 }
 
 /// Raven `NPC_SetFX_SpawnStates`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:817-823`
-pub fn NPC_SetFX_SpawnStates(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn NPC_SetFX_SpawnStates(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*((*ent).NPC as *mut gNPC_t)).aiFlags & NPCAI_CUSTOM_GRAVITY == 0 {
-            (*((*ent).client as *mut gclient_t)).ps.gravity = (*ctx.world).cvars.g_gravity.value as c_int;
+            (*((*ent).client as *mut gclient_t)).ps.gravity =
+                (*ctx.world).cvars.g_gravity.value as c_int;
         }
     }
 }
@@ -524,10 +525,7 @@ pub fn NPC_SetFX_SpawnStates(
 /// Raven `NPC_SpotWouldTelefrag`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:831-859`
-pub fn NPC_SpotWouldTelefrag(
-    ctx: GameContext<'_>,
-    npc: *mut gentity_t,
-) -> qboolean {
+pub fn NPC_SpotWouldTelefrag(ctx: GameContext<'_>, npc: *mut gentity_t) -> qboolean {
     unsafe {
         let mut mins: vec3_t = [0.0; 3];
         let mut maxs: vec3_t = [0.0; 3];
@@ -565,10 +563,7 @@ pub fn NPC_SpotWouldTelefrag(
 /// Raven `NPC_Begin`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:862-1274`
-pub fn NPC_Begin(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn NPC_Begin(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut spawn_origin: vec3_t = [0.0; 3];
         let mut spawn_angles: vec3_t = [0.0; 3];
@@ -578,15 +573,44 @@ pub fn NPC_Begin(
         if (*ent).spawnflags & SFB_NOTSOLID == 0 {
             if NPC_SpotWouldTelefrag(ctx, ent) != 0 {
                 if (*ent).wait < (0) as f32 {
-                    let t3 = if (*ent).target3.is_null() { String::new() } else { cstr_to_str((*ent).target3 as *const c_char) };
-                    let tn = if (*ent).targetname.is_null() { String::new() } else { cstr_to_str((*ent).targetname as *const c_char) };
-                    G_DebugPrint(ctx, WL_DEBUG as i32, cstr(&format!("NPC {} could not spawn, firing target3 ({}) and removing self\n", tn, t3)).as_ptr());
+                    let t3 = if (*ent).target3.is_null() {
+                        String::new()
+                    } else {
+                        cstr_to_str((*ent).target3 as *const c_char)
+                    };
+                    let tn = if (*ent).targetname.is_null() {
+                        String::new()
+                    } else {
+                        cstr_to_str((*ent).targetname as *const c_char)
+                    };
+                    G_DebugPrint(
+                        ctx,
+                        WL_DEBUG as i32,
+                        cstr(&format!(
+                            "NPC {} could not spawn, firing target3 ({}) and removing self\n",
+                            tn, t3
+                        ))
+                        .as_ptr(),
+                    );
                     crate::g_utils::G_UseTargets2(ctx, ent, ent, (*ent).target3 as *const c_char);
                     (*ent).think = Some(EntThink::G_FreeEntity);
                     (*ent).nextthink = (*ctx.world).level.time + 100;
                 } else {
-                    let tn = if (*ent).targetname.is_null() { String::new() } else { cstr_to_str((*ent).targetname as *const c_char) };
-                    G_DebugPrint(ctx, WL_DEBUG as i32, cstr(&format!("NPC {} could not spawn, waiting {:.2} secs to try again\n", tn, (*ent).wait as f32 / 1000.0f32)).as_ptr());
+                    let tn = if (*ent).targetname.is_null() {
+                        String::new()
+                    } else {
+                        cstr_to_str((*ent).targetname as *const c_char)
+                    };
+                    G_DebugPrint(
+                        ctx,
+                        WL_DEBUG as i32,
+                        cstr(&format!(
+                            "NPC {} could not spawn, waiting {:.2} secs to try again\n",
+                            tn,
+                            (*ent).wait as f32 / 1000.0f32
+                        ))
+                        .as_ptr(),
+                    );
                     (*ent).think = Some(EntThink::NPC_Begin);
                     (*ent).nextthink = (((*ctx.world).level.time as f32) + (*ent).wait) as i32;
                 }
@@ -595,7 +619,10 @@ pub fn NPC_Begin(
         }
         NPC_SpawnEffect(ent);
 
-        crate::q_math::_VectorCopy((*((*ent).client as *mut gclient_t)).ps.origin, &mut spawn_origin);
+        crate::q_math::_VectorCopy(
+            (*((*ent).client as *mut gclient_t)).ps.origin,
+            &mut spawn_origin,
+        );
         crate::q_math::_VectorCopy((*ent).s.angles, &mut spawn_angles);
         spawn_angles[YAW as usize] = (*((*ent).NPC as *mut gNPC_t)).desiredYaw;
 
@@ -613,10 +640,13 @@ pub fn NPC_Begin(
                 && (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_SHADOWTROOPER
                 && (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_JEDI
             {
-                (*((*ent).NPC as *mut gNPC_t)).stats.health += (*((*ent).NPC as *mut gNPC_t)).stats.health / 4 * (*ctx.world).cvars.g_spskill.integer;
+                (*((*ent).NPC as *mut gNPC_t)).stats.health +=
+                    (*((*ent).NPC as *mut gNPC_t)).stats.health / 4
+                        * (*ctx.world).cvars.g_spskill.integer;
             }
             (*client).pers.maxHealth = (*((*ent).NPC as *mut gNPC_t)).stats.health;
-            (*client).ps.stats[STAT_MAX_HEALTH as usize] = (*((*ent).NPC as *mut gNPC_t)).stats.health;
+            (*client).ps.stats[STAT_MAX_HEALTH as usize] =
+                (*((*ent).NPC as *mut gNPC_t)).stats.health;
         } else {
             (*client).pers.maxHealth = 100;
             (*client).ps.stats[STAT_MAX_HEALTH as usize] = 100;
@@ -626,8 +656,14 @@ pub fn NPC_Begin(
         if crate::q_shared::Q_stricmp(rodian.as_ptr(), (*ent).NPC_type) == 0 {
             match (*ctx.world).cvars.g_spskill.integer {
                 0 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = (1.0) as i32,
-                1 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = ((*ctx.world).bg_state.rng.Q_irand(2, 3) as f32) as i32,
-                2 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = ((*ctx.world).bg_state.rng.Q_irand(3, 4) as f32) as i32,
+                1 => {
+                    (*((*ent).NPC as *mut gNPC_t)).stats.aim =
+                        ((*ctx.world).bg_state.rng.Q_irand(2, 3) as f32) as i32
+                }
+                2 => {
+                    (*((*ent).NPC as *mut gNPC_t)).stats.aim =
+                        ((*ctx.world).bg_state.rng.Q_irand(3, 4) as f32) as i32
+                }
                 _ => {}
             }
         } else {
@@ -639,25 +675,31 @@ pub fn NPC_Begin(
             {
                 match (*ctx.world).cvars.g_spskill.integer {
                     0 => {
-                        (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed = ((*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed as f64 * 0.75) as f32;
+                        (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed =
+                            ((*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed as f64 * 0.75) as f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
-                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(3, 6);
+                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
+                                (*ctx.world).bg_state.rng.Q_irand(3, 6);
                         }
                     }
                     1 => {
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
-                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(2, 4);
+                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
+                                (*ctx.world).bg_state.rng.Q_irand(2, 4);
                         }
                     }
                     2 => {
                         (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.5f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
-                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(0, 2);
+                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -=
+                                (*ctx.world).bg_state.rng.Q_irand(0, 2);
                         }
                     }
                     _ => {}
                 }
-            } else if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_REBORN || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SHADOWTROOPER {
+            } else if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_REBORN
+                || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SHADOWTROOPER
+            {
                 match (*ctx.world).cvars.g_spskill.integer {
                     1 => (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.25f32,
                     2 => (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.5f32,
@@ -700,7 +742,8 @@ pub fn NPC_Begin(
         if (*client).ps.weapon == WP_NONE {
             NPC_SetWeapons(ctx, ent);
         }
-        (*((*ent).NPC as *mut gNPC_t)).currentAmmo = (*client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize];
+        (*((*ent).NPC as *mut gNPC_t)).currentAmmo =
+            (*client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize];
         (*client).ps.weaponstate = (WEAPON_IDLE) as i32;
         ChangeWeapon(ctx, ent, (*client).ps.weapon);
 
@@ -717,14 +760,18 @@ pub fn NPC_Begin(
 
         if (*ent).spawnflags & 64 == 0 {
             crate::g_utils::G_KillBox(ctx, ent);
-            trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
+            trap::LinkEntity(
+                ctx.engine,
+                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+            );
         }
 
         (*client).ps.pm_flags |= PMF_TIME_KNOCKBACK;
         (*client).ps.pm_time = 100;
 
         (*client).respawnTime = (*ctx.world).level.time;
-        (*client).inactivityTime = (*ctx.world).level.time + ((*ctx.world).cvars.g_inactivity.value as c_int) * 1000;
+        (*client).inactivityTime =
+            (*ctx.world).level.time + ((*ctx.world).cvars.g_inactivity.value as c_int) * 1000;
         (*client).latched_buttons = 0;
         let base = (*ctx.world).g_entities.as_mut_ptr();
         if (*ent).s.m_iVehicleNum != 0 {
@@ -738,14 +785,23 @@ pub fn NPC_Begin(
         }
 
         if (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_VEHICLE {
-            NPC_SetAnim(ctx, ent, SETANIM_BOTH, (BOTH_STAND1) as i32, SETANIM_FLAG_NORMAL);
+            NPC_SetAnim(
+                ctx,
+                ent,
+                SETANIM_BOTH,
+                (BOTH_STAND1) as i32,
+                SETANIM_FLAG_NORMAL,
+            );
         }
 
         if !spawn_point.is_null() {
             crate::g_utils::G_UseTargets(ctx, spawn_point, ent);
         }
 
-        trap::ICARUS_InitEnt(ctx.engine, mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs::new(ent));
+        trap::ICARUS_InitEnt(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs::new(ent),
+        );
 
         SetNPCGlobals(ctx, ent);
 
@@ -763,13 +819,16 @@ pub fn NPC_Begin(
 
         (*client).ps.ping = (*((*ent).NPC as *mut gNPC_t)).stats.reactions * 50;
 
-        if (*ent).s.NPC_class != CLASS_VEHICLE as c_int || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
+        if (*ent).s.NPC_class != CLASS_VEHICLE as c_int
+            || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
+        {
             (*client).ps.persistant[PERS_TEAM as usize] = (*client).playerTeam;
         }
 
         (*ent).use_ = Some(EntUse::NPC_Use);
         (*ent).think = Some(EntThink::NPC_Think);
-        (*ent).nextthink = (*ctx.world).level.time + FRAMETIME + (*ctx.world).bg_state.rng.Q_irand(0, 100);
+        (*ent).nextthink =
+            (*ctx.world).level.time + FRAMETIME + (*ctx.world).bg_state.rng.Q_irand(0, 100);
 
         NPC_SetMiscDefaultData(ctx, ent);
         if (*ent).health <= 0 {
@@ -807,10 +866,15 @@ pub fn NPC_Begin(
 
         ClientThink(ctx, (*ent).s.number, &mut ucmd as *mut usercmd_t);
 
-        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
+        trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+        );
 
         if (*client).playerTeam == NPCTEAM_ENEMY {
-            if (*ent).spawnflags & SFB_CINEMATIC == 0 && (*((*ent).NPC as *mut gNPC_t)).behaviorState != BS_CINEMATIC {
+            if (*ent).spawnflags & SFB_CINEMATIC == 0
+                && (*((*ent).NPC as *mut gNPC_t)).behaviorState != BS_CINEMATIC
+            {
                 // g_entities[0].client stats bump: commented out / no-op in oracle
             }
         }
@@ -823,15 +887,25 @@ pub fn NPC_Begin(
                 let mut droid_ent: *mut gentity_t = core::ptr::null_mut();
                 if !(*ent).model2.is_null() && *(*ent).model2.as_ref().unwrap_or(&0) != 0 {
                     droid_npc_type = (*ent).model2;
-                } else if !(*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).droidNPC.is_null() {
-                    droid_npc_type = (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).droidNPC;
+                } else if !(*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo)
+                    .droidNPC
+                    .is_null()
+                {
+                    droid_npc_type =
+                        (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).droidNPC;
                 }
 
                 if !droid_npc_type.is_null() {
                     let random_s = cstr("random");
                     let default_s = cstr("default");
-                    if crate::q_shared::Q_stricmp(random_s.as_ptr(), droid_npc_type as *const c_char) == 0
-                        || crate::q_shared::Q_stricmp(default_s.as_ptr(), droid_npc_type as *const c_char) == 0
+                    if crate::q_shared::Q_stricmp(
+                        random_s.as_ptr(),
+                        droid_npc_type as *const c_char,
+                    ) == 0
+                        || crate::q_shared::Q_stricmp(
+                            default_s.as_ptr(),
+                            droid_npc_type as *const c_char,
+                        ) == 0
                     {
                         droid_npc_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                             cstr("r2d2").into_raw()
@@ -839,30 +913,51 @@ pub fn NPC_Begin(
                             cstr("r5d2").into_raw()
                         };
                     }
-                    droid_ent = NPC_SpawnType(ctx, ent, droid_npc_type, core::ptr::null_mut(), qfalse);
+                    droid_ent =
+                        NPC_SpawnType(ctx, ent, droid_npc_type, core::ptr::null_mut(), qfalse);
                     if !droid_ent.is_null() {
                         if !(*droid_ent).client.is_null() {
-                            (*((*droid_ent).client as *mut gclient_t)).ps.m_iVehicleNum = (*ent).s.number;
+                            (*((*droid_ent).client as *mut gclient_t)).ps.m_iVehicleNum =
+                                (*ent).s.number;
                             (*droid_ent).s.m_iVehicleNum = (*ent).s.number;
                             (*droid_ent).s.owner = (*ent).s.number;
                             (*droid_ent).r.ownerNum = (*ent).s.number;
                             // `Vehicle_t.m_pDroidUnit` is `mp_bg`'s own `bgEntity_t`; this crate's
                             // `bgEntity_t` name is the `gentity_t` alias (prelude), so the overlay
                             // cast targets the bg type fully qualified.
-                            (*((*ent).m_pVehicle as *mut Vehicle_t)).m_pDroidUnit = droid_ent as *mut mp_bg::public::bg_entity::bgEntity_t;
+                            (*((*ent).m_pVehicle as *mut Vehicle_t)).m_pDroidUnit =
+                                droid_ent as *mut mp_bg::public::bg_entity::bgEntity_t;
                             (*droid_ent).alliedTeam = (*ent).alliedTeam;
                             (*droid_ent).teamnodmg = (*ent).teamnodmg;
-                            (*((*droid_ent).client as *mut gclient_t)).sess.sessionTeam = (*client).sess.sessionTeam;
-                            (*((*droid_ent).client as *mut gclient_t)).ps.persistant[PERS_TEAM as usize] = (*client).ps.persistant[PERS_TEAM as usize];
-                            crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*droid_ent).s.origin);
-                            crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*((*droid_ent).client as *mut gclient_t)).ps.origin);
+                            (*((*droid_ent).client as *mut gclient_t)).sess.sessionTeam =
+                                (*client).sess.sessionTeam;
+                            (*((*droid_ent).client as *mut gclient_t)).ps.persistant
+                                [PERS_TEAM as usize] = (*client).ps.persistant[PERS_TEAM as usize];
+                            crate::q_math::_VectorCopy(
+                                (*ent).r.currentOrigin,
+                                &mut (*droid_ent).s.origin,
+                            );
+                            crate::q_math::_VectorCopy(
+                                (*ent).r.currentOrigin,
+                                &mut (*((*droid_ent).client as *mut gclient_t)).ps.origin,
+                            );
                             crate::g_utils::G_SetOrigin(droid_ent, (*droid_ent).s.origin);
-                            trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(droid_ent));
-                            crate::q_math::_VectorCopy((*ent).r.currentAngles, &mut (*droid_ent).s.angles);
+                            trap::LinkEntity(
+                                ctx.engine,
+                                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(
+                                    droid_ent,
+                                ),
+                            );
+                            crate::q_math::_VectorCopy(
+                                (*ent).r.currentAngles,
+                                &mut (*droid_ent).s.angles,
+                            );
                             crate::g_utils::G_SetAngles(droid_ent, (*droid_ent).s.angles);
                             if !(*droid_ent).NPC.is_null() {
-                                (*((*droid_ent).NPC as *mut gNPC_t)).desiredYaw = (*droid_ent).s.angles[YAW as usize];
-                                (*((*droid_ent).NPC as *mut gNPC_t)).desiredPitch = (*droid_ent).s.angles[PITCH as usize];
+                                (*((*droid_ent).NPC as *mut gNPC_t)).desiredYaw =
+                                    (*droid_ent).s.angles[YAW as usize];
+                                (*((*droid_ent).NPC as *mut gNPC_t)).desiredPitch =
+                                    (*droid_ent).s.angles[PITCH as usize];
                             }
                             (*droid_ent).flags |= FL_UNDYING;
                         } else {
@@ -878,14 +973,13 @@ pub fn NPC_Begin(
 /// Raven `New_NPC_t`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1278-1297`
-pub fn New_NPC_t(
-    ctx: GameContext<'_>,
-    entNum: c_int,
-) -> *mut gNPC_t {
+pub fn New_NPC_t(ctx: GameContext<'_>, entNum: c_int) -> *mut gNPC_t {
     unsafe {
         if (*ctx.world).globals.gNPCPtrs[entNum as usize].is_null() {
-            (*ctx.world).globals.gNPCPtrs[entNum as usize] =
-                BG_Alloc(core::mem::size_of::<gNPC_t>() as c_int, &mut (*ctx.world).bg_state) as *mut gNPC_t;
+            (*ctx.world).globals.gNPCPtrs[entNum as usize] = BG_Alloc(
+                core::mem::size_of::<gNPC_t>() as c_int,
+                &mut (*ctx.world).bg_state,
+            ) as *mut gNPC_t;
         }
 
         let ptr = (*ctx.world).globals.gNPCPtrs[entNum as usize];
@@ -901,9 +995,7 @@ pub fn New_NPC_t(
 /// Raven `NPC_DefaultScriptFlags`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1356-1364`
-pub fn NPC_DefaultScriptFlags(
-    ent: *mut gentity_t,
-) {
+pub fn NPC_DefaultScriptFlags(ent: *mut gentity_t) {
     unsafe {
         if ent.is_null() || (*ent).NPC.is_null() {
             return;
@@ -915,10 +1007,7 @@ pub fn NPC_DefaultScriptFlags(
 /// Raven `NPC_Spawn_Do`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1377-1763`
-pub fn NPC_Spawn_Do(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> *mut gentity_t {
+pub fn NPC_Spawn_Do(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t {
     unsafe {
         let mut newent: *mut gentity_t = core::ptr::null_mut();
         let mut save_org: vec3_t = [0.0; 3];
@@ -957,7 +1046,13 @@ pub fn NPC_Spawn_Do(
         newent = crate::g_utils::G_Spawn(ctx);
 
         if newent.is_null() {
-            crate::g_main::Com_Printf(cstr(&format!("{}ERROR: NPC G_Spawn failed\n", S_COLOR_RED.to_string_lossy())).as_ptr());
+            crate::g_main::Com_Printf(
+                cstr(&format!(
+                    "{}ERROR: NPC G_Spawn failed\n",
+                    S_COLOR_RED.to_string_lossy()
+                ))
+                .as_ptr(),
+            );
             return core::ptr::null_mut();
         }
 
@@ -965,7 +1060,13 @@ pub fn NPC_Spawn_Do(
 
         (*newent).NPC = New_NPC_t(ctx, (*newent).s.number) as *mut c_void;
         if (*newent).NPC.is_null() {
-            crate::g_main::Com_Printf(cstr(&format!("{}ERROR: NPC G_Alloc NPC failed\n", S_COLOR_RED.to_string_lossy())).as_ptr());
+            crate::g_main::Com_Printf(
+                cstr(&format!(
+                    "{}ERROR: NPC G_Alloc NPC failed\n",
+                    S_COLOR_RED.to_string_lossy()
+                ))
+                .as_ptr(),
+            );
             // Raven: goto finish; (unreachable `return NULL;` right after — the
             // goto always wins). Preserve control-flow, not shape (§C10).
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
@@ -974,9 +1075,16 @@ pub fn NPC_Spawn_Do(
             return newent;
         }
 
-        crate::g_utils::G_CreateFakeClient(ctx, (*newent).s.number, &mut (*newent).client as *mut *mut c_void as *mut *mut gclient_t);
+        crate::g_utils::G_CreateFakeClient(
+            ctx,
+            (*newent).s.number,
+            &mut (*newent).client as *mut *mut c_void as *mut *mut gclient_t,
+        );
 
-        (*((*newent).NPC as *mut gNPC_t)).tempGoal = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), crate::g_utils::G_Spawn(ctx));
+        (*((*newent).NPC as *mut gNPC_t)).tempGoal = ent_id_opt(
+            (*ctx.world).g_entities.as_mut_ptr(),
+            crate::g_utils::G_Spawn(ctx),
+        );
 
         if (*((*newent).NPC as *mut gNPC_t)).tempGoal.is_none() {
             (*newent).NPC = core::ptr::null_mut();
@@ -985,13 +1093,22 @@ pub fn NPC_Spawn_Do(
             }
             return core::ptr::null_mut();
         }
-        let temp_goal = ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*((*newent).NPC as *mut gNPC_t)).tempGoal);
+        let temp_goal = ent_id::resolve(
+            (*ctx.world).g_entities.as_mut_ptr(),
+            (*((*newent).NPC as *mut gNPC_t)).tempGoal,
+        );
         (*temp_goal).classname = c"NPC_goal".as_ptr() as *mut c_char;
         (*temp_goal).parent = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), newent));
         (*temp_goal).r.svFlags |= SVF_NOCLIENT;
 
         if (*newent).client.is_null() {
-            crate::g_main::Com_Printf(cstr(&format!("{}ERROR: NPC BG_Alloc client failed\n", S_COLOR_RED.to_string_lossy())).as_ptr());
+            crate::g_main::Com_Printf(
+                cstr(&format!(
+                    "{}ERROR: NPC BG_Alloc client failed\n",
+                    S_COLOR_RED.to_string_lossy()
+                ))
+                .as_ptr(),
+            );
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
                 crate::g_utils::G_SetOrigin(ent, save_org);
             }
@@ -1000,12 +1117,15 @@ pub fn NPC_Spawn_Do(
 
         core::ptr::write_bytes((*newent).client, 0, 1);
 
-        (*newent).playerState = &mut (*((*newent).client as *mut gclient_t)).ps as *mut playerState_t;
+        (*newent).playerState =
+            &mut (*((*newent).client as *mut gclient_t)).ps as *mut playerState_t;
 
         if (*ent).NPC_type.is_null() {
             (*ent).NPC_type = c"random".as_ptr() as *mut c_char;
         } else {
-            (*ent).NPC_type = crate::q_shared::Q_strlwr(crate::g_spawn::G_NewString((*ent).NPC_type as *const c_char));
+            (*ent).NPC_type = crate::q_shared::Q_strlwr(crate::g_spawn::G_NewString(
+                (*ent).NPC_type as *const c_char,
+            ));
         }
 
         if (*ent).r.svFlags & SVF_NO_BASIC_SOUNDS != 0 {
@@ -1024,7 +1144,8 @@ pub fn NPC_Spawn_Do(
         }
 
         let npc_vehicle = cstr("NPC_Vehicle");
-        if crate::q_shared::Q_stricmp((*ent).classname as *const c_char, npc_vehicle.as_ptr()) == 0 {
+        if crate::q_shared::Q_stricmp((*ent).classname as *const c_char, npc_vehicle.as_ptr()) == 0
+        {
             let i_veh_index = BG_VehicleGetIndex(
                 (*ent).NPC_type as *const c_char,
                 &mut (*ctx.world).bg_state,
@@ -1039,30 +1160,55 @@ pub fn NPC_Spawn_Do(
 
             match (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].r#type {
                 VH_ANIMAL => {
-                    crate::AnimalNPC::G_CreateAnimalNPC(ctx, (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t, (*ent).NPC_type as *const c_char);
+                    crate::AnimalNPC::G_CreateAnimalNPC(
+                        ctx,
+                        (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t,
+                        (*ent).NPC_type as *const c_char,
+                    );
                 }
                 VH_SPEEDER => {
-                    crate::SpeederNPC::G_CreateSpeederNPC(ctx, (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t, (*ent).NPC_type as *const c_char);
+                    crate::SpeederNPC::G_CreateSpeederNPC(
+                        ctx,
+                        (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t,
+                        (*ent).NPC_type as *const c_char,
+                    );
                 }
                 VH_FIGHTER => {
-                    crate::FighterNPC::G_CreateFighterNPC(ctx, (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t, (*ent).NPC_type as *const c_char);
+                    crate::FighterNPC::G_CreateFighterNPC(
+                        ctx,
+                        (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t,
+                        (*ent).NPC_type as *const c_char,
+                    );
                 }
                 VH_WALKER => {
-                    crate::WalkerNPC::G_CreateWalkerNPC(ctx, (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t, (*ent).NPC_type as *const c_char);
+                    crate::WalkerNPC::G_CreateWalkerNPC(
+                        ctx,
+                        (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t,
+                        (*ent).NPC_type as *const c_char,
+                    );
                 }
                 _ => {
-                    crate::g_main::Com_Printf(cstr(&format!("{} ERROR: Couldn't spawn NPC {}\n", S_COLOR_RED.to_string_lossy(), cstr_to_str((*ent).NPC_type as *const c_char))).as_ptr());
+                    crate::g_main::Com_Printf(
+                        cstr(&format!(
+                            "{} ERROR: Couldn't spawn NPC {}\n",
+                            S_COLOR_RED.to_string_lossy(),
+                            cstr_to_str((*ent).NPC_type as *const c_char)
+                        ))
+                        .as_ptr(),
+                    );
                     crate::g_utils::G_FreeEntity(ctx, newent);
                     crate::g_utils::G_FreeEntity(ctx, ent);
                     return core::ptr::null_mut();
                 }
             }
 
-            (*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation = &mut (*((*newent).client as *mut gclient_t)).ps.vehOrientation[0] as *mut f32;
+            (*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation =
+                &mut (*((*newent).client as *mut gclient_t)).ps.vehOrientation[0] as *mut f32;
 
             // Overlay cast to `mp_bg`'s `bgEntity_t` (this crate's `bgEntity_t` is the
             // prelude `gentity_t` alias).
-            (*((*newent).m_pVehicle as *mut Vehicle_t)).m_pParentEntity = newent as *mut mp_bg::public::bg_entity::bgEntity_t;
+            (*((*newent).m_pVehicle as *mut Vehicle_t)).m_pParentEntity =
+                newent as *mut mp_bg::public::bg_entity::bgEntity_t;
             crate::veh_dispatch::initialize(ctx, (*newent).m_pVehicle as *mut Vehicle_t);
 
             crate::veh_dispatch::register_assets(ctx, (*newent).m_pVehicle as *mut Vehicle_t);
@@ -1070,13 +1216,25 @@ pub fn NPC_Spawn_Do(
             if (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].r#type == VH_FIGHTER {
                 (*newent).flags |= FL_NO_KNOCKBACK | FL_SHIELDED | FL_DMG_BY_HEAVY_WEAP_ONLY;
             }
-            (*(*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation.add(YAW as usize)) = (*ent).s.angles[YAW as usize];
-            *(*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation.add(PITCH as usize) = 0.0;
-            *(*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation.add(ROLL as usize) = 0.0;
+            (*(*((*newent).m_pVehicle as *mut Vehicle_t))
+                .m_vOrientation
+                .add(YAW as usize)) = (*ent).s.angles[YAW as usize];
+            *(*((*newent).m_pVehicle as *mut Vehicle_t))
+                .m_vOrientation
+                .add(PITCH as usize) = 0.0;
+            *(*((*newent).m_pVehicle as *mut Vehicle_t))
+                .m_vOrientation
+                .add(ROLL as usize) = 0.0;
             let orient: vec3_t = [
-                *(*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation.add(0),
-                *(*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation.add(1),
-                *(*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation.add(2),
+                *(*((*newent).m_pVehicle as *mut Vehicle_t))
+                    .m_vOrientation
+                    .add(0),
+                *(*((*newent).m_pVehicle as *mut Vehicle_t))
+                    .m_vOrientation
+                    .add(1),
+                *(*((*newent).m_pVehicle as *mut Vehicle_t))
+                    .m_vOrientation
+                    .add(2),
             ];
             crate::g_utils::G_SetAngles(newent, orient);
             SetClientViewAngle(newent, orient);
@@ -1093,11 +1251,22 @@ pub fn NPC_Spawn_Do(
         }
 
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*newent).s.origin);
-        crate::q_math::_VectorCopy((*ent).s.origin, &mut (*((*newent).client as *mut gclient_t)).ps.origin);
+        crate::q_math::_VectorCopy(
+            (*ent).s.origin,
+            &mut (*((*newent).client as *mut gclient_t)).ps.origin,
+        );
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*newent).r.currentOrigin);
         crate::g_utils::G_SetOrigin(newent, (*ent).s.origin);
-        if crate::NPC_stats::NPC_ParseParms(ctx, (*ent).NPC_type as *const c_char, newent) == qfalse {
-            crate::g_main::Com_Printf(cstr(&format!("{} ERROR: Couldn't spawn NPC {}\n", S_COLOR_RED.to_string_lossy(), cstr_to_str((*ent).NPC_type as *const c_char))).as_ptr());
+        if crate::NPC_stats::NPC_ParseParms(ctx, (*ent).NPC_type as *const c_char, newent) == qfalse
+        {
+            crate::g_main::Com_Printf(
+                cstr(&format!(
+                    "{} ERROR: Couldn't spawn NPC {}\n",
+                    S_COLOR_RED.to_string_lossy(),
+                    cstr_to_str((*ent).NPC_type as *const c_char)
+                ))
+                .as_ptr(),
+            );
             crate::g_utils::G_FreeEntity(ctx, newent);
             crate::g_utils::G_FreeEntity(ctx, ent);
             return core::ptr::null_mut();
@@ -1108,13 +1277,16 @@ pub fn NPC_Spawn_Do(
             let test = cstr("test");
             if crate::q_shared::Q_stricmp((*ent).NPC_type as *const c_char, kyle.as_ptr()) == 0 {
                 (*((*newent).NPC as *mut gNPC_t)).aiFlags |= NPCAI_MATCHPLAYERWEAPON;
-            } else if crate::q_shared::Q_stricmp((*ent).NPC_type as *const c_char, test.as_ptr()) == 0 {
+            } else if crate::q_shared::Q_stricmp((*ent).NPC_type as *const c_char, test.as_ptr())
+                == 0
+            {
                 let base = (*ctx.world).g_entities.as_mut_ptr();
                 for n in 0..1 {
                     let e = base.add(n as usize);
                     if (*e).s.eType != (ET_NPC) as i32 && !(*e).client.is_null() {
                         crate::q_math::_VectorCopy((*e).s.origin, &mut (*newent).s.origin);
-                        (*((*newent).client as *mut gclient_t)).playerTeam = (*((*e).client as *mut gclient_t)).playerTeam;
+                        (*((*newent).client as *mut gclient_t)).playerTeam =
+                            (*((*e).client as *mut gclient_t)).playerTeam;
                         (*newent).s.teamowner = (*((*e).client as *mut gclient_t)).playerTeam;
                         break;
                     }
@@ -1146,14 +1318,23 @@ pub fn NPC_Spawn_Do(
 
         (*newent).classname = c"NPC".as_ptr() as *mut c_char;
         (*newent).NPC_type = (*ent).NPC_type;
-        trap::UnlinkEntity(ctx.engine, mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(newent));
+        trap::UnlinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs::new(newent),
+        );
 
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*newent).s.angles);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*newent).r.currentAngles);
-        crate::q_math::_VectorCopy((*ent).s.angles, &mut (*((*newent).client as *mut gclient_t)).ps.viewangles);
+        crate::q_math::_VectorCopy(
+            (*ent).s.angles,
+            &mut (*((*newent).client as *mut gclient_t)).ps.viewangles,
+        );
         (*((*newent).NPC as *mut gNPC_t)).desiredYaw = (*ent).s.angles[YAW as usize];
 
-        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent));
+        trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent),
+        );
         (*newent).spawnflags = (*ent).spawnflags;
 
         if !(*ent).paintarget.is_null() {
@@ -1171,7 +1352,12 @@ pub fn NPC_Spawn_Do(
                 // never NULL); only the `[0]` emptiness check survives.
                 let p = &(*(*ent).parms).parm[parm_num as usize];
                 if p[0] != 0 {
-                    Q3_SetParm(ctx, (*newent).s.number, (parm_num) as i32, p.as_ptr() as *const c_char);
+                    Q3_SetParm(
+                        ctx,
+                        (*newent).s.number,
+                        (parm_num) as i32,
+                        p.as_ptr() as *const c_char,
+                    );
                 }
             }
         }
@@ -1201,7 +1387,8 @@ pub fn NPC_Spawn_Do(
         (*newent).alliedTeam = (*ent).alliedTeam;
         (*newent).teamnodmg = (*ent).teamnodmg;
         if !(*ent).team.is_null() && *(*ent).team != 0 {
-            (*((*newent).client as *mut gclient_t)).sess.sessionTeam = crate::bg_lib::atoi((*ent).team as *const c_char);
+            (*((*newent).client as *mut gclient_t)).sess.sessionTeam =
+                crate::bg_lib::atoi((*ent).team as *const c_char);
         } else if (*newent).s.teamowner != TEAM_FREE {
             (*((*newent).client as *mut gclient_t)).sess.sessionTeam = (*newent).s.teamowner;
         } else if (*newent).alliedTeam != TEAM_FREE {
@@ -1211,9 +1398,13 @@ pub fn NPC_Spawn_Do(
         } else {
             (*((*newent).client as *mut gclient_t)).sess.sessionTeam = TEAM_FREE;
         }
-        (*((*newent).client as *mut gclient_t)).ps.persistant[PERS_TEAM as usize] = (*((*newent).client as *mut gclient_t)).sess.sessionTeam;
+        (*((*newent).client as *mut gclient_t)).ps.persistant[PERS_TEAM as usize] =
+            (*((*newent).client as *mut gclient_t)).sess.sessionTeam;
 
-        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent));
+        trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent),
+        );
 
         if (*ent).use_.is_none() {
             if !(*ent).target.is_null() {
@@ -1237,20 +1428,14 @@ pub fn NPC_Spawn_Do(
 /// Raven `NPC_Spawn_Go`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1765-1768`
-pub fn NPC_Spawn_Go(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn NPC_Spawn_Go(ctx: GameContext<'_>, ent: *mut gentity_t) {
     NPC_Spawn_Do(ctx, ent);
 }
 
 /// Raven `NPC_ShySpawn`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1814-1831`
-pub fn NPC_ShySpawn(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn NPC_ShySpawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).nextthink = (*ctx.world).level.time + SHY_THINK_TIME;
         (*ent).think = Some(EntThink::NPC_ShySpawn);
@@ -1306,10 +1491,7 @@ pub fn NPC_Spawn(
 /// Raven `NPC_PrecacheType`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1961-1971`
-pub fn NPC_PrecacheType(
-    ctx: GameContext<'_>,
-    NPC_type: *mut c_char,
-) {
+pub fn NPC_PrecacheType(ctx: GameContext<'_>, NPC_type: *mut c_char) {
     unsafe {
         let fakespawner = crate::g_utils::G_Spawn(ctx);
         if !fakespawner.is_null() {
@@ -1323,10 +1505,7 @@ pub fn NPC_PrecacheType(
 /// Raven `SP_NPC_spawner`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1973-2068`
-pub fn SP_NPC_spawner(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_spawner(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut t: c_int = 0;
 
@@ -1347,15 +1526,18 @@ pub fn SP_NPC_spawner(
             let mut garbage: c_int = 0;
             let no_basic = cstr("noBasicSounds");
             let zero = cstr("0");
-            if crate::g_spawn::G_SpawnInt(ctx, no_basic.as_ptr(), zero.as_ptr(), &mut garbage) != 0 {
+            if crate::g_spawn::G_SpawnInt(ctx, no_basic.as_ptr(), zero.as_ptr(), &mut garbage) != 0
+            {
                 (*self_).r.svFlags |= SVF_NO_BASIC_SOUNDS;
             }
             let no_combat = cstr("noCombatSounds");
-            if crate::g_spawn::G_SpawnInt(ctx, no_combat.as_ptr(), zero.as_ptr(), &mut garbage) != 0 {
+            if crate::g_spawn::G_SpawnInt(ctx, no_combat.as_ptr(), zero.as_ptr(), &mut garbage) != 0
+            {
                 (*self_).r.svFlags |= SVF_NO_COMBAT_SOUNDS;
             }
             let no_extra = cstr("noExtraSounds");
-            if crate::g_spawn::G_SpawnInt(ctx, no_extra.as_ptr(), zero.as_ptr(), &mut garbage) != 0 {
+            if crate::g_spawn::G_SpawnInt(ctx, no_extra.as_ptr(), zero.as_ptr(), &mut garbage) != 0
+            {
                 (*self_).r.svFlags |= SVF_NO_EXTRA_SOUNDS;
             }
         }
@@ -1391,10 +1573,7 @@ pub fn SP_NPC_spawner(
 /// Raven `NPC_VehiclePrecache`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2103-2173`
-pub fn NPC_VehiclePrecache(
-    ctx: GameContext<'_>,
-    spawner: *mut gentity_t,
-) -> qboolean {
+pub fn NPC_VehiclePrecache(ctx: GameContext<'_>, spawner: *mut gentity_t) -> qboolean {
     unsafe {
         let mut droid_npc_type: *const c_char = core::ptr::null();
         let i_veh_index = BG_VehicleGetIndex(
@@ -1406,7 +1585,13 @@ pub fn NPC_VehiclePrecache(
             return qfalse;
         }
 
-        crate::g_utils::G_ModelIndex(cstr(&format!("${}", cstr_to_str((*spawner).NPC_type as *const c_char))).as_ptr());
+        crate::g_utils::G_ModelIndex(
+            cstr(&format!(
+                "${}",
+                cstr_to_str((*spawner).NPC_type as *const c_char)
+            ))
+            .as_ptr(),
+        );
 
         let p_veh_info = &(*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize];
         if !p_veh_info.model.is_null() && *p_veh_info.model != 0 {
@@ -1423,7 +1608,10 @@ pub fn NPC_VehiclePrecache(
                     mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(path),
                 );
             }
-            let glm_path = cstr(&format!("models/players/{}/model.glm", cstr_to_str(p_veh_info.model as *const c_char)));
+            let glm_path = cstr(&format!(
+                "models/players/{}/model.glm",
+                cstr_to_str(p_veh_info.model as *const c_char)
+            ));
             trap::G2API_InitGhoul2Model(
                 ctx.engine,
                 mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
@@ -1441,7 +1629,11 @@ pub fn NPC_VehiclePrecache(
                 gla_name[0] = 0;
                 trap::G2API_GetGLAName(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2_GETGLANAME::GG2GetglanameArgs::new(temp_g2, 0, gla_name.as_mut_ptr()),
+                    mp_abi::game::syscalls::G_G2_GETGLANAME::GG2GetglanameArgs::new(
+                        temp_g2,
+                        0,
+                        gla_name.as_mut_ptr(),
+                    ),
                 );
 
                 if gla_name[0] != 0 {
@@ -1461,17 +1653,22 @@ pub fn NPC_VehiclePrecache(
                 }
                 trap::G2API_CleanGhoul2Models(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs::new(&mut temp_g2 as *mut *mut c_void),
+                    mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs::new(
+                        &mut temp_g2 as *mut *mut c_void,
+                    ),
                 );
             }
         }
 
         if !(*spawner).model2.is_null() && *(*spawner).model2 != 0 {
             droid_npc_type = (*spawner).model2 as *const c_char;
-        } else if !(*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].droidNPC.is_null()
+        } else if !(*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize]
+            .droidNPC
+            .is_null()
             && *(*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].droidNPC != 0
         {
-            droid_npc_type = (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].droidNPC as *const c_char;
+            droid_npc_type =
+                (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].droidNPC as *const c_char;
         }
 
         if !droid_npc_type.is_null() {
@@ -1512,10 +1709,7 @@ pub fn NPC_VehicleSpawnUse(
 /// Raven `SP_NPC_Vehicle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2188-2253`
-pub fn SP_NPC_Vehicle(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Vehicle(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut drop_time: f32 = 0.0;
         let mut t: c_int = 0;
@@ -1574,10 +1768,7 @@ pub fn SP_NPC_Vehicle(
 /// Raven `SP_NPC_Kyle`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2338-2345`
-pub fn SP_NPC_Kyle(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Kyle(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Kyle".as_ptr() as *mut c_char;
         WP_SetSaberModel(core::ptr::null_mut(), CLASS_KYLE);
@@ -1588,88 +1779,59 @@ pub fn SP_NPC_Kyle(
 /// Raven `SP_NPC_Lando`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2354-2359`
-pub fn SP_NPC_Lando(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Lando(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Lando".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Jan`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2368-2373`
-pub fn SP_NPC_Jan(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Jan(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Jan".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Luke`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2382-2389`
-pub fn SP_NPC_Luke(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Luke(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Luke".as_ptr() as *mut c_char;
         WP_SetSaberModel(core::ptr::null_mut(), CLASS_LUKE);
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_MonMothma`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2398-2403`
-pub fn SP_NPC_MonMothma(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_MonMothma(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"MonMothma".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Tavion`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2412-2419`
-pub fn SP_NPC_Tavion(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Tavion(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Tavion".as_ptr() as *mut c_char;
         WP_SetSaberModel(core::ptr::null_mut(), CLASS_TAVION);
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Tavion_New`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2432-2448`
-pub fn SP_NPC_Tavion_New(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Tavion_New(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).spawnflags & 1 != 0 {
             (*self_).NPC_type = c"tavion_scepter".as_ptr() as *mut c_char;
@@ -1680,17 +1842,12 @@ pub fn SP_NPC_Tavion_New(
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Alora`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2460-2472`
-pub fn SP_NPC_Alora(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Alora(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).spawnflags & 1 != 0 {
             (*self_).NPC_type = c"alora_dual".as_ptr() as *mut c_char;
@@ -1699,17 +1856,12 @@ pub fn SP_NPC_Alora(
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Reborn_New`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2487-2524`
-pub fn SP_NPC_Reborn_New(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Reborn_New(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 4 != 0 {
@@ -1732,67 +1884,84 @@ pub fn SP_NPC_Reborn_New(
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Cultist_Saber`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2542-2593`
-pub fn SP_NPC_Cultist_Saber(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Cultist_Saber(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 1 != 0 {
-                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 { c"cultist_saber_med_throw".as_ptr() as *mut c_char } else { c"cultist_saber_med".as_ptr() as *mut c_char };
+                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 {
+                    c"cultist_saber_med_throw".as_ptr() as *mut c_char
+                } else {
+                    c"cultist_saber_med".as_ptr() as *mut c_char
+                };
             } else if (*self_).spawnflags & 2 != 0 {
-                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 { c"cultist_saber_strong_throw".as_ptr() as *mut c_char } else { c"cultist_saber_strong".as_ptr() as *mut c_char };
+                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 {
+                    c"cultist_saber_strong_throw".as_ptr() as *mut c_char
+                } else {
+                    c"cultist_saber_strong".as_ptr() as *mut c_char
+                };
             } else if (*self_).spawnflags & 2 != 0 {
-                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 { c"cultist_saber_all_throw".as_ptr() as *mut c_char } else { c"cultist_saber_all".as_ptr() as *mut c_char };
+                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 {
+                    c"cultist_saber_all_throw".as_ptr() as *mut c_char
+                } else {
+                    c"cultist_saber_all".as_ptr() as *mut c_char
+                };
             } else {
-                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 { c"cultist_saber_throw".as_ptr() as *mut c_char } else { c"cultist_saber".as_ptr() as *mut c_char };
+                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 {
+                    c"cultist_saber_throw".as_ptr() as *mut c_char
+                } else {
+                    c"cultist_saber".as_ptr() as *mut c_char
+                };
             }
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Cultist_Saber_Powers`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2611-2662`
-pub fn SP_NPC_Cultist_Saber_Powers(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Cultist_Saber_Powers(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 1 != 0 {
-                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 { c"cultist_saber_med_throw2".as_ptr() as *mut c_char } else { c"cultist_saber_med2".as_ptr() as *mut c_char };
+                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 {
+                    c"cultist_saber_med_throw2".as_ptr() as *mut c_char
+                } else {
+                    c"cultist_saber_med2".as_ptr() as *mut c_char
+                };
             } else if (*self_).spawnflags & 2 != 0 {
-                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 { c"cultist_saber_strong_throw2".as_ptr() as *mut c_char } else { c"cultist_saber_strong2".as_ptr() as *mut c_char };
+                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 {
+                    c"cultist_saber_strong_throw2".as_ptr() as *mut c_char
+                } else {
+                    c"cultist_saber_strong2".as_ptr() as *mut c_char
+                };
             } else if (*self_).spawnflags & 2 != 0 {
-                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 { c"cultist_saber_all_throw2".as_ptr() as *mut c_char } else { c"cultist_saber_all2".as_ptr() as *mut c_char };
+                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 {
+                    c"cultist_saber_all_throw2".as_ptr() as *mut c_char
+                } else {
+                    c"cultist_saber_all2".as_ptr() as *mut c_char
+                };
             } else {
-                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 { c"cultist_saber_throw".as_ptr() as *mut c_char } else { c"cultist_saber2".as_ptr() as *mut c_char };
+                (*self_).NPC_type = if (*self_).spawnflags & 8 != 0 {
+                    c"cultist_saber_throw".as_ptr() as *mut c_char
+                } else {
+                    c"cultist_saber2".as_ptr() as *mut c_char
+                };
             }
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Cultist`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2679-2725`
-pub fn SP_NPC_Cultist(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Cultist(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 1 != 0 {
@@ -1821,64 +1990,44 @@ pub fn SP_NPC_Cultist(
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Cultist_Commando`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2737-2744`
-pub fn SP_NPC_Cultist_Commando(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Cultist_Commando(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             (*self_).NPC_type = c"cultistcommando".as_ptr() as *mut c_char;
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Cultist_Destroyer`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2755-2759`
-pub fn SP_NPC_Cultist_Destroyer(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Cultist_Destroyer(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"cultist".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Reelo`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2768-2773`
-pub fn SP_NPC_Reelo(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Reelo(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Reelo".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Galak`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2784-2797`
-pub fn SP_NPC_Galak(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Galak(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).spawnflags & 1 != 0 {
             (*self_).NPC_type = c"Galak_Mech".as_ptr() as *mut c_char;
@@ -1888,63 +2037,43 @@ pub fn SP_NPC_Galak(
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Desann`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2806-2813`
-pub fn SP_NPC_Desann(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Desann(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Desann".as_ptr() as *mut c_char;
         WP_SetSaberModel(core::ptr::null_mut(), CLASS_DESANN);
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Bartender`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2822-2827`
-pub fn SP_NPC_Bartender(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Bartender(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Bartender".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_MorganKatarn`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2836-2841`
-pub fn SP_NPC_MorganKatarn(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_MorganKatarn(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"MorganKatarn".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Jedi`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2857-2887`
-pub fn SP_NPC_Jedi(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Jedi(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 1 != 0 {
@@ -1958,51 +2087,44 @@ pub fn SP_NPC_Jedi(
         WP_SetSaberModel(core::ptr::null_mut(), CLASS_JEDI);
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Prisoner`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2896-2911`
-pub fn SP_NPC_Prisoner(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Prisoner(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 { c"Prisoner".as_ptr() as *mut c_char } else { c"Prisoner2".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                c"Prisoner".as_ptr() as *mut c_char
+            } else {
+                c"Prisoner2".as_ptr() as *mut c_char
+            };
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Rebel`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2920-2935`
-pub fn SP_NPC_Rebel(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Rebel(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 { c"Rebel".as_ptr() as *mut c_char } else { c"Rebel2".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                c"Rebel".as_ptr() as *mut c_char
+            } else {
+                c"Rebel2".as_ptr() as *mut c_char
+            };
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Stormtrooper`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2955-2986`
-pub fn SP_NPC_Stormtrooper(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Stormtrooper(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).spawnflags & 8 != 0 {
             (*self_).NPC_type = c"rockettrooper".as_ptr() as *mut c_char;
@@ -2013,100 +2135,82 @@ pub fn SP_NPC_Stormtrooper(
         } else if (*self_).spawnflags & 1 != 0 {
             (*self_).NPC_type = c"stofficer".as_ptr() as *mut c_char;
         } else {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 { c"StormTrooper".as_ptr() as *mut c_char } else { c"StormTrooper2".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                c"StormTrooper".as_ptr() as *mut c_char
+            } else {
+                c"StormTrooper2".as_ptr() as *mut c_char
+            };
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_StormtrooperOfficer`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:2987-2991`
-pub fn SP_NPC_StormtrooperOfficer(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_StormtrooperOfficer(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).spawnflags |= 1;
         SP_NPC_Stormtrooper(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Snowtrooper`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3001-3006`
-pub fn SP_NPC_Snowtrooper(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Snowtrooper(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"snowtrooper".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Tie_Pilot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3016-3021`
-pub fn SP_NPC_Tie_Pilot(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Tie_Pilot(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"stormpilot".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Ugnaught`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3030-3045`
-pub fn SP_NPC_Ugnaught(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Ugnaught(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 { c"Ugnaught".as_ptr() as *mut c_char } else { c"Ugnaught2".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                c"Ugnaught".as_ptr() as *mut c_char
+            } else {
+                c"Ugnaught2".as_ptr() as *mut c_char
+            };
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Jawa`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3056-3071`
-pub fn SP_NPC_Jawa(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Jawa(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*self_).spawnflags & 1 != 0 { c"jawa_armed".as_ptr() as *mut c_char } else { c"jawa".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*self_).spawnflags & 1 != 0 {
+                c"jawa_armed".as_ptr() as *mut c_char
+            } else {
+                c"jawa".as_ptr() as *mut c_char
+            };
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Gran`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3084-3110`
-pub fn SP_NPC_Gran(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Gran(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 1 != 0 {
@@ -2114,39 +2218,37 @@ pub fn SP_NPC_Gran(
             } else if (*self_).spawnflags & 2 != 0 {
                 (*self_).NPC_type = c"granboxer".as_ptr() as *mut c_char;
             } else {
-                (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 { c"gran".as_ptr() as *mut c_char } else { c"gran2".as_ptr() as *mut c_char };
+                (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
+                    c"gran".as_ptr() as *mut c_char
+                } else {
+                    c"gran2".as_ptr() as *mut c_char
+                };
             }
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Rodian`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3121-3136`
-pub fn SP_NPC_Rodian(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Rodian(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*self_).spawnflags & 1 != 0 { c"rodian2".as_ptr() as *mut c_char } else { c"rodian".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*self_).spawnflags & 1 != 0 {
+                c"rodian2".as_ptr() as *mut c_char
+            } else {
+                c"rodian".as_ptr() as *mut c_char
+            };
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Weequay`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3145-3167`
-pub fn SP_NPC_Weequay(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Weequay(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             (*self_).NPC_type = match (*ctx.world).bg_state.rng.Q_irand(0, 3) {
@@ -2158,85 +2260,68 @@ pub fn SP_NPC_Weequay(
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Trandoshan`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3176-3184`
-pub fn SP_NPC_Trandoshan(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Trandoshan(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             (*self_).NPC_type = c"Trandoshan".as_ptr() as *mut c_char;
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Tusken`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3193-3208`
-pub fn SP_NPC_Tusken(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Tusken(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*self_).spawnflags & 1 != 0 { c"tuskensniper".as_ptr() as *mut c_char } else { c"tusken".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*self_).spawnflags & 1 != 0 {
+                c"tuskensniper".as_ptr() as *mut c_char
+            } else {
+                c"tusken".as_ptr() as *mut c_char
+            };
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Noghri`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3217-3225`
-pub fn SP_NPC_Noghri(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Noghri(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             (*self_).NPC_type = c"noghri".as_ptr() as *mut c_char;
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_SwampTrooper`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3235-3250`
-pub fn SP_NPC_SwampTrooper(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_SwampTrooper(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*self_).spawnflags & 1 != 0 { c"SwampTrooper2".as_ptr() as *mut c_char } else { c"SwampTrooper".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*self_).spawnflags & 1 != 0 {
+                c"SwampTrooper2".as_ptr() as *mut c_char
+            } else {
+                c"SwampTrooper".as_ptr() as *mut c_char
+            };
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Imperial`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3267-3301`
-pub fn SP_NPC_Imperial(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Imperial(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 1 != 0 {
@@ -2249,17 +2334,12 @@ pub fn SP_NPC_Imperial(
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_ImpWorker`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3310-3329`
-pub fn SP_NPC_ImpWorker(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_ImpWorker(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
@@ -2272,34 +2352,28 @@ pub fn SP_NPC_ImpWorker(
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_BespinCop`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3338-3353`
-pub fn SP_NPC_BespinCop(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_BespinCop(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 { c"BespinCop".as_ptr() as *mut c_char } else { c"BespinCop2".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+                c"BespinCop".as_ptr() as *mut c_char
+            } else {
+                c"BespinCop2".as_ptr() as *mut c_char
+            };
         }
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Reborn`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3372-3400`
-pub fn SP_NPC_Reborn(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Reborn(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
             if (*self_).spawnflags & 1 != 0 {
@@ -2317,50 +2391,40 @@ pub fn SP_NPC_Reborn(
         WP_SetSaberModel(core::ptr::null_mut(), CLASS_REBORN);
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_ShadowTrooper`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3409-3427`
-pub fn SP_NPC_ShadowTrooper(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_ShadowTrooper(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).NPC_type.is_null() {
-            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 { c"ShadowTrooper".as_ptr() as *mut c_char } else { c"ShadowTrooper2".as_ptr() as *mut c_char };
+            (*self_).NPC_type = if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
+                c"ShadowTrooper".as_ptr() as *mut c_char
+            } else {
+                c"ShadowTrooper2".as_ptr() as *mut c_char
+            };
         }
         crate::NPC_AI_Jedi::NPC_ShadowTrooper_Precache(ctx);
         WP_SetSaberModel(core::ptr::null_mut(), CLASS_SHADOWTROOPER);
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Monster_Murjj`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3439-3444`
-pub fn SP_NPC_Monster_Murjj(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
-    
+pub fn SP_NPC_Monster_Murjj(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Murjj".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
-
 }
 
 /// Raven `SP_NPC_Monster_Swamp`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3453-3458`
-pub fn SP_NPC_Monster_Swamp(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Monster_Swamp(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = c"Swamp".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
@@ -2370,10 +2434,7 @@ pub fn SP_NPC_Monster_Swamp(
 /// Raven `SP_NPC_Monster_Howler`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3467-3472`
-pub fn SP_NPC_Monster_Howler(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Monster_Howler(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"howler".as_ptr() as *const c_char);
     }
@@ -2383,10 +2444,7 @@ pub fn SP_NPC_Monster_Howler(
 /// Raven `SP_NPC_MineMonster`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3481-3487`
-pub fn SP_NPC_MineMonster(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_MineMonster(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"minemonster".as_ptr() as *const c_char);
     }
@@ -2397,10 +2455,7 @@ pub fn SP_NPC_MineMonster(
 /// Raven `SP_NPC_Monster_Claw`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3496-3501`
-pub fn SP_NPC_Monster_Claw(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Monster_Claw(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"Claw".as_ptr() as *const c_char);
     }
@@ -2410,10 +2465,7 @@ pub fn SP_NPC_Monster_Claw(
 /// Raven `SP_NPC_Monster_Glider`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3510-3515`
-pub fn SP_NPC_Monster_Glider(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Monster_Glider(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"Glider".as_ptr() as *const c_char);
     }
@@ -2423,10 +2475,7 @@ pub fn SP_NPC_Monster_Glider(
 /// Raven `SP_NPC_Monster_Flier2`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3524-3529`
-pub fn SP_NPC_Monster_Flier2(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Monster_Flier2(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"Flier2".as_ptr() as *const c_char);
     }
@@ -2436,10 +2485,7 @@ pub fn SP_NPC_Monster_Flier2(
 /// Raven `SP_NPC_Monster_Lizard`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3538-3543`
-pub fn SP_NPC_Monster_Lizard(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Monster_Lizard(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"Lizard".as_ptr() as *const c_char);
     }
@@ -2449,10 +2495,7 @@ pub fn SP_NPC_Monster_Lizard(
 /// Raven `SP_NPC_Monster_Fish`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3552-3557`
-pub fn SP_NPC_Monster_Fish(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Monster_Fish(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"Fish".as_ptr() as *const c_char);
     }
@@ -2462,10 +2505,7 @@ pub fn SP_NPC_Monster_Fish(
 /// Raven `SP_NPC_Monster_Wampa`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3568-3575`
-pub fn SP_NPC_Monster_Wampa(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Monster_Wampa(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"wampa".as_ptr() as *const c_char);
     }
@@ -2476,10 +2516,7 @@ pub fn SP_NPC_Monster_Wampa(
 /// Raven `SP_NPC_Monster_Rancor`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3584-3589`
-pub fn SP_NPC_Monster_Rancor(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Monster_Rancor(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"rancor".as_ptr() as *const c_char);
     }
@@ -2489,10 +2526,7 @@ pub fn SP_NPC_Monster_Rancor(
 /// Raven `SP_NPC_Droid_Interrogator`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3602-3609`
-pub fn SP_NPC_Droid_Interrogator(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Interrogator(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"interrogator".as_ptr() as *const c_char);
     }
@@ -2503,10 +2537,7 @@ pub fn SP_NPC_Droid_Interrogator(
 /// Raven `SP_NPC_Droid_Probe`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3620-3627`
-pub fn SP_NPC_Droid_Probe(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Probe(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"probe".as_ptr() as *const c_char);
     }
@@ -2517,10 +2548,7 @@ pub fn SP_NPC_Droid_Probe(
 /// Raven `SP_NPC_Droid_Mark1`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3639-3646`
-pub fn SP_NPC_Droid_Mark1(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Mark1(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"mark1".as_ptr() as *const c_char);
     }
@@ -2531,10 +2559,7 @@ pub fn SP_NPC_Droid_Mark1(
 /// Raven `SP_NPC_Droid_Mark2`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3658-3665`
-pub fn SP_NPC_Droid_Mark2(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Mark2(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"mark2".as_ptr() as *const c_char);
     }
@@ -2545,10 +2570,7 @@ pub fn SP_NPC_Droid_Mark2(
 /// Raven `SP_NPC_Droid_ATST`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3674-3688`
-pub fn SP_NPC_Droid_ATST(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_ATST(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if ((*self_).spawnflags & 1) != 0 {
             (*self_).NPC_type = G_NewString(c"atst_vehicle".as_ptr() as *const c_char);
@@ -2563,10 +2585,7 @@ pub fn SP_NPC_Droid_ATST(
 /// Raven `SP_NPC_Droid_Remote`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3699-3706`
-pub fn SP_NPC_Droid_Remote(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Remote(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"remote".as_ptr() as *const c_char);
     }
@@ -2577,10 +2596,7 @@ pub fn SP_NPC_Droid_Remote(
 /// Raven `SP_NPC_Droid_Seeker`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3717-3724`
-pub fn SP_NPC_Droid_Seeker(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Seeker(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"seeker".as_ptr() as *const c_char);
     }
@@ -2591,10 +2607,7 @@ pub fn SP_NPC_Droid_Seeker(
 /// Raven `SP_NPC_Droid_Sentry`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3735-3742`
-pub fn SP_NPC_Droid_Sentry(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Sentry(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"sentry".as_ptr() as *const c_char);
     }
@@ -2605,10 +2618,7 @@ pub fn SP_NPC_Droid_Sentry(
 /// Raven `SP_NPC_Droid_Gonk`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3755-3763`
-pub fn SP_NPC_Droid_Gonk(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Gonk(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"gonk".as_ptr() as *const c_char);
     }
@@ -2619,10 +2629,7 @@ pub fn SP_NPC_Droid_Gonk(
 /// Raven `SP_NPC_Droid_Mouse`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3776-3785`
-pub fn SP_NPC_Droid_Mouse(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Mouse(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).NPC_type = G_NewString(c"mouse".as_ptr() as *const c_char);
     }
@@ -2633,10 +2640,7 @@ pub fn SP_NPC_Droid_Mouse(
 /// Raven `SP_NPC_Droid_R2D2`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3798-3812`
-pub fn SP_NPC_Droid_R2D2(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_R2D2(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if ((*self_).spawnflags & 1) != 0 {
             (*self_).NPC_type = G_NewString(c"r2d2_imp".as_ptr() as *const c_char);
@@ -2651,10 +2655,7 @@ pub fn SP_NPC_Droid_R2D2(
 /// Raven `SP_NPC_Droid_R5D2`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3826-3840`
-pub fn SP_NPC_Droid_R5D2(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_R5D2(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if ((*self_).spawnflags & 1) != 0 {
             (*self_).NPC_type = G_NewString(c"r5d2_imp".as_ptr() as *const c_char);
@@ -2669,10 +2670,7 @@ pub fn SP_NPC_Droid_R5D2(
 /// Raven `SP_NPC_Droid_Protocol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:3851-3864`
-pub fn SP_NPC_Droid_Protocol(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_NPC_Droid_Protocol(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if ((*self_).spawnflags & 1) != 0 {
             (*self_).NPC_type = G_NewString(c"protocol_imp".as_ptr() as *const c_char);
@@ -2726,7 +2724,12 @@ pub fn NPC_SpawnType(
     let mut end = [0.0f32; 3];
     let mut trace: trace_t = unsafe { core::mem::zeroed() };
 
-    AngleVectors(unsafe { (*((*ent).client as *mut gclient_t)).ps.viewangles }, Some(&mut forward), None, None);
+    AngleVectors(
+        unsafe { (*((*ent).client as *mut gclient_t)).ps.viewangles },
+        Some(&mut forward),
+        None,
+        None,
+    );
     let _ = VectorNormalize(&mut forward);
 
     unsafe {
@@ -2850,25 +2853,60 @@ pub fn NPC_SpawnType(
 /// Raven `NPC_Spawn_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:4020-4039`
-pub fn NPC_Spawn_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn NPC_Spawn_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     let mut npc_type: [u8; 1024] = [0; 1024];
     let mut targetname: [u8; 1024] = [0; 1024];
     let mut is_vehicle = 0u32;
 
-    trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2, npc_type.as_mut_ptr() as *mut c_char, 1024));
+    trap::Argv(
+        ctx.engine,
+        mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+            2,
+            npc_type.as_mut_ptr() as *mut c_char,
+            1024,
+        ),
+    );
 
-    if Q_stricmp(c"vehicle".as_ptr() as *const c_char, npc_type.as_ptr() as *const c_char) == 0 {
+    if Q_stricmp(
+        c"vehicle".as_ptr() as *const c_char,
+        npc_type.as_ptr() as *const c_char,
+    ) == 0
+    {
         is_vehicle = 1;
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(3, npc_type.as_mut_ptr() as *mut c_char, 1024));
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(4, targetname.as_mut_ptr() as *mut c_char, 1024));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                3,
+                npc_type.as_mut_ptr() as *mut c_char,
+                1024,
+            ),
+        );
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                4,
+                targetname.as_mut_ptr() as *mut c_char,
+                1024,
+            ),
+        );
     } else {
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(3, targetname.as_mut_ptr() as *mut c_char, 1024));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                3,
+                targetname.as_mut_ptr() as *mut c_char,
+                1024,
+            ),
+        );
     }
 
-    NPC_SpawnType(ctx, ent, npc_type.as_mut_ptr() as *mut c_char, targetname.as_mut_ptr() as *mut c_char, (is_vehicle) as i32);
+    NPC_SpawnType(
+        ctx,
+        ent,
+        npc_type.as_mut_ptr() as *mut c_char,
+        targetname.as_mut_ptr() as *mut c_char,
+        (is_vehicle) as i32,
+    );
 }
 
 /// Raven `NPC_Kill_f`.
@@ -2879,11 +2917,17 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
     let mut kill_team: team_t = TEAM_FREE;
     let mut kill_non_sf = 0u32;
 
-    trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2, name.as_mut_ptr() as *mut c_char, 1024));
+    trap::Argv(
+        ctx.engine,
+        mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2, name.as_mut_ptr() as *mut c_char, 1024),
+    );
 
     if name[0] == b'\0' as u8 {
         Com_Printf(c"Error, Expected:\n".as_ptr() as *const c_char);
-        Com_Printf(c"NPC kill '[NPC targetname]' - kills NPCs with certain targetname\n".as_ptr() as *const c_char);
+        Com_Printf(
+            c"NPC kill '[NPC targetname]' - kills NPCs with certain targetname\n".as_ptr()
+                as *const c_char,
+        );
         Com_Printf(c"or\n".as_ptr() as *const c_char);
         Com_Printf(c"NPC kill 'all' - kills all NPCs\n".as_ptr() as *const c_char);
         Com_Printf(c"or\n".as_ptr() as *const c_char);
@@ -2891,11 +2935,25 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
         return;
     }
 
-    if Q_stricmp(c"team".as_ptr() as *const c_char, name.as_ptr() as *const c_char) == 0 {
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(3, name.as_mut_ptr() as *mut c_char, 1024));
+    if Q_stricmp(
+        c"team".as_ptr() as *const c_char,
+        name.as_ptr() as *const c_char,
+    ) == 0
+    {
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                3,
+                name.as_mut_ptr() as *mut c_char,
+                1024,
+            ),
+        );
 
         if name[0] == b'\0' as u8 {
-            Com_Printf(c"NPC_Kill Error: 'npc kill team' requires a team name!\n".as_ptr() as *const c_char);
+            Com_Printf(
+                c"NPC_Kill Error: 'npc kill team' requires a team name!\n".as_ptr()
+                    as *const c_char,
+            );
             Com_Printf(c"Valid team names are:\n".as_ptr() as *const c_char);
             for n in (TEAM_FREE + 1)..TEAM_NUM_TEAMS {
                 // PORT-NOTE(unresolved): TeamNames array access
@@ -2905,10 +2963,15 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
             return;
         }
 
-        if Q_stricmp(c"nonally".as_ptr() as *const c_char, name.as_ptr() as *const c_char) == 0 {
+        if Q_stricmp(
+            c"nonally".as_ptr() as *const c_char,
+            name.as_ptr() as *const c_char,
+        ) == 0
+        {
             kill_non_sf = 1;
         } else {
-            kill_team = GetIDForString(std::ptr::null_mut(), name.as_ptr() as *const c_char) as team_t;
+            kill_team =
+                GetIDForString(std::ptr::null_mut(), name.as_ptr() as *const c_char) as team_t;
 
             if kill_team == TEAM_FREE {
                 Com_Printf(
@@ -2960,7 +3023,8 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
             } else if !player.NPC_type.is_null() && !player.classname.is_null() {
                 unsafe {
                     if (*player.classname) != b'\0' as c_char
-                        && Q_stricmp(c"NPC_starfleet".as_ptr() as *const c_char, player.classname) != 0
+                        && Q_stricmp(c"NPC_starfleet".as_ptr() as *const c_char, player.classname)
+                            != 0
                     {
                         Com_Printf(
                             cstr(&format!(
@@ -2992,17 +3056,19 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 }
             } else if (!player.targetname.is_null()
                 && Q_stricmp(name.as_ptr() as *const c_char, player.targetname) == 0)
-                || Q_stricmp(c"all".as_ptr() as *const c_char, name.as_ptr() as *const c_char)
-                    == 0
+                || Q_stricmp(
+                    c"all".as_ptr() as *const c_char,
+                    name.as_ptr() as *const c_char,
+                ) == 0
             {
                 Com_Printf(
-                        cstr(&format!(
-                            "Killing NPC {} named {}\n",
-                            unsafe { cstr_to_str(player.NPC_type as *const c_char) },
-                            unsafe { cstr_to_str(player.targetname as *const c_char) }
-                        ))
-                        .as_ptr(),
-                    );
+                    cstr(&format!(
+                        "Killing NPC {} named {}\n",
+                        unsafe { cstr_to_str(player.NPC_type as *const c_char) },
+                        unsafe { cstr_to_str(player.targetname as *const c_char) }
+                    ))
+                    .as_ptr(),
+                );
                 player.health = 0;
                 unsafe {
                     (*(player.client as *mut gclient_t)).ps.stats[4] = 0; // STAT_HEALTH
@@ -3018,10 +3084,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
 /// Raven `NPC_PrintScore`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:4172-4175`
-pub fn NPC_PrintScore(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn NPC_PrintScore(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         Com_Printf(
             cstr(&format!(
@@ -3037,31 +3100,63 @@ pub fn NPC_PrintScore(
 /// Raven `Cmd_NPC_f`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:4183-4243`
-pub fn Cmd_NPC_f(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Cmd_NPC_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
     let mut cmd: [u8; 1024] = [0; 1024];
 
-    trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, cmd.as_mut_ptr() as *mut c_char, 1024));
+    trap::Argv(
+        ctx.engine,
+        mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(1, cmd.as_mut_ptr() as *mut c_char, 1024),
+    );
 
     if cmd[0] == b'\0' as u8 {
         Com_Printf(c"Valid NPC commands are:\n".as_ptr() as *const c_char);
         Com_Printf(c" spawn [NPC type (from NCPCs.cfg)]\n".as_ptr() as *const c_char);
-        Com_Printf(c" kill [NPC targetname] or [all(kills all NPCs)] or 'team [teamname]'\n".as_ptr() as *const c_char);
+        Com_Printf(
+            c" kill [NPC targetname] or [all(kills all NPCs)] or 'team [teamname]'\n".as_ptr()
+                as *const c_char,
+        );
         Com_Printf(c" showbounds (draws exact bounding boxes of NPCs)\n".as_ptr() as *const c_char);
-        Com_Printf(c" score [NPC targetname] (prints number of kills per NPC)\n".as_ptr() as *const c_char);
-    } else if Q_stricmp(c"spawn".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
+        Com_Printf(
+            c" score [NPC targetname] (prints number of kills per NPC)\n".as_ptr() as *const c_char,
+        );
+    } else if Q_stricmp(
+        c"spawn".as_ptr() as *const c_char,
+        cmd.as_ptr() as *const c_char,
+    ) == 0
+    {
         NPC_Spawn_f(ctx, ent);
-    } else if Q_stricmp(c"kill".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
+    } else if Q_stricmp(
+        c"kill".as_ptr() as *const c_char,
+        cmd.as_ptr() as *const c_char,
+    ) == 0
+    {
         NPC_Kill_f(ctx);
-    } else if Q_stricmp(c"showbounds".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
+    } else if Q_stricmp(
+        c"showbounds".as_ptr() as *const c_char,
+        cmd.as_ptr() as *const c_char,
+    ) == 0
+    {
         unsafe {
-            (*ctx.world).globals.showBBoxes = if (*ctx.world).globals.showBBoxes != 0 { 0 } else { 1 };
+            (*ctx.world).globals.showBBoxes = if (*ctx.world).globals.showBBoxes != 0 {
+                0
+            } else {
+                1
+            };
         }
-    } else if Q_stricmp(c"score".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
+    } else if Q_stricmp(
+        c"score".as_ptr() as *const c_char,
+        cmd.as_ptr() as *const c_char,
+    ) == 0
+    {
         let mut cmd2: [u8; 1024] = [0; 1024];
-        trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2, cmd2.as_mut_ptr() as *mut c_char, 1024));
+        trap::Argv(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(
+                2,
+                cmd2.as_mut_ptr() as *mut c_char,
+                1024,
+            ),
+        );
 
         if cmd2[0] == b'\0' as u8 {
             // Show the score for all NPCs
@@ -3080,10 +3175,9 @@ pub fn Cmd_NPC_f(
                 NPC_PrintScore(ctx, found_ent);
             } else {
                 Com_Printf(
-                    cstr(&format!(
-                        "ERROR: NPC score - no such NPC {}\n",
-                        unsafe { cstr_to_str(cmd2.as_ptr() as *const c_char) }
-                    ))
+                    cstr(&format!("ERROR: NPC score - no such NPC {}\n", unsafe {
+                        cstr_to_str(cmd2.as_ptr() as *const c_char)
+                    }))
                     .as_ptr(),
                 );
             }

@@ -1314,7 +1314,10 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         G_SpawnString(ctx, c"soundSet".as_ptr(), c"default".as_ptr(), &mut text);
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(mp_bg::public::configstring::CS_GLOBAL_AMBIENT_SET, CStr::from_ptr(text).to_owned()),
+            GSetConfigstringArgs::new(
+                mp_bg::public::configstring::CS_GLOBAL_AMBIENT_SET,
+                CStr::from_ptr(text).to_owned(),
+            ),
         );
 
         (*ctx.world).g_entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;

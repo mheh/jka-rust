@@ -8,7 +8,9 @@ use core::ffi::{c_char, c_int};
 
 use mp_bg::{MAX_SPAWN_VARS, MAX_SPAWN_VARS_CHARS, TEAM_NUM_TEAMS};
 use mp_qshared::common::mp::gentity::gentity_t;
-use mp_qshared::shared::{fileHandle_t, qboolean, vec3_t, MAX_CLIENTS, MAX_QPATH, MAX_STRING_CHARS};
+use mp_qshared::shared::{
+    fileHandle_t, qboolean, vec3_t, MAX_CLIENTS, MAX_QPATH, MAX_STRING_CHARS,
+};
 
 use crate::ai::{AIGroupInfo_t, MAX_FRAME_GROUPS};
 use crate::client::gclient_t;

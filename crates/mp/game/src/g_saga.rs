@@ -31,25 +31,25 @@ use crate::bg_saga::{
     BG_SiegeSetTeamTheme,
 };
 use crate::client::gclient::gclient_t;
-use crate::client::spectator_state::spectatorState_t;
 use crate::client::player_team_state::playerTeamStateState_t;
+use crate::client::spectator_state::spectatorState_t;
 use crate::client::CON_CONNECTED;
 use crate::g_client::{ClientBegin, ClientSpawn, ClientUserinfoChanged};
 use crate::g_combat::AddScore;
+use crate::g_exphysics::G_RunExPhys;
 use crate::g_items::RegisterItem;
 use crate::g_main::{G_Error, LogExit};
 use crate::g_utils::{
     G_EffectIndex, G_Find, G_IconIndex, G_PlayEffectID, G_SetOrigin, G_Sound, G_TempEntity,
     G_UseTargets2, GlobalUse,
 };
-use crate::g_exphysics::G_RunExPhys;
 use crate::q_shared::Info_SetValueForKey;
 use crate::q_shared::Q_strcat;
-use mp_qshared::shared::surface_flags::{CONTENTS_SOLID, CONTENTS_TERRAIN};
-use std::ffi::CString;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::holdable::HI_NUM_HOLDABLE;
 use mp_bg::weapons::weapon_t::WP_NUM_WEAPONS;
+use mp_qshared::shared::surface_flags::{CONTENTS_SOLID, CONTENTS_TERRAIN};
+use std::ffi::CString;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at call sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
@@ -73,10 +73,7 @@ const SIEGE_ITEM_RESPAWN_TIME: c_int = 20000;
 /// team and register their weapons/items for precaching.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:51-87`
-pub fn G_SiegeRegisterWeaponsAndHoldables(
-    ctx: GameContext<'_>,
-    team: c_int,
-) {
+pub fn G_SiegeRegisterWeaponsAndHoldables(ctx: GameContext<'_>, team: c_int) {
     unsafe {
         let stm = BG_SiegeFindThemeForTeam(team, &(*ctx.world).bg_state);
 
@@ -117,10 +114,7 @@ pub fn G_SiegeRegisterWeaponsAndHoldables(
 /// intermission scoreboard.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:91-94`
-pub fn SiegeSetCompleteData(
-    ctx: GameContext<'_>,
-    team: c_int,
-) {
+pub fn SiegeSetCompleteData(ctx: GameContext<'_>, team: c_int) {
     unsafe {
         // PORT-NOTE(unported-const): `CS_SIEGE_WINTEAM` has no ported home yet;
         // referenced verbatim (missing_symbols) per the zero-park policy.
@@ -156,7 +150,8 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
         let mut teamIcon: [c_char; 128] = [0; 128];
         let mut goalreq: [c_char; 64] = [0; 64];
         let mut teams: [c_char; 2048] = [0; 2048];
-        let mut objective: [c_char; MAX_SIEGE_INFO_SIZE as usize] = [0; MAX_SIEGE_INFO_SIZE as usize];
+        let mut objective: [c_char; MAX_SIEGE_INFO_SIZE as usize] =
+            [0; MAX_SIEGE_INFO_SIZE as usize];
         let mut objecStr: [c_char; 8192] = [0; 8192];
         let mut len: c_int = 0;
         let mut objectiveNumTeam1: c_int = 0;
@@ -184,7 +179,10 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
                         ctx.engine,
                         mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
                             CS_SIEGE_TIMEOVERRIDE,
-                            cstr(&format!("{}", (*ctx.world).globals.g_siegePersistant.lastTime)),
+                            cstr(&format!(
+                                "{}",
+                                (*ctx.world).globals.g_siegePersistant.lastTime
+                            )),
                         ),
                     );
                 } else {
@@ -278,27 +276,43 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
             ) != 0
             {
                 if (*ctx.world).cvars.g_siegeTeam1.string[0] != 0
-                    && Q_stricmp((*ctx.world).cvars.g_siegeTeam1.string.as_ptr(), b"none\0".as_ptr() as *const c_char) != 0
+                    && Q_stricmp(
+                        (*ctx.world).cvars.g_siegeTeam1.string.as_ptr(),
+                        b"none\0".as_ptr() as *const c_char,
+                    ) != 0
                 {
                     // check for override
                     write_cstr_field(
                         &mut (*ctx.world).globals.team1,
-                        &core::ffi::CStr::from_ptr((*ctx.world).cvars.g_siegeTeam1.string.as_ptr()).to_string_lossy(),
+                        &core::ffi::CStr::from_ptr((*ctx.world).cvars.g_siegeTeam1.string.as_ptr())
+                            .to_string_lossy(),
                     );
                 } else {
                     // otherwise use level default
-                    BG_SiegeGetPairedValue(teams.as_mut_ptr(), b"team1\0".as_ptr() as *mut c_char, (*ctx.world).globals.team1.as_mut_ptr());
+                    BG_SiegeGetPairedValue(
+                        teams.as_mut_ptr(),
+                        b"team1\0".as_ptr() as *mut c_char,
+                        (*ctx.world).globals.team1.as_mut_ptr(),
+                    );
                 }
 
                 if (*ctx.world).cvars.g_siegeTeam2.string[0] != 0
-                    && Q_stricmp((*ctx.world).cvars.g_siegeTeam2.string.as_ptr(), b"none\0".as_ptr() as *const c_char) != 0
+                    && Q_stricmp(
+                        (*ctx.world).cvars.g_siegeTeam2.string.as_ptr(),
+                        b"none\0".as_ptr() as *const c_char,
+                    ) != 0
                 {
                     write_cstr_field(
                         &mut (*ctx.world).globals.team2,
-                        &core::ffi::CStr::from_ptr((*ctx.world).cvars.g_siegeTeam2.string.as_ptr()).to_string_lossy(),
+                        &core::ffi::CStr::from_ptr((*ctx.world).cvars.g_siegeTeam2.string.as_ptr())
+                            .to_string_lossy(),
                     );
                 } else {
-                    BG_SiegeGetPairedValue(teams.as_mut_ptr(), b"team2\0".as_ptr() as *mut c_char, (*ctx.world).globals.team2.as_mut_ptr());
+                    BG_SiegeGetPairedValue(
+                        teams.as_mut_ptr(),
+                        b"team2\0".as_ptr() as *mut c_char,
+                        (*ctx.world).globals.team2.as_mut_ptr(),
+                    );
                 }
             } else {
                 G_Error(ctx, cstr("Siege teams not defined").as_ptr());
@@ -310,28 +324,53 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
                 (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
             ) != 0
             {
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"TeamIcon\0".as_ptr() as *mut c_char, teamIcon.as_mut_ptr()) != 0 {
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"TeamIcon\0".as_ptr() as *mut c_char,
+                    teamIcon.as_mut_ptr(),
+                ) != 0
+                {
                     trap::Cvar_Set(
                         ctx.engine,
                         mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
                             CString::new("team2_icon").unwrap(),
-                            CString::new(core::ffi::CStr::from_ptr(teamIcon.as_ptr()).to_bytes()).unwrap(),
+                            CString::new(core::ffi::CStr::from_ptr(teamIcon.as_ptr()).to_bytes())
+                                .unwrap(),
                         ),
                     );
                 }
 
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"RequiredObjectives\0".as_ptr() as *mut c_char, goalreq.as_mut_ptr()) != 0 {
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"RequiredObjectives\0".as_ptr() as *mut c_char,
+                    goalreq.as_mut_ptr(),
+                ) != 0
+                {
                     (*ctx.world).globals.rebel_goals_required = atoi(goalreq.as_ptr());
                 }
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"Timed\0".as_ptr() as *mut c_char, goalreq.as_mut_ptr()) != 0 {
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"Timed\0".as_ptr() as *mut c_char,
+                    goalreq.as_mut_ptr(),
+                ) != 0
+                {
                     (*ctx.world).globals.rebel_time_limit = atoi(goalreq.as_ptr()) * 1000;
-                    if (*ctx.world).cvars.g_siegeTeamSwitch.integer != 0 && (*ctx.world).globals.g_siegePersistant.beatingTime != 0 {
-                        (*ctx.world).globals.gRebelCountdown = (*ctx.world).level.time + (*ctx.world).globals.g_siegePersistant.lastTime;
+                    if (*ctx.world).cvars.g_siegeTeamSwitch.integer != 0
+                        && (*ctx.world).globals.g_siegePersistant.beatingTime != 0
+                    {
+                        (*ctx.world).globals.gRebelCountdown = (*ctx.world).level.time
+                            + (*ctx.world).globals.g_siegePersistant.lastTime;
                     } else {
-                        (*ctx.world).globals.gRebelCountdown = (*ctx.world).level.time + (*ctx.world).globals.rebel_time_limit;
+                        (*ctx.world).globals.gRebelCountdown =
+                            (*ctx.world).level.time + (*ctx.world).globals.rebel_time_limit;
                     }
                 }
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"attackers\0".as_ptr() as *mut c_char, goalreq.as_mut_ptr()) != 0 {
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"attackers\0".as_ptr() as *mut c_char,
+                    goalreq.as_mut_ptr(),
+                ) != 0
+                {
                     (*ctx.world).globals.rebel_attackers = atoi(goalreq.as_ptr());
                 }
             }
@@ -342,32 +381,57 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
                 (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
             ) != 0
             {
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"TeamIcon\0".as_ptr() as *mut c_char, teamIcon.as_mut_ptr()) != 0 {
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"TeamIcon\0".as_ptr() as *mut c_char,
+                    teamIcon.as_mut_ptr(),
+                ) != 0
+                {
                     trap::Cvar_Set(
                         ctx.engine,
                         mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
                             CString::new("team1_icon").unwrap(),
-                            CString::new(core::ffi::CStr::from_ptr(teamIcon.as_ptr()).to_bytes()).unwrap(),
+                            CString::new(core::ffi::CStr::from_ptr(teamIcon.as_ptr()).to_bytes())
+                                .unwrap(),
                         ),
                     );
                 }
 
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"RequiredObjectives\0".as_ptr() as *mut c_char, goalreq.as_mut_ptr()) != 0 {
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"RequiredObjectives\0".as_ptr() as *mut c_char,
+                    goalreq.as_mut_ptr(),
+                ) != 0
+                {
                     (*ctx.world).globals.imperial_goals_required = atoi(goalreq.as_ptr());
                 }
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"Timed\0".as_ptr() as *mut c_char, goalreq.as_mut_ptr()) != 0 {
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"Timed\0".as_ptr() as *mut c_char,
+                    goalreq.as_mut_ptr(),
+                ) != 0
+                {
                     if (*ctx.world).globals.rebel_time_limit != 0 {
                         crate::g_main::Com_Printf(cstr("Tried to set imperial time limit, but there's already a rebel time limit!\nOnly one team can have a time limit.\n").as_ptr());
                     } else {
                         (*ctx.world).globals.imperial_time_limit = atoi(goalreq.as_ptr()) * 1000;
-                        if (*ctx.world).cvars.g_siegeTeamSwitch.integer != 0 && (*ctx.world).globals.g_siegePersistant.beatingTime != 0 {
-                            (*ctx.world).globals.gImperialCountdown = (*ctx.world).level.time + (*ctx.world).globals.g_siegePersistant.lastTime;
+                        if (*ctx.world).cvars.g_siegeTeamSwitch.integer != 0
+                            && (*ctx.world).globals.g_siegePersistant.beatingTime != 0
+                        {
+                            (*ctx.world).globals.gImperialCountdown = (*ctx.world).level.time
+                                + (*ctx.world).globals.g_siegePersistant.lastTime;
                         } else {
-                            (*ctx.world).globals.gImperialCountdown = (*ctx.world).level.time + (*ctx.world).globals.imperial_time_limit;
+                            (*ctx.world).globals.gImperialCountdown =
+                                (*ctx.world).level.time + (*ctx.world).globals.imperial_time_limit;
                         }
                     }
                 }
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"attackers\0".as_ptr() as *mut c_char, goalreq.as_mut_ptr()) != 0 {
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"attackers\0".as_ptr() as *mut c_char,
+                    goalreq.as_mut_ptr(),
+                ) != 0
+                {
                     (*ctx.world).globals.imperial_attackers = atoi(goalreq.as_ptr());
                 }
             }
@@ -380,7 +444,10 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
             );
 
             if (*ctx.world).bg_state.bgNumSiegeClasses == 0 {
-                G_Error(ctx, cstr("Couldn't find any player classes for Siege").as_ptr());
+                G_Error(
+                    ctx,
+                    cstr("Couldn't find any player classes for Siege").as_ptr(),
+                );
             }
 
             // Now load the teams since we have class data.
@@ -392,7 +459,10 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
             // PORT-NOTE(missing-field): `bgNumSiegeTeams` is not yet a
             // `BgState` field (missing_symbols); referenced verbatim.
             if (*ctx.world).bg_state.bgNumSiegeTeams == 0 {
-                G_Error(ctx, cstr("Couldn't find any player teams for Siege").as_ptr());
+                G_Error(
+                    ctx,
+                    cstr("Couldn't find any player teams for Siege").as_ptr(),
+                );
             }
 
             // Get and set the team themes for each team.
@@ -402,14 +472,28 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
                 (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
             ) != 0
             {
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"UseTeam\0".as_ptr() as *mut c_char, goalreq.as_mut_ptr()) != 0 {
-                    BG_SiegeSetTeamTheme(SIEGETEAM_TEAM1, goalreq.as_mut_ptr(), &mut (*ctx.world).bg_state);
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"UseTeam\0".as_ptr() as *mut c_char,
+                    goalreq.as_mut_ptr(),
+                ) != 0
+                {
+                    BG_SiegeSetTeamTheme(
+                        SIEGETEAM_TEAM1,
+                        goalreq.as_mut_ptr(),
+                        &mut (*ctx.world).bg_state,
+                    );
                 }
 
                 // Now count up the objectives for this team.
                 let mut i: c_int = 1;
                 write_cstr_field(&mut objecStr, &format!("Objective{}", i));
-                while BG_SiegeGetValueGroup((*ctx.world).globals.gParseObjectives.as_mut_ptr(), objecStr.as_mut_ptr(), objective.as_mut_ptr()) != 0 {
+                while BG_SiegeGetValueGroup(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    objecStr.as_mut_ptr(),
+                    objective.as_mut_ptr(),
+                ) != 0
+                {
                     objectiveNumTeam1 += 1;
                     i += 1;
                     write_cstr_field(&mut objecStr, &format!("Objective{}", i));
@@ -421,13 +505,27 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
                 (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
             ) != 0
             {
-                if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"UseTeam\0".as_ptr() as *mut c_char, goalreq.as_mut_ptr()) != 0 {
-                    BG_SiegeSetTeamTheme(SIEGETEAM_TEAM2, goalreq.as_mut_ptr(), &mut (*ctx.world).bg_state);
+                if BG_SiegeGetPairedValue(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    b"UseTeam\0".as_ptr() as *mut c_char,
+                    goalreq.as_mut_ptr(),
+                ) != 0
+                {
+                    BG_SiegeSetTeamTheme(
+                        SIEGETEAM_TEAM2,
+                        goalreq.as_mut_ptr(),
+                        &mut (*ctx.world).bg_state,
+                    );
                 }
 
                 let mut i: c_int = 1;
                 write_cstr_field(&mut objecStr, &format!("Objective{}", i));
-                while BG_SiegeGetValueGroup((*ctx.world).globals.gParseObjectives.as_mut_ptr(), objecStr.as_mut_ptr(), objective.as_mut_ptr()) != 0 {
+                while BG_SiegeGetValueGroup(
+                    (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                    objecStr.as_mut_ptr(),
+                    objective.as_mut_ptr(),
+                ) != 0
+                {
                     objectiveNumTeam2 += 1;
                     i += 1;
                     write_cstr_field(&mut objecStr, &format!("Objective{}", i));
@@ -552,7 +650,10 @@ pub fn G_SiegeSetObjectiveComplete(
             ctx.engine,
             mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
                 CS_SIEGE_OBJECTIVES,
-                cstr(&core::ffi::CStr::from_ptr((*ctx.world).globals.gObjectiveCfgStr.as_ptr()).to_string_lossy()),
+                cstr(
+                    &core::ffi::CStr::from_ptr((*ctx.world).globals.gObjectiveCfgStr.as_ptr())
+                        .to_string_lossy(),
+                ),
             ),
         );
     }
@@ -563,11 +664,7 @@ pub fn G_SiegeSetObjectiveComplete(
 /// Raven `G_SiegeGetCompletionStatus` — qtrue if objective is currently complete.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:430-480`
-pub fn G_SiegeGetCompletionStatus(
-    ctx: GameContext<'_>,
-    team: c_int,
-    objective: c_int,
-) -> qboolean {
+pub fn G_SiegeGetCompletionStatus(ctx: GameContext<'_>, team: c_int, objective: c_int) -> qboolean {
     unsafe {
         // PORT-NOTE(missing-field): `gObjectiveCfgStr` referenced as
         // `(*ctx.world).globals.gObjectiveCfgStr` (missing_symbols). `strstr`
@@ -663,12 +760,18 @@ pub fn UseSiegeTarget(
             }
             if t == en {
                 // G_Printf("WARNING: Entity used itself.\n") — no format args.
-                crate::g_main::G_Printf(ctx, b"WARNING: Entity used itself.\n\0".as_ptr() as *const c_char);
+                crate::g_main::G_Printf(
+                    ctx,
+                    b"WARNING: Entity used itself.\n\0".as_ptr() as *const c_char,
+                );
             } else if !(*t).use_.is_none() {
                 GlobalUse(t, en, en);
             }
             if (*en).inuse == 0 {
-                crate::g_main::G_Printf(ctx, b"entity was removed while using targets\n\0".as_ptr() as *const c_char);
+                crate::g_main::G_Printf(
+                    ctx,
+                    b"entity was removed while using targets\n\0".as_ptr() as *const c_char,
+                );
                 return;
             }
         }
@@ -714,7 +817,11 @@ pub fn SiegeBroadcast_OBJECTIVECOMPLETE(
     unsafe {
         let nomatter: vec3_t = [0.0, 0.0, 0.0];
 
-        let te = G_TempEntity(ctx, nomatter, entity_event_t::EV_SIEGE_OBJECTIVECOMPLETE as c_int);
+        let te = G_TempEntity(
+            ctx,
+            nomatter,
+            entity_event_t::EV_SIEGE_OBJECTIVECOMPLETE as c_int,
+        );
         (*te).r.svFlags |= SVF_BROADCAST;
         (*te).s.eventParm = team;
         (*te).s.weapon = client;
@@ -725,11 +832,7 @@ pub fn SiegeBroadcast_OBJECTIVECOMPLETE(
 /// Raven `SiegeBroadcast_ROUNDOVER`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:542-553`
-pub fn SiegeBroadcast_ROUNDOVER(
-    ctx: GameContext<'_>,
-    winningteam: c_int,
-    winningclient: c_int,
-) {
+pub fn SiegeBroadcast_ROUNDOVER(ctx: GameContext<'_>, winningteam: c_int, winningclient: c_int) {
     unsafe {
         let nomatter: vec3_t = [0.0, 0.0, 0.0];
 
@@ -760,14 +863,19 @@ pub fn BroadcastObjectiveCompletion(
         // ported home yet; referenced verbatim (missing_symbols).
         if client != ENTITYNUM_NONE
             && !(*ctx.world).g_entities[client as usize].client.is_null()
-            && (*((*ctx.world).g_entities[client as usize].client as *mut gclient_t)).sess.sessionTeam == team
+            && (*((*ctx.world).g_entities[client as usize].client as *mut gclient_t))
+                .sess
+                .sessionTeam
+                == team
         {
             // guy who completed this objective gets points, providing he's on
             // the opposing team
             AddScore(
                 ctx,
                 &mut (*ctx.world).g_entities[client as usize] as *mut gentity_t,
-                (*((*ctx.world).g_entities[client as usize].client as *mut gclient_t)).ps.origin,
+                (*((*ctx.world).g_entities[client as usize].client as *mut gclient_t))
+                    .ps
+                    .origin,
                 SIEGE_POINTS_OBJECTIVECOMPLETED,
             );
         }
@@ -780,11 +888,7 @@ pub fn BroadcastObjectiveCompletion(
 /// Raven `AddSiegeWinningTeamPoints`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:566-589`
-pub fn AddSiegeWinningTeamPoints(
-    ctx: GameContext<'_>,
-    team: c_int,
-    winner: c_int,
-) {
+pub fn AddSiegeWinningTeamPoints(ctx: GameContext<'_>, team: c_int, winner: c_int) {
     unsafe {
         // PORT-NOTE(unported-const): `SIEGE_POINTS_TEAMWONROUND`/
         // `SIEGE_POINTS_FINALOBJECTIVECOMPLETED` have no ported home yet;
@@ -794,7 +898,9 @@ pub fn AddSiegeWinningTeamPoints(
         while i < (MAX_CLIENTS) as i32 {
             let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
-            if !(*ent).client.is_null() && (*((*ent).client as *mut gclient_t)).sess.sessionTeam == team {
+            if !(*ent).client.is_null()
+                && (*((*ent).client as *mut gclient_t)).sess.sessionTeam == team
+            {
                 if i == winner {
                     AddScore(
                         ctx,
@@ -851,7 +957,8 @@ pub fn SiegeDoTeamAssign(ctx: GameContext<'_>) {
         while i < (MAX_CLIENTS) as i32 {
             let ent = &mut (*ctx.world).g_entities[i as usize] as *mut gentity_t;
 
-            if (*ent).inuse != 0 && !(*ent).client.is_null()
+            if (*ent).inuse != 0
+                && !(*ent).client.is_null()
                 && (*((*ent).client as *mut gclient_t)).pers.connected == CON_CONNECTED
             {
                 // a connected client, switch his frickin teams around
@@ -876,11 +983,7 @@ pub fn SiegeDoTeamAssign(ctx: GameContext<'_>) {
 /// Raven `SiegeTeamSwitch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:632-652`
-pub fn SiegeTeamSwitch(
-    ctx: GameContext<'_>,
-    winTeam: c_int,
-    winTime: c_int,
-) {
+pub fn SiegeTeamSwitch(ctx: GameContext<'_>, winTeam: c_int, winTime: c_int) {
     unsafe {
         trap::SiegePersGet(
             ctx.engine,
@@ -918,11 +1021,7 @@ pub fn SiegeTeamSwitch(
 /// Raven `SiegeRoundComplete`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:654-742`
-pub fn SiegeRoundComplete(
-    ctx: GameContext<'_>,
-    winningteam: c_int,
-    winningclient: c_int,
-) {
+pub fn SiegeRoundComplete(ctx: GameContext<'_>, winningteam: c_int, winningclient: c_int) {
     unsafe {
         // PORT-NOTE(missing-fields): `team1`/`team2`/`gParseObjectives`
         // (game globals) and `siege_info` (bg-tier) referenced as
@@ -935,8 +1034,13 @@ pub fn SiegeRoundComplete(
         let mut winningclient = winningclient;
 
         if winningclient != ENTITYNUM_NONE
-            && !(*ctx.world).g_entities[winningclient as usize].client.is_null()
-            && (*((*ctx.world).g_entities[winningclient as usize].client as *mut gclient_t)).sess.sessionTeam != winningteam
+            && !(*ctx.world).g_entities[winningclient as usize]
+                .client
+                .is_null()
+            && (*((*ctx.world).g_entities[winningclient as usize].client as *mut gclient_t))
+                .sess
+                .sessionTeam
+                != winningteam
         {
             // this person just won the round for the other team..
             winningclient = ENTITYNUM_NONE;
@@ -977,7 +1081,12 @@ pub fn SiegeRoundComplete(
             (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
         ) != 0
         {
-            if BG_SiegeGetPairedValue((*ctx.world).globals.gParseObjectives.as_mut_ptr(), b"roundover_target\0".as_ptr() as *mut c_char, teamstr.as_mut_ptr()) == 0 {
+            if BG_SiegeGetPairedValue(
+                (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                b"roundover_target\0".as_ptr() as *mut c_char,
+                teamstr.as_mut_ptr(),
+            ) == 0
+            {
                 // didn't find the name of the thing to target upon win, just
                 // logexit now then.
                 LogExit(ctx, cstr("Objectives completed").as_ptr());
@@ -1009,14 +1118,17 @@ pub fn SiegeRoundComplete(
         }
 
         if (*ctx.world).cvars.g_siegeTeamSwitch.integer != 0
-            && ((*ctx.world).globals.imperial_time_limit != 0 || (*ctx.world).globals.rebel_time_limit != 0)
+            && ((*ctx.world).globals.imperial_time_limit != 0
+                || (*ctx.world).globals.rebel_time_limit != 0)
         {
             // handle stupid team switching crap
             let mut time: c_int = 0;
             if (*ctx.world).globals.imperial_time_limit != 0 {
-                time = (*ctx.world).globals.imperial_time_limit - ((*ctx.world).globals.gImperialCountdown - (*ctx.world).level.time);
+                time = (*ctx.world).globals.imperial_time_limit
+                    - ((*ctx.world).globals.gImperialCountdown - (*ctx.world).level.time);
             } else if (*ctx.world).globals.rebel_time_limit != 0 {
-                time = (*ctx.world).globals.rebel_time_limit - ((*ctx.world).globals.gRebelCountdown - (*ctx.world).level.time);
+                time = (*ctx.world).globals.rebel_time_limit
+                    - ((*ctx.world).globals.gRebelCountdown - (*ctx.world).level.time);
             }
 
             if time < 1 {
@@ -1036,11 +1148,7 @@ pub fn SiegeRoundComplete(
 /// Raven `G_ValidateSiegeClassForTeam`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:744-784`
-pub fn G_ValidateSiegeClassForTeam(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    team: c_int,
-) {
+pub fn G_ValidateSiegeClassForTeam(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int) {
     unsafe {
         let mut newClassIndex: c_int = -1;
         let cl = (*ent).client as *mut gclient_t;
@@ -1049,7 +1157,8 @@ pub fn G_ValidateSiegeClassForTeam(
             return;
         }
 
-        let scl = &mut (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize] as *mut siegeClass_t;
+        let scl = &mut (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize]
+            as *mut siegeClass_t;
 
         let stm = BG_SiegeFindThemeForTeam(team, &(*ctx.world).bg_state);
         if !stm.is_null() {
@@ -1059,11 +1168,17 @@ pub fn G_ValidateSiegeClassForTeam(
                 // go through the team and see its valid classes, can we find
                 // one that matches our current player class?
                 if !(*stm).classes[i as usize].is_null() {
-                    if Q_stricmp((*scl).name.as_ptr(), (*(*stm).classes[i as usize]).name.as_ptr()) == 0 {
+                    if Q_stricmp(
+                        (*scl).name.as_ptr(),
+                        (*(*stm).classes[i as usize]).name.as_ptr(),
+                    ) == 0
+                    {
                         // the class we're using is already ok for this team.
                         return;
                     }
-                    if (*(*stm).classes[i as usize]).playerClass == (*scl).playerClass || newClassIndex == -1 {
+                    if (*(*stm).classes[i as usize]).playerClass == (*scl).playerClass
+                        || newClassIndex == -1
+                    {
                         newClassIndex = i;
                     }
                 }
@@ -1072,10 +1187,16 @@ pub fn G_ValidateSiegeClassForTeam(
 
             if newClassIndex != -1 {
                 // ok, let's find it in the global class array
-                (*cl).siegeClass = BG_SiegeFindClassIndexByName((*(*stm).classes[newClassIndex as usize]).name.as_ptr(), &(*ctx.world).bg_state);
+                (*cl).siegeClass = BG_SiegeFindClassIndexByName(
+                    (*(*stm).classes[newClassIndex as usize]).name.as_ptr(),
+                    &(*ctx.world).bg_state,
+                );
                 write_cstr_field(
                     &mut (*cl).sess.siegeClass,
-                    &core::ffi::CStr::from_ptr((*(*stm).classes[newClassIndex as usize]).name.as_ptr()).to_string_lossy(),
+                    &core::ffi::CStr::from_ptr(
+                        (*(*stm).classes[newClassIndex as usize]).name.as_ptr(),
+                    )
+                    .to_string_lossy(),
                 );
             }
         }
@@ -1085,12 +1206,7 @@ pub fn G_ValidateSiegeClassForTeam(
 /// Raven `SetTeamQuick` — bypass most of the normal checks in SetTeam.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:787-834`
-pub fn SetTeamQuick(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    team: c_int,
-    doBegin: qboolean,
-) {
+pub fn SetTeamQuick(ctx: GameContext<'_>, ent: *mut gentity_t, team: c_int, doBegin: qboolean) {
     unsafe {
         // Raven's `MAX_INFO_STRING` is not yet a ported const (see
         // `q_shared.rs`'s `Info_SetValueForKey` precedent); hardcoded 1024
@@ -1115,25 +1231,43 @@ pub fn SetTeamQuick(
 
         if team == TEAM_SPECTATOR {
             (*cl).sess.spectatorState = spectatorState_t::SPECTATOR_FREE;
-            Info_SetValueForKey(userinfo.as_mut_ptr(), b"team\0".as_ptr() as *const c_char, b"s\0".as_ptr() as *const c_char);
+            Info_SetValueForKey(
+                userinfo.as_mut_ptr(),
+                b"team\0".as_ptr() as *const c_char,
+                b"s\0".as_ptr() as *const c_char,
+            );
         } else {
             (*cl).sess.spectatorState = spectatorState_t::SPECTATOR_NOT;
             if team == TEAM_RED {
-                Info_SetValueForKey(userinfo.as_mut_ptr(), b"team\0".as_ptr() as *const c_char, b"r\0".as_ptr() as *const c_char);
+                Info_SetValueForKey(
+                    userinfo.as_mut_ptr(),
+                    b"team\0".as_ptr() as *const c_char,
+                    b"r\0".as_ptr() as *const c_char,
+                );
             } else if team == TEAM_BLUE {
-                Info_SetValueForKey(userinfo.as_mut_ptr(), b"team\0".as_ptr() as *const c_char, b"b\0".as_ptr() as *const c_char);
+                Info_SetValueForKey(
+                    userinfo.as_mut_ptr(),
+                    b"team\0".as_ptr() as *const c_char,
+                    b"b\0".as_ptr() as *const c_char,
+                );
             } else {
-                Info_SetValueForKey(userinfo.as_mut_ptr(), b"team\0".as_ptr() as *const c_char, b"?\0".as_ptr() as *const c_char);
+                Info_SetValueForKey(
+                    userinfo.as_mut_ptr(),
+                    b"team\0".as_ptr() as *const c_char,
+                    b"?\0".as_ptr() as *const c_char,
+                );
             }
         }
 
-        let info_cstring = std::ffi::CString::new(
-            core::ffi::CStr::from_ptr(userinfo.as_ptr()).to_bytes(),
-        )
-        .unwrap();
+        let info_cstring =
+            std::ffi::CString::new(core::ffi::CStr::from_ptr(userinfo.as_ptr()).to_bytes())
+                .unwrap();
         trap::SetUserinfo(
             ctx.engine,
-            mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new((*ent).s.number, info_cstring),
+            mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
+                (*ent).s.number,
+                info_cstring,
+            ),
         );
 
         (*cl).sess.spectatorClient = 0;
@@ -1151,10 +1285,7 @@ pub fn SetTeamQuick(
 /// Raven `SiegeRespawn` — respawn a siege player, honoring a pending team switch.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:836-851`
-pub fn SiegeRespawn(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SiegeRespawn(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let client = (*ent).client as *mut gclient_t;
 
@@ -1163,7 +1294,8 @@ pub fn SiegeRespawn(
         } else {
             ClientSpawn(ctx, ent);
             // add a teleportation effect
-            let tent = G_TempEntity(ctx, 
+            let tent = G_TempEntity(
+                ctx,
                 (*client).ps.origin,
                 entity_event_t::EV_PLAYER_TELEPORT_IN as c_int,
             );
@@ -1179,10 +1311,7 @@ pub fn SiegeRespawn(
 /// from.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:853-903`
-pub fn SiegeBeginRound(
-    ctx: GameContext<'_>,
-    entNum: c_int,
-) {
+pub fn SiegeBeginRound(ctx: GameContext<'_>, entNum: c_int) {
     unsafe {
         // entNum is just used as something to fire targets from.
         let mut targname: [c_char; 1024] = [0; 1024];
@@ -1198,11 +1327,14 @@ pub fn SiegeBeginRound(
 
                 if (*ent).inuse != 0 && !(*ent).client.is_null() {
                     let cl = (*ent).client as *mut gclient_t;
-                    if (*cl).sess.sessionTeam != TEAM_SPECTATOR && (*cl).ps.pm_flags & PMF_FOLLOW == 0 {
+                    if (*cl).sess.sessionTeam != TEAM_SPECTATOR
+                        && (*cl).ps.pm_flags & PMF_FOLLOW == 0
+                    {
                         // not a spec, just respawn them
                         spawnEnt = qtrue;
                     } else if (*cl).sess.sessionTeam == TEAM_SPECTATOR
-                        && ((*cl).sess.siegeDesiredTeam == TEAM_RED || (*cl).sess.siegeDesiredTeam == TEAM_BLUE)
+                        && ((*cl).sess.siegeDesiredTeam == TEAM_RED
+                            || (*cl).sess.siegeDesiredTeam == TEAM_BLUE)
                     {
                         // spectator but has a desired team
                         spawnEnt = qtrue;
@@ -1305,12 +1437,18 @@ pub fn SiegeCheckTimers(ctx: GameContext<'_>) {
                 i += 1;
             }
 
-            if (*ctx.world).cvars.g_siegeTeamSwitch.integer != 0 && (*ctx.world).globals.g_siegePersistant.beatingTime != 0 {
-                (*ctx.world).globals.gImperialCountdown = (*ctx.world).level.time + (*ctx.world).globals.g_siegePersistant.lastTime;
-                (*ctx.world).globals.gRebelCountdown = (*ctx.world).level.time + (*ctx.world).globals.g_siegePersistant.lastTime;
+            if (*ctx.world).cvars.g_siegeTeamSwitch.integer != 0
+                && (*ctx.world).globals.g_siegePersistant.beatingTime != 0
+            {
+                (*ctx.world).globals.gImperialCountdown =
+                    (*ctx.world).level.time + (*ctx.world).globals.g_siegePersistant.lastTime;
+                (*ctx.world).globals.gRebelCountdown =
+                    (*ctx.world).level.time + (*ctx.world).globals.g_siegePersistant.lastTime;
             } else {
-                (*ctx.world).globals.gImperialCountdown = (*ctx.world).level.time + (*ctx.world).globals.imperial_time_limit;
-                (*ctx.world).globals.gRebelCountdown = (*ctx.world).level.time + (*ctx.world).globals.rebel_time_limit;
+                (*ctx.world).globals.gImperialCountdown =
+                    (*ctx.world).level.time + (*ctx.world).globals.imperial_time_limit;
+                (*ctx.world).globals.gRebelCountdown =
+                    (*ctx.world).level.time + (*ctx.world).globals.rebel_time_limit;
             }
         }
 
@@ -1335,23 +1473,33 @@ pub fn SiegeCheckTimers(ctx: GameContext<'_>) {
         if (*ctx.world).globals.gSiegeRoundBegun == 0 {
             if numTeam1 == 0 || numTeam2 == 0 {
                 // don't have people on both teams yet.
-                (*ctx.world).globals.gSiegeBeginTime = (*ctx.world).level.time + SIEGE_ROUND_BEGIN_TIME;
+                (*ctx.world).globals.gSiegeBeginTime =
+                    (*ctx.world).level.time + SIEGE_ROUND_BEGIN_TIME;
                 trap::SetConfigstring(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_SIEGE_STATE, cstr("1")),
+                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                        CS_SIEGE_STATE,
+                        cstr("1"),
+                    ),
                 ); // "waiting for players on both teams"
             } else if (*ctx.world).globals.gSiegeBeginTime < (*ctx.world).level.time {
                 // mark the round as having begun
                 (*ctx.world).globals.gSiegeRoundBegun = qtrue;
                 SiegeBeginRound(ctx, i); // perform any round start tasks
-            } else if (*ctx.world).globals.gSiegeBeginTime > ((*ctx.world).level.time + SIEGE_ROUND_BEGIN_TIME) {
-                (*ctx.world).globals.gSiegeBeginTime = (*ctx.world).level.time + SIEGE_ROUND_BEGIN_TIME;
+            } else if (*ctx.world).globals.gSiegeBeginTime
+                > ((*ctx.world).level.time + SIEGE_ROUND_BEGIN_TIME)
+            {
+                (*ctx.world).globals.gSiegeBeginTime =
+                    (*ctx.world).level.time + SIEGE_ROUND_BEGIN_TIME;
             } else {
                 trap::SetConfigstring(
                     ctx.engine,
                     mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
                         CS_SIEGE_STATE,
-                        cstr(&format!("2|{}", (*ctx.world).globals.gSiegeBeginTime - SIEGE_ROUND_BEGIN_TIME)),
+                        cstr(&format!(
+                            "2|{}",
+                            (*ctx.world).globals.gSiegeBeginTime - SIEGE_ROUND_BEGIN_TIME
+                        )),
                     ),
                 ); // getting ready to begin
             }
@@ -1421,7 +1569,8 @@ pub fn siegeTriggerUse(
     unsafe {
         let mut teamstr: [c_char; 64] = [0; 64];
         let mut objectivestr: [c_char; 64] = [0; 64];
-        let mut desiredobjective: [c_char; MAX_SIEGE_INFO_SIZE as usize] = [0; MAX_SIEGE_INFO_SIZE as usize];
+        let mut desiredobjective: [c_char; MAX_SIEGE_INFO_SIZE as usize] =
+            [0; MAX_SIEGE_INFO_SIZE as usize];
         let mut clUser: c_int = ENTITYNUM_NONE;
         let mut r#final: c_int = 0;
 
@@ -1441,9 +1590,15 @@ pub fn siegeTriggerUse(
         }
 
         if (*ent).side == SIEGETEAM_TEAM1 {
-            write_cstr_field(&mut teamstr, &core::ffi::CStr::from_ptr((*ctx.world).globals.team1.as_ptr()).to_string_lossy());
+            write_cstr_field(
+                &mut teamstr,
+                &core::ffi::CStr::from_ptr((*ctx.world).globals.team1.as_ptr()).to_string_lossy(),
+            );
         } else {
-            write_cstr_field(&mut teamstr, &core::ffi::CStr::from_ptr((*ctx.world).globals.team2.as_ptr()).to_string_lossy());
+            write_cstr_field(
+                &mut teamstr,
+                &core::ffi::CStr::from_ptr((*ctx.world).globals.team2.as_ptr()).to_string_lossy(),
+            );
         }
 
         if BG_SiegeGetValueGroup(
@@ -1454,15 +1609,32 @@ pub fn siegeTriggerUse(
         {
             write_cstr_field(&mut objectivestr, &format!("Objective{}", (*ent).objective));
 
-            if BG_SiegeGetValueGroup((*ctx.world).globals.gParseObjectives.as_mut_ptr(), objectivestr.as_mut_ptr(), desiredobjective.as_mut_ptr()) != 0 {
-                if BG_SiegeGetPairedValue(desiredobjective.as_mut_ptr(), b"final\0".as_ptr() as *mut c_char, teamstr.as_mut_ptr()) != 0 {
+            if BG_SiegeGetValueGroup(
+                (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                objectivestr.as_mut_ptr(),
+                desiredobjective.as_mut_ptr(),
+            ) != 0
+            {
+                if BG_SiegeGetPairedValue(
+                    desiredobjective.as_mut_ptr(),
+                    b"final\0".as_ptr() as *mut c_char,
+                    teamstr.as_mut_ptr(),
+                ) != 0
+                {
                     r#final = atoi(teamstr.as_ptr());
                 }
 
-                if BG_SiegeGetPairedValue(desiredobjective.as_mut_ptr(), b"target\0".as_ptr() as *mut c_char, teamstr.as_mut_ptr()) != 0 {
+                if BG_SiegeGetPairedValue(
+                    desiredobjective.as_mut_ptr(),
+                    b"target\0".as_ptr() as *mut c_char,
+                    teamstr.as_mut_ptr(),
+                ) != 0
+                {
                     let mut i: isize = 0;
                     while teamstr[i as usize] != 0 {
-                        if teamstr[i as usize] == b'\r' as c_char || teamstr[i as usize] == b'\n' as c_char {
+                        if teamstr[i as usize] == b'\r' as c_char
+                            || teamstr[i as usize] == b'\n' as c_char
+                        {
                             teamstr[i as usize] = 0;
                         }
                         i += 1;
@@ -1487,26 +1659,38 @@ pub fn siegeTriggerUse(
 /// Raven `SP_info_siege_objective`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1137-1179`
-pub fn SP_info_siege_objective(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_info_siege_objective(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut s: *mut c_char = core::ptr::null_mut();
 
-        if (*ctx.world).bg_state.siege_valid == 0 || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
+        if (*ctx.world).bg_state.siege_valid == 0
+            || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
+        {
             crate::g_utils::G_FreeEntity(ctx, ent);
             return;
         }
 
         (*ent).use_ = Some(EntUse::siegeTriggerUse);
-        G_SpawnInt(ctx, b"objective\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).objective);
-        G_SpawnInt(ctx, b"side\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).side);
+        G_SpawnInt(
+            ctx,
+            b"objective\0".as_ptr() as *const c_char,
+            b"0\0".as_ptr() as *const c_char,
+            &mut (*ent).objective,
+        );
+        G_SpawnInt(
+            ctx,
+            b"side\0".as_ptr() as *const c_char,
+            b"0\0".as_ptr() as *const c_char,
+            &mut (*ent).side,
+        );
 
         if (*ent).objective == 0 || (*ent).side == 0 {
             // j00 fux0red something up
             crate::g_utils::G_FreeEntity(ctx, ent);
-            crate::g_main::G_Printf(ctx, cstr("ERROR: info_siege_objective without an objective or side value\n").as_ptr());
+            crate::g_main::G_Printf(
+                ctx,
+                cstr("ERROR: info_siege_objective without an objective or side value\n").as_ptr(),
+            );
             return;
         }
 
@@ -1518,7 +1702,12 @@ pub fn SP_info_siege_objective(
         // All clients want to know where it is at all times for radar
         (*ent).r.svFlags |= SVF_BROADCAST;
 
-        G_SpawnString(ctx, b"icon\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s);
+        G_SpawnString(
+            ctx,
+            b"icon\0".as_ptr() as *const c_char,
+            b"\0".as_ptr() as *const c_char,
+            &mut s,
+        );
 
         if !s.is_null() && *s != 0 {
             // We have an icon, so index it now. We are reusing the
@@ -1543,11 +1732,7 @@ pub fn SP_info_siege_objective(
 /// Raven `SiegeIconUse` — toggle it on and off.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1182-1194`
-pub fn SiegeIconUse(
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
-) {
+pub fn SiegeIconUse(ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     // toggle it on and off
     unsafe {
         if (*ent).s.eFlags & EF_RADAROBJECT != 0 {
@@ -1567,20 +1752,24 @@ pub fn SiegeIconUse(
 /// Raven `SP_info_siege_radaricon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1203-1234`
-pub fn SP_info_siege_radaricon(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_info_siege_radaricon(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut s: *mut c_char = core::ptr::null_mut();
         let mut i: c_int = 0;
 
-        if (*ctx.world).bg_state.siege_valid == 0 || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
+        if (*ctx.world).bg_state.siege_valid == 0
+            || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
+        {
             crate::g_utils::G_FreeEntity(ctx, ent);
             return;
         }
 
-        G_SpawnInt(ctx, b"startoff\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut i);
+        G_SpawnInt(
+            ctx,
+            b"startoff\0".as_ptr() as *const c_char,
+            b"0\0".as_ptr() as *const c_char,
+            &mut i,
+        );
 
         if i == 0 {
             // start on then
@@ -1588,10 +1777,18 @@ pub fn SP_info_siege_radaricon(
             (*ent).r.svFlags |= SVF_BROADCAST;
         }
 
-        G_SpawnString(ctx, b"icon\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s);
+        G_SpawnString(
+            ctx,
+            b"icon\0".as_ptr() as *const c_char,
+            b"\0".as_ptr() as *const c_char,
+            &mut s,
+        );
         if s.is_null() || *s == 0 {
             // that's the whole point of the entity
-            crate::g_main::Com_Error((ERR_DROP) as i32, cstr("misc_siege_radaricon without an icon").as_ptr());
+            crate::g_main::Com_Error(
+                (ERR_DROP) as i32,
+                cstr("misc_siege_radaricon without an icon").as_ptr(),
+            );
             return;
         }
 
@@ -1621,7 +1818,8 @@ pub fn decompTriggerUse(
         let mut r#final: c_int = 0;
         let mut teamstr: [c_char; 1024] = [0; 1024];
         let mut objectivestr: [c_char; 64] = [0; 64];
-        let mut desiredobjective: [c_char; MAX_SIEGE_INFO_SIZE as usize] = [0; MAX_SIEGE_INFO_SIZE as usize];
+        let mut desiredobjective: [c_char; MAX_SIEGE_INFO_SIZE as usize] =
+            [0; MAX_SIEGE_INFO_SIZE as usize];
 
         if (*ctx.world).globals.gSiegeRoundEnded != 0 {
             return;
@@ -1637,9 +1835,15 @@ pub fn decompTriggerUse(
 
         // Find out if this objective counts toward the final objective count
         if (*ent).side == SIEGETEAM_TEAM1 {
-            write_cstr_field(&mut teamstr, &core::ffi::CStr::from_ptr((*ctx.world).globals.team1.as_ptr()).to_string_lossy());
+            write_cstr_field(
+                &mut teamstr,
+                &core::ffi::CStr::from_ptr((*ctx.world).globals.team1.as_ptr()).to_string_lossy(),
+            );
         } else {
-            write_cstr_field(&mut teamstr, &core::ffi::CStr::from_ptr((*ctx.world).globals.team2.as_ptr()).to_string_lossy());
+            write_cstr_field(
+                &mut teamstr,
+                &core::ffi::CStr::from_ptr((*ctx.world).globals.team2.as_ptr()).to_string_lossy(),
+            );
         }
 
         if BG_SiegeGetValueGroup(
@@ -1650,8 +1854,18 @@ pub fn decompTriggerUse(
         {
             write_cstr_field(&mut objectivestr, &format!("Objective{}", (*ent).objective));
 
-            if BG_SiegeGetValueGroup((*ctx.world).globals.gParseObjectives.as_mut_ptr(), objectivestr.as_mut_ptr(), desiredobjective.as_mut_ptr()) != 0 {
-                if BG_SiegeGetPairedValue(desiredobjective.as_mut_ptr(), b"final\0".as_ptr() as *mut c_char, teamstr.as_mut_ptr()) != 0 {
+            if BG_SiegeGetValueGroup(
+                (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
+                objectivestr.as_mut_ptr(),
+                desiredobjective.as_mut_ptr(),
+            ) != 0
+            {
+                if BG_SiegeGetPairedValue(
+                    desiredobjective.as_mut_ptr(),
+                    b"final\0".as_ptr() as *mut c_char,
+                    teamstr.as_mut_ptr(),
+                ) != 0
+                {
                     r#final = atoi(teamstr.as_ptr());
                 }
             }
@@ -1673,24 +1887,37 @@ pub fn decompTriggerUse(
 /// Raven `SP_info_siege_decomplete`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1297-1315`
-pub fn SP_info_siege_decomplete(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_info_siege_decomplete(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        if (*ctx.world).bg_state.siege_valid == 0 || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
+        if (*ctx.world).bg_state.siege_valid == 0
+            || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
+        {
             crate::g_utils::G_FreeEntity(ctx, ent);
             return;
         }
 
         (*ent).use_ = Some(EntUse::decompTriggerUse);
-        G_SpawnInt(ctx, b"objective\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).objective);
-        G_SpawnInt(ctx, b"side\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).side);
+        G_SpawnInt(
+            ctx,
+            b"objective\0".as_ptr() as *const c_char,
+            b"0\0".as_ptr() as *const c_char,
+            &mut (*ent).objective,
+        );
+        G_SpawnInt(
+            ctx,
+            b"side\0".as_ptr() as *const c_char,
+            b"0\0".as_ptr() as *const c_char,
+            &mut (*ent).side,
+        );
 
         if (*ent).objective == 0 || (*ent).side == 0 {
             // j00 fux0red something up
             crate::g_utils::G_FreeEntity(ctx, ent);
-            crate::g_main::G_Printf(ctx, cstr("ERROR: info_siege_objective_decomplete without an objective or side value\n").as_ptr());
+            crate::g_main::G_Printf(
+                ctx,
+                cstr("ERROR: info_siege_objective_decomplete without an objective or side value\n")
+                    .as_ptr(),
+            );
             return;
         }
     }
@@ -1713,12 +1940,11 @@ pub fn siegeEndUse(
 /// Raven `SP_target_siege_end`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1325-1334`
-pub fn SP_target_siege_end(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_target_siege_end(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        if (*ctx.world).bg_state.siege_valid == 0 || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
+        if (*ctx.world).bg_state.siege_valid == 0
+            || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
+        {
             crate::g_utils::G_FreeEntity(ctx, ent);
             return;
         }
@@ -1730,10 +1956,7 @@ pub fn SP_target_siege_end(
 /// Raven `SiegeItemRemoveOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1338-1349`
-pub fn SiegeItemRemoveOwner(
-    ent: *mut gentity_t,
-    carrier: *mut gentity_t,
-) {
+pub fn SiegeItemRemoveOwner(ent: *mut gentity_t, carrier: *mut gentity_t) {
     unsafe {
         (*ent).genericValue2 = 0; // Remove picked-up flag
         (*ent).genericValue8 = ENTITYNUM_NONE; // Mark entity carrying us as none
@@ -1750,11 +1973,7 @@ pub fn SiegeItemRemoveOwner(
 /// fire its respawn target.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1351-1370`
-pub fn SiegeItemRespawnEffect(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    newOrg: vec3_t,
-) {
+pub fn SiegeItemRespawnEffect(ctx: GameContext<'_>, ent: *mut gentity_t, newOrg: vec3_t) {
     unsafe {
         if !(*ent).target5.is_null() && *(*ent).target5 != 0 {
             G_UseTargets2(ctx, ent, ent, (*ent).target5 as *const c_char);
@@ -1800,10 +2019,7 @@ pub fn SiegeItemRespawnOnOriginalSpot(
 /// Raven `SiegeItemThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1382-1475`
-pub fn SiegeItemThink(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SiegeItemThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // PORT-NOTE(unported-const): `SIEGE_ITEM_RESPAWN_TIME` has no ported
         // home yet; referenced verbatim (missing_symbols).
@@ -1811,7 +2027,10 @@ pub fn SiegeItemThink(
 
         if (*ent).genericValue12 != 0 {
             // recharge health
-            if (*ent).health > 0 && (*ent).health < (*ent).maxHealth && (*ent).genericValue14 < (*ctx.world).level.time {
+            if (*ent).health > 0
+                && (*ent).health < (*ent).maxHealth
+                && (*ent).genericValue14 < (*ctx.world).level.time
+            {
                 (*ent).genericValue14 = (*ctx.world).level.time + (*ent).genericValue13;
                 (*ent).health += (*ent).genericValue12;
                 if (*ent).health > (*ent).maxHealth {
@@ -1835,7 +2054,16 @@ pub fn SiegeItemThink(
             }
         } else if (*ent).genericValue1 != 0 {
             // this means we want to run physics on the object
-            G_RunExPhys(ctx, ent, (*ent).radius, (*ent).mass, (*ent).random, qfalse, core::ptr::null_mut(), 0);
+            G_RunExPhys(
+                ctx,
+                ent,
+                (*ent).radius,
+                (*ent).mass,
+                (*ent).random,
+                qfalse,
+                core::ptr::null_mut(),
+                0,
+            );
         }
 
         // Bolt us to whoever is carrying us if a client
@@ -1846,7 +2074,8 @@ pub fn SiegeItemThink(
         }
 
         if !carrier.is_null() {
-            let carrier = &mut (*ctx.world).g_entities[(*ent).genericValue8 as usize] as *mut gentity_t;
+            let carrier =
+                &mut (*ctx.world).g_entities[(*ent).genericValue8 as usize] as *mut gentity_t;
 
             // This checking can be a bit iffy on the death stuff, but in
             // theory we should always get a think in before the default
@@ -2087,7 +2316,12 @@ pub fn SiegeItemUse(
         if !(*ent).paintarget.is_null() && *(*ent).paintarget != 0 {
             // want to be on this guy's origin now then
             let targetname_ofs = core::mem::offset_of!(gentity_t, targetname) as c_int;
-            let targ = G_Find(ctx, core::ptr::null_mut(), targetname_ofs, (*ent).paintarget as *const c_char);
+            let targ = G_Find(
+                ctx,
+                core::ptr::null_mut(),
+                targetname_ofs,
+                (*ent).paintarget as *const c_char,
+            );
 
             if !targ.is_null() && (*targ).inuse != 0 {
                 G_SetOrigin(ent, (*targ).r.currentOrigin);
@@ -2106,33 +2340,50 @@ pub fn SiegeItemUse(
 /// Raven `SP_misc_siege_item`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1676-1835`
-pub fn SP_misc_siege_item(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut canpickup: c_int = 0;
         let mut noradar: c_int = 0;
         let mut s: *mut c_char = core::ptr::null_mut();
 
-        if (*ctx.world).bg_state.siege_valid == 0 || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
+        if (*ctx.world).bg_state.siege_valid == 0
+            || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE
+        {
             crate::g_utils::G_FreeEntity(ctx, ent);
             return;
         }
 
         if (*ent).model.is_null() || *(*ent).model == 0 {
-            G_Error(ctx, cstr("You must specify a model for misc_siege_item types.").as_ptr());
+            G_Error(
+                ctx,
+                cstr("You must specify a model for misc_siege_item types.").as_ptr(),
+            );
         }
 
-        G_SpawnInt(ctx, b"canpickup\0".as_ptr() as *const c_char, b"1\0".as_ptr() as *const c_char, &mut canpickup);
-        G_SpawnInt(ctx, b"usephysics\0".as_ptr() as *const c_char, b"1\0".as_ptr() as *const c_char, &mut (*ent).genericValue1);
+        G_SpawnInt(
+            ctx,
+            b"canpickup\0".as_ptr() as *const c_char,
+            b"1\0".as_ptr() as *const c_char,
+            &mut canpickup,
+        );
+        G_SpawnInt(
+            ctx,
+            b"usephysics\0".as_ptr() as *const c_char,
+            b"1\0".as_ptr() as *const c_char,
+            &mut (*ent).genericValue1,
+        );
 
         if (*ent).genericValue1 != 0 {
             // if we're using physics we want lerporigin smoothing
             (*ent).s.eFlags |= EF_CLIENTSMOOTH;
         }
 
-        G_SpawnInt(ctx, b"noradar\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut noradar);
+        G_SpawnInt(
+            ctx,
+            b"noradar\0".as_ptr() as *const c_char,
+            b"0\0".as_ptr() as *const c_char,
+            &mut noradar,
+        );
         // Want it to always show up as a goal object on radar
         if noradar == 0 && (*ent).spawnflags & SIEGEITEM_STARTOFFRADAR == 0 {
             (*ent).s.eFlags |= EF_RADAROBJECT;
@@ -2141,38 +2392,88 @@ pub fn SP_misc_siege_item(
         // All clients want to know where it is at all times for radar
         (*ent).r.svFlags |= SVF_BROADCAST;
 
-        G_SpawnInt(ctx, b"pickuponlyonce\0".as_ptr() as *const c_char, b"1\0".as_ptr() as *const c_char, &mut (*ent).genericValue4);
+        G_SpawnInt(
+            ctx,
+            b"pickuponlyonce\0".as_ptr() as *const c_char,
+            b"1\0".as_ptr() as *const c_char,
+            &mut (*ent).genericValue4,
+        );
 
-        G_SpawnInt(ctx, b"teamnotouch\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).genericValue6);
-        G_SpawnInt(ctx, b"teamnocomplete\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).genericValue7);
+        G_SpawnInt(
+            ctx,
+            b"teamnotouch\0".as_ptr() as *const c_char,
+            b"0\0".as_ptr() as *const c_char,
+            &mut (*ent).genericValue6,
+        );
+        G_SpawnInt(
+            ctx,
+            b"teamnocomplete\0".as_ptr() as *const c_char,
+            b"0\0".as_ptr() as *const c_char,
+            &mut (*ent).genericValue7,
+        );
 
         // Get default physics values.
-        G_SpawnFloat(ctx, b"mass\0".as_ptr() as *const c_char, b"0.09\0".as_ptr() as *const c_char, &mut (*ent).mass);
-        G_SpawnFloat(ctx, b"gravity\0".as_ptr() as *const c_char, b"3.0\0".as_ptr() as *const c_char, &mut (*ent).radius);
-        G_SpawnFloat(ctx, b"bounce\0".as_ptr() as *const c_char, b"1.3\0".as_ptr() as *const c_char, &mut (*ent).random);
+        G_SpawnFloat(
+            ctx,
+            b"mass\0".as_ptr() as *const c_char,
+            b"0.09\0".as_ptr() as *const c_char,
+            &mut (*ent).mass,
+        );
+        G_SpawnFloat(
+            ctx,
+            b"gravity\0".as_ptr() as *const c_char,
+            b"3.0\0".as_ptr() as *const c_char,
+            &mut (*ent).radius,
+        );
+        G_SpawnFloat(
+            ctx,
+            b"bounce\0".as_ptr() as *const c_char,
+            b"1.3\0".as_ptr() as *const c_char,
+            &mut (*ent).random,
+        );
 
-        G_SpawnString(ctx, b"pickupsound\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s);
+        G_SpawnString(
+            ctx,
+            b"pickupsound\0".as_ptr() as *const c_char,
+            b"\0".as_ptr() as *const c_char,
+            &mut s,
+        );
 
         if !s.is_null() && *s != 0 {
             // We have a pickup sound, so index it now.
             (*ent).noise_index = G_SoundIndex(s as *const c_char);
         }
 
-        G_SpawnString(ctx, b"deathfx\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s);
+        G_SpawnString(
+            ctx,
+            b"deathfx\0".as_ptr() as *const c_char,
+            b"\0".as_ptr() as *const c_char,
+            &mut s,
+        );
 
         if !s.is_null() && *s != 0 {
             // We have a death effect, so index it now.
             (*ent).genericValue3 = G_EffectIndex(s as *const c_char);
         }
 
-        G_SpawnString(ctx, b"respawnfx\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s);
+        G_SpawnString(
+            ctx,
+            b"respawnfx\0".as_ptr() as *const c_char,
+            b"\0".as_ptr() as *const c_char,
+            &mut s,
+        );
 
         if !s.is_null() && *s != 0 {
             // We have a respawn effect, so index it now.
             (*ent).genericValue10 = G_EffectIndex(s as *const c_char);
         }
 
-        G_SpawnString(ctx, b"icon\0".as_ptr() as *const c_char, b"\0".as_ptr() as *const c_char, &mut s);
+        G_SpawnString(
+            ctx,
+            b"icon\0".as_ptr() as *const c_char,
+            b"\0".as_ptr() as *const c_char,
+            &mut s,
+        );
 
         if !s.is_null() && *s != 0 {
             // We have an icon, so index it now. We are reusing the
@@ -2185,7 +2486,12 @@ pub fn SP_misc_siege_item(
 
         // Is the model a ghoul2 model?
         let model_str = core::ffi::CStr::from_ptr((*ent).model).to_bytes();
-        if model_str.len() >= 4 && Q_stricmp(model_str[model_str.len() - 4..].as_ptr() as *const c_char, b".glm\0".as_ptr() as *const c_char) == 0 {
+        if model_str.len() >= 4
+            && Q_stricmp(
+                model_str[model_str.len() - 4..].as_ptr() as *const c_char,
+                b".glm\0".as_ptr() as *const c_char,
+            ) == 0
+        {
             // apparently so.
             (*ent).s.modelGhoul2 = 1;
         }
@@ -2193,8 +2499,18 @@ pub fn SP_misc_siege_item(
         (*ent).s.eType = entityType_t::ET_GENERAL as c_int;
 
         // Set the mins/maxs with default values.
-        G_SpawnVector(ctx, b"mins\0".as_ptr() as *const c_char, b"-16 -16 -24\0".as_ptr() as *const c_char, (*ent).r.mins.as_mut_ptr());
-        G_SpawnVector(ctx, b"maxs\0".as_ptr() as *const c_char, b"16 16 32\0".as_ptr() as *const c_char, (*ent).r.maxs.as_mut_ptr());
+        G_SpawnVector(
+            ctx,
+            b"mins\0".as_ptr() as *const c_char,
+            b"-16 -16 -24\0".as_ptr() as *const c_char,
+            (*ent).r.mins.as_mut_ptr(),
+        );
+        G_SpawnVector(
+            ctx,
+            b"maxs\0".as_ptr() as *const c_char,
+            b"16 16 32\0".as_ptr() as *const c_char,
+            (*ent).r.maxs.as_mut_ptr(),
+        );
 
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*ent).pos1); // store off the initial origin for respawning
         G_SetOrigin(ent, (*ent).s.origin);
@@ -2202,7 +2518,12 @@ pub fn SP_misc_siege_item(
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).r.currentAngles);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*ent).s.apos.trBase);
 
-        G_SpawnInt(ctx, b"forcelimit\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).genericValue15);
+        G_SpawnInt(
+            ctx,
+            b"forcelimit\0".as_ptr() as *const c_char,
+            b"0\0".as_ptr() as *const c_char,
+            &mut (*ent).genericValue15,
+        );
 
         if (*ent).health > 0 {
             // If it has health, it can be killed.
@@ -2212,15 +2533,30 @@ pub fn SP_misc_siege_item(
             (*ent).die = Some(EntDie::SiegeItemDie);
             (*ent).takedamage = qtrue;
 
-            G_SpawnInt(ctx, b"showhealth\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut t);
+            G_SpawnInt(
+                ctx,
+                b"showhealth\0".as_ptr() as *const c_char,
+                b"0\0".as_ptr() as *const c_char,
+                &mut t,
+            );
             if t != 0 {
                 // a non-0 maxhealth value will mean we want to show the
                 // health on the hud
                 (*ent).maxHealth = (*ent).health;
                 G_ScaleNetHealth(ent);
 
-                G_SpawnInt(ctx, b"health_chargeamt\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).genericValue12);
-                G_SpawnInt(ctx, b"health_chargerate\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut (*ent).genericValue13);
+                G_SpawnInt(
+                    ctx,
+                    b"health_chargeamt\0".as_ptr() as *const c_char,
+                    b"0\0".as_ptr() as *const c_char,
+                    &mut (*ent).genericValue12,
+                );
+                G_SpawnInt(
+                    ctx,
+                    b"health_chargerate\0".as_ptr() as *const c_char,
+                    b"0\0".as_ptr() as *const c_char,
+                    &mut (*ent).genericValue13,
+                );
             }
         } else {
             // Otherwise no.
@@ -2236,7 +2572,9 @@ pub fn SP_misc_siege_item(
             (*ent).s.eFlags &= !EF_RADAROBJECT;
         }
 
-        if ((*ent).targetname.is_null() || *(*ent).targetname == 0) || ((*ent).spawnflags & SIEGEITEM_STARTOFFRADAR != 0) {
+        if ((*ent).targetname.is_null() || *(*ent).targetname == 0)
+            || ((*ent).spawnflags & SIEGEITEM_STARTOFFRADAR != 0)
+        {
             if canpickup != 0 || (*ent).takedamage == 0 {
                 // We want to be able to walk into it to pick it up then.
                 (*ent).r.contents = CONTENTS_TRIGGER;
@@ -2273,10 +2611,7 @@ pub fn SP_misc_siege_item(
 /// client's PVS (support guy, etc.).
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1845-1886`
-pub fn G_SiegeClientExData(
-    ctx: GameContext<'_>,
-    msgTarg: *mut gentity_t,
-) {
+pub fn G_SiegeClientExData(ctx: GameContext<'_>, msgTarg: *mut gentity_t) {
     unsafe {
         // PORT-NOTE(unported-const): `MAX_EXDATA_ENTS_TO_SEND` has no ported
         // home yet; referenced verbatim (missing_symbols). `weaponData` is
@@ -2293,7 +2628,8 @@ pub fn G_SiegeClientExData(
                 && !(*ent).client.is_null()
                 && (*msgTarg).s.number != (*ent).s.number
                 && (*ent).s.eType == entityType_t::ET_PLAYER as c_int
-                && (*((*msgTarg).client as *mut gclient_t)).sess.sessionTeam == (*((*ent).client as *mut gclient_t)).sess.sessionTeam
+                && (*((*msgTarg).client as *mut gclient_t)).sess.sessionTeam
+                    == (*((*ent).client as *mut gclient_t)).sess.sessionTeam
                 && trap::InPVS(
                     ctx.engine,
                     mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
@@ -2305,7 +2641,11 @@ pub fn G_SiegeClientExData(
                 // another client in the same pvs, send his jive
                 if count != 0 {
                     // append a separating space if we are not the first in the list
-                    Q_strcat(str_buf.as_mut_ptr(), str_buf.len() as c_int, b" \0".as_ptr() as *const c_char);
+                    Q_strcat(
+                        str_buf.as_mut_ptr(),
+                        str_buf.len() as c_int,
+                        b" \0".as_ptr() as *const c_char,
+                    );
                 } else {
                     // otherwise create the prepended chunk
                     write_cstr_field(&mut str_buf, "sxd ");
@@ -2323,7 +2663,11 @@ pub fn G_SiegeClientExData(
                         (*cl).ps.ammo[weaponData[(*cl).ps.weapon as usize].ammoIndex as usize],
                     ),
                 );
-                Q_strcat(str_buf.as_mut_ptr(), str_buf.len() as c_int, scratch.as_ptr());
+                Q_strcat(
+                    str_buf.as_mut_ptr(),
+                    str_buf.len() as c_int,
+                    scratch.as_ptr(),
+                );
                 count += 1;
             }
             i += 1;

@@ -90,7 +90,12 @@ pub trait BgTraps {
     /// (`G_G2_ADDBOLT` syscall), needed by bg vehicle-loader code (`AttachRidersGeneric`)
     /// that only has `&dyn BgTraps`, not `&Engine`.
     /// Source: `oracle/oracle/codemp/game/g_syscalls.c:1239-1242`
-    fn g2api_add_bolt(&self, ghoul2: *mut c_void, modelIndex: c_int, boneName: *const c_char) -> c_int;
+    fn g2api_add_bolt(
+        &self,
+        ghoul2: *mut c_void,
+        modelIndex: c_int,
+        boneName: *const c_char,
+    ) -> c_int;
 
     /// Raven `strap_G2API_GetBoltMatrix`. Source: `oracle/oracle/codemp/game/g_strap.c:6-10`
     fn g2api_get_bolt_matrix(

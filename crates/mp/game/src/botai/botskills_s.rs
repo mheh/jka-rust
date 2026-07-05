@@ -7,12 +7,12 @@ use core::ffi::c_int;
 /// Type definition source: `oracle/oracle/codemp/game/ai_main.h:137-145`
 #[repr(C)]
 pub struct botskills_t {
-	pub reflex: c_int,
-	pub accuracy: f32,
-	pub turnspeed: f32,
-	pub turnspeed_combat: f32,
-	pub maxturn: f32,
-	pub perfectaim: c_int,
+    pub reflex: c_int,
+    pub accuracy: f32,
+    pub turnspeed: f32,
+    pub turnspeed_combat: f32,
+    pub maxturn: f32,
+    pub perfectaim: c_int,
 }
 
 const _: () = assert!(core::mem::size_of::<botskills_t>() == 24);

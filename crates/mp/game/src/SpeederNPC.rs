@@ -8,8 +8,8 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::g_vehicles::{VEH_MOUNT_THROW_LEFT, VEH_MOUNT_THROW_RIGHT};
+use crate::prelude::*;
 use core::ffi::c_int;
 
 // Vehicle flag constants (from oracle/oracle/codemp/game/bg_vehicles.h)
@@ -129,44 +129,87 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
         // Determine speed increment based on flying status
         if (*pVeh).m_ulFlags & VEH_FLYING != 0 {
-            speedInc = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.acceleration).unwrap_or(0.0)
-                * (*pVeh).m_fTimeModifier * 0.4f32;
+            speedInc = (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.acceleration)
+                .unwrap_or(0.0)
+                * (*pVeh).m_fTimeModifier
+                * 0.4f32;
         } else if crate::veh_dispatch::inhabited(ctx, pVeh) as c_int == 0 {
             // Drifts to a stop
             speedInc = 0.0f32;
         } else {
-            speedInc = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.acceleration).unwrap_or(0.0)
+            speedInc = (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.acceleration)
+                .unwrap_or(0.0)
                 * (*pVeh).m_fTimeModifier;
         }
 
-        speedIdleDec = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.decelIdle).unwrap_or(0.0) * (*pVeh).m_fTimeModifier;
+        speedIdleDec = (*pVeh)
+            .m_pVehicleInfo
+            .as_ref()
+            .map(|vi| vi.decelIdle)
+            .unwrap_or(0.0)
+            * (*pVeh).m_fTimeModifier;
 
         // PORT-NOTE(vtable-access): level.time needed; curTime assignment requires world state
         // Placeholder: curTime = 0; // Would be level.time or pm->cmd.serverTime
         curTime = 0;
 
         // Handle turbo/acceleration
-        if !(*pVeh).m_pPilot.is_null() && ((*pVeh).m_ucmd.buttons & BUTTON_ALT_ATTACK != 0)
-            && (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0.0) != 0.0
+        if !(*pVeh).m_pPilot.is_null()
+            && ((*pVeh).m_ucmd.buttons & BUTTON_ALT_ATTACK != 0)
+            && (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.turboSpeed)
+                .unwrap_or(0.0)
+                != 0.0
         {
             if ((!parentPS.is_null() && (*parentPS).electrifyTime > curTime)
-                || (!pilotPS.is_null() && ((*pilotPS).weapon == WP_MELEE
-                    || ((*pilotPS).weapon == WP_SABER && BG_SabersOff(pilotPS) != 0))))
+                || (!pilotPS.is_null()
+                    && ((*pilotPS).weapon == WP_MELEE
+                        || ((*pilotPS).weapon == WP_SABER && BG_SabersOff(pilotPS) != 0))))
             {
-                if (curTime - (*pVeh).m_iTurboTime) > (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboRecharge).unwrap_or(0) {
-                    (*pVeh).m_iTurboTime = curTime + (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboDuration).unwrap_or(0);
+                if (curTime - (*pVeh).m_iTurboTime)
+                    > (*pVeh)
+                        .m_pVehicleInfo
+                        .as_ref()
+                        .map(|vi| vi.turboRecharge)
+                        .unwrap_or(0)
+                {
+                    (*pVeh).m_iTurboTime = curTime
+                        + (*pVeh)
+                            .m_pVehicleInfo
+                            .as_ref()
+                            .map(|vi| vi.turboDuration)
+                            .unwrap_or(0);
 
-                    if (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.iTurboStartFX).unwrap_or(0) != 0 {
+                    if (*pVeh)
+                        .m_pVehicleInfo
+                        .as_ref()
+                        .map(|vi| vi.iTurboStartFX)
+                        .unwrap_or(0)
+                        != 0
+                    {
                         let mut i: c_int = 0;
                         while (i as usize) < MAX_VEHICLE_EXHAUSTS
-                            && (*pVeh).m_iExhaustTag[i as usize] != -1 {
+                            && (*pVeh).m_iExhaustTag[i as usize] != -1
+                        {
                             // PORT-NOTE(trap-access): G_PlayEffectID requires ctx/trap access
                             i += 1;
                         }
                     }
 
                     if !parentPS.is_null() {
-                        (*parentPS).speed = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0.0) as f32;
+                        (*parentPS).speed = (*pVeh)
+                            .m_pVehicleInfo
+                            .as_ref()
+                            .map(|vi| vi.turboSpeed)
+                            .unwrap_or(0.0) as f32;
                     }
                 }
             }
@@ -190,20 +233,41 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
         // Determine speed max based on turbo
         if curTime < (*pVeh).m_iTurboTime {
-            speedMax = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turboSpeed).unwrap_or(0.0) as f32;
+            speedMax = (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.turboSpeed)
+                .unwrap_or(0.0) as f32;
             if !parentPS.is_null() {
                 (*parentPS).eFlags |= EF_JETPACK_ACTIVE;
             }
         } else {
-            speedMax = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(0.0) as f32;
+            speedMax = (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.speedMax)
+                .unwrap_or(0.0) as f32;
             if !parentPS.is_null() {
                 (*parentPS).eFlags &= !EF_JETPACK_ACTIVE;
             }
         }
 
-        speedIdle = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedIdle).unwrap_or(0.0) as f32;
-        speedIdleAccel = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.accelIdle).unwrap_or(0.0) * (*pVeh).m_fTimeModifier;
-        speedMin = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMin).unwrap_or(0.0) as f32;
+        speedIdle = (*pVeh)
+            .m_pVehicleInfo
+            .as_ref()
+            .map(|vi| vi.speedIdle)
+            .unwrap_or(0.0) as f32;
+        speedIdleAccel = (*pVeh)
+            .m_pVehicleInfo
+            .as_ref()
+            .map(|vi| vi.accelIdle)
+            .unwrap_or(0.0)
+            * (*pVeh).m_fTimeModifier;
+        speedMin = (*pVeh)
+            .m_pVehicleInfo
+            .as_ref()
+            .map(|vi| vi.speedMin)
+            .unwrap_or(0.0) as f32;
 
         // Handle forward/backward movement
         if (!parentPS.is_null() && (*parentPS).speed != 0.0f32)
@@ -276,13 +340,23 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
         if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
             let mut s: f32 = (*parentPS).speed;
-            let maxDif: f32 = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turningSpeed).unwrap_or(0.0) as f32 * 4.0f32;
+            let maxDif: f32 = (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.turningSpeed)
+                .unwrap_or(0.0) as f32
+                * 4.0f32;
 
             if s < 0.0f32 {
                 s = -s;
             }
 
-            angDif *= s / (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(1.0);
+            angDif *= s
+                / (*pVeh)
+                    .m_pVehicleInfo
+                    .as_ref()
+                    .map(|vi| vi.speedMax)
+                    .unwrap_or(1.0);
 
             if angDif > maxDif {
                 angDif = maxDif;
@@ -291,8 +365,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             }
 
             *(*pVeh).m_vOrientation.add(YAW) = AngleNormalize180(
-                *(*pVeh).m_vOrientation.add(YAW)
-                    - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
+                *(*pVeh).m_vOrientation.add(YAW) - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
             );
 
             // PORT-NOTE(vtable-access): pm->cmd.serverTime access requires bg-channel state;
@@ -367,7 +440,8 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             // per-call context from `ctx` (the `BG_ParseAnimationFile` game-tier
             // wrapper precedent; `BG_SetAnimFinal` null-guards the missing `pm`).
             let ps = (*(*pVeh).m_pPilot).playerState;
-            let anims = (*ctx.world).bg_state.bgAllAnims[(*(*pVeh).m_pPilot).localAnimIndex as usize].anims;
+            let anims =
+                (*ctx.world).bg_state.bgAllAnims[(*(*pVeh).m_pPilot).localAnimIndex as usize].anims;
             let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
             let mut callbacks = crate::bg_channel::GameCallbacksImpl {
                 world: ctx.world,
@@ -395,11 +469,7 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// The `_JK2MP` build uses `G_AllocateVehicleObject` on the game side (QAGAME branch);
 /// the cgame branch would use `BG_Alloc` (dead code here, dropped).
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:1092-1113`
-pub fn G_CreateSpeederNPC(
-    ctx: GameContext<'_>,
-    pVeh: *mut *mut Vehicle_t,
-    strType: *const c_char,
-) {
+pub fn G_CreateSpeederNPC(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t, strType: *const c_char) {
     unsafe {
         // Allocate the Vehicle object
         // QAGAME branch (_JK2MP with QAGAME compile flag)

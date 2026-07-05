@@ -24,9 +24,9 @@ use crate::g_combat::{G_Damage, G_RadiusDamage};
 use crate::g_main::{Com_Printf, G_Error, G_Printf};
 use crate::g_misc::TeleportPlayer;
 use crate::g_utils::{
-    G_AddEvent, G_EffectIndex, G_Find, G_FreeEntity, G_ModelIndex, G_PlayEffectID,
+    vtos, G_AddEvent, G_EffectIndex, G_Find, G_FreeEntity, G_ModelIndex, G_PlayEffectID,
     G_ScaleNetHealth, G_SetAngles, G_SetMovedir, G_SetOrigin, G_SoundIndex, G_SoundSetIndex,
-    G_Spawn, G_TempEntity, G_UseTargets, G_UseTargets2, GlobalUse, vtos,
+    G_Spawn, G_TempEntity, G_UseTargets, G_UseTargets2, GlobalUse,
 };
 use crate::q_math::AngleVectors;
 use crate::NPC_utils::G_ActivateBehavior;
@@ -99,10 +99,7 @@ pub const BMS_END: c_int = 2;
 /// Raven `G_PlayDoorLoopSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:45-60`
-pub fn G_PlayDoorLoopSound(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn G_PlayDoorLoopSound(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ent).soundSet.is_null() || *(*ent).soundSet == 0 {
             return;
@@ -117,11 +114,7 @@ pub fn G_PlayDoorLoopSound(
 /// Raven `G_PlayDoorSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:68-78`
-pub fn G_PlayDoorSound(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    r#type: c_int,
-) {
+pub fn G_PlayDoorSound(ctx: GameContext<'_>, ent: *mut gentity_t, r#type: c_int) {
     unsafe {
         if (*ent).soundSet.is_null() || *(*ent).soundSet == 0 {
             return;
@@ -136,10 +129,7 @@ pub fn G_PlayDoorSound(
 /// Raven `G_TestEntityPosition`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:86-111`
-pub fn G_TestEntityPosition(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> *mut gentity_t {
+pub fn G_TestEntityPosition(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t {
     unsafe {
         let mask = if (*ent).clipmask != 0 {
             (*ent).clipmask
@@ -196,10 +186,7 @@ pub fn G_TestEntityPosition(
 /// as a 3-row array via pointer arithmetic (same convention as
 /// `G_TransposeMatrix` in this file).
 /// Source: `oracle/oracle/codemp/game/g_mover.c:118-121`
-pub fn G_CreateRotationMatrix(
-    angles: vec3_t,
-    matrix: *mut vec3_t,
-) {
+pub fn G_CreateRotationMatrix(angles: vec3_t, matrix: *mut vec3_t) {
     unsafe {
         AngleVectors(
             angles,
@@ -221,10 +208,7 @@ pub fn G_CreateRotationMatrix(
 /// decay to a `vec3_t *` at the call boundary, so the raw pointer here is
 /// walked as a 3-row array via pointer arithmetic.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:128-135`
-pub fn G_TransposeMatrix(
-    matrix: *mut vec3_t,
-    transpose: *mut vec3_t,
-) {
+pub fn G_TransposeMatrix(matrix: *mut vec3_t, transpose: *mut vec3_t) {
     unsafe {
         for i in 0..3usize {
             for j in 0..3usize {
@@ -241,15 +225,18 @@ pub fn G_TransposeMatrix(
 /// Raven `G_RotatePoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:142-149`
-pub fn G_RotatePoint(
-    point: &mut vec3_t,
-    matrix: *mut vec3_t,
-) {
+pub fn G_RotatePoint(point: &mut vec3_t, matrix: *mut vec3_t) {
     unsafe {
         let tvec = *point;
-        point[0] = (*matrix.add(0))[0] * tvec[0] + (*matrix.add(0))[1] * tvec[1] + (*matrix.add(0))[2] * tvec[2];
-        point[1] = (*matrix.add(1))[0] * tvec[0] + (*matrix.add(1))[1] * tvec[1] + (*matrix.add(1))[2] * tvec[2];
-        point[2] = (*matrix.add(2))[0] * tvec[0] + (*matrix.add(2))[1] * tvec[1] + (*matrix.add(2))[2] * tvec[2];
+        point[0] = (*matrix.add(0))[0] * tvec[0]
+            + (*matrix.add(0))[1] * tvec[1]
+            + (*matrix.add(0))[2] * tvec[2];
+        point[1] = (*matrix.add(1))[0] * tvec[0]
+            + (*matrix.add(1))[1] * tvec[1]
+            + (*matrix.add(1))[2] * tvec[2];
+        point[2] = (*matrix.add(2))[0] * tvec[0]
+            + (*matrix.add(2))[1] * tvec[1]
+            + (*matrix.add(2))[2] * tvec[2];
     }
 }
 
@@ -479,7 +466,8 @@ pub fn G_MoverPush(
 
         // see if any solid entities are inside the final position
         for e in 0..listed_entities {
-            let check = &mut (*ctx.world).g_entities[entity_list[e as usize] as usize] as *mut gentity_t;
+            let check =
+                &mut (*ctx.world).g_entities[entity_list[e as usize] as usize] as *mut gentity_t;
 
             // only push items and players
             if (*check).s.eType != entityType_t::ET_PLAYER as c_int
@@ -514,7 +502,10 @@ pub fn G_MoverPush(
                 continue;
             }
 
-            if (*pusher).damage != 0 && !(*check).client.is_null() && ((*pusher).spawnflags & 32) != 0 {
+            if (*pusher).damage != 0
+                && !(*check).client.is_null()
+                && ((*pusher).spawnflags & 32) != 0
+            {
                 G_Damage(
                     ctx,
                     check,
@@ -550,7 +541,9 @@ pub fn G_MoverPush(
             // the move was blocked an entity
 
             // bobbing entities are instant-kill and never get blocked
-            if (*pusher).s.pos.trType == trType_t::TR_SINE || (*pusher).s.apos.trType == trType_t::TR_SINE {
+            if (*pusher).s.pos.trType == trType_t::TR_SINE
+                || (*pusher).s.apos.trType == trType_t::TR_SINE
+            {
                 G_Damage(
                     ctx,
                     check,
@@ -599,10 +592,7 @@ pub fn G_MoverPush(
 /// Raven `G_MoverTeam`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:416-471`
-pub fn G_MoverTeam(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn G_MoverTeam(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut obstacle: *mut gentity_t = core::ptr::null_mut();
 
@@ -617,8 +607,16 @@ pub fn G_MoverTeam(
             let mut origin: vec3_t = [0.0; 3];
             let mut angles: vec3_t = [0.0; 3];
             let time = (*ctx.world).level.time;
-            crate::bg_misc::BG_EvaluateTrajectory(&(*part).s.pos as *const trajectory_t, time, &mut origin);
-            crate::bg_misc::BG_EvaluateTrajectory(&(*part).s.apos as *const trajectory_t, time, &mut angles);
+            crate::bg_misc::BG_EvaluateTrajectory(
+                &(*part).s.pos as *const trajectory_t,
+                time,
+                &mut origin,
+            );
+            crate::bg_misc::BG_EvaluateTrajectory(
+                &(*part).s.apos as *const trajectory_t,
+                time,
+                &mut angles,
+            );
             let r#move = [
                 origin[0] - (*part).r.currentOrigin[0],
                 origin[1] - (*part).r.currentOrigin[1],
@@ -631,7 +629,14 @@ pub fn G_MoverTeam(
             ];
             if r#move != [0.0, 0.0, 0.0] || amove != [0.0, 0.0, 0.0] {
                 // actually moved
-                if G_MoverPush(ctx, part, r#move, amove, &mut obstacle as *mut *mut gentity_t) == 0 {
+                if G_MoverPush(
+                    ctx,
+                    part,
+                    r#move,
+                    amove,
+                    &mut obstacle as *mut *mut gentity_t,
+                ) == 0
+                {
                     break; // move was blocked
                 }
             }
@@ -648,8 +653,16 @@ pub fn G_MoverTeam(
                 let time = (*ctx.world).level.time;
                 let mut cur_origin = (*p).r.currentOrigin;
                 let mut cur_angles = (*p).r.currentAngles;
-                crate::bg_misc::BG_EvaluateTrajectory(&(*p).s.pos as *const trajectory_t, time, &mut cur_origin);
-                crate::bg_misc::BG_EvaluateTrajectory(&(*p).s.apos as *const trajectory_t, time, &mut cur_angles);
+                crate::bg_misc::BG_EvaluateTrajectory(
+                    &(*p).s.pos as *const trajectory_t,
+                    time,
+                    &mut cur_origin,
+                );
+                crate::bg_misc::BG_EvaluateTrajectory(
+                    &(*p).s.apos as *const trajectory_t,
+                    time,
+                    &mut cur_angles,
+                );
                 (*p).r.currentOrigin = cur_origin;
                 (*p).r.currentAngles = cur_angles;
                 trap::LinkEntity(ctx.engine, GLinkentityArgs::new(p));
@@ -667,7 +680,9 @@ pub fn G_MoverTeam(
         let mut p = ent;
         while !p.is_null() {
             // call the reached function if time is at or past end point
-            if (*p).s.pos.trType == trType_t::TR_LINEAR_STOP || (*p).s.pos.trType == trType_t::TR_NONLINEAR_STOP {
+            if (*p).s.pos.trType == trType_t::TR_LINEAR_STOP
+                || (*p).s.pos.trType == trType_t::TR_NONLINEAR_STOP
+            {
                 if (*ctx.world).level.time >= (*p).s.pos.trTime + (*p).s.pos.trDuration {
                     if let Some(reached) = (*p).reached {
                         crate::ent_fn_enums::dispatch_reached(ctx, reached, p);
@@ -682,10 +697,7 @@ pub fn G_MoverTeam(
 /// Raven `G_RunMover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:479-493`
-pub fn G_RunMover(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn G_RunMover(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // if not a team captain, don't do anything, because the captain
         // will handle everything
@@ -694,7 +706,9 @@ pub fn G_RunMover(
         }
 
         // if stationary at one of the positions, don't move anything
-        if (*ent).s.pos.trType != trType_t::TR_STATIONARY || (*ent).s.apos.trType != trType_t::TR_STATIONARY {
+        if (*ent).s.pos.trType != trType_t::TR_STATIONARY
+            || (*ent).s.apos.trType != trType_t::TR_STATIONARY
+        {
             G_MoverTeam(ctx, ent);
         }
 
@@ -709,11 +723,7 @@ pub fn G_RunMover(
 /// Raven `CalcTeamDoorCenter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:511-528`
-pub fn CalcTeamDoorCenter(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    center: &mut vec3_t,
-) {
+pub fn CalcTeamDoorCenter(ctx: GameContext<'_>, ent: *mut gentity_t, center: &mut vec3_t) {
     unsafe {
         // start with our own center
         for i in 0..3 {
@@ -797,7 +807,11 @@ pub fn SetMoverState(
         }
         let time = (*ctx.world).level.time;
         let mut cur_origin = (*ent).r.currentOrigin;
-        crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos as *const trajectory_t, time, &mut cur_origin);
+        crate::bg_misc::BG_EvaluateTrajectory(
+            &(*ent).s.pos as *const trajectory_t,
+            time,
+            &mut cur_origin,
+        );
         (*ent).r.currentOrigin = cur_origin;
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
@@ -808,17 +822,13 @@ pub fn SetMoverState(
 /// All entities in a mover team move from pos1 to pos2 in the same amount
 /// of time.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:600-606`
-pub fn MatchTeam(
-    ctx: GameContext<'_>,
-    teamLeader: *mut gentity_t,
-    moverState: c_int,
-    time: c_int,
-) {
+pub fn MatchTeam(ctx: GameContext<'_>, teamLeader: *mut gentity_t, moverState: c_int, time: c_int) {
     unsafe {
         let mut slave = teamLeader;
         while !slave.is_null() {
             SetMoverState(ctx, slave, moverState as moverState_t, time);
-            slave = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*slave).teamchain);
+            slave =
+                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*slave).teamchain);
         }
     }
 }
@@ -826,10 +836,7 @@ pub fn MatchTeam(
 /// Raven `ReturnToPos1`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:615-625`
-pub fn ReturnToPos1(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn ReturnToPos1(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).think = None;
         (*ent).nextthink = 0;
@@ -846,10 +853,7 @@ pub fn ReturnToPos1(
 /// Raven `Reached_BinaryMover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:634-702`
-pub fn Reached_BinaryMover(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Reached_BinaryMover(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // stop the looping sound
         (*ent).s.loopSound = 0;
@@ -883,7 +887,12 @@ pub fn Reached_BinaryMover(
             if (*ent).activator.is_none() {
                 (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
             }
-            G_UseTargets2(ctx, ent, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator), (*ent).opentarget);
+            G_UseTargets2(
+                ctx,
+                ent,
+                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator),
+                (*ent).opentarget,
+            );
         } else if (*ent).moverState == MOVER_2TO1 {
             // closed
             let mut doorcenter: vec3_t = [0.0; 3];
@@ -893,10 +902,21 @@ pub fn Reached_BinaryMover(
             G_PlayDoorSound(ctx, ent, BMS_END);
 
             // close areaportals
-            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster) == ent || (*ent).teammaster.is_none() {
-                trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qfalse));
+            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster)
+                == ent
+                || (*ent).teammaster.is_none()
+            {
+                trap::AdjustAreaPortalState(
+                    ctx.engine,
+                    GAdjustAreaPortalStateArgs::new(ent, qfalse),
+                );
             }
-            G_UseTargets2(ctx, ent, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator), (*ent).closetarget);
+            G_UseTargets2(
+                ctx,
+                ent,
+                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator),
+                (*ent).closetarget,
+            );
         } else {
             G_Error(ctx, c"Reached_BinaryMover: bad moverState".as_ptr());
         }
@@ -906,10 +926,7 @@ pub fn Reached_BinaryMover(
 /// Raven `Use_BinaryMover_Go`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:710-828`
-pub fn Use_BinaryMover_Go(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let activator = (*ent).activator;
         (*ent).activator = activator;
@@ -928,10 +945,20 @@ pub fn Use_BinaryMover_Go(
             (*ent).s.time = (*ctx.world).level.time;
 
             // open areaportal
-            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster) == ent || (*ent).teammaster.is_none() {
-                trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qtrue));
+            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster)
+                == ent
+                || (*ent).teammaster.is_none()
+            {
+                trap::AdjustAreaPortalState(
+                    ctx.engine,
+                    GAdjustAreaPortalStateArgs::new(ent, qtrue),
+                );
             }
-            G_UseTargets(ctx, ent, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator));
+            G_UseTargets(
+                ctx,
+                ent,
+                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator),
+            );
             return;
         }
 
@@ -945,7 +972,12 @@ pub fn Use_BinaryMover_Go(
             } else {
                 (*ent).nextthink = (*ctx.world).level.time + (*ent).wait as c_int;
             }
-            G_UseTargets2(ctx, ent, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator), (*ent).target2);
+            G_UseTargets2(
+                ctx,
+                ent,
+                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).activator),
+                (*ent).target2,
+            );
             return;
         }
 
@@ -1023,9 +1055,7 @@ pub fn Use_BinaryMover_Go(
 /// const pointee) — the fields are still mutated, so the cast to `*mut` here
 /// just recovers writability, not a behavior change.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:830-845`
-pub fn UnLockDoors(
-    ent: *const gentity_t,
-) {
+pub fn UnLockDoors(ent: *const gentity_t) {
     unsafe {
         let mut slave = ent as *mut gentity_t;
         loop {
@@ -1035,7 +1065,10 @@ pub fn UnLockDoors(
             }
             (*slave).spawnflags &= !MOVER_LOCKED;
             (*slave).s.frame = 1; // second stage of anim
-            slave = crate::ent_id::resolve(slave.offset(-((*slave).s.number as isize)), (*slave).teamchain);
+            slave = crate::ent_id::resolve(
+                slave.offset(-((*slave).s.number as isize)),
+                (*slave).teamchain,
+            );
             if slave.is_null() {
                 break;
             }
@@ -1047,15 +1080,16 @@ pub fn UnLockDoors(
 ///
 /// Go through and lock the door and all the slaves.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:846-857`
-pub fn LockDoors(
-    ent: *const gentity_t,
-) {
+pub fn LockDoors(ent: *const gentity_t) {
     unsafe {
         let mut slave = ent as *mut gentity_t;
         loop {
             (*slave).spawnflags |= MOVER_LOCKED;
             (*slave).s.frame = 0; // first stage of anim
-            slave = crate::ent_id::resolve(slave.offset(-((*slave).s.number as isize)), (*slave).teamchain);
+            slave = crate::ent_id::resolve(
+                slave.offset(-((*slave).s.number as isize)),
+                (*slave).teamchain,
+            );
             if slave.is_null() {
                 break;
             }
@@ -1080,7 +1114,12 @@ pub fn Use_BinaryMover(
 
         // only the master should be used
         if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
-            Use_BinaryMover(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster), other, activator);
+            Use_BinaryMover(
+                ctx,
+                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster),
+                other,
+                activator,
+            );
             return;
         }
 
@@ -1112,9 +1151,7 @@ pub fn Use_BinaryMover(
 /// "pos1", "pos2", and "speed" should be set before calling, so the
 /// movement delta can be calculated.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:913-934`
-pub fn InitMoverTrData(
-    ent: *mut gentity_t,
-) {
+pub fn InitMoverTrData(ent: *mut gentity_t) {
     unsafe {
         (*ent).s.pos.trType = trType_t::TR_STATIONARY;
         (*ent).s.pos.trBase = (*ent).pos1;
@@ -1140,10 +1177,7 @@ pub fn InitMoverTrData(
 /// Raven `InitMover`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:936-999`
-pub fn InitMover(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn InitMover(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // if the "model2" key is set, use a seperate model
         // for drawing, but clip against the brushes
@@ -1163,9 +1197,18 @@ pub fn InitMover(
         // if the "color" or "light" keys are set, setup constantLight
         let mut light = 0.0f32;
         let mut color: vec3_t = [0.0; 3];
-        let light_set = G_SpawnFloat(ctx, c"light".as_ptr(), c"100".as_ptr(), &mut light as *mut f32);
-        let color_set =
-            G_SpawnVector(ctx, c"color".as_ptr(), c"1 1 1".as_ptr(), color.as_mut_ptr());
+        let light_set = G_SpawnFloat(
+            ctx,
+            c"light".as_ptr(),
+            c"100".as_ptr(),
+            &mut light as *mut f32,
+        );
+        let color_set = G_SpawnVector(
+            ctx,
+            c"color".as_ptr(),
+            c"1 1 1".as_ptr(),
+            color.as_mut_ptr(),
+        );
         if light_set != 0 || color_set != 0 {
             let mut r = (color[0] * 255.0) as c_int;
             if r > 255 {
@@ -1210,11 +1253,7 @@ pub fn InitMover(
 /// Raven `Blocked_Door`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1018-1029`
-pub fn Blocked_Door(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-) {
+pub fn Blocked_Door(ctx: GameContext<'_>, ent: *mut gentity_t, other: *mut gentity_t) {
     unsafe {
         if (*ent).damage != 0 {
             // Resolved `G_Damage` takes `dir`/`point` by value (Raven passes
@@ -1295,7 +1334,11 @@ pub fn Touch_DoorTriggerSpectator(
             ),
         );
 
-        if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction == 1.0f32 && tr.entityNum as c_int == ENTITYNUM_NONE {
+        if tr.startsolid == 0
+            && tr.allsolid == 0
+            && tr.fraction == 1.0f32
+            && tr.entityNum as c_int == ENTITYNUM_NONE
+        {
             TeleportPlayer(ctx, other, origin, angles);
         }
     }
@@ -1327,7 +1370,8 @@ pub fn Touch_DoorTrigger(
             return;
         }
 
-        if (*ent).genericValue14 == 0 && ((*ent).parent.is_none() || (*parent).genericValue14 == 0) {
+        if (*ent).genericValue14 == 0 && ((*ent).parent.is_none() || (*parent).genericValue14 == 0)
+        {
             if !(*other).client.is_null()
                 && (*other).s.number >= MAX_CLIENTS as c_int
                 && (*other).s.eType == entityType_t::ET_NPC as c_int
@@ -1366,7 +1410,8 @@ pub fn Touch_DoorTrigger(
                         None => core::ptr::null_mut(),
                     };
                 } else {
-                    relock_ent = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent);
+                    relock_ent =
+                        crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent);
                 }
                 if !relock_ent.is_null() {
                     (*relock_ent).spawnflags &= !MOVER_LOCKED;
@@ -1376,7 +1421,12 @@ pub fn Touch_DoorTrigger(
 
         if (*parent).moverState != MOVER_1TO2 {
             // door is not already opening — if closed, opening or open, check this
-            Use_BinaryMover(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent), ent, other);
+            Use_BinaryMover(
+                ctx,
+                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent),
+                ent,
+                other,
+            );
         }
         if !relock_ent.is_null() {
             // re-lock us
@@ -1390,17 +1440,17 @@ pub fn Touch_DoorTrigger(
 /// All of the parts of a door have been spawned, so create a trigger that
 /// encloses all of them.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1168-1215`
-pub fn Think_SpawnNewDoorTrigger(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Think_SpawnNewDoorTrigger(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // set all of the slaves as shootable
         if (*ent).takedamage != 0 {
             let mut other = ent;
             while !other.is_null() {
                 (*other).takedamage = qtrue;
-                other = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*other).teamchain);
+                other = crate::ent_id::resolve(
+                    (*ctx.world).g_entities.as_mut_ptr(),
+                    (*other).teamchain,
+                );
             }
         }
 
@@ -1450,10 +1500,7 @@ pub fn Think_SpawnNewDoorTrigger(
 /// Raven `Think_MatchTeam`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1217-1220`
-pub fn Think_MatchTeam(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Think_MatchTeam(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         MatchTeam(ctx, ent, (*ent).moverState, (*ctx.world).level.time);
     }
@@ -1462,10 +1509,7 @@ pub fn Think_MatchTeam(
 /// Raven `G_EntIsDoor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1222-1237`
-pub fn G_EntIsDoor(
-    ctx: GameContext<'_>,
-    entityNum: c_int,
-) -> qboolean {
+pub fn G_EntIsDoor(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
     unsafe {
         if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
             return qfalse;
@@ -1483,23 +1527,30 @@ pub fn G_EntIsDoor(
 /// Raven `G_FindDoorTrigger`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1239-1280`
-pub fn G_FindDoorTrigger(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> *mut gentity_t {
+pub fn G_FindDoorTrigger(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t {
     unsafe {
         let mut owner: *mut gentity_t = core::ptr::null_mut();
         let mut door = ent;
         if (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
             // not the master door, get the master door
-            while !(*door).teammaster.is_none() && (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
-                door = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*door).teammaster);
+            while !(*door).teammaster.is_none()
+                && (*door).flags & crate::entity::flags::FL_TEAMSLAVE != 0
+            {
+                door = crate::ent_id::resolve(
+                    (*ctx.world).g_entities.as_mut_ptr(),
+                    (*door).teammaster,
+                );
             }
         }
         if !(*door).targetname.is_null() {
             // find out what is targeting it
             loop {
-                owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, target) as c_int, (*door).targetname);
+                owner = G_Find(
+                    ctx,
+                    owner,
+                    core::mem::offset_of!(gentity_t, target) as c_int,
+                    (*door).targetname,
+                );
                 if owner.is_null() {
                     break;
                 }
@@ -1509,7 +1560,12 @@ pub fn G_FindDoorTrigger(
             }
             owner = core::ptr::null_mut();
             loop {
-                owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, target2) as c_int, (*door).targetname);
+                owner = G_Find(
+                    ctx,
+                    owner,
+                    core::mem::offset_of!(gentity_t, target2) as c_int,
+                    (*door).targetname,
+                );
                 if owner.is_null() {
                     break;
                 }
@@ -1521,11 +1577,17 @@ pub fn G_FindDoorTrigger(
 
         owner = core::ptr::null_mut();
         loop {
-            owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, classname) as c_int, c"trigger_door".as_ptr());
+            owner = G_Find(
+                ctx,
+                owner,
+                core::mem::offset_of!(gentity_t, classname) as c_int,
+                c"trigger_door".as_ptr(),
+            );
             if owner.is_null() {
                 break;
             }
-            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*owner).parent) == door {
+            if crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*owner).parent) == door
+            {
                 return owner;
             }
         }
@@ -1537,10 +1599,7 @@ pub fn G_FindDoorTrigger(
 /// Raven `G_EntIsUnlockedDoor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1282-1346`
-pub fn G_EntIsUnlockedDoor(
-    ctx: GameContext<'_>,
-    entityNum: c_int,
-) -> qboolean {
+pub fn G_EntIsUnlockedDoor(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
     unsafe {
         if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
             return qfalse;
@@ -1551,19 +1610,30 @@ pub fn G_EntIsUnlockedDoor(
             let mut owner: *mut gentity_t;
             if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
                 // not the master door, get the master door
-                while !(*ent).teammaster.is_none() && (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
-                    ent = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).teammaster);
+                while !(*ent).teammaster.is_none()
+                    && (*ent).flags & crate::entity::flags::FL_TEAMSLAVE != 0
+                {
+                    ent = crate::ent_id::resolve(
+                        (*ctx.world).g_entities.as_mut_ptr(),
+                        (*ent).teammaster,
+                    );
                 }
             }
             if !(*ent).targetname.is_null() {
                 // find out what is targeting it
                 owner = core::ptr::null_mut();
                 loop {
-                    owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, target) as c_int, (*ent).targetname);
+                    owner = G_Find(
+                        ctx,
+                        owner,
+                        core::mem::offset_of!(gentity_t, target) as c_int,
+                        (*ent).targetname,
+                    );
                     if owner.is_null() {
                         break;
                     }
-                    if crate::q_shared::Q_stricmp((*owner).classname, c"trigger_multiple".as_ptr()) == 0
+                    if crate::q_shared::Q_stricmp((*owner).classname, c"trigger_multiple".as_ptr())
+                        == 0
                         && (*owner).flags & crate::entity::flags::FL_INACTIVE == 0
                     {
                         return qtrue;
@@ -1571,11 +1641,17 @@ pub fn G_EntIsUnlockedDoor(
                 }
                 owner = core::ptr::null_mut();
                 loop {
-                    owner = G_Find(ctx, owner, core::mem::offset_of!(gentity_t, target2) as c_int, (*ent).targetname);
+                    owner = G_Find(
+                        ctx,
+                        owner,
+                        core::mem::offset_of!(gentity_t, target2) as c_int,
+                        (*ent).targetname,
+                    );
                     if owner.is_null() {
                         break;
                     }
-                    if crate::q_shared::Q_stricmp((*owner).classname, c"trigger_multiple".as_ptr()) == 0
+                    if crate::q_shared::Q_stricmp((*owner).classname, c"trigger_multiple".as_ptr())
+                        == 0
                         && (*owner).flags & crate::entity::flags::FL_INACTIVE == 0
                     {
                         return qtrue;
@@ -1606,12 +1682,14 @@ pub fn G_EntIsUnlockedDoor(
 /// Raven `SP_func_door`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1380-1472`
-pub fn SP_func_door(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_func_door(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        G_SpawnInt(ctx, c"vehopen".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue14 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"vehopen".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue14 as *mut c_int,
+        );
 
         (*ent).blocked = Some(EntBlocked::Blocked_Door);
 
@@ -1633,12 +1711,22 @@ pub fn SP_func_door(
         G_SpawnFloat(ctx, c"lip".as_ptr(), c"8".as_ptr(), &mut lip as *mut f32);
 
         // default damage of 2 points
-        G_SpawnInt(ctx, c"dmg".as_ptr(), c"2".as_ptr(), &mut (*ent).damage as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"dmg".as_ptr(),
+            c"2".as_ptr(),
+            &mut (*ent).damage as *mut c_int,
+        );
         if (*ent).damage < 0 {
             (*ent).damage = 0;
         }
 
-        G_SpawnInt(ctx, c"teamallow".as_ptr(), c"0".as_ptr(), &mut (*ent).alliedTeam as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"teamallow".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).alliedTeam as *mut c_int,
+        );
 
         // first position at start
         (*ent).pos1 = (*ent).s.origin;
@@ -1659,7 +1747,8 @@ pub fn SP_func_door(
             (*ent).r.maxs[1] - (*ent).r.mins[1],
             (*ent).r.maxs[2] - (*ent).r.mins[2],
         ];
-        let distance = (abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2]) - lip;
+        let distance =
+            (abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2]) - lip;
         for i in 0..3 {
             (*ent).pos2[i] = (*ent).pos1[i] + distance * (*ent).movedir[i];
         }
@@ -1685,14 +1774,22 @@ pub fn SP_func_door(
 
         if (*ent).flags & crate::entity::flags::FL_TEAMSLAVE == 0 {
             let mut health = 0;
-            G_SpawnInt(ctx, c"health".as_ptr(), c"0".as_ptr(), &mut health as *mut c_int);
+            G_SpawnInt(
+                ctx,
+                c"health".as_ptr(),
+                c"0".as_ptr(),
+                &mut health as *mut c_int,
+            );
 
             if health != 0 {
                 (*ent).takedamage = qtrue;
             }
 
             if (*ent).spawnflags & MOVER_LOCKED == 0
-                && (!(*ent).targetname.is_null() || health != 0 || (*ent).spawnflags & MOVER_PLAYER_USE != 0 || (*ent).spawnflags & MOVER_FORCE_ACTIVATE != 0)
+                && (!(*ent).targetname.is_null()
+                    || health != 0
+                    || (*ent).spawnflags & MOVER_PLAYER_USE != 0
+                    || (*ent).spawnflags & MOVER_FORCE_ACTIVATE != 0)
             {
                 // non touch/shoot doors
                 (*ent).think = Some(EntThink::Think_MatchTeam);
@@ -1720,7 +1817,10 @@ pub fn Touch_Plat(
     trace: *mut trace_t,
 ) {
     unsafe {
-        if (*other).client.is_null() || (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HEALTH as usize] <= 0 {
+        if (*other).client.is_null()
+            || (*((*other).client as *mut gclient_t)).ps.stats[statIndex_t::STAT_HEALTH as usize]
+                <= 0
+        {
             return;
         }
 
@@ -1751,7 +1851,12 @@ pub fn Touch_PlatCenterTrigger(
             None => core::ptr::null_mut(),
         };
         if (*parent).moverState == MOVER_POS1 {
-            Use_BinaryMover(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent), ent, other);
+            Use_BinaryMover(
+                ctx,
+                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent),
+                ent,
+                other,
+            );
         }
     }
 }
@@ -1762,10 +1867,7 @@ pub fn Touch_PlatCenterTrigger(
 /// require that the trigger extend through the entire low position, not
 /// just sit on top of it.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1527-1559`
-pub fn SpawnPlatTrigger(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SpawnPlatTrigger(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // the middle trigger will be a thin trigger just above the starting
         // position
@@ -1803,16 +1905,28 @@ pub fn SpawnPlatTrigger(
 /// Raven `SP_func_plat`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1576-1617`
-pub fn SP_func_plat(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_func_plat(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).s.angles = [0.0; 3];
 
-        G_SpawnFloat(ctx, c"speed".as_ptr(), c"200".as_ptr(), &mut (*ent).speed as *mut f32);
-        G_SpawnInt(ctx, c"dmg".as_ptr(), c"2".as_ptr(), &mut (*ent).damage as *mut c_int);
-        G_SpawnFloat(ctx, c"wait".as_ptr(), c"1".as_ptr(), &mut (*ent).wait as *mut f32);
+        G_SpawnFloat(
+            ctx,
+            c"speed".as_ptr(),
+            c"200".as_ptr(),
+            &mut (*ent).speed as *mut f32,
+        );
+        G_SpawnInt(
+            ctx,
+            c"dmg".as_ptr(),
+            c"2".as_ptr(),
+            &mut (*ent).damage as *mut c_int,
+        );
+        G_SpawnFloat(
+            ctx,
+            c"wait".as_ptr(),
+            c"1".as_ptr(),
+            &mut (*ent).wait as *mut f32,
+        );
         let mut lip = 0.0f32;
         G_SpawnFloat(ctx, c"lip".as_ptr(), c"8".as_ptr(), &mut lip as *mut f32);
 
@@ -1825,7 +1939,13 @@ pub fn SP_func_plat(
         );
 
         let mut height = 0.0f32;
-        if G_SpawnFloat(ctx, c"height".as_ptr(), c"0".as_ptr(), &mut height as *mut f32) == 0 {
+        if G_SpawnFloat(
+            ctx,
+            c"height".as_ptr(),
+            c"0".as_ptr(),
+            &mut height as *mut f32,
+        ) == 0
+        {
             height = ((*ent).r.maxs[2] - (*ent).r.mins[2]) - lip;
         }
 
@@ -1874,10 +1994,7 @@ pub fn Touch_Button(
 /// Raven `SP_func_button`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1660-1702`
-pub fn SP_func_button(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_func_button(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ent).speed == 0.0 {
             (*ent).speed = 40.0;
@@ -1911,7 +2028,8 @@ pub fn SP_func_button(
             (*ent).r.maxs[1] - (*ent).r.mins[1],
             (*ent).r.maxs[2] - (*ent).r.mins[2],
         ];
-        let distance = abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2] - lip;
+        let distance =
+            abs_movedir[0] * size[0] + abs_movedir[1] * size[1] + abs_movedir[2] * size[2] - lip;
         for i in 0..3 {
             (*ent).pos2[i] = (*ent).pos1[i] + distance * (*ent).movedir[i];
         }
@@ -1931,10 +2049,7 @@ pub fn SP_func_button(
 /// Raven `Think_BeginMoving`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1727-1732`
-pub fn Think_BeginMoving(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Think_BeginMoving(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         G_PlayDoorSound(ctx, ent, BMS_START);
         G_PlayDoorLoopSound(ctx, ent);
@@ -1946,10 +2061,7 @@ pub fn Think_BeginMoving(
 /// Raven `Reached_Train`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1739-1793`
-pub fn Reached_Train(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Reached_Train(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // copy the appropriate values
         let next = match (*ent).nextTrain {
@@ -1966,11 +2078,16 @@ pub fn Reached_Train(
         // set the new trajectory
         (*ent).nextTrain = (*next).nextTrain;
         (*ent).pos1 = (*next).s.origin;
-        let next_next = &mut (*ctx.world).g_entities[(*next).nextTrain.unwrap().index()] as *mut gentity_t;
+        let next_next =
+            &mut (*ctx.world).g_entities[(*next).nextTrain.unwrap().index()] as *mut gentity_t;
         (*ent).pos2 = (*next_next).s.origin;
 
         // if the path_corner has a speed, use that
-        let mut speed = if (*next).speed != 0.0 { (*next).speed } else { (*ent).speed };
+        let mut speed = if (*next).speed != 0.0 {
+            (*next).speed
+        } else {
+            (*ent).speed
+        };
         if speed < 1.0 {
             speed = 1.0;
         }
@@ -2006,16 +2123,17 @@ pub fn Reached_Train(
 /// Raven `Think_SetupTrainTargets`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1802-1864`
-pub fn Think_SetupTrainTargets(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn Think_SetupTrainTargets(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        (*ent).nextTrain = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), G_Find(ctx,
-            core::ptr::null_mut(),
-            core::mem::offset_of!(gentity_t, targetname) as c_int,
-            (*ent).target,
-        ));
+        (*ent).nextTrain = ent_id_opt(
+            (*ctx.world).g_entities.as_mut_ptr(),
+            G_Find(
+                ctx,
+                core::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                (*ent).target,
+            ),
+        );
         if (*ent).nextTrain.is_none() {
             Com_Printf(c"func_train at %s with an unfound target\n".as_ptr());
             // Free me?`
@@ -2046,7 +2164,8 @@ pub fn Think_SetupTrainTargets(
             // other targets that get fired when the corner is reached
             let mut next: *mut gentity_t;
             loop {
-                next = G_Find(ctx,
+                next = G_Find(
+                    ctx,
                     core::ptr::null_mut(),
                     core::mem::offset_of!(gentity_t, targetname) as c_int,
                     (*path).target,
@@ -2087,10 +2206,7 @@ pub fn Think_SetupTrainTargets(
 /// Raven `SP_path_corner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1873-1880`
-pub fn SP_path_corner(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_path_corner(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).targetname.is_null() {
             G_Printf(ctx, c"path_corner with no targetname at %s\n".as_ptr());
@@ -2105,10 +2221,7 @@ pub fn SP_path_corner(
 /// Raven `SP_func_train`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1897-1927`
-pub fn SP_func_train(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_func_train(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         (*self_).s.angles = [0.0; 3];
 
@@ -2158,10 +2271,7 @@ pub fn SP_func_train(
 /// Raven `SP_func_static`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:1956-2019`
-pub fn SP_func_static(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_func_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         trap::SetBrushModel(
             ctx.engine,
@@ -2194,7 +2304,12 @@ pub fn SP_func_static(
             (*ent).s.bolt1 = 1;
         }
 
-        G_SpawnInt(ctx, c"model2scale".as_ptr(), c"0".as_ptr(), &mut (*ent).s.iModelScale as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"model2scale".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).s.iModelScale as *mut c_int,
+        );
         if (*ent).s.iModelScale < 0 {
             // NOTE: -1 scale is x -100% (so -3 is 300%)
             (*ent).s.legsFlip = qtrue;
@@ -2208,7 +2323,12 @@ pub fn SP_func_static(
         // "hyperspace" spawn key additionally sets `r.svFlags |=
         // SVF_BROADCAST; s.eFlags2 |= EF2_HYPERSPACE` here.
         let mut test = 0;
-        G_SpawnInt(ctx, c"hyperspace".as_ptr(), c"0".as_ptr(), &mut test as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"hyperspace".as_ptr(),
+            c"0".as_ptr(),
+            &mut test as *mut c_int,
+        );
         if test != 0 {
             (*ent).r.svFlags |= SVF_BROADCAST;
         }
@@ -2278,10 +2398,7 @@ pub fn func_rotating_use(
 /// Raven `SP_func_rotating`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2133-2209`
-pub fn SP_func_rotating(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_func_rotating(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut spinangles: vec3_t = [0.0; 3];
         if (*ent).health != 0 {
@@ -2303,7 +2420,12 @@ pub fn SP_func_rotating(
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
         }
 
-        G_SpawnInt(ctx, c"model2scale".as_ptr(), c"0".as_ptr(), &mut (*ent).s.iModelScale as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"model2scale".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).s.iModelScale as *mut c_int,
+        );
         if (*ent).s.iModelScale < 0 {
             (*ent).s.legsFlip = qtrue;
             (*ent).s.iModelScale = -(*ent).s.iModelScale;
@@ -2311,9 +2433,17 @@ pub fn SP_func_rotating(
             (*ent).s.iModelScale = 1023;
         }
 
-        if G_SpawnVector(ctx, c"spinangles".as_ptr(), c"0 0 0".as_ptr(), spinangles.as_mut_ptr()) != 0 {
-            (*ent).speed =
-                (spinangles[0] * spinangles[0] + spinangles[1] * spinangles[1] + spinangles[2] * spinangles[2]).sqrt();
+        if G_SpawnVector(
+            ctx,
+            c"spinangles".as_ptr(),
+            c"0 0 0".as_ptr(),
+            spinangles.as_mut_ptr(),
+        ) != 0
+        {
+            (*ent).speed = (spinangles[0] * spinangles[0]
+                + spinangles[1] * spinangles[1]
+                + spinangles[2] * spinangles[2])
+                .sqrt();
             // set the axis of rotation
             (*ent).s.apos.trDelta = spinangles;
         } else {
@@ -2349,18 +2479,35 @@ pub fn SP_func_rotating(
 /// Raven `SP_func_bobbing`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2231-2258`
-pub fn SP_func_bobbing(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_func_bobbing(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut height = 0.0f32;
         let mut phase = 0.0f32;
 
-        G_SpawnFloat(ctx, c"speed".as_ptr(), c"4".as_ptr(), &mut (*ent).speed as *mut f32);
-        G_SpawnFloat(ctx, c"height".as_ptr(), c"32".as_ptr(), &mut height as *mut f32);
-        G_SpawnInt(ctx, c"dmg".as_ptr(), c"2".as_ptr(), &mut (*ent).damage as *mut c_int);
-        G_SpawnFloat(ctx, c"phase".as_ptr(), c"0".as_ptr(), &mut phase as *mut f32);
+        G_SpawnFloat(
+            ctx,
+            c"speed".as_ptr(),
+            c"4".as_ptr(),
+            &mut (*ent).speed as *mut f32,
+        );
+        G_SpawnFloat(
+            ctx,
+            c"height".as_ptr(),
+            c"32".as_ptr(),
+            &mut height as *mut f32,
+        );
+        G_SpawnInt(
+            ctx,
+            c"dmg".as_ptr(),
+            c"2".as_ptr(),
+            &mut (*ent).damage as *mut c_int,
+        );
+        G_SpawnFloat(
+            ctx,
+            c"phase".as_ptr(),
+            c"0".as_ptr(),
+            &mut phase as *mut f32,
+        );
 
         trap::SetBrushModel(
             ctx.engine,
@@ -2389,17 +2536,29 @@ pub fn SP_func_bobbing(
 /// Raven `SP_func_pendulum`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2280-2313`
-pub fn SP_func_pendulum(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_func_pendulum(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut speed = 0.0f32;
         let mut phase = 0.0f32;
 
-        G_SpawnFloat(ctx, c"speed".as_ptr(), c"30".as_ptr(), &mut speed as *mut f32);
-        G_SpawnInt(ctx, c"dmg".as_ptr(), c"2".as_ptr(), &mut (*ent).damage as *mut c_int);
-        G_SpawnFloat(ctx, c"phase".as_ptr(), c"0".as_ptr(), &mut phase as *mut f32);
+        G_SpawnFloat(
+            ctx,
+            c"speed".as_ptr(),
+            c"30".as_ptr(),
+            &mut speed as *mut f32,
+        );
+        G_SpawnInt(
+            ctx,
+            c"dmg".as_ptr(),
+            c"2".as_ptr(),
+            &mut (*ent).damage as *mut c_int,
+        );
+        G_SpawnFloat(
+            ctx,
+            c"phase".as_ptr(),
+            c"0".as_ptr(),
+            &mut phase as *mut f32,
+        );
 
         trap::SetBrushModel(
             ctx.engine,
@@ -2412,7 +2571,8 @@ pub fn SP_func_pendulum(
             length = 8.0;
         }
 
-        let freq = 1.0 / (core::f32::consts::PI * 2.0) * ((*ctx.world).cvars.g_gravity.value / (3.0 * length)).sqrt();
+        let freq = 1.0 / (core::f32::consts::PI * 2.0)
+            * ((*ctx.world).cvars.g_gravity.value / (3.0 * length)).sqrt();
 
         (*ent).s.pos.trDuration = (1000.0 / freq) as c_int;
 
@@ -2433,10 +2593,7 @@ pub fn SP_func_pendulum(
 /// Raven `CacheChunkEffects`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2323-2361`
-pub fn CacheChunkEffects(
-    ctx: GameContext<'_>,
-    material: material_t,
-) {
+pub fn CacheChunkEffects(ctx: GameContext<'_>, material: material_t) {
     match material {
         MAT_GLASS => {
             G_EffectIndex(c"chunks/glassbreak".as_ptr());
@@ -2528,10 +2685,7 @@ pub fn G_Chunks(
 /// Raven `funcBBrushDieGo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2398-2498`
-pub fn funcBBrushDieGo(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let attacker = (*self_).enemy;
         let chunk_type = (*self_).material;
@@ -2546,7 +2700,17 @@ pub fn funcBBrushDieGo(
             // faithfully; left unguarded (over-inclusive) rather than
             // silently dropped.
             if (*other).s.groundEntityNum == (*self_).s.number {
-                G_Damage(ctx, other, self_, self_, None, [0.0, 0.0, 0.0], 99999, 0, meansOfDeath_t::MOD_CRUSH as c_int);
+                G_Damage(
+                    ctx,
+                    other,
+                    self_,
+                    self_,
+                    None,
+                    [0.0, 0.0, 0.0],
+                    99999,
+                    0,
+                    meansOfDeath_t::MOD_CRUSH as c_int,
+                );
             }
         }
 
@@ -2562,7 +2726,9 @@ pub fn funcBBrushDieGo(
             G_UseTargets(
                 ctx,
                 self_,
-                attacker.map_or(std::ptr::null_mut(), |id| &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t),
+                attacker.map_or(std::ptr::null_mut(), |id| {
+                    &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t
+                }),
             );
         }
 
@@ -2639,14 +2805,35 @@ pub fn funcBBrushDieGo(
 
         if (*self_).splashDamage > 0 && (*self_).splashRadius > 0 {
             // explode
-            G_RadiusDamage(ctx, org, self_, (*self_).splashDamage as f32, (*self_).splashRadius as f32, self_, core::ptr::null_mut(), meansOfDeath_t::MOD_UNKNOWN as c_int);
+            G_RadiusDamage(
+                ctx,
+                org,
+                self_,
+                (*self_).splashDamage as f32,
+                (*self_).splashRadius as f32,
+                self_,
+                core::ptr::null_mut(),
+                meansOfDeath_t::MOD_UNKNOWN as c_int,
+            );
 
             let te = G_TempEntity(ctx, org, entity_event_t::EV_GENERAL_SOUND as c_int);
             (*te).s.eventParm = G_SoundIndex(c"sound/weapons/explosions/cargoexplode.wav".as_ptr());
         }
 
         //FIXME: base numChunks off size?
-        G_Chunks(ctx, (*self_).s.number, org, dir, (*self_).r.absmin, (*self_).r.absmax, 300.0, num_chunks, chunk_type, 0, scale * (*self_).mass);
+        G_Chunks(
+            ctx,
+            (*self_).s.number,
+            org,
+            dir,
+            (*self_).r.absmin,
+            (*self_).r.absmax,
+            300.0,
+            num_chunks,
+            chunk_type,
+            0,
+            scale * (*self_).mass,
+        );
 
         trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(self_, qtrue));
         (*self_).think = Some(EntThink::G_FreeEntity);
@@ -2671,7 +2858,8 @@ pub fn funcBBrushDie(
 
         if (*self_).delay != 0 {
             (*self_).think = Some(EntThink::funcBBrushDieGo);
-            (*self_).nextthink = (*ctx.world).level.time + ((*self_).delay as f32 * 1000.0).floor() as c_int;
+            (*self_).nextthink =
+                (*ctx.world).level.time + ((*self_).delay as f32 * 1000.0).floor() as c_int;
             return;
         }
 
@@ -2696,7 +2884,14 @@ pub fn funcBBrushUse(
                 G_UseTargets(ctx, self_, activator);
             }
         } else {
-            funcBBrushDie(ctx, self_, other, activator, (*self_).health, meansOfDeath_t::MOD_UNKNOWN as c_int);
+            funcBBrushDie(
+                ctx,
+                self_,
+                other,
+                activator,
+                (*self_).health,
+                meansOfDeath_t::MOD_UNKNOWN as c_int,
+            );
         }
     }
 }
@@ -2727,7 +2922,15 @@ pub fn funcBBrushPain(
                     G_UseTargets2(ctx, self_, attacker, (*self_).paintarget);
                 }
             } else {
-                G_UseTargets2(ctx, self_, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*self_).activator), (*self_).paintarget);
+                G_UseTargets2(
+                    ctx,
+                    self_,
+                    crate::ent_id::resolve(
+                        (*ctx.world).g_entities.as_mut_ptr(),
+                        (*self_).activator,
+                    ),
+                    (*self_).paintarget,
+                );
             }
         }
 
@@ -2751,10 +2954,7 @@ pub fn funcBBrushPain(
 /// Raven `InitBBrush`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2599-2661`
-pub fn InitBBrush(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn InitBBrush(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).pos1 = (*ent).s.origin;
 
@@ -2775,8 +2975,18 @@ pub fn InitBBrush(
         // if the "color" or "light" keys are set, setup constantLight
         let mut light = 0.0f32;
         let mut color: vec3_t = [0.0; 3];
-        let light_set = G_SpawnFloat(ctx, c"light".as_ptr(), c"100".as_ptr(), &mut light as *mut f32);
-        let color_set = G_SpawnVector(ctx, c"color".as_ptr(), c"1 1 1".as_ptr(), color.as_mut_ptr());
+        let light_set = G_SpawnFloat(
+            ctx,
+            c"light".as_ptr(),
+            c"100".as_ptr(),
+            &mut light as *mut f32,
+        );
+        let color_set = G_SpawnVector(
+            ctx,
+            c"color".as_ptr(),
+            c"1 1 1".as_ptr(),
+            color.as_mut_ptr(),
+        );
         if light_set != 0 || color_set != 0 {
             let mut r = (color[0] * 255.0) as c_int;
             if r > 255 {
@@ -2815,23 +3025,20 @@ pub fn InitBBrush(
 ///
 /// Empty in Raven.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2663-2665`
-pub fn funcBBrushTouch(
-    ent: *mut gentity_t,
-    other: *mut gentity_t,
-    trace: *mut trace_t,
-) {
-}
+pub fn funcBBrushTouch(ent: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {}
 
 /// Raven `SP_func_breakable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2731-2829`
-pub fn SP_func_breakable(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_func_breakable(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut s: *mut c_char = core::ptr::null_mut();
-        G_SpawnString(ctx, c"playfx".as_ptr(), c"".as_ptr(), &mut s as *mut *mut c_char);
+        G_SpawnString(
+            ctx,
+            c"playfx".as_ptr(),
+            c"".as_ptr(),
+            &mut s as *mut *mut c_char,
+        );
 
         if !s.is_null() && *s != 0 {
             // should we play a special death effect?
@@ -2845,7 +3052,12 @@ pub fn SP_func_breakable(
         }
 
         let mut t = 0;
-        G_SpawnInt(ctx, c"showhealth".as_ptr(), c"0".as_ptr(), &mut t as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"showhealth".as_ptr(),
+            c"0".as_ptr(),
+            &mut t as *mut c_int,
+        );
         if t != 0 {
             // a non-0 maxhealth value will mean we want to show the health
             // on the hud
@@ -2866,11 +3078,31 @@ pub fn SP_func_breakable(
         }
 
         G_SoundIndex(c"sound/weapons/explosions/cargoexplode.wav".as_ptr()); // precaching
-        G_SpawnFloat(ctx, c"radius".as_ptr(), c"1".as_ptr(), &mut (*self_).radius as *mut f32); // used to scale chunk code if desired by a designer
-        G_SpawnInt(ctx, c"material".as_ptr(), c"0".as_ptr(), &mut (*self_).material as *mut material_t);
+        G_SpawnFloat(
+            ctx,
+            c"radius".as_ptr(),
+            c"1".as_ptr(),
+            &mut (*self_).radius as *mut f32,
+        ); // used to scale chunk code if desired by a designer
+        G_SpawnInt(
+            ctx,
+            c"material".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*self_).material as *mut material_t,
+        );
 
-        G_SpawnInt(ctx, c"splashDamage".as_ptr(), c"0".as_ptr(), &mut (*self_).splashDamage as *mut c_int);
-        G_SpawnInt(ctx, c"splashRadius".as_ptr(), c"0".as_ptr(), &mut (*self_).splashRadius as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"splashDamage".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*self_).splashDamage as *mut c_int,
+        );
+        G_SpawnInt(
+            ctx,
+            c"splashRadius".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*self_).splashRadius as *mut c_int,
+        );
 
         CacheChunkEffects(ctx, (*self_).material);
 
@@ -2911,10 +3143,7 @@ pub fn SP_func_breakable(
 /// Raven `G_EntIsBreakable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2831-2866`
-pub fn G_EntIsBreakable(
-    ctx: GameContext<'_>,
-    entityNum: c_int,
-) -> qboolean {
+pub fn G_EntIsBreakable(ctx: GameContext<'_>, entityNum: c_int) -> qboolean {
     unsafe {
         if entityNum < 0 || entityNum >= ENTITYNUM_WORLD {
             return qfalse;
@@ -3013,11 +3242,7 @@ pub fn GlassDie_Old(
 ///
 /// Empty in Raven (commented-out placeholder).
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2924-2928`
-pub fn GlassPain(
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
-    damage: c_int,
-) {
+pub fn GlassPain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     // G_Printf("Mr. Glass says: PLZ NO IT HURTS\n");
     // Make "cracking" sound?
 }
@@ -3046,7 +3271,11 @@ pub fn GlassUse(
             ((*other).r.mins[2] + (*other).r.maxs[2]) * 0.5,
         ];
 
-        (*self_).pos2 = [temp1[0] - temp2[0], temp1[1] - temp2[1], temp1[2] - temp2[2]];
+        (*self_).pos2 = [
+            temp1[0] - temp2[0],
+            temp1[1] - temp2[1],
+            temp1[2] - temp2[2],
+        ];
         (*self_).pos1 = temp1;
 
         let len = ((*self_).pos2[0] * (*self_).pos2[0]
@@ -3059,7 +3288,14 @@ pub fn GlassUse(
             (*self_).pos2[2] / len * 390.0,
         ];
 
-        GlassDie(ctx, self_, other, activator, 100, meansOfDeath_t::MOD_UNKNOWN as c_int);
+        GlassDie(
+            ctx,
+            self_,
+            other,
+            activator,
+            100,
+            meansOfDeath_t::MOD_UNKNOWN as c_int,
+        );
     }
 }
 
@@ -3069,10 +3305,7 @@ pub fn GlassUse(
 /// Raven `SP_func_glass`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2957-2990`
-pub fn SP_func_glass(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_func_glass(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         trap::SetBrushModel(
             ctx.engine,
@@ -3090,7 +3323,12 @@ pub fn SP_func_glass(
             (*ent).health = 1;
         }
 
-        G_SpawnInt(ctx, c"maxshards".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue3 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"maxshards".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue3 as *mut c_int,
+        );
 
         (*ent).genericValue1 = 0;
         (*ent).genericValue4 = 1;
@@ -3111,10 +3349,7 @@ pub fn SP_func_glass(
 /// Raven `func_wait_return_solid`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2995-3025`
-pub fn func_wait_return_solid(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn func_wait_return_solid(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // once a frame, see if it's clear
         (*self_).clipmask = CONTENTS_BODY;
@@ -3131,7 +3366,15 @@ pub fn func_wait_return_solid(
             (*self_).use_ = Some(EntUse::func_usable_use);
             (*self_).clipmask = 0;
             if !(*self_).target2.is_null() && *(*self_).target2 != 0 {
-                G_UseTargets2(ctx, self_, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*self_).activator), (*self_).target2);
+                G_UseTargets2(
+                    ctx,
+                    self_,
+                    crate::ent_id::resolve(
+                        (*ctx.world).g_entities.as_mut_ptr(),
+                        (*self_).activator,
+                    ),
+                    (*self_).target2,
+                );
             }
         } else {
             (*self_).clipmask = 0;
@@ -3147,9 +3390,7 @@ pub fn func_wait_return_solid(
 /// Raven `func_usable_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3027-3035`
-pub fn func_usable_think(
-    self_: *mut gentity_t,
-) {
+pub fn func_usable_think(self_: *mut gentity_t) {
     unsafe {
         if (*self_).spawnflags & 8 != 0 {
             //TODO: Port SVF_PLAYER_USABLE
@@ -3165,10 +3406,7 @@ pub fn func_usable_think(
 /// Raven `G_EntIsRemovableUsable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3037-3048`
-pub fn G_EntIsRemovableUsable(
-    ctx: GameContext<'_>,
-    entNum: c_int,
-) -> qboolean {
+pub fn G_EntIsRemovableUsable(ctx: GameContext<'_>, entNum: c_int) -> qboolean {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[entNum as usize] as *mut gentity_t;
         if !(*ent).classname.is_null()
@@ -3249,11 +3487,7 @@ pub fn func_usable_use(
 /// Raven `func_usable_pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3108-3111`
-pub fn func_usable_pain(
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
-    damage: c_int,
-) {
+pub fn func_usable_pain(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     unsafe {
         GlobalUse(self_, attacker, attacker);
     }
@@ -3284,10 +3518,7 @@ pub fn func_usable_die(
 /// Raven `SP_func_usable`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3140-3203`
-pub fn SP_func_usable(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn SP_func_usable(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         trap::SetBrushModel(
             ctx.engine,
@@ -3298,13 +3529,21 @@ pub fn SP_func_usable(
         (*self_).r.currentOrigin = (*self_).s.origin;
         (*self_).pos1 = (*self_).s.origin;
 
-        G_SpawnInt(ctx, c"endframe".as_ptr(), c"0".as_ptr(), &mut (*self_).genericValue5 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"endframe".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*self_).genericValue5 as *mut c_int,
+        );
 
         if !(*self_).model2.is_null() && *(*self_).model2 != 0 {
             // Raven `strstr(self->model2, ".glm")` — no ported `strstr`
             // binding in this crate; `CStr::contains` is the equivalent
             // substring check.
-            if std::ffi::CStr::from_ptr((*self_).model2).to_string_lossy().contains(".glm") {
+            if std::ffi::CStr::from_ptr((*self_).model2)
+                .to_string_lossy()
+                .contains(".glm")
+            {
                 // for now, not supported in MP.
                 (*self_).s.modelindex2 = 0;
             } else {
@@ -3360,7 +3599,10 @@ pub fn use_wall(
             (*ent).r.contents = CONTENTS_SOLID;
             if (*ent).spawnflags & 1 == 0 {
                 // START_OFF doesn't affect area portals
-                trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qfalse));
+                trap::AdjustAreaPortalState(
+                    ctx.engine,
+                    GAdjustAreaPortalStateArgs::new(ent, qfalse),
+                );
             }
         } else {
             // make it go away
@@ -3369,7 +3611,10 @@ pub fn use_wall(
             (*ent).s.eFlags |= EF_NODRAW;
             if (*ent).spawnflags & 1 == 0 {
                 // START_OFF doesn't affect area portals
-                trap::AdjustAreaPortalState(ctx.engine, GAdjustAreaPortalStateArgs::new(ent, qtrue));
+                trap::AdjustAreaPortalState(
+                    ctx.engine,
+                    GAdjustAreaPortalStateArgs::new(ent, qtrue),
+                );
             }
         }
     }
@@ -3378,10 +3623,7 @@ pub fn use_wall(
 /// Raven `SP_func_wall`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:3256-3279`
-pub fn SP_func_wall(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_func_wall(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         trap::SetBrushModel(
             ctx.engine,

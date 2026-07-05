@@ -36,26 +36,24 @@ use crate::prelude::*;
 use crate::trap;
 use crate::world::GameContext;
 
-use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::{GIcarusTaskidpending, GIcarusTaskidpendingArgs};
-use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
-use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
-use mp_bg::public::stat_index::statIndex_t;
-use mp_bg::public::entity_event::entity_event_t;
-use crate::teams::npcteam::NPCTEAM_NEUTRAL;
 use crate::g_utils::{G_AddEvent, G_Sound, G_UseTargets2};
-use crate::NPC_utils::{G_ActivateBehavior, NPC_CheckLookTarget, NPC_SetLookTarget};
-use crate::NPC_combat::{G_SetEnemy, G_ClearEnemy};
-use crate::npc_c::{SaveNPCGlobals, SetNPCGlobals, RestoreNPCGlobals};
+use crate::npc_c::{RestoreNPCGlobals, SaveNPCGlobals, SetNPCGlobals};
 use crate::q_shared::Q_stricmp;
+use crate::teams::npcteam::NPCTEAM_NEUTRAL;
+use crate::NPC_combat::{G_ClearEnemy, G_SetEnemy};
+use crate::NPC_utils::{G_ActivateBehavior, NPC_CheckLookTarget, NPC_SetLookTarget};
+use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::{
+    GIcarusTaskidpending, GIcarusTaskidpendingArgs,
+};
+use mp_bg::public::entity_event::entity_event_t;
+use mp_bg::public::stat_index::statIndex_t;
+use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
+use mp_qshared::common::mp::qcommon::task_id_t::taskID_t;
 
 /// Raven `NPC_CheckAttacker`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_reactions.c:42-131`
-pub fn NPC_CheckAttacker(
-    ctx: GameContext<'_>,
-    other: *mut gentity_t,
-    r#mod: c_int,
-) {
+pub fn NPC_CheckAttacker(ctx: GameContext<'_>, other: *mut gentity_t, r#mod: c_int) {
     unsafe {
         const FL_NOTARGET: c_int = 0x00000020;
         const WP_SABER: c_int = 1;
@@ -120,9 +118,9 @@ pub fn NPC_CheckAttacker(
         if other == player {
             // Account for the skill level to skew the results
             let luck_threshold = match (*ctx.world).cvars.g_spskill.integer {
-                0 => 0.9f32,  // Easiest difficulty
-                1 => 0.5f32,  // Medium difficulty
-                _ => 0.0f32,  // Hardest difficulty
+                0 => 0.9f32, // Easiest difficulty
+                1 => 0.5f32, // Medium difficulty
+                _ => 0.0f32, // Hardest difficulty
             };
 
             // Randomly pick up the target. Raven `random()` is already in [0,1);
@@ -154,7 +152,8 @@ pub fn NPC_SetPainEvent(ctx: GameContext<'_>, self_: *mut gentity_t) {
             );
             if pending == 0 && !client.is_null() {
                 let stat_max_health = (*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize];
-                let parm = ((*self_).health as f32 / stat_max_health as f32 * 100.0f32).floor() as c_int;
+                let parm =
+                    ((*self_).health as f32 / stat_max_health as f32 * 100.0f32).floor() as c_int;
                 G_AddEvent(self_, entity_event_t::EV_PAIN as c_int, parm);
             }
         }
@@ -259,19 +258,25 @@ pub fn NPC_ChoosePainAnimation(
                 pain_chance = 0.05f32;
             } else {
                 // The lower my health and greater the damage, the more likely I am to play a pain anim
-                pain_chance = (200.0f32 - (*self_).health as f32) / 100.0f32 + damage as f32 / 50.0f32;
+                pain_chance =
+                    (200.0f32 - (*self_).health as f32) / 100.0f32 + damage as f32 / 50.0f32;
             }
-        } else if !client.is_null() && (*client).playerTeam == NPCTEAM_PLAYER && !other.is_null() && (*other).s.number == 0 {
+        } else if !client.is_null()
+            && (*client).playerTeam == NPCTEAM_PLAYER
+            && !other.is_null()
+            && (*other).s.number == 0
+        {
             // Ally shot by player always complains
             pain_chance = 1.1f32;
         } else {
             if !other.is_null() && (*other).s.weapon == WP_SABER || r#mod == MOD_CRUSH {
-                pain_chance = 1.0f32;  // Always take pain from saber
+                pain_chance = 1.0f32; // Always take pain from saber
             } else if r#mod == MOD_MELEE {
                 // Higher in rank (skill) we are, less likely we are to be fazed by a punch
                 let npc = (*self_).NPC as *mut gNPC_t;
                 if !npc.is_null() {
-                    pain_chance = 1.0f32 - ((RANK_CAPTAIN - (*npc).rank) as f32 / RANK_CAPTAIN as f32);
+                    pain_chance =
+                        1.0f32 - ((RANK_CAPTAIN - (*npc).rank) as f32 / RANK_CAPTAIN as f32);
                 } else {
                     pain_chance = 1.0f32;
                 }
@@ -292,16 +297,20 @@ pub fn NPC_ChoosePainAnimation(
             let mut pain_anim = -1;
 
             // Pick and play our animation
-            if !client.is_null() && (*client).ps.fd.forceGripBeingGripped < (*ctx.world).level.time as f32 {
+            if !client.is_null()
+                && (*client).ps.fd.forceGripBeingGripped < (*ctx.world).level.time as f32
+            {
                 // Not being force-gripped or force-drained
                 let legs_anim = (*client).ps.legsAnim;
                 let torso_anim = (*client).ps.torsoAnim;
 
-                if crate::bg_panimate::PM_SpinningAnim(legs_anim) == qfalse &&
-                   crate::bg_panimate::BG_SaberInSpecialAttack(torso_anim) == qfalse &&
-                   crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse &&
-                   crate::bg_pmove::PM_RollingAnim(legs_anim) == qfalse &&
-                   !(crate::bg_panimate::BG_FlippingAnim(legs_anim) != qfalse && crate::bg_panimate::PM_InCartwheel(legs_anim) == qfalse) {
+                if crate::bg_panimate::PM_SpinningAnim(legs_anim) == qfalse
+                    && crate::bg_panimate::BG_SaberInSpecialAttack(torso_anim) == qfalse
+                    && crate::bg_panimate::PM_InKnockDown(&mut (*client).ps) == qfalse
+                    && crate::bg_pmove::PM_RollingAnim(legs_anim) == qfalse
+                    && !(crate::bg_panimate::BG_FlippingAnim(legs_anim) != qfalse
+                        && crate::bg_panimate::PM_InCartwheel(legs_anim) == qfalse)
+                {
                     // Play an anim
                     let npc = (*self_).NPC as *mut gNPC_t;
                     let local_anim_index = (*self_).localAnimIndex;
@@ -309,31 +318,59 @@ pub fn NPC_ChoosePainAnimation(
                     if !client.is_null() && (*client).NPC_class as c_int == CLASS_GALAKMECH {
                         pain_anim = BOTH_PAIN1;
                     } else if r#mod == MOD_MELEE {
-                        pain_anim = crate::bg_panimate::BG_PickAnim(&mut (*ctx.world).bg_state, local_anim_index, BOTH_PAIN2, BOTH_PAIN3);
+                        pain_anim = crate::bg_panimate::BG_PickAnim(
+                            &mut (*ctx.world).bg_state,
+                            local_anim_index,
+                            BOTH_PAIN2,
+                            BOTH_PAIN3,
+                        );
                     } else if (*self_).s.weapon == WP_SABER {
                         // These are the only 2 pain anims that look good when holding a saber
-                        pain_anim = crate::bg_panimate::BG_PickAnim(&mut (*ctx.world).bg_state, local_anim_index, BOTH_PAIN2, BOTH_PAIN3);
+                        pain_anim = crate::bg_panimate::BG_PickAnim(
+                            &mut (*ctx.world).bg_state,
+                            local_anim_index,
+                            BOTH_PAIN2,
+                            BOTH_PAIN3,
+                        );
                     }
 
                     if pain_anim == -1 {
-                        pain_anim = crate::bg_panimate::BG_PickAnim(&mut (*ctx.world).bg_state, local_anim_index, BOTH_PAIN1, BOTH_PAIN18);
+                        pain_anim = crate::bg_panimate::BG_PickAnim(
+                            &mut (*ctx.world).bg_state,
+                            local_anim_index,
+                            BOTH_PAIN1,
+                            BOTH_PAIN18,
+                        );
                     }
 
-                    (*client).ps.fd.saberAnimLevel = 1;  // FORCE_LEVEL_1
-                    (*client).ps.saberMove = 0;  // LS_READY
+                    (*client).ps.fd.saberAnimLevel = 1; // FORCE_LEVEL_1
+                    (*client).ps.saberMove = 0; // LS_READY
 
                     let mut parts = SETANIM_BOTH;
-                    if crate::bg_panimate::BG_CrouchAnim((*client).ps.legsAnim) != qfalse || crate::bg_panimate::PM_InCartwheel((*client).ps.legsAnim) != qfalse {
+                    if crate::bg_panimate::BG_CrouchAnim((*client).ps.legsAnim) != qfalse
+                        || crate::bg_panimate::PM_InCartwheel((*client).ps.legsAnim) != qfalse
+                    {
                         parts = SETANIM_LEGS;
                     }
 
                     if pain_anim != -1 {
-                        crate::npc_c::NPC_SetAnim(ctx, self_, parts, pain_anim, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        crate::npc_c::NPC_SetAnim(
+                            ctx,
+                            self_,
+                            parts,
+                            pain_anim,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                        );
                     }
                 }
 
                 if voiceEvent != -1 {
-                    crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, voiceEvent, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                    crate::NPC_sounds::G_AddVoiceEvent(
+                        ctx,
+                        self_,
+                        voiceEvent,
+                        (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
+                    );
                 } else {
                     NPC_SetPainEvent(ctx, self_);
                 }
@@ -423,7 +460,11 @@ pub fn NPC_Pain(
             other_team = (*other_client).playerTeam;
         }
 
-        if !client.is_null() && (*client).playerTeam != 0 && !other_client.is_null() && other_team == (*client).playerTeam {
+        if !client.is_null()
+            && (*client).playerTeam != 0
+            && !other_client.is_null()
+            && other_team == (*client).playerTeam
+        {
             // Hit by a teammate. Oracle uses `self`/`other`, not the ambient
             // `NPC` global (SetNPCGlobals(self) is not called until later).
             let other_id = ent_id((*ctx.world).g_entities.as_mut_ptr(), other);
@@ -435,8 +476,10 @@ pub fn NPC_Pain(
                     // If one of us actually has an enemy already, it's okay, just an accident
                     if !client.is_null() && !npc.is_null() {
                         // Run any pain instructions
-                        if (*self_).health <= ((*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] / 3) &&
-                           G_ActivateBehavior(ctx, self_, BSET_FLEE) != 0 {
+                        if (*self_).health
+                            <= ((*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] / 3)
+                            && G_ActivateBehavior(ctx, self_, BSET_FLEE) != 0
+                        {
                         } else {
                             G_ActivateBehavior(ctx, self_, BSET_PAIN);
                         }
@@ -445,9 +488,13 @@ pub fn NPC_Pain(
                     if damage != -1 {
                         // Set our proper pain animation
                         if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
-                            NPC_ChoosePainAnimation(ctx, self_, other, point, damage, r#mod, hit_loc, EV_FFWARN);
+                            NPC_ChoosePainAnimation(
+                                ctx, self_, other, point, damage, r#mod, hit_loc, EV_FFWARN,
+                            );
                         } else {
-                            NPC_ChoosePainAnimation(ctx, self_, other, point, damage, r#mod, hit_loc, -1);
+                            NPC_ChoosePainAnimation(
+                                ctx, self_, other, point, damage, r#mod, hit_loc, -1,
+                            );
                         }
                     }
                     return;
@@ -456,13 +503,19 @@ pub fn NPC_Pain(
                     if (*npc).charmedTime != 0 {
                         // Mindtricked
                         return;
-                    } else if (*npc).ffireCount < 3 + ((2 - (*ctx.world).cvars.g_spskill.integer) * 2) {
+                    } else if (*npc).ffireCount
+                        < 3 + ((2 - (*ctx.world).cvars.g_spskill.integer) * 2)
+                    {
                         // Not mad enough yet
                         if damage != -1 {
                             if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
-                                NPC_ChoosePainAnimation(ctx, self_, other, point, damage, r#mod, hit_loc, EV_FFWARN);
+                                NPC_ChoosePainAnimation(
+                                    ctx, self_, other, point, damage, r#mod, hit_loc, EV_FFWARN,
+                                );
                             } else {
-                                NPC_ChoosePainAnimation(ctx, self_, other, point, damage, r#mod, hit_loc, -1);
+                                NPC_ChoosePainAnimation(
+                                    ctx, self_, other, point, damage, r#mod, hit_loc, -1,
+                                );
                             }
                         }
                         return;
@@ -472,15 +525,16 @@ pub fn NPC_Pain(
                     } else {
                         // Turn on our ally
                         (*npc).blockedSpeechDebounceTime = 0;
-                        voice_event = 132;  // EV_FFTURN
+                        voice_event = 132; // EV_FFTURN
                         (*npc).behaviorState = (*npc).tempBehavior;
                         (*npc).tempBehavior = (*npc).defaultBehavior;
                         (*npc).defaultBehavior = bState_t::BS_DEFAULT;
-                        (*other).flags &= !0x00000020;  // ~FL_NOTARGET
-                        (*self_).r.svFlags &= !0x00008000;  // ~SVF_ICARUS_FREEZE
+                        (*other).flags &= !0x00000020; // ~FL_NOTARGET
+                        (*self_).r.svFlags &= !0x00008000; // ~SVF_ICARUS_FREEZE
                         G_SetEnemy(ctx, self_, other);
                         // ~(SCF_DONT_FIRE|SCF_CROUCHED|SCF_WALKING|SCF_NO_COMBAT_TALK|SCF_FORCED_MARCH)
-                        (*npc).scriptFlags &= !(0x00004000 | 0x00000001 | 0x00000002 | 0x00000200 | 0x00010000);
+                        (*npc).scriptFlags &=
+                            !(0x00004000 | 0x00000001 | 0x00000002 | 0x00000200 | 0x00010000);
                         // |= (SCF_CHASE_ENEMIES|SCF_NO_MIND_TRICK)
                         (*npc).scriptFlags |= (0x00000400 | 0x00080000);
 
@@ -498,22 +552,34 @@ pub fn NPC_Pain(
         // Do extra bits
         let npc_info_ptr = (*ctx.world).globals.NPCInfo;
         if !npc_info_ptr.is_null() && (*npc_info_ptr).ignorePain == 0 {
-            (*npc_info_ptr).confusionTime = 0;  // Clear any charm or confusion
+            (*npc_info_ptr).confusionTime = 0; // Clear any charm or confusion
             if damage != -1 {
-                NPC_ChoosePainAnimation(ctx, self_, other, point, damage, r#mod, hit_loc, voice_event);
+                NPC_ChoosePainAnimation(
+                    ctx,
+                    self_,
+                    other,
+                    point,
+                    damage,
+                    r#mod,
+                    hit_loc,
+                    voice_event,
+                );
             }
 
             // Check to take a new enemy
             let npc_ptr = (*ctx.world).globals.NPC;
-            if (*npc_ptr).enemy != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other)) && npc_ptr != other {
+            if (*npc_ptr).enemy != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
+                && npc_ptr != other
+            {
                 NPC_CheckAttacker(ctx, other, r#mod);
             }
         }
 
         // Attempt to run any pain instructions
         if !client.is_null() && !npc.is_null() {
-            if (*self_).health <= ((*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] / 3) &&
-               G_ActivateBehavior(ctx, self_, BSET_FLEE) != 0 {
+            if (*self_).health <= ((*client).ps.stats[statIndex_t::STAT_MAX_HEALTH as usize] / 3)
+                && G_ActivateBehavior(ctx, self_, BSET_FLEE) != 0
+            {
             } else {
                 G_ActivateBehavior(ctx, self_, BSET_PAIN);
             }
@@ -564,12 +630,16 @@ pub fn NPC_Touch(
             if (*other).health > 0 {
                 let npc_info_ptr = (*ctx.world).globals.NPCInfo;
                 if !npc_info_ptr.is_null() {
-                    (*npc_info_ptr).touchedByPlayer = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other));
+                    (*npc_info_ptr).touchedByPlayer =
+                        Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other));
                 }
             }
 
             let npc_info_ptr = (*ctx.world).globals.NPCInfo;
-            if !npc_info_ptr.is_null() && (*npc_info_ptr).goalEntity == Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other)) {
+            if !npc_info_ptr.is_null()
+                && (*npc_info_ptr).goalEntity
+                    == Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
+            {
                 (*npc_info_ptr).aiFlags |= NPCAI_TOUCHED_GOAL;
             }
 
@@ -584,11 +654,14 @@ pub fn NPC_Touch(
                     if (*other_client).playerTeam == (*client).enemyTeam {
                         // Bumped into an enemy
                         let npc_info_ptr = (*ctx.world).globals.NPCInfo;
-                        if !npc_info_ptr.is_null() &&
-                           (*npc_info_ptr).behaviorState != bState_t::BS_HUNT_AND_KILL &&
-                           (*npc_info_ptr).tempBehavior == bState_t::BS_DEFAULT {
+                        if !npc_info_ptr.is_null()
+                            && (*npc_info_ptr).behaviorState != bState_t::BS_HUNT_AND_KILL
+                            && (*npc_info_ptr).tempBehavior == bState_t::BS_DEFAULT
+                        {
                             let npc_ptr = (*ctx.world).globals.NPC;
-                            if (*npc_ptr).enemy != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other)) {
+                            if (*npc_ptr).enemy
+                                != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
+                            {
                                 G_SetEnemy(ctx, npc_ptr, other);
                             }
                         }
@@ -599,16 +672,21 @@ pub fn NPC_Touch(
             // Other is not a client
             if (*other).health > 0 {
                 // Non-NPC entity (probably an object)
-                if 0 != 0 {  // rwwFIXMEFIXME condition always false
+                if 0 != 0 {
+                    // rwwFIXMEFIXME condition always false
                     let npc_info_ptr = (*ctx.world).globals.NPCInfo;
                     if !npc_info_ptr.is_null() {
-                        (*npc_info_ptr).touchedByPlayer = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other));
+                        (*npc_info_ptr).touchedByPlayer =
+                            Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other));
                     }
                 }
             }
 
             let npc_info_ptr = (*ctx.world).globals.NPCInfo;
-            if !npc_info_ptr.is_null() && (*npc_info_ptr).goalEntity == Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other)) {
+            if !npc_info_ptr.is_null()
+                && (*npc_info_ptr).goalEntity
+                    == Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other))
+            {
                 (*npc_info_ptr).aiFlags |= NPCAI_TOUCHED_GOAL;
             }
         }
@@ -654,7 +732,11 @@ pub fn NPC_TempLookTarget(
             //Not already looking at something else
             //Look at him for 1 to 3 seconds
             let level_time = (*ctx.world).level.time;
-            NPC_SetLookTarget(self_, lookEntNum, level_time + (*ctx.world).bg_state.rng.Q_irand(minLookTime, maxLookTime));
+            NPC_SetLookTarget(
+                self_,
+                lookEntNum,
+                level_time + (*ctx.world).bg_state.rng.Q_irand(minLookTime, maxLookTime),
+            );
         }
     }
 }
@@ -726,7 +808,10 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                     if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                         event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
                     } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
+                        event = (*ctx.world)
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                     } else {
                         event = (*ctx.world).bg_state.rng.Q_irand(EV_COVER1, EV_COVER5);
                     }
@@ -743,7 +828,10 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                     if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                         event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
                     } else if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
+                        event = (*ctx.world)
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                     } else {
                         event = (*ctx.world).bg_state.rng.Q_irand(EV_COVER1, EV_COVER5);
                     }
@@ -754,7 +842,10 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                 } else if (*ctx.world).bg_state.rng.Q_irand(0, 4) > 1 {
                     event = (*ctx.world).bg_state.rng.Q_irand(EV_SOUND1, EV_SOUND3);
                 } else {
-                    event = (*ctx.world).bg_state.rng.Q_irand(EV_JDETECTED1, EV_JDETECTED2);
+                    event = (*ctx.world)
+                        .bg_state
+                        .rng
+                        .Q_irand(EV_JDETECTED1, EV_JDETECTED2);
                 }
             }
             CLASS_LUKE => {
@@ -766,7 +857,8 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
             }
             CLASS_JEDI => {
                 if (*self_).enemy.is_none() {
-                    if 0 != 0 {  // rwwFIXMEFIXME: support flags!
+                    if 0 != 0 {
+                        // rwwFIXMEFIXME: support flags!
                         event = (*ctx.world).bg_state.rng.Q_irand(EV_ANGER1, EV_ANGER3);
                     } else {
                         event = (*ctx.world).bg_state.rng.Q_irand(EV_TAUNT1, EV_TAUNT2);
@@ -778,7 +870,10 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                     if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                         event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
                     } else {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
+                        event = (*ctx.world)
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                     }
                 } else {
                     event = (*ctx.world).bg_state.rng.Q_irand(EV_SOUND1, EV_SOUND3);
@@ -789,7 +884,10 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                     if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                         event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
                     } else {
-                        event = (*ctx.world).bg_state.rng.Q_irand(EV_DETECTED1, EV_DETECTED5);
+                        event = (*ctx.world)
+                            .bg_state
+                            .rng
+                            .Q_irand(EV_DETECTED1, EV_DETECTED5);
                     }
                 } else {
                     event = (*ctx.world).bg_state.rng.Q_irand(EV_SOUND1, EV_SOUND3);
@@ -809,7 +907,10 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                         if (*ctx.world).bg_state.rng.Q_irand(0, 9) > 6 {
                             event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
                         } else if (*ctx.world).bg_state.rng.Q_irand(0, 6) > 4 {
-                            event = (*ctx.world).bg_state.rng.Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
+                            event = (*ctx.world)
+                                .bg_state
+                                .rng
+                                .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                         } else {
                             event = (*ctx.world).bg_state.rng.Q_irand(EV_COVER1, EV_COVER5);
                         }
@@ -830,7 +931,10 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
                         if (*ctx.world).bg_state.rng.Q_irand(0, 9) > 6 {
                             event = (*ctx.world).bg_state.rng.Q_irand(EV_CHASE1, EV_CHASE3);
                         } else if (*ctx.world).bg_state.rng.Q_irand(0, 6) > 4 {
-                            event = (*ctx.world).bg_state.rng.Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
+                            event = (*ctx.world)
+                                .bg_state
+                                .rng
+                                .Q_irand(EV_OUTFLANK1, EV_OUTFLANK2);
                         } else {
                             event = (*ctx.world).bg_state.rng.Q_irand(EV_COVER1, EV_COVER5);
                         }
@@ -850,22 +954,34 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
             CLASS_R2D2 => {
                 // PORT-NOTE(va-formatting): droid sound paths use va() for dynamic formatting
                 // ported to format!() with Rust string construction
-                let sound_path = format!("sound/chars/r2d2/misc/r2d2talk0{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));
+                let sound_path = format!(
+                    "sound/chars/r2d2/misc/r2d2talk0{}.wav",
+                    (*ctx.world).bg_state.rng.Q_irand(1, 3)
+                );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
                 G_Sound(ctx, self_, CHAN_AUTO, sound_index);
             }
             CLASS_R5D2 => {
-                let sound_path = format!("sound/chars/r5d2/misc/r5talk{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 4));
+                let sound_path = format!(
+                    "sound/chars/r5d2/misc/r5talk{}.wav",
+                    (*ctx.world).bg_state.rng.Q_irand(1, 4)
+                );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
                 G_Sound(ctx, self_, CHAN_AUTO, sound_index);
             }
             CLASS_MOUSE => {
-                let sound_path = format!("sound/chars/mouse/misc/mousego{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));
+                let sound_path = format!(
+                    "sound/chars/mouse/misc/mousego{}.wav",
+                    (*ctx.world).bg_state.rng.Q_irand(1, 3)
+                );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
                 G_Sound(ctx, self_, CHAN_AUTO, sound_index);
             }
             CLASS_GONK => {
-                let sound_path = format!("sound/chars/gonk/misc/gonktalk{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 2));
+                let sound_path = format!(
+                    "sound/chars/gonk/misc/gonktalk{}.wav",
+                    (*ctx.world).bg_state.rng.Q_irand(1, 2)
+                );
                 let sound_index = crate::g_utils::G_SoundIndex(cstr(&sound_path).as_ptr());
                 G_Sound(ctx, self_, CHAN_AUTO, sound_index);
             }
@@ -875,19 +991,19 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
         if event != -1 {
             // Hack here because we reuse some "combat" and "extra" sounds
             let add_flag = if !npc.is_null() {
-                ((*npc).scriptFlags & 0x00000200) != 0  // SCF_NO_COMBAT_TALK
+                ((*npc).scriptFlags & 0x00000200) != 0 // SCF_NO_COMBAT_TALK
             } else {
                 false
             };
 
             if !npc.is_null() {
-                (*npc).scriptFlags &= !0x00000200;  // ~SCF_NO_COMBAT_TALK
+                (*npc).scriptFlags &= !0x00000200; // ~SCF_NO_COMBAT_TALK
             }
 
             crate::NPC_sounds::G_AddVoiceEvent(ctx, self_, event, 3000);
 
             if add_flag && !npc.is_null() {
-                (*npc).scriptFlags |= 0x00000200;  // |= SCF_NO_COMBAT_TALK
+                (*npc).scriptFlags |= 0x00000200; // |= SCF_NO_COMBAT_TALK
             }
         }
     }
@@ -989,15 +1105,22 @@ pub fn NPC_Use(
             }
 
             // Run any use instructions
-            if !activator.is_null() && (*activator).s.number == 0 && (*client).NPC_class as c_int == CLASS_GONK {
+            if !activator.is_null()
+                && (*activator).s.number == 0
+                && (*client).NPC_class as c_int == CLASS_GONK
+            {
                 // Must be using the gonk, so attempt to give battery power
                 // (deferred: Add_Batteries(activator, &self->client->ps.batteryCharge))
             }
 
             if !(*self_).behaviorSet[BSET_USE as usize].is_null() {
                 NPC_UseResponse(ctx, self_, other, 1);
-            } else if !npc.is_null() && (*self_).enemy.is_none() && !activator.is_null() && (*activator).s.number == 0 &&
-                      ((*npc).scriptFlags & 0x00000080) == 0 {
+            } else if !npc.is_null()
+                && (*self_).enemy.is_none()
+                && !activator.is_null()
+                && (*activator).s.number == 0
+                && ((*npc).scriptFlags & 0x00000080) == 0
+            {
                 // I don't have an enemy and I was used by the player
                 // (oracle gates on !(scriptFlags & SCF_NO_RESPONSE) = 0x80)
                 NPC_UseResponse(ctx, self_, other, 0);

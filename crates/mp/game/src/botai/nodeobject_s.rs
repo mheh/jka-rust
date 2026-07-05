@@ -9,14 +9,14 @@ use mp_qshared::shared::vec3_t;
 /// Type definition source: `oracle/oracle/codemp/game/ai_main.h:115-128`
 #[repr(C)]
 pub struct nodeobject_t {
-	pub origin: vec3_t,
-	//	int index;
-	pub weight: f32,
-	pub flags: c_int,
-	// Raven gates `neighbornum`/`inuse` to `short` under `_XBOX`; non-Xbox (this
-	// build's target) uses `int`.
-	pub neighbornum: c_int,
-	pub inuse: c_int,
+    pub origin: vec3_t,
+    //	int index;
+    pub weight: f32,
+    pub flags: c_int,
+    // Raven gates `neighbornum`/`inuse` to `short` under `_XBOX`; non-Xbox (this
+    // build's target) uses `int`.
+    pub neighbornum: c_int,
+    pub inuse: c_int,
 }
 
 const _: () = assert!(core::mem::size_of::<nodeobject_t>() == 28);

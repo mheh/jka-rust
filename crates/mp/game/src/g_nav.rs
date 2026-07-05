@@ -14,37 +14,37 @@
 //! pass-3 (final body transcription).
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
-use crate::trap;
-use crate::NPC_utils::{G_ActivateBehavior, NPC_FaceEntity};
-use crate::g_mover::{G_EntIsBreakable, G_EntIsDoor, G_EntIsRemovableUsable, G_EntIsUnlockedDoor};
-use crate::g_utils::G_CheckInSolid;
-use crate::NPC_goal::G_BoundsOverlap;
-use crate::g_misc::TAG_Add;
-use crate::g_main::Com_Error;
-use crate::q_shared::Com_sprintf;
-use crate::g_utils::vtos;
-use crate::npc::g_npc_t::gNPC_t;
 use crate::client::gclient::gclient_t;
+use crate::g_main::Com_Error;
+use crate::g_misc::TAG_Add;
+use crate::g_mover::{G_EntIsBreakable, G_EntIsDoor, G_EntIsRemovableUsable, G_EntIsUnlockedDoor};
+use crate::g_utils::vtos;
+use crate::g_utils::G_CheckInSolid;
+use crate::npc::g_npc_t::gNPC_t;
 use crate::npc::nav_info_s::navInfo_t;
+use crate::prelude::*;
+use crate::q_shared::Com_sprintf;
+use crate::trap;
+use crate::NPC_goal::G_BoundsOverlap;
+use crate::NPC_utils::{G_ActivateBehavior, NPC_FaceEntity};
 
-use mp_abi::game::syscalls::G_NAV_FREE::GNavFreeArgs;
-use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
+use mp_abi::game::syscalls::G_ARGV::GArgvArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
-use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
+use mp_abi::game::syscalls::G_NAV_ADDFAILEDEDGE::GNavAddfailededgeArgs;
+use mp_abi::game::syscalls::G_NAV_ADDRAWPOINT::GNavAddrawpointArgs;
+use mp_abi::game::syscalls::G_NAV_CHECKBLOCKEDEDGES::GNavCheckblockededgesArgs;
+use mp_abi::game::syscalls::G_NAV_FREE::GNavFreeArgs;
+use mp_abi::game::syscalls::G_NAV_GETBESTNODE::GNavGetbestnodeArgs;
 use mp_abi::game::syscalls::G_NAV_GETNEARESTNODE::GNavGetnearestnodeArgs;
 use mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs;
-use mp_abi::game::syscalls::G_NAV_GETBESTNODE::GNavGetbestnodeArgs;
-use mp_abi::game::syscalls::G_NAV_ADDRAWPOINT::GNavAddrawpointArgs;
-use mp_abi::game::syscalls::G_NAV_ADDFAILEDEDGE::GNavAddfailededgeArgs;
-use mp_abi::game::syscalls::G_NAV_HARDCONNECT::GNavHardconnectArgs;
-use mp_abi::game::syscalls::G_NAV_SHOWPATH::GNavShowpathArgs;
-use mp_abi::game::syscalls::G_NAV_SHOWNODES::GNavShownodesArgs;
-use mp_abi::game::syscalls::G_NAV_SHOWEDGES::GNavShowedgesArgs;
-use mp_abi::game::syscalls::G_NAV_CHECKBLOCKEDEDGES::GNavCheckblockededgesArgs;
-use mp_abi::game::syscalls::G_NAV_SETPATHSCALCULATED::GNavSetpathscalculatedArgs;
 use mp_abi::game::syscalls::G_NAV_GETNUMNODES::GNavGetnumnodesArgs;
-use mp_abi::game::syscalls::G_ARGV::GArgvArgs;
+use mp_abi::game::syscalls::G_NAV_HARDCONNECT::GNavHardconnectArgs;
+use mp_abi::game::syscalls::G_NAV_SETPATHSCALCULATED::GNavSetpathscalculatedArgs;
+use mp_abi::game::syscalls::G_NAV_SHOWEDGES::GNavShowedgesArgs;
+use mp_abi::game::syscalls::G_NAV_SHOWNODES::GNavShownodesArgs;
+use mp_abi::game::syscalls::G_NAV_SHOWPATH::GNavShowpathArgs;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
@@ -55,85 +55,48 @@ const qfalse: qboolean = 0;
 ///
 /// Raven: for debug graphics; rwwFIXMEFIXME — never implemented, empty body.
 /// Source: `oracle/oracle/codemp/game/g_nav.c:11-14`
-pub fn G_Line(
-    start: vec3_t,
-    end: vec3_t,
-    color: vec3_t,
-    alpha: f32,
-) {
-}
+pub fn G_Line(start: vec3_t, end: vec3_t, color: vec3_t, alpha: f32) {}
 
 /// Raven `G_Cube`.
 ///
 /// Raven: for debug graphics; empty body (unimplemented in oracle).
 /// Source: `oracle/oracle/codemp/game/g_nav.c:16-19`
-pub fn G_Cube(
-    mins: vec3_t,
-    maxs: vec3_t,
-    color: vec3_t,
-    alpha: f32,
-) {
-}
+pub fn G_Cube(mins: vec3_t, maxs: vec3_t, color: vec3_t, alpha: f32) {}
 
 /// Raven `G_CubeOutline`.
 ///
 /// Raven: for debug graphics; empty body (unimplemented in oracle).
 /// Source: `oracle/oracle/codemp/game/g_nav.c:21-24`
-pub fn G_CubeOutline(
-    mins: vec3_t,
-    maxs: vec3_t,
-    time: c_int,
-    color: c_uint,
-    alpha: f32,
-) {
-}
+pub fn G_CubeOutline(mins: vec3_t, maxs: vec3_t, time: c_int, color: c_uint, alpha: f32) {}
 
 /// Raven `G_DrawEdge`.
 ///
 /// Raven: for debug graphics; empty body (unimplemented in oracle).
 /// Source: `oracle/oracle/codemp/game/g_nav.c:26-29`
-pub fn G_DrawEdge(
-    start: vec3_t,
-    end: vec3_t,
-    r#type: c_int,
-) {
-}
+pub fn G_DrawEdge(start: vec3_t, end: vec3_t, r#type: c_int) {}
 
 /// Raven `G_DrawNode`.
 ///
 /// Raven: for debug graphics; empty body (unimplemented in oracle).
 /// Source: `oracle/oracle/codemp/game/g_nav.c:31-34`
-pub fn G_DrawNode(
-    origin: vec3_t,
-    r#type: c_int,
-) {
-}
+pub fn G_DrawNode(origin: vec3_t, r#type: c_int) {}
 
 /// Raven `G_DrawCombatPoint`.
 ///
 /// Raven: for debug graphics; empty body (unimplemented in oracle).
 /// Source: `oracle/oracle/codemp/game/g_nav.c:36-39`
-pub fn G_DrawCombatPoint(
-    origin: vec3_t,
-    r#type: c_int,
-) {
-}
+pub fn G_DrawCombatPoint(origin: vec3_t, r#type: c_int) {}
 
 /// Raven `TAG_ShowTags`.
 ///
 /// Raven: for debug graphics; empty body (unimplemented in oracle).
 /// Source: `oracle/oracle/codemp/game/g_nav.c:41-44`
-pub fn TAG_ShowTags(
-    flags: c_int,
-) {
-}
+pub fn TAG_ShowTags(flags: c_int) {}
 
 /// Raven `FlyingCreature`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:46-53`
-pub fn FlyingCreature(
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn FlyingCreature(ent: *mut gentity_t) -> qboolean {
     unsafe {
         if !(*ent).client.is_null() {
             let client = (*ent).client as *mut gclient_t;
@@ -148,11 +111,7 @@ pub fn FlyingCreature(
 /// Raven `NPC_Blocked`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:68-104`
-pub fn NPC_Blocked(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    blocker: *mut gentity_t,
-) {
+pub fn NPC_Blocked(ctx: GameContext<'_>, self_: *mut gentity_t, blocker: *mut gentity_t) {
     unsafe {
         if (*self_).NPC.is_null() {
             return;
@@ -319,7 +278,14 @@ pub fn NAV_ClearPathToPoint(
         let mut trace: trace_t = core::mem::zeroed();
 
         // Test if they're even conceivably close to one another
-        if trap::InPVS(ctx.engine, GInPvsArgs::new(&(*self_).r.currentOrigin as *const vec3_t, &point as *const vec3_t)) == 0 {
+        if trap::InPVS(
+            ctx.engine,
+            GInPvsArgs::new(
+                &(*self_).r.currentOrigin as *const vec3_t,
+                &point as *const vec3_t,
+            ),
+        ) == 0
+        {
             return qfalse;
         }
 
@@ -410,14 +376,24 @@ pub fn NAV_ClearPathToPoint(
                 return qtrue;
             } else if (*ctx.world).globals.NAVDEBUG_showCollision != 0 {
                 if (trace.entityNum as c_int) < ENTITYNUM_WORLD
-                    && (*ctx.world).g_entities[trace.entityNum as usize].s.eType != ET_MOVER as c_int
+                    && (*ctx.world).g_entities[trace.entityNum as usize].s.eType
+                        != ET_MOVER as c_int
                 {
-                    let blocker = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
+                    let blocker =
+                        &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
                     let mut p1 = [0.0f32; 3];
                     let mut p2 = [0.0f32; 3];
                     G_DrawEdge(point, trace.endpos, EDGE_PATH);
-                    crate::q_math::_VectorAdd((*blocker).r.mins, (*blocker).r.currentOrigin, &mut p1);
-                    crate::q_math::_VectorAdd((*blocker).r.maxs, (*blocker).r.currentOrigin, &mut p2);
+                    crate::q_math::_VectorAdd(
+                        (*blocker).r.mins,
+                        (*blocker).r.currentOrigin,
+                        &mut p1,
+                    );
+                    crate::q_math::_VectorAdd(
+                        (*blocker).r.maxs,
+                        (*blocker).r.currentOrigin,
+                        &mut p2,
+                    );
                     G_CubeOutline(p1, p2, FRAMETIME, 0x0000ff, 0.5);
                 }
             }
@@ -462,7 +438,8 @@ pub fn NAV_ClearPathToPoint(
                 && (trace.entityNum as c_int) < ENTITYNUM_WORLD
                 && (*ctx.world).g_entities[trace.entityNum as usize].s.eType != ET_MOVER as c_int
             {
-                let blocker = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
+                let blocker =
+                    &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
                 let mut p1 = [0.0f32; 3];
                 let mut p2 = [0.0f32; 3];
                 G_DrawEdge((*self_).r.currentOrigin, trace.endpos, EDGE_PATH);
@@ -530,10 +507,7 @@ pub fn NAV_FindClosestWaypointForPoint(
 /// Raven `NAV_FindClosestWaypointForPoint2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:384-408`
-pub fn NAV_FindClosestWaypointForPoint2(
-    ctx: GameContext<'_>,
-    point: vec3_t,
-) -> c_int {
+pub fn NAV_FindClosestWaypointForPoint2(ctx: GameContext<'_>, point: vec3_t) -> c_int {
     // FIXME (Raven): can we make this a static ent?
     unsafe {
         let marker = G_Spawn(ctx);
@@ -563,9 +537,7 @@ pub fn NAV_FindClosestWaypointForPoint2(
 /// Raven `NAV_ClearBlockedInfo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:416-420`
-pub fn NAV_ClearBlockedInfo(
-    self_: *mut gentity_t,
-) {
+pub fn NAV_ClearBlockedInfo(self_: *mut gentity_t) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).aiFlags &= !NPCAI_BLOCKED;
@@ -576,10 +548,7 @@ pub fn NAV_ClearBlockedInfo(
 /// Raven `NAV_SetBlockedInfo`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:428-432`
-pub fn NAV_SetBlockedInfo(
-    self_: *mut gentity_t,
-    entId: c_int,
-) {
+pub fn NAV_SetBlockedInfo(self_: *mut gentity_t, entId: c_int) {
     unsafe {
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).aiFlags |= NPCAI_BLOCKED;
@@ -590,12 +559,7 @@ pub fn NAV_SetBlockedInfo(
 /// Raven `NAV_Steer`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:440-486`
-pub fn NAV_Steer(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    dir: vec3_t,
-    distance: f32,
-) -> c_int {
+pub fn NAV_Steer(ctx: GameContext<'_>, self_: *mut gentity_t, dir: vec3_t, distance: f32) -> c_int {
     unsafe {
         let mut right_test = [0.0f32; 3];
         let mut left_test = [0.0f32; 3];
@@ -625,11 +589,23 @@ pub fn NAV_Steer(
         }
 
         // Find the right influence
-        NAV_CheckAhead(ctx, self_, right_end, &mut tr as *mut trace_t, self_clipmask | CONTENTS_BOTCLIP);
+        NAV_CheckAhead(
+            ctx,
+            self_,
+            right_end,
+            &mut tr as *mut trace_t,
+            self_clipmask | CONTENTS_BOTCLIP,
+        );
         let right_push = -45.0 * (1.0 - tr.fraction);
 
         // Find the left influence
-        NAV_CheckAhead(ctx, self_, left_end, &mut tr as *mut trace_t, self_clipmask | CONTENTS_BOTCLIP);
+        NAV_CheckAhead(
+            ctx,
+            self_,
+            left_end,
+            &mut tr as *mut trace_t,
+            self_clipmask | CONTENTS_BOTCLIP,
+        );
         let left_push = 45.0 * (1.0 - tr.fraction);
 
         // Influence the mover to respond to the steering
@@ -653,7 +629,11 @@ pub fn NAV_CheckAhead(
     unsafe {
         let mut clipmask = clipmask;
         // Offset the step height
-        let mins = [(*self_).r.mins[0], (*self_).r.mins[1], (*self_).r.mins[2] + STEPSIZE];
+        let mins = [
+            (*self_).r.mins[0],
+            (*self_).r.mins[1],
+            (*self_).r.mins[2] + STEPSIZE,
+        ];
 
         trap::Trace(
             ctx.engine,
@@ -695,7 +675,11 @@ pub fn NAV_CheckAhead(
         }
 
         // This is a work around
-        let radius = if (*self_).r.maxs[0] > (*self_).r.maxs[1] { (*self_).r.maxs[0] } else { (*self_).r.maxs[1] };
+        let radius = if (*self_).r.maxs[0] > (*self_).r.maxs[1] {
+            (*self_).r.maxs[0]
+        } else {
+            (*self_).r.maxs[1]
+        };
         let dist = Distance((*self_).r.currentOrigin, end);
         let tFrac = 1.0 - (radius / dist);
 
@@ -705,12 +689,15 @@ pub fn NAV_CheckAhead(
 
         // Do a special check for doors
         if ((*trace).entityNum as c_int) < ENTITYNUM_WORLD {
-            let blocker = &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t;
+            let blocker =
+                &mut (*ctx.world).g_entities[(*trace).entityNum as usize] as *mut gentity_t;
 
             if !(*blocker).classname.is_null() && *(*blocker).classname != 0 {
                 if G_EntIsUnlockedDoor(ctx, (*blocker).s.number) != 0 {
                     // We're too close, try and avoid the door (most likely stuck on a lip)
-                    if DistanceSquared((*self_).r.currentOrigin, (*trace).endpos) < MIN_DOOR_BLOCK_DIST_SQR as f32 {
+                    if DistanceSquared((*self_).r.currentOrigin, (*trace).endpos)
+                        < MIN_DOOR_BLOCK_DIST_SQR as f32
+                    {
                         return qfalse;
                     }
                     return qtrue;
@@ -740,14 +727,26 @@ pub fn NAV_TestBypass(
         let mut block_test = [0.0f32; 3];
         AngleVectors(avoidAngles, Some(&mut block_test), None, None);
         let mut block_pos = [0.0f32; 3];
-        crate::q_math::_VectorMA((*self_).r.currentOrigin, blocked_dist, block_test, &mut block_pos);
+        crate::q_math::_VectorMA(
+            (*self_).r.currentOrigin,
+            blocked_dist,
+            block_test,
+            &mut block_pos,
+        );
 
         if (*ctx.world).globals.NAVDEBUG_showCollision != 0 {
             G_DrawEdge((*self_).r.currentOrigin, block_pos, EDGE_BLOCKED);
         }
 
         // See if we're clear to move in that direction
-        if NAV_CheckAhead(ctx, self_, block_pos, &mut tr as *mut trace_t, ((*self_).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP) != 0 {
+        if NAV_CheckAhead(
+            ctx,
+            self_,
+            block_pos,
+            &mut tr as *mut trace_t,
+            ((*self_).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
+        ) != 0
+        {
             crate::q_math::_VectorCopy(block_test, movedir);
             return qtrue;
         }
@@ -772,7 +771,11 @@ pub fn NAV_Bypass(
 
         // Draw debug info if requested
         if (*ctx.world).globals.NAVDEBUG_showCollision != 0 {
-            G_DrawEdge((*self_).r.currentOrigin, (*blocker).r.currentOrigin, EDGE_NORMAL);
+            G_DrawEdge(
+                (*self_).r.currentOrigin,
+                (*blocker).r.currentOrigin,
+                EDGE_NORMAL,
+            );
         }
 
         AngleVectors((*self_).r.currentAngles, None, Some(&mut right), None);
@@ -781,11 +784,18 @@ pub fn NAV_Bypass(
         let yaw = vectoyaw(blocked_dir);
 
         // Get the avoid radius
-        let avoidRadius = ((*blocker).r.maxs[0] * (*blocker).r.maxs[0] + (*blocker).r.maxs[1] * (*blocker).r.maxs[1]).sqrt()
-            + ((*self_).r.maxs[0] * (*self_).r.maxs[0] + (*self_).r.maxs[1] * (*self_).r.maxs[1]).sqrt();
+        let avoidRadius = ((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
+            + (*blocker).r.maxs[1] * (*blocker).r.maxs[1])
+            .sqrt()
+            + ((*self_).r.maxs[0] * (*self_).r.maxs[0] + (*self_).r.maxs[1] * (*self_).r.maxs[1])
+                .sqrt();
 
         // See if we're inside our avoidance radius
-        let mut arcAngle = if blocked_dist <= avoidRadius { 135.0 } else { (avoidRadius / blocked_dist) * 90.0 };
+        let mut arcAngle = if blocked_dist <= avoidRadius {
+            135.0
+        } else {
+            (avoidRadius / blocked_dist) * 90.0
+        };
 
         // Check to see what dir the other guy is moving in (if any) and pick the opposite dir
         if !(*blocker).client.is_null() {
@@ -799,8 +809,20 @@ pub fn NAV_Bypass(
                     let mut block_pos = [0.0f32; 3];
                     let mut tr: trace_t = core::mem::zeroed();
                     crate::q_math::_VectorScale(blocker_movedir, -1.0, &mut blocker_movedir);
-                    crate::q_math::_VectorMA((*self_).r.currentOrigin, blocked_dist, blocker_movedir, &mut block_pos);
-                    if NAV_CheckAhead(ctx, self_, block_pos, &mut tr as *mut trace_t, ((*self_).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP) != 0 {
+                    crate::q_math::_VectorMA(
+                        (*self_).r.currentOrigin,
+                        blocked_dist,
+                        blocker_movedir,
+                        &mut block_pos,
+                    );
+                    if NAV_CheckAhead(
+                        ctx,
+                        self_,
+                        block_pos,
+                        &mut tr as *mut trace_t,
+                        ((*self_).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
+                    ) != 0
+                    {
                         crate::q_math::_VectorCopy(blocker_movedir, movedir);
                         return qtrue;
                     }
@@ -816,22 +838,50 @@ pub fn NAV_Bypass(
         }
 
         // Test full, best position first
-        if NAV_TestBypass(ctx, self_, AngleNormalize360(yaw + arcAngle), blocked_dist, movedir) != 0 {
+        if NAV_TestBypass(
+            ctx,
+            self_,
+            AngleNormalize360(yaw + arcAngle),
+            blocked_dist,
+            movedir,
+        ) != 0
+        {
             return qtrue;
         }
 
         // Try a smaller arc
-        if NAV_TestBypass(ctx, self_, AngleNormalize360(yaw + (arcAngle * 0.5)), blocked_dist, movedir) != 0 {
+        if NAV_TestBypass(
+            ctx,
+            self_,
+            AngleNormalize360(yaw + (arcAngle * 0.5)),
+            blocked_dist,
+            movedir,
+        ) != 0
+        {
             return qtrue;
         }
 
         // Try the other direction
-        if NAV_TestBypass(ctx, self_, AngleNormalize360(yaw + (arcAngle * -1.0)), blocked_dist, movedir) != 0 {
+        if NAV_TestBypass(
+            ctx,
+            self_,
+            AngleNormalize360(yaw + (arcAngle * -1.0)),
+            blocked_dist,
+            movedir,
+        ) != 0
+        {
             return qtrue;
         }
 
         // Try the other direction more precisely
-        if NAV_TestBypass(ctx, self_, AngleNormalize360(yaw + ((arcAngle * -1.0) * 0.5)), blocked_dist, movedir) != 0 {
+        if NAV_TestBypass(
+            ctx,
+            self_,
+            AngleNormalize360(yaw + ((arcAngle * -1.0) * 0.5)),
+            blocked_dist,
+            movedir,
+        ) != 0
+        {
             return qtrue;
         }
 
@@ -843,10 +893,7 @@ pub fn NAV_Bypass(
 /// Raven `NAV_MoveBlocker`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:669-688`
-pub fn NAV_MoveBlocker(
-    self_: *mut gentity_t,
-    shove_dir: vec3_t,
-) -> qboolean {
+pub fn NAV_MoveBlocker(self_: *mut gentity_t, shove_dir: vec3_t) -> qboolean {
     unsafe {
         let mut temp_dir = [0.0f32; 3];
         let mut forward = [0.0f32; 3];
@@ -918,7 +965,12 @@ pub fn NAV_TrueCollision(
         }
 
         let mut testPos = [0.0f32; 3];
-        crate::q_math::_VectorMA((*self_).r.currentOrigin, speed * FRAMETIME as f32, velocityDir, &mut testPos);
+        crate::q_math::_VectorMA(
+            (*self_).r.currentOrigin,
+            speed * FRAMETIME as f32,
+            velocityDir,
+            &mut testPos,
+        );
 
         let mut tmins = [0.0f32; 3];
         let mut tmaxs = [0.0f32; 3];
@@ -958,20 +1010,39 @@ pub fn NAV_StackedCanyon(
         PerpendicularVector(&mut perp, pathDir);
         CrossProduct(pathDir, perp, &mut cross);
 
-        let avoidRadius = ((*blocker).r.maxs[0] * (*blocker).r.maxs[0] + (*blocker).r.maxs[1] * (*blocker).r.maxs[1]).sqrt()
-            + ((*self_).r.maxs[0] * (*self_).r.maxs[0] + (*self_).r.maxs[1] * (*self_).r.maxs[1]).sqrt();
+        let avoidRadius = ((*blocker).r.maxs[0] * (*blocker).r.maxs[0]
+            + (*blocker).r.maxs[1] * (*blocker).r.maxs[1])
+            .sqrt()
+            + ((*self_).r.maxs[0] * (*self_).r.maxs[0] + (*self_).r.maxs[1] * (*self_).r.maxs[1])
+                .sqrt();
 
         crate::q_math::_VectorMA((*blocker).r.currentOrigin, avoidRadius, cross, &mut test);
 
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut tr as *mut trace_t, &test as *const vec3_t, &(*self_).r.mins as *const vec3_t, &(*self_).r.maxs as *const vec3_t, &test as *const vec3_t, (*self_).s.number, (*self_).clipmask | extraClip),
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &test as *const vec3_t,
+                &(*self_).r.mins as *const vec3_t,
+                &(*self_).r.maxs as *const vec3_t,
+                &test as *const vec3_t,
+                (*self_).s.number,
+                (*self_).clipmask | extraClip,
+            ),
         );
         if tr.startsolid != 0 && (tr.contents & CONTENTS_BOTCLIP) != 0 {
             extraClip &= !CONTENTS_BOTCLIP;
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut tr as *mut trace_t, &test as *const vec3_t, &(*self_).r.mins as *const vec3_t, &(*self_).r.maxs as *const vec3_t, &test as *const vec3_t, (*self_).s.number, (*self_).clipmask | extraClip),
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &test as *const vec3_t,
+                    &(*self_).r.mins as *const vec3_t,
+                    &(*self_).r.maxs as *const vec3_t,
+                    &test as *const vec3_t,
+                    (*self_).s.number,
+                    (*self_).clipmask | extraClip,
+                ),
             );
         }
 
@@ -992,13 +1063,29 @@ pub fn NAV_StackedCanyon(
 
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut tr as *mut trace_t, &test as *const vec3_t, &(*self_).r.mins as *const vec3_t, &(*self_).r.maxs as *const vec3_t, &test as *const vec3_t, (*self_).s.number, (*self_).clipmask | extraClip),
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &test as *const vec3_t,
+                &(*self_).r.mins as *const vec3_t,
+                &(*self_).r.maxs as *const vec3_t,
+                &test as *const vec3_t,
+                (*self_).s.number,
+                (*self_).clipmask | extraClip,
+            ),
         );
         if tr.startsolid != 0 && (tr.contents & CONTENTS_BOTCLIP) != 0 {
             extraClip &= !CONTENTS_BOTCLIP;
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut tr as *mut trace_t, &test as *const vec3_t, &(*self_).r.mins as *const vec3_t, &(*self_).r.maxs as *const vec3_t, &test as *const vec3_t, (*self_).s.number, (*self_).clipmask | extraClip),
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &test as *const vec3_t,
+                    &(*self_).r.mins as *const vec3_t,
+                    &(*self_).r.maxs as *const vec3_t,
+                    &test as *const vec3_t,
+                    (*self_).s.number,
+                    (*self_).clipmask | extraClip,
+                ),
             );
         }
 
@@ -1036,12 +1123,17 @@ pub fn NAV_ResolveEntityCollision(
 
         // Doors are ignored
         if G_EntIsUnlockedDoor(ctx, (*blocker).s.number) != 0
-            && DistanceSquared((*self_).r.currentOrigin, (*blocker).r.currentOrigin) > MIN_DOOR_BLOCK_DIST_SQR as f32
+            && DistanceSquared((*self_).r.currentOrigin, (*blocker).r.currentOrigin)
+                > MIN_DOOR_BLOCK_DIST_SQR as f32
         {
             return qtrue;
         }
 
-        crate::q_math::_VectorSubtract((*blocker).r.currentOrigin, (*self_).r.currentOrigin, &mut blocked_dir);
+        crate::q_math::_VectorSubtract(
+            (*blocker).r.currentOrigin,
+            (*self_).r.currentOrigin,
+            &mut blocked_dir,
+        );
         let blocked_dist = VectorNormalize(&mut blocked_dir);
 
         // See if we can get around the blocker at all (only for player!)
@@ -1085,7 +1177,15 @@ pub fn NAV_TestForBlocked(
             return qfalse;
         }
 
-        if NAV_HitNavGoal((*blocker).r.currentOrigin, (*blocker).r.mins, (*blocker).r.maxs, (*goal).r.currentOrigin, 12, qfalse) != 0 {
+        if NAV_HitNavGoal(
+            (*blocker).r.currentOrigin,
+            (*blocker).r.mins,
+            (*blocker).r.maxs,
+            (*goal).r.currentOrigin,
+            12,
+            qfalse,
+        ) != 0
+        {
             *flags |= NIF_BLOCKED;
 
             if distance <= MIN_STOP_DIST as f32 {
@@ -1121,7 +1221,12 @@ pub fn NAV_AvoidCollision(
         }
 
         // Get an end position
-        crate::q_math::_VectorMA((*self_).r.currentOrigin, (*info).distance, (*info).direction, &mut movepos);
+        crate::q_math::_VectorMA(
+            (*self_).r.currentOrigin,
+            (*info).distance,
+            (*info).direction,
+            &mut movepos,
+        );
         crate::q_math::_VectorCopy((*info).direction, &mut movedir);
 
         if !self_.is_null() && !(*self_).NPC.is_null() {
@@ -1132,9 +1237,17 @@ pub fn NAV_AvoidCollision(
             }
         }
         // Now test against entities
-        if NAV_CheckAhead(ctx, self_, movepos, &mut (*info).trace as *mut trace_t, CONTENTS_BODY) == 0 {
+        if NAV_CheckAhead(
+            ctx,
+            self_,
+            movepos,
+            &mut (*info).trace as *mut trace_t,
+            CONTENTS_BODY,
+        ) == 0
+        {
             // Get the blocker
-            (*info).blocker = &mut (*ctx.world).g_entities[(*info).trace.entityNum as usize] as *mut gentity_t;
+            (*info).blocker =
+                &mut (*ctx.world).g_entities[(*info).trace.entityNum as usize] as *mut gentity_t;
             (*info).flags |= NIF_COLLISION;
 
             // Ok to hit our goal entity
@@ -1143,7 +1256,15 @@ pub fn NAV_AvoidCollision(
             }
 
             // Test for blocking by standing on goal
-            if NAV_TestForBlocked(ctx, self_, goal, (*info).blocker, (*info).distance, &mut (*info).flags as *mut c_int) != 0 {
+            if NAV_TestForBlocked(
+                ctx,
+                self_,
+                goal,
+                (*info).blocker,
+                (*info).distance,
+                &mut (*info).flags as *mut c_int,
+            ) != 0
+            {
                 return qfalse;
             }
 
@@ -1153,7 +1274,14 @@ pub fn NAV_AvoidCollision(
             }
 
             // See if we can get that entity to move out of our way
-            if NAV_ResolveEntityCollision(ctx, self_, (*info).blocker, movedir, (*info).pathDirection) == 0 {
+            if NAV_ResolveEntityCollision(
+                ctx,
+                self_,
+                (*info).blocker,
+                movedir,
+                (*info).pathDirection,
+            ) == 0
+            {
                 return qfalse;
             }
 
@@ -1188,21 +1316,44 @@ pub fn NAV_TestBestNode(
         let mut clipmask = ((*npc_ent).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP;
 
         // get the position for the test choice
-        trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(endID, &mut end as *mut vec3_t));
+        trap::Nav_GetNodePosition(
+            ctx.engine,
+            GNavGetnodepositionArgs::new(endID, &mut end as *mut vec3_t),
+        );
 
         // Offset the step height
-        let mins = [(*self_).r.mins[0], (*self_).r.mins[1], (*self_).r.mins[2] + STEPSIZE];
+        let mins = [
+            (*self_).r.mins[0],
+            (*self_).r.mins[1],
+            (*self_).r.mins[2] + STEPSIZE,
+        ];
 
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut trace as *mut trace_t, &(*self_).r.currentOrigin as *const vec3_t, &mins as *const vec3_t, &(*self_).r.maxs as *const vec3_t, &end as *const vec3_t, (*self_).s.number, clipmask),
+            GTraceArgs::new(
+                &mut trace as *mut trace_t,
+                &(*self_).r.currentOrigin as *const vec3_t,
+                &mins as *const vec3_t,
+                &(*self_).r.maxs as *const vec3_t,
+                &end as *const vec3_t,
+                (*self_).s.number,
+                clipmask,
+            ),
         );
 
         if trace.startsolid != 0 && (trace.contents & CONTENTS_BOTCLIP) != 0 {
             clipmask &= !CONTENTS_BOTCLIP;
             trap::Trace(
                 ctx.engine,
-                GTraceArgs::new(&mut trace as *mut trace_t, &(*self_).r.currentOrigin as *const vec3_t, &mins as *const vec3_t, &(*self_).r.maxs as *const vec3_t, &end as *const vec3_t, (*self_).s.number, clipmask),
+                GTraceArgs::new(
+                    &mut trace as *mut trace_t,
+                    &(*self_).r.currentOrigin as *const vec3_t,
+                    &mins as *const vec3_t,
+                    &(*self_).r.maxs as *const vec3_t,
+                    &end as *const vec3_t,
+                    (*self_).s.number,
+                    clipmask,
+                ),
             );
         }
         // Do a simple check
@@ -1211,11 +1362,17 @@ pub fn NAV_TestBestNode(
         }
 
         // See if we're too far above
-        if (*self_).s.weapon != WP_SABER as c_int && ((*self_).r.currentOrigin[2] - end[2]).abs() > 48.0 {
+        if (*self_).s.weapon != WP_SABER as c_int
+            && ((*self_).r.currentOrigin[2] - end[2]).abs() > 48.0
+        {
             // too far above
         } else {
             // This is a work around
-            let radius = if (*self_).r.maxs[0] > (*self_).r.maxs[1] { (*self_).r.maxs[0] } else { (*self_).r.maxs[1] };
+            let radius = if (*self_).r.maxs[0] > (*self_).r.maxs[1] {
+                (*self_).r.maxs[0]
+            } else {
+                (*self_).r.maxs[1]
+            };
             let dist = Distance((*self_).r.currentOrigin, end);
             let tFrac = 1.0 - (radius / dist);
 
@@ -1233,10 +1390,14 @@ pub fn NAV_TestBestNode(
                 // special case: doors are architecture, but are dynamic, like entities
                 if G_EntIsUnlockedDoor(ctx, (*blocker).s.number) != 0 {
                     // it's unlocked, go for it
-                    if DistanceSquared((*self_).r.currentOrigin, trace.endpos) < MIN_DOOR_BLOCK_DIST_SQR as f32 {
+                    if DistanceSquared((*self_).r.currentOrigin, trace.endpos)
+                        < MIN_DOOR_BLOCK_DIST_SQR as f32
+                    {
                         return startID;
                     }
-                    if (*self_).s.weapon != WP_SABER as c_int && ((*self_).r.currentOrigin[2] - end[2]).abs() > 48.0 {
+                    if (*self_).s.weapon != WP_SABER as c_int
+                        && ((*self_).r.currentOrigin[2] - end[2]).abs() > 48.0
+                    {
                         // too far above
                     } else {
                         return endID;
@@ -1244,22 +1405,35 @@ pub fn NAV_TestBestNode(
                 } else if G_EntIsDoor(ctx, (*blocker).s.number) != 0 {
                     // a locked door!
                     if failEdge != 0 {
-                        trap::Nav_AddFailedEdge(ctx.engine, GNavAddfailededgeArgs::new((*self_).s.number, startID, endID));
+                        trap::Nav_AddFailedEdge(
+                            ctx.engine,
+                            GNavAddfailededgeArgs::new((*self_).s.number, startID, endID),
+                        );
                     }
                 } else if G_EntIsBreakable(ctx, (*blocker).s.number) != 0 {
                     if failEdge != 0 {
-                        trap::Nav_AddFailedEdge(ctx.engine, GNavAddfailededgeArgs::new((*self_).s.number, startID, endID));
+                        trap::Nav_AddFailedEdge(
+                            ctx.engine,
+                            GNavAddfailededgeArgs::new((*self_).s.number, startID, endID),
+                        );
                     }
                 } else if G_EntIsRemovableUsable(ctx, (*blocker).s.number) != 0 {
                     if failEdge != 0 {
-                        trap::Nav_AddFailedEdge(ctx.engine, GNavAddfailededgeArgs::new((*self_).s.number, startID, endID));
+                        trap::Nav_AddFailedEdge(
+                            ctx.engine,
+                            GNavAddfailededgeArgs::new((*self_).s.number, startID, endID),
+                        );
                     }
                 } else if !(*blocker).targetname.is_null()
                     && (*blocker).s.solid == SOLID_BMODEL as c_int
-                    && (((*blocker).r.contents & CONTENTS_MONSTERCLIP) != 0 || ((*blocker).r.contents & CONTENTS_BOTCLIP) != 0)
+                    && (((*blocker).r.contents & CONTENTS_MONSTERCLIP) != 0
+                        || ((*blocker).r.contents & CONTENTS_BOTCLIP) != 0)
                 {
                     if failEdge != 0 {
-                        trap::Nav_AddFailedEdge(ctx.engine, GNavAddfailededgeArgs::new((*self_).s.number, startID, endID));
+                        trap::Nav_AddFailedEdge(
+                            ctx.engine,
+                            GNavAddfailededgeArgs::new((*self_).s.number, startID, endID),
+                        );
                     }
                 }
             }
@@ -1272,22 +1446,17 @@ pub fn NAV_TestBestNode(
 /// Raven `NAV_GetNearestNode`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1083-1086`
-pub fn NAV_GetNearestNode(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    lastNode: c_int,
-) -> c_int {
-    trap::Nav_GetNearestNode(ctx.engine, GNavGetnearestnodeArgs::new(self_, lastNode, NF_CLEAR_PATH, WAYPOINT_NONE))
+pub fn NAV_GetNearestNode(ctx: GameContext<'_>, self_: *mut gentity_t, lastNode: c_int) -> c_int {
+    trap::Nav_GetNearestNode(
+        ctx.engine,
+        GNavGetnearestnodeArgs::new(self_, lastNode, NF_CLEAR_PATH, WAYPOINT_NONE),
+    )
 }
 
 /// Raven `NAV_MicroError`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1094-1105`
-pub fn NAV_MicroError(
-    ctx: GameContext<'_>,
-    start: vec3_t,
-    end: vec3_t,
-) -> qboolean {
+pub fn NAV_MicroError(ctx: GameContext<'_>, start: vec3_t, end: vec3_t) -> qboolean {
     unsafe {
         if VectorCompare(start, end) != 0 {
             let npc = (*ctx.world).globals.NPC as *mut gentity_t;
@@ -1303,11 +1472,7 @@ pub fn NAV_MicroError(
 /// Raven `NAV_MoveToGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1113-1212`
-pub fn NAV_MoveToGoal(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    info: *mut navInfo_t,
-) -> c_int {
+pub fn NAV_MoveToGoal(ctx: GameContext<'_>, self_: *mut gentity_t, info: *mut navInfo_t) -> c_int {
     unsafe {
         let mut bestNode: c_int;
         let mut origin = [0.0f32; 3];
@@ -1342,13 +1507,22 @@ pub fn NAV_MoveToGoal(
             return WAYPOINT_NONE;
         }
 
-        bestNode = trap::Nav_GetBestNode(ctx.engine, GNavGetbestnodeArgs::new((*self_).waypoint, (*goal_ent).waypoint, NODE_NONE));
+        bestNode = trap::Nav_GetBestNode(
+            ctx.engine,
+            GNavGetbestnodeArgs::new((*self_).waypoint, (*goal_ent).waypoint, NODE_NONE),
+        );
 
         if bestNode == WAYPOINT_NONE {
             if (*ctx.world).globals.NAVDEBUG_showEnemyPath != 0 {
                 let mut torigin = [0.0f32; 3];
-                trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new((*goal_ent).waypoint, &mut torigin as *mut vec3_t));
-                trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new((*self_).waypoint, &mut origin as *mut vec3_t));
+                trap::Nav_GetNodePosition(
+                    ctx.engine,
+                    GNavGetnodepositionArgs::new((*goal_ent).waypoint, &mut torigin as *mut vec3_t),
+                );
+                trap::Nav_GetNodePosition(
+                    ctx.engine,
+                    GNavGetnodepositionArgs::new((*self_).waypoint, &mut origin as *mut vec3_t),
+                );
 
                 G_DrawNode(torigin, NODE_GOAL);
                 G_DrawNode(origin, NODE_GOAL);
@@ -1362,21 +1536,44 @@ pub fn NAV_MoveToGoal(
         bestNode = NAV_TestBestNode(ctx, self_, bestNode, (*goal_ent).waypoint, qfalse);
 
         // Get this position
-        trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(bestNode, &mut origin as *mut vec3_t));
-        trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new((*self_).waypoint, &mut end as *mut vec3_t));
+        trap::Nav_GetNodePosition(
+            ctx.engine,
+            GNavGetnodepositionArgs::new(bestNode, &mut origin as *mut vec3_t),
+        );
+        trap::Nav_GetNodePosition(
+            ctx.engine,
+            GNavGetnodepositionArgs::new((*self_).waypoint, &mut end as *mut vec3_t),
+        );
 
         // Test the path connection from our current position to the best node
-        if NAV_CheckAhead(ctx, self_, origin, &mut (*info).trace as *mut trace_t, ((*self_).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP) == 0 {
+        if NAV_CheckAhead(
+            ctx,
+            self_,
+            origin,
+            &mut (*info).trace as *mut trace_t,
+            ((*self_).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
+        ) == 0
+        {
             // First attempt to move to the closest point on the line between the waypoints
             let mut new_origin = [0.0f32; 3];
             G_FindClosestPointOnLineSegment(origin, end, (*self_).r.currentOrigin, &mut new_origin);
             origin = new_origin;
 
             // See if we can go there
-            if NAV_CheckAhead(ctx, self_, origin, &mut (*info).trace as *mut trace_t, ((*self_).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP) == 0 {
+            if NAV_CheckAhead(
+                ctx,
+                self_,
+                origin,
+                &mut (*info).trace as *mut trace_t,
+                ((*self_).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
+            ) == 0
+            {
                 // Just move towards our current waypoint
                 bestNode = (*self_).waypoint;
-                trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(bestNode, &mut origin as *mut vec3_t));
+                trap::Nav_GetNodePosition(
+                    ctx.engine,
+                    GNavGetnodepositionArgs::new(bestNode, &mut origin as *mut vec3_t),
+                );
             }
         }
 
@@ -1392,12 +1589,21 @@ pub fn NAV_MoveToGoal(
             let mut dest = [0.0f32; 3];
             let mut start = [0.0f32; 3];
 
-            trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new((*goal_ent).waypoint, &mut dest as *mut vec3_t));
-            trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(bestNode, &mut start as *mut vec3_t));
+            trap::Nav_GetNodePosition(
+                ctx.engine,
+                GNavGetnodepositionArgs::new((*goal_ent).waypoint, &mut dest as *mut vec3_t),
+            );
+            trap::Nav_GetNodePosition(
+                ctx.engine,
+                GNavGetnodepositionArgs::new(bestNode, &mut start as *mut vec3_t),
+            );
 
             G_DrawNode(start, NODE_START);
             G_DrawNode(dest, NODE_GOAL);
-            trap::Nav_ShowPath(ctx.engine, GNavShowpathArgs::new((*self_).waypoint, (*goal_ent).waypoint));
+            trap::Nav_ShowPath(
+                ctx.engine,
+                GNavShowpathArgs::new((*self_).waypoint, (*goal_ent).waypoint),
+            );
         }
 
         bestNode
@@ -1434,7 +1640,15 @@ pub fn waypoint_testDirection(
 
         trap::Trace(
             ctx.engine,
-            GTraceArgs::new(&mut tr as *mut trace_t, &origin as *const vec3_t, &mins as *const vec3_t, &maxs as *const vec3_t, &test_pos as *const vec3_t, ENTITYNUM_NONE, CONTENTS_SOLID | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP),
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &origin as *const vec3_t,
+                &mins as *const vec3_t,
+                &maxs as *const vec3_t,
+                &test_pos as *const vec3_t,
+                ENTITYNUM_NONE,
+                CONTENTS_SOLID | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP,
+            ),
         );
 
         (minDist as f32 * tr.fraction) as c_uint
@@ -1444,15 +1658,17 @@ pub fn waypoint_testDirection(
 /// Raven `waypoint_getRadius`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1251-1266`
-pub fn waypoint_getRadius(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> c_uint {
+pub fn waypoint_getRadius(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_uint {
     unsafe {
         let mut minDist: c_uint = (MAX_RADIUS_CHECK + 1) as c_uint;
 
         for i in 0..YAW_ITERATIONS {
-            let dist = waypoint_testDirection(ctx, (*ent).r.currentOrigin, (360.0 / YAW_ITERATIONS as f32) * i as f32, minDist);
+            let dist = waypoint_testDirection(
+                ctx,
+                (*ent).r.currentOrigin,
+                (360.0 / YAW_ITERATIONS as f32) * i as f32,
+                minDist,
+            );
             if dist < minDist {
                 minDist = dist;
             }
@@ -1465,10 +1681,7 @@ pub fn waypoint_getRadius(
 /// Raven `SP_waypoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1275-1313`
-pub fn SP_waypoint(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_waypoint(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ctx.world).globals.navCalculatePaths != 0 {
             (*ent).r.mins = [-15.0, -15.0, DEFAULT_MINS_2];
@@ -1486,7 +1699,11 @@ pub fn SP_waypoint(
                 // if not SOLID_OK, and in solid
                 (*ent).r.maxs[2] = CROUCH_MAXS_2;
                 if G_CheckInSolid(ctx, ent, qtrue) != 0 {
-                    let s = format!("ERROR: Waypoint {} at {} in solid!\n", cstr_to_str((*ent).targetname), cstr_to_str(vtos(ctx, (*ent).r.currentOrigin)));
+                    let s = format!(
+                        "ERROR: Waypoint {} at {} in solid!\n",
+                        cstr_to_str((*ent).targetname),
+                        cstr_to_str(vtos(ctx, (*ent).r.currentOrigin))
+                    );
                     Com_Printf(cstr(&s).as_ptr());
                     debug_assert!(false, "Waypoint in solid!");
                     G_FreeEntity(ctx, ent);
@@ -1496,7 +1713,14 @@ pub fn SP_waypoint(
 
             let radius = waypoint_getRadius(ctx, ent);
 
-            (*ent).health = trap::Nav_AddRawPoint(ctx.engine, GNavAddrawpointArgs::new(&(*ent).r.currentOrigin as *const vec3_t, (*ent).spawnflags, radius as c_int));
+            (*ent).health = trap::Nav_AddRawPoint(
+                ctx.engine,
+                GNavAddrawpointArgs::new(
+                    &(*ent).r.currentOrigin as *const vec3_t,
+                    (*ent).spawnflags,
+                    radius as c_int,
+                ),
+            );
             NAV_StoreWaypoint(ctx, ent);
             G_FreeEntity(ctx, ent);
             return;
@@ -1509,10 +1733,7 @@ pub fn SP_waypoint(
 /// Raven `SP_waypoint_small`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1318-1352`
-pub fn SP_waypoint_small(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_waypoint_small(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ctx.world).globals.navCalculatePaths != 0 {
             (*ent).r.mins = [-2.0, -2.0, DEFAULT_MINS_2];
@@ -1529,7 +1750,11 @@ pub fn SP_waypoint_small(
             if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qtrue) != 0 {
                 (*ent).r.maxs[2] = CROUCH_MAXS_2;
                 if G_CheckInSolid(ctx, ent, qtrue) != 0 {
-                    let s = format!("ERROR: Waypoint_small {} at {} in solid!\n", cstr_to_str((*ent).targetname), cstr_to_str(vtos(ctx, (*ent).r.currentOrigin)));
+                    let s = format!(
+                        "ERROR: Waypoint_small {} at {} in solid!\n",
+                        cstr_to_str((*ent).targetname),
+                        cstr_to_str(vtos(ctx, (*ent).r.currentOrigin))
+                    );
                     Com_Printf(cstr(&s).as_ptr());
                     debug_assert!(false);
                     G_FreeEntity(ctx, ent);
@@ -1537,7 +1762,14 @@ pub fn SP_waypoint_small(
                 }
             }
 
-            (*ent).health = trap::Nav_AddRawPoint(ctx.engine, GNavAddrawpointArgs::new(&(*ent).r.currentOrigin as *const vec3_t, (*ent).spawnflags, 2));
+            (*ent).health = trap::Nav_AddRawPoint(
+                ctx.engine,
+                GNavAddrawpointArgs::new(
+                    &(*ent).r.currentOrigin as *const vec3_t,
+                    (*ent).spawnflags,
+                    2,
+                ),
+            );
             NAV_StoreWaypoint(ctx, ent);
             G_FreeEntity(ctx, ent);
             return;
@@ -1550,22 +1782,35 @@ pub fn SP_waypoint_small(
 /// Raven `SP_waypoint_navgoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1370-1386`
-pub fn SP_waypoint_navgoal(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_waypoint_navgoal(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        let radius: c_int = if (*ent).radius != 0.0 { ((*ent).radius as c_int) | NAVGOAL_USE_RADIUS } else { 12 };
+        let radius: c_int = if (*ent).radius != 0.0 {
+            ((*ent).radius as c_int) | NAVGOAL_USE_RADIUS
+        } else {
+            12
+        };
 
         (*ent).r.mins = [-16.0, -16.0, -24.0];
         (*ent).r.maxs = [16.0, 16.0, 32.0];
         (*ent).s.origin[2] += 0.125;
         if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-            let s = format!("ERROR: Waypoint_navgoal {} at {} in solid!\n", cstr_to_str((*ent).targetname), cstr_to_str(vtos(ctx, (*ent).r.currentOrigin)));
+            let s = format!(
+                "ERROR: Waypoint_navgoal {} at {} in solid!\n",
+                cstr_to_str((*ent).targetname),
+                cstr_to_str(vtos(ctx, (*ent).r.currentOrigin))
+            );
             Com_Printf(cstr(&s).as_ptr());
             debug_assert!(false);
         }
-        TAG_Add(ctx, (*ent).targetname, core::ptr::null(), (*ent).s.origin, (*ent).s.angles, radius, RTF_NAVGOAL);
+        TAG_Add(
+            ctx,
+            (*ent).targetname,
+            core::ptr::null(),
+            (*ent).s.origin,
+            (*ent).s.angles,
+            radius,
+            RTF_NAVGOAL,
+        );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
         G_FreeEntity(ctx, ent); // can't do this, they need to be found later by some functions, though those could be fixed, maybe?
@@ -1575,21 +1820,30 @@ pub fn SP_waypoint_navgoal(
 /// Raven `SP_waypoint_navgoal_8`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1402-1417`
-pub fn SP_waypoint_navgoal_8(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_waypoint_navgoal_8(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).r.mins = [-8.0, -8.0, -24.0];
         (*ent).r.maxs = [8.0, 8.0, 32.0];
         (*ent).s.origin[2] += 0.125;
         if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-            let s = format!("ERROR: Waypoint_navgoal_8 {} at {} in solid!\n", cstr_to_str((*ent).targetname), cstr_to_str(vtos(ctx, (*ent).r.currentOrigin)));
+            let s = format!(
+                "ERROR: Waypoint_navgoal_8 {} at {} in solid!\n",
+                cstr_to_str((*ent).targetname),
+                cstr_to_str(vtos(ctx, (*ent).r.currentOrigin))
+            );
             Com_Printf(cstr(&s).as_ptr());
             debug_assert!(false);
         }
 
-        TAG_Add(ctx, (*ent).targetname, core::ptr::null(), (*ent).s.origin, (*ent).s.angles, 8, RTF_NAVGOAL);
+        TAG_Add(
+            ctx,
+            (*ent).targetname,
+            core::ptr::null(),
+            (*ent).s.origin,
+            (*ent).s.angles,
+            8,
+            RTF_NAVGOAL,
+        );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
         G_FreeEntity(ctx, ent);
@@ -1599,21 +1853,30 @@ pub fn SP_waypoint_navgoal_8(
 /// Raven `SP_waypoint_navgoal_4`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1433-1448`
-pub fn SP_waypoint_navgoal_4(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_waypoint_navgoal_4(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).r.mins = [-4.0, -4.0, -24.0];
         (*ent).r.maxs = [4.0, 4.0, 32.0];
         (*ent).s.origin[2] += 0.125;
         if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-            let s = format!("ERROR: Waypoint_navgoal_4 {} at {} in solid!\n", cstr_to_str((*ent).targetname), cstr_to_str(vtos(ctx, (*ent).r.currentOrigin)));
+            let s = format!(
+                "ERROR: Waypoint_navgoal_4 {} at {} in solid!\n",
+                cstr_to_str((*ent).targetname),
+                cstr_to_str(vtos(ctx, (*ent).r.currentOrigin))
+            );
             Com_Printf(cstr(&s).as_ptr());
             debug_assert!(false);
         }
 
-        TAG_Add(ctx, (*ent).targetname, core::ptr::null(), (*ent).s.origin, (*ent).s.angles, 4, RTF_NAVGOAL);
+        TAG_Add(
+            ctx,
+            (*ent).targetname,
+            core::ptr::null(),
+            (*ent).s.origin,
+            (*ent).s.angles,
+            4,
+            RTF_NAVGOAL,
+        );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
         G_FreeEntity(ctx, ent);
@@ -1623,21 +1886,30 @@ pub fn SP_waypoint_navgoal_4(
 /// Raven `SP_waypoint_navgoal_2`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1464-1479`
-pub fn SP_waypoint_navgoal_2(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_waypoint_navgoal_2(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).r.mins = [-2.0, -2.0, -24.0];
         (*ent).r.maxs = [2.0, 2.0, 32.0];
         (*ent).s.origin[2] += 0.125;
         if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-            let s = format!("ERROR: Waypoint_navgoal_2 {} at {} in solid!\n", cstr_to_str((*ent).targetname), cstr_to_str(vtos(ctx, (*ent).r.currentOrigin)));
+            let s = format!(
+                "ERROR: Waypoint_navgoal_2 {} at {} in solid!\n",
+                cstr_to_str((*ent).targetname),
+                cstr_to_str(vtos(ctx, (*ent).r.currentOrigin))
+            );
             Com_Printf(cstr(&s).as_ptr());
             debug_assert!(false);
         }
 
-        TAG_Add(ctx, (*ent).targetname, core::ptr::null(), (*ent).s.origin, (*ent).s.angles, 2, RTF_NAVGOAL);
+        TAG_Add(
+            ctx,
+            (*ent).targetname,
+            core::ptr::null(),
+            (*ent).s.origin,
+            (*ent).s.angles,
+            2,
+            RTF_NAVGOAL,
+        );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
         G_FreeEntity(ctx, ent);
@@ -1647,21 +1919,30 @@ pub fn SP_waypoint_navgoal_2(
 /// Raven `SP_waypoint_navgoal_1`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1495-1510`
-pub fn SP_waypoint_navgoal_1(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SP_waypoint_navgoal_1(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).r.mins = [-1.0, -1.0, -24.0];
         (*ent).r.maxs = [1.0, 1.0, 32.0];
         (*ent).s.origin[2] += 0.125;
         if ((*ent).spawnflags & 1) == 0 && G_CheckInSolid(ctx, ent, qfalse) != 0 {
-            let s = format!("ERROR: Waypoint_navgoal_1 {} at {} in solid!\n", cstr_to_str((*ent).targetname), cstr_to_str(vtos(ctx, (*ent).r.currentOrigin)));
+            let s = format!(
+                "ERROR: Waypoint_navgoal_1 {} at {} in solid!\n",
+                cstr_to_str((*ent).targetname),
+                cstr_to_str(vtos(ctx, (*ent).r.currentOrigin))
+            );
             Com_Printf(cstr(&s).as_ptr());
             debug_assert!(false);
         }
 
-        TAG_Add(ctx, (*ent).targetname, core::ptr::null(), (*ent).s.origin, (*ent).s.angles, 1, RTF_NAVGOAL);
+        TAG_Add(
+            ctx,
+            (*ent).targetname,
+            core::ptr::null(),
+            (*ent).s.origin,
+            (*ent).s.angles,
+            1,
+            RTF_NAVGOAL,
+        );
 
         (*ent).classname = c"navgoal".as_ptr() as *mut c_char;
         G_FreeEntity(ctx, ent);
@@ -1680,7 +1961,8 @@ pub fn Svcmd_Nav_f(ctx: GameContext<'_>) {
             trap::Argv(ctx.engine, GArgvArgs::new(2, cmd.as_mut_ptr(), 1024));
 
             if Q_stricmp(cmd.as_ptr(), c"all".as_ptr()) == 0 {
-                (*ctx.world).globals.NAVDEBUG_showNodes = ((*ctx.world).globals.NAVDEBUG_showNodes == 0) as qboolean;
+                (*ctx.world).globals.NAVDEBUG_showNodes =
+                    ((*ctx.world).globals.NAVDEBUG_showNodes == 0) as qboolean;
 
                 // NOTENOTE: This causes the two states to sync up if they aren't already
                 let v = (*ctx.world).globals.NAVDEBUG_showNodes;
@@ -1691,21 +1973,29 @@ pub fn Svcmd_Nav_f(ctx: GameContext<'_>) {
                 (*ctx.world).globals.NAVDEBUG_showEdges = v;
                 (*ctx.world).globals.NAVDEBUG_showRadius = v;
             } else if Q_stricmp(cmd.as_ptr(), c"nodes".as_ptr()) == 0 {
-                (*ctx.world).globals.NAVDEBUG_showNodes = ((*ctx.world).globals.NAVDEBUG_showNodes == 0) as qboolean;
+                (*ctx.world).globals.NAVDEBUG_showNodes =
+                    ((*ctx.world).globals.NAVDEBUG_showNodes == 0) as qboolean;
             } else if Q_stricmp(cmd.as_ptr(), c"radius".as_ptr()) == 0 {
-                (*ctx.world).globals.NAVDEBUG_showRadius = ((*ctx.world).globals.NAVDEBUG_showRadius == 0) as qboolean;
+                (*ctx.world).globals.NAVDEBUG_showRadius =
+                    ((*ctx.world).globals.NAVDEBUG_showRadius == 0) as qboolean;
             } else if Q_stricmp(cmd.as_ptr(), c"edges".as_ptr()) == 0 {
-                (*ctx.world).globals.NAVDEBUG_showEdges = ((*ctx.world).globals.NAVDEBUG_showEdges == 0) as qboolean;
+                (*ctx.world).globals.NAVDEBUG_showEdges =
+                    ((*ctx.world).globals.NAVDEBUG_showEdges == 0) as qboolean;
             } else if Q_stricmp(cmd.as_ptr(), c"testpath".as_ptr()) == 0 {
-                (*ctx.world).globals.NAVDEBUG_showTestPath = ((*ctx.world).globals.NAVDEBUG_showTestPath == 0) as qboolean;
+                (*ctx.world).globals.NAVDEBUG_showTestPath =
+                    ((*ctx.world).globals.NAVDEBUG_showTestPath == 0) as qboolean;
             } else if Q_stricmp(cmd.as_ptr(), c"enemypath".as_ptr()) == 0 {
-                (*ctx.world).globals.NAVDEBUG_showEnemyPath = ((*ctx.world).globals.NAVDEBUG_showEnemyPath == 0) as qboolean;
+                (*ctx.world).globals.NAVDEBUG_showEnemyPath =
+                    ((*ctx.world).globals.NAVDEBUG_showEnemyPath == 0) as qboolean;
             } else if Q_stricmp(cmd.as_ptr(), c"combatpoints".as_ptr()) == 0 {
-                (*ctx.world).globals.NAVDEBUG_showCombatPoints = ((*ctx.world).globals.NAVDEBUG_showCombatPoints == 0) as qboolean;
+                (*ctx.world).globals.NAVDEBUG_showCombatPoints =
+                    ((*ctx.world).globals.NAVDEBUG_showCombatPoints == 0) as qboolean;
             } else if Q_stricmp(cmd.as_ptr(), c"navgoals".as_ptr()) == 0 {
-                (*ctx.world).globals.NAVDEBUG_showNavGoals = ((*ctx.world).globals.NAVDEBUG_showNavGoals == 0) as qboolean;
+                (*ctx.world).globals.NAVDEBUG_showNavGoals =
+                    ((*ctx.world).globals.NAVDEBUG_showNavGoals == 0) as qboolean;
             } else if Q_stricmp(cmd.as_ptr(), c"collision".as_ptr()) == 0 {
-                (*ctx.world).globals.NAVDEBUG_showCollision = ((*ctx.world).globals.NAVDEBUG_showCollision == 0) as qboolean;
+                (*ctx.world).globals.NAVDEBUG_showCollision =
+                    ((*ctx.world).globals.NAVDEBUG_showCollision == 0) as qboolean;
             }
         } else if Q_stricmp(cmd.as_ptr(), c"set".as_ptr()) == 0 {
             trap::Argv(ctx.engine, GArgvArgs::new(2, cmd.as_mut_ptr(), 1024));
@@ -1714,7 +2004,12 @@ pub fn Svcmd_Nav_f(ctx: GameContext<'_>) {
                 let ent0 = &mut (*ctx.world).g_entities[0] as *mut gentity_t;
                 (*ctx.world).globals.NAVDEBUG_curGoal = trap::Nav_GetNearestNode(
                     ctx.engine,
-                    GNavGetnearestnodeArgs::new(ent0, (*ent0).waypoint, NF_CLEAR_PATH, WAYPOINT_NONE),
+                    GNavGetnearestnodeArgs::new(
+                        ent0,
+                        (*ent0).waypoint,
+                        NF_CLEAR_PATH,
+                        WAYPOINT_NONE,
+                    ),
                 );
             }
         } else if Q_stricmp(cmd.as_ptr(), c"totals".as_ptr()) == 0 {
@@ -1723,7 +2018,10 @@ pub fn Svcmd_Nav_f(ctx: GameContext<'_>) {
             let n = trap::Nav_GetNumNodes(ctx.engine, GNavGetnumnodesArgs::new());
             let s = format!("Total Nodes:         {}\n", n);
             Com_Printf(cstr(&s).as_ptr());
-            let s2 = format!("Total Combat Points: {}\n", (*ctx.world).level.numCombatPoints);
+            let s2 = format!(
+                "Total Combat Points: {}\n",
+                (*ctx.world).level.numCombatPoints
+            );
             Com_Printf(cstr(&s2).as_ptr());
         } else {
             // Print the available commands
@@ -1747,14 +2045,30 @@ pub fn NAV_WaypointsTooFar(
             (*ctx.world).globals.fatalErrors += 1;
 
             let temp = if (*wp1).targetname.is_null() && (*wp2).targetname.is_null() {
-                format!("Waypoint conn {}->{} > 1024\n", cstr_to_str(vtos(ctx, (*wp1).r.currentOrigin)), cstr_to_str(vtos(ctx, (*wp2).r.currentOrigin)))
+                format!(
+                    "Waypoint conn {}->{} > 1024\n",
+                    cstr_to_str(vtos(ctx, (*wp1).r.currentOrigin)),
+                    cstr_to_str(vtos(ctx, (*wp2).r.currentOrigin))
+                )
             } else if (*wp1).targetname.is_null() {
-                format!("Waypoint conn {}->{} > 1024\n", cstr_to_str(vtos(ctx, (*wp1).r.currentOrigin)), cstr_to_str((*wp2).targetname))
+                format!(
+                    "Waypoint conn {}->{} > 1024\n",
+                    cstr_to_str(vtos(ctx, (*wp1).r.currentOrigin)),
+                    cstr_to_str((*wp2).targetname)
+                )
             } else if (*wp2).targetname.is_null() {
-                format!("Waypoint conn {}->{} > 1024\n", cstr_to_str((*wp1).targetname), cstr_to_str(vtos(ctx, (*wp2).r.currentOrigin)))
+                format!(
+                    "Waypoint conn {}->{} > 1024\n",
+                    cstr_to_str((*wp1).targetname),
+                    cstr_to_str(vtos(ctx, (*wp2).r.currentOrigin))
+                )
             } else {
                 // they both have valid targetnames
-                format!("Waypoint conn {}->{} > 1024\n", cstr_to_str((*wp1).targetname), cstr_to_str((*wp2).targetname))
+                format!(
+                    "Waypoint conn {}->{} > 1024\n",
+                    cstr_to_str((*wp1).targetname),
+                    cstr_to_str((*wp2).targetname)
+                )
             };
 
             //TODO: Port fatalErrorString append
@@ -1790,29 +2104,54 @@ pub fn NAV_ClearStoredWaypoints(ctx: GameContext<'_>) {
 /// Raven `NAV_StoreWaypoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1669-1711`
-pub fn NAV_StoreWaypoint(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn NAV_StoreWaypoint(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ctx.world).globals.numStoredWaypoints >= MAX_STORED_WAYPOINTS as c_int {
             return;
         }
         let i = (*ctx.world).globals.numStoredWaypoints as usize;
         if !(*ent).targetname.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].targetname.as_mut_ptr(), (*ent).targetname, MAX_QPATH as c_int);
+            Q_strncpyz(
+                (*ctx.world).globals.tempWaypointList[i]
+                    .targetname
+                    .as_mut_ptr(),
+                (*ent).targetname,
+                MAX_QPATH as c_int,
+            );
         }
         if !(*ent).target.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target.as_mut_ptr(), (*ent).target, MAX_QPATH as c_int);
+            Q_strncpyz(
+                (*ctx.world).globals.tempWaypointList[i].target.as_mut_ptr(),
+                (*ent).target,
+                MAX_QPATH as c_int,
+            );
         }
         if !(*ent).target2.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target2.as_mut_ptr(), (*ent).target2, MAX_QPATH as c_int);
+            Q_strncpyz(
+                (*ctx.world).globals.tempWaypointList[i]
+                    .target2
+                    .as_mut_ptr(),
+                (*ent).target2,
+                MAX_QPATH as c_int,
+            );
         }
         if !(*ent).target3.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target3.as_mut_ptr(), (*ent).target3, MAX_QPATH as c_int);
+            Q_strncpyz(
+                (*ctx.world).globals.tempWaypointList[i]
+                    .target3
+                    .as_mut_ptr(),
+                (*ent).target3,
+                MAX_QPATH as c_int,
+            );
         }
         if !(*ent).target4.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target4.as_mut_ptr(), (*ent).target4, MAX_QPATH as c_int);
+            Q_strncpyz(
+                (*ctx.world).globals.tempWaypointList[i]
+                    .target4
+                    .as_mut_ptr(),
+                (*ent).target4,
+                MAX_QPATH as c_int,
+            );
         }
         (*ctx.world).globals.tempWaypointList[i].nodeID = (*ent).health;
 
@@ -1823,17 +2162,17 @@ pub fn NAV_StoreWaypoint(
 /// Raven `NAV_GetStoredWaypoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1713-1732`
-pub fn NAV_GetStoredWaypoint(
-    ctx: GameContext<'_>,
-    targetname: *mut c_char,
-) -> c_int {
+pub fn NAV_GetStoredWaypoint(ctx: GameContext<'_>, targetname: *mut c_char) -> c_int {
     unsafe {
         if targetname.is_null() || *targetname == 0 {
             return -1;
         }
         for i in 0..(*ctx.world).globals.numStoredWaypoints as usize {
             if (*ctx.world).globals.tempWaypointList[i].targetname[0] != 0
-                && Q_stricmp(targetname, (*ctx.world).globals.tempWaypointList[i].targetname.as_ptr()) == 0
+                && Q_stricmp(
+                    targetname,
+                    (*ctx.world).globals.tempWaypointList[i].targetname.as_ptr(),
+                ) == 0
             {
                 return i as c_int;
             }
@@ -1848,11 +2187,7 @@ pub fn NAV_GetStoredWaypoint(
 /// Raven `NAV_CalculatePaths`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1734-1838`
-pub fn NAV_CalculatePaths(
-    ctx: GameContext<'_>,
-    filename: *const c_char,
-    checksum: c_int,
-) {
+pub fn NAV_CalculatePaths(ctx: GameContext<'_>, filename: *const c_char, checksum: c_int) {
     unsafe {
         // The oracle's `!tempWaypointList` guard is vacuous — Raven's
         // `tempWaypointList` is a fixed array whose address is never null — so
@@ -1866,35 +2201,65 @@ pub fn NAV_CalculatePaths(
         // deferred — logic-port gap; the fields themselves now exist.
 
         for i in 0..(*ctx.world).globals.numStoredWaypoints as usize {
-            let target = NAV_GetStoredWaypoint(ctx, (*ctx.world).globals.tempWaypointList[i].target.as_mut_ptr());
+            let target = NAV_GetStoredWaypoint(
+                ctx,
+                (*ctx.world).globals.tempWaypointList[i].target.as_mut_ptr(),
+            );
             if target != -1 {
                 trap::Nav_HardConnect(
                     ctx.engine,
-                    GNavHardconnectArgs::new((*ctx.world).globals.tempWaypointList[i].nodeID, (*ctx.world).globals.tempWaypointList[target as usize].nodeID),
+                    GNavHardconnectArgs::new(
+                        (*ctx.world).globals.tempWaypointList[i].nodeID,
+                        (*ctx.world).globals.tempWaypointList[target as usize].nodeID,
+                    ),
                 );
             }
 
-            let target2 = NAV_GetStoredWaypoint(ctx, (*ctx.world).globals.tempWaypointList[i].target2.as_mut_ptr());
+            let target2 = NAV_GetStoredWaypoint(
+                ctx,
+                (*ctx.world).globals.tempWaypointList[i]
+                    .target2
+                    .as_mut_ptr(),
+            );
             if target2 != -1 {
                 trap::Nav_HardConnect(
                     ctx.engine,
-                    GNavHardconnectArgs::new((*ctx.world).globals.tempWaypointList[i].nodeID, (*ctx.world).globals.tempWaypointList[target2 as usize].nodeID),
+                    GNavHardconnectArgs::new(
+                        (*ctx.world).globals.tempWaypointList[i].nodeID,
+                        (*ctx.world).globals.tempWaypointList[target2 as usize].nodeID,
+                    ),
                 );
             }
 
-            let target3 = NAV_GetStoredWaypoint(ctx, (*ctx.world).globals.tempWaypointList[i].target3.as_mut_ptr());
+            let target3 = NAV_GetStoredWaypoint(
+                ctx,
+                (*ctx.world).globals.tempWaypointList[i]
+                    .target3
+                    .as_mut_ptr(),
+            );
             if target3 != -1 {
                 trap::Nav_HardConnect(
                     ctx.engine,
-                    GNavHardconnectArgs::new((*ctx.world).globals.tempWaypointList[i].nodeID, (*ctx.world).globals.tempWaypointList[target3 as usize].nodeID),
+                    GNavHardconnectArgs::new(
+                        (*ctx.world).globals.tempWaypointList[i].nodeID,
+                        (*ctx.world).globals.tempWaypointList[target3 as usize].nodeID,
+                    ),
                 );
             }
 
-            let target4 = NAV_GetStoredWaypoint(ctx, (*ctx.world).globals.tempWaypointList[i].target4.as_mut_ptr());
+            let target4 = NAV_GetStoredWaypoint(
+                ctx,
+                (*ctx.world).globals.tempWaypointList[i]
+                    .target4
+                    .as_mut_ptr(),
+            );
             if target4 != -1 {
                 trap::Nav_HardConnect(
                     ctx.engine,
-                    GNavHardconnectArgs::new((*ctx.world).globals.tempWaypointList[i].nodeID, (*ctx.world).globals.tempWaypointList[target4 as usize].nodeID),
+                    GNavHardconnectArgs::new(
+                        (*ctx.world).globals.tempWaypointList[i].nodeID,
+                        (*ctx.world).globals.tempWaypointList[target4 as usize].nodeID,
+                    ),
                 );
             }
         }
@@ -1934,20 +2299,42 @@ pub fn NAV_ShowDebugInfo(ctx: GameContext<'_>) {
         if (*ctx.world).globals.NAVDEBUG_showTestPath != 0 {
             let ent0 = &mut (*ctx.world).g_entities[0] as *mut gentity_t;
             // Get the nearest node to the player
-            let mut nearestNode = trap::Nav_GetNearestNode(ctx.engine, GNavGetnearestnodeArgs::new(ent0, (*ent0).waypoint, NF_ANY, WAYPOINT_NONE));
-            let testNode = trap::Nav_GetBestNode(ctx.engine, GNavGetbestnodeArgs::new(nearestNode, (*ctx.world).globals.NAVDEBUG_curGoal, NODE_NONE));
+            let mut nearestNode = trap::Nav_GetNearestNode(
+                ctx.engine,
+                GNavGetnearestnodeArgs::new(ent0, (*ent0).waypoint, NF_ANY, WAYPOINT_NONE),
+            );
+            let testNode = trap::Nav_GetBestNode(
+                ctx.engine,
+                GNavGetbestnodeArgs::new(
+                    nearestNode,
+                    (*ctx.world).globals.NAVDEBUG_curGoal,
+                    NODE_NONE,
+                ),
+            );
 
             nearestNode = NAV_TestBestNode(ctx, ent0, nearestNode, testNode, qfalse);
 
             // Show the connection
             let mut dest = [0.0f32; 3];
             let mut start = [0.0f32; 3];
-            trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new((*ctx.world).globals.NAVDEBUG_curGoal, &mut dest as *mut vec3_t));
-            trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(nearestNode, &mut start as *mut vec3_t));
+            trap::Nav_GetNodePosition(
+                ctx.engine,
+                GNavGetnodepositionArgs::new(
+                    (*ctx.world).globals.NAVDEBUG_curGoal,
+                    &mut dest as *mut vec3_t,
+                ),
+            );
+            trap::Nav_GetNodePosition(
+                ctx.engine,
+                GNavGetnodepositionArgs::new(nearestNode, &mut start as *mut vec3_t),
+            );
 
             G_DrawNode(start, NODE_START);
             G_DrawNode(dest, NODE_GOAL);
-            trap::Nav_ShowPath(ctx.engine, GNavShowpathArgs::new(nearestNode, (*ctx.world).globals.NAVDEBUG_curGoal));
+            trap::Nav_ShowPath(
+                ctx.engine,
+                GNavShowpathArgs::new(nearestNode, (*ctx.world).globals.NAVDEBUG_curGoal),
+            );
         }
 
         if (*ctx.world).globals.NAVDEBUG_showCombatPoints != 0 {
@@ -1965,12 +2352,12 @@ pub fn NAV_ShowDebugInfo(ctx: GameContext<'_>) {
 /// Raven `NAV_FindPlayerWaypoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_nav.c:1911-1914`
-pub fn NAV_FindPlayerWaypoint(
-    ctx: GameContext<'_>,
-    clNum: c_int,
-) {
+pub fn NAV_FindPlayerWaypoint(ctx: GameContext<'_>, clNum: c_int) {
     unsafe {
         let ent = &mut (*ctx.world).g_entities[clNum as usize] as *mut gentity_t;
-        (*ent).waypoint = trap::Nav_GetNearestNode(ctx.engine, GNavGetnearestnodeArgs::new(ent, (*ent).lastWaypoint, NF_CLEAR_PATH, WAYPOINT_NONE));
+        (*ent).waypoint = trap::Nav_GetNearestNode(
+            ctx.engine,
+            GNavGetnearestnodeArgs::new(ent, (*ent).lastWaypoint, NF_CLEAR_PATH, WAYPOINT_NONE),
+        );
     }
 }

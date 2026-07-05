@@ -16,11 +16,11 @@
 //! ported in this file (a future cgame port re-derives it per §20).
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_main::Com_Printf;
 use crate::prelude::*;
 use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorNormalize2};
-use crate::g_main::Com_Printf;
-use mp_qshared::shared::trajectory::trType_t;
 use mp_bg::vehicles::MIN_LANDING_SLOPE;
+use mp_qshared::shared::trajectory::trType_t;
 
 // --- file-local `#defines` from `bg_slidemove.c` (porting-rules per-file
 // convention, cf. `bg_pmove.rs`'s `MIN_WALK_NORMAL`/`PMF_STUCK_TO_WALL`). ---
@@ -53,10 +53,9 @@ impl PmoveContext<'_> {
             let pSelfVehInfo = (*pSelfVeh).m_pVehicleInfo;
             let ps = (*self.pm).ps;
             let velocity = (*ps).velocity;
-            let vel_len = (velocity[0] * velocity[0]
-                + velocity[1] * velocity[1]
-                + velocity[2] * velocity[2])
-                .sqrt();
+            let vel_len =
+                (velocity[0] * velocity[0] + velocity[1] * velocity[1] + velocity[2] * velocity[2])
+                    .sqrt();
             let mut magnitude = vel_len * (*pSelfVehInfo).mass as f32 / 50.0;
             let mut forceSurfDestruction: qboolean = QFALSE;
 
@@ -133,7 +132,10 @@ impl PmoveContext<'_> {
                 && (*hitEnt).s.eType == ET_MOVER as c_int
                 && (*hitEnt).s.apos.trType as c_int != trType_t::TR_STATIONARY as c_int
                 && ((*hitEnt).spawnflags & 16) != 0
-                && Q_stricmp((*hitEnt).classname, c"func_rotating".as_ptr() as *const c_char) == 0
+                && Q_stricmp(
+                    (*hitEnt).classname,
+                    c"func_rotating".as_ptr() as *const c_char,
+                ) == 0
             {
                 // hit a func_rotating that is supposed to destroy anything it touches!
                 forceSurfDestruction = QTRUE;
@@ -155,7 +157,8 @@ impl PmoveContext<'_> {
                     || (*pSelfVehInfo).r#type as c_int == VH_FIGHTER as c_int)
                 && (magnitude >= 100.0 || forceSurfDestruction != 0)
             {
-                if (*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_iHitDebounce < (*self.pm).cmd.serverTime
+                if (*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_iHitDebounce
+                    < (*self.pm).cmd.serverTime
                     || forceSurfDestruction != 0
                 {
                     let mut noDamage: qboolean = QFALSE;
@@ -193,8 +196,11 @@ impl PmoveContext<'_> {
                             // check for impact with another fighter
                             if (*hitEnt).s.NPC_class == CLASS_VEHICLE as c_int
                                 && !((*hitEnt).m_pVehicle as *mut Vehicle_t).is_null()
-                                && !(*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo.is_null()
-                                && (*(*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type as c_int
+                                && !(*((*hitEnt).m_pVehicle as *mut Vehicle_t))
+                                    .m_pVehicleInfo
+                                    .is_null()
+                                && (*(*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo)
+                                    .r#type as c_int
                                     == VH_FIGHTER as c_int
                             {
                                 // two vehicles hit each other, turn away from the impact
@@ -263,19 +269,26 @@ impl PmoveContext<'_> {
                                 turnStrength = 2.0;
                             }
                             vectoangles(bounceDir, &mut turnAwayAngles);
-                            AnglesSubtract(turnAwayAngles, *(*pSelfVeh).m_vOrientation.cast::<vec3_t>(), &mut turnDelta);
+                            AnglesSubtract(
+                                turnAwayAngles,
+                                *(*pSelfVeh).m_vOrientation.cast::<vec3_t>(),
+                                &mut turnDelta,
+                            );
                             let orientation = &mut *(*pSelfVeh).m_vOrientation.cast::<vec3_t>();
                             if bounceDir[2] != 0.0 {
-                                let mut pitchTurnStrength = turnStrength * turnDelta[PITCH as usize];
+                                let mut pitchTurnStrength =
+                                    turnStrength * turnDelta[PITCH as usize];
                                 if pitchTurnStrength > MAX_IMPACT_TURN_ANGLE {
                                     pitchTurnStrength = MAX_IMPACT_TURN_ANGLE;
                                 } else if pitchTurnStrength < -MAX_IMPACT_TURN_ANGLE {
                                     pitchTurnStrength = -MAX_IMPACT_TURN_ANGLE;
                                 }
-                                (*pSelfVeh).m_vFullAngleVelocity[PITCH as usize] = AngleNormalize180(
-                                    orientation[PITCH as usize]
-                                        + pitchTurnStrength / turnDivider * (*pSelfVeh).m_fTimeModifier,
-                                );
+                                (*pSelfVeh).m_vFullAngleVelocity[PITCH as usize] =
+                                    AngleNormalize180(
+                                        orientation[PITCH as usize]
+                                            + pitchTurnStrength / turnDivider
+                                                * (*pSelfVeh).m_fTimeModifier,
+                                    );
                             }
                             if bounceDir[0] != 0.0 || bounceDir[1] != 0.0 {
                                 let mut yawTurnStrength = turnStrength * turnDelta[YAW as usize];
@@ -286,7 +299,8 @@ impl PmoveContext<'_> {
                                 }
                                 (*pSelfVeh).m_vFullAngleVelocity[ROLL as usize] = AngleNormalize180(
                                     orientation[ROLL as usize]
-                                        - yawTurnStrength / turnDivider * (*pSelfVeh).m_fTimeModifier,
+                                        - yawTurnStrength / turnDivider
+                                            * (*pSelfVeh).m_fTimeModifier,
                                 );
                             }
 
@@ -297,7 +311,12 @@ impl PmoveContext<'_> {
                             // below; several field accesses are bg-tier gaps.
                             if turnHitEnt != 0
                                 && !((*hitEnt).client as *mut gclient_t).is_null()
-                                && FighterIsLanded(((*hitEnt).m_pVehicle as *mut Vehicle_t), core::ptr::addr_of_mut!((*((*hitEnt).client as *mut gclient_t)).ps)) == 0
+                                && FighterIsLanded(
+                                    ((*hitEnt).m_pVehicle as *mut Vehicle_t),
+                                    core::ptr::addr_of_mut!(
+                                        (*((*hitEnt).client as *mut gclient_t)).ps
+                                    ),
+                                ) == 0
                                 && ((*hitEnt).spawnflags & 2) == 0
                             {
                                 let l = (*((*hitEnt).client as *mut gclient_t)).ps.speed;
@@ -309,13 +328,17 @@ impl PmoveContext<'_> {
                                 for i in 0..3 {
                                     pushDir2[i] = bounceDir[i] * scale;
                                 }
-                                let hitVehInfo = (*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo;
+                                let hitVehInfo =
+                                    (*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo;
                                 let scale2 = l * 0.5 / (*hitVehInfo).mass as f32;
                                 for i in 0..3 {
                                     pushDir2[i] *= scale2;
                                 }
                                 let mut moveDir2: vec3_t = [0.0; 3];
-                                VectorNormalize2((*((*hitEnt).client as *mut gclient_t)).ps.velocity, &mut moveDir2);
+                                VectorNormalize2(
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity,
+                                    &mut moveDir2,
+                                );
                                 let mut bounceDot2 = -(moveDir2[0] * bounceDir[0]
                                     + moveDir2[1] * bounceDir[1]
                                     + moveDir2[2] * bounceDir[2]);
@@ -326,7 +349,8 @@ impl PmoveContext<'_> {
                                     pushDir2[i] *= bounceDot2;
                                 }
                                 for i in 0..3 {
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity[i] += pushDir2[i];
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity[i] +=
+                                        pushDir2[i];
                                 }
                                 let mut turnDivider2 = (*hitVehInfo).mass as f32 / 400.0;
                                 if turnHitEnt != 0 {
@@ -338,27 +362,41 @@ impl PmoveContext<'_> {
                                 let mut turnAwayAngles2: vec3_t = [0.0; 3];
                                 let mut turnDelta2: vec3_t = [0.0; 3];
                                 vectoangles(bounceDir, &mut turnAwayAngles2);
-                                let hitOrient = &mut *(*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_vOrientation.cast::<vec3_t>();
+                                let hitOrient = &mut *(*((*hitEnt).m_pVehicle as *mut Vehicle_t))
+                                    .m_vOrientation
+                                    .cast::<vec3_t>();
                                 AnglesSubtract(turnAwayAngles2, *hitOrient, &mut turnDelta2);
                                 if bounceDir[2] != 0.0 {
-                                    let mut pitchTurnStrength2 = turnStrength * turnDelta2[PITCH as usize];
+                                    let mut pitchTurnStrength2 =
+                                        turnStrength * turnDelta2[PITCH as usize];
                                     if pitchTurnStrength2 > MAX_IMPACT_TURN_ANGLE {
                                         pitchTurnStrength2 = MAX_IMPACT_TURN_ANGLE;
                                     } else if pitchTurnStrength2 < -MAX_IMPACT_TURN_ANGLE {
                                         pitchTurnStrength2 = -MAX_IMPACT_TURN_ANGLE;
                                     }
-                                    (*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_vFullAngleVelocity[PITCH as usize] =
-                                        AngleNormalize180(hitOrient[PITCH as usize] + pitchTurnStrength2 / turnDivider2 * (*pSelfVeh).m_fTimeModifier);
+                                    (*((*hitEnt).m_pVehicle as *mut Vehicle_t))
+                                        .m_vFullAngleVelocity
+                                        [PITCH as usize] = AngleNormalize180(
+                                        hitOrient[PITCH as usize]
+                                            + pitchTurnStrength2 / turnDivider2
+                                                * (*pSelfVeh).m_fTimeModifier,
+                                    );
                                 }
                                 if bounceDir[0] != 0.0 || bounceDir[1] != 0.0 {
-                                    let mut yawTurnStrength2 = turnStrength * turnDelta2[YAW as usize];
+                                    let mut yawTurnStrength2 =
+                                        turnStrength * turnDelta2[YAW as usize];
                                     if yawTurnStrength2 > MAX_IMPACT_TURN_ANGLE {
                                         yawTurnStrength2 = MAX_IMPACT_TURN_ANGLE;
                                     } else if yawTurnStrength2 < -MAX_IMPACT_TURN_ANGLE {
                                         yawTurnStrength2 = -MAX_IMPACT_TURN_ANGLE;
                                     }
-                                    (*((*hitEnt).m_pVehicle as *mut Vehicle_t)).m_vFullAngleVelocity[ROLL as usize] =
-                                        AngleNormalize180(hitOrient[ROLL as usize] - yawTurnStrength2 / turnDivider2 * (*pSelfVeh).m_fTimeModifier);
+                                    (*((*hitEnt).m_pVehicle as *mut Vehicle_t))
+                                        .m_vFullAngleVelocity
+                                        [ROLL as usize] = AngleNormalize180(
+                                        hitOrient[ROLL as usize]
+                                            - yawTurnStrength2 / turnDivider2
+                                                * (*pSelfVeh).m_fTimeModifier,
+                                    );
                                 }
                             }
                         }
@@ -369,12 +407,22 @@ impl PmoveContext<'_> {
                     }
 
                     let mut vehUp: vec3_t = [0.0; 3];
-                    AngleVectors(*(*pSelfVeh).m_vOrientation.cast::<vec3_t>(), None, None, Some(&mut vehUp));
+                    AngleVectors(
+                        *(*pSelfVeh).m_vOrientation.cast::<vec3_t>(),
+                        None,
+                        None,
+                        Some(&mut vehUp),
+                    );
                     if (*pSelfVehInfo).iImpactFX != 0 {
                         // tempent use bad! (Raven comment)
-                        self.callbacks.add_event((*pEnt).s.number, EV_PLAY_EFFECT_ID as c_int, (*pSelfVehInfo).iImpactFX);
+                        self.callbacks.add_event(
+                            (*pEnt).s.number,
+                            EV_PLAY_EFFECT_ID as c_int,
+                            (*pSelfVehInfo).iImpactFX,
+                        );
                     }
-                    (*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_iHitDebounce = (*self.pm).cmd.serverTime + 200;
+                    (*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_iHitDebounce =
+                        (*self.pm).cmd.serverTime + 200;
                     magnitude /= (*pSelfVehInfo).toughness * 50.0;
 
                     if (*hitEnt).s.eType != ET_TERRAIN as c_int
@@ -385,7 +433,9 @@ impl PmoveContext<'_> {
                         let mut killerNum: c_int = (*pEnt).s.number;
                         let mut haveKiller = false;
                         if (*pSelfVehInfo).r#type as c_int == VH_FIGHTER as c_int {
-                            let mut mult = (*(*pSelfVeh).m_vOrientation.cast::<vec3_t>())[PITCH as usize] * 0.1;
+                            let mut mult = (*(*pSelfVeh).m_vOrientation.cast::<vec3_t>())
+                                [PITCH as usize]
+                                * 0.1;
                             if mult < 1.0 {
                                 mult = 1.0;
                             }
@@ -418,7 +468,11 @@ impl PmoveContext<'_> {
                             } else {
                                 MOD_FALLING as c_int
                             };
-                            let attacker = if haveKiller { killerNum } else { (*hitEnt).s.number };
+                            let attacker = if haveKiller {
+                                killerNum
+                            } else {
+                                (*hitEnt).s.number
+                            };
                             // Oracle bg_slidemove.c:466: targ = pEnt (the vehicle damages
                             // ITSELF on impact); inflictor = hitEnt.
                             self.callbacks.damage(
@@ -450,8 +504,10 @@ impl PmoveContext<'_> {
                     if (*hitEnt).inuse != 0 && (*hitEnt).takedamage != 0 {
                         // damage this guy because we hit him
                         let mut pmult: f32 = 1.0;
-                        if ((*hitEnt).s.eType == ET_PLAYER as c_int && (*hitEnt).s.number < MAX_CLIENTS as c_int)
-                            || ((*hitEnt).s.eType == ET_NPC as c_int && (*hitEnt).s.NPC_class != CLASS_VEHICLE as c_int)
+                        if ((*hitEnt).s.eType == ET_PLAYER as c_int
+                            && (*hitEnt).s.number < MAX_CLIENTS as c_int)
+                            || ((*hitEnt).s.eType == ET_NPC as c_int
+                                && (*hitEnt).s.NPC_class != CLASS_VEHICLE as c_int)
                         {
                             // probably a humanoid, or something
                             if (*pSelfVehInfo).r#type as c_int == VH_FIGHTER as c_int {
@@ -461,23 +517,40 @@ impl PmoveContext<'_> {
                             }
 
                             if !((*hitEnt).client as *mut gclient_t).is_null()
-                                && BG_KnockDownable(core::ptr::addr_of_mut!((*((*hitEnt).client as *mut gclient_t)).ps)) != 0
-                                && self.callbacks.can_be_enemy((*pEnt).s.number, (*hitEnt).s.number) != 0
+                                && BG_KnockDownable(core::ptr::addr_of_mut!(
+                                    (*((*hitEnt).client as *mut gclient_t)).ps
+                                )) != 0
+                                && self
+                                    .callbacks
+                                    .can_be_enemy((*pEnt).s.number, (*hitEnt).s.number)
+                                    != 0
                             {
                                 // smash!
-                                if (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_KNOCKDOWN as c_int {
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtendTime = (*self.pm).cmd.serverTime + 1100;
+                                if (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtend
+                                    != HANDEXTEND_KNOCKDOWN as c_int
+                                {
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.forceHandExtend =
+                                        HANDEXTEND_KNOCKDOWN as c_int;
+                                    (*((*hitEnt).client as *mut gclient_t))
+                                        .ps
+                                        .forceHandExtendTime = (*self.pm).cmd.serverTime + 1100;
                                     (*((*hitEnt).client as *mut gclient_t)).ps.forceDodgeAnim = 0;
                                 }
-                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKiller = (*pEnt).s.number;
-                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKillerTime = (*self.pm).cmd.serverTime + 5000;
-                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKillerDebounceTime = (*self.pm).cmd.serverTime + 100;
-                                (*((*hitEnt).client as *mut gclient_t)).otherKillerMOD = MOD_COLLISION as c_int;
+                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKiller =
+                                    (*pEnt).s.number;
+                                (*((*hitEnt).client as *mut gclient_t)).ps.otherKillerTime =
+                                    (*self.pm).cmd.serverTime + 5000;
+                                (*((*hitEnt).client as *mut gclient_t))
+                                    .ps
+                                    .otherKillerDebounceTime = (*self.pm).cmd.serverTime + 100;
+                                (*((*hitEnt).client as *mut gclient_t)).otherKillerMOD =
+                                    MOD_COLLISION as c_int;
                                 (*((*hitEnt).client as *mut gclient_t)).otherKillerVehWeapon = 0;
-                                (*((*hitEnt).client as *mut gclient_t)).otherKillerWeaponType = WP_NONE as c_int;
+                                (*((*hitEnt).client as *mut gclient_t)).otherKillerWeaponType =
+                                    WP_NONE as c_int;
                                 for i in 0..3 {
-                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity[i] += (*ps).velocity[i];
+                                    (*((*hitEnt).client as *mut gclient_t)).ps.velocity[i] +=
+                                        (*ps).velocity[i];
                                 }
                                 (*((*hitEnt).client as *mut gclient_t)).ps.velocity[2] += 200.0;
                             }
@@ -557,9 +630,10 @@ impl PmoveContext<'_> {
             }
 
             let ps = &*(*self.pm).ps;
-            let vel_len =
-                (ps.velocity[0] * ps.velocity[0] + ps.velocity[1] * ps.velocity[1] + ps.velocity[2] * ps.velocity[2])
-                    .sqrt();
+            let vel_len = (ps.velocity[0] * ps.velocity[0]
+                + ps.velocity[1] * ps.velocity[1]
+                + ps.velocity[2] * ps.velocity[2])
+                .sqrt();
             if vel_len >= 100.0
                 && (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int
                 && ps.lastOnGround + 100 < self.callbacks.get_time()
@@ -756,7 +830,9 @@ impl PmoveContext<'_> {
                             j += 1;
                             continue;
                         }
-                        if clipVelocity[0] * planes[j][0] + clipVelocity[1] * planes[j][1] + clipVelocity[2] * planes[j][2]
+                        if clipVelocity[0] * planes[j][0]
+                            + clipVelocity[1] * planes[j][1]
+                            + clipVelocity[2] * planes[j][2]
                             >= 0.1
                         {
                             j += 1;
@@ -770,7 +846,9 @@ impl PmoveContext<'_> {
                         self.PM_ClipVelocity(ecv, planes[j], &mut endClipVelocity, OVERCLIP);
 
                         // see if it goes back into the first clip plane
-                        if clipVelocity[0] * planes[i][0] + clipVelocity[1] * planes[i][1] + clipVelocity[2] * planes[i][2]
+                        if clipVelocity[0] * planes[i][0]
+                            + clipVelocity[1] * planes[i][1]
+                            + clipVelocity[2] * planes[i][2]
                             >= 0.0
                         {
                             j += 1;
@@ -781,14 +859,18 @@ impl PmoveContext<'_> {
                         let mut dir: vec3_t = [0.0; 3];
                         CrossProduct(planes[i], planes[j], &mut dir);
                         VectorNormalize(&mut dir);
-                        let mut d = dir[0] * (*ps).velocity[0] + dir[1] * (*ps).velocity[1] + dir[2] * (*ps).velocity[2];
+                        let mut d = dir[0] * (*ps).velocity[0]
+                            + dir[1] * (*ps).velocity[1]
+                            + dir[2] * (*ps).velocity[2];
                         for k in 0..3 {
                             clipVelocity[k] = dir[k] * d;
                         }
 
                         CrossProduct(planes[i], planes[j], &mut dir);
                         VectorNormalize(&mut dir);
-                        d = dir[0] * endVelocity[0] + dir[1] * endVelocity[1] + dir[2] * endVelocity[2];
+                        d = dir[0] * endVelocity[0]
+                            + dir[1] * endVelocity[1]
+                            + dir[2] * endVelocity[2];
                         for k in 0..3 {
                             endClipVelocity[k] = dir[k] * d;
                         }
@@ -841,7 +923,11 @@ impl PmoveContext<'_> {
                 (*ps).velocity = primal_velocity;
             }
 
-            if bumpcount != 0 { QTRUE } else { QFALSE }
+            if bumpcount != 0 {
+                QTRUE
+            } else {
+                QFALSE
+            }
         }
     }
 
@@ -909,7 +995,9 @@ impl PmoveContext<'_> {
                     || (!pEnt.is_null()
                         && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int
                         && !((*pEnt).m_pVehicle as *mut Vehicle_t).is_null()
-                        && (*(*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type as c_int == VH_WALKER as c_int)
+                        && (*(*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type
+                            as c_int
+                            == VH_WALKER as c_int)
                 {
                     // AT-STs can step high
                     up[2] += 66.0;

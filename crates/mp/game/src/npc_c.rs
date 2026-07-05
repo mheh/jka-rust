@@ -14,6 +14,7 @@ use crate::prelude::*;
 use crate::teams::class::class_t;
 use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 
+use crate::g_utils::G_SetAnim;
 use crate::NPC_AI_Atst::NPC_BSATST_Default;
 use crate::NPC_AI_Default::NPC_BSDefault;
 use crate::NPC_AI_Droid::NPC_BSDroid_Default;
@@ -32,11 +33,10 @@ use crate::NPC_AI_Sentry::NPC_BSSentry_Default;
 use crate::NPC_AI_Sniper::NPC_BSSniper_Default;
 use crate::NPC_AI_Stormtrooper::{NPC_BSST_Default, NPC_BSST_Investigate, NPC_BSST_Sleep};
 use crate::NPC_behavior::{
-    NPC_BSAdvanceFight, NPC_BSCinematic, NPC_BSFlee, NPC_BSFollowLeader, NPC_BSJump,
-    NPC_BSNoClip, NPC_BSRemove, NPC_BSSearch, NPC_BSSleep, NPC_BSWait, NPC_BSWander,
+    NPC_BSAdvanceFight, NPC_BSCinematic, NPC_BSFlee, NPC_BSFollowLeader, NPC_BSJump, NPC_BSNoClip,
+    NPC_BSRemove, NPC_BSSearch, NPC_BSSleep, NPC_BSWait, NPC_BSWander,
 };
 use crate::NPC_stats::NPC_LoadParms;
-use crate::g_utils::G_SetAnim;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
@@ -46,10 +46,7 @@ const qfalse: qboolean = 0;
 /// Raven `CorpsePhysics`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:46-103`
-pub fn CorpsePhysics(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn CorpsePhysics(ctx: GameContext<'_>, self_: *mut gentity_t) {
     // Raven `bg_public.h:604`: `#define EF_DISINTEGRATION (1<<26)`.
     const EF_DISINTEGRATION: c_int = 1 << 26;
     // Raven `b_local.h:164`: `#define ALERT_CLEAR_TIME 200`.
@@ -60,7 +57,11 @@ pub fn CorpsePhysics(
     unsafe {
         let world = &mut *ctx.world;
         world.globals.ucmd = usercmd_t::default();
-        crate::g_active::ClientThink(ctx, (*self_).s.number, &mut world.globals.ucmd as *mut usercmd_t);
+        crate::g_active::ClientThink(
+            ctx,
+            (*self_).s.number,
+            &mut world.globals.ucmd as *mut usercmd_t,
+        );
 
         let client = (*self_).client as *mut gclient_t;
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
@@ -68,7 +69,9 @@ pub fn CorpsePhysics(
         }
 
         //FIXME: match my pitch and roll for the slope of my groundPlane
-        if (*self_).s.groundEntityNum != ENTITYNUM_NONE && ((*self_).s.eFlags & EF_DISINTEGRATION) == 0 {
+        if (*self_).s.groundEntityNum != ENTITYNUM_NONE
+            && ((*self_).s.eFlags & EF_DISINTEGRATION) == 0
+        {
             //on the ground
             //FIXME: check 4 corners
             pitch_roll_for_slope(ctx, self_, None);
@@ -93,7 +96,9 @@ pub fn CorpsePhysics(
 
         if world.level.time - (*self_).s.time > 3000 {
             //been dead for 3 seconds
-            if world.cvars.g_dismember.integer < 11381138 && world.cvars.g_saberRealisticCombat.integer == 0 {
+            if world.cvars.g_dismember.integer < 11381138
+                && world.cvars.g_saberRealisticCombat.integer == 0
+            {
                 //can't be dismembered once dead
                 if !client.is_null() && (*client).NPC_class != class_t::CLASS_PROTOCOL {
                     //	self->client->dismembered = qtrue;
@@ -125,10 +130,7 @@ pub fn CorpsePhysics(
 /// Raven `NPC_RemoveBody`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:115-223`
-pub fn NPC_RemoveBody(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn NPC_RemoveBody(ctx: GameContext<'_>, self_: *mut gentity_t) {
     // Raven `bg_public.h:604`: `#define EF_DISINTEGRATION (1<<26)`.
     const EF_DISINTEGRATION: c_int = 1 << 26;
     // Raven `g_local.h`: `#define FRAMETIME 100` (local per file-group, matching
@@ -179,14 +181,20 @@ pub fn NPC_RemoveBody(
             //if ( !self->taskManager || !self->taskManager->IsRunning() )
             if trap::ICARUS_IsRunning(
                 ctx.engine,
-                mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new((*self_).s.number),
+                mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new(
+                    (*self_).s.number,
+                ),
             ) == 0
             {
                 let activator = match (*self_).activator {
                     Some(id) => &mut world.g_entities[id.index()] as *mut gentity_t,
                     None => core::ptr::null_mut(),
                 };
-                let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
+                let activator_client = if activator.is_null() {
+                    core::ptr::null_mut()
+                } else {
+                    (*activator).client as *mut gclient_t
+                };
                 if activator.is_null()
                     || activator_client.is_null()
                     || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
@@ -200,7 +208,8 @@ pub fn NPC_RemoveBody(
 
         //FIXME: don't ever inflate back up?
         if !client.is_null() {
-            (*self_).r.maxs[2] = (*client).renderInfo.eyePoint[2] - (*self_).r.currentOrigin[2] + 4.0;
+            (*self_).r.maxs[2] =
+                (*client).renderInfo.eyePoint[2] - (*self_).r.currentOrigin[2] + 4.0;
         }
         if (*self_).r.maxs[2] < -8.0 {
             (*self_).r.maxs[2] = -8.0;
@@ -215,10 +224,11 @@ pub fn NPC_RemoveBody(
             // Only do all of this nonsense for Scav boys ( and girls )
             // should I check NPC_class here instead of TEAM ? - dmv
             if !client.is_null()
-                && ((*client).playerTeam == crate::teams::npcteam::NPCTEAM_ENEMY || (*client).NPC_class == class_t::CLASS_PROTOCOL)
+                && ((*client).playerTeam == crate::teams::npcteam::NPCTEAM_ENEMY
+                    || (*client).NPC_class == class_t::CLASS_PROTOCOL)
             {
                 (*self_).nextthink = world.level.time + FRAMETIME; // try back in a second
-                //Don't care about this for MP I guess.
+                                                                   //Don't care about this for MP I guess.
             }
 
             //FIXME: there are some conditions - such as heavy combat - in which we want
@@ -231,21 +241,33 @@ pub fn NPC_RemoveBody(
                 //if ( !self->taskManager || !self->taskManager->IsRunning() )
                 if trap::ICARUS_IsRunning(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new((*self_).s.number),
+                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new(
+                        (*self_).s.number,
+                    ),
                 ) == 0
                 {
                     let activator = match (*self_).activator {
                         Some(id) => &mut world.g_entities[id.index()] as *mut gentity_t,
                         None => core::ptr::null_mut(),
                     };
-                    let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
+                    let activator_client = if activator.is_null() {
+                        core::ptr::null_mut()
+                    } else {
+                        (*activator).client as *mut gclient_t
+                    };
                     if activator.is_null()
                         || activator_client.is_null()
                         || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
                     {
                         //not being held by a Rancor
-                        if !client.is_null() && (*client).ps.saberEntityNum > 0 && (*client).ps.saberEntityNum < ENTITYNUM_WORLD {
-                            let saberent = world.g_entities.as_mut_ptr().add((*client).ps.saberEntityNum as usize);
+                        if !client.is_null()
+                            && (*client).ps.saberEntityNum > 0
+                            && (*client).ps.saberEntityNum < ENTITYNUM_WORLD
+                        {
+                            let saberent = world
+                                .g_entities
+                                .as_mut_ptr()
+                                .add((*client).ps.saberEntityNum as usize);
                             crate::g_utils::G_FreeEntity(ctx, saberent);
                         }
                         crate::g_utils::G_FreeEntity(ctx, self_);
@@ -261,9 +283,7 @@ pub fn NPC_RemoveBody(
 /// Raven: team no longer indicates species/race, so this switches on
 /// `NPC_class` instead (comment preserved from source).
 /// Source: `oracle/oracle/codemp/game/NPC.c:233-312`
-pub fn BodyRemovalPadTime(
-    ent: *mut gentity_t,
-) -> c_int {
+pub fn BodyRemovalPadTime(ent: *mut gentity_t) -> c_int {
     if ent.is_null() {
         return 0;
     }
@@ -401,7 +421,12 @@ pub fn pitch_roll_for_slope(
 
         let mut ovf: vec3_t = [0.0; 3];
         let mut ovr: vec3_t = [0.0; 3];
-        crate::q_math::AngleVectors((*forwhom).r.currentAngles, Some(&mut ovf), Some(&mut ovr), None);
+        crate::q_math::AngleVectors(
+            (*forwhom).r.currentAngles,
+            Some(&mut ovf),
+            Some(&mut ovr),
+            None,
+        );
 
         let mut new_angles: vec3_t = [0.0, 0.0, 0.0];
         crate::q_math::vectoangles(slope, &mut new_angles);
@@ -431,7 +456,10 @@ pub fn pitch_roll_for_slope(
                 //FIXME: trace?
                 (*client).ps.origin[2] += oldmins2 - (*forwhom).r.mins[2];
                 (*forwhom).r.currentOrigin[2] = (*client).ps.origin[2];
-                trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(forwhom));
+                trap::LinkEntity(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(forwhom),
+                );
             }
         } else {
             (*forwhom).r.currentAngles[PITCH] = dot * pitch;
@@ -460,7 +488,8 @@ pub fn DeadThink(ctx: GameContext<'_>) {
         //HACKHACKHACKHACKHACK
         //We should really have a seperate G2 bounding box (seperate from the physics bbox) for G2 collisions only
         //FIXME: don't ever inflate back up?
-        (*npc_ent).r.maxs[2] = (*client).renderInfo.eyePoint[2] - (*npc_ent).r.currentOrigin[2] + 4.0;
+        (*npc_ent).r.maxs[2] =
+            (*client).renderInfo.eyePoint[2] - (*npc_ent).r.currentOrigin[2] + 4.0;
         if (*npc_ent).r.maxs[2] < -8.0 {
             (*npc_ent).r.maxs[2] = -8.0;
         }
@@ -552,7 +581,9 @@ pub fn DeadThink(ctx: GameContext<'_>) {
             if ((*client).ps.eFlags & EF_NODRAW) != 0 {
                 if trap::ICARUS_IsRunning(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new((*npc_ent).s.number),
+                    mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new(
+                        (*npc_ent).s.number,
+                    ),
                 ) == 0
                 {
                     //if ( !NPC->taskManager || !NPC->taskManager->IsRunning() )
@@ -592,7 +623,10 @@ pub fn DeadThink(ctx: GameContext<'_>) {
             // if client is in a nodrop area, make him/her nodraw
             let contents = trap::PointContents(
                 ctx.engine,
-                mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(&(*npc_ent).r.currentOrigin as *const vec3_t, -1),
+                mp_abi::game::syscalls::G_POINT_CONTENTS::GPointContentsArgs::new(
+                    &(*npc_ent).r.currentOrigin as *const vec3_t,
+                    -1,
+                ),
             );
             (*npc_ent).bounceCount = contents;
 
@@ -611,10 +645,7 @@ pub fn DeadThink(ctx: GameContext<'_>) {
 /// Raven `SetNPCGlobals`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:617-623`
-pub fn SetNPCGlobals(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SetNPCGlobals(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let world = &mut *ctx.world;
         world.globals.NPC = ent;
@@ -729,7 +760,9 @@ pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
     const SCF_LEAN_LEFT: c_int = 0x00000010;
     const SCF_RUNNING: c_int = 0x00000020;
     const SCF_ALT_FIRE: c_int = 0x00000040;
-    use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_USE, BUTTON_WALKING};
+    use mp_qshared::common::mp::qcommon::usercmd_button::{
+        BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_USE, BUTTON_WALKING,
+    };
 
     unsafe {
         let world = &mut *ctx.world;
@@ -739,7 +772,9 @@ pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
         let ucmd = &mut world.globals.ucmd;
 
         if (scriptFlags & SCF_CROUCHED) != 0 {
-            if (*npc_info).charmedTime > level_time && (ucmd.forwardmove != 0 || ucmd.rightmove != 0) {
+            if (*npc_info).charmedTime > level_time
+                && (ucmd.forwardmove != 0 || ucmd.rightmove != 0)
+            {
                 //ugh, if charmed and moving, ignore the crouched command
             } else {
                 ucmd.upmove = -127;
@@ -749,7 +784,9 @@ pub fn NPC_ApplyScriptFlags(ctx: GameContext<'_>) {
         if (scriptFlags & SCF_RUNNING) != 0 {
             ucmd.buttons &= !BUTTON_WALKING;
         } else if (scriptFlags & SCF_WALKING) != 0 {
-            if (*npc_info).charmedTime > level_time && (ucmd.forwardmove != 0 || ucmd.rightmove != 0) {
+            if (*npc_info).charmedTime > level_time
+                && (ucmd.forwardmove != 0 || ucmd.rightmove != 0)
+            {
                 //ugh, if charmed and moving, ignore the walking command
             } else {
                 ucmd.buttons |= BUTTON_WALKING;
@@ -807,7 +844,9 @@ pub fn NPC_HandleAIFlags(ctx: GameContext<'_>) {
         //MRJ Request: greet-allies block is `/* ... */`'d out upstream — dead code, not ported.
 
         //been told to play a victory sound after a delay
-        if (*npc_info).greetingDebounceTime != 0 && (*npc_info).greetingDebounceTime < world.level.time {
+        if (*npc_info).greetingDebounceTime != 0
+            && (*npc_info).greetingDebounceTime < world.level.time
+        {
             let ev = (*ctx.world).bg_state.rng.Q_irand(
                 entity_event_t::EV_VICTORY1 as c_int,
                 entity_event_t::EV_VICTORY3 as c_int,
@@ -888,7 +927,9 @@ pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
             enemy_origin[1] - self_origin[1],
             enemy_origin[2] - self_origin[2],
         ];
-        if crate::q_math::VectorLengthSquared(vec) > crate::NPC_combat::NPC_MaxDistSquaredForWeapon(ctx) {
+        if crate::q_math::VectorLengthSquared(vec)
+            > crate::NPC_combat::NPC_MaxDistSquaredForWeapon(ctx)
+        {
             (*npc_info).attackHoldTime = 0;
         } else if (*npc_info).attackHoldTime != 0 && (*npc_info).attackHoldTime > world.level.time {
             world.globals.ucmd.buttons |= BUTTON_ATTACK;
@@ -918,12 +959,14 @@ pub fn NPC_KeepCurrentFacing(ctx: GameContext<'_>) {
         if ucmd.angles[YAW] == 0 {
             // Raven `ANGLE2SHORT(x)` == `((int)((x)*65536/360) & 65535)`.
             let angle2short = |x: f32| -> c_int { ((x * 65536.0 / 360.0) as c_int) & 65535 };
-            ucmd.angles[YAW] = angle2short((*client).ps.viewangles[YAW]) - (*client).ps.delta_angles[YAW];
+            ucmd.angles[YAW] =
+                angle2short((*client).ps.viewangles[YAW]) - (*client).ps.delta_angles[YAW];
         }
 
         if ucmd.angles[PITCH] == 0 {
             let angle2short = |x: f32| -> c_int { ((x * 65536.0 / 360.0) as c_int) & 65535 };
-            ucmd.angles[PITCH] = angle2short((*client).ps.viewangles[PITCH]) - (*client).ps.delta_angles[PITCH];
+            ucmd.angles[PITCH] =
+                angle2short((*client).ps.viewangles[PITCH]) - (*client).ps.delta_angles[PITCH];
         }
     }
 }
@@ -931,10 +974,7 @@ pub fn NPC_KeepCurrentFacing(ctx: GameContext<'_>) {
 /// Raven `NPC_BehaviorSet_Charmed`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:939-963`
-pub fn NPC_BehaviorSet_Charmed(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Charmed(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_FOLLOW_LEADER as c_int => NPC_BSFollowLeader(ctx),
         x if x == bState_t::BS_REMOVE as c_int => NPC_BSRemove(ctx),
@@ -948,10 +988,7 @@ pub fn NPC_BehaviorSet_Charmed(
 /// Raven `NPC_BehaviorSet_Default`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:970-1012`
-pub fn NPC_BehaviorSet_Default(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Default(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_ADVANCE_FIGHT as c_int => NPC_BSAdvanceFight(ctx),
         x if x == bState_t::BS_SLEEP as c_int => NPC_BSSleep(ctx),
@@ -971,10 +1008,7 @@ pub fn NPC_BehaviorSet_Default(
 /// Raven `NPC_BehaviorSet_Interrogator`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1019-1034`
-pub fn NPC_BehaviorSet_Interrogator(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Interrogator(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -991,10 +1025,7 @@ pub fn NPC_BehaviorSet_Interrogator(
 /// Raven `NPC_BehaviorSet_ImperialProbe`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1045-1060`
-pub fn NPC_BehaviorSet_ImperialProbe(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_ImperialProbe(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1011,10 +1042,7 @@ pub fn NPC_BehaviorSet_ImperialProbe(
 /// Raven `NPC_BehaviorSet_Seeker`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1070-1085`
-pub fn NPC_BehaviorSet_Seeker(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Seeker(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1031,20 +1059,14 @@ pub fn NPC_BehaviorSet_Seeker(
 /// Raven `NPC_BehaviorSet_Remote`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1094-1097`
-pub fn NPC_BehaviorSet_Remote(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Remote(ctx: GameContext<'_>, bState: c_int) {
     NPC_BSRemote_Default(ctx);
 }
 
 /// Raven `NPC_BehaviorSet_Sentry`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1106-1121`
-pub fn NPC_BehaviorSet_Sentry(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Sentry(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1061,10 +1083,7 @@ pub fn NPC_BehaviorSet_Sentry(
 /// Raven `NPC_BehaviorSet_Grenadier`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1128-1144`
-pub fn NPC_BehaviorSet_Grenadier(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Grenadier(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1081,10 +1100,7 @@ pub fn NPC_BehaviorSet_Grenadier(
 /// Raven `NPC_BehaviorSet_Sniper`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1150-1166`
-pub fn NPC_BehaviorSet_Sniper(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Sniper(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1101,10 +1117,7 @@ pub fn NPC_BehaviorSet_Sniper(
 /// Raven `NPC_BehaviorSet_Stormtrooper`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1173-1197`
-pub fn NPC_BehaviorSet_Stormtrooper(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Stormtrooper(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1123,10 +1136,7 @@ pub fn NPC_BehaviorSet_Stormtrooper(
 /// Raven `NPC_BehaviorSet_Jedi`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1205-1225`
-pub fn NPC_BehaviorSet_Jedi(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Jedi(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1144,10 +1154,7 @@ pub fn NPC_BehaviorSet_Jedi(
 /// Raven `NPC_BehaviorSet_Droid`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1232-1245`
-pub fn NPC_BehaviorSet_Droid(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Droid(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_DEFAULT as c_int
             || x == bState_t::BS_STAND_GUARD as c_int
@@ -1162,10 +1169,7 @@ pub fn NPC_BehaviorSet_Droid(
 /// Raven `NPC_BehaviorSet_Mark1`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1252-1265`
-pub fn NPC_BehaviorSet_Mark1(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Mark1(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_DEFAULT as c_int
             || x == bState_t::BS_STAND_GUARD as c_int
@@ -1180,10 +1184,7 @@ pub fn NPC_BehaviorSet_Mark1(
 /// Raven `NPC_BehaviorSet_Mark2`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1272-1286`
-pub fn NPC_BehaviorSet_Mark2(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Mark2(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_DEFAULT as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1199,10 +1200,7 @@ pub fn NPC_BehaviorSet_Mark2(
 /// Raven `NPC_BehaviorSet_ATST`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1293-1307`
-pub fn NPC_BehaviorSet_ATST(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_ATST(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_DEFAULT as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1218,10 +1216,7 @@ pub fn NPC_BehaviorSet_ATST(
 /// Raven `NPC_BehaviorSet_MineMonster`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1314-1329`
-pub fn NPC_BehaviorSet_MineMonster(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_MineMonster(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1238,10 +1233,7 @@ pub fn NPC_BehaviorSet_MineMonster(
 /// Raven `NPC_BehaviorSet_Howler`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1336-1351`
-pub fn NPC_BehaviorSet_Howler(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Howler(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1258,10 +1250,7 @@ pub fn NPC_BehaviorSet_Howler(
 /// Raven `NPC_BehaviorSet_Rancor`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1358-1373`
-pub fn NPC_BehaviorSet_Rancor(
-    ctx: GameContext<'_>,
-    bState: c_int,
-) {
+pub fn NPC_BehaviorSet_Rancor(ctx: GameContext<'_>, bState: c_int) {
     match bState {
         x if x == bState_t::BS_STAND_GUARD as c_int
             || x == bState_t::BS_PATROL as c_int
@@ -1282,18 +1271,16 @@ pub fn NPC_BehaviorSet_Rancor(
 /// Raven `NPC_RunBehavior`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1384-1564`
-pub fn NPC_RunBehavior(
-    ctx: GameContext<'_>,
-    team: c_int,
-    bState: c_int,
-) {
+pub fn NPC_RunBehavior(ctx: GameContext<'_>, team: c_int, bState: c_int) {
     unsafe {
         let world = &mut *ctx.world;
         let npc_ent = world.globals.NPC;
         let npc_info = world.globals.NPCInfo;
         let client = (*npc_ent).client as *mut gclient_t;
 
-        if (*npc_ent).s.NPC_class == class_t::CLASS_VEHICLE as c_int && !(*npc_ent).m_pVehicle.is_null() {
+        if (*npc_ent).s.NPC_class == class_t::CLASS_VEHICLE as c_int
+            && !(*npc_ent).m_pVehicle.is_null()
+        {
             //vehicles don't do AI!
             return;
         }
@@ -1401,7 +1388,9 @@ pub fn NPC_RunBehavior(
                         NPC_BehaviorSet_Default(ctx, bState);
                         return;
                     }
-                    if (*client).ps.weapon == WP_DISRUPTOR && ((*npc_info).scriptFlags & 0x00000040) != 0 {
+                    if (*client).ps.weapon == WP_DISRUPTOR
+                        && ((*npc_info).scriptFlags & 0x00000040) != 0
+                    {
                         //a sniper (SCF_ALT_FIRE)
                         NPC_BehaviorSet_Sniper(ctx, bState);
                         return;
@@ -1454,10 +1443,7 @@ pub fn NPC_RunBehavior(
 /// Raven `NPC_ExecuteBState`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1576-1762`
-pub fn NPC_ExecuteBState(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn NPC_ExecuteBState(ctx: GameContext<'_>, self_: *mut gentity_t) {
     use mp_bg::public::anim_number::animNumber_t;
     use mp_bg::public::weaponstate::weaponstate_t::{WEAPON_IDLE, WEAPON_READY};
     use mp_qshared::common::mp::qcommon::usercmd_button::{BUTTON_ALT_ATTACK, BUTTON_ATTACK};
@@ -1503,10 +1489,18 @@ pub fn NPC_ExecuteBState(
         }
 
         if (*client).ps.saberLockTime != 0 && (*client).ps.saberLockEnemy != ENTITYNUM_NONE {
-            crate::NPC_utils::NPC_SetLookTarget(npc_ent, (*client).ps.saberLockEnemy, world.level.time + 1000);
+            crate::NPC_utils::NPC_SetLookTarget(
+                npc_ent,
+                (*client).ps.saberLockEnemy,
+                world.level.time + 1000,
+            );
         } else if crate::NPC_utils::NPC_CheckLookTarget(ctx, npc_ent) == 0 {
             if let Some(enemy_id) = (*npc_ent).enemy {
-                crate::NPC_utils::NPC_SetLookTarget(npc_ent, world.g_entities[enemy_id.index()].s.number, 0);
+                crate::NPC_utils::NPC_SetLookTarget(
+                    npc_ent,
+                    world.g_entities[enemy_id.index()].s.number,
+                    0,
+                );
             }
         }
 
@@ -1518,7 +1512,8 @@ pub fn NPC_ExecuteBState(
             } else if (*client).playerTeam != crate::teams::npcteam::NPCTEAM_ENEMY {
                 let enemy_npc = (*enemy).NPC as *mut gNPC_t;
                 if !enemy_npc.is_null()
-                    && ((*enemy_npc).surrenderTime > world.level.time || ((*enemy_npc).scriptFlags & 0x00010000) != 0)
+                    && ((*enemy_npc).surrenderTime > world.level.time
+                        || ((*enemy_npc).scriptFlags & 0x00010000) != 0)
                 {
                     //don't shoot someone who's surrendering if you're a good guy (SCF_FORCED_MARCH)
                     world.globals.ucmd.buttons &= !BUTTON_ATTACK;
@@ -1533,14 +1528,28 @@ pub fn NPC_ExecuteBState(
             (*client).ps.weaponstate = WEAPON_IDLE as c_int;
         }
 
-        if (world.globals.ucmd.buttons & BUTTON_ATTACK) == 0 && (*npc_ent).attackDebounceTime > world.level.time {
+        if (world.globals.ucmd.buttons & BUTTON_ATTACK) == 0
+            && (*npc_ent).attackDebounceTime > world.level.time
+        {
             //We just shot but aren't still shooting, so hold the gun up for a while
             if (*client).ps.weapon == WP_SABER {
                 //One-handed
-                NPC_SetAnim(ctx, npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONREADY1 as c_int, SETANIM_FLAG_NORMAL);
+                NPC_SetAnim(
+                    ctx,
+                    npc_ent,
+                    SETANIM_TORSO,
+                    animNumber_t::TORSO_WEAPONREADY1 as c_int,
+                    SETANIM_FLAG_NORMAL,
+                );
             } else if (*client).ps.weapon == WP_BRYAR_PISTOL {
                 //Sniper pose
-                NPC_SetAnim(ctx, npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONREADY3 as c_int, SETANIM_FLAG_NORMAL);
+                NPC_SetAnim(
+                    ctx,
+                    npc_ent,
+                    SETANIM_TORSO,
+                    animNumber_t::TORSO_WEAPONREADY3 as c_int,
+                    SETANIM_FLAG_NORMAL,
+                );
             }
         } else if (*npc_ent).enemy.is_none() {
             //HACK!
@@ -1548,7 +1557,13 @@ pub fn NPC_ExecuteBState(
                 || (*npc_ent).s.torsoAnim == animNumber_t::TORSO_WEAPONREADY3 as c_int
             {
                 //we look ready for action, using one of the first 2 weapon, let's rest our weapon on our shoulder
-                NPC_SetAnim(ctx, npc_ent, SETANIM_TORSO, animNumber_t::TORSO_WEAPONIDLE3 as c_int, SETANIM_FLAG_NORMAL);
+                NPC_SetAnim(
+                    ctx,
+                    npc_ent,
+                    SETANIM_TORSO,
+                    animNumber_t::TORSO_WEAPONIDLE3 as c_int,
+                    SETANIM_FLAG_NORMAL,
+                );
             }
         }
 
@@ -1563,7 +1578,8 @@ pub fn NPC_ExecuteBState(
         world.globals.ucmd.serverTime = world.level.time - 50;
         (*npc_info).last_ucmd = world.globals.ucmd;
         if (*npc_info).attackHoldTime == 0 {
-            (*npc_info).last_ucmd.buttons &= !(BUTTON_ATTACK | BUTTON_ALT_ATTACK); //so we don't fire twice in one think
+            (*npc_info).last_ucmd.buttons &= !(BUTTON_ATTACK | BUTTON_ALT_ATTACK);
+            //so we don't fire twice in one think
         }
         //============================================================================
         NPC_CheckAttackScript(ctx);
@@ -1619,7 +1635,10 @@ pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
         } else if crate::q_math::VectorLengthSquared((*npc_info).lastClearOrigin) != 0.0 {
             //			Com_Printf("%s stuck in solid at %s: fixing...\n", NPC->script_targetname, vtos(NPC->r.currentOrigin));
             crate::g_utils::G_SetOrigin(npc_ent, (*npc_info).lastClearOrigin);
-            trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_ent));
+            trap::LinkEntity(
+                ctx.engine,
+                mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc_ent),
+            );
         }
     }
 }
@@ -1627,10 +1646,7 @@ pub fn NPC_CheckInSolid(ctx: GameContext<'_>) {
 /// Raven `G_DroidSounds`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1787-1814`
-pub fn G_DroidSounds(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn G_DroidSounds(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let client = (*self_).client as *mut gclient_t;
         if client.is_null() {
@@ -1666,12 +1682,7 @@ pub fn G_DroidSounds(
                 _ => return,
             };
 
-            crate::g_utils::G_SoundOnEnt(
-                ctx,
-                self_,
-                CHAN_AUTO,
-                cstr(&sound_path).as_ptr(),
-            );
+            crate::g_utils::G_SoundOnEnt(ctx, self_, CHAN_AUTO, cstr(&sound_path).as_ptr());
 
             let duration = (*ctx.world).bg_state.rng.Q_irand(2000, 4000);
             crate::g_timer::TIMER_Set(ctx, self_, c"patrolNoise".as_ptr(), duration);
@@ -1686,10 +1697,7 @@ pub fn G_DroidSounds(
 /// Raven `NPC_Think`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC.c:1826-1979`
-pub fn NPC_Think(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn NPC_Think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     const FRAMETIME: c_int = 100;
     // Raven `w_force.rs:98` precedent — `playerState_t::pm_flags` bit, not yet
     // centrally ported.
@@ -1742,7 +1750,8 @@ pub fn NPC_Think(
         // Raven `svFlags` bit `SVF_ICARUS_FREEZE` (`g_local.h`) — not yet
         // centrally ported; local const per the codebase's per-file precedent.
         const SVF_ICARUS_FREEZE: c_int = 0x00000400;
-        if world.cvars.debugNPCFreeze.value != 0.0 || ((*self_).r.svFlags & SVF_ICARUS_FREEZE) != 0 {
+        if world.cvars.debugNPCFreeze.value != 0.0 || ((*self_).r.svFlags & SVF_ICARUS_FREEZE) != 0
+        {
             crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1);
             let mut ucmd = world.globals.ucmd;
             crate::g_active::ClientThink(ctx, (*self_).s.number, &mut ucmd as *mut usercmd_t);
@@ -1797,7 +1806,10 @@ pub fn NPC_Think(
                 return;
             }
 
-            if (*self_).s.weapon == WP_SABER && world.cvars.g_spskill.integer >= 2 && (*npc).rank > RANK_LT_JG {
+            if (*self_).s.weapon == WP_SABER
+                && world.cvars.g_spskill.integer >= 2
+                && (*npc).rank > RANK_LT_JG
+            {
                 //Jedi think faster on hard difficulty, except low-rank (reborn)
                 (*npc).nextBStateThink = world.level.time + FRAMETIME / 2;
             } else {
@@ -1806,7 +1818,9 @@ pub fn NPC_Think(
             }
 
             //nextthink is set before this so something in here can override it
-            if (*self_).s.NPC_class != class_t::CLASS_VEHICLE as c_int || (*self_).m_pVehicle.is_null() {
+            if (*self_).s.NPC_class != class_t::CLASS_VEHICLE as c_int
+                || (*self_).m_pVehicle.is_null()
+            {
                 //ok, let's not do this at all for vehicles.
                 NPC_ExecuteBState(ctx, self_);
             }
@@ -1862,5 +1876,13 @@ pub fn NPC_SetAnim(
     anim: c_int,
     setAnimFlags: c_int,
 ) {
-    G_SetAnim(ctx, ent, core::ptr::null_mut(), setAnimParts, anim, setAnimFlags, 0);
+    G_SetAnim(
+        ctx,
+        ent,
+        core::ptr::null_mut(),
+        setAnimParts,
+        anim,
+        setAnimFlags,
+        0,
+    );
 }

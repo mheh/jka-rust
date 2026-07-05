@@ -8,12 +8,12 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::bg_panimate::PM_InKnockDown;
-use crate::q_math::{AngleVectors, VectorNormalize};
-use crate::trap;
 use crate::g_nav::NAV_AvoidCollision;
 use crate::g_navnew::{NAVNEW_AvoidCollision, NAVNEW_MoveToGoal};
+use crate::prelude::*;
+use crate::q_math::{AngleVectors, VectorNormalize};
+use crate::trap;
 use std::ffi::c_int;
 
 /// File-scope static for `NPC_move.c` navigation state (oracle/oracle/codemp/game/NPC_move.c:14).
@@ -46,18 +46,21 @@ static mut FRAME_NAV_INFO: navInfo_t = navInfo_t {
 /// Raven `NPC_ClearPathToGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:27-70`
-pub fn NPC_ClearPathToGoal(
-    ctx: GameContext<'_>,
-    dir: vec3_t,
-    goal: *mut gentity_t,
-) -> qboolean {
+pub fn NPC_ClearPathToGoal(ctx: GameContext<'_>, dir: vec3_t, goal: *mut gentity_t) -> qboolean {
     unsafe {
         let mut trace: trace_t = core::mem::zeroed();
         let npc = (*ctx.world).globals.NPC;
         let npc_info = &*(*ctx.world).globals.NPCInfo;
 
         // Look ahead and see if we're clear to move to our goal position
-        if crate::g_nav::NAV_CheckAhead(ctx, npc, (*goal).r.currentOrigin, &mut trace as *mut trace_t, ((*npc).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP) == qtrue {
+        if crate::g_nav::NAV_CheckAhead(
+            ctx,
+            npc,
+            (*goal).r.currentOrigin,
+            &mut trace as *mut trace_t,
+            ((*npc).clipmask & !CONTENTS_BODY) | CONTENTS_BOTCLIP,
+        ) == qtrue
+        {
             return qtrue;
         }
 
@@ -84,7 +87,15 @@ pub fn NPC_ClearPathToGoal(
         // See if we're looking for a navgoal
         if ((*goal).flags & FL_NAVGOAL) != 0 {
             // Okay, didn't get all the way there, let's see if we got close enough
-            if NAV_HitNavGoal(trace.endpos, (*npc).r.mins, (*npc).r.maxs, (*goal).r.currentOrigin, npc_info.goalRadius, FlyingCreature(npc)) == qtrue {
+            if NAV_HitNavGoal(
+                trace.endpos,
+                (*npc).r.mins,
+                (*npc).r.maxs,
+                (*goal).r.currentOrigin,
+                npc_info.goalRadius,
+                FlyingCreature(npc),
+            ) == qtrue
+            {
                 return qtrue;
             }
         }
@@ -101,7 +112,9 @@ pub fn NPC_CheckCombatMove(ctx: GameContext<'_>) -> qboolean {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = &*(*ctx.world).globals.NPCInfo;
 
-        if (npc_info.goalEntity.is_some() && (*npc).enemy.is_some() && npc_info.goalEntity == (*npc).enemy)
+        if (npc_info.goalEntity.is_some()
+            && (*npc).enemy.is_some()
+            && npc_info.goalEntity == (*npc).enemy)
             || npc_info.combatMove != 0
         {
             return qtrue;
@@ -120,15 +133,15 @@ pub fn NPC_CheckCombatMove(ctx: GameContext<'_>) -> qboolean {
 /// Raven `NPC_LadderMove`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:103-118`
-pub fn NPC_LadderMove(
-    ctx: GameContext<'_>,
-    dir: vec3_t,
-) {
+pub fn NPC_LadderMove(ctx: GameContext<'_>, dir: vec3_t) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         let ucmd = &mut (*ctx.world).globals.ucmd;
 
-        if (dir[2] > 0.0) || (dir[2] < 0.0 && (*((*npc).client as *mut gclient_t)).ps.groundEntityNum == ENTITYNUM_NONE) {
+        if (dir[2] > 0.0)
+            || (dir[2] < 0.0
+                && (*((*npc).client as *mut gclient_t)).ps.groundEntityNum == ENTITYNUM_NONE)
+        {
             // Set our movement direction
             ucmd.upmove = if dir[2] > 0.0 { 127 } else { -127 };
 
@@ -156,7 +169,11 @@ pub fn NPC_GetMoveInformation(
             let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
 
             // Get our move info
-            crate::q_math::_VectorSubtract((*goal_ptr).r.currentOrigin, (*npc).r.currentOrigin, dir);
+            crate::q_math::_VectorSubtract(
+                (*goal_ptr).r.currentOrigin,
+                (*npc).r.currentOrigin,
+                dir,
+            );
             *distance = crate::q_math::VectorNormalize(dir);
 
             crate::q_math::_VectorCopy((*goal_ptr).r.currentOrigin, &mut npc_info.blockedDest);
@@ -174,10 +191,7 @@ pub fn NPC_GetMoveInformation(
 /// navigation functions have populated `frameNavInfo` in the same frame.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:149-152`
-pub fn NAV_GetLastMove(
-    ctx: GameContext<'_>,
-    info: *mut navInfo_t,
-) {
+pub fn NAV_GetLastMove(ctx: GameContext<'_>, info: *mut navInfo_t) {
     unsafe {
         *info = FRAME_NAV_INFO;
     }
@@ -186,11 +200,7 @@ pub fn NAV_GetLastMove(
 /// Raven `NPC_GetMoveDirection`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:160-230`
-pub fn NPC_GetMoveDirection(
-    ctx: GameContext<'_>,
-    mut out: vec3_t,
-    distance: *mut f32,
-) -> qboolean {
+pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, mut out: vec3_t, distance: *mut f32) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
@@ -200,7 +210,12 @@ pub fn NPC_GetMoveDirection(
         FRAME_NAV_INFO = unsafe { std::mem::zeroed() };
 
         // Get our movement, if any
-        if NPC_GetMoveInformation(ctx, &mut FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.distance) == qfalse {
+        if NPC_GetMoveInformation(
+            ctx,
+            &mut FRAME_NAV_INFO.direction,
+            &mut FRAME_NAV_INFO.distance,
+        ) == qfalse
+        {
             return qfalse;
         }
 
@@ -221,7 +236,9 @@ pub fn NPC_GetMoveDirection(
             let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
             if NPC_ClearPathToGoal(ctx, FRAME_NAV_INFO.direction, goal_ptr) == qfalse {
                 // See if we're just stuck
-                if crate::g_nav::NAV_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO as *mut navInfo_t) == WAYPOINT_NONE {
+                if crate::g_nav::NAV_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO as *mut navInfo_t)
+                    == WAYPOINT_NONE
+                {
                     // Can't reach goal, just face
                     crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
                     npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
@@ -241,7 +258,9 @@ pub fn NPC_GetMoveDirection(
                 if (FRAME_NAV_INFO.flags & NIF_MACRO_NAV) == 0 {
                     // we had a clear path to goal and didn't try macro nav, but can't avoid collision so try macro nav here
                     // See if we're just stuck
-                    if crate::g_nav::NAV_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO as *mut navInfo_t) == WAYPOINT_NONE {
+                    if crate::g_nav::NAV_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO as *mut navInfo_t)
+                        == WAYPOINT_NONE
+                    {
                         // Can't reach goal, just face
                         crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
                         npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
@@ -283,7 +302,12 @@ pub fn NPC_GetMoveDirectionAltRoute(
         FRAME_NAV_INFO = unsafe { std::mem::zeroed() };
 
         // Get our movement, if any
-        if NPC_GetMoveInformation(ctx, &mut FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.distance) == qfalse {
+        if NPC_GetMoveInformation(
+            ctx,
+            &mut FRAME_NAV_INFO.direction,
+            &mut FRAME_NAV_INFO.distance,
+        ) == qfalse
+        {
             return qfalse;
         }
 
@@ -302,7 +326,9 @@ pub fn NPC_GetMoveDirectionAltRoute(
         // Attempt a straight move to goal
         if let Some(goal_id) = npc_info.goalEntity {
             let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
-            if tryStraight == qfalse || NPC_ClearPathToGoal(ctx, FRAME_NAV_INFO.direction, goal_ptr) == qfalse {
+            if tryStraight == qfalse
+                || NPC_ClearPathToGoal(ctx, FRAME_NAV_INFO.direction, goal_ptr) == qfalse
+            {
                 // blocked — Can't get straight to goal, use macro nav
                 if NAVNEW_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO) == WAYPOINT_NONE {
                     // Can't reach goal, just face
@@ -320,7 +346,8 @@ pub fn NPC_GetMoveDirectionAltRoute(
                 if (*ctx.world).cvars.d_altRoutes.integer != 0 {
                     // try macro nav
                     let mut temp_info = FRAME_NAV_INFO;
-                    if NAVNEW_AvoidCollision(ctx, npc, goal_ptr, &mut temp_info, qtrue, 5) == qfalse {
+                    if NAVNEW_AvoidCollision(ctx, npc, goal_ptr, &mut temp_info, qtrue, 5) == qfalse
+                    {
                         // revert to macro nav — Can't get straight to goal, dump tempInfo and use macro nav
                         if NAVNEW_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO) == WAYPOINT_NONE {
                             // Can't reach goal, just face
@@ -338,7 +365,9 @@ pub fn NPC_GetMoveDirectionAltRoute(
                     }
                 } else {
                     // OR: just give up
-                    if NAVNEW_AvoidCollision(ctx, npc, goal_ptr, &mut FRAME_NAV_INFO, qtrue, 30) == qfalse {
+                    if NAVNEW_AvoidCollision(ctx, npc, goal_ptr, &mut FRAME_NAV_INFO, qtrue, 30)
+                        == qfalse
+                    {
                         // give up
                         return qfalse;
                     }
@@ -363,17 +392,18 @@ pub fn NPC_GetMoveDirectionAltRoute(
 /// the ucmd conversion.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:324-370`
-pub fn G_UcmdMoveForDir(
-    self_: *mut gentity_t,
-    cmd: *mut usercmd_t,
-    dir: vec3_t,
-) {
+pub fn G_UcmdMoveForDir(self_: *mut gentity_t, cmd: *mut usercmd_t, dir: vec3_t) {
     unsafe {
         let mut forward = [0.0f32; 3];
         let mut right = [0.0f32; 3];
 
         // Get forward and right vectors from entity's current angles.
-        AngleVectors((*self_).r.currentAngles, Some(&mut forward), Some(&mut right), None);
+        AngleVectors(
+            (*self_).r.currentAngles,
+            Some(&mut forward),
+            Some(&mut right),
+            None,
+        );
 
         // Zero out vertical component of movement direction.
         let mut move_dir = dir;
@@ -387,8 +417,11 @@ pub fn G_UcmdMoveForDir(
         (*((*self_).client as *mut gclient_t)).ps.moveDir = move_dir;
 
         // Compute dot products with forward and right vectors, scaled to [-127, 127].
-        let mut fDot = (forward[0] * move_dir[0] + forward[1] * move_dir[1] + forward[2] * move_dir[2]) * 127.0f32;
-        let mut rDot = (right[0] * move_dir[0] + right[1] * move_dir[1] + right[2] * move_dir[2]) * 127.0f32;
+        let mut fDot =
+            (forward[0] * move_dir[0] + forward[1] * move_dir[1] + forward[2] * move_dir[2])
+                * 127.0f32;
+        let mut rDot =
+            (right[0] * move_dir[0] + right[1] * move_dir[1] + right[2] * move_dir[2]) * 127.0f32;
 
         // Clamp values to [-127, 127] to avoid overflow in signed byte.
         // DotProduct is not guaranteed to return [-1, 1] due to floating-point errors.
@@ -414,10 +447,7 @@ pub fn G_UcmdMoveForDir(
 /// Raven `NPC_MoveToGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:382-467`
-pub fn NPC_MoveToGoal(
-    ctx: GameContext<'_>,
-    tryStraight: qboolean,
-) -> qboolean {
+pub fn NPC_MoveToGoal(ctx: GameContext<'_>, tryStraight: qboolean) -> qboolean {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
@@ -428,7 +458,8 @@ pub fn NPC_MoveToGoal(
 
         // If taking full body pain, don't move
         if PM_InKnockDown(&mut (*((*npc).client as *mut gclient_t)).ps) == qtrue
-            || ((*npc).s.legsAnim >= BOTH_PAIN1 as c_int && (*npc).s.legsAnim <= BOTH_PAIN18 as c_int)
+            || ((*npc).s.legsAnim >= BOTH_PAIN1 as c_int
+                && (*npc).s.legsAnim <= BOTH_PAIN18 as c_int)
         {
             return qtrue;
         }
@@ -508,9 +539,16 @@ pub fn NPC_ApplyRoff(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
 
-        BG_PlayerStateToEntityState(&mut (*((*npc).client as *mut gclient_t)).ps, &mut (*npc).s, qfalse);
+        BG_PlayerStateToEntityState(
+            &mut (*((*npc).client as *mut gclient_t)).ps,
+            &mut (*npc).s,
+            qfalse,
+        );
 
         // use the precise origin for linking
-        crate::trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc));
+        crate::trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(npc),
+        );
     }
 }

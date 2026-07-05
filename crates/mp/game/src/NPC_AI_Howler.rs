@@ -113,10 +113,7 @@ pub fn Howler_Patrol(ctx: GameContext<'_>) {
 /// Raven `Howler_Move`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:78-86`
-pub fn Howler_Move(
-    ctx: GameContext<'_>,
-    visible: qboolean,
-) {
+pub fn Howler_Move(ctx: GameContext<'_>, visible: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = (*ctx.world).globals.NPCInfo;
@@ -132,11 +129,7 @@ pub fn Howler_Move(
 /// Raven `Howler_TryDamage`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:89-109`
-pub fn Howler_TryDamage(
-    ctx: GameContext<'_>,
-    enemy: *mut gentity_t,
-    damage: c_int,
-) {
+pub fn Howler_TryDamage(ctx: GameContext<'_>, enemy: *mut gentity_t, damage: c_int) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
 
@@ -148,7 +141,12 @@ pub fn Howler_TryDamage(
         let mut dir: vec3_t = [0.0; 3];
         let mut tr: trace_t = std::mem::zeroed();
 
-        crate::q_math::AngleVectors((*((*npc).client as *mut gclient_t)).ps.viewangles, Some(&mut dir), None, None);
+        crate::q_math::AngleVectors(
+            (*((*npc).client as *mut gclient_t)).ps.viewangles,
+            Some(&mut dir),
+            None,
+            None,
+        );
         crate::q_math::_VectorMA((*npc).r.currentOrigin, MIN_DISTANCE as f32, dir, &mut end);
 
         // Should probably trace from the mouth, but, ah well.
@@ -196,7 +194,8 @@ pub fn Howler_Attack(ctx: GameContext<'_>) {
                 c"attacking".as_ptr(),
                 (1700.0 + ((*ctx.world).bg_state.rng.random() as f32 * 200.0)) as c_int,
             );
-            crate::npc_c::NPC_SetAnim(ctx,
+            crate::npc_c::NPC_SetAnim(
+                ctx,
                 npc,
                 SETANIM_BOTH,
                 BOTH_ATTACK1,
@@ -208,7 +207,8 @@ pub fn Howler_Attack(ctx: GameContext<'_>) {
 
         // Need to do delayed damage since the attack animations encapsulate multiple mini-attacks
         if crate::g_timer::TIMER_Done2(ctx, npc, c"attack_dmg".as_ptr(), qtrue) != 0 {
-            let enemy_ptr = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
+            let enemy_ptr =
+                crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*npc).enemy);
             Howler_TryDamage(ctx, enemy_ptr, 5);
         }
 
@@ -286,7 +286,8 @@ pub fn NPC_Howler_Pain(
                 crate::q_math::_VectorCopy((*npc).lastPathAngles, &mut (*self_).s.angles);
             }
 
-            crate::npc_c::NPC_SetAnim(ctx,
+            crate::npc_c::NPC_SetAnim(
+                ctx,
                 self_,
                 SETANIM_BOTH,
                 BOTH_PAIN1,
