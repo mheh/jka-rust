@@ -381,17 +381,22 @@ pub fn ShieldTouch(
     trace: *mut trace_t,
 ) {
     unsafe {
+        let parent = match (*self_).parent {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+
         if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
             // let teammates through
             // compare the parent's team to the "other's" team
-            if !(*self_).parent.is_none() && !(*(*self_).parent).client.is_null() && !(*other).client.is_null() {
-                if OnSameTeam(ctx, (*self_).parent, other) != 0 {
+            if !parent.is_null() && !(*parent).client.is_null() && !(*other).client.is_null() {
+                if OnSameTeam(ctx, parent, other) != 0 {
                     ShieldGoNotSolid(ctx, self_);
                 }
             }
         } else {
             // let the person who dropped the shield through
-            if !(*self_).parent.is_none() && (*(*self_).parent).s.number == (*other).s.number {
+            if !parent.is_null() && (*parent).s.number == (*other).s.number {
                 ShieldGoNotSolid(ctx, self_);
             }
         }
@@ -737,7 +742,10 @@ pub fn pas_fire(
         let mut myOrg = (*ent).r.currentOrigin;
         myOrg[2] += 24.0;
 
-        let mut enOrg = (*((*(*ent).enemy).client as *mut gclient_t)).ps.origin;
+        // Raven derefs `ent->enemy` unconditionally; callers only invoke
+        // `pas_fire` when `ent->enemy` is non-null (see `pas_think`).
+        let enemy = &mut (*ctx.world).entities[(*ent).enemy.unwrap().index()] as *mut gentity_t;
+        let mut enOrg = (*((*enemy).client as *mut gclient_t)).ps.origin;
         enOrg[2] += 24.0;
 
         let mut fwd = [enOrg[0] - myOrg[0], enOrg[1] - myOrg[1], enOrg[2] - myOrg[2]];
@@ -861,17 +869,20 @@ pub fn pas_adjust_enemy(
 ) {
     unsafe {
         let mut keep = qtrue;
+        // Raven derefs `ent->enemy` unconditionally here; callers only invoke
+        // `pas_adjust_enemy` when `ent->enemy` is non-null (see `pas_think`).
+        let enemy = &mut (*ctx.world).entities[(*ent).enemy.unwrap().index()] as *mut gentity_t;
 
-        if (*(*ent).enemy).health <= 0 {
+        if (*enemy).health <= 0 {
             keep = qfalse;
         } else {
             let org2 = (*ent).s.pos.trBase;
-            let org = if !(*(*ent).enemy).client.is_null() {
-                let mut o = (*((*(*ent).enemy).client as *mut gclient_t)).ps.origin;
+            let org = if !(*enemy).client.is_null() {
+                let mut o = (*((*enemy).client as *mut gclient_t)).ps.origin;
                 o[2] -= 15.0;
                 o
             } else {
-                (*(*ent).enemy).r.currentOrigin
+                (*enemy).r.currentOrigin
             };
 
             let mut tr: trace_t = core::mem::zeroed();
@@ -881,7 +892,7 @@ pub fn pas_adjust_enemy(
             );
 
             if tr.allsolid != 0 || tr.startsolid != 0 || tr.fraction < 0.9 || tr.entityNum as c_int == (*ent).s.number {
-                if tr.entityNum as c_int != (*(*ent).enemy).s.number {
+                if tr.entityNum as c_int != (*enemy).s.number {
                     // trace failed
                     keep = qfalse;
                 }
@@ -1022,12 +1033,13 @@ pub fn pas_think(
             pas_adjust_enemy(ctx, ent);
         }
 
-        if !(*ent).enemy.is_none() {
-            if (*(*ent).enemy).client.is_null() {
+        if let Some(enemy_id) = (*ent).enemy {
+            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            if (*enemy).client.is_null() {
                 (*ent).enemy = None;
-            } else if (*(*ent).enemy).s.number == (*ent).s.number {
+            } else if (*enemy).s.number == (*ent).s.number {
                 (*ent).enemy = None;
-            } else if (*(*ent).enemy).health < 1 {
+            } else if (*enemy).health < 1 {
                 (*ent).enemy = None;
             }
         }
@@ -1036,8 +1048,8 @@ pub fn pas_think(
             pas_find_enemies(ctx, ent);
         }
 
-        if !(*ent).enemy.is_none() {
-            (*ent).s.bolt2 = (*(*ent).enemy).s.number;
+        if let Some(enemy_id) = (*ent).enemy {
+            (*ent).s.bolt2 = (*ctx.world).entities[enemy_id.index()].s.number;
         } else {
             (*ent).s.bolt2 = ENTITYNUM_NONE;
         }
@@ -1049,13 +1061,14 @@ pub fn pas_think(
         (*ent).speed = AngleNormalize360((*ent).speed);
         (*ent).random = AngleNormalize360((*ent).random);
 
-        if !(*ent).enemy.is_none() {
+        if let Some(enemy_id) = (*ent).enemy {
             // ...then we'll calculate what new aim adjustments we should attempt to make this frame
             // Aim at enemy
-            let org = if !(*(*ent).enemy).client.is_null() {
-                (*((*(*ent).enemy).client as *mut gclient_t)).ps.origin
+            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            let org = if !(*enemy).client.is_null() {
+                (*((*enemy).client as *mut gclient_t)).ps.origin
             } else {
-                (*(*ent).enemy).r.currentOrigin
+                (*enemy).r.currentOrigin
             };
 
             let enemyDir = [org[0] - (*ent).r.currentOrigin[0], org[1] - (*ent).r.currentOrigin[1], org[2] - (*ent).r.currentOrigin[2]];
@@ -2766,18 +2779,30 @@ pub fn RespawnItem(
             let master = (*ent).teammaster;
 
             let mut count = 0;
-            let mut e = master;
-            while !e.is_none() {
-                e = (*e).teamchain;
+            let mut e = match master {
+                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                None => core::ptr::null_mut(),
+            };
+            while !e.is_null() {
+                e = match (*e).teamchain {
+                    Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                    None => core::ptr::null_mut(),
+                };
                 count += 1;
             }
 
             let choice = (*ctx.world).bg_state.rng.rand() % count;
 
             let mut i = 0;
-            e = master;
+            e = match master {
+                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                None => core::ptr::null_mut(),
+            };
             while i < choice {
-                e = (*e).teamchain;
+                e = match (*e).teamchain {
+                    Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                    None => core::ptr::null_mut(),
+                };
                 i += 1;
             }
             ent = e;
@@ -2924,10 +2949,19 @@ pub fn Touch_Item(
 
         if CheckItemCanBePickedUpByNPC(ctx, ent, other) != 0 {
             let npc = (*other).NPC as *mut gNPC_t;
-            if !npc.is_null() && !(*npc).goalEntity.is_none() && (*(*npc).goalEntity).enemy == ent {
-                // they were running to pick me up, they did, so clear goal
-                (*npc).goalEntity = None;
-                (*npc).squadState = SQUAD_STAND_AND_SHOOT;
+            if !npc.is_null() {
+                if let Some(goal_id) = (*npc).goalEntity {
+                    let goal = &mut (*ctx.world).entities[goal_id.index()] as *mut gentity_t;
+                    let goal_enemy = match (*goal).enemy {
+                        Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                        None => core::ptr::null_mut(),
+                    };
+                    if goal_enemy == ent {
+                        // they were running to pick me up, they did, so clear goal
+                        (*npc).goalEntity = None;
+                        (*npc).squadState = SQUAD_STAND_AND_SHOOT;
+                    }
+                }
             }
         } else if ((*ent).spawnflags & ITMSF_ALLOWNPC) == 0 {
             // NPCs cannot pick it up

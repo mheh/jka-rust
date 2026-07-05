@@ -213,11 +213,13 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
 
                 if cp == -1 && ((*npc_info_ptr).scriptFlags & SCF_USE_CP_NEAREST) == 0 {
                     // okay, try one by the enemy
+                    // `goalEntity == enemy` (checked above) and `goalEntity` is
+                    // `Some` here, so `enemy` is guaranteed `Some` too.
                     cp = NPC_FindCombatPoint(
                         ctx,
                         (*npc_ptr).r.currentOrigin,
                         (*npc_ptr).r.currentOrigin,
-                        (*(*npc_ptr).enemy).r.currentOrigin,
+                        world.entities[(*npc_ptr).enemy.unwrap().index()].r.currentOrigin,
                         CP_CLEAR | CP_HAS_ROUTE | CP_HORZ_DIST_COLL,
                         32.0,
                         -1,
@@ -373,7 +375,8 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                 (*npc_ptr).r.currentOrigin,
                 (*npc_ptr).r.mins,
                 (*npc_ptr).r.maxs,
-                (*(*npc_info_ptr).goalEntity).r.currentOrigin,
+                // guarded by `!goalEntity.is_none()` above.
+                world.entities[(*npc_info_ptr).goalEntity.unwrap().index()].r.currentOrigin,
                 16,
                 FlyingCreature(npc_ptr),
             ) != QFALSE
@@ -477,7 +480,7 @@ pub fn Grenadier_EvaluateShot(
             return QFALSE;
         }
 
-        if hit == (*(*npc_ptr).enemy).s.number {
+        if hit == world.entities[(*npc_ptr).enemy.unwrap().index()].s.number {
             // can hit enemy
             return QTRUE;
         }
@@ -534,18 +537,21 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             return;
         }
 
+        // Guaranteed `Some` from here to the end of the function by the guard above.
+        let enemy_ent = &mut (*ctx.world).entities[(*npc_ptr).enemy.unwrap().index()] as *mut gentity_t;
+
         world.globals.enemyLOS3 = QFALSE;
         world.globals.enemyCS3 = QFALSE;
         world.globals.move3 = QTRUE;
         world.globals.faceEnemy3 = QFALSE;
         world.globals.shoot3 = QFALSE;
-        world.globals.enemyDist3 = DistanceSquared((*(*npc_ptr).enemy).r.currentOrigin, (*npc_ptr).r.currentOrigin);
+        world.globals.enemyDist3 = DistanceSquared((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin);
 
         // See if we should switch to melee attack
         if world.globals.enemyDist3 < 16384.0
-            && ((*(*npc_ptr).enemy).client.is_null()
-                || (*(*(*npc_ptr).enemy).client).ps.weapon != mp_bg::weapons::weapon_t::WP_SABER
-                || BG_SabersOff(&mut (*(*(*npc_ptr).enemy).client).ps) != QFALSE)
+            && ((*enemy_ent).client.is_null()
+                || (*((*enemy_ent).client as *mut gclient_t)).ps.weapon != mp_bg::weapons::weapon_t::WP_SABER
+                || BG_SabersOff(&mut (*((*enemy_ent).client as *mut gclient_t)).ps) != QFALSE)
         {
             // enemy is close and not using saber
             if (*(*npc_ptr).client).ps.weapon == WP_THERMAL {
@@ -555,13 +561,13 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
                     ctx.engine,
                     &mut trace,
                     (*npc_ptr).r.currentOrigin,
-                    (*(*npc_ptr).enemy).r.mins,
-                    (*(*npc_ptr).enemy).r.maxs,
-                    (*(*npc_ptr).enemy).r.currentOrigin,
+                    (*enemy_ent).r.mins,
+                    (*enemy_ent).r.maxs,
+                    (*enemy_ent).r.currentOrigin,
                     (*npc_ptr).s.number,
-                    (*(*npc_ptr).enemy).clipmask,
+                    (*enemy_ent).clipmask,
                 );
-                if !trace.allsolid && !trace.startsolid && (trace.fraction == 1.0 || trace.entityNum == (*(*npc_ptr).enemy).s.number) {
+                if !trace.allsolid && !trace.startsolid && (trace.fraction == 1.0 || trace.entityNum == (*enemy_ent).s.number) {
                     // I can get right to him
                     // reset fire-timing variables
                     NPC_ChangeWeapon(WP_STUN_BATON);
@@ -571,9 +577,9 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
                 }
             }
         } else if world.globals.enemyDist3 > 65536.0
-            || (!(*(*npc_ptr).enemy).client.is_null()
-                && (*(*(*npc_ptr).enemy).client).ps.weapon == mp_bg::weapons::weapon_t::WP_SABER
-                && (*(*(*npc_ptr).enemy).client).ps.saberHolstered == 0)
+            || (!(*enemy_ent).client.is_null()
+                && (*((*enemy_ent).client as *mut gclient_t)).ps.weapon == mp_bg::weapons::weapon_t::WP_SABER
+                && (*((*enemy_ent).client as *mut gclient_t)).ps.saberHolstered == 0)
         {
             // enemy is far or using saber
             if (*(*npc_ptr).client).ps.weapon == WP_STUN_BATON
@@ -592,23 +598,23 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
 
             if (*(*npc_ptr).client).ps.weapon == WP_STUN_BATON {
                 if world.globals.enemyDist3 <= 4096.0
-                    && InFOV3((*(*npc_ptr).enemy).r.currentOrigin, (*npc_ptr).r.currentOrigin, (*(*npc_ptr).client).ps.viewangles, 90, 45) != QFALSE
+                    && InFOV3((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin, (*(*npc_ptr).client).ps.viewangles, 90, 45) != QFALSE
                 {
                     // within 64 & infront
-                    mp_qshared::shared::VectorCopy((*(*npc_ptr).enemy).r.currentOrigin, &mut (*npc_info_ptr).enemyLastSeenLocation);
+                    mp_qshared::shared::VectorCopy((*enemy_ent).r.currentOrigin, &mut (*npc_info_ptr).enemyLastSeenLocation);
                     world.globals.enemyCS3 = QTRUE;
                 }
-            } else if InFOV3((*(*npc_ptr).enemy).r.currentOrigin, (*npc_ptr).r.currentOrigin, (*(*npc_ptr).client).ps.viewangles, 45, 90) != QFALSE {
+            } else if InFOV3((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin, (*(*npc_ptr).client).ps.viewangles, 45, 90) != QFALSE {
                 // in front of me
                 // can we shoot our target?
                 let hit = NPC_ShotEntity(ctx, (*npc_ptr).enemy, core::ptr::null_mut());
                 let hit_ent = &world.entities[hit as usize];
-                if hit == (*(*npc_ptr).enemy).s.number
+                if hit == (*enemy_ent).s.number
                     || (!hit_ent.client.is_null()
                         && (*hit_ent.client).playerTeam == (*(*npc_ptr).client).enemyTeam)
                 {
-                    let enemyHorzDist = DistanceHorizontalSquared((*(*npc_ptr).enemy).r.currentOrigin, (*npc_ptr).r.currentOrigin);
-                    mp_qshared::shared::VectorCopy((*(*npc_ptr).enemy).r.currentOrigin, &mut (*npc_info_ptr).enemyLastSeenLocation);
+                    let enemyHorzDist = DistanceHorizontalSquared((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin);
+                    mp_qshared::shared::VectorCopy((*enemy_ent).r.currentOrigin, &mut (*npc_info_ptr).enemyLastSeenLocation);
 
                     if enemyHorzDist < 1048576.0 {
                         // within 1024
@@ -635,8 +641,8 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
                 world.globals.move3 = QFALSE;
             } else if (*(*npc_ptr).client).ps.weapon == WP_STUN_BATON
                 && world.globals.enemyDist3
-                    < (((*npc_ptr).r.maxs[0] + (*(*npc_ptr).enemy).r.maxs[0] + 16.0)
-                        * ((*npc_ptr).r.maxs[0] + (*(*npc_ptr).enemy).r.maxs[0] + 16.0))
+                    < (((*npc_ptr).r.maxs[0] + (*enemy_ent).r.maxs[0] + 16.0)
+                        * ((*npc_ptr).r.maxs[0] + (*enemy_ent).r.maxs[0] + 16.0))
             {
                 // close enough
                 world.globals.move3 = QFALSE;

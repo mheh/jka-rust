@@ -5168,20 +5168,23 @@ pub fn BotWeaponCanLead(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:4607-4684`
 pub fn BotAimLeading(
+    ctx: GameContext<'_>,
     bs: *mut bot_state_t,
     headlevel: vec3_t,
     leadAmount: f32,
 ) {
     unsafe {
         let bs = &mut *bs;
-        if bs.currentEnemy.is_none() || (*bs.currentEnemy).client.is_null() {
+        let base = (*ctx.world).entities.as_mut_ptr();
+        let currentEnemy = crate::ent_id::resolve(base, bs.currentEnemy);
+        if currentEnemy.is_null() || (*currentEnemy).client.is_null() {
             return;
         }
         if bs.frame_Enemy_Len == 0.0 {
             return;
         }
 
-        let ce_client = (*bs.currentEnemy).client;
+        let ce_client = (*currentEnemy).client as *mut gclient_t;
         let vel = (*ce_client).ps.velocity;
 
         let mut vtotal: f32 = 0.0;
@@ -7782,7 +7785,7 @@ pub fn StandardBotAI(
             } else {
                 bLeadAmount = BotWeaponCanLead(bs);
                 if ((*bs).skills.accuracy / (*bs).settings.skill) <= 8.0 && bLeadAmount != 0.0 {
-                    BotAimLeading(bs, headlevel, bLeadAmount);
+                    BotAimLeading(ctx, bs, headlevel, bLeadAmount);
                 } else {
                     _VectorSubtract(headlevel, (*bs).eye, &mut a);
                     vectoangles(a, &mut ang);

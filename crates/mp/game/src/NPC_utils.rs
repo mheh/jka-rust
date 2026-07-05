@@ -431,7 +431,9 @@ pub fn NPC_AimWiggle(
         //shoot for somewhere between the head and torso
         //NOTE: yes, I know this looks weird, but it works
         if (*npc_info).aimErrorDebounceTime < (*ctx.world).level.time {
-            let enemy = (*npc).enemy;
+            // Raven derefs `NPC->enemy` unconditionally here (assumed non-null
+            // by the caller).
+            let enemy = &mut (*ctx.world).entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
             (*npc_info).aimOfs[0] = 0.3 * flrand((*enemy).r.mins[0], (*enemy).r.maxs[0]);
             (*npc_info).aimOfs[1] = 0.3 * flrand((*enemy).r.mins[1], (*enemy).r.maxs[1]);
             if (*enemy).r.maxs[2] > 0.0 {
@@ -1059,17 +1061,22 @@ pub fn NPC_ValidEnemy(
             return QFALSE;
         }
 
+        let ent_enemy = match (*ent).enemy {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+
         //if haven't seen him in a while, give up
         if ent_team == (*npc_client).enemyTeam as c_int //simplest case: they're on my enemy team
             || ((*npc_client).enemyTeam as c_int == NPCTEAM_FREE && (*ent_client).NPC_class != (*npc_client).NPC_class) //I get mad at anyone and this guy isn't the same class as me
-            || ((*ent_client).NPC_class == CLASS_WAMPA && !(*ent).enemy.is_none()) //a rampaging wampa
-            || ((*ent_client).NPC_class == CLASS_RANCOR && !(*ent).enemy.is_none()) //a rampaging rancor
+            || ((*ent_client).NPC_class == CLASS_WAMPA && !ent_enemy.is_null()) //a rampaging wampa
+            || ((*ent_client).NPC_class == CLASS_RANCOR && !ent_enemy.is_null()) //a rampaging rancor
             || (ent_team == NPCTEAM_FREE
                 && (*ent_client).enemyTeam as c_int == NPCTEAM_FREE
-                && !(*ent).enemy.is_none()
-                && !(*(*ent).enemy).client.is_null()
+                && !ent_enemy.is_null()
+                && !(*ent_enemy).client.is_null()
                 && ({
-                    let enemy_client = (*(*ent).enemy).client as *mut gclient_t;
+                    let enemy_client = (*ent_enemy).client as *mut gclient_t;
                     (*enemy_client).playerTeam == (*npc_client).playerTeam
                         || ((*enemy_client).playerTeam as c_int != NPCTEAM_ENEMY
                             && (*npc_client).playerTeam as c_int == NPCTEAM_PLAYER)
@@ -1369,14 +1376,16 @@ pub fn NPC_FacePosition(
         (*npc_info).desiredYaw = AngleNormalize360(angles[YAW]);
         (*npc_info).desiredPitch = AngleNormalize360(angles[PITCH]);
 
-        let enemy = (*npc).enemy;
-        if !enemy.is_none() && !(*enemy).client.is_null() {
-            let enemy_client = (*enemy).client as *mut gclient_t;
-            if (*enemy_client).NPC_class == CLASS_ATST {
-                // FIXME: this is kind of dumb, but it was the easiest way to get it to look sort of ok
-                (*npc_info).desiredYaw +=
-                    flrand(-5.0, 5.0) + (((*ctx.world).level.time as f32) * 0.004).sin() * 7.0;
-                (*npc_info).desiredPitch += flrand(-2.0, 2.0);
+        if let Some(enemy_id) = (*npc).enemy {
+            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            if !(*enemy).client.is_null() {
+                let enemy_client = (*enemy).client as *mut gclient_t;
+                if (*enemy_client).NPC_class == CLASS_ATST {
+                    // FIXME: this is kind of dumb, but it was the easiest way to get it to look sort of ok
+                    (*npc_info).desiredYaw +=
+                        flrand(-5.0, 5.0) + (((*ctx.world).level.time as f32) * 0.004).sin() * 7.0;
+                    (*npc_info).desiredPitch += flrand(-2.0, 2.0);
+                }
             }
         }
         //Face that yaw

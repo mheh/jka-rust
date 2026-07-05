@@ -654,14 +654,15 @@ pub fn turretG2_aim(
         (*self_).r.currentAngles[YAW as usize] = AngleNormalize360((*self_).r.currentAngles[YAW as usize]);
         (*self_).speed = AngleNormalize360((*self_).speed);
 
-        if !(*self_).enemy.is_none() {
+        if let Some(enemy_id) = (*self_).enemy {
+            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
             let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
             // ...then we'll calculate what new aim adjustments we should attempt to make this frame
             // Aim at enemy
-            if !(*(*self_).enemy).client.is_null() {
-                org = (*((*(*self_).enemy).client as *mut gclient_t)).renderInfo.eyePoint;
+            if !(*enemy).client.is_null() {
+                org = (*((*enemy).client as *mut gclient_t)).renderInfo.eyePoint;
             } else {
-                org = (*(*self_).enemy).r.currentOrigin;
+                org = (*enemy).r.currentOrigin;
             }
             if (*self_).spawnflags & 2 != 0 {
                 org[2] -= 15.0;
@@ -677,10 +678,10 @@ pub fn turretG2_aim(
                     org[2] - (*self_).s.origin[2],
                 ];
                 let dist = VectorNormalize(&mut diff);
-                let velocity = if !(*(*self_).enemy).client.is_null() {
-                    (*((*(*self_).enemy).client as *mut gclient_t)).ps.velocity
+                let velocity = if !(*enemy).client.is_null() {
+                    (*((*enemy).client as *mut gclient_t)).ps.velocity
                 } else {
-                    (*(*self_).enemy).s.pos.trDelta
+                    (*enemy).s.pos.trDelta
                 };
                 let scale = dist / (*self_).mass;
                 org = [
@@ -977,8 +978,9 @@ pub fn turretG2_base_think(
             (*self_).flags &= !FL_NOTARGET;
         }
 
-        if !(*self_).enemy.is_none() {
-            if (*(*self_).enemy).health < 0 || (*(*self_).enemy).inuse == 0 {
+        if let Some(enemy_id) = (*self_).enemy {
+            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            if (*enemy).health < 0 || (*enemy).inuse == 0 {
                 (*self_).enemy = None;
             }
         }
@@ -988,7 +990,8 @@ pub fn turretG2_base_think(
             if turretG2_find_enemies(ctx, self_) != 0 {
                 // found one
                 turnOff = qfalse;
-                if !(*(*self_).enemy).client.is_null() {
+                let enemy = &mut (*ctx.world).entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
+                if !(*enemy).client.is_null() {
                     // hold on to clients for a min of 3 seconds
                     (*self_).last_move_time = (*ctx.world).level.time + 3000;
                 } else {
@@ -998,9 +1001,10 @@ pub fn turretG2_base_think(
             }
         }
 
-        if !(*self_).enemy.is_none() {
-            if !(*(*self_).enemy).client.is_null()
-                && (*((*(*self_).enemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR as c_int
+        if let Some(enemy_id) = (*self_).enemy {
+            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            if !(*enemy).client.is_null()
+                && (*((*enemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR as c_int
             {
                 // don't keep going after spectators
                 (*self_).enemy = None;
@@ -1008,22 +1012,22 @@ pub fn turretG2_base_think(
                 // FIXME: remain single-minded or look for a new enemy every now and then?
                 // enemy is alive
                 let enemyDir = [
-                    (*(*self_).enemy).r.currentOrigin[0] - (*self_).r.currentOrigin[0],
-                    (*(*self_).enemy).r.currentOrigin[1] - (*self_).r.currentOrigin[1],
-                    (*(*self_).enemy).r.currentOrigin[2] - (*self_).r.currentOrigin[2],
+                    (*enemy).r.currentOrigin[0] - (*self_).r.currentOrigin[0],
+                    (*enemy).r.currentOrigin[1] - (*self_).r.currentOrigin[1],
+                    (*enemy).r.currentOrigin[2] - (*self_).r.currentOrigin[2],
                 ];
                 let enemyDist = VectorLengthSquared(enemyDir);
 
                 if enemyDist < (*self_).radius * (*self_).radius {
                     // was in valid radius
-                    if trap::InPVS(ctx.engine, GInPvsArgs::new(&(*self_).r.currentOrigin as *const vec3_t, &(*(*self_).enemy).r.currentOrigin as *const vec3_t)) != 0 {
+                    if trap::InPVS(ctx.engine, GInPvsArgs::new(&(*self_).r.currentOrigin as *const vec3_t, &(*enemy).r.currentOrigin as *const vec3_t)) != 0 {
                         // Every now and again, check to see if we can even trace to the enemy
                         let mut tr: trace_t = core::mem::zeroed();
 
-                        let org = if !(*(*self_).enemy).client.is_null() {
-                            (*((*(*self_).enemy).client as *mut gclient_t)).renderInfo.eyePoint
+                        let org = if !(*enemy).client.is_null() {
+                            (*((*enemy).client as *mut gclient_t)).renderInfo.eyePoint
                         } else {
-                            (*(*self_).enemy).r.currentOrigin
+                            (*enemy).r.currentOrigin
                         };
                         let mut org2 = (*self_).r.currentOrigin;
                         if (*self_).spawnflags & 2 != 0 {
@@ -1036,7 +1040,7 @@ pub fn turretG2_base_think(
                             GTraceArgs::new(&mut tr as *mut trace_t, &org2 as *const vec3_t, core::ptr::null(), core::ptr::null(), &org as *const vec3_t, (*self_).s.number, MASK_SHOT),
                         );
 
-                        if tr.allsolid == 0 && tr.startsolid == 0 && tr.entityNum as c_int == (*(*self_).enemy).s.number {
+                        if tr.allsolid == 0 && tr.startsolid == 0 && tr.entityNum as c_int == (*enemy).s.number {
                             turnOff = qfalse; // Can see our enemy
                         }
                     }

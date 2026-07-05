@@ -179,9 +179,12 @@ pub fn NPC_RemoveBody(
                 mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new((*self_).s.number),
             ) == 0
             {
-                let activator = (*self_).activator;
-                let activator_client = if activator.is_none() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
-                if activator.is_none()
+                let activator = match (*self_).activator {
+                    Some(id) => &mut world.entities[id.index()] as *mut gentity_t,
+                    None => core::ptr::null_mut(),
+                };
+                let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
+                if activator.is_null()
                     || activator_client.is_null()
                     || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
                 {
@@ -228,9 +231,12 @@ pub fn NPC_RemoveBody(
                     mp_abi::game::syscalls::G_ICARUS_ISRUNNING::GIcarusIsrunningArgs::new((*self_).s.number),
                 ) == 0
                 {
-                    let activator = (*self_).activator;
-                    let activator_client = if activator.is_none() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
-                    if activator.is_none()
+                    let activator = match (*self_).activator {
+                        Some(id) => &mut world.entities[id.index()] as *mut gentity_t,
+                        None => core::ptr::null_mut(),
+                    };
+                    let activator_client = if activator.is_null() { core::ptr::null_mut() } else { (*activator).client as *mut gclient_t };
+                    if activator.is_null()
                         || activator_client.is_null()
                         || ((*activator_client).ps.eFlags2 & EF2_HELD_BY_MONSTER) == 0
                     {
@@ -869,7 +875,9 @@ pub fn NPC_CheckAttackHold(ctx: GameContext<'_>) {
 
         // Raven's borg-specific `/* ... */`'d branch is dead code upstream —
         // only the live `else` block (everyone else) runs.
-        let enemy_origin = (*(*npc_ent).enemy).r.currentOrigin;
+        // Guaranteed `Some` — the early return above covers the `None` case.
+        let enemy = &mut world.entities[(*npc_ent).enemy.unwrap().index()] as *mut gentity_t;
+        let enemy_origin = (*enemy).r.currentOrigin;
         let self_origin = (*npc_ent).r.currentOrigin;
         let vec: vec3_t = [
             enemy_origin[0] - self_origin[0],
@@ -1376,7 +1384,9 @@ pub fn NPC_RunBehavior(
                     {
                         //if in battle and have no weapon, run away, fixme: when in BS_HUNT_AND_KILL, they just stand there
                         if bState != bState_t::BS_FLEE as c_int {
-                            crate::NPC_behavior::NPC_StartFlee(ctx, (*npc_ent).enemy, (*(*npc_ent).enemy).r.currentOrigin, alertEventLevel_e::AEL_DANGER_GREAT as c_int, 5000, 10000);
+                            // Guaranteed `Some` — covered by the `enemy.is_none()` guard above.
+                            let enemy = &mut world.entities[(*npc_ent).enemy.unwrap().index()] as *mut gentity_t;
+                            crate::NPC_behavior::NPC_StartFlee(ctx, enemy, (*enemy).r.currentOrigin, alertEventLevel_e::AEL_DANGER_GREAT as c_int, 5000, 10000);
                         } else {
                             crate::NPC_behavior::NPC_BSFlee(ctx);
                         }
@@ -1480,21 +1490,24 @@ pub fn NPC_ExecuteBState(
         //Pick the proper bstate for us and run it
         NPC_RunBehavior(ctx, (*client).playerTeam as c_int, bState as c_int);
 
-        if !(*npc_ent).enemy.is_none() && (*(*npc_ent).enemy).inuse == 0 {
-            //just in case bState doesn't catch this
-            crate::NPC_combat::G_ClearEnemy(ctx, npc_ent);
+        if let Some(enemy_id) = (*npc_ent).enemy {
+            let enemy = &mut world.entities[enemy_id.index()] as *mut gentity_t;
+            if (*enemy).inuse == 0 {
+                //just in case bState doesn't catch this
+                crate::NPC_combat::G_ClearEnemy(ctx, npc_ent);
+            }
         }
 
         if (*client).ps.saberLockTime != 0 && (*client).ps.saberLockEnemy != ENTITYNUM_NONE {
             crate::NPC_utils::NPC_SetLookTarget(npc_ent, (*client).ps.saberLockEnemy, world.level.time + 1000);
         } else if crate::NPC_utils::NPC_CheckLookTarget(ctx, npc_ent) == 0 {
-            if !(*npc_ent).enemy.is_none() {
-                crate::NPC_utils::NPC_SetLookTarget(npc_ent, (*(*npc_ent).enemy).s.number, 0);
+            if let Some(enemy_id) = (*npc_ent).enemy {
+                crate::NPC_utils::NPC_SetLookTarget(npc_ent, world.entities[enemy_id.index()].s.number, 0);
             }
         }
 
-        if !(*npc_ent).enemy.is_none() {
-            let enemy = (*npc_ent).enemy;
+        if let Some(enemy_id) = (*npc_ent).enemy {
+            let enemy = &mut world.entities[enemy_id.index()] as *mut gentity_t;
             if ((*enemy).flags & FL_DONT_SHOOT) != 0 {
                 world.globals.ucmd.buttons &= !BUTTON_ATTACK;
                 world.globals.ucmd.buttons &= !BUTTON_ALT_ATTACK;

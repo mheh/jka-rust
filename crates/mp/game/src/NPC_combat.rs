@@ -116,9 +116,8 @@ pub fn G_ClearEnemy(
 
         if !(*self_).enemy.is_none() {
             let client = (*self_).client as *mut gclient_t;
-            if !client.is_null()
-                && (*client).renderInfo.lookTarget == (*(*self_).enemy).s.number
-            {
+            let enemy = &mut (*ctx.world).entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
+            if !client.is_null() && (*client).renderInfo.lookTarget == (*enemy).s.number {
                 NPC_ClearLookTarget(self_);
             }
 

@@ -371,11 +371,12 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
         if ((*NPCInfo).goalEntity != (*NPC).enemy) && ((*NPCInfo).goalEntity != None) {
             // Did we make it?
             let flying = FlyingCreature(NPC);
+            let goal_ent = &mut world.entities[(*NPCInfo).goalEntity.unwrap().index()] as *mut gentity_t;
             if NAV_HitNavGoal(
                 (*NPC).r.currentOrigin,
                 (*NPC).r.mins,
                 (*NPC).r.maxs,
-                (*(*NPCInfo).goalEntity).r.currentOrigin,
+                (*goal_ent).r.currentOrigin,
                 16,
                 flying,
             ) != 0
@@ -593,8 +594,9 @@ pub fn Sniper_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
             return QFALSE;
         }
 
+        let enemy_number = world.entities[(*NPC).enemy.unwrap().index()].s.number;
         let hitEnt = &mut world.entities[hit as usize];
-        if hit == (*(*NPC).enemy).s.number
+        if hit == enemy_number
             || (hitEnt.client != core::ptr::null_mut()
                 && (*(hitEnt.client as *mut gclient_t)).playerTeam == (*(*NPC).client as *mut gclient_t).enemyTeam)
             || (hitEnt.takedamage != 0
@@ -695,7 +697,8 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
             }
             // GetAnglesForDirection(muzzle, target, angles);
         } else {
-            target[2] += flrand(0.0, (*(*NPC).enemy).r.maxs[2]);
+            let enemy_maxs2 = world.entities[(*NPC).enemy.unwrap().index()].r.maxs[2];
+            target[2] += flrand(0.0, enemy_maxs2);
             // CalcEntitySpot((*NPC).enemy, SPOT_HEAD_LEAN, &mut target);
             // GetAnglesForDirection(muzzle, target, angles);
         }
@@ -785,12 +788,14 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             return;
         }
 
+        let enemy_ptr = &mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
+
         world.globals.enemyLOS2 = QFALSE;
         world.globals.enemyCS2 = QFALSE;
         world.globals.move2 = QTRUE;
         world.globals.faceEnemy2 = QFALSE;
         world.globals.shoot2 = QFALSE;
-        world.globals.enemyDist2 = DistanceSquared((*NPC).r.currentOrigin, (*(*NPC).enemy).r.currentOrigin);
+        world.globals.enemyDist2 = DistanceSquared((*NPC).r.currentOrigin, (*enemy_ptr).r.currentOrigin);
 
         if world.globals.enemyDist2 < 16384.0 {
             // 128 squared, too close, so switch to primary fire
@@ -837,9 +842,9 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             let maxShootDist;
 
             (*NPCInfo).enemyLastSeenTime = world.level.time;
-            (*NPCInfo).enemyLastSeenLocation[0] = (*(*NPC).enemy).r.currentOrigin[0];
-            (*NPCInfo).enemyLastSeenLocation[1] = (*(*NPC).enemy).r.currentOrigin[1];
-            (*NPCInfo).enemyLastSeenLocation[2] = (*(*NPC).enemy).r.currentOrigin[2];
+            (*NPCInfo).enemyLastSeenLocation[0] = (*enemy_ptr).r.currentOrigin[0];
+            (*NPCInfo).enemyLastSeenLocation[1] = (*enemy_ptr).r.currentOrigin[1];
+            (*NPCInfo).enemyLastSeenLocation[2] = (*enemy_ptr).r.currentOrigin[2];
             world.globals.enemyLOS2 = QTRUE;
             maxShootDist = NPC_MaxDistSquaredForWeapon(ctx);
             if world.globals.enemyDist2 < maxShootDist {

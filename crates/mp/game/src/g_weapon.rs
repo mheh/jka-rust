@@ -4699,52 +4699,57 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
             }
         }
 
+        let activator = match (*self_).activator {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+
         if !(*self_).activator.is_none()
-            && !(*(*self_).activator).client.is_null()
-            && (*(*self_).activator).inuse != 0
+            && !(*activator).client.is_null()
+            && (*activator).inuse != 0
         {
             let mut vLen = [0.0f32; 3];
-            crate::q_math::VectorSubtract(&(*self_).s.origin, &(*(*(*self_).activator).client).ps.origin, &mut vLen);
+            crate::q_math::VectorSubtract(&(*self_).s.origin, &(*((*activator).client as *mut gclient_t)).ps.origin, &mut vLen);
             let ownLen = crate::g_client::VectorLength(vLen);
 
-            if ((*(*(*self_).activator).client).pers.cmd.buttons & crate::shared::BUTTON_USE) == 0
+            if ((*((*activator).client as *mut gclient_t)).pers.cmd.buttons & crate::shared::BUTTON_USE) == 0
                 && (*self_).genericValue1 != 0
             {
                 (*self_).genericValue1 = 0;
             }
 
-            if (((*(*(*self_).activator).client).pers.cmd.buttons & crate::shared::BUTTON_USE) != 0)
+            if (((*((*activator).client as *mut gclient_t)).pers.cmd.buttons & crate::shared::BUTTON_USE) != 0)
                 && (*self_).genericValue1 == 0
             {
-                (*(*(*self_).activator).client).ps.emplacedIndex = 0;
-                (*(*(*self_).activator).client).ps.saberHolstered = 0;
+                (*((*activator).client as *mut gclient_t)).ps.emplacedIndex = 0;
+                (*((*activator).client as *mut gclient_t)).ps.saberHolstered = 0;
                 (*self_).nextthink = (*ctx.world).level.time + 50;
                 return;
             }
         }
 
-        if (!(*self_).activator.is_none() && !(*(*self_).activator).client.is_null())
-            && ((*(*self_).activator).inuse == 0
-                || (*(*(*self_).activator).client).ps.emplacedIndex != (*self_).s.number
+        if (!(*self_).activator.is_none() && !(*activator).client.is_null())
+            && ((*activator).inuse == 0
+                || (*((*activator).client as *mut gclient_t)).ps.emplacedIndex != (*self_).s.number
                 || (*self_).genericValue4 != 0
                 || ownLen > 64.0f32)
         {
-            (*(*(*self_).activator).client).ps.stats[crate::shared::STAT_WEAPONS as usize] &=
+            (*((*activator).client as *mut gclient_t)).ps.stats[crate::shared::STAT_WEAPONS as usize] &=
                 !(1 << crate::shared::WP_EMPLACED_GUN);
 
-            let oldWeap = (*(*(*self_).activator).client).ps.weapon;
-            (*(*(*self_).activator).client).ps.weapon = (*self_).s.weapon;
+            let oldWeap = (*((*activator).client as *mut gclient_t)).ps.weapon;
+            (*((*activator).client as *mut gclient_t)).ps.weapon = (*self_).s.weapon;
             (*self_).s.weapon = oldWeap;
-            (*(*(*self_).activator).client).ps.emplacedTime = (*ctx.world).level.time + 1000;
-            (*(*(*self_).activator).client).ps.emplacedIndex = 0;
-            (*(*(*self_).activator).client).ps.saberHolstered = 0;
-            (*(*self_).activator).r.ownerNum = crate::shared::ENTITYNUM_NONE as u32;
+            (*((*activator).client as *mut gclient_t)).ps.emplacedTime = (*ctx.world).level.time + 1000;
+            (*((*activator).client as *mut gclient_t)).ps.emplacedIndex = 0;
+            (*((*activator).client as *mut gclient_t)).ps.saberHolstered = 0;
+            (*activator).r.ownerNum = crate::shared::ENTITYNUM_NONE as u32;
             (*self_).activator = None;
 
             (*self_).s.activeForcePass = 0;
-        } else if !(*self_).activator.is_none() && !(*(*self_).activator).client.is_null() {
-            (*(*(*self_).activator).client).ps.weapon = crate::shared::WP_EMPLACED_GUN;
-            (*(*(*self_).activator).client).ps.weaponstate = crate::shared::WEAPON_READY;
+        } else if !(*self_).activator.is_none() && !(*activator).client.is_null() {
+            (*((*activator).client as *mut gclient_t)).ps.weapon = crate::shared::WP_EMPLACED_GUN;
+            (*((*activator).client as *mut gclient_t)).ps.weaponstate = crate::shared::WEAPON_READY;
         }
         (*self_).nextthink = (*ctx.world).level.time + 50;
 

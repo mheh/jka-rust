@@ -65,8 +65,11 @@ pub fn TurretPain(
     damage: c_int,
 ) {
     unsafe {
-        let target = (*self_).target_ent;
-        if !target.is_none() {
+        let target = match (*self_).target_ent {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+        if !target.is_null() {
             (*target).health = (*self_).health;
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(target);
@@ -99,8 +102,11 @@ pub fn TurretBasePain(
     damage: c_int,
 ) {
     unsafe {
-        let target = (*self_).target_ent;
-        if !target.is_none() {
+        let target = match (*self_).target_ent {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+        if !target.is_null() {
             (*target).health = (*self_).health;
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(target);
@@ -167,8 +173,11 @@ pub fn auto_turret_die(
         if (*self_).s.modelindex2 != 0 {
             (*self_).s.modelindex = (*self_).s.modelindex2;
 
-            let target = (*self_).target_ent;
-            if !target.is_none() && (*target).s.modelindex2 != 0 {
+            let target = match (*self_).target_ent {
+                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                None => core::ptr::null_mut(),
+            };
+            if !target.is_null() && (*target).s.modelindex2 != 0 {
                 (*target).s.modelindex = (*target).s.modelindex2;
             }
 
@@ -203,8 +212,11 @@ pub fn bottom_die(
     meansOfDeath: c_int,
 ) {
     unsafe {
-        let target = (*self_).target_ent;
-        if !target.is_none() && (*target).health > 0 {
+        let target = match (*self_).target_ent {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+        if !target.is_null() && (*target).health > 0 {
             (*target).health = (*self_).health;
             if (*target).maxHealth != 0 {
                 G_ScaleNetHealth(target);
@@ -399,17 +411,18 @@ pub fn turret_aim(
             diffYaw = AngleSubtract(desiredAngles[YAW], top.r.currentAngles[YAW]);
             diffPitch = AngleSubtract(desiredAngles[PITCH], top.r.currentAngles[PITCH]);
             turnSpeed = ctx.world.rng.next_float() * 10.0 - 5.0;
-        } else if !(*self_).enemy.is_none() {
+        } else if let Some(enemy_id) = (*self_).enemy {
             // Aim at enemy
-            let enemy = (*self_).enemy;
+            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
             org[0] = (*enemy).r.currentOrigin[0];
             org[1] = (*enemy).r.currentOrigin[1];
             org[2] = (*enemy).r.currentOrigin[2] + (*enemy).r.maxs[2] * 0.5;
 
             // Check for walker vehicle
             if (*enemy).s.eType == ET_NPC && (*enemy).s.NPC_class == CLASS_VEHICLE && !(*enemy).m_pVehicle.is_null() {
-                if (*(*enemy).m_pVehicle).m_pVehicleInfo as *const vehicleInfo_t != std::ptr::null() {
-                    if (*(*(*enemy).m_pVehicle).m_pVehicleInfo).vehicle_type == VH_WALKER {
+                let enemy_veh = (*enemy).m_pVehicle as *mut Vehicle_t;
+                if (*enemy_veh).m_pVehicleInfo as *const vehicleInfo_t != std::ptr::null() {
+                    if (*(*enemy_veh).m_pVehicleInfo).vehicle_type == VH_WALKER {
                         org[2] += 32.0;
                     }
                 }
@@ -659,50 +672,56 @@ pub fn turret_base_think(
             if turret_find_enemies(ctx, self_) {
                 turnOff = qfalse;
             }
-        } else if !(*self_).enemy.is_none() && !(*(*self_).enemy).client.is_null() && (*(*(*self_).enemy).client).sess.sessionTeam == TEAM_SPECTATOR {
-            // Don't keep going after spectators
-            (*self_).enemy = None;
-        } else if !(*self_).enemy.is_none() && (*(*self_).enemy).health > 0 {
-            // Enemy is alive
-            let mut enemyDir = [0.0; 3];
-            enemyDir[0] = (*(*self_).enemy).r.currentOrigin[0] - (*self_).r.currentOrigin[0];
-            enemyDir[1] = (*(*self_).enemy).r.currentOrigin[1] - (*self_).r.currentOrigin[1];
-            enemyDir[2] = (*(*self_).enemy).r.currentOrigin[2] - (*self_).r.currentOrigin[2];
+        } else {
+            let enemy = &mut (*ctx.world).entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
+            if !(*enemy).client.is_null()
+                && (*((*enemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
+            {
+                // Don't keep going after spectators
+                (*self_).enemy = None;
+            } else if (*enemy).health > 0 {
+                // Enemy is alive
+                let mut enemyDir = [0.0; 3];
+                enemyDir[0] = (*enemy).r.currentOrigin[0] - (*self_).r.currentOrigin[0];
+                enemyDir[1] = (*enemy).r.currentOrigin[1] - (*self_).r.currentOrigin[1];
+                enemyDir[2] = (*enemy).r.currentOrigin[2] - (*self_).r.currentOrigin[2];
 
-            let enemyDist = crate::q_math::VectorLengthSquared(enemyDir);
+                let enemyDist = crate::q_math::VectorLengthSquared(enemyDir);
 
-            if enemyDist < ((*self_).radius * (*self_).radius) {
-                // Was in valid radius
-                if trap::InPVS(ctx.engine, (*self_).r.currentOrigin, (*(*self_).enemy).r.currentOrigin) {
-                    // Every now and then, check if we can trace to enemy
-                    let mut tr: crate::q_shared::trace_t = std::mem::zeroed();
-                    let mut org = [0.0; 3];
-                    let mut org2 = [0.0; 3];
+                if enemyDist < ((*self_).radius * (*self_).radius) {
+                    // Was in valid radius
+                    if trap::InPVS(ctx.engine, (*self_).r.currentOrigin, (*enemy).r.currentOrigin) {
+                        // Every now and then, check if we can trace to enemy
+                        let mut tr: crate::q_shared::trace_t = std::mem::zeroed();
+                        let mut org = [0.0; 3];
+                        let mut org2 = [0.0; 3];
 
-                    if !(*(*self_).enemy).client.is_null() {
-                        org[0] = (*(*(*self_).enemy).client).renderInfo.eyePoint[0];
-                        org[1] = (*(*(*self_).enemy).client).renderInfo.eyePoint[1];
-                        org[2] = (*(*(*self_).enemy).client).renderInfo.eyePoint[2];
-                    } else {
-                        org[0] = (*(*self_).enemy).r.currentOrigin[0];
-                        org[1] = (*(*self_).enemy).r.currentOrigin[1];
-                        org[2] = (*(*self_).enemy).r.currentOrigin[2];
-                    }
+                        if !(*enemy).client.is_null() {
+                            let enemy_client = (*enemy).client as *mut gclient_t;
+                            org[0] = (*enemy_client).renderInfo.eyePoint[0];
+                            org[1] = (*enemy_client).renderInfo.eyePoint[1];
+                            org[2] = (*enemy_client).renderInfo.eyePoint[2];
+                        } else {
+                            org[0] = (*enemy).r.currentOrigin[0];
+                            org[1] = (*enemy).r.currentOrigin[1];
+                            org[2] = (*enemy).r.currentOrigin[2];
+                        }
 
-                    org2[0] = (*self_).r.currentOrigin[0];
-                    org2[1] = (*self_).r.currentOrigin[1];
-                    org2[2] = (*self_).r.currentOrigin[2];
+                        org2[0] = (*self_).r.currentOrigin[0];
+                        org2[1] = (*self_).r.currentOrigin[1];
+                        org2[2] = (*self_).r.currentOrigin[2];
 
-                    if ((*self_).spawnflags & 2) != 0 {
-                        org2[2] += 10.0;
-                    } else {
-                        org2[2] -= 10.0;
-                    }
+                        if ((*self_).spawnflags & 2) != 0 {
+                            org2[2] += 10.0;
+                        } else {
+                            org2[2] -= 10.0;
+                        }
 
-                    trap::Trace(ctx.engine, &mut tr, org2, std::ptr::null(), std::ptr::null(), org, (*self_).s.number, MASK_SHOT);
+                        trap::Trace(ctx.engine, &mut tr, org2, std::ptr::null(), std::ptr::null(), org, (*self_).s.number, MASK_SHOT);
 
-                    if !tr.allsolid && !tr.startsolid && tr.entityNum == (*(*self_).enemy).s.number {
-                        turnOff = qfalse;
+                        if !tr.allsolid && !tr.startsolid && tr.entityNum == (*enemy).s.number {
+                            turnOff = qfalse;
+                        }
                     }
                 }
             }

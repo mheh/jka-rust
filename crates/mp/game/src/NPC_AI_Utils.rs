@@ -576,8 +576,9 @@ pub fn AI_GetGroup(ctx: GameContext<'_>, self_: *mut gentity_t) {
             return;
         }
 
-        if !(*self_).enemy.is_none() {
-            let enemyClient = (*(*self_).enemy).client;
+        if let Some(enemy_id) = (*self_).enemy {
+            let enemy_ent = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            let enemyClient = (*enemy_ent).client;
             if enemyClient.is_null()
                 || ((*ctx.world).level.time - (*npc).enemyLastSeenTime > 7000)
             {

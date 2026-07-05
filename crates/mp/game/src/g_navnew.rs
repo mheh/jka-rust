@@ -593,7 +593,7 @@ pub fn NAVNEW_ResolveEntityCollision(
         //Doors are ignored
         if crate::q_shared::Q_stricmp((*blocker).classname, cstr("func_door").as_ptr()) == 0 {
             let mut center = [0.0f32; 3];
-            CalcTeamDoorCenter(blocker, &mut center);
+            CalcTeamDoorCenter(ctx, blocker, &mut center);
             if crate::q_math::DistanceSquared((*self_).r.currentOrigin, center) > MIN_DOOR_BLOCK_DIST_SQR {
                 return QTRUE;
             }
