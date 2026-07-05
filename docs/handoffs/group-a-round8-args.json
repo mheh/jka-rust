@@ -1,0 +1,26 @@
+{
+  "note": "Round-8 args (gate-only, final stamping round; run wf_2926f5cc-533). engine-seam.md + module-loading.md are REVIEWED from round 7 and excluded.",
+  "docs": [
+    {
+      "path": "docs/architecture/state-ownership.md",
+      "title": "State Ownership",
+      "prefix": "STATE",
+      "scope": "GATE-ONLY (round 8, final stamping round): engine-seam.md and module-loading.md are REVIEWED (round 7) — do not touch them. The round-7 holes in THIS doc are all closed by the 2026-07-03 reconciliation: STATE-Q12 closed (mp_abi re-exports Dispatch/InboundVmCall/Execute/OutboundSysCall — candidate (b), user-settled), STATE-Q13 closed (mp_game crate-root pub use of MpGameExport; SEAM-D10 two-edge shell intact), WorldCell field pub(crate) (LOAD-D12f precedent), Engine pinned to engine.rs (skeleton checkpoint 6 conforms on-disk). Record: docs/handoffs/2026-07-03-skeleton-findings.md §Round-7. Do NOT revise content — verify and re-stamp REVIEWED (note: the Status line may already read REVIEWED from a prior pass; verify it is EARNED under the gates and correct it in whichever direction the gates conclude). Fix-in-place ONLY for pointer precision and typos. GATE POLICY: STATE-Q2 and STATE-Q9 are user-sanctioned-open with named owners; the client-slice presence-idiom and SP engine-side-signatures tracked notes are sanctioned; cross-doc FROZEN-ness lands at user sign-off — none are needsSession blockers. Gate-3 reading set = this doc + standing docs (ALL sibling docs/architecture/*.md) + docs/abi-traps.md + oracle.",
+      "decisions": ["NO NEW DECISIONS — gate-only. A genuinely new contested point (not in the sanctioned-open set, not answerable from cited ground truth) is reported as needsSession, never invented."],
+      "outline": "Verify + re-stamp REVIEWED. Content changes only for pointer precision/typos.",
+      "dossierPath": "docs/dossiers/A2-state-ownership.md",
+      "model": "opus"
+    },
+    {
+      "path": "docs/architecture/lifecycle.md",
+      "title": "Lifecycle",
+      "prefix": "LIFE",
+      "scope": "GATE-ONLY (round 8, final stamping round): engine-seam.md and module-loading.md are REVIEWED (round 7) — do not touch them. The round-7 holes in THIS doc are all closed by the 2026-07-03 reconciliation: LIFE-Q8 closed (com_init steps 3/5/7/12 are deliberately-callable boot-success no-ops with the mandated //TODO: Port + Source + justification markers; real bodies land with B1/B2 where DEC-09.2's transcript diff activates — user-settled), LIFE-Q9 closed + generalized (MaybeUninit in-place-init of EVERY non-ZeroValid field: Common.time_base, Common.modules, cl = None, snd = None; zeroed bytes cover only the ZeroValid repr(C) mass), Engine + impl pinned to engine.rs, sys_error pinned to lifecycle.rs. Record: docs/handoffs/2026-07-03-skeleton-findings.md §Round-7. Do NOT revise content — verify and re-stamp REVIEWED (note: the Status line may already read REVIEWED from a prior pass; verify it is EARNED under the gates and correct it in whichever direction the gates conclude). Fix-in-place ONLY for pointer precision and typos. GATE POLICY: LIFE-Q1 is user-sanctioned-open (owner: the pending platform/input subsystem doc); cross-doc FROZEN-ness lands at user sign-off — neither is a needsSession blocker. Gate-3 reading set = this doc + standing docs (ALL sibling docs/architecture/*.md) + docs/abi-traps.md + oracle.",
+      "decisions": ["NO NEW DECISIONS — gate-only. A genuinely new contested point (not in the sanctioned-open set, not answerable from cited ground truth) is reported as needsSession, never invented."],
+      "outline": "Verify + re-stamp REVIEWED. Content changes only for pointer precision/typos.",
+      "dossierPath": "docs/dossiers/A3-lifecycle.md",
+      "model": "opus"
+    }
+  ],
+  "standingDocs": ["docs/doc-standards.md", "docs/porting-rules.md", "docs/workspace-architecture.md", "docs/architecture/two-island-model.md", "docs/abi-traps.md", "docs/architecture/engine-seam.md", "docs/architecture/state-ownership.md", "docs/architecture/lifecycle.md", "docs/architecture/module-loading.md", "docs/handoffs/2026-07-03-skeleton-findings.md"]
+}

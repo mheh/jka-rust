@@ -1,0 +1,4167 @@
+{
+ "run": "wf_55d03832-2c3",
+ "date": "2026-07-03",
+ "files": [
+  {
+   "file": "g_ICARUScb.c",
+   "fns_ported": 6,
+   "fns_parked": 155
+  },
+  {
+   "file": "ai_main.c",
+   "fns_ported": 7,
+   "fns_parked": 102
+  },
+  {
+   "file": "bg_pmove.c",
+   "fns_ported": 11,
+   "fns_parked": 91
+  },
+  {
+   "file": "NPC_spawn.c",
+   "fns_ported": 5,
+   "fns_parked": 85
+  },
+  {
+   "file": "g_weapon.c",
+   "fns_ported": 15,
+   "fns_parked": 70
+  },
+  {
+   "file": "crates/mp/game/src/w_saber.rs",
+   "fns_ported": 13,
+   "fns_parked": 66
+  },
+  {
+   "file": "NPC_AI_Jedi.c",
+   "fns_ported": 6,
+   "fns_parked": 62
+  },
+  {
+   "file": "g_misc.c",
+   "fns_ported": 20,
+   "fns_parked": 60
+  },
+  {
+   "file": "g_items.c",
+   "fns_ported": 12,
+   "fns_parked": 55
+  },
+  {
+   "file": "g_mover.c",
+   "fns_ported": 22,
+   "fns_parked": 50
+  },
+  {
+   "file": "g_main.c",
+   "fns_ported": 0,
+   "fns_parked": 49
+  },
+  {
+   "file": "g_cmds.c",
+   "fns_ported": 6,
+   "fns_parked": 48
+  },
+  {
+   "file": "ai_wpnav.c",
+   "fns_ported": 3,
+   "fns_parked": 42
+  },
+  {
+   "file": "g_nav.c",
+   "fns_ported": 9,
+   "fns_parked": 41
+  },
+  {
+   "file": "g_combat.c",
+   "fns_ported": 7,
+   "fns_parked": 40
+  },
+  {
+   "file": "NPC_combat.c",
+   "fns_ported": 5,
+   "fns_parked": 38
+  },
+  {
+   "file": "g_active.c",
+   "fns_ported": 0,
+   "fns_parked": 36
+  },
+  {
+   "file": "g_trigger.c",
+   "fns_ported": 6,
+   "fns_parked": 36
+  },
+  {
+   "file": "bg_saber.c",
+   "fns_ported": 10,
+   "fns_parked": 33
+  },
+  {
+   "file": "g_utils.c",
+   "fns_ported": 6,
+   "fns_parked": 33
+  },
+  {
+   "file": "g_saga.c",
+   "fns_ported": 5,
+   "fns_parked": 33
+  },
+  {
+   "file": "g_log.c",
+   "fns_ported": 1,
+   "fns_parked": 32
+  },
+  {
+   "file": "crates/mp/game/src/g_target.rs",
+   "fns_ported": 13,
+   "fns_parked": 31
+  },
+  {
+   "file": "w_force.c",
+   "fns_ported": 24,
+   "fns_parked": 28
+  },
+  {
+   "file": "g_client.c",
+   "fns_ported": 19,
+   "fns_parked": 27
+  },
+  {
+   "file": "NPC_senses.c",
+   "fns_ported": 1,
+   "fns_parked": 27
+  },
+  {
+   "file": "NPC_AI_Stormtrooper.c",
+   "fns_ported": 5,
+   "fns_parked": 26
+  },
+  {
+   "file": "NPC_utils.c",
+   "fns_ported": 11,
+   "fns_parked": 24
+  },
+  {
+   "file": "g_bot.c",
+   "fns_ported": 1,
+   "fns_parked": 24
+  },
+  {
+   "file": "NPC_behavior.c",
+   "fns_ported": 0,
+   "fns_parked": 21
+  },
+  {
+   "file": "NPC.c",
+   "fns_ported": 23,
+   "fns_parked": 20
+  },
+  {
+   "file": "g_vehicles.c",
+   "fns_ported": 12,
+   "fns_parked": 20
+  },
+  {
+   "file": "bg_panimate.c",
+   "fns_ported": 64,
+   "fns_parked": 19
+  },
+  {
+   "file": "g_team.c",
+   "fns_ported": 18,
+   "fns_parked": 18
+  },
+  {
+   "file": "bg_saga.c",
+   "fns_ported": 4,
+   "fns_parked": 16
+  },
+  {
+   "file": "g_turret_G2.c",
+   "fns_ported": 0,
+   "fns_parked": 15
+  },
+  {
+   "file": "NPC_AI_Default.c",
+   "fns_ported": 0,
+   "fns_parked": 15
+  },
+  {
+   "file": "NPC_AI_Mark1.c",
+   "fns_ported": 1,
+   "fns_parked": 15
+  },
+  {
+   "file": "NPC_AI_Sniper.c",
+   "fns_ported": 2,
+   "fns_parked": 13
+  },
+  {
+   "file": "g_svcmds.c",
+   "fns_ported": 1,
+   "fns_parked": 13
+  },
+  {
+   "file": "bg_vehicleLoad.c",
+   "fns_ported": 4,
+   "fns_parked": 12
+  },
+  {
+   "file": "bg_misc.c",
+   "fns_ported": 22,
+   "fns_parked": 12
+  },
+  {
+   "file": "NPC_AI_GalakMech.c",
+   "fns_ported": 2,
+   "fns_parked": 12
+  },
+  {
+   "file": "NPC_AI_Rancor.c",
+   "fns_ported": 4,
+   "fns_parked": 12
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_strap.rs",
+   "fns_ported": 0,
+   "fns_parked": 12
+  },
+  {
+   "file": "g_turret.c",
+   "fns_ported": 3,
+   "fns_parked": 11
+  },
+  {
+   "file": "q_shared.c",
+   "fns_ported": 46,
+   "fns_parked": 10
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs",
+   "fns_ported": 1,
+   "fns_parked": 10
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs",
+   "fns_ported": 1,
+   "fns_parked": 10
+  },
+  {
+   "file": "NPC_AI_Remote.c",
+   "fns_ported": 1,
+   "fns_parked": 10
+  },
+  {
+   "file": "g_missile.c",
+   "fns_ported": 1,
+   "fns_parked": 9
+  },
+  {
+   "file": "NPC_move.c",
+   "fns_ported": 2,
+   "fns_parked": 9
+  },
+  {
+   "file": "NPC_AI_Grenadier.c",
+   "fns_ported": 3,
+   "fns_parked": 8
+  },
+  {
+   "file": "g_navnew.c",
+   "fns_ported": 5,
+   "fns_parked": 8
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs",
+   "fns_ported": 1,
+   "fns_parked": 8
+  },
+  {
+   "file": "bg_saberLoad.c",
+   "fns_ported": 23,
+   "fns_parked": 7
+  },
+  {
+   "file": "AnimalNPC.c",
+   "fns_ported": 2,
+   "fns_parked": 7
+  },
+  {
+   "file": "NPC_reactions.c",
+   "fns_ported": 6,
+   "fns_parked": 6
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_goal.rs",
+   "fns_ported": 1,
+   "fns_parked": 6
+  },
+  {
+   "file": "NPC_AI_Howler.c",
+   "fns_ported": 3,
+   "fns_parked": 6
+  },
+  {
+   "file": "bg_slidemove.c",
+   "fns_ported": 0,
+   "fns_parked": 5
+  },
+  {
+   "file": "SpeederNPC.c",
+   "fns_ported": 3,
+   "fns_parked": 5
+  },
+  {
+   "file": "q_math.c",
+   "fns_ported": 54,
+   "fns_parked": 5
+  },
+  {
+   "file": "g_session.c",
+   "fns_ported": 0,
+   "fns_parked": 5
+  },
+  {
+   "file": "NPC_stats.c",
+   "fns_ported": 4,
+   "fns_parked": 4
+  },
+  {
+   "file": "NPC_AI_Utils.c",
+   "fns_ported": 20,
+   "fns_parked": 4
+  },
+  {
+   "file": "ai_util.c",
+   "fns_ported": 8,
+   "fns_parked": 4
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs",
+   "fns_ported": 2,
+   "fns_parked": 4
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_object.rs",
+   "fns_ported": 0,
+   "fns_parked": 4
+  },
+  {
+   "file": "g_spawn.c",
+   "fns_ported": 14,
+   "fns_parked": 3
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_mem.rs",
+   "fns_ported": 0,
+   "fns_parked": 3
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/FighterNPC.rs",
+   "fns_ported": 16,
+   "fns_parked": 2
+  },
+  {
+   "file": "WalkerNPC.c",
+   "fns_ported": 5,
+   "fns_parked": 2
+  },
+  {
+   "file": "bg_lib.c",
+   "fns_ported": 6,
+   "fns_parked": 2
+  },
+  {
+   "file": "bg_g2_utils.c",
+   "fns_ported": 0,
+   "fns_parked": 2
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_misc.rs",
+   "fns_ported": 0,
+   "fns_parked": 2
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_sounds.rs",
+   "fns_ported": 0,
+   "fns_parked": 2
+  },
+  {
+   "file": "NPC_AI_Interrogator.c",
+   "fns_ported": 9,
+   "fns_parked": 1
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_exphysics.rs",
+   "fns_ported": 0,
+   "fns_parked": 1
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_arenas.rs",
+   "fns_ported": 0,
+   "fns_parked": 1
+  },
+  {
+   "file": "g_syscalls.c",
+   "fns_ported": 0,
+   "fns_parked": 0
+  },
+  {
+   "file": "NPC_AI_Droid.c",
+   "fns_ported": 14,
+   "fns_parked": 0
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_ImperialProbe.rs",
+   "fns_ported": 12,
+   "fns_parked": 0
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Sentry.rs",
+   "fns_ported": 12,
+   "fns_parked": 0
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Mark2.rs",
+   "fns_ported": 10,
+   "fns_parked": 0
+  },
+  {
+   "file": "NPC_AI_Atst.c",
+   "fns_ported": 9,
+   "fns_parked": 0
+  },
+  {
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_timer.rs",
+   "fns_ported": 12,
+   "fns_parked": 0
+  },
+  {
+   "file": "tri_coll_test.c",
+   "fns_ported": 2,
+   "fns_parked": 0
+  }
+ ],
+ "escalations": [
+  {
+   "fn": "StandardBotAI",
+   "topic": "seam-threading",
+   "question": "The faithful raw-pointer skeleton signatures carry no &Engine or &mut GameWorld, but trap_* wrappers require engine:&Engine and file-scope globals/cvars (level, g_entities, botstates, gWPArray, bot_* cvars, flag globals, numbots, floattime...) must become GameWorld/GameCvars per ruling 1, with B3/B4 forbidding a hidden-global accessor. How should engine+world be threaded into these signatures? This gates ~95 of the 102 parked functions (every fn touching a trap, global, or cvar).",
+   "file": "ai_main.c"
+  },
+  {
+   "fn": "BotStraightTPOrderCheck",
+   "topic": "entity-repr",
+   "question": "bot_state_t stored entity pointers (squadLeader, chatObject, etc.) \u2014 per rulings 4/5 stored pointers become EntityId, but the skeleton params are *mut gentity_t; what repr do these stored fields use so identity compares (squadLeader==ent) transcribe correctly?",
+   "file": "ai_main.c"
+  },
+  {
+   "fn": "BotGetWeaponRange",
+   "topic": "aimain-consts",
+   "question": "ai_main.h constants (BWEAPONRANGE_MELEE/SABER/MID/LONG and the TEAMPLAYSTATE_*/SIEGESTATE_*/CTFSTATE_* families) are not ported/re-exported and not provided in the packet \u2014 where should they live / how referenced?",
+   "file": "ai_main.c"
+  },
+  {
+   "fn": "PrimFiring",
+   "topic": "weaponstate-consts",
+   "question": "weaponState_t constants WEAPON_CHARGING / WEAPON_CHARGING_ALT are not resolvable via the packet or prelude \u2014 what is their port location/path?",
+   "file": "ai_main.c"
+  },
+  {
+   "fn": "RemoveColorEscapeSequences",
+   "topic": "q_shared-helpers",
+   "question": "Q_IsColorString (q_shared macro) and Q_COLOR_ESCAPE are not provided in the packet \u2014 inline the macro or call a ported q_shared helper?",
+   "file": "ai_main.c"
+  },
+  {
+   "fn": "Jedi_Attack",
+   "topic": "ambient-state",
+   "question": "The faithful context-free raw-pointer signatures (fnskel output) have no GameContext/&Engine param, yet ~52 fns in this file reach the ai_main file-scope globals (NPC/NPCInfo/ucmd/player/level/g_entities) or need &Engine for trap_* calls. Rule B forbids static mut globals and the resolved cross-file signatures (TIMER_Set, NPC_SetAnim, ...) are equally context-free. How should ambient game state and the Engine thread into context-free faithful logic fns \u2014 is the skeleton meant to be re-signatured with GameContext, or is there a blessed accessor?",
+   "file": "NPC_AI_Jedi.c"
+  },
+  {
+   "fn": "NPC_Jedi_PlayConfusionSound",
+   "topic": "constants-in-scope",
+   "question": "crate::prelude re-exports only types, not the Raven event/anim/flag/force constants these bodies need (EV_*, EF2_FLYING, SETANIM_*/BOTH_*, FORCE_LEVEL_3, JSF_AMBUSH, NPCTEAM_PLAYER, MASK_SHOT, ENTITYNUM_*, DAMAGE_*/MOD_*, YAW, PW_*/PMF_*). What import path resolves these constants (which ported enum/const module owns each)?",
+   "file": "NPC_AI_Jedi.c"
+  },
+  {
+   "fn": "G_Damage",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "The staged raw-pointer skeleton signatures (and the resolved cross-file signatures) carry no GameWorld/engine handle, so bodies cannot reach level/g_entities/cvars/g* globals or call traps as the GameWorld-fields ruling requires. How should a raw-ptr skeleton fn reach threaded world/engine state? (~31 g_combat fns blocked, incl. player_die, G_Damage, G_RadiusDamage, CanDamage, all vehicle/dismember-bolt/duel-score fns.)",
+   "file": "g_combat.c"
+  },
+  {
+   "fn": "G_GetHitLocation",
+   "topic": "vec3-outparam-seam",
+   "question": "Resolved signatures AngleVectors(angles,forward,right,up) and VectorNormalize(v)->vec_t take vec3_t ([f32;3]) BY VALUE, so the C out-param mutation these helpers perform cannot be received by callers, and I'm forbidden to re-declare. Should these seam signatures be &mut/return-tuple? (Blocks G_GetHitLocation, ExplodeDeath, RaySphereIntersections, G_GetDismemberLoc, DeathFX.)",
+   "file": "g_combat.c"
+  },
+  {
+   "fn": "G_InKnockDown",
+   "topic": "unported-anim-consts",
+   "question": "animNumber_t (BOTH_KNOCKDOWN1..5, BOTH_GETUP*, BOTH_FORCE_GETUP_*, BOTH_DEATH1) is not yet ported (bg_panimate.rs carries //TODO: Port animNumber_t). Needed by G_InKnockDown, DismembermentTest, DismembermentByNum \u2014 port animNumber_t first or provide the const values?",
+   "file": "g_combat.c"
+  },
+  {
+   "fn": "ScorePlum",
+   "topic": "unported-svf-consts",
+   "question": "SVF_SINGLECLIENT (svflags #define) is not ported anywhere in the crate graph and its numeric value is not in the packet; ScorePlum needs it for plum->r.svFlags |= SVF_SINGLECLIENT. Where should svflags constants live / what is the value?",
+   "file": "g_combat.c"
+  },
+  {
+   "fn": "PmoveSingle",
+   "topic": "pmove-working-state",
+   "question": "How is the file-static pmove working set (pmove_t *pm, pml_t pml, pm_entSelf/pm_entVeh, pm_flying, gPMDoSlowFall, pm_cancelOutZoom) threaded into the ~75 no-arg C-signature functions that read/write it? Rule B3 forbids static mut/hidden globals and B4 forbids ambient reach, but the faithful skeleton signatures pass no pm/world/context \u2014 this is the file's core unsettled fork and blocks the whole move/weapon/ground pipeline.",
+   "file": "bg_pmove.c"
+  },
+  {
+   "fn": "BG_G2ClientSpineAngles",
+   "topic": "vec3-outparam-signature",
+   "question": "The skeleton passes mutated vec3_t out-params (e.g. thoracicAngles, ulAngles, viewAngles, lookAngles, legsAngles) BY VALUE, but vec3_t is [f32;3] (Copy), so in-place writes cannot propagate to the caller; should these become &mut [f32;3] (contradicting 'use resolved signatures verbatim') or return values? Blocks the G2 animation family and PM_AnglesForSlope.",
+   "file": "bg_pmove.c"
+  },
+  {
+   "fn": "PM_WalkingAnim",
+   "topic": "animNumber_t",
+   "question": "The anim-predicate switches (PM_WalkingAnim/RunningAnim/SwimmingAnim/RollingAnim, BG_InSlopeAnim/InRollAnim/InKnockDown/InRollES/InRoll2, BG_CmdForRoll) match on BOTH_*/LEGS_* constants from animNumber_t, which the packet marks unported (/*TODO: Port animNumber_t*/) \u2014 need it ported before these can be written.",
+   "file": "bg_pmove.c"
+  },
+  {
+   "fn": "BG_VehTraceFromCamPos",
+   "topic": "engine-trap-threading",
+   "question": "Functions calling traps (trap_Trace here, trap_SnapVector in PmoveSingle) need the SEAM-D13 wrapper's engine handle (trap::Trace(engine, ..)), but these C-signature functions thread no engine/ServerGame context \u2014 how is the engine reached from a bg-tier free function?",
+   "file": "bg_pmove.c"
+  },
+  {
+   "fn": "BG_UnrestrainedPitchRoll",
+   "topic": "bg-global",
+   "question": "Unresolved extern bg-tier globals: cvar bg_fighterAltControl (BG_UnrestrainedPitchRoll), tables bgHumanoidAnimations (BG_IK_MoveArm) and WeaponReadyAnim/WeaponAttackAnim/WeaponReadyLegsAnim (BG_G2PlayerAngles etc.) are referenced but not resolved in the packet's out-of-file surface.",
+   "file": "bg_pmove.c"
+  },
+  {
+   "fn": "BG_VehicleTurnRateForSpeed",
+   "topic": "missing-const",
+   "question": "#define constants not provided by the packet: MIN_LANDING_SLOPE (BG_VehicleTurnRateForSpeed) and JUMP_VELOCITY (element 0 of the forceJumpStrength table needed by BG_ForceWallJumpStrength) \u2014 cannot define dependent tables/comparisons without inventing their values.",
+   "file": "bg_pmove.c"
+  },
+  {
+   "fn": "BG_VehicleAdjustBBoxForOrientation",
+   "topic": "fn-pointer-param",
+   "question": "localTrace is a raw C function-pointer param (void (*)(trace_t*, const vec_t*, const vec_t*, const vec_t*, const vec_t*, int, int)) whose type is unported; the body invokes it, so it needs the trap/dispatch shape settled (skeleton currently types it *mut c_void).",
+   "file": "bg_pmove.c"
+  },
+  {
+   "fn": "* (148 functions)",
+   "topic": "entid-lookup",
+   "question": "This skeleton's cross-file signatures still take raw int entID / *mut gentity_t (pre-EntityId-refactor, matching ruling #4's deferred state); gentity_t.client is still *mut c_void and think/reached/blocked are raw C fn-ptr Options (ruling #2's fn-ID enums not yet applied). There is no g_entities[]/EntityId accessor exposed at this staging layer, so entID cannot be resolved to a gentity_t without inventing the seam. Nearly every remaining function in this file needs this resolved first.",
+   "file": "g_ICARUScb.c"
+  },
+  {
+   "fn": "G_DebugPrint",
+   "topic": "variadic-c-abi",
+   "question": "G_DebugPrint takes C varargs (...); the skeleton itself flags this as \"seam decision pending\". What Rust shape (fmt::Arguments, a macro, fixed-arity overloads per call site) should replace it?",
+   "file": "g_ICARUScb.c"
+  },
+  {
+   "fn": "Q3_GetAnimLower / Q3_GetAnimUpper",
+   "topic": "client-still-void",
+   "question": "gentity_t.client is currently *mut c_void (gclient_t not yet re-exported through prelude for this file), so ps.legsAnim/torsoAnim can't be read without an unsound cast. Blocked pending gclient_t landing in prelude.",
+   "file": "g_ICARUScb.c"
+  },
+  {
+   "fn": "DeathmatchScoreboardMessage (+ ~45 other Cmd_*/G_* functions)",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Nearly every function in g_cmds.c reads level.*, g_entities, cvars (g_gametype, g_cheats, ...), or calls trap_* syscalls, but the staged skeleton signatures carry raw C pointers only (no GameWorld/GameCvars/engine handle param). How should these be threaded once the skeleton graduates past the raw-pointer staging stage (matches the same parking pattern already used in g_combat.rs)?",
+   "file": "g_cmds.c"
+  },
+  {
+   "fn": "ConcatArgs",
+   "topic": "static-scratch-buffer-vs-raw-ptr-return",
+   "question": "Fork-5 ruling resolves the C `static char line[]` rotating scratch buffer to an owned return value, but the staged skeleton return type is `*mut c_char`; how should this be reconciled (leak, thread_local, or re-declare signature)?",
+   "file": "g_cmds.c"
+  },
+  {
+   "fn": "G_TeamForSiegeClass",
+   "topic": "unresolved-siege-team-consts",
+   "question": "Needs SIEGETEAM_TEAM1/SIEGETEAM_TEAM2 (siege-team-id constants distinct from team_t RED/BLUE) and MAX_SIEGE_CLASSES; neither appears in the packet's resolved call surface or the landed mp_bg::saga types (only MAX_SIEGE_CLASSES_PER_TEAM and duelTeam_t are ported). What type/const carries these once ported?",
+   "file": "g_cmds.c"
+  },
+  {
+   "fn": "CheckSaberDamage",
+   "topic": "engine-world-threading",
+   "question": "~56 fns: fnskel signatures are raw *mut gentity_t with NO ctx: GameContext, but the bodies call trap_* (need &Engine) and read/write level/cvars/g_entities (need &mut GameWorld). g_init_game threads GameContext; the cross-file resolved signatures (G_Damage, G_Spawn, ...) also lack it. Should every w_saber fn (and the resolved cross-file sigs) gain a ctx: GameContext param, or is there an ambient engine/world accessor the porter should use?",
+   "file": "crates/mp/game/src/w_saber.rs"
+  },
+  {
+   "fn": "WP_SaberClearDamage",
+   "topic": "file-static-globals",
+   "question": "w_saber.c file-scope statics (victimEntityNum[], numVictims, totalDmg[], dmgDir[], saberSpinSound, bladeActive, ...) per ruling 5 become GameWorld fields, but the raw-pointer signatures expose no world to reach them \u2014 same threading question as engine-world-threading; confirm they land as GameWorld fields and how they're reached here.",
+   "file": "crates/mp/game/src/w_saber.rs"
+  },
+  {
+   "fn": "WP_SaberBlock",
+   "topic": "vec3-outparam-convention",
+   "question": "WP_SaberBlock/WP_SaberBlockNonRandom call AngleVectors(fwdangles,NULL,right,NULL) and VectorNormalize(diff) in-place, but the resolved q_math signatures pass vec3_t (=[f32;3], Copy) BY VALUE with void/scalar return, so outputs can't be written back. The 'out-params -> return values' ruling isn't reflected in the fnskel sigs \u2014 what is the settled shape for these vec3 out-param helpers?",
+   "file": "crates/mp/game/src/w_saber.rs"
+  },
+  {
+   "fn": "G_GetAttackDamage",
+   "topic": "bg-anim-globals",
+   "question": "G_GetAttackDamage/G_GetAnimPoint index the shared bg animation table bgAllAnims[localAnimIndex].anims[...]. Where does bgAllAnims live in the port (owned/threaded per ruling 1) and how is it reached from a raw *mut gentity_t signature?",
+   "file": "crates/mp/game/src/w_saber.rs"
+  },
+  {
+   "fn": "G_SaberLockAnim",
+   "topic": "unported-const",
+   "question": "Constants are unported: G_SaberLockAnim needs animNumber_t/BOTH_LK_* anim enum + SABERLOCK_* enum; G_ClientIdleInWorld needs BUTTON_* usercmd button flags. None found in the mp crates. Port the owning enums first, or provide their module paths.",
+   "file": "crates/mp/game/src/w_saber.rs"
+  },
+  {
+   "fn": "G_BuildSaberFaces",
+   "topic": "saberFace_t-unported",
+   "question": "G_BuildSaberFaces/G_SaberFaceCollisionCheck operate on saberFace_t, which is unported (skeleton params degrade to *mut c_void). Port saberFace_t (w_saber.c local struct) before these two can be transcribed.",
+   "file": "crates/mp/game/src/w_saber.rs"
+  },
+  {
+   "fn": "RandFloat",
+   "topic": "rng-threading",
+   "question": "RandFloat returns rand()*(max-min)/RAND_MAX+min: RAND_MAX is unported (not in tree) and rand() is resolved as an argless fn, but ruling 3 mandates an owned+threaded LCG. How is the RNG threaded into these raw-pointer signatures, and where does RAND_MAX live?",
+   "file": "crates/mp/game/src/w_saber.rs"
+  },
+  {
+   "fn": "G_DebugBoxLines",
+   "topic": "debug-only-ifdef",
+   "question": "G_DebugBoxLines is defined only under #ifdef DEBUG_SABER_BOX (compiled out of the shipping oracle build). Port it behind a cfg feature, or drop it (skeleton always includes it)?",
+   "file": "crates/mp/game/src/w_saber.rs"
+  },
+  {
+   "fn": "WP_InitForcePowers",
+   "topic": "spine-convention",
+   "question": "The fnskel skeletons carry raw-pointer signatures (self_: *mut gentity_t) with no spine, but bodies must reach level/cvars/g_entities/traps. I threaded ctx: GameContext<'_> into gentity fns per the g_init_game precedent \u2014 but the packet's resolved cross-file signatures (G_TempEntity, G_Sound, G_Damage, OnSameTeam, \u2026) ALSO need the spine yet omit ctx, and I was told to call them verbatim. Confirm: do all game-logic fns uniformly gain a leading ctx/GameContext param (so cross-file calls pass it too), or is a different threading (thread-local engine, &mut GameWorld, EntityId self params) intended? Every fn in this file depends on this.",
+   "file": "w_force.c"
+  },
+  {
+   "fn": "WP_InitForcePowers",
+   "topic": "constant-and-table-sourcing",
+   "question": "The packet does not enumerate Raven constant spellings/enum-qualification (FP_*, EV_*, FORCE_LEVEL_*, PDSOUND_*, CHAN_*, STAT_*, etc.) nor the sourcing of the tables forcePowerNeeded (bg const), bgSiegeClasses (bg global), and botstates (game global). I transcribed constants by their bare Raven names (integration-deferred) and referenced the tables bare; botstates needs a GameWorld field per fork-1. Where should each constant/table resolve from?",
+   "file": "w_force.c"
+  },
+  {
+   "fn": "ForceGrip",
+   "topic": "vehicle-vtable",
+   "question": "ForceGrip's grip-hit branch calls vehEnt->m_pVehicle->m_pVehicleInfo->Eject(...), the fork-7 vehicle vtable (mp_bg enum-over-type dispatch), which is not in the packet's resolved call surface. What is the bg Eject dispatch entrypoint to call? Same question applies to any other vehicle-vtable sub-calls in the parked large fns (ForceThrow, WP_ForcePowersUpdate).",
+   "file": "w_force.c"
+  },
+  {
+   "fn": "PM_irand_timesync",
+   "topic": "pmove-working-state",
+   "question": "How is the file-static pmove_t *pm (and pml) threaded into these no-arg C-signature fns without a S B3 static? (same open fork already flagged in bg_pmove.rs/w_saber.rs)",
+   "file": "bg_saber.c"
+  },
+  {
+   "fn": "BG_ForcePowerDrain",
+   "topic": "unported-global-table",
+   "question": "forcePowerNeeded[level][power] const table (bg_local.h) is not yet ported into the Rust tree \u2014 where should it land?",
+   "file": "bg_saber.c"
+  },
+  {
+   "fn": "PM_SaberAnimTransitionAnim",
+   "topic": "saber-move-data-table",
+   "question": "saberMoveData/transitionMove (~90-entry const tables keyed by saberMoveName_t) are not yet ported \u2014 what module/shape should they land in before functions that read them can be ported?",
+   "file": "bg_saber.c"
+  },
+  {
+   "fn": "PM_SaberLockLoseAnim",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "NPC_SetAnim(&g_entities[clientNum], ...) needs the bare g_entities global; skeleton has no world/entity-arena handle param \u2014 same fork as g_combat.rs raw-ptr-skeleton-no-world-handle.",
+   "file": "bg_saber.c"
+  },
+  {
+   "fn": "BG_CheckIncrementLockAnim",
+   "topic": "unported-anim-consts",
+   "question": "BOTH_LK_* saberlock animation-table constants and SABERLOCK_WIN/SABERLOCK_LOSE are not yet ported \u2014 which module owns them?",
+   "file": "bg_saber.c"
+  },
+  {
+   "fn": "BG_MySaber",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_entities[clientNum].client->saber[saberNum] with no world handle in scope \u2014 same fork as above.",
+   "file": "bg_saber.c"
+  },
+  {
+   "fn": "most WP_Fire*/think/die/use functions",
+   "topic": "seam-threading",
+   "question": "Faithful skeleton signatures carry no &Engine/&mut GameWorld param, but level.time, g_entities[], file-static forward/vright/up/muzzle vec3_t globals, and vmCvar_t handles (g_gametype, g_cheats, d_projectileGhoul2Collision, g_g2TraceLod, g_vehAutoAimLead) all need to be reached from inside them, as do trap_Trace/trap_G2Trace/trap_LinkEntity. Matches the same open question already parked across ai_main.c and NPC_AI_Jedi.c \u2014 how is state threaded into this context-free signature?",
+   "file": "g_weapon.c"
+  },
+  {
+   "fn": "WP_FireTurretMissile, WP_FireGenericBlasterMissile, WP_FireBlasterMissile, WP_FireEmplacedMissile",
+   "topic": "bg-dep",
+   "question": "MASK_SHOT and CONTENTS_LIGHTSABER (q_shared.h content/trace mask flags) aren't ported anywhere in the crate graph yet and aren't in the packet's resolved call surface. Where will these constants live once ported?",
+   "file": "g_weapon.c"
+  },
+  {
+   "fn": "G_CanDisruptify, WP_GetVehicleCamPos, G_VehMuzzleFireFX",
+   "topic": "bg-dep",
+   "question": "gentity_t.m_pVehicle is typed *mut c_void with a doc comment saying Vehicle_t isn't ported yet \u2014 but Vehicle_t/vehicleInfo_t do exist now in mp_bg (crates/mp/bg/src/vehicles/). Is casting m_pVehicle to *mut Vehicle_t sanctioned, or does the gentity_t field need updating first (and by whom)?",
+   "file": "g_weapon.c"
+  },
+  {
+   "fn": "WP_CreateFlechetteBouncyThing",
+   "topic": "rng-threading",
+   "question": "random() (missile speed jitter) needs the ruling-3 threaded LCG Rng, but the faithful skeleton signature carries no Rng param. How is the Rng reached here?",
+   "file": "g_weapon.c"
+  },
+  {
+   "fn": "CalcMuzzlePoint",
+   "topic": "weapon-muzzle-table",
+   "question": "References the static WP_MuzzlePoint[] per-weapon muzzle-offset table, which isn't in the resolved call surface. Where does this table live / what's its ported shape?",
+   "file": "g_weapon.c"
+  },
+  {
+   "fn": "ClientThink_real (systemic \u2014 applies to all 36 fns in g_active.c)",
+   "topic": "state-threading",
+   "question": "fnskel signatures take raw *mut gentity_t/scalars with no GameContext/world/engine channel, but faithful bodies need GameWorld state (level, g_entities, g_clients, g_main cvars) and engine-bearing traps (trap::X(engine,\u2026)); STATE-D1/\u00a7B3 forbid a global level accessor and the verbatim cross-file signature contract forbids rethreading a GameContext param \u2014 how should the module island + trap engine handle reach these raw-pointer skeleton bodies during the fill phase? (secondary facet: Raven constants BUTTON_*/BOTH_*/STAT_*/EF_*/qtrue/qfalse are not re-exported by prelude, blocking even the pure fns.)",
+   "file": "g_active.c"
+  },
+  {
+   "fn": "G_Printf/G_Error/Com_Error/Com_Printf/G_LogPrintf",
+   "fn2": "",
+   "topic": "variadic-c-abi",
+   "question": "What Rust shape represents a variadic printf-style C entry point at the ABI seam?",
+   "file": "g_main.c"
+  },
+  {
+   "fn": "all other 44 functions",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "The staged raw-pointer g_main.c skeleton has no GameWorld/engine handle parameter, but every function reads/writes level/g_entities/GameCvars/other file-scope globals per fork ruling 1 \u2014 what threading shape (extra &mut GameWorld param? ambient accessor?) should these raw-ptr skeletons take before they can be filled?",
+   "file": "g_main.c"
+  },
+  {
+   "fn": "ALL_PARKED_FNS",
+   "fn2": "",
+   "topic": "packet-contract",
+   "question": "The NPC_spawn.md packet has no resolved-signature/prelude section for out-of-file symbols (level, g_entities, G_Spawn, gNPC_t field accessors, ~213 fn-pointer targets, vehicle vtable, ICARUS traps) despite the task brief promising one \u2014 please regenerate the packet with that section, or confirm the exact prelude re-export names/signatures so bodies can be filled without exploring the tree.",
+   "file": "NPC_spawn.c"
+  },
+  {
+   "fn": "NPC_ReactionTime",
+   "topic": "ambient-global",
+   "question": "NPC_ReactionTime reads file-scope NPCInfo global but its resolved skeleton signature takes no params \u2014 how should ambient per-NPC-info state thread through a zero-arg fn?",
+   "file": "NPC_stats.c"
+  },
+  {
+   "fn": "NPC_Precache",
+   "topic": "ambient-global",
+   "question": "NPC_Precache parses the NPCParms/NPCFile buffers and TeamTable/WPTable string-ID tables (fork-1 GameWorld fields) but its resolved skeleton signature is the bare gentity_t* pointer with no GameWorld/table param \u2014 where do these thread from?",
+   "file": "NPC_stats.c"
+  },
+  {
+   "fn": "NPC_ParseParms",
+   "topic": "scope+ambient-global",
+   "question": "2260 LOC function with the same ambient-global threading gap as NPC_Precache, plus BG_TempAlloc/Free scratch and dozens of field branches \u2014 needs the GameWorld threading decision settled and likely its own dedicated pass rather than folding into this file's port.",
+   "file": "NPC_stats.c"
+  },
+  {
+   "fn": "NPC_LoadParms",
+   "topic": "ambient-global",
+   "question": "NPC_LoadParms writes NPCParms/npcParseBuffer via trap_FS_* calls but its resolved skeleton signature is zero-arg with no engine/world handle to route the trap calls or globals through.",
+   "file": "NPC_stats.c"
+  },
+  {
+   "fn": "adjustRespawnTime",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads g_adaptRespawn cvar and level.numPlayingClients \u2014 no world/engine handle on staged raw-pointer signature",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "ShieldRemove/ShieldThink/ShieldDie/ShieldPain/ShieldGoSolid/ShieldGoNotSolid/ShieldTouch/CreateShield",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "read level/g_gametype/file-static shield sound handles and call trap_LinkEntity/trap_Trace \u2014 no world/engine handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "PlaceShield",
+   "topic": "vec3-outparam-seam",
+   "question": "AngleVectors out-params can't be received by-value vec3_t signature; also needs world/engine handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "pas_fire/pas_find_enemies/pas_adjust_enemy/pas_think/turret_die/SP_PAS/ItemUse_Sentry",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "index g_entities / read level and call traps (InPVS/Trace/EntitiesInBox) with no world/engine handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "sentryExpire",
+   "topic": "missing-const",
+   "question": "MOD_UNKNOWN (meansOfDeath_t) is not ported anywhere in the crate graph",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "Jetpack_On/ItemUse_Jetpack/ItemUse_UseCloak/SpecialItemThink/G_SpecialSpawnItem/ItemUse_Seeker",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "read level/g_gametype/bg_itemlist/d_siegeSeekerNPC \u2014 no world handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "ItemUse_UseDisp",
+   "topic": "vec3-outparam-seam",
+   "question": "AngleVectors out-params plus trap_LinkEntity/level need world/engine handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "EWebDisattach/EWebDie/EWebPain/EWeb_SetBoneAngles/EWeb_SetBoneAnim/EWebFire/EWebThink/EWeb_Create/ItemUse_UseEWeb",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "read level/g_entities/bg_itemlist and call G2API traps \u2014 no world/engine handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "EWebPositionUser",
+   "topic": "vec3-outparam-seam",
+   "question": "vectoangles/BG_GiveMeVectorFromMatrix out-params plus trap_G2API_GetBoltMatrix/trap_Trace need world/engine handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "Pickup_Powerup",
+   "topic": "vec3-outparam-seam",
+   "question": "AngleVectors out-params plus trap_Trace/g_gametype/level need world/engine handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "Pickup_Holdable/Add_Ammo/Pickup_Ammo/Pickup_Weapon",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "read bg_itemlist/g_gametype/ammoData/weaponData/g_weaponRespawn \u2014 no world handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "RespawnItem",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "calls trap_LinkEntity \u2014 no engine handle on staged signature",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "CheckItemCanBePickedUpByNPC/Touch_Item/FinishSpawningItem/G_CheckTeamItems/ClearRegisteredItems/RegisterItem/SaveRegisteredItems/G_ItemDisabled/G_SpawnItem/G_BounceItem/G_RunItem",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "read g_entities/level/bg_itemlist/itemRegistered/bg_numItems/g_gametype/g_forcePowerDisable/g_duelWeaponDisable/g_weaponDisable and/or call traps \u2014 no world/engine handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "LaunchItem",
+   "topic": "vec3-outparam-seam",
+   "question": "vectoangles out-param plus trap_LinkEntity/bg_itemlist/g_gametype/level need world/engine handle",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "Drop_Item",
+   "topic": "vec3-outparam-seam",
+   "question": "AngleVectors forward/right out-params can't be received by-value vec3_t signature",
+   "file": "g_items.c"
+  },
+  {
+   "fn": "G_TeamEnemy",
+   "topic": "seam-threading",
+   "question": "How is &mut GameWorld (g_entities/level) threaded into faithful-skeleton function bodies that take no world param?",
+   "file": "NPC_combat.c"
+  },
+  {
+   "fn": "G_AttackDelay",
+   "topic": "seam-threading",
+   "question": "How are GameCvars (g_spskill) reached from bodies whose skeleton signature carries no cvar/world handle?",
+   "file": "NPC_combat.c"
+  },
+  {
+   "fn": "ChangeWeapon",
+   "topic": "seam-threading",
+   "question": "Same as above, plus weaponData table location is unresolved in this packet.",
+   "file": "NPC_combat.c"
+  },
+  {
+   "fn": "NPC_ApplyWeaponFireDelay",
+   "topic": "ai-context",
+   "question": "Raven's b_local.h declares file-static ambient globals `NPC`/`NPCInfo`/`client`/`ucmd` (the 'current AI actor' context) that ~25 functions in this file read/write directly with no self/world param at all. What Rust threading mechanism replaces them (e.g. a GameWorld.current_npc context struct passed through the AI dispatch loop)?",
+   "file": "NPC_combat.c"
+  },
+  {
+   "fn": "IdealDistance",
+   "topic": "ai-context",
+   "question": "Same ai-context gap \u2014 this fn even ignores its own `self` param and reads ambient NPC/NPCInfo instead (verbatim Raven behavior).",
+   "file": "NPC_combat.c"
+  },
+  {
+   "fn": "WP_SaberBladeDoTransitionDamage",
+   "topic": "missing-const",
+   "question": "SFL2_TRANSITION_DAMAGE/SFL2_TRANSITION_DAMAGE2 saberFlags2 bitflags are not yet ported into the Rust tree (q_shared.h) \u2014 what are their bit values?",
+   "file": "bg_saberLoad.c"
+  },
+  {
+   "fn": "WP_SaberCanTurnOffSomeBlades",
+   "topic": "missing-const",
+   "question": "SFL2_NO_MANUAL_DEACTIVATE/SFL2_NO_MANUAL_DEACTIVATE2 saberFlags2 bitflags are not yet ported \u2014 what are their bit values?",
+   "file": "bg_saberLoad.c"
+  },
+  {
+   "fn": "WP_SaberSetDefaults",
+   "topic": "missing-const",
+   "question": "SABER_RADIUS_STANDARD (q_shared.h) is not yet ported into the Rust tree \u2014 what is its value, and where should it live?",
+   "file": "bg_saberLoad.c"
+  },
+  {
+   "fn": "WP_SaberParseParms",
+   "topic": "ambient-global + missing-const + seam-threading",
+   "question": "Needs the file-static SaberParms buffer, the SaberTable/SaberMoveTable/FPTable/animTable lookup tables, the SFL_/SFL2_ saberFlags bitflag consts, and trap_R_RegisterSkin (needs &Engine) \u2014 none of which are threaded through this zero-world-handle skeleton signature or ported yet. How should the fork-1 SaberParms global be threaded into this bg_ function's signature?",
+   "file": "bg_saberLoad.c"
+  },
+  {
+   "fn": "WP_SaberParseParm",
+   "topic": "ambient-global",
+   "question": "Needs the file-static SaberParms buffer (fork-1 GameWorld placement) but the resolved skeleton signature has no world/GameWorld handle \u2014 how should it be threaded in?",
+   "file": "bg_saberLoad.c"
+  },
+  {
+   "fn": "WP_SetSaber",
+   "topic": "missing-const",
+   "question": "SFL_TWO_HANDED saberFlags bitflag is not yet ported \u2014 what is its bit value?",
+   "file": "bg_saberLoad.c"
+  },
+  {
+   "fn": "WP_SaberLoadParms",
+   "topic": "seam-threading + ambient-global",
+   "question": "Calls trap_FS_FOpenFile/FS_Read/FS_FCloseFile/FS_GetFileList which need &Engine, but the skeleton signature is zero-arg, and it writes the file-static SaberParms/bgSaberParseTBuffer globals \u2014 how should engine + world state be threaded into this fn?",
+   "file": "bg_saberLoad.c"
+  },
+  {
+   "fn": "BotWaypointRender, TransferWPData, CreateNewWP, CreateNewWP_FromObject, RemoveWP, RemoveAllWP, RemoveWP_InTrail, CreateNewWP_InTrail, CreateNewWP_InsertUnder, TeleportToWP, WPFlagsModify, NodeHere, CanGetToVector, CanGetToVectorTravel, ConnectTrail, OpposingEnds, DoorBlockingSection, RepairPaths, OrgVisibleCurve, CanForceJumpTo, CalculatePaths, GetObjectThatTargets, CalculateSiegeGoals, GetNearestVisibleWPToItem, CalculateWeightGoals, CalculateJumpRoutes, LoadPathData, FlagObjects, SavePathData, G_NearestNodeToPoint, G_NodeClearForNext, G_NodeClearFlags, G_NodeMatchingXY, G_NodeMatchingXY_BA, G_RecursiveConnection, G_BackwardAttachment, G_RMGPathing, BeginAutoPathRoutine, LoadPath_ThisLevel, GetClosestSpawn, GetNextSpawnInIndex, AcceptBotCommand",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "These functions read/write file-scope globals (gWPArray/gWPNum/nodetable/nodenum/flagRed/flagBlue/gBotEdit/\u2026) and/or call G_Printf (variadic, itself parked in g_main.rs) and/or call trap::Trace (which requires an &Engine handle per trap.rs). The staged raw-pointer fnskel signature for this file has no GameWorld/engine parameter to reach any of that through \u2014 same precedent already established for the entirety of g_main.c (0/49) and most of g_combat.c. How should the mega-pass's later integration/wiring step thread GameWorld+Engine into these staged signatures?",
+   "file": "ai_wpnav.c"
+  },
+  {
+   "fn": "ST_Speech, ST_HoldPosition, NPC_ST_SayMovementSpeech, NPC_ST_StoreMovementSpeech, ST_Move, NPC_ST_SleepShuffle, NPC_BSST_Sleep, NPC_CheckEnemyStealth, NPC_CheckPlayerTeamStealth, NPC_ST_InvestigateEvent, ST_OffsetLook, ST_LookAround, NPC_BSST_Investigate, NPC_BSST_Patrol, ST_CheckMoveState, ST_ResolveBlockedShot, ST_CheckFireState, ST_TrackEnemy, ST_ApproachEnemy, ST_HuntEnemy, ST_TransferTimers, ST_TransferMoveGoal, ST_GetCPFlags, ST_Commander, NPC_BSST_Attack, NPC_BSST_Default",
+   "topic": "ai-context",
+   "question": "These 26 functions read/write the ambient file-static globals NPC/NPCInfo (b_local.h extern gentity_t *NPC, gNPC_t *NPCInfo), level (level.time/level.alertEvents), g_entities[], and several file-static scratch booleans (enemyLOS/enemyCS/enemyInFOV/hitAlly/faceEnemy/move/shoot/impactPos, groupSpeechDebounceTime[]). The faithful skeleton signatures for this file carry none of these as params, and no GameWorld/current-AI-actor threading mechanism is resolved in the packet or prelude (same gap already flagged ai-context/seam-threading in the sibling NPC_combat.c port). Parked per protocol rather than inventing the threading shape.",
+   "file": "NPC_AI_Stormtrooper.c"
+  },
+  {
+   "fn": "misc_lightstyle_set, SP_light, TeleportPlayer, SP_misc_portal_surface, SP_misc_portal_camera, SP_misc_bsp, SP_terrain, G_PortalifyEntities, SP_misc_skyportal, HolocronTouch, HolocronThink, SP_misc_holocron, InitShooter, check_recharge, shield_power_converter_use, ammo_generic_power_converter_use, SP_misc_ammo_floor_unit, SP_misc_shield_floor_unit, SP_misc_model_shield_power_converter, ammo_power_converter_use, SP_misc_model_ammo_power_converter, health_power_converter_use, SP_misc_model_health_power_converter, fx_runner_think, fx_runner_use, fx_runner_link, SP_fx_runner, SP_target_screenshake, Use_Target_Escapetrig, SP_target_escapetrig, SP_misc_maglock, maglock_link, faller_touch, faller_think, misc_faller_create, misc_faller_think, SP_misc_faller, SP_reference_tag, G_ClientForShooter, G_FreeClientForShooter, misc_weapon_shooter_fire, misc_weapon_shooter_use, misc_weapon_shooter_aim, SP_misc_weapon_shooter",
+   "fn2": "",
+   "topic": "state-threading",
+   "question": "These fnskel signatures are raw `*mut gentity_t`/scalars with no GameContext/engine/world channel, but their faithful bodies need trap_* calls and/or the `level`/cvar/file-static globals (g_RMG, g_MaxHolocronCarry, g_gametype, ammoData, bgSiegeClasses, forcePowerDarkLight, WPTable, g_shooterClients, gEscaping/gEscapeTime, BMS_*). Same systemic gap as g_active.rs/g_items.rs precedent (raw-ptr-skeleton-no-world-handle) \u2014 how should the module-island state + engine handle be threaded into these verbatim cross-file signatures?",
+   "file": "g_misc.c"
+  },
+  {
+   "fn": "misc_dlight_use-adjacent writers: SP_light, G_PortalifyEntities, SP_misc_skyportal, SP_misc_holocron, InitShooter, SP_misc_ammo_floor_unit, SP_misc_shield_floor_unit, SP_misc_model_shield_power_converter, SP_misc_model_ammo_power_converter, SP_misc_model_health_power_converter, fx_runner_use, fx_runner_link, SP_fx_runner, SP_target_screenshake, maglock_link (die assign), faller_think, misc_faller_create, SP_misc_faller, SP_reference_tag, misc_weapon_shooter_fire, misc_weapon_shooter_use (read/compare), SP_misc_weapon_shooter",
+   "topic": "fn-pointer-dispatch",
+   "question": "gentity_t.think/use_/touch/die are still `Option<unsafe extern \"C\" fn(...)>` raw pointers (not yet the EntThink/EntUse/... enum from out/gen/ent_fn_enums.rs per ruling 2), and skeleton target fns are plain `pub fn` (not `unsafe extern \"C\"`) \u2014 assigning or comparing them doesn't type-check. Does the gentity_t field type change to Option<EntXxx>, or is there a bridging adapter?",
+   "file": "g_misc.c"
+  },
+  {
+   "fn": "Use_Shooter",
+   "topic": "rng-threading",
+   "question": "Faithful body needs crandom() (ruling 3's threaded LCG) \u2014 this raw-pointer signature carries no Rng channel. How is the threaded Rng reached from a verbatim cross-file callback signature?",
+   "file": "g_misc.c"
+  },
+  {
+   "fn": "locateCamera",
+   "topic": "vec3-outparam-seam",
+   "question": "Resolved VectorNormalize(vec3_t)->vec_t and G_SetMovedir(vec3_t,vec3_t) take/return vec3_t by value, but the C body relies on in-place mutation of the `dir` out-param. Same gap as g_items.rs's PlaceShield park \u2014 how should vec3 out-params be resolved?",
+   "file": "g_misc.c"
+  },
+  {
+   "fn": "SP_CreateSpaceDust, SP_CreateRain",
+   "topic": "variadic-seam",
+   "question": "Both format through va(\"...%i\", ent->count) with a real arg; va/G_Printf/Com_sprintf's C-varargs seam is marked pending at their own definitions. What's the call convention once decided?",
+   "file": "g_misc.c"
+  },
+  {
+   "fn": "FirstFreeTagOwner, FirstFreeRefTag, TAG_Init, TAG_FindOwner, TAG_Find, TAG_Add, TAG_GetOrigin, TAG_GetOrigin2, TAG_GetAngles, TAG_GetRadius, TAG_GetFlags, ref_link",
+   "topic": "bg-dep",
+   "question": "tagOwner_t (file-static refTagOwnerMap pool) is unported; the whole TAG_* reference-tag subsystem plus ref_link (which calls TAG_Add) depends on it. Needs its own type/port pass before these can be filled.",
+   "file": "g_misc.c"
+  },
+  {
+   "fn": "AddRemap/BuildShaderStateConfig/G_FindConfigstringIndex/...",
+   "fn2": "",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Most functions need level/g_entities/cvars/trap_* (Engine) but the staged skeleton signatures are bare raw-pointer C signatures with no GameWorld/engine handle param \u2014 how should the raw-ptr skeleton reach GameWorld/Engine?",
+   "file": "g_utils.c"
+  },
+  {
+   "fn": "GlobalUse/ValidUseTarget/TryUse",
+   "topic": "fn-pointer-dispatch",
+   "question": "These read/compare entity->use/touch fn-pointer fields directly; ruling 2 wants fn-ID enums + central match dispatch, not yet wired into the staged raw gentity_t \u2014 how should fn-pointer fields be dispatched from this skeleton shape?",
+   "file": "g_utils.c"
+  },
+  {
+   "fn": "tv/vtos",
+   "topic": "scratch-buffer-return-type-seam",
+   "question": "Ruling 5 blesses turning the va/vtos rotating-buffer idiom into an owned return value, but the skeleton fixes the return type at a raw pointer (*mut f32 / *mut c_char) \u2014 can the signature change, or should these stay parked?",
+   "file": "g_utils.c"
+  },
+  {
+   "fn": "G_SetMovedir/ShortestLineSegBewteen2LineSegs/GetAnglesForDirection",
+   "topic": "vec3-outparam-seam",
+   "question": "vec3_t out-params are passed by value (Copy [f32;3]) in the staged signatures, so writes don't propagate to the caller \u2014 same seam already flagged in g_combat.rs; how should vec3 out-params be expressed here?",
+   "file": "g_utils.c"
+  },
+  {
+   "fn": "G_CreateRotationMatrix, G_RotatePoint, CalcTeamDoorCenter",
+   "fn_note": "",
+   "topic": "vec3-outparam-seam",
+   "question": "Resolved AngleVectors/BG_EvaluateTrajectory/RadiusFromBounds and any vec3_t parameter that Raven uses as an out-param (decays to pointer in C) all resolve to by-value [f32;3] in the staged skeleton, so out-param mutation cannot reach the caller. How should vec3 out-params be re-seamed (pointer-based helper overloads? wrapper structs?) so these functions can be ported faithfully?",
+   "file": "g_mover.c"
+  },
+  {
+   "fn": "G_TestEntityPosition, G_TryPushingEntity, G_MoverPush, G_MoverTeam, SetMoverState, ReturnToPos1, Reached_BinaryMover, Use_BinaryMover_Go, Use_BinaryMover, InitMover, Touch_DoorTriggerSpectator, Think_SpawnNewDoorTrigger, Think_MatchTeam, G_EntIsDoor, G_EntIsUnlockedDoor, SP_func_door, Touch_Plat, SpawnPlatTrigger, SP_func_plat, SP_func_button, Think_BeginMoving, Reached_Train, SP_func_train, SP_func_static, SP_func_rotating, SP_func_bobbing, SP_func_pendulum, funcBBrushDieGo, funcBBrushDie, funcBBrushPain, InitBBrush, SP_func_breakable, G_EntIsBreakable, SP_func_glass, func_wait_return_solid, G_EntIsRemovableUsable, func_usable_use, SP_func_usable, use_wall, SP_func_wall",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "These bodies need `level.time`/`g_entities[]`/the pushed[] save-stack/`G_Error`, and/or a trap_* syscall (all of which require a threaded &Engine/world handle the staged raw-pointer fn signatures don't carry). How should game-state globals and the engine handle be reached from a raw-pointer skeleton with no threaded world/engine param?",
+   "file": "g_mover.c"
+  },
+  {
+   "fn": "G_RunMover, Touch_DoorTrigger, G_FindDoorTrigger, func_usable_think",
+   "topic": "unported-flag-consts",
+   "question": "FL_TEAMSLAVE, FL_INACTIVE, CONTENTS_TRIGGER, SVF_PLAYER_USABLE (g_local.h/bg_public.h bitflags) aren't type-ported anywhere in the crate graph yet. Where should these live once g_local.h's flag tables are ported, and can they be added additively now?",
+   "file": "g_mover.c"
+  },
+  {
+   "fn": "Touch_PlatCenterTrigger, Touch_Button",
+   "topic": "moverstate-enum-unported",
+   "question": "moverState_t is `type moverState_t = c_int` with its MOVER_POS1/MOVER_1TO2/MOVER_POS2/MOVER_2TO1 enum constants not yet defined anywhere (g_local.h is out of this file's packet). What are the authoritative values, and where should the consts be defined?",
+   "file": "g_mover.c"
+  },
+  {
+   "fn": "CacheChunkEffects",
+   "topic": "bg-dep",
+   "question": "material_t (MAT_GLASS, MAT_METAL, ...) is a `type material_t = c_int` alias whose anonymous enum constants aren't type-ported anywhere yet. Where should the MAT_* table live?",
+   "file": "g_mover.c"
+  },
+  {
+   "fn": "SP_info_player_siegeteam1, SP_info_player_siegeteam2, SP_info_jedimaster_start, BodySink, CopyToBodyQue, ClientSpawn",
+   "topic": "fn-ptr-store-shape-mismatch",
+   "question": "gentity_t.{think,touch,use_,die} on the staged struct are still raw Option<unsafe extern \"C\" fn(...)> pointers, NOT the fork-2 EntXxx fn-ID enums, and skeleton targets are plain pub fn \u2014 should the EntThink/EntTouch/EntUse/EntDie enums (already in ent_fn_enums.rs) be wired into gentity_t's fn-pointer fields so `ent->use = SiegePointUse` etc. can be stored faithfully?",
+   "file": "g_client.c"
+  },
+  {
+   "fn": "G_SaberModelSetup, SetupGameGhoul2Model, G_UpdateClientAnims, ClientDisconnect",
+   "topic": "g2-ghoul2-traps",
+   "question": "trap_G2API_* wrappers need a ghoul2 instance handle threaded through GameContext plus their Args::new constructors (not in this packet). How is the server-side ghoul2 handle reached, and are the G2API Args structs available like GEntitiesInBoxArgs?",
+   "file": "g_client.c"
+  },
+  {
+   "fn": "SelectRandomFurthestSpawnPoint, SelectDuelSpawnPoint, G_BreakArm",
+   "topic": "rng-random-macro",
+   "question": "Q3's random() float-RNG macro and Q_irand map to the fork-3 threaded LCG. Should the owned Rng be exposed via GameContext with a documented method so random()/Q_irand call sites resolve bit-exactly?",
+   "file": "g_client.c"
+  },
+  {
+   "fn": "ClientUserinfoChanged, ClientConnect, ClientBegin, JMSaberTouch, MaintainBodyQueue",
+   "topic": "va-varargs",
+   "question": "Resolved va(format, ...) / Com_sprintf / trap_SendServerCommand sites use C varargs the dropped-varargs skeleton signature can't pass. What is the convention for va()/formatted-string call sites (format! into an owned CString buffer)?",
+   "file": "g_client.c"
+  },
+  {
+   "fn": "TeamCount, TeamLeader, PickTeam, SelectSpectatorSpawnPoint",
+   "topic": "level-locals-field-paths",
+   "question": "These walk level_locals_t/session fields (maxclients, clients[i].pers.connected, .sess.sessionTeam, intermission_origin/angle). Can the exact level_locals_t + session field spellings be confirmed so the loops transcribe without inventing field names?",
+   "file": "g_client.c"
+  },
+  {
+   "fn": "SelectInitialSpawnPoint",
+   "topic": "vec3-outparam-convention",
+   "question": "Spawn selectors write origin/angles out-params (VectorCopy + origin[2]+=9) but the resolved skeleton passes vec3_t by value (Copy) so writes can't flow back. Adopt out-param->return (or &mut vec3_t), consistent with the vec3-outparam escalation in w_saber/g_combat?",
+   "file": "g_client.c"
+  },
+  {
+   "fn": "ThrowSaberToAttacker, JMSaberThink",
+   "topic": "gjmsaber-global",
+   "question": "The file-scope `gentity_t *gJMSaberEnt` mutable global (fork-1) needs a GameWorld field. Add `pub gJMSaberEnt` (EntityId or *mut gentity_t) to GameWorld keeping the Raven name?",
+   "file": "g_client.c"
+  },
+  {
+   "fn": "BG_BrokenParryForAttack",
+   "topic": "saber-move-data-table",
+   "question": "saberMoveData[move].startQuad const table not yet ported into Rust tree (same gap as bg_saber.rs) \u2014 where does it land / what's the import path?",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_SaberBounceForAttack",
+   "topic": "saber-move-data-table",
+   "question": "same saberMoveData gap as BG_BrokenParryForAttack.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "BG_AnimLength",
+   "topic": "own-file-static-no-world-handle",
+   "question": "file-static bgAllAnims[MAX_ANIM_FILES] has no world/handle param in the staged skeleton signature (BG_AnimLength(index, anim)) \u2014 how should this cross-frame animation-set state be threaded?",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_AnimLength",
+   "topic": "pmove-working-state",
+   "question": "reads file-static pmove_t *pm (pm->animations) with no pmove handle in signature \u2014 same open fork as bg_saber.rs/bg_pmove.rs pmove-working-state.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_DebugLegsAnim",
+   "topic": "pmove-working-state",
+   "question": "reads file-static pm and animTable with no pmove handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "BG_InitAnimsets",
+   "topic": "own-file-static-no-world-handle",
+   "question": "BG_InitAnimsets() takes zero params but writes bgAllAnims/BGPAFtextLoaded file statics.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "BG_AnimsetAlloc",
+   "topic": "own-file-static-no-world-handle",
+   "question": "BG_AnimsetAlloc() takes zero params but reads/writes bgAllAnims/bgNumAllAnims and calls BG_Alloc.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "BG_ParseAnimationFile",
+   "topic": "own-file-static-no-world-handle",
+   "question": "242-LOC animation-config parser touching bgAllAnims/bgNumAllAnims/BGPAFtextLoaded/bgHumanoidAnimations and trap_FS_* \u2014 needs the same world-handle decision as the other own-file-static parks, plus its own design pass given its size.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "BG_StartLegsAnim",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads bare g_entities[ps->clientNum] with no world/entity-arena handle \u2014 same gap as g_combat.rs.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_ContinueLegsAnim",
+   "topic": "pmove-working-state",
+   "question": "reads file-static pm with no pmove handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_ForceLegsAnim",
+   "topic": "pmove-working-state",
+   "question": "writes file-static pm with no pmove handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "BG_StartTorsoAnim",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads bare g_entities[ps->clientNum] with no world/entity-arena handle.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_StartTorsoAnim",
+   "topic": "pmove-working-state",
+   "question": "reads file-static pm with no pmove handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_SetLegsAnimTimer",
+   "topic": "pmove-working-state",
+   "question": "reads file-static pm->ps with no pmove handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_SetTorsoAnimTimer",
+   "topic": "pmove-working-state",
+   "question": "reads file-static pm->ps with no pmove handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_SetAnimFinal",
+   "topic": "pmove-working-state",
+   "question": "reads file-static pm->ps/pm->animations with no pmove handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "BG_HasAnimation",
+   "topic": "own-file-static-no-world-handle",
+   "question": "reads file-static bgAllAnims/bgNumAllAnims with no world handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "BG_SetAnim",
+   "topic": "own-file-static-no-world-handle",
+   "question": "falls back to file-static bgAllAnims[0].anims when animations is null, with no world handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "PM_SetAnim",
+   "topic": "pmove-working-state",
+   "question": "reads file-static pm with no pmove handle in signature.",
+   "file": "bg_panimate.c"
+  },
+  {
+   "fn": "all 21 functions",
+   "topic": "ai-context",
+   "question": "Every function in this file reads/writes the ambient Raven globals NPC/NPCInfo/ucmd/level/enemyVisibility with zero threading in the skeleton signatures (matches the identical wall hit in sibling files NPC_combat.c and NPC_AI_Jedi.c, already parked there under the same ai-context topic) \u2014 what is the resolved mechanism (thread-local context struct? extra &mut GameWorld + NPC-context param added to every AI behavior fn?) for reaching these globals from a per-frame call?",
+   "file": "NPC_behavior.c"
+  },
+  {
+   "fn": "InitTrigger",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs trap_SetBrushModel \u2014 no engine handle in signature",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "multi_trigger_run",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time, trap_SetConfigstring, threaded LCG, and a fn-ptr write \u2014 no channel",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "multi_trigger",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs g_gametype cvar, level.time, g_entities[], gSiegeRoundBegun, trap_EntitiesInBox \u2014 no channel",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "Touch_Multi",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time and a fn-ptr compare (think == trigger_cleared_fire) \u2014 no enum wiring",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "trigger_cleared_fire",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time and threaded LCG crandom",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_multiple",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs trap_LinkEntity and fn-ptr writes",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_once",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs trap_LinkEntity and fn-ptr writes",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "Do_Strike",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs trap_Trace, level.time, g_entities[]",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "Think_Strike",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time and Q_irand",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "Use_Strike",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_lightningstrike",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time, trap_LinkEntity, Com_Error, fn-ptr writes",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_always",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time and a fn-ptr write",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "trigger_push_touch",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time, BG_TouchJumpPad, fn-ptr write",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "AimAtTarget",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs g_gravity cvar",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_push",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time, trap_LinkEntity, fn-ptr writes",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "Use_target_push",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_target_push",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time and fn-ptr writes",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_teleport",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs trap_LinkEntity and fn-ptr write",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "hurt_use",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs trap_UnlinkEntity/trap_LinkEntity",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "hurt_touch",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs g_gametype cvar and level.time",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_hurt",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs trap_LinkEntity/trap_UnlinkEntity, gTrigFallSound global, fn-ptr writes",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "space_touch",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs g_entities[] and level.time",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_space",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs trap_LinkEntity and fn-ptr write",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "shipboundary_touch",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time, G_Find/G_Error, trap_LinkEntity",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "shipboundary_think",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time, trap_EntitiesInBox, g_entities[]",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_shipboundary",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time, G_Error, trap_LinkEntity, fn-ptr writes",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "hyperspace_touch",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time and G_Find/G_Error",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_hyperspace",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs G_Error, trap_LinkEntity, fn-ptr write",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "func_timer_think",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time and threaded LCG",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_func_timer",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time, G_Printf variadic, fn-ptr writes",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "asteroid_pick_random_asteroid",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs G_Find and threaded LCG Q_irand",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "asteroid_count_num_asteroids",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "iterates g_entities[] directly",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "asteroid_move_to_start2",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time, threaded LCG, Q3_Lerp2Origin, fn-ptr write",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "asteroid_move_to_start",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "indexes g_entities[]",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "asteroid_field_think",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs level.time and G_Spawn",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "SP_trigger_asteroid_field",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "needs trap_SetBrushModel/trap_LinkEntity, level.time, fn-ptr write",
+   "file": "g_trigger.c"
+  },
+  {
+   "fn": "CorpsePhysics",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs the ucmd/eventClearTime/g_dismember/g_saberRealisticCombat file-scope globals; no GameWorld/engine handle reachable from the fixed (*mut gentity_t) signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_RemoveBody",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_entities/level plus trap_ICARUS_IsRunning/MaintainTaskManager (&Engine); none reachable from the fixed signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_RemoveBodyEffect",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Zero-param function reads the file-scope NPC global directly; no handle to reach it.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "pitch_roll_for_slope",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs trap_Trace/trap_LinkEntity (&Engine), not reachable from the fixed signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "DeadThink",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Zero-param function needs NPC/NPCInfo/level globals plus three traps.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "SetNPCGlobals",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Writes the NPC/NPCInfo/client/ucmd file-scope globals; no GameWorld handle in signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "SaveNPCGlobals",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Same globals plus _saved_* shadow globals, zero params.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "RestoreNPCGlobals",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Same as SaveNPCGlobals.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "ClearNPCGlobals",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Writes NPC/NPCInfo/client globals, zero params.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_ShowDebugInfo",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs showBBoxes/g_entities and trap_InPVS; zero-param signature can't reach them.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_ApplyScriptFlags",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs NPCInfo/level/ucmd globals; zero-param signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_HandleAIFlags",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs NPC/NPCInfo/d_patched/level globals; zero-param signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_CheckAttackScript",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs NPC/ucmd globals; zero-param signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_CheckAttackHold",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs NPC/NPCInfo/level globals; zero-param signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_KeepCurrentFacing",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs client/ucmd globals; zero-param signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_RunBehavior",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs NPC/NPCInfo/level globals plus trap_ICARUS_TaskIDPending; (team, bState) signature can't reach NPC.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_ExecuteBState",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs NPC/NPCInfo/client/ucmd/level globals throughout; not reachable from (*mut gentity_t) alone.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_CheckInSolid",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs NPC/NPCInfo globals plus trap_Trace/trap_LinkEntity; zero-param signature.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "G_DroidSounds",
+   "topic": "va-variadic-seam",
+   "question": "Every branch needs va(fmt, arg) to build a sound path, but va's C-varargs seam is itself parked with a fixed one-arg stub signature \u2014 no place to pass the substitution value until that seam lands.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "NPC_Think",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs NPC/NPCInfo/ucmd/level/debugNPCFreeze/g_spskill/g_entities globals plus trap_ICARUS_MaintainTaskManager; not reachable from (*mut gentity_t) alone.",
+   "file": "NPC.c"
+  },
+  {
+   "fn": "SiegeSetCompleteData",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "The staged raw-pointer skeleton signatures carry no GameWorld/engine handle, so the ~28 functions reaching file-scope siege globals (team1/team2/siege_info/siege_valid/g_siegePersistant/imperial_*/rebel_*/gSiege*/gObjectiveCfgStr), level, g_entities, cvars (g_gametype/g_siege*), or engine traps cannot be threaded \u2014 how should these be reached from the staged signature (add a GameWorld/&Engine param, or land these once the world/trap seam is wired)?",
+   "file": "g_saga.c"
+  },
+  {
+   "fn": "SiegeItemRemoveOwner",
+   "topic": "unported-game-consts",
+   "question": "SVF_BROADCAST, EF_RADAROBJECT, and ENTITYNUM_NONE are not ported anywhere in the crate graph and their values are not in the packet; should these game #defines be ported/exported (or their values supplied) so SiegeBroadcast_OBJECTIVECOMPLETE/SiegeBroadcast_ROUNDOVER/SiegeIconUse/SiegeItemRemoveOwner can land?",
+   "file": "g_saga.c"
+  },
+  {
+   "fn": "UseSiegeTarget",
+   "topic": "fofs-and-variadic-printf",
+   "question": "UseSiegeTarget calls G_Find(t, FOFS(targetname), target) \u2014 the FOFS field-offset macro has no ported spelling here \u2014 and the variadic G_Printf; how should the field-offset selector and the variadic print seam be expressed against the raw-pointer skeleton?",
+   "file": "g_saga.c"
+  },
+  {
+   "fn": "G_LogWeaponInit",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs GameWorld-bound G_WeaponLog* arrays but signature has no world/engine handle param.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_LogWeaponPickup",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Same \u2014 no world handle to reach G_WeaponLogPickups/G_WeaponLogClientTouch.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_LogWeaponFire",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs level.time plus G_WeaponLog* arrays; no world handle.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_LogWeaponDamage",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogDamage/G_WeaponLogClientTouch; no world handle.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_LogWeaponKill",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogKills/G_WeaponLogClientTouch; no world handle.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_LogWeaponFrag",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogFrags/G_WeaponLogClientTouch; no world handle.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_LogWeaponDeath",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogDeaths/G_WeaponLogClientTouch; no world handle.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_LogWeaponPowerup",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogPowerups/G_WeaponLogClientTouch; no world handle.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_LogWeaponItem",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogItems/G_WeaponLogClientTouch; no world handle.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_LogWeaponOutput",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Dumps every G_WeaponLog* array plus g_entities/g_statLog via trap_FS_*; no world/engine handle in signature.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateEfficiency",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Loops g_entities/g_maxclients and reads ent->client (opaque *mut c_void); no world/cvar handle.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateSharpshooter",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs level.time, g_entities, g_maxclients, G_WeaponLogKills; none reachable.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateUntouchable",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs level.time and g_gametype cvar; ent->client opaque.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateLogistics",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_entities, g_maxclients, G_WeaponLogPowerups/Items.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateTactician",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs level.time, g_entities, g_maxclients, g_gametype, weaponFromMOD, G_WeaponLogPickups/Kills.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateDemolitionist",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs level.time, g_entities, g_maxclients, G_WeaponLogKills.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateTeamMVP",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_entities/g_maxclients and typed ent->client->ps.persistant access.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateTeamMVPByRank",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Same as CalculateTeamMVP.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateTeamDefender",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_entities/g_maxclients and ent->client->pers.teamState.basedefense.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateTeamWarrior",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_entities/g_maxclients and ent->client->ps.persistant[PERS_SCORE].",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateTeamCarrier",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_entities/g_maxclients and ent->client->pers.teamState.captures.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateTeamInterceptor",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_entities/g_maxclients and teamState.flagrecovery/fragcarrier.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateTeamRedShirt",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_entities/g_maxclients and ps.persistant[PERS_KILLED]/fd.suicides.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateTeamAward",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_gametype cvar; composes parked Calculate* fns.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateSection31Award",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_entities/g_maxclients; composes parked Calculate* fns.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "CalculateAwards",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs g_gametype; composes every other parked Calculate* fn.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "GetMaxDeathsForClient",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogFrags array.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "GetMaxKillsForClient",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogFrags array.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "GetFavoriteTargetForClient",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogFrags array.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "GetWorstEnemyForClient",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogFrags array.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "GetFavoriteWeaponForClient",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs G_WeaponLogKills array (weaponFromMOD alone would resolve as const).",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_ClearClientLog",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Zeroes every G_WeaponLog* array for one client; no world handle.",
+   "file": "g_log.c"
+  },
+  {
+   "fn": "G_SetSharedVehicleFunctions",
+   "topic": "vehicle-vtable",
+   "question": "The ported vehicleInfo_t vtable slots are Option<unsafe extern \"C\" fn>, but the ported vehicle member fns (ValidateBoard, Board, Animate, Update, ...) are plain-Rust `fn` items \u2014 assigning them needs a settled extern-\"C\" dispatch seam (fork-7). Also 3 assigned targets (Eject, DeathUpdate, RegisterAssets) live in g_vehicles.c but are excluded from this file's manifest, so their Rust homes are unresolved. How should the vtable be populated?",
+   "file": "g_vehicles.c"
+  },
+  {
+   "fn": "ValidateBoard",
+   "topic": "vec3-outparam-seam",
+   "question": "ValidateBoard/VEH_TryEject/G_FlyVehicleImpactDir rely on AngleVectors (out forward/right/up) and in-place VectorNormalize, but the resolved skeleton signatures take every vec3_t by value ([f32;3]) so the out-params cannot be written back and the signature can't be re-declared. What is the settled out-param convention for these math fns?",
+   "file": "g_vehicles.c"
+  },
+  {
+   "fn": "G_EjectDroidUnit",
+   "topic": "packet-contract",
+   "question": "G_EjectDroidUnit/EjectAll/G_SetVehDamageFlags call G_Damage(..., NULL, NULL, ...) but the resolved G_Damage takes its dir/point as vec3_t by value, which cannot express a C NULL argument (G_Damage branches on `if (dir)`). How should a NULL vec3_t argument be threaded through the resolved signature?",
+   "file": "g_vehicles.c"
+  },
+  {
+   "fn": "Vehicle_SetAnim",
+   "topic": "bg-anim-globals",
+   "question": "Vehicle_SetAnim (and Initialize) index the runtime-populated bgAllAnims[localAnimIndex].anims global table and call BG_SetAnim against it; the table has no handle in the raw-pointer skeleton signature. Where does bgAllAnims live and how is it reached?",
+   "file": "g_vehicles.c"
+  },
+  {
+   "fn": "G_VehicleTrace",
+   "topic": "seam-threading",
+   "question": "G_VehicleTrace (and the trap_Trace/trap_G2API_*/trap_LinkEntity/trap_ICARUS_* callers) invoke trap wrappers that require &Engine, but the skeleton signatures thread no engine handle. How is &Engine threaded to trap-calling leaf fns?",
+   "file": "g_vehicles.c"
+  },
+  {
+   "fn": "G_IsRidingVehicle",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "12 fns (G_IsRidingVehicle, G_VehicleSpawn, G_AttachToVehicle, Board, StartDeathDelay, Initialize, Update, UpdateRider, AttachRiders, G_VehicleDamageBoxSizing, G_FlyVehicleImpactDir, G_FlyVehicleDestroySurface) read level.time / g_entities / cvar globals (per ruling 1 these live on the world) but the raw-pointer skeleton signatures thread no world handle. Confirming the recurring park until signatures thread the world.",
+   "file": "g_vehicles.c"
+  },
+  {
+   "fn": "NPC_Blocked",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "level.time and random() (LCG) are unreachable from the bare gentity_t* skeleton; how should file-scope level/RNG state be threaded into raw-pointer-skeleton functions?",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NPC_SetMoveGoal",
+   "topic": "unported-consts",
+   "question": "WAYPOINT_NONE is not ported anywhere yet; which crate/module should own it?",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_HitNavGoal",
+   "topic": "unported-consts",
+   "question": "NAVGOAL_USE_RADIUS flag-bit constant is not ported anywhere yet.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_ClearPathToPoint",
+   "topic": "unported-consts",
+   "question": "Needs the NPCInfo current-NPC global, content masks (CONTENTS_MONSTERCLIP/BOTCLIP/BODY), ET_MOVER, EDGE_PATH, FRAMETIME, and g_entities[] \u2014 none reachable/ported.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_FindClosestWaypointForEnt/Point/Point2",
+   "topic": "unported-consts",
+   "question": "NF_CLEAR_PATH, WAYPOINT_NONE, MASK_NPCSOLID are not ported anywhere yet.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_ClearBlockedInfo / NAV_SetBlockedInfo",
+   "topic": "unported-consts",
+   "question": "NPCAI_BLOCKED and ENTITYNUM_WORLD are not ported anywhere yet.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_Steer / NAV_TestBypass / NAV_Bypass / NAV_MoveBlocker / waypoint_testDirection",
+   "topic": "vec3-outparam-seam",
+   "question": "AngleVectors/vectoyaw/vectoangles resolve to by-value vec3_t signatures that cannot write their out-params \u2014 same structural gap as g_combat.rs. Does the fnskel generator need &mut/*mut vec3_t out-params for these math helpers?",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_CheckAhead",
+   "topic": "unported-consts",
+   "question": "CONTENTS_BOTCLIP, ENTITYNUM_WORLD, MIN_DOOR_BLOCK_DIST_SQR not ported.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_TrueCollision",
+   "topic": "unported-consts",
+   "question": "FRAMETIME constant not ported anywhere yet.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_StackedCanyon",
+   "topic": "unported-consts",
+   "question": "CONTENTS_BOTCLIP not ported; also depends on PerpendicularVector's trig basis, not a trivial inline.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_ResolveEntityCollision",
+   "topic": "unported-consts",
+   "question": "MIN_DOOR_BLOCK_DIST_SQR not ported.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_TestForBlocked",
+   "topic": "unported-consts",
+   "question": "ET_ITEM entity-type variant not resolved for this comparison.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_AvoidCollision / NAV_TestBestNode / NAV_MoveToGoal",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Read the current-NPC global (NPC/NPCInfo), g_entities[], and debug cvars (NAVDEBUG_*) unreachable from the bare gentity_t* skeleton.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_GetNearestNode",
+   "topic": "unported-consts",
+   "question": "NF_CLEAR_PATH/WAYPOINT_NONE not ported.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_MicroError",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads the current-NPC global NPC->r.currentOrigin, distinct from any parameter.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "waypoint_getRadius / SP_waypoint*",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads file-scope navCalculatePaths global and several unported consts (DEFAULT_MINS_2/MAXS_2, MASK_DEADSOLID, CROUCH_MAXS_2, MAX_RADIUS_CHECK, YAW_ITERATIONS).",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "Svcmd_Nav_f",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Console command handler needs trap_Argc/Argv and no engine/world handle exists in a bare () signature \u2014 how should Svcmd_* handlers be threaded?",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_WaypointsTooFar / NAV_ClearStoredWaypoints / NAV_StoreWaypoint / NAV_GetStoredWaypoint",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "These read/write a file-scope stored-waypoint table (fork 5 cross-frame state) with no GameWorld field yet allocated for it.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "NAV_CalculatePaths / NAV_Shutdown / NAV_ShowDebugInfo / NAV_FindPlayerWaypoint",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Whole-map nav rebuild/shutdown/debug-dump functions reach level/g_entities[]/engine file traps with no world handle in their skeleton signatures.",
+   "file": "g_nav.c"
+  },
+  {
+   "fn": "BG_ClearVehicleParseParms",
+   "topic": "ambient-global",
+   "question": "How should file-static scratch buffers (VehWeaponParms/VehicleParms) be threaded into context-free faithful fn signatures \u2014 GameWorld field with no param to reach it here?",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "BG_ParseVehWeaponParm",
+   "topic": "ambient-global",
+   "question": "The vehWeaponFields (26-entry) offset-descriptor table encodes VWFOFS byte offsets into vehWeaponInfo_t plus VehicleTable/animTable string-to-enum tables \u2014 should these become file-local consts (fork-5) even though no packet resolves/ports them, and how do offset macros map onto the Rust struct's offset_of! layout?",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "VEH_LoadVehWeapon",
+   "topic": "ambient-global",
+   "question": "Needs VehWeaponParms/g_vehWeaponInfo/numVehicleWeapons \u2014 where do these live as GameWorld fields and how is this fn's signature meant to reach them?",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "VEH_VehWeaponIndexForName",
+   "topic": "ambient-global",
+   "question": "Same g_vehWeaponInfo/numVehicleWeapons threading question.",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "BG_ParseVehicleParm",
+   "topic": "ambient-global",
+   "question": "vehicleFields (~150 entries) offset table + VehicleTable/animTable \u2014 same as BG_ParseVehWeaponParm but at much larger scale; worth a dedicated field-table generation pass rather than hand transcription?",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "VEH_LoadVehicle",
+   "topic": "ambient-global",
+   "question": "Needs VehicleParms/g_vehicleInfo/numVehicles threading.",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "VEH_VehicleIndexForName",
+   "topic": "ambient-global",
+   "question": "Same g_vehicleInfo/numVehicles threading question.",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "BG_VehWeaponLoadParms",
+   "topic": "seam-threading",
+   "question": "Needs trap_FS_* (&Engine) plus VehWeaponParms global; no engine param on this faithful signature \u2014 how should file-loading fns like this reach the engine?",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "BG_VehicleLoadParms",
+   "topic": "seam-threading",
+   "question": "Same trap_FS_*/&Engine threading question, plus VehicleParms/g_vehicleInfo/numVehicles.",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "BG_GetVehicleModelName",
+   "topic": "ambient-global",
+   "question": "Needs g_vehicleInfo array read; how does this signature reach it?",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "BG_GetVehicleSkinName",
+   "topic": "ambient-global",
+   "question": "Same g_vehicleInfo threading question.",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "AttachRidersGeneric",
+   "topic": "seam-threading",
+   "question": "Needs trap_G2API_AddBolt/trap_G2API_GetBoltMatrix (&Engine); no engine param on this faithful signature.",
+   "file": "bg_vehicleLoad.c"
+  },
+  {
+   "fn": "BG_SiegeTranslateForcePowers",
+   "topic": "bg-dep",
+   "question": "FPTable (file-scope const force-power name/id table) and NUM_FORCE_POWERS/FORCE_LEVEL_* consts are not resolved out-of-file symbols in this packet nor in the prelude \u2014 where should this const table live and how is it named/shaped?",
+   "file": "bg_saga.c"
+  },
+  {
+   "fn": "BG_SiegeParseClassFile,BG_SiegeCountBaseClass,BG_GetUIPortraitFile,BG_GetUIPortrait,BG_GetClassOnBaseClass,BG_SiegeLoadClasses,BG_SiegeFindClassByName,BG_SiegeParseTeamFile,BG_SiegeLoadTeams,BG_SiegeFindThemeForTeam,BG_PrecacheSabersForSiegeTeam,BG_SiegeCheckClassLegality,BG_SiegeFindTeamForTheme,BG_SiegeSetTeamTheme,BG_SiegeFindClassIndexByName",
+   "topic": "state-threading",
+   "question": "These 15 functions read/write the siege module-scope globals (bgSiegeClasses/bgNumSiegeClasses/bgSiegeTeams/bgNumSiegeTeams/team1Theme/team2Theme, GameWorld fields per fork-ruling 1) and/or the engine FS_* trap seam, but the faithful fnskel signatures (verbatim cross-file contract) carry no GameContext/world/engine channel \u2014 same systemic gap already parked in g_active.c. How should GameWorld/engine reach these bg_ signatures without inventing a param that breaks the cross-file call contract?",
+   "file": "bg_saga.c"
+  },
+  {
+   "fn": "*",
+   "topic": "missing-skeleton",
+   "question": "No skeleton module for g_syscalls exists under crates/mp/game/src in worktree agent-a43cc53200d2fdf54, and the specified packet path (tools/closure-prototype/out/packets/g_syscalls.c.md) does not exist \u2014 only g_syscalls.md (no .c) is present. The skeleton-staging step for this file appears not to have run. Cannot port without a pre-generated skeleton per task protocol. Please regenerate the skeleton for g_syscalls.c and confirm the correct packet filename before re-dispatching.",
+   "file": "g_syscalls.c"
+  },
+  {
+   "fn": "BG_FileExists",
+   "topic": "no-engine-handle",
+   "question": "trap_FS_FOpenFile/trap_FS_FCloseFile need &Engine; the staged bg-shared signature carries none \u2014 how should bg-shared free functions reach the engine handle?",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_ModelCache",
+   "topic": "no-engine-handle",
+   "question": "same as BG_FileExists: trap_G2API_InitGhoul2Model/CleanGhoul2Models/R_RegisterSkin need &Engine not present in this signature.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_Alloc",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "bg_pool/bg_poolSize/bg_poolTail are cross-call statics (fork-5: should become a GameWorld field) but this fn's staged signature has no GameWorld/engine param to hold them.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_AllocUnaligned",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "same bg_pool state threading gap as BG_Alloc.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_TempAlloc",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "same bg_pool state threading gap as BG_Alloc.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_TempFree",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "same bg_pool state threading gap as BG_Alloc.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_StringAlloc",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "depends on BG_Alloc, which is parked for the same reason.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_OutOfMemory",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads the bg_poolSize static; same gap as BG_Alloc.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_PlayerTouchesItem",
+   "topic": "vec3-outparam-seam",
+   "question": "depends on BG_EvaluateTrajectory's result, whose vec3_t out-param is by-value in the staged signature (can't report back to caller).",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_EvaluateTrajectory",
+   "topic": "vec3-outparam-seam",
+   "question": "`result: vec3_t` is by-value (Copy [f32;3]) in the staged signature, but Raven's result is a float* out-param the caller reads afterward \u2014 same class of blocker as g_combat.rs's G_GetHitLocation/ExplodeDeath. Needs the fnskel vec3-out-param convention (pointer vs return value) settled.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_EvaluateTrajectoryDelta",
+   "topic": "vec3-outparam-seam",
+   "question": "same vec3_t by-value out-param blocker as BG_EvaluateTrajectory.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "BG_TouchJumpPad",
+   "topic": "vec3-outparam-seam",
+   "question": "calls vectoangles(origin2, angles) whose angles out-param is by-value vec3_t in the staged signature, so the computed angles never reach this function's logic.",
+   "file": "bg_misc.c"
+  },
+  {
+   "fn": "GM_CreateExplosion",
+   "topic": "ambient-state",
+   "question": "Reads level.time and calls trap_G2API_GetBoltMatrix (needs &Engine); no GameContext/&Engine channel in this faithful zero-extra-param signature.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "GM_Dying",
+   "topic": "ambient-state",
+   "question": "Reads level.time and calls trap_G2API_AddBolt/trap_G2API_GetSurfaceRenderStatus (needs &Engine); no channel resolved.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "NPC_GM_Pain",
+   "topic": "ambient-state",
+   "question": "Reads file-scope gPainMOD/gPainPoint globals (ai_main) and level.time; also stored as an EntPain fn-pointer target needing an enum variant \u2014 no channel/enum resolved in packet.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "GM_HoldPosition",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC/NPCInfo globals and calls trap_ICARUS_TaskIDPending (needs &Engine); zero-param faithful signature has no channel.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "GM_Move",
+   "topic": "ambient-state",
+   "question": "Same as GM_HoldPosition \u2014 ambient NPC/NPCInfo + trap_ICARUS_TaskIDPending, no channel.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "NPC_BSGM_Patrol",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC/NPCInfo/ucmd globals; no channel in zero-param faithful signature.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "GM_CheckMoveState",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC/NPCInfo plus this file's own file-static scratch (enemyDist4/enemyLOS4/move4, fork ruling 5) and calls trap_ICARUS_TaskIDPending; no channel.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "GM_CheckFireState",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC/NPCInfo plus file-static scratch (enemyCS4/hitAlly4/impactPos4/faceEnemy4/shoot4) and calls trap_Trace; no channel.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "NPC_GM_StartLaser",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC global; zero-param faithful signature has no channel.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "GM_StartGloat",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC global; zero-param faithful signature has no channel.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "NPC_BSGM_Attack",
+   "topic": "ambient-state",
+   "question": "Largest function: reads/writes ambient NPC/NPCInfo/ucmd/g_entities plus all seven file-static scratch vars and calls trap_InPVS/trap_Trace; no channel.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "NPC_BSGM_Default",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC/NPCInfo and calls trap_Trace; no channel.",
+   "file": "NPC_AI_GalakMech.c"
+  },
+  {
+   "fn": "G2Tur_SetBoneAngles",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time and calls trap_G2API_SetBoneAngles directly \u2014 how should globals/traps be reached from a raw-pointer skeleton with no threaded world/engine param?",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_set_models",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Calls trap_G2API_RemoveGhoul2Model/InitGhoul2Model/AddBolt directly with no engine handle available.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "TurretG2Pain",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time (self->genericValue8 < level.time) with no world handle available.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_die",
+   "topic": "unported-consts",
+   "question": "Reads self->s.eFlags & EF_SHADER_ANIM \u2014 not ported anywhere in the crate graph yet; where should this bg_public.h entity-flag const land?",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "TurboLaser_SetBoneAnim",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time and calls trap_G2API_SetBoneAnim directly; also references unported EF_G2ANIMATING/BONE_ANIM_OVERRIDE_FREEZE/BONE_ANIM_BLEND consts.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_fire",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time, calls trap_PointContents directly, and assigns bolt->think = G_FreeEntity to a field typed Option<unsafe extern \"C\" fn(...)> from a plain pub fn \u2014 what bridges the ABI gap?",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_respawn",
+   "topic": "entfield-fnptr-abi-mismatch",
+   "question": "Assigns self->use/pain/die to named plain pub fn values, but gentity_t's fields are Option<unsafe extern \"C\" fn(...)> and ent_fn_enums.rs's EntUse/EntPain/EntDie enums are a different type than the actual field \u2014 which mechanism bridges the two?",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_head_think",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time and calls trap_G2API_GetBoltMatrix directly.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_aim",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time and calls trap_G2API_GetBoltMatrix directly.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_turnoff",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads/writes level.time (self->aimDebounceTime = level.time + 5000).",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_find_enemies",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time repeatedly and calls trap_InPVS/trap_Trace directly.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_base_think",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads/writes level.time (FRAMETIME also unported) and calls trap_InPVS/trap_Trace via turretG2_find_enemies.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "turretG2_base_use",
+   "topic": "unported-consts",
+   "question": "Reads self->s.eFlags & EF_SHADER_ANIM \u2014 not ported anywhere yet.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "SP_misc_turretG2",
+   "topic": "unported-consts",
+   "question": "Writes base->s.eFlags |= EF_SHADER_ANIM / EF_RADAROBJECT \u2014 neither ported anywhere yet.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "finish_spawning_turretG2",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads/writes level.time and g_gametype and calls trap_LinkEntity directly; also references unported FRAMETIME/MAT_METAL/CONTENTS_*/EF2_BRACKET_ENTITY consts and assigns named functions to fn-pointer fields.",
+   "file": "g_turret_G2.c"
+  },
+  {
+   "fn": "CalcEntitySpot",
+   "topic": "vec3-outparam-seam",
+   "question": "point is a byval vec3_t out-param (Copy, no write-back) \u2014 same unresolved fork as g_utils.rs's vec3-outparam-seam sites; what's the seam shape (return value? *mut vec3_t?)",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "G_GetBoltPosition",
+   "topic": "vec3-outparam-seam",
+   "question": "pos is a byval vec3_t out-param, same fork as CalcEntitySpot",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_UpdateAngles",
+   "topic": "ai-context",
+   "question": "reads/writes ambient NPC/NPCInfo/client/ucmd/level bot-AI actor globals with no GameWorld/GameContext channel and no entity param to substitute \u2014 how is the per-think 'current NPC' context threaded into NPC_utils.c helpers?",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_AimWiggle",
+   "topic": "ai-context",
+   "question": "same ai-context threading gap (ambient NPCInfo/NPC/level)",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_UpdateFiringAngles",
+   "topic": "ai-context",
+   "question": "same ai-context threading gap (ambient NPC/NPCInfo/client/ucmd/level)",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_UpdateShootAngles",
+   "topic": "ai-context",
+   "question": "same ai-context threading gap (ambient NPCInfo)",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "G_ActivateBehavior",
+   "topic": "va-varargs",
+   "question": "calls va(\"%s/%s\", Q3_SCRIPT_DIR, bs_name) with real variadic args; resolved va() drops the C varargs \u2014 what Rust shape represents a variadic call site with actual arguments (vs. the zero-arg Com_Printf/G_DebugPrint calls elsewhere that ARE portable)?",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_ClearLOS",
+   "topic": "ai-context",
+   "question": "calls G_ClearLOS(NPC, start, end) \u2014 ambient NPC, no entity param on this signature",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_ClearLOS5",
+   "topic": "ai-context",
+   "question": "same (ambient NPC)",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_ClearLOS4",
+   "topic": "ai-context",
+   "question": "same (ambient NPC)",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_ClearLOS3",
+   "topic": "ai-context",
+   "question": "same (ambient NPC)",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_ClearLOS2",
+   "topic": "ai-context",
+   "question": "same (ambient NPC)",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_ValidEnemy",
+   "topic": "ai-context",
+   "question": "reads ambient NPC (NPC->client->playerTeam/enemyTeam etc.) and g_gametype cvar throughout, no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_TargetVisible",
+   "topic": "ai-context",
+   "question": "reads ambient NPC/NPCInfo (visrange/hfov/vfov, NPC->r.currentOrigin), no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_FindNearestEnemy",
+   "topic": "ai-context",
+   "question": "reads ambient NPCInfo->stats.visrange plus needs Engine for trap_EntitiesInBox, no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_PickEnemyExt",
+   "topic": "ai-context",
+   "question": "reads ambient NPC/level (g_entities, level.alertEvents), no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_FindEnemy",
+   "topic": "ai-context",
+   "question": "reads ambient NPC/NPCInfo/level, no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_FacePosition",
+   "topic": "ai-context",
+   "question": "reads/writes ambient NPC/client/level/ucmd/NPCInfo throughout, no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_FaceEnemy",
+   "topic": "ai-context",
+   "question": "reads ambient NPC (NPC->enemy), no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_CheckCanAttackExt",
+   "topic": "ai-context",
+   "question": "reads ambient NPCInfo/NPC, no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_CheckCharmed",
+   "topic": "ai-context",
+   "question": "reads/writes ambient NPC/NPCInfo/level, zero-param signature, no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_EntRangeFromBolt",
+   "topic": "ai-context",
+   "question": "calls G_GetBoltPosition(NPC, ...) \u2014 ambient NPC, no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_EnemyRangeFromBolt",
+   "topic": "ai-context",
+   "question": "reads ambient NPC (NPC->enemy), no channel",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "NPC_GetEntsNearBolt",
+   "topic": "ai-context",
+   "question": "calls G_GetBoltPosition(NPC, ...) \u2014 ambient NPC, no channel, plus needs Engine for trap_EntitiesInBox",
+   "file": "NPC_utils.c"
+  },
+  {
+   "fn": "PM_VehicleImpact",
+   "topic": "pmove-working-state",
+   "question": "How is the file-static pmove_t *pm/pml/pm_entSelf working set threaded into no-arg C-signature fns without a static mut? (also secondarily bg-dep: QAGAME vehicle damage path calls unported G_Damage/G_DamageFromKiller/G_FlyVehicleSurfaceDestruction/FighterIsLanded/G_CanBeEnemy)",
+   "file": "bg_slidemove.c"
+  },
+  {
+   "fn": "PM_GroundSlideOkay",
+   "topic": "pmove-working-state",
+   "question": "Same pm/pml threading question as bg_pmove.rs \u2014 how should PM_GroundSlideOkay reach pm->ps without a static?",
+   "file": "bg_slidemove.c"
+  },
+  {
+   "fn": "PM_ClientImpact",
+   "topic": "pmove-working-state",
+   "question": "Same pm/pml/pm_entSelf/g_entities/level threading question as bg_pmove.rs.",
+   "file": "bg_slidemove.c"
+  },
+  {
+   "fn": "PM_SlideMove",
+   "topic": "pmove-working-state",
+   "question": "Same pm/pml threading question as bg_pmove.rs \u2014 PM_SlideMove reads and writes both extensively.",
+   "file": "bg_slidemove.c"
+  },
+  {
+   "fn": "PM_StepSlideMove",
+   "topic": "pmove-working-state",
+   "question": "Same pm/pm_entSelf/c_pmove threading question as bg_pmove.rs.",
+   "file": "bg_slidemove.c"
+  },
+  {
+   "fn": "G_ParseInfos",
+   "topic": "variadic-c-abi",
+   "question": "va(\"%d\", MAX_ARENAS) call needs real C varargs; staged va() signature is fixed single-arg \u2014 same variadic-seam gap already parked elsewhere (Com_Printf/COM_ParseError).",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "trap_Cvar_VariableValue",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs trap_Cvar_VariableStringBuffer via &Engine; staged signature carries no engine handle.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_LoadArenasFromFile",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Touches g_arenaInfos/g_numArenas globals + FS traps; no GameWorld/engine handle in staged signature.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_DoesMapSupportGametype",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_arenaInfos/g_numArenas globals; no handle to reach them.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_RefreshNextMap",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_arenaInfos/g_autoMapCycle/g_numArenas + Cvar traps; no handle.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_LoadArenas",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Writes g_numArenas, reads g_gametype, calls trap_FS_GetFileList; no-arg signature has no handle.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_GetArenaInfoByMap",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_arenaInfos/g_numArenas globals.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_AddRandomBot",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads many globals + traps + shared LCG (ruling 3, not yet threaded).",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_RemoveRandomBot",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_entities/g_gametype/g_maxclients/level + trap_SendConsoleCommand.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_CountHumanPlayers",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_entities/g_maxclients/level globals.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_CountBotPlayers",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads botSpawnQueue/g_entities/g_gametype/g_maxclients/level globals.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_CheckMinimumPlayers",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs cvar/globals/trap + fn-scope-static-turned-GameWorld-field (ruling 5).",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_CheckBotSpawn",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads/writes botSpawnQueue + level.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "AddBotToSpawnQueue",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads/writes botSpawnQueue + level.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_RemoveQueuedBotBegin",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Writes botSpawnQueue global.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_BotConnect",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Needs trap_DropClient/trap_GetUserinfo via &Engine.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_AddBot",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_entities/g_gametype + 4 traps.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "Svcmd_AddBot_f",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level + 4 traps.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "Svcmd_BotList_f",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_botInfos/g_numBots + trap_Printf.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_LoadBotsFromFile",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Writes g_botInfos/g_numBots + 4 FS traps.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_LoadBots",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Writes g_numBots + 3 traps, no-arg signature.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_GetBotInfoByNumber",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_botInfos/g_numBots + trap_Printf.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_GetBotInfoByName",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_botInfos/g_numBots globals.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "G_InitBots",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads bot_minplayers + trap_Cvar_Register, no-arg signature.",
+   "file": "g_bot.c"
+  },
+  {
+   "fn": "Team_InitGame",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads g_gametype, writes teamgame \u2014 no world/cvar handle in staged signature",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "AddTeamScore",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads/writes level.teamScores \u2014 no world handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "OnSameTeam",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads g_gametype \u2014 no cvar handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_SetFlagStatus",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads/writes teamgame, reads g_gametype, calls trap_SetConfigstring \u2014 no world/engine handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_ForceGesture",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "iterates g_entities \u2014 no world handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_FragBonuses",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads g_entities/g_maxclients/level, calls trap_InPVS \u2014 no world/engine handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_CheckHurtCarrier",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads level.time \u2014 no world handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_ResetFlags",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads g_gametype \u2014 no cvar handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_TakeFlagSound",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads/writes teamgame and level.time \u2014 no world handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_TouchOurFlag",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads g_entities/g_maxclients/level, writes teamgame \u2014 no world handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_TouchEnemyFlag",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads level.time \u2014 no world handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_GetLocation",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "walks level.locationHead, calls trap_InPVS \u2014 no world/engine handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "Team_GetLocationMsg",
+   "topic": "unresolved-varargs",
+   "question": "Com_sprintf resolved signature is varargs-only, can't express the format call",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "SelectRandomTeamSpawnPoint",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads bgSiegeClasses and g_gametype \u2014 no world/cvar handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "SelectCTFSpawnPoint",
+   "topic": "vec3-outparam-seam",
+   "question": "origin/angles are by-value vec3_t in staged signature \u2014 can't express VectorCopy out-param mutation",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "SelectSiegeSpawnPoint",
+   "topic": "vec3-outparam-seam",
+   "question": "origin/angles are by-value vec3_t in staged signature \u2014 can't express VectorCopy out-param mutation",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "TeamplayInfoMessage",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads g_entities/g_maxclients/level.sortedClients, calls trap_SendServerCommand \u2014 no world/engine handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "CheckTeamStatus",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads/writes level, reads g_entities/g_maxclients \u2014 no world handle",
+   "file": "g_team.c"
+  },
+  {
+   "fn": "G_ReflectMissile",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads g_entities/level and zeroes think/nextthink (fn-ptr write) \u2014 needs a threaded GameWorld/engine handle and EntThink enum support the staged raw-pointer signature doesn't carry.",
+   "file": "g_missile.c"
+  },
+  {
+   "fn": "G_DeflectMissile",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time and zeroes think/nextthink (fn-ptr write) \u2014 same missing world/engine handle.",
+   "file": "g_missile.c"
+  },
+  {
+   "fn": "G_BounceMissile",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time/level.previousTime \u2014 no world handle on this signature.",
+   "file": "g_missile.c"
+  },
+  {
+   "fn": "G_ExplodeMissile",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time, indexes g_entities, calls trap_LinkEntity \u2014 no world/engine handle.",
+   "file": "g_missile.c"
+  },
+  {
+   "fn": "G_RunStuckMissile",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Indexes g_entities and reads the shared vec3_origin global \u2014 no world handle.",
+   "file": "g_missile.c"
+  },
+  {
+   "fn": "G_BounceProjectile",
+   "topic": "vec3-outparam-seam",
+   "question": "endout is a C out-param but vec3_t (Copy array) is passed by value in the staged skeleton with no &mut/return channel \u2014 same seam as locateCamera in g_misc.rs. Should the skeleton signature be regenerated to take &mut vec3_t / return vec3_t?",
+   "file": "g_missile.c"
+  },
+  {
+   "fn": "CreateMissile",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Calls G_Spawn (arena alloc), reads level.time, and writes think = G_FreeEntity (needs EntThink::G_FreeEntity) \u2014 no world/engine handle on this signature.",
+   "file": "g_missile.c"
+  },
+  {
+   "fn": "G_MissileImpact",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time, indexes g_entities heavily, calls trap_LinkEntity \u2014 no world/engine handle.",
+   "file": "g_missile.c"
+  },
+  {
+   "fn": "G_RunMissile",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads cvars d_projectileGhoul2Collision/g_g2TraceLod, indexes g_entities, reads level.time, calls trap_G2Trace/trap_Trace/trap_LinkEntity \u2014 no world/engine/cvar handle on this signature.",
+   "file": "g_missile.c"
+  },
+  {
+   "fn": "NPC_CheckAttacker",
+   "topic": "ai-context",
+   "question": "How should functions that read the ambient per-frame \"current NPC\" global (NPC/NPCInfo, set by ai_main.c's think loop) reach that state under the raw-pointer faithful skeleton? No GameContext/entity param carries it (matches existing NPC_combat.rs/NPC_utils.rs ai-context parks).",
+   "file": "NPC_reactions.c"
+  },
+  {
+   "fn": "NPC_ChoosePainAnimation",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "How should code reach the runtime-populated bgAllAnims/bgHumanoidAnimations animation tables (no GameWorld/GameContext channel exists for them yet), and where does the unported rank_t enum (RANK_CAPTAIN) land?",
+   "file": "NPC_reactions.c"
+  },
+  {
+   "fn": "NPC_Pain",
+   "topic": "ai-context",
+   "question": "Same ambient NPC/NPCInfo issue as NPC_CheckAttacker, plus file-scope gPainMOD/gPainHitLoc/gPainPoint/killPlayerTimer globals with no GameWorld field yet, and it's stored as a fn pointer needing an EntPain enum variant.",
+   "file": "NPC_reactions.c"
+  },
+  {
+   "fn": "NPC_Touch",
+   "topic": "ai-context",
+   "question": "Same ambient NPC/NPCInfo issue; also stored as a fn pointer needing an EntTouch enum variant.",
+   "file": "NPC_reactions.c"
+  },
+  {
+   "fn": "NPC_Respond",
+   "topic": "va-varargs",
+   "question": "The droid-class branches call G_SoundIndex(va(fmt, Q_irand(...))) with a real variadic argument; the resolved va() signature drops C varargs entirely (same open fork as g_client.rs/w_force.rs/NPC_utils.rs) \u2014 how should variadic va() calls be transcribed?",
+   "file": "NPC_reactions.c"
+  },
+  {
+   "fn": "NPC_Use",
+   "topic": "ai-context",
+   "question": "Reads the ambient NPC global directly (Jedi_WaitingAmbush(NPC)/Jedi_Ambush(NPC)); also touches the deferred vehicleInfo_t C++ vtable (EjectAll/Eject/Board) and is stored as a fn pointer needing an EntUse enum variant.",
+   "file": "NPC_reactions.c"
+  },
+  {
+   "fn": "all 15 functions in file",
+   "topic": "ambient-ai-state",
+   "question": "What is the settled Rust shape for the ai_main.c 'current NPC' ambient context (NPC/NPCInfo/client/ucmd/enemyVisibility) that every NPC_AI_*.c behavior-state function reads/writes? The fnskel signatures for this whole file family take zero arguments (faithful to Raven's global-based design), but no GameWorld field, EntityId thread, or prelude accessor establishes how a bState think-fn reaches the entity currently being thought for. This is cross-file (affects every NPC_AI_*.c sibling file, all similarly zero-arg), so it's outside single-file packet scope and needs a session ruling before any of these bodies can be filled without inventing architecture.",
+   "file": "NPC_AI_Default.c"
+  },
+  {
+   "fn": "COM_BeginParseSession",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "com_parsename/com_lines parse-session globals need GameWorld state but the staged raw-pointer signature has no world/engine handle param.",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "COM_GetCurrentParseLine",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "reads com_lines global; zero-param skeleton has no handle to reach it.",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "COM_ParseError",
+   "topic": "variadic-c-abi",
+   "question": "C varargs printf-style entry (also touches com_lines/com_parsename) \u2014 same undecided seam as g_main.rs's G_Printf/Com_Error.",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "COM_ParseWarning",
+   "topic": "variadic-c-abi",
+   "question": "same as COM_ParseError.",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "SkipWhitespace",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "writes com_lines global; no world handle in signature.",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "COM_ParseExt",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "writes com_token (rotating scratch return buffer) and com_lines; fixed *mut c_char return + no world handle can't host either without a forbidden static.",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "SkipRestOfLine",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "writes com_lines global; no world handle in signature.",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "Com_sprintf",
+   "topic": "variadic-c-abi",
+   "question": "generic printf-style variadic entry point \u2014 undecided Rust shape (same class as g_main.rs Com_Error/Com_Printf).",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "va",
+   "topic": "variadic-c-abi",
+   "question": "variadic + rotating-scratch string[2][32000]/index statics; fixed return type + no world handle.",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "Info_ValueForKey",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "value[2][BIG_INFO_VALUE]/valueindex rotating-scratch statics (va-idiom, ruling 5) can't be owned given fixed *mut c_char return and no world handle.",
+   "file": "q_shared.c"
+  },
+  {
+   "fn": "AI_ClosestGroupEntityNumToPoint",
+   "topic": "unported-consts",
+   "question": "Needs WAYPOINT_NONE, Q3_INFINITE, ENTITYNUM_NONE \u2014 none ported anywhere in the crate graph yet (same gap g_nav.rs already parks on); port once those sentinels land.",
+   "file": "NPC_AI_Utils.c"
+  },
+  {
+   "fn": "AI_SetClosestBuddy",
+   "topic": "unported-consts",
+   "question": "Needs ENTITYNUM_NONE and Q3_INFINITE \u2014 not yet ported.",
+   "file": "NPC_AI_Utils.c"
+  },
+  {
+   "fn": "AI_SortGroupByPathCostToEnemy",
+   "topic": "unported-consts",
+   "question": "Needs WAYPOINT_NONE and Q3_INFINITE \u2014 not yet ported.",
+   "file": "NPC_AI_Utils.c"
+  },
+  {
+   "fn": "AI_ValidateNoEnemyGroupMember",
+   "topic": "unported-consts",
+   "question": "Needs ENTITYNUM_WORLD \u2014 not yet ported.",
+   "file": "NPC_AI_Utils.c"
+  },
+  {
+   "fn": "Update",
+   "topic": "ambient-global",
+   "question": "g_vehicleInfo[VEHICLE_BASE] base-vtable dispatch table isn't placed on GameWorld yet (same unresolved global already parked in bg_vehicleLoad.rs) \u2014 where should it live?",
+   "file": "SpeederNPC.c"
+  },
+  {
+   "fn": "ProcessMoveCommands",
+   "topic": "ambient-global+bg-dep",
+   "question": "Needs level.time threaded (no GameContext on the faithful skeleton signature) plus unported BUTTON_ALT_ATTACK/EF_JETPACK_ACTIVE/WP_MELEE/WP_SABER constants \u2014 add ctx param and port the consts?",
+   "file": "SpeederNPC.c"
+  },
+  {
+   "fn": "ProcessOrientCommands",
+   "topic": "ambient-global",
+   "question": "The _JK2MP branch reads the file-static `pm` (current pmove_t*) for pm->cmd.serverTime; not on the faithful signature \u2014 how should shared BG code reach the active pmove context?",
+   "file": "SpeederNPC.c"
+  },
+  {
+   "fn": "AnimateRiders",
+   "topic": "bg-dep",
+   "question": "Boarding-anim branch needs animNumber_t enum (BOTH_VS_MOUNT_*/MOUNTTHROW_*), VEH_MOUNT_THROW_LEFT/RIGHT consts, and the bgAllAnims table \u2014 none ported yet in mp_bg/mp_qshared.",
+   "file": "SpeederNPC.c"
+  },
+  {
+   "fn": "G_CreateSpeederNPC",
+   "topic": "ambient-global",
+   "question": "Needs g_vehicleInfo[BG_VehicleGetIndex(strType)] (same unresolved global) and Vehicle_t::m_pVehicleInfo is still a *mut c_void placeholder pending vehicleInfo_t pointer-field port.",
+   "file": "SpeederNPC.c"
+  },
+  {
+   "fn": "B_InitAlloc",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "memset(gWPArray,...) needs the gWPArray global \u2014 no GameWorld/engine handle on the staged raw-pointer signature to reach it.",
+   "file": "ai_util.c"
+  },
+  {
+   "fn": "BotDoChat",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads gBotChatBuffer/level.time and calls trap::Cvar_VariableIntegerValue (needs &Engine) \u2014 no handle on the staged signature.",
+   "file": "ai_util.c"
+  },
+  {
+   "fn": "ReadChatGroups",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Writes gBotChatBuffer and calls G_Printf \u2014 no handle on the staged signature.",
+   "file": "ai_util.c"
+  },
+  {
+   "fn": "BotUtilizePersonality",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Writes gBotChatBuffer and calls trap::FS_FOpenFile/FS_Read/FS_FCloseFile plus G_Printf \u2014 no handle on the staged signature.",
+   "file": "ai_util.c"
+  },
+  {
+   "fn": "Rancor_SetBolts",
+   "topic": "ambient-state",
+   "question": "Calls trap_G2API_AddBolt directly; faithful context-free signature carries no &Engine to reach the trap seam \u2014 how should trap access be threaded into context-free AI logic fns (same open question as NPC_AI_GalakMech/Jedi/Stormtrooper)?",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_Idle",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPCInfo/ucmd globals with no GameWorld/GameContext channel in this faithful signature \u2014 same open threading question as the other AI files.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_Patrol",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC/NPCInfo/ucmd globals; same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_Move",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC/NPCInfo globals; same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_DropVictim",
+   "topic": "ambient-state",
+   "question": "Reads ambient level.time global; same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_Swing",
+   "topic": "ambient-state",
+   "question": "Operates entirely on the file-scope NPC ambient pointer (not a parameter); same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_Smash",
+   "topic": "ambient-state",
+   "question": "Reads ambient NPC global; same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_Bite",
+   "topic": "ambient-state",
+   "question": "Reads ambient NPC global; same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_Attack",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC global; same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_Combat",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC/NPCInfo globals; same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_CheckDropVictim",
+   "topic": "ambient-state",
+   "question": "Reads ambient NPC global and calls trap_Trace (needs &Engine); same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "Rancor_Crush",
+   "topic": "ambient-state",
+   "question": "Reads ambient NPC/g_entities globals; same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "NPC_BSRancor_Default",
+   "topic": "ambient-state",
+   "question": "Reads/writes ambient NPC/NPCInfo/level globals; same threading question.",
+   "file": "NPC_AI_Rancor.c"
+  },
+  {
+   "fn": "TurretPain",
+   "topic": "world-threading",
+   "question": "Fn signature is (self_, attacker, damage) only \u2014 no path to level.time or the ruled faithful-LCG Rng (random()). How should GameWorld/Rng be threaded into g_turret.c's fn-pointer-shaped functions given their fixed C-mirroring signatures?",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "auto_turret_die",
+   "topic": "world-threading",
+   "question": "Needs to write g_entities[self->r.ownerNum].think/use \u2014 no entity-arena/&mut GameWorld param reachable from this signature.",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "turret_fire",
+   "topic": "world-threading",
+   "question": "Needs level.time, trap_PointContents (&Engine), and G_Spawn's arena \u2014 none reachable from (ent, start, dir).",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "turret_head_think",
+   "topic": "world-threading",
+   "question": "Needs g_entities[self->r.ownerNum] and level.time \u2014 none reachable from (self_,).",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "turret_aim",
+   "topic": "world-threading",
+   "question": "Needs g_entities[], level.time, and Rng (flrand) \u2014 none reachable from (self_,).",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "turret_turnoff",
+   "topic": "world-threading",
+   "question": "Needs g_entities[] and level.time \u2014 none reachable from (self_,).",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "turret_sleep",
+   "topic": "world-threading",
+   "question": "Needs level.time \u2014 not reachable from (self_,).",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "turret_find_enemies",
+   "topic": "world-threading",
+   "question": "Needs g_entities[], level.time, trap_InPVS/trap_Trace (&Engine), and G_RadiusList's arena scan \u2014 none reachable from (self_,).",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "turret_base_think",
+   "topic": "world-threading",
+   "question": "Needs level.time, trap_InPVS/trap_Trace (&Engine), and Rng \u2014 none reachable from (self_,).",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "SP_misc_turret",
+   "topic": "world-threading",
+   "question": "Needs level.time and trap_LinkEntity (&Engine) \u2014 none reachable from (base,).",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "turret_base_spawn_top",
+   "topic": "world-threading",
+   "question": "Needs G_Spawn's arena, trap_LinkEntity (&Engine), and Rng \u2014 none reachable from (base,).",
+   "file": "g_turret.c"
+  },
+  {
+   "fn": "G_ClearLineOfSight",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "trap_Trace needs &Engine and g_entities needs GameWorld \u2014 how is either threaded into this faithful raw-pointer signature?",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "CanSee",
+   "topic": "ai-context",
+   "question": "body reads ambient NPC global and calls trap_Trace x3 \u2014 no threading mechanism resolved for either.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "InFront",
+   "topic": "vec3-outparam-seam",
+   "question": "VectorNormalize/AngleVectors take vec3_t out-params by value (q_math.rs skeleton) so cannot write dir/forward back \u2014 how should local out-param mutation be modeled?",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "InFOV3",
+   "topic": "vec3-outparam-seam",
+   "question": "vectoangles can't write its vec3_t out-param back into this function's local \u2014 same open fork as InFront.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "InFOV2",
+   "topic": "vec3-outparam-seam",
+   "question": "CalcEntitySpot can't write its vec3_t out-param back \u2014 same open fork.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "InFOV",
+   "topic": "vec3-outparam-seam / seam-threading",
+   "question": "reads ambient vec3_origin (needs GameWorld threading) and depends on CalcEntitySpot/vectoangles out-param writeback.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "InVisrange",
+   "topic": "ai-context",
+   "question": "reads ambient NPC/NPCInfo globals directly \u2014 no threading mechanism resolved.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "NPC_CheckVisibility",
+   "topic": "ai-context",
+   "question": "reads ambient NPC/NPCInfo and calls trap_InPVS \u2014 no threading mechanism resolved.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_CheckSoundEvents",
+   "topic": "seam-threading",
+   "question": "iterates level.alertEvents[] directly \u2014 how does level reach this signature?",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_CheckSightEvents",
+   "topic": "seam-threading",
+   "question": "same level.alertEvents[] access as G_CheckSoundEvents.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_CheckAlertEvents",
+   "topic": "seam-threading",
+   "question": "reads g_entities[0] and reads/writes level.alertEvents[] directly.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "NPC_CheckAlertEvents",
+   "topic": "ai-context",
+   "question": "forwards ambient NPC/NPCInfo into G_CheckAlertEvents.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_CheckForDanger",
+   "topic": "seam-threading",
+   "question": "reads level.alertEvents[alertEvent] directly.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "NPC_CheckForDanger",
+   "topic": "ai-context",
+   "question": "forwards ambient NPC into G_CheckForDanger.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "AddSoundEvent",
+   "topic": "seam-threading",
+   "question": "writes level.alertEvents[]/numAlertEvents/curAlertID/time directly.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "AddSightEvent",
+   "topic": "seam-threading",
+   "question": "same level.alertEvents[] writes as AddSoundEvent.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "ClearPlayerAlertEvents",
+   "topic": "seam-threading",
+   "question": "reads/writes level.alertEvents[]/numAlertEvents/time and file-static eventClearTime extern.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "RemoveOldestAlert",
+   "topic": "seam-threading",
+   "question": "reads/writes level.alertEvents[]/numAlertEvents directly.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_ClearLOS",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "trap_Trace needs &Engine and g_entities needs GameWorld.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_ClearLOS2",
+   "topic": "vec3-outparam-seam",
+   "question": "CalcEntitySpot can't write eyes back before forwarding into G_ClearLOS.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_ClearLOS3",
+   "topic": "vec3-outparam-seam",
+   "question": "CalcEntitySpot can't write spot back (x2) before forwarding into G_ClearLOS.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_ClearLOS4",
+   "topic": "vec3-outparam-seam",
+   "question": "CalcEntitySpot can't write eyes back before forwarding into G_ClearLOS3.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_ClearLOS5",
+   "topic": "vec3-outparam-seam",
+   "question": "CalcEntitySpot can't write eyes back before forwarding into G_ClearLOS.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "NPC_GetHFOVPercentage",
+   "topic": "vec3-outparam-seam",
+   "question": "vectoangles can't write angles back.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "NPC_GetVFOVPercentage",
+   "topic": "vec3-outparam-seam",
+   "question": "vectoangles can't write angles back.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "G_FindLocalInterestPoint",
+   "topic": "seam-threading",
+   "question": "iterates level.interestPoints[] and calls trap_InPVS \u2014 no threading resolved.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "SP_target_interest",
+   "topic": "seam-threading",
+   "question": "reads/writes level.numInterestPoints/interestPoints[] directly.",
+   "file": "NPC_senses.c"
+  },
+  {
+   "fn": "DeathUpdate",
+   "topic": "raw-ptr-skeleton-no-world-handle + bg-dep",
+   "question": "reads level.time (no world handle) and derefs pVeh->m_pVehicleInfo (still *mut c_void placeholder) \u2014 needs fork-1 GameWorld threading and vehicleInfo_t port",
+   "file": "AnimalNPC.c"
+  },
+  {
+   "fn": "Update",
+   "topic": "ambient-global",
+   "question": "dispatches via file-static g_vehicleInfo[VEHICLE_BASE].Update \u2014 needs that global placed on GameWorld (fork 1)",
+   "file": "AnimalNPC.c"
+  },
+  {
+   "fn": "ProcessMoveCommands",
+   "topic": "ambient-global + bg-dep",
+   "question": "reads level.time and pVeh->m_pVehicleInfo->{decelIdle,speedMax,speedIdle,accelIdle,speedMin,turboSpeed,turboRecharge,turboDuration,acceleration} through unported vehicleInfo_t",
+   "file": "AnimalNPC.c"
+  },
+  {
+   "fn": "ProcessOrientCommands",
+   "topic": "bg-dep",
+   "question": "reads pVeh->m_pVehicleInfo->{turningSpeed,speedMax} through unported vehicleInfo_t (Vehicle_t::m_pVehicleInfo is *mut c_void placeholder)",
+   "file": "AnimalNPC.c"
+  },
+  {
+   "fn": "AnimateVehicle",
+   "topic": "raw-ptr-skeleton-no-world-handle + bg-dep",
+   "question": "reads level.time, unported vehicleInfo_t, and casts bgEntity_t to full game-side gentity_t for client/health/legsAnim fields",
+   "file": "AnimalNPC.c"
+  },
+  {
+   "fn": "AnimateRiders",
+   "topic": "raw-ptr-skeleton-no-world-handle + bg-dep",
+   "question": "same as AnimateVehicle plus enemy/ghoul2 game-side fields",
+   "file": "AnimalNPC.c"
+  },
+  {
+   "fn": "G_CreateAnimalNPC",
+   "topic": "ambient-global + bg-dep",
+   "question": "reads file-static g_vehicleInfo table and populates m_pVehicleInfo (unported vehicleInfo_t pointer field)",
+   "file": "AnimalNPC.c"
+  },
+  {
+   "fn": "NPC_Sniper_PlayConfusionSound",
+   "topic": "constants-in-scope",
+   "question": "SQUAD_IDLE (squadState_e) has no resolved const/import path in this crate \u2014 need its numeric value or a landed enum to unblock this function.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "Sniper_HoldPosition",
+   "topic": "ambient-state",
+   "question": "How should file-scope AI globals (NPC/NPCInfo/ucmd/level/g_entities) and this file's statics (enemyLOS2/enemyCS2/faceEnemy2/move2/shoot2/enemyDist2) thread into these context-free faithful signatures (GameWorld/GameContext per fork ruling 1)?",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "Sniper_Move",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question as Sniper_HoldPosition.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "NPC_BSSniper_Patrol",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question as Sniper_HoldPosition.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "Sniper_CheckMoveState",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question as Sniper_HoldPosition.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "Sniper_ResolveBlockedShot",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question as Sniper_HoldPosition.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "Sniper_CheckFireState",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question as Sniper_HoldPosition.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "Sniper_EvaluateShot",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question (reads ambient NPC + g_entities array).",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "Sniper_FaceEnemy",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question; also needs &Engine for trap_Trace.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "Sniper_UpdateEnemyPos",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question as Sniper_HoldPosition.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "Sniper_StartHide",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question as Sniper_HoldPosition.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "NPC_BSSniper_Attack",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question; also needs &Engine for trap_Trace.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "NPC_BSSniper_Default",
+   "topic": "ambient-state",
+   "question": "Same ambient-state threading question as Sniper_HoldPosition.",
+   "file": "NPC_AI_Sniper.c"
+  },
+  {
+   "fn": "SP_target_give / Use_Target_Give / SP_target_delay / Use_Target_Delay / SP_target_score / SP_target_print / Use_Target_Print / SP_target_speaker / target_laser_think / target_laser_off / target_laser_start / SP_target_laser / SP_target_teleporter / target_relay_use / SP_target_relay / SP_target_kill / target_location_linkup / SP_target_location / SP_target_counter / target_random_use / SP_target_random / scriptrunner_run / target_scriptrunner_use / SP_target_scriptrunner / SP_target_activate / SP_target_deactivate / target_level_change_use / SP_target_level_change / target_play_music_use / SP_target_play_music",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "All parked functions need one or more of: direct trap_* calls (no `engine` param on the staged raw-pointer signature), direct `level`/g_entities global access, LCG rng (crandom/rand) threading, or fn-pointer field writes (`ent->use =`/`ent->think =`) \u2014 the frozen `gentity_t.use_`/`think` fields are still `Option<unsafe extern \"C\" fn(...)>`, not the ruling-2 `EntUse`/`EntThink` enums, so there's nowhere to store an enum-based fn-ID yet. This matches the same blocker already recorded by other parallel porters across g_trigger.rs, g_combat.rs, g_missile.rs, g_turret_G2.rs, g_utils.rs, NPC_utils.rs, etc. \u2014 the Land phase presumably threads an engine/world handle and migrates the fn-pointer fields to the enum types.",
+   "file": "crates/mp/game/src/g_target.rs"
+  },
+  {
+   "fn": "Rand_Init, flrand, Q_flrand, irand, Q_irand",
+   "topic": "rng-threading",
+   "question": "Fork ruling 3 settles the LCG as an owned, threaded Rng (bg-shared), but doesn't name the concrete type or where it lives (mp_bg struct field? GameWorld field?), and this file's staged skeleton signatures carry no such parameter (bare C scalars only, mirroring Raven's `holdrand` file-static). Where should the threaded Rng state live and what's its type, so these 5 functions can take it as a parameter instead of a forbidden hidden static?",
+   "file": "q_math.c"
+  },
+  {
+   "fn": "Board",
+   "topic": "vtable-dispatch",
+   "question": "Need resolved vehicleInfo_t.Board function ptr signature and calling convention for base class delegation",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/FighterNPC.rs"
+  },
+  {
+   "fn": "Eject",
+   "topic": "vtable-dispatch",
+   "question": "Need resolved vehicleInfo_t.Eject function ptr signature and calling convention for base class delegation",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/FighterNPC.rs"
+  },
+  {
+   "fn": "Grenadier_HoldPosition",
+   "topic": "ai-context",
+   "question": "How to thread ambient NPC/NPCInfo/level globals into raw-pointer signatures without context parameters?",
+   "file": "NPC_AI_Grenadier.c"
+  },
+  {
+   "fn": "Grenadier_Move",
+   "topic": "ai-context",
+   "question": "How to thread ambient NPC/NPCInfo/level globals into raw-pointer signatures without context parameters?",
+   "file": "NPC_AI_Grenadier.c"
+  },
+  {
+   "fn": "NPC_BSGrenadier_Patrol",
+   "topic": "ai-context",
+   "question": "How to thread ambient NPC/NPCInfo/level/ucmd globals into raw-pointer signatures without context parameters?",
+   "file": "NPC_AI_Grenadier.c"
+  },
+  {
+   "fn": "Grenadier_CheckMoveState",
+   "topic": "ai-context",
+   "question": "How to thread ambient NPC/NPCInfo/level globals and file-statics (enemyLOS3/enemyCS3/move3/faceEnemy3/shoot3/enemyDist3) into raw-pointer signatures?",
+   "file": "NPC_AI_Grenadier.c"
+  },
+  {
+   "fn": "Grenadier_CheckFireState",
+   "topic": "ai-context",
+   "question": "How to thread ambient NPC/NPCInfo globals and file-static enemyCS3 into raw-pointer signature?",
+   "file": "NPC_AI_Grenadier.c"
+  },
+  {
+   "fn": "Grenadier_EvaluateShot",
+   "topic": "ai-context",
+   "question": "How to thread ambient NPC/g_entities globals into single-parameter raw-pointer signature?",
+   "file": "NPC_AI_Grenadier.c"
+  },
+  {
+   "fn": "NPC_BSGrenadier_Attack",
+   "topic": "ai-context",
+   "question": "How to thread multiple ambient globals and file-statics into no-parameter raw-pointer signature?",
+   "file": "NPC_AI_Grenadier.c"
+  },
+  {
+   "fn": "NPC_BSGrenadier_Default",
+   "topic": "ai-context",
+   "question": "How to thread ambient NPC/NPCInfo globals into no-parameter raw-pointer signature?",
+   "file": "NPC_AI_Grenadier.c"
+  },
+  {
+   "fn": "NPC_Mark1_Part_Explode",
+   "topic": "ambient-state",
+   "question": "How does level.time (and other ambient globals) get threaded into context-free faithful fn signatures?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_Idle",
+   "topic": "ambient-state",
+   "question": "How do NPC/NPCInfo ambient globals reach a zero-arg faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1Dead_FireRocket",
+   "topic": "ambient-state",
+   "question": "How do NPC/level ambient globals reach a zero-arg faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1Dead_FireBlaster",
+   "topic": "ambient-state",
+   "question": "How do NPC/level ambient globals reach a zero-arg faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_die",
+   "topic": "variadic-c-abi",
+   "question": "va()'s packet-resolved signature drops the C varargs entirely (fn va(format) with no substitution args) - how should Q_irand(1,2) reach the format string?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_dying",
+   "topic": "client-cast",
+   "question": "gentity_t.client is untyped *mut c_void; is casting it to gclient_t sanctioned, or does a resolved accessor exist?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "NPC_Mark1_Pain",
+   "topic": "ambient-state",
+   "question": "How does the gPainHitLoc ambient global reach this faithful signature, and what EntXxx enum variant covers this pain fn-pointer target?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_Hunt",
+   "topic": "ambient-state",
+   "question": "How do NPC/NPCInfo ambient globals reach a zero-arg faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_FireBlaster",
+   "topic": "ambient-state",
+   "question": "How do NPC/NPCInfo/level ambient globals plus fn-scope statics (forward/vright/up/muzzle) reach a zero-arg faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_BlasterAttack",
+   "topic": "ambient-state",
+   "question": "How do NPC/NPCInfo ambient globals reach this faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_FireRocket",
+   "topic": "ambient-state",
+   "question": "How do NPC/level ambient globals plus fn-scope statics reach a zero-arg faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_RocketAttack",
+   "topic": "ambient-state",
+   "question": "How does the NPC ambient global reach this faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_AttackDecision",
+   "topic": "ambient-state",
+   "question": "How does the NPC ambient global reach a zero-arg faithful signature, given trap_G2API_GetSurfaceRenderStatus needs &Engine?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Mark1_Patrol",
+   "topic": "ambient-state",
+   "question": "How do NPC/ucmd ambient globals reach a zero-arg faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "NPC_BSMark1_Default",
+   "topic": "ambient-state",
+   "question": "How do NPC/NPCInfo ambient globals reach a zero-arg faithful signature?",
+   "file": "NPC_AI_Mark1.c"
+  },
+  {
+   "fn": "Wampa_SetBolts",
+   "topic": "ai-context-threading",
+   "question": "NPC AI think-loop helper functions need access to implicit NPC/NPCInfo/ucmd/level frame globals set by ai_main.c; faithful skeleton signatures provide no channel. How should per-frame actor state be threaded to these helpers\u2014as additive GameContext parameters, as thread-local accessors, or via GameWorld fields?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "Wampa_Idle",
+   "topic": "ai-context-threading",
+   "question": "Reads/writes implicit NPC/NPCInfo/ucmd bot-AI frame globals; faithful skeleton signature has no parameters.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "Wampa_CheckRoar",
+   "topic": "ai-context-threading",
+   "question": "Accesses implicit level.time global; no signature channel to reach it from context-free skeleton.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "Wampa_Patrol",
+   "topic": "ai-context-threading",
+   "question": "Reads/writes implicit NPC/NPCInfo/ucmd/level bot-AI frame globals; faithful skeleton has no parameters.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "Wampa_Move",
+   "topic": "ai-context-threading",
+   "question": "Reads/writes implicit NPC/NPCInfo/ucmd/enemyDist/level bot-AI frame globals; faithful skeleton has no parameters.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "Wampa_Slash",
+   "topic": "ai-context-threading",
+   "question": "Reads implicit NPC/g_entities/level/vec3_origin bot-AI frame globals and requires entity arena access; no signature channel.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "Wampa_Attack",
+   "topic": "ai-context-threading",
+   "question": "Reads/writes implicit NPC/ucmd bot-AI frame globals; faithful skeleton has no parameters.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "Wampa_Combat",
+   "topic": "ai-context-threading",
+   "question": "Reads/writes implicit NPC/NPCInfo/level/enemyDist bot-AI frame globals; faithful skeleton has no parameters.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "NPC_Wampa_Pain",
+   "topic": "ai-context-threading",
+   "question": "Accesses implicit level.time global through entity operations; faithful skeleton provides no level context parameter.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "NPC_BSWampa_Default",
+   "topic": "ai-context-threading",
+   "question": "Reads/writes implicit NPC/NPCInfo/level/ucmd/enemyDist bot-AI frame globals throughout (largest function); faithful skeleton has no parameters. Also main entrypoint think function\u2014dispatch precedent?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Wampa.rs"
+  },
+  {
+   "fn": "NPC_Seeker_Pain",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC global set up by SetNPCGlobals()?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "Seeker_MaintainHeight",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC/NPCInfo/ucmd/level globals?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "Seeker_Strafe",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC/NPCInfo/level globals and trap_Trace?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "Seeker_Hunt",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC/NPCInfo/level/g_spskill globals?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "Seeker_Fire",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC global?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "Seeker_Ranged",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC/NPCInfo globals?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "Seeker_Attack",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC/NPCInfo globals?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "Seeker_FindEnemy",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC/g_entities globals and trap_EntitiesInBox?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "Seeker_FollowOwner",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC/NPCInfo/level/g_entities globals?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "NPC_BSSeeker_Default",
+   "topic": "ambient-state",
+   "question": "How should context-free faithful signatures access NPC/g_entities globals?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Seeker.rs"
+  },
+  {
+   "fn": "NPC_SetBlocked",
+   "topic": "const-value",
+   "question": "What is MIN_BLOCKED_SPEECH_TIME's actual value (b_local.h/b_public.h define, unresolved in packet)?",
+   "file": "g_navnew.c"
+  },
+  {
+   "fn": "NAVNEW_PushBlocker",
+   "topic": "const-value",
+   "question": "What is CONTENTS_BOTCLIP's actual bit value (JKA-added content-mask flag, unresolved in packet)?",
+   "file": "g_navnew.c"
+  },
+  {
+   "fn": "NAVNEW_SidestepBlocker",
+   "topic": "const-value",
+   "question": "What is CONTENTS_BOTCLIP's actual bit value, used in self->clipmask|CONTENTS_BOTCLIP at every trap_Trace call?",
+   "file": "g_navnew.c"
+  },
+  {
+   "fn": "NAVNEW_Bypass",
+   "topic": "const-value",
+   "question": "Where should NAVDEBUG_showCollision live (GameWorld field?) and what is EDGE_NORMAL's enum ordinal (g_nav.c debug-draw enum, unresolved)?",
+   "file": "g_navnew.c"
+  },
+  {
+   "fn": "NAVNEW_ResolveEntityCollision",
+   "topic": "const-value",
+   "question": "What is MIN_DOOR_BLOCK_DIST_SQR's actual value (g_navnew.c-local magic number, unresolved in packet)?",
+   "file": "g_navnew.c"
+  },
+  {
+   "fn": "NAVNEW_AvoidCollision",
+   "topic": "const-value",
+   "question": "What are navInfo_t's NIF_COLLISION flag bit and EDGE_MOVEDIR's enum ordinal (unresolved in packet)?",
+   "file": "g_navnew.c"
+  },
+  {
+   "fn": "NAVNEW_TestNodeConnectionBlocked",
+   "topic": "const-value",
+   "question": "What are MASK_NPCSOLID, CONTENTS_BOTCLIP/SOLID/MONSTERCLIP/BODY, and DEFAULT_MINS_2/DEFAULT_MAXS_2's actual values (all unresolved in packet)?",
+   "file": "g_navnew.c"
+  },
+  {
+   "fn": "NAVNEW_MoveToGoal",
+   "topic": "ai-context",
+   "question": "How should the ambient per-frame 'current NPC' global NPCInfo (blockedDest field) be reached from a GameContext-threaded signature, matching the same open fork as NPC_reactions.rs/NPC_utils.rs?",
+   "file": "g_navnew.c"
+  },
+  {
+   "fn": "UpdateIPBans",
+   "topic": "file-scope-globals-ip-filters",
+   "question": "How should file-scope IP filter globals (ipFilters, numIPFilters) be threaded to functions?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "G_FilterPacket",
+   "topic": "file-scope-globals-ip-filters",
+   "question": "How should file-scope IP filter globals (ipFilters, numIPFilters, g_filterBan cvar) be threaded to functions?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "AddIP",
+   "topic": "file-scope-globals-ip-filters",
+   "question": "How should file-scope IP filter globals be accessed without world/engine handle?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "G_ProcessIPBans",
+   "topic": "file-scope-globals-cvar",
+   "question": "How should GameCvars fields like g_banIPs be accessible to functions without engine/world handle?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "Svcmd_AddIP_f",
+   "topic": "raw-ptr-skeleton-no-engine-handle",
+   "question": "How should trap_Argc/trap_Argv be called without &Engine handle in skeleton?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "Svcmd_RemoveIP_f",
+   "topic": "raw-ptr-skeleton-no-engine-handle",
+   "question": "How should trap_Argc/trap_Argv be called without &Engine handle in skeleton?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "Svcmd_ListIPs_f",
+   "topic": "file-scope-globals-ip-filters",
+   "question": "How should file-scope IP filter globals be accessed for listing?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "G_SaveBanIP",
+   "topic": "raw-ptr-skeleton-no-engine-handle",
+   "question": "How should trap_FS_* calls be made without &Engine handle in skeleton?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "G_LoadIPBans",
+   "topic": "raw-ptr-skeleton-no-engine-handle",
+   "question": "How should trap_FS_* calls be made without &Engine handle in skeleton?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "Svcmd_EntityList_f",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "How should level/g_entities globals be accessible to functions without world handle?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "ClientForString",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "How should level global be accessible without world handle?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "Svcmd_ForceTeam_f",
+   "topic": "raw-ptr-skeleton-no-engine-handle",
+   "question": "How should trap_Argv be called without &Engine handle in skeleton?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "ConsoleCommand",
+   "topic": "raw-ptr-skeleton-no-engine-handle",
+   "question": "How should trap_Argv/trap_SendServerCommand be called without &Engine handle in skeleton?",
+   "file": "g_svcmds.c"
+  },
+  {
+   "fn": "ProcessMoveCommands",
+   "topic": "pm-global",
+   "question": "How should the global pm pointer (for electrify electrifyTime check at oracle line 224) be accessed in the game context?",
+   "file": "WalkerNPC.c"
+  },
+  {
+   "fn": "G_SetWalkerVehicleFunctions",
+   "topic": "fn-enum-dispatch",
+   "question": "What is the fn-ID enum dispatch pattern for function pointer assignment per Ruling 2?",
+   "file": "WalkerNPC.c"
+  },
+  {
+   "fn": "G_CallSpawn",
+   "topic": "spawn-table-unresolved",
+   "question": "The classname->SP_* dispatch table spawns[] (~180 entries) targets SP_* functions ported one-per-file elsewhere; none are in this packet's resolved out-of-file call surface. How should G_CallSpawn reach them without a manifest/skeleton that resolves the full spawns[] table?",
+   "file": "g_spawn.c"
+  },
+  {
+   "fn": "SP_worldspawn",
+   "topic": "bg-panimate-globals",
+   "question": "SP_worldspawn reads BGPAFtextLoaded/bgHumanoidAnimations/precachedKyle/g2SaberInstance/g_cullDistance file-scope statics with no established GameWorld channel (same blocker already parking BG_ParseAnimationFile and other callers like NPC_reactions.rs/g_combat.rs). What GameWorld field / channel should these route through?",
+   "file": "g_spawn.c"
+  },
+  {
+   "fn": "G_SpawnEntitiesFromString",
+   "topic": "fn-ptr-store-shape-mismatch",
+   "question": "G_SpawnEntitiesFromString stores script_runner->think = scriptrunner_run, but gentity_t.think is still a raw extern \"C\" fn pointer (not the EntThink enum) and scriptrunner_run is an out-of-file g_spawn.c-local target with no resolved signature. Same mismatch already parked in g_client.rs's SP_info_jedimaster_start \u2014 how should fn-ptr field stores resolve once EntThink dispatch is wired into gentity_t's layout?",
+   "file": "g_spawn.c"
+  },
+  {
+   "fn": "NPC_Remote_Pain",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC, NPCInfo, level) without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "Remote_MaintainHeight",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC, NPCInfo, level) without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "Remote_Strafe",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC, NPCInfo, level) and call trap_Trace without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "Remote_Hunt",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC, NPCInfo, level, g_spskill) without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "Remote_Fire",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC) without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "Remote_Ranged",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC, NPCInfo) without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "Remote_Attack",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC, NPCInfo) without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "Remote_Idle",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC) without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "Remote_Patrol",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC, ucmd) without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "NPC_BSRemote_Default",
+   "topic": "ambient-state",
+   "question": "How do context-free NPC AI handler signatures access file-scope globals (NPC, NPCInfo) without taking GameWorld/Engine parameters?",
+   "file": "NPC_AI_Remote.c"
+  },
+  {
+   "fn": "G_WriteClientSessionData",
+   "topic": "va-varargs-and-level-access",
+   "question": "How should va() be called with varargs from Rust when resolved signature drops C varargs, and how should functions access level global without GameContext parameter?",
+   "file": "g_session.c"
+  },
+  {
+   "fn": "G_ReadSessionData",
+   "topic": "va-varargs-and-level-access",
+   "question": "How should va() be called with varargs from Rust when resolved signature drops C varargs, and how should functions access level global without GameContext parameter?",
+   "file": "g_session.c"
+  },
+  {
+   "fn": "G_InitSessionData",
+   "topic": "va-varargs-and-blocked-dependency",
+   "question": "This function calls G_WriteClientSessionData which is blocked on va-varargs resolution; unblock dependency first before porting.",
+   "file": "g_session.c"
+  },
+  {
+   "fn": "G_InitWorldSession",
+   "topic": "level-access-without-gamecontext",
+   "question": "How should functions that need to read/write level.newSession and g_gametype cvars access GameWorld state when they don't have GameContext in their signature?",
+   "file": "g_session.c"
+  },
+  {
+   "fn": "G_WriteSessionData",
+   "topic": "va-varargs-and-level-access",
+   "question": "How should va() be called with varargs from Rust when resolved signature drops C varargs, and how should functions access level global without GameContext parameter?",
+   "file": "g_session.c"
+  },
+  {
+   "fn": "VEH_TurretCheckFire",
+   "topic": "level-access",
+   "question": "How should functions access level.time (current game frame time) without GameWorld context parameter?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretFindEnemies",
+   "topic": "trap-engine-access",
+   "question": "How should seam-stage skeleton functions call trap syscalls (InPVS, Trace) that require &Engine parameter?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretFindEnemies",
+   "topic": "global-g-entities",
+   "question": "How should functions access g_entities global array (entity arena) without GameWorld exposing it?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretFindEnemies",
+   "topic": "undefined-constants",
+   "question": "Where should WP_TURRET, FL_NOTARGET, FL_BBRUSH, MASK_SHOT, ENTITYNUM_WORLD constants be imported from or defined?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretObeyPassengerControl",
+   "topic": "global-g-vehWeaponInfo",
+   "question": "How should functions access g_vehWeaponInfo global array without GameWorld or data module exposing it?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretObeyPassengerControl",
+   "topic": "undefined-constants",
+   "question": "Where should BUTTON_ATTACK, BUTTON_ALT_ATTACK constants be imported from?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretThink",
+   "topic": "level-access",
+   "question": "How should functions access level.time for game frame timing?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretThink",
+   "topic": "trap-engine-access",
+   "question": "How should seam-stage skeleton functions call trap syscalls that require &Engine parameter?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretThink",
+   "topic": "global-g-entities",
+   "question": "How should functions access g_entities global entity array?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretThink",
+   "topic": "global-g-gametype",
+   "question": "How should functions access g_gametype global cvar without GameWorld context?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "VEH_TurretThink",
+   "topic": "undefined-constants",
+   "question": "Where should ENTITYNUM_WORLD, ENTITYNUM_NONE, GT_TEAM, MASK_SHOT constants be imported from?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_vehicleTurret.rs"
+  },
+  {
+   "fn": "G_BounceObject",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level and g_gravity cvars with no GameWorld context parameter\u2014how should ambient game state thread through raw-pointer signatures?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_object.rs"
+  },
+  {
+   "fn": "G_RunObject",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level, g_gravity, g_entities and calls traps; also stores fn-pointer (EntThink::G_RunObject)\u2014how should GameWorld/engine handle be threaded?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_object.rs"
+  },
+  {
+   "fn": "G_StopObjectMoving",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads/writes level fields with no world handle\u2014how to access GameWorld from raw-pointer-only signature?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_object.rs"
+  },
+  {
+   "fn": "G_StartObjectMoving",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Reads level.time and assigns fn-pointer (ruling 2) with no world handle\u2014how to thread GameWorld context and EntThink enum?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_object.rs"
+  },
+  {
+   "fn": "NPC_ClearPathToGoal",
+   "topic": "ai-context",
+   "question": "How should functions that read/write the ambient NPC/NPCInfo globals (set by ai_main.c think-loop) thread that context when their faithful signatures don't provide a channel?",
+   "file": "NPC_move.c"
+  },
+  {
+   "fn": "NPC_CheckCombatMove",
+   "topic": "ai-context",
+   "question": "How should functions that read ambient NPC/NPCInfo globals thread that context when their faithful signatures don't provide a channel?",
+   "file": "NPC_move.c"
+  },
+  {
+   "fn": "NPC_LadderMove",
+   "topic": "ai-context",
+   "question": "How should functions that read/write ambient NPC/ucmd globals thread that context when their faithful signatures don't provide a channel?",
+   "file": "NPC_move.c"
+  },
+  {
+   "fn": "NPC_GetMoveInformation",
+   "topic": "ai-context",
+   "question": "How should functions that read ambient NPC/NPCInfo globals thread that context when their faithful signatures don't provide a channel?",
+   "file": "NPC_move.c"
+  },
+  {
+   "fn": "NPC_GetMoveDirection",
+   "topic": "ai-context",
+   "question": "How should functions that read/write ambient NPC/NPCInfo globals and file-scope frameNavInfo thread that context when their faithful signatures don't provide a channel?",
+   "file": "NPC_move.c"
+  },
+  {
+   "fn": "NPC_GetMoveDirectionAltRoute",
+   "topic": "ai-context",
+   "question": "How should functions that read/write ambient NPC/NPCInfo globals, frameNavInfo, and d_altRoutes cvar thread that context when their faithful signatures don't provide a channel?",
+   "file": "NPC_move.c"
+  },
+  {
+   "fn": "NPC_MoveToGoal",
+   "topic": "ai-context",
+   "question": "How should functions that read/write ambient NPC/NPCInfo/ucmd globals thread that context when their faithful signatures don't provide a channel?",
+   "file": "NPC_move.c"
+  },
+  {
+   "fn": "NPC_SlideMoveToGoal",
+   "topic": "ai-context",
+   "question": "How should functions that read/write ambient NPC/NPCInfo globals thread that context when their faithful signatures don't provide a channel?",
+   "file": "NPC_move.c"
+  },
+  {
+   "fn": "NPC_ApplyRoff",
+   "topic": "ai-context",
+   "question": "How should functions that read ambient NPC global and call trap_LinkEntity (needs Engine context) thread both contexts when their faithful signature provides neither?",
+   "file": "NPC_move.c"
+  },
+  {
+   "fn": "Interrogator_Strafe",
+   "topic": "trap-no-engine",
+   "question": "How to thread Engine handle to context-free AI functions that call trap_Trace?",
+   "file": "NPC_AI_Interrogator.c"
+  },
+  {
+   "fn": "SetGoal",
+   "topic": "seam-threading",
+   "question": "How should SetGoal access level.time and NPCInfo without a GameWorld/NPC context parameter?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_goal.rs"
+  },
+  {
+   "fn": "NPC_SetGoal",
+   "topic": "seam-threading",
+   "question": "How should NPC_SetGoal access and modify NPCInfo without a GameWorld/NPC context parameter?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_goal.rs"
+  },
+  {
+   "fn": "NPC_ClearGoal",
+   "topic": "seam-threading",
+   "question": "How should NPC_ClearGoal access and modify NPCInfo without a GameWorld/NPC context parameter?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_goal.rs"
+  },
+  {
+   "fn": "NPC_ReachedGoal",
+   "topic": "seam-threading",
+   "question": "How should NPC_ReachedGoal access NPC/level/NPCInfo/ucmd globals and call trap_ICARUS_TaskIDComplete without a GameWorld/engine handle?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_goal.rs"
+  },
+  {
+   "fn": "ReachedGoal",
+   "topic": "seam-threading",
+   "question": "How should ReachedGoal access NPC/NPCInfo globals and call FlyingCreature/NAV_HitNavGoal without a GameWorld/NPC context?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_goal.rs"
+  },
+  {
+   "fn": "UpdateGoal",
+   "topic": "seam-threading",
+   "question": "How should UpdateGoal access NPCInfo and call internal functions without a GameWorld/NPC context parameter?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_goal.rs"
+  },
+  {
+   "fn": "G_RunExPhys",
+   "topic": "state-threading",
+   "question": "How should functions that need level.time/g_entities/engine trap access be threaded when the faithful skeleton signature has only raw pointers (no GameContext parameter)?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_exphysics.rs"
+  },
+  {
+   "fn": "srand",
+   "topic": "randSeed-storage",
+   "question": "Where should the file-static randSeed variable be stored (GameWorld field, thread-local, or other)?",
+   "file": "bg_lib.c"
+  },
+  {
+   "fn": "rand",
+   "topic": "randSeed-storage",
+   "question": "Where should the file-static randSeed variable be stored (GameWorld field, thread-local, or other)?",
+   "file": "bg_lib.c"
+  },
+  {
+   "fn": "TIMER_Set, TIMER_Done, TIMER_Done2",
+   "topic": "level-global-access",
+   "question": "Timer functions need level.time from GameWorld but have no GameWorld parameter; how should non-threaded ABI functions access mutable game state once full architecture is designed?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_timer.rs"
+  },
+  {
+   "fn": "UpdateTournamentInfo",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "Function needs GameWorld/engine parameters to access level, g_entities, g_gametype \u2014 skeleton signature has no parameters",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_arenas.rs"
+  },
+  {
+   "fn": "MineMonster_Idle",
+   "topic": "ai-context",
+   "question": "How should file-scope ambient AI globals (NPC, NPCInfo, ucmd) with GameWorld-resident state be threaded into skeleton signatures that have no GameContext receiver?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs"
+  },
+  {
+   "fn": "MineMonster_Patrol",
+   "topic": "ai-context",
+   "question": "Same as MineMonster_Idle; also needs level.time and g_entities[] access.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs"
+  },
+  {
+   "fn": "MineMonster_Move",
+   "topic": "ai-context",
+   "question": "Reads and modifies NPCInfo fields with no GameContext channel.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs"
+  },
+  {
+   "fn": "MineMonster_TryDamage",
+   "topic": "ai-context",
+   "question": "Reads NPC global for entity data and g_entities[] array; also needs trap::Trace engine channel.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs"
+  },
+  {
+   "fn": "MineMonster_Attack",
+   "topic": "ai-context",
+   "question": "Reads NPC global, calls TIMER_* (needs level.time), and needs random() (fork 3: owned Rng).",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs"
+  },
+  {
+   "fn": "MineMonster_Combat",
+   "topic": "ai-context",
+   "question": "Reads and modifies NPC/NPCInfo globals; calls TIMER_* functions (needs level.time).",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs"
+  },
+  {
+   "fn": "NPC_MineMonster_Pain",
+   "topic": "anim-constants",
+   "question": "Calls NPC_SetAnim with SETANIM_BOTH, BOTH_PAIN1, SETANIM_FLAG_OVERRIDE, SETANIM_FLAG_HOLD\u2014animation constants not yet ported from anims.h/NPC.h; are they available or need porting?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs"
+  },
+  {
+   "fn": "NPC_BSMineMonster_Default",
+   "topic": "ai-context",
+   "question": "Reads NPC and NPCInfo globals; calls other NPC behavior functions with no GameContext channel.",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_MineMonster.rs"
+  },
+  {
+   "fn": "BG_AttachToRancor",
+   "topic": "engine-trap-threading",
+   "question": "How should BG_ functions with trap calls obtain an engine context when their C signatures do not thread it?",
+   "file": "bg_g2_utils.c"
+  },
+  {
+   "fn": "BG_GetRootSurfNameWithVariant",
+   "topic": "engine-trap-threading",
+   "question": "How should BG_ functions with trap calls obtain an engine context when their C signatures do not thread it?",
+   "file": "bg_g2_utils.c"
+  },
+  {
+   "fn": "Debug_Printf",
+   "topic": "varargs-seam",
+   "question": "C varargs handling at ABI boundary \u2014 how to capture and use varargs from extern \"C\" fn with vsprintf, and how to access level.time global (currently threaded as GameWorld per porting-rules \u00a7B4)?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_misc.rs"
+  },
+  {
+   "fn": "Debug_NPCPrintf",
+   "topic": "varargs-seam",
+   "question": "C varargs handling at ABI boundary \u2014 how to capture and use varargs from extern \"C\" fn with vsprintf, and how to access level.time global (currently threaded as GameWorld per porting-rules \u00a7B4)?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_misc.rs"
+  },
+  {
+   "fn": "G_Alloc",
+   "topic": "state-threading",
+   "question": "How should module-island state (memoryPool, allocPoint) and cvars (g_debugAlloc) be threaded into functions whose verbatim cross-file signatures have no world/engine channel?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_mem.rs"
+  },
+  {
+   "fn": "G_InitMemory",
+   "topic": "state-threading",
+   "question": "How should module-island state (allocPoint) be accessed in functions whose verbatim cross-file signatures have no world/engine channel?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_mem.rs"
+  },
+  {
+   "fn": "Svcmd_GameMem_f",
+   "topic": "state-threading",
+   "question": "How should module-island state (allocPoint) and engine trap channel (G_Printf) be threaded into functions whose verbatim cross-file signatures have no world/engine channel?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_mem.rs"
+  },
+  {
+   "fn": "Howler_Patrol, Howler_Move, Howler_TryDamage, Howler_Attack, Howler_Combat, NPC_BSHowler_Default",
+   "topic": "ambient-ai-state",
+   "question": "How should the ai_main.c \"current NPC\" ambient context (NPC/NPCInfo/ucmd/level) be threaded into behavior-state functions that faithfully mirror the C signature (zero params for most)?",
+   "file": "NPC_AI_Howler.c"
+  },
+  {
+   "fn": "strap_G2API_GetBoltMatrix (+ 11 others)",
+   "topic": "strap-wrapper-calling-convention",
+   "question": "How should strap_* wrapper functions call trap_* wrappers when the skeleton signatures don't include GameContext/Engine parameter? Should signatures be updated to take GameContext<'_>, or is there an implicit engine access mechanism?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_strap.rs"
+  },
+  {
+   "fn": "G_AddVoiceEvent",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "How should game-logic functions that call engine traps and access level.time be evolved from raw-pointer skeletons to accept GameContext/Engine parameters?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_sounds.rs"
+  },
+  {
+   "fn": "NPC_PlayConfusionSound",
+   "topic": "raw-ptr-skeleton-no-world-handle",
+   "question": "How should game-logic functions that read level.time be evolved from raw-pointer skeletons to accept GameContext parameter for level access?",
+   "file": "/Users/milohehmsoth/Developer/Milo/jka-rust/.claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_sounds.rs"
+  }
+ ]
+}

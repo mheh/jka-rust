@@ -1,5 +1,5 @@
 # Engine Seam Design
-Status: DRAFT     Supersedes: docs/engine-plan.md
+Status: FROZEN (user sign-off 2026-07-03)     Supersedes: docs/engine-plan.md
 Decision prefix: SEAM     Ledger deps: DEC-04, DEC-05, DEC-07, DEC-08, DEC-09
 
 ## Standing context
@@ -120,7 +120,7 @@ sizeof(gentity_t)`, and returns a static-scoped struct
 handoff fields `gentities`/`gentitySize`/`num_entities` (`g_public.h:524-526`) —
 SP's analog of `trap_LocateGameData`. The version check is **engine-side, caller
 position**: after `ge = Sys_GetGameAPI(&import);` the engine compares
-`ge->apiversion != GAME_API_VERSION` (`server/sv_game.cpp:682-684`).
+`ge->apiversion != GAME_API_VERSION` (`code/server/sv_game.cpp:682-684`).
 
 SP cgame is statically compiled into the *same game DLL* but reached through a
 fake-VM shim: `int VM_Call( int callnum, ... )` forwards ten words via pointer
@@ -181,7 +181,7 @@ module-side syscall pointer — justified by the §B6 singleton exception becaus
 |---|---|---|---|---|
 | `syscall` fn-ptr (module) | `codemp/game/g_syscalls.c:8` | `OnceLock<CEngine>` at the module cdylib seam (the §B6 exception) | `dllEntry` export storing `CEngine::new(ptr)` | `&CEngine` passed inward from `vmMain`/`trap_*` |
 | `currentVM` | `qcommon/vm.cpp:24` (defn; set-as-current at `:800`) | **eliminated as a global** — each dispatch is explicitly parameterized; its one surviving role (bridging the stateless C syscall fn-ptr to per-VM engine state) becomes the per-slot trampoline cell below (SEAM-D11), not a global | — | dispatcher `engine` + `transport` args |
-| per-slot `*mut Engine` trampoline cell (engine-side; replaces `currentVM`'s bridging role) | (new; supplants `currentVM` `qcommon/vm.cpp:24`) | `mp_engine_qcommon::ModuleRegistry`'s per-slot `ModuleSlot.engine` cell (SEAM-D11 amended 2026-07-02; the `engine: EngineSlotCell` field of the composed per-slot `ModuleSlot`, whose type `module-loading.md` owns; `ModuleRegistry` mirrors oracle `qcommon/vm.cpp`) — one cell **per module slot**, never one global (STATE-D2) | `EngineSlotGuard::enter` at the top of each engine→module call into that slot; cleared on `Drop` | read only by that slot's raw `extern "C-unwind"` syscall trampoline (§ Seam — inbound raw syscall trampoline); the porting-rules §D11 engine-side seam exemption, the twin of the module shell's `OnceLock<CEngine>` |
+| per-slot injected engine reference (engine-side; replaces `currentVM`'s bridging role) | (new; supplants `currentVM` `qcommon/vm.cpp:24`) | `mp_engine_qcommon::ModuleRegistry`'s per-slot `EngineSlot { ctx: *mut c_void, syscall: SlotSyscall }` (SEAM-D11 amended 2026-07-03; supersedes the 2026-07-02 `ModuleSlot.engine`/`EngineSlotCell` cell; `ModuleRegistry` mirrors oracle `qcommon/vm.cpp`) — one slot **per module**, never one global (STATE-D2) | **injected at `load_module`** (Raven `VM_Create` receives+stores `systemCalls`, `vm.cpp:471-472,506`; restart reuses it, `:399-409`), superseding the retired `EngineSlotGuard::enter`/`Drop` per-call cell | read only by that slot's raw `extern "C-unwind"` syscall trampoline (a committed C shim, § Seam — inbound raw syscall trampoline); the porting-rules §D11 engine-side seam exemption, the twin of the module shell's `OnceLock<CEngine>` |
 | `lastVM` | `qcommon/vm.cpp:25` | **eliminated** (see SEAM-D1); Raven's `VM_Free` global-clobber bug is **not** reproduced (A4 survey) | — | — |
 | `sv.gentities`, `sv.gentitySize`, `sv.num_entities`, `sv.gameClients`, `sv.gameClientSize` | `server/sv_game.cpp:329-334` | `impl SharedGameData` held in the engine's module-host state (§ Seam) | `LocateGameData` handler (`Static`/`NativeDll`: cached base+stride; `Wasm`: re-resolved) | server-state field; owner spine in state-ownership.md (pending) |
 | `sv.mSharedMemory` (MP game), `cl.mSharedMemory` (MP cgame) | `server/sv_game.cpp:940`, `client/cl_cgame.cpp:1683`; field `server.h:87` | second `SharedGameData`-family registration in the engine's module-host state (§ Seam), same per-transport contract as `LocateGameData` | `G_SET_SHARED_BUFFER` / `CG_SET_SHARED_BUFFER` handler, registered once (`g_main.c:920`, `cg_main.c:3713`): store `VMA(1)`, return `0` | server/client-state field; owner spine in state-ownership.md (pending) |
@@ -372,7 +372,7 @@ interpretation and the wasm host marshaller differ (SEAM-D4).
 
 The inbound direction (engine→module `vmMain`) is the dual: the module-side
 `vmMain` entrypoint hosts an exhaustive `match` over the export enum
-(`MpGameExport`, `crates/mp/abi/src/game/exports.rs:9`); each arm decodes via
+(`MpGameExport`, `crates/mp/abi/src/game/exports.rs:10`); each arm decodes via
 `DecodeVmMain`, routes to that command's per-call `Dispatch<C>` impl, and encodes
 via `EncodeVmMainReturn` — the exact mirror of the outbound `sv_game_system_calls`
 `match` routing to `Execute<C>` handlers. This doc freezes only the
@@ -400,6 +400,43 @@ inventory or lives elsewhere — is state-ownership.md's to freeze, not this
 doc's; SEAM-D10 fixes only the shell's seam surface (`ENGINE`, the exports, the
 `Dispatch<C>` match), which is orthogonal to the world the match delegates into.
 
+*Amendment (2026-07-03, SEAM-Q12 resolved; construction surface corrected
+2026-07-03).* The concrete `Dispatch<C>` receiver is now settled and
+**supersedes** the round-3 `WorldPtr` named above: it is the copyable
+`pub struct GameContext<'e> { pub world: *mut GameWorld, pub engine: &'e Engine }`,
+defined in `mp_game` (`Engine` = the `mp_engine_select` module-side transport
+alias, SEAM-D13). Its two fields are **`pub`**, so the cross-crate `jampgame`
+shell's `vmMain` constructs it directly by struct literal
+`GameContext { world, engine }` — a `Copy` struct of a raw pointer plus a shared
+reference has no invariant a constructor would protect (mirrors the `WorldPtr`
+precedent), so **no** `pub fn new` is exposed. This **removes** the interim
+private-fields / `pub fn new(...)` sentence an earlier round-5 skeleton draft
+carried (a skeleton-artifact, now superseded). The field-visibility/construction
+shape is settled as the **pub-fields / struct-literal** form frozen in this block
+(fields `pub`, no `pub fn new`, shell constructs by struct literal) — the user
+resolution of 2026-07-03 (`docs/handoffs/2026-07-03-skeleton-findings.md`,
+round-5 resolution #1: "pub fields + struct literal … `::new` dropped").
+**Reconciled 2026-07-03 (single-editor pass): `state-ownership.md` STATE-D8 is the
+frozen home** for the `GameContext` shape, and its § `GameContext` code block now
+renders the identical `pub`-fields / struct-literal / no-`::new` form. This doc
+carries the same shape as a cross-reference to that frozen home — **not** a rival or
+governing copy. Both docs read identically; the earlier "state-ownership.md lags /
+this doc governs" framing is retired. The settled shape is `pub` fields,
+struct-literal construction, no `::new`.
+`vmMain` constructs
+one per call from the module-side world value (`WORLD`) + `ENGINE.get()`
+(SEAM-D1) and dispatches on it; each `impl Dispatch<C> for GameContext` unpacks
+`ctx.world` via STATE-D6 leaf reborrows and threads `ctx.engine` into the logic
+fns, whose `trap::X(ctx.engine, …)` call sites keep the frozen SEAM-D1/SEAM-D13
+wrapper shape and oracle syscall order (§ Call-site conventions). This settles
+both SEAM-Q12 sub-tensions **without touching SEAM-D8**: the `&Engine` channel is
+the receiver's own `engine` field (no `dispatch` parameter is added, the trait
+signature is unchanged), and the orphan rule is satisfied because `GameContext`
+and its `Dispatch<C>` impls both live in `mp_game` — the shell only constructs
+the value (by struct literal, from its private `ENGINE`) and passes it into the
+match, never supplying `&Engine` through the trait. Closes SEAM-Q12 (§ Open
+questions).
+
 For the sole purpose of writing this doc's `vmMain` match and `Dispatch<C>`
 skeleton, that receiver is **forward-declared** as `GameWorld` — the module-side
 owned value already named by `two-island-model.md` (STATE-D1/STATE-D2; e.g.
@@ -422,6 +459,21 @@ stays exhaustive over the valid enum variants while the fallback lives in the
 conversion, not in an arm. Whether that match is reached through a C `vmMain`
 export, a direct linked call, or a wasm export is the module-side compile-time
 transport (SEAM-D1).
+
+*Pinnings (2026-07-03, user-sanctioned defaults — mechanical, freeze textually
+where this doc sketches the `vmMain` dispatch).* (a) The export-enum dispatch is
+an **inline exhaustive `match` written directly in `vmMain`**, the exact mirror of
+the outbound `sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) ->
+isize` match — there is **no** separate `dispatch()` helper fn interposed between
+`vmMain` and the per-arm `Dispatch<C>` routing. (c) The `GAME_INIT` bootstrap
+case — reached before a `GameContext` exists, since `GAME_INIT` is the command
+that *constructs* the module-side world (the `WorldCell`, a § Scope & non-goals
+deferral owned by `state-ownership.md`) — is detected **pre-decode** by the direct
+discriminant comparison `command == MpGameExport::GAME_INIT as c_int` (inline
+enum-discriminant cast; the SCREAMING_SNAKE variant per the enum-fidelity rule,
+`crates/mp/abi/src/game/exports.rs:16`; no standalone `c_int` constant — corrected
+2026-07-03, reconciliation pass), ahead of the general
+`c_int → MpGameExport::try_from` decode above.
 
 ### Inbound raw syscall trampoline (engine-side) — SEAM-D11
 
@@ -454,13 +506,60 @@ impl Drop for EngineSlotGuard<'_> { fn drop(&mut self); }          // cell = pre
 // The raw fn assigned to the hosted module's `syscall` slot (one monomorphic
 // trampoline per slot; e.g. the game slot). Reads `EngineSlot.engine`, reconstructs
 // the flat `&[isize]` frame from `&arg` exactly as VM_DllSyscall treats `&arg` as
-// an `int[16]` base (vm.cpp:363-376), then calls the typed dispatcher above.
+// an `int[16]` base (the `return currentVM->systemCall( &arg )` branch,
+// vm.cpp:363-380), then calls the typed dispatcher above.
 // `extern "C-unwind"` so a Com_Error panic can unwind back through the host's
 // live C frames (SEAM-D12).
 extern "C-unwind" fn game_syscall_trampoline(arg: isize, ...) -> isize;
 //   body (unsafe, the §D11 choke point): let engine = &mut *slot.engine.get();
 //                                        sv_game_system_calls(engine, frame_from(&arg))
 ```
+
+*Amendment (2026-07-03, trampoline signature — C shim). Supersedes the
+`extern "C-unwind" fn game_syscall_trampoline(arg: isize, ...) -> isize` frozen
+above.* Stable Rust cannot **define** a C-variadic function (`c_variadic` is
+nightly-only), and a fixed-arity Rust stand-in is unsound for foreign variadic
+callers on arm64 macOS (stack-passed va-args). Resolution: a committed C shim
+built by a `cc` build script confined to `mp_engine_qcommon` —
+`vm/game_syscall_trampoline.c` defines the true variadic
+`intptr_t game_syscall_trampoline( intptr_t arg, ... )`, unpacks into
+`intptr_t args[16]` **exactly mirroring Raven's `VM_DllSyscall` unpack**
+(`vm.cpp:363-377`; the 15-`va_arg`, extras-thrown-away rationale, `vm.cpp:358-360`),
+and forwards to a Rust
+`#[no_mangle] extern "C-unwind" fn game_syscall_trampoline_words(args: *const isize) -> isize`.
+Variadic extern **declarations** compile on stable, so the loader hands the C
+symbol's address to `dllEntry`. Accepted cost: a build-time C-compiler dependency
+for `mp_engine_qcommon` only. The `extern "C-unwind"` ABI (SEAM-D12) is unchanged;
+only the language of the definition (C, not Rust) and the split into a C shim +
+Rust `_words` fn are new.
+
+*Amendment (2026-07-03, `EngineSlot` — injected at load, Raven-style).
+Supersedes the per-call `EngineSlot { engine: Cell<*mut Engine> }` +
+`EngineSlotGuard`/`enter` scope-guard shapes frozen above (the guard and its
+`enter`/`Drop` cell-swap are **retired**).* The slot now stores **injected**
+state handed in at module-load time rather than a `*mut Engine` cell set per
+call:
+
+```rust
+// mp_engine_qcommon: injected at load, mirroring Raven's VM_Create(systemCalls).
+pub type SlotSyscall =
+    extern "C-unwind" fn(ctx: *mut c_void, args: *const isize) -> isize;
+struct EngineSlot { ctx: *mut c_void, syscall: SlotSyscall }
+```
+
+`SlotSyscall` is Raven's `systemCalls` fn pointer widened with an opaque `ctx`
+carrier; the C shim's Rust `_words` target reads the slot's `ctx`/`syscall` and
+forwards. Ground truth for load-time injection: `VM_Create` **receives**
+`systemCalls` as an argument (`vm.cpp:471-472`) and stores it
+(`vm->systemCall = systemCalls`, `vm.cpp:506`) rather than naming the server — so
+`mp_engine_qcommon` likewise **never names** `mp_engine_core::Engine` or
+`mp_engine_server` (this resolves the uphill-crate-edge contradiction rustc
+surfaced against the round-3 `Cell<*mut Engine>`). `load_module` gains the
+injected `system_calls: SlotSyscall` + `ctx: *mut c_void` parameters; no
+crate-graph change. **Restart reuses the stored injection:** `VM_Restart` saves
+`systemCall` off the freed `vm_t` and reuses it (`vm.cpp:399-409`), so the stored
+`EngineSlot` is reused (not re-supplied) on restart and LOAD-D12b's frozen
+signature stands unchanged.
 
 Non-blocking for Slice 0: SEAM-D7 boots our module *inside a real/OpenJK engine*
 (which supplies its own syscall pointer), so this engine-side trampoline is
@@ -485,7 +584,19 @@ transport-agnostic so the `Static` and `wasm32` builds reuse it; neither lineage
 is deleted (SEAM-D10). One shared `entrypoints.rs` could not carry a per-module
 `OnceLock` or per-module `match`, so `abi-transport`'s `entrypoints.rs` keeps only
 the raw C-ABI type aliases (`RawSyscall`, `RawVmMain`, …); its stub bodies are
-retired by the per-crate live exports below rather than edited in place. The
+retired by the per-crate live exports below rather than edited in place.
+
+*Amendment (2026-07-03, done on the skeleton — checkpoint-3 finding 14).* The
+`abi_transport::entrypoints::{qvm, sp_game}` stub **modules** are now **retired**:
+their `#[no_mangle]` symbols collide at cdylib link with the live per-shell
+exports (which SEAM-D9/SEAM-D10 already mandate), so keeping them alongside the
+live exports is a link error, not a choice. The `entrypoints.rs` raw C-ABI type
+aliases stay. `crates/cgame`/`crates/ui` carry the former stub bodies verbatim in
+their own `lib.rs` (still plain `extern "C"` — the SEAM-D12 sweep has not reached
+them) pending their live shape; only `jampgame` (MP game) and `jagame` (SP game)
+carry live exports so far.
+
+The
 fn-pointer aliases among them — `RawDllEntry`/`RawVmMain`/`RawGetModuleApi`/
 `RawGetGameApi` (`crates/abi-transport/src/entrypoints.rs:9-27`) — are the
 type spellings of exactly these seam-crossing exports, so they carry
@@ -558,7 +669,15 @@ scope at the match site, but the frozen `Dispatch<C>::dispatch(&self, args)`
 body — which the orphan rule pins to mp_game (where `WorldPtr` is defined), a
 crate SEAM-D13 bars from reading the shell's `ENGINE`. Whether these impls can
 therefore live where this comment implies, and how `&Engine` bridges the
-match-site→impl-body handoff, is what SEAM-Q12 settles.
+match-site→impl-body handoff, is what SEAM-Q12 settles. *Amendment
+(2026-07-03).* SEAM-Q12 is resolved: the receiver is the copyable
+`GameContext<'e> { pub world, pub engine }` defined in `mp_game`, so the shell
+constructs it by struct literal `GameContext { world, engine }` from `WORLD` +
+`ENGINE.get()` at the match site and passes it into the
+match; each `impl Dispatch<C> for GameContext` reads `&Engine` from the
+receiver's own `engine` field — not from the shell's `ENGINE` — so both the
+impls and `GameContext` live in `mp_game` with no orphan-rule conflict, and
+SEAM-D8 stays untouched (§ Seam definition, inbound dual).
 
 `crates/cgame`/`crates/ui` (and the SP `jagame` shell) mirror this against
 `mp_cgame`/`mp_ui`/the SP game tier. `crates/mp/game` and its peers stay pure
@@ -624,6 +743,11 @@ to the corresponding `game_import_t` fn-pointer directly (SEAM-D2) — same
 `Execute`-shaped surface to the caller, faithful wire underneath. Any natural-
 argument ergonomics above `C::Args` are per-call module-side sugar, out of this
 seam's scope (the frozen surface is `engine.execute(args)`).
+
+*Pinning (2026-07-03, user-sanctioned default — mechanical).* The MP outbound
+`trap_*` wrappers of this `mod trap` live in **one file,
+`crates/mp/game/src/trap.rs`**, mirroring Raven's single `g_syscalls.c`
+(§ Raven ground truth); the SP `mod gi` peer follows the same one-file convention.
 
 ### `SharedGameData` — the register-once/read-later abstraction (informative)
 
@@ -771,6 +895,17 @@ SEAM-D9 to a concrete crate identity. *Rejected:* deleting one lineage or moving
 entrypoint code into the logic crate — it would bind `mp_game` to the `NativeDll`
 transport and block `Static`/`wasm32` reuse.
 
+*Amendment (2026-07-03, compile-forced).* `CEngine` carries `unsafe impl Send for
+CEngine {}` + `unsafe impl Sync for CEngine {}` — required so the shell's `static
+ENGINE: OnceLock<CEngine>` (SEAM-D1) type-checks (a `static` demands `Sync`). Sound
+because `CEngine` wraps only the set-once, single-thread-accessed raw syscall
+pointer; not a design choice, a mechanical consequence of the `OnceLock` static.
+The SP `jagame` shell's `OnceLock<game_import_t>` is likewise not `Sync` — its
+raw-pointer member `VoiceVolume: *mut c_int` (`code/game/g_public.h:287`) — so it
+needs the same local cell wrapper + `unsafe impl Send/Sync` (skeleton finding 13,
+compile-forced): the SP twin of this CEngine finding, identical soundness
+(set-once, single-thread) and identical mechanical (not design) status.
+
 **SEAM-D11 — Our engine reaches a hosted DLL's typed state through one
 `extern "C-unwind"` trampoline per module slot, over a per-slot `*mut Engine` cell
 set by a `Drop` scope-guard (resolves SEAM-Q9).** Each hosted slot's raw `syscall`
@@ -793,6 +928,17 @@ is owned by `docs/architecture/module-loading.md` (its LOAD decision this round)
 which this doc only references. The state-table trampoline-cell row's storage
 column reads `ModuleSlot.engine`.
 
+*Amendment (2026-07-03, guard retired / injected slot). Supersedes this record's
+2026-07-02 "Cell semantics and the `Drop` scope-guard are unchanged" clause.* The
+per-call `Cell<*mut Engine>` + `EngineSlotGuard`/`enter` scope-guard is **retired**
+in favor of load-time injection — `EngineSlot { ctx: *mut c_void, syscall:
+SlotSyscall }` set once when `load_module` runs (Raven `VM_Create` receives and
+stores `systemCalls`, `vm.cpp:471-472,506`; restart reuses the stored injection,
+`vm.cpp:399-409`), and the raw trampoline is a committed C shim rather than a Rust
+variadic definition. Full shapes and rationale: § Seam — inbound raw syscall
+trampoline (two 2026-07-03 amendments). `mp_engine_qcommon` never names
+`mp_engine_core::Engine`/`mp_engine_server`; no crate-graph change.
+
 **SEAM-D12 — Seam entrypoints/dispatchers are `extern "C-unwind"` (adopts
 STATE-D3).** The four live exports (`dllEntry`/`vmMain`/`GetModuleAPI`/
 `GetGameAPI`), every seam dispatcher, and the SEAM-D11 trampoline carry the
@@ -811,6 +957,15 @@ fn-pointer *fields* (e.g. SP UI `gameinfo_import_t`, renderer `refexport_t`) and
 exports and must not silently diverge from them. *Rejected:* plain
 `extern "C"` — unwinding through it is undefined and aborts, breaking DEC-08
 recovery when hosting a native DLL.
+
+*Amendment (2026-07-03, partial application — skeleton finding 10).* The SEAM-D12
+follow-up sweep is **partially applied now**, compile-forced: `game_export_t`'s
+fn-pointer fields (`crates/sp/abi/src/game/public/game_export_t.rs`) are flipped to
+`extern "C-unwind"`, because the export table cannot hold the C-unwind SP
+game-export shell fns otherwise. `game_import_t` is **untouched**; the full
+fn-pointer sweep (both the fn-pointer *fields* and the raw entrypoint *aliases*
+above) remains pending as the tracked slice task. Recorded non-silently — a
+mechanical compile consequence, not a new decision.
 
 **SEAM-D13 — The `type Engine` alias lives in a dedicated binding-leaf crate
 `mp_engine_select`; logic crates import it and carry no cfg/feature (resolves
@@ -841,6 +996,14 @@ recompiles per shell and makes the logic crate carry features, breaking SEAM-D10
 literally); a generic `Engine` type parameter (contradicts the frozen non-generic
 `&Engine` signature); hoisting `mod trap` into the shell crate (a forward
 dependency edge `mp_game`→`jampgame`).
+
+*Naming (2026-07-03).* Two crates spell a type `Engine` and must be
+crate-qualified wherever both could be confused: `mp_engine_select::Engine`
+(this record's module-side transport alias — `CEngine`/`Static`/wasm) and
+`mp_engine_core::Engine` (the engine-island aggregate). They sit on opposite
+islands and are never co-scoped, so neither is renamed. Canonical disambiguation
+block: `docs/workspace-architecture.md` (updated 2026-07-03); see also
+state-ownership.md STATE-D5.
 
 ## Verification strategy
 
@@ -946,6 +1109,31 @@ function/struct/file per commit, slice-driven.
   (SEAM-D8) cannot carry, the terminal compile step is itself gated on it — so a
   dry-run legitimately surfaces SEAM-Q12 as an open question this doc must still
   settle, not merely an external gate. Lifecycle/boot order → lifecycle.md.
+  *Amendment (2026-07-03, SEAM-Q12 resolved).* The `&Engine`-channel gate this
+  bullet places on the Slice-0 terminal compile step (both above, "until
+  **SEAM-Q12** … settles the `&Engine` channel", and here) is **lifted**: the
+  `Dispatch<C>` receiver is now the copyable `GameContext<'e> { world, engine }`
+  (§ Seam definition, inbound dual, amendment), whose `engine` field supplies the
+  `&Engine` the frozen `GAME_INIT` arm's outbound registrations need — with
+  SEAM-D8 untouched. The terminal step ("`jampgame` compiles … unit-testable in
+  isolation") is therefore reachable from this doc alone; only the two named
+  external freezes — (a) `GameWorld`'s definition/construction/home →
+  state-ownership.md and (c) the LOAD-D1 host-load → module-loading.md — still
+  gate end-to-end wiring. *(Note, 2026-07-03: gate (a) is owned by
+  state-ownership.md, and its `zeroed_box`/`GameWorld::zeroed` safe-generic soundness
+  **(STATE-Q10) is CLOSED** — see state-ownership.md **STATE-D9** (the STATE-Q10
+  resolution is applied there, not merely pending). `zeroed_box` is a **safe**
+  `fn zeroed_box<T: ZeroValid>() -> Box<T>`, bounded on a hand-rolled **unsafe marker
+  trait `ZeroValid`** (bytemuck-`Zeroable` style), with a per-type `unsafe impl
+  ZeroValid` beside that type's layout asserts **and** the blanket `unsafe impl<T:
+  ZeroValid, const N: usize> ZeroValid for [T; N]` the entity-array fields require;
+  call sites stay safe. STATE-D9 is its definer, so a plan step that goes past this
+  doc's terminal deliverable to actually construct `GAME_INIT` uses exactly that
+  signature. Because engine-seam.md's own terminal step compiles against a
+  **forward-declared** `GameWorld` (§ Seam definition, inbound dual), it does not
+  itself reach the construction — so this is not a SEAM-owned open question —
+  while the signature a further construction step needs is fully determined
+  above.)*
 - **Later slices.** MP client adds the `CL_CgameSystemCalls` / `CL_UISystemCalls`
   dispatchers and their `vmMain` duals; our-engine hosting of a real DLL adds the
   SEAM-D11 per-slot trampoline **and** the native `SharedGameData` engine-side impl
@@ -1001,62 +1189,6 @@ function/struct/file per commit, slice-driven.
   defer to post-parity, but the type/file that satisfies the standing compile-gate
   must be settled before `mp_engine_select`'s wasm arm can be written.
 
-- **SEAM-Q12 — How a `Dispatch<C>` handler obtains `&Engine` for mid-dispatch
-  outbound calls, and which crate hosts `impl Dispatch<C> for WorldPtr`.** This
-  doc freezes two things its own Slice 0 puts in direct tension, with no stated
-  reconciliation. SEAM-D8 freezes the inbound handler as `fn dispatch(&self, args:
-  C::Args) -> C::Output` — no `&Engine`/`svc` parameter — with the receiver
-  (state-ownership.md) the single-field copyable `WorldPtr(*mut GameWorld)`
-  (§ Seam definition, inbound dual). Yet Slice 0 freezes the `GAME_INIT` dispatch
-  arm as the handler that makes the outbound one-shot registrations
-  `trap_LocateGameData`/`trap_SV_RegisterSharedMemory(gSharedBuffer)`
-  (`g_main.c:519-520,920`; oracle-verified: `G_InitGame` calls
-  `trap_SV_RegisterSharedMemory(gSharedBuffer)` directly), and § Call-site
-  conventions freezes every outbound wrapper as `trap::X(engine: &Engine, args)`.
-  Those calls need an `&Engine` in the handler body; two-island-model.md's Chain-A
-  worked example likewise threads it as the `svc` parameter of `g_run_frame(&mut
-  GameWorld, svc)` — a parameter this doc never names or threads. `&Engine` can
-  legally exist only by reading the shell's private `ENGINE: OnceLock<CEngine>`
-  (SEAM-D1/D9/D10). SEAM-D10 puts both `ENGINE` and the `vmMain` match in the
-  shell, so `&Engine` is in scope at the match site — but the frozen
-  `dispatch(&self, args)` gives the match no parameter to carry it into the impl
-  body, and Rust's orphan rule (`Dispatch` is foreign, from `abi_transport`) pins
-  `impl Dispatch<C> for WorldPtr` to whichever crate defines `WorldPtr`. Two
-  coupled sub-tensions, one decision:
-  - **(A) the `&Engine` channel.** SEAM-D8's engine-less signature and the
-    one-field `WorldPtr` spelling leave no slot for `&Engine`. Candidate
-    reconciliations, each a new decision: amend SEAM-D8 to `dispatch(&self, engine:
-    &Engine, args)`; give `WorldPtr` a second `&Engine`/`*mut Engine` field
-    (contradicts the frozen one-field spelling); or a shell-side per-call
-    convenience wrapper distinct from the frozen `dispatch`. A process-wide
-    thread-local/global bridging `&Engine` is foreclosed (porting-rules §B3 — the
-    same ground that rejected the SEAM-D11 bridging global).
-  - **(B) impl crate-location vs orphan rule.** If `WorldPtr` is defined in
-    `mp_game` (the natural reading of state-ownership.md), its `Dispatch<C>` impls
-    must live in `mp_game` too, which SEAM-D13 bars from reading `jampgame`'s
-    `ENGINE` — so (A) must supply `&Engine` through the trait, not by the impl
-    reading `ENGINE`. If instead the impls (and a shell-local receiver newtype)
-    live in `jampgame`, that reopens SEAM-D10's closed shell inventory ("exactly
-    three things") and the receiver's home. The illustrative shell comment
-    (§ Concrete shell) shows the match calling `mp_game::g_init`/`mp_game::g_run_frame`
-    free functions — implying a shell-routes-to-logic-crate-free-function split
-    with signatures like `mp_game::g_init(engine, world, args)` — but this is a
-    code comment, not a numbered decision, and does not say which crate the ~40
-    `MpGameExport` `Dispatch<C>` impls live in nor how that squares with the
-    orphan rule.
-  There is **no oracle ground truth** to derive this from: the orphan rule, the
-  two-island crate split, and `mp_engine_select` are jka-rust additions (DEC-05,
-  SEAM-D10/D13), absent from Raven's single-address-space C. The internal
-  (non-frozen) logic-fn shape `mp_game::g_init(engine, world, args)` is
-  illustratively derivable (two-island Chain-A + § Call-site conventions) but is
-  contingent on (A)/(B). Unlike SEAM-Q7/SEAM-Q11, this item is **on the Slice-0
-  path**: the frozen `GAME_INIT` dispatch arm cannot typecheck its outbound
-  registrations — so `jampgame` cannot reach the Slice-0 dry-run terminal step
-  ("`jampgame` compiles … unit-testable in isolation") — until the `&Engine`
-  channel is settled. Escalated to a design session; the natural home is the seam
-  dispatch design here (a SEAM-D8/D10 amendment), coordinated with
-  state-ownership.md's `WorldPtr` definition.
-
 **Resolved (history).** All previously escalated items are resolved; their
 resolutions live in the records/sections above:
 
@@ -1088,14 +1220,27 @@ resolutions live in the records/sections above:
   crate owns the one cfg'd `type Engine` alias; logic crates import it and carry
   no cfg/feature; § Call-site conventions, § Decisions, and
   `docs/workspace-architecture.md` § Dependency edges).
+- **SEAM-Q12** (the `&Engine` channel into a `Dispatch<C>` handler and the
+  orphan-rule crate-location of the receiver impls) — resolved 2026-07-03 by the
+  copyable `GameContext<'e> { world, engine }` receiver (§ Seam definition,
+  inbound dual, *Amendment (2026-07-03)*): the receiver carries `engine: &'e
+  Engine` as a field, so SEAM-D8's `dispatch(&self, args)` is untouched, and both
+  `GameContext` and its `Dispatch<C>` impls live in `mp_game`, satisfying the
+  orphan rule; it **supersedes** the round-3 `WorldPtr`. **Reconciled 2026-07-03:
+  `state-ownership.md` STATE-D8 is the frozen home** for the `GameContext` shape and
+  renders the identical **pub-fields / struct-literal / no-`::new`** form (user
+  resolution round-5 #1, `docs/handoffs/2026-07-03-skeleton-findings.md`); this doc
+  carries it as a cross-reference, both docs read identically. The tie-break
+  grounding is spelled in § Seam definition, inbound dual, amendment.
 
 Remaining deferrals to sibling docs (the `SharedGameData` method set →
 state-ownership.md; the module-side `Dispatch<C>` `Self` receiver — the owned
 `GameWorld`-shaped value persisted across `vmMain` calls — and its
 construction/ownership → state-ownership.md; the `Static` bootstrap slice →
 module-loading.md) are scoped non-goals (§ Scope & non-goals), not open
-questions. SEAM-Q7 (`GetModuleAPI` OpenJK-load contract), SEAM-Q11 (the
-module-side `wasm32` `Execute<C>` backend type/file), and SEAM-Q12 (the `&Engine`
-channel into a `Dispatch<C>` handler and the orphan-rule crate-location of
-`impl Dispatch<C> for WorldPtr`) are the genuinely open items, because no sibling
-doc yet owns them.
+questions. SEAM-Q7 (`GetModuleAPI` OpenJK-load contract) and SEAM-Q11 (the
+module-side `wasm32` `Execute<C>` backend type/file) are the genuinely open
+items, because no sibling doc yet owns them. SEAM-Q12 (the `&Engine` channel into
+a `Dispatch<C>` handler and the orphan-rule crate-location of its receiver impls)
+was resolved 2026-07-03 by the `GameContext<'e>` receiver (Resolved history
+above).

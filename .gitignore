@@ -1,3 +1,5 @@
 /target
 __pycache__/
 *.py[cod]
+.claude/worktrees/
+tools/closure-prototype/out/
