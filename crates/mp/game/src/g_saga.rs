@@ -111,7 +111,7 @@ pub fn G_SiegeRegisterWeaponsAndHoldables(
 
 // PORT-NOTE(unported-const): `trap_SetConfigstring(CS_SIEGE_WINTEAM, …)` —
 // `CS_SIEGE_WINTEAM` is not ported anywhere in the crate graph and its value
-// is not in the packet (only the fork-10 const/enum backfill list, which does
+// is not in the packet (only the const/enum backfill list, which does
 // not include the `CS_SIEGE_*` configstring-index family).
 /// Raven `SiegeSetCompleteData` — tell clients this team won for their
 /// intermission scoreboard.
@@ -137,7 +137,7 @@ pub fn SiegeSetCompleteData(
 // PORT-NOTE(bg-boundary): reads/writes the bg-tier siege globals
 // (`team1`/`team2`/`siege_info`/`gParseObjectives`/`bgSiegeClasses`/
 // `bgNumSiegeClasses`/`bgNumSiegeTeams`/`gObjectiveCfgStr`) — none of these are
-// GameWorld fields yet (fork 8a: bg-tier state, still parked in `bg_saga.rs`)
+// GameWorld fields yet (bg-tier state, still parked in `bg_saga.rs`)
 // — and several `CS_SIEGE_*`/`MAX_SIEGE_INFO_SIZE` consts are unported too.
 /// Raven `InitSiegeMode`.
 ///
@@ -472,7 +472,7 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
 }
 
 // PORT-NOTE(bg-boundary): parses/mutates `gObjectiveCfgStr`, a bg-tier
-// siege global not yet a GameWorld field (fork 8a), and calls
+// siege global not yet a GameWorld field, and calls
 // `trap_SetConfigstring(CS_SIEGE_OBJECTIVES, …)` — `CS_SIEGE_OBJECTIVES` is
 // also unported.
 /// Raven `G_SiegeSetObjectiveComplete`.
@@ -552,7 +552,7 @@ pub fn G_SiegeSetObjectiveComplete(
 }
 
 // PORT-NOTE(bg-boundary): reads `gObjectiveCfgStr`, a bg-tier siege
-// global not yet a GameWorld field (fork 8a).
+// global not yet a GameWorld field.
 /// Raven `G_SiegeGetCompletionStatus` — qtrue if objective is currently complete.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:430-480`
@@ -735,7 +735,7 @@ pub fn SiegeBroadcast_ROUNDOVER(
 
 // PORT-NOTE(unported-const): `AddScore(…, SIEGE_POINTS_OBJECTIVECOMPLETED)`
 // — the `SIEGE_POINTS_*` score-award consts are not ported anywhere in the
-// crate graph and their values are not in the packet (only the fork-10
+// crate graph and their values are not in the packet (only the const/enum
 // backfill list, which does not include them); a placeholder value would
 // silently diverge from the oracle's actual scoring.
 /// Raven `BroadcastObjectiveCompletion`.
@@ -1024,7 +1024,7 @@ pub fn SiegeRoundComplete(
 }
 
 // PORT-NOTE(bg-boundary): indexes `bgSiegeClasses`/`bgNumSiegeClasses`
-// (bg-tier siege globals, not yet GameWorld fields — fork 8a, still parked in
+// (bg-tier siege globals, not yet GameWorld fields — still parked in
 // `bg_saga.rs`).
 /// Raven `G_ValidateSiegeClassForTeam`.
 ///
@@ -1166,7 +1166,7 @@ pub fn SiegeRespawn(
 }
 
 // PORT-NOTE(bg-boundary): reads the bg-tier `siege_info` global (not yet
-// a GameWorld field — fork 8a) and calls `trap_SetConfigstring(CS_SIEGE_STATE,
+// a GameWorld field) and calls `trap_SetConfigstring(CS_SIEGE_STATE,
 // …)` — `CS_SIEGE_STATE` is also unported.
 /// Raven `SiegeBeginRound` — entNum is just used as something to fire targets
 /// from.
@@ -1401,7 +1401,7 @@ pub fn SiegeObjectiveCompleted(
 
 // PORT-NOTE(bg-boundary): reads the bg-tier siege globals (`siege_valid`/
 // `team1`/`team2`/`siege_info`/`gParseObjectives`), none of which are GameWorld
-// fields yet (fork 8a, still parked in `bg_saga.rs`).
+// fields yet (still parked in `bg_saga.rs`).
 /// Raven `siegeTriggerUse`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1060-1128`
@@ -1475,7 +1475,7 @@ pub fn siegeTriggerUse(
 }
 
 // PORT-NOTE(bg-boundary): reads the bg-tier `siege_valid` global (not
-// yet a GameWorld field — fork 8a); also uses the unported
+// yet a GameWorld field); also uses the unported
 // `SIEGEITEM_STARTOFFRADAR` spawnflag const.
 /// Raven `SP_info_siege_objective`.
 ///
@@ -1554,7 +1554,7 @@ pub fn SiegeIconUse(
 }
 
 // PORT-NOTE(bg-boundary): reads the bg-tier `siege_valid` global (not
-// yet a GameWorld field — fork 8a); also calls `Com_Error` (variadic — the
+// yet a GameWorld field); also calls `Com_Error` (variadic — the
 // call site here passes no format args, so that part is not itself blocking)
 // and uses the unported `EF_RADAROBJECT` eflags bit.
 /// Raven `SP_info_siege_radaricon`.
@@ -1600,7 +1600,7 @@ pub fn SP_info_siege_radaricon(
 }
 
 // PORT-NOTE(bg-boundary): reads the bg-tier siege globals (`team1`/
-// `team2`/`siege_info`/`gParseObjectives`), not yet GameWorld fields (fork 8a).
+// `team2`/`siege_info`/`gParseObjectives`), not yet GameWorld fields.
 /// Raven `decompTriggerUse`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1236-1291`
@@ -1662,7 +1662,7 @@ pub fn decompTriggerUse(
 }
 
 // PORT-NOTE(bg-boundary): reads the bg-tier `siege_valid` global, not
-// yet a GameWorld field (fork 8a).
+// yet a GameWorld field.
 /// Raven `SP_info_siege_decomplete`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1297-1315`
@@ -1702,7 +1702,7 @@ pub fn siegeEndUse(
 }
 
 // PORT-NOTE(bg-boundary): reads the bg-tier `siege_valid` global, not
-// yet a GameWorld field (fork 8a).
+// yet a GameWorld field.
 /// Raven `SP_target_siege_end`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_saga.c:1325-1334`
@@ -2094,7 +2094,7 @@ pub fn SiegeItemUse(
 }
 
 // PORT-NOTE(bg-boundary): reads the bg-tier `siege_valid` global (not
-// yet a GameWorld field — fork 8a); also uses the unported
+// yet a GameWorld field); also uses the unported
 // `SIEGEITEM_STARTOFFRADAR`/`EF_RADAROBJECT` consts.
 /// Raven `SP_misc_siege_item`.
 ///
@@ -2259,7 +2259,7 @@ pub fn SP_misc_siege_item(
 }
 
 // PORT-NOTE(bg-boundary): reads the `weaponData` bg-tier weapon-data
-// table (not a GameWorld field — fork 8a, a const table, not threaded here)
+// table (not a GameWorld field — a const table, not threaded here)
 // and the unported `MAX_EXDATA_ENTS_TO_SEND` const; its value is not in the
 // packet.
 /// Raven `G_SiegeClientExData` — send extra data about other clients in this

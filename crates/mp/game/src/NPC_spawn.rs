@@ -52,7 +52,7 @@ pub const SFB_STARTINSOLID: c_int = 128;
 // function in this file (NPC_Begin, NPC_Spawn_Do, the ~60 SP_NPC_* spawn-field
 // setters, vehicle/precache plumbing, Cmd_NPC_f, …) reaches `level`,
 // `g_entities`, `G_Spawn`/`G_FreeEntity`, NPC.cfg parsing, ICARUS, vehicle
-// vtables, and ~213 fn-pointer targets (ruling 2) whose concrete Rust
+// vtables, and ~213 fn-pointer targets whose concrete Rust
 // shapes/signatures are not given here and this protocol forbids exploring
 // the tree to find them. Parking those bodies rather than inventing
 // signatures. Only the handful of functions below are fully self-contained
@@ -76,7 +76,7 @@ pub fn WP_SetSaberModel(
 pub fn NPC_PainFunc(
     ent: *mut gentity_t,
 ) -> Option<crate::ent_fn_enums::EntPain> {
-    // Raven returns the selected pain fn-ptr; ruling 26 makes fn-ptr fields the
+    // Raven returns the selected pain fn-ptr; fn-ptr fields are the
     // `Option<EntPain>` fn-ID enum directly (no *mut c_void encoding).
     let pain = unsafe {
         if (*((*ent).client as *mut gclient_t)).ps.weapon == WP_SABER {
@@ -112,7 +112,7 @@ pub fn NPC_PainFunc(
 pub fn NPC_TouchFunc(
     _ent: *mut gentity_t,
 ) -> Option<crate::ent_fn_enums::EntTouch> {
-    // Raven always returns `NPC_Touch`; ruling 26 — `Option<EntTouch>` directly.
+    // Raven always returns `NPC_Touch`, returned here as `Option<EntTouch>` directly.
     Some(crate::ent_fn_enums::EntTouch::NPC_Touch)
 }
 
@@ -754,7 +754,7 @@ pub fn NPC_Begin(
         NPC_ChangeWeapon((*client).ps.weapon);
 
         (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Pain);
-        // Ruling 26: pain/touch fn-ID enums assigned straight from the selector
+        // pain/touch fn-ID enums assigned straight from the selector
         // fns (no *mut c_void encode/transmute round-trip).
         (*ent).pain = NPC_PainFunc(ent);
         (*ent).touch = NPC_TouchFunc(ent);

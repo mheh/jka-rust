@@ -43,7 +43,7 @@ use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 
 /// Raven `pushed_t` (`g_mover.c:19-24`) — one saved position/angle/deltayaw
 /// snapshot per moved entity, so a blocked mover push can roll everything
-/// back. Owned by `GameGlobals::pushed`/`pushed_p` (fork ruling 1/5: the
+/// back. Owned by `GameGlobals::pushed`/`pushed_p` (the
 /// `pushed[]`/`pushed_p` save-stack is genuine cross-call scratch state,
 /// modeled as a `Vec` + cursor index rather than a raw pointer pair per
 /// porting-rules B3/B5).
@@ -90,7 +90,7 @@ pub const MOVER_PLAYER_USE: c_int = 64;
 pub const MOVER_INACTIVE: c_int = 128;
 
 // Raven file-scope `int BMS_START/BMS_MID/BMS_END` (g_mover.c:35-37) — never
-// reassigned at runtime (fork ruling 5: const tables -> const).
+// reassigned at runtime (const tables -> const).
 // Source: `oracle/oracle/codemp/game/g_mover.c:35-37`
 pub const BMS_START: c_int = 0;
 pub const BMS_MID: c_int = 1;
@@ -234,7 +234,7 @@ pub fn G_TransposeMatrix(
     }
 }
 
-// Fork-9 reshape: Raven's `point` is written through (`point[i] =
+// Reshape: Raven's `point` is written through (`point[i] =
 // DotProduct(...)`, read back by the caller), so it becomes `&mut vec3_t`
 // per the ruling's non-nullable-out case. Same-file callers (below)
 // updated to pass `&mut`.
@@ -256,8 +256,7 @@ pub fn G_RotatePoint(
 /// Raven `G_TryPushingEntity`.
 ///
 /// `move`/`amove` are read-only in Raven (never written back through), so
-/// they stay by value per the fork-9 "keep by-value only if never written"
-/// clause.
+/// they stay by value ("keep by-value only if never written" clause).
 /// Source: `oracle/oracle/codemp/game/g_mover.c:159-269`
 pub fn G_TryPushingEntity(
     ctx: GameContext<'_>,
@@ -411,7 +410,7 @@ pub fn G_TryPushingEntity(
 
 /// Raven `G_MoverPush`.
 ///
-/// `move`/`amove` are read-only in Raven, so they stay by value (fork-9).
+/// `move`/`amove` are read-only in Raven, so they stay by value.
 /// Source: `oracle/oracle/codemp/game/g_mover.c:283-408`
 pub fn G_MoverPush(
     ctx: GameContext<'_>,
@@ -704,7 +703,7 @@ pub fn G_RunMover(
     }
 }
 
-// Fork-9 reshape: Raven's `center` is written through (built up across the
+// Reshape: Raven's `center` is written through (built up across the
 // slave loop, read back by every caller), so it becomes `&mut vec3_t` per
 // the ruling's non-nullable-out case. Same-file callers updated below.
 /// Raven `CalcTeamDoorCenter`.

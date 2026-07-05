@@ -1,13 +1,13 @@
-//! Entity fn-pointer dispatch fn-ID enums (ruling 2), hoisted to `mp_qshared`
+//! Entity fn-pointer dispatch fn-ID enums, hoisted to `mp_qshared`
 //! so `gentity_t`'s dispatch fields can name them.
 //!
-//! Ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): per-field fn-ID enums
-//! replace Raven's stored fn pointers; `PartialEq` replaces fn-address compares;
-//! stored as `Option<EntXxx>` where Raven stored a nullable fn pointer.
+//! Per-field fn-ID enums replace Raven's stored fn pointers; `PartialEq`
+//! replaces fn-address compares; stored as `Option<EntXxx>` where Raven stored
+//! a nullable fn pointer.
 //!
-//! `gentity_t` lives in this crate (the abi seam names `*mut gentity_t`), and the
-//! fork-2 flip turns its 7 stored dispatch fn-pointer fields (`think`, `reached`,
-//! `blocked`, `touch`, `use_`, `pain`, `die`) into `Option<EntXxx>`. That field
+//! `gentity_t` lives in this crate (the abi seam names `*mut gentity_t`), and its
+//! 7 stored dispatch fn-pointer fields (`think`, `reached`,
+//! `blocked`, `touch`, `use_`, `pain`, `die`) are `Option<EntXxx>`. That field
 //! type must therefore be visible in `mp_qshared`, below `mp_game`. The central
 //! match dispatch (`dispatch_think`, …) stays in `mp_game`'s `ent_fn_enums`
 //! (it names the handler fns), which re-exports these enums so existing imports

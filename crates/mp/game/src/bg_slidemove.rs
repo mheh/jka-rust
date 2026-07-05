@@ -2,9 +2,9 @@
 //! Ported `oracle/oracle/codemp/game/bg_slidemove.c` bodies (pass 3).
 //!
 //! All five functions are built on the pmove working set that `bg_pmove.rs`
-//! threads as `PmoveContext` (pass-3 rulings 8a/12): `self.pm`/`self.pml`/
-//! `self.pm_entSelf`, `self.bg` (session state), `self.traps` (`BgTraps`,
-//! ruling 13) and `self.callbacks` (`GameCallbacks`, ruling 16) replace the
+//! threads as `PmoveContext`: `self.pm`/`self.pml`/
+//! `self.pm_entSelf`, `self.bg` (session state), `self.traps` (`BgTraps`)
+//! and `self.callbacks` (`GameCallbacks`) replace the
 //! Raven file statics and the `QAGAME`-only game-tier calls. They are `impl
 //! PmoveContext<'_>` methods, mirroring the proven shape already landed for
 //! `PM_BGEntForNum`/`PM_ClipVelocity`/`PM_Friction` in `bg_pmove.rs`.
@@ -68,7 +68,7 @@ impl PmoveContext<'_> {
 
             // PORT-NOTE(bg-tier-gap): Raven's `hitEnt` here is a full
             // `gentity_t*` (inuse/r.ownerNum/client/…), which the bg tier's
-            // `bgEntity_t` overlay does not expose (ruling 14). Fields below
+            // `bgEntity_t` overlay does not expose. Fields below
             // that only exist on `gentity_t` are referenced literally and
             // reported as missing symbols; a fixer must widen the bg-visible
             // surface (new `BgTraps`/`GameCallbacks` accessors) to close them.

@@ -58,28 +58,19 @@ pub struct bot_state_t {
 	pub viewanglespeed: vec3_t,
 
 	// rww - new AI values
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub currentEnemy: Option<EntityId>,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub revengeEnemy: Option<EntityId>,
 
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub squadLeader: Option<EntityId>,
 
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub lastHurt: Option<EntityId>,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub lastAttacked: Option<EntityId>,
 
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub wantFlag: Option<EntityId>,
 
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub touchGoal: Option<EntityId>,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub shootGoal: Option<EntityId>,
 
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub dangerousObject: Option<EntityId>,
 
 	pub staticFlagSpot: vec3_t,
@@ -154,9 +145,7 @@ pub struct bot_state_t {
 	pub chatTime_stored: f32,
 	pub doChat: c_int,
 	pub chatTeam: c_int,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub chatObject: Option<EntityId>,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub chatAltObject: Option<EntityId>,
 
 	pub meleeStrafeTime: f32,
@@ -258,9 +247,8 @@ const _: () = assert!(core::mem::offset_of!(bot_state_t, ws) == 1948);
 const _: () = assert!(core::mem::offset_of!(bot_state_t, viewangles) == 1952);
 const _: () = assert!(core::mem::offset_of!(bot_state_t, ideal_viewangles) == 1964);
 const _: () = assert!(core::mem::offset_of!(bot_state_t, viewanglespeed) == 1976);
-// RULING 22 (`docs/handoffs/jampgame-fork-discovery.md`): the fork-4 flip turned
-// this struct's stored `gentity_t*` fields into `Option<EntityId>` (align 4 vs a
-// pointer's align 8), so the private tail's byte offsets shift. This struct is
+// This struct's stored `gentity_t*` fields are ported as `Option<EntityId>`
+// (align 4 vs a pointer's align 8), so the private tail's byte offsets shift. This struct is
 // game-internal / not ABI-fixed beyond its prefix — the engine learns the full
 // stride at runtime via `trap_LocateGameData`. The `size_of` assert and every
 // `offset_of` assert at/after the first flipped field are therefore dropped;

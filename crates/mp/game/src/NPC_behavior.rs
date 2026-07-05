@@ -259,10 +259,10 @@ pub fn BeamOut(
         let world = &mut *ctx.world;
         // fixme: doesn't actually go away!
         (*self_).nextthink = world.level.time + 1500;
-        // fork ruling 2: fn-ptr field -> fn-ID enum (shape_mismatch: gentity_t.think's
+        // fn-ptr field -> fn-ID enum (shape_mismatch: gentity_t.think's
         // declared type is still the raw `unsafe extern "C" fn` pointer in this
-        // worktree, not `Option<EntThink>` — writing the ruling-2 assignment anyway
-        // per LAW; see shape_mismatches in the port report).
+        // worktree, not `Option<EntThink>` — writing the enum assignment anyway
+        // per the settled rule; see shape_mismatches in the port report).
         (*self_).think = Some(EntThink::Disappear);
         let client = (*self_).client as *mut gclient_t;
         (*client).squadname = core::ptr::null_mut();

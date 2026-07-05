@@ -1,7 +1,7 @@
-//! `Rng` — the fork-3 faithful LCG (Raven's VC-libc `rand()` clone).
+//! `Rng` — the faithful LCG (Raven's VC-libc `rand()` clone).
 //!
 //! Raven kept the generator in a single file-static `holdrand` shared by the
-//! whole game+bg tier (`q_math.c`). Fork ruling 3 / pass-3 ruling 15: reproduce
+//! whole game+bg tier (`q_math.c`). This reproduces
 //! the LCG bit-exactly as an owned, threaded generator living in `BgState`;
 //! game reaches it via `world.bg_state.rng`. Never the `rand` crate — every
 //! `Q_flrand`/`Q_irand` site is parity-visible.
@@ -17,7 +17,7 @@ use core::ffi::{c_int, c_uint};
 ///
 /// Raven kept two independent generator states — this file-static `holdrand`
 /// (`q_math.c:1432`) and `bg_lib.c`'s file-static `randSeed` (`bg_lib.c:763`)
-/// — that never shared state; pass-3 ruling 15 keeps both threaded here.
+/// — that never shared state; both are kept threaded here.
 ///
 /// Source: `oracle/oracle/codemp/game/q_math.c:1432`
 pub struct Rng {
@@ -121,7 +121,7 @@ impl Default for Rng {
     }
 }
 
-// Fork-3 parity is bit-exact ONLY for a 32-bit `unsigned long` (the shipping
+// Parity is bit-exact ONLY for a 32-bit `unsigned long` (the shipping
 // `jampded`/i686 target). `holdrand` is modelled as `u32` and every step uses
 // wrapping arithmetic to reproduce the truncation; this assert pins that the
 // state width has not silently widened. On an LP64 host `unsigned long` is
@@ -130,5 +130,5 @@ impl Default for Rng {
 // Source: `oracle/oracle/codemp/game/q_math.c:1432` (holdrand*214013+2531011 >>17)
 const _: () = assert!(
     core::mem::size_of::<u32>() == 4,
-    "fork-3 LCG parity requires a 32-bit holdrand state"
+    "LCG parity requires a 32-bit holdrand state"
 );

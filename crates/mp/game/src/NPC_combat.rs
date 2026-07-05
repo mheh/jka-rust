@@ -66,14 +66,14 @@ const CHECK_VISRANGE: c_int = 16;
 const DEBUG_LEVEL_INFO: c_int = 3;
 
 /// `ent - g_entities` base pointer for this file's `ent_id`/`ent_id_opt` calls
-/// (ruling 22 seam helper), precedent `g_missile.rs`/`g_trigger.rs`.
+/// (entity-id/pointer seam helper), precedent `g_missile.rs`/`g_trigger.rs`.
 #[inline]
 unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
     unsafe { (*ctx.world).g_entities.as_ptr() }
 }
 
 /// Resolve a stored `Option<EntityId>` field back to a `gentity_t*` (the
-/// id->pointer half of the ruling-22 seam; `None` -> Raven's NULL).
+/// id->pointer half of the entity-id seam; `None` -> Raven's NULL).
 #[inline]
 unsafe fn ent_ptr(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut gentity_t {
     match id {
@@ -1061,7 +1061,7 @@ pub fn CanShoot(
         ];
         // Raven `random()` (`q_shared.h:1591`, `(rand()&0x7fff)/32767.0`) —
         // the `bg_lib.c` `randSeed` LCG (distinct from the game's own
-        // `Q_flrand`/`Q_irand` LCG, ruling 15), reached via `bg_state.rng`.
+        // `Q_flrand`/`Q_irand` LCG), reached via `bg_state.rng`.
         let random = (*ctx.world).bg_state.rng.random();
         if VectorLength(diff) < random * 32.0 {
             return 1;
@@ -1376,7 +1376,7 @@ pub fn NPC_PickEnemy(
                                     failed = true;
                                 } else {
                                     // PORT-NOTE(varargs-seam): Debug_Printf's ported signature has no
-                                    // variadic slot; pre-format via format! (ruling 18) and pass as fmt.
+                                    // variadic slot; pre-format via format! and pass as fmt.
                                     let s = format!(
                                         "{} saw {} trying to hide - hiddenDir {} targetDir {} dot {}\n",
                                         cstr_to_str((*npc).targetname as *const c_char),
@@ -1967,8 +1967,8 @@ pub fn NPC_ShotEntity(
             );
         }
         //FIXME: if using a bouncing weapon like the bowcaster, should we check the reflection of the wall, too?
-        // PORT-NOTE(fork-9): `impactPos` here is caller-owned storage the packet
-        // keeps by-value per LAW; Raven's `if (impactPos)` null-check is
+        // PORT-NOTE(vec3-out-param-reshape): `impactPos` here is caller-owned
+        // storage kept by-value; Raven's `if (impactPos)` null-check is
         // unreachable for a by-value array, so this always writes through.
         let mut impactPos = impactPos;
         impactPos = tr.endpos;

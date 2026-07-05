@@ -53,7 +53,7 @@ pub fn BG_AttachToRancor(
     );
 
     // Storing ent position, bolt position, and bolt axis
-    // PORT-NOTE(vec3-outparam-fork9): out_origin/out_angles are by-value vec3_t in resolved
+    // PORT-NOTE(vec3-outparam): out_origin/out_angles are by-value vec3_t in resolved
     // signature but C semantics require writing through pointers; treating as nullable pointers
     // (checking against zero/null for safety; addresses alignment concerns).
     if &out_origin as *const vec3_t as usize != 0 {

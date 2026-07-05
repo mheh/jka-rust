@@ -11,8 +11,8 @@
 //! systemic topic — `state-threading`. The fnskel signatures take only
 //! typed parameters with NO `GameContext`/`world`/`engine` channel, but
 //! faithful bodies pervasively need module-island state (`allocPoint`,
-//! `memoryPool`, and `g_debugAlloc` cvar — all `GameWorld` fields per
-//! fork-ruling 1). The frozen state-ownership design (STATE-D1 /
+//! `memoryPool`, and `g_debugAlloc` cvar — all `GameWorld` fields).
+//! The frozen state-ownership design (STATE-D1 /
 //! porting-rules §B3) forbids globals/`static mut`, so these accessors
 //! cannot be invented; the verbatim cross-file signature contract forbids
 //! rethreading a `GameContext` param into these signatures. This is
@@ -32,7 +32,7 @@ pub fn G_Alloc(size: c_int) -> *mut c_void {
     const POOLSIZE: c_int = 262144; // 256 * 1024
 
     // PORT-NOTE(state-threading-g-alloc): G_Alloc lacks ctx param but needs GameWorld
-    // state (allocPoint, memoryPool, g_debugAlloc cvar). Ruling 21 marks this as a
+    // state (allocPoint, memoryPool, g_debugAlloc cvar). This is a
     // ctx-free boundary function called from bg via GameCallbacks. The architecture
     // expects GameCallbacksImpl.alloc() to delegate here, but direct game-code calls
     // (g_spawn.rs, g_ICARUScb.rs) and state access require resolution per integration.

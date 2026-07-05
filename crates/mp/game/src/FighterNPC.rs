@@ -38,7 +38,7 @@ pub fn Board(
     pEnt: *mut bgEntity_t,
 ) -> qboolean {
     unsafe {
-        // Fork-7: `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
+        // `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
         if crate::g_vehicles::Board(ctx, pVeh, pEnt) == qfalse {
             return qfalse;
         }
@@ -60,7 +60,7 @@ pub fn Eject(
     forceEject: qboolean,
 ) -> qboolean {
     unsafe {
-        // Fork-7: `g_vehicleInfo[VEHICLE_BASE].Eject` is the generic base body.
+        // `g_vehicleInfo[VEHICLE_BASE].Eject` is the generic base body.
         if crate::g_vehicles::Eject(ctx, pVeh, pEnt, forceEject) != qfalse {
             qtrue
         } else {
@@ -620,7 +620,7 @@ pub fn FighterPitchClamp(
     }
 }
 
-// Fork-7 (2026-07-03): `G_SetFighterVehicleFunctions` retired — it only assigned the now-removed
+// `G_SetFighterVehicleFunctions` retired — it only assigned the now-removed
 // `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
 // `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
 

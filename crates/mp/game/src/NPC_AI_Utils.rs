@@ -8,9 +8,9 @@
 //! `level` -> `(*ctx.world).level`, `g_entities[i]` -> `(*ctx.world).g_entities[i]`,
 //! cvars -> `(*ctx.world).cvars`. Traps go through `trap::X(ctx.engine, …)`.
 //! Raw `gentity_t*`/`AIGroupInfo_t*` chains are transcribed as `unsafe`
-//! raw-pointer field access mirroring the C exactly (fork ruling 4:
-//! multi-EntityId reshaping is deferred to the later integration pass; this
-//! pass keeps the packet's resolved raw-pointer signatures verbatim).
+//! raw-pointer field access mirroring the C exactly (multi-EntityId
+//! reshaping is deferred to the later integration pass; this pass keeps
+//! the packet's resolved raw-pointer signatures verbatim).
 //! `ent->client`/`ent->NPC` are `*mut c_void` placeholders in `gentity_t`
 //! (tiering note in `mp_qshared::gentity_t`); cast to `*mut gclient_t`/
 //! `*mut gNPC_t` at each use site, matching the established

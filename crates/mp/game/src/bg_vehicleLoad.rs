@@ -296,7 +296,7 @@ pub fn VEH_VehWeaponIndexForName(
 /// Raven `BG_SetSharedVehicleFunctions`.
 ///
 /// //TODO: Port BG_SetSharedVehicleFunctions
-/// Deliberately a no-op under fork 7 (blessed 2026-07-03): Raven's body filled
+/// Deliberately a no-op: Raven's body filled
 /// the `vehicleInfo_t` fn-ptr slots (via `G_SetSharedVehicleFunctions` +
 /// `G_Set<Type>VehicleFunctions`), but those slots are retired for stateless
 /// `vehicleType_t`-keyed dispatch (`crate::veh_dispatch`), so `.veh`-load has no

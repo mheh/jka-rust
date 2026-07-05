@@ -1,10 +1,10 @@
-//! Game-tier implementations of the bg channel traits (pass-3 rulings 13/16).
+//! Game-tier implementations of the bg channel traits.
 //!
 //! `BgTraps`/`GameCallbacks` are declared in the (conceptually bg) channel with
 //! bg-visible signatures; their concrete implementations belong to the game
-//! tier and hold the game's `&Engine` / world handle. Ruling 19 keeps
-//! everything in `mp_game` for pass 3, so the impls live here beside the traits;
-//! when the bg crate splits out, only this file moves to game proper.
+//! tier and hold the game's `&Engine` / world handle. Everything currently
+//! lives in `mp_game`, so the impls live here beside the traits; when the bg
+//! crate splits out, only this file moves to game proper.
 //!
 //! Exercised in the pmove slice: [`GameBgTraps::pointcontents`] delegates to
 //! `crate::trap::PointContents` with a real `Engine` handle — the end-to-end
@@ -30,7 +30,7 @@ pub struct GameBgTraps<'a> {
 impl<'a> GameBgTraps<'a> {
     pub fn new(engine: &'a Engine) -> Self {
         // Create a temporary GameContext just for the engine; world is unreachable
-        // from BgTraps methods (ruling 13 seam boundary).
+        // from BgTraps methods (seam boundary).
         Self {
             ctx: GameContext {
                 world: std::ptr::null_mut(),
@@ -67,7 +67,7 @@ impl BgTraps for GameBgTraps<'_> {
         todo!("Port BgTraps::fs_fopen delegation — crate::trap::FS_FOpenFile")
     }
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
-        // Mechanical delegation (ruling 13) — matches the proven `pointcontents`
+        // Mechanical delegation — matches the proven `pointcontents`
         // shape. Raven: `trap_FS_Read` (`G_FS_READ`).
         use mp_abi::game::syscalls::G_FS_READ::GFsReadArgs;
         crate::trap::FS_Read(self.ctx.engine, GFsReadArgs::new(buffer as *mut u8, len, f))
@@ -93,7 +93,7 @@ impl BgTraps for GameBgTraps<'_> {
     }
 
     fn r_register_skin(&self, name: *const c_char) -> qhandle_t {
-        // Mechanical delegation (ruling 13), matching `g2api_add_bolt`'s
+        // Mechanical delegation, matching `g2api_add_bolt`'s
         // CString-conversion shape. Raven: `trap_R_RegisterSkin` (`G_R_REGISTERSKIN`).
         let name = unsafe { std::ffi::CStr::from_ptr(name) }.to_owned();
         crate::trap::R_RegisterSkin(
@@ -112,7 +112,7 @@ impl BgTraps for GameBgTraps<'_> {
         modelFlags: c_int,
         lodBias: c_int,
     ) -> c_int {
-        // Mechanical delegation (ruling 13). Raven: `trap_G2API_InitGhoul2Model`
+        // Mechanical delegation. Raven: `trap_G2API_InitGhoul2Model`
         // (`G_G2_INITGHOUL2MODEL`).
         let file_name = unsafe { std::ffi::CStr::from_ptr(fileName) }.to_owned();
         crate::trap::G2API_InitGhoul2Model(
@@ -129,7 +129,7 @@ impl BgTraps for GameBgTraps<'_> {
         )
     }
     fn g2api_clean_ghoul2_models(&self, ghoul2Ptr: *mut *mut c_void) {
-        // Mechanical delegation (ruling 13). Raven: `trap_G2API_CleanGhoul2Models`
+        // Mechanical delegation. Raven: `trap_G2API_CleanGhoul2Models`
         // (`G_G2_CLEANMODELS`).
         crate::trap::G2API_CleanGhoul2Models(
             self.ctx.engine,

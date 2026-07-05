@@ -1,4 +1,4 @@
-//! `PmoveContext` — the per-`Pmove`-call bg working set (pass-3 ruling 12, 8a).
+//! `PmoveContext` — the per-`Pmove`-call bg working set.
 //!
 //! Raven's `bg_pmove.c` kept its working state in file-scope statics
 //! (`pmove_t *pm`, `pml_t pml`, `bgEntity_t *pm_entSelf`/`pm_entVeh`,
@@ -22,7 +22,7 @@ use mp_bg::local::pml_t::pml_t;
 /// The pmove working set for one `Pmove` call plus the bg channel handles.
 ///
 /// The raw `pm`/`pm_entSelf`/`pm_entVeh` pointers are the faithful pmove seam
-/// (ruling 14: `bgEntity_t` access stays the `baseEnt`/`entSize` overlay); the
+/// (`bgEntity_t` access stays the `baseEnt`/`entSize` overlay); the
 /// unsafe that dereferences them is confined to the pmove methods.
 pub struct PmoveContext<'a> {
     /// Raven `pmove_t *pm` — the in/out move block, assigned per call.
@@ -48,11 +48,11 @@ pub struct PmoveContext<'a> {
     pub pm_cancelOutZoom: qboolean,
 
     /// Session-lifetime bg state (anim/saber/vehicle tables + RNG), threaded in
-    /// by the game-tier caller (ruling 12).
+    /// by the game-tier caller.
     pub bg: &'a mut BgState,
-    /// The outbound engine surface (ruling 13).
+    /// The outbound engine surface.
     pub traps: &'a dyn BgTraps,
-    /// The bg→game upcall surface (ruling 16).
+    /// The bg→game upcall surface.
     pub callbacks: &'a mut dyn GameCallbacks,
 }
 

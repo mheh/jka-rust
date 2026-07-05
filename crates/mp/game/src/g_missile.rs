@@ -7,14 +7,14 @@
 //! `d_projectileGhoul2Collision`/`g_g2TraceLod`) and engine traps
 //! (`trap_LinkEntity`/`trap_Trace`/`trap_G2Trace`) through the threaded
 //! `GameContext`/`GameWorld` handle; fn-pointer fields (`think`) are set via
-//! the `EntThink` enum (ruling 2) rather than a bare fn pointer.
+//! the `EntThink` enum rather than a bare fn pointer.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
 use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_TempEntity};
 use crate::trap;
 
-// Ruling 22 seam helpers (local to this file): `gentity_t*` stored fields
+// Seam helpers (local to this file): `gentity_t*` stored fields
 // (`parent`/`target_ent`/`activator`/`hook`) are `Option<EntityId>`; these
 // resolve an id back to the live pointer needed at raw-pointer call sites
 // (`G_RadiusDamage`, `G_Damage`, …) and build the id at assignment sites.

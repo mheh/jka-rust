@@ -7,11 +7,11 @@
 //! `docs/handoffs/jampgame-fork-discovery.md`). STAGING ONLY — not wired into
 //! crates/; the tree is not compiled per porter ("Do NOT run cargo").
 //!
-//! SPINE (fork rulings 1/4 + `docs/architecture/engine-seam.md`, precedent
-//! `g_client.rs`/`w_force.rs`): logic fns that reach `level`/cvars/
+//! SPINE (per the settled fork rulings + `docs/architecture/engine-seam.md`,
+//! precedent `g_client.rs`/`w_force.rs`): logic fns that reach `level`/cvars/
 //! `g_entities`/traps thread the `GameContext<'_>` receiver (`.world: *mut
 //! GameWorld`, `.engine`) as an ADDED first parameter (not present on the
-//! staged raw-pointer skeleton). Globals are `GameWorld` fields (fork 1):
+//! staged raw-pointer skeleton). Globals are `GameWorld` fields:
 //! `level` -> `(*ctx.world).level`, cvars -> `(*ctx.world).cvars`,
 //! `g_entities[i]` -> `(*ctx.world).g_entities[i]`. Traps go through
 //! `trap::X(ctx.engine, <Name>Args::new(...))`. Cross-file callees are invoked
@@ -774,7 +774,7 @@ const fn field(name: &'static CStr, ofs: usize, r#type: fieldtype_t) -> BG_field
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:766-842`
 pub fn G_SpawnGEntityFromSpawnVars(ctx: GameContext<'_>, inSubBSP: qboolean) {
     unsafe {
-        // static char *gametypeNames[] — fn-scope const table (fork ruling 5).
+        // static char *gametypeNames[] — fn-scope const table.
         const GAMETYPE_NAMES: [&CStr; 10] = [
             c"ffa",
             c"holocron",

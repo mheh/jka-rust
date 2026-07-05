@@ -1,6 +1,6 @@
-//! `veh_dispatch` — fork-7 vehicle "virtual" dispatch.
+//! `veh_dispatch` — vehicle "virtual" dispatch.
 //!
-//! Fork 7 (blessed 2026-07-03) retires Raven's `vehicleInfo_t` function-pointer
+//! This (blessed 2026-07-03) retires Raven's `vehicleInfo_t` function-pointer
 //! table (the 25 `AnimateVehicle`/`Board`/`Eject`/… slots filled once at `.veh`
 //! load by `G_Set*VehicleFunctions`) in favour of `vehicleType_t`-keyed dispatch
 //! (porting-rules §C8/§F17 — a closed hierarchy: `VH_WALKER`/`VH_FIGHTER`/
@@ -18,7 +18,7 @@
 //!
 //! Tier note: the slot impls are game-tier (they take `GameContext`), so this
 //! dispatch is game-tier too and lives in `mp_game` rather than `mp_bg` (the
-//! ruling's "mp_bg vehicles subsystem" predates ruling-19, under which the
+//! earlier plan's "mp_bg vehicles subsystem" predates the settled decision that the
 //! bg/game boundary is the `BgTraps`/`GameCallbacks` traits, not a crate wall,
 //! and the pmove/vehicle bodies all live in `mp_game`). Game-tier callers invoke
 //! these directly; the one bg-tier caller (`bg_pmove` boarding) reaches `board`

@@ -1,9 +1,8 @@
 //! `EntityId` — the entity handle (porting-rules §B5), hoisted to `mp_qshared`
-//! so `gentity_t`'s stored entity fields can name it (ruling 22).
+//! so `gentity_t`'s stored entity fields can name it.
 //!
-//! `gentity_t` lives in this crate (the abi seam names `*mut gentity_t`), and the
-//! fork-4 flip (ruling 22, `docs/handoffs/jampgame-fork-discovery.md`) turns the 38
-//! stored `gentity_t*` struct fields into `Option<EntityId>`. That field type must
+//! `gentity_t` lives in this crate (the abi seam names `*mut gentity_t`), and its
+//! 38 stored `gentity_t*` struct fields are `Option<EntityId>`. That field type must
 //! therefore be visible in `mp_qshared`. `mp_game` re-exports it (via
 //! `crate::world::EntityId` + the prelude) so every existing use keeps compiling.
 
@@ -14,11 +13,11 @@ use crate::common::mp::gentity::gentity_t;
 /// no aliasing raw pointers in safe code (§B5).
 ///
 /// Wire-shaped `u32` newtype (entity numbers cross the wire as indices). Entity 0
-/// is valid, so nullability is carried by `Option<EntityId>` (ruling 22), not a
+/// is valid, so nullability is carried by `Option<EntityId>`, not a
 /// sentinel niche.
 ///
 /// Source: `docs/architecture/state-ownership.md` § `EntityId` — the entity
-/// handle (§B5); hoist per ruling 22.
+/// handle (§B5).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct EntityId(pub u32);
 
@@ -30,9 +29,9 @@ impl EntityId {
     }
 }
 
-/// The `ent - g_entities` seam helper (ruling 22): recover an [`EntityId`] from a
+/// The `ent - g_entities` seam helper: recover an [`EntityId`] from a
 /// live `gentity_t*` given the `g_entities` array base. This is the pointer→index
-/// half of the fork-4 retrofit — the `Option<EntityId>` stored fields are filled
+/// half of the retrofit — the `Option<EntityId>` stored fields are filled
 /// via `Some(ent_id(base, ent))` at pointer-assignment sites, and reloaded via
 /// `&world.g_entities[id.index()]` at deref sites.
 ///
@@ -50,7 +49,7 @@ pub unsafe fn ent_id(base: *const gentity_t, ent: *const gentity_t) -> EntityId 
 }
 
 /// NULL-aware [`ent_id`]: Raven's nullable `gentity_t*` → `Option<EntityId>`
-/// (ruling 22 — NULL becomes `None`; entity 0 is valid so there is no sentinel).
+/// (NULL becomes `None`; entity 0 is valid so there is no sentinel).
 ///
 /// # Safety
 /// Same contract as [`ent_id`] when `ent` is non-null.

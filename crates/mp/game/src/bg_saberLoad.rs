@@ -6,7 +6,7 @@
 //! porting-rules §20 ("drop dead surface").
 //!
 //! Several fns reach `SaberParms`/`bgSaberParseTBuffer` through `BgState`
-//! (ruling 12) and the engine surface through `BgTraps` (ruling 13). Some
+//! and the engine surface through `BgTraps`. Some
 //! `SFL2_` saberFlags bitflag consts (e.g. `SFL2_NO_MANUAL_DEACTIVATE`) and the
 //! `SaberTable`/`SaberMoveTable`/`FPTable`/`animTable` lookup statics are not
 //! yet ported into the Rust tree; those sites reference the Raven names
@@ -2086,7 +2086,7 @@ pub fn WP_SaberSetColor(
 /// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2738-2790`
 // PORT-NOTE(vec-as-fixed-buffer): Raven's `SaberParms`/`bgSaberParseTBuffer`
 // are fixed `char[MAX_SABER_DATA_SIZE]` statics; `BgState` owns them as
-// growable `Vec<u8>` (ruling 12/§9). Pre-sized here to `MAX_SABER_DATA_SIZE`
+// growable `Vec<u8>`. Pre-sized here to `MAX_SABER_DATA_SIZE`
 // so the pointer-arithmetic parse below (raw `*mut c_char` into the backing
 // storage) stays faithful to Raven's fixed-buffer indexing.
 pub fn WP_SaberLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {

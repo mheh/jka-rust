@@ -271,13 +271,10 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:240`
     pub soundLoop: c_int,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:241`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub parent: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:242`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub nextTrain: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:243`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub prevTrain: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:244`
     pub pos1: vec3_t,
@@ -315,7 +312,6 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:263`
     pub targetShaderNewName: *mut c_char,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:264`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub target_ent: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:266`
     pub closetarget: *mut c_char,
@@ -343,26 +339,19 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:283`
     pub nextthink: c_int,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:284`
-    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntThink>` (Raven fn ptr).
     pub think: Option<EntThink>,
     /// Movers call this when hitting endpoint.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:285`
-    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntReached>` (Raven fn ptr).
     pub reached: Option<EntReached>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:286`
-    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntBlocked>` (Raven fn ptr).
     pub blocked: Option<EntBlocked>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:287`
-    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntTouch>` (Raven fn ptr).
     pub touch: Option<EntTouch>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:288`
-    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntUse>` (Raven fn ptr).
     pub use_: Option<EntUse>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:289`
-    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntPain>` (Raven fn ptr).
     pub pain: Option<EntPain>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:290`
-    /// ruling 2 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntDie>` (Raven fn ptr).
     pub die: Option<EntDie>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:292`
     pub pain_debounce_time: c_int,
@@ -400,24 +389,18 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:312`
     pub alt_fire: qboolean,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:314`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub chain: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:315`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub enemy: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:316`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub lastEnemy: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:317`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub activator: Option<EntityId>,
     /// Next entity in team.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:318`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub teamchain: Option<EntityId>,
     /// Master of the team.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:319`
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub teammaster: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:321`
     pub watertype: c_int,
@@ -488,10 +471,10 @@ pub struct gentity_t {
 // pointers, so these offsets hold regardless of those types being ported.
 // Source: `oracle/oracle/codemp/game/g_local.h:133-359`
 //
-// RULING 22 (`docs/handoffs/jampgame-fork-discovery.md`): the fork-4 flip turned
-// 10 stored `gentity_t*` fields (`parent`..`teammaster`, all after `moverState`)
-// into `Option<EntityId>`. Those pointers were never ABI-visible — the engine
-// only pins the SHARED PREFIX (`s`, then `r`/`entityShared_t`, up through
+// The 10 stored `gentity_t*` fields (`parent`..`teammaster`, all after
+// `moverState`) became `Option<EntityId>`. Those pointers were never
+// ABI-visible — the engine only pins the SHARED PREFIX (`s`, then
+// `r`/`entityShared_t`, up through
 // `next_roff_time`, per the "DO NOT MODIFY ANYTHING ABOVE THIS" comment) and
 // learns the full stride at runtime via `trap_LocateGameData`. So the private
 // tail (`size_of` and every offset at/after the first flipped field `parent`)

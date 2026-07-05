@@ -1593,7 +1593,7 @@ pub fn SP_misc_model_shield_power_converter(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1743-1746`
 // PORT-NOTE(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
+// `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one —
 // how is state threaded in?
 pub fn EnergyAmmoStationSettings(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
@@ -1711,7 +1711,7 @@ pub fn SP_misc_model_ammo_power_converter(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1911-1914`
 // PORT-NOTE(seam-threading): faithful skeleton signature carries no
-// `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one (ruling 1) —
+// `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one —
 // how is state threaded in?
 pub fn EnergyHealthStationSettings(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
@@ -2105,7 +2105,7 @@ pub fn Use_Target_Screenshake(
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): faithful body has no
 // trap/level dependency itself, but is a fn-pointer write
-// (`use_ = Use_Target_Screenshake`, ruling 2) the `gentity_t` field type
+// (`use_ = Use_Target_Screenshake`) the `gentity_t` field type
 // cannot yet express.
 /// Raven `SP_target_screenshake`.
 ///
@@ -2682,7 +2682,7 @@ pub fn TAG_Add(
     }
 }
 
-// fork-9 vec3 out-param reshape: `origin` is written through
+// vec3 out-param reshape: `origin` is written through
 // (`VectorClear`/`VectorCopy` in every branch), never read — reshaped to
 // `&mut vec3_t` (no same-file callers to fix; cross-file callers are the
 // fixer's job per the packet).
@@ -2702,7 +2702,7 @@ pub fn TAG_GetOrigin(
     1
 }
 
-// fork-9 vec3 out-param reshape (as `TAG_GetOrigin`): `origin` is written
+// vec3 out-param reshape (as `TAG_GetOrigin`): `origin` is written
 // through, never read.
 /// Raven `TAG_GetOrigin2`.
 ///
@@ -2719,7 +2719,7 @@ pub fn TAG_GetOrigin2(
     1
 }
 
-// fork-9 vec3 out-param reshape (as `TAG_GetOrigin`): `angles` is written
+// vec3 out-param reshape (as `TAG_GetOrigin`): `angles` is written
 // through, never read.
 /// Raven `TAG_GetAngles`.
 ///

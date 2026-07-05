@@ -6,13 +6,13 @@
 //! since been filled in.
 //!
 //! Nearly every function in this file reads/writes the file-static Raven
-//! `pmove_t *pm` working set (`pm->ps`, `pm->cmd`, `pm->animations`, …). Per
-//! ruling 12/8a, that working set is threaded as `PmoveContext` — those
+//! `pmove_t *pm` working set (`pm->ps`, `pm->cmd`, `pm->animations`, …). That
+//! working set is threaded as `PmoveContext` — those
 //! functions are ported as `impl PmoveContext<'_>` methods below rather than
 //! free functions. `saberMoveData`/`transitionMove`/`saberMoveTransitionAngle`
 //! (the move-data const tables) are ported and used directly. Functions that
 //! read the Raven `g_entities` global reach the entity arena/world through
-//! `PmoveContext`/`GameCallbacks` (ruling 16) instead of a bare global. The
+//! `PmoveContext`/`GameCallbacks` instead of a bare global. The
 //! pure, pointer/value-parameterized functions that need none of that stay as
 //! free functions below.
 #![allow(non_snake_case, unused, clippy::all)]
@@ -443,7 +443,7 @@ pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, bg: &BgState) -> *mut saber
         // return NULL;
 
         // PORT-NOTE(entity-access-arena): BG_MySaber needs to access g_entities[clientNum].
-        // Per ruling 14, entity access is normally through PM_BGEntForNum (PmoveContext method).
+        // Entity access is normally through PM_BGEntForNum (PmoveContext method).
         // In this free-fn context, the entity array is accessed through an arena pattern.
         // Assuming the g_entities array is accessible via a module-level or prelude mechanism,
         // we dereference it as a contiguous array of gentity_t pointers and index by clientNum.
@@ -479,12 +479,12 @@ pub fn BG_MySaber(clientNum: c_int, saberNum: c_int, bg: &BgState) -> *mut saber
 // Pass-3 real bodies: the pmove working-set functions previously skeletoned
 // as free `todo!()` fns are ported here as methods on `PmoveContext` —
 // matching the `bg_pmove.rs` precedent (`PM_BGEntForNum`) where the resolved
-// shape for a state-touching bg fn is a method on `PmoveContext` (ruling
-// 12/8a: "pmove working set -> methods on PmoveContext, reach the working set
-// via self.pm/self.pml/..."). The old free-fn stubs (and the escalation
-// markers they carried) have been removed now that this shape resolves them.
+// shape for a state-touching bg fn is a method on `PmoveContext`, reaching
+// the working set via `self.pm`/`self.pml`/…. The old free-fn stubs (and the
+// escalation markers they carried) have been removed now that this shape
+// resolves them.
 // `unsafe` here is the confined pmove/entity-overlay deref (porting-rules
-// §D11; ruling 14).
+// §D11).
 // ============================================================================
 impl PmoveContext<'_> {
     /// Raven `PM_irand_timesync`.
@@ -854,7 +854,7 @@ impl PmoveContext<'_> {
             }
             if loseAnim != -1 {
                 // QAGAME branch (server-side): apply on the enemy directly via
-                // the GameCallbacks upcall (ruling 16), matching the C
+                // the GameCallbacks upcall, matching the C
                 // `NPC_SetAnim(&g_entities[genemy->clientNum], ...)` call.
                 self.callbacks.npc_set_anim(
                     (*genemy).clientNum,
@@ -2830,7 +2830,7 @@ impl PmoveContext<'_> {
     ///
     /// PORT-NOTE(client-saber-field): the oracle reads
     /// `g_entities[clientNum].client->saber[saberNum]`. `gclient_t.saber` is
-    /// not yet present on the ported struct — referenced here per ruling 14's
+    /// not yet present on the ported struct — referenced here via the entity
     /// overlay idiom; a fixer must land the field.
     /// Source: `oracle/oracle/codemp/game/bg_saber.c:4100-4141`
     pub fn BG_MySaber(&mut self, clientNum: c_int, saberNum: c_int) -> *mut saberInfo_t {

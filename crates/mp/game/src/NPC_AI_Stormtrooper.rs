@@ -6,8 +6,8 @@
 //! `Option<EntityId>` stored fields, bg/game state split). File-scope AI
 //! globals (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) and this file's
 //! own file-statics (`enemyLOS`/`enemyCS`/`enemyInFOV`/`faceEnemy`/`hitAlly`/
-//! `move`/`shoot`/`enemyDist` — fork ruling 5: genuine cross-frame state)
-//! reach through `ctx.world`/`ctx.world.globals` per ruling 8/12.
+//! `move`/`shoot`/`enemyDist` — genuine cross-frame state)
+//! reach through `ctx.world`/`ctx.world.globals`.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -59,8 +59,8 @@ use mp_bg::public::entity_event::entity_event_t::{
 };
 use mp_bg::public::weaponstate::weaponstate_t::WEAPON_READY;
 
-// Combat point search flags (ruling 5/1 style file-scope consts, mirroring
-// the NPC_AI_Sniper.rs precedent — each AI file replicates its own copy of
+// Combat point search flags (file-scope consts, mirroring the
+// NPC_AI_Sniper.rs precedent — each AI file replicates its own copy of
 // these #defines).
 // Source: `oracle/oracle/codemp/game/b_local.h:243-263`
 pub const CP_ANY: c_int = 0x0000_0000;
@@ -107,7 +107,7 @@ pub const CAUTIOUS_THRESHOLD: f32 = REALIZE_THRESHOLD * 0.75;
 // `MIN_ROCKET_DIST_SQUARED` (`b_local.h`) — 128*128.
 pub const MIN_ROCKET_DIST_SQUARED: f32 = 16384.0;
 
-// Ruling 22 seam helpers (local to this file, mirroring the `g_missile.rs`
+// EntityId seam helpers (local to this file, mirroring the `g_missile.rs`
 // precedent): `gentity_t*` stored fields (`enemy`/`goalEntity`/`tempGoal`/…)
 // are `Option<EntityId>`; these resolve an id back to the live pointer at
 // call sites that still take raw `*mut gentity_t`, and build the id back at
@@ -1062,8 +1062,8 @@ pub fn ST_OffsetLook(
         CalcEntitySpot(ctx, NPC, SPOT_HEAD, &mut temp);
         out[2] = temp[2];
         // PORT-NOTE(vec3-out-param): the packet's resolved LAW signature takes
-        // `out` by value (no `&mut`/write-back channel) though fork-9 calls for
-        // `&mut [f32;3]` here — reported as a shape_mismatch. Kept the faithful
+        // `out` by value (no `&mut`/write-back channel) though it should be an
+        // out-param, `&mut [f32;3]`, here — reported as a shape_mismatch. Kept the faithful
         // arithmetic so the fix is a pure signature change, not a rewrite.
         let _ = out;
     }

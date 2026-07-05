@@ -8,9 +8,9 @@
 //! `NPC_AI_Rancor.rs`: almost every body in this file reaches the file-scope
 //! AI globals (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) or this
 //! file's own file-statics (`enemyLOS2`/`enemyCS2`/`faceEnemy2`/`move2`/
-//! `shoot2`/`enemyDist2` — fork ruling 5: genuine cross-frame state ->
-//! GameWorld field) or calls a `trap_*` (needs `&Engine`). Fork ruling 1
-//! makes the AI globals `GameWorld`/`GameContext` state, but these faithful
+//! `shoot2`/`enemyDist2` — genuine cross-frame state, a GameWorld field)
+//! or calls a `trap_*` (needs `&Engine`). The AI globals become
+//! `GameWorld`/`GameContext` state, but these faithful
 //! signatures carry no `GameContext`/`&Engine` and the resolved cross-file
 //! signatures are equally context-free.
 #![allow(non_snake_case, unused, clippy::all)]

@@ -8,10 +8,10 @@
 //!
 //! Parking pattern (mirrors `NPC_AI_Stormtrooper.rs`):
 //! - `ai-context`: reads the file-static ambient globals `NPC`, `NPCInfo`,
-//!   `ucmd` (fork 1: these become GameWorld fields, but no `GameContext` is
+//!   `ucmd` (these become GameWorld fields, but no `GameContext` is
 //!   threaded into this faithful skeleton signature to access them). Also
 //!   reads `level.time` for timer operations and the LCG-based `random()`
-//!   (fork 3: owned threaded Rng, unavailable here).
+//!   (owned threaded Rng, unavailable here).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

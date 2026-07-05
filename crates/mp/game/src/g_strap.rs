@@ -1,6 +1,6 @@
-// PORT-COMPLETE: g_strap.c 12/12 (ruling 30)
+// PORT-COMPLETE: g_strap.c 12/12
 //! `g_strap.c` — ctx-less bg-boundary wrappers over the `trap_G2API_*`/`trap_True*`
-//! seam (ruling 30, BLESSED 2026-07-05).
+//! seam (BLESSED 2026-07-05).
 //!
 //! Raven exposes these `strap_*` functions with fixed C signatures
 //! (`bg_strap.h`); bg logic (`bg_pmove.c`) calls them WITHOUT a `GameContext`.
@@ -21,7 +21,7 @@ use mp_engine_select::Engine;
 
 use crate::prelude::*;
 
-/// Seam engine handle for the ctx-less `strap_*` wrappers (ruling 30). Holds a
+/// Seam engine handle for the ctx-less `strap_*` wrappers. Holds a
 /// raw `*const Engine` because the engine outlives the module (mirrors Raven's
 /// global syscall pointer); set once at GAME_INIT, read single-threaded from bg
 /// logic.
@@ -35,7 +35,7 @@ unsafe impl Sync for StrapEngine {}
 /// The write-once seam cell (SEAM-D1-style `OnceLock`).
 static STRAP_ENGINE: OnceLock<StrapEngine> = OnceLock::new();
 
-/// Arm the seam engine cell (ruling 30). Called exactly once from `g_init_game`
+/// Arm the seam engine cell. Called exactly once from `g_init_game`
 /// (GAME_INIT) with the entrypoint-owned engine handle.
 /// Source: `oracle/oracle/codemp/game/g_main.c:897` (`G_InitGame`).
 pub fn init_strap_engine(engine: &Engine) {
@@ -51,7 +51,7 @@ fn strap_engine() -> &'static Engine {
         Some(e) => unsafe { &*e.0 },
         None => panic!(
             "strap_* bg-boundary wrapper called before init_strap_engine (GAME_INIT) \
-             armed the ruling-30 seam cell"
+             armed the seam cell"
         ),
     }
 }
@@ -70,7 +70,7 @@ pub fn strap_G2API_GetBoltMatrix(
     modelList: *mut qhandle_t,
     scale: vec3_t,
 ) -> qboolean {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_GetBoltMatrix(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
@@ -93,7 +93,7 @@ pub fn strap_G2API_GetBoltMatrix_NoReconstruct(
     modelList: *mut qhandle_t,
     mut scale: vec3_t,
 ) -> qboolean {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_GetBoltMatrix_NoReconstruct(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_GETBOLT_NOREC::GG2GetboltNorecArgs::new(
@@ -124,7 +124,7 @@ pub fn strap_G2API_GetBoltMatrix_NoRecNoRot(
     modelList: *mut qhandle_t,
     scale: vec3_t,
 ) -> qboolean {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_GetBoltMatrix_NoRecNoRot(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_GETBOLT_NOREC_NOROT::GG2GetboltNorecNorotArgs::new(
@@ -149,7 +149,7 @@ pub fn strap_G2API_SetBoneAngles(
     blendTime: c_int,
     currentTime: c_int,
 ) -> qboolean {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_SetBoneAngles(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs::new(
@@ -183,7 +183,7 @@ pub fn strap_G2API_SetBoneAnim(
     setFrame: f32,
     blendTime: c_int,
 ) -> qboolean {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_SetBoneAnim(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs::new(
@@ -216,7 +216,7 @@ pub fn strap_G2API_GetBoneAnim(
     modelList: *mut c_int,
     modelIndex: c_int,
 ) -> qboolean {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_GetBoneAnim(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_GETBONEANIM::GG2GetboneanimArgs::new(
@@ -238,7 +238,7 @@ pub fn strap_G2API_GetBoneAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_strap.c:43-46`
 pub fn strap_G2API_SetRagDoll(ghoul2: *mut c_void, params: *mut sharedRagDollParams_t) {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_SetRagDoll(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_SETRAGDOLL::GG2SetragdollArgs::new(ghoul2, params),
@@ -253,7 +253,7 @@ pub fn strap_G2API_AnimateG2Models(
     time: c_int,
     params: *mut sharedRagDollUpdateParams_t,
 ) {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_AnimateG2Models(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_ANIMATEG2MODELS::GG2Animateg2ModelsArgs::new(
@@ -272,7 +272,7 @@ pub fn strap_G2API_SetBoneIKState(
     ikState: c_int,
     params: *mut sharedSetBoneIKStateParams_t,
 ) -> qboolean {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_SetBoneIKState(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_SETBONEIKSTATE::GG2SetboneikstateArgs::new(
@@ -293,7 +293,7 @@ pub fn strap_G2API_IKMove(
     time: c_int,
     params: *mut sharedIKMoveParams_t,
 ) -> qboolean {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::G2API_IKMove(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_IKMOVE::GG2IkmoveArgs::new(ghoul2, time, params),
@@ -304,7 +304,7 @@ pub fn strap_G2API_IKMove(
 ///
 /// Source: `oracle/oracle/codemp/game/g_strap.c:63-66`
 pub fn strap_TrueMalloc(ptr: *mut *mut c_void, size: c_int) {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::TrueMalloc(
         strap_engine(),
         mp_abi::game::syscalls::G_TRUEMALLOC::GTruemallocArgs::new(ptr, size),
@@ -315,7 +315,7 @@ pub fn strap_TrueMalloc(ptr: *mut *mut c_void, size: c_int) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_strap.c:68-71`
 pub fn strap_TrueFree(ptr: *mut *mut c_void) {
-    // ruling 30: ctx-less bg-boundary wrapper; engine via the seam cell.
+    // ctx-less bg-boundary wrapper; engine via the seam cell.
     crate::trap::TrueFree(
         strap_engine(),
         mp_abi::game::syscalls::G_TRUEFREE::GTruefreeArgs::new(ptr),

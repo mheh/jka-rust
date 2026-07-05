@@ -6,7 +6,7 @@ use core::ffi::{c_char, c_float, c_int};
 
 use mp_qshared::shared::{qboolean, vec3_t};
 
-// Fork-7 retired the fn-ptr slots, so `usercmd_t`/`bgEntity_t`/`Vehicle_t` (only
+// The fn-ptr slots were retired, so `usercmd_t`/`bgEntity_t`/`Vehicle_t` (only
 // referenced by those slot signatures) are no longer imported here.
 use crate::vehicles::vehicle_s::{MAX_VEHICLE_MUZZLES, MAX_VEHICLE_TURRETS, MAX_VEHICLE_WEAPONS};
 use crate::vehicles::{turretStats_t, vehWeaponStats_t, vehicleType_t};
@@ -273,7 +273,7 @@ pub struct vehicleInfo_t {
     /// set internally, not until this vehicle is spawned into the level
     pub modelIndex: c_int,
 
-    // Fork-7 (blessed 2026-07-03): the 25 `vehicleInfo_t` function-pointer
+    // The 25 `vehicleInfo_t` function-pointer
     // "virtual" slots (`AnimateVehicle`..`Inhabited`, Raven bg_vehicles.h:291-359)
     // are RETIRED. Raven filled them once at `.veh` load via `G_Set*VehicleFunctions`
     // and never reassigned/address-compared them; per porting-rules §C8/§F17 that

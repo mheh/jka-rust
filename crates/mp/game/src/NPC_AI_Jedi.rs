@@ -1,10 +1,10 @@
 //! FAITHFUL port of `oracle/oracle/codemp/game/NPC_AI_Jedi.c`.
 //!
-//! Pass-3 transcription: all functions are filled against the settled fork
-//! rulings — `ctx: GameContext` threads the ai_main globals (`NPC`, `NPCInfo`,
-//! `ucmd`, `level`, `g_entities`) via `(*ctx.world)`, RNG routes to the one
-//! `BgState.rng`, and stored `enemy`/`goalEntity`/`activator`/`lastEnemy` fields
-//! are `Option<EntityId>` (ruling 22). See `PORT-NOTE`s for the two open items:
+//! Pass-3 transcription: `ctx: GameContext` threads the ai_main globals
+//! (`NPC`, `NPCInfo`, `ucmd`, `level`, `g_entities`) via `(*ctx.world)`, RNG
+//! routes to the one `BgState.rng`, and stored `enemy`/`goalEntity`/
+//! `activator`/`lastEnemy` fields are `Option<EntityId>`. See `PORT-NOTE`s
+//! for the two open items:
 //! the `jediSpeechDebounceTime` global is still a `()` placeholder in
 //! `game_globals.rs`, and `BG_AnimLength` resolved as a `PmoveContext` method
 //! with no game-tier receiver at its single call site.
@@ -308,7 +308,7 @@ pub fn WP_ResistForcePush(
 
 /// Raven `Boba_StopKnockdown`.
 ///
-/// `pushDir` is read-only here (fork-9: never written), so it stays by-value.
+/// `pushDir` is read-only here (never written), so it stays by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:272-343`
 pub fn Boba_StopKnockdown(
@@ -4177,8 +4177,8 @@ pub fn Jedi_SetEnemyInfo(
     enemy_movespeed: *mut f32,
     prediction: c_int,
 ) {
-    // fork-9: enemy_dest/enemy_dir/enemy_movedir are written out-params (`&mut`);
-    // the staged skeleton carried the stale by-value shape — updated to LAW.
+    // enemy_dest/enemy_dir/enemy_movedir are written out-params (`&mut`); the
+    // staged skeleton carried the stale by-value shape — updated to match.
     unsafe {
         let world = ctx.world;
         let npc = (*world).globals.NPC;

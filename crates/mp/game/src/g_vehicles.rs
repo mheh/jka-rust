@@ -3,7 +3,7 @@
 // Update, G_FlyVehicleImpactDir, G_SetVehDamageFlags, G_FlyVehicleDestroySurface)
 // carry no ctx/bg channel in their fixed vtable/fn-ptr slot signatures yet reach
 // world/engine/rng — those references are transcribed against the game channel
-// (`ctx`) and flagged with PORT-NOTEs pending the fork-7 vtable-dispatch retrofit.
+// (`ctx`) and flagged with PORT-NOTEs pending the vtable-dispatch retrofit.
 //! FAITHFUL port of `oracle/oracle/codemp/game/g_vehicles.c` (MP `_JK2MP` +
 //! `QAGAME` compile path).
 //!
@@ -13,7 +13,7 @@
 //! Parking pattern in this file (see the workflow's recurring escalations):
 //! - `raw-ptr-skeleton-no-world-handle`: reads `level.time`/`g_entities`/cvar
 //!   globals or calls engine traps, none reachable from the raw-pointer skeleton
-//!   signature (rulings item 1: `level`/`g_entities`/cvars live on the world).
+//!   signature (`level`/`g_entities`/cvars live on the world).
 //! - `vec3-outparam-seam`: relies on `AngleVectors`/`VectorNormalize` out-params,
 //!   whose resolved signatures take `vec3_t` ([f32;3]) by value and so cannot
 //!   write back — the signature can't be re-declared here.
@@ -23,7 +23,7 @@
 //!   which has no handle in scope.
 //! - `vehicle-vtable`: the `vehicleInfo_t` vtable fields are
 //!   `Option<unsafe extern "C" fn>` but the ported member fns are plain-Rust —
-//!   assigning them needs an unsettled extern-"C" seam (fork-7 dispatch).
+//!   assigning them needs an unsettled extern-"C" seam (vtable dispatch).
 //!
 //! The `Ghost`/`UnGhost`/`SHIPSURF_*`/`SVF_*`/`EF_*`/`CONTENTS_*` constants are
 //! spelled with their Raven names as bare identifiers (staging convention: the
@@ -308,7 +308,7 @@ pub fn Animate(
     pVeh: *mut Vehicle_t,
 ) {
     unsafe {
-        // Validate a pilot rider. (Fork-7: the per-type dispatch no-ops for
+        // Validate a pilot rider. (The per-type dispatch no-ops for
         // vehicle types that leave the slot null, matching Raven's `if`-guard.)
         if !(*pVeh).m_pPilot.is_null() {
             crate::veh_dispatch::animate_riders(pVeh);
@@ -575,7 +575,7 @@ pub fn Board(
 
 /// Raven `VEH_TryEject`.
 ///
-/// `vExitPos` is Raven's out-param exit position (fork-9: written through, never
+/// `vExitPos` is Raven's out-param exit position (written through, never
 /// NULL at any oracle caller) → `&mut vec3_t`.
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:874-987`
 pub fn VEH_TryEject(
@@ -702,7 +702,7 @@ pub fn G_EjectDroidUnit(
             // Kill them, too.
             crate::g_utils::G_MuteSound(ctx, (*droidEnt).s.number, CHAN_VOICE);
             // PORT-NOTE(G_Damage-null-dir): Raven passes NULL for `dir`; the resolved
-            // G_Damage takes `dir: &mut vec3_t` (fork-9 reshaped only OUT-params, not
+            // G_Damage takes `dir: &mut vec3_t` (reshape covered only OUT-params, not
             // nullable INs) — a zero vec3 stands in for the C NULL. See shape_mismatch.
             crate::g_combat::G_Damage(
                 ctx,
@@ -959,12 +959,12 @@ pub fn Initialize(
 
 /// Raven `Update`.
 ///
-/// PORT-NOTE(bg-boundary): fork-8a — `Update` is stored as the `vehicleInfo_t`
+/// PORT-NOTE(bg-boundary): `Update` is stored as the `vehicleInfo_t`
 /// `Update` vtable slot and dispatched from the bg/vehicle-update path, so its LAW
 /// signature carries no channel. Its body nonetheless reads `level.time`/`g_entities`,
 /// draws from the RNG, and calls ctx-requiring fns (`VEH_TurretThink`,
 /// `G_VehicleDamageBoxSizing`, `BG_UnrestrainedPitchRoll`). Those are transcribed
-/// against the game channel `ctx`, which must be threaded in by the fork-7
+/// against the game channel `ctx`, which must be threaded in by the
 /// vtable-dispatch retrofit (see shape_mismatch). All other logic is faithful MP+QAGAME.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1763-2334`
@@ -1833,10 +1833,10 @@ pub fn G_VehicleDamageBoxSizing(
 
 /// Raven `G_FlyVehicleImpactDir`.
 ///
-/// PORT-NOTE(bg-boundary): fork-8a — the LAW signature is ctx-free (its caller
+/// PORT-NOTE(bg-boundary): the LAW signature is ctx-free (its caller
 /// `G_FlyVehicleSurfaceDestruction` invokes it ctx-free), yet the body needs
 /// `trap_Trace` (engine). The trap calls are transcribed against the game channel
-/// `ctx`, which must be threaded in by the fork-7 dispatch retrofit (see shape_mismatch).
+/// `ctx`, which must be threaded in by the dispatch retrofit (see shape_mismatch).
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2843-2924`
 pub fn G_FlyVehicleImpactDir(
@@ -1985,11 +1985,11 @@ pub fn G_ShipSurfaceForSurfName(
 
 /// Raven `G_SetVehDamageFlags`.
 ///
-/// PORT-NOTE(bg-boundary): fork-8a — the LAW signature is ctx-free. Only the
+/// PORT-NOTE(bg-boundary): the LAW signature is ctx-free. Only the
 /// destroyed-droid sub-branch (`damageLevel==3`, `SHIPSURF_BACK`) needs the world
 /// (to resolve `veh->enemy: Option<EntityId>` to a `*mut gentity_t` for G_Damage);
 /// that resolution is transcribed against the game channel `ctx`, threaded in by
-/// the fork-7 dispatch retrofit (see shape_mismatch). The bit flag bulk is faithful.
+/// the dispatch retrofit (see shape_mismatch). The bit flag bulk is faithful.
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2961-3039`
 pub fn G_SetVehDamageFlags(
@@ -2147,11 +2147,11 @@ pub fn G_VehicleSetDamageLocFlags(
 
 /// Raven `G_FlyVehicleDestroySurface`.
 ///
-/// PORT-NOTE(bg-boundary): fork-8a — the LAW signature is ctx-free (caller
+/// PORT-NOTE(bg-boundary): the LAW signature is ctx-free (caller
 /// `G_FlyVehicleSurfaceDestruction` invokes it ctx-free), yet the body reads
 /// `level.time` and calls ctx-requiring fns (`NPC_SetSurfaceOnOff`, `G_RadiusDamage`,
 /// `G_EntitySound`). Those are transcribed against the game channel `ctx`, threaded
-/// in by the fork-7 dispatch retrofit (see shape_mismatch).
+/// in by the dispatch retrofit (see shape_mismatch).
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3102-3188`
 pub fn G_FlyVehicleDestroySurface(
@@ -2780,6 +2780,6 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// stub matches that faithfully rather than panicking.
 pub unsafe extern "C" fn RegisterAssets(pVeh: *mut Vehicle_t) {}
 
-// Fork-7 (2026-07-03): `G_SetSharedVehicleFunctions` retired — it only assigned the now-removed
+// 2026-07-03: `G_SetSharedVehicleFunctions` retired — it only assigned the now-removed
 // `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
 // `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.

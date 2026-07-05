@@ -14,7 +14,7 @@
 //! (not a resolved out-of-file symbol in this packet), the rest read/write
 //! the siege module-scope globals (`bgSiegeClasses`, `bgNumSiegeClasses`,
 //! `bgSiegeTeams`, `bgNumSiegeTeams`, `team1Theme`, `team2Theme` — all
-//! `GameWorld` fields per fork-ruling 1) and/or the engine-bearing trap seam
+//! `GameWorld` fields) and/or the engine-bearing trap seam
 //! (`trap::X(engine, …)`), but the fnskel signatures take raw
 //! pointers/scalars with NO `GameContext`/`world`/`engine` channel — same
 //! systemic gap as `g_active.c` (see that file's header). Undecidable from

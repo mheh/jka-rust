@@ -934,7 +934,7 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
 
                 if trap::ICARUS_IsInitialized(ctx.engine, (*self_).s.number) == 0 {
                     if (*activator_ent).script_targetname.is_null() || *(*activator_ent).script_targetname == b'\0' as c_char {
-                        // DIVERGENCE (ruling 18/19): store owned string instead of va() pointer
+                        // DIVERGENCE: store owned string instead of va() pointer
                         let name = format!("newICARUSEnt{}", (*ctx.world).globals.numNewICARUSEnts);
                         (*ctx.world).globals.numNewICARUSEnts += 1;
                         (*activator_ent).script_targetname = G_NewString(cstr(&name));

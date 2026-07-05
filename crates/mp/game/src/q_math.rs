@@ -317,7 +317,7 @@ pub fn Q_crandom(seed: *mut c_int) -> f32 {
 }
 
 // `random()`/`crandom()` (`q_shared.h:1591-1592`) are ported as methods on
-// `bg_channel::rng::Rng` (BgState) per ruling 15 — `Rng::random`/`Rng::crandom`.
+// `bg_channel::rng::Rng` (BgState) — `Rng::random`/`Rng::crandom`.
 
 /// Raven `ClampChar`.
 ///
@@ -1117,7 +1117,7 @@ pub fn NormalToLatLong(normal: vec3_t, bytes: *mut byte) {
 }
 
 // RNG functions (Rand_Init/flrand/Q_flrand/irand/Q_irand) are ported as methods
-// on bg_channel::rng::Rng (pass-3 ruling 15: BgState.rng).
+// on bg_channel::rng::Rng (BgState.rng).
 // Source: `oracle/oracle/codemp/game/q_math.c:1434-1474` → `bg_channel/rng.rs`
 
 /// Raven `powf`.

@@ -4,10 +4,10 @@
 //! jampgame mega-pass (settled fork rulings,
 //! `docs/handoffs/jampgame-fork-discovery.md`).
 //!
-//! SPINE (fork rulings 1/4 + `docs/architecture/engine-seam.md`): logic fns that
+//! SPINE (`docs/architecture/engine-seam.md`): logic fns that
 //! reach `level`/cvars/`g_entities`/traps thread the `GameContext<'_>` receiver
 //! (`.world: *mut GameWorld`, `.engine`) — the only ported-logic precedent
-//! (`g_init_game`). Globals are `GameWorld` fields (fork 1): `level` →
+//! (`g_init_game`). Globals are `GameWorld` fields: `level` →
 //! `(*ctx.world).level`, cvars → `(*ctx.world).cvars`, `g_entities[i]` →
 //! `(*ctx.world).g_entities[i]`. Traps go through `trap::X(ctx.engine, …)`.
 //! Cross-file callees are invoked with the packet's resolved raw-pointer
@@ -16,7 +16,7 @@
 //! Raw `gentity_t*`/`gclient_t*`/`playerState_t*` chains are transcribed as
 //! `unsafe` raw-pointer field access mirroring the C exactly (the fnskel
 //! skeletons operate in raw-pointer space; `GameContext.world` is itself a raw
-//! pointer). EntityId reshaping (fork 4) lands in the later integration pass.
+//! pointer). EntityId reshaping lands in the later integration pass.
 //!
 //! NOTE (integration-deferred): the packet does not enumerate the Raven
 //! constant spellings (`EV_*`, `FP_*`, `FORCE_LEVEL_*`, `PDSOUND_*`, `CHAN_*`,
@@ -24,7 +24,7 @@
 //! names (the port preserves them) and their exact enum-qualification / module
 //! path is resolved at integration (the mega-pass tree is not compiled per
 //! porter — "Do NOT run cargo"). `forcePowerNeeded` is the bg-shared const
-//! table (fork 5: const tables stay const), referenced by its Raven name.
+//! table (const tables stay const), referenced by its Raven name.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
@@ -1500,7 +1500,7 @@ pub fn ForceGrip(ctx: GameContext<'_>, self_: *mut gentity_t) {
             if (*target).s.number < MAX_CLIENTS as c_int && (*tcl).ps.m_iVehicleNum != 0 {
                 //a player on a vehicle
                 // PORT-NOTE(vehicle-vtable): faithful Raven grabs
-                // `vehEnt->m_pVehicle->m_pVehicleInfo->Eject(...)` — the fork-7
+                // `vehEnt->m_pVehicle->m_pVehicleInfo->Eject(...)` — the
                 // vehicle vtable dispatch is not in this packet's resolved call
                 // surface. Left as a no-op eject; the surrounding grip logic is
                 // otherwise faithful.
@@ -2438,8 +2438,8 @@ pub fn ForceJumpCharge(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut u
 /// Raven `WP_GetVelocityForForceJump`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:2377-2460`
-// `jumpVel` is a written-through out-param (`VectorMA(... jumpVel)`); fork-9
-// reshapes the by-value `vec3_t` to `&mut vec3_t`.
+// `jumpVel` is a written-through out-param (`VectorMA(... jumpVel)`); the
+// out-param reshape turns the by-value `vec3_t` into `&mut vec3_t`.
 pub fn WP_GetVelocityForForceJump(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
@@ -3125,7 +3125,7 @@ pub fn G_LetGoOfWall(ctx: GameContext<'_>, ent: *mut gentity_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:3054-3820`
 // PORT-NOTE(unported-global-and-vehicle-vtable): reads the un-ported
-// `forcePowerNeeded` table (fork-5), calls the fork-7 vehicle vtable
+// `forcePowerNeeded` table, calls the vehicle vtable
 // (`vehEnt->m_pVehicle->m_pVehicleInfo->Eject`, not in the resolved call surface),
 // and uses `VectorCompare` (marked unresolved in the packet). Multiple genuinely
 // un-ported deps — parked.
@@ -3693,7 +3693,7 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                             {
                                 // PORT-NOTE(vehicle-vtable): faithful Raven grabs
                                 // `vehEnt->m_pVehicle->m_pVehicleInfo->Eject(...)`
-                                // — the fork-7 vehicle vtable dispatch is not in
+                                // — the vehicle vtable dispatch is not in
                                 // this packet's resolved call surface; left as a
                                 // no-op eject.
                             }
@@ -4042,7 +4042,7 @@ pub fn WP_ForcePowerStop(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:3948-4162`
 // PORT-NOTE(unported-global-table): reads `forcePowerNeeded[level][power]`
-// (fork-5 const table not yet ported; values absent from packet). Parked like
+// (const table not yet ported; values absent from packet). Parked like
 // the other `forcePowerNeeded` consumers.
 // MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: forcePowers_t) {
@@ -5196,7 +5196,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:5094-5671`
 // PORT-NOTE(unported-global-table): the siege force-regen branch reads
-// `bgSiegeClasses[...].classflags` (fork-5 saga class data, not yet ported;
+// `bgSiegeClasses[...].classflags` (saga class data, not yet ported;
 // values absent from packet) and `forcePowerDarkLight` (currently a private
 // `const` in `bg_misc.rs`, not exported). Faithful port of those two branches is
 // blocked, so the whole fn is parked with its pass-1 siblings.

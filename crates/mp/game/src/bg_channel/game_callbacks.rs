@@ -1,4 +1,4 @@
-//! `GameCallbacks` — the bg tier's upcalls into game logic (pass-3 ruling 16).
+//! `GameCallbacks` — the bg tier's upcalls into game logic.
 //!
 //! The boundary dossier's "16 both" class: functions reachable from bg code
 //! (Pmove every frame via `PM_SlideMove`→`PM_VehicleImpact`→`G_Damage`, etc.)
@@ -131,9 +131,9 @@ pub trait GameCallbacks {
     /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c` (`Q3_SetParm`)
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char);
 
-    /// Fork-7 vehicle boarding upcall. `bg_pmove`'s ground-check boards a
+    /// Vehicle boarding upcall. `bg_pmove`'s ground-check boards a
     /// vehicle NPC by calling `pVeh->m_pVehicleInfo->Board(pVeh, pEnt)` — a
-    /// game-tier body. Under fork 7 that dispatches through
+    /// game-tier body. That dispatches through
     /// [`crate::veh_dispatch::board`], which is game-tier (takes `GameContext`),
     /// so bg reaches it here by entity number rather than by calling the
     /// game-tier dispatch directly.

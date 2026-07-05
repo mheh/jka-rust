@@ -37,7 +37,6 @@ pub struct gNPC_t {
 	//FIXME: Put in playerInfo or something
 	/// FIXME do we really need both of these
 	pub timeOfDeath: i32,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub touchedByPlayer: Option<EntityId>,
 
 	pub enemyLastVisibility: visibility_t,
@@ -48,7 +47,6 @@ pub struct gNPC_t {
 	pub lockedDesiredYaw: f32,
 	pub lockedDesiredPitch: f32,
 	/// debugging aid
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub aimingBeam: Option<EntityId>,
 
 	pub enemyLastSeenLocation: vec3_t,
@@ -101,33 +99,24 @@ pub struct gNPC_t {
 	pub investigateSoundDebounceTime: i32,
 	/// when we can greet someone next
 	pub greetingDebounceTime: i32,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub eventOwner: Option<EntityId>,
 
 	//bState-specific fields
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub coverTarg: Option<EntityId>,
 	pub jumpState: jumpState_t,
 	pub followDist: f32,
 
 	// goal, navigation & pathfinding
 	/// used for locational goals (player's last seen/heard position)
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub tempGoal: Option<EntityId>,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub goalEntity: Option<EntityId>,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub lastGoalEntity: Option<EntityId>,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub eventualGoal: Option<EntityId>,
 	/// Where we should try to capture
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub captureGoal: Option<EntityId>,
 	/// Who we're trying to protect
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub defendEnt: Option<EntityId>,
 	/// Who we're greeting
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub greetEnt: Option<EntityId>,
 	/// FIXME: This is never actually used
 	pub goalTime: i32,
@@ -217,7 +206,6 @@ pub struct gNPC_t {
 	pub enemyLaggedPos: [vec3_t; ENEMY_POS_LAG_STEPS],
 
 	/// for BS_CINEMATIC, keeps facing this ent
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
 	pub watchTarget: Option<EntityId>,
 
 	/// sigh... you'd think I'd be able to find a way to do this without having to use 3 int fields, but...
@@ -227,8 +215,7 @@ pub struct gNPC_t {
 }
 
 const _: () = assert!(core::mem::offset_of!(gNPC_t, timeOfDeath) == 0);
-// RULING 22 (`docs/handoffs/jampgame-fork-discovery.md`): the fork-4 flip turned
-// this struct's stored `gentity_t*` fields into `Option<EntityId>` (align 4 vs a
+// This struct's stored `gentity_t*` fields became `Option<EntityId>` (align 4 vs a
 // pointer's align 8), so the private tail's byte offsets shift. This struct is
 // game-internal / not ABI-fixed beyond its prefix — the engine learns the full
 // stride at runtime via `trap_LocateGameData`. The `size_of` assert and every

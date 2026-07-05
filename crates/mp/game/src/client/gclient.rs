@@ -93,7 +93,6 @@ pub struct gclient_s {
     pub lastKillTime: c_int, // for multiple kill rewards
 
     pub fireHeld: qboolean,     // used for hook
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub hook: Option<EntityId>,   // grapple hook if out
 
     pub switchTeamTime: c_int, // time the player switched teams
@@ -170,11 +169,8 @@ pub struct gclient_s {
     pub playerTeam: npcteam_t,
     pub enemyTeam: npcteam_t,
     pub squadname: *mut c_char,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub team_leader: Option<EntityId>,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub leader: Option<EntityId>,
-    /// ruling 22 (`docs/handoffs/jampgame-fork-discovery.md`): `Option<EntityId>` (Raven `gentity_t*`).
     pub follower: Option<EntityId>,
     pub numFollowers: c_int,
     pub formationGoal: *mut gentity_t,
@@ -244,9 +240,8 @@ const _: () = assert!(core::mem::offset_of!(gclient_t, sess) == 1708);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gclient_t, saber) == 1992);
 #[cfg(target_pointer_width = "64")]
-// RULING 22 (`docs/handoffs/jampgame-fork-discovery.md`): the fork-4 flip turned
-// this struct's stored `gentity_t*` fields into `Option<EntityId>` (align 4 vs a
-// pointer's align 8), so the private tail's byte offsets shift. This struct is
+// This struct's stored `gentity_t*` fields are ported as `Option<EntityId>`
+// (align 4 vs a pointer's align 8), so the private tail's byte offsets shift. This struct is
 // game-internal / not ABI-fixed beyond its prefix — the engine learns the full
 // stride at runtime via `trap_LocateGameData`. The `size_of` assert and every
 // `offset_of` assert at/after the first flipped field are therefore dropped;

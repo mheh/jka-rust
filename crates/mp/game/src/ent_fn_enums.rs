@@ -4,12 +4,12 @@
 
 //! Entity fn-pointer dispatch as fn-ID enums + central match dispatch.
 //!
-//! Ruling 2 (docs/handoffs/jampgame-fork-discovery.md): per-field fn-ID
+//! Entity fn-pointer fields are ported as per-field fn-ID
 //! enums; `PartialEq` replaces Raven's fn-address compares; stored as
 //! `Option<EntXxx>` where Raven stored a nullable fn pointer.
 //! Field signatures source: `oracle/oracle/codemp/game/g_local.h:285-291`
 //! Targets: fnsweep manifest fn-ptr write census (assignments in game/*.c).
-//! Vehicle-vtable fields are excluded (fork-7 ruling: mp_bg enum dispatch).
+//! Vehicle-vtable fields are excluded (mp_bg enum dispatch).
 #![allow(non_snake_case, non_camel_case_types, unused)]
 
 // Dispatch targets are the entity fn-pointer handlers, each defined in one
@@ -104,7 +104,7 @@ use crate::tri_coll_test::*;
 use crate::w_force::*;
 use crate::w_saber::*;
 
-// Ruling 2 fn-ID enums hoisted to `mp_qshared` (below `mp_game`) so
+// fn-ID enums hoisted to `mp_qshared` (below `mp_game`) so
 // `gentity_t`'s dispatch fields can name them; the central match dispatch
 // below stays here (it names the handler fns). Re-exported so existing
 // `crate::ent_fn_enums::EntXxx` imports keep resolving.
@@ -115,7 +115,7 @@ pub use mp_qshared::common::mp::ent_fn_ids::{
 
 /// Central `think` dispatch (replaces `ent->think(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
-/// re-shapes to (world, EntityId, …) per ruling 4.
+/// re-shapes to (world, EntityId, …).
 pub fn dispatch_think(
     ctx: GameContext<'_>,id: EntThink, self_: *mut gentity_t) {
     match id {
@@ -208,7 +208,7 @@ pub fn dispatch_think(
 
 /// Central `reached` dispatch (replaces `ent->reached(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
-/// re-shapes to (world, EntityId, …) per ruling 4.
+/// re-shapes to (world, EntityId, …).
 pub fn dispatch_reached(
     ctx: GameContext<'_>,id: EntReached, self_: *mut gentity_t) {
     match id {
@@ -221,7 +221,7 @@ pub fn dispatch_reached(
 
 /// Central `blocked` dispatch (replaces `ent->blocked(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
-/// re-shapes to (world, EntityId, …) per ruling 4.
+/// re-shapes to (world, EntityId, …).
 pub fn dispatch_blocked(
     ctx: GameContext<'_>,id: EntBlocked, self_: *mut gentity_t, other: *mut gentity_t) {
     match id {
@@ -232,7 +232,7 @@ pub fn dispatch_blocked(
 
 /// Central `touch` dispatch (replaces `ent->touch(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
-/// re-shapes to (world, EntityId, …) per ruling 4.
+/// re-shapes to (world, EntityId, …).
 pub fn dispatch_touch(
     ctx: GameContext<'_>,id: EntTouch, self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     match id {
@@ -269,7 +269,7 @@ pub fn dispatch_touch(
 
 /// Central `use` dispatch (replaces `ent->use(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
-/// re-shapes to (world, EntityId, …) per ruling 4.
+/// re-shapes to (world, EntityId, …).
 pub fn dispatch_use(
     ctx: GameContext<'_>,id: EntUse, self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     match id {
@@ -331,7 +331,7 @@ pub fn dispatch_use(
 
 /// Central `pain` dispatch (replaces `ent->pain(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
-/// re-shapes to (world, EntityId, …) per ruling 4.
+/// re-shapes to (world, EntityId, …).
 pub fn dispatch_pain(
     ctx: GameContext<'_>,id: EntPain, self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int) {
     match id {
@@ -367,7 +367,7 @@ pub fn dispatch_pain(
 
 /// Central `die` dispatch (replaces `ent->die(...)`).
 /// Faithful raw-pointer params for staging; the Land phase
-/// re-shapes to (world, EntityId, …) per ruling 4.
+/// re-shapes to (world, EntityId, …).
 pub fn dispatch_die(
     ctx: GameContext<'_>,id: EntDie, self_: *mut gentity_t, inflictor: *mut gentity_t, attacker: *mut gentity_t, damage: c_int, r#mod: c_int) {
     match id {
@@ -391,9 +391,9 @@ pub fn dispatch_die(
     }
 }
 
-// ==== EntSpawn (agenda C13 / fork-2): classname->SP_ dispatch ====
+// ==== EntSpawn (agenda C13): classname->SP_ dispatch ====
 // GENERATED addendum (pass-3 prep C1). The spawns[] table dual from
-// oracle g_spawn.c:435-673 (190 entries). Fork-2 ruling: classname strcmp
+// oracle g_spawn.c:435-673 (190 entries). classname strcmp
 // becomes an EntSpawn lookup + central match dispatch (EntThink pattern).
 // Source: `oracle/oracle/codemp/game/g_spawn.c:435-673` (G_CallSpawn)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -958,7 +958,7 @@ pub fn spawn_for_classname(classname: &str) -> Option<EntSpawn> {
 
 /// Central spawn dispatch (replaces the `spawns[].spawn(ent)` call in
 /// `G_CallSpawn`). Faithful raw-pointer `ent` param for staging; the Land
-/// phase re-shapes to `(world, EntityId)` per ruling 4.
+/// phase re-shapes to `(world, EntityId)`.
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:435-673`
 pub fn dispatch_spawn(ctx: GameContext<'_>, id: EntSpawn, ent: *mut gentity_t) {
     match id {

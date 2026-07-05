@@ -13,7 +13,7 @@ use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 
-// Pass-2: entity fn-pointer dispatch as fn-ID enums (ruling 2) and the
+// Pass-2: entity fn-pointer dispatch as fn-ID enums and the
 // `DAMAGE_*` dflag family (`g_local.h:1170-1190`).
 use crate::ent_fn_enums::EntThink;
 use crate::entity::hit_location::*;
@@ -252,7 +252,7 @@ pub fn W_TraceSetStart(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `muzzle`/`forward` globals (ruling 1) need it — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `muzzle`/`forward` globals need it — how is state threaded in?
 /// Raven `WP_FireBryarPistol`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:236-293`
@@ -509,7 +509,7 @@ pub fn WP_FireEmplacedMissile(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals (ruling 1) plus `crandom()` (RNG, ruling 3) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals plus `crandom()` (RNG) are needed — how is state threaded in?
 /// Raven `WP_FireBlaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:451-469`
@@ -533,7 +533,7 @@ pub fn WP_FireBlaster(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboole
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities`/`g_gametype`/`d_projectileGhoul2Collision`/`g_g2TraceLod` globals and `trap_G2Trace`/`trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities`/`g_gametype`/`d_projectileGhoul2Collision`/`g_g2TraceLod` globals and `trap_G2Trace`/`trap_Trace` are needed — how is state threaded in?
 /// Raven `WP_DisruptorMainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:483-621`
@@ -770,13 +770,13 @@ pub fn G_CanDisruptify(ent: *mut gentity_t) -> qboolean {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities`/`g_gametype`/`d_projectileGhoul2Collision`/`g_g2TraceLod` globals and `trap_G2Trace`/`trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities`/`g_gametype`/`d_projectileGhoul2Collision`/`g_g2TraceLod` globals and `trap_G2Trace`/`trap_Trace` are needed — how is state threaded in?
 /// Raven `WP_DisruptorAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:642-886`
 pub fn WP_DisruptorAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
     // PORT-NOTE(file-static-globals): `forward`/`muzzle` are the unported
-    // file-static globals set by `FireWeapon` before dispatch (ruling 1);
+    // file-static globals set by `FireWeapon` before dispatch;
     // referenced bare, reported as missing symbols.
     unsafe {
         let mut damage: c_int = DISRUPTOR_ALT_DAMAGE - 30;
@@ -1087,7 +1087,7 @@ pub fn WP_FireDisruptor(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboo
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals are needed — how is state threaded in?
 /// Raven `WP_BowcasterAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:923-942`
@@ -1123,7 +1123,7 @@ pub fn WP_BowcasterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals are needed — how is state threaded in?
 /// Raven `WP_BowcasterMainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:945-1029`
@@ -1218,7 +1218,7 @@ pub fn WP_FireBowcaster(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboo
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `muzzle` global (ruling 1) is needed for the `CreateMissile` start point — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `muzzle` global is needed for the `CreateMissile` start point — how is state threaded in?
 /// Raven `WP_RepeaterMainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1056-1073`
@@ -1249,7 +1249,7 @@ pub fn WP_RepeaterMainFire(ctx: GameContext<'_>, ent: *mut gentity_t, dir: vec3_
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals and `g_gametype` cvar (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals and `g_gametype` cvar are needed — how is state threaded in?
 /// Raven `WP_RepeaterAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1076-1107`
@@ -1294,7 +1294,7 @@ pub fn WP_RepeaterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward` global (ruling 1) is needed (via WP_RepeaterMainFire) — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward` global is needed (via WP_RepeaterMainFire) — how is state threaded in?
 /// Raven `WP_FireRepeater`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1110-1131`
@@ -1319,7 +1319,7 @@ pub fn WP_FireRepeater(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qbool
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals are needed — how is state threaded in?
 /// Raven `WP_DEMP2_MainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1142-1160`
@@ -1354,7 +1354,7 @@ pub fn WP_DEMP2_MainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and `trap_Trace` are needed — how is state threaded in?
 /// Raven `DEMP2_AltRadiusDamage`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1164-1307`
@@ -1519,7 +1519,7 @@ pub fn DEMP2_AltRadiusDamage(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` is needed — how is state threaded in?
 /// Raven `DEMP2_AltDetonate`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1310-1333`
@@ -1549,7 +1549,7 @@ pub fn DEMP2_AltDetonate(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time`, the file-static `forward`/`muzzle` globals, and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time`, the file-static `forward`/`muzzle` globals, and `trap_Trace` are needed — how is state threaded in?
 /// Raven `WP_DEMP2_AltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1336-1403`
@@ -1645,7 +1645,7 @@ pub fn WP_FireDEMP2(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolean
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals are needed — how is state threaded in?
 /// Raven `WP_FlechetteMainFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1430-1467`
@@ -1697,7 +1697,7 @@ pub fn WP_FlechetteMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` is needed — how is state threaded in?
 /// Raven `prox_mine_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1470-1506`
@@ -1747,7 +1747,7 @@ pub fn prox_mine_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `trap_Trace` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `trap_Trace` is needed — how is state threaded in?
 /// Raven `WP_TraceSetStart`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1509-1541`
@@ -1826,7 +1826,7 @@ pub fn WP_flechette_alt_blow(ctx: GameContext<'_>, ent: *mut gentity_t) {
     laserTrapExplode(ctx, ent);
 }
 
-// PORT-NOTE(rng-threading): faithful skeleton signature carries no threaded Rng (ruling 3: `random()`/Q_flrand LCG is bg-shared and threaded), but `random()` is used for the missile speed/life here — how is the Rng reached from this context-free signature?
+// PORT-NOTE(rng-threading): faithful skeleton signature carries no threaded Rng (the `random()`/Q_flrand LCG is bg-shared and threaded), but `random()` is used for the missile speed/life here — how is the Rng reached from this context-free signature?
 /// Raven `WP_CreateFlechetteBouncyThing`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1560-1599`
@@ -1879,7 +1879,7 @@ pub fn WP_CreateFlechetteBouncyThing(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`muzzle` globals are needed — how is state threaded in?
 /// Raven `WP_FlechetteAltFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1602-1623`
@@ -1918,7 +1918,7 @@ pub fn WP_FireFlechette(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboo
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals are needed — how is state threaded in?
 /// Raven `rocketThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1651-1811`
@@ -2102,7 +2102,7 @@ pub fn RocketDie(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities`/`g_gametype` globals and the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities`/`g_gametype` globals and the file-static `forward`/`muzzle` globals are needed — how is state threaded in?
 /// Raven `WP_FireRocket`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1826-1908`
@@ -2204,7 +2204,7 @@ pub fn WP_FireRocket(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolea
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and `trap_Trace` are needed — how is state threaded in?
 /// Raven `thermalDetonatorExplode`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1936-1970`
@@ -2288,7 +2288,7 @@ pub fn thermalThinkStandard(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals are needed — how is state threaded in?
 /// Raven `WP_FireThermalDetonator`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:1986-2072`
@@ -2385,13 +2385,13 @@ pub fn WP_FireThermalDetonator(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`vright` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but the file-static `forward`/`vright` globals are needed — how is state threaded in?
 /// Raven `WP_DropThermal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2074-2078`
 pub fn WP_DropThermal(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity_t {
     // PORT-NOTE(file-static-globals): `forward`/`vright`/`up` are the unported
-    // file-static globals (ruling 1); referenced bare, reported missing.
+    // file-static globals; referenced bare, reported missing.
     unsafe {
         crate::q_math::AngleVectors(
             (*((*ent).client as *mut gclient_t)).ps.viewangles,
@@ -2403,7 +2403,7 @@ pub fn WP_DropThermal(ctx: GameContext<'_>, ent: *mut gentity_t) -> *mut gentity
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and `trap_Trace` are needed — how is state threaded in?
 /// Raven `WP_LobFire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2082-2226`
@@ -2590,7 +2590,7 @@ pub fn WP_LobFire(
     // copies `failCase` (worst case) or `shotVel` (success) back through it.
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` is needed — how is state threaded in?
 /// Raven `laserTrapExplode`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2244-2280`
@@ -2635,7 +2635,7 @@ pub fn laserTrapExplode(ctx: GameContext<'_>, self_: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` is needed — how is state threaded in?
 /// Raven `laserTrapDelayedExplode`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2282-2294`
@@ -2670,7 +2670,7 @@ const LT_ALT_TIME: c_int = 2000;
 const LT_ACTIVATION_DELAY: c_int = 1000;
 const LT_DELAY_TIME: c_int = 50;
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals are needed — how is state threaded in?
 /// Raven `touchLaserTrap`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2296-2318`
@@ -2704,7 +2704,7 @@ pub fn touchLaserTrap(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals are needed — how is state threaded in?
 /// Raven `proxMineThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2320-2365`
@@ -2766,7 +2766,7 @@ pub fn proxMineThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and `trap_Trace` are needed — how is state threaded in?
 /// Raven `laserTrapThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2367-2400`
@@ -2822,7 +2822,7 @@ pub fn laserTrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` is needed — how is state threaded in?
 /// Raven `laserTrapStick`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2402-2469`
@@ -2915,7 +2915,7 @@ pub fn TrapThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
     crate::g_object::G_RunObject(ctx, ent);
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and `trap_LinkEntity`-adjacent globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and `trap_LinkEntity`-adjacent globals are needed — how is state threaded in?
 /// Raven `CreateLaserTrap`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2477-2531`
@@ -2992,7 +2992,7 @@ pub fn CreateLaserTrap(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals, the file-static `forward`/`muzzle` globals, and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals, the file-static `forward`/`muzzle` globals, and `trap_Trace` are needed — how is state threaded in?
 /// Raven `WP_PlaceLaserTrap`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2533-2626`
@@ -3090,7 +3090,7 @@ pub fn VectorNPos(r#in: vec3_t, out: vec3_t) -> vec3_t {
     out
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` is needed — how is state threaded in?
 /// Raven `charge_stick`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2645-2738`
@@ -3216,7 +3216,7 @@ pub fn charge_stick(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals are needed — how is state threaded in?
 /// Raven `DetPackBlow`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2740-2766`
@@ -3304,7 +3304,7 @@ pub fn DetPackDie(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and `trap_Trace` are needed — how is state threaded in?
 /// Raven `drop_charge`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2782-2849`
@@ -3382,7 +3382,7 @@ pub fn drop_charge(ctx: GameContext<'_>, self_: *mut gentity_t, start: vec3_t, d
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` is needed — how is state threaded in?
 /// Raven `BlowDetpacks`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2851-2869`
@@ -3428,7 +3428,7 @@ pub fn CheatsOn(ctx: GameContext<'_>) -> qboolean {
     qtrue
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and the file-static `forward`/`vright`/`up`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals and the file-static `forward`/`vright`/`up`/`muzzle` globals are needed — how is state threaded in?
 /// Raven `WP_DropDetPack`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2880-2964`
@@ -3527,7 +3527,7 @@ pub fn WP_DropDetPack(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbool
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals, the file-static `forward`/`muzzle` globals, cvars, and `trap_G2Trace`/`trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals, the file-static `forward`/`muzzle` globals, cvars, and `trap_G2Trace`/`trap_Trace` are needed — how is state threaded in?
 /// Raven `WP_FireConcussionAlt`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:2967-3229`
@@ -3788,7 +3788,7 @@ pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` and the file-static `forward`/`muzzle` globals are needed — how is state threaded in?
 /// Raven `WP_FireConcussion`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3232-3276`
@@ -3836,7 +3836,7 @@ pub fn WP_FireConcussion(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals, the file-static `forward`/`vright`/`muzzle` globals, and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals, the file-static `forward`/`vright`/`muzzle` globals, and `trap_Trace` are needed — how is state threaded in?
 /// Raven `WP_FireStunBaton`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3282-3357`
@@ -3958,7 +3958,7 @@ pub fn WP_FireStunBaton(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbo
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `g_entities`, the file-static `forward`/`vright`/`muzzle` globals, and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `g_entities`, the file-static `forward`/`vright`/`muzzle` globals, and `trap_Trace` are needed — how is state threaded in?
 /// Raven `WP_FireMelee`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3363-3445`
@@ -4230,7 +4230,7 @@ pub fn WP_TouchVehMissile(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time`, `muzzle`, and `trap_Trace` (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time`, `muzzle`, and `trap_Trace` are needed — how is state threaded in?
 /// Raven `WP_CalcVehMuzzle`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3580-3608`
@@ -4292,7 +4292,7 @@ pub fn WP_CalcVehMuzzle(ctx: GameContext<'_>, ent: *mut gentity_t, muzzleNum: c_
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level.time` is needed — how is state threaded in?
 /// Raven `WP_VehWeapSetSolidToOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3610-3625`
@@ -4313,7 +4313,7 @@ pub fn WP_VehWeapSetSolidToOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals (ruling 1) are needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `level`/`g_entities` globals are needed — how is state threaded in?
 /// Raven `WP_FireVehicleWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3628-3848`
@@ -4598,7 +4598,7 @@ pub fn G_VehMuzzleFireFX(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `trap_Trace` (ruling 1) is needed — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but `trap_Trace` is needed — how is state threaded in?
 /// Raven `G_EstimateCamPos`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3883-3959`
@@ -4922,7 +4922,7 @@ pub fn WP_VehCheckTraceFromCamPos(
                 let mut extraTrace: trace_t = std::mem::zeroed();
                 let mut newEnd: vec3_t = [0.0; 3];
                 // PORT-NOTE(bg-fn-shape): `BG_VehTraceFromCamPos` is a bg-tier
-                // free fn taking `&BgState`/`&dyn BgTraps` (ruling 12/15 shape),
+                // free fn taking `&BgState`/`&dyn BgTraps`,
                 // not `GameContext`; called through `(*ctx.world).bg_state`/the
                 // game-tier trap adapter per that shape. Reported as a shape
                 // mismatch since this caller only has `ctx`.

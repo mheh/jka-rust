@@ -29,7 +29,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let level_time = crate::g_main::level_time();
         if level_time >= (*pVeh).m_iDieTime {
-            // If the vehicle is not empty. (Fork-7: `Inhabited`/`EjectAll` have
+            // If the vehicle is not empty. (`Inhabited`/`EjectAll` have
             // no Animal override, so dispatch resolves to the generic base.)
             if crate::veh_dispatch::inhabited(pVeh) != qfalse {
                 crate::veh_dispatch::eject_all(ctx, pVeh);
@@ -44,7 +44,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:151-154`
 pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
-        // Fork-7: Animal `Update` delegates to the generic base body.
+        // Animal `Update` delegates to the generic base body.
         crate::g_vehicles::Update(ctx, pVeh, pUcmd)
     }
 }
@@ -499,7 +499,7 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
     }
 }
 
-// Fork-7 (2026-07-03): `G_SetAnimalVehicleFunctions` retired — it only assigned the now-removed
+// `G_SetAnimalVehicleFunctions` retired — it only assigned the now-removed
 // `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
 // `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
 

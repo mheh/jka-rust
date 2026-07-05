@@ -3,7 +3,7 @@
 //!
 //! State reached through `ctx.world` (STATE-D6 leaf reborrows), traps through
 //! `trap::X(ctx.engine, …)`, file-scope globals/cvars via the pre-merged
-//! `GameWorld` fields (fork ruling 1). Five functions remain parked: the three
+//! `GameWorld` fields. Five functions remain parked: the three
 //! entity-`touch` fn-pointer callers (`ClientImpacts`, `G_TouchTriggers`,
 //! `G_MoverTouchPushTriggers`) and the two `Pmove` drivers (`SpectatorThink`,
 //! `ClientThink_real`) — both blocked on storing engine-bearing/ctx-carrying
@@ -817,7 +817,7 @@ pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut user
             pm.cmd = *ucmd;
             // spectators can fly through bodies
             pm.tracemask = MASK_PLAYERSOLID & !CONTENTS_BODY;
-            // ruling 21: pm.trace/pointcontents fields stay for layout only;
+            // pm.trace/pointcontents fields stay for layout only;
             // bg logic reaches the engine via BgTraps, threaded into Pmove below.
 
             pm.noSpecMove = (*ctx.world).cvars.g_noSpecMove.integer;
@@ -2851,7 +2851,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         } else {
             pm.tracemask = MASK_PLAYERSOLID;
         }
-        // ruling 21: pm.trace/pointcontents fields stay for layout only; bg logic
+        // pm.trace/pointcontents fields stay for layout only; bg logic
         // reaches the engine through BgTraps threaded into Pmove below.
         pm.debugLevel = (*ctx.world).cvars.g_debugMove.integer;
         pm.noFootsteps = (((*ctx.world).cvars.g_dmflags.integer & DF_NO_FOOTSTEPS) > 0) as qboolean;

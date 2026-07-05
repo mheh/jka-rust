@@ -440,7 +440,7 @@ pub fn TransferWPData(ctx: GameContext<'_>, from: c_int, to: c_int) {
 /// Raven `CreateNewWP`.
 ///
 /// Appends a fresh waypoint at `gWPNum`. `origin` is only read (copied into the
-/// slot), so it stays by-value (fork-9: keep-by-value when never written).
+/// slot), so it stays by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:371-401`
 pub fn CreateNewWP(ctx: GameContext<'_>, origin: vec3_t, flags: c_int) {
@@ -624,7 +624,7 @@ pub fn RemoveWP_InTrail(ctx: GameContext<'_>, afterindex: c_int) {
 /// Raven `CreateNewWP_InTrail`.
 ///
 /// Inserts a new waypoint immediately *after* index `afterindex`, shifting the
-/// tail up one slot. `origin` is read-only (fork-9: by-value).
+/// tail up one slot. `origin` is read-only, so it stays by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:559-635`
 pub fn CreateNewWP_InTrail(
@@ -703,7 +703,7 @@ pub fn CreateNewWP_InTrail(
 ///
 /// Like `CreateNewWP_InTrail`, but the new point replaces the found slot (the
 /// found point is pushed up) rather than being inserted after it. `origin` is
-/// read-only (fork-9: by-value).
+/// read-only, so it stays by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:637-714`
 pub fn CreateNewWP_InsertUnder(
@@ -856,7 +856,7 @@ pub fn NotWithinRange(base: c_int, extent: c_int) -> c_int {
 /// Raven `NodeHere`.
 ///
 /// Whether a node already sits at (integer-truncated) `spot` X/Y with Z within
-/// ±5. `spot` is read-only (fork-9: by-value).
+/// ±5. `spot` is read-only, so it stays by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:787-809`
 pub fn NodeHere(ctx: GameContext<'_>, spot: vec3_t) -> c_int {
@@ -888,7 +888,7 @@ pub fn NodeHere(ctx: GameContext<'_>, spot: vec3_t) -> c_int {
 ///
 /// Single solid box-trace between two points; no file-scope state. `org1`/
 /// `org2`/`mins`/`maxs` are read-only trace args (never written), so they
-/// stay by-value `vec3_t` (fork-9: keep-by-value when never written).
+/// stay by-value `vec3_t`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:812-824`
 pub fn CanGetToVector(
@@ -912,7 +912,7 @@ pub fn CanGetToVector(
 ///
 /// Walks a box from `org1` toward `moveTo` in `stepSize` increments, allowing a
 /// single 16-unit stair step, and reports whether any progress was made. All
-/// four `vec3_t` args are read-only (fork-9: by-value). (The `#if 0` block at
+/// four `vec3_t` args are read-only, so they stay by-value. (The `#if 0` block at
 /// `ai_wpnav.c:826-882` is dead source, dropped per §20.)
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:883-996`
@@ -1534,7 +1534,7 @@ pub fn RepairPaths(ctx: GameContext<'_>, behindTheScenes: qboolean) -> c_int {
 ///
 /// Double solid box-trace along a levelled path segment; no file-scope state.
 /// All `vec3_t` args are read-only trace args (`org1`/`org2`/`mins`/`maxs`),
-/// so they stay by-value (fork-9: keep-by-value when never written).
+/// so they stay by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:1526-1547`
 pub fn OrgVisibleCurve(
@@ -2489,7 +2489,7 @@ pub fn SavePathData(ctx: GameContext<'_>, filename: *const c_char) -> c_int {
 
 /// Raven `G_NearestNodeToPoint`.
 ///
-/// Nearest grid node to `point` (read-only; fork-9 by-value).
+/// Nearest grid node to `point` (read-only, passed by-value).
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:2510-2541`
 pub fn G_NearestNodeToPoint(ctx: GameContext<'_>, point: vec3_t) -> c_int {
@@ -2772,7 +2772,7 @@ pub fn G_BackwardAttachment(
 ///
 /// The `PATH_TIME_DEBUG`/`ASCII_ART_DEBUG`/`PAINFULLY_DEBUGGING_THROUGH_VM`
 /// `#ifdef` blocks are not defined in this build (dead debug source); dropped
-/// per §20/ruling 11, including their `trap_Milliseconds`/`Com_Printf` calls.
+/// per §20, including their `trap_Milliseconds`/`Com_Printf` calls.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3055-3250`
 pub fn G_RMGPathing(ctx: GameContext<'_>) {
@@ -2943,7 +2943,7 @@ pub fn G_RMGPathing(ctx: GameContext<'_>) {
 ///
 /// Called for RMG levels. The `PAINFULLY_DEBUGGING_THROUGH_VM` `#ifdef`
 /// `Com_Printf` blocks are dead source in this build (not defined); dropped
-/// per §20/ruling 11.
+/// per §20.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_wpnav.c:3254-3342`
 pub fn BeginAutoPathRoutine(ctx: GameContext<'_>) {

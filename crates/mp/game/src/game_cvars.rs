@@ -5,8 +5,8 @@
 //! `GameCvars` — Raven's ~136 file-scope `vmCvar_t` handles as one
 //! GameWorld sub-struct, plus the registration table data.
 //!
-//! Ruling 1 (docs/handoffs/jampgame-fork-discovery.md): all file-scope
-//! globals become GameWorld fields; cvar handles grouped in GameCvars.
+//! All file-scope globals become GameWorld fields; cvar handles grouped in
+//! GameCvars.
 //! Source: `oracle/oracle/codemp/game/g_main.c:230-475` (gameCvarTable)
 #![allow(non_snake_case, non_camel_case_types, unused)]
 

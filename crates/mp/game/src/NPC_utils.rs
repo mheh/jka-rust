@@ -6,11 +6,11 @@
 //! `docs/handoffs/jampgame-fork-discovery.md`), then the pass-2 sweep
 //! (`packets/NPC_utils.md`) that resolved the `ai-context` park class below.
 //!
-//! SPINE (fork rulings 1/4 + `docs/architecture/engine-seam.md`, precedent
+//! SPINE (`docs/architecture/engine-seam.md`, precedent
 //! `w_force.rs`/`g_client.rs`): logic fns that reach `level`/cvars/`g_entities`/
 //! traps thread the `GameContext<'_>` receiver (`.world: *mut GameWorld`,
 //! `.engine`) as an ADDITIVE first parameter (the faithful C signature carries
-//! none). Globals are `GameWorld` fields (fork 1): `level` →
+//! none). Globals are `GameWorld` fields: `level` →
 //! `(*ctx.world).level`, `g_entities[i]` → `(*ctx.world).g_entities[i]`; this
 //! file's own `teamNumbers`/`teamStrength`/`teamCounter` file-scope globals
 //! were added to `GameWorld` (additive, Raven names kept — see
@@ -25,7 +25,7 @@
 //! fields (`GameGlobals`, backfilled from their `()` placeholders) — the
 //! bulk of this file's fns that were parked `ai-context` in the mega pass are
 //! ported reaching them through `ctx`. `CalcEntitySpot`'s `point` and
-//! `G_GetBoltPosition`'s `pos` got the fork-9 vec3 out-param reshape
+//! `G_GetBoltPosition`'s `pos` got the vec3 out-param reshape
 //! (`&mut vec3_t` / `Option<&mut vec3_t>`) and same-file callers were fixed up.
 //!
 //! Two markers remain (see PORT-NOTE): `NPC_SetSurfaceOnOff` needs
@@ -142,7 +142,7 @@ use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 
 /// Raven `CalcEntitySpot`.
 ///
-/// Fork-9 reshape: `point` is written unconditionally on every branch (no
+/// Out-param reshape: `point` is written unconditionally on every branch (no
 /// oracle caller passes NULL), so it becomes the non-nullable `&mut vec3_t`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:20-168`
@@ -416,7 +416,7 @@ pub fn NPC_UpdateAngles(
 
 /// Raven `NPC_AimWiggle`.
 ///
-/// Fork-9 reshape: `enemy_org` is mutated in place (`VectorAdd(enemy_org,
+/// Out-param reshape: `enemy_org` is mutated in place (`VectorAdd(enemy_org,
 /// NPCInfo->aimOfs, enemy_org)`), so it becomes `&mut vec3_t`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:519-533`
@@ -569,7 +569,7 @@ pub fn NPC_UpdateFiringAngles(
 /// Raven `NPC_UpdateShootAngles`.
 ///
 /// Raven: FIXME: shoot angles either not set right or not used! `angles` is
-/// read-only here (never written), so the fork-9 out-param reshape does not
+/// read-only here (never written), so the out-param reshape does not
 /// apply — kept by-value.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:740-808`
@@ -1624,7 +1624,7 @@ pub fn NPC_CheckCharmed(ctx: GameContext<'_>) {
 
 /// Raven `G_GetBoltPosition`.
 ///
-/// Fork-9 reshape: `pos` is guarded by `if (pos)` in the oracle (the
+/// Out-param reshape: `pos` is guarded by `if (pos)` in the oracle (the
 /// AngleVectors NULL-able idiom), so it becomes `Option<&mut vec3_t>`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_utils.c:1707-1740`
@@ -1719,7 +1719,7 @@ pub fn NPC_EnemyRangeFromBolt(
 
 /// Raven `NPC_GetEntsNearBolt`.
 ///
-/// Fork-9 reshape: `boltOrg` is written unconditionally
+/// Out-param reshape: `boltOrg` is written unconditionally
 /// (`VectorCopy(org, boltOrg)`), so it becomes the non-nullable
 /// `&mut vec3_t`.
 ///

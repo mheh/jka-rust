@@ -1,7 +1,7 @@
 //! `GameGlobals` — the remaining game-tier mutable file-scope globals
-//! and file-statics as one owned GameWorld sub-struct (fork ruling 1:
-//! file-scope mutable globals become GameWorld fields, grouped by owning
-//! `.c` file). Pass-2 porters read/write these through `ctx.world`; they
+//! and file-statics as one owned GameWorld sub-struct: file-scope mutable
+//! globals become GameWorld fields, grouped by owning `.c` file. Pass-2
+//! porters read/write these through `ctx.world`; they
 //! never add a field. Scalar decls carry their Rust type; non-scalar
 //! decls (pointers/structs/arrays) are `()` placeholders with a
 //! `//TODO: Port <type>` marker — the porter fills the real type when
@@ -499,7 +499,7 @@ pub struct teamgame_t {
     pub blueTakenTime: c_int,
 }
 
-/// Raven game-tier mutable file-scope globals (fork ruling 1).
+/// Raven game-tier mutable file-scope globals, grouped into GameWorld fields.
 #[derive(Default)]
 pub struct GameGlobals {
     // --- `NPC.c` file-scope globals ---
@@ -527,7 +527,7 @@ pub struct GameGlobals {
     /// `ucmd`. Source: `oracle/oracle/codemp/game/NPC.c:36`
     pub ucmd: usercmd_t,
     /// `_saved_ucmd` — the `SaveNPCGlobals`/`RestoreNPCGlobals` shadow copy of
-    /// `ucmd` (fork ruling 1: genuine cross-frame state).
+    /// `ucmd` (genuine cross-frame state).
     /// Source: `oracle/oracle/codemp/game/NPC.c:628`
     pub _saved_ucmd: usercmd_t,
     // --- `NPC_AI_GalakMech.c` file-scope globals ---
@@ -608,7 +608,7 @@ pub struct GameGlobals {
     pub gNPCPtrs: (),
     /// `showBBoxes`. Source: `oracle/oracle/codemp/game/NPC_spawn.c:4182`
     pub showBBoxes: qboolean,
-    // --- `NPC_stats.c` file-scope globals (ruling 24 — file-scope mutable → globals) ---
+    // --- `NPC_stats.c` file-scope globals ---
     /// Raven `char NPCParms[MAX_NPC_DATA_SIZE]` — the loaded NPC-config text.
     /// Source: `oracle/oracle/codemp/game/NPC_stats.c:237`
     pub NPCParms: NpcDataBuffer,
@@ -646,11 +646,11 @@ pub struct GameGlobals {
     /// `gUpdateVars`. Source: `oracle/oracle/codemp/game/ai_main.c:7485`
     pub gUpdateVars: c_int,
     /// `static int lastbotthink_time` — bot-think cadence latch (function-scope
-    /// static in `BotAIStartFrame`; genuine cross-frame state per ruling 5).
+    /// static in `BotAIStartFrame`; genuine cross-frame state).
     /// Source: `oracle/oracle/codemp/game/ai_main.c:7497`
     pub lastbotthink_time: c_int,
     /// `static int local_time` — bot-frame elapsed-time cursor (function-scope
-    /// static in `BotAIStartFrame`; genuine cross-frame state per ruling 5).
+    /// static in `BotAIStartFrame`; genuine cross-frame state).
     /// Source: `oracle/oracle/codemp/game/ai_main.c:7495`
     pub local_time: c_int,
     /// `numbots`. Source: `oracle/oracle/codemp/game/ai_main.c:48`
@@ -724,7 +724,7 @@ pub struct GameGlobals {
     /// Raven `gentity_t *gJMSaberEnt` — the current Jedi-Master saber entity.
     /// Source: `oracle/oracle/codemp/game/g_client.c:471`
     //
-    // Fork-4 rules stored `gentity_t*` → `EntityId`, but g_client.rs transcribes
+    // The general rule stores `gentity_t*` as `EntityId`, but g_client.rs transcribes
     // entities as raw `*mut gentity_t` throughout (its resolved signatures keep
     // raw pointers); `Option<_>` gives the nullable-pointer semantics a Default
     // (`None`) that a bare `*mut` lacks under this struct's `#[derive(Default)]`.
@@ -1000,16 +1000,16 @@ pub struct GameGlobals {
     /// `s_quadFactor`. Source: `oracle/oracle/codemp/game/g_weapon.c:12`
     pub s_quadFactor: f32,
     /// `static vec3_t forward` — fire-time forward axis shared across
-    /// `WP_Fire*`/`CalcMuzzlePoint` (ruling 29).
+    /// `WP_Fire*`/`CalcMuzzlePoint`.
     /// Source: `oracle/oracle/codemp/game/g_weapon.c:13`
     pub forward: vec3_t,
-    /// `static vec3_t vright` — fire-time right axis (ruling 29).
+    /// `static vec3_t vright` — fire-time right axis.
     /// Source: `oracle/oracle/codemp/game/g_weapon.c:13`
     pub vright: vec3_t,
-    /// `static vec3_t up` — fire-time up axis (ruling 29).
+    /// `static vec3_t up` — fire-time up axis.
     /// Source: `oracle/oracle/codemp/game/g_weapon.c:13`
     pub up: vec3_t,
-    /// `static vec3_t muzzle` — fire-time muzzle point (ruling 29).
+    /// `static vec3_t muzzle` — fire-time muzzle point.
     /// Source: `oracle/oracle/codemp/game/g_weapon.c:14`
     pub muzzle: vec3_t,
     // --- `w_saber.c` file-scope globals ---

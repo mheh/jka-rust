@@ -193,7 +193,7 @@ pub fn RandFloat(
     max: f32,
 ) -> f32 {
     // Raven (linux path): `((rand() * (max - min)) / (float)RAND_MAX) + min`.
-    // The LCG lives on `bg_state.rng` (fork ruling 15).
+    // The LCG lives on `bg_state.rng`.
     unsafe { (((*ctx.world).bg_state.rng.rand() as f32 * (max - min)) / RAND_MAX as f32) + min }
 }
 
@@ -202,10 +202,9 @@ pub fn RandFloat(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:46-78`
 ///
 /// Debug-only visualization: the oracle body compiles only under
-/// `DEBUG_SABER_BOX`, and every call site sits under the same guard. Per fork
-/// ruling 11 (#ifdef-only debug fns dropped) and porting-rules §20 (drop dead
-/// surface with a note), this ships as a no-op — `mins`/`maxs` are never
-/// written, so the fork-9 out-param reshape does not apply.
+/// `DEBUG_SABER_BOX`, and every call site sits under the same guard. Per
+/// porting-rules §20 (drop dead surface with a note), this ships as a no-op —
+/// `mins`/`maxs` are never written, so the out-param reshape does not apply.
 pub fn G_DebugBoxLines(
     ctx: GameContext<'_>,
     mins: vec3_t,
@@ -814,7 +813,7 @@ pub fn G_CheckLookTarget(
                 let lookCent = &mut (*ctx.world).g_entities[(*sc).renderInfo.lookTarget as usize]
                     as *mut gentity_t;
                 if !lookCent.is_null() {
-                    // ruling 22: `enemy` is `Option<EntityId>`; identity-compare by id.
+                    // `enemy` is `Option<EntityId>`; identity-compare by id.
                     if (*ent).enemy != Some(ent_id(base, lookCent)) {
                         // We turn heads faster than headbob speed, but not as fast
                         // as if watching an enemy
@@ -2943,7 +2942,7 @@ pub fn G_SabCol_PointRelativeToPlane(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2599-2697`
 // PORT-NOTE(saberFace_t): the resolved sig keeps `fList: *mut c_void`; the type
 // `saberFace_t` is ported (`crate::saber::saber_face_t`), so the body casts and
-// walks it as Raven does. `atkMins`/`atkMaxs`/`impactPoint` are fork-9 out-slots.
+// walks it as Raven does. `atkMins`/`atkMaxs`/`impactPoint` are out-param slots.
 pub fn G_SaberFaceCollisionCheck(
     ctx: GameContext<'_>,
     fNum: c_int,
@@ -3371,7 +3370,7 @@ pub fn WP_SabersIntersect(
                             }
                         }
 
-                        // DEBUG_SABER_BOX visualization dropped (fork ruling 11 / §20).
+                        // DEBUG_SABER_BOX visualization dropped (porting-rules §20).
 
                         if tri_tri_intersect(
                             saberBase1,
@@ -6794,7 +6793,7 @@ pub fn saberMoveBack(
     goingBack: qboolean,
 ) {
     // The `THROWN_SABER_COMP` compensation block is `#ifdef`-gated off in the MP
-    // build, so `oldOrg`/`goingBack` are unused here (fork ruling 11).
+    // build, so `oldOrg`/`goingBack` are unused here.
     let _ = goingBack;
     unsafe {
         let level_time = (*ctx.world).level.time;
@@ -8376,7 +8375,7 @@ pub fn G_KickDownable(
 /// Raven `G_TossTheMofo`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7502-7525`
-// fork-9: `tossDir` is read-only here (`VectorMA` input only, never written),
+// `tossDir` is read-only here (`VectorMA` input only, never written),
 // so it stays by-value.
 pub fn G_TossTheMofo(
     ctx: GameContext<'_>,
@@ -10607,7 +10606,7 @@ pub fn WP_MissileBlockForBlock(
 /// Raven `WP_SaberBlockNonRandom`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9127-9198`
-// fork-9: `hitloc` is a read-only input here (VectorSubtract source, `hitloc[2]`
+// `hitloc` is a read-only input here (VectorSubtract source, `hitloc[2]`
 // read), never written — so it stays by-value `vec3_t`.
 pub fn WP_SaberBlockNonRandom(
     self_: *mut gentity_t,
@@ -10673,7 +10672,7 @@ pub fn WP_SaberBlockNonRandom(
 /// Raven `WP_SaberBlock`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9200-9274`
-// fork-9: `hitloc` is a read-only input here (VectorSubtract source, `hitloc[2]`
+// `hitloc` is a read-only input here (VectorSubtract source, `hitloc[2]`
 // read), never written — so it stays by-value `vec3_t`.
 pub fn WP_SaberBlock(
     ctx: GameContext<'_>,
@@ -10746,7 +10745,7 @@ pub fn WP_SaberBlock(
 /// Raven `WP_SaberCanBlock`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9276-9451`
-// fork-9: `point` is read-only (passed to InFront/WP_SaberBlockNonRandom, never
+// `point` is read-only (passed to InFront/WP_SaberBlockNonRandom, never
 // written) — stays by-value `vec3_t`. Raven's `!point` null-guard is vestigial
 // for a by-value array and is dropped.
 pub fn WP_SaberCanBlock(

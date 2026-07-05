@@ -7,7 +7,7 @@
 /// Source: `oracle/oracle/codemp/game/q_shared.h:1985`
 pub const MAX_CLIENTS: usize = 32;
 
-/// `c_int`-typed dual of [`MAX_CLIENTS`] (ruling-21 rider). Raven compares
+/// `c_int`-typed dual of [`MAX_CLIENTS`]. Raven compares
 /// `int` client numbers against `MAX_CLIENTS` in hundreds of `< MAX_CLIENTS`
 /// sites; this spelling drops the `as c_int` noise at those comparisons.
 ///

@@ -134,7 +134,7 @@ pub const forcePowerDarkLight: [c_int; 18] = [
 
 /// Raven `WeaponReadyAnim[WP_NUM_WEAPONS]` — weapon-ready animation per weapon type.
 ///
-/// Ruling 24: bg const table lives as a `static` in its owning bg module
+/// bg const table lives as a `static` in its owning bg module
 /// (the `bg_itemlist` precedent).
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:242-266`
 pub static WeaponReadyAnim: [c_int; 19] = [
@@ -162,7 +162,7 @@ pub static WeaponReadyAnim: [c_int; 19] = [
 /// Raven `WeaponReadyLegsAnim[WP_NUM_WEAPONS]` — legs weapon-ready animation
 /// per weapon type.
 ///
-/// Ruling 24: bg const table lives as a `static` in its owning bg module
+/// bg const table lives as a `static` in its owning bg module
 /// (the `bg_itemlist` precedent).
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:268-291`
 pub static WeaponReadyLegsAnim: [c_int; 19] = [
@@ -196,7 +196,7 @@ pub static WeaponReadyLegsAnim: [c_int; 19] = [
 /// positionally (by index), matching the oracle's actual (not commented)
 /// per-weapon assignment.
 ///
-/// Ruling 24: bg const table lives as a `static` in its owning bg module
+/// bg const table lives as a `static` in its owning bg module
 /// (the `bg_itemlist` precedent).
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:294-317`
 pub static WeaponAttackAnim: [c_int; 19] = [
@@ -1414,7 +1414,7 @@ pub fn BG_ValidateSkinForTeam(
                     write_cstr_truncated(skinName, max_qpath, &skin);
                     // if file does not exist, set to "red"
                     // PORT-NOTE(escalation-resolution): BG_FileExists requires &dyn BgTraps
-                    // which this function signature cannot carry (ruling 12 constraint).
+                    // which this function signature cannot carry.
                     // Conservatively assume file does not exist and fall back to "red".
                     write_cstr_truncated(skinName, max_qpath, "red");
                     return qfalse;
@@ -1445,7 +1445,7 @@ pub fn BG_ValidateSkinForTeam(
                     }
                     write_cstr_truncated(skinName, max_qpath, &skin);
                     // PORT-NOTE(escalation-resolution): BG_FileExists requires &dyn BgTraps
-                    // which this function signature cannot carry (ruling 12 constraint).
+                    // which this function signature cannot carry.
                     // Conservatively assume file does not exist and fall back to "blue".
                     write_cstr_truncated(skinName, max_qpath, "blue");
                     return qfalse;

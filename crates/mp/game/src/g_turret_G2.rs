@@ -6,7 +6,7 @@
 //! ONLY — not wired into crates/. 3 fns remain parked: they assign a
 //! *named* function to a `gentity_t` think/use/pain/die field, whose type
 //! is the type-port's frozen `Option<unsafe extern "C" fn(...)>` — the
-//! fork-2 `EntThink`/`EntUse`/`EntPain`/`EntDie` dispatch enums this pass's
+//! `EntThink`/`EntUse`/`EntPain`/`EntDie` dispatch enums this pass's
 //! `pub fn` bodies would need to assign through are a different type than
 //! what `gentity_t` actually carries. See each fn's PORT-NOTE marker.
 #![allow(non_snake_case, unused, clippy::all)]
@@ -79,7 +79,7 @@ unsafe fn VALIDSTRING(a: *const c_char) -> bool {
 /// Raven `G2Tur_SetBoneAngles`.
 ///
 /// Raven: special routine for tracking angles between client and server -rww.
-/// Fork-9: `angles` is only ever read (copied into the entity state / handed
+/// `angles` is only ever read (copied into the entity state / handed
 /// to the trap), never written back — kept by-value.
 /// Source: `oracle/oracle/codemp/game/g_turret_G2.c:24-123`
 pub fn G2Tur_SetBoneAngles(

@@ -1,14 +1,14 @@
-//! `EntityId` -> `gentity_t*` seam helper (ruling 22): the index->pointer half
-//! of the fork-4 retrofit, complementing `mp_qshared`'s pointer->index
+//! `EntityId` -> `gentity_t*` seam helper: the index->pointer half
+//! of the `Option<EntityId>` retrofit, complementing `mp_qshared`'s pointer->index
 //! `ent_id`/`ent_id_opt` (see `crate::world`/`crate::ent_id`).
 //!
 //! Raven code dereferences a `gentity_t*` field directly (e.g.
-//! `ent->activator`); after ruling 22 that field is `Option<EntityId>`, so call
+//! `ent->activator`); that field is ported as `Option<EntityId>`, so call
 //! sites re-derive the live pointer via `base.add(id.index())` before
 //! dereferencing — Raven's exact `g_entities + entityNum` idiom.
 //!
 //! Source: `oracle/oracle/codemp/game/g_utils.c` (the `g_entities + i` idiom,
-//! e.g. `G_Find`/`ENT_STATE`); ruling 22, `docs/handoffs/jampgame-fork-discovery.md`.
+//! e.g. `G_Find`/`ENT_STATE`).
 
 use crate::world::EntityId;
 use mp_qshared::common::mp::gentity::gentity_t;

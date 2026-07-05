@@ -35,11 +35,11 @@ const SQUAD_TRANSITION: i32 = 4;
 const SQUAD_POINT: i32 = 5;
 const SQUAD_SCOUT: i32 = 6;
 
-// Navigation flag constants (fork ruling 5: file-scope consts).
+// Navigation flag constants.
 // Source: `oracle/oracle/codemp/game/b_local.h:314-322`
 pub const NIF_COLLISION: i32 = 0x00000004;
 
-// Script flags (fork ruling 5: file-scope consts).
+// Script flags.
 // Source: `oracle/oracle/codemp/game/b_public.h`
 const SCF_CHASE_ENEMIES: i32 = 0x00000400;
 const SCF_USE_CP_NEAREST: i32 = 0x00100000;
@@ -48,7 +48,7 @@ const SCF_FIRE_WEAPON: i32 = 0x00000008;
 const SCF_IGNORE_ALERTS: i32 = 0x00000001;
 const SCF_LOOK_FOR_ENEMIES: i32 = 0x00000080;
 
-// Combat point flags (fork ruling 5: file-scope consts).
+// Combat point flags.
 // Source: `oracle/oracle/codemp/game/b_public.h`
 pub const CP_CLEAR: c_int = 0x00000002;           // Has a clear shot to the enemy
 pub const CP_NEAREST: c_int = 0x00000010;         // Find the nearest combat point
@@ -62,7 +62,7 @@ pub const CP_HORZ_DIST_COLL: c_int = 0x00008000;  // Collect within horizontal d
 const PITCH: usize = 0;
 const YAW: usize = 1;
 
-// Entity state flags (fork ruling 5: file-scope consts).
+// Entity state flags.
 // Source: `oracle/oracle/codemp/game/g_public.h`
 const SVF_GLASS_BRUSH: i32 = 0x08000000;  // Ent is a glass brush
 

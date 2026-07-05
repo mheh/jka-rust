@@ -10,7 +10,7 @@
 //!
 //! - `ambient-state` — nearly every body reaches the file-scope AI globals
 //!   (`NPC`, `NPCInfo`, `ucmd`, `level`, `gPainHitLoc`) or calls a `trap_*`
-//!   (needs `&Engine`). Fork ruling 1 makes the AI globals `GameWorld`/
+//!   (needs `&Engine`). The AI globals become `GameWorld`/
 //!   `GameContext` state, but these faithful signatures carry no
 //!   `GameContext`/`&Engine` and the resolved cross-file signatures are
 //!   equally context-free. How ambient state + engine thread into
@@ -423,7 +423,7 @@ pub fn Mark1_dying(
 
 // PORT-NOTE(ambient-state): reads the `gPainHitLoc` ambient global; no
 // channel from this context-free faithful signature. Also stored as a fn
-// pointer (needs an EntXxx enum variant per ruling 2).
+// pointer (needs an EntXxx enum variant).
 /// Raven `NPC_Mark1_Pain`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:320-396`
@@ -558,8 +558,8 @@ pub fn Mark1_Hunt(ctx: GameContext<'_>) {
 
 // PORT-NOTE(ambient-state): reads/writes the `NPC`/`NPCInfo` ambient
 // globals, `level.time`, and this file's own fn-scope statics
-// (`forward`/`vright`/`up`/`muzzle` — fork ruling 5: genuine cross-frame
-// state -> GameWorld field); no channel from this context-free faithful
+// (`forward`/`vright`/`up`/`muzzle` — genuine cross-frame state, a
+// GameWorld field); no channel from this context-free faithful
 // signature.
 /// Raven `Mark1_FireBlaster`.
 ///
@@ -704,8 +704,8 @@ pub fn Mark1_BlasterAttack(
 }
 
 // PORT-NOTE(ambient-state): reads the `NPC` ambient global, `level.time`,
-// and this file's own fn-scope statics (`forward`/`vright`/`up` — fork
-// ruling 5); no channel from this context-free faithful signature.
+// and this file's own fn-scope statics (`forward`/`vright`/`up` — genuine
+// cross-frame state); no channel from this context-free faithful signature.
 /// Raven `Mark1_FireRocket`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark1.c:555-599`

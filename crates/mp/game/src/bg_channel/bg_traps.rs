@@ -1,4 +1,4 @@
-//! `BgTraps` — the bg tier's outbound engine surface (pass-3 ruling 13).
+//! `BgTraps` — the bg tier's outbound engine surface.
 //!
 //! The bg tier (`bg_pmove.c` et al.) cannot see `Engine`/`GameContext`
 //! (bg < game). Raven bridged this with the `GAME_HARD_LINKED` `strap_*` shim
@@ -7,8 +7,9 @@
 //! `Args`). The game tier implements it over the `crate::trap` wrappers (holding
 //! `&Engine`); `PmoveContext`/`BgState` carry a `&dyn BgTraps`.
 //!
-//! Ruling 19 keeps the bg modules inside `mp_game` for pass 3, so this trait
-//! lives here; the trait boundary — not a crate split — enforces the tier.
+//! The bg modules currently live inside `mp_game` rather than their own crate,
+//! so this trait lives here; the trait boundary — not a crate split — enforces
+//! the tier.
 #![allow(non_snake_case, clippy::too_many_arguments)]
 
 use core::ffi::{c_char, c_int, c_void};

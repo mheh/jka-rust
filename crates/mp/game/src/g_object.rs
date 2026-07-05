@@ -334,9 +334,9 @@ pub fn G_StartObjectMoving(
     speed: f32,
     trType: trType_t,
 ) {
-    // PORT-NOTE(fork-9-signature-mismatch): skeleton has dir: vec3_t but fork-9 ruling
-    // settled to &mut vec3_t for params written through VectorNormalize. Code below
-    // assumes &mut semantics but compiles with by-value param; mutations invisible to caller.
+    // PORT-NOTE(signature-mismatch): skeleton has dir: vec3_t but the settled shape for
+    // params written through VectorNormalize is &mut vec3_t. Code below assumes &mut
+    // semantics but compiles with by-value param; mutations invisible to caller.
     let mut dir_mut = dir;
     crate::q_math::VectorNormalize(&mut dir_mut);
 

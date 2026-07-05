@@ -7,9 +7,9 @@
 //! `NPC_AI_Jedi.rs`/`NPC_AI_Stormtrooper.rs`/`NPC_AI_GalakMech.rs`: almost
 //! every body in this file reaches the file-scope AI globals (`NPC`,
 //! `NPCInfo`, `ucmd`, `level`, `g_entities`) or a `trap_*` seam call, and the
-//! faithful context-free signatures have no channel to reach either (fork
-//! ruling 1 makes the AI globals `GameWorld`/`GameContext` state, but these
-//! resolved cross-file signatures are equally context-free).
+//! faithful context-free signatures have no channel to reach either (the AI
+//! globals become `GameWorld`/`GameContext` state, but these resolved
+//! cross-file signatures are equally context-free).
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

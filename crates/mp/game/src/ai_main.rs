@@ -41,8 +41,8 @@ const ACTION_WALK: c_int = 0x0080000;
 const ACTION_FORCEPOWER: c_int = 0x0100000;
 const ACTION_ALT_ATTACK: c_int = 0x0200000;
 
-// Pass-2 body imports: the outbound trap seam, the ai_main.h const families
-// (fork ruling 10), and the syscall `Args` builders each ported body constructs.
+// Pass-2 body imports: the outbound trap seam, the ai_main.h const families,
+// and the syscall `Args` builders each ported body constructs.
 use crate::botai::bot_ctf_state_t::bot_ctf_state_t;
 use crate::botai::bot_teamplay_state_t::bot_teamplay_state_t;
 use crate::botai::bweaponrange::{
@@ -413,7 +413,7 @@ pub fn BotAI_GetEntityState(
     }
 }
 
-// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld (ruling 1) — how is state threaded in?
+// PORT-NOTE(seam-threading): faithful skeleton signature carries no &Engine/&mut GameWorld, but trap_* wrappers need &Engine and file globals/cvars need GameWorld — how is state threaded in?
 /// Raven `BotAI_GetSnapshotEntity`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:388-400`
@@ -1137,7 +1137,7 @@ pub fn BotAILoadMap(
 /// Raven `OrgVisible`.
 ///
 /// `org1`/`org2` are read-only trace endpoints (never written), so they stay
-/// by-value `vec3_t` (fork-9: keep-by-value when never written).
+/// by-value `vec3_t`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:982-994`
 pub fn OrgVisible(
@@ -5967,7 +5967,7 @@ pub fn BotLovedOneDied(
         }
 
         // PORT-NOTE(bot_attachments): file-scope `bot_attachments` cvar (ai_main.c)
-        // — homes on GameCvars per ruling 1; field not yet present.
+        // — homes on GameCvars; field not yet present.
         if (*world).cvars.bot_attachments.integer == 0 {
             return;
         }
@@ -8336,7 +8336,7 @@ pub fn StandardBotAI(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:7492-7568`
 // PORT-NOTE(fn-statics): Raven's function-local `static int local_time`/
-// `lastbotthink_time`/`botlib_residual` persist across calls; per ruling 1 they
+// `lastbotthink_time`/`botlib_residual` persist across calls; they
 // home on GameGlobals (`local_time`/`lastbotthink_time`; `botlib_residual` is
 // dead in Raven and dropped).
 pub fn BotAIStartFrame(
@@ -8463,7 +8463,7 @@ pub fn BotAIStartFrame(
 /// Source: `oracle/oracle/codemp/game/ai_main.c:7575-7616`
 // PORT-NOTE(bot-cvars): the `bot_forcepowers`/`bot_forgimmick`/
 // `bot_honorableduelacceptance`/`bot_pvstype`/`bot_getinthecarrr` file-scope cvars
-// home on GameCvars per ruling 1 (fields not yet present). The `#ifdef _DEBUG`
+// home on GameCvars (fields not yet present). The `#ifdef _DEBUG`
 // bot_nogoals/bot_debugmessages registrations are dropped (§20, debug-only).
 pub fn BotAISetup(
     ctx: GameContext<'_>,

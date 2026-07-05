@@ -290,7 +290,7 @@ pub fn __builtin___memmove_chk(
 }
 
 // `srand`/`rand` are ported as the `randSeed` generator on
-// `bg_channel::rng::Rng` (BgState) per ruling 15 — reach them via
+// `bg_channel::rng::Rng` (BgState) — reach them via
 // `world.bg_state.rng.srand`/`.rand`.
 // Source: oracle/oracle/codemp/game/bg_lib.c:763-772
 

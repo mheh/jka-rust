@@ -84,16 +84,16 @@ pub fn VEH_StartStrafeRam(pVeh: *mut Vehicle_t, Right: qboolean, Duration: c_int
 pub extern "C" fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
         // Call base vehicle Update; if it returns false, propagate that
-        // PORT-NOTE(fork-7-vtable-access): g_vehicleInfo[VEHICLE_BASE].Update(pVeh, pUcmd)
+        // PORT-NOTE(vtable-access): g_vehicleInfo[VEHICLE_BASE].Update(pVeh, pUcmd)
         // requires ctx to access g_vehicleInfo; vtable fn-ptr dispatch needs game-tier state threading
-        // For now, assume base update succeeds (placeholder until fork-7 vtable retrofit)
+        // For now, assume base update succeeds (placeholder until vtable dispatch retrofit)
         // if !g_vehicleInfo[VEHICLE_BASE].Update(pVeh, pUcmd) {
         //     return qfalse;
         // }
 
         // Check if vehicle is dying and call DeathUpdate if so
         if (*pVeh).m_iDieTime != 0 {
-            // PORT-NOTE(fork-7-vtable-access): (*pVeh).m_pVehicleInfo.DeathUpdate(pVeh)
+            // PORT-NOTE(vtable-access): (*pVeh).m_pVehicleInfo.DeathUpdate(pVeh)
             // requires g_vehicleInfo or vtable fn-ptr in m_pVehicleInfo
         }
 
@@ -121,7 +121,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
         let curTime: c_int;
 
         // Get player states from parent and pilot
-        // PORT-NOTE(fork-7-vtable-access): m_pParentEntity.playerState access requires entity dereferencing
+        // PORT-NOTE(vtable-access): m_pParentEntity.playerState access requires entity dereferencing
         parentPS = (*(*pVeh).m_pParentEntity).playerState;
         if !(*pVeh).m_pPilot.is_null() {
             pilotPS = (*(*pVeh).m_pPilot).playerState;
@@ -141,7 +141,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
 
         speedIdleDec = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.decelIdle).unwrap_or(0.0) * (*pVeh).m_fTimeModifier;
 
-        // PORT-NOTE(fork-7-vtable-access): level.time needed; curTime assignment requires world state
+        // PORT-NOTE(vtable-access): level.time needed; curTime assignment requires world state
         // Placeholder: curTime = 0; // Would be level.time or pm->cmd.serverTime
         curTime = 0;
 
@@ -160,7 +160,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
                         let mut i: c_int = 0;
                         while (i as usize) < MAX_VEHICLE_EXHAUSTS
                             && (*pVeh).m_iExhaustTag[i as usize] != -1 {
-                            // PORT-NOTE(fork-7-trap-access): G_PlayEffectID requires ctx/trap access
+                            // PORT-NOTE(trap-access): G_PlayEffectID requires ctx/trap access
                             i += 1;
                         }
                     }
@@ -295,7 +295,7 @@ pub extern "C" fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
                     - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
             );
 
-            // PORT-NOTE(fork-7-vtable-access): pm->cmd.serverTime access requires bg-channel state;
+            // PORT-NOTE(vtable-access): pm->cmd.serverTime access requires bg-channel state;
             // electrify effect is guarded by pm access which needs threading
             // if parentPS->electrifyTime > pm->cmd.serverTime {
             //     pVeh->m_vOrientation[YAW] += (sin(pm->cmd.serverTime/1000.0f32)*3.0f32)*pVeh->m_fTimeModifier;
@@ -349,14 +349,14 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
             }
 
             // Set the delay time (40% of animation time)
-            // PORT-NOTE(fork-7-bg-anim-table): BG_AnimLength requires bgAllAnims table access
+            // PORT-NOTE(bg-anim-table): BG_AnimLength requires bgAllAnims table access
             // iAnimLen = BG_AnimLength(pVeh->m_pPilot->localAnimIndex, Anim) * 0.4f32;
-            // PORT-NOTE(fork-7-vtable-access): BG_GetTime() needs game-tier state or engine access
+            // PORT-NOTE(vtable-access): BG_GetTime() needs game-tier state or engine access
             // pVeh->m_iBoarding = BG_GetTime() + iAnimLen;
             iAnimLen = 100; // Placeholder
 
             // Set the animation which won't be interrupted until completed
-            // PORT-NOTE(fork-7-bg-anim-dispatch): BG_SetAnim requires bgAllAnims and PmoveContext
+            // PORT-NOTE(bg-anim-dispatch): BG_SetAnim requires bgAllAnims and PmoveContext
             // BG_SetAnim(pVeh->m_pPilot->playerState, bgAllAnims[pVeh->m_pPilot->localAnimIndex].anims,
             //     SETANIM_BOTH, Anim, iFlags, iBlend);
         }
@@ -365,7 +365,7 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
     }
 }
 
-// Fork-7 (2026-07-03): `G_SetSpeederVehicleFunctions` retired — it only assigned the now-removed
+// `G_SetSpeederVehicleFunctions` retired (2026-07-03) — it only assigned the now-removed
 // `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
 // `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
 
@@ -389,7 +389,7 @@ pub fn G_CreateSpeederNPC(
         core::ptr::write_bytes(*pVeh, 0, 1);
 
         // Set the vehicle info pointer from the type string
-        // PORT-NOTE(fork-7-bg-vehicle-table): g_vehicleInfo table access requires
+        // PORT-NOTE(bg-vehicle-table): g_vehicleInfo table access requires
         // ctx.world.bg_state.g_vehicleInfo or equivalent; BG_VehicleGetIndex returns index
         let vehicleIndex: c_int = BG_VehicleGetIndex(strType);
         // (*pVeh)->m_pVehicleInfo = &g_vehicleInfo[vehicleIndex];

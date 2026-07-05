@@ -23,7 +23,7 @@ pub fn RegisterAssets(
         let weapon = crate::bg_misc::BG_FindItemForWeapon(WP_TURRET);
         crate::g_items::RegisterItem(ctx, weapon);
 
-        // Fork-7: the generic base RegisterAssets body (empty).
+        // The generic base RegisterAssets body (empty).
         crate::g_vehicles::RegisterAssets(pVeh);
     }
 }
@@ -113,7 +113,7 @@ pub fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
         }
 
         // PORT-NOTE(pm-global): electrifyTime check requires access to global pm;
-        // accessing through bg_pmove module. Ruling 14 overlay cast (bgEntity_t->gentity_t).
+        // accessing through bg_pmove module (bgEntity_t overlay-cast to gentity_t).
         if parent_ps.electrifyTime > 0 {
             // Electrify check: reduce speed by half
             // Note: oracle accesses pm->cmd.serverTime; we check electrifyTime > 0 as proxy
@@ -282,7 +282,7 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
         if parent_bg.is_null() {
             return;
         }
-        // Ruling 14 overlay cast: `bgEntity_t` is only the shared head of
+        // Overlay cast: `bgEntity_t` is only the shared head of
         // `gentity_t`; `health`/`client` live past that head on the real object.
         let parent = parent_bg as *mut gentity_t;
 
@@ -348,17 +348,17 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
     }
 }
 
-// Fork-7 (2026-07-03): `G_SetWalkerVehicleFunctions` retired — it only assigned the now-removed
+// `G_SetWalkerVehicleFunctions` retired — it only assigned the now-removed
 // `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
 // `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
 
 /// Raven `Board`.
 ///
-/// Board the Walker vehicle (fork-7: reached via `crate::veh_dispatch::board`).
+/// Board the Walker vehicle (reached via `crate::veh_dispatch::board`).
 /// Source: `oracle/oracle/codemp/game/WalkerNPC.c:106-115`
 pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
     unsafe {
-        // Fork-7: `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
+        // `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
         if crate::g_vehicles::Board(ctx, pVeh, pEnt) == qfalse {
             return false;
         }

@@ -58,7 +58,7 @@ use mp_bg::vehicles::MIN_LANDING_SLOPE;
 use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
 use mp_qshared::shared::shared_eik_move_state::sharedEIKMoveState::{IKS_DYNAMIC, IKS_NONE};
 
-// Pass-3 bg state channel (fork rulings 12-16): the per-call working set + the
+// Pass-3 bg state channel: the per-call working set + the
 // two seam traits + the session state. `PmoveContext` replaces the file-static
 // pmove working set the skeletons parked on.
 use crate::bg_channel::{BgState, BgTraps, GameCallbacks, PmoveContext};
@@ -66,8 +66,7 @@ use crate::bg_channel::{BgState, BgTraps, GameCallbacks, PmoveContext};
 use mp_bg::vehicles::vehicle_type_t::vehicleType_t;
 
 // --- `bg_pmove.c` file-scope movement parameters (globals 41-55). These are
-// read-only tunables, so they stay module `const`s (post-mega-pass ruling 15:
-// "the pm_* float constants can stay consts").
+// read-only tunables, so they stay module `const`s.
 // Source: `oracle/oracle/codemp/game/bg_pmove.c:41-55`
 pub const pm_stopspeed: f32 = 100.0;
 pub const pm_duckScale: f32 = 0.50;
@@ -131,7 +130,7 @@ const BONE_ANGLES_POSTMULT: c_int = 0x0002;
 
 
 // `PM_BGEntForNum` is a `PmoveContext<'_>` method below (already filled); the stale
-// free-fn stub is removed per ruling 12 (no dead duplicate).
+// free-fn stub is removed (no dead duplicate).
 
 /// Raven `BG_SabersOff`.
 ///
@@ -241,7 +240,7 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_pitch_roll_for_slope`.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:346-439`
-    // PORT-NOTE(fork-9): the resolved LAW signature keeps `storeAngles` by value, so
+    // PORT-NOTE(law-signature-by-value): the resolved LAW signature keeps `storeAngles` by value, so
     // writes into it are lost to the caller; the Raven `if (storeAngles)` NULL test is
     // always-true here (only live caller PM_SetVehicleAngles passes a non-NULL buffer),
     // so the else (viewangles) branch is unreachable. Reported as a shape_mismatch.
@@ -361,7 +360,7 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_SetVehicleAngles`.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:482-635`
-    // PORT-NOTE(fork-9): resolved LAW keeps `normal` by value, so the Raven `else if (normal)`
+    // PORT-NOTE(vehicle-angles-normal-by-value): resolved LAW keeps `normal` by value, so the Raven `else if (normal)`
     // NULL test cannot be expressed — the "in air" (normal==NULL) branch is unreachable here
     // and callers pass a zero vec for the flying case. Reported as a shape_mismatch.
     pub fn PM_SetVehicleAngles(&mut self, normal: vec3_t) {
@@ -683,7 +682,8 @@ impl PmoveContext<'_> {
 
                 (*pVeh).m_vAngularVelocity = 0.0;
             } else {
-                // NULL call: flying-in-air; by-value normal cannot express NULL (fork-9).
+                // NULL call: flying-in-air; by-value normal cannot express NULL
+                // (see PORT-NOTE(vehicle-angles-normal-by-value) on `PM_SetVehicleAngles`).
                 self.PM_SetVehicleAngles(crate::q_math::vec3_origin);
                 // We're flying in the air.
                 (*pVeh).m_ulFlags |= VEH_FLYING as u64;
@@ -756,14 +756,14 @@ impl PmoveContext<'_> {
     }
 }
 
-// The pmove pipeline as `PmoveContext` methods (pass-3 rulings 12/8a). Each was
+// The pmove pipeline as `PmoveContext` methods. Each was
 // a no-arg C function reaching the file-static working set; the set now lives in
 // `self` (`self.pm`/`self.pml`/`self.pm_entSelf`/… + `self.bg`/`self.traps`).
 // The `unsafe` that dereferences the faithful `pm`/entity pointers is confined
-// to these bodies (porting-rules §D11; ruling 14).
+// to these bodies (porting-rules §D11).
 impl PmoveContext<'_> {
-    /// Raven `PM_BGEntForNum` — the faithful `baseEnt`/`entSize` head-overlay
-    /// (ruling 14). Returns the `bgEntity_t` at index `num` in the base array
+    /// Raven `PM_BGEntForNum` — the faithful `baseEnt`/`entSize` head-overlay.
+    /// Returns the `bgEntity_t` at index `num` in the base array
     /// the engine handed us. Raven's `assert`s become defensive null/zero
     /// returns (out-of-pmove calls / unset base are the UB cases §19 covers).
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:172-199`
@@ -933,7 +933,7 @@ impl PmoveContext<'_> {
 
     /// Raven `PM_SetWaterLevel` — set `pm->waterlevel`/`watertype` by sampling
     /// point contents at three heights (accounting for ducking). Exercises the
-    /// `BgTraps::pointcontents` seam (ruling 13).
+    /// `BgTraps::pointcontents` seam.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4285-4320`
     pub fn PM_SetWaterLevel(&mut self) {
         unsafe {
@@ -4011,7 +4011,7 @@ impl PmoveContext<'_> {
                                     == (*((*servEnt).client as *mut gclient_t)).sess.sessionTeam as c_int
                             {
                                 //not belonging to a team, or client is on same team
-                                // Fork-7: the vehicle `Board` body is game-tier;
+                                // The vehicle `Board` body is game-tier;
                                 // bg reaches it via the GameCallbacks upcall (by
                                 // entity number), which dispatches through
                                 // `crate::veh_dispatch::board`.
@@ -4418,7 +4418,7 @@ pub fn PM_RollingAnim(
 /// Raven `PM_AnglesForSlope`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4649-4675`
-// fork-9: `angles` is a written-through out-param → `&mut [f32;3]`; `slope` stays a
+// `angles` is a written-through out-param → `&mut [f32;3]`; `slope` stays a
 // read-only by-value input. Cross-file callers are updated by the fixer.
 pub fn PM_AnglesForSlope(
     yaw: f32,
@@ -7561,7 +7561,7 @@ pub fn BG_InRollES(
 
 /// Raven `BG_IK_MoveArm` — drive the left-arm inverse-kinematics bone chain
 /// toward `desiredPos` (used to fling people in throws). `bgHumanoidAnimations`
-/// is threaded via `bg: &BgState` (ruling 11/15).
+/// is threaded via `bg: &BgState`.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8576-8730`
 pub fn BG_IK_MoveArm(
     ghoul2: *mut c_void,
@@ -7822,7 +7822,7 @@ pub fn BG_IK_MoveArm(
 /// Raven `BG_UpdateLookAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8733-8787`
-// fork-9: `lastHeadAngles`/`lookAngles` are written in place → `&mut vec3_t`
+// `lastHeadAngles`/`lookAngles` are written in place → `&mut vec3_t`
 // (never NULL in the oracle callers).
 pub fn BG_UpdateLookAngles(
     lookingDebounceTime: c_int,
@@ -7839,7 +7839,7 @@ pub fn BG_UpdateLookAngles(
 ) {
     let fFrameInter: f32 = 0.1;
     // Raven's function-scope `static` scratch (oldLookAngles/lookAnglesDiff/ang)
-    // are single-call temporaries (ruling 5) → plain locals.
+    // are single-call temporaries → plain locals.
     let mut oldLookAngles: vec3_t = [0.0; 3];
     let mut lookAnglesDiff: vec3_t = [0.0; 3];
 
@@ -7890,7 +7890,7 @@ pub fn BG_UpdateLookAngles(
 /// Raven `BG_G2ClientNeckAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8790-8866`
-// fork-9: `headAngles`/`neckAngles`/`thoracicAngles` are written in place → `&mut vec3_t`;
+// `headAngles`/`neckAngles`/`thoracicAngles` are written in place → `&mut vec3_t`;
 // `lookAngles`/`headClampMin/MaxAngles` are read-only → keep by-value `vec3_t`.
 pub fn BG_G2ClientNeckAngles(
     ghoul2: *mut c_void,
@@ -7992,7 +7992,7 @@ pub fn BG_G2ClientNeckAngles(
 /// Raven `BG_G2ClientSpineAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8869-8990`
-// fork-9: `viewAngles`/`thoracicAngles`/`ulAngles`/`llAngles` are written in place → `&mut vec3_t`;
+// `viewAngles`/`thoracicAngles`/`ulAngles`/`llAngles` are written in place → `&mut vec3_t`;
 // `cent_lerpOrigin`/`cent_lerpAngles`/`angles`/`modelScale` are read-only → keep by-value `vec3_t`.
 // Only Raven's active `#if 1` correction path is ported (the `#else` branch is dead); with `#if 1`,
 // `tPitchAngle`/`tYawAngle`/`corrTime` are unreferenced.
@@ -8220,10 +8220,10 @@ pub fn BG_InRoll2(
 /// Raven `BG_G2PlayerAngles` — compute the torso/legs/neck bone angles for a
 /// player skeleton and drive them into the g2 instance.
 ///
-/// `WeaponReadyAnim` is the bg const weapon-ready-anim table (ruling 12). Raven's
-/// function-scope `static` scratch is single-call temporaries (ruling 5) → plain
+/// `WeaponReadyAnim` is the bg const weapon-ready-anim table. Raven's
+/// function-scope `static` scratch is single-call temporaries → plain
 /// locals. `VEH_CONTROL_SCHEME_4`/`BONE_BASED_LEG_ANGLES` are undefined.
-/// fork-9: `legsAngles`/`turAngles` are written out-params (`&mut`); `legs` is
+/// `legsAngles`/`turAngles` are written out-params (`&mut`); `legs` is
 /// the axis matrix out (`*mut vec3_t`).
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9082-9457`
 pub fn BG_G2PlayerAngles(
@@ -9200,9 +9200,9 @@ impl PmoveContext<'_> {
 /// Raven `BG_VehicleAdjustBBoxForOrientation` — resize a fighter/flier vehicle's
 /// bbox to its oriented extents, tracing to confirm the new box is valid.
 ///
-/// Ruling 26: Raven's `localTrace` fn-ptr param is dropped; the bg callee reaches
-/// the engine trace through `self.traps.trace` (the `pm->trace` channel — ruling
-/// 13 `BgTraps`). Raven's pmove caller always passes a non-null `pm->trace`, so
+/// Raven's `localTrace` fn-ptr param is dropped; the bg callee reaches
+/// the engine trace through `self.traps.trace` (the `pm->trace` channel via
+/// `BgTraps`). Raven's pmove caller always passes a non-null `pm->trace`, so
 /// the old NULL-`localTrace` "don't care about solids" branch is unreachable and
 /// dropped.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9993-10076`
@@ -9392,7 +9392,7 @@ impl PmoveContext<'_> {
 // set the C file-statics used to hold).
 
 /// Raven `Pmove` — the public pmove entrypoint. Constructs one `PmoveContext`
-/// per call (ruling 12) from the bg channel handles the game tier supplies,
+/// per call from the bg channel handles the game tier supplies,
 /// then chops the move into fixed timesteps and runs `PmoveSingle` for each.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:11167-11215`
 pub fn Pmove(

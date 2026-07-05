@@ -137,27 +137,27 @@ pub use mp_qshared::shared::trackchan::{trackchan_t, trackchan_t::*};
 pub use mp_qshared::shared::trajectory::trType_t::*;
 pub use mp_qshared::shared::wl_e::{WL_e, WL_e::*};
 
-// Pass-2 ctx threading (fork 8): the module-island dispatch receiver, injected
+// Pass-2 ctx threading: the module-island dispatch receiver, injected
 // as the first param of every game-tier needs-ctx fn.
-// Source: `docs/handoffs/jampgame-fork-discovery.md` fork 8; `world/game_context.rs`
+// See `world/game_context.rs`.
 pub use crate::world::GameContext;
 
-// Pass-3 prep C1 riders (ruling 21 / rulings 12-16, 22): the entity handle, the
-// spawn fn-ID enum, and the bg-channel state/trait set — hoisted into the
-// prelude so the pass-3 porter bodies name them unqualified.
-// - `EntityId` (ruling 22): the `Option<EntityId>` stored-field handle.
+// Pass-3 prep riders: the entity handle, the spawn fn-ID enum, and the
+// bg-channel state/trait set — hoisted into the prelude so the pass-3 porter
+// bodies name them unqualified.
+// - `EntityId`: the `Option<EntityId>` stored-field handle.
 // - `EntSpawn` (agenda C13): the `spawns[]` classname->fn dispatch enum.
-// - `BgState`/`PmoveContext`/`BgTraps`/`GameCallbacks` (rulings 12-16): the bg
+// - `BgState`/`PmoveContext`/`BgTraps`/`GameCallbacks`: the bg
 //   session/per-call state + the two seam traits.
-// - `pml_t` (ruling 21): bg pmove local working-set type.
+// - `pml_t`: bg pmove local working-set type.
 pub use crate::bg_channel::{BgState, BgTraps, GameCallbacks, PmoveContext};
 pub use crate::ent_fn_enums::EntSpawn;
-// `EntityId` + the `ent - g_entities` seam helpers (ruling 22): `Some(ent_id(base,
+// `EntityId` + the `ent - g_entities` seam helpers: `Some(ent_id(base,
 // p))` / `ent_id_opt(base, p)` fill the `Option<EntityId>` stored fields at
 // pointer-assignment sites; `field.is_none()` / id-equality replace NULL/address
 // compares.
 pub use crate::world::{ent_id, ent_id_opt, EntityId};
-// Index->pointer counterpart (ruling 22): `crate::ent_id::resolve` re-derives a
+// Index->pointer counterpart: `crate::ent_id::resolve` re-derives a
 // live `gentity_t*` from a stored `Option<EntityId>` field.
 pub use crate::ent_id;
 pub use mp_bg::local::pml_t::pml_t;
@@ -186,7 +186,7 @@ pub use crate::trap::G2API_IKMove as trap_G2API_IKMove;
 pub use crate::trap::TrueMalloc as trap_TrueMalloc;
 pub use crate::trap::TrueFree as trap_TrueFree;
 
-// The entity fn-ID dispatch enums (ruling 2 / `ent_fn_enums`), named bare in the
+// The entity fn-ID dispatch enums (`ent_fn_enums`), named bare in the
 // spawn/think/touch/… assignment sites.
 pub use crate::ent_fn_enums::{
     EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse,

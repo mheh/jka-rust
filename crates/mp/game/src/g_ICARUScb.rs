@@ -73,7 +73,7 @@ pub fn Q3_TaskIDClear(taskID: *mut c_int) {
 // PORT-NOTE(variadic-c-abi): Raven `vsprintf(text, format, argptr)` expands
 // the caller's varargs into `text`; this seam has no varargs channel, so
 // every call site in this file passes an already-formatted string and
-// `format` is treated as that finished `text` verbatim (ruling 18: va/printf
+// `format` is treated as that finished `text` verbatim (va/printf
 // callers bind a `format!`ed String before the call).
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:275-324`
 pub fn G_DebugPrint(
@@ -344,8 +344,8 @@ pub fn anglerCallback(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         // Stop thinking.
         (*ent).reached = None;
-        // Raven compares `ent->think == anglerCallback` by address (ruling 2:
-        // fn-ID enums replace address compares) before clearing it; the
+        // Raven compares `ent->think == anglerCallback` by address (fn-ID
+        // enums replace address compares) before clearing it; the
         // `gentity_t.think` field is not yet retrofitted from a raw fn-ptr to
         // `Option<EntThink>` so the compare itself can't be reproduced here.
         // This callback is only ever assigned as its own think, so
@@ -410,7 +410,7 @@ pub fn Blocked_Mover(
 
         if (*ent).damage != 0 {
             // Raven passes `NULL` for both `dir` and `point`; `dir` is now
-            // `Option<&mut vec3_t>` (ruling 25) so `None` is faithful, but
+            // `Option<&mut vec3_t>` so `None` is faithful, but
             // `point` is still a by-value `vec3_t` (no null representation),
             // so the zero vector (`vec3_origin`) remains the stand-in there.
             G_Damage(
@@ -634,7 +634,7 @@ pub fn Q3_Lerp2Pos(
 ///
 /// `angles` is written through (`ang[i] = AngleSubtract(...)`, but the
 /// output is `ent->s.apos.trDelta`, not `angles` itself) — re-checking the
-/// oracle: `angles` is only ever read here, so it stays by-value per fork-9.
+/// oracle: `angles` is only ever read here, so it stays by-value.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:892-939`
 pub fn Q3_Lerp2Angles(
     ctx: GameContext<'_>,
@@ -1338,7 +1338,7 @@ pub fn MoveOwner(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
 /// Raven `Q3_SetTeleportDest`.
 ///
-/// `org` is only ever read here, so it stays by-value per fork-9.
+/// `org` is only ever read here, so it stays by-value.
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:1895-1920`
 pub fn Q3_SetTeleportDest(ctx: GameContext<'_>, entID: c_int, org: vec3_t) -> qboolean {
     unsafe {
@@ -1445,7 +1445,7 @@ pub fn Q3_SetVelocity(ctx: GameContext<'_>, entID: c_int, axis: c_int, speed: f3
 /// Raven `Q3_SetAngles`.
 ///
 /// `angles` is only ever read here (never written through), so it stays a
-/// by-value `vec3_t` per fork-9 ("keep by-value only if never written").
+/// by-value `vec3_t` ("keep by-value only if never written").
 /// Source: `oracle/oracle/codemp/game/g_ICARUScb.c:2022-2042`
 pub fn Q3_SetAngles(ctx: GameContext<'_>, entID: c_int, angles: vec3_t) {
     unsafe {
@@ -2843,7 +2843,7 @@ pub fn Q3_SetParm(
             );
         } else {
             // Raven: strncpy + explicit truncation-NUL; write_cstr_field is the
-            // Q_strncpyz/Com_sprintf byte-copy dual (ruling 18 §3/§4).
+            // Q_strncpyz/Com_sprintf byte-copy dual.
             write_cstr_field(
                 &mut (*(*ent).parms).parm[parmNum as usize],
                 &cstr_to_str(parmValue),
@@ -4011,7 +4011,7 @@ pub fn Q3_SetCleanDamagingEnts(ctx: GameContext<'_>) {
 /// Raven `SetTextColor`.
 ///
 /// Raven: `textcolor` is only ever read (never written) in this NOT-SUPPORTED
-/// stub body, so it stays by-value `vec4_t` per fork-9 ("keep by-value only
+/// stub body, so it stays by-value `vec4_t` ("keep by-value only
 /// if never written").
 /// Raven `textcolor_caption` — file-scope static for caption text color.
 ///

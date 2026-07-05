@@ -1,4 +1,4 @@
-//! `BgState` — the session-lifetime bg working state (pass-3 ruling 12).
+//! `BgState` — the session-lifetime bg working state.
 //!
 //! Raven scattered the bg tier's session-lifetime tables across six `.c` files
 //! as file-scope statics (§B3 forbids that here). This struct owns them in one
@@ -8,7 +8,7 @@
 //! `BG_ParseSaberParms`, item registration) in later passes — here they are the
 //! owned containers, empty until loaded.
 //!
-//! The one member that must be bit-exact from day one is the fork-3 RNG
+//! The one member that must be bit-exact from day one is the faithful LCG RNG
 //! (`rng`); see [`Rng`].
 #![allow(non_snake_case, non_upper_case_globals)]
 
@@ -22,12 +22,12 @@ use mp_bg::public::bg_loaded_events::bgLoadedEvents_t;
 use mp_bg::public::saber_move_data::saberMoveData_t;
 use mp_bg::public::saber_move_data_table::saberMoveData;
 
-/// The bg tier's session-lifetime state, owned by `GameWorld` (ruling 12).
+/// The bg tier's session-lifetime state, owned by `GameWorld`.
 ///
 /// Raven's fixed static tables become owned collections (porting-rules §9:
 /// pools/tables → `Vec`/`Box`). Each field cites its owning Raven static.
 pub struct BgState {
-    /// Fork-3 LCG (ruling 15). The single parity-critical member.
+    /// The faithful LCG RNG. The single parity-critical member.
     /// Source: `oracle/oracle/codemp/game/q_math.c:1432`
     pub rng: Rng,
 
@@ -103,7 +103,7 @@ pub struct BgState {
     /// Source: `oracle/oracle/codemp/game/bg_saga.c:39`
     pub bgNumSiegeClasses: c_int,
 
-    // --- `bg_saga.c` siege team tables (ruling 24 — module-scope mutable → BgState) ---
+    // --- `bg_saga.c` siege team tables (module-scope mutable state, now owned by BgState) ---
     /// Raven `siegeTeam_t bgSiegeTeams[MAX_SIEGE_TEAMS]` — siege team definitions.
     /// Source: `oracle/oracle/codemp/game/bg_saga.c:41`
     pub bgSiegeTeams: Vec<siegeTeam_t>,
@@ -128,9 +128,9 @@ pub struct BgState {
 
     // --- `g_cmds.c` `ConcatArgs` returned-string scratch ---
     /// Raven `ConcatArgs` builds the joined-argument string in a
-    /// `static char line[MAX_STRING_CHARS]` and returns a pointer to it; ruling 24
-    /// formalizes the porter's `concat_args_line` scratch as the owned home for
-    /// that static, holding the NUL-terminated bytes across the return.
+    /// `static char line[MAX_STRING_CHARS]` and returns a pointer to it;
+    /// `concat_args_line` is the owned home for that static, holding the
+    /// NUL-terminated bytes across the return.
     /// Source: `oracle/oracle/codemp/game/g_cmds.c:127-140`
     pub concat_args_line: Vec<u8>,
 
@@ -146,8 +146,8 @@ pub struct BgState {
     pub bg_poolTail: c_int,
 
     // --- `bg_pmove.c` cross-frame debug counter ---
-    /// Raven `int c_pmove = 0` — the PmoveSingle journal counter (fork ruling 5:
-    /// genuine cross-frame state → owned field).
+    /// Raven `int c_pmove = 0` — the PmoveSingle journal counter; genuine
+    /// cross-frame state, so it's an owned field.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:57`
     pub c_pmove: c_int,
 }

@@ -418,7 +418,7 @@ pub fn ShieldTouch(
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): calls `trap_LinkEntity`/
 // `trap_Trace`, reads `g_gametype`/`level`/sound statics, and holds the
-// `shieldID` fn-scope static (ruling 5) — no world/engine handle to host it.
+// `shieldID` fn-scope static — no world/engine handle to host it.
 /// Raven `CreateShield`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_items.c:254-380`
@@ -3446,7 +3446,7 @@ pub fn G_CheckTeamItems(ctx: GameContext<'_>) {
 }
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): reads `g_gametype`/
-// `itemRegistered` (fork-1 cross-frame global) — no world handle to host
+// `itemRegistered` (cross-frame global) — no world handle to host
 // `itemRegistered`.
 /// Raven `ClearRegisteredItems`.
 ///
@@ -3469,7 +3469,7 @@ pub fn ClearRegisteredItems(ctx: GameContext<'_>) {
 }
 
 // PORT-NOTE(raw-ptr-skeleton-no-world-handle): writes the
-// `itemRegistered` fork-1 cross-frame global and reads `bg_itemlist` — no
+// `itemRegistered` cross-frame global and reads `bg_itemlist` — no
 // world handle.
 /// Raven `RegisterItem`.
 ///
@@ -3597,8 +3597,8 @@ pub fn G_BounceItem(
         // reflect the velocity on the trace plane
         let hitTime = (*ctx.world).level.previousTime + (((*ctx.world).level.time - (*ctx.world).level.previousTime) as f32 * (*trace).fraction) as c_int;
         // NOTE: `BG_EvaluateTrajectoryDelta`'s resolved cross-file signature
-        // (bg_misc.rs) takes `result: vec3_t` by value (not yet fork-9
-        // reshaped), so the write cannot propagate here — out of scope for
+        // (bg_misc.rs) takes `result: vec3_t` by value (not yet
+        // reshaped to `&mut`), so the write cannot propagate here — out of scope for
         // this file; flagged for the cross-file signature fixer.
         let velocity: vec3_t = [0.0; 3];
         BG_EvaluateTrajectoryDelta(&(*ent).s.pos as *const trajectory_t, hitTime, velocity);

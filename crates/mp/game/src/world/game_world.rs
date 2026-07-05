@@ -24,18 +24,18 @@ pub struct GameWorld {
     /// asserted 7344 B). MP only.
     pub clients: Box<[gclient_t; MAX_CLIENTS]>,
     /// Raven's ~136 file-scope `vmCvar_t` cvar handles, grouped as one
-    /// GameWorld sub-struct (fork ruling 1: file-scope globals become GameWorld
+    /// GameWorld sub-struct (file-scope globals become GameWorld
     /// fields). Not part of the `LocateGameData` alias set.
     /// Source: `oracle/oracle/codemp/game/g_main.c:230-475`
     pub cvars: GameCvars,
 
     /// Raven's remaining game-tier mutable file-scope globals/statics as one
-    /// owned sub-struct (fork ruling 1; grouped by owning `.c` file). Pass-2
+    /// owned sub-struct (grouped by owning `.c` file). Pass-2
     /// porters reach these through `ctx.world.globals`; they never add a field.
     /// Source: `crate::game_globals::GameGlobals`
     pub globals: crate::game_globals::GameGlobals,
 
-    /// `w_force.c` file-scope loop-sound handles (fork ruling 1: file-scope
+    /// `w_force.c` file-scope loop-sound handles (file-scope
     /// mutable globals become GameWorld fields, grouped by owning .c file).
     /// Cached `G_SoundIndex` results, lazily filled in `WP_InitForcePowers`.
     /// Source: `oracle/oracle/codemp/game/w_force.c:24-34`
@@ -46,29 +46,29 @@ pub struct GameWorld {
     pub seeLoopSound: c_int,
     pub ysalamiriLoopSound: c_int,
 
-    /// `NPC_utils.c` file-scope globals (fork ruling 1: file-scope mutable
+    /// `NPC_utils.c` file-scope globals (file-scope mutable
     /// globals become GameWorld fields, grouped by owning .c file).
     /// Source: `oracle/oracle/codemp/game/NPC_utils.c:7-9`
     pub teamNumbers: [c_int; 4],
     pub teamStrength: [c_int; 4],
     pub teamCounter: [c_int; 4],
 
-    /// `g_mem.c` file-scope globals (fork ruling 1: file-scope mutable
+    /// `g_mem.c` file-scope globals (file-scope mutable
     /// globals become GameWorld fields, grouped by owning .c file).
     /// Memory pool for G_Alloc (256 KB), and current allocation point.
     /// Source: `oracle/oracle/codemp/game/g_mem.c:13-14`
     pub memoryPool: Box<[u8; 262144]>, // 256 * 1024
     pub allocPoint: c_int,
 
-    /// The bg tier's session-lifetime state (pass-3 ruling 12): the anim/saber/
-    /// vehicle tables, the `BG_Alloc` pool, and the fork-3 RNG. Game reaches the
-    /// LCG as `world.bg_state.rng` (ruling 15); `Pmove` borrows this to build a
+    /// The bg tier's session-lifetime state: the anim/saber/
+    /// vehicle tables, the `BG_Alloc` pool, and the RNG. Game reaches the
+    /// LCG as `world.bg_state.rng`; `Pmove` borrows this to build a
     /// `PmoveContext` each call.
     /// Source: `crate::bg_channel::BgState`
     pub bg_state: crate::bg_channel::BgState,
 
-    /// `g_misc.c` file-scope `refTagOwnerMap[MAX_TAG_OWNERS]` (fork ruling 1:
-    /// file-scope mutable globals become GameWorld fields, grouped by owning
+    /// `g_misc.c` file-scope `refTagOwnerMap[MAX_TAG_OWNERS]` (file-scope
+    /// mutable globals become GameWorld fields, grouped by owning
     /// .c file).
     /// Source: `oracle/oracle/codemp/game/g_misc.c:2886`
     pub refTagOwnerMap:

@@ -20,13 +20,13 @@
 use crate::prelude::*;
 use mp_qshared::shared::{QFALSE, QTRUE};
 
-// Parse-session state (ruling 1: cross-frame state -> GameWorld fields, pending full threading).
+// Parse-session state (cross-frame state -> GameWorld fields, pending full threading).
 // These are module-level statics mimicking Raven's file-static globals in q_shared.c.
 static mut COM_LINES: c_int = 0;
 static mut COM_PARSENAME: [c_char; 256] = [0; 256]; // MAX_QPATH
 static mut COM_TOKEN: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
 
-// va() rotating-buffer statics (ruling 5 idiom: 2-slot rotating return buffer).
+// va() rotating-buffer statics (2-slot rotating return buffer).
 static mut VA_STRING: [[c_char; 32000]; 2] = [[0; 32000]; 2];
 static mut VA_INDEX: usize = 0;
 
@@ -1129,7 +1129,7 @@ pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char) {
 /// The Raven implementation uses va_start/va_end/vsprintf to format into a rotating 2-slot
 /// static buffer. This implementation accesses the static VA_STRING rotating buffer and
 /// formats with the format string available; true vararg expansion requires a seam decision
-/// (vsprintf FFI or macro-based variadic wrapper). The packet ruling 18 notes va() is consumed
+/// (vsprintf FFI or macro-based variadic wrapper). va() is consumed
 /// immediately (passed to trap, copied into field) — callers should use format!() + cstr() directly.
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1017-1031`
 pub fn va(format: *const c_char) -> *mut c_char {
