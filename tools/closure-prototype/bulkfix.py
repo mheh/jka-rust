@@ -50,7 +50,13 @@ SRC = WT / "crates/mp/game/src"
 ENTITIES_PAT = re.compile(r"(world\)?)\.entities\b")
 
 PRIM_INTS = {"i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64", "isize", "usize", "c_int"}
-EXPECTED_FOUND = re.compile(r"expected `([\w:]+)`, found `([\w:]+)`")
+PRIM_FLOATS = {"f32", "f64"}
+PRIM_NUMS = PRIM_INTS | PRIM_FLOATS
+# rustc writes unsuffixed literals without backticks: "found integer" /
+# "found floating-point number".
+EXPECTED_FOUND = re.compile(
+    r"expected `([\w:]+)`, found (?:`([\w:]+)`|(integer|floating-point number))"
+)
 
 
 def resolve(names):
@@ -101,11 +107,19 @@ def cast_targets(target_paths):
             mm = EXPECTED_FOUND.search(sp.get("label") or "") or EXPECTED_FOUND.search(msg.get("message", ""))
             if not mm:
                 continue
-            expected, found = mm.group(1).split("::")[-1], mm.group(2).split("::")[-1]
-            # only primitive-int targets; sources: primitive ints or #[repr(int)] enums
-            if expected not in PRIM_INTS:
+            expected = mm.group(1).split("::")[-1]
+            found = (mm.group(2) or mm.group(3)).split("::")[-1]
+            # numeric-primitive targets; sources: numeric primitives, unsuffixed
+            # literals, or #[repr(int)] enums (`*_t`) when the target is an int.
+            if expected not in PRIM_NUMS:
                 continue
-            if found not in PRIM_INTS and not found.endswith("_t"):
+            if found in {"integer", "floating-point number"}:
+                pass  # unsuffixed literal -> cast is the faithful C conversion
+            elif found in PRIM_NUMS:
+                pass
+            elif found.endswith("_t") and expected in PRIM_INTS:
+                pass
+            else:
                 continue
             f = str(WT / sp["file_name"])
             if f in targets:
