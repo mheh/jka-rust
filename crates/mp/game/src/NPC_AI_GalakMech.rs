@@ -1072,24 +1072,11 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             }
         } else {
             // Okay, we're not in a special attack, see if we should switch weapons or start a special attack
-            if (*client).ps.weapon == WP_REPEATER as c_int
-                && ((*npc_info).scriptFlags & SCF_ALT_FIRE as i32) as c_int == 0
-                && (*npc_ent).enemy.is_some()
-                && (*enemy_ent).s.weapon == WP_SABER as c_int
-                && (*client).ps.saberEventFlags & SEF_DEFLECTED as c_int != 0
-                && (*ctx.world).bg_state.rng.Q_irand(0, 50) == 0
-            {
-                // he's deflecting my shots, switch to the laser or the lob fire for a while
-                crate::g_timer::TIMER_Set(ctx, npc_ent, c"noRapid".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(2000, 6000));
-                (*npc_info).scriptFlags |= SCF_ALT_FIRE as i32;
-                (*npc_ent).alt_fire = qtrue;
-                if (*npc_ent).locationDamage[HL_GENERIC1 as usize] > GENERATOR_HEALTH {
-                    if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 || (*ctx.world).globals.enemyDist4 < MAX_LOB_DIST_SQUARED {
-                        // shield down, use laser
-                        NPC_GM_StartLaser(ctx);
-                    }
-                }
-            } else if (*ctx.world).globals.enemyDist4 < MELEE_DIST_SQUARED
+            // (Raven's WP_REPEATER "he's deflecting my shots" branch is inside a
+            // `/* ... */` block comment in the oracle — dead code, not transcribed;
+            // its `Q_irand(0,50)`/`Q_irand(2000,6000)`/`Q_irand(0,1)` draws never run.)
+            // Source: `oracle/oracle/codemp/game/NPC_AI_GalakMech.c:813-828`
+            if (*ctx.world).globals.enemyDist4 < MELEE_DIST_SQUARED
                 && InFront(
                     (*enemy_ent).r.currentOrigin,
                     (*npc_ent).r.currentOrigin,

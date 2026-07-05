@@ -88,8 +88,11 @@ pub fn Interrogator_die(
 
                 // Clear flying flag and set random horizontal velocity
                 client.ps.eFlags2 &= !(crate::prelude::EF2_FLYING as c_int);
-                client.ps.velocity[0] = (*ctx.world).bg_state.rng.Q_irand(-20, -10) as f32;
-                client.ps.velocity[1] = (*ctx.world).bg_state.rng.Q_irand(-20, -10) as f32;
+                // Raven passes the range reversed — `Q_irand(-10, -20)` — and irand's
+                // arithmetic gives different values for a reversed range; keep it verbatim.
+                // Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:49-50`
+                client.ps.velocity[0] = (*ctx.world).bg_state.rng.Q_irand(-10, -20) as f32;
+                client.ps.velocity[1] = (*ctx.world).bg_state.rng.Q_irand(-10, -20) as f32;
                 client.ps.velocity[2] = -100.0;
             }
         });
@@ -468,6 +471,11 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
         // randomly talk
         if crate::g_timer::TIMER_Done(ctx, npc, c"patrolNoise".as_ptr()) != 0 {
             if crate::g_timer::TIMER_Done(ctx, npc, c"angerNoise".as_ptr()) != 0 {
+                // Raven: `va("sound/chars/probe/misc/talk.wav", Q_irand(1, 3))` — the
+                // format string has no specifier, so the value is discarded, but the
+                // Q_irand still advances the holdrand stream; keep the draw.
+                // Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:395`
+                let _ = (*ctx.world).bg_state.rng.Q_irand(1, 3);
                 crate::g_utils::G_SoundOnEnt(
                     ctx,
                     npc,

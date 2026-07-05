@@ -656,6 +656,11 @@ pub fn Sniper_FaceEnemy(ctx: GameContext<'_>) {
                     // GetAnglesForDirection(muzzle, target, angles);
                     AngleVectors(angles, Some(&mut forward), Some(&mut right), Some(&mut up));
 
+                    //TODO: Port Sniper_FireDecide miss loop body (VectorMA flrand(1.5,4)
+                    // draws x4, trap_Trace, Sniper_EvaluateShot) — the commented calls
+                    // below each consume a holdrand draw in the oracle, so this loop
+                    // desyncs the flrand stream until ported.
+                    // Source: oracle/oracle/codemp/game/NPC_AI_Sniper.c:536-565
                     while hit != 0 && tryMissCount < 10 {
                         tryMissCount += 1;
                         if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {

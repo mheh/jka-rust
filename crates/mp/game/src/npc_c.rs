@@ -318,9 +318,10 @@ pub fn NPC_RemoveBodyEffect(ctx: GameContext<'_>) {
 // carry.
 /// Raven `pitch_roll_for_slope`.
 ///
-/// `pass_slope` is NULL-able at every oracle call site (`!pass_slope`
-/// guard) and never written through, so it takes the AngleVectors-idiom
-/// shape (`Option<&mut [f32;3]>`) per the mechanical out-param rule.
+/// `pass_slope` is NULL-able (`!pass_slope` guard: NULL from `NPC_Pain`,
+/// non-NULL `tr.plane.normal` from `G_RunObject`) and never written
+/// through, so it takes the AngleVectors-idiom shape
+/// (`Option<&mut [f32;3]>`) per the mechanical out-param rule.
 /// Source: `oracle/oracle/codemp/game/NPC.c:395-470`
 pub fn pitch_roll_for_slope(
     ctx: GameContext<'_>,
