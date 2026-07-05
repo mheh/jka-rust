@@ -239,7 +239,10 @@ pub fn CrossProduct(v1: vec3_t, v2: vec3_t, cross: &mut vec3_t) {
 /// plain-C branch is the compiled one).
 /// Source: `oracle/oracle/codemp/game/q_shared.h:1460-1489`
 pub fn VectorLength(v: vec3_t) -> vec_t {
-    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
+    // Raven: `(vec_t)sqrt(..)`. The sum is float; `sqrt` is the double libm call
+    // rounded back to float. An f32 sqrt double-rounds and diverges from the
+    // oracle, so compute the sqrt in f64.
+    ((v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) as f64).sqrt() as f32
 }
 
 /// Raven `VectorLengthSquared` (header-inline helper; `_XBOX` asm branch dropped).
@@ -479,11 +482,14 @@ pub fn RotatePointAroundVector(dst: &mut vec3_t, dir: vec3_t, point: vec3_t, deg
     zrot[1][1] = 1.0;
     zrot[2][2] = 1.0;
 
-    let rad = degrees.to_radians();
-    zrot[0][0] = rad.cos();
-    zrot[0][1] = rad.sin();
-    zrot[1][0] = -rad.sin();
-    zrot[1][1] = rad.cos();
+    // Raven: `rad = DEG2RAD(degrees)` = `(degrees*M_PI)/180.0F` with M_PI the
+    // double from math.h on the native build; cos/sin are double libm rounded
+    // to float. f32 trig here diverges from the oracle.
+    let rad = ((degrees as f64 * std::f64::consts::PI) / 180.0) as f32;
+    zrot[0][0] = (rad as f64).cos() as f32;
+    zrot[0][1] = (rad as f64).sin() as f32;
+    zrot[1][0] = -((rad as f64).sin() as f32);
+    zrot[1][1] = (rad as f64).cos() as f32;
 
     tmpmat = [[0f32; 3]; 3];
     MatrixMultiply(&m, &zrot, &mut tmpmat);
@@ -531,8 +537,10 @@ pub fn vectoangles(value1: vec3_t, angles: &mut vec3_t) {
         yaw = 0.0;
         pitch = if value1[2] > 0.0 { 90.0 } else { 270.0 };
     } else {
+        // Raven's atan2/sqrt are double libm and M_PI is math.h's double; the
+        // `*180/M_PI` chain evaluates in f64 then rounds to the float result.
         let mut y = if value1[0] != 0.0 {
-            value1[1].atan2(value1[0]) * 180.0 / std::f32::consts::PI
+            ((value1[1] as f64).atan2(value1[0] as f64) * 180.0 / std::f64::consts::PI) as f32
         } else if value1[1] > 0.0 {
             90.0
         } else {
@@ -543,8 +551,8 @@ pub fn vectoangles(value1: vec3_t, angles: &mut vec3_t) {
         }
         yaw = y;
 
-        let forward = (value1[0] * value1[0] + value1[1] * value1[1]).sqrt();
-        pitch = value1[2].atan2(forward) * 180.0 / std::f32::consts::PI;
+        let forward = ((value1[0] * value1[0] + value1[1] * value1[1]) as f64).sqrt() as f32;
+        pitch = ((value1[2] as f64).atan2(forward as f64) * 180.0 / std::f64::consts::PI) as f32;
         if pitch < 0.0 {
             pitch += 360.0;
         }
@@ -649,7 +657,9 @@ pub fn Q_rsqrt(number: f32) -> f32 {
     let threehalfs = 1.5f32;
     let x2 = number * 0.5;
     let mut i = number.to_bits() as i32;
-    i = 0x5f3759df - (i >> 1); // what the fuck?
+    // C's `int i = 0x5f3759df - (i>>1)` wraps; Rust's `-` panics in debug for
+    // inputs whose shifted bits exceed the constant. `wrapping_sub` matches.
+    i = 0x5f3759df_i32.wrapping_sub(i >> 1); // what the fuck?
     let mut y = f32::from_bits(i as u32);
     y = y * (threehalfs - (x2 * y * y)); // 1st iteration
     y
@@ -706,7 +716,10 @@ pub fn AnglesSubtract(v1: vec3_t, v2: vec3_t, v3: &mut vec3_t) {
 ///
 /// Source: `oracle/oracle/codemp/game/q_math.c:697-700`
 pub fn AngleMod(a: f32) -> f32 {
-    (360.0f32 / 65536.0) * (((a * (65536.0 / 360.0)) as i32) & 65535) as f32
+    // Raven's `65536/360.0` and `360.0/65536` are double literals, so the
+    // scale and product evaluate in f64 (rounded to the float result); an
+    // all-f32 form diverges from the oracle at the int-truncation boundary.
+    ((360.0f64 / 65536.0) * (((a as f64 * (65536.0 / 360.0)) as i32) & 65535) as f64) as f32
 }
 
 /// Raven `AngleNormalize360`.
@@ -714,7 +727,8 @@ pub fn AngleMod(a: f32) -> f32 {
 /// Returns angle normalized to the range [0 <= angle < 360].
 /// Source: `oracle/oracle/codemp/game/q_math.c:710-712`
 pub fn AngleNormalize360(angle: f32) -> f32 {
-    (360.0f32 / 65536.0) * (((angle * (65536.0 / 360.0)) as i32) & 65535) as f32
+    // f64 constant math, matching Raven's double literals (see `AngleMod`).
+    ((360.0f64 / 65536.0) * (((angle as f64 * (65536.0 / 360.0)) as i32) & 65535) as f64) as f32
 }
 
 /// Raven `AngleNormalize180`.
@@ -850,7 +864,7 @@ pub fn ClearBounds(mins: &mut vec3_t, maxs: &mut vec3_t) {
 /// Source: `oracle/oracle/codemp/game/q_math.c:1134-1139`
 pub fn DistanceHorizontal(p1: vec3_t, p2: vec3_t) -> vec_t {
     let v = vec_sub(p2, p1);
-    (v[0] * v[0] + v[1] * v[1]).sqrt() // Leave off the z component
+    ((v[0] * v[0] + v[1] * v[1]) as f64).sqrt() as f32 // z left off; sqrt in f64 (Raven double libm)
 }
 
 /// Raven `DistanceHorizontalSquared`.
@@ -892,7 +906,7 @@ pub fn AddPointToBounds(v: vec3_t, mins: &mut vec3_t, maxs: &mut vec3_t) {
 /// Source: `oracle/oracle/codemp/game/q_math.c:1172-1186`
 pub fn VectorNormalize(v: &mut vec3_t) -> vec_t {
     let mut length = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
-    length = length.sqrt();
+    length = (length as f64).sqrt() as f32; // Raven `sqrt` is double libm rounded to float
 
     if length != 0.0 {
         let ilength = 1.0 / length;
@@ -909,7 +923,7 @@ pub fn VectorNormalize(v: &mut vec3_t) -> vec_t {
 /// Source: `oracle/oracle/codemp/game/q_math.c:1188-1212`
 pub fn VectorNormalize2(v: vec3_t, out: &mut vec3_t) -> vec_t {
     let mut length = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
-    length = length.sqrt();
+    length = (length as f64).sqrt() as f32; // Raven `sqrt` is double libm rounded to float
 
     if length != 0.0 {
         let ilength = 1.0 / length;
@@ -1039,15 +1053,18 @@ pub fn AngleVectors(
     right: Option<&mut vec3_t>,
     up: Option<&mut vec3_t>,
 ) {
-    let angle = angles[YAW] * (std::f32::consts::PI * 2.0 / 360.0);
-    let sy = angle.sin();
-    let cy = angle.cos();
-    let angle = angles[PITCH] * (std::f32::consts::PI * 2.0 / 360.0);
-    let sp = angle.sin();
-    let cp = angle.cos();
-    let angle = angles[ROLL] * (std::f32::consts::PI * 2.0 / 360.0);
-    let sr = angle.sin();
-    let cr = angle.cos();
+    // Raven: `angle = angles[..] * (M_PI*2 / 360)` with M_PI the double from
+    // math.h; the constant and the sin/cos evaluate in f64, rounded to the
+    // float `angle`/`s*`/`c*` locals. f32 trig diverges from the oracle.
+    let angle = (angles[YAW] as f64 * (std::f64::consts::PI * 2.0 / 360.0)) as f32;
+    let sy = (angle as f64).sin() as f32;
+    let cy = (angle as f64).cos() as f32;
+    let angle = (angles[PITCH] as f64 * (std::f64::consts::PI * 2.0 / 360.0)) as f32;
+    let sp = (angle as f64).sin() as f32;
+    let cp = (angle as f64).cos() as f32;
+    let angle = (angles[ROLL] as f64 * (std::f64::consts::PI * 2.0 / 360.0)) as f32;
+    let sr = (angle as f64).sin() as f32;
+    let cr = (angle as f64).cos() as f32;
 
     if let Some(forward) = forward {
         forward[0] = cp * cy;
@@ -1108,8 +1125,14 @@ pub fn NormalToLatLong(normal: vec3_t, bytes: *mut byte) {
             bytes[1] = 0; // lat = 0, long = 128
         }
     } else {
-        let a = ((normal[1].atan2(normal[0]).to_degrees()) * (255.0 / 360.0)) as i32 & 0xff;
-        let b = (normal[2].acos().to_degrees() * (255.0 / 360.0)) as i32 & 0xff;
+        // Raven: `a = (int)(RAD2DEG((vec_t)atan2(..)) * (255.0f/360.0f))`. atan2
+        // is double, cast to float; RAD2DEG = `(a*180.0f)/M_PI` promotes to f64
+        // (M_PI is math.h's double); `* (255/360 in f32)` stays f64.
+        let scale = (255.0f32 / 360.0f32) as f64;
+        let atan_f = (normal[1] as f64).atan2(normal[0] as f64) as f32;
+        let a = (((atan_f * 180.0f32) as f64 / std::f64::consts::PI) * scale) as i32 & 0xff;
+        let acos_f = (normal[2] as f64).acos() as f32;
+        let b = (((acos_f * 180.0f32) as f64 / std::f64::consts::PI) * scale) as i32 & 0xff;
 
         bytes[0] = b as u8; // longitude
         bytes[1] = a as u8; // lattitude
@@ -1203,7 +1226,7 @@ pub fn G_FindClosestPointOnLineSegment(
 
     // Get length of side from End2Result using sine of theta
     let dist_end2from = VectorLength(vec_end2from); // c
-    let cos_theta = theta.to_radians().cos(); // cos(theta)
+    let cos_theta = ((theta as f64 * std::f64::consts::PI / 180.0).cos()) as f32; // cos(DEG2RAD(theta)); Raven double libm
     let dist_end2result = cos_theta * dist_end2from; // b
 
     // Extrapolate to find result
@@ -1264,7 +1287,7 @@ pub fn G_PointDistFromLineSegment(start: vec3_t, end: vec3_t, from: vec3_t) -> f
     let theta = 90.0 * (1.0 - dot);
 
     // Get length of side from End2Result using sine of theta
-    let cos_theta = theta.to_radians().cos(); // cos(theta)
+    let cos_theta = ((theta as f64 * std::f64::consts::PI / 180.0).cos()) as f32; // cos(DEG2RAD(theta)); Raven double libm
     let dist_end2result = cos_theta * dist_end2from; // b
 
     // Extrapolate to find result

@@ -1,10 +1,11 @@
 //! MP `q_math.c` VC-libc-compatible LCG random helpers.
 //!
-//! //TODO: Port holdrand, Rand_Init, flrand, Q_flrand, irand
-//! // Source: `oracle/oracle/codemp/game/q_math.c:1432-1469`
-//! The 32-bit LCG (`holdrand = holdrand * 214013 + 2531011`) and its
-//! `flrand`/`Q_flrand`/`irand` wrappers are not ported yet; this constant is
-//! placed here so it's beside the LCG when that lands.
+//! The 32-bit LCG itself (`holdrand`, `Rand_Init`, `flrand`, `Q_flrand`,
+//! `irand`, `Q_irand`) lives on the game tier as `bg_channel::rng::Rng` in
+//! `crates/mp/game/src/bg_channel/rng.rs` (the generator is stateful, so it is
+//! an owned threaded object in `BgState`, not a qshared free function). Only
+//! this stateless `RAND_MAX` constant stays here.
+//! Source: `oracle/oracle/codemp/game/q_math.c:1432-1469`
 
 use core::ffi::c_int;
 
