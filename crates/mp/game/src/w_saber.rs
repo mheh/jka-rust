@@ -2780,8 +2780,7 @@ pub fn G_BuildSaberFaces(
     fwd: vec3_t,
     right: vec3_t,
     fNum: *mut c_int,
-    //TODO: Port saberFace_t  (C: `saberFace_t **`)
-    fList: *mut *mut c_void,
+    fList: *mut *mut saberFace_t,
 ) {
     unsafe {
         // PORT-NOTE(faces): Raven's `static saberFace_t faces[12]` is a
@@ -2910,7 +2909,7 @@ pub fn G_BuildSaberFaces(
 
         // yeah.. always going to be 12 I suppose.
         *fNum = i as c_int;
-        *fList = FACES.as_mut_ptr() as *mut c_void;
+        *fList = FACES.as_mut_ptr();
     }
 }
 
@@ -2951,14 +2950,10 @@ pub fn G_SabCol_PointRelativeToPlane(pos: vec3_t, side: *mut f32, planeEq: *mut 
 /// Raven `G_SaberFaceCollisionCheck`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2599-2697`
-// PORT-NOTE(saberFace_t): the resolved sig keeps `fList: *mut c_void`; the type
-// `saberFace_t` is ported (`crate::saber::saber_face_t`), so the body casts and
-// walks it as Raven does. `atkMins`/`atkMaxs`/`impactPoint` are out-param slots.
 pub fn G_SaberFaceCollisionCheck(
     ctx: GameContext<'_>,
     fNum: c_int,
-    //TODO: Port saberFace_t  (C: `saberFace_t *`)
-    fList: *mut c_void,
+    fList: *mut saberFace_t,
     atkStart: vec3_t,
     atkEnd: vec3_t,
     atkMins: &mut vec3_t,
@@ -2982,7 +2977,7 @@ pub fn G_SaberFaceCollisionCheck(
 
         _VectorSubtract(atkEnd, atkStart, &mut dir);
 
-        let mut fl = fList as *mut saberFace_t;
+        let mut fl = fList;
         while i < fNum {
             G_SabCol_CalcPlaneEq((*fl).v1, (*fl).v2, (*fl).v3, planeEq.as_mut_ptr());
 
@@ -3129,7 +3124,7 @@ pub fn G_SaberCollide(
                 let mut base: vec3_t = [0.0; 3];
                 let mut tip: vec3_t = [0.0; 3];
                 let mut fNum: c_int = 0;
-                let mut fList: *mut c_void = core::ptr::null_mut();
+                let mut fList: *mut saberFace_t = core::ptr::null_mut();
 
                 //go through each blade on the defender's sabers
                 while j < (*dc).saber[i as usize].numBlades {
@@ -3155,7 +3150,7 @@ pub fn G_SaberCollide(
                             fwd,
                             right,
                             &mut fNum,
-                            &mut fList as *mut *mut c_void,
+                            &mut fList,
                         );
                         if fNum > 0 {
                             if G_SaberFaceCollisionCheck(
