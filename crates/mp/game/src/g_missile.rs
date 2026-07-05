@@ -277,8 +277,8 @@ pub fn G_RunStuckMissile(
             if (*ent).s.groundEntityNum >= 0 && ((*ent).s.groundEntityNum as usize) < ENTITYNUM_WORLD as usize {
                 let other = &mut (*ctx.world).g_entities[(*ent).s.groundEntityNum as usize];
 
-                let delta_moving = !VectorCompare(crate::q_math::vec3_origin, (*other).s.pos.trDelta) && (*other).s.pos.trType != TR_STATIONARY;
-                let apos_moving = !VectorCompare(crate::q_math::vec3_origin, (*other).s.apos.trDelta) && (*other).s.apos.trType != TR_STATIONARY;
+                let delta_moving = VectorCompare(crate::q_math::vec3_origin, (*other).s.pos.trDelta) == 0 && (*other).s.pos.trType != TR_STATIONARY;
+                let apos_moving = VectorCompare(crate::q_math::vec3_origin, (*other).s.apos.trDelta) == 0 && (*other).s.apos.trType != TR_STATIONARY;
 
                 if delta_moving || apos_moving {
                     // Thing I stuck to is moving or rotating now, kill me
@@ -628,7 +628,7 @@ pub fn G_MissileImpact(
                     didDmg = qtrue;
                 }
 
-                if didDmg != 0 && !other.is_null() && !(*other).client.is_null() {
+                if didDmg != 0 && !(*other).client.is_null() {
                     let npc_class = (*((*other).client as *mut gclient_t)).NPC_class;
                     if npc_class == CLASS_SEEKER || npc_class == CLASS_PROBE || npc_class == CLASS_MOUSE || npc_class == CLASS_GONK || npc_class == CLASS_R2D2 || npc_class == CLASS_R5D2 || npc_class == CLASS_REMOTE || npc_class == CLASS_MARK1 || npc_class == CLASS_MARK2 || npc_class == CLASS_INTERROGATOR || npc_class == CLASS_ATST || npc_class == CLASS_SENTRY {
                         if (*((*other).client as *mut gclient_t)).ps.electrifyTime < (*ctx.world).level.time + 100 {
@@ -639,7 +639,7 @@ pub fn G_MissileImpact(
             }
 
             if (*ent).s.weapon == WP_DEMP2 {
-                if !other.is_null() && !(*other).client.is_null() && (*((*other).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE {
+                if !(*other).client.is_null() && (*((*other).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE {
                     let other_vehicle = (*other).m_pVehicle as *mut Vehicle_t;
                     if !other_vehicle.is_null() && !(*other_vehicle).m_pVehicleInfo.is_null() && ((*(*other_vehicle).m_pVehicleInfo).r#type == VH_SPEEDER || ((*(*other_vehicle).m_pVehicleInfo).r#type == VH_FIGHTER && !(*ent).classname.is_null() && crate::q_shared::Q_stricmp((*ent).classname, c"vehicle_proj".as_ptr() as *const c_char) == 0)) && FighterIsLanded(other_vehicle, &mut (*((*other).client as *mut gclient_t)).ps) == 0 && (((*other).spawnflags & 2) == 0) {
                         if (*((*other).client as *mut gclient_t)).ps.electrifyTime > (*ctx.world).level.time {
@@ -651,7 +651,7 @@ pub fn G_MissileImpact(
                             (*((*other).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(200, 500);
                         }
                     }
-                } else if !other.is_null() && !(*other).client.is_null() && (*((*other).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0 {
+                } else if !(*other).client.is_null() && (*((*other).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0 {
                     Jedi_Decloak(ctx, other);
                     if (*ent).methodOfDeath == MOD_DEMP2_ALT as c_int {
                         (*((*other).client as *mut gclient_t)).cloakToggleTime = Q3_INFINITE;

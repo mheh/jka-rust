@@ -60,7 +60,7 @@ const ARMOR_REDUCTION_FACTOR: f32 = 0.50;
 /// Raven `modNames` — obituary name table indexed by `meansOfDeath_t`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:755-797`
-const modNames: [*const c_char; 41] = [
+const modNames: [*const c_char; 42] = [
     c"MOD_UNKNOWN".as_ptr(),
     c"MOD_STUN_BATON".as_ptr(),
     c"MOD_MELEE".as_ptr(),
@@ -167,7 +167,7 @@ pub fn G_HeavyMelee(ctx: GameContext<'_>, attacker: *mut gentity_t) -> qboolean 
             && ((*ctx.world).bg_state.bgSiegeClasses
                 [(*((*attacker).client as *mut gclient_t)).siegeClass as usize]
                 .classflags
-                & (1 << CFL_HEAVYMELEE))
+                & (1 << CFL_HEAVYMELEE as c_int))
                 != 0
         {
             return qtrue;
@@ -1251,6 +1251,7 @@ pub fn G_PickDeathAnim(
         {
             // I guess we'll take what we can get.....
             deathAnim = BG_PickAnim(
+                &mut (*ctx.world).bg_state,
                 (*self_).localAnimIndex,
                 BOTH_DEATH1 as c_int,
                 BOTH_DEATH25 as c_int,
@@ -4625,7 +4626,7 @@ pub fn G_Damage(
             // rage overridden by no_protection
             if !targ.is_null()
                 && !(*targ).client.is_null()
-                && ((*((*targ).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << FP_RAGE))
+                && ((*((*targ).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << FP_RAGE as c_int))
                     != 0
             {
                 damage = (damage as f64 * 0.5) as c_int;
@@ -4830,7 +4831,7 @@ pub fn G_Damage(
             && ((*ctx.world).bg_state.bgSiegeClasses
                 [(*((*targ).client as *mut gclient_t)).siegeClass as usize]
                 .classflags
-                & (1 << CFL_STRONGAGAINSTPHYSICAL))
+                & (1 << CFL_STRONGAGAINSTPHYSICAL as c_int))
                 != 0
         {
             // this class takes less damage from physical attacks.
@@ -5319,7 +5320,7 @@ pub fn G_Damage(
             if take != 0
                 && !(*targ).client.is_null()
                 && ((*((*targ).client as *mut gclient_t)).ps.fd.forcePowersActive
-                    & (1 << FP_PROTECT))
+                    & (1 << FP_PROTECT as c_int))
                     != 0
             {
                 let tc = (*targ).client as *mut gclient_t;
@@ -5411,7 +5412,7 @@ pub fn G_Damage(
             if (dflags & DAMAGE_NO_PROTECTION) == 0 {
                 if !(*targ).client.is_null()
                     && ((*((*targ).client as *mut gclient_t)).ps.fd.forcePowersActive
-                        & (1 << FP_RAGE))
+                        & (1 << FP_RAGE as c_int))
                         != 0
                     && (!(*inflictor).client.is_null() || !(*attacker).client.is_null())
                 {
@@ -5435,7 +5436,7 @@ pub fn G_Damage(
             if (dflags & DAMAGE_NO_PROTECTION) == 0 {
                 if !(*targ).client.is_null()
                     && ((*((*targ).client as *mut gclient_t)).ps.fd.forcePowersActive
-                        & (1 << FP_RAGE))
+                        & (1 << FP_RAGE as c_int))
                         != 0
                     && (!(*inflictor).client.is_null() || !(*attacker).client.is_null())
                 {
@@ -5482,7 +5483,7 @@ pub fn G_Damage(
                     (*ctx.world).globals.gPainHitLoc = -1;
                 }
 
-                if (*ctx.world).globals.gPainHitLoc < (HL_MAX) as i32
+                if (*ctx.world).globals.gPainHitLoc < (crate::entity::hit_location::HL_MAX) as i32
                     && (*ctx.world).globals.gPainHitLoc >= 0
                     && (*targ).locationDamage[(*ctx.world).globals.gPainHitLoc as usize] < Q3_INFINITE
                     && ((*targ).s.eType == entityType_t::ET_PLAYER as c_int
@@ -5849,7 +5850,7 @@ pub fn G_RadiusDamage(
                         ent,
                         missile,
                         (*av).m_pPilot as *mut gentity_t,
-                        &mut dir,
+                        Some(&mut dir),
                         origin,
                         points as c_int,
                         DAMAGE_RADIUS,
@@ -5861,7 +5862,7 @@ pub fn G_RadiusDamage(
                         ent,
                         missile,
                         attacker,
-                        &mut dir,
+                        Some(&mut dir),
                         origin,
                         points as c_int,
                         DAMAGE_RADIUS,

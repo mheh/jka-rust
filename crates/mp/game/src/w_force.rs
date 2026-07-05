@@ -66,7 +66,8 @@ use crate::g_cmds::Cmd_ToggleSaber_f;
 use crate::g_combat::G_Damage;
 use crate::g_team::OnSameTeam;
 use crate::g_utils::{
-    G_EntitySound, G_MuteSound, G_PlayEffect, G_SetAnim, G_Sound, G_SoundAtLoc, G_SoundIndex,
+    G_EffectIndex, G_EntitySound, G_MuteSound, G_PlayEffect, G_PlayEffectID, G_SetAnim, G_Sound,
+    G_SoundAtLoc, G_SoundIndex,
     G_TempEntity, GlobalUse,
 };
 use crate::g_weapon::WP_FireGenericBlasterMissile;
@@ -278,9 +279,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         // PORT-NOTE(bot-forcepowers): `(*ent).r.svFlags & SVF_BOT` + `botstates`
-        // branch overwrites `forcePowers` from the bot's personality file;
-        // `botstates` is still a `()` placeholder (MISSING-SYMBOL) so this
-        // branch is transcribed against the faithful indexing shape below.
+        // branch overwrites `forcePowers` from the bot's personality file.
         if (*ent).r.svFlags & SVF_BOT != 0 && !(*ctx.world).globals.botstates[(*ent).s.number as usize].is_null() {
             //if it's a bot just copy the info directly from its personality
             let bot_forceinfo = cstr_to_str((*(*ctx.world).globals.botstates[(*ent).s.number as usize]).forceinfo.as_ptr());
@@ -3422,11 +3421,11 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                     }
                 }
             } else {
-                if (*ent).s.pos.trType == TR_STATIONARY as c_int && (*ent).s.eFlags & EF_MISSILE_STICK != 0 {
+                if (*ent).s.pos.trType == TR_STATIONARY && (*ent).s.eFlags & EF_MISSILE_STICK != 0 {
                     //can't force-push/pull stuck missiles (detpacks, tripmines)
                     continue;
                 }
-                if (*ent).s.pos.trType == TR_STATIONARY as c_int && (*ent).s.weapon != WP_THERMAL as c_int {
+                if (*ent).s.pos.trType == TR_STATIONARY && (*ent).s.weapon != WP_THERMAL as c_int {
                     //only thermal detonators can be pushed once stopped
                     continue;
                 }
@@ -3748,8 +3747,8 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                         (*pcl).ps.velocity[2] = pushDir[2] * pushPowerMod;
                     }
                 } else if (*push_list[x]).s.eType == ET_MISSILE as c_int
-                    && (*push_list[x]).s.pos.trType != TR_STATIONARY as c_int
-                    && ((*push_list[x]).s.pos.trType != TR_INTERPOLATE as c_int
+                    && (*push_list[x]).s.pos.trType != TR_STATIONARY
+                    && ((*push_list[x]).s.pos.trType != TR_INTERPOLATE
                         || (*push_list[x]).s.weapon != WP_THERMAL as c_int)
                 //rolling and stationary thermal detonators are dealt with below
                 {
@@ -5574,7 +5573,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                 //don't regen force power while throwing saber
                 if (*cl).ps.saberEntityNum < ENTITYNUM_NONE && (*cl).ps.saberEntityNum > 0 {
                     //player is 0
-                    if (*ctx.world).g_entities[(*cl).ps.saberEntityNum as usize].s.pos.trType == TR_LINEAR as c_int {
+                    if (*ctx.world).g_entities[(*cl).ps.saberEntityNum as usize].s.pos.trType == TR_LINEAR {
                         //fell to the ground and we're trying to pull it back
                         usingForce = qtrue;
                     }

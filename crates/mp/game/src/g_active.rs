@@ -802,7 +802,7 @@ pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut user
         if (*client).sess.spectatorState != SPECTATOR_FOLLOW {
             (*client).ps.pm_type = (PM_SPECTATOR) as i32;
             (*client).ps.speed = 400.0; // faster than normal
-            (*client).ps.basespeed = 400.0;
+            (*client).ps.basespeed = 400;
 
             // hmm, shouldn't have an anim if you're a spectator, make sure
             // it gets cleared.
@@ -1949,8 +1949,8 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: *mut gentity_t, taunt: c_int) {
                 if (*cl).ps.groundEntityNum != ENTITYNUM_NONE {
                     (*cl).ps.forceHandExtend = HANDEXTEND_TAUNT as c_int;
                     (*cl).ps.forceDodgeAnim = anim;
-                    (*cl).ps.forceHandExtendTime =
-                        level_time + BG_AnimLength((*ent).localAnimIndex, anim);
+                    (*cl).ps.forceHandExtendTime = level_time
+                        + crate::bg_panimate::BG_AnimLength(&(*ctx.world).bg_state, (*ent).localAnimIndex, anim);
                 }
                 if taunt != TAUNT_MEDITATE && taunt != TAUNT_BOW {
                     //no sound for meditate or bow
@@ -2147,7 +2147,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         // check for exiting intermission
         if (*ctx.world).level.intermissiontime != 0 {
-            if (*ent).s.number < MAX_CLIENTS as c_int || (*client).NPC_class == CLASS_VEHICLE as c_int
+            if (*ent).s.number < MAX_CLIENTS as c_int || (*client).NPC_class == CLASS_VEHICLE
             {
                 // players and vehicles do nothing in intermissions
                 ClientIntermissionThink(client);

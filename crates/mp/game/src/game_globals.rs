@@ -972,6 +972,10 @@ pub struct GameGlobals {
     /// `void *precachedKyle` — the server's precached Kyle template ghoul2 instance handle.
     /// Source: `oracle/oracle/codemp/game/g_spawn.c:1226`
     pub precachedKyle: *mut c_void,
+    /// `float g_cullDistance` — server-cull distance, set once from the
+    /// `worldspawn` `distanceCull` key and read by vehicle crosshair tracing.
+    /// Source: `oracle/oracle/codemp/game/g_spawn.c:1258`
+    pub g_cullDistance: f32,
     // --- `g_svcmds.c` file-scope globals ---
     /// `ipFilter_t ipFilters[MAX_IPFILTERS]`.
     /// Source: oracle/oracle/codemp/game/g_svcmds.c:54

@@ -1680,9 +1680,12 @@ pub fn BG_AnimLength(bg_state: &crate::bg_channel::BgState, index: c_int, anim: 
     if (index as usize) >= bg_state.bgAllAnims.len() {
         return -1;
     }
-    (bg_state.bgAllAnims[index as usize].anims[anim as usize].numFrames as f32
-        * (bg_state.bgAllAnims[index as usize].anims[anim as usize].frameLerp as f32).abs())
-        as c_int
+    unsafe {
+        let anims = bg_state.bgAllAnims[index as usize].anims;
+        ((*anims.offset(anim as isize)).numFrames as f32
+            * ((*anims.offset(anim as isize)).frameLerp as f32).abs())
+            as c_int
+    }
 }
 
 /// Raven `PM_AnimLength`.
@@ -1692,7 +1695,7 @@ pub fn BG_AnimLength(bg_state: &crate::bg_channel::BgState, index: c_int, anim: 
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:1584-1595`
 impl PmoveContext<'_> {
     pub fn PM_AnimLength(&mut self, index: c_int, anim: c_int) -> c_int {
-        if anim >= MAX_ANIMATIONS as c_int || (*self.pm).animations.is_null() {
+        if anim >= MAX_ANIMATIONS as c_int || unsafe { (*self.pm).animations.is_null() } {
             return -1;
         }
         if anim < 0 {
@@ -2131,7 +2134,8 @@ impl PmoveContext<'_> {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2687-2690`
 impl PmoveContext<'_> {
     pub fn PM_StartTorsoAnim(&mut self, anim: c_int) {
-        self.BG_StartTorsoAnim((*self.pm).ps, anim);
+        let ps = unsafe { (*self.pm).ps };
+        self.BG_StartTorsoAnim(ps, anim);
     }
 }
 
@@ -2154,7 +2158,7 @@ pub fn BG_SetLegsAnimTimer(ps: *mut playerState_t, time: c_int) {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2708-2711`
 impl PmoveContext<'_> {
     pub fn PM_SetLegsAnimTimer(&mut self, time: c_int) {
-        BG_SetLegsAnimTimer((*self.pm).ps, time);
+        BG_SetLegsAnimTimer(unsafe { (*self.pm).ps }, time);
     }
 }
 
@@ -2177,7 +2181,7 @@ pub fn BG_SetTorsoAnimTimer(ps: *mut playerState_t, time: c_int) {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2728-2731`
 impl PmoveContext<'_> {
     pub fn PM_SetTorsoAnimTimer(&mut self, time: c_int) {
-        BG_SetTorsoAnimTimer((*self.pm).ps, time);
+        BG_SetTorsoAnimTimer(unsafe { (*self.pm).ps }, time);
     }
 }
 
@@ -2361,7 +2365,9 @@ pub fn BG_SetAnimFinal(
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2926-2930`
 impl PmoveContext<'_> {
     pub fn PM_SetAnimFinal(&mut self, setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
-        self.BG_SetAnimFinal((*self.pm).ps, (*self.pm).animations, setAnimParts, anim, setAnimFlags, blendTime);
+        unsafe {
+            BG_SetAnimFinal((*self.pm).ps, (*self.pm).animations, setAnimParts, anim, setAnimFlags, blendTime);
+        }
     }
 }
 
@@ -2498,7 +2504,7 @@ impl PmoveContext<'_> {
                 }
             }
 
-            self.BG_SetAnimFinal(ps, animations, setAnimParts, anim, setAnimFlags, blendTime);
+            BG_SetAnimFinal(ps, animations, setAnimParts, anim, setAnimFlags, blendTime);
         }
     }
 }
@@ -2508,6 +2514,7 @@ impl PmoveContext<'_> {
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:3037-3040`
 impl PmoveContext<'_> {
     pub fn PM_SetAnim(&mut self, setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
-        self.BG_SetAnim((*self.pm).ps, (*self.pm).animations, setAnimParts, anim, setAnimFlags, blendTime);
+        let (ps, animations) = unsafe { ((*self.pm).ps, (*self.pm).animations) };
+        self.BG_SetAnim(ps, animations, setAnimParts, anim, setAnimFlags, blendTime);
     }
 }

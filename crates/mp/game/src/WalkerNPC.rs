@@ -205,8 +205,8 @@ pub fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
         let parent_ps: *mut playerState_t = (*parent).playerState;
 
         let mut rider: *mut bgEntity_t = std::ptr::null_mut();
-        if parent.s.owner != ENTITYNUM_NONE {
-            rider = crate::bg_pmove::PM_BGEntForNum(parent.s.owner as c_int);
+        if (*parent).s.owner != ENTITYNUM_NONE {
+            rider = crate::bg_pmove::PM_BGEntForNum((*parent).s.owner as c_int);
         }
 
         if rider.is_null() {

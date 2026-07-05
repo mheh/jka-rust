@@ -975,13 +975,13 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
         }
 
         if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"holdables".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), HoldableTable.as_mut_ptr(), qtrue);
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), HoldableTable.as_ptr() as *mut stringID_table_t, qtrue);
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems = 0;
         }
 
         if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"powerups".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].powerups = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), PowerupTable.as_mut_ptr(), qtrue);
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].powerups = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), PowerupTable.as_ptr() as *mut stringID_table_t, qtrue);
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].powerups = 0;
         }
@@ -1335,9 +1335,9 @@ pub fn BG_SiegeCheckClassLegality(team: c_int, classname: *mut c_char, bg: &BgSt
         let mut i: isize = 0;
 
         if team == SIEGETEAM_TEAM1 {
-            team_ptr = &mut bg.team1Theme as *mut *mut siegeTeam_t;
+            team_ptr = &bg.team1Theme as *const *mut siegeTeam_t as *mut *mut siegeTeam_t;
         } else if team == SIEGETEAM_TEAM2 {
-            team_ptr = &mut bg.team2Theme as *mut *mut siegeTeam_t;
+            team_ptr = &bg.team2Theme as *const *mut siegeTeam_t as *mut *mut siegeTeam_t;
         } else {
             return qtrue;
         }

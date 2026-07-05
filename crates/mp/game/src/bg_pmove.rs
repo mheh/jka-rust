@@ -1175,7 +1175,7 @@ impl PmoveContext<'_> {
         unsafe {
             let ps = (*self.pm).ps;
             if (*ps).fd.forcePowersActive & (1 << FP_LEVITATION) == 0
-                && (*ps).fd.forceJumpCharge != 0
+                && (*ps).fd.forceJumpCharge != 0.0
             {
                 //already jumped and let go
                 return qfalse;
@@ -5586,10 +5586,10 @@ impl PmoveContext<'_> {
                         let id0 = (*info).weapon[0].ID as usize;
                         let id1 = (*info).weapon[1].ID as usize;
                         if ((*pm).cmd.buttons & BUTTON_ATTACK != 0
-                            && self.bg.g_vehWeaponInfo[id0].fHoming != 0
+                            && self.bg.g_vehWeaponInfo[id0].fHoming != 0.0
                             && (*ps).ammo[0] >= self.bg.g_vehWeaponInfo[id0].iAmmoPerShot)
                             || ((*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
-                                && self.bg.g_vehWeaponInfo[id1].fHoming != 0
+                                && self.bg.g_vehWeaponInfo[id1].fHoming != 0.0
                                 && (*ps).ammo[1] >= self.bg.g_vehWeaponInfo[id1].iAmmoPerShot)
                         {
                             //pressing the appropriate fire button for the lock-on/charging weapon
@@ -6714,8 +6714,8 @@ impl PmoveContext<'_> {
                 let pv = (*veh).m_pVehicle as *mut Vehicle_t;
                 let id0 = (*(*pv).m_pVehicleInfo).weapon[0].ID as usize;
                 let id1 = (*(*pv).m_pVehicleInfo).weapon[1].ID as usize;
-                if self.bg.g_vehWeaponInfo[id0].fHoming != 0
-                    || self.bg.g_vehWeaponInfo[id1].fHoming != 0
+                if self.bg.g_vehWeaponInfo[id0].fHoming != 0.0
+                    || self.bg.g_vehWeaponInfo[id1].fHoming != 0.0
                 {
                     vehicleRocketLock = qtrue;
                 }

@@ -244,7 +244,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
 
         let missile = crate::g_missile::CreateMissile(ctx, muzzle, forward, 1600.0, 10000, NPC, qfalse);
 
-        (*missile).classname = cstr("bryar_proj").as_ptr();
+        (*missile).classname = cstr("bryar_proj").as_ptr().cast_mut();
         (*missile).s.weapon = WP_BRYAR_PISTOL;
 
         (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
@@ -499,7 +499,7 @@ pub fn Sentry_RangedAttack(ctx: GameContext<'_>, visible: qboolean, advance: qbo
         let NPC = world.globals.NPC;
         let NPCInfo = world.globals.NPCInfo;
 
-        if crate::g_timer::TIMER_Done(ctx, NPC, cstr("attackDelay").as_ptr())
+        if crate::g_timer::TIMER_Done(ctx, NPC, cstr("attackDelay").as_ptr()) != qfalse
             && (*NPC).attackDebounceTime < world.level.time
             && visible != qfalse
         {
@@ -561,8 +561,8 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
         (*NPC).s.loopSound = crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_hover_2_lp").as_ptr());
 
         // randomly talk
-        if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) {
-            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("angerNoise").as_ptr()) {
+        if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) != qfalse {
+            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("angerNoise").as_ptr()) != qfalse {
                 let talk_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
                 crate::g_utils::G_SoundOnEnt(ctx, NPC, CHAN_AUTO, cstr(&s).as_ptr());
@@ -642,7 +642,7 @@ pub fn NPC_Sentry_Patrol(ctx: GameContext<'_>) {
             }
 
             // randomly talk
-            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) {
+            if crate::g_timer::TIMER_Done(ctx, NPC, cstr("patrolNoise").as_ptr()) != qfalse {
                 let talk_idx = world.bg_state.rng.Q_irand(1, 3);
                 let s = format!("sound/chars/sentry/misc/talk{}", talk_idx);
                 crate::g_utils::G_SoundOnEnt(ctx, NPC, CHAN_AUTO, cstr(&s).as_ptr());

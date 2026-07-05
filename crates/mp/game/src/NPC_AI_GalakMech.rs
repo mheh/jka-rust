@@ -1008,8 +1008,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     // do the trace and damage
                     let mut trace: trace_t = core::mem::zeroed();
                     let mut end: vec3_t = [0.0; 3];
-                    let mins = [-3.0, -3.0, -3.0];
-                    let maxs = [3.0, 3.0, 3.0];
+                    let mins: vec3_t = [-3.0, -3.0, -3.0];
+                    let maxs: vec3_t = [3.0, 3.0, 3.0];
                     _VectorMA((*client).renderInfo.muzzlePoint, 1024.0, (*client).renderInfo.muzzleDir, &mut end);
                     trap::Trace(
                         ctx.engine,
@@ -1549,8 +1549,8 @@ pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
                 (*npc_ent).flags &= !FL_SHIELDED; // no more reflections
                 (*npc_ent).r.mins = [-20.0, -20.0, -24.0];
                 (*npc_ent).r.maxs = [20.0, 20.0, 64.0];
-                (*client).ps.crouchheight = 64.0;
-                (*client).ps.standheight = 64.0;
+                (*client).ps.crouchheight = 64;
+                (*client).ps.standheight = 64;
                 if (*npc_ent).locationDamage[HL_GENERIC1 as usize] < GENERATOR_HEALTH {
                     // still have the generator bolt-on
                     if (*npc_info).investigateCount < 12 {

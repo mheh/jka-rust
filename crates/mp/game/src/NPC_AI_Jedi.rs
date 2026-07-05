@@ -1984,7 +1984,7 @@ pub fn Jedi_CombatDistance(
             //first, check some tactical force power decisions
             if !enemy.is_null()
                 && !(*enemy).client.is_null()
-                && (*enemy_client).ps.fd.forceGripBeingGripped > (*world).level.time
+                && (*enemy_client).ps.fd.forceGripBeingGripped > (*world).level.time as f32
             {
                 //They're being gripped, rush them!
                 if (*enemy_client).ps.groundEntityNum != ENTITYNUM_NONE {
@@ -4946,7 +4946,7 @@ pub fn Jedi_Jump(
 
                 crate::q_math::_VectorScale(targetDir, shotSpeed, &mut shotVel);
                 travelTime = targetDist / shotSpeed;
-                shotVel[2] += travelTime * 0.5 * (*client).ps.gravity;
+                shotVel[2] += travelTime * 0.5 * (*client).ps.gravity as f32;
 
                 if hitCount == 0 {
                     //save the first one as the worst case scenario
@@ -6038,7 +6038,7 @@ pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
         let client = (*npc).client as *mut gclient_t;
         let mut i = 0;
         let mut target_dist: f32;
-        let zDiff: f32;
+        let mut zDiff: f32;
 
         while i < MAX_CLIENTS {
             let player = ge.add(i as usize);

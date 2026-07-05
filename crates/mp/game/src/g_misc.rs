@@ -26,7 +26,8 @@ use crate::g_utils::{
 };
 use crate::NPC_utils::G_ActivateBehavior;
 use crate::g_exphysics::G_RunExPhys;
-use crate::g_main::G_Printf;
+use crate::g_combat::AddScore;
+use crate::g_main::{G_Printf, LogExit};
 use crate::g_object::G_RunObject;
 use crate::g_spawn::{G_SpawnFloat, G_SpawnInt};
 use crate::q_math::{DirToByte, PerpendicularVector, VectorNormalize};

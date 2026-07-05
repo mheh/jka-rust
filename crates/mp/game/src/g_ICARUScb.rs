@@ -57,6 +57,7 @@ use mp_abi::game::syscalls::G_ICARUS_GETFLOATVARIABLE::GIcarusGetfloatvariableAr
 use mp_abi::game::syscalls::G_ICARUS_GETVECTORVARIABLE::GIcarusGetvectorvariableArgs;
 use mp_abi::game::syscalls::G_ICARUS_GETSTRINGVARIABLE::GIcarusGetstringvariableArgs;
 use crate::g_client::SetClientViewAngle;
+use mp_qshared::common::mp::entity_id::ent_id;
 
 
 /// Raven `Q3_TaskIDClear`.

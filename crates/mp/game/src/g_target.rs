@@ -491,7 +491,7 @@ pub fn target_laser_off(
 ) {
     unsafe {
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(self_));
-        (*self_).nextthink = 0.0;
+        (*self_).nextthink = 0;
     }
 }
 
@@ -725,15 +725,27 @@ pub fn target_location_linkup(
         (*ctx.world).level.locationLinked = qtrue;
         (*ctx.world).level.locationHead = core::ptr::null_mut();
 
-        trap::SetConfigstring(ctx.engine, mp_bg::public::configstring::CS_LOCATIONS, b"unknown\0".as_ptr() as *const c_char);
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                mp_bg::public::configstring::CS_LOCATIONS,
+                cstr("unknown"),
+            ),
+        );
 
         let mut n = 1;
-        for i in 0..(*ctx.world).level.num_entities {
+        for i in 0..(*ctx.world).level.num_entities as usize {
             let ent_ptr = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             if !(*ent_ptr).classname.is_null() && Q_stricmp((*ent_ptr).classname, b"target_location\0".as_ptr() as *const c_char) == 0 {
                 // lets overload some variables!
                 (*ent_ptr).health = n; // use for location marking
-                trap::SetConfigstring(ctx.engine, mp_bg::public::configstring::CS_LOCATIONS + n as c_int, (*ent_ptr).message);
+                trap::SetConfigstring(
+                    ctx.engine,
+                    mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                        mp_bg::public::configstring::CS_LOCATIONS + n,
+                        cstr(&cstr_to_str((*ent_ptr).message)),
+                    ),
+                );
                 n += 1;
                 (*ent_ptr).nextTrain = (*ctx.world).level.locationHead;
                 (*ctx.world).level.locationHead = ent_ptr;

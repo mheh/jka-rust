@@ -198,13 +198,13 @@ pub fn BotReportStatus(
             // PORT-NOTE(StateDescriptions): the {teamplay,siege,ctf}StateDescriptions
             // C string tables have no ported home yet; referenced as cited and
             // reported as missing symbols.
-            let s = cstr_to_str(teamplayStateDescriptions[(*bs).teamplayState as usize]);
+            let s = cstr_to_str(teamplayStateDescriptions[(*bs).teamplayState as usize].as_ptr());
             trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
         } else if gt == GT_SIEGE {
-            let s = cstr_to_str(siegeStateDescriptions[(*bs).siegeState as usize]);
+            let s = cstr_to_str(siegeStateDescriptions[(*bs).siegeState as usize].as_ptr());
             trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
         } else if gt == GT_CTF || gt == GT_CTY {
-            let s = cstr_to_str(ctfStateDescriptions[(*bs).ctfState as usize]);
+            let s = cstr_to_str(ctfStateDescriptions[(*bs).ctfState as usize].as_ptr());
             trap::EA_SayTeam(ctx.engine, BotlibEaSayTeamArgs::new((*bs).client, cstr(&s)));
         }
     }

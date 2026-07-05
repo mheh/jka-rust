@@ -767,7 +767,7 @@ pub fn NPC_Begin(
             (*client).ps.persistant[PERS_TEAM as usize] = (*client).playerTeam;
         }
 
-        (*ent).use = Some(EntUse::NPC_Use);
+        (*ent).r#use = Some(EntUse::NPC_Use);
         (*ent).think = Some(EntThink::NPC_Think);
         (*ent).nextthink = (*ctx.world).level.time + FRAMETIME + (*ctx.world).bg_state.rng.Q_irand(0, 100);
 
@@ -946,7 +946,7 @@ pub fn NPC_Spawn_Do(
         if (*ent).count != -1 {
             (*ent).count -= 1;
             if (*ent).count <= 0 {
-                (*ent).use = None;
+                (*ent).r#use = None;
             }
         }
 
@@ -1203,7 +1203,7 @@ pub fn NPC_Spawn_Do(
 
         trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent));
 
-        if (*ent).use.is_none() {
+        if (*ent).r#use.is_none() {
             if !(*ent).target.is_null() {
                 crate::g_utils::G_UseTargets(ctx, ent, ent);
             }
@@ -1368,7 +1368,7 @@ pub fn SP_NPC_spawner(
         crate::NPC_stats::NPC_Precache(ctx, self_);
 
         if !(*self_).targetname.is_null() {
-            (*self_).use = Some(EntUse::NPC_Spawn);
+            (*self_).r#use = Some(EntUse::NPC_Spawn);
         } else {
             (*self_).think = Some(EntThink::NPC_Spawn_Go);
             (*self_).nextthink = (*ctx.world).level.time + START_TIME_REMOVE_ENTS + 50;
@@ -1539,7 +1539,7 @@ pub fn SP_NPC_Vehicle(
                 crate::g_utils::G_FreeEntity(ctx, self_);
                 return;
             }
-            (*self_).use = Some(EntUse::NPC_VehicleSpawnUse);
+            (*self_).r#use = Some(EntUse::NPC_VehicleSpawnUse);
         } else {
             if (*self_).delay != 0 {
                 if NPC_VehiclePrecache(ctx, self_) == qfalse {

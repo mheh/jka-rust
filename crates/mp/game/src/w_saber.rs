@@ -1644,7 +1644,7 @@ pub fn WP_SabersCheckLock2(
                 .anims
                 .add(attAnim as usize);
             (*ac).ps.saberLockFrame =
-                anim.firstFrame + (anim.numFrames as f32 * attStart) as c_int;
+                anim.firstFrame as c_int + (anim.numFrames as f32 * attStart) as c_int;
         }
 
         crate::g_utils::G_SetAnim(
@@ -1660,7 +1660,7 @@ pub fn WP_SabersCheckLock2(
                 .anims
                 .add(defAnim as usize);
             (*dc).ps.saberLockFrame =
-                anim.firstFrame + (anim.numFrames as f32 * defStart) as c_int;
+                anim.firstFrame as c_int + (anim.numFrames as f32 * defStart) as c_int;
         }
 
         (*ac).ps.saberLockHits = 0;

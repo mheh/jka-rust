@@ -509,7 +509,7 @@ impl PmoveContext<'_> {
         unsafe {
             let ps = (*self.pm).ps;
             if (*ps).fd.forcePower < cost {
-                PM_AddEvent(EV_NOAMMO as c_int);
+                self.PM_AddEvent(EV_NOAMMO as c_int);
                 return 0;
             }
             1
@@ -1010,7 +1010,7 @@ impl PmoveContext<'_> {
 
             (*ps).forceHandExtend = HANDEXTEND_WEAPONREADY as c_int;
 
-            PM_AddEvent(EV_JUMP as c_int);
+            self.PM_AddEvent(EV_JUMP as c_int);
             if victory == 0 {
                 BG_AddPredictableEventToPlayerstate(EV_JUMP as c_int, 0, genemy);
             } else if self.PM_irand_timesync(0, 1) != 0 {
@@ -1099,7 +1099,7 @@ impl PmoveContext<'_> {
                     }
 
                     if self.PM_irand_timesync(0, 2) == 0 {
-                        PM_AddEvent(EV_JUMP as c_int);
+                        self.PM_AddEvent(EV_JUMP as c_int);
                     }
 
                     let anim2 = (*self.pm).animations.add((*genemy).torsoAnim as usize);
@@ -1225,7 +1225,7 @@ impl PmoveContext<'_> {
             (*ps).velocity[2] = 400.0;
 
             PM_SetForceJumpZStart((*ps).origin[2]);
-            PM_AddEvent(EV_JUMP as c_int);
+            self.PM_AddEvent(EV_JUMP as c_int);
             (*ps).fd.forceJumpSound = 1;
             (*self.pm).cmd.upmove = 0;
 
@@ -1345,7 +1345,7 @@ impl PmoveContext<'_> {
                 let mut jumpFwd = [0.0f32; 3];
                 AngleVectors(fwdAngles, Some(&mut jumpFwd), None, None);
                 _VectorScale(jumpFwd, 150.0, &mut (*ps).velocity);
-                PM_AddEvent(EV_JUMP as c_int);
+                self.PM_AddEvent(EV_JUMP as c_int);
                 return LS_A_LUNGE;
             } else if noSpecials == 0 && (*ps).fd.saberAnimLevel == SS_STAFF as c_int {
                 return LS_SPINATTACK;
@@ -1421,7 +1421,7 @@ impl PmoveContext<'_> {
             (*ps).velocity[2] = 280.0;
             PM_SetForceJumpZStart((*ps).origin[2]);
 
-            PM_AddEvent(EV_JUMP as c_int);
+            self.PM_AddEvent(EV_JUMP as c_int);
             (*ps).fd.forceJumpSound = 1;
             (*self.pm).cmd.upmove = 0;
 
@@ -1662,7 +1662,7 @@ impl PmoveContext<'_> {
                             newmove = LS_BUTTERFLY_RIGHT;
                             (*ps).velocity[2] = 350.0;
                         } else if allowCartwheels {
-                            PM_AddEvent(EV_JUMP as c_int);
+                            self.PM_AddEvent(EV_JUMP as c_int);
                             (*ps).velocity[2] = 300.0;
                             newmove = LS_JUMPATTACK_ARIAL_RIGHT;
                         }
@@ -1698,7 +1698,7 @@ impl PmoveContext<'_> {
                             newmove = LS_BUTTERFLY_LEFT;
                             (*ps).velocity[2] = 250.0;
                         } else if allowCartwheels {
-                            PM_AddEvent(EV_JUMP as c_int);
+                            self.PM_AddEvent(EV_JUMP as c_int);
                             (*ps).velocity[2] = 350.0;
                             newmove = LS_JUMPATTACK_ARIAL_LEFT;
                         }
@@ -2014,7 +2014,7 @@ impl PmoveContext<'_> {
                     {
                         if (*ps).saberHolstered == 2 {
                             (*ps).saberHolstered = 0;
-                            PM_AddEvent(EV_SABER_UNHOLSTER as c_int);
+                            self.PM_AddEvent(EV_SABER_UNHOLSTER as c_int);
                         }
                         self.PM_SetSaberMove(LS_ROLL_STAB as c_short);
                         BG_ForcePowerDrain(ps, FP_GRIP, SABER_ALT_ATTACK_POWER_FB);
@@ -2082,7 +2082,7 @@ impl PmoveContext<'_> {
                     if (*ps).duelTime < (*self.pm).cmd.serverTime {
                         if (*ps).m_iVehicleNum == 0 {
                             (*ps).saberHolstered = 0;
-                            PM_AddEvent(EV_SABER_UNHOLSTER as c_int);
+                            self.PM_AddEvent(EV_SABER_UNHOLSTER as c_int);
                         } else {
                             (*self.pm).cmd.buttons &= !(BUTTON_ALT_ATTACK as c_int);
                             (*self.pm).cmd.buttons &= !(BUTTON_ATTACK as c_int);
@@ -2793,7 +2793,7 @@ impl PmoveContext<'_> {
                             && newMove != LS_KICK_R_AIR
                             && newMove != LS_KICK_L_AIR
                         {
-                            PM_AddEvent(EV_SABER_ATTACK as c_int);
+                            self.PM_AddEvent(EV_SABER_ATTACK as c_int);
                         }
 
                         if (*ps).brokenLimbs != 0 {

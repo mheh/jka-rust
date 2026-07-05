@@ -1139,14 +1139,16 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
 
         // I want to "cull" entities out of net sends to clients to reduce
         // net traffic on our larger open maps -rww
-        let mut g_cullDistance: f32 = 0.0;
         G_SpawnFloat(
             ctx,
             c"distanceCull".as_ptr(),
             c"6000.0".as_ptr(),
-            &mut g_cullDistance,
+            &mut (*ctx.world).globals.g_cullDistance,
         );
-        trap::SetServerCull(ctx.engine, GSetServerCullArgs::new(g_cullDistance));
+        trap::SetServerCull(
+            ctx.engine,
+            GSetServerCullArgs::new((*ctx.world).globals.g_cullDistance),
+        );
 
         G_SpawnString(ctx, c"classname".as_ptr(), c"".as_ptr(), &mut text);
         if Q_stricmp(text, c"worldspawn".as_ptr()) != 0 {
@@ -1177,7 +1179,15 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         // PORT-NOTE(bg-panimate-method): BG_ParseAnimationFile is a PmoveContext method in the ported codebase,
         // but needs to be called from game-tier SP_worldspawn; using the resolved freestanding signature.
         if (*ctx.world).bg_state.BGPAFtextLoaded == QFALSE {
+            let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
+            let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                world: ctx.world,
+                engine: ctx.engine,
+            };
             BG_ParseAnimationFile(
+                &mut (*ctx.world).bg_state,
+                &traps,
+                &mut callbacks,
                 c"models/players/_humanoid/animation.cfg".as_ptr(),
                 (*ctx.world).bg_state.bgHumanoidAnimations.as_mut_ptr(),
                 QTRUE,
@@ -1191,7 +1201,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 ctx.engine,
                 GG2Initghoul2ModelArgs::new(
                     &mut (*ctx.world).globals.precachedKyle as *mut *mut c_void,
-                    c"models/players/kyle/model.glm".as_ptr(),
+                    c"models/players/kyle/model.glm".to_owned(),
                     0,
                     0,
                     -20,
@@ -1203,7 +1213,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             if !(*ctx.world).globals.precachedKyle.is_null() {
                 defSkin = trap::R_RegisterSkin(
                     ctx.engine,
-                    GR_RegisterSkinArgs::new(c"models/players/kyle/model_default.skin".as_ptr()),
+                    GR_RegisterSkinArgs::new(c"models/players/kyle/model_default.skin".to_owned()),
                 );
                 trap::G2API_SetSkin(
                     ctx.engine,
@@ -1217,7 +1227,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 ctx.engine,
                 GG2Initghoul2ModelArgs::new(
                     &mut (*ctx.world).globals.g2SaberInstance as *mut *mut c_void,
-                    c"models/weapons2/saber/saber_w.glm".as_ptr(),
+                    c"models/weapons2/saber/saber_w.glm".to_owned(),
                     0,
                     0,
                     -20,
@@ -1238,7 +1248,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                     GG2AddboltArgs::new(
                         (*ctx.world).globals.g2SaberInstance,
                         0,
-                        c"*blade1".as_ptr(),
+                        c"*blade1".to_owned(),
                     ),
                 );
             }
@@ -1252,40 +1262,52 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         // make some data visible to connecting client
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(CS_GAME_VERSION, c"GAME_VERSION".as_ptr() as *const c_char),
+            GSetConfigstringArgs::new(CS_GAME_VERSION, c"GAME_VERSION".to_owned()),
         );
 
         let level_start_time_str = format!("{}", (*ctx.world).level.startTime);
         let level_start_time_c = CString::new(level_start_time_str).unwrap();
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(CS_LEVEL_START_TIME, level_start_time_c.as_ptr()),
+            GSetConfigstringArgs::new(CS_LEVEL_START_TIME, level_start_time_c),
         );
 
         G_SpawnString(ctx, c"music".as_ptr(), c"".as_ptr(), &mut text);
-        trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_MUSIC, text));
+        trap::SetConfigstring(
+            ctx.engine,
+            GSetConfigstringArgs::new(CS_MUSIC, CStr::from_ptr(text).to_owned()),
+        );
 
         G_SpawnString(ctx, c"message".as_ptr(), c"".as_ptr(), &mut text);
-        trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_MESSAGE, text)); // map specific message
+        trap::SetConfigstring(
+            ctx.engine,
+            GSetConfigstringArgs::new(CS_MESSAGE, CStr::from_ptr(text).to_owned()),
+        ); // map specific message
 
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(CS_MOTD, (*ctx.world).cvars.g_motd.string),
+            GSetConfigstringArgs::new(
+                CS_MOTD,
+                CStr::from_ptr((*ctx.world).cvars.g_motd.string).to_owned(),
+            ),
         ); // message of the day
 
         G_SpawnString(ctx, c"gravity".as_ptr(), c"800".as_ptr(), &mut text);
-        trap::Cvar_Set(ctx.engine, GCvarSetArgs::new(c"g_gravity".as_ptr(), text));
+        trap::Cvar_Set(
+            ctx.engine,
+            GCvarSetArgs::new(c"g_gravity".to_owned(), CStr::from_ptr(text).to_owned()),
+        );
 
         G_SpawnString(ctx, c"enableBreath".as_ptr(), c"0".as_ptr(), &mut text);
         trap::Cvar_Set(
             ctx.engine,
-            GCvarSetArgs::new(c"g_enableBreath".as_ptr(), text),
+            GCvarSetArgs::new(c"g_enableBreath".to_owned(), CStr::from_ptr(text).to_owned()),
         );
 
         G_SpawnString(ctx, c"soundSet".as_ptr(), c"default".as_ptr(), &mut text);
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(CS_GLOBAL_AMBIENT_SET, text),
+            GSetConfigstringArgs::new(CS_GLOBAL_AMBIENT_SET, CStr::from_ptr(text).to_owned()),
         );
 
         (*ctx.world).g_entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;
@@ -1295,12 +1317,12 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         // see if we want a warmup time
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(CS_WARMUP, c"".as_ptr()),
+            GSetConfigstringArgs::new(CS_WARMUP, c"".to_owned()),
         );
         if (*ctx.world).cvars.g_restarted.integer != 0 {
             trap::Cvar_Set(
                 ctx.engine,
-                GCvarSetArgs::new(c"g_restarted".as_ptr(), c"0".as_ptr()),
+                GCvarSetArgs::new(c"g_restarted".to_owned(), c"0".to_owned()),
             );
             (*ctx.world).level.warmupTime = 0;
         }
@@ -1309,21 +1331,21 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             ctx.engine,
             GSetConfigstringArgs::new(
                 CS_LIGHT_STYLES + (LS_STYLES_START as c_int * 3) as c_int,
-                defaultStyles[0][0].as_ptr() as *const c_char,
+                CStr::from_ptr(defaultStyles[0][0]).to_owned(),
             ),
         );
         trap::SetConfigstring(
             ctx.engine,
             GSetConfigstringArgs::new(
                 CS_LIGHT_STYLES + (LS_STYLES_START as c_int * 3 + 1) as c_int,
-                defaultStyles[0][1].as_ptr() as *const c_char,
+                CStr::from_ptr(defaultStyles[0][1]).to_owned(),
             ),
         );
         trap::SetConfigstring(
             ctx.engine,
             GSetConfigstringArgs::new(
                 CS_LIGHT_STYLES + (LS_STYLES_START as c_int * 3 + 2) as c_int,
-                defaultStyles[0][2].as_ptr() as *const c_char,
+                CStr::from_ptr(defaultStyles[0][2]).to_owned(),
             ),
         );
 
@@ -1334,7 +1356,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             G_SpawnString(
                 ctx,
                 red_key_c.as_ptr(),
-                defaultStyles[i as usize][0].as_ptr() as *mut c_char,
+                defaultStyles[i as usize][0],
                 &mut text,
             );
             lengthRed = (strlen(text)) as i32;
@@ -1342,7 +1364,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 ctx.engine,
                 GSetConfigstringArgs::new(
                     CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3) as c_int,
-                    text,
+                    CStr::from_ptr(text).to_owned(),
                 ),
             );
 
@@ -1351,7 +1373,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             G_SpawnString(
                 ctx,
                 green_key_c.as_ptr(),
-                defaultStyles[i as usize][1].as_ptr() as *mut c_char,
+                defaultStyles[i as usize][1],
                 &mut text,
             );
             lengthGreen = (strlen(text)) as i32;
@@ -1359,7 +1381,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 ctx.engine,
                 GSetConfigstringArgs::new(
                     CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3 + 1) as c_int,
-                    text,
+                    CStr::from_ptr(text).to_owned(),
                 ),
             );
 
@@ -1368,7 +1390,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
             G_SpawnString(
                 ctx,
                 blue_key_c.as_ptr(),
-                defaultStyles[i as usize][2].as_ptr() as *mut c_char,
+                defaultStyles[i as usize][2],
                 &mut text,
             );
             lengthBlue = (strlen(text)) as i32;
@@ -1376,7 +1398,7 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
                 ctx.engine,
                 GSetConfigstringArgs::new(
                     CS_LIGHT_STYLES + ((i + LS_STYLES_START) as c_int * 3 + 2) as c_int,
-                    text,
+                    CStr::from_ptr(text).to_owned(),
                 ),
             );
 

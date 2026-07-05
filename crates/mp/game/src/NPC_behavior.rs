@@ -12,6 +12,8 @@
 use crate::prelude::*;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_NAV_GETNODENUMEDGES::GNavGetnodenumedgesArgs;
+use mp_abi::game::syscalls::G_NAV_GETNODEEDGE::GNavGetnodeedgeArgs;
+use mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs;
 use mp_abi::game::syscalls::G_ICARUS_ISINITIALIZED::GIcarusIsinitializedArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
@@ -898,8 +900,8 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
                                 let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
                                 let mut branchPos = [0.0f32; 3];
                                 let mut lookDir = [0.0f32; 3];
-                                let nextWp = trap::Nav_GetNodeEdge(ctx.engine, (*tempGoal).waypoint, branchNum);
-                                trap::Nav_GetNodePosition(ctx.engine, nextWp, &mut branchPos);
+                                let nextWp = trap::Nav_GetNodeEdge(ctx.engine, GNavGetnodeedgeArgs::new((*tempGoal).waypoint, branchNum));
+                                trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(nextWp, &mut branchPos as *mut vec3_t));
                                 _VectorSubtract(branchPos, (*tempGoal).r.currentOrigin, &mut lookDir);
                                 (*NPCInfo).desiredYaw = AngleNormalize360(vectoyaw(lookDir) + world.bg_state.rng.flrand(-45.0, 45.0));
                             }
@@ -916,12 +918,12 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
                         let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, GNavGetnodenumedgesArgs::new((*tempGoal).waypoint));
                         if numEdges != WAYPOINT_NONE {
                             let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
-                            let nextWp = trap::Nav_GetNodeEdge(ctx.engine, (*NPCInfo).homeWp, branchNum);
-                            trap::Nav_GetNodePosition(ctx.engine, nextWp, &mut (*tempGoal).r.currentOrigin);
+                            let nextWp = trap::Nav_GetNodeEdge(ctx.engine, GNavGetnodeedgeArgs::new((*NPCInfo).homeWp, branchNum));
+                            trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(nextWp, &mut (*tempGoal).r.currentOrigin as *mut vec3_t));
                             (*tempGoal).waypoint = nextWp;
                         }
                     } else {
-                        trap::Nav_GetNodePosition(ctx.engine, (*NPCInfo).homeWp, &mut (*tempGoal).r.currentOrigin);
+                        trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new((*NPCInfo).homeWp, &mut (*tempGoal).r.currentOrigin as *mut vec3_t));
                         (*tempGoal).waypoint = (*NPCInfo).homeWp;
                     }
 
@@ -962,7 +964,7 @@ pub fn NPC_BSSearchStart(
         (*NPCInfo).investigateDebounceTime = 0;
         if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
             let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
-            trap::Nav_GetNodePosition(ctx.engine, homeWp, &mut (*tempGoal).r.currentOrigin);
+            trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(homeWp, &mut (*tempGoal).r.currentOrigin as *mut vec3_t));
             (*tempGoal).waypoint = homeWp;
         }
     }
@@ -1060,8 +1062,8 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
                                 let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
                                 let mut branchPos = [0.0f32; 3];
                                 let mut lookDir = [0.0f32; 3];
-                                let nextWp = trap::Nav_GetNodeEdge(ctx.engine, (*tempGoal).waypoint, branchNum);
-                                trap::Nav_GetNodePosition(ctx.engine, nextWp, &mut branchPos);
+                                let nextWp = trap::Nav_GetNodeEdge(ctx.engine, GNavGetnodeedgeArgs::new((*tempGoal).waypoint, branchNum));
+                                trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(nextWp, &mut branchPos as *mut vec3_t));
                                 _VectorSubtract(branchPos, (*tempGoal).r.currentOrigin, &mut lookDir);
                                 (*NPCInfo).desiredYaw = AngleNormalize360(vectoyaw(lookDir) + world.bg_state.rng.flrand(-45.0, 45.0));
                             }
@@ -1077,8 +1079,8 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
                         if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
                             let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
                             let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
-                            let nextWp = trap::Nav_GetNodeEdge(ctx.engine, (*NPC).waypoint, branchNum);
-                            trap::Nav_GetNodePosition(ctx.engine, nextWp, &mut (*tempGoal).r.currentOrigin);
+                            let nextWp = trap::Nav_GetNodeEdge(ctx.engine, GNavGetnodeedgeArgs::new((*NPC).waypoint, branchNum));
+                            trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(nextWp, &mut (*tempGoal).r.currentOrigin as *mut vec3_t));
                             (*tempGoal).waypoint = nextWp;
                         }
 
@@ -1219,8 +1221,8 @@ pub fn NPC_BSFlee(ctx: GameContext<'_>) {
                         let mut branchPos = [0.0f32; 3];
                         let mut runDir = [0.0f32; 3];
 
-                        let nextWp = trap::Nav_GetNodeEdge(ctx.engine, (*NPC).waypoint, branchNum);
-                        trap::Nav_GetNodePosition(ctx.engine, nextWp, &mut branchPos);
+                        let nextWp = trap::Nav_GetNodeEdge(ctx.engine, GNavGetnodeedgeArgs::new((*NPC).waypoint, branchNum));
+                        trap::Nav_GetNodePosition(ctx.engine, GNavGetnodepositionArgs::new(nextWp, &mut branchPos as *mut vec3_t));
 
                         _VectorSubtract(branchPos, (*NPC).r.currentOrigin, &mut runDir);
                         VectorNormalize(&mut runDir);

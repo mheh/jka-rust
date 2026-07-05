@@ -4863,10 +4863,8 @@ pub fn WP_VehCheckTraceFromCamPos(
         }
 
         let vehInfo = (*pVeh).m_pVehicleInfo as *mut mp_bg::vehicles::vehicleInfo_t;
-        // PORT-NOTE(unported-const): `g_cullDistance`/`MAX_XHAIR_DIST_ACCURACY`
-        // aren't ported yet; referenced bare, reported as missing symbols.
         if ((*vehInfo).r#type == mp_bg::vehicles::vehicleType_t::VH_FIGHTER
-            && g_cullDistance > MAX_XHAIR_DIST_ACCURACY)
+            && (*ctx.world).globals.g_cullDistance > MAX_XHAIR_DIST_ACCURACY)
             || (*vehInfo).r#type == mp_bg::vehicles::vehicleType_t::VH_WALKER
         {
             // FIRST: simulate the normal crosshair trace from the center of the veh straight forward
@@ -4898,7 +4896,7 @@ pub fn WP_VehCheckTraceFromCamPos(
                 crate::q_math::AngleVectors(ang, Some(&mut dir), None, None);
                 start = (*ent).r.currentOrigin;
             }
-            crate::q_math::_VectorMA(start, g_cullDistance, dir, &mut end);
+            crate::q_math::_VectorMA(start, (*ctx.world).globals.g_cullDistance, dir, &mut end);
             trap::Trace(
                 ctx.engine,
                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
@@ -4934,7 +4932,7 @@ pub fn WP_VehCheckTraceFromCamPos(
                     end,
                     newEnd,
                     *shotDir,
-                    trace.fraction * g_cullDistance,
+                    trace.fraction * (*ctx.world).globals.g_cullDistance,
                     &(*ctx.world).bg_state,
                     ctx.engine,
                 );

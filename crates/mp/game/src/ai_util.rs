@@ -777,14 +777,14 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>,bs: *mut bot_state_t) {
             let len = c_strlen(readbuf as *const u8);
             let dest_len = bs_ref.forceinfo.len();
             let copy_len = if len < dest_len - 1 { len } else { dest_len - 1 };
-            core::ptr::copy_nonoverlapping(readbuf, bs_ref.forceinfo.as_mut_ptr(), copy_len);
+            core::ptr::copy_nonoverlapping(readbuf as *const u8, bs_ref.forceinfo.as_mut_ptr(), copy_len);
             bs_ref.forceinfo[copy_len] = 0;
         } else {
             let default_forces = "5-1-000000000000000000\0".as_ptr() as *const c_char;
             let len = c_strlen(default_forces as *const u8);
             let dest_len = bs_ref.forceinfo.len();
             let copy_len = if len < dest_len - 1 { len } else { dest_len - 1 };
-            core::ptr::copy_nonoverlapping(default_forces, bs_ref.forceinfo.as_mut_ptr(), copy_len);
+            core::ptr::copy_nonoverlapping(default_forces as *const u8, bs_ref.forceinfo.as_mut_ptr(), copy_len);
             bs_ref.forceinfo[copy_len] = 0;
         }
 
@@ -806,57 +806,57 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>,bs: *mut bot_state_t) {
         // Parse weapon weights
         if GetValueGroup(buf, "BotWeaponWeights\0".as_ptr() as *mut c_char, group) != 0 {
             if GetPairedValue(group, "WP_STUN_BATON\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_STUN_BATON as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_STUN_BATON as usize] = c_atoi_ptr(readbuf) as f32;
                 bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_MELEE as usize] =
                     bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_STUN_BATON as usize];
             }
 
             if GetPairedValue(group, "WP_SABER\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_SABER as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_SABER as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_BRYAR_PISTOL\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_BRYAR_PISTOL as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_BLASTER\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_BLASTER as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_BLASTER as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_DISRUPTOR\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_DISRUPTOR as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_DISRUPTOR as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_BOWCASTER\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_BOWCASTER as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_BOWCASTER as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_REPEATER\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_REPEATER as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_REPEATER as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_DEMP2\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_DEMP2 as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_DEMP2 as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_FLECHETTE\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_FLECHETTE as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_FLECHETTE as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_ROCKET_LAUNCHER\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_ROCKET_LAUNCHER as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_ROCKET_LAUNCHER as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_THERMAL\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_THERMAL as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_THERMAL as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_TRIP_MINE\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_TRIP_MINE as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_TRIP_MINE as usize] = c_atoi_ptr(readbuf) as f32;
             }
 
             if GetPairedValue(group, "WP_DET_PACK\0".as_ptr() as *mut c_char, readbuf) != 0 {
-                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_DET_PACK as usize] = c_atoi_ptr(readbuf);
+                bs_ref.botWeaponWeights[mp_bg::weapons::weapon_t::WP_DET_PACK as usize] = c_atoi_ptr(readbuf) as f32;
             }
         }
 

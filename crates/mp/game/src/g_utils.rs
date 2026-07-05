@@ -1849,7 +1849,7 @@ pub fn TryUse(
 
         // Trace ahead
         let mut viewspot = (*client).ps.origin;
-        viewspot[2] += (*client).ps.viewheight;
+        viewspot[2] += (*client).ps.viewheight as f32;
 
         let src = viewspot;
         let mut vf = [0.0f32; 3];
@@ -1927,10 +1927,8 @@ pub fn TryUse(
         // Check for valid use target
         if ValidUseTarget(target) != qfalse
             && (world.cvars.g_gametype.value as c_int != GT_SIEGE
-                || !(*target).alliedTeam.is_null()
-                || ((*target).alliedTeam.is_null() == false
-                    && ((*target).alliedTeam as *mut c_char
-                        != (*client).sess.sessionTeam as *mut c_char))
+                || (*target).alliedTeam == 0
+                || (*target).alliedTeam != (*client).sess.sessionTeam
                 || (world.cvars.g_ff_objectives.value as c_int) != 0)
         {
             if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD || (*client).ps.torsoAnim == BOTH_CONSOLE1 {

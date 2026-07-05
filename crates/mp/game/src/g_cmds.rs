@@ -3551,7 +3551,7 @@ pub fn Cmd_DebugSetSaberMove_f(
         // PORT-NOTE(animTable/saberMoveData): file-scope tables now reached
         // via `animTable`/`(*world).bg_state.saberMoveData`.
         let animIdx = (*world).bg_state.saberMoveData[(*client).ps.saberMove as usize].animToUse;
-        let name = cstr_to_str(animTable[animIdx as usize].name.as_ptr());
+        let name = cstr_to_str(animTable[animIdx as usize].name);
         crate::g_main::Com_Printf(cstr(&format!("Anim for move: {}\n", name)).as_ptr());
     }
 }
@@ -3588,7 +3588,7 @@ pub fn Cmd_DebugSetBodyAnim_f(
         // PORT-NOTE(animTable): file-scope table now reached via
         // `animTable`.
         while (i as usize) < MAX_ANIMATIONS as usize {
-            if crate::q_shared::Q_stricmp(arg.as_ptr(), animTable[i as usize].name.as_ptr()) == 0 {
+            if crate::q_shared::Q_stricmp(arg.as_ptr(), animTable[i as usize].name) == 0 {
                 break;
             }
             i += 1;

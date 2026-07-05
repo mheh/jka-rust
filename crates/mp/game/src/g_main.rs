@@ -133,7 +133,7 @@ pub fn G_FindTeams(ctx: GameContext<'_>) {
                 // therefore omitted.
                 //TODO: Port CONTENTS_TRIGGER
                 // Source: oracle/oracle/codemp/game/q_shared.h (CONTENTS_* bitmask)
-                e.teammaster = e as *mut gentity_t;
+                e.teammaster = Some(ent_id(base, e as *const gentity_t));
                 let mut j = i + 1;
                 while j < num_entities {
                     let e2 = &mut *base.add(j as usize);
@@ -143,8 +143,8 @@ pub fn G_FindTeams(ctx: GameContext<'_>) {
                         && CStr::from_ptr(e.team).to_bytes() == CStr::from_ptr(e2.team).to_bytes()
                     {
                         e2.teamchain = e.teamchain;
-                        e.teamchain = e2 as *mut gentity_t;
-                        e2.teammaster = e as *mut gentity_t;
+                        e.teamchain = Some(ent_id(base, e2 as *const gentity_t));
+                        e2.teammaster = Some(ent_id(base, e as *const gentity_t));
                         e2.flags |= FL_TEAMSLAVE;
                         // make sure that targets only point at the master
                         if !e2.targetname.is_null() {

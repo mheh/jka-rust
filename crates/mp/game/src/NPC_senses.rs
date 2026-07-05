@@ -1254,7 +1254,7 @@ pub fn SP_target_interest(
 
     if world.level.numInterestPoints >= MAX_INTEREST_POINTS as c_int {
         // ERROR: Too many interest points, limit is MAX_INTEREST_POINTS
-        Com_Printf(b"ERROR:  Too many interest points, limit is %d\n\0".as_ptr() as *const c_char, MAX_INTEREST_POINTS as c_int);
+        Com_Printf(cstr(&format!("ERROR:  Too many interest points, limit is {}\n", MAX_INTEREST_POINTS as c_int)).as_ptr());
         G_FreeEntity(ctx, self_);
         return;
     }

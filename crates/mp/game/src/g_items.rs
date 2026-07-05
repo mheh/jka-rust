@@ -2938,22 +2938,22 @@ pub fn Touch_Item(
         }
 
         let npc_class = (*((*other).client as *mut gclient_t)).NPC_class;
-        if npc_class == CLASS_ATST as c_int
-            || npc_class == CLASS_GONK as c_int
-            || npc_class == CLASS_MARK1 as c_int
-            || npc_class == CLASS_MARK2 as c_int
-            || npc_class == CLASS_MOUSE as c_int
-            || npc_class == CLASS_PROBE as c_int
-            || npc_class == CLASS_PROTOCOL as c_int
-            || npc_class == CLASS_R2D2 as c_int
-            || npc_class == CLASS_R5D2 as c_int
-            || npc_class == CLASS_SEEKER as c_int
-            || npc_class == CLASS_REMOTE as c_int
-            || npc_class == CLASS_RANCOR as c_int
-            || npc_class == CLASS_WAMPA as c_int
-            //|| npc_class == CLASS_JAWA as c_int //FIXME: in some cases it's okay?
-            || npc_class == CLASS_UGNAUGHT as c_int //FIXME: in some cases it's okay?
-            || npc_class == CLASS_SENTRY as c_int
+        if npc_class == CLASS_ATST
+            || npc_class == CLASS_GONK
+            || npc_class == CLASS_MARK1
+            || npc_class == CLASS_MARK2
+            || npc_class == CLASS_MOUSE
+            || npc_class == CLASS_PROBE
+            || npc_class == CLASS_PROTOCOL
+            || npc_class == CLASS_R2D2
+            || npc_class == CLASS_R5D2
+            || npc_class == CLASS_SEEKER
+            || npc_class == CLASS_REMOTE
+            || npc_class == CLASS_RANCOR
+            || npc_class == CLASS_WAMPA
+            //|| npc_class == CLASS_JAWA //FIXME: in some cases it's okay?
+            || npc_class == CLASS_UGNAUGHT //FIXME: in some cases it's okay?
+            || npc_class == CLASS_SENTRY
         {
             //FIXME: some flag would be better
             // droids can't pick up items/weapons!

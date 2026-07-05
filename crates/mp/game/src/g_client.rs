@@ -39,10 +39,12 @@ use crate::entity::flags::{FL_NO_BOTS, FL_NO_HUMANS};
 use crate::trap;
 use crate::world::GameContext;
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_FREE;
-use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::SS_STAFF;
+use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
+    SS_DUAL, SS_FAST, SS_STAFF, SS_STRONG,
+};
 use crate::g_main::{CalculateRanks, G_GetStringEdString, G_LogPrintf};
 use crate::bg_vehicleLoad::BG_GetVehicleModelName;
-use crate::bg_misc::{BG_IsValidCharacterModel, BG_PlayerStateToEntityState, BG_ValidateSkinForTeam};
+use crate::bg_misc::{BG_IsValidCharacterModel, BG_PlayerStateToEntityState, BG_ValidateSkinForTeam, WeaponReadyAnim};
 use crate::bg_saga::{BG_SiegeCheckClassLegality, BG_SiegeFindClassIndexByName};
 use crate::ai_main::BotAIShutdownClient;
 use crate::g_cmds::{BroadcastTeamChange, G_SetSaber, SetTeam, StopFollowing};
@@ -83,6 +85,10 @@ const BONE_ANIM_OVERRIDE_LOOP: c_int = 0x0010;
 const BONE_ANIM_OVERRIDE_FREEZE: c_int = 0x0040 + BONE_ANIM_OVERRIDE;
 const BONE_ANIM_BLEND: c_int = 0x0080;
 
+/// Raven ghoul2 bone-angle flag (`BONE_ANGLES_POSTMULT`), used by
+/// `SetupGameGhoul2Model`. Source: `oracle/oracle/codemp/ghoul2/G2.h:30`
+const BONE_ANGLES_POSTMULT: c_int = 0x0002;
+
 /// Raven `BODY_SINK_TIME` — how long a corpse persists before it is unlinked.
 /// Source: `oracle/oracle/codemp/game/g_client.c:946`
 pub const BODY_SINK_TIME: c_int = 30000;
@@ -98,6 +104,15 @@ pub const CS_CLIENT_JEDIMASTER: c_int = 28;
 /// Raven default player bbox extents (`bg_public.h:41-42`).
 pub const DEFAULT_MINS_2: c_int = -24;
 pub const DEFAULT_MAXS_2: c_int = 40;
+
+/// Raven `CROUCH_MAXS_2` — the crouched player bbox max Z.
+/// Source: `oracle/oracle/codemp/game/bg_public.h:44`
+pub const CROUCH_MAXS_2: c_int = 16;
+
+// `S_COLOR_WHITE` is `&CStr` (`g_team`) crate-wide; these `format!` sites need the
+// `&str` spelling for `Display`. Shadows the prelude glob (glob is lower priority).
+// Source: `oracle/oracle/codemp/game/q_shared.h` (`"^7"`)
+const S_COLOR_WHITE: &str = "^7";
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
@@ -204,7 +219,7 @@ pub fn SP_info_player_deathmatch(
 pub fn SP_info_player_start(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
     unsafe {
-        (*ent).classname = b"info_player_deathmatch ".as_ptr() as *mut c_char;
+        (*ent).classname = b"info_player_deathmatch\0".as_ptr() as *mut c_char;
         SP_info_player_deathmatch(ctx, ent);
     }
 }
@@ -327,11 +342,12 @@ pub fn SP_info_player_intermission_blue(ent: *mut gentity_t) {}
 pub fn ThrowSaberToAttacker(
     ctx: GameContext<'_>,self_: *mut gentity_t, attacker: *mut gentity_t) {
     unsafe {
+        let base = (*ctx.world).g_entities.as_ptr();
         let client = (*self_).client as *mut gclient_t;
         let mut ent = &mut (*ctx.world).g_entities[(*client).ps.saberIndex as usize] as *mut gentity_t;
         let mut altVelocity: c_int = 0;
 
-        if ent.is_null() || (*ent).enemy != self_ {
+        if ent.is_null() || (*ent).enemy != ent_id_opt(base, self_) {
             // something has gone very wrong (this should never happen)
             // but in case it does.. find the saber manually
             ent = (*ctx.world).globals.gJMSaberEnt.unwrap_or(core::ptr::null_mut());
@@ -340,7 +356,7 @@ pub fn ThrowSaberToAttacker(
                 return;
             }
 
-            (*ent).enemy = self_;
+            (*ent).enemy = ent_id_opt(base, self_);
             (*client).ps.saberIndex = (*ent).s.number;
         }
 
@@ -355,10 +371,10 @@ pub fn ThrowSaberToAttacker(
             let flyingsaber = &mut (*ctx.world).g_entities[(*client).ps.saberEntityNum as usize] as *mut gentity_t;
 
             if !flyingsaber.is_null() && (*flyingsaber).inuse != qfalse {
-                (*ent).s.pos.tr_base = (*flyingsaber).s.pos.tr_base;
-                (*ent).s.pos.tr_delta = (*flyingsaber).s.pos.tr_delta;
-                (*ent).s.apos.tr_base = (*flyingsaber).s.apos.tr_base;
-                (*ent).s.apos.tr_delta = (*flyingsaber).s.apos.tr_delta;
+                (*ent).s.pos.trBase = (*flyingsaber).s.pos.trBase;
+                (*ent).s.pos.trDelta = (*flyingsaber).s.pos.trDelta;
+                (*ent).s.apos.trBase = (*flyingsaber).s.apos.trBase;
+                (*ent).s.apos.trDelta = (*flyingsaber).s.apos.trDelta;
 
                 (*ent).r.currentOrigin = (*flyingsaber).r.currentOrigin;
                 (*ent).r.currentAngles = (*flyingsaber).r.currentAngles;
@@ -379,10 +395,10 @@ pub fn ThrowSaberToAttacker(
         (*ent).s.eFlags &= !EF_NODRAW;
         (*ent).s.modelGhoul2 = 1;
         (*ent).s.eType = ET_MISSILE as c_int;
-        (*ent).enemy = core::ptr::null_mut();
+        (*ent).enemy = None;
 
         if attacker.is_null() || (*attacker).client.is_null() {
-            (*ent).s.pos.tr_base = (*ent).s.origin2;
+            (*ent).s.pos.trBase = (*ent).s.origin2;
             (*ent).s.origin = (*ent).s.origin2;
             (*ent).r.currentOrigin = (*ent).s.origin2;
             (*ent).pos2[0] = 0.0;
@@ -391,20 +407,20 @@ pub fn ThrowSaberToAttacker(
         }
 
         if altVelocity == 0 {
-            (*ent).s.pos.tr_base = (*self_).s.pos.tr_base;
-            (*ent).s.origin = (*self_).s.pos.tr_base;
-            (*ent).r.currentOrigin = (*self_).s.pos.tr_base;
+            (*ent).s.pos.trBase = (*self_).s.pos.trBase;
+            (*ent).s.origin = (*self_).s.pos.trBase;
+            (*ent).r.currentOrigin = (*self_).s.pos.trBase;
 
             let mut a: vec3_t = [0.0; 3];
             for k in 0..3 {
-                a[k] = (*((*attacker).client as *mut gclient_t)).ps.origin[k] - (*ent).s.pos.tr_base[k];
+                a[k] = (*((*attacker).client as *mut gclient_t)).ps.origin[k] - (*ent).s.pos.trBase[k];
             }
 
             crate::q_math::VectorNormalize(&mut a);
 
-            (*ent).s.pos.tr_delta[0] = a[0] * 256.0;
-            (*ent).s.pos.tr_delta[1] = a[1] * 256.0;
-            (*ent).s.pos.tr_delta[2] = 256.0;
+            (*ent).s.pos.trDelta[0] = a[0] * 256.0;
+            (*ent).s.pos.trDelta[1] = a[1] * 256.0;
+            (*ent).s.pos.trDelta[2] = 256.0;
         }
 
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
@@ -428,9 +444,9 @@ pub fn JMSaberThink(
             let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
             if (*enemy).client.is_null() || (*enemy).inuse == qfalse {
                 // disconnected?
-                (*ent).s.pos.tr_base = (*enemy).s.pos.tr_base;
-                (*ent).s.origin = (*enemy).s.pos.tr_base;
-                (*ent).r.currentOrigin = (*enemy).s.pos.tr_base;
+                (*ent).s.pos.trBase = (*enemy).s.pos.trBase;
+                (*ent).s.origin = (*enemy).s.pos.trBase;
+                (*ent).r.currentOrigin = (*enemy).s.pos.trBase;
                 (*ent).s.modelindex = crate::g_utils::G_ModelIndex(
                     b"models/weapons2/saber/saber_w.glm\0".as_ptr() as *const c_char,
                 );
@@ -446,7 +462,7 @@ pub fn JMSaberThink(
                 (*ent).pos2[1] = ((*ctx.world).level.time + JMSABER_RESPAWN_TIME) as f32;
             }
         } else if (*ent).pos2[0] != 0.0 && (*ent).pos2[1] < (*ctx.world).level.time as f32 {
-            (*ent).s.pos.tr_base = (*ent).s.origin2;
+            (*ent).s.pos.trBase = (*ent).s.origin2;
             (*ent).s.origin = (*ent).s.origin2;
             (*ent).r.currentOrigin = (*ent).s.origin2;
             (*ent).pos2[0] = 0.0;
@@ -1744,7 +1760,7 @@ pub fn ClientConnect(
         if isBot != qfalse {
             (*ent).r.svFlags |= SVF_BOT;
             (*ent).inuse = qtrue;
-            if crate::g_bot::G_BotConnect(ctx, clientNum, firstTime == qfalse) == qfalse {
+            if crate::g_bot::G_BotConnect(ctx, clientNum, (firstTime == qfalse) as qboolean) == qfalse {
                 return b"BotConnectfailed\0".as_ptr() as *mut c_char;
             }
         }
@@ -2158,7 +2174,7 @@ pub fn G_UpdateClientAnims(
                 GG2SetboneanimArgs::new(
                     (*self_).ghoul2, 0, cstr("model_root").as_ptr(), frame, frame + 1,
                     BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND, animSpeedScale,
-                    (*ctx.world).level.time, -1, 150,
+                    (*ctx.world).level.time, -1.0, 150,
                 ),
             );
             trap::G2API_SetBoneAnim(
@@ -2166,7 +2182,7 @@ pub fn G_UpdateClientAnims(
                 GG2SetboneanimArgs::new(
                     (*self_).ghoul2, 0, cstr("lower_lumbar").as_ptr(), frame, frame + 1,
                     BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND, animSpeedScale,
-                    (*ctx.world).level.time, -1, 150,
+                    (*ctx.world).level.time, -1.0, 150,
                 ),
             );
             trap::G2API_SetBoneAnim(
@@ -2174,7 +2190,7 @@ pub fn G_UpdateClientAnims(
                 GG2SetboneanimArgs::new(
                     (*self_).ghoul2, 0, cstr("Motion").as_ptr(), frame, frame + 1,
                     BONE_ANIM_OVERRIDE_FREEZE | BONE_ANIM_BLEND, animSpeedScale,
-                    (*ctx.world).level.time, -1, 150,
+                    (*ctx.world).level.time, -1.0, 150,
                 ),
             );
             return;
@@ -2215,7 +2231,7 @@ pub fn G_UpdateClientAnims(
                     ctx.engine,
                     GG2SetboneanimArgs::new(
                         (*self_).ghoul2, 0, cstr("model_root").as_ptr(), first_frame, last_frame,
-                        a_flags, l_anim_speed_scale, (*ctx.world).level.time, -1, 150,
+                        a_flags, l_anim_speed_scale, (*ctx.world).level.time, -1.0, 150,
                     ),
                 );
                 (*((*self_).client as *mut gclient_t)).legsAnimExecute = legs_anim;
@@ -2280,7 +2296,7 @@ pub fn G_UpdateClientAnims(
                 ctx.engine,
                 GG2SetboneanimArgs::new(
                     (*self_).ghoul2, 0, cstr("lower_lumbar").as_ptr(), first2, last2, a_flags2,
-                    speed2, (*ctx.world).level.time, -1, 150,
+                    speed2, (*ctx.world).level.time, -1.0, 150,
                 ),
             );
 
@@ -2303,7 +2319,7 @@ pub fn G_UpdateClientAnims(
                 ctx.engine,
                 GG2SetboneanimArgs::new(
                     (*self_).ghoul2, 0, cstr("Motion").as_ptr(), first_frame, last_frame, a_flags,
-                    l_anim_speed_scale, (*ctx.world).level.time, -1, 150,
+                    l_anim_speed_scale, (*ctx.world).level.time, -1.0, 150,
                 ),
             );
         }
@@ -2407,18 +2423,18 @@ pub fn ClientSpawn(
 
             if (*client).saber[0].model[0] != 0 && (*client).saber[1].model[0] != 0 {
                 // dual
-                (*client).ps.fd.saberAnimLevelBase = SS_DUAL;
-                (*client).ps.fd.saberAnimLevel = SS_DUAL;
-                (*client).ps.fd.saberDrawAnimLevel = SS_DUAL;
+                (*client).ps.fd.saberAnimLevelBase = SS_DUAL as c_int;
+                (*client).ps.fd.saberAnimLevel = SS_DUAL as c_int;
+                (*client).ps.fd.saberDrawAnimLevel = SS_DUAL as c_int;
             } else if (*client).saber[0].saberFlags & SFL_TWO_HANDED != 0 {
                 // staff
                 (*client).ps.fd.saberAnimLevel = SS_STAFF as c_int;
                 (*client).ps.fd.saberDrawAnimLevel = SS_STAFF as c_int;
             } else {
-                if (*client).sess.saberLevel < SS_FAST {
-                    (*client).sess.saberLevel = SS_FAST;
-                } else if (*client).sess.saberLevel > SS_STRONG {
-                    (*client).sess.saberLevel = SS_STRONG;
+                if (*client).sess.saberLevel < SS_FAST as c_int {
+                    (*client).sess.saberLevel = SS_FAST as c_int;
+                } else if (*client).sess.saberLevel > SS_STRONG as c_int {
+                    (*client).sess.saberLevel = SS_STRONG as c_int;
                 }
                 (*client).ps.fd.saberAnimLevelBase = (*client).sess.saberLevel;
                 (*client).ps.fd.saberAnimLevel = (*client).sess.saberLevel;
@@ -2464,14 +2480,14 @@ pub fn ClientSpawn(
         }
 
         if (*client).ps.fd.saberAnimLevel != SS_STAFF as c_int
-            && (*client).ps.fd.saberAnimLevel != SS_DUAL
+            && (*client).ps.fd.saberAnimLevel != SS_DUAL as c_int
             && (*client).ps.fd.saberAnimLevel == (*client).ps.fd.saberDrawAnimLevel
             && (*client).ps.fd.saberAnimLevel == (*client).sess.saberLevel
         {
-            if (*client).sess.saberLevel < SS_FAST {
-                (*client).sess.saberLevel = SS_FAST;
-            } else if (*client).sess.saberLevel > SS_STRONG {
-                (*client).sess.saberLevel = SS_STRONG;
+            if (*client).sess.saberLevel < SS_FAST as c_int {
+                (*client).sess.saberLevel = SS_FAST as c_int;
+            } else if (*client).sess.saberLevel > SS_STRONG as c_int {
+                (*client).sess.saberLevel = SS_STRONG as c_int;
             }
             (*client).ps.fd.saberAnimLevel = (*client).sess.saberLevel;
             (*client).ps.fd.saberDrawAnimLevel = (*client).sess.saberLevel;
@@ -2599,7 +2615,7 @@ pub fn ClientSpawn(
         let mut g2_weapon_ptrs: [*mut c_void; MAX_SABERS as usize] = (*client).weaponGhoul2;
 
         i = 0;
-        while i < HL_MAX {
+        while i < crate::entity::hit_location::HL_MAX {
             (*ent).locationDamage[i as usize] = 0;
             i += 1;
         }
@@ -2708,7 +2724,7 @@ pub fn ClientSpawn(
         if (*ctx.world).cvars.g_gametype.integer != GT_HOLOCRON
             && (*ctx.world).cvars.g_gametype.integer != GT_JEDIMASTER
             && HasSetSaberOnly(ctx) == qfalse
-            && crate::w_saber::AllForceDisabled((*ctx.world).cvars.g_forcePowerDisable.integer) == qfalse
+            && AllForceDisabled((*ctx.world).cvars.g_forcePowerDisable.integer) == qfalse
             && (*ctx.world).cvars.g_trueJedi.integer != 0
         {
             if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM
@@ -2834,13 +2850,13 @@ pub fn ClientSpawn(
                         let scl = &(*ctx.world).bg_state.bgSiegeClasses[(*client).siegeClass as usize];
                         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE && m == WP_ROCKET_LAUNCHER {
                             // don't give full ammo!
-                            if scl.classflags & (1 << CFL_SINGLE_ROCKET) != 0 {
+                            if scl.classflags & (1 << CFL_SINGLE_ROCKET as c_int) != 0 {
                                 (*client).ps.ammo[weaponData[m as usize].ammoIndex as usize] = 1;
                             } else {
                                 (*client).ps.ammo[weaponData[m as usize].ammoIndex as usize] = 10;
                             }
                         } else if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
-                            && scl.classflags & (1 << CFL_EXTRA_AMMO) != 0
+                            && scl.classflags & (1 << CFL_EXTRA_AMMO as c_int) != 0
                         {
                             // double ammo
                             (*client).ps.ammo[weaponData[m as usize].ammoIndex as usize] =
@@ -3132,7 +3148,7 @@ pub fn ClientDisconnect(
         if (*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum != 0 {
             // tell it I'm getting off
             let veh = (*ctx.world)
-                .entities
+                .g_entities
                 .as_mut_ptr()
                 .add((*((*ent).client as *mut gclient_t)).ps.m_iVehicleNum as usize);
 
@@ -3153,7 +3169,7 @@ pub fn ClientDisconnect(
         while i < (*ctx.world).level.maxclients {
             let cl = &(*ctx.world).clients[i as usize];
             if cl.sess.sessionTeam == TEAM_SPECTATOR
-                && cl.sess.spectatorState == SPECTATOR_FOLLOW
+                && cl.sess.spectatorState == crate::client::spectator_state::spectatorState_t::SPECTATOR_FOLLOW
                 && cl.sess.spectatorClient == clientNum
             {
                 StopFollowing(ctx, (*ctx.world).g_entities.as_mut_ptr().add(i as usize));
@@ -3314,7 +3330,7 @@ pub fn SetupGameGhoul2Model(
                 ctx.engine,
                 GG2InitghoulModelArgs::new(
                     &mut (*ctx.world).globals.precachedKyle as *mut *mut c_void,
-                    cstr(&cstr_to_str(afilename.as_ptr())).as_ptr(),
+                    cstr(&cstr_to_str(afilename.as_ptr())),
                     0,
                     0,
                     -20,
@@ -3330,7 +3346,7 @@ pub fn SetupGameGhoul2Model(
             defSkin = trap::R_RegisterSkin(
                 ctx.engine,
                 mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(
-                    cstr("models/players/kyle/model_default.skin").as_ptr(),
+                    cstr("models/players/kyle/model_default.skin"),
                 ),
             );
             trap::G2API_SetSkin(
@@ -3369,19 +3385,19 @@ pub fn SetupGameGhoul2Model(
                     if !(*ent).m_pVehicle.is_null()
                         && !(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo.is_null()
                         && !(*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).skin.is_null()
-                        && *(*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).skin.as_ptr() as c_int != 0
+                        && *(*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).skin as c_int != 0
                     {
                         let skin_str = format!(
                             "models/players/{}/model_{}.skin",
                             cstr_to_str(modelname),
                             cstr_to_str(
-                                (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).skin.as_ptr()
+                                (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).skin
                             )
                         );
                         skinHandle = trap::R_RegisterSkin(
                             ctx.engine,
                             mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(
-                                cstr(&skin_str).as_ptr(),
+                                cstr(&skin_str),
                             ),
                         );
                     } else {
@@ -3389,7 +3405,7 @@ pub fn SetupGameGhoul2Model(
                         skinHandle = trap::R_RegisterSkin(
                             ctx.engine,
                             mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(
-                                cstr(&skin_str).as_ptr(),
+                                cstr(&skin_str),
                             ),
                         );
                     }
@@ -3467,7 +3483,7 @@ pub fn SetupGameGhoul2Model(
                     skinHandle = trap::R_RegisterSkin(
                         ctx.engine,
                         mp_abi::game::syscalls::G_R_REGISTERSKIN::GRRegisterskinArgs::new(
-                            cstr(&useSkinName).as_ptr(),
+                            cstr(&useSkinName),
                         ),
                     );
                 }
@@ -3483,7 +3499,7 @@ pub fn SetupGameGhoul2Model(
                     ctx.engine,
                     GG2InitghoulModelArgs::new(
                         &mut (*ent).ghoul2 as *mut *mut c_void,
-                        cstr(&cstr_to_str(modelFullPath.as_ptr())).as_ptr(),
+                        cstr(&cstr_to_str(modelFullPath.as_ptr())),
                         0,
                         skinHandle,
                         -20,
@@ -3679,13 +3695,13 @@ pub fn SetupGameGhoul2Model(
             // Setup the default first bolt
             i = trap::G2API_AddBolt(
                 ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("model_root").as_ptr()),
+                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("model_root")),
             );
 
             // Setup the droid unit.
             (*((*ent).m_pVehicle as *mut Vehicle_t)).m_iDroidUnitTag = trap::G2API_AddBolt(
                 ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*droidunit").as_ptr()),
+                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*droidunit")),
             );
 
             // Setup the Exhausts.
@@ -3694,7 +3710,7 @@ pub fn SetupGameGhoul2Model(
                 write_cstr_field(&mut strTemp, &format!("*exhaust{}", i + 1));
                 (*((*ent).m_pVehicle as *mut Vehicle_t)).m_iExhaustTag[i as usize] = trap::G2API_AddBolt(
                     ctx.engine,
-                    GG2AddBoltArgs::new((*ent).ghoul2, 0, strTemp.as_ptr()),
+                    GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr(&cstr_to_str(strTemp.as_ptr()))),
                 );
                 i += 1;
             }
@@ -3705,14 +3721,14 @@ pub fn SetupGameGhoul2Model(
                 write_cstr_field(&mut strTemp, &format!("*muzzle{}", i + 1));
                 (*((*ent).m_pVehicle as *mut Vehicle_t)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(
                     ctx.engine,
-                    GG2AddBoltArgs::new((*ent).ghoul2, 0, strTemp.as_ptr()),
+                    GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr(&cstr_to_str(strTemp.as_ptr()))),
                 );
                 if (*((*ent).m_pVehicle as *mut Vehicle_t)).m_iMuzzleTag[i as usize] == -1 {
                     // ergh, try *flash?
                     write_cstr_field(&mut strTemp, &format!("*flash{}", i + 1));
                     (*((*ent).m_pVehicle as *mut Vehicle_t)).m_iMuzzleTag[i as usize] = trap::G2API_AddBolt(
                         ctx.engine,
-                        GG2AddBoltArgs::new((*ent).ghoul2, 0, strTemp.as_ptr()),
+                        GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr(&cstr_to_str(strTemp.as_ptr()))),
                     );
                 }
                 i += 1;
@@ -3730,8 +3746,10 @@ pub fn SetupGameGhoul2Model(
                         GG2AddBoltArgs::new(
                             (*ent).ghoul2,
                             0,
-                            (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).turret[i as usize]
-                                .gunnerViewTag,
+                            cstr(&cstr_to_str(
+                                (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).turret[i as usize]
+                                    .gunnerViewTag,
+                            )),
                         ),
                     );
                 } else {
@@ -3747,28 +3765,28 @@ pub fn SetupGameGhoul2Model(
             // a player or NPC saber user
             trap::G2API_AddBolt(
                 ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*r_hand").as_ptr()),
+                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*r_hand")),
             );
             trap::G2API_AddBolt(
                 ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*l_hand").as_ptr()),
+                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*l_hand")),
             );
 
             // rhand must always be first bolt. lhand always second. Whichever you want the
             // jetpack bolted to must always be third.
             trap::G2API_AddBolt(
                 ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*chestg").as_ptr()),
+                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*chestg")),
             );
 
             // claw bolts
             trap::G2API_AddBolt(
                 ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*r_hand_cap_r_arm").as_ptr()),
+                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*r_hand_cap_r_arm")),
             );
             trap::G2API_AddBolt(
                 ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*l_hand_cap_l_arm").as_ptr()),
+                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("*l_hand_cap_l_arm")),
             );
 
             trap::G2API_SetBoneAnim(
@@ -3782,7 +3800,7 @@ pub fn SetupGameGhoul2Model(
                     BONE_ANIM_OVERRIDE_LOOP,
                     1.0f32,
                     (*ctx.world).level.time,
-                    -1,
+                    -1.0,
                     -1,
                 ),
             );
@@ -3791,12 +3809,12 @@ pub fn SetupGameGhoul2Model(
                 GG2SetBoneAnglesArgs::new(
                     (*ent).ghoul2,
                     0,
-                    cstr("upper_lumbar").as_ptr(),
+                    cstr("upper_lumbar"),
                     &tempVec as *const vec3_t,
                     BONE_ANGLES_POSTMULT,
-                    POSITIVE_X,
-                    NEGATIVE_Y,
-                    NEGATIVE_Z,
+                    POSITIVE_X as c_int,
+                    NEGATIVE_Y as c_int,
+                    NEGATIVE_Z as c_int,
                     core::ptr::null_mut(),
                     0,
                     (*ctx.world).level.time,
@@ -3807,12 +3825,12 @@ pub fn SetupGameGhoul2Model(
                 GG2SetBoneAnglesArgs::new(
                     (*ent).ghoul2,
                     0,
-                    cstr("cranium").as_ptr(),
+                    cstr("cranium"),
                     &tempVec as *const vec3_t,
                     BONE_ANGLES_POSTMULT,
-                    POSITIVE_Z,
-                    NEGATIVE_Y,
-                    POSITIVE_X,
+                    POSITIVE_Z as c_int,
+                    NEGATIVE_Y as c_int,
+                    POSITIVE_X as c_int,
                     core::ptr::null_mut(),
                     0,
                     (*ctx.world).level.time,
@@ -3824,7 +3842,7 @@ pub fn SetupGameGhoul2Model(
                     ctx.engine,
                     GG2InitghoulModelArgs::new(
                         &mut (*ctx.world).globals.g2SaberInstance as *mut *mut c_void,
-                        cstr("models/weapons2/saber/saber_w.glm").as_ptr(),
+                        cstr("models/weapons2/saber/saber_w.glm"),
                         0,
                         0,
                         -20,
@@ -3846,7 +3864,7 @@ pub fn SetupGameGhoul2Model(
                         GG2AddBoltArgs::new(
                             (*ctx.world).globals.g2SaberInstance,
                             0,
-                            cstr("*blade1").as_ptr(),
+                            cstr("*blade1"),
                         ),
                     );
                 }
@@ -3871,7 +3889,7 @@ pub fn SetupGameGhoul2Model(
             // some extra NPC stuff
             if trap::G2API_AddBolt(
                 ctx.engine,
-                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("lower_lumbar").as_ptr()),
+                GG2AddBoltArgs::new((*ent).ghoul2, 0, cstr("lower_lumbar")),
             ) == -1
             {
                 // check now to see if we have this bone for setting anims and such
@@ -3946,7 +3964,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
         ClientCleanName(ctx, s, (*client).pers.netname.as_mut_ptr(), 64);
 
         if (*client).sess.sessionTeam == TEAM_SPECTATOR {
-            if (*client).sess.spectatorState == SPECTATOR_SCOREBOARD {
+            if (*client).sess.spectatorState == crate::client::spectator_state::spectatorState_t::SPECTATOR_SCOREBOARD {
                 crate::q_shared::Q_strncpyz(
                     (*client).pers.netname.as_mut_ptr(),
                     c"scoreboard".as_ptr(),
@@ -3972,7 +3990,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
                     );
                     trap::SendServerCommand(
                         ctx.engine,
-                        GSendServerCommandArgs::new(clientNum, cstr(&msg).as_ptr()),
+                        GSendServerCommandArgs::new(clientNum, cstr(&msg)),
                     );
 
                     crate::q_shared::Info_SetValueForKey(
@@ -3984,7 +4002,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
                         ctx.engine,
                         mp_abi::game::syscalls::G_SET_USERINFO::GSetUserinfoArgs::new(
                             clientNum,
-                            userinfo.as_ptr(),
+                            cstr(&cstr_to_str(userinfo.as_ptr())),
                         ),
                     );
                     write_cstr_field(&mut (*client).pers.netname, cstr_to_str(oldname.as_ptr()));
@@ -4002,7 +4020,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
                     );
                     trap::SendServerCommand(
                         ctx.engine,
-                        GSendServerCommandArgs::new(-1, cstr(&msg).as_ptr()),
+                        GSendServerCommandArgs::new(-1, cstr(&msg)),
                     );
                     (*client).pers.netnameTime = (*ctx.world).level.time + 5000;
                 }
@@ -4251,7 +4269,7 @@ pub fn ClientUserinfoChanged(ctx: GameContext<'_>, clientNum: c_int) {
 
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(CS_PLAYERS + clientNum, cstr(&configstring_s).as_ptr()),
+            GSetConfigstringArgs::new(CS_PLAYERS + clientNum, cstr(&configstring_s)),
         );
 
         if modelChanged != qfalse {
