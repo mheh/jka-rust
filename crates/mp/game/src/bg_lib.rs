@@ -340,10 +340,14 @@ pub fn atoi(string: *const c_char) -> c_int {
             if c < b'0' || c > b'9' {
                 break;
             }
-            value = value * 10 + (c - b'0') as c_int;
+            // C's `int value = value*10 + c` wraps on overflow (2's complement);
+            // Rust's `*`/`+` panic in debug. Use wrapping to reproduce Raven's
+            // behavior for out-of-range inputs (e.g. "99999999999").
+            // Source: `oracle/oracle/codemp/game/bg_lib.c:948-953`
+            value = value.wrapping_mul(10).wrapping_add((c - b'0') as c_int);
         }
 
-        value * sign
+        value.wrapping_mul(sign)
     }
 }
 
@@ -436,7 +440,14 @@ pub fn _atof(stringPtr: *mut *const c_char) -> f64 {
         // Oracle declares `float value; float sign;` (bg_lib.c:843-844) — 32-bit
         // float accumulation; only `fraction` is double.
         let mut value: f32 = 0.0;
-        let mut c: u8;
+        // Oracle inits `int c = '0'` (bg_lib.c:845) and does the sign check on
+        // `*string` directly, never assigning `c`. So a leading '.' with no
+        // preceding digit leaves `c == '0'`, and the `if (c == '.')` fractional
+        // block is SKIPPED — `_atof(".5")` returns 0 and advances 0. (This
+        // differs from `atof`, which advances past a leading '.'.) The prior
+        // port seeded `c` from the sign char and wrongly entered the fraction.
+        // Source: `oracle/oracle/codemp/game/bg_lib.c:845,858-885`
+        let mut c: u8 = b'0';
 
         // Skip whitespace (signed-char semantics — see `atoi`).
         loop {
@@ -451,9 +462,8 @@ pub fn _atof(stringPtr: *mut *const c_char) -> f64 {
             string = string.add(1);
         }
 
-        // Check sign
-        c = *string as u8;
-        let sign: f32 = match c {
+        // Check sign (on `*string` directly, matching the oracle's switch).
+        let sign: f32 = match *string as u8 {
             b'+' => {
                 string = string.add(1);
                 1.0
