@@ -25,7 +25,7 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
     let mut n: c_int;
     let mut accuracy: c_int;
     let mut perfect: c_int;
-    let mut msglen: c_int;
+    let msglen: c_int;
     let mut buflen: c_int;
     let mut score1: c_int;
     let mut score2: c_int;
@@ -139,7 +139,8 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
             msg[msg_len + j] = buf[j];
         }
         msg[msg_len + buf_len] = 0;
-        msglen += buflen;
+        // Oracle never updates `msglen` in this loop (g_arenas.c:90-99): the guard
+        // above keeps comparing the original length every iteration. Preserved.
         i += 1;
     }
 

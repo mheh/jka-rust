@@ -1912,11 +1912,13 @@ pub fn NPC_ShotEntity(
             //thermal aims from slightly above head
             //FIXME: what about low-angle shots, rolling the thermal under something?
             let npc_client = (*npc).client as *mut gclient_t;
+            CalcEntitySpot(ctx, npc, spot_t::SPOT_HEAD, &mut muzzle);
             let angles: vec3_t = [0.0, (*npc_client).ps.viewangles[1], 0.0];
             let mut forward: vec3_t = [0.0; 3];
             AngleVectors(angles, Some(&mut forward), None, None);
-            _VectorMA(muzzle, 8.0, forward, &mut muzzle);
-            muzzle[2] += 24.0;
+            let mut end: vec3_t = [0.0; 3];
+            _VectorMA(muzzle, 8.0, forward, &mut end);
+            end[2] += 24.0;
             trap::Trace(
                 ctx.engine,
                 GTraceArgs::new(
@@ -1924,7 +1926,7 @@ pub fn NPC_ShotEntity(
                     &muzzle as *const vec3_t,
                     &vec3_origin as *const vec3_t,
                     &vec3_origin as *const vec3_t,
-                    &muzzle as *const vec3_t,
+                    &end as *const vec3_t,
                     (*npc).s.number,
                     MASK_SHOT,
                 ),

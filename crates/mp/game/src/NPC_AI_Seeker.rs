@@ -39,11 +39,14 @@ const qfalse: qboolean = 0;
 // Local constants for Seeker AI.
 // Source: oracle/oracle/codemp/game/NPC_AI_Seeker.c / q_shared.h / g_local.h
 const CONTENTS_LIGHTSABER: c_int = 0x00040000;
-const MASK_SHOT: c_int = CONTENTS_LIGHTSABER | 0x00000001 | 0x00000100 | 0x00000200; // CONTENTS_LIGHTSABER | CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE
-const MOD_FALLING: c_int = 9;
-const MOD_BLASTER: c_int = 5;
-const MOD_UNKNOWN: c_int = 46;
-const MOD_TELEFRAG: c_int = 13;
+// Oracle: `missile->clipmask = MASK_SHOT | CONTENTS_LIGHTSABER`, where
+// MASK_SHOT = SOLID|BODY|CORPSE|TERRAIN (0x1301). Fold LIGHTSABER in here so
+// the net clipmask is 0x41301; CONTENTS_TERRAIN (0x1000) must be included.
+const MASK_SHOT: c_int = CONTENTS_LIGHTSABER | 0x00000001 | 0x00000100 | 0x00000200 | 0x00001000; // LIGHTSABER|SOLID|BODY|CORPSE|TERRAIN
+const MOD_FALLING: c_int = 38;
+const MOD_BLASTER: c_int = 6;
+const MOD_UNKNOWN: c_int = 0;
+const MOD_TELEFRAG: c_int = 37;
 const SCF_CHASE_ENEMIES: i32 = 0x00000400;
 
 
@@ -699,7 +702,8 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
 
         if let Some(enemy_id) = (*NPC).enemy {
             let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
-            if (*enemy).health > 0 && (*enemy).inuse != 0 {
+            // Oracle tests `NPC->enemy->health` truthy (`!= 0`), not `> 0`.
+            if (*enemy).health != 0 && (*enemy).inuse != 0 {
             if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT
                 && ((*enemy).s.number == 0
                     || (!(*enemy).client.is_null()

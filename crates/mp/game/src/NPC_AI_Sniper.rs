@@ -170,8 +170,8 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
         NAV_GetLastMove(ctx, &mut info);
 
         // If we hit our target, then stop and fire!
-        if (info.flags & 1) != 0 {
-            // NIF_COLLISION = 1
+        if (info.flags & NIF_COLLISION) != 0 {
+            // NIF_COLLISION = 0x4 (0x1 is NIF_FAILED)
             if ent_id_opt(world.g_entities.as_ptr(), info.blocker) == (*NPC).enemy {
                 Sniper_HoldPosition(ctx);
             }

@@ -8,25 +8,25 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
-use crate::g_utils::{
-    G_ScaleNetHealth, G_PlayEffect, G_PlayEffectID, G_Spawn, G_FreeEntity, G_UseTargets, G_UseTargets2,
-    G_RadiusList, G_SetAngles, G_SetOrigin, G_EffectIndex, G_IconIndex, G_SoundIndex, G_ModelIndex,
-};
-use crate::g_spawn::{G_SpawnInt, G_SpawnString, G_SpawnFloat};
-use crate::g_combat::{G_RadiusDamage, ObjectDie};
-use crate::NPC_combat::G_SetEnemy;
-use crate::q_math::{
-    AngleVectors, AngleNormalize180, AngleSubtract, vectoangles, VectorLengthSquared,
-    YAW, PITCH,
-};
-use crate::g_items::FRAMETIME;
-use crate::q_shared::Q_stricmp;
 use crate::bg_misc::{BG_EvaluateTrajectory, BG_FindItemForWeapon};
-use crate::g_items::RegisterItem;
-use crate::trap;
-use crate::ent_fn_enums::{EntThink, EntUse, EntDie, EntPain};
+use crate::ent_fn_enums::{EntDie, EntPain, EntThink, EntUse};
 use crate::entity::flags::FL_NOTARGET;
+use crate::g_combat::{G_RadiusDamage, ObjectDie};
+use crate::g_items::RegisterItem;
+use crate::g_items::FRAMETIME;
+use crate::g_spawn::{G_SpawnFloat, G_SpawnInt, G_SpawnString};
+use crate::g_utils::{
+    G_EffectIndex, G_FreeEntity, G_IconIndex, G_ModelIndex, G_PlayEffect, G_PlayEffectID,
+    G_RadiusList, G_ScaleNetHealth, G_SetAngles, G_SetOrigin, G_SoundIndex, G_Spawn, G_UseTargets,
+    G_UseTargets2,
+};
+use crate::prelude::*;
+use crate::q_math::{
+    vectoangles, AngleNormalize180, AngleSubtract, AngleVectors, VectorLengthSquared, PITCH, YAW,
+};
+use crate::q_shared::Q_stricmp;
+use crate::trap;
+use crate::NPC_combat::G_SetEnemy;
 use mp_bg::public::effect_types::effectTypes_t::{EFFECT_EXPLOSION_TURRET, EFFECT_SPARKS};
 use mp_bg::public::means_of_death::meansOfDeath_t::{MOD_TARGET_LASER, MOD_UNKNOWN};
 use mp_qshared::shared::trajectory::trType_t::{TR_LINEAR, TR_LINEAR_STOP, TR_STATIONARY};
@@ -229,12 +229,7 @@ pub fn bottom_die(
 /// Raven `turret_fire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:129-176`
-pub fn turret_fire(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    start: vec3_t,
-    dir: vec3_t,
-) {
+pub fn turret_fire(ctx: GameContext<'_>, ent: *mut gentity_t, start: vec3_t, dir: vec3_t) {
     unsafe {
         let contents = trap::PointContents(
             ctx.engine,
@@ -300,7 +295,12 @@ pub fn turret_fire(
         (*bolt).s.pos.trDelta[1] = dir[1] * (*ent).mass as f32;
         (*bolt).s.pos.trDelta[2] = dir[2] * (*ent).mass as f32;
 
-        trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut (*bolt).s.pos.trDelta as *mut vec3_t));
+        trap::SnapVector(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(
+                &mut (*bolt).s.pos.trDelta as *mut vec3_t,
+            ),
+        );
 
         // VectorCopy(start, currentOrigin)
         (*bolt).r.currentOrigin[0] = start[0];
@@ -316,10 +316,7 @@ pub const START_DIS: f32 = 15.0;
 /// Raven `turret_head_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:179-225`
-pub fn turret_head_think(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turret_head_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let top_num = (*self_).r.ownerNum as usize;
         if top_num >= (*ctx.world).g_entities.len() {
@@ -336,7 +333,10 @@ pub fn turret_head_think(
             }
         }
 
-        if !(*self_).enemy.is_none() && (*self_).setTime < (*ctx.world).level.time && (*self_).attackDebounceTime < (*ctx.world).level.time {
+        if !(*self_).enemy.is_none()
+            && (*self_).setTime < (*ctx.world).level.time
+            && (*self_).attackDebounceTime < (*ctx.world).level.time
+        {
             let mut fwd = [0.0; 3];
             let mut org = [0.0; 3];
 
@@ -375,10 +375,7 @@ pub fn turret_head_think(
 /// Raven `turret_aim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:228-352`
-pub fn turret_aim(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turret_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let top_num = (*self_).r.ownerNum as usize;
         if top_num >= (*ctx.world).g_entities.len() {
@@ -398,15 +395,21 @@ pub fn turret_aim(
         const PITCH_CAP: f32 = 40.0;
 
         // Evaluate trajectory for the gun base
-        BG_EvaluateTrajectory(&top.s.apos, (*ctx.world).level.time, &mut top.r.currentAngles);
+        BG_EvaluateTrajectory(
+            &top.s.apos,
+            (*ctx.world).level.time,
+            &mut top.r.currentAngles,
+        );
         top.r.currentAngles[PITCH] = AngleNormalize180(top.r.currentAngles[PITCH]);
         top.r.currentAngles[YAW] = AngleNormalize180(top.r.currentAngles[YAW]);
         turnSpeed = top.speed;
 
         if (*self_).painDebounceTime > (*ctx.world).level.time {
             // In pain — aim randomly
-            desiredAngles[YAW] = top.r.currentAngles[YAW] + (*ctx.world).bg_state.rng.random() * 90.0 - 45.0;
-            desiredAngles[PITCH] = top.r.currentAngles[PITCH] + (*ctx.world).bg_state.rng.random() * 20.0 - 10.0;
+            desiredAngles[YAW] =
+                top.r.currentAngles[YAW] + (*ctx.world).bg_state.rng.random() * 90.0 - 45.0;
+            desiredAngles[PITCH] =
+                top.r.currentAngles[PITCH] + (*ctx.world).bg_state.rng.random() * 20.0 - 10.0;
 
             if desiredAngles[PITCH] < -PITCH_CAP {
                 desiredAngles[PITCH] = -PITCH_CAP;
@@ -425,7 +428,10 @@ pub fn turret_aim(
             org[2] = (*enemy).r.currentOrigin[2] + (*enemy).r.maxs[2] * 0.5;
 
             // Check for walker vehicle
-            if (*enemy).s.eType == ET_NPC as c_int && (*enemy).s.NPC_class == CLASS_VEHICLE && !(*enemy).m_pVehicle.is_null() {
+            if (*enemy).s.eType == ET_NPC as c_int
+                && (*enemy).s.NPC_class == CLASS_VEHICLE
+                && !(*enemy).m_pVehicle.is_null()
+            {
                 let enemy_veh = (*enemy).m_pVehicle as *mut Vehicle_t;
                 if (*enemy_veh).m_pVehicleInfo as *const vehicleInfo_t != std::ptr::null() {
                     if (*(*enemy_veh).m_pVehicleInfo).r#type == VH_WALKER {
@@ -456,7 +462,8 @@ pub fn turret_aim(
             diffPitch = AngleSubtract(desiredAngles[PITCH], top.r.currentAngles[PITCH]);
         } else {
             // No enemy — pan back and forth
-            desiredAngles[YAW] = (((*ctx.world).level.time as f32) * 0.0001 + top.count as f32).sin();
+            desiredAngles[YAW] =
+                (((*ctx.world).level.time as f32) * 0.0001 + top.count as f32).sin();
             desiredAngles[YAW] *= 60.0;
             desiredAngles[YAW] += (*self_).s.angles[YAW];
             desiredAngles[YAW] = AngleNormalize180(desiredAngles[YAW]);
@@ -469,12 +476,20 @@ pub fn turret_aim(
         // Cap turn speed
         if diffYaw != 0.0 {
             if diffYaw.abs() > turnSpeed {
-                diffYaw = if diffYaw >= 0.0 { turnSpeed } else { -turnSpeed };
+                diffYaw = if diffYaw >= 0.0 {
+                    turnSpeed
+                } else {
+                    -turnSpeed
+                };
             }
         }
         if diffPitch != 0.0 {
             if diffPitch.abs() > turnSpeed {
-                diffPitch = if diffPitch > 0.0 { turnSpeed } else { -turnSpeed };
+                diffPitch = if diffPitch > 0.0 {
+                    turnSpeed
+                } else {
+                    -turnSpeed
+                };
             }
         }
 
@@ -508,10 +523,7 @@ pub fn turret_aim(
 /// Raven `turret_turnoff`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:355-374`
-pub fn turret_turnoff(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turret_turnoff(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let top_num = (*self_).r.ownerNum as usize;
         if top_num < (*ctx.world).g_entities.len() {
@@ -539,10 +551,7 @@ pub fn turret_turnoff(
 /// Raven `turret_sleep`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:377-391`
-pub fn turret_sleep(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turret_sleep(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).enemy.is_none() {
             return;
@@ -556,10 +565,7 @@ pub fn turret_sleep(
 /// Raven `turret_find_enemies`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:394-502`
-pub fn turret_find_enemies(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) -> qboolean {
+pub fn turret_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboolean {
     unsafe {
         let mut found = qfalse;
         let mut bestDist = (*self_).radius * (*self_).radius;
@@ -582,8 +588,16 @@ pub fn turret_find_enemies(
         org2[1] = top.r.currentOrigin[1];
         org2[2] = top.r.currentOrigin[2];
 
-        let mut entity_list: [*mut gentity_t; MAX_GENTITIES] = [std::ptr::null_mut(); MAX_GENTITIES];
-        let count = G_RadiusList(ctx, org2, (*self_).radius, self_, qtrue, entity_list.as_mut_ptr());
+        let mut entity_list: [*mut gentity_t; MAX_GENTITIES] =
+            [std::ptr::null_mut(); MAX_GENTITIES];
+        let count = G_RadiusList(
+            ctx,
+            org2,
+            (*self_).radius,
+            self_,
+            qtrue,
+            entity_list.as_mut_ptr(),
+        );
 
         for i in 0..count as usize {
             let target = entity_list[i];
@@ -591,21 +605,37 @@ pub fn turret_find_enemies(
             if target.is_null() || (*target).client.is_null() {
                 continue;
             }
-            if target == self_ || (*target).takedamage == qfalse || (*target).health <= 0 || ((*target).flags & FL_NOTARGET) != 0 {
+            if target == self_
+                || (*target).takedamage == qfalse
+                || (*target).health <= 0
+                || ((*target).flags & FL_NOTARGET) != 0
+            {
                 continue;
             }
-            if !(*target).client.is_null() && (*((*target).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR {
+            if !(*target).client.is_null()
+                && (*((*target).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
+            {
                 continue;
             }
             if (*self_).alliedTeam != 0 {
-                if !(*target).client.is_null() && (*((*target).client as *mut gclient_t)).sess.sessionTeam == (*self_).alliedTeam {
+                if !(*target).client.is_null()
+                    && (*((*target).client as *mut gclient_t)).sess.sessionTeam
+                        == (*self_).alliedTeam
+                {
                     continue;
                 }
                 if (*target).teamnodmg == (*self_).alliedTeam {
                     continue;
                 }
             }
-            if trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&org2 as *const vec3_t, &(*target).r.currentOrigin as *const vec3_t)) == 0 {
+            if trap::InPVS(
+                ctx.engine,
+                mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                    &org2 as *const vec3_t,
+                    &(*target).r.currentOrigin as *const vec3_t,
+                ),
+            ) == 0
+            {
                 continue;
             }
 
@@ -628,7 +658,10 @@ pub fn turret_find_enemies(
                 ),
             );
 
-            if tr.allsolid == 0 && tr.startsolid == 0 && (tr.fraction == 1.0 || tr.entityNum as c_int == (*target).s.number) {
+            if tr.allsolid == 0
+                && tr.startsolid == 0
+                && (tr.fraction == 1.0 || tr.entityNum as c_int == (*target).s.number)
+            {
                 let mut enemyDir = [0.0; 3];
                 enemyDir[0] = (*target).r.currentOrigin[0] - top.r.currentOrigin[0];
                 enemyDir[1] = (*target).r.currentOrigin[1] - top.r.currentOrigin[1];
@@ -638,7 +671,8 @@ pub fn turret_find_enemies(
 
                 let atst_name = c"atst_vehicle".as_ptr();
                 let target_is_atst = Q_stricmp((*target).NPC_type, atst_name) == 0;
-                let best_is_atst = !bestTarget.is_null() && Q_stricmp((*bestTarget).NPC_type, atst_name) == 0;
+                let best_is_atst =
+                    !bestTarget.is_null() && Q_stricmp((*bestTarget).NPC_type, atst_name) == 0;
 
                 if enemyDist < bestDist || (target_is_atst && !best_is_atst) {
                     if (*self_).attackDebounceTime < (*ctx.world).level.time {
@@ -666,10 +700,7 @@ pub fn turret_find_enemies(
 /// Raven `turret_base_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:505-601`
-pub fn turret_base_think(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn turret_base_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut turnOff = qtrue;
 
@@ -690,73 +721,87 @@ pub fn turret_base_think(
                 turnOff = qfalse;
             }
         } else {
-            let enemy = &mut (*ctx.world).g_entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
+            let enemy =
+                &mut (*ctx.world).g_entities[(*self_).enemy.unwrap().index()] as *mut gentity_t;
             if !(*enemy).client.is_null()
                 && (*((*enemy).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
             {
                 // Don't keep going after spectators
                 (*self_).enemy = None;
-            } else if (*enemy).health > 0 {
-                // Enemy is alive
-                let mut enemyDir = [0.0; 3];
-                enemyDir[0] = (*enemy).r.currentOrigin[0] - (*self_).r.currentOrigin[0];
-                enemyDir[1] = (*enemy).r.currentOrigin[1] - (*self_).r.currentOrigin[1];
-                enemyDir[2] = (*enemy).r.currentOrigin[2] - (*self_).r.currentOrigin[2];
+            } else {
+                //FIXME: remain single-minded or look for a new enemy every now and then?
+                if (*enemy).health > 0 {
+                    // Enemy is alive
+                    let mut enemyDir = [0.0; 3];
+                    enemyDir[0] = (*enemy).r.currentOrigin[0] - (*self_).r.currentOrigin[0];
+                    enemyDir[1] = (*enemy).r.currentOrigin[1] - (*self_).r.currentOrigin[1];
+                    enemyDir[2] = (*enemy).r.currentOrigin[2] - (*self_).r.currentOrigin[2];
 
-                let enemyDist = crate::q_math::VectorLengthSquared(enemyDir);
+                    let enemyDist = crate::q_math::VectorLengthSquared(enemyDir);
 
-                if enemyDist < ((*self_).radius * (*self_).radius) {
-                    // Was in valid radius
-                    if trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*self_).r.currentOrigin as *const vec3_t, &(*enemy).r.currentOrigin as *const vec3_t)) != 0 {
-                        // Every now and then, check if we can trace to enemy
-                        let mut tr: trace_t = std::mem::zeroed();
-                        let mut org = [0.0; 3];
-                        let mut org2 = [0.0; 3];
+                    if enemyDist < ((*self_).radius * (*self_).radius) {
+                        // Was in valid radius
+                        if trap::InPVS(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                                &(*self_).r.currentOrigin as *const vec3_t,
+                                &(*enemy).r.currentOrigin as *const vec3_t,
+                            ),
+                        ) != 0
+                        {
+                            // Every now and then, check if we can trace to enemy
+                            let mut tr: trace_t = std::mem::zeroed();
+                            let mut org = [0.0; 3];
+                            let mut org2 = [0.0; 3];
 
-                        if !(*enemy).client.is_null() {
-                            let enemy_client = (*enemy).client as *mut gclient_t;
-                            org[0] = (*enemy_client).renderInfo.eyePoint[0];
-                            org[1] = (*enemy_client).renderInfo.eyePoint[1];
-                            org[2] = (*enemy_client).renderInfo.eyePoint[2];
-                        } else {
-                            org[0] = (*enemy).r.currentOrigin[0];
-                            org[1] = (*enemy).r.currentOrigin[1];
-                            org[2] = (*enemy).r.currentOrigin[2];
-                        }
+                            if !(*enemy).client.is_null() {
+                                let enemy_client = (*enemy).client as *mut gclient_t;
+                                org[0] = (*enemy_client).renderInfo.eyePoint[0];
+                                org[1] = (*enemy_client).renderInfo.eyePoint[1];
+                                org[2] = (*enemy_client).renderInfo.eyePoint[2];
+                            } else {
+                                org[0] = (*enemy).r.currentOrigin[0];
+                                org[1] = (*enemy).r.currentOrigin[1];
+                                org[2] = (*enemy).r.currentOrigin[2];
+                            }
 
-                        org2[0] = (*self_).r.currentOrigin[0];
-                        org2[1] = (*self_).r.currentOrigin[1];
-                        org2[2] = (*self_).r.currentOrigin[2];
+                            org2[0] = (*self_).r.currentOrigin[0];
+                            org2[1] = (*self_).r.currentOrigin[1];
+                            org2[2] = (*self_).r.currentOrigin[2];
 
-                        if ((*self_).spawnflags & 2) != 0 {
-                            org2[2] += 10.0;
-                        } else {
-                            org2[2] -= 10.0;
-                        }
+                            if ((*self_).spawnflags & 2) != 0 {
+                                org2[2] += 10.0;
+                            } else {
+                                org2[2] -= 10.0;
+                            }
 
-                        trap::Trace(
-                ctx.engine,
-                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                    &mut tr as *mut trace_t,
-                    &org2 as *const vec3_t,
-                    std::ptr::null(),
-                    std::ptr::null(),
-                    &org as *const vec3_t,
-                    (*self_).s.number,
-                    MASK_SHOT,
-                ),
-            );
+                            trap::Trace(
+                                ctx.engine,
+                                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
+                                    &mut tr as *mut trace_t,
+                                    &org2 as *const vec3_t,
+                                    std::ptr::null(),
+                                    std::ptr::null(),
+                                    &org as *const vec3_t,
+                                    (*self_).s.number,
+                                    MASK_SHOT,
+                                ),
+                            );
 
-                        if tr.allsolid == 0 && tr.startsolid == 0 && tr.entityNum as c_int == (*enemy).s.number {
-                            turnOff = qfalse;
+                            if tr.allsolid == 0
+                                && tr.startsolid == 0
+                                && tr.entityNum as c_int == (*enemy).s.number
+                            {
+                                turnOff = qfalse;
+                            }
                         }
                     }
                 }
+                // Oracle calls turret_head_think only in this branch (enemy
+                // existed and is not a spectator), NOT on the frame a fresh
+                // enemy is acquired via turret_find_enemies.
+                turret_head_think(ctx, self_);
             }
-        }
-
-        if !(*self_).enemy.is_none() {
-            turret_head_think(ctx, self_);
         }
 
         if turnOff != 0 {
@@ -764,7 +809,9 @@ pub fn turret_base_think(
                 turret_sleep(ctx, self_);
             }
         } else {
-            (*self_).bounceCount = (*ctx.world).level.time + 2000 + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
+            (*self_).bounceCount = (*ctx.world).level.time
+                + 2000
+                + ((*ctx.world).bg_state.rng.random() * 150.0) as c_int;
         }
 
         turret_aim(ctx, self_);
@@ -774,11 +821,7 @@ pub fn turret_base_think(
 /// Raven `turret_base_use`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:604-620`
-pub fn turret_base_use(
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    activator: *mut gentity_t,
-) {
+pub fn turret_base_use(self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     unsafe {
         // Toggle on and off
         (*self_).spawnflags ^= 1;
@@ -790,10 +833,7 @@ pub fn turret_base_use(
 /// Raven `SP_misc_turret`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:663-703`
-pub fn SP_misc_turret(
-    ctx: GameContext<'_>,
-    base: *mut gentity_t,
-) {
+pub fn SP_misc_turret(ctx: GameContext<'_>, base: *mut gentity_t) {
     unsafe {
         (*base).s.modelindex2 = G_ModelIndex(c"models/map_objects/hoth/turret_bottom.md3".as_ptr());
         (*base).s.modelindex = G_ModelIndex(c"models/map_objects/hoth/turret_base.md3".as_ptr());
@@ -823,7 +863,10 @@ pub fn SP_misc_turret(
         (*base).think = Some(EntThink::turret_base_think);
         (*base).nextthink = (*ctx.world).level.time + FRAMETIME * 5;
 
-        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base));
+        trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(base),
+        );
 
         if turret_base_spawn_top(ctx, base) == 0 {
             G_FreeEntity(ctx, base);
@@ -834,10 +877,7 @@ pub fn SP_misc_turret(
 /// Raven `turret_base_spawn_top`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:706-861`
-pub fn turret_base_spawn_top(
-    ctx: GameContext<'_>,
-    base: *mut gentity_t,
-) -> qboolean {
+pub fn turret_base_spawn_top(ctx: GameContext<'_>, base: *mut gentity_t) -> qboolean {
     unsafe {
         let mut org = [0.0; 3];
         let mut t: c_int = 0;
@@ -900,7 +940,12 @@ pub fn turret_base_spawn_top(
         (*base).die = Some(EntDie::bottom_die);
 
         // Shot speed
-        G_SpawnFloat(ctx, c"shotspeed".as_ptr(), c"1100".as_ptr(), &mut (*base).mass);
+        G_SpawnFloat(
+            ctx,
+            c"shotspeed".as_ptr(),
+            c"1100".as_ptr(),
+            &mut (*base).mass,
+        );
         (*top).mass = (*base).mass;
 
         // Light crosshair
@@ -981,7 +1026,10 @@ pub fn turret_base_spawn_top(
         // Set as turret
         (*top).s.weapon = WP_EMPLACED_GUN;
 
-        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(top));
+        trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(top),
+        );
         qtrue
     }
 }

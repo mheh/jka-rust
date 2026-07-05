@@ -11,7 +11,9 @@ use crate::prelude::*;
 
 use crate::bg_channel::GameBgTraps;
 use crate::bg_misc::vectoyaw;
+use crate::bg_panimate::{BG_HasAnimation, BG_PickAnim};
 use crate::bg_pmove::BG_KnockDownable;
+use crate::ent_fn_enums::{EntDie, EntThink, EntTouch};
 use crate::entity::hit_location::*;
 use crate::g_main::CalculateRanks;
 use crate::g_timer::TIMER_Set;
@@ -21,15 +23,13 @@ use crate::q_shared::Q_stricmp;
 use crate::teams::class::class_t;
 use crate::trap;
 use crate::NPC_utils::G_ActivateBehavior;
-use crate::bg_panimate::{BG_HasAnimation, BG_PickAnim};
-use crate::ent_fn_enums::{EntDie, EntThink, EntTouch};
 use core::ffi::CStr;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use mp_bg::public::anim_number::animNumber_t;
+use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_LONE};
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::entity_type::entityType_t;
-use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_LONE};
 use mp_bg::public::g2_model_parts::g2ModelParts_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::shared::MAX_CLIENTS;
@@ -272,10 +272,18 @@ pub fn G_GetHitLocation(ctx: GameContext<'_>, target: *mut gentity_t, ppoint: ve
 
         if hit_loc <= 10 {
             // Feet.
-            if rdot > 0.0 { HL_FOOT_RT } else { HL_FOOT_LT }
+            if rdot > 0.0 {
+                HL_FOOT_RT
+            } else {
+                HL_FOOT_LT
+            }
         } else if hit_loc <= 50 {
             // Legs.
-            if rdot > 0.0 { HL_LEG_RT } else { HL_LEG_LT }
+            if rdot > 0.0 {
+                HL_LEG_RT
+            } else {
+                HL_LEG_LT
+            }
         } else if hit_loc == 56
             || hit_loc == 60
             || hit_loc == 61
@@ -284,7 +292,11 @@ pub fn G_GetHitLocation(ctx: GameContext<'_>, target: *mut gentity_t, ppoint: ve
             || hit_loc == 70
         {
             // Hands.
-            if rdot > 0.0 { HL_HAND_RT } else { HL_HAND_LT }
+            if rdot > 0.0 {
+                HL_HAND_RT
+            } else {
+                HL_HAND_LT
+            }
         } else if hit_loc == 83
             || hit_loc == 87
             || hit_loc == 88
@@ -293,7 +305,11 @@ pub fn G_GetHitLocation(ctx: GameContext<'_>, target: *mut gentity_t, ppoint: ve
             || hit_loc == 97
         {
             // Arms.
-            if rdot > 0.0 { HL_ARM_RT } else { HL_ARM_LT }
+            if rdot > 0.0 {
+                HL_ARM_RT
+            } else {
+                HL_ARM_LT
+            }
         } else if (107..=109).contains(&hit_loc)
             || (112..=114).contains(&hit_loc)
             || (117..=119).contains(&hit_loc)
@@ -406,7 +422,12 @@ pub fn AddScore(ctx: GameContext<'_>, ent: *mut gentity_t, origin: vec3_t, score
 /// Raven `TossClientWeapon`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:469-559`
-pub fn TossClientWeapon(ctx: GameContext<'_>, self_: *mut gentity_t, direction: vec3_t, speed: f32) {
+pub fn TossClientWeapon(
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    direction: vec3_t,
+    speed: f32,
+) {
     unsafe {
         let mut vel: vec3_t = [0.0; 3];
         let client = (*self_).client as *mut gclient_t;
@@ -430,13 +451,10 @@ pub fn TossClientWeapon(ctx: GameContext<'_>, self_: *mut gentity_t, direction: 
         let item =
             crate::bg_misc::BG_FindItemForWeapon(core::mem::transmute::<c_int, weapon_t>(weapon));
 
-        let mut ammoSub = (*client).ps.ammo
-            [weaponData[weapon as usize].ammoIndex as usize]
-            - bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
-                weapon,
-                IT_WEAPON as c_int,
-            ) as usize]
-            .quantity;
+        let mut ammoSub = (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize]
+            - bg_itemlist
+                [crate::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
+                .quantity;
 
         if ammoSub < 0 {
             let mut ammoQuan = (*item).quantity;
@@ -457,22 +475,16 @@ pub fn TossClientWeapon(ctx: GameContext<'_>, self_: *mut gentity_t, direction: 
         (*launched).s.generic1 = (*self_).s.number;
         (*launched).s.powerups = (*ctx.world).level.time + 1500;
 
-        (*launched).count = bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
-            weapon,
-            IT_WEAPON as c_int,
-        ) as usize]
-        .quantity;
+        (*launched).count = bg_itemlist
+            [crate::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
+            .quantity;
 
-        (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] -=
-            bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
-                weapon,
-                IT_WEAPON as c_int,
-            ) as usize]
+        (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] -= bg_itemlist
+            [crate::bg_misc::BG_GetItemIndexByTag(weapon, IT_WEAPON as c_int) as usize]
             .quantity;
 
         if (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] < 0 {
-            (*launched).count -=
-                -(*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize];
+            (*launched).count -= -(*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize];
             (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] = 0;
         }
 
@@ -547,8 +559,9 @@ pub fn TossClientItems(ctx: GameContext<'_>, self_: *mut gentity_t) {
             && (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] != 0
         {
             // find the item type for this weapon
-            let item =
-                crate::bg_misc::BG_FindItemForWeapon(core::mem::transmute::<c_int, weapon_t>(weapon));
+            let item = crate::bg_misc::BG_FindItemForWeapon(
+                core::mem::transmute::<c_int, weapon_t>(weapon),
+            );
 
             // tell all clients to remove the weapon model on this guy until he respawns
             let te = G_TempEntity(
@@ -570,14 +583,17 @@ pub fn TossClientItems(ctx: GameContext<'_>, self_: *mut gentity_t) {
             let mut angle: f32 = 45.0;
             for i in 1..PW_NUM_POWERUPS as c_int {
                 if (*client).ps.powerups[i as usize] > (*ctx.world).level.time {
-                    let item =
-                        crate::bg_misc::BG_FindItemForPowerup(core::mem::transmute::<c_int, powerup_t>(i));
+                    let item = crate::bg_misc::BG_FindItemForPowerup(core::mem::transmute::<
+                        c_int,
+                        powerup_t,
+                    >(i));
                     if item.is_null() {
                         continue;
                     }
                     let drop = crate::g_items::Drop_Item(ctx, self_, item, angle);
                     // decide how many seconds it has left
-                    (*drop).count = ((*client).ps.powerups[i as usize] - (*ctx.world).level.time) / 1000;
+                    (*drop).count =
+                        ((*client).ps.powerups[i as usize] - (*ctx.world).level.time) / 1000;
                     if (*drop).count < 1 {
                         (*drop).count = 1;
                     }
@@ -591,11 +607,7 @@ pub fn TossClientItems(ctx: GameContext<'_>, self_: *mut gentity_t) {
 /// Raven `LookAtKiller`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:643-661`
-pub fn LookAtKiller(
-    self_: *mut gentity_t,
-    inflictor: *mut gentity_t,
-    attacker: *mut gentity_t,
-) {
+pub fn LookAtKiller(self_: *mut gentity_t, inflictor: *mut gentity_t, attacker: *mut gentity_t) {
     unsafe {
         let mut dir: vec3_t = [0.0; 3];
         let mut angles: vec3_t = [0.0; 3];
@@ -627,11 +639,7 @@ pub fn LookAtKiller(
 /// Raven `GibEntity`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:668-673`
-pub fn GibEntity(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    killer: c_int,
-) {
+pub fn GibEntity(ctx: GameContext<'_>, self_: *mut gentity_t, killer: c_int) {
     unsafe {
         G_AddEvent(self_, entity_event_t::EV_GIB_PLAYER as c_int, killer);
         (*self_).takedamage = qfalse;
@@ -725,10 +733,7 @@ pub fn body_die(
 /// Raven `CheckAlmostCapture`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:806-851`
-pub fn CheckAlmostCapture(
-    self_: *mut gentity_t,
-    attacker: *mut gentity_t,
-) {
+pub fn CheckAlmostCapture(self_: *mut gentity_t, attacker: *mut gentity_t) {
     // Raven's entire body is `#if 0`'d out (disabled CTF "almost capture"
     // event); the compiled function is a no-op.
 }
@@ -799,8 +804,10 @@ pub fn G_CheckSpecialDeathAnim(
         };
 
         let legs_anim_for_roll = (*client).ps.legsAnim;
-        if crate::bg_panimate::BG_InRoll(&mut (*client).ps as *mut playerState_t, legs_anim_for_roll)
-            != qfalse
+        if crate::bg_panimate::BG_InRoll(
+            &mut (*client).ps as *mut playerState_t,
+            legs_anim_for_roll,
+        ) != qfalse
         {
             deathAnim = BOTH_DEATH_ROLL as c_int; //# Death anim from a roll
         } else if crate::bg_panimate::BG_FlippingAnim((*client).ps.legsAnim) != qfalse {
@@ -1157,7 +1164,9 @@ pub fn G_PickDeathAnim(
                 let mh = max_health as f32;
                 // death anims
                 if hitLoc == HL_FOOT_RT || hitLoc == HL_FOOT_LT {
-                    if r#mod == meansOfDeath_t::MOD_SABER as c_int && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
+                    if r#mod == meansOfDeath_t::MOD_SABER as c_int
+                        && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0
+                    {
                         return BOTH_DEATH10 as c_int; // chest: back flip
                     } else if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
                         deathAnim = BOTH_DEATH4 as c_int;
@@ -1277,10 +1286,7 @@ pub fn G_GetJediMaster(ctx: GameContext<'_>) -> *mut gentity_t {
         for i in 0..MAX_CLIENTS as usize {
             let ent = &mut (*ctx.world).g_entities[i] as *mut gentity_t;
             let client = (*ent).client as *mut gclient_t;
-            if (*ent).inuse != qfalse
-                && !client.is_null()
-                && (*client).ps.isJediMaster != qfalse
-            {
+            if (*ent).inuse != qfalse && !client.is_null() && (*client).ps.isJediMaster != qfalse {
                 return ent;
             }
         }
@@ -1327,7 +1333,8 @@ pub fn G_AlertTeam(
 
         // Cull this list
         for i in 0..numEnts {
-            let check = &mut (*ctx.world).g_entities[radiusEnts[i as usize] as usize] as *mut gentity_t;
+            let check =
+                &mut (*ctx.world).g_entities[radiusEnts[i as usize] as usize] as *mut gentity_t;
 
             // Validate clients
             if (*check).client.is_null() {
@@ -1381,8 +1388,10 @@ pub fn G_AlertTeam(
 
             if (*check).enemy.is_none() {
                 // only do this if they're not already mad at someone
-                let distSq =
-                    crate::q_math::DistanceSquared((*check).r.currentOrigin, (*victim).r.currentOrigin);
+                let distSq = crate::q_math::DistanceSquared(
+                    (*check).r.currentOrigin,
+                    (*victim).r.currentOrigin,
+                );
                 if distSq > 16384.0
                     && trap::InPVS(
                         ctx.engine,
@@ -1424,11 +1433,7 @@ pub fn G_AlertTeam(
 ///
 /// Raven: FIXME: with all the other alert stuff, do we really need this?
 /// Source: `oracle/oracle/codemp/game/g_combat.c:1869-1872`
-pub fn G_DeathAlert(
-    ctx: GameContext<'_>,
-    victim: *mut gentity_t,
-    attacker: *mut gentity_t,
-) {
+pub fn G_DeathAlert(ctx: GameContext<'_>, victim: *mut gentity_t, attacker: *mut gentity_t) {
     // #define DEATH_ALERT_RADIUS 512 / DEATH_ALERT_SOUND_RADIUS 512
     G_AlertTeam(ctx, victim, attacker, 512.0, 512.0);
 }
@@ -1530,7 +1535,9 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     ctx,
                     ent,
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(cstr("sound/chars/mark2/misc/mark2_explo").as_ptr()),
+                    crate::g_utils::G_SoundIndex(
+                        cstr("sound/chars/mark2/misc/mark2_explo").as_ptr(),
+                    ),
                 );
             }
             class_t::CLASS_PROTOCOL | class_t::CLASS_R5D2 => {
@@ -1545,7 +1552,9 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     ctx,
                     ent,
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(cstr("sound/chars/mark2/misc/mark2_explo").as_ptr()),
+                    crate::g_utils::G_SoundIndex(
+                        cstr("sound/chars/mark2/misc/mark2_explo").as_ptr(),
+                    ),
                 );
             }
             class_t::CLASS_MARK2 => {
@@ -1560,7 +1569,9 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     ctx,
                     ent,
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(cstr("sound/chars/mark2/misc/mark2_explo").as_ptr()),
+                    crate::g_utils::G_SoundIndex(
+                        cstr("sound/chars/mark2/misc/mark2_explo").as_ptr(),
+                    ),
                 );
             }
             class_t::CLASS_INTERROGATOR => {
@@ -1605,7 +1616,9 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     ctx,
                     ent,
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(cstr("sound/chars/mark1/misc/mark1_explo").as_ptr()),
+                    crate::g_utils::G_SoundIndex(
+                        cstr("sound/chars/mark1/misc/mark1_explo").as_ptr(),
+                    ),
                 );
             }
             class_t::CLASS_SENTRY => {
@@ -1613,7 +1626,9 @@ pub fn DeathFX(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     ctx,
                     ent,
                     CHAN_AUTO,
-                    crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_explo").as_ptr()),
+                    crate::g_utils::G_SoundIndex(
+                        cstr("sound/chars/sentry/misc/sentry_explo").as_ptr(),
+                    ),
                 );
                 crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut effectPos);
                 crate::g_utils::G_PlayEffectID(
@@ -1646,7 +1661,12 @@ pub fn G_CheckVictoryScript(ctx: GameContext<'_>, self_: *mut gentity_t) {
         }
         if !client.is_null() && (*client).NPC_class == class_t::CLASS_GALAKMECH {
             (*self_).wait = 1.0;
-            TIMER_Set(ctx, self_, c"gloatTime".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(5000, 8000));
+            TIMER_Set(
+                ctx,
+                self_,
+                c"gloatTime".as_ptr(),
+                (*ctx.world).bg_state.rng.Q_irand(5000, 8000),
+            );
             (*npc).blockedSpeechDebounceTime = 0; // get him ready to taunt
             return;
         }
@@ -1661,9 +1681,11 @@ pub fn G_CheckVictoryScript(ctx: GameContext<'_>, self_: *mut gentity_t) {
         {
             // sometimes have the group commander speak instead
             let cmdr_npc = (*(*(*npc).group).commander).NPC as *mut gNPC_t;
-            (*cmdr_npc).greetingDebounceTime = level_time + (*ctx.world).bg_state.rng.Q_irand(2000, 5000);
+            (*cmdr_npc).greetingDebounceTime =
+                level_time + (*ctx.world).bg_state.rng.Q_irand(2000, 5000);
         } else if !npc.is_null() {
-            (*npc).greetingDebounceTime = level_time + (*ctx.world).bg_state.rng.Q_irand(2000, 5000);
+            (*npc).greetingDebounceTime =
+                level_time + (*ctx.world).bg_state.rng.Q_irand(2000, 5000);
         }
     }
 }
@@ -1741,7 +1763,11 @@ pub fn G_BroadcastObit(
         if (*self_).s.eType != entityType_t::ET_NPC as c_int
             && (*ctx.world).globals.g_noPDuelCheck == 0
         {
-            let ent = G_TempEntity(ctx, (*self_).r.currentOrigin, entity_event_t::EV_OBITUARY as c_int);
+            let ent = G_TempEntity(
+                ctx,
+                (*self_).r.currentOrigin,
+                entity_event_t::EV_OBITUARY as c_int,
+            );
             (*ent).s.eventParm = meansOfDeath;
             (*ent).s.otherEntityNum = (*self_).s.number;
             if !attacker.is_null() {
@@ -1750,7 +1776,10 @@ pub fn G_BroadcastObit(
                 (*ent).s.otherEntityNum2 = killer;
             }
             if !inflictor.is_null()
-                && Q_stricmp(c"vehicle_proj".as_ptr(), (*inflictor).classname as *const c_char) == 0
+                && Q_stricmp(
+                    c"vehicle_proj".as_ptr(),
+                    (*inflictor).classname as *const c_char,
+                ) == 0
             {
                 // a vehicle missile
                 (*ent).s.eventParm = meansOfDeath_t::MOD_VEHICLE as c_int;
@@ -1767,8 +1796,10 @@ pub fn G_BroadcastObit(
                 if (*attacker).s.m_iVehicleNum != 0 && (*attacker).s.number < MAX_CLIENTS as c_int {
                     (*ent).s.brokenLimbs = (*attacker).s.m_iVehicleNum;
                 } else if (*ent).s.lookTarget != 0
-                    && Q_stricmp(c"func_rotating".as_ptr(), (*attacker).classname as *const c_char)
-                        == 0
+                    && Q_stricmp(
+                        c"func_rotating".as_ptr(),
+                        (*attacker).classname as *const c_char,
+                    ) == 0
                 {
                     // my vehicle was killed by a func_rotating, probably an asteroid
                     (*ent).s.saberInFlight = qtrue;
@@ -1841,7 +1872,8 @@ pub fn player_die(
 
             if (*cl).ps.otherKillerTime >= (*ctx.world).level.time {
                 // use the last attacker
-                murderer = &mut (*ctx.world).g_entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
+                murderer =
+                    &mut (*ctx.world).g_entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
                 if (*murderer).inuse == qfalse || (*murderer).client.is_null() {
                     murderer = core::ptr::null_mut();
                 } else {
@@ -1926,7 +1958,8 @@ pub fn player_die(
             if (*(*selfVeh).m_pVehicleInfo).hideRider != qfalse {
                 // pilot is *inside* me, so kill him, too
                 killEnt = (*selfVeh).m_pPilot as *mut gentity_t;
-                if !killEnt.is_null() && (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
+                if !killEnt.is_null() && (*killEnt).inuse != qfalse && !(*killEnt).client.is_null()
+                {
                     G_Damage(
                         ctx,
                         killEnt,
@@ -1944,7 +1977,8 @@ pub fn player_die(
                     i = 0;
                     while i < numPass && (*selfVeh).m_iNumPassengers != 0 {
                         // go through and eject the last passenger
-                        killEnt = (*selfVeh).m_ppPassengers[((*selfVeh).m_iNumPassengers - 1) as usize]
+                        killEnt = (*selfVeh).m_ppPassengers
+                            [((*selfVeh).m_iNumPassengers - 1) as usize]
                             as *mut gentity_t;
                         if !killEnt.is_null() {
                             crate::veh_dispatch::eject(
@@ -2023,7 +2057,8 @@ pub fn player_die(
 
         if (*cl).NPC_class != class_t::CLASS_VEHICLE && (*cl).ps.m_iVehicleNum != 0 {
             // I'm riding a vehicle - tell it I'm getting off
-            let veh = &mut (*ctx.world).g_entities[(*cl).ps.m_iVehicleNum as usize] as *mut gentity_t;
+            let veh =
+                &mut (*ctx.world).g_entities[(*cl).ps.m_iVehicleNum as usize] as *mut gentity_t;
             let vehVeh = (*veh).m_pVehicle as *mut Vehicle_t;
 
             if (*veh).inuse != qfalse && !(*veh).client.is_null() && !(*veh).m_pVehicle.is_null() {
@@ -2039,7 +2074,10 @@ pub fn player_die(
                     (*cl).ps.eFlags2 |= EF2_SHIP_DEATH;
 
                     // put me over where my vehicle exploded
-                    crate::g_utils::G_SetOrigin(self_, (*((*veh).client as *mut gclient_t)).ps.origin);
+                    crate::g_utils::G_SetOrigin(
+                        self_,
+                        (*((*veh).client as *mut gclient_t)).ps.origin,
+                    );
                     crate::q_math::_VectorCopy(
                         (*((*veh).client as *mut gclient_t)).ps.origin,
                         &mut (*cl).ps.origin,
@@ -2088,7 +2126,8 @@ pub fn player_die(
 
         if !(*self_).NPC.is_null() {
             let npc = (*self_).NPC as *mut gNPC_t;
-            if !(*self_).client.is_null() && crate::NPC_AI_Jedi::Jedi_WaitingAmbush(self_) != qfalse {
+            if !(*self_).client.is_null() && crate::NPC_AI_Jedi::Jedi_WaitingAmbush(self_) != qfalse
+            {
                 // ambushing trooper
                 (*cl).noclip = qfalse;
             }
@@ -2192,7 +2231,8 @@ pub fn player_die(
             && (*cl).ps.otherKillerTime > (*ctx.world).level.time
         {
             // remember who last attacked us
-            attacker = &mut (*ctx.world).g_entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
+            attacker =
+                &mut (*ctx.world).g_entities[(*cl).ps.otherKiller as usize] as *mut gentity_t;
             if (*cl).otherKillerMOD != meansOfDeath_t::MOD_UNKNOWN as c_int {
                 actualMOD = (*cl).otherKillerMOD;
             }
@@ -2219,7 +2259,10 @@ pub fn player_die(
             killer = (*attacker).s.number;
             if !(*attacker).client.is_null() {
                 killer_name = cstr_to_str(
-                    (*((*attacker).client as *mut gclient_t)).pers.netname.as_ptr(),
+                    (*((*attacker).client as *mut gclient_t))
+                        .pers
+                        .netname
+                        .as_ptr(),
                 );
             } else {
                 killer_name = "<non-client>".to_string();
@@ -2357,7 +2400,8 @@ pub fn player_die(
                 || meansOfDeath == meansOfDeath_t::MOD_VEH_EXPLOSION as c_int
             {
                 // no credit for veh-veh collisions?
-            } else if attacker == self_ || crate::g_team::OnSameTeam(ctx, self_, attacker) != qfalse {
+            } else if attacker == self_ || crate::g_team::OnSameTeam(ctx, self_, attacker) != qfalse
+            {
                 // killed self or teammate
                 if meansOfDeath == meansOfDeath_t::MOD_FALLING as c_int
                     && attacker != self_
@@ -2377,7 +2421,9 @@ pub fn player_die(
                     if otherClNum >= 0
                         && otherClNum < MAX_CLIENTS as c_int
                         && (*ctx.world).g_entities[otherClNum as usize].inuse != qfalse
-                        && !(*ctx.world).g_entities[otherClNum as usize].client.is_null()
+                        && !(*ctx.world).g_entities[otherClNum as usize]
+                            .client
+                            .is_null()
                         && otherClNum != (*attacker).s.number
                     {
                         AddScore(
@@ -2470,7 +2516,9 @@ pub fn player_die(
                 if otherClNum >= 0
                     && otherClNum < MAX_CLIENTS as c_int
                     && (*ctx.world).g_entities[otherClNum as usize].inuse != qfalse
-                    && !(*ctx.world).g_entities[otherClNum as usize].client.is_null()
+                    && !(*ctx.world).g_entities[otherClNum as usize]
+                        .client
+                        .is_null()
                     && otherClNum != (*self_).s.number
                 {
                     AddScore(
@@ -2579,14 +2627,7 @@ pub fn player_die(
             // normal death
             let mut i_val = DEATH_ANIM_I.load(core::sync::atomic::Ordering::Relaxed);
 
-            let anim = G_PickDeathAnim(
-                ctx,
-                self_,
-                (*self_).pos1,
-                damage,
-                meansOfDeath,
-                HL_NONE,
-            );
+            let anim = G_PickDeathAnim(ctx, self_, (*self_).pos1, damage, meansOfDeath, HL_NONE);
 
             if anim >= 1 {
                 // Some droids don't have death anims
@@ -2601,7 +2642,8 @@ pub fn player_die(
 
                 if (*self_).inuse != qfalse {
                     // not disconnecting
-                    crate::g_utils::G_SetAnim(ctx,
+                    crate::g_utils::G_SetAnim(
+                        ctx,
                         self_,
                         core::ptr::null_mut(),
                         SETANIM_BOTH,
@@ -2619,7 +2661,15 @@ pub fn player_die(
                 {
                     // saber or heavy melee (claws)
                     crate::g_client::G_UpdateClientAnims(ctx, self_, 1.0);
-                    G_CheckForDismemberment(ctx, self_, attacker, (*self_).pos1, damage, anim, qfalse);
+                    G_CheckForDismemberment(
+                        ctx,
+                        self_,
+                        attacker,
+                        (*self_).pos1,
+                        damage,
+                        anim,
+                        qfalse,
+                    );
                 }
             } else if !(*self_).NPC.is_null()
                 && !(*self_).client.is_null()
@@ -2735,7 +2785,12 @@ pub fn player_die(
 /// Raven `CheckArmor`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3019-3071`
-pub fn CheckArmor(ctx: GameContext<'_>, ent: *mut gentity_t, damage: c_int, dflags: c_int) -> c_int {
+pub fn CheckArmor(
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    damage: c_int,
+    dflags: c_int,
+) -> c_int {
     unsafe {
         if damage == 0 {
             return 0;
@@ -2796,7 +2851,12 @@ pub fn CheckArmor(ctx: GameContext<'_>, ent: *mut gentity_t, damage: c_int, dfla
 /// `newDir` is read-only (`VectorScale` reads it into `kvel`), so it stays
 /// by-value.
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3074-3121`
-pub fn G_ApplyKnockback(ctx: GameContext<'_>, targ: *mut gentity_t, newDir: vec3_t, knockback: f32) {
+pub fn G_ApplyKnockback(
+    ctx: GameContext<'_>,
+    targ: *mut gentity_t,
+    newDir: vec3_t,
+    knockback: f32,
+) {
     unsafe {
         let mut kvel: vec3_t = [0.0; 3];
 
@@ -2872,7 +2932,13 @@ pub fn RaySphereIntersections(
 
         let d = b * b - 4.0 * c;
         // VectorMA(point, t, dir, out): out[i] = point[i] + t * dir[i]
-        let ma = |t: f32| [point[0] + t * dir[0], point[1] + t * dir[1], point[2] + t * dir[2]];
+        let ma = |t: f32| {
+            [
+                point[0] + t * dir[0],
+                point[1] + t * dir[1],
+                point[2] + t * dir[2],
+            ]
+        };
         if d > 0.0 {
             let t = (-b + d.sqrt()) / 2.0;
             *intersections.add(0) = ma(t);
@@ -3098,11 +3164,7 @@ pub fn G_GetDismemberBolt(
 /// Raven `LimbTouch`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3387-3389`
-pub fn LimbTouch(
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    trace: *mut trace_t,
-) {
+pub fn LimbTouch(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     // Raven's body is empty — the touch handler is a deliberate no-op.
 }
 
@@ -3655,27 +3717,51 @@ pub fn G_GetHitLocFromSurfName(
             // humanoid
             handLBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*l_hand".to_owned()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                    (*ent).ghoul2,
+                    0,
+                    c"*l_hand".to_owned(),
+                ),
             );
             handRBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*r_hand".to_owned()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                    (*ent).ghoul2,
+                    0,
+                    c"*r_hand".to_owned(),
+                ),
             );
             kneeLBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*hips_l_knee".to_owned()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                    (*ent).ghoul2,
+                    0,
+                    c"*hips_l_knee".to_owned(),
+                ),
             );
             kneeRBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*hips_r_knee".to_owned()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                    (*ent).ghoul2,
+                    0,
+                    c"*hips_r_knee".to_owned(),
+                ),
             );
             footLBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*l_leg_foot".to_owned()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                    (*ent).ghoul2,
+                    0,
+                    c"*l_leg_foot".to_owned(),
+                ),
             );
             footRBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*r_leg_foot".to_owned()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                    (*ent).ghoul2,
+                    0,
+                    c"*r_leg_foot".to_owned(),
+                ),
             );
         }
 
@@ -3729,7 +3815,8 @@ pub fn G_GetHitLocFromSurfName(
             return qfalse;
         }
 
-        let strncmp = |lit: &CStr, n: c_int| crate::q_shared::Q_strncmp(lit.as_ptr(), surfName, n) == 0;
+        let strncmp =
+            |lit: &CStr, n: c_int| crate::q_shared::Q_strncmp(lit.as_ptr(), surfName, n) == 0;
 
         let actualTime = (*ctx.world).level.time;
         if strncmp(c"hips", 4) {
@@ -3808,10 +3895,19 @@ pub fn G_GetHitLocFromSurfName(
 
                 if (*client).renderInfo.boltValidityTime != (*ctx.world).level.time {
                     let renderAng: vec3_t = [0.0, (*client).ps.viewangles[YAW], 0.0];
-                    crate::w_saber::UpdateClientRenderBolts(ctx, ent, (*client).ps.origin, renderAng);
+                    crate::w_saber::UpdateClientRenderBolts(
+                        ctx,
+                        ent,
+                        (*client).ps.origin,
+                        renderAng,
+                    );
                 }
 
-                crate::q_math::_VectorSubtract(point, (*client).renderInfo.torsoPoint, &mut dirToImpact);
+                crate::q_math::_VectorSubtract(
+                    point,
+                    (*client).renderInfo.torsoPoint,
+                    &mut dirToImpact,
+                );
                 let frontSide = crate::q_math::_DotProduct(t_fwd, dirToImpact);
                 let rightSide = crate::q_math::_DotProduct(t_rt, dirToImpact);
                 let upSide = crate::q_math::_DotProduct(t_up, dirToImpact);
@@ -4194,7 +4290,9 @@ pub fn G_CheckForDismemberment(
         } else {
             G_GetDismemberLoc(ent, &mut boltPoint, hitLocUse);
         }
-        G_Dismember(ctx, ent, enemy, boltPoint, hitLocUse, 90.0, 0.0, deathAnim, postDeath);
+        G_Dismember(
+            ctx, ent, enemy, boltPoint, hitLocUse, 90.0, 0.0, deathAnim, postDeath,
+        );
     }
 }
 
@@ -4324,8 +4422,7 @@ pub fn G_Knockdown(ctx: GameContext<'_>, victim: *mut gentity_t) {
             return;
         }
         let client = (*victim).client as *mut gclient_t;
-        if !client.is_null()
-            && BG_KnockDownable(&mut (*client).ps as *mut playerState_t) != qfalse
+        if !client.is_null() && BG_KnockDownable(&mut (*client).ps as *mut playerState_t) != qfalse
         {
             (*client).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
             (*client).ps.forceDodgeAnim = 0;
@@ -4398,8 +4495,8 @@ pub fn G_ApplyVehicleOtherKiller(
                             [passNum as usize]
                             as *mut gentity_t))
                             .s
-                            .number as usize]
-                            as *mut gentity_t;
+                            .number
+                            as usize] as *mut gentity_t;
                         if !(*pass).client.is_null() {
                             let pc = (*pass).client as *mut gclient_t;
                             (*pc).ps.otherKiller = (*targClient).ps.otherKiller;
@@ -4422,9 +4519,7 @@ pub fn G_ApplyVehicleOtherKiller(
 ///
 /// Raven: NOTE: this covers both the vehicle and NPCs riding vehicles (droids).
 /// Source: `oracle/oracle/codemp/game/g_combat.c:4528-4544`
-pub fn G_CheckVehicleNPCTeamDamage(
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn G_CheckVehicleNPCTeamDamage(ent: *mut gentity_t) -> qboolean {
     unsafe {
         // not valid or a real client or not an NPC
         if ent.is_null()
@@ -4538,7 +4633,8 @@ pub fn G_Damage(
             return;
         }
 
-        if ((*targ).flags & FL_DMG_BY_SABER_ONLY) != 0 && r#mod != meansOfDeath_t::MOD_SABER as c_int
+        if ((*targ).flags & FL_DMG_BY_SABER_ONLY) != 0
+            && r#mod != meansOfDeath_t::MOD_SABER as c_int
         {
             // saber-only damage
             return;
@@ -4548,8 +4644,8 @@ pub fn G_Damage(
             // don't take damage when in a walker, or fighter unless it's dead
             let tc = (*targ).client as *mut gclient_t;
             if (*tc).ps.clientNum < MAX_CLIENTS as c_int && (*tc).ps.m_iVehicleNum != 0 {
-                let veh = &mut (*ctx.world).g_entities[(*tc).ps.m_iVehicleNum as usize]
-                    as *mut gentity_t;
+                let veh =
+                    &mut (*ctx.world).g_entities[(*tc).ps.m_iVehicleNum as usize] as *mut gentity_t;
                 let vv = (*veh).m_pVehicle as *mut Vehicle_t;
                 if !(*veh).m_pVehicle.is_null() && (*veh).health > 0 {
                     if (*(*vv).m_pVehicleInfo).r#type == VH_WALKER
@@ -4652,7 +4748,11 @@ pub fn G_Damage(
             // rage overridden by no_protection
             if !targ.is_null()
                 && !(*targ).client.is_null()
-                && ((*((*targ).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << FP_RAGE as c_int))
+                && ((*((*targ).client as *mut gclient_t))
+                    .ps
+                    .fd
+                    .forcePowersActive
+                    & (1 << FP_RAGE as c_int))
                     != 0
             {
                 damage = (damage as f64 * 0.5) as c_int;
@@ -4755,7 +4855,8 @@ pub fn G_Damage(
 
             if r#mod == meansOfDeath_t::MOD_SABER as c_int {
                 let mut saberKnockbackScale = (*ctx.world).cvars.g_saberDmgVelocityScale.value;
-                if (dflags & DAMAGE_SABER_KNOCKBACK1) != 0 || (dflags & DAMAGE_SABER_KNOCKBACK2) != 0
+                if (dflags & DAMAGE_SABER_KNOCKBACK1) != 0
+                    || (dflags & DAMAGE_SABER_KNOCKBACK2) != 0
                 {
                     if saberKnockbackScale == 0.0 {
                         saberKnockbackScale = 1.0;
@@ -4782,7 +4883,11 @@ pub fn G_Damage(
                     &mut kvel,
                 );
             } else {
-                crate::q_math::_VectorScale(dir_val, g_knockback * knockback as f32 / mass, &mut kvel);
+                crate::q_math::_VectorScale(
+                    dir_val,
+                    g_knockback * knockback as f32 / mass,
+                    &mut kvel,
+                );
             }
             crate::q_math::_VectorAdd((*tc).ps.velocity, kvel, &mut (*tc).ps.velocity);
 
@@ -4883,7 +4988,8 @@ pub fn G_Damage(
                     }
                 {
                     // emplaced guns don't hurt teammates of user
-                    let act = &mut (*ctx.world).g_entities[(*attacker).activator.unwrap().0 as usize]
+                    let act = &mut (*ctx.world).g_entities
+                        [(*attacker).activator.unwrap().0 as usize]
                         as *mut gentity_t;
                     if crate::g_team::OnSameTeam(ctx, targ, act) != qfalse {
                         if (*ctx.world).cvars.g_friendlyFire.integer == 0 {
@@ -4928,7 +5034,8 @@ pub fn G_Damage(
                 && (*targ).s.owner >= 0
                 && (*targ).s.owner < MAX_CLIENTS as c_int
             {
-                let targown = &mut (*ctx.world).g_entities[(*targ).s.owner as usize] as *mut gentity_t;
+                let targown =
+                    &mut (*ctx.world).g_entities[(*targ).s.owner as usize] as *mut gentity_t;
 
                 if !targown.is_null()
                     && (*targown).inuse != qfalse
@@ -5108,7 +5215,8 @@ pub fn G_Damage(
                         );
 
                         if hitSurface[0] != 0 {
-                            surface = crate::g_vehicles::G_ShipSurfaceForSurfName(hitSurface.as_ptr());
+                            surface =
+                                crate::g_vehicles::G_ShipSurfaceForSurfName(hitSurface.as_ptr());
 
                             if take != 0 && surface > 0 {
                                 // hit a certain part of the ship
@@ -5181,7 +5289,11 @@ pub fn G_Damage(
                             None,
                             Some(&mut vUp),
                         );
-                        crate::q_math::_VectorSubtract(point, (*targ).r.currentOrigin, &mut impactDir);
+                        crate::q_math::_VectorSubtract(
+                            point,
+                            (*targ).r.currentOrigin,
+                            &mut impactDir,
+                        );
                         crate::q_math::VectorNormalize(&mut impactDir);
                         if surface <= 0 {
                             // no surf guess where we were hit, then
@@ -5263,8 +5375,8 @@ pub fn G_Damage(
                     if (*client).jetPackOn != qfalse {
                         // disable jetpack temporarily
                         crate::g_items::Jetpack_Off(targ);
-                        (*client).jetPackToggleTime =
-                            (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
+                        (*client).jetPackToggleTime = (*ctx.world).level.time
+                            + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
                     }
 
                     if (*client).NPC_class == class_t::CLASS_PROTOCOL
@@ -5351,7 +5463,10 @@ pub fn G_Damage(
         if (dflags & DAMAGE_NO_PROTECTION) == 0 {
             if take != 0
                 && !(*targ).client.is_null()
-                && ((*((*targ).client as *mut gclient_t)).ps.fd.forcePowersActive
+                && ((*((*targ).client as *mut gclient_t))
+                    .ps
+                    .fd
+                    .forcePowersActive
                     & (1 << FP_PROTECT as c_int))
                     != 0
             {
@@ -5360,7 +5475,11 @@ pub fn G_Damage(
                     let mut maxtake = take;
 
                     if (*tc).forcePowerSoundDebounce < (*ctx.world).level.time {
-                        crate::w_force::G_PreDefSound(ctx, (*tc).ps.origin, (PDSOUND_PROTECTHIT) as i32);
+                        crate::w_force::G_PreDefSound(
+                            ctx,
+                            (*tc).ps.origin,
+                            (PDSOUND_PROTECTHIT) as i32,
+                        );
                         (*tc).forcePowerSoundDebounce = (*ctx.world).level.time + 400;
                     }
 
@@ -5385,9 +5504,8 @@ pub fn G_Damage(
                     }
 
                     if (*tc).ps.powerups[PW_FORCE_BOON as usize] == 0 {
-                        (*tc).ps.fd.forcePower = ((*tc).ps.fd.forcePower as f32
-                            - (maxtake as f32 * famt))
-                            as c_int;
+                        (*tc).ps.fd.forcePower =
+                            ((*tc).ps.fd.forcePower as f32 - (maxtake as f32 * famt)) as c_int;
                     } else {
                         (*tc).ps.fd.forcePower = ((*tc).ps.fd.forcePower as f32
                             - (maxtake as f32 * famt) / 2.0)
@@ -5443,7 +5561,10 @@ pub fn G_Damage(
 
             if (dflags & DAMAGE_NO_PROTECTION) == 0 {
                 if !(*targ).client.is_null()
-                    && ((*((*targ).client as *mut gclient_t)).ps.fd.forcePowersActive
+                    && ((*((*targ).client as *mut gclient_t))
+                        .ps
+                        .fd
+                        .forcePowersActive
                         & (1 << FP_RAGE as c_int))
                         != 0
                     && (!(*inflictor).client.is_null() || !(*attacker).client.is_null())
@@ -5467,7 +5588,10 @@ pub fn G_Damage(
 
             if (dflags & DAMAGE_NO_PROTECTION) == 0 {
                 if !(*targ).client.is_null()
-                    && ((*((*targ).client as *mut gclient_t)).ps.fd.forcePowersActive
+                    && ((*((*targ).client as *mut gclient_t))
+                        .ps
+                        .fd
+                        .forcePowersActive
                         & (1 << FP_RAGE as c_int))
                         != 0
                     && (!(*inflictor).client.is_null() || !(*attacker).client.is_null())
@@ -5485,7 +5609,8 @@ pub fn G_Damage(
             // We want to set gPainHitLoc regardless of if we have a pain func
             if !(*targ).client.is_null()
                 && !(*targ).ghoul2.is_null()
-                && (*((*targ).client as *mut gclient_t)).g2LastSurfaceTime == (*ctx.world).level.time
+                && (*((*targ).client as *mut gclient_t)).g2LastSurfaceTime
+                    == (*ctx.world).level.time
             {
                 let tc = (*targ).client as *mut gclient_t;
                 let mut hitSurface: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
@@ -5517,7 +5642,8 @@ pub fn G_Damage(
 
                 if (*ctx.world).globals.gPainHitLoc < (crate::entity::hit_location::HL_MAX) as i32
                     && (*ctx.world).globals.gPainHitLoc >= 0
-                    && (*targ).locationDamage[(*ctx.world).globals.gPainHitLoc as usize] < Q3_INFINITE
+                    && (*targ).locationDamage[(*ctx.world).globals.gPainHitLoc as usize]
+                        < Q3_INFINITE
                     && ((*targ).s.eType == entityType_t::ET_PLAYER as c_int
                         || (*targ).s.NPC_class != class_t::CLASS_VEHICLE as c_int)
                 {
@@ -5601,7 +5727,9 @@ pub fn G_Damage(
 
                 (*targ).enemy = Some(ent_id(base, attacker));
                 if let Some(die_fn) = (*targ).die {
-                    crate::ent_fn_enums::dispatch_die(ctx, die_fn, targ, inflictor, attacker, take, r#mod);
+                    crate::ent_fn_enums::dispatch_die(
+                        ctx, die_fn, targ, inflictor, attacker, take, r#mod,
+                    );
                 }
                 G_ActivateBehavior(ctx, targ, bSet_t::BSET_DEATH as c_int);
                 return;
@@ -5688,20 +5816,14 @@ pub fn G_DamageFromKiller(
             && (*killer).s.eType == entityType_t::ET_NPC as c_int
             && (*killer).s.NPC_class == class_t::CLASS_VEHICLE as c_int
             && !(*killer).m_pVehicle.is_null()
-            && !(*((*killer).m_pVehicle as *mut Vehicle_t)).m_pPilot.is_null()
+            && !(*((*killer).m_pVehicle as *mut Vehicle_t))
+                .m_pPilot
+                .is_null()
         {
             killer = (*((*killer).m_pVehicle as *mut Vehicle_t)).m_pPilot as *mut gentity_t;
         }
         G_Damage(
-            ctx,
-            pEnt,
-            inflictor,
-            killer,
-            None,
-            org,
-            damage,
-            dflags,
-            r#mod,
+            ctx, pEnt, inflictor, killer, None, org, damage, dflags, r#mod,
         );
         if tempInflictor != qfalse {
             crate::g_utils::G_FreeEntity(ctx, inflictor);
@@ -5833,7 +5955,8 @@ pub fn G_RadiusDamage(
         );
 
         for e in 0..numListedEntities {
-            let ent = &mut (*ctx.world).g_entities[entityList[e as usize] as usize] as *mut gentity_t;
+            let ent =
+                &mut (*ctx.world).g_entities[entityList[e as usize] as usize] as *mut gentity_t;
 
             if ent == ignore {
                 continue;
@@ -5867,21 +5990,24 @@ pub fn G_RadiusDamage(
                 crate::q_math::_VectorSubtract((*ent).r.currentOrigin, origin, &mut dir);
                 // push the center of mass higher than the origin so players get knocked into the air more
                 dir[2] += 24.0;
-                let av = (*attacker).m_pVehicle as *mut Vehicle_t;
+                // Match the oracle's short-circuit ordering: `attacker->m_pVehicle`
+                // must only be read after the `attacker` / `m_pVehicle` null guards.
                 if !attacker.is_null()
                     && (*attacker).inuse != qfalse
                     && !(*attacker).client.is_null()
                     && (*attacker).s.eType == entityType_t::ET_NPC as c_int
                     && (*attacker).s.NPC_class == class_t::CLASS_VEHICLE as c_int
                     && !(*attacker).m_pVehicle.is_null()
-                    && !(*av).m_pPilot.is_null()
+                    && !(*((*attacker).m_pVehicle as *mut Vehicle_t))
+                        .m_pPilot
+                        .is_null()
                 {
                     // say my pilot did it.
                     G_Damage(
                         ctx,
                         ent,
                         missile,
-                        (*av).m_pPilot as *mut gentity_t,
+                        (*((*attacker).m_pVehicle as *mut Vehicle_t)).m_pPilot as *mut gentity_t,
                         Some(&mut dir),
                         origin,
                         points as c_int,
@@ -5906,8 +6032,10 @@ pub fn G_RadiusDamage(
                     && !(*ent).client.is_null()
                     && roastPeople != qfalse
                     && !missile.is_null()
-                    && crate::q_math::VectorCompare((*ent).r.currentOrigin, (*missile).r.currentOrigin)
-                        == qfalse
+                    && crate::q_math::VectorCompare(
+                        (*ent).r.currentOrigin,
+                        (*missile).r.currentOrigin,
+                    ) == qfalse
                 {
                     // the thing calling this function can create burn marks on people
                     let evEnt = G_TempEntity(

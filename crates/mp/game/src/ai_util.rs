@@ -325,8 +325,9 @@ pub fn BotDoChat(
         }
 
         // Remove CR/tab characters from the group
+        // Oracle: `inc_1 = 0; inc_2 = 2;` (ai_util.c:372-373).
         let chatgroup_b = chatgroup as *const u8;
-        let mut inc_1 = 2isize;
+        let mut inc_1 = 0isize;
         let mut inc_2 = 2isize;
 
         while *chatgroup_b.offset(inc_2) != 0 {
@@ -450,7 +451,8 @@ pub fn BotDoChat(
         } else {
             bs_ref.doChat = 1;
         }
-        bs_ref.chatTime_stored = (((line_len as c_int) * 45)
+        // Oracle uses `strlen(bs->currentChat)` — the post-%-substitution length.
+        bs_ref.chatTime_stored = (((c_strlen(currentChat_b as *const u8) as c_int) * 45)
             + (*ctx.world).bg_state.rng.Q_irand(1300, 1500)) as f32;
         bs_ref.chatTime = (world.level.time as f32) + bs_ref.chatTime_stored;
 

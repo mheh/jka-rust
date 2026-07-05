@@ -6342,7 +6342,11 @@ impl PmoveContext<'_> {
                 && tr.entityNum as c_int != (*ps).clientNum
             {
                 let bgEnt = self.PM_BGEntForNum(tr.entityNum as c_int);
-                if !bgEnt.is_null() && (*bgEnt).s.powerups & (1 << PW_CLOAKED) != 0 {
+                // Preserved oracle quirk: masks with the raw PW_CLOAKED value (11),
+                // not `1 << PW_CLOAKED` — so it tests bits 0/1/3, not bit 11. This is
+                // the only cloak test in the tree using the shift-less form
+                // (bg_pmove.c:5925); every other site uses `1 << PW_CLOAKED`.
+                if !bgEnt.is_null() && (*bgEnt).s.powerups & PW_CLOAKED != 0 {
                     (*ps).rocketLockIndex = ENTITYNUM_NONE;
                     (*ps).rocketLockTime = 0.0;
                 } else if !bgEnt.is_null()

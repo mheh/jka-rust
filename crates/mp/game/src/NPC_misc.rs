@@ -85,21 +85,22 @@ pub fn Debug_NPCPrintf(
             return;
         }
 
-        // Map debug level to color code (integer character value for format output)
+        // Map debug level to color code. Raven's COLOR_* are the ASCII digit
+        // chars '7'/'2'/'3'/'1', emitted as literal bytes (not control codes).
         let color: char = match debugLevel {
-            DEBUG_LEVEL_DETAIL => '\x07',   // COLOR_WHITE (code 7)
-            DEBUG_LEVEL_INFO => '\x02',     // COLOR_GREEN (code 2)
-            DEBUG_LEVEL_WARNING => '\x03',  // COLOR_YELLOW (code 3)
-            DEBUG_LEVEL_ERROR => '\x01',    // COLOR_RED (code 1)
-            _ => '\x01',                     // Default to COLOR_RED
+            DEBUG_LEVEL_DETAIL => '7',   // COLOR_WHITE
+            DEBUG_LEVEL_INFO => '2',     // COLOR_GREEN
+            DEBUG_LEVEL_WARNING => '3',  // COLOR_YELLOW
+            DEBUG_LEVEL_ERROR => '1',    // COLOR_RED
+            _ => '1',                    // Default to COLOR_RED
         };
 
         let time = (*ctx.world).level.time;
         let msg: String = cstr_to_str(fmt);
         let npc_targetname: String = cstr_to_str((*printNPC).targetname);
 
-        // Format: Q_COLOR_ESCAPE (\x1b) + color code (as char) + time + NPC name + message
-        let output = format!("\x1b{}{:5} ({}) {}",
+        // Format: Q_COLOR_ESCAPE ('^') + color char + time + NPC name + message
+        let output = format!("^{}{:5} ({}) {}",
             color,
             time,
             npc_targetname,

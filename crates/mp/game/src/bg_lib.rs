@@ -306,10 +306,11 @@ pub fn atoi(string: *const c_char) -> c_int {
     unsafe {
         let mut string = string;
 
-        // Skip whitespace
+        // Skip whitespace. Oracle's `*string` is a signed char, so bytes
+        // 0x80-0xFF sign-extend negative and satisfy `<= ' '` (skipped).
         loop {
-            let ch = *string as u8;
-            if ch > b' ' {
+            let ch = *string as i8 as i32;
+            if ch > b' ' as i32 {
                 break;
             }
             if ch == 0 {
@@ -357,12 +358,14 @@ pub fn atoi(string: *const c_char) -> c_int {
 pub fn atof(string: *const c_char) -> f64 {
     unsafe {
         let mut string = string;
-        let mut value: f64 = 0.0;
+        // Oracle declares `float value; float sign;` (bg_lib.c:775-776) so the
+        // accumulation rounds to 32-bit float each step; only `fraction` is double.
+        let mut value: f32 = 0.0;
 
-        // Skip whitespace
+        // Skip whitespace (signed-char semantics — see `atoi`).
         loop {
-            let ch = *string as u8;
-            if ch > b' ' {
+            let ch = *string as i8 as i32;
+            if ch > b' ' as i32 {
                 break;
             }
             if ch == 0 {
@@ -373,7 +376,7 @@ pub fn atof(string: *const c_char) -> f64 {
 
         // Check sign
         let mut c = *string as u8;
-        let sign = match c {
+        let sign: f32 = match c {
             b'+' => {
                 string = string.add(1);
                 1.0
@@ -396,7 +399,7 @@ pub fn atof(string: *const c_char) -> f64 {
                 if c < b'0' || c > b'9' {
                     break;
                 }
-                value = value * 10.0 + (c - b'0') as f64;
+                value = value * 10.0 + (c - b'0') as f32;
             }
         } else {
             string = string.add(1);
@@ -411,12 +414,13 @@ pub fn atof(string: *const c_char) -> f64 {
                 if c < b'0' || c > b'9' {
                     break;
                 }
-                value += (c - b'0') as f64 * fraction;
+                // `c * fraction` is double; the += rounds back to float.
+                value = (value as f64 + (c - b'0') as f64 * fraction) as f32;
                 fraction *= 0.1;
             }
         }
 
-        value * sign
+        (value * sign) as f64
     }
 }
 
@@ -429,13 +433,15 @@ pub fn atof(string: *const c_char) -> f64 {
 pub fn _atof(stringPtr: *mut *const c_char) -> f64 {
     unsafe {
         let mut string = *stringPtr;
-        let mut value: f64 = 0.0;
+        // Oracle declares `float value; float sign;` (bg_lib.c:843-844) — 32-bit
+        // float accumulation; only `fraction` is double.
+        let mut value: f32 = 0.0;
         let mut c: u8;
 
-        // Skip whitespace
+        // Skip whitespace (signed-char semantics — see `atoi`).
         loop {
-            let ch = *string as u8;
-            if ch > b' ' {
+            let ch = *string as i8 as i32;
+            if ch > b' ' as i32 {
                 break;
             }
             if ch == 0 {
@@ -447,7 +453,7 @@ pub fn _atof(stringPtr: *mut *const c_char) -> f64 {
 
         // Check sign
         c = *string as u8;
-        let sign = match c {
+        let sign: f32 = match c {
             b'+' => {
                 string = string.add(1);
                 1.0
@@ -469,7 +475,7 @@ pub fn _atof(stringPtr: *mut *const c_char) -> f64 {
                 if c < b'0' || c > b'9' {
                     break;
                 }
-                value = value * 10.0 + (c - b'0') as f64;
+                value = value * 10.0 + (c - b'0') as f32;
             }
         }
 
@@ -482,12 +488,13 @@ pub fn _atof(stringPtr: *mut *const c_char) -> f64 {
                 if c < b'0' || c > b'9' {
                     break;
                 }
-                value += (c - b'0') as f64 * fraction;
+                // `c * fraction` is double; the += rounds back to float.
+                value = (value as f64 + (c - b'0') as f64 * fraction) as f32;
                 fraction *= 0.1;
             }
         }
 
         *stringPtr = string;
-        value * sign
+        (value * sign) as f64
     }
 }

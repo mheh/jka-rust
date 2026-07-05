@@ -809,10 +809,11 @@ pub fn BG_CycleForce(
         let mut presel;
         let mut foundnext: c_int = -1;
 
-        // Raven: `if (!ps->fd.forcePowersKnown & (1 << x) || x >= NUM_FORCE_POWERS || x == -1)`
-        // (`!` binds to `forcePowersKnown` alone, not the whole `&` expression —
-        // transcribed exactly, this is the Raven bug/quirk, not our own.)
-        if (!(*ps).fd.forcePowersKnown) & (1 << x) != 0
+        // Raven: `if (!ps->fd.forcePowersKnown & (1 << x) || x >= NUM_FORCE_POWERS || x == -1)`.
+        // C's `!` is a *logical* not binding to `forcePowersKnown` alone (higher
+        // precedence than `&`), yielding 0/1 — preserved as `(known == 0) as c_int`.
+        // Rust's `!` on an int would be bitwise, a genuinely different value.
+        if (((*ps).fd.forcePowersKnown == 0) as c_int) & (1 << x) != 0
             || x >= forcePowerSorted.len() as c_int
             || x == -1
         {

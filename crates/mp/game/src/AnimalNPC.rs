@@ -91,7 +91,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             speedMax = (*(*pVeh).m_pVehicleInfo).speedMax;
         }
 
-        if !(*parentPS).m_iVehicleNum == 0 {
+        if (*parentPS).m_iVehicleNum == 0 {
             speedInc = speedIdle * (*pVeh).m_fTimeModifier;
             crate::q_math::VectorClear(&mut (*parentPS).moveDir);
             (*parentPS).speed = 0.0f32;
@@ -167,7 +167,9 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             let rider_ent = parent;
             let riderPS = (*rider_ent).playerState;
 
-            if !rider.is_null() {
+            // Oracle: `if (!rider) rider = parent;` then `if (rider)` — always
+            // true here, so key the yaw block off the reassigned rider (parent).
+            if !rider_ent.is_null() {
                 let mut angDif =
                     crate::q_math::AngleSubtract(                        *(*pVeh).m_vOrientation.add(YAW),
                         (*riderPS).viewangles[YAW],

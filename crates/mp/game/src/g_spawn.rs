@@ -56,9 +56,9 @@ use mp_qshared::shared::{QFALSE, QTRUE};
 use crate::bg_misc::{BG_FindItem, BG_ParseField};
 use crate::bg_panimate::BG_ParseAnimationFile;
 use crate::g_items::G_SpawnItem;
-use crate::g_misc::{SP_info_notnull, SP_info_null};
 use crate::g_main::{G_Error, G_Printf};
 use crate::g_mem::G_Alloc;
+use crate::g_misc::{SP_info_notnull, SP_info_null};
 use crate::g_utils::{G_FreeEntity, G_SetOrigin, G_SoundIndex, G_SoundSetIndex, G_Spawn};
 use crate::q_shared::{Q_stricmp, Q_strncmp};
 use crate::NPC_utils::G_ActivateBehavior;
@@ -94,17 +94,15 @@ const GT_MAX_GAME_TYPE: c_int = 10;
 // `BSET_SPAWN` (`g_public.h`'s `bSet_t`, `g_local.h`) — local const.
 const BSET_SPAWN: c_int = 0;
 
-// Configstring indices (from bg_public.h)
-const CS_GAME_VERSION: c_int = 0;
-const CS_LEVEL_START_TIME: c_int = 2;
-const CS_MUSIC: c_int = 6;
-const CS_MESSAGE: c_int = 7;
-const CS_MOTD: c_int = 15;
-const CS_GLOBAL_AMBIENT_SET: c_int = 24;
-const CS_WARMUP: c_int = 20;
-const CS_LIGHT_STYLES: c_int = 32;
+// Configstring indices come from the canonical `mp_bg::public::configstring`
+// module via the prelude glob (`CS_GAME_VERSION`=20, `CS_MUSIC`=2, `CS_MESSAGE`=3,
+// `CS_MOTD`=4, `CS_WARMUP`=5, `CS_LEVEL_START_TIME`=21, `CS_GLOBAL_AMBIENT_SET`=32,
+// `CS_LIGHT_STYLES`=`CS_EFFECTS+MAX_FX`). The former file-local block diverged from
+// these oracle values and was removed.
+// Source: `oracle/oracle/codemp/game/bg_public.h:59-114`
 
 // Light style constants
+// Source: `oracle/oracle/codemp/game/g_spawn.c` (SP_worldspawn light styles)
 const LS_STYLES_START: c_int = 0;
 const LS_NUM_STYLES: c_int = 32;
 
@@ -342,7 +340,11 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
         let classname_disp = CStr::from_ptr((*ent).classname).to_string_lossy();
         G_Printf(
             ctx,
-            cstr(&format!("{} doesn't have a spawn function\n", classname_disp)).as_ptr(),
+            cstr(&format!(
+                "{} doesn't have a spawn function\n",
+                classname_disp
+            ))
+            .as_ptr(),
         );
         QFALSE
     }
@@ -1303,13 +1305,16 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         G_SpawnString(ctx, c"enableBreath".as_ptr(), c"0".as_ptr(), &mut text);
         trap::Cvar_Set(
             ctx.engine,
-            GCvarSetArgs::new(c"g_enableBreath".to_owned(), CStr::from_ptr(text).to_owned()),
+            GCvarSetArgs::new(
+                c"g_enableBreath".to_owned(),
+                CStr::from_ptr(text).to_owned(),
+            ),
         );
 
         G_SpawnString(ctx, c"soundSet".as_ptr(), c"default".as_ptr(), &mut text);
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(CS_GLOBAL_AMBIENT_SET, CStr::from_ptr(text).to_owned()),
+            GSetConfigstringArgs::new(mp_bg::public::configstring::CS_GLOBAL_AMBIENT_SET, CStr::from_ptr(text).to_owned()),
         );
 
         (*ctx.world).g_entities[ENTITYNUM_WORLD as usize].s.number = ENTITYNUM_WORLD;
@@ -1511,36 +1516,87 @@ pub fn G_SpawnEntitiesFromString(ctx: GameContext<'_>, inSubBSP: qboolean) {
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:1070-1236`
 pub const defaultStyles: [[*const c_char; 3]; 32] = [
     [c"z".as_ptr(), c"z".as_ptr(), c"z".as_ptr()], // 0 normal
-    [c"mmnmmommommnonmmonqnmmo".as_ptr(), c"mmnmmommommnonmmonqnmmo".as_ptr(), c"mmnmmommommnonmmonqnmmo".as_ptr()], // 1 FLICKER (first variety)
-    [c"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcb".as_ptr(), c"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcb".as_ptr(), c"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcb".as_ptr()], // 2 SLOW STRONG PULSE
-    [c"mmmmmaaaaammmmmaaaaaabcdefgabcdefg".as_ptr(), c"mmmmmaaaaammmmmaaaaaabcdefgabcdefg".as_ptr(), c"mmmmmaaaaammmmmaaaaaabcdefgabcdefg".as_ptr()], // 3 CANDLE (first variety)
-    [c"mamamamamama".as_ptr(), c"mamamamamama".as_ptr(), c"mamamamamama".as_ptr()], // 4 FAST STROBE
-    [c"jklmnopqrstuvwxyzyxwvutsrqponmlkj".as_ptr(), c"jklmnopqrstuvwxyzyxwvutsrqponmlkj".as_ptr(), c"jklmnopqrstuvwxyzyxwvutsrqponmlkj".as_ptr()], // 5 GENTLE PULSE 1
-    [c"nmonqnmomnmomomno".as_ptr(), c"nmonqnmomnmomomno".as_ptr(), c"nmonqnmomnmomomno".as_ptr()], // 6 FLICKER (second variety)
-    [c"mmmaaaabcdefgmmmmaaaammmaamm".as_ptr(), c"mmmaaaabcdefgmmmmaaaammmaamm".as_ptr(), c"mmmaaaabcdefgmmmmaaaammmaamm".as_ptr()], // 7 CANDLE (second variety)
-    [c"mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa".as_ptr(), c"mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa".as_ptr(), c"mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa".as_ptr()], // 8 CANDLE (third variety)
-    [c"aaaaaaaazzzzzzzz".as_ptr(), c"aaaaaaaazzzzzzzz".as_ptr(), c"aaaaaaaazzzzzzzz".as_ptr()], // 9 SLOW STROBE (fourth variety)
-    [c"mmamammmmammamamaaamammma".as_ptr(), c"mmamammmmammamamaaamammma".as_ptr(), c"mmamammmmammamamaaamammma".as_ptr()], // 10 FLUORESCENT FLICKER
-    [c"abcdefghijklmnopqrrqponmlkjihgfedcba".as_ptr(), c"abcdefghijklmnopqrrqponmlkjihgfedcba".as_ptr(), c"abcdefghijklmnopqrrqponmlkjihgfedcba".as_ptr()], // 11 SLOW PULSE NOT FADE TO BLACK
-    [c"mkigegik".as_ptr(), c"mkigegik".as_ptr(), c"mkigegik".as_ptr()], // 12 FAST PULSE FOR JEREMY
-    [c"abcdefghijklmqrstuvwxyz".as_ptr(), c"zyxwvutsrqmlkjihgfedcba".as_ptr(), c"aammbbzzccllcckkffyyggp".as_ptr()], // 13 Test Blending
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 14
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 15
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 16
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 17
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 18
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 19
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 20
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 21
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 22
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 23
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 24
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 25
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 26
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 27
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 28
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 29
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 30
-    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()], // 31
+    [
+        c"mmnmmommommnonmmonqnmmo".as_ptr(),
+        c"mmnmmommommnonmmonqnmmo".as_ptr(),
+        c"mmnmmommommnonmmonqnmmo".as_ptr(),
+    ], // 1 FLICKER (first variety)
+    [
+        c"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcb".as_ptr(),
+        c"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcb".as_ptr(),
+        c"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcb".as_ptr(),
+    ], // 2 SLOW STRONG PULSE
+    [
+        c"mmmmmaaaaammmmmaaaaaabcdefgabcdefg".as_ptr(),
+        c"mmmmmaaaaammmmmaaaaaabcdefgabcdefg".as_ptr(),
+        c"mmmmmaaaaammmmmaaaaaabcdefgabcdefg".as_ptr(),
+    ], // 3 CANDLE (first variety)
+    [
+        c"mamamamamama".as_ptr(),
+        c"mamamamamama".as_ptr(),
+        c"mamamamamama".as_ptr(),
+    ], // 4 FAST STROBE
+    [
+        c"jklmnopqrstuvwxyzyxwvutsrqponmlkj".as_ptr(),
+        c"jklmnopqrstuvwxyzyxwvutsrqponmlkj".as_ptr(),
+        c"jklmnopqrstuvwxyzyxwvutsrqponmlkj".as_ptr(),
+    ], // 5 GENTLE PULSE 1
+    [
+        c"nmonqnmomnmomomno".as_ptr(),
+        c"nmonqnmomnmomomno".as_ptr(),
+        c"nmonqnmomnmomomno".as_ptr(),
+    ], // 6 FLICKER (second variety)
+    [
+        c"mmmaaaabcdefgmmmmaaaammmaamm".as_ptr(),
+        c"mmmaaaabcdefgmmmmaaaammmaamm".as_ptr(),
+        c"mmmaaaabcdefgmmmmaaaammmaamm".as_ptr(),
+    ], // 7 CANDLE (second variety)
+    [
+        c"mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa".as_ptr(),
+        c"mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa".as_ptr(),
+        c"mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa".as_ptr(),
+    ], // 8 CANDLE (third variety)
+    [
+        c"aaaaaaaazzzzzzzz".as_ptr(),
+        c"aaaaaaaazzzzzzzz".as_ptr(),
+        c"aaaaaaaazzzzzzzz".as_ptr(),
+    ], // 9 SLOW STROBE (fourth variety)
+    [
+        c"mmamammmmammamamaaamammma".as_ptr(),
+        c"mmamammmmammamamaaamammma".as_ptr(),
+        c"mmamammmmammamamaaamammma".as_ptr(),
+    ], // 10 FLUORESCENT FLICKER
+    [
+        c"abcdefghijklmnopqrrqponmlkjihgfedcba".as_ptr(),
+        c"abcdefghijklmnopqrrqponmlkjihgfedcba".as_ptr(),
+        c"abcdefghijklmnopqrrqponmlkjihgfedcba".as_ptr(),
+    ], // 11 SLOW PULSE NOT FADE TO BLACK
+    [
+        c"mkigegik".as_ptr(),
+        c"mkigegik".as_ptr(),
+        c"mkigegik".as_ptr(),
+    ], // 12 FAST PULSE FOR JEREMY
+    [
+        c"abcdefghijklmqrstuvwxyz".as_ptr(),
+        c"zyxwvutsrqmlkjihgfedcba".as_ptr(),
+        c"aammbbzzccllcckkffyyggp".as_ptr(),
+    ], // 13 Test Blending
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 14
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 15
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 16
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 17
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 18
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 19
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 20
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 21
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 22
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 23
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 24
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 25
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 26
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 27
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 28
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 29
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 30
+    [c"".as_ptr(), c"".as_ptr(), c"".as_ptr()],    // 31
 ];
-

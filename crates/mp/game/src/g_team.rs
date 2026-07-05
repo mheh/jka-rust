@@ -251,9 +251,9 @@ pub fn OnSameTeam(
 
         if gametype == GT_SINGLE_PLAYER as c_int {
             let ent1IsBot =
-                if (*ent1).r.svFlags & 0x0001 != 0 { qtrue } else { qfalse };
+                if (*ent1).r.svFlags & SVF_BOT != 0 { qtrue } else { qfalse };
             let ent2IsBot =
-                if (*ent2).r.svFlags & 0x0001 != 0 { qtrue } else { qfalse };
+                if (*ent2).r.svFlags & SVF_BOT != 0 { qtrue } else { qfalse };
 
             if (ent1IsBot != 0 && ent2IsBot != 0) || (ent1IsBot == 0 && ent2IsBot == 0) {
                 return qtrue;
@@ -266,7 +266,7 @@ pub fn OnSameTeam(
         }
 
         if (*ent1).s.eType == entityType_t::ET_NPC as c_int
-            && (*ent1).s.NPC_class as c_int == 130 // CLASS_VEHICLE
+            && (*ent1).s.NPC_class as c_int == class_t::CLASS_VEHICLE as c_int
             && !(*ent1).client.is_null()
             && (*((*ent1).client as *mut gclient_t)).sess.sessionTeam as c_int != TEAM_FREE
             && !(*ent2).client.is_null()
@@ -275,7 +275,7 @@ pub fn OnSameTeam(
             return qtrue;
         }
         if (*ent2).s.eType == entityType_t::ET_NPC as c_int
-            && (*ent2).s.NPC_class as c_int == 130 // CLASS_VEHICLE
+            && (*ent2).s.NPC_class as c_int == class_t::CLASS_VEHICLE as c_int
             && !(*ent2).client.is_null()
             && (*((*ent2).client as *mut gclient_t)).sess.sessionTeam as c_int != TEAM_FREE
             && !(*ent1).client.is_null()
@@ -453,6 +453,9 @@ pub fn Team_FragBonuses(
         };
 
         // did the attacker frag the flag carrier?
+        // Oracle sets `tokens = 0` here (g_team.c:394) and never changes it, so the
+        // `if (tokens)` block below is dead. Preserved as a dead branch (porting-rules §20).
+        let tokens = 0;
         if (*((*targ).client as *mut gclient_t)).ps.powerups[enemy_flag_pw as usize] != 0 {
             (*((*attacker).client as *mut gclient_t)).pers.teamState.lastfraggedcarrier = world.level.time as f32;
             // AddScore(attacker, targ->r.currentOrigin, CTF_FRAG_CARRIER_BONUS);
@@ -471,7 +474,8 @@ pub fn Team_FragBonuses(
         }
 
         // did the attacker frag a head carrier? other->client->ps.generic1
-        if (*((*targ).client as *mut gclient_t)).ps.generic1 != 0 {
+        // Dead branch in oracle: `tokens` is always 0 (see above). g_team.c:413-429.
+        if tokens != 0 {
             (*((*attacker).client as *mut gclient_t)).pers.teamState.lastfraggedcarrier = world.level.time as f32;
             // AddScore(attacker, targ->r.currentOrigin, CTF_FRAG_CARRIER_BONUS * tokens * tokens);
             (*((*attacker).client as *mut gclient_t)).pers.teamState.fragcarrier += 1;
@@ -488,7 +492,7 @@ pub fn Team_FragBonuses(
         }
 
         if (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier != 0.0
-            && (world.level.time as f32) - (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier < 10000.0
+            && (world.level.time as f32) - (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier < 8000.0 // CTF_CARRIER_DANGER_PROTECT_TIMEOUT
             && (*((*attacker).client as *mut gclient_t)).ps.powerups[flag_pw as usize] == 0
         {
             // attacker is on the same team as the flag carrier and fragged a guy who hurt our flag carrier
@@ -505,7 +509,7 @@ pub fn Team_FragBonuses(
         }
 
         if (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier != 0.0
-            && (world.level.time as f32) - (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier < 10000.0
+            && (world.level.time as f32) - (*((*targ).client as *mut gclient_t)).pers.teamState.lasthurtcarrier < 8000.0 // CTF_CARRIER_DANGER_PROTECT_TIMEOUT
         {
             // attacker is on the same team as the skull carrier and
             // AddScore(attacker, targ->r.currentOrigin, CTF_CARRIER_DANGER_PROTECT_BONUS);
@@ -574,8 +578,9 @@ pub fn Team_FragBonuses(
         let v1_len = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
         let v2_len = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
 
-        if ((v1_len < 500.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*flag).r.currentOrigin as *const vec3_t, &(*targ).r.currentOrigin as *const vec3_t)) != 0)
-            || (v2_len < 500.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*flag).r.currentOrigin as *const vec3_t, &(*attacker).r.currentOrigin as *const vec3_t)) != 0))
+        // CTF_TARGET_PROTECT_RADIUS = 1000 (g_team.h:17)
+        if ((v1_len < 1000.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*flag).r.currentOrigin as *const vec3_t, &(*targ).r.currentOrigin as *const vec3_t)) != 0)
+            || (v2_len < 1000.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*flag).r.currentOrigin as *const vec3_t, &(*attacker).r.currentOrigin as *const vec3_t)) != 0))
             && (*((*attacker).client as *mut gclient_t)).sess.sessionTeam as c_int != (*((*targ).client as *mut gclient_t)).sess.sessionTeam as c_int
         {
             // we defended the base flag
@@ -589,18 +594,22 @@ pub fn Team_FragBonuses(
         }
 
         if !carrier.is_null() && carrier != attacker {
+            // Oracle typo (g_team.c:517-518): VectorSubtract writes v1 on BOTH lines,
+            // so v2 is never recomputed here and stays stale (attacker-flag from the
+            // base-flag block above). Preserved verbatim (porting-rules §19).
             v1[0] = (*targ).r.currentOrigin[0] - (*carrier).r.currentOrigin[0];
             v1[1] = (*targ).r.currentOrigin[1] - (*carrier).r.currentOrigin[1];
             v1[2] = (*targ).r.currentOrigin[2] - (*carrier).r.currentOrigin[2];
-            v2[0] = (*attacker).r.currentOrigin[0] - (*carrier).r.currentOrigin[0];
-            v2[1] = (*attacker).r.currentOrigin[1] - (*carrier).r.currentOrigin[1];
-            v2[2] = (*attacker).r.currentOrigin[2] - (*carrier).r.currentOrigin[2];
+            v1[0] = (*attacker).r.currentOrigin[0] - (*carrier).r.currentOrigin[0];
+            v1[1] = (*attacker).r.currentOrigin[1] - (*carrier).r.currentOrigin[1];
+            v1[2] = (*attacker).r.currentOrigin[2] - (*carrier).r.currentOrigin[2];
 
             let v1_len = (v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]).sqrt();
             let v2_len = (v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]).sqrt();
 
-            if ((v1_len < 300.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*carrier).r.currentOrigin as *const vec3_t, &(*targ).r.currentOrigin as *const vec3_t)) != 0)
-                || (v2_len < 300.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*carrier).r.currentOrigin as *const vec3_t, &(*attacker).r.currentOrigin as *const vec3_t)) != 0))
+            // CTF_ATTACKER_PROTECT_RADIUS = 1000 (g_team.h:18)
+            if ((v1_len < 1000.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*carrier).r.currentOrigin as *const vec3_t, &(*targ).r.currentOrigin as *const vec3_t)) != 0)
+                || (v2_len < 1000.0 && trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*carrier).r.currentOrigin as *const vec3_t, &(*attacker).r.currentOrigin as *const vec3_t)) != 0))
                 && (*((*attacker).client as *mut gclient_t)).sess.sessionTeam as c_int != (*((*targ).client as *mut gclient_t)).sess.sessionTeam as c_int
             {
                 // AddScore(attacker, targ->r.currentOrigin, CTF_CARRIER_PROTECT_BONUS);
@@ -936,13 +945,15 @@ pub fn Team_TouchOurFlag(
                     // AddScore(player, ent->r.currentOrigin, CTF_TEAM_BONUS);
                 }
                 // award extra points for capture assists
-                if (*((*player).client as *mut gclient_t)).pers.teamState.lastreturnedflag + 300000.0 > world.level.time as f32 {
+                if (*((*player).client as *mut gclient_t)).pers.teamState.lastreturnedflag + 10000.0 > world.level.time as f32 {
+                    // CTF_RETURN_FLAG_ASSIST_TIMEOUT = 10000 (g_team.h:22)
                     // AddScore (player, ent->r.currentOrigin, CTF_RETURN_FLAG_ASSIST_BONUS);
                     (*cl).pers.teamState.assists += 1;
 
                     (*((*player).client as *mut gclient_t)).ps.persistant[persEnum_t::PERS_ASSIST_COUNT as usize] += 1;
                     (*((*player).client as *mut gclient_t)).rewardTime = world.level.time + 2000;
-                } else if (*((*player).client as *mut gclient_t)).pers.teamState.lastfraggedcarrier + 300000.0 > world.level.time as f32 {
+                } else if (*((*player).client as *mut gclient_t)).pers.teamState.lastfraggedcarrier + 10000.0 > world.level.time as f32 {
+                    // CTF_FRAG_CARRIER_ASSIST_TIMEOUT = 10000 (g_team.h:21)
                     // AddScore(player, ent->r.currentOrigin, CTF_FRAG_CARRIER_ASSIST_BONUS);
                     (*cl).pers.teamState.assists += 1;
                     (*((*player).client as *mut gclient_t)).ps.persistant[persEnum_t::PERS_ASSIST_COUNT as usize] += 1;
@@ -1077,18 +1088,18 @@ pub fn Team_GetLocationMsg(
             return qfalse;
         }
 
-        let mut count = (*best).count;
-        if count < 0 {
-            count = 0;
-        }
-        if count > 7 {
-            count = 7;
-        }
-
         let message = CStr::from_ptr((*best).message).to_string_lossy();
 
-        let formatted = if count > 0 {
-            format!("^{}{}{}", (count as u8 + b'0') as char, message, "^7")
+        // Oracle gates on the original `best->count`, then clamps and writes the
+        // clamped value back into the entity (g_team.c:928-933).
+        let formatted = if (*best).count != 0 {
+            if (*best).count < 0 {
+                (*best).count = 0;
+            }
+            if (*best).count > 7 {
+                (*best).count = 7;
+            }
+            format!("^{}{}{}", ((*best).count as u8 + b'0') as char, message, "^7")
         } else {
             message.to_string()
         };
@@ -1140,8 +1151,9 @@ pub fn SelectRandomTeamSpawnPoint(
 
         let mustBeEnabled = world.cvars.g_gametype.integer == GT_SIEGE as c_int;
 
+        // MAX_TEAM_SPAWN_POINTS = 32 (g_team.c:950)
         let mut count: c_int = 0;
-        let mut spots: [*mut gentity_t; 16] = [core::ptr::null_mut(); 16];
+        let mut spots: [*mut gentity_t; 32] = [core::ptr::null_mut(); 32];
         let mut spot: *mut gentity_t = core::ptr::null_mut();
 
         loop {
@@ -1160,7 +1172,7 @@ pub fn SelectRandomTeamSpawnPoint(
 
             spots[count as usize] = spot;
             count += 1;
-            if count == 16 {
+            if count == 32 {
                 break;
             }
         }
@@ -1170,7 +1182,7 @@ pub fn SelectRandomTeamSpawnPoint(
         }
 
         if world.cvars.g_gametype.integer == GT_SIEGE as c_int && siegeClass >= 0 {
-            let mut class_spots: [*mut gentity_t; 16] = [core::ptr::null_mut(); 16];
+            let mut class_spots: [*mut gentity_t; 32] = [core::ptr::null_mut(); 32];
             let mut class_count: c_int = 0;
             let mut i: c_int = 0;
 
@@ -1192,7 +1204,10 @@ pub fn SelectRandomTeamSpawnPoint(
 
             if class_count > 0 {
                 let selection = ((*ctx.world).bg_state.rng.rand() % class_count) as usize;
-                return class_spots[selection];
+                // Oracle returns `spots[selection]` here (g_team.c:1034), not
+                // `classSpots[selection]` — a Raven bug (selection is classCount-bounded
+                // but indexes the full spots array). Preserved (porting-rules §19).
+                return spots[selection];
             }
         }
 
@@ -1276,12 +1291,13 @@ pub fn TeamplayInfoMessage(
             return;
         }
 
-        let mut clients: [c_int; 8] = [0; 8];
+        // TEAM_MAXOVERLAY = 32 (bg_public.h:1031)
+        let mut clients: [c_int; 32] = [0; 32];
         let mut cnt: c_int = 0;
         let max_clients = world.cvars.g_maxclients.integer;
 
         for i in 0..max_clients {
-            if cnt >= 8 {
+            if cnt >= 32 {
                 break;
             }
             let player = &mut world.g_entities[i as usize];
@@ -1303,8 +1319,10 @@ pub fn TeamplayInfoMessage(
         let mut string: [c_char; 8192] = [0; 8192];
         let mut stringlength: usize = 0;
 
+        // Oracle re-initializes `cnt = 0` in the second loop header (g_team.c:1134).
+        cnt = 0;
         for i in 0..max_clients {
-            if cnt >= 8 {
+            if cnt >= 32 {
                 break;
             }
             let player = &mut world.g_entities[i as usize];

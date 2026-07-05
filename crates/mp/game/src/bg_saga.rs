@@ -952,8 +952,11 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
         if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"class_shader".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader = 0;
             let title_length: usize = strlen(parse_buf.as_ptr());
-            let mut found_class: bool = false;
-            for i in 0..SPC_MAX as i16 {
+            // Oracle only falls back to SPC_INFANTRY when the loop runs to
+            // completion (`i >= SPC_MAX`); an early break on `arrayTitleLength >
+            // titleLength` leaves playerClass unchanged. bg_saga.c:1034.
+            let mut i: i16 = 0;
+            while i < SPC_MAX as i16 {
                 let array_title_length: usize = strlen(classTitles[i as usize].as_ptr());
                 if array_title_length > title_length {
                     break;
@@ -962,12 +965,13 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
                 let hold_buf = parse_buf.as_ptr().add(title_length - array_title_length);
                 if Q_strcmp(hold_buf, classTitles[i as usize].as_ptr()) == 0 {
                     bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = i;
-                    found_class = true;
                     break;
                 }
+                i += 1;
             }
 
-            if !found_class {
+            // In case the icon name doesn't match up
+            if i >= SPC_MAX as i16 {
                 bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY as i16;
             }
         } else {

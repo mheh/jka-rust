@@ -39,22 +39,22 @@ use mp_qshared::shared::CHAN_WEAPON;
 // (`DAMAGE_NO_KNOCKBACK`, `FL_NO_KNOCKBACK`). Per porting-rules the port
 // preserves the Raven spelling; their exact enum-qualification / module path is
 // resolved at integration (the mega-pass tree is not compiled per porter).
-use crate::client::render_info::renderInfo_t;
-use crate::g_object::G_RunObject;
-use crate::g_utils::{G_FreeEntity, G_InitGentity, G_Spawn};
 use crate::bg_pmove::{BG_InKnockDown, BG_KnockDownable};
 use crate::bg_saberLoad::WP_SaberBladeUseSecondBladeStyle;
+use crate::client::render_info::renderInfo_t;
 use crate::g_combat::{G_Damage, G_Knockdown};
 use crate::g_mover::G_EntIsBreakable;
+use crate::g_object::G_RunObject;
+use crate::g_utils::{G_FreeEntity, G_InitGentity, G_Spawn};
 use crate::g_utils::{G_Sound, G_SoundIndex, G_Throw};
 use crate::q_math::{vec3_origin, VectorLength, VectorNormalize, PITCH};
 use crate::trap;
+use crate::NPC_utils::G_GetBoltPosition;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
-use crate::NPC_utils::G_GetBoltPosition;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 use mp_bg::public::gametype::{GT_DUEL, GT_JEDIMASTER, GT_POWERDUEL};
@@ -62,63 +62,63 @@ use mp_bg::public::saberlock::{
     SABERLOCK_LOCK, SABERLOCK_LOSE, SABERLOCK_SUPERBREAK, SABERLOCK_TOP, SABERLOCK_WIN,
 };
 use mp_qshared::common::mp::qcommon::usercmd_button::{
-    BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_FORCE_DRAIN, BUTTON_FORCE_LIGHTNING, BUTTON_FORCEGRIP,
-    BUTTON_FORCEPOWER, BUTTON_GESTURE,
+    BUTTON_ALT_ATTACK, BUTTON_ATTACK, BUTTON_FORCEGRIP, BUTTON_FORCEPOWER, BUTTON_FORCE_DRAIN,
+    BUTTON_FORCE_LIGHTNING, BUTTON_GESTURE,
 };
 use mp_qshared::shared::q_math_rand::RAND_MAX;
 // --- pass-2 shard-2 body-fill callee imports (resolved owning files per packet) ---
+use crate::ai_wpnav::G_TestLine;
 use crate::bg_misc::BG_EvaluateTrajectory;
+use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri};
+use crate::bg_panimate::{
+    BG_BrokenParryForParry, BG_InSpecialJump, BG_KnockawayForParry, BG_SaberInAttackPure,
+    BG_SaberInReturn, BG_SaberInSpecialAttack, BG_SpinningSaberAnim, BG_StabDownAnim,
+    PM_InKnockDown, PM_SaberInDeflect, PM_SaberInParry, PM_SaberInReflect,
+};
+use crate::bg_panimate::{BG_InExtraDefenseSaberMove, BG_SuperBreakLoseAnim};
 use crate::bg_panimate::{
     BG_InGrappleMove, BG_InSaberLock, BG_KickingAnim, BG_SaberInAttack, BG_SaberInKata,
     BG_SaberInSpecial, BG_SaberInTransitionAny, BG_SaberStartTransAnim, BG_SuperBreakWinAnim,
     PM_InSaberAnim, PM_SaberInTransition,
 };
 use crate::bg_pmove::BG_SabersOff;
+use crate::bg_saber::PM_SaberInBounce;
 use crate::bg_saber::PM_SaberInBrokenParry;
+use crate::bg_saberLoad::WP_SaberBladeDoTransitionDamage;
 use crate::g_client::{G_UpdateClientAnims, SetClientViewAngle};
+use crate::g_team::OnSameTeam;
+use crate::g_timer::TIMER_Set;
 use crate::g_utils::{G_EntitySound, G_SetAnim, G_SetOrigin, G_TempEntity};
 use crate::q_math::{
     vectoangles, AngleDelta, AngleNormalize180, AngleVectors, AnglesToAxis, Distance,
     DistanceSquared, LerpAngle, VectorCompare, VectorNormalize2,
 };
-use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
-use crate::NPC_senses::InFront;
-use crate::w_force::{ForceThrow, WP_ForcePowerUsable};
-use crate::ai_wpnav::G_TestLine;
-use crate::NPC_AI_Jedi::{Jedi_Ambush, Jedi_SaberBlockGo, Jedi_WaitingAmbush};
-use crate::g_timer::TIMER_Set;
-use crate::tri_coll_test::tri_tri_intersect;
-use crate::bg_saberLoad::WP_SaberBladeDoTransitionDamage;
-use crate::bg_saber::PM_SaberInBounce;
-use crate::g_team::OnSameTeam;
-use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
-use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri};
-use crate::bg_panimate::{BG_InExtraDefenseSaberMove, BG_SuperBreakLoseAnim};
-use crate::bg_panimate::{
-    BG_BrokenParryForParry, BG_InSpecialJump, BG_KnockawayForParry, BG_SaberInAttackPure, BG_SaberInReturn,
-    BG_SaberInSpecialAttack, BG_SpinningSaberAnim, BG_StabDownAnim, PM_InKnockDown,
-    PM_SaberInDeflect, PM_SaberInParry, PM_SaberInReflect,
-};
 use crate::saber::saber_flags::{
     SFL_NOT_DISARMABLE, SFL_NOT_THROWABLE, SFL_RETURN_DAMAGE, SFL_SINGLE_BLADE_THROWABLE,
 };
+use crate::tri_coll_test::tri_tri_intersect;
+use crate::w_force::{ForceThrow, WP_ForcePowerUsable};
+use crate::NPC_AI_Jedi::{Jedi_Ambush, Jedi_SaberBlockGo, Jedi_WaitingAmbush};
+use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
+use crate::NPC_senses::InFront;
+use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 
 // --- pass-3 shard-2 body-fill imports (resolved owning modules per packet) ---
+use crate::q_math::{
+    _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, VectorClear,
+    VectorSet,
+};
 use crate::saber::saber_face_t::saberFace_t;
 use crate::saber::w_saber_consts::{
-    SABER_REFLECT_MISSILE_CONE, SEF_BLOCKED, SEF_DEFLECTED, SEF_HITENEMY, SEF_HITOBJECT, SEF_HITWALL,
-    SEF_PARRIED,
-};
-use crate::q_math::{
-    VectorClear, VectorSet, _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale,
-    _VectorSubtract,
+    SABER_REFLECT_MISSILE_CONE, SEF_BLOCKED, SEF_DEFLECTED, SEF_HITENEMY, SEF_HITOBJECT,
+    SEF_HITWALL, SEF_PARRIED,
 };
 // --- pass-3 shard-1 (angles/lock/deflection/collide) body-fill imports ---
 use crate::npc::g_npc_t::gNPC_t;
 use crate::npc::look_mode::lookMode_t;
 use crate::saber::saber_flags::SFL_NOT_LOCKABLE;
-use mp_qshared::shared::saber_block_type::saberBlockType_t;
 use mp_qshared::common::mp::qcommon::collision_record::{G2Trace_t, MAX_G2_COLLISIONS};
+use mp_qshared::shared::saber_block_type::saberBlockType_t;
 
 // w_saber.c file-local `#define`s used by this shard (matching the file's
 // existing file-local const scoping, e.g. `SABER_NONATTACK_DAMAGE` above).
@@ -186,15 +186,10 @@ const WEAPON_DROPPING: c_int = weaponstate_t::WEAPON_DROPPING as c_int;
 // Unported types referenced in this file (need porting before this compiles):
 // saberFace_t, sabersLockMode_t
 
-
 /// Raven `RandFloat`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:39-43`
-pub fn RandFloat(
-    ctx: GameContext<'_>,
-    min: f32,
-    max: f32,
-) -> f32 {
+pub fn RandFloat(ctx: GameContext<'_>, min: f32, max: f32) -> f32 {
     // Raven (linux path): `((rand() * (max - min)) / (float)RAND_MAX) + min`.
     // The LCG lives on `bg_state.rng`.
     unsafe { (((*ctx.world).bg_state.rng.rand() as f32 * (max - min)) / RAND_MAX as f32) + min }
@@ -208,12 +203,7 @@ pub fn RandFloat(
 /// `DEBUG_SABER_BOX`, and every call site sits under the same guard. Per
 /// porting-rules §20 (drop dead surface with a note), this ships as a no-op —
 /// `mins`/`maxs` are never written, so the out-param reshape does not apply.
-pub fn G_DebugBoxLines(
-    ctx: GameContext<'_>,
-    mins: vec3_t,
-    maxs: vec3_t,
-    duration: c_int,
-) {
+pub fn G_DebugBoxLines(ctx: GameContext<'_>, mins: vec3_t, maxs: vec3_t, duration: c_int) {
     let _ = (ctx, mins, maxs, duration);
 }
 
@@ -273,11 +263,7 @@ pub fn G_CanBeEnemy(
 /// Raven `G_SaberAttackPower`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:120-217`
-pub fn G_SaberAttackPower(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    attacking: qboolean,
-) -> c_int {
+pub fn G_SaberAttackPower(ctx: GameContext<'_>, ent: *mut gentity_t, attacking: qboolean) -> c_int {
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
         let client = (*ent).client as *mut gclient_t;
@@ -356,11 +342,7 @@ pub fn G_SaberAttackPower(
 /// Raven `WP_DeactivateSaber`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:219-248`
-pub fn WP_DeactivateSaber(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    clearLength: qboolean,
-) {
+pub fn WP_DeactivateSaber(ctx: GameContext<'_>, self_: *mut gentity_t, clearLength: qboolean) {
     let _ = clearLength; // oracle's SetSaberLength(0) path is commented out.
     unsafe {
         if self_.is_null() || (*self_).client.is_null() {
@@ -372,11 +354,21 @@ pub fn WP_DeactivateSaber(
             (*client).ps.saberHolstered = 2;
             // Doesn't matter ATM (SetSaberLength commented out in oracle).
             if (*client).saber[0].soundOff != 0 {
-                crate::g_utils::G_Sound(ctx, self_, CHAN_WEAPON as c_int, (*client).saber[0].soundOff);
+                crate::g_utils::G_Sound(
+                    ctx,
+                    self_,
+                    CHAN_WEAPON as c_int,
+                    (*client).saber[0].soundOff,
+                );
             }
 
             if (*client).saber[1].soundOff != 0 && (*client).saber[1].model[0] != 0 {
-                crate::g_utils::G_Sound(ctx, self_, CHAN_WEAPON as c_int, (*client).saber[1].soundOff);
+                crate::g_utils::G_Sound(
+                    ctx,
+                    self_,
+                    CHAN_WEAPON as c_int,
+                    (*client).saber[1].soundOff,
+                );
             }
         }
     }
@@ -385,10 +377,7 @@ pub fn WP_DeactivateSaber(
 /// Raven `WP_ActivateSaber`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:250-282`
-pub fn WP_ActivateSaber(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn WP_ActivateSaber(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if self_.is_null() || (*self_).client.is_null() {
             return;
@@ -424,10 +413,7 @@ pub fn WP_ActivateSaber(
 /// Raven `SaberUpdateSelf`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:286-358`
-pub fn SaberUpdateSelf(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn SaberUpdateSelf(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let level_time = (*ctx.world).level.time;
         let owner_num = (*ent).r.ownerNum;
@@ -516,10 +502,7 @@ pub fn SaberGotHit(
 /// Raven `SetSaberBoxSize`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:376-564`
-pub fn SetSaberBoxSize(
-    ctx: GameContext<'_>,
-    saberent: *mut gentity_t,
-) {
+pub fn SetSaberBoxSize(ctx: GameContext<'_>, saberent: *mut gentity_t) {
     unsafe {
         let level_time = (*ctx.world).level.time;
         let mut owner: *mut gentity_t = core::ptr::null_mut();
@@ -695,10 +678,7 @@ pub fn SetSaberBoxSize(
 /// Raven `WP_SaberInitBladeData`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:566-637`
-pub fn WP_SaberInitBladeData(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn WP_SaberInitBladeData(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let level_time = (*ctx.world).level.time;
         let mut saberent: *mut gentity_t = core::ptr::null_mut();
@@ -869,7 +849,12 @@ pub fn G_CheckLookTarget(
 /// Raven `G_G2NPCAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:732-879`
-pub fn G_G2NPCAngles(ctx: GameContext<'_>, ent: *mut gentity_t, legs: *mut vec3_t, angles: &mut vec3_t) {
+pub fn G_G2NPCAngles(
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    legs: *mut vec3_t,
+    angles: &mut vec3_t,
+) {
     unsafe {
         let cranium_bone = cstr("cranium");
         let thoracic_bone = cstr("thoracic"); // only used by atst so doesn't need a case
@@ -1050,7 +1035,9 @@ pub fn G_G2PlayerAngles(
 
             if (*sc).ps.hasLookTarget != 0 {
                 _VectorSubtract(
-                    (*ctx.world).g_entities[(*sc).ps.lookTarget as usize].r.currentOrigin,
+                    (*ctx.world).g_entities[(*sc).ps.lookTarget as usize]
+                        .r
+                        .currentOrigin,
                     (*sc).ps.origin,
                     &mut lookAngles,
                 );
@@ -1206,7 +1193,8 @@ pub fn G_G2PlayerAngles(
             }
         } else if !(*ent).m_pVehicle.is_null()
             && (*((*((*ent).m_pVehicle as *mut mp_bg::vehicles::vehicle_s::Vehicle_t))
-                .m_pVehicleInfo as *mut mp_bg::vehicles::vehicle_info_t::vehicleInfo_t))
+                .m_pVehicleInfo
+                as *mut mp_bg::vehicles::vehicle_info_t::vehicleInfo_t))
                 .r#type
                 == VH_WALKER
         {
@@ -1245,9 +1233,7 @@ pub fn G_G2PlayerAngles(
 /// Raven `SaberAttacking`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:1036-1073`
-pub fn SaberAttacking(
-    self_: *mut gentity_t,
-) -> qboolean {
+pub fn SaberAttacking(self_: *mut gentity_t) -> qboolean {
     unsafe {
         let ps = &(*((*self_).client as *mut gclient_t)).ps;
         if crate::bg_panimate::PM_SaberInParry(ps.saberMove) != 0 {
@@ -1633,7 +1619,8 @@ pub fn WP_SabersCheckLock2(
             }
         }
 
-        crate::g_utils::G_SetAnim(ctx,
+        crate::g_utils::G_SetAnim(
+            ctx,
             attacker,
             core::ptr::null_mut(),
             SETANIM_BOTH,
@@ -1649,7 +1636,8 @@ pub fn WP_SabersCheckLock2(
                 anim.firstFrame as c_int + (anim.numFrames as f32 * attStart) as c_int;
         }
 
-        crate::g_utils::G_SetAnim(ctx,
+        crate::g_utils::G_SetAnim(
+            ctx,
             defender,
             core::ptr::null_mut(),
             SETANIM_BOTH,
@@ -1681,7 +1669,11 @@ pub fn WP_SabersCheckLock2(
         (*dc).ps.weaponTime = (*ctx.world).bg_state.rng.Q_irand(1000, 3000);
         (*ac).ps.weaponTime = (*dc).ps.weaponTime;
 
-        _VectorSubtract((*defender).r.currentOrigin, (*attacker).r.currentOrigin, &mut defDir);
+        _VectorSubtract(
+            (*defender).r.currentOrigin,
+            (*attacker).r.currentOrigin,
+            &mut defDir,
+        );
         _VectorCopy((*ac).ps.viewangles, &mut attAngles);
         attAngles[YAW as usize] = crate::bg_misc::vectoyaw(defDir);
         SetClientViewAngle(attacker, attAngles);
@@ -1693,7 +1685,12 @@ pub fn WP_SabersCheckLock2(
         // MATCH POSITIONS — diff is the total error in dist
         diff = VectorNormalize(&mut defDir) - idealDist;
         // try to move attacker half the diff towards the defender
-        _VectorMA((*attacker).r.currentOrigin, diff * 0.5f32, defDir, &mut newOrg);
+        _VectorMA(
+            (*attacker).r.currentOrigin,
+            diff * 0.5f32,
+            defDir,
+            &mut newOrg,
+        );
 
         trap::Trace(
             ctx.engine,
@@ -1715,7 +1712,11 @@ pub fn WP_SabersCheckLock2(
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(attacker));
         }
         // now get the defender's dist and do it for him too
-        _VectorSubtract((*attacker).r.currentOrigin, (*defender).r.currentOrigin, &mut attDir);
+        _VectorSubtract(
+            (*attacker).r.currentOrigin,
+            (*defender).r.currentOrigin,
+            &mut attDir,
+        );
         diff = VectorNormalize(&mut attDir) - idealDist;
         // try to move defender all of the remaining diff towards the attacker
         _VectorMA((*defender).r.currentOrigin, diff, attDir, &mut newOrg);
@@ -1747,7 +1748,11 @@ pub fn WP_SabersCheckLock2(
 /// Raven `WP_SabersCheckLock`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:1462-1889`
-pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut gentity_t) -> qboolean {
+pub fn WP_SabersCheckLock(
+    ctx: GameContext<'_>,
+    ent1: *mut gentity_t,
+    ent2: *mut gentity_t,
+) -> qboolean {
     unsafe {
         let mut ent1BlockingPlayer: qboolean = qfalse;
         let mut ent2BlockingPlayer: qboolean = qfalse;
@@ -1806,7 +1811,8 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         if ((*ent1).r.currentOrigin[2] - (*ent2).r.currentOrigin[2]).abs() > 16.0 {
             return qfalse;
         }
-        if (*c1).ps.groundEntityNum == ENTITYNUM_NONE || (*c2).ps.groundEntityNum == ENTITYNUM_NONE {
+        if (*c1).ps.groundEntityNum == ENTITYNUM_NONE || (*c2).ps.groundEntityNum == ENTITYNUM_NONE
+        {
             return qfalse;
         }
         let dist = DistanceSquared((*ent1).r.currentOrigin, (*ent2).r.currentOrigin);
@@ -1822,10 +1828,14 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
             return qfalse;
         }
 
-        if crate::bg_panimate::BG_InRoll(&mut (*c1).ps as *mut playerState_t, (*c1).ps.legsAnim) != 0 {
+        if crate::bg_panimate::BG_InRoll(&mut (*c1).ps as *mut playerState_t, (*c1).ps.legsAnim)
+            != 0
+        {
             return qfalse;
         }
-        if crate::bg_panimate::BG_InRoll(&mut (*c2).ps as *mut playerState_t, (*c2).ps.legsAnim) != 0 {
+        if crate::bg_panimate::BG_InRoll(&mut (*c2).ps as *mut playerState_t, (*c2).ps.legsAnim)
+            != 0
+        {
             return qfalse;
         }
 
@@ -1858,10 +1868,22 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
             return qfalse;
         }
 
-        if InFront((*c1).ps.origin, (*c2).ps.origin, (*c2).ps.viewangles, 0.4f32) == 0 {
+        if InFront(
+            (*c1).ps.origin,
+            (*c2).ps.origin,
+            (*c2).ps.viewangles,
+            0.4f32,
+        ) == 0
+        {
             return qfalse;
         }
-        if InFront((*c2).ps.origin, (*c1).ps.origin, (*c1).ps.viewangles, 0.4f32) == 0 {
+        if InFront(
+            (*c2).ps.origin,
+            (*c1).ps.origin,
+            (*c1).ps.viewangles,
+            0.4f32,
+        ) == 0
+        {
             return qfalse;
         }
 
@@ -2175,9 +2197,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
 /// Raven `G_GetParryForBlock`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:1891-1930`
-pub fn G_GetParryForBlock(
-    block: c_int,
-) -> c_int {
+pub fn G_GetParryForBlock(block: c_int) -> c_int {
     match block {
         BLOCKED_UPPER_RIGHT => LS_PARRY_UR,
         BLOCKED_UPPER_RIGHT_PROJ => LS_REFLECT_UR,
@@ -2260,8 +2280,7 @@ pub fn WP_GetSaberDeflectionAngle(
                 quadDiff = 4 - (quadDiff - 4);
             }
             // have the quads, find a good anim to use
-            if (quadDiff == 0
-                || (quadDiff == 1 && (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0))
+            if (quadDiff == 0 || (quadDiff == 1 && (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0))
                 && (defSaberLevel == attSaberLevel
                     || (*ctx.world)
                         .bg_state
@@ -2275,13 +2294,13 @@ pub fn WP_GetSaberDeflectionAngle(
                 // `PmoveContext` method, but this game-tier fn holds only
                 // `GameContext`; called as a free fn against `bg_panimate`
                 // (reported as shape_mismatch for the integrator to bridge).
-                (*ac).ps.saberMove = crate::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
+                (*ac).ps.saberMove =
+                    crate::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
                 if (*ctx.world).cvars.g_saberDebugPrint.integer != 0 {
                     let s = format!(
                         "attack {} vs. parry {} bounced to {}\n",
                         cstr_to_str(
-                            animTable[(*ctx.world).bg_state.saberMoveData
-                                [attMove as usize]
+                            animTable[(*ctx.world).bg_state.saberMoveData[attMove as usize]
                                 .animToUse as usize]
                                 .name
                         ),
@@ -2340,8 +2359,7 @@ pub fn WP_GetSaberDeflectionAngle(
                         let s = format!(
                             "attack {} vs. parry {} bounced to {}\n",
                             cstr_to_str(
-                                animTable[(*ctx.world).bg_state.saberMoveData
-                                    [attMove as usize]
+                                animTable[(*ctx.world).bg_state.saberMoveData[attMove as usize]
                                     .animToUse as usize]
                                     .name
                             ),
@@ -2370,8 +2388,7 @@ pub fn WP_GetSaberDeflectionAngle(
                         let s = format!(
                             "attack {} vs. parry {} deflected to {}\n",
                             cstr_to_str(
-                                animTable[(*ctx.world).bg_state.saberMoveData
-                                    [attMove as usize]
+                                animTable[(*ctx.world).bg_state.saberMoveData[attMove as usize]
                                     .animToUse as usize]
                                     .name
                             ),
@@ -2405,13 +2422,19 @@ pub fn WP_GetSaberDeflectionAngle(
 
             AngleVectors((*ac).lastSaberDir_Always, Some(&mut att_HitDir), None, None);
 
-            AngleVectors((*dc).lastSaberDir_Always, Some(&mut def_BladeDir), None, None);
+            AngleVectors(
+                (*dc).lastSaberDir_Always,
+                Some(&mut def_BladeDir),
+                None,
+                None,
+            );
 
             // now compare
             hitDot = _DotProduct(att_HitDir, def_BladeDir);
             if hitDot < 0.25f32 && hitDot > -0.25f32 {
                 // hit pretty much perpendicular, pop straight back
-                (*ac).ps.saberMove = crate::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
+                (*ac).ps.saberMove =
+                    crate::bg_panimate::PM_SaberBounceForAttack((*ac).ps.saberMove);
                 (*ac).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
                 return qfalse;
             } else {
@@ -2484,19 +2507,17 @@ pub fn WP_GetSaberDeflectionAngle(
 /// Raven `G_KnockawayForParry`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2210-2233`
-pub fn G_KnockawayForParry(
-    r#move: c_int,
-) -> c_int {
+pub fn G_KnockawayForParry(r#move: c_int) -> c_int {
     // FIXME(Raven): need actual anims for this; need to know which side of the
     // saber was hit — presume it gets knocked away from the center.
     // Oracle's `case LS_PARRY_UR:` falls through into `default:` (both return
     // LS_K1_TR), so the `_` arm covers LS_PARRY_UR and every unmatched value.
     match r#move {
-        LS_PARRY_UP => LS_K1_T_,   // push up
-        LS_PARRY_UL => LS_K1_TL,   // push up and to left
-        LS_PARRY_LR => LS_K1_BR,   // push down and to left
-        LS_PARRY_LL => LS_K1_BL,   // push down and to right
-        _ => LS_K1_TR,             // LS_PARRY_UR / default: push up, slightly right
+        LS_PARRY_UP => LS_K1_T_, // push up
+        LS_PARRY_UL => LS_K1_TL, // push up and to left
+        LS_PARRY_LR => LS_K1_BR, // push down and to left
+        LS_PARRY_LL => LS_K1_BL, // push down and to right
+        _ => LS_K1_TR,           // LS_PARRY_UR / default: push up, slightly right
     }
 }
 
@@ -2516,8 +2537,7 @@ pub fn G_GetAttackDamage(
         let anim = &*(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize]
             .anims
             .add((*sc).ps.torsoAnim as usize);
-        let mut attackAnimLength =
-            anim.numFrames as f32 * ((anim.frameLerp as f32).abs());
+        let mut attackAnimLength = anim.numFrames as f32 * ((anim.frameLerp as f32).abs());
         let mut animSpeedFactor = 1.0f32;
 
         // Be sure to scale by the proper anim speed
@@ -2564,10 +2584,7 @@ pub fn G_GetAttackDamage(
 /// Raven `G_GetAnimPoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2290-2310`
-pub fn G_GetAnimPoint(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) -> f32 {
+pub fn G_GetAnimPoint(ctx: GameContext<'_>, self_: *mut gentity_t) -> f32 {
     unsafe {
         let sc = (*self_).client as *mut gclient_t;
         let anim = &*(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize]
@@ -2597,9 +2614,7 @@ pub fn G_GetAnimPoint(
 /// Raven `G_ClientIdleInWorld`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2312-2334`
-pub fn G_ClientIdleInWorld(
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn G_ClientIdleInWorld(ent: *mut gentity_t) -> qboolean {
     unsafe {
         if (*ent).s.eType == ET_NPC as c_int {
             return 0;
@@ -2750,9 +2765,7 @@ pub fn G_G2TraceCollide(
 /// Raven `G_SaberInBackAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2428-2439`
-pub fn G_SaberInBackAttack(
-    r#move: c_int,
-) -> qboolean {
+pub fn G_SaberInBackAttack(r#move: c_int) -> qboolean {
     match r#move {
         LS_A_BACK | LS_A_BACK_CR | LS_A_BACKSTAB => 1,
         _ => 0,
@@ -2906,12 +2919,7 @@ pub fn G_BuildSaberFaces(
 /// Raven `G_SabCol_CalcPlaneEq`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2573-2579`
-pub fn G_SabCol_CalcPlaneEq(
-    x: vec3_t,
-    y: vec3_t,
-    z: vec3_t,
-    planeEq: *mut f32,
-) {
+pub fn G_SabCol_CalcPlaneEq(x: vec3_t, y: vec3_t, z: vec3_t, planeEq: *mut f32) {
     unsafe {
         *planeEq.add(0) = x[1] * (y[2] - z[2]) + y[1] * (z[2] - x[2]) + z[1] * (x[2] - y[2]);
         *planeEq.add(1) = x[2] * (y[0] - z[0]) + y[2] * (z[0] - x[0]) + z[2] * (x[0] - y[0]);
@@ -2925,11 +2933,7 @@ pub fn G_SabCol_CalcPlaneEq(
 /// Raven `G_SabCol_PointRelativeToPlane`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2582-2596`
-pub fn G_SabCol_PointRelativeToPlane(
-    pos: vec3_t,
-    side: *mut f32,
-    planeEq: *mut f32,
-) -> c_int {
+pub fn G_SabCol_PointRelativeToPlane(pos: vec3_t, side: *mut f32, planeEq: *mut f32) -> c_int {
     unsafe {
         *side = *planeEq.add(0) * pos[0]
             + *planeEq.add(1) * pos[1]
@@ -3011,10 +3015,14 @@ pub fn G_SaberFaceCollisionCheck(
 
                 if facing < 0 {
                     //not intersecting.. let's try with the mins/maxs and see if they interesect on the edge plane
-                    facing = G_SabCol_PointRelativeToPlane(minPoint, &mut side, planeEq.as_mut_ptr());
+                    facing =
+                        G_SabCol_PointRelativeToPlane(minPoint, &mut side, planeEq.as_mut_ptr());
                     if facing < 0 {
-                        facing =
-                            G_SabCol_PointRelativeToPlane(maxPoint, &mut side, planeEq.as_mut_ptr());
+                        facing = G_SabCol_PointRelativeToPlane(
+                            maxPoint,
+                            &mut side,
+                            planeEq.as_mut_ptr(),
+                        );
                     }
                 }
 
@@ -3022,8 +3030,7 @@ pub fn G_SaberFaceCollisionCheck(
                     //first edge is facing...
                     _VectorMA((*fl).v2, -2.0f32, planeNormal, &mut extruded);
                     G_SabCol_CalcPlaneEq((*fl).v2, (*fl).v3, extruded, planeEq.as_mut_ptr());
-                    facing =
-                        G_SabCol_PointRelativeToPlane(point, &mut side, planeEq.as_mut_ptr());
+                    facing = G_SabCol_PointRelativeToPlane(point, &mut side, planeEq.as_mut_ptr());
 
                     if facing < 0 {
                         facing = G_SabCol_PointRelativeToPlane(
@@ -3044,11 +3051,8 @@ pub fn G_SaberFaceCollisionCheck(
                         //second edge is facing...
                         _VectorMA((*fl).v3, -2.0f32, planeNormal, &mut extruded);
                         G_SabCol_CalcPlaneEq((*fl).v3, (*fl).v1, extruded, planeEq.as_mut_ptr());
-                        facing = G_SabCol_PointRelativeToPlane(
-                            point,
-                            &mut side,
-                            planeEq.as_mut_ptr(),
-                        );
+                        facing =
+                            G_SabCol_PointRelativeToPlane(point, &mut side, planeEq.as_mut_ptr());
 
                         if facing < 0 {
                             facing = G_SabCol_PointRelativeToPlane(
@@ -3185,9 +3189,7 @@ pub fn G_SaberCollide(
 /// Raven `WP_SaberBladeLength`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2779-2791`
-pub fn WP_SaberBladeLength(
-    saber: *mut saberInfo_t,
-) -> f32 {
+pub fn WP_SaberBladeLength(saber: *mut saberInfo_t) -> f32 {
     // return largest length
     unsafe {
         let mut len = 0.0f32;
@@ -3203,9 +3205,7 @@ pub fn WP_SaberBladeLength(
 /// Raven `WP_SaberLength`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2793-2813`
-pub fn WP_SaberLength(
-    ent: *mut gentity_t,
-) -> f32 {
+pub fn WP_SaberLength(ent: *mut gentity_t) -> f32 {
     // return largest length
     unsafe {
         if ent.is_null() || (*ent).client.is_null() {
@@ -3226,9 +3226,7 @@ pub fn WP_SaberLength(
 /// Raven `WPDEBUG_SaberColor`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:2814-2840`
-pub fn WPDEBUG_SaberColor(
-    saberColor: saber_colors_t,
-) -> c_int {
+pub fn WPDEBUG_SaberColor(saberColor: saber_colors_t) -> c_int {
     match saberColor {
         SABER_RED => 0x000000ff,
         SABER_ORANGE => 0x000088ff,
@@ -3290,8 +3288,8 @@ pub fn WP_SabersIntersect(
                         //valid saber and this blade is on
                         //if ( ent1->client->saberInFlight )
                         {
-                            let b1 = &(*ec1).saber[ent1SaberNum as usize].blade
-                                [ent1BladeNum as usize];
+                            let b1 =
+                                &(*ec1).saber[ent1SaberNum as usize].blade[ent1BladeNum as usize];
                             _VectorCopy(b1.muzzlePointOld, &mut saberBase1);
                             _VectorCopy(b1.muzzlePoint, &mut saberBaseNext1);
 
@@ -3321,8 +3319,8 @@ pub fn WP_SabersIntersect(
 
                         //if ( ent2->client->saberInFlight )
                         {
-                            let b2 = &(*ec2).saber[ent2SaberNum as usize].blade
-                                [ent2BladeNum as usize];
+                            let b2 =
+                                &(*ec2).saber[ent2SaberNum as usize].blade[ent2BladeNum as usize];
                             _VectorCopy(b2.muzzlePointOld, &mut saberBase2);
                             _VectorCopy(b2.muzzlePoint, &mut saberBaseNext2);
 
@@ -3930,10 +3928,7 @@ pub fn WP_SaberDamageAdd(
 /// Raven `WP_SaberApplyDamage`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:3577-3605`
-pub fn WP_SaberApplyDamage(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn WP_SaberApplyDamage(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*ctx.world).globals.numVictims == 0 {
             return;
@@ -4043,7 +4038,8 @@ pub fn WP_SaberDoHit(
                     &mut (*te).s.angles,
                 );
 
-                if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0 {
+                if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0
+                {
                     // don't let it play with no direction
                     (*te).s.angles[1] = 1.0;
                 }
@@ -4072,7 +4068,8 @@ pub fn WP_SaberDoHit(
                         // don't do clash flare
                     } else {
                         if (*ctx.world).globals.totalDmg[iu] > SABER_NONATTACK_DAMAGE {
-                            let teS = G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
+                            let teS =
+                                G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
                             (*teS).s.origin = (*te).s.origin;
                         }
                         (*te).s.eventParm = 0;
@@ -4122,8 +4119,8 @@ pub fn WP_SaberRadiusDamage(
         );
 
         for i in 0..numEnts {
-            let radiusEnt = &mut (*ctx.world).g_entities[radiusEnts[i as usize] as usize]
-                as *mut gentity_t;
+            let radiusEnt =
+                &mut (*ctx.world).g_entities[radiusEnts[i as usize] as usize] as *mut gentity_t;
             if (*radiusEnt).inuse == 0 {
                 continue;
             }
@@ -4222,7 +4219,11 @@ pub fn WP_SaberDoClash(
 ) {
     unsafe {
         if (*ctx.world).globals.saberDoClashEffect != 0 {
-            let te = G_TempEntity(ctx, (*ctx.world).globals.saberClashPos, EV_SABER_BLOCK as c_int);
+            let te = G_TempEntity(
+                ctx,
+                (*ctx.world).globals.saberClashPos,
+                EV_SABER_BLOCK as c_int,
+            );
             (*te).s.origin = (*ctx.world).globals.saberClashPos;
             (*te).s.angles = (*ctx.world).globals.saberClashNorm;
             (*te).s.eventParm = (*ctx.world).globals.saberClashEventParm;
@@ -4288,11 +4289,9 @@ pub fn WP_SaberBounceSound(
         } else {
             // `va("sound/weapons/saber/saberblock%d.wav", index)` — rendered as an
             // owned NUL-terminated string (appendix ruling: va -> owned String).
-            let path = std::ffi::CString::new(format!(
-                "sound/weapons/saber/saberblock{}.wav",
-                index
-            ))
-            .unwrap();
+            let path =
+                std::ffi::CString::new(format!("sound/weapons/saber/saberblock{}.wav", index))
+                    .unwrap();
             G_Sound(ctx, ent, CHAN_AUTO as c_int, G_SoundIndex(path.as_ptr()));
         }
     }
@@ -4378,16 +4377,32 @@ pub fn CheckSaberDamage(
             }
         } else if (*sc).ps.fd.saberAnimLevel < FORCE_LEVEL_2 {
             //box trace for fast, because it doesn't get updated so often
-            VectorSet(&mut saberTrMins, -saberBoxSize, -saberBoxSize, -saberBoxSize);
+            VectorSet(
+                &mut saberTrMins,
+                -saberBoxSize,
+                -saberBoxSize,
+                -saberBoxSize,
+            );
             VectorSet(&mut saberTrMaxs, saberBoxSize, saberBoxSize, saberBoxSize);
         } else if (*ctx.world).cvars.d_saberAlwaysBoxTrace.integer != 0 {
-            VectorSet(&mut saberTrMins, -saberBoxSize, -saberBoxSize, -saberBoxSize);
+            VectorSet(
+                &mut saberTrMins,
+                -saberBoxSize,
+                -saberBoxSize,
+                -saberBoxSize,
+            );
             VectorSet(&mut saberTrMaxs, saberBoxSize, saberBoxSize, saberBoxSize);
         } else {
             //just trace the minimum blade radius
-            saberBoxSize = (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize].radius * 0.4f32;
+            saberBoxSize =
+                (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize].radius * 0.4f32;
 
-            VectorSet(&mut saberTrMins, -saberBoxSize, -saberBoxSize, -saberBoxSize);
+            VectorSet(
+                &mut saberTrMins,
+                -saberBoxSize,
+                -saberBoxSize,
+                -saberBoxSize,
+            );
             VectorSet(&mut saberTrMaxs, saberBoxSize, saberBoxSize, saberBoxSize);
         }
 
@@ -4402,7 +4417,9 @@ pub fn CheckSaberDamage(
                 let mut trDif: f32 = 8.0;
 
                 if ((*ctx.world).level.time
-                    - (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize].trail.lastTime)
+                    - (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                        .trail
+                        .lastTime)
                     > 100
                 {
                     //no valid last pos, use current
@@ -4411,11 +4428,15 @@ pub fn CheckSaberDamage(
                 } else {
                     //trace from last pos
                     _VectorCopy(
-                        (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize].trail.base,
+                        (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .base,
                         &mut oldSaberStart,
                     );
                     _VectorCopy(
-                        (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize].trail.tip,
+                        (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .tip,
                         &mut oldSaberEnd,
                     );
                 }
@@ -4450,21 +4471,41 @@ pub fn CheckSaberDamage(
                 _VectorCopy(saberEnd, &mut lastValidStart);
                 _VectorCopy(saberStart, &mut lastValidEnd);
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
-                    G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
+                    G_G2TraceCollide(
+                        ctx,
+                        &mut tr,
+                        lastValidStart,
+                        lastValidEnd,
+                        saberTrMins,
+                        saberTrMaxs,
+                    );
                 } else if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
-                    let trHit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+                    let trHit =
+                        &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                     if (*trHit).inuse != 0 && !(*trHit).ghoul2.is_null() {
                         //hit a non-client entity with a g2 instance
-                        G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
+                        G_G2TraceCollide(
+                            ctx,
+                            &mut tr,
+                            lastValidStart,
+                            lastValidEnd,
+                            saberTrMins,
+                            saberTrMaxs,
+                        );
                     }
                 }
 
                 trDif += 1.0;
 
-                while tr.fraction == 1.0 && traceTests < 4 && (tr.entityNum as c_int) >= ENTITYNUM_NONE {
+                while tr.fraction == 1.0
+                    && traceTests < 4
+                    && (tr.entityNum as c_int) >= ENTITYNUM_NONE
+                {
                     if ((*ctx.world).level.time
-                        - (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize].trail.lastTime)
+                        - (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                            .trail
+                            .lastTime)
                         > 100
                     {
                         //no valid last pos, use current
@@ -4473,11 +4514,15 @@ pub fn CheckSaberDamage(
                     } else {
                         //trace from last pos
                         _VectorCopy(
-                            (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize].trail.base,
+                            (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                                .trail
+                                .base,
                             &mut oldSaberStart,
                         );
                         _VectorCopy(
-                            (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize].trail.tip,
+                            (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                                .trail
+                                .tip,
                             &mut oldSaberEnd,
                         );
                     }
@@ -4512,13 +4557,28 @@ pub fn CheckSaberDamage(
                     _VectorCopy(saberEnd, &mut lastValidStart);
                     _VectorCopy(saberStart, &mut lastValidEnd);
                     if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
-                        G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
+                        G_G2TraceCollide(
+                            ctx,
+                            &mut tr,
+                            lastValidStart,
+                            lastValidEnd,
+                            saberTrMins,
+                            saberTrMaxs,
+                        );
                     } else if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
-                        let trHit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+                        let trHit =
+                            &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                         if (*trHit).inuse != 0 && !(*trHit).ghoul2.is_null() {
                             //hit a non-client entity with a g2 instance
-                            G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
+                            G_G2TraceCollide(
+                                ctx,
+                                &mut tr,
+                                lastValidStart,
+                                lastValidEnd,
+                                saberTrMins,
+                                saberTrMaxs,
+                            );
                         }
                     }
 
@@ -4532,7 +4592,12 @@ pub fn CheckSaberDamage(
                     let mut diff: vec3_t = [0.0; 3];
                     _VectorSubtract(saberEnd, saberStart, &mut diff);
                     VectorNormalize(&mut diff);
-                    _VectorMA(saberStart, SABER_EXTRAPOLATE_DIST, diff, &mut saberEndExtrapolated);
+                    _VectorMA(
+                        saberStart,
+                        SABER_EXTRAPOLATE_DIST,
+                        diff,
+                        &mut saberEndExtrapolated,
+                    );
                 } else {
                     _VectorCopy(saberEnd, &mut saberEndExtrapolated);
                 }
@@ -4552,13 +4617,28 @@ pub fn CheckSaberDamage(
                 _VectorCopy(saberStart, &mut lastValidStart);
                 _VectorCopy(saberEndExtrapolated, &mut lastValidEnd);
                 if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
-                    G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
+                    G_G2TraceCollide(
+                        ctx,
+                        &mut tr,
+                        lastValidStart,
+                        lastValidEnd,
+                        saberTrMins,
+                        saberTrMaxs,
+                    );
                 } else if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
-                    let trHit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
+                    let trHit =
+                        &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                     if (*trHit).inuse != 0 && !(*trHit).ghoul2.is_null() {
                         //hit a non-client entity with a g2 instance
-                        G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
+                        G_G2TraceCollide(
+                            ctx,
+                            &mut tr,
+                            lastValidStart,
+                            lastValidEnd,
+                            saberTrMins,
+                            saberTrMaxs,
+                        );
                     }
                 }
             }
@@ -4647,8 +4727,8 @@ pub fn CheckSaberDamage(
                         dmg = (fDmg * traceLength * 0.1f32 * 0.33f32).ceil() as c_int;
                     } else {
                         //fractional hit, the sooner you hit in the trace, the more damage you did
-                        dmg = (fDmg * traceLength * (1.0f32 - tr.fraction) * 0.1f32 * 0.33f32).ceil()
-                            as c_int;
+                        dmg = (fDmg * traceLength * (1.0f32 - tr.fraction) * 0.1f32 * 0.33f32)
+                            .ceil() as c_int;
                     }
                 }
                 if (*sc).ps.torsoAnim == BOTH_A1_SPECIAL as c_int
@@ -4664,7 +4744,9 @@ pub fn CheckSaberDamage(
             } else {
                 dmg = SABER_HITDAMAGE;
 
-                if (*sc).ps.fd.saberAnimLevel == saber_styles_t::SS_STAFF as c_int || (*sc).ps.fd.saberAnimLevel == saber_styles_t::SS_DUAL as c_int {
+                if (*sc).ps.fd.saberAnimLevel == saber_styles_t::SS_STAFF as c_int
+                    || (*sc).ps.fd.saberAnimLevel == saber_styles_t::SS_DUAL as c_int
+                {
                     if saberInSpecial != 0 {
                         //it will get auto-ramped based on the point in the attack, later on
                         if (*sc).ps.saberMove == LS_SPINATTACK
@@ -4897,14 +4979,17 @@ pub fn CheckSaberDamage(
             {
                 let mut te: *mut gentity_t = core::ptr::null_mut();
 
-                (*sc).ps.saberMove =
-                    crate::bg_panimate::BG_BrokenParryForAttack(&(*ctx.world).bg_state, (*sc).ps.saberMove);
+                (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                    &(*ctx.world).bg_state,
+                    (*sc).ps.saberMove,
+                );
                 (*sc).ps.saberBlocked = BLOCKED_PARRY_BROKEN;
                 if (*sc).ps.torsoAnim == (*sc).ps.legsAnim {
                     //set anim now on both parts
-                    let anim = (*ctx.world).bg_state.saberMoveData[(*sc).ps.saberMove as usize]
-                        .animToUse;
-                    G_SetAnim(ctx,
+                    let anim =
+                        (*ctx.world).bg_state.saberMoveData[(*sc).ps.saberMove as usize].animToUse;
+                    G_SetAnim(
+                        ctx,
                         self_,
                         &mut (*sc).pers.cmd as *mut usercmd_t,
                         SETANIM_BOTH,
@@ -4924,7 +5009,8 @@ pub fn CheckSaberDamage(
                 (*te).s.legsAnim = rBladeNum;
                 _VectorCopy(tr.endpos, &mut (*te).s.origin);
                 _VectorCopy(tr.plane.normal, &mut (*te).s.angles);
-                if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0 {
+                if (*te).s.angles[0] == 0.0 && (*te).s.angles[1] == 0.0 && (*te).s.angles[2] == 0.0
+                {
                     //don't let it play with no direction
                     (*te).s.angles[1] = 1.0;
                 }
@@ -4963,7 +5049,8 @@ pub fn CheckSaberDamage(
         if (tr.fraction != 1.0 || tr.startsolid != 0)
             && (*ctx.world).g_entities[tr.entityNum as usize].takedamage != 0
             && ((*ctx.world).g_entities[tr.entityNum as usize].health > 0
-                || ((*ctx.world).g_entities[tr.entityNum as usize].s.eFlags & EF_DISINTEGRATION) == 0)
+                || ((*ctx.world).g_entities[tr.entityNum as usize].s.eFlags & EF_DISINTEGRATION)
+                    == 0)
             && tr.entityNum as c_int != (*self_).s.number
             && (*ctx.world).g_entities[tr.entityNum as usize].inuse != 0
         {
@@ -4998,8 +5085,7 @@ pub fn CheckSaberDamage(
                 && crate::bg_panimate::BG_InKnockDownOnGround(
                     &(*ctx.world).bg_state,
                     &mut (*trc).ps as *mut playerState_t,
-                )
-                    == 0
+                ) == 0
             {
                 //stabdowns only damage people who are actually on the ground...
                 return qfalse;
@@ -5012,12 +5098,20 @@ pub fn CheckSaberDamage(
             if (*ctx.world).cvars.d_saberSPStyleDamage.integer == 0
                 && !(*trEnt).client.is_null()
                 && unblockable == 0
-                && WP_SaberCanBlock(ctx, trEnt, tr.endpos, 0, MOD_SABER as c_int, qfalse, attackStr) != 0
+                && WP_SaberCanBlock(
+                    ctx,
+                    trEnt,
+                    tr.endpos,
+                    0,
+                    MOD_SABER as c_int,
+                    qfalse,
+                    attackStr,
+                ) != 0
             {
                 //hit a client who blocked the attack (fake: didn't actually hit their saber)
                 if dmg <= SABER_NONATTACK_DAMAGE {
-                    (*sc).ps.saberIdleWound = (*ctx.world).level.time
-                        + (*ctx.world).cvars.g_saberDmgDelay_Idle.integer;
+                    (*sc).ps.saberIdleWound =
+                        (*ctx.world).level.time + (*ctx.world).cvars.g_saberDmgDelay_Idle.integer;
                 }
                 (*ctx.world).globals.saberDoClashEffect = qtrue;
                 _VectorCopy(tr.endpos, &mut (*ctx.world).globals.saberClashPos);
@@ -5164,7 +5258,8 @@ pub fn CheckSaberDamage(
                 }
             }
         } else if (tr.fraction != 1.0 || tr.startsolid != 0)
-            && ((*ctx.world).g_entities[tr.entityNum as usize].r.contents & CONTENTS_LIGHTSABER) != 0
+            && ((*ctx.world).g_entities[tr.entityNum as usize].r.contents & CONTENTS_LIGHTSABER)
+                != 0
             && (*ctx.world).g_entities[tr.entityNum as usize].r.contents != -1
             && (*ctx.world).g_entities[tr.entityNum as usize].inuse != 0
         {
@@ -5184,7 +5279,8 @@ pub fn CheckSaberDamage(
                 //hit an in-hand saber, do extra collision check against it
                 if (*ctx.world).cvars.d_saberSPStyleDamage.integer != 0 {
                     //use SP-style blade-collision test
-                    if WP_SabersIntersect(ctx, self_, rSaberNum, rBladeNum, otherOwner, qfalse) == 0 {
+                    if WP_SabersIntersect(ctx, self_, rSaberNum, rBladeNum, otherOwner, qfalse) == 0
+                    {
                         //sabers did not actually intersect
                         return qfalse;
                     }
@@ -5238,8 +5334,8 @@ pub fn CheckSaberDamage(
                 (*ctx.world).level.time + (*ctx.world).cvars.g_saberDmgDelay_Idle.integer;
 
             if dmg <= SABER_NONATTACK_DAMAGE {
-                (*sc).ps.saberIdleWound = (*ctx.world).level.time
-                    + (*ctx.world).cvars.g_saberDmgDelay_Idle.integer;
+                (*sc).ps.saberIdleWound =
+                    (*ctx.world).level.time + (*ctx.world).cvars.g_saberDmgDelay_Idle.integer;
             }
 
             (*ctx.world).globals.saberDoClashEffect = qtrue;
@@ -5269,7 +5365,8 @@ pub fn CheckSaberDamage(
                 && rSaberNum == 0
                 && saberCheckKnockdown_Smashed(
                     ctx,
-                    &mut (*ctx.world).g_entities[(*sc).ps.saberEntityNum as usize] as *mut gentity_t,
+                    &mut (*ctx.world).g_entities[(*sc).ps.saberEntityNum as usize]
+                        as *mut gentity_t,
                     self_,
                     otherOwner,
                     dmg,
@@ -5287,7 +5384,9 @@ pub fn CheckSaberDamage(
             let ooc = (*otherOwner).client as *mut gclient_t;
             otherUnblockable = qfalse;
 
-            if !otherOwner.is_null() && !(*otherOwner).client.is_null() && (*ooc).ps.saberInFlight != 0
+            if !otherOwner.is_null()
+                && !(*otherOwner).client.is_null()
+                && (*ooc).ps.saberInFlight != 0
             {
                 return qfalse;
             }
@@ -5360,7 +5459,8 @@ pub fn CheckSaberDamage(
             if ((selfSaberLevel < FORCE_LEVEL_3
                 && ((tryDeflectAgain != 0 && (*ctx.world).bg_state.rng.Q_irand(1, 10) <= 3)
                     || (tryDeflectAgain == 0 && (*ctx.world).bg_state.rng.Q_irand(1, 10) <= 7)))
-                || ((*ctx.world).bg_state.rng.Q_irand(1, 10) <= 1 && otherSaberLevel >= FORCE_LEVEL_3))
+                || ((*ctx.world).bg_state.rng.Q_irand(1, 10) <= 1
+                    && otherSaberLevel >= FORCE_LEVEL_3))
                 && PM_SaberInBounce((*sc).ps.saberMove) == 0
                 && PM_SaberInBrokenParry((*ooc).ps.saberMove) == 0
                 && BG_SaberInSpecial((*ooc).ps.saberMove) == 0
@@ -5396,8 +5496,10 @@ pub fn CheckSaberDamage(
                 }
 
                 //make them (me) go into a broken parry
-                (*sc).ps.saberMove =
-                    crate::bg_panimate::BG_BrokenParryForAttack(&(*ctx.world).bg_state, (*sc).ps.saberMove);
+                (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                    &(*ctx.world).bg_state,
+                    (*sc).ps.saberMove,
+                );
                 (*sc).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
 
                 if (*ctx.world).cvars.g_saberDebugPrint.integer != 0 {
@@ -5537,8 +5639,7 @@ pub fn CheckSaberDamage(
                     attackAdv = (attackStr
                         + attackBonus
                         + (*sc).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize])
-                        - (defendStr
-                            + (*ooc).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize]);
+                        - (defendStr + (*ooc).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize]);
 
                     if attackAdv > 1 {
                         //I won, he should knockaway
@@ -5603,7 +5704,9 @@ pub fn CheckSaberDamage(
 
                     if SaberAttacking(otherOwner) == 0 {
                         let mut otherIdleStr = (*ooc).ps.fd.saberAnimLevel;
-                        if otherIdleStr == saber_styles_t::SS_DUAL as c_int || otherIdleStr == saber_styles_t::SS_STAFF as c_int {
+                        if otherIdleStr == saber_styles_t::SS_DUAL as c_int
+                            || otherIdleStr == saber_styles_t::SS_STAFF as c_int
+                        {
                             otherIdleStr = saber_styles_t::SS_MEDIUM as c_int;
                         }
 
@@ -5764,10 +5867,7 @@ pub fn CheckSaberDamage(
 /// Raven `VectorCompare2`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:5275-5282`
-pub fn VectorCompare2(
-    v1: vec3_t,
-    v2: vec3_t,
-) -> c_int {
+pub fn VectorCompare2(v1: vec3_t, v2: vec3_t) -> c_int {
     if v1[0] > v2[0] + 0.0001f32
         || v1[0] < v2[0] - 0.0001f32
         || v1[1] > v2[1] + 0.0001f32
@@ -5802,7 +5902,9 @@ pub fn G_SPSaberDamageTraceLerped(
         let mut md2: vec3_t = [0.0; 3];
 
         if ((*ctx.world).level.time
-            - (*ec).saber[saberNum as usize].blade[bladeNum as usize].trail.lastTime)
+            - (*ec).saber[saberNum as usize].blade[bladeNum as usize]
+                .trail
+                .lastTime)
             > 100
         {
             //no valid last pos, use current
@@ -5811,11 +5913,15 @@ pub fn G_SPSaberDamageTraceLerped(
         } else {
             //trace from last pos
             _VectorCopy(
-                (*ec).saber[saberNum as usize].blade[bladeNum as usize].trail.base,
+                (*ec).saber[saberNum as usize].blade[bladeNum as usize]
+                    .trail
+                    .base,
                 &mut baseOld,
             );
             _VectorCopy(
-                (*ec).saber[saberNum as usize].blade[bladeNum as usize].trail.tip,
+                (*ec).saber[saberNum as usize].blade[bladeNum as usize]
+                    .trail
+                    .tip,
                 &mut endOld,
             );
         }
@@ -5886,7 +5992,12 @@ pub fn G_SPSaberDamageTraceLerped(
                 AngleVectors(md2ang, Some(&mut md2), None, None);
                 //shorten the base pos
                 _VectorSubtract(mp2, mp1, &mut baseDiff);
-                _VectorMA(mp1, (*ctx.world).globals.saberHitFraction, baseDiff, baseNew);
+                _VectorMA(
+                    mp1,
+                    (*ctx.world).globals.saberHitFraction,
+                    baseDiff,
+                    baseNew,
+                );
                 _VectorMA(
                     *baseNew,
                     (*ec).saber[saberNum as usize].blade[bladeNum as usize].lengthMax,
@@ -5968,7 +6079,12 @@ pub fn G_SPSaberDamageTraceLerped(
                         let mut curMA2: vec3_t = [0.0; 3];
                         //adjust muzzle endpoint
                         _VectorSubtract(mp2, mp1, &mut baseDiff);
-                        _VectorMA(mp1, (*ctx.world).globals.saberHitFraction, baseDiff, baseNew);
+                        _VectorMA(
+                            mp1,
+                            (*ctx.world).globals.saberHitFraction,
+                            baseDiff,
+                            baseNew,
+                        );
                         _VectorMA(
                             *baseNew,
                             (*ec).saber[saberNum as usize].blade[bladeNum as usize].lengthMax,
@@ -5995,8 +6111,7 @@ pub fn G_SPSaberDamageTraceLerped(
                     }
                     step += stepsize;
                 }
-                if (*ctx.world).globals.saberHitWall != 0
-                    || (*ctx.world).globals.saberHitSaber != 0
+                if (*ctx.world).globals.saberHitWall != 0 || (*ctx.world).globals.saberHitSaber != 0
                 {
                     break;
                 }
@@ -6199,17 +6314,15 @@ pub fn WP_SaberStartMissileBlockCheck(
             if (*ent).inuse == 0 {
                 continue;
             }
-            if (*ent).s.eType != ET_MISSILE as c_int
-                && (*ent).s.eFlags & EF_MISSILE_STICK == 0
-            {
+            if (*ent).s.eType != ET_MISSILE as c_int && (*ent).s.eFlags & EF_MISSILE_STICK == 0 {
                 //not a normal projectile
                 if (*ent).r.ownerNum < 0 || (*ent).r.ownerNum >= ENTITYNUM_WORLD {
                     //not going to be a client then.
                     continue;
                 }
 
-                let pOwner = &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize]
-                    as *mut gentity_t;
+                let pOwner =
+                    &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize] as *mut gentity_t;
                 let poc = (*pOwner).client as *mut gclient_t;
 
                 if (*pOwner).inuse == 0 || (*pOwner).client.is_null() {
@@ -6353,8 +6466,7 @@ pub fn WP_SaberStartMissileBlockCheck(
                             as *mut gentity_t;
                         let owc = (*owner).client as *mut gclient_t;
                         if (*owner).health >= 0
-                            && ((*owner).client.is_null()
-                                || (*owc).playerTeam != (*sc).playerTeam)
+                            && ((*owner).client.is_null() || (*owc).playerTeam != (*sc).playerTeam)
                         {
                             G_SetEnemy(ctx, self_, owner);
                         }
@@ -6530,7 +6642,8 @@ pub fn CheckThrownSaberDamaged(
 
                 if tr.fraction == 1.0 || tr.entityNum as c_int == (*ent).s.number {
                     if (*soc).ps.isJediMaster == 0
-                        && WP_SaberCanBlock(ctx, ent, tr.endpos, 0, MOD_SABER as c_int, qfalse, 999) != 0
+                        && WP_SaberCanBlock(ctx, ent, tr.endpos, 0, MOD_SABER as c_int, qfalse, 999)
+                            != 0
                     {
                         // they blocked it
                         WP_SaberBlockNonRandom(ent, tr.endpos, qfalse);
@@ -6675,7 +6788,11 @@ pub fn CheckThrownSaberDamaged(
                 let mut entOrigin: vec3_t = [0.0; 3];
 
                 if (*ent).s.eType == ET_MOVER as c_int {
-                    crate::q_math::_VectorSubtract((*ent).r.absmax, (*ent).r.absmin, &mut entOrigin);
+                    crate::q_math::_VectorSubtract(
+                        (*ent).r.absmax,
+                        (*ent).r.absmin,
+                        &mut entOrigin,
+                    );
                     let tmp = entOrigin;
                     crate::q_math::_VectorMA((*ent).r.absmin, 0.5, tmp, &mut entOrigin);
                     crate::q_math::_VectorAdd((*ent).r.absmin, (*ent).r.absmax, &mut entOrigin);
@@ -6714,9 +6831,29 @@ pub fn CheckThrownSaberDamaged(
 
                     if (*ent).s.eType == ET_NPC as c_int {
                         // an animent
-                        G_Damage(ctx, ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 40, dflags, MOD_SABER as c_int);
+                        G_Damage(
+                            ctx,
+                            ent,
+                            saberOwner,
+                            saberOwner,
+                            Some(&mut dir),
+                            tr.endpos,
+                            40,
+                            dflags,
+                            MOD_SABER as c_int,
+                        );
                     } else {
-                        G_Damage(ctx, ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 5, dflags, MOD_SABER as c_int);
+                        G_Damage(
+                            ctx,
+                            ent,
+                            saberOwner,
+                            saberOwner,
+                            Some(&mut dir),
+                            tr.endpos,
+                            5,
+                            dflags,
+                            MOD_SABER as c_int,
+                        );
                     }
 
                     let te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
@@ -6741,7 +6878,8 @@ pub fn CheckThrownSaberDamaged(
                             // don't do clash flare
                             G_FreeEntity(ctx, te);
                         } else {
-                            let teS = G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
+                            let teS =
+                                G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
                             (*teS).s.origin = (*te).s.origin;
                             (*te).s.eventParm = 0;
                         }
@@ -6769,11 +6907,7 @@ pub fn CheckThrownSaberDamaged(
 // we're going to cheat and damage players within the saber's radius, just for the
 // sake of doing things more "efficiently" (and because the saber entity has no
 // server g2 instance)
-pub fn saberCheckRadiusDamage(
-    ctx: GameContext<'_>,
-    saberent: *mut gentity_t,
-    returning: c_int,
-) {
+pub fn saberCheckRadiusDamage(ctx: GameContext<'_>, saberent: *mut gentity_t, returning: c_int) {
     unsafe {
         let mut i = 0;
         let dist: c_int;
@@ -6792,7 +6926,9 @@ pub fn saberCheckRadiusDamage(
             return;
         }
 
-        if (*((*saberOwner).client as *mut gclient_t)).ps.saberAttackWound
+        if (*((*saberOwner).client as *mut gclient_t))
+            .ps
+            .saberAttackWound
             > (*ctx.world).level.time
         {
             return;
@@ -6809,23 +6945,96 @@ pub fn saberCheckRadiusDamage(
 /// Raven `saberMoveBack`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6165-6227`
-pub fn saberMoveBack(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    goingBack: qboolean,
-) {
-    // The `THROWN_SABER_COMP` compensation block is `#ifdef`-gated off in the MP
-    // build, so `oldOrg`/`goingBack` are unused here.
-    let _ = goingBack;
+pub fn saberMoveBack(ctx: GameContext<'_>, ent: *mut gentity_t, goingBack: qboolean) {
     unsafe {
         let level_time = (*ctx.world).level.time;
         (*ent).s.pos.trType = trType_t::TR_LINEAR;
 
+        let oldOrg = (*ent).r.currentOrigin;
         let mut origin: vec3_t = [0.0; 3];
         // get current position
         BG_EvaluateTrajectory(&(*ent).s.pos, level_time, &mut origin);
         // Get current angles?
         BG_EvaluateTrajectory(&(*ent).s.apos, level_time, &mut (*ent).r.currentAngles);
+
+        // compensation test code — `THROWN_SABER_COMP` is `#define`d
+        // unconditionally in the oracle, so this block is compiled in.
+        if goingBack == qfalse && (*ent).s.pos.trType != trType_t::TR_GRAVITY {
+            // acts as a fallback in case touch code fails, keeps saber from
+            // going through things between predictions
+            let iCompensationLength = 32;
+            let mut tr: trace_t = core::mem::zeroed();
+            let mut mins: vec3_t = [0.0; 3];
+            let mut maxs: vec3_t = [0.0; 3];
+            let mut calcComp: vec3_t = [0.0; 3];
+            let mut compensatedOrigin: vec3_t = [0.0; 3];
+            VectorSet(&mut mins, -24.0, -24.0, -8.0);
+            VectorSet(&mut maxs, 24.0, 24.0, 8.0);
+
+            crate::q_math::_VectorSubtract(origin, oldOrg, &mut calcComp);
+            let originalLength = VectorLength(calcComp);
+
+            VectorNormalize(&mut calcComp);
+
+            compensatedOrigin[0] =
+                oldOrg[0] + calcComp[0] * (originalLength + iCompensationLength as f32);
+            compensatedOrigin[1] =
+                oldOrg[1] + calcComp[1] * (originalLength + iCompensationLength as f32);
+            compensatedOrigin[2] =
+                oldOrg[2] + calcComp[2] * (originalLength + iCompensationLength as f32);
+
+            trap::Trace(
+                ctx.engine,
+                GTraceArgs::new(
+                    &mut tr as *mut trace_t,
+                    &oldOrg as *const vec3_t,
+                    &mins as *const vec3_t,
+                    &maxs as *const vec3_t,
+                    &compensatedOrigin as *const vec3_t,
+                    (*ent).r.ownerNum,
+                    MASK_PLAYERSOLID,
+                ),
+            );
+
+            if (tr.fraction != 1.0 || tr.startsolid != 0 || tr.allsolid != 0)
+                && tr.entityNum as i32 != (*ent).r.ownerNum
+                && ((*ctx.world).g_entities[tr.entityNum as usize].r.contents & CONTENTS_LIGHTSABER)
+                    == 0
+            {
+                VectorClear(&mut (*ent).s.pos.trDelta);
+
+                // Unfortunately restoring `origin` would defeat the purpose of
+                // the compensation; we settle for a jerk on the client.
+                // we'll skip the dist check, since we just hit it physically
+                CheckThrownSaberDamaged(
+                    ctx,
+                    ent,
+                    &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize] as *mut gentity_t,
+                    &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t,
+                    256,
+                    0,
+                    qtrue,
+                );
+
+                if (*ent).s.pos.trType == trType_t::TR_GRAVITY {
+                    // got blocked and knocked away in the damage func
+                    return;
+                }
+
+                tr.startsolid = 0;
+                if tr.entityNum as i32 == ENTITYNUM_NONE {
+                    // it had to hit something, so we'll say it hit the world
+                    tr.entityNum = ENTITYNUM_WORLD as i16;
+                }
+                thrownSaberTouch(
+                    ctx,
+                    ent,
+                    &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t,
+                    &mut tr as *mut trace_t,
+                );
+                return;
+            }
+        }
 
         crate::q_math::_VectorCopy(origin, &mut (*ent).r.currentOrigin);
     }
@@ -6834,11 +7043,7 @@ pub fn saberMoveBack(
 /// Raven `SaberBounceSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6229-6233`
-pub fn SaberBounceSound(
-    self_: *mut gentity_t,
-    other: *mut gentity_t,
-    trace: *mut trace_t,
-) {
+pub fn SaberBounceSound(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
     let _ = (other, trace);
     unsafe {
         (*self_).s.apos.trBase = (*self_).r.currentAngles; // VectorCopy
@@ -6849,10 +7054,7 @@ pub fn SaberBounceSound(
 /// Raven `DeadSaberThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6235-6245`
-pub fn DeadSaberThink(
-    ctx: GameContext<'_>,
-    saberent: *mut gentity_t,
-) {
+pub fn DeadSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
     unsafe {
         if (*saberent).speed < ((*ctx.world).level.time) as f32 {
             (*saberent).think = Some(EntThink::G_FreeEntity);
@@ -6869,10 +7071,7 @@ pub fn DeadSaberThink(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6247-6335`
 // spawn a "dead" saber entity here so it looks like the saber fell out of the air.
 // This entity removes itself after a very short time period.
-pub fn MakeDeadSaber(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) {
+pub fn MakeDeadSaber(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ctx.world).cvars.g_gametype.integer == GT_JEDIMASTER {
             // never spawn a dead saber in JM, because the only saber on the level is
@@ -6967,10 +7166,7 @@ pub fn MakeDeadSaber(
 /// Raven `DownedSaberThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6342-6480`
-pub fn DownedSaberThink(
-    ctx: GameContext<'_>,
-    saberent: *mut gentity_t,
-) {
+pub fn DownedSaberThink(ctx: GameContext<'_>, saberent: *mut gentity_t) {
     unsafe {
         let level_time = (*ctx.world).level.time;
         let mut notDisowned = qfalse;
@@ -6986,7 +7182,8 @@ pub fn DownedSaberThink(
             return;
         }
 
-        let saberOwn = &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
+        let saberOwn =
+            &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
 
         if (*saberOwn).inuse == 0
             || (*saberOwn).client.is_null()
@@ -7052,9 +7249,7 @@ pub fn DownedSaberThink(
             return;
         }
 
-        if (*soc).saberKnockedTime < level_time
-            && ((*soc).pers.cmd.buttons & BUTTON_ATTACK) != 0
-        {
+        if (*soc).saberKnockedTime < level_time && ((*soc).pers.cmd.buttons & BUTTON_ATTACK) != 0 {
             // He wants us back
             pullBack = qtrue;
         } else if (level_time - (*soc).saberKnockedTime) > MAX_LEAVE_TIME {
@@ -7101,11 +7296,7 @@ pub fn DownedSaberThink(
 /// Raven `saberReactivate`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6482-6508`
-pub fn saberReactivate(
-    ctx: GameContext<'_>,
-    saberent: *mut gentity_t,
-    saberOwner: *mut gentity_t,
-) {
+pub fn saberReactivate(ctx: GameContext<'_>, saberent: *mut gentity_t, saberOwner: *mut gentity_t) {
     unsafe {
         (*saberent).s.saberInFlight = qtrue;
 
@@ -7128,7 +7319,9 @@ pub fn saberReactivate(
 
         (*saberent).s.weapon = WP_SABER as c_int;
 
-        (*((*saberOwner).client as *mut gclient_t)).ps.saberEntityState = 1;
+        (*((*saberOwner).client as *mut gclient_t))
+            .ps
+            .saberEntityState = 1;
 
         trap::LinkEntity(
             ctx.engine,
@@ -7228,7 +7421,12 @@ pub fn saberKnockDown(
         }
 
         if (*soc).saber[1].soundOff != 0 && (*soc).saber[1].model[0] != 0 {
-            G_Sound(ctx, saberOwner, CHAN_BODY as c_int, (*soc).saber[1].soundOff);
+            G_Sound(
+                ctx,
+                saberOwner,
+                CHAN_BODY as c_int,
+                (*soc).saber[1].soundOff,
+            );
         }
     }
 }
@@ -7239,10 +7437,7 @@ pub fn saberKnockDown(
 // PORT-NOTE(g2-seam-argshape): oracle passes `&saberent->ghoul2` (void**) but the
 // resolved `GG2Removeghoul2ModelsArgs::new` takes a single `*mut c_void`; the
 // address-of is cast to match (reported as a shape_mismatch).
-pub fn WP_SaberRemoveG2Model(
-    ctx: GameContext<'_>,
-    saberent: *mut gentity_t,
-) {
+pub fn WP_SaberRemoveG2Model(ctx: GameContext<'_>, saberent: *mut gentity_t) {
     unsafe {
         if !(*saberent).ghoul2.is_null() {
             trap::G2API_RemoveGhoul2Models(
@@ -7399,15 +7594,21 @@ pub fn saberCheckKnockdown_DuelLoss(
         let mut validMomentum = qtrue;
         let mut disarmChance = 1;
 
-        // PORT-NOTE(SABERINVALID): the w_saber.c `SABERINVALID` macro is not
-        // surfaced by the packet; ported as the null/inuse/client guard the body
-        // relies on.
+        // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
         if saberent.is_null()
             || saberOwner.is_null()
             || other.is_null()
+            || (*saberent).inuse == 0
             || (*saberOwner).inuse == 0
+            || (*other).inuse == 0
             || (*saberOwner).client.is_null()
             || (*other).client.is_null()
+            || (*((*saberOwner).client as *mut gclient_t))
+                .ps
+                .saberEntityNum
+                == 0
+            || (*((*saberOwner).client as *mut gclient_t)).ps.saberLockTime
+                > ((*ctx.world).level.time - 100)
         {
             return qfalse;
         }
@@ -7495,13 +7696,21 @@ pub fn saberCheckKnockdown_BrokenParry(
         let mut doKnock = qfalse;
         let mut disarmChance = 1;
 
-        // PORT-NOTE(SABERINVALID): unresolved macro; ported as the guard the body needs.
+        // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
         if saberent.is_null()
             || saberOwner.is_null()
             || other.is_null()
+            || (*saberent).inuse == 0
             || (*saberOwner).inuse == 0
+            || (*other).inuse == 0
             || (*saberOwner).client.is_null()
             || (*other).client.is_null()
+            || (*((*saberOwner).client as *mut gclient_t))
+                .ps
+                .saberEntityNum
+                == 0
+            || (*((*saberOwner).client as *mut gclient_t)).ps.saberLockTime
+                > ((*ctx.world).level.time - 100)
         {
             return qfalse;
         }
@@ -7587,11 +7796,21 @@ pub fn saberCheckKnockdown_Smashed(
     damage: c_int,
 ) -> qboolean {
     unsafe {
-        // PORT-NOTE(SABERINVALID): unresolved macro; ported as the guard the body needs.
+        // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
         if saberent.is_null()
             || saberOwner.is_null()
+            || other.is_null()
+            || (*saberent).inuse == 0
             || (*saberOwner).inuse == 0
+            || (*other).inuse == 0
             || (*saberOwner).client.is_null()
+            || (*other).client.is_null()
+            || (*((*saberOwner).client as *mut gclient_t))
+                .ps
+                .saberEntityNum
+                == 0
+            || (*((*saberOwner).client as *mut gclient_t)).ps.saberLockTime
+                > ((*ctx.world).level.time - 100)
         {
             return qfalse;
         }
@@ -7626,8 +7845,6 @@ pub fn saberCheckKnockdown_Smashed(
 /// Raven `saberCheckKnockdown_Thrown`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6884-6915`
-// PORT-NOTE(SABERINVALID): the w_saber.c `SABERINVALID` macro is not surfaced by
-// the packet; ported as the null/inuse/client guard the body relies on.
 pub fn saberCheckKnockdown_Thrown(
     ctx: GameContext<'_>,
     saberent: *mut gentity_t,
@@ -7637,12 +7854,21 @@ pub fn saberCheckKnockdown_Thrown(
     unsafe {
         let mut tossIt = qfalse;
 
+        // Raven `SABERINVALID` macro (`w_saber.c:6587`), expanded in full.
         if saberent.is_null()
             || saberOwner.is_null()
             || other.is_null()
+            || (*saberent).inuse == 0
             || (*saberOwner).inuse == 0
+            || (*other).inuse == 0
             || (*saberOwner).client.is_null()
             || (*other).client.is_null()
+            || (*((*saberOwner).client as *mut gclient_t))
+                .ps
+                .saberEntityNum
+                == 0
+            || (*((*saberOwner).client as *mut gclient_t)).ps.saberLockTime
+                > ((*ctx.world).level.time - 100)
         {
             return qfalse;
         }
@@ -7672,10 +7898,7 @@ pub fn saberCheckKnockdown_Thrown(
 /// Raven `saberBackToOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:6917-7076`
-pub fn saberBackToOwner(
-    ctx: GameContext<'_>,
-    saberent: *mut gentity_t,
-) {
+pub fn saberBackToOwner(ctx: GameContext<'_>, saberent: *mut gentity_t) {
     unsafe {
         let level_time = (*ctx.world).level.time;
         let saberOwner =
@@ -7772,7 +7995,8 @@ pub fn saberBackToOwner(
 
         // I don't really like the spin on the way back.
         if (*soc).ps.saberEntityNum == (*saberent).s.number {
-            if ((*soc).saber[0].saberFlags & SFL_RETURN_DAMAGE) == 0 || (*soc).ps.saberHolstered != 0
+            if ((*soc).saber[0].saberFlags & SFL_RETURN_DAMAGE) == 0
+                || (*soc).ps.saberHolstered != 0
             {
                 (*saberent).s.saberInFlight = qfalse;
             }
@@ -7848,7 +8072,9 @@ pub fn thrownSaberTouch(
         if !other.is_null()
             && (*other).r.ownerNum < (MAX_CLIENTS) as i32
             && ((*other).r.contents & CONTENTS_LIGHTSABER) != 0
-            && !(*ctx.world).g_entities[(*other).r.ownerNum as usize].client.is_null()
+            && !(*ctx.world).g_entities[(*other).r.ownerNum as usize]
+                .client
+                .is_null()
             && (*ctx.world).g_entities[(*other).r.ownerNum as usize].inuse != 0
         {
             hitEnt = &mut (*ctx.world).g_entities[(*other).r.ownerNum as usize] as *mut gentity_t;
@@ -7866,13 +8092,11 @@ pub fn thrownSaberTouch(
 /// Raven `saberFirstThrown`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7117-7257`
-pub fn saberFirstThrown(
-    ctx: GameContext<'_>,
-    saberent: *mut gentity_t,
-) {
+pub fn saberFirstThrown(ctx: GameContext<'_>, saberent: *mut gentity_t) {
     unsafe {
         let level_time = (*ctx.world).level.time;
-        let saberOwn = &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
+        let saberOwn =
+            &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
 
         if (*saberent).r.ownerNum == ENTITYNUM_NONE {
             MakeDeadSaber(ctx, saberent);
@@ -7951,7 +8175,11 @@ pub fn saberFirstThrown(
             }
 
             let mut vSub: vec3_t = [0.0; 3];
-            crate::q_math::_VectorSubtract((*soc).ps.origin, (*saberent).r.currentOrigin, &mut vSub);
+            crate::q_math::_VectorSubtract(
+                (*soc).ps.origin,
+                (*saberent).r.currentOrigin,
+                &mut vSub,
+            );
             let vLen = VectorLength(vSub);
 
             if vLen
@@ -7985,7 +8213,8 @@ pub fn saberFirstThrown(
                 saberMoveBack(ctx, saberent, qfalse);
                 (*saberent).s.pos.trBase = (*saberent).r.currentOrigin;
 
-                let mask = if (*soc).ps.fd.forcePowerLevel[FP_SABERTHROW as usize] >= FORCE_LEVEL_3 {
+                let mask = if (*soc).ps.fd.forcePowerLevel[FP_SABERTHROW as usize] >= FORCE_LEVEL_3
+                {
                     MASK_PLAYERSOLID
                 } else {
                     MASK_SOLID
@@ -8183,13 +8412,11 @@ pub fn UpdateClientRenderinfo(
             _VectorCopy((*client).ps.viewangles, &mut (*ri).eyeAngles);
 
             //we'll just say the legs/torso are whatever the first frame of our current anim is.
-            (*ri).torsoFrame = (*(*ctx.world).bg_state.bgAllAnims
-                [(*self_).localAnimIndex as usize]
+            (*ri).torsoFrame = (*(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize]
                 .anims
                 .add((*client).ps.torsoAnim as usize))
             .firstFrame as c_int;
-            (*ri).legsFrame = (*(*ctx.world).bg_state.bgAllAnims
-                [(*self_).localAnimIndex as usize]
+            (*ri).legsFrame = (*(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize]
                 .anims
                 .add((*client).ps.legsAnim as usize))
             .firstFrame as c_int;
@@ -8353,7 +8580,12 @@ pub fn UpdateClientRenderinfo(
             _VectorCopy((*ri).muzzlePoint, &mut (*ri).muzzlePointOld);
             _VectorCopy((*client).ps.origin, &mut (*ri).muzzlePoint);
             _VectorCopy((*ri).muzzleDir, &mut (*ri).muzzleDirOld);
-            AngleVectors((*client).ps.viewangles, Some(&mut (*ri).muzzleDir), None, None);
+            AngleVectors(
+                (*client).ps.viewangles,
+                Some(&mut (*ri).muzzleDir),
+                None,
+                None,
+            );
             (*ri).mPCalcTime = (*ctx.world).level.time;
 
             _VectorCopy((*client).ps.origin, &mut (*ri).eyePoint);
@@ -8365,10 +8597,7 @@ pub fn UpdateClientRenderinfo(
 /// Raven `G_KickDownable`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7474-7500`
-pub fn G_KickDownable(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn G_KickDownable(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         if (*ctx.world).cvars.d_saberKickTweak.integer == 0 {
             return 1;
@@ -8379,8 +8608,7 @@ pub fn G_KickDownable(
         }
         let client = (*ent).client as *mut gclient_t;
 
-        if BG_InKnockDown((*client).ps.legsAnim) != 0
-            || BG_InKnockDown((*client).ps.torsoAnim) != 0
+        if BG_InKnockDown((*client).ps.legsAnim) != 0 || BG_InKnockDown((*client).ps.torsoAnim) != 0
         {
             return 0;
         }
@@ -8401,12 +8629,7 @@ pub fn G_KickDownable(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7502-7525`
 // `tossDir` is read-only here (`VectorMA` input only, never written),
 // so it stays by-value.
-pub fn G_TossTheMofo(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    tossDir: vec3_t,
-    tossStr: f32,
-) {
+pub fn G_TossTheMofo(ctx: GameContext<'_>, ent: *mut gentity_t, tossDir: vec3_t, tossStr: f32) {
     unsafe {
         if (*ent).inuse == 0 || (*ent).client.is_null() {
             // no good
@@ -9047,11 +9270,7 @@ pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `G_PrettyCloseIGuess`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7958-7967`
-pub fn G_PrettyCloseIGuess(
-    a: f32,
-    b: f32,
-    tolerance: f32,
-) -> qboolean {
+pub fn G_PrettyCloseIGuess(a: f32, b: f32, tolerance: f32) -> qboolean {
     if (a - b) < tolerance && (a - b) > -tolerance {
         return 1;
     }
@@ -9061,10 +9280,7 @@ pub fn G_PrettyCloseIGuess(
 /// Raven `G_GrabSomeMofos`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7969-8082`
-pub fn G_GrabSomeMofos(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-) {
+pub fn G_GrabSomeMofos(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let client = (*self_).client as *mut gclient_t;
         // `renderInfo_t *ri = &self->client->renderInfo;` — only `handRBolt` is read.
@@ -9109,7 +9325,10 @@ pub fn G_GrabSomeMofos(
                 &pos as *const vec3_t,
                 (*self_).s.number,
                 MASK_SHOT,
-                G2TRFLAG_DOGHOULTRACE | G2TRFLAG_GETSURFINDEX | G2TRFLAG_THICK | G2TRFLAG_HITCORPSES,
+                G2TRFLAG_DOGHOULTRACE
+                    | G2TRFLAG_GETSURFINDEX
+                    | G2TRFLAG_THICK
+                    | G2TRFLAG_HITCORPSES,
                 (*ctx.world).cvars.g_g2TraceLod.integer,
             ),
         );
@@ -9124,11 +9343,7 @@ pub fn G_GrabSomeMofos(
                 && !(*grabbed).client.is_null()
                 && (*grabbed).health > 0
                 && G_CanBeEnemy(ctx, self_, grabbed) != 0
-                && G_PrettyCloseIGuess(
-                    (*gcl).ps.origin[2],
-                    (*client).ps.origin[2],
-                    4.0,
-                ) != 0
+                && G_PrettyCloseIGuess((*gcl).ps.origin[2], (*client).ps.origin[2], 4.0) != 0
                 && (BG_InGrappleMove((*gcl).ps.torsoAnim) == 0
                     || (*gcl).ps.torsoAnim == animNumber_t::BOTH_KYLE_GRAB as c_int)
                 && (BG_InGrappleMove((*gcl).ps.legsAnim) == 0
@@ -9151,7 +9366,8 @@ pub fn G_GrabSomeMofos(
                 if tortureAnim == -1 || correspondingAnim == -1 {
                     if (*client).ps.torsoTimer < 300 && (*client).grappleState == 0 {
                         // you failed to grab anyone, play the "failed to grab" anim
-                        G_SetAnim(ctx,
+                        G_SetAnim(
+                            ctx,
                             self_,
                             &mut (*client).pers.cmd,
                             SETANIM_BOTH,
@@ -9174,7 +9390,8 @@ pub fn G_GrabSomeMofos(
                 (*gcl).grappleState = 20;
 
                 // time to crack some heads
-                G_SetAnim(ctx,
+                G_SetAnim(
+                    ctx,
                     self_,
                     &mut (*client).pers.cmd,
                     SETANIM_BOTH,
@@ -9187,7 +9404,8 @@ pub fn G_GrabSomeMofos(
                     (*client).ps.weaponTime = (*client).ps.torsoTimer;
                 }
 
-                G_SetAnim(ctx,
+                G_SetAnim(
+                    ctx,
                     grabbed,
                     &mut (*gcl).pers.cmd,
                     SETANIM_BOTH,
@@ -9220,7 +9438,8 @@ pub fn G_GrabSomeMofos(
 
         if (*client).ps.torsoTimer < 300 && (*client).grappleState == 0 {
             // you failed to grab anyone, play the "failed to grab" anim
-            G_SetAnim(ctx,
+            G_SetAnim(
+                ctx,
                 self_,
                 &mut (*client).pers.cmd,
                 SETANIM_BOTH,
@@ -9243,11 +9462,7 @@ pub fn G_GrabSomeMofos(
 /// work maintaining the server g2 client instance (updating angles/anims/etc).
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:8084-9102`
-pub fn WP_SaberPositionUpdate(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    ucmd: *mut usercmd_t,
-) {
+pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut usercmd_t) {
     unsafe {
         let mut mySaber: *mut gentity_t = core::ptr::null_mut();
         let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
@@ -9324,20 +9539,17 @@ pub fn WP_SaberPositionUpdate(
                 || (*gcl).grappleState == 0
                 || (*grappler).health < 1
                 || (*self_).health < 1
-                || G_PrettyCloseIGuess(
-                    (*client).ps.origin[2],
-                    (*gcl).ps.origin[2],
-                    4.0f32,
-                ) == qfalse
+                || G_PrettyCloseIGuess((*client).ps.origin[2], (*gcl).ps.origin[2], 4.0f32)
+                    == qfalse
             {
                 (*client).grappleState = 0;
-                if (BG_InGrappleMove((*client).ps.torsoAnim) != 0
-                    && (*client).ps.torsoTimer > 100)
+                if (BG_InGrappleMove((*client).ps.torsoAnim) != 0 && (*client).ps.torsoTimer > 100)
                     || (BG_InGrappleMove((*client).ps.legsAnim) != 0
                         && (*client).ps.legsTimer > 100)
                 {
                     // if they're pretty far from finishing the anim then shove them into another anim
-                    G_SetAnim(ctx,
+                    G_SetAnim(
+                        ctx,
                         self_,
                         &mut (*client).pers.cmd,
                         SETANIM_BOTH,
@@ -9364,7 +9576,8 @@ pub fn WP_SaberPositionUpdate(
                     {
                         (*client).grappleState = 0;
 
-                        G_SetAnim(ctx,
+                        G_SetAnim(
+                            ctx,
                             self_,
                             &mut (*client).pers.cmd,
                             SETANIM_BOTH,
@@ -9412,7 +9625,8 @@ pub fn WP_SaberPositionUpdate(
                                 (*self_).clipmask,
                             ),
                         );
-                        if trace.startsolid == 0 && trace.allsolid == 0 && trace.fraction == 1.0f32 {
+                        if trace.startsolid == 0 && trace.allsolid == 0 && trace.fraction == 1.0f32
+                        {
                             // go there
                             G_SetOrigin(self_, idealSpot);
                             crate::q_math::_VectorCopy(idealSpot, &mut (*client).ps.origin);
@@ -9424,10 +9638,20 @@ pub fn WP_SaberPositionUpdate(
                             if (*gcl).ps.saberHolstered == 0 {
                                 (*gcl).ps.saberHolstered = 2;
                                 if (*gcl).saber[0].soundOff != 0 {
-                                    G_Sound(ctx, grappler, CHAN_AUTO as c_int, (*gcl).saber[0].soundOff);
+                                    G_Sound(
+                                        ctx,
+                                        grappler,
+                                        CHAN_AUTO as c_int,
+                                        (*gcl).saber[0].soundOff,
+                                    );
                                 }
                                 if (*gcl).saber[1].soundOff != 0 && (*gcl).saber[1].model[0] != 0 {
-                                    G_Sound(ctx, grappler, CHAN_AUTO as c_int, (*gcl).saber[1].soundOff);
+                                    G_Sound(
+                                        ctx,
+                                        grappler,
+                                        CHAN_AUTO as c_int,
+                                        (*gcl).saber[1].soundOff,
+                                    );
                                 }
                             }
                         }
@@ -9527,7 +9751,8 @@ pub fn WP_SaberPositionUpdate(
                                     if (*grappler).health > 0 {
                                         // if still alive knock them down
                                         (*gcl).ps.forceHandExtend = HANDEXTEND_KNOCKDOWN as c_int;
-                                        (*gcl).ps.forceHandExtendTime = (*ctx.world).level.time + 1300;
+                                        (*gcl).ps.forceHandExtendTime =
+                                            (*ctx.world).level.time + 1300;
                                     }
                                 }
                             }
@@ -9640,7 +9865,10 @@ pub fn WP_SaberPositionUpdate(
                     && (*client).ps.saberInFlight == 0
                 {
                     // Since we haven't got a bolt position, place it on top of the player origin.
-                    crate::q_math::_VectorCopy((*client).ps.origin, &mut (*mySaber).r.currentOrigin);
+                    crate::q_math::_VectorCopy(
+                        (*client).ps.origin,
+                        &mut (*mySaber).r.currentOrigin,
+                    );
                 }
             }
 
@@ -9732,8 +9960,7 @@ pub fn WP_SaberPositionUpdate(
                     && !(*vehEnt).client.is_null()
                     && !(*vehEnt).m_pVehicle.is_null()
                 {
-                    properAngles[1] = *(*((*vehEnt).m_pVehicle
-                        as *mut mp_bg::vehicles::Vehicle_t))
+                    properAngles[1] = *(*((*vehEnt).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t))
                         .m_vOrientation
                         .add(YAW as usize);
                 } else {
@@ -9768,7 +9995,10 @@ pub fn WP_SaberPositionUpdate(
                         || (*mySaber).r.contents == 0)
                     && (*client).ps.saberInFlight == 0
                 {
-                    crate::q_math::_VectorCopy((*client).ps.origin, &mut (*mySaber).r.currentOrigin);
+                    crate::q_math::_VectorCopy(
+                        (*client).ps.origin,
+                        &mut (*mySaber).r.currentOrigin,
+                    );
                 }
 
                 break 'finalUpdate;
@@ -10092,7 +10322,8 @@ pub fn WP_SaberPositionUpdate(
                     while rBladeNum < (*client).saber[rSaberNum as usize].numBlades {
                         // update muzzle data for the blade
                         crate::q_math::_VectorCopy(
-                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize].muzzlePoint,
+                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
+                                .muzzlePoint,
                             &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .muzzlePointOld,
                         );
@@ -10293,8 +10524,11 @@ pub fn WP_SaberPositionUpdate(
                                 } else {
                                     while sN < (MAX_CLIENTS) as i32 {
                                         if (*ctx.world).g_entities[sN as usize].inuse != 0
-                                            && !(*ctx.world).g_entities[sN as usize].client.is_null()
-                                            && (*ctx.world).g_entities[sN as usize].r.linked != qfalse
+                                            && !(*ctx.world).g_entities[sN as usize]
+                                                .client
+                                                .is_null()
+                                            && (*ctx.world).g_entities[sN as usize].r.linked
+                                                != qfalse
                                             && (*ctx.world).g_entities[sN as usize].health > 0
                                             && ((*ctx.world).g_entities[sN as usize].r.contents
                                                 & CONTENTS_BODY)
@@ -10314,27 +10548,13 @@ pub fn WP_SaberPositionUpdate(
 
                                 while gotHit == qfalse {
                                     if CheckSaberDamage(
-                                        ctx,
-                                        self_,
-                                        rSaberNum,
-                                        rBladeNum,
-                                        boltOrigin,
-                                        end,
-                                        qfalse,
-                                        trMask,
-                                        qfalse,
+                                        ctx, self_, rSaberNum, rBladeNum, boltOrigin, end, qfalse,
+                                        trMask, qfalse,
                                     ) == qfalse
                                     {
                                         if CheckSaberDamage(
-                                            ctx,
-                                            self_,
-                                            rSaberNum,
-                                            rBladeNum,
-                                            boltOrigin,
-                                            end,
-                                            qtrue,
-                                            trMask,
-                                            qfalse,
+                                            ctx, self_, rSaberNum, rBladeNum, boltOrigin, end,
+                                            qtrue, trMask, qfalse,
                                         ) == qfalse
                                         {
                                             let mut oldSaberStart: vec3_t = [0.0; 3];
@@ -10490,10 +10710,12 @@ pub fn WP_SaberPositionUpdate(
                                             if clientUnlinked[sN as usize] != qfalse {
                                                 // Make clients clip properly again.
                                                 if (*ctx.world).g_entities[sN as usize].inuse != 0
-                                                    && (*ctx.world).g_entities[sN as usize].health > 0
+                                                    && (*ctx.world).g_entities[sN as usize].health
+                                                        > 0
                                                 {
-                                                    (*ctx.world).g_entities[sN as usize].r.contents |=
-                                                        CONTENTS_BODY;
+                                                    (*ctx.world).g_entities[sN as usize]
+                                                        .r
+                                                        .contents |= CONTENTS_BODY;
                                                 }
                                             }
                                             sN += 1;
@@ -10619,9 +10841,7 @@ pub fn WP_SaberPositionUpdate(
 /// Raven `WP_MissileBlockForBlock`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9104-9125`
-pub fn WP_MissileBlockForBlock(
-    saberBlock: c_int,
-) -> c_int {
+pub fn WP_MissileBlockForBlock(saberBlock: c_int) -> c_int {
     match saberBlock {
         BLOCKED_UPPER_RIGHT => BLOCKED_UPPER_RIGHT_PROJ,
         BLOCKED_UPPER_LEFT => BLOCKED_UPPER_LEFT_PROJ,
@@ -10637,11 +10857,7 @@ pub fn WP_MissileBlockForBlock(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:9127-9198`
 // `hitloc` is a read-only input here (VectorSubtract source, `hitloc[2]`
 // read), never written — so it stays by-value `vec3_t`.
-pub fn WP_SaberBlockNonRandom(
-    self_: *mut gentity_t,
-    hitloc: vec3_t,
-    missileBlock: qboolean,
-) {
+pub fn WP_SaberBlockNonRandom(self_: *mut gentity_t, hitloc: vec3_t, missileBlock: qboolean) {
     unsafe {
         let client = (*self_).client as *mut gclient_t;
 
@@ -10728,7 +10944,8 @@ pub fn WP_SaberBlock(
 
         let rightdot = (right[0] * diff[0] + right[1] * diff[1] + right[2] * diff[2])
             + RandFloat(ctx, -0.2, 0.2);
-        let zdiff = hitloc[2] - (*client).ps.origin[2] + (*ctx.world).bg_state.rng.Q_irand(-8, 8) as f32;
+        let zdiff =
+            hitloc[2] - (*client).ps.origin[2] + (*ctx.world).bg_state.rng.Q_irand(-8, 8) as f32;
 
         // Figure out what quadrant the block was in.
         if zdiff > 24.0 {
@@ -10888,7 +11105,13 @@ pub fn WP_SaberCanBlock(
             blockFactor -= 0.25;
         }
 
-        if InFront(point, (*client).ps.origin, (*client).ps.viewangles, blockFactor) == 0 {
+        if InFront(
+            point,
+            (*client).ps.origin,
+            (*client).ps.viewangles,
+            blockFactor,
+        ) == 0
+        {
             return 0;
         }
 

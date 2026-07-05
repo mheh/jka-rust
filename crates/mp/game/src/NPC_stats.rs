@@ -503,8 +503,10 @@ pub fn NPC_Precache(
             }
 
             // (unrecognized token inside this block falls through — the
-            // oracle loop has no `else` catch-all here, matching its while(1))
-            break;
+            // oracle loop has no `else` catch-all here, matching its while(1),
+            // so an unrecognized token is ignored and the loop continues,
+            // rather than exiting early)
+            continue;
         }
 
         // If we're not a vehicle, then an error here would be valid...

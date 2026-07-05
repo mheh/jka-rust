@@ -230,8 +230,13 @@ pub fn Use_Target_Print(
 
         if (*ent).spawnflags & 4 != 0 {
             // private, to one client only
-            if !activator.is_null() && (*activator).inuse != 0 {
-                if !(*activator).client.is_null() && !(*activator).client.is_null() {
+            if activator.is_null() || (*activator).inuse == 0 {
+                // Com_Printf("ERROR: Bad activator in Use_Target_Print");
+            }
+            // Oracle gates the send only on `activator && activator->client`
+            // (no inuse check). g_target.c:190.
+            if !activator.is_null() && !(*activator).client.is_null() {
+                {
                     // make sure there's a valid client ent to send it to
                     let msg = crate::cstr_util::cstr_to_str((*ent).message);
                     if *(*ent).message == b'@' as c_char && *(*ent).message.add(1) != b'@' as c_char {

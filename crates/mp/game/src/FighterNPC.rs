@@ -44,7 +44,7 @@ const MIN_LANDING_SPEED: f32 = 200.0; // bg_public.h
 const MAX_STRAFE_TIME: f32 = 2000.0; // q_shared.h
 const EF2_HYPERSPACE: c_int = 1 << 5;
 const EF_JETPACK_ACTIVE: c_int = 1 << 11;
-const EF_DEAD: c_int = 1 << 7;
+const EF_DEAD: c_int = 1 << 1; // bg_public.h:561
 const CHAN_AUTO: c_int = 0; // soundChannel_t CHAN_AUTO
 // `vehFlags_t` masks as `u64` for `Vehicle_t::m_ulFlags`. Source: `bg_vehicles.h:417`.
 const VEH_WINGSOPEN: u64 = 0x0000_0020;
@@ -118,8 +118,10 @@ pub fn BG_FighterUpdate(
             }
         }
 
-        // Get parent's player state
-        parentPS = (*pVeh).m_pParentEntity.cast::<playerState_t>();
+        // Get parent's player state. Oracle: `pVeh->m_pParentEntity->playerState`
+        // reads the bgEntity's playerState pointer field, not a reinterpret of the
+        // bgEntity pointer itself (whose first member is entityState_t s).
+        parentPS = (*(*pVeh).m_pParentEntity).playerState;
         if parentPS.is_null() {
             // ERROR: NULL PS
             return qfalse;
@@ -140,7 +142,7 @@ pub fn BG_FighterUpdate(
         }
 
         // Check if dead
-        isDead = if (*parentPS).eFlags & (1 << 7) != 0 { qtrue } else { qfalse };  // EF_DEAD
+        isDead = if (*parentPS).eFlags & EF_DEAD != 0 { qtrue } else { qfalse };
 
         // Check landing surface. `vec3_t` (`[f32;3]`) is `Copy`, so `VectorCopy`
         // transcribes as plain array assignment per the bless-the-rule appendix
@@ -339,14 +341,14 @@ pub fn FighterWingMalfunctionCheck(
         );
 
         // Check right wing damage
-        if ((*parentPS).brokenLimbs & (1 << 4)) != 0 {
+        if ((*parentPS).brokenLimbs & (1 << 6)) != 0 {
             // SHIPSURF_DAMAGE_RIGHT_HEAVY
             *(*pVeh).m_vOrientation.add(2) +=
                 (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
                     * (*pVeh).m_fTimeModifier
                     * mYawOverride
                     * 50.0f32;
-        } else if ((*parentPS).brokenLimbs & (1 << 3)) != 0 {
+        } else if ((*parentPS).brokenLimbs & (1 << 2)) != 0 {
             // SHIPSURF_DAMAGE_RIGHT_LIGHT
             *(*pVeh).m_vOrientation.add(2) +=
                 (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
@@ -356,14 +358,14 @@ pub fn FighterWingMalfunctionCheck(
         }
 
         // Check left wing damage
-        if ((*parentPS).brokenLimbs & (1 << 2)) != 0 {
+        if ((*parentPS).brokenLimbs & (1 << 7)) != 0 {
             // SHIPSURF_DAMAGE_LEFT_HEAVY
             *(*pVeh).m_vOrientation.add(2) -=
                 (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
                     * (*pVeh).m_fTimeModifier
                     * mYawOverride
                     * 50.0f32;
-        } else if ((*parentPS).brokenLimbs & (1 << 1)) != 0 {
+        } else if ((*parentPS).brokenLimbs & (1 << 3)) != 0 {
             // SHIPSURF_DAMAGE_LEFT_LIGHT
             *(*pVeh).m_vOrientation.add(2) -=
                 (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
@@ -392,13 +394,13 @@ pub fn FighterNoseMalfunctionCheck(
         );
 
         // Check nose damage
-        if ((*parentPS).brokenLimbs & (1 << 0)) != 0 {
+        if ((*parentPS).brokenLimbs & (1 << 4)) != 0 {
             // SHIPSURF_DAMAGE_FRONT_HEAVY
             *(*pVeh).m_vOrientation.add(0) += ((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
                 * (*pVeh).m_fTimeModifier
                 * mPitchOverride
                 * 50.0f32;
-        } else if ((*parentPS).brokenLimbs & (1 << 5)) != 0 {
+        } else if ((*parentPS).brokenLimbs & (1 << 0)) != 0 {
             // SHIPSURF_DAMAGE_FRONT_LIGHT
             *(*pVeh).m_vOrientation.add(0) += ((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
                 * (*pVeh).m_fTimeModifier
