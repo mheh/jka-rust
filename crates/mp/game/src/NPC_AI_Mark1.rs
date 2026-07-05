@@ -506,7 +506,7 @@ pub fn NPC_Mark1_Pain(
                 self_,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
-                [0.0, 0.0, 0.0],
+                None,
                 [0.0, 0.0, 0.0],
                 (*self_).health,
                 0,
@@ -806,13 +806,14 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
         }
 
         // Enemy is dead or he has no enemy.
-        if (*(*npc).enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
+        let npc_enemy = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*npc).enemy);
+        if (*npc_enemy).health < 1 || crate::NPC_utils::NPC_CheckEnemyExt(ctx, QFALSE) == QFALSE {
             (*npc).enemy = None;
             return;
         }
 
         // Rate our distance to the target and visibility
-        let distance = crate::q_math::DistanceHorizontalSquared((*npc).r.currentOrigin, (*(*npc).enemy).r.currentOrigin) as c_int;
+        let distance = crate::q_math::DistanceHorizontalSquared((*npc).r.currentOrigin, (*npc_enemy).r.currentOrigin) as c_int;
         let distRate = if distance > MIN_MELEE_RANGE_SQR { DIST_LONG } else { DIST_MELEE };
         let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, (*npc).enemy);
         let advance = if distance > MIN_DISTANCE_SQR { QTRUE } else { QFALSE };

@@ -508,7 +508,7 @@ pub fn Boba_FireFlameThrower(
                 traceEnt,
                 self_,
                 self_,
-                &mut dir,
+                Some(&mut dir),
                 tr.endpos,
                 damage,
                 (DAMAGE_NO_ARMOR | DAMAGE_NO_KNOCKBACK | DAMAGE_IGNORE_TEAM) as c_int,

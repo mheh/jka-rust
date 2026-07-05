@@ -393,14 +393,15 @@ pub fn Blocked_Mover(
         }
 
         if (*ent).damage != 0 {
-            // Raven passes `NULL` for `dir`/`point`; `vec3_t` is a by-value
-            // array here (no null representation), so the zero vector
-            // (`vec3_origin`) is the faithful stand-in.
+            // Raven passes `NULL` for both `dir` and `point`; `dir` is now
+            // `Option<&mut vec3_t>` (ruling 25) so `None` is faithful, but
+            // `point` is still a by-value `vec3_t` (no null representation),
+            // so the zero vector (`vec3_origin`) remains the stand-in there.
             G_Damage(
                 other,
                 ent,
                 ent,
-                vec3_origin,
+                None,
                 vec3_origin,
                 (*ent).damage,
                 0,

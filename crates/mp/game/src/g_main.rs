@@ -3101,12 +3101,7 @@ pub fn G_RunFrame(
                             if (*ent).health > 0 && (*ent).takedamage != QFALSE {
                                 // if they're still alive..
                                 let dmg = world.bg_state.rng.Q_irand(50, 70);
-                                let mut dir: vec3_t = [0.0; 3];
-                                // PORT-NOTE(g_damage-null-dir): Raven passes `NULL` for
-                                // `dir`; `G_Damage`'s resolved signature takes `&mut
-                                // vec3_t` (non-nullable) — a zeroed local stands in
-                                // (shape mismatch, see shape_mismatches).
-                                G_Damage(ent, spacetrigger, spacetrigger, &mut dir, (*client).ps.origin, dmg, DAMAGE_NO_ARMOR, MOD_SUICIDE);
+                                G_Damage(ent, spacetrigger, spacetrigger, None, (*client).ps.origin, dmg, DAMAGE_NO_ARMOR, MOD_SUICIDE);
 
                                 if (*ent).health > 0 {
                                     // play the choking sound

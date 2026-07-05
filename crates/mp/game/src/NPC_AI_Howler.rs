@@ -171,7 +171,7 @@ pub fn Howler_TryDamage(
                 &mut (*ctx.world).entities[tr.entityNum as usize] as *mut gentity_t,
                 npc,
                 npc,
-                &mut dir,
+                Some(&mut dir),
                 tr.endpos,
                 damage,
                 DAMAGE_NO_KNOCKBACK,

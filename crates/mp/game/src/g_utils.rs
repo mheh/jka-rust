@@ -1293,7 +1293,7 @@ pub fn G_KillBox(
                 hit,
                 ent,
                 ent,
-                [0.0, 0.0, 0.0],
+                None,
                 [0.0, 0.0, 0.0],
                 100000,
                 DAMAGE_NO_PROTECTION,

@@ -223,7 +223,7 @@ pub fn Wampa_Slash(
 
             if DistanceSquared((*radiusEnt).r.currentOrigin, boltOrg) <= radiusSquared {
                 // smack
-                crate::g_combat::G_Damage(radiusEnt, npc, npc, crate::prelude::vec3_origin, radiusEnt.r.currentOrigin, if backhand != 0 { crate::q_math::Q_irand(10, 15) } else { crate::q_math::Q_irand(20, 30) }, if backhand != 0 { crate::prelude::DAMAGE_NO_ARMOR } else { crate::prelude::DAMAGE_NO_ARMOR | crate::prelude::DAMAGE_NO_KNOCKBACK }, crate::prelude::MOD_MELEE);
+                crate::g_combat::G_Damage(radiusEnt, npc, npc, Some(&mut crate::prelude::vec3_origin), radiusEnt.r.currentOrigin, if backhand != 0 { crate::q_math::Q_irand(10, 15) } else { crate::q_math::Q_irand(20, 30) }, if backhand != 0 { crate::prelude::DAMAGE_NO_ARMOR } else { crate::prelude::DAMAGE_NO_ARMOR | crate::prelude::DAMAGE_NO_KNOCKBACK }, crate::prelude::MOD_MELEE);
                 if backhand != 0 {
                     // actually push the enemy
                     let mut pushDir: [f32; 3] = [0.0; 3];
@@ -363,9 +363,12 @@ pub fn Wampa_Combat(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         let npc_info = (*ctx.world).globals.NPCInfo;
+        // Raven dereferences `NPC->enemy` unguarded here; this function is only
+        // called while actively engaged, so the enemy is assumed live.
+        let enemy_ent = &mut (*ctx.world).entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
 
         // If we cannot see our target or we have somewhere to go, then do that
-        if !crate::NPC_utils::NPC_ClearLOS(ctx, (*npc).r.currentOrigin, (*(*npc).enemy).r.currentOrigin) != 0 {
+        if !crate::NPC_utils::NPC_ClearLOS(ctx, (*npc).r.currentOrigin, (*enemy_ent).r.currentOrigin) != 0 {
             if !crate::q_math::Q_irand(0, 10) != 0 {
                 if Wampa_CheckRoar(ctx, npc) != 0 {
                     return;
@@ -385,7 +388,7 @@ pub fn Wampa_Combat(ctx: GameContext<'_>) {
             Wampa_Move(ctx, 1);
             return;
         } else {
-            let distance = crate::q_math::Distance((*npc).r.currentOrigin, (*(*npc).enemy).r.currentOrigin);
+            let distance = crate::q_math::Distance((*npc).r.currentOrigin, (*enemy_ent).r.currentOrigin);
             (*ctx.world).globals.enemyDist = distance;
             let advance = if distance > ((*npc).r.maxs[0] as f32 + MIN_DISTANCE as f32) { qtrue } else { qfalse };
             let mut doCharge = qfalse;
@@ -398,9 +401,9 @@ pub fn Wampa_Combat(ctx: GameContext<'_>) {
                 // have to get closer
                 let mut yawOnlyAngles: [f32; 3] = [0.0; 3];
                 crate::q_math::VectorSet(&mut yawOnlyAngles, 0.0, (*npc).r.currentAngles[crate::prelude::YAW as usize], 0.0);
-                if (*(*npc).enemy).health > 0 // enemy still alive
+                if (*enemy_ent).health > 0 // enemy still alive
                     && (distance - 350.0).abs() <= 80.0 // enemy anywhere from 270 to 430 away
-                    && crate::NPC_senses::InFOV3((*(*npc).enemy).r.currentOrigin, (*npc).r.currentOrigin, yawOnlyAngles, 20, 20) != 0
+                    && crate::NPC_senses::InFOV3((*enemy_ent).r.currentOrigin, (*npc).r.currentOrigin, yawOnlyAngles, 20, 20) != 0
                 {
                     // enemy generally in front
                     if !crate::q_math::Q_irand(0, 9) != 0 {
@@ -453,11 +456,17 @@ pub fn NPC_Wampa_Pain(
             && attacker != (*self_).enemy
             && ((*attacker).flags & crate::prelude::FL_NOTARGET) == 0
         {
+            // Resolved once; only dereferenced downstream after the `is_none()`
+            // short-circuit guards it (mirrors Raven's unguarded `self->enemy->x`).
+            let enemy_ptr = match (*self_).enemy {
+                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                None => core::ptr::null_mut(),
+            };
             if ((*attacker).s.number == 0 && !crate::q_math::Q_irand(0, 3) != 0)
                 || (*self_).enemy.is_none()
-                || (*(*self_).enemy).health == 0
-                || (!(*self_).enemy.is_none() && !(*(*self_).enemy).client.is_null() && (*(*(*self_).enemy).client).NPC_class == crate::prelude::CLASS_WAMPA)
-                || (!crate::q_math::Q_irand(0, 4) != 0 && crate::q_math::DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < crate::q_math::DistanceSquared((*(*self_).enemy).r.currentOrigin, (*self_).r.currentOrigin))
+                || (*enemy_ptr).health == 0
+                || (!(*self_).enemy.is_none() && !(*enemy_ptr).client.is_null() && (*((*enemy_ptr).client as *mut gclient_t)).NPC_class == crate::prelude::CLASS_WAMPA)
+                || (!crate::q_math::Q_irand(0, 4) != 0 && crate::q_math::DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < crate::q_math::DistanceSquared((*enemy_ptr).r.currentOrigin, (*self_).r.currentOrigin))
             {
                 // if my enemy is dead (or attacked by player) and I'm not still holding/eating someone, turn on the attacker
                 // FIXME: if can't nav to my enemy, take this guy if I can nav to him
@@ -533,12 +542,15 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
             return;
         }
         if !(*npc).enemy.is_none() {
+            // Guaranteed `Some` inside this block by the guard above (mirrors
+            // Raven's unguarded `NPC->enemy->x` once `NPC->enemy` is known set).
+            let enemy_ptr = &mut (*ctx.world).entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
             if !crate::g_timer::TIMER_Done(ctx, npc, c"attacking".as_ptr()) != 0 {
                 // in middle of attack
                 // face enemy
                 crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
                 // continue attack logic
-                (*ctx.world).globals.enemyDist = crate::q_math::Distance((*npc).r.currentOrigin, (*(*npc).enemy).r.currentOrigin);
+                (*ctx.world).globals.enemyDist = crate::q_math::Distance((*npc).r.currentOrigin, (*enemy_ptr).r.currentOrigin);
                 Wampa_Attack(ctx, (*ctx.world).globals.enemyDist, qfalse);
                 return;
             } else {
@@ -548,7 +560,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                     crate::g_timer::TIMER_Set(ctx, npc, c"angrynoise".as_ptr(), crate::q_math::Q_irand(5000, 10000));
                 }
                 // else, if he's in our hand, we eat, else if he's on the ground, we keep attacking his dead body for a while
-                if !(*npc).enemy.is_none() && !(*(*npc).enemy).client.is_null() && (*(*(*npc).enemy).client).NPC_class == crate::prelude::CLASS_WAMPA {
+                if !(*npc).enemy.is_none() && !(*enemy_ptr).client.is_null() && (*((*enemy_ptr).client as *mut gclient_t)).NPC_class == crate::prelude::CLASS_WAMPA {
                     // got mad at another Wampa, look for a valid enemy
                     if !crate::g_timer::TIMER_Done(ctx, npc, c"wampaInfight".as_ptr()) != 0 {
                         crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue);
@@ -556,7 +568,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                 } else {
                     if crate::NPC_combat::ValidEnemy(ctx, (*npc).enemy) == qfalse {
                         crate::g_timer::TIMER_Remove(ctx, npc, c"lookForNewEnemy".as_ptr()); // make them look again right now
-                        if !(*(*npc).enemy).inuse != 0 || (*ctx.world).level.time - (*(*npc).enemy).s.time > crate::q_math::Q_irand(10000, 15000) {
+                        if !(*enemy_ptr).inuse != 0 || (*ctx.world).level.time - (*enemy_ptr).s.time > crate::q_math::Q_irand(10000, 15000) {
                             // it's been a while since the enemy died, or enemy is completely gone, get bored with him
                             (*npc).enemy = None;
                             Wampa_Patrol(ctx);

@@ -1444,7 +1444,7 @@ pub fn Cmd_DuelTeam_f(
                 ent,
                 ent,
                 ent,
-                std::ptr::null_mut(),
+                None,
                 (*client).ps.origin,
                 99999,
                 DAMAGE_NO_PROTECTION,

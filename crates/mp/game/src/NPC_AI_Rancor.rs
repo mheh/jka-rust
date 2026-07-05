@@ -153,42 +153,46 @@ pub fn Rancor_DropVictim(
     //FIXME: if Rancor dies, it should drop its victim.
     //FIXME: if Rancor is removed, it must remove its victim.
     unsafe {
-        if !(*self_).activator.is_none() {
-            if !(*(*self_).activator).client.is_null() {
-                (*(*(*self_).activator).client).ps.eFlags2 &= !EF2_HELD_BY_MONSTER;
-                (*(*(*self_).activator).client).ps.hasLookTarget = qfalse;
-                (*(*(*self_).activator).client).ps.lookTarget = ENTITYNUM_NONE;
-                (*(*(*self_).activator).client).ps.viewangles[ROLL] = 0.0;
-                crate::g_client::SetClientViewAngle((*self_).activator, (*(*(*self_).activator).client).ps.viewangles);
-                (*(*self_).activator).r.currentAngles[PITCH] = 0.0;
-                (*(*self_).activator).r.currentAngles[ROLL] = 0.0;
-                crate::g_utils::G_SetAngles((*self_).activator, (*(*self_).activator).r.currentAngles);
+        let activator = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*self_).activator);
+        if !activator.is_null() {
+            if !(*activator).client.is_null() {
+                let activator_client = (*activator).client as *mut gclient_t;
+                (*activator_client).ps.eFlags2 &= !EF2_HELD_BY_MONSTER;
+                (*activator_client).ps.hasLookTarget = qfalse;
+                (*activator_client).ps.lookTarget = ENTITYNUM_NONE;
+                (*activator_client).ps.viewangles[ROLL] = 0.0;
+                crate::g_client::SetClientViewAngle(activator, (*activator_client).ps.viewangles);
+                (*activator).r.currentAngles[PITCH] = 0.0;
+                (*activator).r.currentAngles[ROLL] = 0.0;
+                crate::g_utils::G_SetAngles(activator, (*activator).r.currentAngles);
             }
-            if (*(*self_).activator).health <= 0 {
+            if (*activator).health <= 0 {
                 //if ( self->activator->s.number )
                 {//never free player
                     if (*self_).count == 1 {
                         //in my hand, just drop them
-                        if !(*(*self_).activator).client.is_null() {
-                            (*(*(*self_).activator).client).ps.legsTimer = 0;
-                            (*(*(*self_).activator).client).ps.torsoTimer = 0;
+                        if !(*activator).client.is_null() {
+                            let activator_client = (*activator).client as *mut gclient_t;
+                            (*activator_client).ps.legsTimer = 0;
+                            (*activator_client).ps.torsoTimer = 0;
                             //FIXME: ragdoll?
                         }
                     } else {
-                        if !(*(*self_).activator).client.is_null() {
-                            (*(*(*self_).activator).client).ps.eFlags |= EF_NODRAW;//so his corpse doesn't drop out of me...
+                        if !(*activator).client.is_null() {
+                            (*((*activator).client as *mut gclient_t)).ps.eFlags |= EF_NODRAW;//so his corpse doesn't drop out of me...
                         }
                         //G_FreeEntity( self->activator );
                     }
                 }
             } else {
-                if !(*(*self_).activator).NPC.is_null() {
+                if !(*activator).NPC.is_null() {
                     //start thinking again
-                    (*(*(*self_).activator).NPC).nextBStateThink = (*ctx.world).level.time;
+                    (*((*activator).NPC as *mut gNPC_t)).nextBStateThink = (*ctx.world).level.time;
                 }
                 //clear their anim and let them fall
-                (*(*(*self_).activator).client).ps.legsTimer = 0;
-                (*(*(*self_).activator).client).ps.torsoTimer = 0;
+                let activator_client = (*activator).client as *mut gclient_t;
+                (*activator_client).ps.legsTimer = 0;
+                (*activator_client).ps.torsoTimer = 0;
             }
             if (*self_).enemy == (*self_).activator {
                 (*self_).enemy = None;
@@ -295,7 +299,7 @@ pub fn Rancor_Swing(
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
                     if (*(*radiusEnt).client).NPC_class != CLASS_RANCOR
                         && (*(*radiusEnt).client).NPC_class != CLASS_ATST {
-                        crate::g_combat::G_Damage(radiusEnt, npc, npc, [0.0; 3], (*radiusEnt).r.currentOrigin, crate::q_math::Q_irand(25, 40), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE);
+                        crate::g_combat::G_Damage(radiusEnt, npc, npc, Some(&mut [0.0; 3]), (*radiusEnt).r.currentOrigin, crate::q_math::Q_irand(25, 40), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE);
                         crate::g_combat::G_Throw(ctx, radiusEnt, pushDir, 250.0);
                         if (*radiusEnt).health > 0 {
                             //do pain on enemy
@@ -350,7 +354,7 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
                 crate::g_utils::G_Sound(ctx, radiusEnt, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()));
                 if distSq < halfRadSquared {
                     //close enough to do damage, too
-                    crate::g_combat::G_Damage(radiusEnt, npc, npc, [0.0; 3], (*radiusEnt).r.currentOrigin, crate::q_math::Q_irand(10, 25), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE);
+                    crate::g_combat::G_Damage(radiusEnt, npc, npc, Some(&mut [0.0; 3]), (*radiusEnt).r.currentOrigin, crate::q_math::Q_irand(10, 25), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE);
                 }
                 if (*radiusEnt).health > 0
                     && !(*radiusEnt).client.is_null()
@@ -402,7 +406,7 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
             }
 
             if DistanceSquared((*radiusEnt).r.currentOrigin, boltOrg) <= radiusSquared {
-                crate::g_combat::G_Damage(radiusEnt, npc, npc, [0.0; 3], (*radiusEnt).r.currentOrigin, crate::q_math::Q_irand(15, 30), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE);
+                crate::g_combat::G_Damage(radiusEnt, npc, npc, Some(&mut [0.0; 3]), (*radiusEnt).r.currentOrigin, crate::q_math::Q_irand(15, 30), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE);
                 if (*radiusEnt).health <= 0 && !(*radiusEnt).client.is_null() {
                     //killed them, chance of dismembering
                     if !crate::q_math::Q_irand(0, 1) != 0 {
@@ -432,12 +436,14 @@ pub fn Rancor_Attack(
     ctx: GameContext<'_>,distance: f32, doCharge: qboolean) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
+        let ent_base = (*ctx.world).entities.as_mut_ptr();
 
         if !crate::g_timer::TIMER_Exists(ctx, npc, c"attacking".as_ptr()) {
             if (*npc).count == 2 && !(*npc).activator.is_none() {
             } else if (*npc).count == 1 && !(*npc).activator.is_none() {
+                let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
                 //holding enemy
-                if (*(*npc).activator).health > 0 && crate::q_math::Q_irand(0, 1) != 0 {
+                if (*activator).health > 0 && crate::q_math::Q_irand(0, 1) != 0 {
                     //quick bite
                     crate::npc_c::NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 450);
@@ -446,17 +452,17 @@ pub fn Rancor_Attack(
                     crate::npc_c::NPC_SetAnim(npc, SETANIM_BOTH, BOTH_ATTACK3, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg".as_ptr(), 900);
                     //Make victim scream in fright
-                    if (*(*npc).activator).health > 0 && !(*(*npc).activator).client.is_null() {
-                        crate::g_utils::G_AddEvent((*npc).activator, crate::q_math::Q_irand(EV_DEATH1, EV_DEATH3), 0);
-                        crate::npc_c::NPC_SetAnim((*npc).activator, SETANIM_TORSO, BOTH_FALLDEATH1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
-                        if !(*(*npc).activator).NPC.is_null() {
+                    if (*activator).health > 0 && !(*activator).client.is_null() {
+                        crate::g_utils::G_AddEvent(activator, crate::q_math::Q_irand(EV_DEATH1, EV_DEATH3), 0);
+                        crate::npc_c::NPC_SetAnim(activator, SETANIM_TORSO, BOTH_FALLDEATH1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        if !(*activator).NPC.is_null() {
                             //no more thinking for you
                             crate::g_combat::TossClientItems(ctx, npc);
-                            (*(*(*npc).activator).NPC).nextBStateThink = Q3_INFINITE;
+                            (*((*activator).NPC as *mut gNPC_t)).nextBStateThink = Q3_INFINITE;
                         }
                     }
                 }
-            } else if (*(*npc).enemy).health > 0 && doCharge != 0 {
+            } else if (*crate::ent_id::resolve(ent_base, (*npc).enemy)).health > 0 && doCharge != 0 {
                 //charge
                 let mut fwd: vec3_t = [0.0; 3];
                 let mut yawAng: vec3_t = [0.0, (*(*npc).client).ps.viewangles[1], 0.0];
@@ -497,18 +503,20 @@ pub fn Rancor_Attack(
             },
             BOTH_ATTACK1 => {
                 if (*npc).count == 1 && !(*npc).activator.is_none() {
-                    crate::g_combat::G_Damage((*npc).activator, npc, npc, [0.0; 3], (*(*npc).activator).r.currentOrigin, crate::q_math::Q_irand(25, 40), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE);
-                    if (*(*npc).activator).health <= 0 {
+                    let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
+                    crate::g_combat::G_Damage(activator, npc, npc, Some(&mut [0.0; 3]), (*activator).r.currentOrigin, crate::q_math::Q_irand(25, 40), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE);
+                    if (*activator).health <= 0 {
                         //killed him
                         //make it look like we bit his head off
                         //NPC->activator->client->dismembered = qfalse;
-                        crate::g_combat::G_Dismember(ctx, (*npc).activator, npc, (*(*npc).activator).r.currentOrigin, G2_MODELPART_HEAD, 90.0, 0.0, (*(*(*npc).activator).client).ps.torsoAnim, qtrue);
+                        let activator_client = (*activator).client as *mut gclient_t;
+                        crate::g_combat::G_Dismember(ctx, activator, npc, (*activator).r.currentOrigin, G2_MODELPART_HEAD, 90.0, 0.0, (*activator_client).ps.torsoAnim, qtrue);
                         //G_DoDismemberment( NPC->activator, NPC->activator->r.currentOrigin, MOD_SABER, 1000, HL_HEAD, qtrue );
-                        (*(*(*npc).activator).client).ps.forceHandExtend = HANDEXTEND_NONE;
-                        (*(*(*npc).activator).client).ps.forceHandExtendTime = 0;
-                        crate::npc_c::NPC_SetAnim((*npc).activator, SETANIM_BOTH, BOTH_SWIM_IDLE1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE;
+                        (*activator_client).ps.forceHandExtendTime = 0;
+                        crate::npc_c::NPC_SetAnim(activator, SETANIM_BOTH, BOTH_SWIM_IDLE1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     }
-                    crate::g_utils::G_Sound(ctx, (*npc).activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()));
+                    crate::g_utils::G_Sound(ctx, activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()));
                 }
             },
             BOTH_ATTACK2 => {
@@ -517,22 +525,24 @@ pub fn Rancor_Attack(
             },
             BOTH_ATTACK3 => {
                 if (*npc).count == 1 && !(*npc).activator.is_none() {
+                    let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
                     //cut in half
-                    if !(*(*npc).activator).client.is_null() {
+                    if !(*activator).client.is_null() {
                         //NPC->activator->client->dismembered = qfalse;
-                        crate::g_combat::G_Dismember(ctx, (*npc).activator, npc, (*(*npc).activator).r.currentOrigin, G2_MODELPART_WAIST, 90.0, 0.0, (*(*(*npc).activator).client).ps.torsoAnim, qtrue);
+                        crate::g_combat::G_Dismember(ctx, activator, npc, (*activator).r.currentOrigin, G2_MODELPART_WAIST, 90.0, 0.0, (*((*activator).client as *mut gclient_t)).ps.torsoAnim, qtrue);
                         //G_DoDismemberment( NPC->activator, NPC->enemy->r.currentOrigin, MOD_SABER, 1000, HL_WAIST, qtrue );
                     }
                     //KILL
-                    crate::g_combat::G_Damage((*npc).activator, npc, npc, [0.0; 3], (*(*npc).activator).r.currentOrigin, (*(*npc).enemy).health+10, DAMAGE_NO_PROTECTION|DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK|DAMAGE_NO_HIT_LOC, MOD_MELEE);//, HL_NONE );//
-                    if !(*(*npc).activator).client.is_null() {
-                        (*(*(*npc).activator).client).ps.forceHandExtend = HANDEXTEND_NONE;
-                        (*(*(*npc).activator).client).ps.forceHandExtendTime = 0;
-                        crate::npc_c::NPC_SetAnim((*npc).activator, SETANIM_BOTH, BOTH_SWIM_IDLE1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    crate::g_combat::G_Damage(activator, npc, npc, Some(&mut [0.0; 3]), (*activator).r.currentOrigin, (*crate::ent_id::resolve(ent_base, (*npc).enemy)).health+10, DAMAGE_NO_PROTECTION|DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK|DAMAGE_NO_HIT_LOC, MOD_MELEE);//, HL_NONE );//
+                    if !(*activator).client.is_null() {
+                        let activator_client = (*activator).client as *mut gclient_t;
+                        (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE;
+                        (*activator_client).ps.forceHandExtendTime = 0;
+                        crate::npc_c::NPC_SetAnim(activator, SETANIM_BOTH, BOTH_SWIM_IDLE1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     }
                     crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg2".as_ptr(), 1350);
-                    crate::g_utils::G_Sound(ctx, (*npc).activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()));
-                    crate::g_utils::G_AddEvent((*npc).activator, EV_JUMP, (*(*npc).activator).health);
+                    crate::g_utils::G_Sound(ctx, activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/swipehit.wav".as_ptr()));
+                    crate::g_utils::G_AddEvent(activator, EV_JUMP, (*activator).health);
                 }
             },
             _ => {}
@@ -550,25 +560,27 @@ pub fn Rancor_Attack(
             },
             BOTH_ATTACK3 => {
                 if (*npc).count == 1 && !(*npc).activator.is_none() {
+                    let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
                     //swallow victim
-                    crate::g_utils::G_Sound(ctx, (*npc).activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()));
+                    crate::g_utils::G_Sound(ctx, activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()));
                     //FIXME: sometimes end up with a live one in our mouths?
                     //just make sure they're dead
-                    if (*(*npc).activator).health > 0 {
+                    if (*activator).health > 0 {
                         //cut in half
                         //NPC->activator->client->dismembered = qfalse;
-                        crate::g_combat::G_Dismember(ctx, (*npc).activator, npc, (*(*npc).activator).r.currentOrigin, G2_MODELPART_WAIST, 90.0, 0.0, (*(*(*npc).activator).client).ps.torsoAnim, qtrue);
+                        let activator_client = (*activator).client as *mut gclient_t;
+                        crate::g_combat::G_Dismember(ctx, activator, npc, (*activator).r.currentOrigin, G2_MODELPART_WAIST, 90.0, 0.0, (*activator_client).ps.torsoAnim, qtrue);
                         //G_DoDismemberment( NPC->activator, NPC->enemy->r.currentOrigin, MOD_SABER, 1000, HL_WAIST, qtrue );
                         //KILL
-                        crate::g_combat::G_Damage((*npc).activator, npc, npc, [0.0; 3], (*(*npc).activator).r.currentOrigin, (*(*npc).enemy).health+10, DAMAGE_NO_PROTECTION|DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK|DAMAGE_NO_HIT_LOC, MOD_MELEE);//, HL_NONE );
-                        (*(*(*npc).activator).client).ps.forceHandExtend = HANDEXTEND_NONE;
-                        (*(*(*npc).activator).client).ps.forceHandExtendTime = 0;
-                        crate::npc_c::NPC_SetAnim((*npc).activator, SETANIM_BOTH, BOTH_SWIM_IDLE1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
-                        crate::g_utils::G_AddEvent((*npc).activator, EV_JUMP, (*(*npc).activator).health);
+                        crate::g_combat::G_Damage(activator, npc, npc, Some(&mut [0.0; 3]), (*activator).r.currentOrigin, (*crate::ent_id::resolve(ent_base, (*npc).enemy)).health+10, DAMAGE_NO_PROTECTION|DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK|DAMAGE_NO_HIT_LOC, MOD_MELEE);//, HL_NONE );
+                        (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE;
+                        (*activator_client).ps.forceHandExtendTime = 0;
+                        crate::npc_c::NPC_SetAnim(activator, SETANIM_BOTH, BOTH_SWIM_IDLE1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        crate::g_utils::G_AddEvent(activator, EV_JUMP, (*activator).health);
                     }
-                    if !(*(*npc).activator).client.is_null() {
+                    if !(*activator).client.is_null() {
                         //*sigh*, can't get tags right, just remove them?
-                        (*(*(*npc).activator).client).ps.eFlags |= EF_NODRAW;
+                        (*((*activator).client as *mut gclient_t)).ps.eFlags |= EF_NODRAW;
                     }
                     (*npc).count = 2;
                     crate::g_timer::TIMER_Set(ctx, npc, c"clearGrabbed".as_ptr(), 2600);
@@ -632,16 +644,17 @@ pub fn Rancor_Combat(ctx: GameContext<'_>) {
         crate::NPC_utils::NPC_FaceEnemy(ctx, qtrue);
 
         {
-            let distance = crate::q_math::Distance((*npc).r.currentOrigin, (*(*npc).enemy).r.currentOrigin);
+            let enemy = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*npc).enemy);
+            let distance = crate::q_math::Distance((*npc).r.currentOrigin, (*enemy).r.currentOrigin);
             let advance = if distance > ((*npc).r.maxs[0] + MIN_DISTANCE as f32) { qtrue } else { qfalse };
             let mut doCharge = qfalse;
 
             if advance != 0 {
                 //have to get closer
                 let yawOnlyAngles: vec3_t = [0.0, (*npc).r.currentAngles[1], 0.0];
-                if (*(*npc).enemy).health > 0
+                if (*enemy).health > 0
                     && (distance - 250.0).abs() <= 80.0
-                    && crate::NPC_senses::InFOV3((*(*npc).enemy).r.currentOrigin, (*npc).r.currentOrigin, yawOnlyAngles, 30, 30) != 0 {
+                    && crate::NPC_senses::InFOV3((*enemy).r.currentOrigin, (*npc).r.currentOrigin, yawOnlyAngles, 30, 30) != 0 {
                     if !crate::q_math::Q_irand(0, 9) != 0 {
                         //go for the charge
                         doCharge = qtrue;
@@ -673,6 +686,7 @@ pub fn NPC_Rancor_Pain(
         if !attacker.is_null() && !(*attacker).client.is_null() && (*(*attacker).client).NPC_class == CLASS_RANCOR {
             hitByRancor = qtrue;
         }
+        let self_enemy = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*self_).enemy);
         if !attacker.is_null()
             && (*attacker).inuse != 0
             && attacker != (*self_).enemy
@@ -680,9 +694,9 @@ pub fn NPC_Rancor_Pain(
             if (*self_).count == 0 {
                 if ((*attacker).s.number == 0 && !crate::q_math::Q_irand(0,3) != 0)
                     || (*self_).enemy.is_none()
-                    || (*(*self_).enemy).health == 0
-                    || (!(*(*self_).enemy).client.is_null() && (*(*(*self_).enemy).client).NPC_class == CLASS_RANCOR)
-                    || (!(*self_).NPC.is_null() && (*(*self_).NPC).consecutiveBlockedMoves>=10 && DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < DistanceSquared((*(*self_).enemy).r.currentOrigin, (*self_).r.currentOrigin)) {
+                    || (*self_enemy).health == 0
+                    || (!(*self_enemy).client.is_null() && (*((*self_enemy).client as *mut gclient_t)).NPC_class == CLASS_RANCOR)
+                    || (!(*self_).NPC.is_null() && (*(*self_).NPC).consecutiveBlockedMoves>=10 && DistanceSquared((*attacker).r.currentOrigin, (*self_).r.currentOrigin) < DistanceSquared((*self_enemy).r.currentOrigin, (*self_).r.currentOrigin)) {
                     //if my enemy is dead (or attacked by player) and I'm not still holding/eating someone, turn on the attacker
                     //FIXME: if can't nav to my enemy, take this guy if I can nav to him
                     crate::NPC_combat::G_SetEnemy(ctx, self_, attacker);
@@ -737,13 +751,14 @@ pub fn NPC_Rancor_Pain(
 pub fn Rancor_CheckDropVictim(ctx: GameContext<'_>) {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
-        let mins: vec3_t = [(*(*npc).activator).r.mins[0]-1.0, (*(*npc).activator).r.mins[1]-1.0, 0.0];
-        let maxs: vec3_t = [(*(*npc).activator).r.maxs[0]+1.0, (*(*npc).activator).r.maxs[1]+1.0, 1.0];
-        let start: vec3_t = [(*(*npc).activator).r.currentOrigin[0], (*(*npc).activator).r.currentOrigin[1], (*(*npc).activator).r.absmin[2]];
-        let end: vec3_t = [(*(*npc).activator).r.currentOrigin[0], (*(*npc).activator).r.currentOrigin[1], (*(*npc).activator).r.absmax[2]-1.0];
+        let activator = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*npc).activator);
+        let mins: vec3_t = [(*activator).r.mins[0]-1.0, (*activator).r.mins[1]-1.0, 0.0];
+        let maxs: vec3_t = [(*activator).r.maxs[0]+1.0, (*activator).r.maxs[1]+1.0, 1.0];
+        let start: vec3_t = [(*activator).r.currentOrigin[0], (*activator).r.currentOrigin[1], (*activator).r.absmin[2]];
+        let end: vec3_t = [(*activator).r.currentOrigin[0], (*activator).r.currentOrigin[1], (*activator).r.absmax[2]-1.0];
         let mut trace: trace_t = core::mem::zeroed();
 
-        trap::Trace(ctx.engine, &mut trace, start, mins, maxs, end, (*(*npc).activator).s.number, (*(*npc).activator).clipmask);
+        trap::Trace(ctx.engine, &mut trace, start, mins, maxs, end, (*activator).s.number, (*activator).clipmask);
         if !trace.allsolid && !trace.startsolid && trace.fraction >= 1.0 {
             Rancor_DropVictim(ctx, npc);
         }
@@ -767,7 +782,7 @@ pub fn Rancor_Crush(ctx: GameContext<'_>) {
         let crush = &mut (*ctx.world).entities[(*(*npc).client).ps.groundEntityNum as usize];
         if crush.inuse != 0 && !crush.client.is_null() && crush.localAnimIndex == 0 {
             //a humanoid, smash them good.
-            crate::g_combat::G_Damage(crush as *mut gentity_t, npc, npc, core::ptr::null_mut(), (*npc).r.currentOrigin, 200, 0, MOD_CRUSH);
+            crate::g_combat::G_Damage(crush as *mut gentity_t, npc, npc, None, (*npc).r.currentOrigin, 200, 0, MOD_CRUSH);
         }
     }
 }
@@ -836,7 +851,8 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
                 return;
             }
             //else, if he's in our hand, we eat, else if he's on the ground, we keep attacking his dead body for a while
-            if !(*(*npc).enemy).client.is_null() && (*(*(*npc).enemy).client).NPC_class == CLASS_RANCOR {
+            let npc_enemy = crate::ent_id::resolve((*ctx.world).entities.as_mut_ptr(), (*npc).enemy);
+            if !(*npc_enemy).client.is_null() && (*((*npc_enemy).client as *mut gclient_t)).NPC_class == CLASS_RANCOR {
                 //got mad at another Rancor, look for a valid enemy
                 if crate::g_timer::TIMER_Done(ctx, npc, c"rancorInfight".as_ptr()) != 0 {
                     crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue);
@@ -844,7 +860,7 @@ pub fn NPC_BSRancor_Default(ctx: GameContext<'_>) {
             } else if (*npc).count == 0 {
                 if crate::NPC_combat::ValidEnemy(ctx, (*npc).enemy) == qfalse {
                     crate::g_timer::TIMER_Remove(ctx, npc, c"lookForNewEnemy".as_ptr());//make them look again right now
-                    if (*(*npc).enemy).inuse == 0 || (*ctx.world).level.time - (*(*npc).enemy).s.time > crate::q_math::Q_irand(10000, 15000) {
+                    if (*npc_enemy).inuse == 0 || (*ctx.world).level.time - (*npc_enemy).s.time > crate::q_math::Q_irand(10000, 15000) {
                         //it's been a while since the enemy died, or enemy is completely gone, get bored with him
                         (*npc).enemy = None;
                         Rancor_Patrol(ctx);

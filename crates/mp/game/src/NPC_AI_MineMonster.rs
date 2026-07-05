@@ -157,7 +157,7 @@ pub fn MineMonster_TryDamage(
             damage_entity,
             npc,
             npc,
-            &mut dir_copy,
+            Some(&mut dir_copy),
             tr.endpos,
             damage,
             DAMAGE_NO_KNOCKBACK,

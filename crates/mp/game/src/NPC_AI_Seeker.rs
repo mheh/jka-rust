@@ -73,7 +73,7 @@ pub fn NPC_Seeker_Pain(
                 self_,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
-                crate::q_math::vec3_origin,
+                Some(&mut crate::q_math::vec3_origin),
                 crate::q_math::vec3_origin,
                 999,
                 0,
@@ -109,10 +109,11 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
                 crate::g_timer::TIMER_Set(ctx, NPC, c"heightChange".as_ptr(), crate::q_math::Q_irand(1000, 3000));
 
                 // Find the height difference
-                let dif = ((*(*NPC).enemy).r.currentOrigin[2]
+                let enemy = &mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
+                let dif = ((*enemy).r.currentOrigin[2]
                     + crate::q_math::flrand(
-                        (*(*NPC).enemy).r.maxs[2] / 2.0f32,
-                        (*(*NPC).enemy).r.maxs[2] + 8.0f32,
+                        (*enemy).r.maxs[2] / 2.0f32,
+                        (*enemy).r.maxs[2] + 8.0f32,
                     ))
                     - (*NPC).r.currentOrigin[2];
 
@@ -195,7 +196,10 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
         let mut dir: vec3_t = [0.0f32; 3];
         let mut tr: trace_t = core::mem::zeroed();
 
-        if (*ctx.world).bg_state.rng.random() > 0.7f32 || (*NPC).enemy.is_none() || (*(*NPC).enemy).client.is_null() {
+        if (*ctx.world).bg_state.rng.random() > 0.7f32
+            || (*NPC).enemy.is_none()
+            || (*(&mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t)).client.is_null()
+        {
             // Do a regular style strafe
             crate::q_math::AngleVectors(
                 (*(*NPC).client).renderInfo.eyeAngles,
@@ -240,10 +244,12 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
             }
         } else {
             let mut stDis: f32;
+            // guaranteed non-null by the `if` branch above (enemy is_some && enemy.client non-null)
+            let enemy = &mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
 
             // Do a strafe to try and keep on the side of their enemy
             crate::q_math::AngleVectors(
-                (*(*(*NPC).enemy).client).renderInfo.eyeAngles,
+                (*((*enemy).client as *mut gclient_t)).renderInfo.eyeAngles,
                 Some(&mut dir),
                 Some(&mut right),
                 None,
@@ -257,7 +263,7 @@ pub fn Seeker_Strafe(ctx: GameContext<'_>) {
             }
             // Inline VectorMA: end = enemy_origin + stDis * side * right
             for i in 0..3 {
-                end[i] = (*(*NPC).enemy).r.currentOrigin[i] + stDis * side as f32 * right[i];
+                end[i] = (*enemy).r.currentOrigin[i] + stDis * side as f32 * right[i];
             }
 
             // then add a very small bit of random in front of/behind the player action
@@ -353,9 +359,10 @@ pub fn Seeker_Hunt(
             }
         } else {
             let mut forward: vec3_t = [0.0f32; 3];
-            forward[0] = (*(*NPC).enemy).r.currentOrigin[0] - (*NPC).r.currentOrigin[0];
-            forward[1] = (*(*NPC).enemy).r.currentOrigin[1] - (*NPC).r.currentOrigin[1];
-            forward[2] = (*(*NPC).enemy).r.currentOrigin[2] - (*NPC).r.currentOrigin[2];
+            let enemy = &mut world.entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
+            forward[0] = (*enemy).r.currentOrigin[0] - (*NPC).r.currentOrigin[0];
+            forward[1] = (*enemy).r.currentOrigin[1] - (*NPC).r.currentOrigin[1];
+            forward[2] = (*enemy).r.currentOrigin[2] - (*NPC).r.currentOrigin[2];
             let _distance = crate::q_math::VectorNormalize(&mut forward);
 
             let speed = SEEKER_FORWARD_BASE_SPEED + SEEKER_FORWARD_MULTIPLIER * world.cvars.g_spskill.integer as f32;
@@ -432,7 +439,7 @@ pub fn Seeker_Ranged(
                     NPC,
                     NPC,
                     NPC,
-                    core::ptr::null(),
+                    None,
                     core::ptr::null(),
                     999,
                     0,
@@ -459,7 +466,8 @@ pub fn Seeker_Attack(ctx: GameContext<'_>) {
         Seeker_MaintainHeight(ctx);
 
         // Rate our distance to the target, and our visibilty
-        let distance = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, (*(*NPC).enemy).r.currentOrigin);
+        let enemy = &mut (*ctx.world).entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
+        let distance = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, (*enemy).r.currentOrigin);
         let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, (*NPC).enemy);
         let mut advance = if distance > MIN_DISTANCE_SQR as f32 { qtrue } else { qfalse };
 
@@ -641,7 +649,7 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
                     NPC,
                     core::ptr::null_mut(),
                     core::ptr::null_mut(),
-                    core::ptr::null(),
+                    None,
                     core::ptr::null(),
                     10000,
                     crate::level::damage_flags::DAMAGE_NO_PROTECTION,
@@ -656,8 +664,14 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
             (*NPC).random = (*ctx.world).bg_state.rng.random() * 6.3f32; // roughly 2pi
         }
 
-        if !(*NPC).enemy.is_none() && (*(*NPC).enemy).health > 0 && (*(*NPC).enemy).inuse != 0 {
-            if (*(*NPC).client).NPC_class != CLASS_BOBAFETT && ((*(*NPC).enemy).s.number == 0 || (!(*(*NPC).enemy).client.is_null() && (*(*(*NPC).enemy).client).NPC_class == CLASS_SEEKER)) {
+        if let Some(enemy_id) = (*NPC).enemy {
+            let enemy = &mut (*ctx.world).entities[enemy_id.index()] as *mut gentity_t;
+            if (*enemy).health > 0 && (*enemy).inuse != 0 {
+            if (*(*NPC).client).NPC_class != CLASS_BOBAFETT
+                && ((*enemy).s.number == 0
+                    || (!(*enemy).client.is_null()
+                        && (*((*enemy).client as *mut gclient_t)).NPC_class == CLASS_SEEKER))
+            {
                 //hacked to never take the player as an enemy, even if the player shoots at it
                 (*NPC).enemy = None;
             } else {
@@ -666,6 +680,7 @@ pub fn NPC_BSSeeker_Default(ctx: GameContext<'_>) {
                     crate::NPC_AI_Jedi::Boba_FireDecide(ctx);
                 }
                 return;
+            }
             }
         }
 

@@ -688,11 +688,12 @@ pub fn GM_CheckMoveState(ctx: GameContext<'_>) {
         // See if we're moving towards a goal, not the enemy
         if (*npc_info).goalEntity != (*npc_ent).enemy && !(*npc_info).goalEntity.is_none() {
             // Did we make it?
+            // Guarded by `!goalEntity.is_none()` above.
             let hit_goal = crate::g_nav::NAV_HitNavGoal(
                 (*npc_ent).r.currentOrigin,
                 (*npc_ent).r.mins,
                 (*npc_ent).r.maxs,
-                (*(*npc_info).goalEntity).r.currentOrigin,
+                (*ctx.world).g_entities[(*npc_info).goalEntity.unwrap().index()].r.currentOrigin,
                 16,
                 0,
             );
@@ -932,6 +933,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             NPC_BSGM_Patrol(ctx);
             return;
         }
+        // Guaranteed `Some` from here to the end of the function by the guard above.
+        let enemy_ent = g_entities_base.add((*npc_ent).enemy.unwrap().index());
 
         // Initialize combat state
         (*ctx.world).globals.enemyLOS4 = qfalse;
@@ -942,7 +945,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         (*ctx.world).globals.hitAlly4 = qfalse;
         VectorClear(&mut IMPACT_POS_4);
         (*ctx.world).globals.enemyDist4 =
-            DistanceSquared((*npc_ent).r.currentOrigin, (*(*npc_ent).enemy).r.currentOrigin);
+            DistanceSquared((*npc_ent).r.currentOrigin, (*enemy_ent).r.currentOrigin);
 
         // Melee attack logic disabled with if(0)
 
@@ -1041,7 +1044,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                                     trace_ent,
                                     npc_ent,
                                     npc_ent,
-                                    (*client).renderInfo.muzzleDir,
+                                    Some(&mut (*client).renderInfo.muzzleDir),
                                     trace.endpos,
                                     10,
                                     0,
@@ -1069,7 +1072,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             if (*client).ps.weapon == WP_REPEATER as c_int
                 && ((*npc_info).scriptFlags & SCF_ALT_FIRE as i32) as c_int == 0
                 && (*npc_ent).enemy.is_some()
-                && (*(*npc_ent).enemy).s.weapon == WP_SABER as c_int
+                && (*enemy_ent).s.weapon == WP_SABER as c_int
                 && (*client).ps.saberEventFlags & SEF_DEFLECTED as c_int != 0
                 && (*ctx.world).bg_state.rng.Q_irand(0, 50) == 0
             {
@@ -1085,12 +1088,12 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 }
             } else if (*ctx.world).globals.enemyDist4 < MELEE_DIST_SQUARED
                 && InFront(
-                    (*(*npc_ent).enemy).r.currentOrigin,
+                    (*enemy_ent).r.currentOrigin,
                     (*npc_ent).r.currentOrigin,
                     (*client).ps.viewangles,
                     0.3,
                 ) != 0
-                && (*(*npc_ent).enemy).localAnimIndex <= 1
+                && (*enemy_ent).localAnimIndex <= 1
             {
                 // our shield is down, and enemy within 80, if very close, use melee attack to slap away
                 if crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0 {
@@ -1116,7 +1119,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 && (*npc_ent).locationDamage[HL_GENERIC1 as usize] > GENERATOR_HEALTH as c_float
                 && crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0
                 && InFront(
-                    (*(*npc_ent).enemy).r.currentOrigin,
+                    (*enemy_ent).r.currentOrigin,
                     (*npc_ent).r.currentOrigin,
                     (*client).ps.viewangles,
                     0.3,
@@ -1126,14 +1129,14 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     && (*ctx.world).globals.enemyDist4 < MAX_LOB_DIST_SQUARED
                     || !crate::g_timer::TIMER_Done(ctx, npc_ent, c"noLob".as_ptr()) != 0
                         && !crate::g_timer::TIMER_Done(ctx, npc_ent, c"noRapid".as_ptr()) != 0)
-                && (*(*npc_ent).enemy).s.weapon != WP_TURRET as c_int
+                && (*enemy_ent).s.weapon != WP_TURRET as c_int
             {
                 // sometimes use the laser beam attack, but only after he's taken down our generator
                 (*ctx.world).globals.shoot4 = qfalse;
                 NPC_GM_StartLaser(ctx);
             } else if (*ctx.world).globals.enemyDist4 < MIN_LOB_DIST_SQUARED
-                && ((*(*npc_ent).enemy).s.weapon != WP_TURRET as c_int
-                    || crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*(*npc_ent).enemy).classname.as_ptr()) != 0)
+                && ((*enemy_ent).s.weapon != WP_TURRET as c_int
+                    || crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname.as_ptr()) != 0)
                 && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noRapid".as_ptr()) != 0
             {
                 // enemy within 256
@@ -1144,8 +1147,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     crate::NPC_combat::NPC_ChangeWeapon(WP_REPEATER);
                 }
             } else if ((*ctx.world).globals.enemyDist4 > MAX_LOB_DIST_SQUARED
-                || ((*(*npc_ent).enemy).s.weapon == WP_TURRET as c_int
-                    && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*(*npc_ent).enemy).classname.as_ptr()) == 0))
+                || ((*enemy_ent).s.weapon == WP_TURRET as c_int
+                    && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname.as_ptr()) == 0))
                 && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noLob".as_ptr()) != 0
             {
                 // enemy more than 448 away and we are ready to try lob fire again
@@ -1177,7 +1180,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 } else {
                     let hit = crate::NPC_combat::NPC_ShotEntity(ctx, (*npc_ent).enemy, IMPACT_POS_4);
                     let hit_ent = g_entities_base.add(hit as usize);
-                    if hit == (*(*npc_ent).enemy).s.number as c_int
+                    if hit == (*enemy_ent).s.number as c_int
                         || (!hit_ent.is_null()
                             && (*hit_ent).client != core::ptr::null_mut()
                             && (*(*hit_ent).client).playerTeam == (*client).enemyTeam)
@@ -1186,7 +1189,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         // can hit enemy or will hit glass or other breakable, so shoot anyway
                         (*ctx.world).globals.enemyCS4 = qtrue;
                         crate::NPC_combat::NPC_AimAdjust(ctx, 2); // adjust aim better longer we have clear shot at enemy
-                        _VectorCopy((*(*npc_ent).enemy).r.currentOrigin, &mut (*npc_info).enemyLastSeenLocation);
+                        _VectorCopy((*enemy_ent).r.currentOrigin, &mut (*npc_info).enemyLastSeenLocation);
                     } else {
                         // Hmm, have to get around this bastard
                         crate::NPC_combat::NPC_AimAdjust(ctx, 1); // adjust aim better longer we can see enemy
@@ -1202,7 +1205,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             }
         } else if trap::InPVS(
             ctx.engine,
-            (*(*npc_ent).enemy).r.currentOrigin,
+            (*enemy_ent).r.currentOrigin,
             (*npc_ent).r.currentOrigin,
         ) != 0
         {
@@ -1231,7 +1234,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
 
             let hit = crate::NPC_combat::NPC_ShotEntity(ctx, (*npc_ent).enemy, IMPACT_POS_4);
             let hit_ent = g_entities_base.add(hit as usize);
-            if hit == (*(*npc_ent).enemy).s.number as c_int
+            if hit == (*enemy_ent).s.number as c_int
                 || (!hit_ent.is_null()
                     && (*hit_ent).client != core::ptr::null_mut()
                     && (*(*hit_ent).client).playerTeam == (*client).enemyTeam)
@@ -1292,7 +1295,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
 
             crate::NPC_utils::CalcEntitySpot(ctx, npc_ent, SPOT_WEAPON, &mut muzzle);
 
-            _VectorCopy((*(*npc_ent).enemy).r.currentOrigin, &mut target);
+            _VectorCopy((*enemy_ent).r.currentOrigin, &mut target);
 
             target[0] += (*ctx.world).bg_state.rng.flrand(-5.0, 5.0)
                 + ((*ctx.world).bg_state.rng.crandom() * (6 - (*npc_info).currentAim) as f32 * 2.0);
@@ -1313,7 +1316,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 &mut velocity,
                 qtrue,
                 (*npc_ent).s.number,
-                (*(*npc_ent).enemy).s.number as c_int,
+                (*enemy_ent).s.number as c_int,
                 300.0,
                 1100.0,
                 1500.0,
@@ -1393,8 +1396,11 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             (*ctx.world).globals.shoot4 = qfalse;
         }
 
-        if (*npc_ent).enemy.is_some() && (*(*npc_ent).enemy).enemy.is_some() {
-            if (*(*npc_ent).enemy).s.weapon == WP_SABER as c_int && (*(*(*npc_ent).enemy).enemy).s.weapon == WP_SABER as c_int {
+        if (*npc_ent).enemy.is_some() && (*enemy_ent).enemy.is_some() {
+            // The enemy's own enemy — a second EntityId hop off `enemy_ent`, resolved
+            // only inside this guard (guaranteed `Some` by the check above).
+            let enemy_of_enemy_ent = g_entities_base.add((*enemy_ent).enemy.unwrap().index());
+            if (*enemy_ent).s.weapon == WP_SABER as c_int && (*enemy_of_enemy_ent).s.weapon == WP_SABER as c_int {
                 // don't shoot at an enemy jedi who is fighting another jedi, for fear of injuring one or causing rogue blaster deflections (a la Obi Wan/Vader duel at end of ANH)
                 (*ctx.world).globals.shoot4 = qfalse;
             }
@@ -1411,13 +1417,13 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         }
 
         // also:
-        if (*(*npc_ent).enemy).s.weapon == WP_TURRET as c_int && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*(*npc_ent).enemy).classname.as_ptr()) == 0 {
+        if (*enemy_ent).s.weapon == WP_TURRET as c_int && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname.as_ptr()) == 0 {
             // crush turrets
             if crate::NPC_goal::G_BoundsOverlap(
                 (*npc_ent).r.absmin,
                 (*npc_ent).r.absmax,
-                (*(*npc_ent).enemy).r.absmin,
-                (*(*npc_ent).enemy).r.absmax,
+                (*enemy_ent).r.absmin,
+                (*enemy_ent).r.absmax,
             ) != 0
             {
                 // have to do this test because placed turrets are not solid to NPCs (so they don't obstruct navigation)
@@ -1428,7 +1434,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         (*npc_ent).enemy,
                         npc_ent,
                         npc_ent,
-                        vec3_origin,
+                        None,
                         (*npc_ent).r.currentOrigin,
                         100,
                         DAMAGE_NO_KNOCKBACK,
@@ -1439,7 +1445,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         (*npc_ent).enemy,
                         npc_ent,
                         npc_ent,
-                        vec3_origin,
+                        None,
                         (*npc_ent).r.currentOrigin,
                         100,
                         DAMAGE_NO_KNOCKBACK,
@@ -1457,22 +1463,22 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 (*npc_info).touchedByPlayer = None;
                 (*client).ps.powerups[statIndex_t::PW_BATTLESUIT as usize] = level_time + ARMOR_EFFECT_TIME;
 
-                _VectorSubtract((*(*npc_ent).enemy).r.currentOrigin, (*npc_ent).r.currentOrigin, &mut smackDir);
+                _VectorSubtract((*enemy_ent).r.currentOrigin, (*npc_ent).r.currentOrigin, &mut smackDir);
                 smackDir[2] += 30.0;
                 VectorNormalize(&mut smackDir);
                 crate::g_combat::G_Damage(
                     (*npc_ent).enemy,
                     npc_ent,
                     npc_ent,
-                    smackDir,
+                    Some(&mut smackDir),
                     (*npc_ent).r.currentOrigin,
                     ((*ctx.world).cvars.g_spskill.integer + 1) * (*ctx.world).bg_state.rng.Q_irand(5, 10),
                     DAMAGE_NO_KNOCKBACK,
                     meansOfDeath_t::MOD_UNKNOWN as c_int,
                 );
                 crate::g_utils::G_Throw(ctx, (*npc_ent).enemy, smackDir, 100.0);
-                if (*(*npc_ent).enemy).client != core::ptr::null_mut() {
-                    (*(*(*npc_ent).enemy).client).ps.electrifyTime = level_time + 1000;
+                if (*enemy_ent).client != core::ptr::null_mut() {
+                    (*((*enemy_ent).client as *mut gclient_t)).ps.electrifyTime = level_time + 1000;
                 }
                 ucmd.buttons = 0;
             }
@@ -1480,10 +1486,10 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
 
         if (*npc_info).movementSpeech < 3 && (*npc_info).blockedSpeechDebounceTime <= level_time {
             if (*npc_ent).enemy.is_some()
-                && (*(*npc_ent).enemy).health > 0
-                && (*(*npc_ent).enemy).painDebounceTime > level_time
+                && (*enemy_ent).health > 0
+                && (*enemy_ent).painDebounceTime > level_time
             {
-                if (*(*npc_ent).enemy).health < 50 && (*npc_info).movementSpeech == 2 {
+                if (*enemy_ent).health < 50 && (*npc_info).movementSpeech == 2 {
                     crate::NPC_sounds::G_AddVoiceEvent(
                         ctx,
                         npc_ent,
@@ -1491,7 +1497,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
                     (*npc_info).movementSpeech = 3;
-                } else if (*(*npc_ent).enemy).health < 75 && (*npc_info).movementSpeech == 1 {
+                } else if (*enemy_ent).health < 75 && (*npc_info).movementSpeech == 1 {
                     crate::NPC_sounds::G_AddVoiceEvent(
                         ctx,
                         npc_ent,
@@ -1499,7 +1505,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
                     );
                     (*npc_info).movementSpeech = 2;
-                } else if (*(*npc_ent).enemy).health < 100 && (*npc_info).movementSpeech == 0 {
+                } else if (*enemy_ent).health < 100 && (*npc_info).movementSpeech == 0 {
                     crate::NPC_sounds::G_AddVoiceEvent(
                         ctx,
                         npc_ent,

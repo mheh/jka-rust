@@ -383,8 +383,8 @@ pub fn target_laser_think(
         let mut point: vec3_t = [0.0; 3];
 
         // if pointed at another entity, set movedir to point at it
-        if !(*self_).enemy.is_none() {
-            let enemy = (*self_).enemy;
+        if let Some(enemy_id) = (*self_).enemy {
+            let enemy = &mut ctx.world.entities[enemy_id.index()] as *mut gentity_t;
             // VectorMA(self->enemy->s.origin, 0.5, self->enemy->r.mins, point)
             point[0] = (*enemy).s.origin[0] + 0.5 * (*enemy).r.mins[0];
             point[1] = (*enemy).s.origin[1] + 0.5 * (*enemy).r.mins[1];
@@ -413,7 +413,7 @@ pub fn target_laser_think(
         if tr.entityNum != 0 {
             // hurt it if we can
             let targ = &mut ctx.world.entities[tr.entityNum as usize];
-            G_Damage(targ, self_, (*self_).activator, (*self_).movedir, tr.endpos, (*self_).damage, DAMAGE_NO_KNOCKBACK, meansOfDeath_t::MOD_TARGET_LASER as c_int);
+            G_Damage(targ, self_, (*self_).activator, Some(&mut (*self_).movedir), tr.endpos, (*self_).damage, DAMAGE_NO_KNOCKBACK, meansOfDeath_t::MOD_TARGET_LASER as c_int);
         }
 
         // VectorCopy(tr.endpos, self->s.origin2)
@@ -638,7 +638,7 @@ pub fn target_kill_use(
             activator,
             core::ptr::null_mut(),
             core::ptr::null_mut(),
-            [0.0; 3],
+            None,
             [0.0; 3],
             100000,
             DAMAGE_NO_PROTECTION,

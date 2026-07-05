@@ -1741,7 +1741,7 @@ pub fn ForceLightningDamage(
     ctx: GameContext<'_>,
     self_: *mut gentity_t,
     traceEnt: *mut gentity_t,
-    dir: vec3_t,
+    mut dir: vec3_t,
     impactPoint: vec3_t,
 ) {
     unsafe {
@@ -1810,7 +1810,7 @@ pub fn ForceLightningDamage(
 
                     if dmg != 0 {
                         //rww - Shields can now absorb lightning too.
-                        G_Damage(traceEnt, self_, self_, dir, impactPoint, dmg, 0, MOD_FORCE_DARK as c_int);
+                        G_Damage(traceEnt, self_, self_, Some(&mut dir), impactPoint, dmg, 0, MOD_FORCE_DARK as c_int);
                     }
                     if !(*traceEnt).client.is_null() {
                         if Q_irand(0, 2) == 0 {
@@ -4104,7 +4104,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
         if (*cl).ps.fd.forcePowerDebounce[FP_GRIP as usize] < level_time {
             //2 damage per second while choking, resulting in 10 damage total (not including The Squeeze<tm>)
             (*cl).ps.fd.forcePowerDebounce[FP_GRIP as usize] = level_time + 1000;
-            G_Damage(gripEnt, self_, self_, [0.0; 3], [0.0; 3], 2, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
+            G_Damage(gripEnt, self_, self_, None, [0.0; 3], 2, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
         }
 
         Jetpack_Off(gripEnt); //make sure the guy being gripped has his jetpack off.
@@ -4140,7 +4140,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
             {
                 //if we managed to lift him into the air for 2 seconds, give him a crack
                 (*cl).ps.fd.forceGripDamageDebounceTime = 1;
-                G_Damage(gripEnt, self_, self_, [0.0; 3], [0.0; 3], 20, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
+                G_Damage(gripEnt, self_, self_, None, [0.0; 3], 20, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
                 let snd = format!("*choke{}.wav", Q_irand(1, 3));
@@ -4224,7 +4224,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
             {
                 //if we managed to lift him into the air for 2 seconds, give him a crack
                 (*cl).ps.fd.forceGripDamageDebounceTime = 1;
-                G_Damage(gripEnt, self_, self_, [0.0; 3], [0.0; 3], 40, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
+                G_Damage(gripEnt, self_, self_, None, [0.0; 3], 40, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
                 let snd = format!("*choke{}.wav", Q_irand(1, 3));

@@ -703,12 +703,11 @@ pub fn G_EjectDroidUnit(
             // PORT-NOTE(G_Damage-null-dir): Raven passes NULL for `dir`; the resolved
             // G_Damage takes `dir: &mut vec3_t` (fork-9 reshaped only OUT-params, not
             // nullable INs) — a zero vec3 stands in for the C NULL. See shape_mismatch.
-            let mut null_dir: vec3_t = [0.0; 3];
             crate::g_combat::G_Damage(
                 droidEnt,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
-                &mut null_dir,
+                None,
                 (*droidEnt).s.origin,
                 10000,
                 0,
@@ -736,10 +735,6 @@ pub fn EjectAll(
         (*pVeh).m_iBoarding = 0;
         (*pVeh).m_bWasBoarding = qfalse;
 
-        // PORT-NOTE(G_Damage-null-dir): the kill-rider branches pass NULL for
-        // G_Damage `dir`; resolved sig is `&mut vec3_t`, so a zero vec stands in.
-        let mut null_dir: vec3_t = [0.0; 3];
-
         // Throw them off.
         if !(*pVeh).m_pPilot.is_null() {
             let pilot = (*pVeh).m_pPilot as *mut gentity_t;
@@ -750,7 +745,7 @@ pub fn EjectAll(
                     pilot,
                     core::ptr::null_mut(),
                     core::ptr::null_mut(),
-                    &mut null_dir,
+                    None,
                     (*pilot).s.origin,
                     10000,
                     0,
@@ -767,7 +762,7 @@ pub fn EjectAll(
                     pilot,
                     core::ptr::null_mut(),
                     core::ptr::null_mut(),
-                    &mut null_dir,
+                    None,
                     (*pilot).s.origin,
                     10000,
                     0,
@@ -787,7 +782,7 @@ pub fn EjectAll(
                             rider,
                             core::ptr::null_mut(),
                             core::ptr::null_mut(),
-                            &mut null_dir,
+                            None,
                             (*rider).s.origin,
                             10000,
                             0,
@@ -1045,10 +1040,6 @@ pub fn Update(
             (*pclient).ps.vehBoarding = qfalse;
         }
 
-        // PORT-NOTE(G_Damage-null-dir): several G_Damage calls below pass NULL for
-        // `dir`; resolved sig is `&mut vec3_t`, so a zero vec stands in.
-        let mut null_dir: vec3_t = [0.0; 3];
-
         // See whether this vehicle should be dieing or dead. (MP: `m_iDieTime != 0`)
         if (*pVeh).m_iDieTime != 0 {
             // Keep track of the old orientation.
@@ -1104,7 +1095,7 @@ pub fn Update(
                         parent,
                         parent,
                         parent,
-                        &mut null_dir,
+                        None,
                         (*pclient).ps.origin,
                         99999,
                         DAMAGE_NO_PROTECTION,
@@ -1123,7 +1114,7 @@ pub fn Update(
                             parent,
                             parent,
                             parent,
-                            &mut null_dir,
+                            None,
                             (*pclient).ps.origin,
                             99999,
                             DAMAGE_NO_PROTECTION,
@@ -1814,13 +1805,11 @@ pub fn G_VehicleDamageBoxSizing(
             _VectorCopy(back, &mut (*parent).r.mins);
         } else {
             // oh well, DIE!
-            // PORT-NOTE(G_Damage-null-dir): Raven passes NULL `dir`; zero vec stands in.
-            let mut null_dir: vec3_t = [0.0; 3];
             crate::g_combat::G_Damage(
                 parent,
                 parent,
                 parent,
-                &mut null_dir,
+                None,
                 (*pcl).ps.origin,
                 9999,
                 DAMAGE_NO_PROTECTION,
@@ -2026,13 +2015,12 @@ pub fn G_SetVehDamageFlags(
                             // PORT-NOTE(G_Damage-null-dir/point): Raven passes NULL for both
                             // `dir` and `point`; resolved sig takes `dir: &mut vec3_t` and
                             // `point: vec3_t`, so zero vecs stand in.
-                            let mut null_dir: vec3_t = [0.0; 3];
                             let null_point: vec3_t = [0.0; 3];
                             crate::g_combat::G_Damage(
                                 droidEnt,
                                 enemy_ptr,
                                 enemy_ptr,
-                                &mut null_dir,
+                                None,
                                 null_point,
                                 99999,
                                 0,
@@ -2652,14 +2640,13 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 if crate::veh_dispatch::inhabited(pVeh) != qfalse {
                     // if we've still got people in us, just kill the bastards
                     let pc = (*parent).client as *mut gclient_t;
-                    let mut null_dir: vec3_t = [0.0; 3];
                     if !(*pVeh).m_pPilot.is_null() {
                         //FIXME: does this give proper credit to the enemy who shot you down?
                         crate::g_combat::G_Damage(
                             (*pVeh).m_pPilot as *mut gentity_t,
                             parent,
                             parent,
-                            &mut null_dir,
+                            None,
                             (*pc).ps.origin,
                             999,
                             DAMAGE_NO_PROTECTION,
@@ -2675,7 +2662,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                                     *(*pVeh).m_ppPassengers.add(i as usize) as *mut gentity_t,
                                     parent,
                                     parent,
-                                    &mut null_dir,
+                                    None,
                                     (*pc).ps.origin,
                                     999,
                                     DAMAGE_NO_PROTECTION,

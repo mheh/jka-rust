@@ -3941,7 +3941,7 @@ pub fn WP_SaberApplyDamage(
                 victim,
                 self_,
                 self_,
-                (*ctx.world).globals.dmgDir[iu],
+                Some(&mut (*ctx.world).globals.dmgDir[iu]),
                 (*ctx.world).globals.dmgSpot[iu],
                 (*ctx.world).globals.totalDmg[iu],
                 dflags,
@@ -4116,7 +4116,7 @@ pub fn WP_SaberRadiusDamage(
                         radiusEnt,
                         ent,
                         ent,
-                        vec3_origin,
+                        Some(&mut vec3_origin),
                         (*radiusEnt).r.currentOrigin,
                         10,
                         0,
@@ -4144,7 +4144,7 @@ pub fn WP_SaberRadiusDamage(
                         radiusEnt,
                         ent,
                         ent,
-                        vec3_origin,
+                        Some(&mut vec3_origin),
                         (*radiusEnt).r.currentOrigin,
                         points,
                         DAMAGE_NO_KNOCKBACK,
@@ -6555,7 +6555,7 @@ pub fn CheckThrownSaberDamaged(
                                 ent,
                                 saberOwner,
                                 saberOwner,
-                                dir,
+                                Some(&mut dir),
                                 tr.endpos,
                                 (*saberent).damage * 2,
                                 dflags,
@@ -6566,7 +6566,7 @@ pub fn CheckThrownSaberDamaged(
                                 ent,
                                 saberOwner,
                                 saberOwner,
-                                dir,
+                                Some(&mut dir),
                                 tr.endpos,
                                 (*saberent).damage,
                                 dflags,
@@ -6671,9 +6671,9 @@ pub fn CheckThrownSaberDamaged(
 
                     if (*ent).s.eType == ET_NPC as c_int {
                         // an animent
-                        G_Damage(ent, saberOwner, saberOwner, dir, tr.endpos, 40, dflags, MOD_SABER);
+                        G_Damage(ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 40, dflags, MOD_SABER);
                     } else {
-                        G_Damage(ent, saberOwner, saberOwner, dir, tr.endpos, 5, dflags, MOD_SABER);
+                        G_Damage(ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 5, dflags, MOD_SABER);
                     }
 
                     let te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT);
@@ -8532,7 +8532,7 @@ pub fn G_KickTrace(
                             hitEnt,
                             ent,
                             ent,
-                            &mut kickDir,
+                            Some(&mut kickDir),
                             trace.endpos,
                             (kickDamage as f32 * 0.2f32) as c_int,
                             DAMAGE_NO_KNOCKBACK,
@@ -8544,7 +8544,7 @@ pub fn G_KickTrace(
                             hitEnt,
                             ent,
                             ent,
-                            &mut kickDir,
+                            Some(&mut kickDir),
                             trace.endpos,
                             kickDamage,
                             DAMAGE_NO_KNOCKBACK,
@@ -9401,7 +9401,7 @@ pub fn WP_SaberPositionUpdate(
                                         grappler,
                                         self_,
                                         self_,
-                                        &mut [0.0; 3],
+                                        None,
                                         (*client).ps.origin,
                                         10,
                                         0,
@@ -9429,7 +9429,7 @@ pub fn WP_SaberPositionUpdate(
                                         grappler,
                                         self_,
                                         self_,
-                                        &mut [0.0; 3],
+                                        None,
                                         (*client).ps.origin,
                                         10,
                                         0,
@@ -9455,7 +9455,7 @@ pub fn WP_SaberPositionUpdate(
                                         grappler,
                                         self_,
                                         self_,
-                                        &mut [0.0; 3],
+                                        None,
                                         (*client).ps.origin,
                                         30,
                                         0,
@@ -9499,7 +9499,7 @@ pub fn WP_SaberPositionUpdate(
                                         grappler,
                                         self_,
                                         self_,
-                                        &mut [0.0; 3],
+                                        None,
                                         (*client).ps.origin,
                                         20,
                                         0,
@@ -9535,7 +9535,7 @@ pub fn WP_SaberPositionUpdate(
                                         grappler,
                                         self_,
                                         self_,
-                                        &mut [0.0; 3],
+                                        None,
                                         (*client).ps.origin,
                                         30,
                                         0,

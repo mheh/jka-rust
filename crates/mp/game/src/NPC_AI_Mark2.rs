@@ -210,7 +210,7 @@ pub fn NPC_Mark2_Pain(
             self_,
             core::ptr::null_mut(),
             core::ptr::null_mut(),
-            core::ptr::null_mut(),
+            None,
             [0.0; 3],
             (*self_).health,
             crate::level::damage_flags::DAMAGE_NO_PROTECTION,

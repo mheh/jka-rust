@@ -1916,13 +1916,12 @@ pub fn player_die(
                 // pilot is *inside* me, so kill him, too
                 killEnt = (*selfVeh).m_pPilot as *mut gentity_t;
                 if !killEnt.is_null() && (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
-                    let mut zero_dir: vec3_t = [0.0; 3];
                     G_Damage(
                         ctx,
                         killEnt,
                         tempInflictorEnt,
                         murderer,
-                        &mut zero_dir,
+                        None,
                         (*((*killEnt).client as *mut gclient_t)).ps.origin,
                         99999,
                         DAMAGE_NO_PROTECTION,
@@ -1944,13 +1943,12 @@ pub fn player_die(
                                 qtrue,
                             );
                             if (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
-                                let mut zero_dir: vec3_t = [0.0; 3];
                                 G_Damage(
                                     ctx,
                                     killEnt,
                                     tempInflictorEnt,
                                     murderer,
-                                    &mut zero_dir,
+                                    None,
                                     (*((*killEnt).client as *mut gclient_t)).ps.origin,
                                     99999,
                                     DAMAGE_NO_PROTECTION,
@@ -1965,13 +1963,12 @@ pub fn player_die(
             killEnt = (*selfVeh).m_pDroidUnit as *mut gentity_t;
             if !killEnt.is_null() && (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
                 (*killEnt).flags &= !FL_UNDYING;
-                let mut zero_dir: vec3_t = [0.0; 3];
                 G_Damage(
                     ctx,
                     killEnt,
                     tempInflictorEnt,
                     murderer,
-                    &mut zero_dir,
+                    None,
                     (*((*killEnt).client as *mut gclient_t)).ps.origin,
                     99999,
                     DAMAGE_NO_PROTECTION,
@@ -4420,18 +4417,17 @@ pub fn G_CheckVehicleNPCTeamDamage(
 
 /// Raven `G_Damage`.
 ///
-/// PORT-NOTE(ctx-and-dir): the LAW block gives no `ctx` and `dir: &mut vec3_t`;
-/// the body calls ~20 ctx-threaded fns so `ctx` is threaded here (fork-8), and
-/// `dir` stays `&mut` per the LAW. Raven's `if (!dir)` null branches are dead
-/// (a `&mut` is never null) — callers that passed NULL now pass a zero dir.
-/// See shape_mismatches.
+/// PORT-NOTE(ctx-and-dir): the LAW block gives no `ctx`; `ctx` is threaded here
+/// (fork-8, the body calls ~20 ctx-threaded fns). Ruling 25: Raven's NULL-able
+/// `dir` out-param is `Option<&mut vec3_t>`, so the `if (!dir)` branches are
+/// restored as `is_none()` checks and NULL callers pass `None`.
 /// Source: `oracle/oracle/codemp/game/g_combat.c:4577-5715`
 pub fn G_Damage(
     ctx: GameContext<'_>,
     targ: *mut gentity_t,
     mut inflictor: *mut gentity_t,
     mut attacker: *mut gentity_t,
-    dir: &mut vec3_t,
+    mut dir: Option<&mut vec3_t>,
     point: vec3_t,
     mut damage: c_int,
     mut dflags: c_int,
@@ -4455,7 +4451,7 @@ pub fn G_Damage(
                 &mut (*ctx.world).entities[(*targ).damageRedirectTo as usize] as *mut gentity_t,
                 inflictor,
                 attacker,
-                dir,
+                dir.as_deref_mut(),
                 point,
                 damage,
                 dflags,
@@ -4696,9 +4692,18 @@ pub fn G_Damage(
             }
         }
 
-        // PORT-NOTE(dir-null): Raven `if (!dir) dflags|=DAMAGE_NO_KNOCKBACK; else
-        // VectorNormalize(dir);` — dir is a non-null `&mut`, so always normalize.
-        crate::q_math::VectorNormalize(dir);
+        // Ruling 25: Raven `if (!dir) dflags|=DAMAGE_NO_KNOCKBACK; else VectorNormalize(dir);`
+        if let Some(d) = dir.as_deref_mut() {
+            crate::q_math::VectorNormalize(d);
+        } else {
+            dflags |= DAMAGE_NO_KNOCKBACK;
+        }
+        // Snapshot the (now-normalized) direction and its presence for the read
+        // sites below. `dir_val` is zero when NULL; those reads are gated by
+        // DAMAGE_NO_KNOCKBACK or an explicit `dir_present` branch (Raven §19: the
+        // one NULL-deref path — DirToByte — becomes DirToByte(vec3_origin)).
+        let dir_present = dir.is_some();
+        let dir_val: vec3_t = dir.as_deref().copied().unwrap_or([0.0, 0.0, 0.0]);
 
         knockback = damage;
         if knockback > 200 {
@@ -4742,12 +4747,12 @@ pub fn G_Damage(
                     }
                 }
                 crate::q_math::_VectorScale(
-                    *dir,
+                    dir_val,
                     (g_knockback * knockback as f32 / mass) * saberKnockbackScale,
                     &mut kvel,
                 );
             } else {
-                crate::q_math::_VectorScale(*dir, g_knockback * knockback as f32 / mass, &mut kvel);
+                crate::q_math::_VectorScale(dir_val, g_knockback * knockback as f32 / mass, &mut kvel);
             }
             crate::q_math::_VectorAdd((*tc).ps.velocity, kvel, &mut (*tc).ps.velocity);
 
@@ -5276,10 +5281,15 @@ pub fn G_Damage(
             (*client).damage_armor += asave;
             (*client).damage_blood += take;
             (*client).damage_knockback += knockback;
-            // PORT-NOTE(dir-null): Raven copies `dir` when non-null, else the
-            // target origin; dir is a non-null `&mut` here so always copy dir.
-            crate::q_math::_VectorCopy(*dir, &mut (*client).damage_from);
-            (*client).damage_fromWorld = qfalse;
+            // Ruling 25: Raven `if (dir) { VectorCopy(dir, damage_from); fromWorld=qfalse }
+            // else { VectorCopy(targ->r.currentOrigin, damage_from); fromWorld=qtrue }`.
+            if dir_present {
+                crate::q_math::_VectorCopy(dir_val, &mut (*client).damage_from);
+                (*client).damage_fromWorld = qfalse;
+            } else {
+                crate::q_math::_VectorCopy((*targ).r.currentOrigin, &mut (*client).damage_from);
+                (*client).damage_fromWorld = qtrue;
+            }
 
             if !attacker.is_null() && !(*attacker).client.is_null() {
                 crate::ai_main::BotDamageNotification(ctx, client, attacker);
@@ -5370,7 +5380,9 @@ pub fn G_Damage(
                 entity_event_t::EV_SHIELD_HIT as c_int,
             );
             (*evEnt).s.otherEntityNum = (*targ).s.number;
-            (*evEnt).s.eventParm = crate::q_math::DirToByte(*dir);
+            // Ruling 25 §19: Raven passes `dir` here even when it may be NULL
+            // (would UB-deref); `dir_val` is the zero vector when absent.
+            (*evEnt).s.eventParm = crate::q_math::DirToByte(dir_val);
             (*evEnt).s.time2 = shieldAbsorbed as c_int;
         }
 
@@ -5459,7 +5471,7 @@ pub fn G_Damage(
                         hitSurface.as_ptr(),
                         &mut (*ctx.world).globals.gPainHitLoc,
                         point,
-                        *dir,
+                        dir_val,
                         [0.0; 3],
                         r#mod,
                     );
@@ -5520,7 +5532,12 @@ pub fn G_Damage(
                 // If we are a breaking glass brush, store the damage point
                 if ((*targ).r.svFlags & SVF_GLASS_BRUSH) != 0 {
                     crate::q_math::_VectorCopy(point, &mut (*targ).pos1);
-                    crate::q_math::_VectorCopy(*dir, &mut (*targ).pos2);
+                    // Ruling 25: Raven `if (dir) VectorCopy(dir,pos2); else VectorClear(pos2);`
+                    if dir_present {
+                        crate::q_math::_VectorCopy(dir_val, &mut (*targ).pos2);
+                    } else {
+                        (*targ).pos2 = [0.0, 0.0, 0.0];
+                    }
                 }
 
                 if (*targ).s.eType == entityType_t::ET_NPC as c_int
@@ -5639,13 +5656,12 @@ pub fn G_DamageFromKiller(
         {
             killer = (*((*killer).m_pVehicle as *mut Vehicle_t)).m_pPilot as *mut gentity_t;
         }
-        let mut zero_dir: vec3_t = [0.0; 3];
         G_Damage(
             ctx,
             pEnt,
             inflictor,
             killer,
-            &mut zero_dir,
+            None,
             org,
             damage,
             dflags,

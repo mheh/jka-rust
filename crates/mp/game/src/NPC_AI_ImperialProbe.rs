@@ -568,13 +568,12 @@ pub fn ImperialProbe_Wait(ctx: GameContext<'_>) {
         );
 
         if trace.fraction != 1.0 {
-            let mut dir = [0.0; 3];
             let enemy_ptr = if let Some(enemy_id) = (*npc).enemy {
                 &mut world.entities[enemy_id.0 as usize]
             } else {
                 core::ptr::null_mut()
             };
-            G_Damage(npc, enemy_ptr, enemy_ptr, &mut dir, [0.0; 3], 2000, 0, MOD_UNKNOWN);
+            G_Damage(npc, enemy_ptr, enemy_ptr, None, [0.0; 3], 2000, 0, MOD_UNKNOWN);
         }
     }
 

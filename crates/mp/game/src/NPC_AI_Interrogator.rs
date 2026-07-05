@@ -424,13 +424,12 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
                         c"attackDelay".as_ptr(),
                         (*ctx.world).bg_state.rng.Q_irand(500, 3000),
                     );
-                    let mut dir = [0.0f32; 3];
                     crate::g_combat::G_Damage(
                         ctx,
                         enemy_ptr,
                         npc,
                         npc,
-                        &mut dir,
+                        None,
                         [0.0f32; 3],
                         2,
                         DAMAGE_NO_KNOCKBACK,

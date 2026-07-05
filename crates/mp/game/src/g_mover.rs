@@ -278,7 +278,7 @@ pub fn G_TryPushingEntity(
                 check,
                 pusher,
                 pusher,
-                [0.0, 0.0, 0.0],
+                None,
                 [0.0, 0.0, 0.0],
                 (*pusher).damage,
                 0, // DAMAGE_NO_KNOCKBACK — not yet ported as a const; Raven passes it here.
@@ -374,7 +374,7 @@ pub fn G_TryPushingEntity(
                     check,
                     pusher,
                     pusher,
-                    [0.0, 0.0, 0.0], // Raven passes `vec3_origin` here.
+                    Some(&mut [0.0, 0.0, 0.0]), // Raven passes `vec3_origin` here.
                     (*check).r.currentOrigin,
                     999,
                     0,
@@ -518,7 +518,7 @@ pub fn G_MoverPush(
                     check,
                     pusher,
                     pusher,
-                    [0.0, 0.0, 0.0],
+                    None,
                     [0.0, 0.0, 0.0],
                     (*pusher).damage,
                     0,
@@ -535,7 +535,7 @@ pub fn G_MoverPush(
                     check,
                     pusher,
                     pusher,
-                    [0.0, 0.0, 0.0],
+                    None,
                     [0.0, 0.0, 0.0],
                     999,
                     0,
@@ -552,7 +552,7 @@ pub fn G_MoverPush(
                     check,
                     pusher,
                     pusher,
-                    [0.0, 0.0, 0.0],
+                    None,
                     [0.0, 0.0, 0.0],
                     99999,
                     0,
@@ -706,6 +706,7 @@ pub fn G_RunMover(
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:511-528`
 pub fn CalcTeamDoorCenter(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
     center: &mut vec3_t,
 ) {
@@ -715,17 +716,18 @@ pub fn CalcTeamDoorCenter(
             center[i] = ((*ent).r.mins[i] + (*ent).r.maxs[i]) * 0.5;
         }
         let mut slave = (*ent).teamchain;
-        while !slave.is_none() {
+        while let Some(slave_id) = slave {
+            let slave_ptr = &mut (*ctx.world).entities[slave_id.index()] as *mut gentity_t;
             // find slave's center
             let mut slave_center = [0.0f32; 3];
             for i in 0..3 {
-                slave_center[i] = ((*slave).r.mins[i] + (*slave).r.maxs[i]) * 0.5;
+                slave_center[i] = ((*slave_ptr).r.mins[i] + (*slave_ptr).r.maxs[i]) * 0.5;
             }
             // add that to our own, find middle
             for i in 0..3 {
                 center[i] = (center[i] + slave_center[i]) * 0.5;
             }
-            slave = (*slave).teamchain;
+            slave = (*slave_ptr).teamchain;
         }
     }
 }
@@ -854,7 +856,7 @@ pub fn Reached_BinaryMover(
             let mut doorcenter: vec3_t = [0.0; 3];
 
             SetMoverState(ctx, ent, MOVER_POS2, (*ctx.world).level.time);
-            CalcTeamDoorCenter(ent, &mut doorcenter);
+            CalcTeamDoorCenter(ctx, ent, &mut doorcenter);
             G_PlayDoorSound(ctx, ent, BMS_END);
 
             if (*ent).wait < 0.0 {
@@ -883,7 +885,7 @@ pub fn Reached_BinaryMover(
             let mut doorcenter: vec3_t = [0.0; 3];
 
             SetMoverState(ctx, ent, MOVER_POS1, (*ctx.world).level.time);
-            CalcTeamDoorCenter(ent, &mut doorcenter);
+            CalcTeamDoorCenter(ctx, ent, &mut doorcenter);
             G_PlayDoorSound(ctx, ent, BMS_END);
 
             // close areaportals
@@ -914,7 +916,7 @@ pub fn Use_BinaryMover_Go(
             // start moving 50 msec later, because if this was player
             // triggered, level.time hasn't been advanced yet
             MatchTeam(ctx, ent, MOVER_1TO2, (*ctx.world).level.time + 50);
-            CalcTeamDoorCenter(ent, &mut doorcenter);
+            CalcTeamDoorCenter(ctx, ent, &mut doorcenter);
 
             // starting sound
             G_PlayDoorLoopSound(ctx, ent);
@@ -1218,7 +1220,7 @@ pub fn Blocked_Door(
                 other,
                 ent,
                 ent,
-                [0.0, 0.0, 0.0],
+                None,
                 [0.0, 0.0, 0.0],
                 (*ent).damage,
                 0,
@@ -1305,18 +1307,22 @@ pub fn Touch_DoorTrigger(
 ) {
     unsafe {
         let mut relock_ent: *mut gentity_t = core::ptr::null_mut();
+        let parent = match (*ent).parent {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
 
         if !(*other).client.is_null()
             && (*((*other).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR
         {
             // if the door is not open and not opening
-            if (*(*ent).parent).moverState != MOVER_1TO2 && (*(*ent).parent).moverState != MOVER_POS2 {
+            if (*parent).moverState != MOVER_1TO2 && (*parent).moverState != MOVER_POS2 {
                 Touch_DoorTriggerSpectator(ctx, ent, other, trace);
             }
             return;
         }
 
-        if (*ent).genericValue14 == 0 && ((*ent).parent.is_none() || (*(*ent).parent).genericValue14 == 0) {
+        if (*ent).genericValue14 == 0 && ((*ent).parent.is_none() || (*parent).genericValue14 == 0) {
             if !(*other).client.is_null()
                 && (*other).s.number >= MAX_CLIENTS as c_int
                 && (*other).s.eType == entityType_t::ET_NPC as c_int
@@ -1339,18 +1345,21 @@ pub fn Touch_DoorTrigger(
             return;
         }
 
-        if (*(*ent).parent).spawnflags & MOVER_LOCKED != 0 {
+        if (*parent).spawnflags & MOVER_LOCKED != 0 {
             // don't even try to use the door if it's locked
-            if (*(*ent).parent).alliedTeam == 0
+            if (*parent).alliedTeam == 0
                 || (*other).client.is_null()
-                || (*((*other).client as *mut gclient_t)).sess.sessionTeam != (*(*ent).parent).alliedTeam
+                || (*((*other).client as *mut gclient_t)).sess.sessionTeam != (*parent).alliedTeam
             {
                 return;
             } else {
                 // temporarily unlock us while we call Use_BinaryMover (so it
                 // doesn't unlock all the doors in this team)
-                if (*(*ent).parent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
-                    relock_ent = (*(*ent).parent).teammaster;
+                if (*parent).flags & crate::entity::flags::FL_TEAMSLAVE != 0 {
+                    relock_ent = match (*parent).teammaster {
+                        Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                        None => core::ptr::null_mut(),
+                    };
                 } else {
                     relock_ent = (*ent).parent;
                 }
@@ -1360,7 +1369,7 @@ pub fn Touch_DoorTrigger(
             }
         }
 
-        if (*(*ent).parent).moverState != MOVER_1TO2 {
+        if (*parent).moverState != MOVER_1TO2 {
             // door is not already opening — if closed, opening or open, check this
             Use_BinaryMover(ctx, (*ent).parent, ent, other);
         }
@@ -1394,11 +1403,17 @@ pub fn Think_SpawnNewDoorTrigger(
         let mut mins = (*ent).r.absmin;
         let mut maxs = (*ent).r.absmax;
 
-        let mut other = (*ent).teamchain;
-        while !other.is_none() {
+        let mut other = match (*ent).teamchain {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+        while !other.is_null() {
             AddPointToBounds((*other).r.absmin, &mut mins, &mut maxs);
             AddPointToBounds((*other).r.absmax, &mut mins, &mut maxs);
-            other = (*other).teamchain;
+            other = match (*other).teamchain {
+                Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+                None => core::ptr::null_mut(),
+            };
         }
 
         // find the thinnest axis, which will be the one we expand
@@ -1726,7 +1741,11 @@ pub fn Touch_PlatCenterTrigger(
             return;
         }
 
-        if (*(*ent).parent).moverState == MOVER_POS1 {
+        let parent = match (*ent).parent {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+        if (*parent).moverState == MOVER_POS1 {
             Use_BinaryMover(ctx, (*ent).parent, ent, other);
         }
     }
@@ -1928,8 +1947,11 @@ pub fn Reached_Train(
 ) {
     unsafe {
         // copy the appropriate values
-        let next = (*ent).nextTrain;
-        if next.is_none() || (*next).nextTrain.is_null() {
+        let next = match (*ent).nextTrain {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => return, // just stop
+        };
+        if (*next).nextTrain.is_none() {
             return; // just stop
         }
 
@@ -1939,7 +1961,8 @@ pub fn Reached_Train(
         // set the new trajectory
         (*ent).nextTrain = (*next).nextTrain;
         (*ent).pos1 = (*next).s.origin;
-        (*ent).pos2 = (*(*next).nextTrain).s.origin;
+        let next_next = &mut (*ctx.world).entities[(*next).nextTrain.unwrap().index()] as *mut gentity_t;
+        (*ent).pos2 = (*next_next).s.origin;
 
         // if the path_corner has a speed, use that
         let mut speed = if (*next).speed != 0.0 { (*next).speed } else { (*ent).speed };
@@ -2000,7 +2023,10 @@ pub fn Think_SetupTrainTargets(
         //          ^      |
         //           \_____|
         let mut start: *mut gentity_t = core::ptr::null_mut();
-        let mut path = (*ent).nextTrain;
+        let mut path = match (*ent).nextTrain {
+            Some(id) => &mut (*ctx.world).entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
         while path != start {
             if start.is_null() {
                 start = path;
@@ -2015,7 +2041,7 @@ pub fn Think_SetupTrainTargets(
             // other targets that get fired when the corner is reached
             let mut next: *mut gentity_t;
             loop {
-                next = G_Find(ctx, 
+                next = G_Find(ctx,
                     core::ptr::null_mut(),
                     core::mem::offset_of!(gentity_t, targetname) as c_int,
                     (*path).target,
@@ -2034,7 +2060,7 @@ pub fn Think_SetupTrainTargets(
             }
 
             if !next.is_null() {
-                (*path).nextTrain = next;
+                (*path).nextTrain = ent_id_opt((*ctx.world).entities.as_mut_ptr(), next);
             } else {
                 break;
             }
@@ -2515,7 +2541,7 @@ pub fn funcBBrushDieGo(
             // faithfully; left unguarded (over-inclusive) rather than
             // silently dropped.
             if (*other).s.groundEntityNum == (*self_).s.number {
-                G_Damage(other, self_, self_, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 99999, 0, meansOfDeath_t::MOD_CRUSH as c_int);
+                G_Damage(other, self_, self_, None, [0.0, 0.0, 0.0], 99999, 0, meansOfDeath_t::MOD_CRUSH as c_int);
             }
         }
 
@@ -2574,14 +2600,19 @@ pub fn funcBBrushDieGo(
             *c *= 0.5;
         }
 
-        let dir = if !attacker.is_none() && !(*attacker).client.is_null() {
-            let mut d = [
-                org[0] - (*attacker).r.currentOrigin[0],
-                org[1] - (*attacker).r.currentOrigin[1],
-                org[2] - (*attacker).r.currentOrigin[2],
-            ];
-            VectorNormalize(&mut d);
-            d
+        let dir = if let Some(attacker_id) = attacker {
+            let attacker_ptr = &mut (*ctx.world).entities[attacker_id.index()] as *mut gentity_t;
+            if !(*attacker_ptr).client.is_null() {
+                let mut d = [
+                    org[0] - (*attacker_ptr).r.currentOrigin[0],
+                    org[1] - (*attacker_ptr).r.currentOrigin[1],
+                    org[2] - (*attacker_ptr).r.currentOrigin[2],
+                ];
+                VectorNormalize(&mut d);
+                d
+            } else {
+                up
+            }
         } else {
             up
         };

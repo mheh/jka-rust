@@ -897,7 +897,7 @@ pub fn Do_Strike(
                     tr_hit,
                     ent,
                     ent,
-                    vec3_origin,
+                    None,
                     (*tr_hit).r.currentOrigin,
                     (*ent).damage,
                     0,
@@ -1470,12 +1470,12 @@ pub fn hurt_touch(
 
             if !(*other).NPC.is_null() {
                 // kill it now
-                let v_dir: vec3_t = [0.0, 1.0, 0.0];
+                let mut v_dir: vec3_t = [0.0, 1.0, 0.0];
                 G_Damage(
                     other,
                     other,
                     other,
-                    v_dir,
+                    Some(&mut v_dir),
                     (*other_client).ps.origin,
                     Q3_INFINITE,
                     0,
@@ -1508,7 +1508,7 @@ pub fn hurt_touch(
                     other,
                     activator_ptr,
                     activator_ptr,
-                    vec3_origin,
+                    None,
                     vec3_origin,
                     dmg,
                     dflags | DAMAGE_NO_PROTECTION,
@@ -1519,7 +1519,7 @@ pub fn hurt_touch(
                     other,
                     self_,
                     self_,
-                    vec3_origin,
+                    None,
                     vec3_origin,
                     dmg,
                     dflags | DAMAGE_NO_PROTECTION,
@@ -1672,7 +1672,7 @@ pub fn shipboundary_touch(
                 other,
                 other,
                 other,
-                vec3_origin,
+                None,
                 (*other_client).ps.origin,
                 99999,
                 DAMAGE_NO_PROTECTION,
@@ -1906,7 +1906,7 @@ pub fn hyperspace_touch(
                     other,
                     other,
                     other,
-                    vec3_origin,
+                    None,
                     (*other_client).ps.origin,
                     99999,
                     DAMAGE_NO_PROTECTION,
