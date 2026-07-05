@@ -3497,7 +3497,7 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
 
                     // keep him in the "use" anim
                     if (*client).ps.torsoAnim != BOTH_CONSOLE1 as c_int {
-                        G_SetAnim(
+                        G_SetAnim(ctx,
                             ent,
                             std::ptr::null_mut(),
                             SETANIM_TORSO,

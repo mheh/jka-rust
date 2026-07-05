@@ -301,7 +301,7 @@ pub fn ATST_Idle(ctx: GameContext<'_>) {
 
         NPC_BSIdle(ctx);
 
-        NPC_SetAnim(npc, SETANIM_BOTH, BOTH_STAND1 as c_int, SETANIM_FLAG_NORMAL);
+        NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_STAND1 as c_int, SETANIM_FLAG_NORMAL);
     }
 }
 

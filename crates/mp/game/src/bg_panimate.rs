@@ -2257,6 +2257,16 @@ pub fn BG_SetAnimFinal(
         // NOTE: Setting blendTime here breaks actual blending..
         blendTime = 0;
 
+        // Raven's `BG_SetAnim` contract is pm-free (bg_panimate.c:2984 "do not
+        // reference pm in this function"), and `BG_MySaber` (the sole consumer of
+        // this arg) null-checks ents. Game-tier callers build a pm-null
+        // `PmoveContext` to reach `BG_SetAnim`, so guard here: a null `pm`/`baseEnt`
+        // degrades to a missing-saber lookup rather than a null-deref.
+        let baseEnt = if self.pm.is_null() || (*self.pm).baseEnt.is_null() {
+            core::ptr::null_mut()
+        } else {
+            (*self.pm).baseEnt as *mut gentity_t
+        };
         BG_SaberStartTransAnim(
             (*ps).clientNum,
             (*ps).fd.saberAnimLevel,
@@ -2264,7 +2274,7 @@ pub fn BG_SetAnimFinal(
             anim,
             &mut editAnimSpeed,
             (*ps).brokenLimbs,
-            (*self.pm).baseEnt as *mut gentity_t,
+            baseEnt,
         );
 
         // Set torso anim

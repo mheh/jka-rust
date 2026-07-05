@@ -2115,13 +2115,13 @@ pub fn EWebPositionUser(
                             // reset to change direction
                             aFlags |= SETANIM_FLAG_OVERRIDE as c_int;
                         }
-                        G_SetAnim(owner, &mut (*((*owner).client as *mut gclient_t)).pers.cmd, SETANIM_LEGS as c_int, BOTH_STRAFE_LEFT1 as c_int, aFlags, 0);
+                        G_SetAnim(ctx, owner, &mut (*((*owner).client as *mut gclient_t)).pers.cmd, SETANIM_LEGS as c_int, BOTH_STRAFE_LEFT1 as c_int, aFlags, 0);
                     } else {
                         if (*((*owner).client as *mut gclient_t)).ps.legsAnim == BOTH_STRAFE_LEFT1 as c_int {
                             // reset to change direction
                             aFlags |= SETANIM_FLAG_OVERRIDE as c_int;
                         }
-                        G_SetAnim(owner, &mut (*((*owner).client as *mut gclient_t)).pers.cmd, SETANIM_LEGS as c_int, BOTH_STRAFE_RIGHT1 as c_int, aFlags, 0);
+                        G_SetAnim(ctx, owner, &mut (*((*owner).client as *mut gclient_t)).pers.cmd, SETANIM_LEGS as c_int, BOTH_STRAFE_RIGHT1 as c_int, aFlags, 0);
                     }
                 } else if (*((*owner).client as *mut gclient_t)).ps.legsAnim == BOTH_STRAFE_RIGHT1 as c_int || (*((*owner).client as *mut gclient_t)).ps.legsAnim == BOTH_STRAFE_LEFT1 as c_int {
                     // don't keep animating in place

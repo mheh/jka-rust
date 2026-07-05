@@ -5143,7 +5143,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
         let cmd = &mut (*cl).pers.cmd as *mut usercmd_t;
 
         if (*cl).pers.cmd.rightmove > 0 && (*cl).pers.cmd.forwardmove == 0 {
-            G_SetAnim(
+            G_SetAnim(ctx,
                 self_,
                 cmd,
                 SETANIM_BOTH,
@@ -5153,7 +5153,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
             );
             rolled = qtrue;
         } else if (*cl).pers.cmd.rightmove < 0 && (*cl).pers.cmd.forwardmove == 0 {
-            G_SetAnim(
+            G_SetAnim(ctx,
                 self_,
                 cmd,
                 SETANIM_BOTH,
@@ -5163,7 +5163,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
             );
             rolled = qtrue;
         } else if (*cl).pers.cmd.rightmove == 0 && (*cl).pers.cmd.forwardmove > 0 {
-            G_SetAnim(
+            G_SetAnim(ctx,
                 self_,
                 cmd,
                 SETANIM_BOTH,
@@ -5173,7 +5173,7 @@ pub fn G_SpecialRollGetup(ctx: GameContext<'_>, self_: *mut gentity_t) -> qboole
             );
             rolled = qtrue;
         } else if (*cl).pers.cmd.rightmove == 0 && (*cl).pers.cmd.forwardmove < 0 {
-            G_SetAnim(
+            G_SetAnim(ctx,
                 self_,
                 cmd,
                 SETANIM_BOTH,

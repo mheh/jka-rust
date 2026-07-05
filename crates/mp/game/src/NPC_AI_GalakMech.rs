@@ -897,7 +897,7 @@ pub fn GM_StartGloat(ctx: GameContext<'_>) {
         crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_collar".as_ptr(), TURN_ON);
         crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_galaktorso".as_ptr(), TURN_ON);
 
-        crate::npc_c::NPC_SetAnim(
+        crate::npc_c::NPC_SetAnim(ctx,
             npc_ent,
             SETANIM_BOTH,
             animNumber_t::BOTH_STAND2TO1 as c_int,
@@ -960,7 +960,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 if crate::g_timer::TIMER_Done(ctx, npc_ent, c"beamDelay".as_ptr()) != 0 {
                     // time to start the beam
                     let laserAnim: c_int = BOTH_ATTACK2 as c_int;
-                    crate::npc_c::NPC_SetAnim(
+                    crate::npc_c::NPC_SetAnim(ctx,
                         npc_ent,
                         SETANIM_BOTH,
                         laserAnim,
@@ -1102,7 +1102,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 if crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0 {
                     // animate me
                     let swingAnim: c_int = BOTH_ATTACK1 as c_int;
-                    crate::npc_c::NPC_SetAnim(
+                    crate::npc_c::NPC_SetAnim(ctx,
                         npc_ent,
                         SETANIM_BOTH,
                         swingAnim,

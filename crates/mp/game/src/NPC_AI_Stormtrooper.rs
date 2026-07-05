@@ -297,7 +297,7 @@ pub fn ST_MarkToCover(
         }
         let npc = (*self_).NPC as *mut gNPC_t;
         (*npc).localState = LSTATE_UNDERFIRE;
-        TIMER_Set(ctx, 
+        TIMER_Set(ctx,
             self_,
             c"attackDelay".as_ptr() as *const c_char,
             (*ctx.world).bg_state.rng.Q_irand(500, 2500),
@@ -352,7 +352,7 @@ pub fn NPC_ST_Pain(
 
         if damage == 0 && (*self_).health > 0 {
             // FIXME: better way to know I was pushed (Raven comment).
-            G_AddVoiceEvent(ctx, 
+            G_AddVoiceEvent(ctx,
                 self_,
                 (*ctx.world).bg_state.rng.Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int),
                 2000,
@@ -1273,7 +1273,7 @@ pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
                     if (world.globals.ucmd.buttons & BUTTON_WALKING) != 0 && ((*NPCInfo).scriptFlags & SCF_RUNNING) == 0 {
                         // not running, only set upper anim
                         // No longer overrides scripted anims
-                        NPC_SetAnim(NPC, SETANIM_TORSO, BOTH_STAND4 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                        NPC_SetAnim(ctx, NPC, SETANIM_TORSO, BOTH_STAND4 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                         (*client).ps.torsoTimer = 200;
                     }
                 }
@@ -1283,7 +1283,7 @@ pub fn NPC_BSST_Patrol(ctx: GameContext<'_>) {
                 if ((*client).ps.torsoTimer <= 0 || (*client).ps.torsoAnim == BOTH_STAND4 as c_int)
                     && ((*client).ps.legsTimer <= 0 || (*client).ps.legsAnim == BOTH_STAND4 as c_int)
                 {
-                    NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_STAND4 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    NPC_SetAnim(ctx, NPC, SETANIM_BOTH, BOTH_STAND4 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     (*client).ps.torsoTimer = 200;
                     (*client).ps.legsTimer = 200;
                 }

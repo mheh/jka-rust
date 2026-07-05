@@ -133,11 +133,12 @@ pub fn AddRemap(
 pub fn BuildShaderStateConfig(ctx: GameContext<'_>) -> *const c_char {
     unsafe {
         const MAX_STRING_CHARS: usize = 1024;
-        static mut BUFF: [c_char; MAX_STRING_CHARS * 4] = [0; MAX_STRING_CHARS * 4];
+        #[allow(non_upper_case_globals)] // Raven `static char buff[...]` spelling
+        static mut buff: [c_char; MAX_STRING_CHARS * 4] = [0; MAX_STRING_CHARS * 4];
 
         // Zero out the buffer at the start
         for i in 0..MAX_STRING_CHARS * 4 {
-            BUFF[i] = 0;
+            buff[i] = 0;
         }
 
         let world = &*ctx.world;
@@ -148,10 +149,10 @@ pub fn BuildShaderStateConfig(ctx: GameContext<'_>) -> *const c_char {
 
             let formatted = format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset);
             let out_cstr = CString::new(formatted).unwrap_or_else(|_| CString::new("").unwrap());
-            Q_strcat(BUFF.as_mut_ptr(), (MAX_STRING_CHARS * 4) as c_int, out_cstr.as_ptr());
+            Q_strcat(buff.as_mut_ptr(), (MAX_STRING_CHARS * 4) as c_int, out_cstr.as_ptr());
         }
 
-        BUFF.as_ptr()
+        buff.as_ptr()
     }
 }
 
@@ -613,22 +614,31 @@ pub fn G_CleanAllFakeClients(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:479-509`
 pub fn G_SetAnim(
+    ctx: GameContext<'_>,
     ent: *mut gentity_t,
-    ucmd: *mut usercmd_t,
+    _ucmd: *mut usercmd_t,
     setAnimParts: c_int,
     anim: c_int,
     setAnimFlags: c_int,
     blendTime: c_int,
 ) {
-    // PORT-NOTE(ctx-free-boundary-needs-state): This function is in the ctx-free boundary set,
-    // but the oracle calls BG_SetAnim which needs access to bgAllAnims and the bg state.
-    // Without ctx, cannot create a PmoveContext to call BG_SetAnim as required. Faithful
-    // transcription is blocked by the signature/threading architecture.
+    // Oracle body (the live `#else` "new clean and shining way"): the old
+    // `#if 0` pmove path is dead, so `ucmd` is unused (kept for signature parity).
+    // `BG_SetAnim` is a `PmoveContext` method (needs `bgAllAnims` off `BgState` +
+    // the bg channel handles); build a per-call context from `ctx`, matching the
+    // `BG_ParseAnimationFile` game-tier wrapper precedent.
     unsafe {
-        debug_assert!(!ent.is_null() && (*ent).client.is_null() == false);
-        // The oracle body (non-#if 0 section):
-        // BG_SetAnim(&ent->client->ps, bgAllAnims[ent->localAnimIndex].anims, setAnimParts, anim, setAnimFlags, blendTime);
-        // Cannot proceed without access to bgAllAnims and a way to call BG_SetAnim.
+        debug_assert!(!ent.is_null() && !(*ent).client.is_null());
+        let anims = (*ctx.world).bg_state.bgAllAnims[(*ent).localAnimIndex as usize].anims;
+        let ps = &mut (*((*ent).client as *mut gclient_t)).ps as *mut playerState_t;
+        let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
+        let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+            world: ctx.world,
+            engine: ctx.engine,
+        };
+        let mut pmc =
+            crate::bg_channel::PmoveContext::new(&mut (*ctx.world).bg_state, &traps, &mut callbacks);
+        pmc.BG_SetAnim(ps, anims, setAnimParts, anim, setAnimFlags, blendTime);
     }
 }
 
@@ -784,11 +794,13 @@ pub fn tv(
     z: f32,
 ) -> *mut f32 {
     unsafe {
-        static mut INDEX: c_int = 0;
-        static mut VECS: [[f32; 3]; 8] = [[0.0; 3]; 8];
+        #[allow(non_upper_case_globals)] // Raven `static int index` spelling
+        static mut index: c_int = 0;
+        #[allow(non_upper_case_globals)] // Raven `static vec3_t vecs[8]` spelling
+        static mut vecs: [[f32; 3]; 8] = [[0.0; 3]; 8];
 
-        let v = &mut VECS[INDEX as usize];
-        INDEX = (INDEX + 1) & 7;
+        let v = &mut vecs[index as usize];
+        index = (index + 1) & 7;
 
         v[0] = x;
         v[1] = y;
@@ -806,11 +818,13 @@ pub fn vtos(
     v: vec3_t,
 ) -> *mut c_char {
     unsafe {
-        static mut INDEX: c_int = 0;
-        static mut STR: [[c_char; 32]; 8] = [[0; 32]; 8];
+        #[allow(non_upper_case_globals)] // Raven `static int index` spelling
+        static mut index: c_int = 0;
+        #[allow(non_upper_case_globals)] // Raven `static char str[8][32]` spelling
+        static mut str: [[c_char; 32]; 8] = [[0; 32]; 8];
 
-        let s = &mut STR[INDEX as usize];
-        INDEX = (INDEX + 1) & 7;
+        let s = &mut str[index as usize];
+        index = (index + 1) & 7;
 
         let formatted = format!("({} {} {})", v[0] as c_int, v[1] as c_int, v[2] as c_int);
         let bytes = formatted.as_bytes();
@@ -1910,7 +1924,7 @@ pub fn TryUse(
                 if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD {
                     (*client).ps.torsoTimer = 500;
                 } else {
-                    G_SetAnim(
+                    G_SetAnim(ctx,
                         ent,
                         core::ptr::null_mut(),
                         SETANIM_TORSO,
@@ -1934,7 +1948,7 @@ pub fn TryUse(
             if (*client).ps.torsoAnim == BOTH_BUTTON_HOLD || (*client).ps.torsoAnim == BOTH_CONSOLE1 {
                 (*client).ps.torsoTimer = 500;
             } else {
-                G_SetAnim(
+                G_SetAnim(ctx,
                     ent,
                     core::ptr::null_mut(),
                     SETANIM_TORSO,

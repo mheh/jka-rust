@@ -690,7 +690,7 @@ pub fn Touch_Multi(
             if (*other_client).ps.torsoAnim != BOTH_BUTTON_HOLD as c_int
                 && (*other_client).ps.torsoAnim != BOTH_CONSOLE1 as c_int
             {
-                G_SetAnim(
+                G_SetAnim(ctx,
                     other,
                     core::ptr::null_mut(),
                     SETANIM_TORSO as c_int,

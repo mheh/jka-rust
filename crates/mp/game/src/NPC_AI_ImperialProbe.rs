@@ -224,7 +224,7 @@ pub fn ImperialProbe_Hunt(
     let mut forward = [0.0; 3];
     let mut distance = 0.0;
 
-    NPC_SetAnim(
+    NPC_SetAnim(ctx,
         npc,
         SETANIM_BOTH,
         BOTH_RUN1 as c_int,
@@ -409,7 +409,7 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
         return;
     }
 
-    NPC_SetAnim(npc, SETANIM_BOTH, BOTH_RUN1 as c_int, SETANIM_FLAG_NORMAL);
+    NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_RUN1 as c_int, SETANIM_FLAG_NORMAL);
 
     // Rate our distance to the target, and our visibility
     let distance = DistanceHorizontalSquared((*npc).r.currentOrigin, if let Some(enemy_id) = (*npc).enemy {
@@ -480,7 +480,7 @@ pub fn NPC_Probe_Pain(
             if (mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int) && !other.is_null() {
                 let mut dir = [0.0; 3];
 
-                NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
 
                 _VectorSubtract((*self_).r.currentOrigin, (*other).r.currentOrigin, &mut dir);
                 VectorNormalize(&mut dir);
@@ -497,7 +497,7 @@ pub fn NPC_Probe_Pain(
         let pain_chance = NPC_GetPainChance(ctx, self_, damage);
 
         if world.bg_state.rng.random() < pain_chance {
-            NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE);
+            NPC_SetAnim(ctx, self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE);
         }
     }
 
@@ -530,7 +530,7 @@ pub fn ImperialProbe_Patrol(ctx: GameContext<'_>) {
 
     // If we have somewhere to go, then do that
     if (*npc).enemy.is_none() {
-        NPC_SetAnim(npc, SETANIM_BOTH, BOTH_RUN1 as c_int, SETANIM_FLAG_NORMAL);
+        NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_RUN1 as c_int, SETANIM_FLAG_NORMAL);
 
         if UpdateGoal(ctx) != core::ptr::null_mut() {
             // start loop sound once we move

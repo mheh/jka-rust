@@ -330,10 +330,10 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
         // We've just started boarding, set the amount of time it will take to finish boarding
         if (*pVeh).m_iBoarding < 0 {
-            let mut iAnimLen: c_int;
+            let iAnimLen: c_int;
             let mut Anim: animNumber_t = BOTH_VS_IDLE;
             let iFlags: c_int = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
-            let iBlend: c_int = 300;
+            let mut iBlend: c_int = 300;
 
             // Determine boarding animation based on direction
             if (*pVeh).m_iBoarding == -1 {
@@ -343,8 +343,10 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             } else if (*pVeh).m_iBoarding == -3 {
                 Anim = BOTH_VS_MOUNTJUMP_L;
             } else if (*pVeh).m_iBoarding == VEH_MOUNT_THROW_LEFT {
+                iBlend = 0;
                 Anim = BOTH_VS_MOUNTTHROW_R;
             } else if (*pVeh).m_iBoarding == VEH_MOUNT_THROW_RIGHT {
+                iBlend = 0;
                 Anim = BOTH_VS_MOUNTTHROW_L;
             }
 
@@ -357,13 +359,26 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 Anim as c_int,
             ) as f32
                 * 0.4f32) as c_int;
-            // PORT-NOTE(vtable-access): BG_GetTime() needs game-tier state or engine access
-            // pVeh->m_iBoarding = BG_GetTime() + iAnimLen;
+            // MP `BG_GetTime()` is `level.time`, reachable through `ctx`.
+            (*pVeh).m_iBoarding = (*ctx.world).level.time + iAnimLen;
 
-            // Set the animation which won't be interrupted until completed
-            // PORT-NOTE(bg-anim-dispatch): BG_SetAnim requires bgAllAnims and PmoveContext
-            // BG_SetAnim(pVeh->m_pPilot->playerState, bgAllAnims[pVeh->m_pPilot->localAnimIndex].anims,
-            //     SETANIM_BOTH, Anim, iFlags, iBlend);
+            // Set the animation which won't be interrupted until completed. `BG_SetAnim`
+            // is a `PmoveContext` method (`bgAllAnims` off `BgState`); build a pm-null
+            // per-call context from `ctx` (the `BG_ParseAnimationFile` game-tier
+            // wrapper precedent; `BG_SetAnimFinal` null-guards the missing `pm`).
+            let ps = (*(*pVeh).m_pPilot).playerState;
+            let anims = (*ctx.world).bg_state.bgAllAnims[(*(*pVeh).m_pPilot).localAnimIndex as usize].anims;
+            let traps = crate::bg_channel::GameBgTraps::new(ctx.engine);
+            let mut callbacks = crate::bg_channel::GameCallbacksImpl {
+                world: ctx.world,
+                engine: ctx.engine,
+            };
+            let mut pmc = crate::bg_channel::PmoveContext::new(
+                &mut (*ctx.world).bg_state,
+                &traps,
+                &mut callbacks,
+            );
+            pmc.BG_SetAnim(ps, anims, SETANIM_BOTH, Anim as c_int, iFlags, iBlend);
         }
 
         // Old pilot handling - SP only, dead code in MP

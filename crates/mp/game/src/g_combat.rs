@@ -2601,7 +2601,7 @@ pub fn player_die(
 
                 if (*self_).inuse != qfalse {
                     // not disconnecting
-                    crate::g_utils::G_SetAnim(
+                    crate::g_utils::G_SetAnim(ctx,
                         self_,
                         core::ptr::null_mut(),
                         SETANIM_BOTH,

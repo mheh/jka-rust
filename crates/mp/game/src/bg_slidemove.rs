@@ -434,7 +434,14 @@ impl PmoveContext<'_> {
                         }
 
                         if (*pSelfVehInfo).surfDestruction != 0 {
-                            self.callbacks.flyveh_surface_destruction((*pEnt).s.number, 0, magnitude);
+                            // Oracle bg_slidemove.c:472: pass the live impact `trace` and
+                            // the `forceSurfDestruction` flag (both in scope here).
+                            self.callbacks.flyveh_surface_destruction(
+                                (*pEnt).s.number,
+                                trace,
+                                magnitude as c_int,
+                                forceSurfDestruction,
+                            );
                         }
 
                         (*pSelfVeh).m_ulFlags |= VEH_CRASHING as u64;

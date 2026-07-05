@@ -697,7 +697,7 @@ pub fn NPC_BSJump(ctx: GameContext<'_>) {
         match (*NPCInfo).jumpState {
             jumpState_t::JS_FACING => {
                 if yawError < MIN_ANGLE_ERROR {
-                    NPC_SetAnim(NPC, SETANIM_LEGS, BOTH_CROUCH1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    NPC_SetAnim(ctx, NPC, SETANIM_LEGS, BOTH_CROUCH1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     (*NPCInfo).jumpState = JS_CROUCHING;
                 }
             }
@@ -771,12 +771,12 @@ pub fn NPC_BSJump(ctx: GameContext<'_>) {
                 if (*NPC).s.groundEntityNum != ENTITYNUM_NONE {
                     // Landed, start landing anim.
                     (*npc_client).ps.velocity = [0.0; 3];
-                    NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_LAND1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+                    NPC_SetAnim(ctx, NPC, SETANIM_BOTH, BOTH_LAND1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     (*NPCInfo).jumpState = JS_LANDING;
                 } else if (*npc_client).ps.legsTimer > 0 {
                     return;
                 } else {
-                    NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_INAIR1 as c_int, SETANIM_FLAG_OVERRIDE);
+                    NPC_SetAnim(ctx, NPC, SETANIM_BOTH, BOTH_INAIR1 as c_int, SETANIM_FLAG_OVERRIDE);
                 }
             }
             jumpState_t::JS_LANDING => {
@@ -882,9 +882,9 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
                 }
 
                 if world.bg_state.rng.Q_irand(0, 1) == 0 {
-                    NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_GUARD_LOOKAROUND1 as c_int, SETANIM_FLAG_NORMAL);
+                    NPC_SetAnim(ctx, NPC, SETANIM_BOTH, BOTH_GUARD_LOOKAROUND1 as c_int, SETANIM_FLAG_NORMAL);
                 } else {
-                    NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_GUARD_IDLE1 as c_int, SETANIM_FLAG_NORMAL);
+                    NPC_SetAnim(ctx, NPC, SETANIM_BOTH, BOTH_GUARD_IDLE1 as c_int, SETANIM_FLAG_NORMAL);
                 }
                 (*NPCInfo).investigateDebounceTime = world.level.time + world.bg_state.rng.Q_irand(3000, 10000);
             } else {
@@ -1044,9 +1044,9 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
                 (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, NPC, WAYPOINT_NONE);
 
                 if world.bg_state.rng.Q_irand(0, 1) == 0 {
-                    NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_GUARD_LOOKAROUND1 as c_int, SETANIM_FLAG_NORMAL);
+                    NPC_SetAnim(ctx, NPC, SETANIM_BOTH, BOTH_GUARD_LOOKAROUND1 as c_int, SETANIM_FLAG_NORMAL);
                 } else {
-                    NPC_SetAnim(NPC, SETANIM_BOTH, BOTH_GUARD_IDLE1 as c_int, SETANIM_FLAG_NORMAL);
+                    NPC_SetAnim(ctx, NPC, SETANIM_BOTH, BOTH_GUARD_IDLE1 as c_int, SETANIM_FLAG_NORMAL);
                 }
                 (*NPCInfo).investigateDebounceTime = world.level.time + world.bg_state.rng.Q_irand(3000, 10000);
             } else {

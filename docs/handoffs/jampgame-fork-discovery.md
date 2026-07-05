@@ -207,6 +207,27 @@ parks trace to the generated signatures not carrying already-settled rulings.
     + `AnimalNPC::AnimateRiders` became direct `(*ctx.world).g_entities[...]`
     indexing.
 
+**BG_MySaber arena-base param.** RULING: BLESSED (user, 2026-07-05): the bg
+saber lookup takes an explicit arena base — `BG_MySaber(clientNum, saberNum,
+ents: *mut gentity_t)` (`bg_saber.rs:437`) — because it reads `g_entities` under
+`#ifdef QAGAME` and bg has no ambient world. Pmove-tier callers pass
+`pm->baseEnt` (the overlay base, ruling-14 cast); game-tier callers pass
+`g_entities`. Where the caller already holds a `PmoveContext` receiver, the
+`PmoveContext::BG_MySaber` method form (`bg_saber.rs:2828`) is preferred over the
+free fn (it reaches the base off `self.pm`). `BG_MySaber` null-checks `ents`, so
+a null base degrades to a missing-saber lookup rather than a deref — the guard
+`BG_SetAnimFinal` relies on when game-tier callers build a pm-null context.
+
+**bg_fighterAltControl BgState cvar mirror.** RULING: BLESSED (user, 2026-07-05):
+bg movement code that reads a game-tier cvar (`bg_pmove.c`'s
+`bg_fighterAltControl`) reads a mirror field on `BgState`
+(`bg.bg_fighterAltControl`), not the cvar directly (bg cannot reach the cvar
+table). The game tier owns the `vmCvar_t` (`game_cvars.rs:238`) and writes the
+mirror wherever it registers/refreshes the cvar (`g_main.rs:198,268`); bg reads
+`bg.bg_fighterAltControl` (`bg_pmove.rs:7855`). This is the standard pattern for
+any future bg-visible cvar: game-tier `vmCvar_t` + a `BgState` mirror updated at
+register/update time.
+
 ## Already covered — no decision (bless-the-rule appendix)
 
 vec3_t out-params (§C7; VectorCopy ×1358), qboolean returns → bool ×652

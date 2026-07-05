@@ -999,7 +999,7 @@ pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: *mut gentity_t) {
             );
 
             if !(*droidEnt).NPC.is_null() {
-                NPC_SetAnim(
+                NPC_SetAnim(ctx,
                     droidEnt,
                     SETANIM_BOTH as c_int,
                     BOTH_STAND2 as c_int,
@@ -1559,7 +1559,7 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
             }
 
             if idleAnim != -1 && idleAnim > 0 && idleAnim < MAX_ANIMATIONS as c_int {
-                G_SetAnim(
+                G_SetAnim(ctx,
                     ent,
                     ucmd,
                     SETANIM_BOTH as c_int,

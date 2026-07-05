@@ -738,7 +738,7 @@ pub fn NPC_Begin(
         }
 
         if (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_VEHICLE {
-            NPC_SetAnim(ent, SETANIM_BOTH, (BOTH_STAND1) as i32, SETANIM_FLAG_NORMAL);
+            NPC_SetAnim(ctx, ent, SETANIM_BOTH, (BOTH_STAND1) as i32, SETANIM_FLAG_NORMAL);
         }
 
         if !spawn_point.is_null() {

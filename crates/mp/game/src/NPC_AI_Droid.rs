@@ -90,15 +90,15 @@ pub fn R2D2_TurnAnims(ctx: GameContext<'_>) {
             anim = (*((*npc).client as *mut gclient_t)).ps.legsAnim;
             if turndelta < 0.0 {
                 if anim != 24 { // BOTH_TURN_LEFT1
-                    NPC_SetAnim(npc, 0, 24, 0x80 | 0x200); // SETANIM_BOTH = 0, SETANIM_FLAG_OVERRIDE = 0x80, SETANIM_FLAG_HOLD = 0x200
+                    NPC_SetAnim(ctx, npc, 0, 24, 0x80 | 0x200); // SETANIM_BOTH = 0, SETANIM_FLAG_OVERRIDE = 0x80, SETANIM_FLAG_HOLD = 0x200
                 }
             } else {
                 if anim != 25 { // BOTH_TURN_RIGHT1
-                    NPC_SetAnim(npc, 0, 25, 0x80 | 0x200);
+                    NPC_SetAnim(ctx, npc, 0, 25, 0x80 | 0x200);
                 }
             }
         } else {
-            NPC_SetAnim(npc, 0, 5, 0x80 | 0x200); // BOTH_RUN1 = 5
+            NPC_SetAnim(ctx, npc, 0, 5, 0x80 | 0x200); // BOTH_RUN1 = 5
         }
     }
 }
@@ -316,9 +316,9 @@ pub fn NPC_Droid_Pain(
                     let anim = (*((*self_).client as *mut gclient_t)).ps.legsAnim;
 
                     if anim == 14 { // BOTH_STAND2 = 14
-                        NPC_SetAnim(self_, 0, 20, 0x80 | 0x200); // BOTH_PAIN1 = 20
+                        NPC_SetAnim(ctx, self_, 0, 20, 0x80 | 0x200); // BOTH_PAIN1 = 20
                     } else {
-                        NPC_SetAnim(self_, 0, 21, 0x80 | 0x200); // BOTH_PAIN2 = 21
+                        NPC_SetAnim(ctx, self_, 0, 21, 0x80 | 0x200); // BOTH_PAIN2 = 21
                     }
 
                     (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;
@@ -371,9 +371,9 @@ pub fn NPC_Droid_Pain(
                     let anim = (*((*self_).client as *mut gclient_t)).ps.legsAnim;
 
                     if anim == 14 { // BOTH_STAND2 = 14
-                        NPC_SetAnim(self_, 0, 20, 0x80 | 0x200); // BOTH_PAIN1 = 20
+                        NPC_SetAnim(ctx, self_, 0, 20, 0x80 | 0x200); // BOTH_PAIN1 = 20
                     } else {
-                        NPC_SetAnim(self_, 0, 21, 0x80 | 0x200); // BOTH_PAIN2 = 21
+                        NPC_SetAnim(ctx, self_, 0, 21, 0x80 | 0x200); // BOTH_PAIN2 = 21
                     }
 
                     (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_SPINNING;

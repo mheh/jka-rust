@@ -136,59 +136,80 @@ pub fn un_ghost(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_
 }
 
 /// `AnimateVehicle` — per-class only (the generic base leaves the slot null, so
-/// Raven's callers `if`-guard it; the `_` arm is that skip). Fighter's override
-/// is not yet ported.
-/// Source: `oracle/oracle/codemp/game/{Speeder,Walker,Animal}NPC.c` (`AnimateVehicle`).
+/// Raven's callers `if`-guard it; the `_` arm is that skip).
+/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c` (`AnimateVehicle`).
 pub fn animate_vehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateVehicle(ctx, pVeh),
         vehicleType_t::VH_WALKER => crate::WalkerNPC::AnimateVehicle(ctx, pVeh),
         vehicleType_t::VH_ANIMAL => crate::AnimalNPC::AnimateVehicle(ctx, pVeh),
-        //TODO: Port FighterNPC::AnimateVehicle
-        // Source: oracle/oracle/codemp/game/FighterNPC.c:1951
-        vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::AnimateVehicle — FighterNPC.c:1951"),
+        vehicleType_t::VH_FIGHTER => crate::FighterNPC::AnimateVehicle(ctx, pVeh),
         _ => {}
     }
 }
 
-/// `AnimateRiders` — per-class only (Walker leaves it null). Fighter's override
-/// is not yet ported.
-/// Source: `oracle/oracle/codemp/game/{Speeder,Animal}NPC.c` (`AnimateRiders`).
+/// `AnimateRiders` — per-class only (Walker leaves it null).
+/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Animal}NPC.c` (`AnimateRiders`).
 pub fn animate_riders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateRiders(ctx, pVeh),
         vehicleType_t::VH_ANIMAL => crate::AnimalNPC::AnimateRiders(ctx, pVeh),
-        //TODO: Port FighterNPC::AnimateRiders
-        // Source: oracle/oracle/codemp/game/FighterNPC.c:1952
-        vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::AnimateRiders — FighterNPC.c:1952"),
+        vehicleType_t::VH_FIGHTER => crate::FighterNPC::AnimateRiders(ctx, pVeh),
         _ => {}
     }
 }
 
-/// `ProcessMoveCommands` — per-class only. Fighter's override is not yet ported.
-/// Source: `oracle/oracle/codemp/game/{Speeder,Walker,Animal}NPC.c`.
+/// `ProcessMoveCommands` — per-class only.
+/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c`.
 pub fn process_move_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessMoveCommands(ctx, pVeh),
         vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessMoveCommands(ctx, pVeh),
         vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessMoveCommands(ctx, pVeh),
-        //TODO: Port FighterNPC::ProcessMoveCommands
-        // Source: oracle/oracle/codemp/game/FighterNPC.c:1970
-        vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::ProcessMoveCommands — FighterNPC.c:1970"),
+        vehicleType_t::VH_FIGHTER => crate::FighterNPC::ProcessMoveCommands(ctx, pVeh),
         _ => {}
     }
 }
 
-/// `ProcessOrientCommands` — per-class only. Fighter's override is not yet ported.
-/// Source: `oracle/oracle/codemp/game/{Speeder,Walker,Animal}NPC.c`.
+/// `ProcessOrientCommands` — per-class only.
+/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Walker,Animal}NPC.c`.
 pub fn process_orient_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
         vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessOrientCommands(ctx, pVeh),
         vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessOrientCommands(ctx, pVeh),
         vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessOrientCommands(ctx, pVeh),
-        //TODO: Port FighterNPC::ProcessOrientCommands
-        // Source: oracle/oracle/codemp/game/FighterNPC.c:1971
-        vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::ProcessOrientCommands — FighterNPC.c:1971"),
+        vehicleType_t::VH_FIGHTER => crate::FighterNPC::ProcessOrientCommands(ctx, pVeh),
         _ => {}
     }
+}
+
+/// `Update` — generic base only (the shared setter is the sole assigner; no
+/// per-class override). Distinct from `AnimateVehicle`/`AnimateRiders`.
+/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3306`.
+pub fn update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+    crate::g_vehicles::Update(ctx, pVeh, pUcmd)
+}
+
+/// `Animate` — generic base only (the `vehicleInfo_t.Animate` slot, distinct
+/// from the per-class `AnimateVehicle` slot dispatched by [`animate_vehicle`]).
+/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3298`.
+pub fn animate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+    crate::g_vehicles::Animate(ctx, pVeh)
+}
+
+/// `UpdateRider` — generic base only.
+/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3307`.
+pub fn update_rider(
+    ctx: GameContext<'_>,
+    pVeh: *mut Vehicle_t,
+    pRider: *mut bgEntity_t,
+    pUcmd: *mut usercmd_t,
+) -> qboolean {
+    crate::g_vehicles::UpdateRider(ctx, pVeh, pRider, pUcmd)
+}
+
+/// `AttachRiders` — generic base only.
+/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3310`.
+pub fn attach_riders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+    crate::g_vehicles::AttachRiders(ctx, pVeh)
 }

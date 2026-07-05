@@ -43,8 +43,9 @@ use crate::bg_panimate::{
 use crate::bg_saber::BG_MySaber;
 // Additional bg helpers reached by the pmove pipeline (pass-3 call surface).
 use crate::bg_panimate::{
-    BG_FlippingAnim, BG_InBackFlip, BG_InDeathAnim, BG_InReboundHold, BG_InReboundJump,
-    BG_InSpecialJump, BG_KickingAnim, BG_SaberInSpecialAttack, PM_InKnockDown, PM_InOnGroundAnim,
+    BG_FlippingAnim, BG_FullBodyTauntAnim, BG_InBackFlip, BG_InDeathAnim, BG_InGrappleMove,
+    BG_InKataAnim, BG_InReboundHold, BG_InReboundJump, BG_InSpecialJump, BG_KickMove,
+    BG_KickingAnim, BG_SaberInKata, BG_SaberInSpecialAttack, PM_InKnockDown, PM_InOnGroundAnim,
     PM_InRollComplete, PM_InSaberAnim, PM_LandingAnim, PM_PainAnim, PM_SaberInStart,
 };
 use crate::bg_misc::{
@@ -1001,10 +1002,12 @@ impl PmoveContext<'_> {
         }
     }
 
-    /// Raven `PmoveSingle` — one fixed-timestep move. The opening (proxy button
-    /// fix-up, working-set entity setup, slow-fall latch, result clear, rocket-
-    /// trooper crouch clamp) is ported faithfully; the ~930-line move pipeline
-    /// remainder is the pass-3 target (single `todo!` per task).
+    /// Raven `PmoveSingle` — one fixed-timestep move (`QAGAME` build: game-side
+    /// `#ifdef QAGAME` branches compiled, cgame `#else` branches dropped). The
+    /// game-tier vehicle-NPC virtual dispatch
+    /// (`m_pVehicleInfo->Update`/`Animate`/`UpdateRider`/`AttachRiders`) crosses
+    /// the seam via the `GameCallbacks` upcalls (`update_vehicle`/
+    /// `pm_animate_vehicle`/`update_rider`/`attach_riders`, by entity number).
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:10174-11157`
     pub fn PmoveSingle(&mut self, pmove: *mut pmove_t) {
         unsafe {
@@ -1049,9 +1052,814 @@ impl PmoveContext<'_> {
                 }
             }
 
-            //TODO: Port PmoveSingle remainder
-            // Source: oracle/oracle/codemp/game/bg_pmove.c:10228-11157
-            todo!("Port PmoveSingle remainder — pass 3")
+            // Raven `#define JETPACK_HOVER_HEIGHT 64` (bg_pmove.c:10088).
+            const JETPACK_HOVER_HEIGHT: c_int = 64;
+
+            let ps = (*pm).ps;
+            let mut stiffenedUp: qboolean = qfalse;
+            let mut gDist: f32 = 0.0;
+            let mut noAnimate: qboolean = qfalse;
+            let mut savedGravity: c_int = 0;
+
+            if (*ps).pm_type == PM_FLOAT as c_int {
+                // You get no control over where you go in grip movement
+                stiffenedUp = qtrue;
+            } else if (*ps).eFlags & EF_DISINTEGRATION != 0 {
+                stiffenedUp = qtrue;
+            } else if BG_SaberLockBreakAnim((*ps).legsAnim) != qfalse
+                || BG_SaberLockBreakAnim((*ps).torsoAnim) != qfalse
+                || (*ps).saberLockTime >= (*pm).cmd.serverTime
+            {
+                // can't move or turn
+                stiffenedUp = qtrue;
+                PM_SetPMViewAngle(ps, (*ps).viewangles, &mut (*pm).cmd);
+            } else if (*ps).saberMove == LS_A_BACK
+                || (*ps).saberMove == LS_A_BACK_CR
+                || (*ps).saberMove == LS_A_BACKSTAB
+                || (*ps).saberMove == LS_A_FLIP_STAB
+                || (*ps).saberMove == LS_A_FLIP_SLASH
+                || (*ps).saberMove == LS_A_JUMP_T__B_
+                || (*ps).saberMove == LS_DUAL_LR
+                || (*ps).saberMove == LS_DUAL_FB
+            {
+                if (*ps).legsAnim == BOTH_JUMPFLIPSTABDOWN as c_int
+                    || (*ps).legsAnim == BOTH_JUMPFLIPSLASHDOWN1 as c_int
+                {
+                    // flipover medium stance attack
+                    if (*ps).legsTimer < 1600 && (*ps).legsTimer > 900 {
+                        (*ps).viewangles[YAW] += self.pml.frametime * 240.0;
+                        PM_SetPMViewAngle(ps, (*ps).viewangles, &mut (*pm).cmd);
+                    }
+                }
+                stiffenedUp = qtrue;
+            } else if (*ps).legsAnim == BOTH_A2_STABBACK1 as c_int
+                || (*ps).legsAnim == BOTH_ATTACK_BACK as c_int
+                || (*ps).legsAnim == BOTH_CROUCHATTACKBACK1 as c_int
+                || (*ps).legsAnim == BOTH_FORCELEAP2_T__B_ as c_int
+                || (*ps).legsAnim == BOTH_JUMPFLIPSTABDOWN as c_int
+                || (*ps).legsAnim == BOTH_JUMPFLIPSLASHDOWN1 as c_int
+            {
+                stiffenedUp = qtrue;
+            } else if (*ps).legsAnim == BOTH_ROLL_STAB as c_int {
+                stiffenedUp = qtrue;
+                PM_SetPMViewAngle(ps, (*ps).viewangles, &mut (*pm).cmd);
+            } else if (*ps).heldByClient != 0 {
+                stiffenedUp = qtrue;
+            } else if BG_KickMove((*ps).saberMove) != qfalse
+                || BG_KickingAnim((*ps).legsAnim) != qfalse
+            {
+                stiffenedUp = qtrue;
+            } else if BG_InGrappleMove((*ps).torsoAnim) != 0 {
+                stiffenedUp = qtrue;
+                PM_SetPMViewAngle(ps, (*ps).viewangles, &mut (*pm).cmd);
+            } else if (*ps).saberMove == LS_STABDOWN_DUAL
+                || (*ps).saberMove == LS_STABDOWN_STAFF
+                || (*ps).saberMove == LS_STABDOWN
+            {
+                // FIXME (Raven): need to only move forward until we bump into our target...?
+                if (*ps).legsTimer < 800 {
+                    // freeze movement near end of anim
+                    stiffenedUp = qtrue;
+                    PM_SetPMViewAngle(ps, (*ps).viewangles, &mut (*pm).cmd);
+                } else {
+                    // force forward til then
+                    (*pm).cmd.rightmove = 0;
+                    (*pm).cmd.upmove = 0;
+                    (*pm).cmd.forwardmove = 64;
+                }
+            } else if (*ps).saberMove == LS_PULL_ATTACK_STAB
+                || (*ps).saberMove == LS_PULL_ATTACK_SWING
+            {
+                stiffenedUp = qtrue;
+            } else if BG_SaberInKata((*ps).saberMove) != qfalse
+                || BG_InKataAnim((*ps).torsoAnim) != qfalse
+                || BG_InKataAnim((*ps).legsAnim) != qfalse
+            {
+                self.PM_MoveForKata(&mut (*pm).cmd);
+            } else if BG_FullBodyTauntAnim((*ps).legsAnim) != qfalse
+                && BG_FullBodyTauntAnim((*ps).torsoAnim) != qfalse
+            {
+                if (*pm).cmd.buttons & BUTTON_ATTACK != 0
+                    || (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+                    || (*pm).cmd.buttons & BUTTON_FORCEPOWER != 0
+                    || (*pm).cmd.buttons & BUTTON_FORCEGRIP != 0
+                    || (*pm).cmd.buttons & BUTTON_FORCE_LIGHTNING != 0
+                    || (*pm).cmd.buttons & BUTTON_FORCE_DRAIN != 0
+                    || (*pm).cmd.upmove != 0
+                {
+                    // stop the anim
+                    if (*ps).legsAnim == BOTH_MEDITATE as c_int
+                        && (*ps).torsoAnim == BOTH_MEDITATE as c_int
+                    {
+                        self.PM_SetAnim(
+                            SETANIM_BOTH,
+                            BOTH_MEDITATE_END as c_int,
+                            SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                            0,
+                        );
+                    } else {
+                        (*ps).legsTimer = 0;
+                        (*ps).torsoTimer = 0;
+                    }
+                    if (*ps).forceHandExtend == HANDEXTEND_TAUNT as c_int {
+                        (*ps).forceHandExtend = 0;
+                    }
+                } else {
+                    if (*ps).legsAnim == BOTH_MEDITATE as c_int {
+                        if (*ps).legsTimer < 100 {
+                            (*ps).legsTimer = 100;
+                        }
+                    }
+                    if (*ps).torsoAnim == BOTH_MEDITATE as c_int {
+                        // PORT-NOTE(meditate-timer-quirk): Raven sets `legsTimer`
+                        // (not `torsoTimer`) inside this `torsoTimer < 100` guard;
+                        // preserved faithfully. Source: bg_pmove.c:10349-10352.
+                        if (*ps).torsoTimer < 100 {
+                            (*ps).legsTimer = 100;
+                        }
+                        (*ps).forceHandExtend = HANDEXTEND_TAUNT as c_int;
+                        (*ps).forceHandExtendTime = (*pm).cmd.serverTime + 100;
+                    }
+                    if (*ps).legsTimer > 0 || (*ps).torsoTimer > 0 {
+                        stiffenedUp = qtrue;
+                        PM_SetPMViewAngle(ps, (*ps).viewangles, &mut (*pm).cmd);
+                        (*pm).cmd.rightmove = 0;
+                        (*pm).cmd.upmove = 0;
+                        (*pm).cmd.forwardmove = 0;
+                        (*pm).cmd.buttons = 0;
+                    }
+                }
+            } else if (*ps).legsAnim == BOTH_MEDITATE_END as c_int && (*ps).legsTimer > 0 {
+                stiffenedUp = qtrue;
+                PM_SetPMViewAngle(ps, (*ps).viewangles, &mut (*pm).cmd);
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+                (*pm).cmd.forwardmove = 0;
+                (*pm).cmd.buttons = 0;
+            } else if (*ps).legsAnim == BOTH_FORCELAND1 as c_int
+                || (*ps).legsAnim == BOTH_FORCELANDBACK1 as c_int
+                || (*ps).legsAnim == BOTH_FORCELANDRIGHT1 as c_int
+                || (*ps).legsAnim == BOTH_FORCELANDLEFT1 as c_int
+            {
+                // can't move while in a force land
+                stiffenedUp = qtrue;
+            }
+
+            if (*ps).saberMove == LS_A_LUNGE {
+                // can't move during lunge
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+                if (*ps).legsTimer > 500 {
+                    (*pm).cmd.forwardmove = 127;
+                } else {
+                    (*pm).cmd.forwardmove = 0;
+                }
+            }
+
+            if (*ps).saberMove == LS_A_JUMP_T__B_ {
+                // can't move during leap
+                if (*ps).groundEntityNum != ENTITYNUM_NONE {
+                    // hit the ground
+                    (*pm).cmd.forwardmove = 0;
+                }
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+            }
+
+            if (*ps).emplacedIndex != 0 {
+                if (*pm).cmd.forwardmove < 0 || self.PM_GroundDistance() > 32.0 {
+                    (*ps).emplacedIndex = 0;
+                    (*ps).saberHolstered = 0;
+                } else {
+                    stiffenedUp = qtrue;
+                }
+            }
+
+            if (*ps).weapon == WP_DISRUPTOR as c_int
+                && (*ps).weaponstate == WEAPON_CHARGING_ALT as c_int
+            {
+                // not allowed to move while charging the disruptor
+                if (*pm).cmd.forwardmove != 0 || (*pm).cmd.rightmove != 0 || (*pm).cmd.upmove > 0 {
+                    // get out
+                    (*ps).weaponstate = WEAPON_READY as c_int;
+                    (*ps).weaponTime = 1000;
+                    // cut the weapon charge sound
+                    self.PM_AddEventWithParm(EV_WEAPON_CHARGE as c_int, WP_DISRUPTOR as c_int);
+                    (*pm).cmd.upmove = 0;
+                }
+            } else if (*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode == 1 {
+                // can't jump
+                if (*pm).cmd.upmove > 0 {
+                    (*pm).cmd.upmove = 0;
+                }
+            }
+
+            if stiffenedUp != qfalse {
+                (*pm).cmd.forwardmove = 0;
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+            }
+
+            if (*ps).fd.forceGripCripple != 0 {
+                // don't let attack or alt attack if being gripped I guess
+                (*pm).cmd.buttons &= !BUTTON_ATTACK;
+                (*pm).cmd.buttons &= !BUTTON_ALT_ATTACK;
+            }
+
+            if BG_InRoll(ps, (*ps).legsAnim) != qfalse {
+                // can't roll unless you're able to move normally
+                BG_CmdForRoll(ps, (*ps).legsAnim, &mut (*pm).cmd, self.bg);
+            }
+
+            self.PM_CmdForSaberMoves(&mut (*pm).cmd);
+
+            self.BG_AdjustClientSpeed(ps, &mut (*pm).cmd, (*pm).cmd.serverTime);
+
+            if (*ps).stats[STAT_HEALTH as usize] <= 0 {
+                // corpses can fly through bodies
+                (*pm).tracemask &= !CONTENTS_BODY;
+            }
+
+            // make sure walking button is clear if they are running, to avoid
+            // proxy no-footsteps cheats
+            if ((*pm).cmd.forwardmove as c_int).abs() > 64
+                || ((*pm).cmd.rightmove as c_int).abs() > 64
+            {
+                (*pm).cmd.buttons &= !BUTTON_WALKING;
+            }
+
+            // set the talk balloon flag
+            if (*pm).cmd.buttons & BUTTON_TALK != 0 {
+                (*ps).eFlags |= EF_TALK;
+            } else {
+                (*ps).eFlags &= !EF_TALK;
+            }
+
+            self.pm_cancelOutZoom = qfalse;
+            if (*ps).weapon == WP_DISRUPTOR as c_int && (*ps).zoomMode == 1 {
+                if (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+                    && (*pm).cmd.buttons & BUTTON_ATTACK == 0
+                    && (*ps).zoomLocked != 0
+                {
+                    self.pm_cancelOutZoom = qtrue;
+                }
+            }
+            // In certain situations, we may want to control which attack buttons are pressed
+            // and what kind of functionality is attached to them
+            self.PM_AdjustAttackStates(pm);
+
+            // clear the respawned flag if attack and use are cleared
+            if (*ps).stats[STAT_HEALTH as usize] > 0
+                && (*pm).cmd.buttons & (BUTTON_ATTACK | BUTTON_USE_HOLDABLE) == 0
+            {
+                (*ps).pm_flags &= !PMF_RESPAWNED;
+            }
+
+            // if talk button is down, disallow all other input; this is to prevent any
+            // possible intercept proxy from adding fake talk balloons
+            if (*pm).cmd.buttons & BUTTON_TALK != 0 {
+                // keep the talk button set tho for when the cmd.serverTime > 66 msec
+                // and the same cmd is used multiple times in Pmove
+                (*pm).cmd.buttons = BUTTON_TALK;
+                (*pm).cmd.forwardmove = 0;
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+            }
+
+            // clear all pmove local vars
+            self.pml = core::mem::zeroed();
+
+            // determine the time
+            self.pml.msec = (*pm).cmd.serverTime - (*ps).commandTime;
+            if self.pml.msec < 1 {
+                self.pml.msec = 1;
+            } else if self.pml.msec > 200 {
+                self.pml.msec = 200;
+            }
+
+            (*ps).commandTime = (*pm).cmd.serverTime;
+
+            // save old org in case we get stuck
+            _VectorCopy((*ps).origin, &mut self.pml.previous_origin);
+
+            // save old velocity for crashlanding
+            _VectorCopy((*ps).velocity, &mut self.pml.previous_velocity);
+
+            self.pml.frametime = self.pml.msec as f32 * 0.001;
+
+            if (*ps).clientNum >= MAX_CLIENTS as c_int
+                && !self.pm_entSelf.is_null()
+                && (*self.pm_entSelf).s.NPC_class == CLASS_VEHICLE as c_int
+            {
+                // we are a vehicle
+                let veh = self.pm_entSelf;
+                if !veh.is_null() && !(*veh).m_pVehicle.is_null() {
+                    (*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_fTimeModifier = self.pml.frametime * 60.0;
+                }
+            } else if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int
+                && (*ps).m_iVehicleNum != 0
+            {
+                let veh = self.pm_entVeh;
+                if !veh.is_null()
+                    && !(*veh).playerState.is_null()
+                    && ((*pm).cmd.serverTime - (*(*veh).playerState).hyperSpaceTime)
+                        < HYPERSPACE_TIME as c_int
+                {
+                    // going into hyperspace, turn to face the right angles
+                    self.PM_VehFaceHyperspacePoint(veh);
+                } else if !veh.is_null()
+                    && !(*veh).playerState.is_null()
+                    && (*(*veh).playerState).vehTurnaroundIndex != 0
+                    && (*(*veh).playerState).vehTurnaroundTime > (*pm).cmd.serverTime
+                {
+                    // riding this vehicle, turn my view too
+                    self.PM_VehForcedTurning(veh);
+                }
+            }
+
+            if (*ps).legsAnim == BOTH_FORCEWALLRUNFLIP_ALT as c_int && (*ps).legsTimer > 0 {
+                let mut vFwd: vec3_t = [0.0; 3];
+                let mut fwdAng: vec3_t = [0.0; 3];
+                VectorSet(&mut fwdAng, 0.0, (*ps).viewangles[YAW], 0.0);
+
+                AngleVectors(fwdAng, Some(&mut vFwd), None, None);
+                if (*ps).groundEntityNum == ENTITYNUM_NONE {
+                    let savZ = (*ps).velocity[2];
+                    _VectorScale(vFwd, 100.0, &mut (*ps).velocity);
+                    (*ps).velocity[2] = savZ;
+                }
+                (*pm).cmd.forwardmove = 0;
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+                self.PM_AdjustAnglesForWallRunUpFlipAlt(&mut (*pm).cmd);
+            }
+
+            self.PM_AdjustAngleForWallJump(ps, &mut (*pm).cmd, qtrue);
+            self.PM_AdjustAngleForWallRunUp(ps, &mut (*pm).cmd, qtrue);
+            self.PM_AdjustAngleForWallRun(ps, &mut (*pm).cmd, qtrue);
+
+            if (*ps).saberMove == LS_A_JUMP_T__B_
+                || (*ps).saberMove == LS_A_LUNGE
+                || (*ps).saberMove == LS_A_BACK_CR
+                || (*ps).saberMove == LS_A_BACK
+                || (*ps).saberMove == LS_A_BACKSTAB
+            {
+                PM_SetPMViewAngle(ps, (*ps).viewangles, &mut (*pm).cmd);
+            }
+
+            self.PM_SetSpecialMoveValues();
+
+            // update the viewangles
+            self.PM_UpdateViewAngles(ps, &(*pm).cmd);
+
+            AngleVectors(
+                (*ps).viewangles,
+                Some(&mut self.pml.forward),
+                Some(&mut self.pml.right),
+                Some(&mut self.pml.up),
+            );
+
+            if ((*pm).cmd.upmove as c_int) < 10 && (*ps).pm_flags & PMF_STUCK_TO_WALL == 0 {
+                // not holding jump
+                (*ps).pm_flags &= !PMF_JUMP_HELD;
+            }
+
+            // decide if backpedaling animations should be used
+            if (*pm).cmd.forwardmove < 0 {
+                (*ps).pm_flags |= PMF_BACKWARDS_RUN;
+            } else if (*pm).cmd.forwardmove > 0
+                || ((*pm).cmd.forwardmove == 0 && (*pm).cmd.rightmove != 0)
+            {
+                (*ps).pm_flags &= !PMF_BACKWARDS_RUN;
+            }
+
+            if (*ps).pm_type >= PM_DEAD as c_int {
+                (*pm).cmd.forwardmove = 0;
+                (*pm).cmd.rightmove = 0;
+                (*pm).cmd.upmove = 0;
+            }
+
+            if (*ps).saberLockTime >= (*pm).cmd.serverTime {
+                (*pm).cmd.upmove = 0;
+                (*pm).cmd.forwardmove = 0;
+                (*pm).cmd.rightmove = 0;
+            }
+
+            if (*ps).pm_type == PM_SPECTATOR as c_int {
+                self.PM_CheckDuck();
+                if (*pm).noSpecMove == 0 {
+                    self.PM_FlyMove();
+                }
+                self.PM_DropTimers();
+                return;
+            }
+
+            if (*ps).pm_type == PM_NOCLIP as c_int {
+                if (*ps).clientNum < MAX_CLIENTS as c_int {
+                    self.PM_NoclipMove();
+                    self.PM_DropTimers();
+                    return;
+                }
+            }
+
+            if (*ps).pm_type == PM_FREEZE as c_int {
+                return; // no movement at all
+            }
+
+            if (*ps).pm_type == PM_INTERMISSION as c_int
+                || (*ps).pm_type == PM_SPINTERMISSION as c_int
+            {
+                return; // no movement at all
+            }
+
+            // set watertype, and waterlevel
+            self.PM_SetWaterLevel();
+            self.pml.previous_waterlevel = (*pm).waterlevel;
+
+            // set mins, maxs, and viewheight
+            self.PM_CheckDuck();
+
+            if (*ps).pm_type == PM_JETPACK as c_int {
+                gDist = self.PM_GroundDistance();
+                savedGravity = (*ps).gravity;
+
+                if gDist < (JETPACK_HOVER_HEIGHT + 64) as f32 {
+                    (*ps).gravity = ((*ps).gravity as f32 * 0.1) as c_int;
+                } else {
+                    (*ps).gravity = ((*ps).gravity as f32 * 0.25) as c_int;
+                }
+            } else if self.gPMDoSlowFall != qfalse {
+                savedGravity = (*ps).gravity;
+                (*ps).gravity = ((*ps).gravity as f32 * 0.5) as c_int;
+            }
+
+            // if we're in jetpack mode then see if we should be jetting around
+            if (*ps).pm_type == PM_JETPACK as c_int {
+                if (*pm).cmd.rightmove > 0 {
+                    self.PM_ContinueLegsAnim(BOTH_INAIRRIGHT1 as c_int);
+                } else if (*pm).cmd.rightmove < 0 {
+                    self.PM_ContinueLegsAnim(BOTH_INAIRLEFT1 as c_int);
+                } else if (*pm).cmd.forwardmove > 0 {
+                    self.PM_ContinueLegsAnim(BOTH_INAIR1 as c_int);
+                } else if (*pm).cmd.forwardmove < 0 {
+                    self.PM_ContinueLegsAnim(BOTH_INAIRBACK1 as c_int);
+                } else {
+                    self.PM_ContinueLegsAnim(BOTH_INAIR1 as c_int);
+                }
+
+                if (*ps).weapon == WP_SABER as c_int
+                    && BG_SpinningSaberAnim((*ps).legsAnim) != qfalse
+                {
+                    // make him stir around since he shouldn't have any real control when spinning
+                    (*ps).velocity[0] += self.bg.rng.Q_irand(-100, 100) as f32;
+                    (*ps).velocity[1] += self.bg.rng.Q_irand(-100, 100) as f32;
+                }
+
+                if (*pm).cmd.upmove > 0 && (*ps).velocity[2] < 256.0 {
+                    // cap upward velocity off at 256. Seems reasonable.
+                    let mut addIn: f32 = 12.0;
+
+                    if (*ps).velocity[2] > 0.0 {
+                        addIn = 12.0 - (gDist / 64.0);
+                    }
+
+                    if addIn > 0.0 {
+                        (*ps).velocity[2] += addIn;
+                    }
+
+                    (*ps).eFlags |= EF_JETPACK_FLAMING; // going up
+                } else {
+                    (*ps).eFlags &= !EF_JETPACK_FLAMING; // idling
+
+                    if (*ps).velocity[2] < 256.0 {
+                        if (*ps).velocity[2] < -100.0 {
+                            (*ps).velocity[2] = -100.0;
+                        }
+                        if gDist < JETPACK_HOVER_HEIGHT as f32 {
+                            // make sure we're always hovering off the ground somewhat while jetpack is active
+                            (*ps).velocity[2] += 2.0;
+                        }
+                    }
+                }
+            }
+
+            if (*ps).clientNum >= MAX_CLIENTS as c_int
+                && !self.pm_entSelf.is_null()
+                && !(*self.pm_entSelf).m_pVehicle.is_null()
+            {
+                // Now update our mins/maxs to match our m_vOrientation based on our
+                // length, width & height
+                self.BG_VehicleAdjustBBoxForOrientation(
+                    (*self.pm_entSelf).m_pVehicle as *mut Vehicle_t,
+                    (*ps).origin,
+                    &mut (*pm).mins,
+                    &mut (*pm).maxs,
+                    (*ps).clientNum,
+                    (*pm).tracemask,
+                );
+            }
+
+            // set groundentity
+            self.PM_GroundTrace();
+            if self.pm_flying == FLY_HOVER {
+                // never stick to the ground
+                self.PM_HoverTrace();
+            }
+
+            if (*ps).groundEntityNum != ENTITYNUM_NONE {
+                // on ground
+                (*ps).fd.forceJumpZStart = 0.0;
+            }
+
+            if (*ps).pm_type == PM_DEAD as c_int {
+                if (*ps).clientNum >= MAX_CLIENTS as c_int
+                    && !self.pm_entSelf.is_null()
+                    && (*self.pm_entSelf).s.NPC_class == CLASS_VEHICLE as c_int
+                    && (*(*((*self.pm_entSelf).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_pVehicleInfo).r#type as c_int
+                        != VH_ANIMAL as c_int
+                {
+                    // vehicles don't use deadmove
+                } else {
+                    self.PM_DeadMove();
+                }
+            }
+
+            self.PM_DropTimers();
+
+            if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int && (*ps).m_iVehicleNum != 0
+            {
+                // a player riding a vehicle
+                let veh = self.pm_entVeh;
+
+                if !veh.is_null()
+                    && !(*veh).m_pVehicle.is_null()
+                    && ((*(*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_pVehicleInfo).r#type as c_int == VH_WALKER as c_int
+                        || (*(*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_pVehicleInfo).r#type as c_int
+                            == VH_FIGHTER as c_int)
+                {
+                    // *sigh*, until we get forced weapon-switching working?
+                    (*pm).cmd.buttons &= !(BUTTON_ATTACK | BUTTON_ALT_ATTACK);
+                    (*ps).eFlags &= !(EF_FIRING | EF_ALT_FIRING);
+                }
+            }
+
+            if (*ps).m_iVehicleNum == 0
+                && (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int
+                && (*self.pm_entSelf).s.NPC_class != CLASS_RANCOR as c_int
+                && (*ps).groundEntityNum < ENTITYNUM_WORLD
+                && (*ps).groundEntityNum >= MAX_CLIENTS as c_int
+            {
+                // I am a player client, not riding on a vehicle, and potentially standing on an NPC
+                let pEnt = self.PM_BGEntForNum((*ps).groundEntityNum);
+
+                if !pEnt.is_null()
+                    && (*pEnt).s.eType == entityType_t::ET_NPC as c_int
+                    && (*pEnt).s.NPC_class != CLASS_VEHICLE as c_int
+                {
+                    // this is actually an NPC, let's try to bounce off its head to make
+                    // sure we can't just stand around on top of it.
+                    if (*ps).velocity[2] < 270.0 {
+                        // try forcing velocity up and also force him to jump
+                        (*ps).velocity[2] = 270.0; // seems reasonable
+                        (*pm).cmd.upmove = 127;
+                    }
+                }
+                // QAGAME: if land on an empty, suspended vehicle, get in it
+                else if (*ps).zoomMode == 0
+                    && !self.pm_entSelf.is_null()
+                    && !(*pEnt).m_pVehicle.is_null()
+                {
+                    let gEnt = pEnt as *mut gentity_t;
+                    if !(*gEnt).client.is_null()
+                        && (*((*gEnt).client as *mut gclient_t)).ps.m_iVehicleNum == 0
+                        && (*gEnt).spawnflags & 2 != 0
+                    // SUSPENDED
+                    {
+                        // it's a vehicle, get in it. The vehicle `Board` body is
+                        // game-tier; bg reaches it via the GameCallbacks upcall
+                        // (by entity number), which dispatches through
+                        // `crate::veh_dispatch::board`.
+                        self.callbacks
+                            .board_vehicle((*pEnt).s.number, (*self.pm_entSelf).s.number);
+                    }
+                }
+            }
+
+            if (*ps).clientNum >= MAX_CLIENTS as c_int
+                && !self.pm_entSelf.is_null()
+                && (*self.pm_entSelf).s.NPC_class == CLASS_VEHICLE as c_int
+            {
+                // we are a vehicle
+                let veh = self.pm_entSelf;
+                let pVeh = (*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
+
+                debug_assert!(
+                    !veh.is_null()
+                        && !(*veh).playerState.is_null()
+                        && !pVeh.is_null()
+                        && (*veh).s.number >= MAX_CLIENTS as c_int
+                );
+
+                if (*(*pVeh).m_pVehicleInfo).r#type as c_int != VH_FIGHTER as c_int {
+                    // kind of hacky, don't want to do this for flying vehicles
+                    *(*pVeh).m_vOrientation.add(PITCH) = (*ps).viewangles[PITCH];
+                }
+
+                if (*ps).m_iVehicleNum == 0 {
+                    // no one is driving, just update and get out (QAGAME). The
+                    // `Update`/`Animate` virtuals are game-tier; bg reaches them via
+                    // the GameCallbacks upcalls (by entity number).
+                    // Source: oracle/oracle/codemp/game/bg_pmove.c:10919-10922
+                    self.callbacks.update_vehicle((*veh).s.number, &(*self.pm).cmd);
+                    self.callbacks.pm_animate_vehicle((*veh).s.number);
+                } else {
+                    let selfEnt = self.pm_entVeh;
+
+                    debug_assert!(
+                        !selfEnt.is_null()
+                            && !(*selfEnt).playerState.is_null()
+                            && (*selfEnt).s.number < MAX_CLIENTS as c_int
+                    );
+
+                    if (*ps).pm_type == PM_DEAD as c_int
+                        && (*pVeh).m_ulFlags & (VEH_CRASHING as u64) != 0
+                    {
+                        (*pVeh).m_ulFlags &= !(VEH_CRASHING as u64);
+                    }
+
+                    if !(*selfEnt).playerState.is_null()
+                        && (*(*selfEnt).playerState).m_iVehicleNum != 0
+                    {
+                        // only do it if they still have a vehicle (didn't get ejected this update)
+                        PM_VehicleViewAngles(
+                            (*selfEnt).playerState,
+                            veh,
+                            &mut (*pVeh).m_ucmd,
+                            self.bg,
+                        );
+                    }
+
+                    // The `Update`/`Animate`/`UpdateRider` virtuals and the passenger
+                    // `UpdateRider` loop are game-tier; bg reaches them via the
+                    // GameCallbacks upcalls. The driver's cmd is the bg-reachable
+                    // `m_ucmd`; each passenger's `client->pers.cmd` is game-side, so a
+                    // null `ucmd` signals the impl to use the rider's own pers.cmd
+                    // (and to guard `inuse && client`).
+                    // Source: oracle/oracle/codemp/game/bg_pmove.c:10944-10961
+                    self.callbacks
+                        .update_vehicle((*veh).s.number, &(*pVeh).m_ucmd);
+                    self.callbacks.pm_animate_vehicle((*veh).s.number);
+                    self.callbacks.update_rider(
+                        (*veh).s.number,
+                        (*selfEnt).s.number,
+                        &mut (*pVeh).m_ucmd,
+                    );
+                    // update the passengers
+                    let mut i: c_int = 0;
+                    while i < (*pVeh).m_iNumPassengers {
+                        if !(*pVeh).m_ppPassengers[i as usize].is_null() {
+                            let passNum = (*(*pVeh).m_ppPassengers[i as usize]).s.number;
+                            self.callbacks.update_rider(
+                                (*veh).s.number,
+                                passNum,
+                                core::ptr::null_mut(),
+                            );
+                        }
+                        i += 1;
+                    }
+                }
+                noAnimate = qtrue;
+            }
+
+            if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int && (*ps).m_iVehicleNum != 0
+            {
+                // don't even run physics on a player if he's on a vehicle -
+                // he goes where the vehicle goes
+            } else {
+                if (*ps).pm_type == PM_FLOAT as c_int || self.pm_flying == FLY_NORMAL {
+                    self.PM_FlyMove();
+                } else if self.pm_flying == FLY_VEHICLE {
+                    self.PM_FlyVehicleMove();
+                } else if (*ps).pm_flags & PMF_TIME_WATERJUMP != 0 {
+                    self.PM_WaterJumpMove();
+                } else if (*pm).waterlevel > 1 {
+                    // swimming
+                    self.PM_WaterMove();
+                } else if self.pml.walking != qfalse {
+                    // walking on ground
+                    self.PM_WalkMove();
+                } else {
+                    // airborne
+                    self.PM_AirMove();
+                }
+            }
+
+            if noAnimate == qfalse {
+                self.PM_Animate();
+            }
+
+            // set groundentity, watertype, and waterlevel
+            self.PM_GroundTrace();
+            if self.pm_flying == FLY_HOVER {
+                // never stick to the ground
+                self.PM_HoverTrace();
+            }
+            self.PM_SetWaterLevel();
+            if (*pm).cmd.forcesel as c_int != -1
+                && (*ps).fd.forcePowersKnown & 1i32.wrapping_shl((*pm).cmd.forcesel as u32) != 0
+            {
+                // PORT-NOTE(byte-select-shift): Raven's `cmd.forcesel`/`invensel` are
+                // `byte`, so `!= -1` is always true and `1 << sel` is x86 shift-masked
+                // when `sel` is the 255 "none" sentinel; `wrapping_shl` reproduces that
+                // masked shift faithfully (porting-rules §19).
+                (*ps).fd.forcePowerSelected = (*pm).cmd.forcesel as c_int;
+            }
+            if (*pm).cmd.invensel as c_int != -1
+                && (*ps).stats[STAT_HOLDABLE_ITEMS as usize]
+                    & 1i32.wrapping_shl((*pm).cmd.invensel as u32)
+                    != 0
+            {
+                (*ps).stats[STAT_HOLDABLE_ITEM as usize] =
+                    BG_GetItemIndexByTag((*pm).cmd.invensel as c_int, IT_HOLDABLE as c_int);
+            }
+
+            if (*ps).m_iVehicleNum != 0 && (*ps).clientNum < MAX_CLIENTS as c_int {
+                // a client riding a vehicle
+                if (*ps).eFlags & EF_NODRAW != 0 {
+                    // inside the vehicle, do nothing
+                } else if PM_WeaponOkOnVehicle((*pm).cmd.weapon as c_int) == qfalse
+                    || PM_WeaponOkOnVehicle((*ps).weapon) == qfalse
+                {
+                    // this weapon is not legal for the vehicle, force to our current one
+                    if PM_WeaponOkOnVehicle((*ps).weapon) == qfalse {
+                        // uh-oh!
+                        let weap = self.PM_GetOkWeaponForVehicle();
+
+                        if weap != -1 {
+                            (*pm).cmd.weapon = weap as u8;
+                            (*ps).weapon = weap;
+                        }
+                    } else {
+                        (*pm).cmd.weapon = (*ps).weapon as u8;
+                    }
+                }
+            }
+
+            if (*ps).m_iVehicleNum == 0
+                || (*self.pm_entSelf).s.NPC_class == CLASS_VEHICLE as c_int
+                || ((*ps).eFlags & EF_NODRAW == 0
+                    && PM_WeaponOkOnVehicle((*pm).cmd.weapon as c_int) != qfalse)
+            {
+                // only run weapons if a valid weapon is selected
+                self.PM_Weapon();
+            }
+
+            self.PM_Use();
+
+            if (*ps).m_iVehicleNum == 0
+                && ((*ps).clientNum < MAX_CLIENTS as c_int
+                    || self.pm_entSelf.is_null()
+                    || (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int)
+            {
+                // don't do this if we're on a vehicle, or we are one
+                // footstep events / legs animations
+                self.PM_Footsteps();
+            }
+
+            // entering / leaving water splashes
+            self.PM_WaterEvents();
+
+            // snap some parts of playerstate to save network bandwidth
+            self.traps.snap_vector((*ps).velocity.as_mut_ptr());
+
+            if (*ps).pm_type == PM_JETPACK as c_int || self.gPMDoSlowFall != qfalse {
+                (*ps).gravity = savedGravity;
+            }
+
+            if (*ps).clientNum >= MAX_CLIENTS as c_int
+                && !self.pm_entSelf.is_null()
+                && (*self.pm_entSelf).s.NPC_class == CLASS_VEHICLE as c_int
+            {
+                // a vehicle with passengers
+                let veh = self.pm_entSelf;
+
+                debug_assert!(!(*veh).m_pVehicle.is_null());
+
+                // this could be kind of "inefficient" because it's called after every
+                // passenger pmove too.
+                if !(*veh).m_pVehicle.is_null() && !(*veh).ghoul2.is_null() {
+                    // `AttachRiders` is a game-tier virtual; bg reaches it via the
+                    // GameCallbacks upcall (by entity number).
+                    // Source: oracle/oracle/codemp/game/bg_pmove.c:11146-11149
+                    self.callbacks.attach_riders((*veh).s.number);
+                }
+            }
+
+            if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int && (*ps).m_iVehicleNum != 0
+            {
+                // riding a vehicle, see if we should do some anim overrides
+                self.PM_VehicleWeaponAnimate();
+            }
         }
     }
 }
