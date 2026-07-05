@@ -44,6 +44,85 @@ pub static BSTable: [stringID_table_t; 11] = [
     stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
 ];
 
+/// Raven `TeamTable` — NPC-team name/id lookup.
+///
+/// Source: `oracle/oracle/codemp/game/NPC_stats.c:14-20`
+pub static TeamTable: [stringID_table_t; 5] = [
+    stringID_table_t { name: c"NPCTEAM_FREE".as_ptr() as *mut c_char, id: NPCTEAM_FREE as c_int },
+    stringID_table_t { name: c"NPCTEAM_PLAYER".as_ptr() as *mut c_char, id: NPCTEAM_PLAYER as c_int },
+    stringID_table_t { name: c"NPCTEAM_ENEMY".as_ptr() as *mut c_char, id: NPCTEAM_ENEMY as c_int },
+    stringID_table_t { name: c"NPCTEAM_NEUTRAL".as_ptr() as *mut c_char, id: NPCTEAM_NEUTRAL as c_int },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },   // terminator: Raven's `"", -1`
+];
+
+/// Raven `ClassTable` — NPC-class name/id lookup (order must match the `class_t`
+/// enum in `teams.h`).
+///
+/// Source: `oracle/oracle/codemp/game/NPC_stats.c:23-86`
+pub static ClassTable: [stringID_table_t; 57] = [
+    stringID_table_t { name: c"CLASS_NONE".as_ptr() as *mut c_char, id: CLASS_NONE as c_int },
+    stringID_table_t { name: c"CLASS_ATST".as_ptr() as *mut c_char, id: CLASS_ATST as c_int },
+    stringID_table_t { name: c"CLASS_BARTENDER".as_ptr() as *mut c_char, id: CLASS_BARTENDER as c_int },
+    stringID_table_t { name: c"CLASS_BESPIN_COP".as_ptr() as *mut c_char, id: CLASS_BESPIN_COP as c_int },
+    stringID_table_t { name: c"CLASS_CLAW".as_ptr() as *mut c_char, id: CLASS_CLAW as c_int },
+    stringID_table_t { name: c"CLASS_COMMANDO".as_ptr() as *mut c_char, id: CLASS_COMMANDO as c_int },
+    stringID_table_t { name: c"CLASS_DESANN".as_ptr() as *mut c_char, id: CLASS_DESANN as c_int },
+    stringID_table_t { name: c"CLASS_FISH".as_ptr() as *mut c_char, id: CLASS_FISH as c_int },
+    stringID_table_t { name: c"CLASS_FLIER2".as_ptr() as *mut c_char, id: CLASS_FLIER2 as c_int },
+    stringID_table_t { name: c"CLASS_GALAK".as_ptr() as *mut c_char, id: CLASS_GALAK as c_int },
+    stringID_table_t { name: c"CLASS_GLIDER".as_ptr() as *mut c_char, id: CLASS_GLIDER as c_int },
+    stringID_table_t { name: c"CLASS_GONK".as_ptr() as *mut c_char, id: CLASS_GONK as c_int },
+    stringID_table_t { name: c"CLASS_GRAN".as_ptr() as *mut c_char, id: CLASS_GRAN as c_int },
+    stringID_table_t { name: c"CLASS_HOWLER".as_ptr() as *mut c_char, id: CLASS_HOWLER as c_int },
+    // ENUM2STRING(CLASS_RANCOR) — commented out in the oracle here (line 40); the
+    // active CLASS_RANCOR entry appears near the end (line 83).
+    stringID_table_t { name: c"CLASS_IMPERIAL".as_ptr() as *mut c_char, id: CLASS_IMPERIAL as c_int },
+    stringID_table_t { name: c"CLASS_IMPWORKER".as_ptr() as *mut c_char, id: CLASS_IMPWORKER as c_int },
+    stringID_table_t { name: c"CLASS_INTERROGATOR".as_ptr() as *mut c_char, id: CLASS_INTERROGATOR as c_int },
+    stringID_table_t { name: c"CLASS_JAN".as_ptr() as *mut c_char, id: CLASS_JAN as c_int },
+    stringID_table_t { name: c"CLASS_JEDI".as_ptr() as *mut c_char, id: CLASS_JEDI as c_int },
+    stringID_table_t { name: c"CLASS_KYLE".as_ptr() as *mut c_char, id: CLASS_KYLE as c_int },
+    stringID_table_t { name: c"CLASS_LANDO".as_ptr() as *mut c_char, id: CLASS_LANDO as c_int },
+    stringID_table_t { name: c"CLASS_LIZARD".as_ptr() as *mut c_char, id: CLASS_LIZARD as c_int },
+    stringID_table_t { name: c"CLASS_LUKE".as_ptr() as *mut c_char, id: CLASS_LUKE as c_int },
+    stringID_table_t { name: c"CLASS_MARK1".as_ptr() as *mut c_char, id: CLASS_MARK1 as c_int },
+    stringID_table_t { name: c"CLASS_MARK2".as_ptr() as *mut c_char, id: CLASS_MARK2 as c_int },
+    stringID_table_t { name: c"CLASS_GALAKMECH".as_ptr() as *mut c_char, id: CLASS_GALAKMECH as c_int },
+    stringID_table_t { name: c"CLASS_MINEMONSTER".as_ptr() as *mut c_char, id: CLASS_MINEMONSTER as c_int },
+    stringID_table_t { name: c"CLASS_MONMOTHA".as_ptr() as *mut c_char, id: CLASS_MONMOTHA as c_int },
+    stringID_table_t { name: c"CLASS_MORGANKATARN".as_ptr() as *mut c_char, id: CLASS_MORGANKATARN as c_int },
+    stringID_table_t { name: c"CLASS_MOUSE".as_ptr() as *mut c_char, id: CLASS_MOUSE as c_int },
+    stringID_table_t { name: c"CLASS_MURJJ".as_ptr() as *mut c_char, id: CLASS_MURJJ as c_int },
+    stringID_table_t { name: c"CLASS_PRISONER".as_ptr() as *mut c_char, id: CLASS_PRISONER as c_int },
+    stringID_table_t { name: c"CLASS_PROBE".as_ptr() as *mut c_char, id: CLASS_PROBE as c_int },
+    stringID_table_t { name: c"CLASS_PROTOCOL".as_ptr() as *mut c_char, id: CLASS_PROTOCOL as c_int },
+    stringID_table_t { name: c"CLASS_R2D2".as_ptr() as *mut c_char, id: CLASS_R2D2 as c_int },
+    stringID_table_t { name: c"CLASS_R5D2".as_ptr() as *mut c_char, id: CLASS_R5D2 as c_int },
+    stringID_table_t { name: c"CLASS_REBEL".as_ptr() as *mut c_char, id: CLASS_REBEL as c_int },
+    stringID_table_t { name: c"CLASS_REBORN".as_ptr() as *mut c_char, id: CLASS_REBORN as c_int },
+    stringID_table_t { name: c"CLASS_REELO".as_ptr() as *mut c_char, id: CLASS_REELO as c_int },
+    stringID_table_t { name: c"CLASS_REMOTE".as_ptr() as *mut c_char, id: CLASS_REMOTE as c_int },
+    stringID_table_t { name: c"CLASS_RODIAN".as_ptr() as *mut c_char, id: CLASS_RODIAN as c_int },
+    stringID_table_t { name: c"CLASS_SEEKER".as_ptr() as *mut c_char, id: CLASS_SEEKER as c_int },
+    stringID_table_t { name: c"CLASS_SENTRY".as_ptr() as *mut c_char, id: CLASS_SENTRY as c_int },
+    stringID_table_t { name: c"CLASS_SHADOWTROOPER".as_ptr() as *mut c_char, id: CLASS_SHADOWTROOPER as c_int },
+    stringID_table_t { name: c"CLASS_STORMTROOPER".as_ptr() as *mut c_char, id: CLASS_STORMTROOPER as c_int },
+    stringID_table_t { name: c"CLASS_SWAMP".as_ptr() as *mut c_char, id: CLASS_SWAMP as c_int },
+    stringID_table_t { name: c"CLASS_SWAMPTROOPER".as_ptr() as *mut c_char, id: CLASS_SWAMPTROOPER as c_int },
+    stringID_table_t { name: c"CLASS_TAVION".as_ptr() as *mut c_char, id: CLASS_TAVION as c_int },
+    stringID_table_t { name: c"CLASS_TRANDOSHAN".as_ptr() as *mut c_char, id: CLASS_TRANDOSHAN as c_int },
+    stringID_table_t { name: c"CLASS_UGNAUGHT".as_ptr() as *mut c_char, id: CLASS_UGNAUGHT as c_int },
+    stringID_table_t { name: c"CLASS_JAWA".as_ptr() as *mut c_char, id: CLASS_JAWA as c_int },
+    stringID_table_t { name: c"CLASS_WEEQUAY".as_ptr() as *mut c_char, id: CLASS_WEEQUAY as c_int },
+    stringID_table_t { name: c"CLASS_BOBAFETT".as_ptr() as *mut c_char, id: CLASS_BOBAFETT as c_int },
+    // ENUM2STRING(CLASS_ROCKETTROOPER) — commented out in the oracle (line 80).
+    // ENUM2STRING(CLASS_PLAYER) — commented out in the oracle (line 81).
+    stringID_table_t { name: c"CLASS_VEHICLE".as_ptr() as *mut c_char, id: CLASS_VEHICLE as c_int },
+    stringID_table_t { name: c"CLASS_RANCOR".as_ptr() as *mut c_char, id: CLASS_RANCOR as c_int },
+    stringID_table_t { name: c"CLASS_WAMPA".as_ptr() as *mut c_char, id: CLASS_WAMPA as c_int },
+    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },   // terminator: Raven's `"", -1`
+];
+
 /// Raven `NPC_ReactionTime`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_stats.c:220-223`
@@ -179,10 +258,6 @@ pub fn NPC_Precache(
     use mp_bg::weapons::weapon_t::{weapon_t, WP_NONE, WP_NUM_WEAPONS};
 
     unsafe {
-        // PORT-NOTE(unported-global): `NPCParms`/`NPCFile`/`TeamTable` are not
-        // real `GameGlobals` fields yet (confirmed by grep — no placeholder
-        // exists for any of the three). Referenced through the globals path
-        // per ruling 8 pending backfill; see missing_symbols.
         let mut player_team: team_t = NPCTEAM_FREE;
         let mut md3_model: qboolean = 0; // qfalse
         let mut custom_skin: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
@@ -325,7 +400,7 @@ pub fn NPC_Precache(
                 let tk = format!("NPC{}", cstr_to_str(token));
                 let tk_c = cstr(&tk);
                 player_team = crate::q_shared::GetIDForString(
-                    &(*ctx.world).globals.TeamTable as *const _ as *mut stringID_table_t,
+                    TeamTable.as_ptr() as *mut stringID_table_t,
                     tk_c.as_ptr(),
                 );
                 continue;
@@ -562,10 +637,6 @@ pub fn NPC_ParseParms(
             return 0; // qfalse
         }
 
-        // PORT-NOTE(unported-global): `NPCParms`/`NPCFile`/`ClassTable`/
-        // `TeamTable` are not real `GameGlobals` fields yet — referenced
-        // through the globals path per ruling 8 pending backfill; see
-        // missing_symbols.
         let npc_parms: *const c_char =
             (&(*ctx.world).globals.NPCParms) as *const _ as *const c_char;
         let npc_file: *const c_char = (&(*ctx.world).globals.NPCFile) as *const _ as *const c_char;
@@ -1054,7 +1125,7 @@ pub fn NPC_ParseParms(
                 let tk = format!("NPC{}", cstr_to_str(token));
                 let tk_c = cstr(&tk);
                 let team_id = crate::q_shared::GetIDForString(
-                    &(*ctx.world).globals.TeamTable as *const _ as *mut stringID_table_t,
+                    TeamTable.as_ptr() as *mut stringID_table_t,
                     tk_c.as_ptr(),
                 );
                 (*client_ptr).playerTeam = team_id;
@@ -1072,7 +1143,7 @@ pub fn NPC_ParseParms(
                 let tk = format!("NPC{}", cstr_to_str(token));
                 let tk_c = cstr(&tk);
                 (*client_ptr).enemyTeam = crate::q_shared::GetIDForString(
-                    &(*ctx.world).globals.TeamTable as *const _ as *mut stringID_table_t,
+                    TeamTable.as_ptr() as *mut stringID_table_t,
                     tk_c.as_ptr(),
                 );
                 continue;
@@ -1086,7 +1157,7 @@ pub fn NPC_ParseParms(
                     continue;
                 }
                 let class_id = crate::q_shared::GetIDForString(
-                    &(*ctx.world).globals.ClassTable as *const _ as *mut stringID_table_t,
+                    ClassTable.as_ptr() as *mut stringID_table_t,
                     value,
                 );
                 (*client_ptr).NPC_class = core::mem::transmute::<c_int, class_t>(class_id);
