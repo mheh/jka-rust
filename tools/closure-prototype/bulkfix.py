@@ -78,17 +78,19 @@ def cast_targets(target_paths):
         code = (msg.get("code") or {}).get("code")
         if code != "E0308":
             continue
-        mm = EXPECTED_FOUND.search(msg.get("message", ""))
-        if not mm:
-            continue
-        expected, found = mm.group(1).split("::")[-1], mm.group(2).split("::")[-1]
-        # only primitive-int targets; sources: primitive ints or #[repr(int)] enums
-        if expected not in PRIM_INTS:
-            continue
-        if found not in PRIM_INTS and not found.endswith("_t"):
-            continue
         for sp in msg.get("spans", []):
             if not sp.get("is_primary"):
+                continue
+            # rustc puts the `expected T, found U` text in the primary span's
+            # label, not the top-level message (which is just "mismatched types").
+            mm = EXPECTED_FOUND.search(sp.get("label") or "") or EXPECTED_FOUND.search(msg.get("message", ""))
+            if not mm:
+                continue
+            expected, found = mm.group(1).split("::")[-1], mm.group(2).split("::")[-1]
+            # only primitive-int targets; sources: primitive ints or #[repr(int)] enums
+            if expected not in PRIM_INTS:
+                continue
+            if found not in PRIM_INTS and not found.endswith("_t"):
                 continue
             f = str(WT / sp["file_name"])
             if f in targets:
