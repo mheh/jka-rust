@@ -503,29 +503,9 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
     }
 }
 
-/// Raven `G_SetAnimalVehicleFunctions` — on the client this function will
-/// only set up the process command funcs.
-///
-/// Raven: installs this file's vehicle-vtable functions onto a
-/// `vehicleInfo_t` (ruling 7: enum-over-vehicle-type dispatch lives in the
-/// caller — `bg_vehicleLoad.rs` matches on `vehicleType_t::VH_ANIMAL` — this
-/// fn just fills the already-ported `Option<unsafe extern "C" fn(...)>`
-/// vtable fields directly). Only the `#ifdef QAGAME` (game-side) and shared
-/// assignments are live for jampgame; the `#ifndef QAGAME` (cgame
-/// `AttachRidersGeneric`) arm is dead here.
-/// Source: `oracle/oracle/codemp/game/AnimalNPC.c:857-887`
-pub fn G_SetAnimalVehicleFunctions(pVehInfo: *mut vehicleInfo_t) {
-    unsafe {
-        (*pVehInfo).AnimateVehicle = Some(AnimateVehicle);
-        (*pVehInfo).AnimateRiders = Some(AnimateRiders);
-        (*pVehInfo).DeathUpdate = Some(DeathUpdate);
-        (*pVehInfo).Update = Some(Update);
-
-        // shared
-        (*pVehInfo).ProcessMoveCommands = Some(ProcessMoveCommands);
-        (*pVehInfo).ProcessOrientCommands = Some(ProcessOrientCommands);
-    }
-}
+// Fork-7 (2026-07-03): `G_SetAnimalVehicleFunctions` retired — it only assigned the now-removed
+// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
+// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
 
 /// Raven `G_CreateAnimalNPC` — create/allocate a new Animal Vehicle
 /// (initializing it as well).

@@ -345,27 +345,9 @@ pub fn AnimateVehicle(pVeh: *mut Vehicle_t) {
     }
 }
 
-/// Raven `G_SetWalkerVehicleFunctions`.
-///
-/// Assigns vehicle handler functions to the Walker vehicle info structure.
-/// Source: `oracle/oracle/codemp/game/WalkerNPC.c:547-577`
-pub fn G_SetWalkerVehicleFunctions(pVehInfo: *mut vehicleInfo_t) {
-    unsafe {
-        let veh_info = &mut *pVehInfo;
-
-        // QAGAME path assignments (per #ifdef QAGAME)
-        veh_info.AnimateVehicle = Some(AnimateVehicle as unsafe extern "C" fn(*mut Vehicle_t));
-        veh_info.Board = Some(Board as unsafe extern "C" fn(*mut Vehicle_t, *mut bgEntity_t) -> qboolean);
-        veh_info.RegisterAssets = Some(RegisterAssets_extern as unsafe extern "C" fn(*mut Vehicle_t));
-
-        // Available to both QAGAME and cgame
-        veh_info.ProcessMoveCommands = Some(ProcessMoveCommands as unsafe extern "C" fn(*mut Vehicle_t));
-        veh_info.ProcessOrientCommands = Some(ProcessOrientCommands as unsafe extern "C" fn(*mut Vehicle_t));
-
-        // cgame-only (AttachRiders, #ifndef QAGAME)
-        veh_info.AttachRiders = Some(AttachRidersGeneric as unsafe extern "C" fn(*mut Vehicle_t));
-    }
-}
+// Fork-7 (2026-07-03): `G_SetWalkerVehicleFunctions` retired — it only assigned the now-removed
+// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
+// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
 
 /// Shim for RegisterAssets matching the C callback signature.
 /// RegisterAssets needs GameContext to access g_vehicleInfo, but vehicleInfo_t callbacks

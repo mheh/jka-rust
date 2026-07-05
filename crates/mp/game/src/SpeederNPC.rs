@@ -375,27 +375,9 @@ pub extern "C" fn AnimateRiders(pVeh: *mut Vehicle_t) {
     }
 }
 
-/// Raven `G_SetSpeederVehicleFunctions`.
-///
-/// Raven: installs this file's vehicle-vtable functions onto a `vehicleInfo_t`
-/// (ruling 7: enum-over-vehicle-type dispatch lives in the caller —
-/// `bg_vehicleLoad.rs`'s `BG_VehicleGetIndex`/loader match on
-/// `vehicleType_t::VH_SPEEDER` — this fn just fills the already-ported
-/// `Option<unsafe extern "C" fn(...)>` vtable fields directly). Only the
-/// `#ifdef QAGAME` (game-side) and shared assignments are live for jampgame;
-/// the `#ifndef QAGAME` (cgame `AttachRidersGeneric`) arm is dead here.
-/// Source: `oracle/oracle/codemp/game/SpeederNPC.c:1044-1076`
-pub fn G_SetSpeederVehicleFunctions(pVehInfo: *mut vehicleInfo_t) {
-    unsafe {
-        (*pVehInfo).AnimateVehicle = Some(AnimateVehicle);
-        (*pVehInfo).AnimateRiders = Some(AnimateRiders);
-        (*pVehInfo).Update = Some(Update);
-
-        // shared
-        (*pVehInfo).ProcessMoveCommands = Some(ProcessMoveCommands);
-        (*pVehInfo).ProcessOrientCommands = Some(ProcessOrientCommands);
-    }
-}
+// Fork-7 (2026-07-03): `G_SetSpeederVehicleFunctions` retired — it only assigned the now-removed
+// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
+// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
 
 /// Raven `G_CreateSpeederNPC`.
 ///

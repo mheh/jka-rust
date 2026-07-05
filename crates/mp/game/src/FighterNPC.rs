@@ -620,25 +620,9 @@ pub fn FighterPitchClamp(
     }
 }
 
-/// Raven `G_SetFighterVehicleFunctions`.
-///
-/// Source: `oracle/oracle/codemp/game/FighterNPC.c:1948-1978`
-pub fn G_SetFighterVehicleFunctions(
-    pVehInfo: *mut vehicleInfo_t,
-) {
-    unsafe {
-        // These are function pointer assignments per ruling 2.
-        // In Rust, we'd use fn-ID enums instead, but here we just document
-        // which functions are assigned to which vtable slots.
-        // For now, a no-op placeholder since the vtable assignment
-        // would be handled by the calling code with the enum-based dispatch.
-        if pVehInfo.is_null() {
-            return;
-        }
-        // The actual assignments would be:
-        // Board, Eject, Update, ProcessMoveCommands, ProcessOrientCommands, etc.
-    }
-}
+// Fork-7 (2026-07-03): `G_SetFighterVehicleFunctions` retired — it only assigned the now-removed
+// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
+// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
 
 /// Raven `G_CreateFighterNPC`.
 ///

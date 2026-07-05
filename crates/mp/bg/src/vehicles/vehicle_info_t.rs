@@ -4,12 +4,12 @@
 
 use core::ffi::{c_char, c_float, c_int};
 
-use mp_qshared::common::mp::qcommon::usercmd_t;
 use mp_qshared::shared::{qboolean, vec3_t};
 
-use crate::public::bg_entity::bgEntity_t;
+// Fork-7 retired the fn-ptr slots, so `usercmd_t`/`bgEntity_t`/`Vehicle_t` (only
+// referenced by those slot signatures) are no longer imported here.
 use crate::vehicles::vehicle_s::{MAX_VEHICLE_MUZZLES, MAX_VEHICLE_TURRETS, MAX_VEHICLE_WEAPONS};
-use crate::vehicles::{turretStats_t, vehWeaponStats_t, vehicleType_t, Vehicle_t};
+use crate::vehicles::{turretStats_t, vehWeaponStats_t, vehicleType_t};
 
 /// Raven `vehicleInfo_t` — static per-vehicle-type data (parsed from `.veh`
 /// files) plus the function-pointer "virtual" interface each vehicle
@@ -273,102 +273,18 @@ pub struct vehicleInfo_t {
     /// set internally, not until this vehicle is spawned into the level
     pub modelIndex: c_int,
 
-    // NOTE: Please note that most of this stuff has been converted from C++ classes to generic C.
-    // This part of the structure is used to simulate inheritance for vehicles. The basic idea is that all vehicle use
-    // this vehicle interface since they declare their own functions and assign the function pointer to the
-    // corresponding function. Meanwhile, the base logic can still call the appropriate functions. In C++ talk all
-    // of these functions (pointers) are pure virtuals and this is an abstract base class (although it cannot be
-    // inherited from, only contained and reimplemented (through an object and a setup function respectively)). -AReis
-    /// Makes sure that the vehicle is properly animated.
-    pub AnimateVehicle: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
-
-    /// Makes sure that the rider's in this vehicle are properly animated.
-    pub AnimateRiders: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
-
-    /// Determine whether this entity is able to board this vehicle or not.
-    pub ValidateBoard:
-        Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean>,
-
-    /// Set the parent entity of this Vehicle NPC.
-    pub SetParent:
-        Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pParentEntity: *mut bgEntity_t)>,
-
-    /// Add a pilot to the vehicle.
-    pub SetPilot: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pPilot: *mut bgEntity_t)>,
-
-    /// Add a passenger to the vehicle (false if we're full).
-    pub AddPassenger: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> qboolean>,
-
-    /// Animate the vehicle and it's riders.
-    pub Animate: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
-
-    /// Board this Vehicle (get on). The first entity to board an empty vehicle becomes the Pilot.
-    pub Board:
-        Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean>,
-
-    /// Eject an entity from the vehicle.
-    pub Eject: Option<
-        unsafe extern "C" fn(
-            pVeh: *mut Vehicle_t,
-            pEnt: *mut bgEntity_t,
-            forceEject: qboolean,
-        ) -> qboolean,
-    >,
-
-    /// Eject all the inhabitants of this vehicle.
-    pub EjectAll: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> qboolean>,
-
-    /// Start a delay until the vehicle dies.
-    pub StartDeathDelay: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, iDelayTime: c_int)>,
-
-    /// Update death sequence.
-    pub DeathUpdate: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
-
-    /// Register all the assets used by this vehicle.
-    pub RegisterAssets: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
-
-    /// Initialize the vehicle (should be called by Spawn?).
-    pub Initialize: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> qboolean>,
-
-    /// Like a think or move command, this updates various vehicle properties.
-    pub Update:
-        Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean>,
-
-    /// Update the properties of a Rider (that may reflect what happens to the vehicle).
-    ///
-    /// Raven: `[return]  bool  True if still in vehicle, false if otherwise.`
-    pub UpdateRider: Option<
-        unsafe extern "C" fn(
-            pVeh: *mut Vehicle_t,
-            pRider: *mut bgEntity_t,
-            pUcmd: *mut usercmd_t,
-        ) -> qboolean,
-    >,
-
-    /// ProcessMoveCommands the Vehicle.
-    pub ProcessMoveCommands: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
-
-    /// ProcessOrientCommands the Vehicle.
-    pub ProcessOrientCommands: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
-
-    /// Attachs all the riders of this vehicle to their appropriate position/tag (*driver, *pass1, *pass2, whatever...).
-    pub AttachRiders: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t)>,
-
-    /// Make someone invisible and un-collidable.
-    pub Ghost: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)>,
-
-    /// Make someone visible and collidable.
-    pub UnGhost: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t)>,
-
-    /// Get the pilot of this vehicle.
-    pub GetPilot: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> *const bgEntity_t>,
-
-    /// Whether this vehicle is currently inhabited (by anyone) or not.
-    pub Inhabited: Option<unsafe extern "C" fn(pVeh: *mut Vehicle_t) -> qboolean>,
+    // Fork-7 (blessed 2026-07-03): the 25 `vehicleInfo_t` function-pointer
+    // "virtual" slots (`AnimateVehicle`..`Inhabited`, Raven bg_vehicles.h:291-359)
+    // are RETIRED. Raven filled them once at `.veh` load via `G_Set*VehicleFunctions`
+    // and never reassigned/address-compared them; per porting-rules §C8/§F17 that
+    // closed hierarchy is now `vehicleType_t`-keyed dispatch in
+    // `crate::veh_dispatch` (game tier). This struct is bg/game-internal (never
+    // crosses the engine ABI seam), so §D12 grants layout latitude: the trailing
+    // fn-ptr region and the total-`size_of` static-assert are dropped; the parsed
+    // `.veh` DATA fields above keep their exact offsets (the `vehFields` table
+    // still indexes them).
 }
 
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<vehicleInfo_t>() == 952);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, name) == 0);
 #[cfg(target_pointer_width = "64")]
@@ -597,49 +513,3 @@ const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, cameraAlpha) == 756);
 const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, cameraPitchDependantVertOffset) == 760);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, modelIndex) == 764);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, AnimateVehicle) == 768);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, AnimateRiders) == 776);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, ValidateBoard) == 784);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, SetParent) == 792);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, SetPilot) == 800);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, AddPassenger) == 808);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, Animate) == 816);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, Board) == 824);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, Eject) == 832);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, EjectAll) == 840);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, StartDeathDelay) == 848);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, DeathUpdate) == 856);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, RegisterAssets) == 864);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, Initialize) == 872);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, Update) == 880);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, UpdateRider) == 888);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, ProcessMoveCommands) == 896);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, ProcessOrientCommands) == 904);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, AttachRiders) == 912);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, Ghost) == 920);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, UnGhost) == 928);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, GetPilot) == 936);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(vehicleInfo_t, Inhabited) == 944);

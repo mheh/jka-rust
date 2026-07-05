@@ -293,32 +293,16 @@ pub fn VEH_VehWeaponIndexForName(
 
 /// Raven `BG_SetSharedVehicleFunctions`.
 ///
-/// Raven: sets up the shared vehicle function pointers (ones that all
-/// vehicles would generally use), then dispatches to the per-type
-/// function-pointer setup. `G_SetSharedVehicleFunctions` (QAGAME-only) and
-/// the four `G_Set<Type>VehicleFunctions` targets are fn-pointer
-/// dispatchers whose bodies are ported in other files/modules; this body
-/// just calls through per fork ruling 2 (fn-ID enums / central match
-/// dispatch lives in the callee, not here).
+/// //TODO: Port BG_SetSharedVehicleFunctions
+/// Deliberately a no-op under fork 7 (blessed 2026-07-03): Raven's body filled
+/// the `vehicleInfo_t` fn-ptr slots (via `G_SetSharedVehicleFunctions` +
+/// `G_Set<Type>VehicleFunctions`), but those slots are retired for stateless
+/// `vehicleType_t`-keyed dispatch (`crate::veh_dispatch`), so `.veh`-load has no
+/// per-vehicle function setup left to do. The call is kept in the load sequence
+/// (`BG_VehicleLoadParms`/`BG_VehicleClampData`) to mirror Raven's shape.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:683-707`
-pub fn BG_SetSharedVehicleFunctions(
-    pVehInfo: *mut vehicleInfo_t,
-) {
-    // QAGAME (jampgame) branch: `#ifdef QAGAME` is always true in this crate.
-    crate::g_vehicles::G_SetSharedVehicleFunctions(pVehInfo);
-
-    // `#ifndef WE_ARE_IN_THE_UI` is always true in this crate (jampgame, not ui).
-    use mp_bg::vehicles::vehicleType_t;
-    let vtype = unsafe { (*pVehInfo).r#type };
-    match vtype {
-        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::G_SetSpeederVehicleFunctions(pVehInfo),
-        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::G_SetAnimalVehicleFunctions(pVehInfo),
-        vehicleType_t::VH_FIGHTER => crate::FighterNPC::G_SetFighterVehicleFunctions(pVehInfo),
-        vehicleType_t::VH_WALKER => crate::WalkerNPC::G_SetWalkerVehicleFunctions(pVehInfo),
-        _ => {}
-    }
-}
+pub fn BG_SetSharedVehicleFunctions(_pVehInfo: *mut vehicleInfo_t) {}
 
 /// Raven `BG_VehicleSetDefaults`.
 ///

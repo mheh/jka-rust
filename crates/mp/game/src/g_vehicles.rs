@@ -2776,38 +2776,6 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// stub matches that faithfully rather than panicking.
 pub unsafe extern "C" fn RegisterAssets(pVeh: *mut Vehicle_t) {}
 
-/// Raven `G_SetSharedVehicleFunctions`.
-///
-/// PORT-NOTE(vehicle-vtable): fork-7 — assigns this TU's member fns into the
-/// `vehicleInfo_t` vtable slots as `Some(FnName)`. The ctx-carrying members
-/// (Board/EjectAll/StartDeathDelay/Initialize/UpdateRider/AttachRiders) do not
-/// match a ctx-free slot fn-ptr type; the vtable-dispatch ctx-threading seam is
-/// unsettled (see shape_mismatch). `Eject`/`DeathUpdate`/`RegisterAssets` are
-/// defined in g_vehicles.c but excluded from this shard's manifest — referenced by
-/// name (reported as missing symbols) per zero-park.
-///
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3290-3314`
-pub fn G_SetSharedVehicleFunctions(
-    pVehInfo: *mut vehicleInfo_t,
-) {
-    unsafe {
-        (*pVehInfo).ValidateBoard = Some(ValidateBoard);
-        (*pVehInfo).SetParent = Some(SetParent);
-        (*pVehInfo).SetPilot = Some(SetPilot);
-        (*pVehInfo).AddPassenger = Some(AddPassenger);
-        (*pVehInfo).Animate = Some(Animate);
-        (*pVehInfo).Board = Some(Board);
-        (*pVehInfo).Eject = Some(Eject);
-        (*pVehInfo).EjectAll = Some(EjectAll);
-        (*pVehInfo).StartDeathDelay = Some(StartDeathDelay);
-        (*pVehInfo).DeathUpdate = Some(DeathUpdate);
-        (*pVehInfo).RegisterAssets = Some(RegisterAssets);
-        (*pVehInfo).Initialize = Some(Initialize);
-        (*pVehInfo).Update = Some(Update);
-        (*pVehInfo).UpdateRider = Some(UpdateRider);
-        (*pVehInfo).AttachRiders = Some(AttachRiders);
-        (*pVehInfo).Ghost = Some(Ghost);
-        (*pVehInfo).UnGhost = Some(UnGhost);
-        (*pVehInfo).Inhabited = Some(Inhabited);
-    }
-}
+// Fork-7 (2026-07-03): `G_SetSharedVehicleFunctions` retired — it only assigned the now-removed
+// `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in
+// `crate::veh_dispatch`. Source: see per-class setter in the oracle .c.
