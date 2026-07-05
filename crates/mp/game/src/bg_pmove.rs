@@ -9180,34 +9180,26 @@ impl PmoveContext<'_> {
 /// Raven `BG_VehicleAdjustBBoxForOrientation` — resize a fighter/flier vehicle's
 /// bbox to its oriented extents, tracing to confirm the new box is valid.
 ///
-/// `localTrace` is Raven's `void (*)(trace_t*, const vec3_t start, mins, maxs,
-/// end, int, int)` callback; the resolved signature keeps it as `*mut c_void`
-/// (ruling 11 fn-ptr param unsettled) so we transmute at the call site.
+/// Ruling 26: Raven's `localTrace` fn-ptr param is dropped; the bg callee reaches
+/// the engine trace through `self.traps.trace` (the `pm->trace` channel — ruling
+/// 13 `BgTraps`). Raven's pmove caller always passes a non-null `pm->trace`, so
+/// the old NULL-`localTrace` "don't care about solids" branch is unreachable and
+/// dropped.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9993-10076`
-pub fn BG_VehicleAdjustBBoxForOrientation(
-    veh: *mut Vehicle_t,
-    origin: vec3_t,
-    mins: &mut vec3_t,
-    maxs: &mut vec3_t,
-    clientNum: c_int,
-    tracemask: c_int,
-    localTrace: *mut c_void,
-) {
-    /// `DEFAULT_MINS_2`. Source: `oracle/oracle/codemp/game/bg_public.h`
-    const DEFAULT_MINS_2: f32 = -24.0;
-    // PORT-NOTE(fn-pointer-param): `localTrace` arrives as `*mut c_void` (LAW
-    // signature); transmute to Raven's callback type to invoke it.
-    type LocalTraceFn = unsafe extern "C" fn(
-        *mut trace_t,
-        *const vec3_t,
-        *const vec3_t,
-        *const vec3_t,
-        *const vec3_t,
-        c_int,
-        c_int,
-    );
+impl PmoveContext<'_> {
+    pub fn BG_VehicleAdjustBBoxForOrientation(
+        &self,
+        veh: *mut Vehicle_t,
+        origin: vec3_t,
+        mins: &mut vec3_t,
+        maxs: &mut vec3_t,
+        clientNum: c_int,
+        tracemask: c_int,
+    ) {
+        /// `DEFAULT_MINS_2`. Source: `oracle/oracle/codemp/game/bg_public.h`
+        const DEFAULT_MINS_2: f32 = -24.0;
 
-    unsafe {
+        unsafe {
         if veh.is_null() {
             return;
         }
@@ -9290,22 +9282,15 @@ pub fn BG_VehicleAdjustBBoxForOrientation(
             let nmx = newMaxs;
             _VectorSubtract(nmx, origin, &mut newMaxs);
             // now see if that's a valid way to be
-            if !localTrace.is_null() {
-                let f: LocalTraceFn = core::mem::transmute(localTrace);
-                f(
-                    &mut trace,
-                    &origin as *const vec3_t,
-                    &newMins as *const vec3_t,
-                    &newMaxs as *const vec3_t,
-                    &origin as *const vec3_t,
-                    clientNum,
-                    tracemask,
-                );
-            } else {
-                // don't care about solid stuff then
-                trace.startsolid = 0;
-                trace.allsolid = 0;
-            }
+            self.traps.trace(
+                &mut trace,
+                &origin as *const vec3_t,
+                &newMins as *const vec3_t,
+                &newMaxs as *const vec3_t,
+                &origin as *const vec3_t,
+                clientNum,
+                tracemask,
+            );
             if trace.startsolid == 0 && trace.allsolid == 0 {
                 // let's use it!
                 _VectorCopy(newMins, mins);
@@ -9314,6 +9299,7 @@ pub fn BG_VehicleAdjustBBoxForOrientation(
             // else: just use the last one
         }
     }
+}
 }
 
 /// Raven `PM_MoveForKata` — force movement/jump commands during the soulcal and

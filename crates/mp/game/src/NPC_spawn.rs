@@ -48,12 +48,9 @@ pub fn WP_SetSaberModel(
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:103-189`
 pub fn NPC_PainFunc(
     ent: *mut gentity_t,
-) -> *mut c_void {
-    // PORT-NOTE(fn-ptr-enum-encoding): LAW signature returns *mut c_void
-    // (pre-dates ruling-2 EntPain plumbing). We encode the selected EntPain
-    // variant as its discriminant cast through a pointer-sized integer;
-    // NPC_Begin decodes the equivalent selection inline rather than
-    // round-tripping through this raw encoding (see note there).
+) -> Option<crate::ent_fn_enums::EntPain> {
+    // Raven returns the selected pain fn-ptr; ruling 26 makes fn-ptr fields the
+    // `Option<EntPain>` fn-ID enum directly (no *mut c_void encoding).
     let pain = unsafe {
         if (*(*ent).client).ps.weapon == WP_SABER {
             crate::ent_fn_enums::EntPain::NPC_Jedi_Pain
@@ -79,18 +76,17 @@ pub fn NPC_PainFunc(
             }
         }
     };
-    (pain as usize) as *mut c_void
+    Some(pain)
 }
 
 /// Raven `NPC_TouchFunc`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:199-206`
 pub fn NPC_TouchFunc(
-    ent: *mut gentity_t,
-) -> *mut c_void {
-    // PORT-NOTE(fn-ptr-enum-encoding): see NPC_PainFunc — same raw
-    // discriminant-through-pointer encoding for the LAW *mut c_void return.
-    (crate::ent_fn_enums::EntTouch::NPC_Touch as usize) as *mut c_void
+    _ent: *mut gentity_t,
+) -> Option<crate::ent_fn_enums::EntTouch> {
+    // Raven always returns `NPC_Touch`; ruling 26 — `Option<EntTouch>` directly.
+    Some(crate::ent_fn_enums::EntTouch::NPC_Touch)
 }
 
 /// Raven `NPC_SetMiscDefaultData`.
@@ -731,16 +727,10 @@ pub fn NPC_Begin(
         NPC_ChangeWeapon((*client).ps.weapon);
 
         (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Pain);
-        // PORT-NOTE(fn-ptr-enum-encoding): pain/touch are the literal
-        // NPC_PainFunc/NPC_TouchFunc selections inlined directly rather than
-        // round-tripped through the *mut c_void encoding those fns return
-        // (see the note on NPC_PainFunc/NPC_TouchFunc above).
-        {
-            let pain_enc = NPC_PainFunc(ent) as usize;
-            (*ent).pain = Some(core::mem::transmute::<u8, crate::ent_fn_enums::EntPain>(pain_enc as u8));
-            let touch_enc = NPC_TouchFunc(ent) as usize;
-            (*ent).touch = Some(core::mem::transmute::<u8, crate::ent_fn_enums::EntTouch>(touch_enc as u8));
-        }
+        // Ruling 26: pain/touch fn-ID enums assigned straight from the selector
+        // fns (no *mut c_void encode/transmute round-trip).
+        (*ent).pain = NPC_PainFunc(ent);
+        (*ent).touch = NPC_TouchFunc(ent);
 
         (*client).ps.ping = ((*(*ent).NPC).stats.reactions * 50.0) as c_int;
 
