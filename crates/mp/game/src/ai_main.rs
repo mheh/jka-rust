@@ -16,6 +16,7 @@ use crate::bg_panimate::{BG_SaberInKata, BG_SaberInSpecial};
 use crate::bg_misc::BG_GetItemIndexByTag;
 use crate::g_utils::G_Find;
 use crate::g_bot::G_CheckBotSpawn;
+use crate::w_force::ForcePowerUsableOn;
 // Weapon-id constants (Raven `weapon_t` values) used by the ported
 // pure-logic functions below; prelude re-exports only the type.
 use mp_bg::weapons::weapon_t::{

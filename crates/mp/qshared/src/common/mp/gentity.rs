@@ -24,6 +24,12 @@ pub const NUM_TIDS: usize = 10;
 /// Definition source: `oracle/oracle/codemp/game/g_public.h:642-663`
 pub const NUM_BSETS: usize = 17;
 
+/// Raven MP `BSET_FIRST` — alias for `BSET_SPAWN` (first `bSet_t` value), used
+/// as the loop start when walking `behaviorSet[]`.
+///
+/// Definition source: `oracle/oracle/codemp/game/g_public.h:642-663`
+pub const BSET_FIRST: usize = 0;
+
 /// Raven MP `MAX_FAILED_NODES`.
 ///
 /// Definition source: `oracle/oracle/codemp/game/g_public.h:673`

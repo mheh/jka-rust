@@ -975,7 +975,7 @@ pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: *mut gentity_t) {
                     &(*vehEnt).r.currentOrigin as *const vec3_t,
                     (*ctx.world).level.time,
                     core::ptr::null_mut(),
-                    (*vehEnt).modelScale,
+                    &(*vehEnt).modelScale as *const vec3_t,
                 ),
             );
             BG_GiveMeVectorFromMatrix(
@@ -1739,6 +1739,7 @@ pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut *mu
                 (*ent).waypoint = (*monster).waypoint;
                 if (*monster).s.NPC_class == CLASS_RANCOR as c_int {
                     //only possibility right now, may add Wampa and Sand Creature later
+                    let traps = GameBgTraps::new(ctx.engine);
                     BG_AttachToRancor(
                         (*monster).ghoul2, //ghoul2 info
                         (*monster).r.currentAngles[YAW],
@@ -1750,6 +1751,8 @@ pub fn G_HeldByMonster(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut *mu
                         (*cl).ps.origin,
                         (*cl).ps.viewangles,
                         core::ptr::null_mut(),
+                        &(*ctx.world).bg_state,
+                        &traps,
                     );
                 }
                 (*cl).ps.velocity = [0.0; 3];

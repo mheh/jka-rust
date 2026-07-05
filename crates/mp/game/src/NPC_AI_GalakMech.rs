@@ -82,7 +82,7 @@ const ARMOR_EFFECT_TIME: c_int = 3000;
 /// same name — the call-surface table's "ported: NPC_AI_Mark2.rs" copy is
 /// `fn`-private to that file).
 #[inline]
-fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, vec: &mut vec3_t) {
+pub(crate) fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, vec: &mut vec3_t) {
     pub const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
     pub const NEGATIVE_Y: c_int = Eorientations::NEGATIVE_Y as c_int;
     unsafe {

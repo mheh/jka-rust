@@ -1347,6 +1347,7 @@ pub fn Update(
                     * (*pVeh).m_fTimeModifier
                     / 180.0f32;
                 crate::g_combat::G_DamageFromKiller(
+                    ctx,
                     parent,
                     parent,
                     parent,

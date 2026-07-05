@@ -252,12 +252,12 @@ pub fn G_ExplodeMissile(
                 if let Some(parent_id) = (*ent).parent {
                     let parent_num = parent_id.index();
                     if !(*ctx.world).g_entities[parent_num].client.is_null() {
-                        (*(*ctx.world).g_entities[parent_num].client as *mut gclient_t).accuracy_hits += 1;
+                        (*((*ctx.world).g_entities[parent_num].client as *mut gclient_t)).accuracy_hits += 1;
                     }
                 } else if let Some(activator_id) = (*ent).activator {
                     let activator_num = activator_id.index();
                     if !(*ctx.world).g_entities[activator_num].client.is_null() {
-                        (*(*ctx.world).g_entities[activator_num].client as *mut gclient_t).accuracy_hits += 1;
+                        (*((*ctx.world).g_entities[activator_num].client as *mut gclient_t)).accuracy_hits += 1;
                     }
                 }
             }
@@ -382,7 +382,7 @@ pub fn G_MissileBounceEffect(
 pub fn G_MissileImpact(
     ctx: GameContext<'_>,ent: *mut gentity_t, trace: *mut trace_t) {
     unsafe {
-        let tr = &*trace;
+        let tr = &mut *trace;
         let mut other = &mut (*ctx.world).g_entities[tr.entityNum as usize];
         let mut hitClient = qfalse;
         let mut isKnockedSaber = qfalse;
@@ -414,7 +414,7 @@ pub fn G_MissileImpact(
         // Saber block checks
         if (((*other).r.contents & CONTENTS_LIGHTSABER) != 0) && isKnockedSaber == 0 {
             let otherOwner = &mut (*ctx.world).g_entities[(*other).r.ownerNum as usize];
-            if (*otherOwner).takedamage != 0 && !(*otherOwner).client.is_null() && (*(*otherOwner).client as *mut gclient_t).ps.duelInProgress != 0 && (*(*otherOwner).client as *mut gclient_t).ps.duelIndex != (*ent).r.ownerNum {
+            if (*otherOwner).takedamage != 0 && !(*otherOwner).client.is_null() && (*((*otherOwner).client as *mut gclient_t)).ps.duelInProgress != 0 && (*((*otherOwner).client as *mut gclient_t)).ps.duelIndex != (*ent).r.ownerNum {
                 // Jump to killProj label
                 let mut dir: vec3_t = [0.0, 0.0, 1.0];
                 if (*other).takedamage != 0 && !(*other).client.is_null() && isKnockedSaber == 0 {
@@ -435,7 +435,7 @@ pub fn G_MissileImpact(
                 if (*ent).splashDamage != 0 {
                     if G_RadiusDamage(ctx, tr.endpos, ent_resolve_opt(ctx, (*ent).parent), (*ent).splashDamage as f32, (*ent).splashRadius as f32, other, ent, (*ent).splashMethodOfDeath) != 0 {
                         if hitClient == 0 && !(*ctx.world).g_entities[(*ent).r.ownerNum as usize].client.is_null() {
-                            (*(*ctx.world).g_entities[(*ent).r.ownerNum as usize].client as *mut gclient_t).accuracy_hits += 1;
+                            (*((*ctx.world).g_entities[(*ent).r.ownerNum as usize].client as *mut gclient_t)).accuracy_hits += 1;
                         }
                     }
                 }
@@ -446,7 +446,7 @@ pub fn G_MissileImpact(
                 return;
             }
         } else if isKnockedSaber == 0 {
-            if (*other).takedamage != 0 && !(*other).client.is_null() && (*(*other).client as *mut gclient_t).ps.duelInProgress != 0 && (*(*other).client as *mut gclient_t).ps.duelIndex != (*ent).r.ownerNum {
+            if (*other).takedamage != 0 && !(*other).client.is_null() && (*((*other).client as *mut gclient_t)).ps.duelInProgress != 0 && (*((*other).client as *mut gclient_t)).ps.duelIndex != (*ent).r.ownerNum {
                 // Jump to killProj label
                 let mut dir: vec3_t = [0.0, 0.0, 1.0];
                 if (*other).takedamage != 0 && !(*other).client.is_null() && isKnockedSaber == 0 {
@@ -467,7 +467,7 @@ pub fn G_MissileImpact(
                 if (*ent).splashDamage != 0 {
                     if G_RadiusDamage(ctx, tr.endpos, ent_resolve_opt(ctx, (*ent).parent), (*ent).splashDamage as f32, (*ent).splashRadius as f32, other, ent, (*ent).splashMethodOfDeath) != 0 {
                         if hitClient == 0 && !(*ctx.world).g_entities[(*ent).r.ownerNum as usize].client.is_null() {
-                            (*(*ctx.world).g_entities[(*ent).r.ownerNum as usize].client as *mut gclient_t).accuracy_hits += 1;
+                            (*((*ctx.world).g_entities[(*ent).r.ownerNum as usize].client as *mut gclient_t)).accuracy_hits += 1;
                         }
                     }
                 }
@@ -498,7 +498,7 @@ pub fn G_MissileImpact(
         if (((*other).flags & FL_SHIELDED) != 0) && (*ent).s.weapon != WP_ROCKET_LAUNCHER && (*ent).s.weapon != WP_THERMAL && (*ent).s.weapon != WP_TRIP_MINE && (*ent).s.weapon != WP_DET_PACK && (*ent).s.weapon != WP_DEMP2 && (*ent).s.weapon != WP_EMPLACED_GUN && (*ent).methodOfDeath != MOD_REPEATER_ALT as c_int && (*ent).methodOfDeath != MOD_FLECHETTE_ALT_SPLASH as c_int && (*ent).methodOfDeath != MOD_TURBLAST as c_int && (*ent).methodOfDeath != MOD_TARGET_LASER as c_int && (*ent).methodOfDeath != MOD_VEHICLE as c_int && (*ent).methodOfDeath != MOD_CONC as c_int && (*ent).methodOfDeath != MOD_CONC_ALT as c_int && ((*ent).dflags & DAMAGE_HEAVY_WEAP_CLASS) == 0 {
             let mut fwd: vec3_t = [0.0; 3];
             if !(*other).client.is_null() {
-                crate::q_math::AngleVectors((*(*other).client as *mut gclient_t).ps.viewangles, Some(&mut fwd), None, None);
+                crate::q_math::AngleVectors((*((*other).client as *mut gclient_t)).ps.viewangles, Some(&mut fwd), None, None);
             } else {
                 crate::q_math::AngleVectors((*other).r.currentAngles, Some(&mut fwd), None, None);
             }
@@ -508,9 +508,9 @@ pub fn G_MissileImpact(
         }
 
         // Saber block handling
-        if (*other).takedamage != 0 && !(*other).client.is_null() && (*ent).s.weapon != WP_ROCKET_LAUNCHER && (*ent).s.weapon != WP_THERMAL && (*ent).s.weapon != WP_TRIP_MINE && (*ent).s.weapon != WP_DET_PACK && (*ent).s.weapon != WP_DEMP2 && (*ent).methodOfDeath != MOD_REPEATER_ALT as c_int && (*ent).methodOfDeath != MOD_FLECHETTE_ALT_SPLASH as c_int && (*ent).methodOfDeath != MOD_CONC as c_int && (*ent).methodOfDeath != MOD_CONC_ALT as c_int && (*(*other).client as *mut gclient_t).ps.saberBlockTime < (*ctx.world).level.time && isKnockedSaber == 0 && WP_SaberCanBlock(ctx, other, (*ent).r.currentOrigin, 0, 0, qtrue, 0) != 0 {
+        if (*other).takedamage != 0 && !(*other).client.is_null() && (*ent).s.weapon != WP_ROCKET_LAUNCHER && (*ent).s.weapon != WP_THERMAL && (*ent).s.weapon != WP_TRIP_MINE && (*ent).s.weapon != WP_DET_PACK && (*ent).s.weapon != WP_DEMP2 && (*ent).methodOfDeath != MOD_REPEATER_ALT as c_int && (*ent).methodOfDeath != MOD_FLECHETTE_ALT_SPLASH as c_int && (*ent).methodOfDeath != MOD_CONC as c_int && (*ent).methodOfDeath != MOD_CONC_ALT as c_int && (*((*other).client as *mut gclient_t)).ps.saberBlockTime < (*ctx.world).level.time && isKnockedSaber == 0 && WP_SaberCanBlock(ctx, other, (*ent).r.currentOrigin, 0, 0, qtrue, 0) != 0 {
             let mut fwd: vec3_t = [0.0; 3];
-            let otherDefLevel = (*(*other).client as *mut gclient_t).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize];
+            let otherDefLevel = (*((*other).client as *mut gclient_t)).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize];
 
             let te = G_TempEntity(ctx, (*ent).r.currentOrigin, EV_SABER_BLOCK as c_int);
             crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*te).s.origin);
@@ -520,14 +520,14 @@ pub fn G_MissileImpact(
             (*te).s.legsAnim = 0;
 
             let mut adjusted_def_level = otherDefLevel;
-            if (*(*other).client as *mut gclient_t).ps.velocity[2] > 0.0 || (*(*other).client as *mut gclient_t).pers.cmd.forwardmove < 0 {
+            if (*((*other).client as *mut gclient_t)).ps.velocity[2] > 0.0 || (*((*other).client as *mut gclient_t)).pers.cmd.forwardmove < 0 {
                 adjusted_def_level -= 1;
                 if adjusted_def_level < 0 {
                     adjusted_def_level = 0;
                 }
             }
 
-            crate::q_math::AngleVectors((*(*other).client as *mut gclient_t).ps.viewangles, Some(&mut fwd), None, None);
+            crate::q_math::AngleVectors((*((*other).client as *mut gclient_t)).ps.viewangles, Some(&mut fwd), None, None);
             if adjusted_def_level == FORCE_LEVEL_1 as c_int {
                 // Kill the projectile
             } else if adjusted_def_level == FORCE_LEVEL_2 as c_int {
@@ -535,11 +535,11 @@ pub fn G_MissileImpact(
             } else {
                 G_ReflectMissile(ctx, other, ent, fwd);
             }
-            (*(*other).client as *mut gclient_t).ps.saberBlockTime = (*ctx.world).level.time + (350 - (adjusted_def_level * 100));
-            (*(*other).client as *mut gclient_t).ps.saberEventFlags |= SEF_DEFLECTED;
+            (*((*other).client as *mut gclient_t)).ps.saberBlockTime = (*ctx.world).level.time + (350 - (adjusted_def_level * 100));
+            (*((*other).client as *mut gclient_t)).ps.saberEventFlags |= SEF_DEFLECTED;
 
             if adjusted_def_level == FORCE_LEVEL_3 as c_int {
-                (*(*other).client as *mut gclient_t).ps.saberBlockTime = 0;
+                (*((*other).client as *mut gclient_t)).ps.saberBlockTime = 0;
             }
 
             if adjusted_def_level == FORCE_LEVEL_1 as c_int {
@@ -558,15 +558,15 @@ pub fn G_MissileImpact(
                 (*te).s.weapon = 0;
                 (*te).s.legsAnim = 0;
 
-                let mut other_def_level = (*(*otherOwner).client as *mut gclient_t).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize];
-                if (*(*otherOwner).client as *mut gclient_t).ps.velocity[2] > 0.0 || (*(*otherOwner).client as *mut gclient_t).pers.cmd.forwardmove < 0 {
+                let mut other_def_level = (*((*otherOwner).client as *mut gclient_t)).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize];
+                if (*((*otherOwner).client as *mut gclient_t)).ps.velocity[2] > 0.0 || (*((*otherOwner).client as *mut gclient_t)).pers.cmd.forwardmove < 0 {
                     other_def_level -= 1;
                     if other_def_level < 0 {
                         other_def_level = 0;
                     }
                 }
 
-                crate::q_math::AngleVectors((*(*otherOwner).client as *mut gclient_t).ps.viewangles, Some(&mut fwd), None, None);
+                crate::q_math::AngleVectors((*((*otherOwner).client as *mut gclient_t)).ps.viewangles, Some(&mut fwd), None, None);
 
                 if other_def_level == FORCE_LEVEL_1 as c_int {
                     // Kill projectile
@@ -575,11 +575,11 @@ pub fn G_MissileImpact(
                 } else {
                     G_ReflectMissile(ctx, otherOwner, ent, fwd);
                 }
-                (*(*otherOwner).client as *mut gclient_t).ps.saberBlockTime = (*ctx.world).level.time + (350 - (other_def_level * 100));
-                (*(*otherOwner).client as *mut gclient_t).ps.saberEventFlags |= SEF_DEFLECTED;
+                (*((*otherOwner).client as *mut gclient_t)).ps.saberBlockTime = (*ctx.world).level.time + (350 - (other_def_level * 100));
+                (*((*otherOwner).client as *mut gclient_t)).ps.saberEventFlags |= SEF_DEFLECTED;
 
                 if other_def_level == FORCE_LEVEL_3 as c_int {
-                    (*(*otherOwner).client as *mut gclient_t).ps.saberBlockTime = 0;
+                    (*((*otherOwner).client as *mut gclient_t)).ps.saberBlockTime = 0;
                 }
 
                 if other_def_level == FORCE_LEVEL_1 as c_int {
@@ -604,7 +604,7 @@ pub fn G_MissileImpact(
                 let mut didDmg = qfalse;
 
                 if LogAccuracyHit(ctx, other, &mut (*ctx.world).g_entities[(*ent).r.ownerNum as usize]) != 0 {
-                    (*(*ctx.world).g_entities[(*ent).r.ownerNum as usize].client as *mut gclient_t).accuracy_hits += 1;
+                    (*((*ctx.world).g_entities[(*ent).r.ownerNum as usize].client as *mut gclient_t)).accuracy_hits += 1;
                     hitClient = qtrue;
                 }
 
@@ -629,34 +629,34 @@ pub fn G_MissileImpact(
                 }
 
                 if didDmg != 0 && !other.is_null() && !(*other).client.is_null() {
-                    let npc_class = (*(*other).client as *mut gclient_t).NPC_class;
+                    let npc_class = (*((*other).client as *mut gclient_t)).NPC_class;
                     if npc_class == CLASS_SEEKER || npc_class == CLASS_PROBE || npc_class == CLASS_MOUSE || npc_class == CLASS_GONK || npc_class == CLASS_R2D2 || npc_class == CLASS_R5D2 || npc_class == CLASS_REMOTE || npc_class == CLASS_MARK1 || npc_class == CLASS_MARK2 || npc_class == CLASS_INTERROGATOR || npc_class == CLASS_ATST || npc_class == CLASS_SENTRY {
-                        if (*(*other).client as *mut gclient_t).ps.electrifyTime < (*ctx.world).level.time + 100 {
-                            (*(*other).client as *mut gclient_t).ps.electrifyTime = (*ctx.world).level.time + 450;
+                        if (*((*other).client as *mut gclient_t)).ps.electrifyTime < (*ctx.world).level.time + 100 {
+                            (*((*other).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world).level.time + 450;
                         }
                     }
                 }
             }
 
             if (*ent).s.weapon == WP_DEMP2 {
-                if !other.is_null() && !(*other).client.is_null() && (*(*other).client as *mut gclient_t).NPC_class == CLASS_VEHICLE {
+                if !other.is_null() && !(*other).client.is_null() && (*((*other).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE {
                     let other_vehicle = (*other).m_pVehicle as *mut Vehicle_t;
-                    if !other_vehicle.is_null() && !(*other_vehicle).m_pVehicleInfo.is_null() && ((*(*other_vehicle).m_pVehicleInfo).r#type == VH_SPEEDER || ((*(*other_vehicle).m_pVehicleInfo).r#type == VH_FIGHTER && !(*ent).classname.is_null() && crate::q_shared::Q_stricmp((*ent).classname, c"vehicle_proj".as_ptr() as *const c_char) == 0)) && FighterIsLanded(other_vehicle, &mut (*(*other).client as *mut gclient_t).ps) == 0 && (((*other).spawnflags & 2) == 0) {
-                        if (*(*other).client as *mut gclient_t).ps.electrifyTime > (*ctx.world).level.time {
-                            (*(*other).client as *mut gclient_t).ps.electrifyTime += (*ctx.world).bg_state.rng.Q_irand(200, 500);
-                            if (*(*other).client as *mut gclient_t).ps.electrifyTime > (*ctx.world).level.time + 4000 {
-                                (*(*other).client as *mut gclient_t).ps.electrifyTime = (*ctx.world).level.time + 4000;
+                    if !other_vehicle.is_null() && !(*other_vehicle).m_pVehicleInfo.is_null() && ((*(*other_vehicle).m_pVehicleInfo).r#type == VH_SPEEDER || ((*(*other_vehicle).m_pVehicleInfo).r#type == VH_FIGHTER && !(*ent).classname.is_null() && crate::q_shared::Q_stricmp((*ent).classname, c"vehicle_proj".as_ptr() as *const c_char) == 0)) && FighterIsLanded(other_vehicle, &mut (*((*other).client as *mut gclient_t)).ps) == 0 && (((*other).spawnflags & 2) == 0) {
+                        if (*((*other).client as *mut gclient_t)).ps.electrifyTime > (*ctx.world).level.time {
+                            (*((*other).client as *mut gclient_t)).ps.electrifyTime += (*ctx.world).bg_state.rng.Q_irand(200, 500);
+                            if (*((*other).client as *mut gclient_t)).ps.electrifyTime > (*ctx.world).level.time + 4000 {
+                                (*((*other).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world).level.time + 4000;
                             }
                         } else {
-                            (*(*other).client as *mut gclient_t).ps.electrifyTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(200, 500);
+                            (*((*other).client as *mut gclient_t)).ps.electrifyTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(200, 500);
                         }
                     }
-                } else if !other.is_null() && !(*other).client.is_null() && (*(*other).client as *mut gclient_t).ps.powerups[PW_CLOAKED as usize] != 0 {
+                } else if !other.is_null() && !(*other).client.is_null() && (*((*other).client as *mut gclient_t)).ps.powerups[PW_CLOAKED as usize] != 0 {
                     Jedi_Decloak(ctx, other);
                     if (*ent).methodOfDeath == MOD_DEMP2_ALT as c_int {
-                        (*(*other).client as *mut gclient_t).cloakToggleTime = Q3_INFINITE;
+                        (*((*other).client as *mut gclient_t)).cloakToggleTime = Q3_INFINITE;
                     } else {
-                        (*(*other).client as *mut gclient_t).cloakToggleTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
+                        (*((*other).client as *mut gclient_t)).cloakToggleTime = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(3000, 10000);
                     }
                 }
             }
@@ -686,7 +686,7 @@ pub fn G_MissileImpact(
         if (*ent).splashDamage != 0 {
             if G_RadiusDamage(ctx, tr.endpos, ent_resolve_opt(ctx, (*ent).parent), (*ent).splashDamage as f32, (*ent).splashRadius as f32, other, ent, (*ent).splashMethodOfDeath) != 0 {
                 if hitClient == 0 && !(*ctx.world).g_entities[(*ent).r.ownerNum as usize].client.is_null() {
-                    (*(*ctx.world).g_entities[(*ent).r.ownerNum as usize].client as *mut gclient_t).accuracy_hits += 1;
+                    (*((*ctx.world).g_entities[(*ent).r.ownerNum as usize].client as *mut gclient_t)).accuracy_hits += 1;
                 }
             }
         }
@@ -749,8 +749,8 @@ pub fn G_RunMissile(
             if tr.fraction != 1.0 && (tr.entityNum as usize) < ENTITYNUM_WORLD as usize {
                 let g2Hit = &mut (*ctx.world).g_entities[tr.entityNum as usize];
                 if (*g2Hit).inuse != 0 && !(*g2Hit).client.is_null() && !(*g2Hit).ghoul2.is_null() {
-                    (*(*g2Hit).client as *mut gclient_t).g2LastSurfaceHit = tr.surfaceFlags as c_int;
-                    (*(*g2Hit).client as *mut gclient_t).g2LastSurfaceTime = (*ctx.world).level.time;
+                    (*((*g2Hit).client as *mut gclient_t)).g2LastSurfaceHit = tr.surfaceFlags as c_int;
+                    (*((*g2Hit).client as *mut gclient_t)).g2LastSurfaceTime = (*ctx.world).level.time;
                 }
                 if !(*g2Hit).ghoul2.is_null() {
                     tr.surfaceFlags = 0;

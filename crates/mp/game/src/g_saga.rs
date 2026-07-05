@@ -373,14 +373,21 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
             }
 
             // Load the player class types
-            BG_SiegeLoadClasses(core::ptr::null_mut(), &mut (*ctx.world).bg_state, ctx.bg_traps());
+            BG_SiegeLoadClasses(
+                core::ptr::null_mut(),
+                &mut (*ctx.world).bg_state,
+                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            );
 
             if (*ctx.world).bg_state.bgNumSiegeClasses == 0 {
                 G_Error(ctx, cstr("Couldn't find any player classes for Siege").as_ptr());
             }
 
             // Now load the teams since we have class data.
-            BG_SiegeLoadTeams(&mut (*ctx.world).bg_state, ctx.bg_traps());
+            BG_SiegeLoadTeams(
+                &mut (*ctx.world).bg_state,
+                &crate::bg_channel::GameBgTraps::new(ctx.engine),
+            );
 
             // PORT-NOTE(missing-field): `bgNumSiegeTeams` is not yet a
             // `BgState` field (missing_symbols); referenced verbatim.

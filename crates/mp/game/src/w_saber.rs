@@ -50,6 +50,7 @@ use crate::q_math::{vec3_origin, VectorLength, VectorNormalize, PITCH};
 use crate::trap;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs;
+use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use crate::NPC_utils::G_GetBoltPosition;
 use mp_bg::public::anim_number::animNumber_t;
@@ -1639,8 +1640,9 @@ pub fn WP_SabersCheckLock2(
             0,
         );
         {
-            let anim = &(*ctx.world).bg_state.bgAllAnims[(*attacker).localAnimIndex as usize].anims
-                [attAnim as usize];
+            let anim = &*(*ctx.world).bg_state.bgAllAnims[(*attacker).localAnimIndex as usize]
+                .anims
+                .add(attAnim as usize);
             (*ac).ps.saberLockFrame =
                 anim.firstFrame + (anim.numFrames as f32 * attStart) as c_int;
         }
@@ -1654,8 +1656,9 @@ pub fn WP_SabersCheckLock2(
             0,
         );
         {
-            let anim = &(*ctx.world).bg_state.bgAllAnims[(*defender).localAnimIndex as usize].anims
-                [defAnim as usize];
+            let anim = &*(*ctx.world).bg_state.bgAllAnims[(*defender).localAnimIndex as usize]
+                .anims
+                .add(defAnim as usize);
             (*dc).ps.saberLockFrame =
                 anim.firstFrame + (anim.numFrames as f32 * defStart) as c_int;
         }
@@ -2508,8 +2511,9 @@ pub fn G_GetAttackDamage(
     unsafe {
         let sc = (*self_).client as *mut gclient_t;
         let mut totalDamage = maxDmg;
-        let anim = &(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize].anims
-            [(*sc).ps.torsoAnim as usize];
+        let anim = &*(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize]
+            .anims
+            .add((*sc).ps.torsoAnim as usize);
         let mut attackAnimLength =
             anim.numFrames as f32 * ((anim.frameLerp as f32).abs());
         let mut animSpeedFactor = 1.0f32;
@@ -2563,8 +2567,9 @@ pub fn G_GetAnimPoint(
 ) -> f32 {
     unsafe {
         let sc = (*self_).client as *mut gclient_t;
-        let anim = &(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize].anims
-            [(*sc).ps.torsoAnim as usize];
+        let anim = &*(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize]
+            .anims
+            .add((*sc).ps.torsoAnim as usize);
         let mut attackAnimLength = anim.numFrames as f32 * ((anim.frameLerp as f32).abs());
         let mut animSpeedFactor = 1.0f32;
 
@@ -4888,7 +4893,8 @@ pub fn CheckSaberDamage(
             {
                 let mut te: *mut gentity_t = core::ptr::null_mut();
 
-                (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack((*sc).ps.saberMove);
+                (*sc).ps.saberMove =
+                    crate::bg_panimate::BG_BrokenParryForAttack(&(*ctx.world).bg_state, (*sc).ps.saberMove);
                 (*sc).ps.saberBlocked = BLOCKED_PARRY_BROKEN;
                 if (*sc).ps.torsoAnim == (*sc).ps.legsAnim {
                     //set anim now on both parts
@@ -4985,7 +4991,10 @@ pub fn CheckSaberDamage(
 
             if BG_StabDownAnim((*sc).ps.torsoAnim) != 0
                 && !(*trEnt).client.is_null()
-                && crate::bg_panimate::BG_InKnockDownOnGround(&mut (*trc).ps as *mut playerState_t)
+                && crate::bg_panimate::BG_InKnockDownOnGround(
+                    &(*ctx.world).bg_state,
+                    &mut (*trc).ps as *mut playerState_t,
+                )
                     == 0
             {
                 //stabdowns only damage people who are actually on the ground...
@@ -5383,7 +5392,8 @@ pub fn CheckSaberDamage(
                 }
 
                 //make them (me) go into a broken parry
-                (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack((*sc).ps.saberMove);
+                (*sc).ps.saberMove =
+                    crate::bg_panimate::BG_BrokenParryForAttack(&(*ctx.world).bg_state, (*sc).ps.saberMove);
                 (*sc).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
 
                 if (*ctx.world).cvars.g_saberDebugPrint.integer != 0 {
@@ -5431,7 +5441,8 @@ pub fn CheckSaberDamage(
                     crate::g_main::Com_Printf(cstr(&s).as_ptr());
                 }
 
-                (*ooc).ps.saberMove = BG_BrokenParryForParry((*ooc).ps.saberMove);
+                (*ooc).ps.saberMove =
+                    BG_BrokenParryForParry(&mut (*ctx.world).bg_state, (*ooc).ps.saberMove);
                 (*ooc).ps.saberBlocked = BLOCKED_PARRY_BROKEN;
 
                 didDefense = qtrue;
@@ -5528,6 +5539,7 @@ pub fn CheckSaberDamage(
                     if attackAdv > 1 {
                         //I won, he should knockaway
                         (*ooc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                            &(*ctx.world).bg_state,
                             (*ooc).ps.saberMove,
                         );
                         (*ooc).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
@@ -5536,8 +5548,10 @@ pub fn CheckSaberDamage(
                         (*ooc).ps.saberBlocked = BLOCKED_ATK_BOUNCE;
                     } else if attackAdv < 1 {
                         //I lost, I get knocked away
-                        (*sc).ps.saberMove =
-                            crate::bg_panimate::BG_BrokenParryForAttack((*sc).ps.saberMove);
+                        (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                            &(*ctx.world).bg_state,
+                            (*sc).ps.saberMove,
+                        );
                         (*sc).ps.saberBlocked = BLOCKED_BOUNCE_MOVE;
                     } else if attackAdv < 0 {
                         //I lost, I bounce off
@@ -5669,8 +5683,10 @@ pub fn CheckSaberDamage(
                             && unblockable == 0
                         {
                             //They are higher, this means they can actually smash us into a broken parry
-                            (*sc).ps.saberMove =
-                                crate::bg_panimate::BG_BrokenParryForAttack((*sc).ps.saberMove);
+                            (*sc).ps.saberMove = crate::bg_panimate::BG_BrokenParryForAttack(
+                                &(*ctx.world).bg_state,
+                                (*sc).ps.saberMove,
+                            );
                             (*sc).ps.saberBlocked = BLOCKED_PARRY_BROKEN;
 
                             if (*sc).ps.saberEntityNum != 0 {
@@ -5702,8 +5718,10 @@ pub fn CheckSaberDamage(
                         && PM_SaberInParry(G_GetParryForBlock((*ooc).ps.saberBlocked)) != 0
                     {
                         //This means that the attack actually hit our saber, and we went to block it.
-                        (*ooc).ps.saberMove =
-                            BG_BrokenParryForParry(G_GetParryForBlock((*ooc).ps.saberBlocked));
+                        (*ooc).ps.saberMove = BG_BrokenParryForParry(
+                            &mut (*ctx.world).bg_state,
+                            G_GetParryForBlock((*ooc).ps.saberBlocked),
+                        );
                         (*ooc).ps.saberBlocked = BLOCKED_PARRY_BROKEN;
 
                         (*ooc).ps.saberEventFlags &= !SEF_PARRIED;
@@ -8161,14 +8179,16 @@ pub fn UpdateClientRenderinfo(
             _VectorCopy((*client).ps.viewangles, &mut (*ri).eyeAngles);
 
             //we'll just say the legs/torso are whatever the first frame of our current anim is.
-            (*ri).torsoFrame = (*ctx.world).bg_state.bgAllAnims
+            (*ri).torsoFrame = (*(*ctx.world).bg_state.bgAllAnims
                 [(*self_).localAnimIndex as usize]
-                .anims[(*client).ps.torsoAnim as usize]
-                .firstFrame as c_int;
-            (*ri).legsFrame = (*ctx.world).bg_state.bgAllAnims
+                .anims
+                .add((*client).ps.torsoAnim as usize))
+            .firstFrame as c_int;
+            (*ri).legsFrame = (*(*ctx.world).bg_state.bgAllAnims
                 [(*self_).localAnimIndex as usize]
-                .anims[(*client).ps.legsAnim as usize]
-                .firstFrame as c_int;
+                .anims
+                .add((*client).ps.legsAnim as usize))
+            .firstFrame as c_int;
             if (*ctx.world).cvars.g_debugServerSkel.integer != 0 {
                 //Alright, I was doing this, but it's just too slow to do every frame.
                 let mut boltMatrix: mdxaBone_t = core::mem::zeroed();

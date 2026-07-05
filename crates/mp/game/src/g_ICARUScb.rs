@@ -836,6 +836,7 @@ pub fn Q3_Remove(ctx: GameContext<'_>, entID: c_int, name: *const c_char) {
                 );
                 return;
             }
+            let victim = &mut (*ctx.world).g_entities[victim.unwrap().0 as usize] as *mut gentity_t;
             Q3_RemoveEnt(ctx, victim);
         } else {
             let mut victim = G_Find(

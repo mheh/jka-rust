@@ -13,6 +13,8 @@ use crate::prelude::*;
 // define it): the canonical home is g_public_consts, per house convention.
 use crate::g_public_consts::SVF_NOCLIENT;
 use crate::g_ICARUScb::G_DebugPrint;
+use crate::g_ICARUScb::Q3_SetParm;
+use mp_qshared::common::mp::gentity::BSET_FIRST;
 
 // Unported types referenced in this file (need porting before this compiles):
 // PAIN_FUNC, TOUCH_FUNC

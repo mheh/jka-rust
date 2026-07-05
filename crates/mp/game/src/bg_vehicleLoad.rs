@@ -467,13 +467,13 @@ pub fn BG_ParseVehicleParm(
 pub fn VEH_LoadVehicle(
     vehicleName: *const c_char,
     bg: &mut BgState,
+    traps: &dyn BgTraps,
 ) -> c_int {
     unsafe {
         if bg.numVehicles == 0 {
-            // SHAPE-MISMATCH: `VEH_LoadVehicle`'s LAW signature carries no
-            // `traps: &dyn BgTraps`, but `BG_VehicleLoadParms` needs one; `traps`
-            // is not in scope here. Written to match the LAW call surface
-            // anyway — see shape_mismatches.
+            // `BG_VehicleLoadParms` reaches the engine, so `traps: &dyn BgTraps`
+            // is threaded through here per rulings 12/15 (the loader call chain
+            // is self-contained within this module).
             BG_VehicleLoadParms(bg, traps);
         }
 
@@ -637,6 +637,7 @@ pub fn VEH_LoadVehicle(
 pub fn VEH_VehicleIndexForName(
     vehicleName: *const c_char,
     bg: &mut BgState,
+    traps: &dyn BgTraps,
 ) -> c_int {
     unsafe {
         if vehicleName.is_null() || *vehicleName == 0 {
@@ -656,7 +657,7 @@ pub fn VEH_VehicleIndexForName(
             Com_Printf(cstr(&format!("{}ERROR: Too many Vehicles (max 64), aborting load on {}!\n", S_COLOR_RED.to_str().unwrap(), name)).as_ptr());
             return VEHICLE_NONE;
         }
-        v = VEH_LoadVehicle(vehicleName, bg);
+        v = VEH_LoadVehicle(vehicleName, bg, traps);
         if v == VEHICLE_NONE {
             let name = cstr_to_str(vehicleName);
             Com_Printf(cstr(&format!("{}ERROR: Could not find Vehicle {}!\n", S_COLOR_RED.to_str().unwrap(), name)).as_ptr());

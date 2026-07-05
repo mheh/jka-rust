@@ -196,8 +196,13 @@ pub fn ProcessOrientCommands(pVeh: *mut Vehicle_t) {
             return;
         }
 
-        let parent = &mut *parent;
-        let parent_ps: *mut playerState_t = parent.playerState;
+        // Kept as a raw pointer (not reborrowed to `&mut`): `Vehicle_t`'s
+        // `m_pParentEntity` is `mp_bg`'s own `bgEntity_t`, while this crate's
+        // `bgEntity_t` name is the `gentity_t` alias (prelude); a reference-to-
+        // pointer `as` cast requires identical pointee types, so the overlay
+        // cast below needs `parent` to stay a raw pointer (pointer-to-pointer
+        // casts are unconstrained).
+        let parent_ps: *mut playerState_t = (*parent).playerState;
 
         let mut rider: *mut bgEntity_t = std::ptr::null_mut();
         if parent.s.owner != ENTITYNUM_NONE {
