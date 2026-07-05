@@ -1,5 +1,5 @@
 # Module Loading Design
-Status: DRAFT     Supersedes: none
+Status: FROZEN (user sign-off 2026-07-03)     Supersedes: none
 Decision prefix: LOAD     Ledger deps: DEC-05, DEC-07, DEC-08, DEC-09
 
 ## Standing context
@@ -22,15 +22,19 @@ Links only — never restated here:
 - `docs/architecture/engine-seam.md` — the **typed call/dispatch** side (SEAM-D1
   compile-time-per-artifact vs runtime-per-module transport, SEAM-D4 pointer-word
   interpretation, `ModuleTransport` enum, `Execute`/`Dispatch`, `CEngine`,
-  `SharedGameData`; SEAM-D12 seam entrypoints/dispatchers are `extern "C-unwind"`,
-  with the follow-up sweep of the `entrypoints.rs:9-27` raw aliases this doc
-  relocates). This doc supplies the loader that produces the handles that doc
-  dispatches through; the two are duals.
+  `SharedGameData`; **SEAM-D9/SEAM-D10** — the module shell's live
+  `dllEntry`/`vmMain`/`GetGameAPI` + `ENGINE: OnceLock<CEngine>` live in each shell
+  crate's `lib.rs`, `abi-transport`'s `entrypoints.rs` keeps only the raw C-ABI
+  aliases, and the `qvm`/`sp_game` stubs are retired (2026-07-03 amendment), which
+  this doc's LOAD-D4 reconciliation defers to; SEAM-D12 seam
+  entrypoints/dispatchers are `extern "C-unwind"`, with the follow-up sweep of the
+  `entrypoints.rs:9-27` raw aliases this doc relocates). This doc supplies the loader
+  that produces the handles that doc dispatches through; the two are duals.
 - `docs/architecture/two-island-model.md` — STATE-D3 (`extern "C-unwind"`).
 - `docs/architecture/state-ownership.md` — STATE-D7 (resolving STATE-Q4): the
   receiverless leaf throw `pub fn com_error(level: ErrorLevel, msg: String) -> !`
   in `mp_engine_qcommon` (FROZEN in state-ownership § `com_init`/`com_frame`/
-  `com_shutdown`/`com_error` entry points, cite `state-ownership.md:575`) that
+  `com_shutdown`/`com_error` entry points, cite `state-ownership.md:719`) that
   LOAD-D11 calls directly, and the `ErrorLevel` taxonomy — concretely the fatal
   variant `ErrorLevel::ERR_FATAL`, the ported `errorParm_t` enum's first member
   (`oracle/oracle/codemp/game/q_shared.h:451-457`; state-ownership STATE-D7 /
@@ -38,6 +42,20 @@ Links only — never restated here:
   settled shape; lifecycle.md's earlier receiver-ful
   `com_error(engine, …)` is superseded by STATE-D7 and is **not** the one LOAD-D11
   uses.
+- `docs/architecture/lifecycle.md` (DRAFT — **exists on disk**, not "pending") —
+  LIFE-D3 (`pub type ErrorLevel = errorParm_t`, `lifecycle.md:662`; per-mode MP-5 /
+  SP-4 `errorParm_t`) and the module-load **trigger points**: the empty
+  `ModuleRegistry` is default-constructed at `Com_Init` step-30 `VM_Init`
+  (`lifecycle.md:187-215`) and hangs off `Engine.common.modules` (LIFE-Q5, shared
+  with state-ownership STATE-D10); the game module is actually *loaded* at map spawn
+  (`SV_SpawnServer → SV_InitGameProgs`, **post-Slice-0**), not at engine boot
+  (`lifecycle.md:82,222`). lifecycle.md **punts `SV_InitGameProgs`'s module-load
+  mechanics back to this doc** (`lifecycle.md:69-70`); the residual — the
+  `SV_InitGameProgs`-equiv function's own crate/signature — is neither doc's settled
+  territory (LOAD-Q12).
+- `docs/abi-traps.md` — trap signatures. Which trap words are pointer-shaped (read
+  through `WasmPtr<T>` in the `Wasm` dispatcher arm) is decided there + engine-seam
+  SEAM-D4, **not** this doc; referenced only, never restated.
 
 ## Scope & non-goals
 
@@ -57,7 +75,10 @@ Non-goals (punted, each with its owning doc):
   decides which trap words get read through them.
 - **Lifecycle / boot / frame ordering** — *when* a load, restart, or unload
   fires during boot, connect, map change, or `vid_restart` →
-  `docs/architecture/lifecycle.md` (pending). This doc records the Raven
+  `docs/architecture/lifecycle.md` (**DRAFT — exists**; it fixes the trigger
+  points: the empty `ModuleRegistry` at `Com_Init` step-30 `VM_Init`, and the
+  game-module load at map spawn via `SV_SpawnServer → SV_InitGameProgs`,
+  post-Slice-0, `lifecycle.md:82,187-215,222`). This doc records the Raven
   create/destroy *cadence* only as ground truth for the restart semantics it
   freezes.
 - **Which physical crate hosts each module shell** (`ENGINE` + live exports)
@@ -69,7 +90,8 @@ Non-goals (punted, each with its owning doc):
   open). This doc places it in the parity matrix; it does not define its body.
 - **The raw inbound syscall trampoline** an engine hands a hosted DLL →
   engine-seam.md **SEAM-D11** (resolved upstream: one `extern "C-unwind"`
-  trampoline per module slot over a per-slot `*mut Engine` cell).
+  C-shim trampoline per module slot reading a per-slot **injected** `EngineSlot
+  { ctx, syscall }` — amended 2026-07-03, `engine-seam.md:545-570`).
 
 ## Raven ground truth
 
@@ -87,19 +109,22 @@ allocates the first free slot of `vmTable[MAX_VM]` — the free-slot test is
 `dllHandle`/`entryPoint`, `:122-123`) — (`#define MAX_VM 3`, `vm.cpp:28-29`;
 fatal if full, `vm.cpp:499-500`), stores the name and syscall (`Q_strncpyz(
 vm->name, module, …)` `vm.cpp:505`, `vm->systemCall = systemCalls` `vm.cpp:506`),
+skips the `fs_restrict` demo override (`vm.cpp:508-513` — forces `VMI_COMPILED`,
+i.e. the QVM path, **out of scope DEC-05.4**; never gates the native path we host),
 then attempts a native load: `Sys_LoadDll(module, &vm->entryPoint, VM_DllSyscall)`
 (`vm.cpp:515-518`). Success returns immediately; failure falls through to the
 QVM path — **out of scope (DEC-05.4)** (`vm.cpp:519-524`, non-fatal).
 
 **Not-found disposition is caller-side and non-uniform (ground truth for
-LOAD-Q10).** `VM_Create` **never fatals on load-not-found** — with the QVM
+`load_module`'s `Option<SlotId>` return, LOAD-D11 amended 2026-07-03 —
+resolving LOAD-Q10).** `VM_Create` **never fatals on load-not-found** — with the QVM
 fallback out of scope, the observable native outcome is a `NULL` return, and
 **each caller decides** the disposition, *differently per mode*:
 `SV_InitGameProgs` → `if (!gvm) Com_Error(ERR_FATAL, "VM_Create on game failed")`
 (`oracle/oracle/codemp/server/sv_game.cpp:1750-1752`, two lines below the
 `VM_Create("jampgame", …)` call); `CL_InitCGame` → `Com_Error(ERR_DROP,
 "VM_Create on cgame failed")` (`client/cl_cgame.cpp:1772-1774`); `CL_InitUI` →
-`Com_Error(ERR_FATAL, "VM_Create on UI failed")` (`client/cl_ui.cpp:1481-1483`).
+`Com_Error(ERR_FATAL, "VM_Create on UI failed")` (`client/cl_ui.cpp:1479-1481`).
 The split is **not uniform** — game and ui are `ERR_FATAL`, cgame is `ERR_DROP` —
 so no single in-`VM_Create` fatal reproduces it; the fatal-vs-drop choice lives at
 the caller.
@@ -224,33 +249,65 @@ layout must be checked against the actual host binary, not just the oracle
 ## State ownership
 
 Loading-specific globals (the dispatch-side `syscall` pointer, `ENGINE`
-`OnceLock`, `cgvm.entryPoint`, and the eliminated `currentVM`/`lastVM` are owned
-by `engine-seam.md`'s table and only cross-referenced here to avoid duplication,
-porting-rules §4 / doc-standards §4). SEAM-D11's per-slot `*mut Engine`
-trampoline cell is physically composed into the `ModuleSlot.engine` field this
-doc's registry owns (LOAD-D8 round-3 amendment), but its **type/shape** stays
-owned by engine-seam SEAM-D11 — tabled below only as the slot field it occupies,
-not re-specified here. engine-seam **freezes that concrete shape** as the struct
-`EngineSlot { engine: Cell<*mut Engine> }` (`engine-seam.md:445`) in this same
-`mp_engine_qcommon` crate, so the `ModuleSlot.engine` field names a compilable
-type — `EngineSlot` — that a porter uses directly, **not** an opaque placeholder.
-The field type is spelled **`EngineSlot`** here: it is the sole *defined* type in
-the owner (the frozen `struct EngineSlot`, `engine-seam.md:445`); `EngineSlotCell`
-appears only in engine-seam's surrounding prose and is defined nowhere, so this
-doc names the frozen struct, not that undefined spelling.
+`OnceLock`, `cgvm.entryPoint`, and the eliminated `currentVM`/`lastVM`) are owned
+by `engine-seam.md`'s table and only cross-referenced here to avoid duplication
+(porting-rules §4 / doc-standards §4). SEAM-D11's per-slot engine trampoline cell
+is physically composed into the `ModuleSlot.engine` field this doc's registry owns
+(LOAD-D8 round-3 amendment); its **type/shape** stays owned by engine-seam
+SEAM-D11, which — as **amended 2026-07-03 (load-time injection, Raven-style)**,
+`engine-seam.md:545-570` — freezes it as the struct
+`EngineSlot { ctx: *mut c_void, syscall: SlotSyscall }` (`engine-seam.md:547`) in
+this same `mp_engine_qcommon` crate, where
+`SlotSyscall = extern "C-unwind" fn(ctx: *mut c_void, args: *const isize) -> isize`
+(`engine-seam.md:545-546`). The field type is therefore spelled **`EngineSlot`**
+everywhere in this doc (mechanical unification, 2026-07-03) — the sole *defined*
+type in the owner, named directly, **not** an opaque placeholder.
+
+**LOAD-Q11 is resolved by the injection (see LOAD-D8's 2026-07-03 amendment).**
+The round-4 hole — that the below-facade `mp_engine_qcommon` could not name the
+`mp_engine_core::Engine` aggregate its `Cell<*mut Engine>` field pointed at
+without crossing a **forbidden uphill edge** (`mp_engine_core` depends *down* on
+`mp_engine_qcommon`, workspace-architecture § Dependency edges) — is dissolved by
+storing **injected** state instead of a typed `*mut Engine`. Mirroring Raven's
+`VM_Create`, which **receives** its `systemCalls` argument (`vm.cpp:471-472`) and
+stores it (`vm->systemCall = systemCalls`, `vm.cpp:506`) rather than naming the
+server, the injected `EngineSlot { ctx: *mut c_void, syscall: SlotSyscall }`
+carries an **opaque** `ctx` pointer plus the syscall fn pointer handed in at
+module-load time — so `mp_engine_qcommon` **never names** `mp_engine_core::Engine`
+or `mp_engine_server::sv_game_system_calls` (both uphill), and no crate-graph edge
+is added (`engine-seam.md:545-570`, the SEAM-D11 amendment). The construction and
+initialisation of the cell that was previously unresolved is now settled: it is
+built at `load_module` from that function's own injected parameters (LOAD-D8's
+2026-07-03 amendment), not from an `Engine` in scope. This changes none of
+this doc's slot *semantics*; it removes the compilability blocker LOAD-Q11 named.
 
 | Raven global | oracle cite | Rust owner (crate::Type.field) | constructed by | threaded via |
 |---|---|---|---|---|
-| `vmTable[MAX_VM]` (`MAX_VM = 3`) | `qcommon/vm.cpp:28-29` | `mp_engine_qcommon::ModuleRegistry.slots: [Option<ModuleSlot>; MAX_VM]` — **per-slot only, no current-module global** (LOAD-D5); home crate `mp_engine_qcommon` mirrors `vm.cpp`'s subsystem (LOAD-D8; engine-seam.md state table — `ModuleRegistry` mirrors oracle `qcommon/vm.cpp`) | `ModuleRegistry::load_module` (FROZEN — LOAD-D8: slot reuse-by-name `vm.cpp:485-489`, first free slot `vm.cpp:494`, `Com_Error(ERR_FATAL)` when all `MAX_VM` full `vm.cpp:499-500`) | dispatcher `engine` arg (engine-seam) |
+| `vmTable[MAX_VM]` (`MAX_VM = 3`) | `qcommon/vm.cpp:28-29` | `mp_engine_qcommon::ModuleRegistry.slots: [Option<ModuleSlot>; MAX_VM]` — **per-slot only, no current-module global** (LOAD-D5); home crate `mp_engine_qcommon` mirrors `vm.cpp`'s subsystem (LOAD-D8; engine-seam.md state table — `ModuleRegistry` mirrors oracle `qcommon/vm.cpp`) | `ModuleRegistry::load_module` (FROZEN — LOAD-D8: slot reuse-by-name `vm.cpp:485-489`, first free slot `vm.cpp:494`, `Com_Error(ERR_FATAL)` when all `MAX_VM` full `vm.cpp:499-500`) | **container owned at `Engine.common.modules`** (state-ownership STATE-D10 / lifecycle LIFE-Q5), default-constructed empty at `Com_Init` step-30 `VM_Init` (`lifecycle.md:187-215`), reached as `engine.common.modules`; dispatcher `engine` arg (engine-seam) |
 | `vm->dllHandle` | `qcommon/vm_local.h:111-146` | `ModuleSlot.module.lib: libloading::Library` (LoadedModule inside the slot) | `sys_load_dll` | held in slot; dropped on unload |
 | `vm->entryPoint` | `qcommon/vm_local.h:123` | `ModuleSlot.module.entry: RawVmMain` (LoadedModule inside the slot) | handshake in `sys_load_dll` | passed to `Dispatch` (engine-seam) |
 | `vm->name` (slot identity for reuse/free) | `qcommon/vm_local.h:119`; set `vm.cpp:505`, read `vm.cpp:486,494` | `ModuleSlot.name: String` (LOAD-D8 round-3 amendment — the composed slot: `name` sits on the slot beside its `module`/`engine`, the faithful `vm_s` mirror) | stamped by `load_module` from its `name: &str` arg | held in slot; `load_module`'s reuse scan compares it (`vm.cpp:485-489`) |
-| per-slot `*mut Engine` cell (SEAM-D11) | engine-seam SEAM-D11 (supplants `currentVM`, `qcommon/vm.cpp:24`) | `ModuleSlot.engine: EngineSlot` — the concrete type frozen by engine-seam SEAM-D11 as `struct EngineSlot { engine: Cell<*mut Engine> }` (`engine-seam.md:445`), in this same `mp_engine_qcommon` crate. Composed into this doc's slot per LOAD-D8 round-3 | `EngineSlot::enter` per engine→module call (`engine-seam.md:449-450`) | the slot's raw syscall trampoline reads it (engine-seam) |
+| per-slot injected engine cell (SEAM-D11) | engine-seam SEAM-D11 (supplants `currentVM`, `qcommon/vm.cpp:24`) | `ModuleSlot.engine: EngineSlot` — the concrete type frozen by engine-seam SEAM-D11 (amended 2026-07-03) as `struct EngineSlot { ctx: *mut c_void, syscall: SlotSyscall }` (`engine-seam.md:547`), in this same `mp_engine_qcommon` crate. Composed into this doc's slot per LOAD-D8 round-3 | **injected at `load_module`** from its `system_calls: SlotSyscall` + `ctx: *mut c_void` params (Raven `VM_Create` receives+stores `systemCalls`, `vm.cpp:471-472,506`; the retired `EngineSlot::enter` per-call cell is superseded — `engine-seam.md:545-570`) | read only by that slot's raw C-shim syscall trampoline (engine-seam SEAM-D11) |
 | `currentVM`, `lastVM` | `qcommon/vm.cpp:24-25` | **eliminated** (LOAD-D5; owned/justified in engine-seam state table) — the `VM_Free` clobber (`vm.cpp:624-625`) is structurally unreproducible | — | — |
 | `gvm` (jampgame slot) | `server/sv_game.cpp:1750` | `ModuleRegistry` slot; server state holds the `SlotId` | `SV_InitGameProgs`-equiv | server state |
 | `cgvm`, `uivm` (MP slots) | `client/cl_cgame.cpp:1771`, `client/cl_ui.cpp:1478` | `ModuleRegistry` slots; client state holds their `SlotId`s | `CL_InitCGame` / `CL_InitUI`-equiv | client state |
 | SP `game_library` `HINSTANCE` | `code/win32/win_main.cpp:459` | **no jka-rust owner** — our SP is fully static (DEC-07) → no handle; a retail SP `game_library` only exists when hosting a real SP game DLL, which is outside DEC-05.3 (MP `jampgamex86.dll` replacements only) and has no parity-matrix row | `Sys_GetGameAPI`-equiv | — |
 | SP `cgvm`/`uivm` (vmachine shim) | `code/client/vmachine.h:54-55` | static dispatch handles, **no load** (DEC-07); owned as `cgvm.entryPoint` in engine-seam state table | static link | dispatcher arg (engine-seam) |
+
+**Where the `ModuleRegistry` container hangs (settled upstream, cross-ref only).**
+The registry this doc's slot API operates on is a **field of `Common`** —
+`Engine.common.modules: ModuleRegistry` (state-ownership **STATE-D10** / lifecycle
+**LIFE-Q5**, resolved 2026-07-02, shared) — mirroring Raven's `vmTable` being a
+`qcommon`-subsystem file-scope static (`vm.cpp:28-29`); `Common` and
+`ModuleRegistry` are both `mp_engine_qcommon`, so no cross-crate edge is added. It
+is default-constructed **empty** at `Com_Init` step-30 `VM_Init`
+(`lifecycle.md:187-215`) and reached as `engine.common.modules`; a boot/spawn call
+site invokes `.load_module(...)` on it. This doc owns the registry's *type/shape*
+(LOAD-D8); its *attachment field* is STATE-D10 / LIFE-Q5, cited not restated
+(doc-standards §4). `lifecycle.md`'s own restatement of that shape
+(`lifecycle.md:199`) already reads `{ slots: [Option<ModuleSlot>; MAX_VM] }`,
+matching this doc's frozen LOAD-D8 shape — the sibling is consistent, no
+reconciliation is owed.
 
 ## Seam definition
 
@@ -308,14 +365,24 @@ and two `#[no_mangle]` stub-export modules (`qvm`: `dllEntry`/`vmMain`/`GetModul
 relocate them** — only the five aliases above move. The four table aliases **stay
 in `abi-transport`**; `AbiCommand` (relocated) stays referenceable there through
 LOAD-D6's re-export, so `RawGetModuleApi`'s signature still typechecks in place. The
-`qvm`/`sp_game` stub modules are the **pre-decision state superseded by LOAD-D4**:
-LOAD-D4 freezes the entrypoints module structure as the `native`/`wasm` `#[cfg]`
-arms and places `dllEntry`/`vmMain`/`GetGameAPI` in the `native` arm, so those stub
-exports fold into `native` and the `qvm`/`sp_game` names do not survive the split
-(their `GetModuleAPI`/`GetGameAPI` **bodies** stay SEAM-Q7-owned in engine-seam).
-This applies LOAD-D6 (move scope) + LOAD-D4 (module structure) — it settles nothing
-new; a porter neither leaves the four table aliases dangling nor guesses whether to
-keep `qvm`/`sp_game`.
+`qvm`/`sp_game` stub modules are **retired** — superseded **not** by LOAD-D4's
+original placement text but by engine-seam **SEAM-D9/SEAM-D10** (2026-07-03 amendment,
+checkpoint-3 finding 14, `engine-seam.md:589-597`): their `#[no_mangle]` symbols
+collide at cdylib link with the live per-shell exports SEAM-D9/D10 mandate, so they
+cannot coexist with them (a link error, not a choice). This doc's own Scope punts
+**which physical crate hosts each module shell (`ENGINE` + live exports)** to SEAM-D10
+(§ Scope & non-goals), so that placement is engine-seam's: the live
+`dllEntry`/`vmMain`/`GetGameAPI` and the `ENGINE: OnceLock<CEngine>` live in each
+**shell crate's `lib.rs`** (`crates/jampgame/src/lib.rs`, …), **not** in
+`abi_transport::entrypoints::native` (`engine-seam.md:574-597,647-663`); the
+`GetModuleAPI`/`GetGameAPI` **bodies** stay SEAM-Q7-owned. `abi-transport`'s
+`entrypoints.rs` keeps **only** the raw C-ABI type aliases — the four table aliases
+above plus LOAD-D6's five relocated aliases' re-exports (`engine-seam.md:879-880`).
+This applies LOAD-D6 (move scope) + SEAM-D9/D10 (shell-crate export placement) — it
+settles nothing new; a porter neither leaves the four table aliases dangling nor keeps
+`qvm`/`sp_game`. (Reconciliation note: LOAD-D4's original "places … in the `native`
+arm" wording is retracted — see the LOAD-D4 amendment in § Per-target entrypoint
+modules and § Decisions; engine-seam SEAM-D9/D10 wins by this doc's own Scope punt.)
 
 ### The loader mechanism — `crates/native/platform`
 
@@ -331,8 +398,11 @@ a module logic crate — LOAD-D4).
 /// MP has no Mac loader, dossier §3). Exact macOS base string: LOAD-Q1.
 pub struct ModuleNaming {
     /// Appended to the bare module name, e.g. "x86.dll" → "jampgamex86.dll".
-    /// win_main.cpp:826 ("x86.dll"); unix_main.c:346 ("i386.so"); macOS: ".dylib".
-    pub suffix: &'static str,
+    /// win_main.cpp:826 (`Some("x86.dll")`); unix_main.c:346 (`Some("i386.so")`).
+    /// `None` = suffix not yet resolved — the macOS arm only (LOAD-Q1; oracle has
+    /// no Mac MP loader, dossier §3). Widened to `Option` 2026-07-03 (mechanical)
+    /// so "unset" is representable without a placeholder literal.
+    pub suffix: Option<&'static str>,
 }
 
 /// A mode's search policy — a value, built **per load by the caller in
@@ -374,9 +444,11 @@ cvar port (B1) lands the caller resolves `Cvar_VariableString("fs_basepath")` /
 **resolved** `FsPath { base, gamedir }` values; Slice 0 (pre-B1) builds the same
 value from hardcoded / CLI paths. This doc freezes the per-mode policy **value** —
 its `naming` / `direct_first` / `steps` — which is what Slice 0 needs; *when* that
-construction runs during boot is `lifecycle.md`'s (pending). This construction is
-**inline at the Slice-0 boot call site** (the `SV_InitGameProgs`-equiv, owned by
-SEAM-D7 / `lifecycle.md` — pending; see Slice hooks, *Referenced but owned
+construction runs is `lifecycle.md`'s — settled there as **map spawn**
+(`SV_SpawnServer → SV_InitGameProgs`, post-Slice-0), not engine boot
+(`lifecycle.md:82,222`). This construction is **inline at the load call site**
+(the `SV_InitGameProgs`-equiv; its *trigger* is settled by lifecycle, but its own
+crate/signature is unpinned — **LOAD-Q12**; see Slice hooks, *Referenced but owned
 elsewhere*), **not** a separately-homed frozen helper this doc pins: the block below
 is the illustrative body that call site runs, landing wherever the call site lands,
 so a porter does **not** invent a home or a function name for it. The MP
@@ -401,7 +473,8 @@ if !cdpath.is_empty() {
     steps.push(SearchStep::FsPath { base: cdpath.into(), gamedir: gamedir.clone() }); // :866-869
 }
 ModuleSearchPolicy {
-    naming: ModuleNaming { suffix: /* Win32 "x86.dll" | Unix "i386.so" | macOS: LOAD-Q1
+    naming: ModuleNaming { suffix: /* Win32 Some("x86.dll") | Unix Some("i386.so") |
+                                       macOS None until LOAD-Q1 resolves the literal
                                        (macOS arm not built for Slice 0's win/linux targets) */ },
     // Win32: true (win_main.cpp:855); Unix: false (unix_main.c:361-373 is #if 0'd).
     direct_first: cfg!(windows),
@@ -466,6 +539,36 @@ pub enum RestartKind {
     WasmInPlaceReset,
 }
 ```
+
+**Amendment (2026-07-03, user ruling item 18 — Unix in-loader fatal on a missing
+export, release builds).** The `sys_load_dll` handshake step above ("`dlsym`
+'dllEntry'+'vmMain' (both required)") maps a **found library whose required exports
+are missing** to `None` — the debug-build behavior. Raven's Unix loader, however, is
+**per-build**: on a missing `vmMain`/`dllEntry` it does `#ifdef NDEBUG` →
+`Com_Error(ERR_FATAL, "Sys_LoadDll(%s) failed dlsym(vmMain): …")`, `#else` →
+`Com_Printf(…)` then `return NULL` (`oracle/oracle/codemp/unix/unix_main.c:431-436`;
+note the semantics — `NDEBUG` = **release** takes the fatal, debug takes the print).
+The port reproduces this faithfully (porting-rules §20 — preserve per-mode quirks):
+the missing-export arm gains a `cfg(not(debug_assertions))` branch that raises the
+receiverless `com_error(ErrorLevel::ERR_FATAL, …)` dual, while the
+`cfg(debug_assertions)` branch keeps `com_printf` + `None` (the current text). The
+**`Option` contract is otherwise unchanged**: `None` still means "not found on any
+policy step", and caller dispositions (`SV_InitGameProgs`/`CL_InitUI` `ERR_FATAL`,
+`CL_InitCGame` `ERR_DROP`) are unchanged — the release fatal fires only for the
+distinct *found-but-no-vmMain* case, before any caller-side `None`-match.
+
+**Open sub-question (mechanism, tracked — NOT settled; owner: slice-0 wiring).** The
+*contract* above is user-settled; the *mechanism* is not. `sys_load_dll` lives in
+`crates/native/platform` (tier −1), which **cannot name `mp_engine_qcommon::com_error`
+(an uphill edge — the same class as the checkpoint-2 `EngineSlot`-injection fix)**. So
+where the `cfg(not(debug_assertions))` fatal physically fires is open, with candidates:
+(a) an **injected fatal hook** passed into the loader at load time (à la the settled
+`systemCalls`/`ctx` injection); (b) a **platform-local sys-fatal** primitive in
+`native/platform` (print+`exit`, no `com_error`); or (c) a **three-state loader return**
+(found / not-found / found-but-bad-export) with the cfg-gated `com_error` raised by the
+caller in `mp_engine_qcommon::load_module`. **Do not pick one** — flagged for slice-0
+wiring (checkpoint-5 finding 23). This does not change the frozen `sys_load_dll`
+signature; it only defers where the release-fatal is emitted.
 
 **Alias home (LOAD-D6).** The raw ABI aliases named above — `RawVmMain`
 (`LoadedModule.entry`), `RawSyscall` (`sys_load_dll`'s `syscall`), and
@@ -551,19 +654,22 @@ pub struct SlotId(pub(crate) u32);   // index into slots[0..MAX_VM]; pub(crate) 
 pub struct ModuleSlot {
     /// vm->name (vm_local.h:119): the bare module name ("jampgame"/"cgame"/"ui"),
     /// the reuse-by-name key load_module's scan compares **case-insensitively**
-    /// (Raven `Q_stricmp`, vm.cpp:485-489 / q_shared.c:900; Rust `eq_ignore_ascii_case`,
+    /// (Raven `Q_stricmp`, vm.cpp:485-489 / game/q_shared.c:900; Rust `eq_ignore_ascii_case`,
     /// §A2 faithful-first). Stamped by load_module from its `name: &str` arg.
     /// pub(crate) (LOAD-D12f).
     pub(crate) name: String,
     /// The loaded native artifact (lib + vmMain entry). NativeDll-only today; its
     /// transport-polymorphic content for Static/Wasm is LOAD-Q9 (open).
     pub(crate) module: LoadedModule,
-    /// SEAM-D11's per-slot `*mut Engine` stash + guard — the inbound trampoline's
-    /// engine cell, one per slot. Concrete type owned + frozen by engine-seam
-    /// SEAM-D11 as `struct EngineSlot { engine: Cell<*mut Engine> }`
-    /// (`engine-seam.md:445`), in this same `mp_engine_qcommon` crate — a porter
-    /// names `EngineSlot` here (a compilable, same-crate type), not an opaque
-    /// placeholder.
+    /// SEAM-D11's per-slot injected engine cell — the inbound trampoline's stored
+    /// syscall channel, one per slot. Concrete type owned + frozen by engine-seam
+    /// SEAM-D11 (amended 2026-07-03) as
+    /// `struct EngineSlot { ctx: *mut c_void, syscall: SlotSyscall }`
+    /// (`engine-seam.md:547`), in this same `mp_engine_qcommon` crate — a porter
+    /// names `EngineSlot` here (a same-crate type), not an opaque placeholder.
+    /// Injected by `load_module` from its `system_calls`/`ctx` params (Raven's
+    /// stored `vm->systemCall`, `vm.cpp:506`); the opaque `ctx` means this crate
+    /// never names `mp_engine_core::Engine` (LOAD-Q11 dissolved, LOAD-D8 2026-07-03).
     pub(crate) engine: EngineSlot,
 }
 
@@ -573,48 +679,72 @@ pub struct ModuleRegistry {
 
 impl ModuleRegistry {
     /// VM_Create slot semantics (vm.cpp:471 region). First the bad-parms guard
-    /// (vm.cpp:480-482): `if name.is_empty() || syscall.is_null()` →
-    /// `com_error(ErrorLevel::ERR_FATAL, "VM_Create: bad parms")` (LOAD-D11 amendment
-    /// — the reachable disjuncts of Raven's `!module || !module[0] || !systemCalls`;
-    /// `!module` (a null pointer) is vacuous for `&str`). Then reuse a live slot
+    /// (vm.cpp:480-482): `if name.is_empty()` →
+    /// `com_error(ErrorLevel::ERR_FATAL, "VM_Create: bad parms")` (LOAD-D11, amended
+    /// 2026-07-03 — the **sole** reachable disjunct of Raven's
+    /// `!module || !module[0] || !systemCalls` is `!module[0]` (empty name); `!module`
+    /// (a null pointer) is vacuous for a `&str`, and `!systemCalls`'s dual is the
+    /// non-nullable `system_calls: SlotSyscall` (a Rust fn pointer, never null), so
+    /// both drop as structurally unreachable. `syscall: RawSyscall` is a *different*
+    /// Raven parameter — Sys_LoadDll's trampoline, not VM_Create's `systemCalls` — and
+    /// is **not** guarded, matching Raven (vm.cpp:480-482 does not test it)). Then reuse a live slot
     /// whose stored name matches — scan
     /// `slots[i].as_ref().map(|s| s.name.eq_ignore_ascii_case(name))` (Raven reuse is
-    /// `Q_stricmp`, case-insensitive — vm.cpp:486 / q_shared.c:900; `eq_ignore_ascii_case`
+    /// `Q_stricmp`, case-insensitive — vm.cpp:486 / game/q_shared.c:900; `eq_ignore_ascii_case`
     /// reproduces its ASCII a–z fold exactly, §A2 faithful-first) against each
     /// occupied slot's `ModuleSlot.name` (vm.cpp:485-489, returned
-    /// as-is, NO reload), else the first free slot (`slots[i].is_none()`,
-    /// vm.cpp:494), else `com_error(ErrorLevel::ERR_FATAL, …)` when all MAX_VM slots
-    /// are full (vm.cpp:499-500). A fresh slot runs sys_load_dll and wraps the returned
-    /// `LoadedModule` into a `ModuleSlot { name, module, engine }` (name stamped
-    /// here, engine cell per SEAM-D11).
+    /// as-is, NO reload → `Some(slot_id)`), else the first free slot
+    /// (`slots[i].is_none()`, vm.cpp:494), else `com_error(ErrorLevel::ERR_FATAL, …)`
+    /// when all MAX_VM slots are full (vm.cpp:499-500). A fresh slot runs
+    /// `sys_load_dll(policy, name, syscall)` — handing the module the raw C-shim
+    /// syscall trampoline `syscall` (Raven's `VM_DllSyscall` passed to `Sys_LoadDll`,
+    /// vm.cpp:518) via `dllEntry` — and on a hit wraps the returned `LoadedModule`
+    /// into a `ModuleSlot { name, module, engine }`, where `engine` is the
+    /// **injected** `EngineSlot { ctx, syscall: system_calls }` constructed here
+    /// from `load_module`'s own `ctx`/`system_calls` params (Raven stores its
+    /// `systemCalls` arg in `vm->systemCall`, vm.cpp:506), then returns
+    /// `Some(slot_id)`.
     ///
-    /// Infallible `-> SlotId` (LOAD-D11): neither ERR_FATAL branch (bad-parms,
-    /// slot-full) surfaces an error — each reproduces Raven's `Com_Error(ERR_FATAL)`
-    /// by calling the receiverless `mp_engine_qcommon::com_error(ErrorLevel::ERR_FATAL, …)`
-    /// directly (same crate, exactly Raven-shaped call geometry), a diverging
-    /// `-> !` panic that unwinds to the `mp_engine_core` catch (DEC-08 model).
-    /// These two fatal branches are fillable the moment a porter starts the body;
-    /// the fresh-slot *not-found* branch below is the one that is not (LOAD-Q10).
+    /// **The two fn-pointer params are Raven duals (LOAD-D8's 2026-07-03 amendment).**
+    /// `syscall: RawSyscall` is `Sys_LoadDll`'s trampoline argument — the address
+    /// handed to the module's `dllEntry` (Raven `VM_DllSyscall`, vm.cpp:518). The
+    /// `system_calls: SlotSyscall` + `ctx: *mut c_void` pair is `VM_Create`'s
+    /// `systemCalls` argument (vm.cpp:471-472), stored in the slot's `EngineSlot`
+    /// (Raven `vm->systemCall = systemCalls`, vm.cpp:506) for the C-shim trampoline
+    /// to read and forward — mirroring how `VM_DllSyscall` reads
+    /// `currentVM->systemCall`. Injecting them at load is what lets
+    /// `mp_engine_qcommon` avoid naming `mp_engine_core::Engine` (LOAD-Q11 dissolved;
+    /// `engine-seam.md:545-570`).
     ///
-    /// **Not-found branch — LOAD-Q10 (open, BLOCKING for this body).** When a
-    /// *fresh* slot's `sys_load_dll` returns `None` (artifact not found anywhere on
-    /// the policy), the disposition is **undecided**. Oracle *does* define it, but as
-    /// a *caller-side*, non-uniform `Com_Error` (game/ui `ERR_FATAL`, cgame `ERR_DROP`
-    /// — see `## Raven ground truth`); faithfully reproduced (§A2) that split forces
-    /// `load_module` to **surface the `None` to its caller**, directly contradicting
-    /// this **FROZEN infallible `-> SlotId`** (LOAD-D11) — and LOAD-D11's own
-    /// `com_error`-inside mechanism can't be reused, since a uniform internal
-    /// `ERR_FATAL` would diverge from cgame's `ERR_DROP`. No disposition is
-    /// authorized, so **no compiling body exists for this branch**: a marker comment
-    /// cannot yield the `SlotId` the branch must return, and an invented
-    /// `todo!()`/panic or widened `Result` would pre-empt the eventual decision
-    /// (porting-rules §14). The frozen *signature* stands, but `load_module`'s **body
-    /// is blocked on LOAD-Q10** — the standalone type/signature/golden build
-    /// (Verification 1) is unaffected (it exercises `sys_load_dll`, not this branch),
-    /// while the `load_module` implementation and any Slice-0 end-to-end boot wait on
-    /// the LOAD-Q10 session.
+    /// **Two in-`VM_Create` fatals stay internal (LOAD-D11).** The bad-parms
+    /// (vm.cpp:480-482) and slot-full (vm.cpp:499-500) branches each reproduce Raven's
+    /// `Com_Error(ERR_FATAL)` by calling the receiverless
+    /// `mp_engine_qcommon::com_error(ErrorLevel::ERR_FATAL, …)` directly (same crate —
+    /// `ErrorLevel` lives beside `com_error` in `mp_engine_qcommon`, so both resolve
+    /// crate-locally from `load_module` with no cross-crate `use`: STATE-D7 fixes that
+    /// crate home (state-ownership.md:1449), and lifecycle.md:662 freezes
+    /// `pub type ErrorLevel = errorParm_t` over the existing per-mode
+    /// `mp_qshared::errorParm_t`; exactly Raven-shaped call geometry), a diverging
+    /// `-> !` panic that unwinds to the `mp_engine_core` catch (DEC-08 model). Raven puts THOSE two fatals inside
+    /// `VM_Create`, so they stay inside `load_module` — both branches are fillable the
+    /// moment a porter starts the body.
+    ///
+    /// **Not-found returns `None` (LOAD-D11, amended 2026-07-03 — resolving LOAD-Q10).**
+    /// When a *fresh* slot's `sys_load_dll` returns `None` (artifact not found anywhere
+    /// on the policy), `load_module` **returns `None`**, mirroring `sys_load_dll`'s own
+    /// `Option` contract. This is faithful (§A2): Raven's `VM_Create` itself returns
+    /// `NULL` **non-fatally** on load-not-found (its QVM fallback is out of scope,
+    /// DEC-05.4), and the **caller** owns the fatal disposition, which is **non-uniform
+    /// per mode** — `SV_InitGameProgs`/`CL_InitUI` `ERR_FATAL`, `CL_InitCGame`
+    /// `ERR_DROP` (see `## Raven ground truth`). The `SV_InitGameProgs`-equiv boot call
+    /// site reproduces its `if (!gvm) Com_Error(ERR_FATAL, …)` (`sv_game.cpp:1750-1752`)
+    /// by matching this `None` and calling the receiverless `com_error` itself. No fatal
+    /// is baked in here, so no per-mode divergence is pre-empted and this branch now has
+    /// a fully compilable body. The remaining Slice-0 dependency is only *where* the boot
+    /// call site lives (SEAM-D7 / `lifecycle.md`), not this disposition.
     pub fn load_module(&mut self, policy: &ModuleSearchPolicy, name: &str,
-                       syscall: RawSyscall) -> SlotId;
+                       syscall: RawSyscall, system_calls: SlotSyscall,
+                       ctx: *mut c_void) -> Option<SlotId>;
 
     /// VM_Free (vm.cpp:605-610): unload_module the slot's module, clearing it.
     /// No global currentVM/lastVM clobber (LOAD-D5).
@@ -626,6 +756,12 @@ impl ModuleRegistry {
     /// Static, `WasmInPlaceReset` for the wasm fast path (LOAD-D2), so the registry
     /// needs no internal transport tag to choose between them (closes LOAD-Q8).
     /// `policy`/`name`/`syscall` are still needed for `DropRecreate`'s reload.
+    /// **`restart` is NOT widened with the injection params (LOAD-D8's 2026-07-03
+    /// amendment; restart semantics LOAD-D2):**
+    /// Raven's native `VM_Restart` saves `systemCall` off the freed `vm_t` and
+    /// reuses it (vm.cpp:399-409), so the reload reuses the slot's **stored**
+    /// `EngineSlot` rather than re-taking `system_calls`/`ctx` — LOAD-D12b's frozen
+    /// signature stands unchanged.
     pub fn restart(&mut self, slot: SlotId, kind: RestartKind,
                    policy: &ModuleSearchPolicy, name: &str, syscall: RawSyscall);
 }
@@ -634,7 +770,7 @@ impl ModuleRegistry {
 **Transport scope of the frozen slot (LOAD-Q9, open).** `slots` holds `ModuleSlot`,
 whose `module: LoadedModule` payload is **NativeDll-only** (`libloading::Library` +
 `RawVmMain`) — all Slice 0 exercises (`NativeDll`, LOAD-D2 / SEAM-D7). engine-seam
-(state table, line 184) makes `ModuleTransport { NativeDll | Static | Wasm }` a
+(state table, line 192) makes `ModuleTransport { NativeDll | Static | Wasm }` a
 **field of** `ModuleRegistry`, and DEC-05 / LOAD-D2 require the registry to also
 track `Static` (no library handle) and `Wasm` (a wasmtime `Instance`, not a
 `libloading::Library`) modules. **How a non-`NativeDll` module occupies a slot** —
@@ -662,10 +798,53 @@ types (not Raven identifiers):
 ```
 crates/mp/engine/qcommon/src/vm/   // mirrors oracle qcommon/vm.cpp
   slot_id.rs          // SlotId
-  module_slot.rs      // ModuleSlot (imports LoadedModule from native/platform,
-                      //   the EngineSlot struct from engine-seam SEAM-D11)
+  module_slot.rs      // ModuleSlot (imports LoadedModule from native/platform;
+                      //   EngineSlot from the sibling engine_slot.rs below)
+  engine_slot.rs      // EngineSlot { ctx: *mut c_void, syscall: SlotSyscall } + the
+                      //   SlotSyscall alias — struct FROZEN by engine-seam SEAM-D11
+                      //   (amended 2026-07-03, engine-seam.md:545-570,547), which places
+                      //   it in the mp_engine_qcommon vm.cpp-mirror subsystem
+                      //   (engine-seam.md:489-490); the file follows this folder's
+                      //   one-type-per-file convention (mechanical, same rationale as rest)
   module_registry.rs  // ModuleRegistry + MAX_VM
 ```
+
+`EngineSlot`'s **type/shape** stays owned by engine-seam SEAM-D11 (this doc never
+redefines it); its **home crate** is `mp_engine_qcommon` — the same crate as
+`ModuleSlot` — and SEAM-D11 pins it to that crate's vm.cpp-mirror subsystem
+(engine-seam.md:489-490), which is exactly this `vm/` folder. By the same one-type-per-file
+placement this section already applies to `SlotId`/`ModuleSlot`/`ModuleRegistry`
+(mechanical, porting-rules §D12), it lands in `engine_slot.rs`, so `module_slot.rs`
+imports it crate-locally as `use crate::vm::engine_slot::EngineSlot` — the same-crate
+path the composed slot's `engine: EngineSlot` field names. (engine-seam.md
+does not itself pin the file; the placement is derived here only from its settled
+subsystem + the shared mechanical convention, so it settles nothing new.) Both the
+`EngineSlot` *type name* and its **fields** now resolve crate-locally: after the
+2026-07-03 injection amendment the fields are an opaque `ctx: *mut c_void` and a
+`SlotSyscall` fn pointer (both defined in `mp_engine_qcommon`), so there is no
+longer a cross-crate `*mut Engine` field target — **LOAD-Q11 is dissolved**
+(LOAD-D8's 2026-07-03 amendment; `engine-seam.md:545-570`), and
+`engine_slot.rs`/`module_slot.rs` compile with no uphill edge.
+
+**`EngineSlot`'s cross-module visibility (derived, no new decision — LOAD-D12k).**
+The frozen `EngineSlot` block (engine-seam SEAM-D11, `engine-seam.md:547`, restated
+verbatim in this doc) spells `struct EngineSlot { ctx: *mut c_void, syscall:
+SlotSyscall }` with **no** visibility modifier — under Rust's default privacy it and
+its fields would be reachable only inside `engine_slot.rs`. But this doc's own
+placement (above) requires it across the same-crate one-type-per-file split:
+`module_slot.rs` does `use crate::vm::engine_slot::EngineSlot` and embeds it as the
+`pub(crate) engine: EngineSlot` field (LOAD-D12f), and that slot's same-crate C-shim
+syscall trampoline (engine-seam SEAM-D11) reads its `ctx`/`syscall`. `EngineSlot`'s
+**struct-level visibility and both fields therefore take `pub(crate)`** — the exact
+LOAD-D12f mechanical convention already pinned for `ModuleSlot`/`SlotId`/`LoadedModule`
+("reachable across each crate's one-type-per-file split, no wider; ordinary Rust
+idiom, porting-rules §D12"). This is **forced** by the same-crate cross-module use
+this doc mandates, not chosen — exactly one visibility (`pub(crate)`) satisfies it,
+so it is a mechanical derivation identical to the file-placement derivation just
+above (this doc never redefines the engine-seam-owned *type/shape*; it only spells
+the visibility its own composition requires, derived from the shared convention —
+settling nothing new). `pub(crate)` here scopes to `mp_engine_qcommon`, the crate
+SEAM-D11 already homes `EngineSlot` in.
 
 `const MAX_VM: usize = 3` (`vm.cpp:28-29`) lives in `module_registry.rs` beside
 `ModuleRegistry`, mirroring oracle's `#define MAX_VM 3` sitting immediately beside
@@ -750,12 +929,49 @@ wasm32 for the sandbox). No separate wasm wrapper crates. The physical shell
 crate that carries each module's live exports + `ENGINE` + inbound `Dispatch`
 match is SEAM-D9's per-module-shell pattern; its identity is settled upstream by
 SEAM-D10 (`crates/jampgame`, resolving SEAM-Q8) — this doc only fixes that
-whichever crate it is, it selects the `native`/`wasm` arm above by its `--target`.
+whichever crate it is, it is compiled per `--target` (its live exports live in that
+shell's own `lib.rs`, not in an `abi_transport::entrypoints` arm — see the
+reconciliation amendment below).
+
+**Amendment (2026-07-03, LOAD-D4 ↔ SEAM-D9/D10 reconciliation).** The code block
+above is the pre-amendment sketch and is superseded on one point: the live
+`dllEntry`/`vmMain`/`GetGameAPI` exports and the `ENGINE: OnceLock<CEngine>` do
+**not** live in `abi_transport::entrypoints::native`. Engine-seam **SEAM-D9/SEAM-D10**
+(and its 2026-07-03 amendment, checkpoint-3 finding 14, `engine-seam.md:574-597,
+873-896`) place them in each **shell crate's `lib.rs`** (`crates/jampgame/src/lib.rs`,
+…), because a shared `abi_transport::entrypoints::native`'s per-`#[no_mangle]` export
+collides at cdylib link with the per-shell live exports and a shared module cannot
+carry a per-module `OnceLock`/`match` (`engine-seam.md:584-597`). This doc's own Scope
+already punts "which physical crate hosts each module shell (`ENGINE` + live exports)"
+to SEAM-D10 (§ Scope & non-goals) and the Slice-hooks section already anchors on that
+shell's `lib.rs`, so this is a reconciliation to this doc's own settled Scope, **not a
+new decision**. What **survives** of LOAD-D4 is its actual invariant — one crate per
+module, compiled per `--target`, native-only code (libloading/OS types) structurally
+confined so the wasm32 CI compile-gate stays a compiler-checked invariant — now
+realized by each **shell crate** compiling per `--target`, not by a `native`/`wasm`
+module split inside `abi_transport::entrypoints`. That `native`/`wasm` cfg-module split
+therefore does **not** survive as an empty/structural gate either: SEAM-D9 keeps
+**only** the raw C-ABI type aliases in `entrypoints.rs` (`engine-seam.md:879-880`); the
+native-vs-wasm engine selection is SEAM-D13's `cfg(target_arch = "wasm32")` on the
+single `type Engine` alias in the select crate (`engine-seam.md:971-975`), and the
+module-side `wasm32` `Execute<C>` backend's home is engine-seam **SEAM-Q11** (open
+there) — neither lives in `abi_transport::entrypoints`.
 
 ### SP linkage surface (DEC-07, LOAD-D5)
 
-Our SP **always** uses the console/Mac fully-static shape — `Sys_LoadCgame` /
-`GetProcAddress` are never exercised (dossier §4 conclusion):
+**None of this doc's MP loading apparatus has an SP dual.** SP has **no
+`VM_Create`**, so it grows **no** `load_module`, **no** per-slot `EngineSlot`
+injection, and **no** C-shim syscall trampoline (the whole `ModuleRegistry` /
+`ModuleSlot` machinery frozen above is MP-only): its `jagame` attach is the
+**direct, statically linked `GetGameAPI` call** (DEC-07; the settled SP access
+discipline is state-ownership **STATE-D12** — `GetGameAPI` fn-pointer table, no
+`vmMain`/`Dispatch` routing, `state-ownership.md:1617`). Raven's SP
+`SV_InitGameProgs` *does* wrap this in a fake `VM_Create("cl")` shim
+(`code/server/sv_game.cpp:676-679`, `## Raven ground truth`), but that shim is a
+dispatch wrapper over the same `game_library` handle, not a second load, and our
+port drops it (LOAD-D5). Our SP **always** uses the console/Mac fully-static
+shape — `Sys_LoadCgame` / `GetProcAddress` are never exercised (dossier §4
+conclusion):
 
 - **game** — reached through the `GetGameAPI` table factory
   (`code/game/g_public.h`); the only load-shaped entry, statically linked in our
@@ -850,6 +1066,20 @@ one source compiled twice keeps the module logic transport-agnostic and makes
 *Rejected:* separate wasm wrapper crates (doubles the shell surface for no gain);
 un-gated shared entrypoints (would let libloading/OS types break the wasm32
 build).
+*Amendment (2026-07-03, ↔ SEAM-D9/D10).* The "`abi_transport::entrypoints::native`
+vs `::wasm`" placement in this record is **retracted**. Engine-seam SEAM-D9/SEAM-D10
+(2026-07-03 amendment, `engine-seam.md:574-597,873-896`) place the live
+`dllEntry`/`vmMain`/`GetGameAPI` + `ENGINE: OnceLock<CEngine>` in each **shell crate's
+`lib.rs`**, not in an `abi_transport::entrypoints` arm — a shared arm's `#[no_mangle]`
+symbols collide at cdylib link with the per-shell live exports (`engine-seam.md:589-597`),
+and `abi-transport`'s `entrypoints.rs` keeps only the raw C-ABI type aliases
+(`engine-seam.md:879-880`). This doc's Scope already punts the shell's physical home
+to SEAM-D10 (§ Scope & non-goals), so SEAM-D9/D10 is authoritative here — **no new
+decision**. LOAD-D4's surviving core is unchanged: one crate per module, compiled per
+`--target`, native-only code confined so the wasm32 CI compile-gate stays a
+compiler-checked invariant — now realized per shell crate. See § Per-target entrypoint
+modules for the full reconciliation (including that the `native`/`wasm` cfg-module
+split does not survive as a structural gate).
 
 **LOAD-D5 — Per-slot registry, no current-module global; SP always static.** The
 engine-side module registry has **no** current-module global — per-slot state
@@ -919,7 +1149,7 @@ LOAD-Q3; session 2026-07-02.) The `vmTable[MAX_VM]` replacement `ModuleRegistry`
 engine-seam.md's state table) exposes a frozen slot API following `VM_Create`'s
 semantics (`vm.cpp:471` region): `load_module(&mut self, policy, name, syscall) ->
 SlotId` **reuses** a live slot whose module name matches **case-insensitively**
-(Raven `Q_stricmp`, `vm.cpp:486` / `q_shared.c:900`; the Rust faithful equal is
+(Raven `Q_stricmp`, `vm.cpp:486` / `game/q_shared.c:900`; the Rust faithful equal is
 `eq_ignore_ascii_case`, matching Q_stricmp's ASCII a–z fold, §A2), returned as-is
 with **no reload** (`vm.cpp:485-489`), else takes the **first free** slot
 (`vm.cpp:494`) and
@@ -933,7 +1163,7 @@ so porting-rules §A2 permits this shape. **Freeze scope:** this covers
 `ModuleSlot` (its `module: LoadedModule` payload; all Slice 0 needs); the
 transport-polymorphic slot **content** for `Static`/`Wasm` and the
 `ModuleTransport` field engine-seam places on `ModuleRegistry` (state table, line
-184) are **LOAD-Q9** (open, non-blocking for
+192) are **LOAD-Q9** (open, non-blocking for
 the NativeDll-only Slice 0), not frozen here. *Rejected:* modeling name-reuse or
 fatal-overflow differently (they are cited `VM_Create` behavior on the hosting
 path); a current-module global (LOAD-D5).
@@ -954,9 +1184,9 @@ with `ModuleRegistry.slots: [Option<ModuleSlot>; MAX_VM]`. `name` is the
 `vm.cpp:485-489` reuse-by-name key (the faithful `vm_s` mirror — oracle's
 `vm->name` sits in the *same* slot record as `dllHandle`/`entryPoint`,
 `vm_local.h:119,122-123`); `module` is the unchanged `LoadedModule { lib, entry }`;
-`engine` is the SEAM-D11 cell — the frozen `struct EngineSlot { engine: Cell<*mut
-Engine> }` (`engine-seam.md:445`), its **type owned by engine-seam**, this struct
-only holds the field. `load_module`'s reuse scan reads `slot.name`, and stamps it
+`engine` is the SEAM-D11 cell (its **type owned by engine-seam**, this struct only
+holds the field — see the 2026-07-03 amendment below for its injected shape).
+`load_module`'s reuse scan reads `slot.name`, and stamps it
 from the `name: &str` arg it already receives — closing the name-field hole **with
 authorization**. `LoadedModule` reverts to `{ lib, entry }` (name moved up to the
 slot); the free-slot test is `slots[i].is_none()` (oracle's `!vmTable[i].name[0]`,
@@ -964,6 +1194,33 @@ slot); the free-slot test is `slots[i].is_none()` (oracle's `!vmTable[i].name[0]
 reconciles LOAD-D8 with SEAM-D11 on one shared slot type. *Rejected:* a parallel
 `names: [Option<String>; MAX_VM]` (splits identity from payload); leaving the
 engine cell out of the slot (SEAM-D11 requires it per-slot).
+
+*Amended 2026-07-03 (`EngineSlot` load-time injection + `load_module` widening —
+reconciling this doc with engine-seam SEAM-D11's 2026-07-03 amendment,
+`engine-seam.md:545-570`; supersedes the round-3 `Cell<*mut Engine>` cell + the
+retired `EngineSlotGuard`/`enter` scope-guard).* The composed slot's `engine`
+field is now the **injected** shape `EngineSlot { ctx: *mut c_void, syscall:
+SlotSyscall }` (`engine-seam.md:547`), with
+`SlotSyscall = extern "C-unwind" fn(ctx: *mut c_void, args: *const isize) -> isize`
+(`engine-seam.md:545-546`). Two consequences for the frozen `ModuleRegistry` API:
+**(1)** `load_module` is **widened** to
+`load_module(&mut self, policy, name, syscall: RawSyscall, system_calls:
+SlotSyscall, ctx: *mut c_void) -> Option<SlotId>` — the two fn-pointer params are
+Raven duals: `syscall` is `Sys_LoadDll`'s trampoline argument handed to `dllEntry`
+(Raven `VM_DllSyscall`, `vm.cpp:518`), while `system_calls`+`ctx` are `VM_Create`'s
+`systemCalls` (`vm.cpp:471-472`), which `load_module` stores in the slot as
+`EngineSlot { ctx, syscall: system_calls }` (Raven `vm->systemCall = systemCalls`,
+`vm.cpp:506`). The `Option<SlotId>` return is unchanged (LOAD-D11's 2026-07-03
+amendment stands). **(2)** `restart` is **not** widened: Raven's native
+`VM_Restart` saves `systemCall` off the freed `vm_t` and reuses it
+(`vm.cpp:399-409`), so the reload reuses the slot's stored `EngineSlot` and
+LOAD-D12b's frozen `restart` signature stands. This injection is precisely what
+lets `mp_engine_qcommon` avoid naming the uphill `mp_engine_core::Engine` — it
+stores what it is **handed** at load, mirroring `VM_Create`'s stored `systemCalls`
+— **resolving LOAD-Q11** (Open questions → Resolved). *Rejected:* keeping the
+per-call `Cell<*mut Engine>` cell + guard (rustc surfaced the forbidden uphill
+edge, `engine-seam.md:555-557`); re-taking the injection on `restart` (Raven reuses
+the stored `systemCall`, `vm.cpp:399-409`).
 
 **LOAD-D9 — `SearchStep::FsPath` carries resolved paths; the policy is built at
 the `mp_engine_qcommon` call site (resolve-at-construction).** (Resolves LOAD-Q6;
@@ -1020,15 +1277,16 @@ in `crates/native/platform` (would pull `wasmtime` into the base platform tier);
 the `#[cfg(target_arch = "wasm32")]` guest arm of `abi-transport::entrypoints`
 (they bind a host `Memory`, not a guest type).
 
-**LOAD-D11 — `load_module`'s `ERR_FATAL` is a direct `com_error` panic; the return
-stays infallible.** (Resolves LOAD-Q7; session 2026-07-02.) Following the STATE-D7
+**LOAD-D11 — `load_module`'s `ERR_FATAL` is a direct `com_error` panic; not-found
+returns `None` (`-> Option<SlotId>`, per the 2026-07-03 amendment below).**
+(Resolves LOAD-Q7; session 2026-07-02.) Following the STATE-D7
 split shape (resolving STATE-Q4) settled and **FROZEN** in `state-ownership.md`
 (now in this doc's Standing context; the earlier receiver-ful `lifecycle.md`
 shape is superseded), `ModuleRegistry::load_module` reproduces Raven's slot-full
 `Com_Error(ERR_FATAL)` (`vm.cpp:499-500`) by calling the **receiverless**
 `mp_engine_qcommon::com_error` **directly** — its exact frozen signature is
 `pub fn com_error(level: ErrorLevel, msg: String) -> !` (state-ownership STATE-D7,
-`state-ownership.md:575`), invoked with the concrete fatal variant
+`state-ownership.md:719`), invoked with the concrete fatal variant
 `ErrorLevel::ERR_FATAL` — `ErrorLevel` aliases the ported `errorParm_t` enum whose
 first member is `ERR_FATAL` (`oracle/oracle/codemp/game/q_shared.h:451-457`;
 state-ownership STATE-D7 / lifecycle LIFE-D3 name the alias) — and a formatted `String`.
@@ -1060,6 +1318,55 @@ structurally-unreachable (cf. LOAD-D5's dropped `currentVM` clobber); `!module[0
 (empty) and `!systemCalls` (null syscall) are the reachable, reproduced ones.
 `load_module` keeps its infallible `-> SlotId`.
 
+*Amended 2026-07-03 (LOAD-Q10 resolution — supersedes the "infallible `-> SlotId`"
+return in the original record and its bad-parms amendment above).* `load_module`
+**returns `Option<SlotId>`**: a fresh-slot `sys_load_dll(...) -> None` (artifact not
+found on any policy step) yields **`None`**, mirroring `sys_load_dll`'s own `Option`
+contract. This is faithful (§A2), not a widened error channel invented for
+convenience: Raven's `VM_Create` **itself returns `NULL` non-fatally** on
+load-not-found (the adjacent QVM fallback is out of scope, DEC-05.4), and **the
+caller owns the fatal disposition** — which is **non-uniform per mode**
+(`SV_InitGameProgs`/`CL_InitUI` `ERR_FATAL`, `CL_InitCGame` `ERR_DROP`; see
+`## Raven ground truth`). The `SV_InitGameProgs`-equiv boot call site reproduces
+`gvm = VM_Create(...); if (!gvm) Com_Error(ERR_FATAL, "VM_Create on game failed")`
+(`sv_game.cpp:1750-1752`) by matching `None` and calling the receiverless `com_error`
+itself. **The two in-`VM_Create` `ERR_FATAL`s stay inside `load_module`** (bad-parms
+`vm.cpp:480-482`, slot-full `vm.cpp:499-500`) — Raven puts THOSE inside `VM_Create`,
+so LOAD-D11's original mechanism (direct receiverless `com_error`) is unchanged for
+them; only the caller-side not-found disposition moves out via the `Option`. This
+closes **LOAD-Q10**: the earlier "genuine fork = whether to amend FROZEN LOAD-D11"
+is settled by amending it (return widened to `Option<SlotId>`), and the earlier
+claim that the not-found case was "not derivable from oracle ground truth" is
+**withdrawn** (oracle derives it at the caller, `sv_game.cpp:1750-1752`). *Because* a
+per-mode fatal split cannot be reproduced by a single internal `ERR_FATAL`, so the
+`None` must surface to the caller — exactly Raven's own contract. *Rejected:* a
+uniform internal `ERR_FATAL` on not-found (diverges from cgame's `ERR_DROP`); a
+`Result<SlotId, E>` (the disposition needs no error payload — `None` is Raven's
+`NULL`, and the caller re-derives the level per mode).
+
+*Amended 2026-07-03 (round-6 stamping — bad-parms guard corrected; closes the
+round-5 escalation; supersedes the `|| syscall.is_null()` disjunct in the
+2026-07-02 bad-parms amendment above).* The 2026-07-02 amendment reproduced Raven's
+`if ( !module || !module[0] || !systemCalls )` guard (`vm.cpp:480-482`) as
+`if name.is_empty() || syscall.is_null()`, mapping `!systemCalls` to
+`syscall.is_null()`. That mapping is **wrong** and is dropped: `syscall: RawSyscall`
+is `Sys_LoadDll`'s trampoline argument (Raven's `VM_DllSyscall`, `vm.cpp:518`), a
+**different** Raven parameter than `VM_Create`'s `systemCalls`. `systemCalls`' actual
+Rust dual is the settled `system_calls: SlotSyscall` (LOAD-D8's 2026-07-03 injection
+amendment), a **non-nullable** Rust fn pointer — exactly the class of Raven's
+`!module` disjunct that this decision already drops for a `&str` (both are
+null-pointer tests with no reachable Rust dual). The guard is therefore
+**`if name.is_empty()` only** — the sole reachable disjunct is `!module[0]` (empty
+name). `syscall: RawSyscall` is **not** guarded, matching Raven, which does not test
+its `Sys_LoadDll` trampoline argument either (`vm.cpp:480-482` guards only `module`
+and `systemCalls`). Observable behavior is identical: the "bad parms" fatal never
+fires in legitimate use, and the removed `syscall.is_null()` branch tested a
+parameter Raven never guards. This is faithful-first (§A2) — a structurally-unreachable
+disjunct dropped like `!module` and LOAD-D5's `currentVM` clobber — **not** a new
+choice. *Rejected:* keeping `syscall.is_null()` relabeled as defensive-Rust
+(speculative divergence, §A2); an `Option<SlotSyscall>` ceremony to make
+`systemCalls` nullable (invents a null state Raven's non-null fn pointer never has).
+
 **LOAD-D12 — Mechanical closes (no forks).** (Session 2026-07-02; **(f)** added
 round-3 2026-07-02.) Mechanical hole-closes, none a new design choice: **(a)** the relocated `RawSyscall` /
 `RawVmMain` / `RawDllEntry` aliases (LOAD-D6) are `extern "C-unwind"` per
@@ -1087,6 +1394,31 @@ plus `ModuleSlot`'s `name`/`module`/`engine` (constructed by `module_registry.rs
 within `mp_engine_qcommon`) — reachable across each crate's one-type-per-file split,
 no wider; ordinary Rust idiom (porting-rules §D12), pinned only so porters spell it
 uniformly. *Rejected:* n/a — mechanical, no alternatives.
+
+*Amended 2026-07-03 (round-5 mechanical sweep, skeleton-seed findings — no forks).*
+**(g)** `SlotSyscall` (the injected syscall fn-pointer alias, `engine-seam.md:545-546`)
+and `c_void` are named crate-locally in `mp_engine_qcommon` by the widened
+`load_module` and the `EngineSlot` field (LOAD-D8 2026-07-03 amendment); the C-shim
+syscall trampoline whose address is handed as `syscall: RawSyscall` is engine-seam
+SEAM-D11's committed `vm/game_syscall_trampoline.c` (`cc` build dep confined to
+`mp_engine_qcommon`, `engine-seam.md:527-543`), cross-referenced, not owned here.
+**(h)** Sibling-doc status annotations are current: `lifecycle.md` and
+`state-ownership.md` **exist on disk** (DRAFT / FROZEN sections as cited) — no stale
+"(pending)" annotation remains (the sole surviving "pending" is the still-open
+LOAD-Q1 macOS-suffix golden). **(i)** The cross-doc deferral pointers for the
+registry attachment (STATE-D10 / LIFE-Q5, `Engine.common.modules`) and the
+`SV_InitGameProgs`-equiv call site (SEAM-D7 + `lifecycle.md:69-70` mutual deferral,
+LOAD-Q12) were re-verified precise under the full sibling reading set; text
+unchanged. *Rejected:* n/a — mechanical.
+
+*Amended 2026-07-03 (round-6 dry-run hole-close — derived visibility; no forks).*
+**(k)** `EngineSlot`'s
+struct-level and `ctx`/`syscall` field visibility is **derived** `pub(crate)` — forced
+by the same-crate `module_slot.rs` `use` + C-shim trampoline read this doc mandates,
+under the identical LOAD-D12f one-type-per-file convention (§ Per-file placement,
+"EngineSlot's cross-module visibility"). This spells only the visibility the
+composition requires; the engine-seam-owned SEAM-D11 *type/shape* is unchanged.
+*Rejected:* n/a — mechanical.
 
 The bad-parms fatal (the second `VM_Create` `ERR_FATAL`, `vm.cpp:480-482`) is covered by LOAD-D11's amendment above
 (added to `## Raven ground truth` and LOAD-D11's enumeration, reproduced via the
@@ -1121,10 +1453,11 @@ file/function per commit):
    `base`/`gamedir` and any empty-`fs_cdpath` step is omitted at construction, so
    the empty-cdpath skip is golden-tested at the construction layer and
    `sys_load_dll` never reads a cvar. Naming-table goldens assert `"jampgame" →
-   jampgamex86.dll` (Win32) / `jampgamei386.so` (Unix) per platform; the macOS
-   naming golden is **pending LOAD-Q1** (its exact suffix is unresolved, so no
-   macOS `ModuleNaming` is constructed yet — LOAD-Q1), and Slice 0's win/linux
-   targets do not exercise it.
+   jampgamex86.dll` (Win32, `suffix: Some("x86.dll")`) / `jampgamei386.so` (Unix,
+   `Some("i386.so")`) per platform; the macOS naming golden is **pending LOAD-Q1**
+   (its exact suffix is unresolved, so no macOS `ModuleNaming` is constructed yet —
+   `suffix` would be `None`, LOAD-Q1), and Slice 0's win/linux targets do not
+   exercise it.
 2. **Live-peer** (DEC-09.2, DEC-05.2): our module cdylib (`…x86.dll`,
    i686-pc-windows) loaded by an **unmodified OpenJK/retail** engine — the
    `dllEntry`+`vmMain` handshake round-trip against a real host (matrix rows
@@ -1154,21 +1487,31 @@ file/function per commit):
   `crates/native/platform` (LOAD-D6, resolving LOAD-Q4); and the engine-side
   `SV_InitGameProgs`-equiv boot — where the `sys_load_dll` call site lives —
   registers the loaded `jampgame` slot through the frozen
-  `ModuleRegistry::load_module -> SlotId` (LOAD-D8, resolving LOAD-Q3). The
+  `ModuleRegistry::load_module(policy, name, syscall, system_calls, ctx) ->
+  Option<SlotId>` (LOAD-D8, resolving LOAD-Q3; return widened by LOAD-D11's
+  2026-07-03 amendment, params widened by LOAD-D8's 2026-07-03 injection amendment).
+  The slot's `engine: EngineSlot` cell — previously the LOAD-Q11 compilability
+  blocker — is now the **injected** `EngineSlot { ctx, syscall: system_calls }`
+  built from `load_module`'s own params, so `mp_engine_qcommon` names no uphill
+  `Engine` and `engine_slot.rs`/`module_slot.rs` compile standalone (**LOAD-Q11
+  resolved**, LOAD-D8's 2026-07-03 amendment). The
   pure-server `Sys_UnpackDLL` pre-step is stubbed with a `//TODO: Port` marker
-  (LOAD-D7) — Slice 0 is non-pure and does not exercise it. Two Slice-0 caveats
-  remain: the `SV_InitGameProgs`-equiv **boot call site**
-  (crate/signature/trigger) is SEAM-D7 + `lifecycle.md`'s (pending), **owned
-  outside this doc / open** — the loader surface builds standalone but end-to-end
-  wiring waits on it (Referenced-but-owned-elsewhere note). The `FsPath`
-  cvar-resolution path the jampgame policy relies on is now **settled (LOAD-D9)** —
-  the `mp_engine_qcommon` caller plants resolved values (Slice 0 uses
-  hardcoded/CLI paths pre-B1), so it no longer blocks Slice 0. **A third caveat:**
-  `load_module`'s fresh-slot *not-found* branch has no compilable body until
-  **LOAD-Q10** resolves (see its doc-comment) — the loader/registry
-  type/signature/golden surface builds standalone (Verification 1 exercises
-  `sys_load_dll`), but a Slice-0 **end-to-end** boot that must handle a missing
-  `jampgame` waits on LOAD-Q10, alongside the boot call site above.
+  (LOAD-D7) — Slice 0 is non-pure and does not exercise it. **LOAD-Q10 is now
+  resolved** (LOAD-D11 amended 2026-07-03): `load_module` returns
+  `Option<SlotId>`, so its fresh-slot *not-found* branch has a compilable body
+  (`None`) and the missing-`jampgame` path is expressible — the boot call site
+  reproduces Raven's `if (!gvm) Com_Error(ERR_FATAL, …)` (`sv_game.cpp:1750-1752`)
+  by matching that `None`. One caveat remains: the `SV_InitGameProgs`-equiv load
+  call site's **trigger** is settled — map spawn (`SV_SpawnServer → SV_InitGameProgs`,
+  post-Slice-0, `lifecycle.md:82,222`), not engine boot (Slice-0 `Com_Init` only
+  default-constructs the empty registry at step-30 `VM_Init`) — but its own
+  **crate/signature** (and *where* that `None`-match lives) is pinned by **neither**
+  this doc nor lifecycle.md (they mutually defer, `lifecycle.md:69-70`): **LOAD-Q12**,
+  **owned outside this doc**. The loader surface builds standalone; end-to-end wiring
+  waits on it (Referenced-but-owned-elsewhere note). The `FsPath` cvar-resolution path the
+  jampgame policy relies on is **settled (LOAD-D9)** — the `mp_engine_qcommon`
+  caller plants resolved values (Slice 0 uses hardcoded/CLI paths pre-B1), so it no
+  longer blocks Slice 0.
 - **Client slices** add cgame/ui loading (same MP policy, same drop+recreate
   cadence, dossier §1) and their registry slots.
 - **SP slice** wires the `GetGameAPI` table + vmachine shim dispatch — no loader
@@ -1187,25 +1530,25 @@ file/function per commit):
   §3), so the precise base string — whether the module name carries an arch infix
   (e.g. OpenJK's `…arm64.dylib` / `…x86_64.dylib`) or a bare `…​.dylib` — cannot
   be derived from oracle ground truth and must match whatever OpenJK-style host
-  we intend to interoperate with (a DEC-05.2 interop detail). Until resolved,
-  **no macOS `ModuleNaming` value is constructed at all**: the frozen `suffix:
-  &'static str` is a mandatory, non-`Option` field, so it is never *left* "unset" —
-  the macOS naming arm is simply **not written yet** (a `//TODO: Port <macOS module
-  suffix>` + `// Source:` LOAD-Q1 marker stands in that macOS-only construction arm,
-  per porting-rules §14, and Slice 0's i686-windows / native-Linux targets never
-  compile it). Slice 0 constructs only the Win32 (`"x86.dll"`) and Unix
-  (`"i386.so"`) naming values; when the macOS host is wired, LOAD-Q1's resolution
-  supplies the real literal. The frozen `suffix: &'static str` type is unchanged
-  (not widened to `Option`) and the Win32/Unix entries and the whole native-parity
-  path are unaffected. **Owner:** resolved by verifying against the OpenJK-style
-  host the module targets, when the macOS host is wired; not needed for Slice 0
-  (i686-windows / native-Linux only).
+  we intend to interoperate with (a DEC-05.2 interop detail). `ModuleNaming.suffix`
+  was **widened to `Option<&'static str>`** (mechanical, 2026-07-03) so the macOS
+  arm is representable as **`None`** — "suffix not yet resolved" — rather than
+  forcing a placeholder literal into a mandatory field. Until LOAD-Q1 resolves, no
+  macOS `ModuleNaming` value is constructed for Slice 0 at all: a `//TODO: Port
+  <macOS module suffix>` + `// Source:` LOAD-Q1 marker stands in that macOS-only
+  construction arm (porting-rules §14), and Slice 0's i686-windows / native-Linux
+  targets never compile it. Slice 0 constructs only the Win32 (`Some("x86.dll")`)
+  and Unix (`Some("i386.so")`) naming values; when the macOS host is wired,
+  LOAD-Q1's resolution supplies the real literal (`Some("…")`). The Win32/Unix
+  entries and the whole native-parity path are unaffected by the widening. **Owner:**
+  resolved by verifying against the OpenJK-style host the module targets, when the
+  macOS host is wired; not needed for Slice 0 (i686-windows / native-Linux only).
 
 - **LOAD-Q9 — Transport-polymorphic slot content for `Static` / `Wasm` modules.**
   The frozen `ModuleRegistry.slots: [Option<ModuleSlot>; MAX_VM]` (LOAD-D8 round-3)
   holds a `ModuleSlot` whose `module: LoadedModule` payload is **NativeDll-only**
   (`libloading::Library` + `RawVmMain`) — all Slice 0 exercises. engine-seam (state
-  table, line 184) makes `ModuleTransport { NativeDll | Static | Wasm }` a **field
+  table, line 192) makes `ModuleTransport { NativeDll | Static | Wasm }` a **field
   of** `ModuleRegistry`, and DEC-05 / LOAD-D2 require the registry to also hold
   `Static` (no library handle) and `Wasm` (a wasmtime `Instance`, not a
   `libloading::Library`) modules — but neither this doc nor any cited sibling
@@ -1219,32 +1562,65 @@ file/function per commit):
   compiles today without it). **Owner:** design session, before the first `Static`
   (client / SP slices) or `Wasm` (post-native-parity, DEC-05.5) registry slot lands.
 
-- **LOAD-Q10 — `load_module`'s not-found disposition (blocks the `load_module`
-  body).** When a *fresh* slot's `sys_load_dll(...) -> Option<LoadedModule>` returns
-  `None`, its contract delegates "the caller decides fatal-vs-skip per mode." Oracle
-  **does** define that disposition (correcting the earlier claim that it was not
-  oracle-derivable), and it is **non-uniform**: `VM_Create` returns `NULL`
-  non-fatally on load-not-found (the QVM fallback below it is out of scope,
-  DEC-05.4), and each caller `Com_Error`s *differently* — `SV_InitGameProgs`
-  `ERR_FATAL` (`sv_game.cpp:1750-1752`), `CL_InitUI` `ERR_FATAL`
-  (`cl_ui.cpp:1481-1483`), `CL_InitCGame` `ERR_DROP` (`cl_cgame.cpp:1772-1774`).
-  Faithfully reproducing that per-mode split (§A2) requires `load_module` to
-  **surface the `None` to its caller**, which **directly contradicts its FROZEN
-  infallible `-> SlotId`** (LOAD-D11): LOAD-D11's own `com_error`-inside mechanism
-  (used for the slot-full and bad-parms fatals) **cannot** be reused here, because a
-  uniform internal `ERR_FATAL` would diverge from cgame's `ERR_DROP`. So the genuine
-  fork is **not the disposition** (oracle-derivable) but **whether to amend FROZEN
-  LOAD-D11** — widen `load_module`'s return to carry the `None`, or move the fatal to
-  the caller. That is a design decision touching a frozen record, **beyond the
-  round-3 session inputs**, so per doc-standards §7 it escalates to a session rather
-  than self-resolving. **Blocking scope:** no compiling body can be written for
-  `load_module`'s fresh-slot `None` branch until this resolves (see the `load_module`
-  doc-comment) — a marker comment cannot yield the `SlotId` the branch must return,
-  and the forbidden `todo!()`/panic/`Result` would pre-empt the decision. The
-  standalone loader/registry **type/signature/golden** build (Verification 1) is
-  unaffected (it exercises `sys_load_dll`, not this branch). **Owner:** design
-  session, before the Slice-0 boot call site (SEAM-D7 / lifecycle.md) drives a real
-  load; the resolution likely amends LOAD-D11.
+- **LOAD-Q12 — The `SV_InitGameProgs`-equiv load call site's crate/signature
+  (mutual-deferral ownership).** *When* the game module loads is settled by
+  lifecycle.md — map spawn (`SV_SpawnServer → SV_InitGameProgs`, post-Slice-0), not
+  engine boot (`lifecycle.md:82,187-215,222`; Slice-0 `Com_Init` only builds the empty
+  registry at step-30 `VM_Init`). What is **unsettled** is the our-engine
+  `SV_InitGameProgs`-equiv function's own **crate + exact signature** (and where the
+  `load_module -> Option<SlotId>` `None`-match reproducing `if (!gvm)
+  Com_Error(ERR_FATAL, …)`, `sv_game.cpp:1750-1752`, physically lives): lifecycle.md
+  **punts `SV_InitGameProgs` module-load mechanics back to this doc**
+  (`lifecycle.md:69-70`) while this doc's Scope punts the call site to lifecycle.md +
+  engine-seam **SEAM-D7** — so neither doc owns it. Not a Slice-0 blocker: SEAM-D7's
+  Slice-0 model hosts our module **inside a real/OpenJK engine** (which supplies the
+  boot sequencing), so the *our-engine* boot function is a later-slice deliverable;
+  the loader/registry surface builds standalone (Verification 1). **Owner:** a design
+  session resolving the mutual deferral (engine boot-sequencing home), before the
+  first our-engine-hosted MP boot slice.
+
+- **LOAD-Q13 — Where the release-build missing-export `ERR_FATAL` physically fires
+  (mechanism; contract settled).** The user-settled *contract* (§ Load / unload /
+  restart amendment 2026-07-03, item 18): a **found library missing `vmMain`/`dllEntry`**
+  raises `com_error(ERR_FATAL, …)` in `cfg(not(debug_assertions))` (release) and keeps
+  `com_printf` + `None` in debug — faithful to `unix_main.c:431-436`'s `#ifdef NDEBUG`
+  split (porting-rules §20). What is **unsettled** is the *mechanism*: `sys_load_dll`
+  lives in `crates/native/platform` (tier −1), which **cannot name
+  `mp_engine_qcommon::com_error`** (uphill edge — the checkpoint-2 `EngineSlot`-injection
+  class). Candidates, none picked: (a) an **injected fatal hook** handed to the loader at
+  load time (à la the settled `systemCalls`/`ctx` injection); (b) a **platform-local
+  sys-fatal** primitive in `native/platform` (print + `exit`, no `com_error`); or (c) a
+  **three-state loader return** (found / not-found / found-but-bad-export) with the
+  cfg-gated `com_error` raised by the caller in `mp_engine_qcommon::load_module`. Does
+  **not** change the frozen `sys_load_dll` signature — only where the release-fatal is
+  emitted. **Owner:** slice-0 wiring (checkpoint-5 finding 23); not a Slice-0 blocker
+  (SEAM-D7's Slice 0 is hosted inside a real engine, which owns the loader).
+
+**Resolved (2026-07-03 session, skeleton-seed findings — supersession recorded in
+LOAD-D8's 2026-07-03 amendment):** LOAD-Q11 → **EngineSlot load-time injection**.
+The per-slot cell no longer holds a typed `Cell<*mut Engine>` that would force the
+forbidden `mp_engine_qcommon → mp_engine_core::Engine` uphill edge; it holds the
+**injected** `EngineSlot { ctx: *mut c_void, syscall: SlotSyscall }`
+(`engine-seam.md:545-570,547`) — an opaque `ctx` + syscall fn pointer handed in at
+module-load, mirroring Raven's `VM_Create` storing its received `systemCalls`
+argument (`vm.cpp:471-472,506`). `mp_engine_qcommon` therefore never names the
+engine aggregate (`engine-seam.md:555-557`), the cell's construction is settled
+(built at `load_module` from its own `ctx`/`system_calls` params), and
+`engine_slot.rs`/`module_slot.rs` compile with no uphill edge — the exact
+compilability blocker LOAD-Q11 named. The earlier "no cited doc settles how the
+below-facade crate names `*mut Engine`" framing is withdrawn: it no longer names one.
+
+**Resolved (2026-07-03 session), now a Decision amendment:** LOAD-Q10 →
+**LOAD-D11** (2026-07-03 amendment). `load_module` returns **`Option<SlotId>`**: a
+fresh-slot not-found (`sys_load_dll(...) -> None`) yields `None`, mirroring
+`sys_load_dll`'s own `Option` contract, and the **caller** owns the non-uniform
+fatal disposition — faithful to Raven, where `VM_Create` returns `NULL`
+non-fatally and each caller `Com_Error`s differently (`SV_InitGameProgs`/`CL_InitUI`
+`ERR_FATAL`, `CL_InitCGame` `ERR_DROP`; `sv_game.cpp:1750-1752`,
+`cl_ui.cpp:1479-1481`, `cl_cgame.cpp:1772-1774`). The earlier "not derivable from
+oracle ground truth" framing is withdrawn (oracle derives it at the caller). The two
+in-`VM_Create` `ERR_FATAL`s (bad-parms, slot-full) stay internal to `load_module`
+per the original LOAD-D11 mechanism.
 
 **Resolved (2026-07-02 escalation session), now Decisions:** LOAD-Q2 → **LOAD-D7**
 (`Sys_UnpackDLL` in scope, deferred to a post-B2 MP-server slice, Slice 0 stubs
@@ -1257,24 +1633,34 @@ LOAD-Q4 → **LOAD-D6** (raw ABI aliases relocate to `crates/native/platform`,
 `mp_engine_qcommon` call site, `native/platform` stays cvar-free); LOAD-Q5 →
 **LOAD-D10** (host-side wasm types live in `crates/mp/engine/wasm-host`); LOAD-Q7
 → **LOAD-D11** (`load_module`'s `ERR_FATAL` is a direct receiverless `com_error`
-panic, return stays infallible); LOAD-Q8 → **LOAD-D12b** (`RestartKind` threaded
+panic; the return was **later widened to `Option<SlotId>`** by the 2026-07-03
+amendment resolving LOAD-Q10); LOAD-Q8 → **LOAD-D12b** (`RestartKind` threaded
 through `ModuleRegistry::restart` as a caller-supplied `kind` parameter).
 
 **Referenced but owned elsewhere (not re-opened here):** the `GetModuleAPI`
 OpenJK-native handshake contract (**SEAM-Q7**) remains open in `engine-seam.md`.
 The raw inbound syscall trampoline a Rust engine hands a hosted DLL (**SEAM-Q9**)
-is now **resolved** upstream as **SEAM-D11** (one `extern "C-unwind"` trampoline
-per module slot over a per-slot `*mut Engine` cell); the module-shell crate
+is now **resolved** upstream as **SEAM-D11** (one `extern "C-unwind"` C-shim
+trampoline per module slot reading a per-slot **injected** `EngineSlot { ctx,
+syscall }` — amended 2026-07-03, `engine-seam.md:545-570`; the injection is what
+lets `mp_engine_qcommon` avoid the uphill `Engine` name, resolving LOAD-Q11); the
+module-shell crate
 identity + dependency edges (**SEAM-Q8**) is **resolved** upstream as **SEAM-D10**
 (`crates/jampgame` thin cdylib shell), which this doc's Slice 0 hooks anchor on.
 This doc's matrix and seam depend on those resolutions but does not settle them.
 
-The **Slice 0 boot call site** — where `ModuleRegistry::load_module` is actually
-invoked during MP dedicated boot (the `SV_InitGameProgs`-equiv function,
-`oracle/oracle/codemp/server/sv_game.cpp:1750`: its Rust crate, signature, and
-boot trigger) — is likewise owned by engine-seam **SEAM-D7** and
-`docs/architecture/lifecycle.md` (**pending**; Scope non-goal, *when* a load
-fires), **not** frozen here. The loader/registry surface this doc freezes is
-standalone-**buildable** (Verification 1), but driving Slice 0 **end-to-end** is a
-hard prerequisite on that call site landing upstream; this doc **restates** the
-dependency rather than inventing the call site.
+The **load call site** — where `ModuleRegistry::load_module` is actually invoked
+(the `SV_InitGameProgs`-equiv function, `oracle/oracle/codemp/server/sv_game.cpp:1750`)
+— splits into a *settled* and an *unsettled* half. Its **trigger** is settled by
+lifecycle.md (DRAFT, exists): the game module loads at **map spawn**
+(`SV_SpawnServer → SV_InitGameProgs`, **post-Slice-0**), not at engine boot — Slice-0
+`Com_Init` only default-constructs the empty registry at step-30 `VM_Init`
+(`lifecycle.md:82,187-215,222`). Its **crate/signature** (and where the `None`-match
+lives) is settled by **neither** doc: lifecycle.md punts `SV_InitGameProgs` module-load
+mechanics **back** to this doc (`lifecycle.md:69-70`) while this doc's Scope punts the
+call site to lifecycle.md + SEAM-D7 — a mutual deferral tracked as **LOAD-Q12**. The
+loader/registry surface this doc freezes is standalone-**buildable** (Verification 1);
+driving an end-to-end our-engine boot waits on LOAD-Q12. (SEAM-D7's Slice-0 model
+hosts our module **inside a real/OpenJK engine**, so the *our-engine*
+`SV_InitGameProgs`-equiv is not itself a Slice-0 deliverable — LOAD-Q12 is
+non-blocking for Slice 0.)
