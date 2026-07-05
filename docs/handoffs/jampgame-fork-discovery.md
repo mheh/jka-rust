@@ -174,6 +174,23 @@ parks trace to the generated signatures not carrying already-settled rulings.
     added here to record the disposition where the residual data-table port
     commits.)
 
+29. **`g_weapon.c` fire-time scratch vec3s.** RULING: BLESSED (user, 2026-07-05):
+    the file-statics `forward`, `vright`, `up`, `muzzle` (`g_weapon.c:13-14`) —
+    fire-time scratch `vec3_t`s shared across `WP_Fire*`/`CalcMuzzlePoint` —
+    become `GameGlobals` fields per ruling 24's standard rule (file-scope
+    mutable → `GameWorld` globals). `WP_Fire*` fns access them via
+    `(*ctx.world).globals.<name>`; functions that declare *locals* of the same
+    name keep the locals (only the unresolved bare-static references move).
+30. **ctx-less `strap_*` bg-boundary wrappers.** RULING: BLESSED (user,
+    2026-07-05): the `strap_G2API_*` family (`g_strap.rs`) are ctx-less
+    bg-boundary wrappers — called from bg logic (`bg_pmove.rs`) without a
+    `GameContext` — so they reach the engine through a seam-scoped
+    `OnceCell`/`OnceLock<...>` engine-handle cell in the strap/seam module,
+    initialized exactly once by the ABI entrypoint that owns the engine
+    (`g_init_game`, GAME_INIT). §D11 seam confinement applies (this mirrors
+    Raven's global syscall pointer). All ctx-taking code continues to use
+    `ctx.engine`; the cell is ONLY for the ctx-less boundary fn-ptrs.
+
 ## Already covered — no decision (bless-the-rule appendix)
 
 vec3_t out-params (§C7; VectorCopy ×1358), qboolean returns → bool ×652
