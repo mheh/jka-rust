@@ -47,6 +47,14 @@ impl Rng {
         }
     }
 
+    /// Read-only observation of the current `holdrand` state — the parity
+    /// tripwire dumped as `rng=%08x` by the pmove differential (a mid-Pmove draw
+    /// moves it). Observes only; production behavior is unchanged.
+    /// Source: `oracle/oracle/codemp/game/q_math.c:1432`
+    pub fn holdrand(&self) -> u32 {
+        self.holdrand
+    }
+
     /// Raven `Rand_Init` — reseed the generator.
     /// Source: `oracle/oracle/codemp/game/q_math.c:1434-1437`
     pub fn Rand_Init(&mut self, seed: c_int) {
