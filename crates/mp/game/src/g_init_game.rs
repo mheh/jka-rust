@@ -18,6 +18,9 @@ use crate::world::GameContext;
 /// Source: `oracle/oracle/codemp/game/g_main.c:897,925-927`
 pub fn g_init_game(ctx: GameContext<'_>, args: GameInitArgs) {
     let _ = args;
+    // Ruling 30: arm the ctx-less `strap_*` seam engine cell from the GAME_INIT
+    // entrypoint that owns the engine, before any bg logic can call `strap_*`.
+    crate::g_strap::init_strap_engine(ctx.engine);
     // G_Printf banner block (g_main.c:925-927). GAMEVERSION = "basejka"
     // (g_local.h:29); the __DATE__ line carries the port's marker text.
     trap::Printf(
