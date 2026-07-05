@@ -1599,7 +1599,7 @@ pub fn WPConstantRoutine(
                 && ((*bs).cur_ps.fd.forceJumpCharge
                     < (forceJumpStrength
                         [(*bs).cur_ps.fd.forcePowerLevel[FP_LEVITATION as usize] as usize]
-                        - 100) as f32
+                        - 100.0)
                     || (*bs).cur_ps.groundEntityNum == ENTITYNUM_NONE)
             {
                 // alright, let's jump
@@ -1643,7 +1643,7 @@ pub fn WPConstantRoutine(
             if (*bs).cur_ps.fd.forceJumpCharge
                 < (forceJumpStrength
                     [(*bs).cur_ps.fd.forcePowerLevel[FP_LEVITATION as usize] as usize]
-                    - 100) as f32
+                    - 100.0)
             {
                 (*bs).forceJumpChargeTime = lt + 200;
             }
@@ -1781,6 +1781,10 @@ pub fn BotTrace_Strafe(
 ) -> c_int {
     // PORT-NOTE(DEFAULT_MAXS_2/STRAFEAROUND_*): these consts have no shared
     // ported home yet; referenced as cited and reported as missing.
+    // Raven `DEFAULT_MAXS_2` (`bg_public.h:41-42`); file-local per the
+    // `g_navnew.rs`/`g_mover.rs`/`ai_wpnav.rs` precedent (f32, matches the
+    // vec3_t component it seeds).
+    const DEFAULT_MAXS_2: f32 = 40.0;
     unsafe {
         let localPlayerMins: vec3_t = [-15.0, -15.0, /*DEFAULT_MINS_2*/ -8.0];
         let localPlayerMaxs: vec3_t = [15.0, 15.0, DEFAULT_MAXS_2];

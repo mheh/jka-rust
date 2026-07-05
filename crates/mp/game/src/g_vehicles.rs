@@ -1841,6 +1841,7 @@ pub fn G_VehicleDamageBoxSizing(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2843-2924`
 pub fn G_FlyVehicleImpactDir(
+    ctx: GameContext<'_>,
     veh: *mut gentity_t,
     trace: *mut trace_t,
 ) -> c_int {
@@ -2156,6 +2157,7 @@ pub fn G_VehicleSetDamageLocFlags(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3102-3188`
 pub fn G_FlyVehicleDestroySurface(
+    ctx: GameContext<'_>,
     veh: *mut gentity_t,
     surface: c_int,
 ) -> qboolean {
@@ -2258,6 +2260,7 @@ pub fn G_FlyVehicleDestroySurface(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3190-3259`
 pub fn G_FlyVehicleSurfaceDestruction(
+    ctx: GameContext<'_>,
     veh: *mut gentity_t,
     trace: *mut trace_t,
     magnitude: c_int,
@@ -2272,7 +2275,7 @@ pub fn G_FlyVehicleSurfaceDestruction(
         let vp = (*veh).m_pVehicle as *mut Vehicle_t;
         let vi = (*vp).m_pVehicleInfo as *mut vehicleInfo_t;
 
-        let mut impactDir = G_FlyVehicleImpactDir(veh, trace);
+        let mut impactDir = G_FlyVehicleImpactDir(ctx, veh, trace);
         let mut alreadyRebroken = qfalse;
         // Raven declares `deathPoint = -1` before the `anotherImpact` label; the
         // goto-loop keeps the prior value when a `default` impactDir leaves it
@@ -2306,7 +2309,7 @@ pub fn G_FlyVehicleSurfaceDestruction(
                 }
                 if (*veh).locationDamage[impactDir as usize] >= deathPoint {
                     // do it
-                    if G_FlyVehicleDestroySurface(veh, impactDir) != qfalse {
+                    if G_FlyVehicleDestroySurface(ctx, veh, impactDir) != qfalse {
                         // actually took off a surface
                         G_VehicleSetDamageLocFlags(veh, impactDir, deathPoint);
                     }
@@ -2316,7 +2319,7 @@ pub fn G_FlyVehicleSurfaceDestruction(
             }
 
             if alreadyRebroken == qfalse {
-                let secondImpact = G_FlyVehicleImpactDir(veh, trace);
+                let secondImpact = G_FlyVehicleImpactDir(ctx, veh, trace);
                 if impactDir != secondImpact {
                     // can break off another piece in this same impact.. but only
                     // break off up to 2 at once

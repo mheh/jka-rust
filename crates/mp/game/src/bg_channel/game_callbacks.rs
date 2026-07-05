@@ -53,6 +53,16 @@ pub trait GameCallbacks {
     /// Source: `oracle/oracle/codemp/game/g_local.h:1063`
     fn add_event(&mut self, entNum: c_int, event: c_int, eventParm: c_int);
 
+    /// Reads `g_entities[entNum].s.legsAnim` — the `#ifdef QAGAME` branch of
+    /// Raven `BG_StartLegsAnim` that only compiles on the game side.
+    /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2610-2616`
+    fn entity_legs_anim(&self, entNum: c_int) -> c_int;
+
+    /// Reads `g_entities[entNum].s.torsoAnim` — the `#ifdef QAGAME` branch of
+    /// Raven `BG_StartTorsoAnim` that only compiles on the game side.
+    /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2680-2683`
+    fn entity_torso_anim(&self, entNum: c_int) -> c_int;
+
     /// Raven `G_Alloc(size)` — the game-tier bump allocator (distinct from the
     /// bg `BG_Alloc` pool). Returns the address of the reserved block.
     /// Source: `oracle/oracle/codemp/game/g_local.h:1368`

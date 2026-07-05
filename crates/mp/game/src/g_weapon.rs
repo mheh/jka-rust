@@ -281,9 +281,9 @@ pub fn WP_FireBryarPistol(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qb
         if altFire != qfalse {
             let mut boxSize: f32 = 0.0;
 
-            count = ((*ctx.world).level.time
-                - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime)
-                / BRYAR_CHARGE_UNIT;
+            count = (((*ctx.world).level.time
+                - (*((*ent).client as *mut gclient_t)).ps.weaponChargeTime) as f32
+                / BRYAR_CHARGE_UNIT) as c_int;
 
             if count < 1 {
                 count = 1;
@@ -5740,6 +5740,7 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
             None => core::ptr::null_mut(),
         };
 
+        let mut ownLen = 0.0f32;
         if !(*self_).activator.is_none()
             && !(*activator).client.is_null()
             && (*activator).inuse != 0
@@ -5750,7 +5751,7 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 (*((*activator).client as *mut gclient_t)).ps.origin,
                 &mut vLen,
             );
-            let ownLen = crate::q_math::VectorLength(vLen);
+            ownLen = crate::q_math::VectorLength(vLen);
 
             if ((*((*activator).client as *mut gclient_t)).pers.cmd.buttons & BUTTON_USE) == 0
                 && (*self_).genericValue1 != 0

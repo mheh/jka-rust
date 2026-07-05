@@ -26,6 +26,7 @@ use mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_abi::game::syscalls::G_ICARUS_ISINITIALIZED::GIcarusIsinitializedArgs;
 
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
@@ -747,7 +748,11 @@ pub fn target_location_linkup(
                     ),
                 );
                 n += 1;
-                (*ent_ptr).nextTrain = (*ctx.world).level.locationHead;
+                (*ent_ptr).nextTrain = if (*ctx.world).level.locationHead.is_null() {
+                    None
+                } else {
+                    Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), (*ctx.world).level.locationHead))
+                };
                 (*ctx.world).level.locationHead = ent_ptr;
             }
         }
@@ -874,7 +879,7 @@ pub fn target_random_use(
         }
 
         // Pick a random target
-        let pick = Q_irand(1, t_count);
+        let pick = (*ctx.world).bg_state.rng.Q_irand(1, t_count);
         t_count = 0;
 
         loop {
@@ -944,7 +949,7 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
                 let activator_id = (*self_).activator.unwrap();
                 let activator_ent = &mut (*ctx.world).g_entities[activator_id.0 as usize] as *mut gentity_t;
 
-                if trap::ICARUS_IsInitialized(ctx.engine, (*self_).s.number) == 0 {
+                if trap::ICARUS_IsInitialized(ctx.engine, GIcarusIsinitializedArgs::new((*self_).s.number)) == 0 {
                     if (*activator_ent).script_targetname.is_null() || *(*activator_ent).script_targetname == b'\0' as c_char {
                         // DIVERGENCE: store owned string instead of va() pointer
                         let name = format!("newICARUSEnt{}", (*ctx.world).globals.numNewICARUSEnts);

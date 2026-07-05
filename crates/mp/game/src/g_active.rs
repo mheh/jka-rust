@@ -2384,7 +2384,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     (*ucmd).rightmove = -64;
                 }
             }
-            (*client).ps.basespeed = (*client).ps.speed;
+            (*client).ps.basespeed = (*client).ps.speed as c_int;
         } else if (*client).ps.m_iVehicleNum == 0
             && ((*ent).NPC.is_null() || (*ent).s.NPC_class != CLASS_VEHICLE as c_int)
         {
@@ -2402,7 +2402,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 (*client).ps.speed *= 0.2;
             }
 
-            (*client).ps.basespeed = (*client).ps.speed;
+            (*client).ps.basespeed = (*client).ps.speed as c_int;
         }
 
         if (*ent).NPC.is_null()
@@ -2483,7 +2483,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 }
             } else {
                 (*client).ps.speed = 0.0;
-                (*client).ps.basespeed = 0.0;
+                (*client).ps.basespeed = 0;
                 (*ucmd).forwardmove = 0;
                 (*ucmd).rightmove = 0;
                 (*ucmd).upmove = 0;

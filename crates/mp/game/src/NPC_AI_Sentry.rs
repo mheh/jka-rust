@@ -53,7 +53,7 @@ pub fn NPC_Sentry_Precache(ctx: GameContext<'_>) {
     crate::g_utils::G_EffectIndex(cstr("bryar/muzzle_flash").as_ptr());
     crate::g_utils::G_EffectIndex(cstr("env/med_explode").as_ptr());
 
-    if let Some(item) = unsafe { crate::bg_misc::BG_FindItemForAmmo(AMMO_BLASTER) }.as_mut() {
+    if let Some(item) = unsafe { crate::bg_misc::BG_FindItemForAmmo(AMMO_BLASTER).as_mut() } {
         crate::g_items::RegisterItem(ctx, item);
     }
 }
@@ -670,7 +670,7 @@ pub fn NPC_BSSentry_Default(ctx: GameContext<'_>) {
         let NPCInfo = world.globals.NPCInfo;
 
         if !(*NPC).targetname.is_null() {
-            (*NPC).use_fn = Some(crate::ent_fn_enums::EntUse::sentry_use);
+            (*NPC).use_ = Some(crate::ent_fn_enums::EntUse::sentry_use);
         }
 
         if (*NPC).enemy.is_some() && (*NPCInfo).localState != LSTATE_WAKEUP {

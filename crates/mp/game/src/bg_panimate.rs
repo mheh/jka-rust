@@ -2039,15 +2039,9 @@ impl PmoveContext<'_> {
             if (*ps).legsAnim == anim {
                 BG_FlipPart(ps, SETANIM_LEGS);
             } else {
-                // PORT-NOTE(qagame-ifdef): original has #ifdef QAGAME check for g_entities access
-                // We're in the bg module context; this is the faithful Raven condition but marked
-                // as conditional-world access. The overlay access is unavailable here without context.
-                let base = g_entities as *const gentity_t;
-                if base.is_null() {
-                    return; // Safety fallback if g_entities is null
-                }
-                let client_ent = base.offset((*ps).clientNum as isize) as *const gentity_t;
-                if (*client_ent).s.legsAnim == anim {
+                // Raven's `#ifdef QAGAME` branch reaches `g_entities` directly; bg has no
+                // world access, so this upcalls through `GameCallbacks` (game-only symbol).
+                if self.callbacks.entity_legs_anim((*ps).clientNum) == anim {
                     BG_FlipPart(ps, SETANIM_LEGS);
                 }
             }
@@ -2114,13 +2108,9 @@ impl PmoveContext<'_> {
             if (*ps).torsoAnim == anim {
                 BG_FlipPart(ps, SETANIM_TORSO);
             } else {
-                // PORT-NOTE(qagame-ifdef): original has #ifdef QAGAME check for g_entities access
-                let base = g_entities as *const gentity_t;
-                if base.is_null() {
-                    return;
-                }
-                let client_ent = base.offset((*ps).clientNum as isize) as *const gentity_t;
-                if (*client_ent).s.torsoAnim == anim {
+                // Raven's `#ifdef QAGAME` branch reaches `g_entities` directly; bg has no
+                // world access, so this upcalls through `GameCallbacks` (game-only symbol).
+                if self.callbacks.entity_torso_anim((*ps).clientNum) == anim {
                     BG_FlipPart(ps, SETANIM_TORSO);
                 }
             }

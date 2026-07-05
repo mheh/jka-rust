@@ -695,11 +695,14 @@ pub fn Q3_GetTag(
             return 0;
         }
 
-        //TODO: Port TYPE_ORIGIN, TYPE_ANGLES
-        // Source: oracle/oracle/codemp/icarus/interpreter.h:35-80 — anonymous enum
-        // values are transitive off `TK_USERDEF` (external lexer base) through the
-        // full ID_* token list; needs the ICARUS interpreter enum chain ported
-        // (C++-track subsystem, porting-rules §F), not a mechanical symbol fix.
+        // interpreter.h `enum` type-IDs, derived through the generated chain
+        // (tokenizer.h `TK_USERDEF`=8 -> interpreter.h `NUM_USER_TOKENS`=19 ->
+        // `ID_AFFECT`=19 ... `NUM_IDS`=51 -> `TYPE_WAIT_COMPLETE`=51,
+        // `TYPE_WAIT_TRIGGERED`=52, `TYPE_ANGLES`=53, `TYPE_ORIGIN`=54).
+        // Source: oracle/oracle/codemp/icarus/interpreter.h:35-80
+        const TYPE_ANGLES: c_int = 53;
+        const TYPE_ORIGIN: c_int = 54;
+
         if lookup == TYPE_ORIGIN {
             return TAG_GetOrigin(ctx, (*ent).ownername, name, info);
         } else if lookup == TYPE_ANGLES {

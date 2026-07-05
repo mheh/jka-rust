@@ -668,7 +668,7 @@ pub fn G_PickTarget(
             return core::ptr::null_mut();
         }
 
-        let world = &*ctx.world;
+        let world = &mut *ctx.world;
         let idx = (world.bg_state.rng.rand() % num_choices as c_int) as usize;
         choice[idx]
     }
@@ -2231,7 +2231,7 @@ pub fn DebugLine(
             mp_abi::game::syscalls::G_DEBUG_POLYGON_CREATE::GDebugPolygonCreateArgs::new(
                 color,
                 4,
-                points.as_ptr() as *const vec3_t,
+                points.as_mut_ptr() as *mut vec3_t,
             ),
         )
     }

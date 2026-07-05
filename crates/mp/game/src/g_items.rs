@@ -3596,12 +3596,8 @@ pub fn G_BounceItem(
     unsafe {
         // reflect the velocity on the trace plane
         let hitTime = (*ctx.world).level.previousTime + (((*ctx.world).level.time - (*ctx.world).level.previousTime) as f32 * (*trace).fraction) as c_int;
-        // NOTE: `BG_EvaluateTrajectoryDelta`'s resolved cross-file signature
-        // (bg_misc.rs) takes `result: vec3_t` by value (not yet
-        // reshaped to `&mut`), so the write cannot propagate here — out of scope for
-        // this file; flagged for the cross-file signature fixer.
-        let velocity: vec3_t = [0.0; 3];
-        BG_EvaluateTrajectoryDelta(&(*ent).s.pos as *const trajectory_t, hitTime, velocity);
+        let mut velocity: vec3_t = [0.0; 3];
+        BG_EvaluateTrajectoryDelta(&(*ent).s.pos as *const trajectory_t, hitTime, &mut velocity);
         let dot = velocity[0] * (*trace).plane.normal[0] + velocity[1] * (*trace).plane.normal[1] + velocity[2] * (*trace).plane.normal[2];
         (*ent).s.pos.trDelta = [
             velocity[0] + -2.0 * dot * (*trace).plane.normal[0],
@@ -3674,12 +3670,12 @@ pub fn G_RunItem(
         }
 
         // get current position
-        // NOTE: `BG_EvaluateTrajectory`'s resolved cross-file signature
-        // (bg_misc.rs) takes `result: vec3_t` by value, so the write cannot
-        // propagate here — out of scope for this file; flagged for the
-        // cross-file signature fixer.
-        let origin: vec3_t = [0.0; 3];
-        BG_EvaluateTrajectory(&(*ent).s.pos as *const trajectory_t, (*ctx.world).level.time, origin);
+        let mut origin: vec3_t = [0.0; 3];
+        BG_EvaluateTrajectory(
+            &(*ent).s.pos as *const trajectory_t,
+            (*ctx.world).level.time,
+            &mut origin,
+        );
 
         // trace a line from the previous position to the current position
         let mask = if (*ent).clipmask != 0 { (*ent).clipmask } else { MASK_PLAYERSOLID & !CONTENTS_BODY };

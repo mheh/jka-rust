@@ -16,6 +16,7 @@ use mp_abi::game::syscalls::G_NAV_GETNODEEDGE::GNavGetnodeedgeArgs;
 use mp_abi::game::syscalls::G_NAV_GETNODEPOSITION::GNavGetnodepositionArgs;
 use mp_abi::game::syscalls::G_ICARUS_ISINITIALIZED::GIcarusIsinitializedArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
+use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use crate::ent_fn_enums::EntThink;
 use crate::g_nav::NPC_SetMoveGoal;
@@ -1136,7 +1137,10 @@ pub fn NPC_CheckSurrender(ctx: GameContext<'_>) -> qboolean {
         let enemy = &mut world.g_entities[enemy_id.index()] as *mut gentity_t;
         let enemy_client = (*enemy).client as *mut gclient_t;
 
-        if trap::ICARUS_TaskIDPending(ctx.engine, NPC, taskID_t::TID_MOVE_NAV as c_int) == 0
+        if trap::ICARUS_TaskIDPending(
+            ctx.engine,
+            GIcarusTaskidpendingArgs::new(NPC, taskID_t::TID_MOVE_NAV as c_int),
+        ) == 0
             && (*npc_client).ps.groundEntityNum != ENTITYNUM_NONE
             && (*npc_client).ps.weaponTime == 0
             && PM_InKnockDown(&mut (*npc_client).ps) == 0
@@ -1284,7 +1288,11 @@ pub fn NPC_StartFlee(
         let npc_client = (*NPC).client as *mut gclient_t;
         let mut cp: c_int = -1;
 
-        if trap::ICARUS_TaskIDPending(ctx.engine, NPC, taskID_t::TID_MOVE_NAV as c_int) != 0 {
+        if trap::ICARUS_TaskIDPending(
+            ctx.engine,
+            GIcarusTaskidpendingArgs::new(NPC, taskID_t::TID_MOVE_NAV as c_int),
+        ) != 0
+        {
             return;
         }
 
@@ -1438,7 +1446,7 @@ pub fn NPC_BSEmplaced(ctx: GameContext<'_>) {
             if NPC_ClearLOS4(ctx, enemy) != QFALSE {
                 enemyLOS = QTRUE;
 
-                let hit = NPC_ShotEntity(ctx, enemy, &mut impactPos);
+                let hit = NPC_ShotEntity(ctx, enemy, impactPos);
                 let hitEnt = &mut world.g_entities[hit as usize] as *mut gentity_t;
 
                 if hit == (*enemy).s.number || (!hitEnt.is_null() && (*hitEnt).takedamage != 0) {

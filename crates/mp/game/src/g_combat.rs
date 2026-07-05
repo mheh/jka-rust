@@ -9,6 +9,7 @@
 
 use crate::prelude::*;
 
+use crate::bg_channel::GameBgTraps;
 use crate::bg_misc::vectoyaw;
 use crate::bg_pmove::BG_KnockDownable;
 use crate::entity::hit_location::*;
@@ -342,7 +343,8 @@ pub fn ExplodeDeath(ctx: GameContext<'_>, self_: *mut gentity_t) {
         if (*self_).splashDamage > 0 && (*self_).splashRadius > 0 {
             let mut attacker = self_;
             if !(*self_).parent.is_none() {
-                attacker = (*self_).parent;
+                attacker = &mut (*ctx.world).g_entities[(*self_).parent.unwrap().0 as usize]
+                    as *mut gentity_t;
             }
             G_RadiusDamage(
                 ctx,
@@ -432,7 +434,7 @@ pub fn TossClientWeapon(ctx: GameContext<'_>, self_: *mut gentity_t, direction: 
             [weaponData[weapon as usize].ammoIndex as usize]
             - bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
                 weapon,
-                itemType_t::IT_WEAPON as c_int,
+                IT_WEAPON as c_int,
             ) as usize]
             .quantity;
 
@@ -457,14 +459,14 @@ pub fn TossClientWeapon(ctx: GameContext<'_>, self_: *mut gentity_t, direction: 
 
         (*launched).count = bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
             weapon,
-            itemType_t::IT_WEAPON as c_int,
+            IT_WEAPON as c_int,
         ) as usize]
         .quantity;
 
         (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] -=
             bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
                 weapon,
-                itemType_t::IT_WEAPON as c_int,
+                IT_WEAPON as c_int,
             ) as usize]
             .quantity;
 
@@ -802,9 +804,10 @@ pub fn G_CheckSpecialDeathAnim(
         } else if G_InKnockDown(&mut (*client).ps as *mut playerState_t) != qfalse {
             // since these happen a lot, let's handle them case by case
             let legsAnim = (*client).ps.legsAnim;
-            let animLength = (*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize]
-                .anims[legsAnim as usize]
-                .numFrames as f32
+            let animLength = (*(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize]
+                .anims
+                .add(legsAnim as usize))
+            .numFrames as f32
                 * ((*ctx.world).bg_state.bgHumanoidAnimations[legsAnim as usize].frameLerp as f32)
                     .abs();
             let legsTimer = (*client).ps.legsTimer as f32;
@@ -2046,7 +2049,7 @@ pub fn player_die(
                     mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
                         (*self_).ghoul2,
                         0,
-                        c"head".as_ptr(),
+                        c"head".to_owned(),
                     ),
                 ) == 0
                 {
@@ -2064,7 +2067,7 @@ pub fn player_die(
                     mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
                         (*self_).ghoul2,
                         0,
-                        c"head".as_ptr(),
+                        c"head".to_owned(),
                     ),
                 ) == 0
                 {
@@ -2249,14 +2252,28 @@ pub fn player_die(
             && (*ctx.world).cvars.g_gametype.integer == GT_DUEL
             && (*ctx.world).level.numPlayingClients >= 2
         {
-            let spawnTime = if (*ctx.world).level.clients
-                [(*ctx.world).level.sortedClients[0] as usize]
+            let spawnTime = if (*(*ctx.world)
+                .level
+                .clients
+                .add((*ctx.world).level.sortedClients[0] as usize))
+            .respawnTime
+                > (*(*ctx.world)
+                    .level
+                    .clients
+                    .add((*ctx.world).level.sortedClients[1] as usize))
                 .respawnTime
-                > (*ctx.world).level.clients[(*ctx.world).level.sortedClients[1] as usize].respawnTime
             {
-                (*ctx.world).level.clients[(*ctx.world).level.sortedClients[0] as usize].respawnTime
+                (*(*ctx.world)
+                    .level
+                    .clients
+                    .add((*ctx.world).level.sortedClients[0] as usize))
+                .respawnTime
             } else {
-                (*ctx.world).level.clients[(*ctx.world).level.sortedClients[1] as usize].respawnTime
+                (*(*ctx.world)
+                    .level
+                    .clients
+                    .add((*ctx.world).level.sortedClients[1] as usize))
+                .respawnTime
             };
             crate::g_main::G_LogPrintf(ctx, cstr("Duel Kill Details:\n").as_ptr());
             let s = format!("Kill Time: {}\n", (*ctx.world).level.time - spawnTime);
@@ -2281,7 +2298,7 @@ pub fn player_die(
                     let s = format!(
                         "killer saber style: {}, killer saber anim {}\n",
                         (*acl).ps.fd.saberAnimLevel,
-                        cstr_to_str(animTable[(*acl).ps.torsoAnim as usize].name.as_ptr())
+                        cstr_to_str(animTable[(*acl).ps.torsoAnim as usize].name)
                     );
                     crate::g_main::G_LogPrintf(ctx, cstr(&s).as_ptr());
                 }
@@ -2471,15 +2488,15 @@ pub fn player_die(
 
         // if I committed suicide, the flag does not fall, it returns.
         if meansOfDeath == meansOfDeath_t::MOD_SUICIDE as c_int {
-            if (*cl).ps.powerups[powerup_t::PW_NEUTRALFLAG as usize] != 0 {
+            if (*cl).ps.powerups[PW_NEUTRALFLAG as usize] != 0 {
                 crate::g_team::Team_ReturnFlag(ctx, TEAM_FREE as c_int);
-                (*cl).ps.powerups[powerup_t::PW_NEUTRALFLAG as usize] = 0;
-            } else if (*cl).ps.powerups[powerup_t::PW_REDFLAG as usize] != 0 {
+                (*cl).ps.powerups[PW_NEUTRALFLAG as usize] = 0;
+            } else if (*cl).ps.powerups[PW_REDFLAG as usize] != 0 {
                 crate::g_team::Team_ReturnFlag(ctx, TEAM_RED as c_int);
-                (*cl).ps.powerups[powerup_t::PW_REDFLAG as usize] = 0;
-            } else if (*cl).ps.powerups[powerup_t::PW_BLUEFLAG as usize] != 0 {
+                (*cl).ps.powerups[PW_REDFLAG as usize] = 0;
+            } else if (*cl).ps.powerups[PW_BLUEFLAG as usize] != 0 {
                 crate::g_team::Team_ReturnFlag(ctx, TEAM_BLUE as c_int);
-                (*cl).ps.powerups[powerup_t::PW_BLUEFLAG as usize] = 0;
+                (*cl).ps.powerups[PW_BLUEFLAG as usize] = 0;
             }
         }
 
@@ -2496,11 +2513,11 @@ pub fn player_die(
                 TossClientItems(ctx, self_);
             }
         } else {
-            if (*cl).ps.powerups[powerup_t::PW_NEUTRALFLAG as usize] != 0 {
+            if (*cl).ps.powerups[PW_NEUTRALFLAG as usize] != 0 {
                 crate::g_team::Team_ReturnFlag(ctx, TEAM_FREE as c_int);
-            } else if (*cl).ps.powerups[powerup_t::PW_REDFLAG as usize] != 0 {
+            } else if (*cl).ps.powerups[PW_REDFLAG as usize] != 0 {
                 crate::g_team::Team_ReturnFlag(ctx, TEAM_RED as c_int);
-            } else if (*cl).ps.powerups[powerup_t::PW_BLUEFLAG as usize] != 0 {
+            } else if (*cl).ps.powerups[PW_BLUEFLAG as usize] != 0 {
                 crate::g_team::Team_ReturnFlag(ctx, TEAM_BLUE as c_int);
             }
         }
@@ -2514,7 +2531,7 @@ pub fn player_die(
 
         // send updated scores to any clients that are following this one
         for i in 0..(*ctx.world).level.maxclients {
-            let client = &mut (*ctx.world).level.clients[i as usize] as *mut gclient_t;
+            let client = (*ctx.world).level.clients.add(i as usize);
             if (*client).pers.connected != CON_CONNECTED {
                 continue;
             }
@@ -2973,7 +2990,11 @@ pub fn G_GetDismemberBolt(
 
         useBolt = trap::G2API_AddBolt(
             ctx.engine,
-            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*self_).ghoul2, 0, rotateBone),
+            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                (*self_).ghoul2,
+                0,
+                core::ffi::CStr::from_ptr(rotateBone).to_owned(),
+            ),
         );
 
         crate::q_math::_VectorCopy((*client).ps.origin, &mut properOrigin);
@@ -3100,7 +3121,7 @@ pub fn LimbThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
         // G2_MODELPART_LARM/RARM/RHAND/LLEG/RLEG/default: leave defaults
 
-        if (*ent).speed < (*ctx.world).level.time {
+        if (*ent).speed < (*ctx.world).level.time as f32 {
             (*ent).think = Some(EntThink::G_FreeEntity);
             (*ent).nextthink = (*ctx.world).level.time;
             return;
@@ -3129,7 +3150,7 @@ pub fn LimbThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
 ///
 /// PORT-NOTE(bg-traps-handle): `BG_GetRootSurfNameWithVariant` is a bg-tier fn
 /// taking `&BgState` + `&dyn BgTraps`; the game-tier `&dyn BgTraps` handle is
-/// passed as `ctx.bg_traps()` (provisional — the fn itself is OPEN).
+/// passed as `&GameBgTraps::new(ctx.engine)` (provisional — the fn itself is OPEN).
 /// Source: `oracle/oracle/codemp/game/g_combat.c:3436-3620`
 pub fn G_Dismember(
     ctx: GameContext<'_>,
@@ -3165,7 +3186,7 @@ pub fn G_Dismember(
                 limbName.as_mut_ptr(),
                 limbName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 (*ent).ghoul2,
@@ -3173,7 +3194,7 @@ pub fn G_Dismember(
                 stubName.as_mut_ptr(),
                 stubName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             write_cstr_field(
                 &mut stubCapName,
@@ -3186,7 +3207,7 @@ pub fn G_Dismember(
                 limbName.as_mut_ptr(),
                 limbName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 (*ent).ghoul2,
@@ -3194,7 +3215,7 @@ pub fn G_Dismember(
                 stubName.as_mut_ptr(),
                 stubName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             write_cstr_field(
                 &mut stubCapName,
@@ -3207,7 +3228,7 @@ pub fn G_Dismember(
                 limbName.as_mut_ptr(),
                 limbName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 (*ent).ghoul2,
@@ -3215,7 +3236,7 @@ pub fn G_Dismember(
                 stubName.as_mut_ptr(),
                 stubName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             write_cstr_field(
                 &mut stubCapName,
@@ -3228,7 +3249,7 @@ pub fn G_Dismember(
                 limbName.as_mut_ptr(),
                 limbName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 (*ent).ghoul2,
@@ -3236,7 +3257,7 @@ pub fn G_Dismember(
                 stubName.as_mut_ptr(),
                 stubName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             write_cstr_field(
                 &mut stubCapName,
@@ -3249,7 +3270,7 @@ pub fn G_Dismember(
                 limbName.as_mut_ptr(),
                 limbName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 (*ent).ghoul2,
@@ -3257,7 +3278,7 @@ pub fn G_Dismember(
                 stubName.as_mut_ptr(),
                 stubName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             write_cstr_field(
                 &mut stubCapName,
@@ -3271,7 +3292,7 @@ pub fn G_Dismember(
                 limbName.as_mut_ptr(),
                 limbName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             crate::bg_g2_utils::BG_GetRootSurfNameWithVariant(
                 (*ent).ghoul2,
@@ -3279,7 +3300,7 @@ pub fn G_Dismember(
                 stubName.as_mut_ptr(),
                 stubName.len() as c_int,
                 &(*ctx.world).bg_state,
-                ctx.bg_traps(),
+                &GameBgTraps::new(ctx.engine),
             );
             write_cstr_field(
                 &mut stubCapName,
@@ -3293,7 +3314,7 @@ pub fn G_Dismember(
                 mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs::new(
                     (*ent).ghoul2,
                     0,
-                    limbName.as_ptr(),
+                    core::ffi::CStr::from_ptr(limbName.as_ptr()).to_owned(),
                 ),
             ) != 0
         {
@@ -3309,7 +3330,8 @@ pub fn G_Dismember(
         crate::q_math::_VectorCopy(newPoint, &mut (*limb).s.pos.trBase);
         (*limb).think = Some(EntThink::LimbThink);
         (*limb).touch = Some(EntTouch::LimbTouch);
-        (*limb).speed = (*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(8000, 16000);
+        (*limb).speed =
+            ((*ctx.world).level.time + (*ctx.world).bg_state.rng.Q_irand(8000, 16000)) as f32;
         (*limb).nextthink = (*ctx.world).level.time + FRAMETIME;
 
         (*limb).r.svFlags = SVF_USE_CURRENT_ORIGIN;
@@ -3629,27 +3651,27 @@ pub fn G_GetHitLocFromSurfName(
             // humanoid
             handLBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*l_hand".as_ptr()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*l_hand".to_owned()),
             );
             handRBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*r_hand".as_ptr()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*r_hand".to_owned()),
             );
             kneeLBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*hips_l_knee".as_ptr()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*hips_l_knee".to_owned()),
             );
             kneeRBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*hips_r_knee".as_ptr()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*hips_r_knee".to_owned()),
             );
             footLBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*l_leg_foot".as_ptr()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*l_leg_foot".to_owned()),
             );
             footRBolt = trap::G2API_AddBolt(
                 ctx.engine,
-                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*r_leg_foot".as_ptr()),
+                mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*r_leg_foot".to_owned()),
             );
         }
 
@@ -3731,7 +3753,7 @@ pub fn G_GetHitLocFromSurfName(
                     );
                     crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
-                        ORIGIN,
+                        ORIGIN as c_int,
                         &mut tagOrg,
                     );
                     if crate::q_math::DistanceSquared(point, tagOrg) < 100.0 {
@@ -3756,7 +3778,7 @@ pub fn G_GetHitLocFromSurfName(
                         );
                         crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
                             &boltMatrix as *const mdxaBone_t,
-                            ORIGIN,
+                            ORIGIN as c_int,
                             &mut tagOrg,
                         );
                         if crate::q_math::DistanceSquared(point, tagOrg) < 100.0 {
@@ -3843,7 +3865,7 @@ pub fn G_GetHitLocFromSurfName(
                     );
                     crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
-                        ORIGIN,
+                        ORIGIN as c_int,
                         &mut tagOrg,
                     );
                     if crate::q_math::DistanceSquared(point, tagOrg) < 256.0 {
@@ -3874,7 +3896,7 @@ pub fn G_GetHitLocFromSurfName(
                     );
                     crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
-                        ORIGIN,
+                        ORIGIN as c_int,
                         &mut tagOrg,
                     );
                     if crate::q_math::DistanceSquared(point, tagOrg) < 256.0 {
@@ -3905,7 +3927,7 @@ pub fn G_GetHitLocFromSurfName(
                     );
                     crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
-                        ORIGIN,
+                        ORIGIN as c_int,
                         &mut tagOrg,
                     );
                     if crate::q_math::DistanceSquared(point, tagOrg) < 100.0 {
@@ -3936,7 +3958,7 @@ pub fn G_GetHitLocFromSurfName(
                     );
                     crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
                         &boltMatrix as *const mdxaBone_t,
-                        ORIGIN,
+                        ORIGIN as c_int,
                         &mut tagOrg,
                     );
                     if crate::q_math::DistanceSquared(point, tagOrg) < 100.0 {
@@ -3992,7 +4014,7 @@ pub fn G_GetHitLocFromSurfName(
                             mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
                                 (*ent).ghoul2,
                                 0,
-                                tagName,
+                                core::ffi::CStr::from_ptr(tagName).to_owned(),
                             ),
                         );
                         if tagBolt != -1 {
@@ -4017,12 +4039,12 @@ pub fn G_GetHitLocFromSurfName(
                             );
                             crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
                                 &boltMatrix as *const mdxaBone_t,
-                                ORIGIN,
+                                ORIGIN as c_int,
                                 &mut tagOrg,
                             );
                             crate::NPC_AI_GalakMech::BG_GiveMeVectorFromMatrix(
                                 &boltMatrix as *const mdxaBone_t,
-                                NEGATIVE_Y,
+                                NEGATIVE_Y as c_int,
                                 &mut tagDir,
                             );
                             if crate::q_math::DistanceSquared(point, tagOrg) < 256.0 {
@@ -4646,7 +4668,7 @@ pub fn G_Damage(
 
         // shootable doors / buttons don't actually have any health
         if (*targ).s.eType == entityType_t::ET_MOVER as c_int && (*targ).genericValue4 != 1 {
-            if (*targ).r#use.is_some() && (*targ).moverState == MOVER_POS1 {
+            if (*targ).use_.is_some() && (*targ).moverState == MOVER_POS1 {
                 crate::g_utils::GlobalUse(targ, inflictor, attacker);
             }
             return;
@@ -4976,7 +4998,7 @@ pub fn G_Damage(
         }
 
         // battlesuit protects from all radius damage (but takes knockback) and 50% against all damage
-        if !client.is_null() && (*client).ps.powerups[powerup_t::PW_BATTLESUIT as usize] != 0 {
+        if !client.is_null() && (*client).ps.powerups[PW_BATTLESUIT as usize] != 0 {
             G_AddEvent(targ, entity_event_t::EV_POWERUP_BATTLESUIT as c_int, 0);
             if (dflags & DAMAGE_RADIUS) != 0 || r#mod == meansOfDeath_t::MOD_FALLING as c_int {
                 return;
@@ -5110,8 +5132,9 @@ pub fn G_Damage(
                                     if (*targ).locationDamage[surface as usize] >= deathPoint {
                                         // this area of the ship is now dead
                                         let wasDying = (*tv).m_iRemovedSurfaces != 0;
-                                        if crate::g_vehicles::G_FlyVehicleDestroySurface(targ, surface)
-                                            != qfalse
+                                        if crate::g_vehicles::G_FlyVehicleDestroySurface(
+                                            ctx, targ, surface,
+                                        ) != qfalse
                                         {
                                             crate::g_vehicles::G_VehicleSetDamageLocFlags(
                                                 targ, surface, deathPoint,
@@ -5148,7 +5171,12 @@ pub fn G_Damage(
                             impactStrength = 10.0;
                         }
                         // pitch or roll us based on where we were hit
-                        AngleVectors((*tv).m_vOrientation, None, None, Some(&mut vUp));
+                        AngleVectors(
+                            *((*tv).m_vOrientation as *const vec3_t),
+                            None,
+                            None,
+                            Some(&mut vUp),
+                        );
                         crate::q_math::_VectorSubtract(point, (*targ).r.currentOrigin, &mut impactDir);
                         crate::q_math::VectorNormalize(&mut impactDir);
                         if surface <= 0 {
@@ -5156,7 +5184,7 @@ pub fn G_Damage(
                             let mut vFwd: vec3_t = [0.0; 3];
                             let mut vRight: vec3_t = [0.0; 3];
                             AngleVectors(
-                                (*tv).m_vOrientation,
+                                *((*tv).m_vOrientation as *const vec3_t),
                                 Some(&mut vFwd),
                                 Some(&mut vRight),
                                 Some(&mut vUp),
@@ -5179,33 +5207,33 @@ pub fn G_Damage(
                             SHIPSURF_FRONT => {
                                 dot = crate::q_math::_DotProduct(vUp, impactDir);
                                 if dot > 0.0 {
-                                    (*tv).m_vOrientation[PITCH] += impactStrength;
+                                    *(*tv).m_vOrientation.add(PITCH) += impactStrength;
                                 } else {
-                                    (*tv).m_vOrientation[PITCH] -= impactStrength;
+                                    *(*tv).m_vOrientation.add(PITCH) -= impactStrength;
                                 }
                             }
                             SHIPSURF_BACK => {
                                 dot = crate::q_math::_DotProduct(vUp, impactDir);
                                 if dot > 0.0 {
-                                    (*tv).m_vOrientation[PITCH] -= impactStrength;
+                                    *(*tv).m_vOrientation.add(PITCH) -= impactStrength;
                                 } else {
-                                    (*tv).m_vOrientation[PITCH] += impactStrength;
+                                    *(*tv).m_vOrientation.add(PITCH) += impactStrength;
                                 }
                             }
                             SHIPSURF_RIGHT => {
                                 dot = crate::q_math::_DotProduct(vUp, impactDir);
                                 if dot > 0.0 {
-                                    (*tv).m_vOrientation[ROLL] -= impactStrength;
+                                    *(*tv).m_vOrientation.add(ROLL) -= impactStrength;
                                 } else {
-                                    (*tv).m_vOrientation[ROLL] += impactStrength;
+                                    *(*tv).m_vOrientation.add(ROLL) += impactStrength;
                                 }
                             }
                             SHIPSURF_LEFT => {
                                 dot = crate::q_math::_DotProduct(vUp, impactDir);
                                 if dot > 0.0 {
-                                    (*tv).m_vOrientation[ROLL] += impactStrength;
+                                    *(*tv).m_vOrientation.add(ROLL) += impactStrength;
                                 } else {
-                                    (*tv).m_vOrientation[ROLL] -= impactStrength;
+                                    *(*tv).m_vOrientation.add(ROLL) -= impactStrength;
                                 }
                             }
                             _ => {}
@@ -5352,7 +5380,7 @@ pub fn G_Damage(
                         }
                     }
 
-                    if (*tc).ps.powerups[powerup_t::PW_FORCE_BOON as usize] == 0 {
+                    if (*tc).ps.powerups[PW_FORCE_BOON as usize] == 0 {
                         (*tc).ps.fd.forcePower = ((*tc).ps.fd.forcePower as f32
                             - (maxtake as f32 * famt))
                             as c_int;

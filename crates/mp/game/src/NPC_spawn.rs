@@ -139,7 +139,7 @@ pub fn NPC_SetMiscDefaultData(
         if (*ent).s.NPC_class == CLASS_VEHICLE as c_int && (*ent).m_pVehicle != core::ptr::null_mut() {
             (*ent).s.g2radius = 255;
             if (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type == VH_WALKER {
-                (*ent).mass = 2000;
+                (*ent).mass = 2000.0;
                 (*ent).flags |= FL_SHIELDED | FL_NO_KNOCKBACK;
                 (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_ATST_Pain);
             }
@@ -157,14 +157,14 @@ pub fn NPC_SetMiscDefaultData(
         if crate::q_shared::Q_stricmp(wampa.as_ptr(), (*ent).NPC_type) == 0 {
             crate::NPC_AI_Wampa::Wampa_SetBolts(ctx, ent);
             (*ent).s.g2radius = 80;
-            (*ent).mass = 300;
+            (*ent).mass = 300.0;
             (*ent).flags |= FL_NO_KNOCKBACK;
             (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Wampa_Pain);
         }
         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_RANCOR {
             crate::NPC_AI_Rancor::Rancor_SetBolts(ctx, ent);
             (*ent).s.g2radius = 255;
-            (*ent).mass = 1000;
+            (*ent).mass = 1000.0;
             (*ent).flags |= FL_NO_KNOCKBACK;
             (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_Rancor_Pain);
             (*ent).health *= 4;
@@ -667,7 +667,7 @@ pub fn NPC_Begin(
         }
 
         (*ent).s.groundEntityNum = ENTITYNUM_NONE;
-        (*ent).mass = 10;
+        (*ent).mass = 10.0;
         (*ent).takedamage = qtrue;
         (*ent).inuse = qtrue;
         (*ent).classname = c"NPC".as_ptr() as *mut c_char;
@@ -767,7 +767,7 @@ pub fn NPC_Begin(
             (*client).ps.persistant[PERS_TEAM as usize] = (*client).playerTeam;
         }
 
-        (*ent).r#use = Some(EntUse::NPC_Use);
+        (*ent).use_ = Some(EntUse::NPC_Use);
         (*ent).think = Some(EntThink::NPC_Think);
         (*ent).nextthink = (*ctx.world).level.time + FRAMETIME + (*ctx.world).bg_state.rng.Q_irand(0, 100);
 
@@ -946,7 +946,7 @@ pub fn NPC_Spawn_Do(
         if (*ent).count != -1 {
             (*ent).count -= 1;
             if (*ent).count <= 0 {
-                (*ent).r#use = None;
+                (*ent).use_ = None;
             }
         }
 
@@ -1203,7 +1203,7 @@ pub fn NPC_Spawn_Do(
 
         trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent));
 
-        if (*ent).r#use.is_none() {
+        if (*ent).use_.is_none() {
             if !(*ent).target.is_null() {
                 crate::g_utils::G_UseTargets(ctx, ent, ent);
             }
@@ -1368,7 +1368,7 @@ pub fn SP_NPC_spawner(
         crate::NPC_stats::NPC_Precache(ctx, self_);
 
         if !(*self_).targetname.is_null() {
-            (*self_).r#use = Some(EntUse::NPC_Spawn);
+            (*self_).use_ = Some(EntUse::NPC_Spawn);
         } else {
             (*self_).think = Some(EntThink::NPC_Spawn_Go);
             (*self_).nextthink = (*ctx.world).level.time + START_TIME_REMOVE_ENTS + 50;
@@ -1539,7 +1539,7 @@ pub fn SP_NPC_Vehicle(
                 crate::g_utils::G_FreeEntity(ctx, self_);
                 return;
             }
-            (*self_).r#use = Some(EntUse::NPC_VehicleSpawnUse);
+            (*self_).use_ = Some(EntUse::NPC_VehicleSpawnUse);
         } else {
             if (*self_).delay != 0 {
                 if NPC_VehiclePrecache(ctx, self_) == qfalse {
@@ -2346,7 +2346,7 @@ pub fn SP_NPC_Monster_Swamp(
     self_: *mut gentity_t,
 ) {
     unsafe {
-        (*self_).NPC_type = c"Swamp".as_ptr();
+        (*self_).NPC_type = c"Swamp".as_ptr() as *mut c_char;
         SP_NPC_spawner(ctx, self_);
     }
 }
@@ -3040,7 +3040,9 @@ pub fn Cmd_NPC_f(
     } else if Q_stricmp(c"kill".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
         NPC_Kill_f(ctx);
     } else if Q_stricmp(c"showbounds".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
-        (*ctx.world).globals.showBBoxes = if (*ctx.world).globals.showBBoxes != 0 { 0 } else { 1 };
+        unsafe {
+            (*ctx.world).globals.showBBoxes = if (*ctx.world).globals.showBBoxes != 0 { 0 } else { 1 };
+        }
     } else if Q_stricmp(c"score".as_ptr() as *const c_char, cmd.as_ptr() as *const c_char) == 0 {
         let mut cmd2: [u8; 1024] = [0; 1024];
         trap::Argv(ctx.engine, mp_abi::game::syscalls::G_ARGV::GArgvArgs::new(2, cmd2.as_mut_ptr() as *mut c_char, 1024));

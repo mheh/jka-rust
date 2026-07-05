@@ -23,6 +23,7 @@ use mp_qshared::common::mp::qcommon::saber::saber_colors::{
     SABER_BLUE, SABER_GREEN, SABER_ORANGE, SABER_PURPLE, SABER_RED, SABER_YELLOW,
 };
 use mp_qshared::common::mp::qcommon::saber::saber_info::MAX_SABERS;
+use mp_qshared::common::mp::qcommon::saber::saber_type::saberType_t;
 use mp_qshared::shared::saber_blocked_type::saberBlockedType_t;
 use mp_qshared::shared::CHAN_WEAPON;
 
@@ -51,6 +52,7 @@ use crate::trap;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_G2TRACE::GG2TraceArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
+use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use crate::NPC_utils::G_GetBoltPosition;
 use mp_bg::public::anim_number::animNumber_t;

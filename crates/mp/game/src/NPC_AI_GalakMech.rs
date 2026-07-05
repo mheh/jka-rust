@@ -1580,8 +1580,8 @@ pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
                 if tr.startsolid == 0 {
                     (*npc_ent).r.mins = shield_mins;
                     (*npc_ent).r.maxs = shield_maxs;
-                    (*client).ps.crouchheight = shield_maxs[2];
-                    (*client).ps.standheight = shield_maxs[2];
+                    (*client).ps.crouchheight = shield_maxs[2] as c_int;
+                    (*client).ps.standheight = shield_maxs[2] as c_int;
                     (*client).ps.stats[statIndex_t::STAT_ARMOR as usize] = GALAK_SHIELD_HEALTH;
                     (*npc_info).investigateDebounceTime = 0;
                     (*npc_ent).flags |= FL_SHIELDED; // reflect normal shots

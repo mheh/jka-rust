@@ -366,6 +366,12 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
     fn add_event(&mut self, entNum: c_int, event: c_int, eventParm: c_int) {
         todo!("Port GameCallbacks::add_event delegation — G_AddEvent (g_utils.c)")
     }
+    fn entity_legs_anim(&self, entNum: c_int) -> c_int {
+        unsafe { (*self.world).g_entities[entNum as usize].s.legsAnim }
+    }
+    fn entity_torso_anim(&self, entNum: c_int) -> c_int {
+        unsafe { (*self.world).g_entities[entNum as usize].s.torsoAnim }
+    }
     fn alloc(&mut self, size: c_int) -> *mut c_void {
         todo!("Port GameCallbacks::alloc delegation — G_Alloc (g_mem.c)")
     }

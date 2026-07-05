@@ -63,7 +63,9 @@ use crate::bg_panimate::{BG_InReboundHold, BG_InReboundJump, BG_FullBodyTauntAni
 use crate::bg_pmove::BG_InKnockDown;
 use crate::bg_saber::BG_ForcePowerDrain;
 use crate::g_cmds::Cmd_ToggleSaber_f;
-use crate::g_combat::G_Damage;
+use crate::g_combat::{G_Damage, TossClientWeapon};
+use crate::g_missile::G_ReflectMissile;
+use crate::level::spawn_flags::SPF_BUTTON_FPUSHABLE;
 use crate::g_team::OnSameTeam;
 use crate::g_utils::{
     G_EffectIndex, G_EntitySound, G_MuteSound, G_PlayEffect, G_PlayEffectID, G_SetAnim, G_Sound,
@@ -83,8 +85,11 @@ use crate::q_math::vec3_origin;
 // Const/enum families transcribed by faithful Raven name (file header note).
 use crate::entity::hit_location::*;
 use crate::level::damage_flags::*;
+use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
 use mp_abi::game::syscalls::G_CVAR_UPDATE::GCvarUpdateArgs;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
+use mp_abi::game::syscalls::G_GET_USERINFO::GGetUserinfoArgs;
+use mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::public::anim_number::animNumber_t::*;
 use mp_bg::public::jump_velocity::JUMP_VELOCITY;

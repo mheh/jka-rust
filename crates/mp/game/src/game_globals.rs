@@ -869,9 +869,9 @@ pub struct GameGlobals {
     pub gEscaping: qboolean,
     /// `g_shooterClientInit`. Source: `oracle/oracle/codemp/game/g_misc.c:3352`
     pub g_shooterClientInit: qboolean,
-    //TODO: Port shooterClient_t[MAX_SHOOTERS]
-    // Source: oracle/oracle/codemp/game/g_misc.c:3351
-    pub g_shooterClients: (),
+    /// `shooterClient_t g_shooterClients[MAX_SHOOTERS]`.
+    /// Source: `oracle/oracle/codemp/game/g_misc.c:3351`
+    pub g_shooterClients: [crate::g_misc::shooterClient_t; crate::g_misc::MAX_SHOOTERS as usize],
     // --- `g_mover.c` file-scope globals ---
     /// `pushed_t pushed[MAX_GENTITIES]` / `pushed_p` save-stack
     /// (`g_mover.c:19-24`) — one saved position/angle/deltayaw snapshot per

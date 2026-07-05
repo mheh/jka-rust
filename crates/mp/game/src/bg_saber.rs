@@ -1224,7 +1224,7 @@ impl PmoveContext<'_> {
             _VectorScale(jumpFwd, 150.0, &mut (*ps).velocity);
             (*ps).velocity[2] = 400.0;
 
-            PM_SetForceJumpZStart((*ps).origin[2]);
+            self.PM_SetForceJumpZStart((*ps).origin[2]);
             self.PM_AddEvent(EV_JUMP as c_int);
             (*ps).fd.forceJumpSound = 1;
             (*self.pm).cmd.upmove = 0;
@@ -1419,7 +1419,7 @@ impl PmoveContext<'_> {
             AngleVectors(fwdAngles, Some(&mut jumpFwd), None, None);
             _VectorScale(jumpFwd, 300.0, &mut (*ps).velocity);
             (*ps).velocity[2] = 280.0;
-            PM_SetForceJumpZStart((*ps).origin[2]);
+            self.PM_SetForceJumpZStart((*ps).origin[2]);
 
             self.PM_AddEvent(EV_JUMP as c_int);
             (*ps).fd.forceJumpSound = 1;

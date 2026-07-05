@@ -567,12 +567,16 @@ impl PmoveContext<'_> {
                             vAng[PITCH] = 0.0;
                             vAng[ROLL] = 0.0;
                             vAng[YAW] = (*(*pVeh).m_vOrientation.add(YAW));
-                            AngleVectors(
-                                vAng,
-                                Some(&mut fxAxis[2]),
-                                Some(&mut fxAxis[1]),
-                                Some(&mut fxAxis[0]),
-                            );
+                            {
+                                let (fx01, fx2) = fxAxis.split_at_mut(2);
+                                let (fx0, fx1) = fx01.split_at_mut(1);
+                                AngleVectors(
+                                    vAng,
+                                    Some(&mut fx2[0]),
+                                    Some(&mut fx1[0]),
+                                    Some(&mut fx0[0]),
+                                );
+                            }
                             _VectorCopy((*(*self.pm).ps).origin, &mut wakeOrg);
                             if (*self.pm).waterlevel >= 2 {
                                 wakeOrg[2] = (*(*self.pm).ps).origin[2] + 16.0;
@@ -653,12 +657,16 @@ impl PmoveContext<'_> {
                                     vAng[PITCH] = 0.0;
                                     vAng[ROLL] = 0.0;
                                     vAng[YAW] = (*(*pVeh).m_vOrientation.add(YAW));
-                                    AngleVectors(
-                                        vAng,
-                                        Some(&mut fxAxis[2]),
-                                        Some(&mut fxAxis[1]),
-                                        Some(&mut fxAxis[0]),
-                                    );
+                                    {
+                                        let (fx01, fx2) = fxAxis.split_at_mut(2);
+                                        let (fx0, fx1) = fx01.split_at_mut(1);
+                                        AngleVectors(
+                                            vAng,
+                                            Some(&mut fx2[0]),
+                                            Some(&mut fx1[0]),
+                                            Some(&mut fx0[0]),
+                                        );
+                                    }
                                     if (*info).iWakeFX != 0 {
                                         self.callbacks.play_effect_id(
                                             (*info).iWakeFX,

@@ -38,7 +38,7 @@ use crate::prelude::*;
 use crate::entity::flags::{FL_NO_BOTS, FL_NO_HUMANS};
 use crate::trap;
 use crate::world::GameContext;
-use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_FREE;
+use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_FREE, DUELTEAM_LONE, DUELTEAM_SINGLE};
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::{
     SS_DUAL, SS_FAST, SS_STAFF, SS_STRONG,
 };
@@ -2543,7 +2543,7 @@ pub fn ClientSpawn(
                 } else if (*ctx.world).cvars.g_gametype.integer == GT_DUEL {
                     sp = SelectDuelSpawnPoint(
                         ctx,
-                        DUELTEAM_SINGLE,
+                        DUELTEAM_SINGLE as c_int,
                         (*client).ps.origin,
                         &mut spawn_origin,
                         &mut spawn_angles,
@@ -2935,7 +2935,7 @@ pub fn ClientSpawn(
         } else if (*ctx.world).cvars.g_gametype.integer == GT_DUEL
             || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
         {
-            if (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL && (*client).sess.duelTeam == DUELTEAM_LONE {
+            if (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL && (*client).sess.duelTeam == DUELTEAM_LONE as c_int {
                 if (*ctx.world).cvars.g_duel_fraglimit.integer != 0 {
                     let h = ((*ctx.world).cvars.g_powerDuelStartHealth.integer as f32
                         - (((*ctx.world).cvars.g_powerDuelStartHealth.integer
@@ -3269,7 +3269,7 @@ pub fn ClientDisconnect(
             BotAIShutdownClient(ctx, clientNum, qfalse);
         }
 
-        G_ClearClientLog(ctx, clientNum);
+        crate::g_log::G_ClearClientLog(ctx, clientNum);
     }
 }
 
