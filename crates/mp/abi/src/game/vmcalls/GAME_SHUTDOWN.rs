@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 // Flow:
 //
@@ -44,4 +46,18 @@ impl InboundVmCall for GameShutdown {
     type Output = ();
 
     const COMMAND: MpGameExport = MpGameExport::GAME_SHUTDOWN;
+}
+
+impl DecodeVmMain for GameShutdown {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `G_ShutdownGame( arg0 )` — g_main.c:521.
+        GameShutdownArgs::new(word_to_c_int(t.arg(0)))
+    }
+}
+
+impl EncodeVmMainReturn for GameShutdown {
+    fn encode_return(_output: Self::Output) -> isize {
+        // `G_ShutdownGame(...); return 0;` — g_main.c:521-522.
+        0
+    }
 }

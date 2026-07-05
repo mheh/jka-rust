@@ -25,9 +25,28 @@ pub struct GameContext<'e> {
     pub engine: &'e Engine,
 }
 
-// The per-command `impl Dispatch<C> for GameContext` blocks (one per
-// `MpGameExport` variant — GAME_INIT/GAME_RUN_FRAME/…) are logic-port work, not
-// frozen skeleton surface. Each unpacks `self.world` via STATE-D6 leaf reborrows
-// and threads `self.engine` into the ported logic fns.
-//TODO: Port Dispatch<C> for GameContext (per-command, logic-port)
+// The per-command `impl Dispatch<C> for GameContext` blocks colocate here
+// (round-6 pinning: thin adapters only; per-command logic stays
+// one-fn-per-file). Each unpacks `self.world` via STATE-D6 leaf reborrows and
+// threads `self.engine` into the ported logic fns.
+
+use mp_abi::game::vmcalls::GAME_INIT::{GameInit, GameInitArgs};
+use mp_abi::game::vmcalls::GAME_SHUTDOWN::{GameShutdown, GameShutdownArgs};
+use mp_abi::Dispatch;
+
+/// `GAME_INIT` → `G_InitGame( arg0, arg1, arg2 )` (`g_main.c:517-519`).
+impl Dispatch<GameInit> for GameContext<'_> {
+    fn dispatch(&self, args: GameInitArgs) {
+        crate::g_init_game::g_init_game(*self, args)
+    }
+}
+
+/// `GAME_SHUTDOWN` → `G_ShutdownGame( arg0 )` (`g_main.c:520-522`).
+impl Dispatch<GameShutdown> for GameContext<'_> {
+    fn dispatch(&self, args: GameShutdownArgs) {
+        crate::g_shutdown_game::g_shutdown_game(*self, args)
+    }
+}
+
+//TODO: Port Dispatch<C> for GameContext (remaining MpGameExport commands)
 // Source: docs/architecture/engine-seam.md § inbound dual (SEAM-D8)

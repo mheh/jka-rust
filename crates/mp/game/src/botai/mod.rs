@@ -8,4 +8,5 @@ pub mod bot_teamplay_state_t;
 pub mod botattachment_s;
 pub mod boteventtracker_s;
 pub mod botskills_s;
+pub mod bweaponrange;
 pub mod nodeobject_s;

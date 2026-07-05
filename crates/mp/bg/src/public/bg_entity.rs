@@ -4,11 +4,12 @@
 
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::c_int;
-use core::ffi::c_void;
+use core::ffi::{c_char, c_int, c_void};
 
 use mp_qshared::common::mp::qcommon::{entityState_t, playerState_t};
-use mp_qshared::shared::vec3_t;
+use mp_qshared::shared::{vec3_t, entityShared_t};
+
+use crate::vehicles::vehicle_s::Vehicle_t;
 
 /// Raven `bgEntity_t` — the shared bg-side view of an entity (matches the head
 /// of `gentity_t`/`centity_t`).
@@ -23,13 +24,11 @@ pub struct bgEntity_t {
     pub s: entityState_t,
     /// Raven field source: `oracle/oracle/codemp/game/bg_public.h:426`
     pub playerState: *mut playerState_t,
-    //TODO: Port Vehicle_t
-    // Source: oracle/oracle/codemp/game/bg_public.h:427 (used *mut only)
-    /// Placeholder for `Vehicle_t *m_pVehicle` until `Vehicle_t` is ported.
+    /// Raven `Vehicle_t *m_pVehicle`.
     ///
     /// Raven: vehicle data.
     /// Raven field source: `oracle/oracle/codemp/game/bg_public.h:427`
-    pub m_pVehicle: *mut c_void,
+    pub m_pVehicle: *mut Vehicle_t,
     /// G2 instance.
     /// Raven field source: `oracle/oracle/codemp/game/bg_public.h:428`
     pub ghoul2: *mut c_void,
@@ -39,10 +38,18 @@ pub struct bgEntity_t {
     /// Needed for g2 collision.
     /// Raven field source: `oracle/oracle/codemp/game/bg_public.h:430`
     pub modelScale: vec3_t,
+    /// Shared entity state: linked, bmodel, mins/maxs, absmin/absmax, ownerNum, etc.
+    ///
+    /// Raven field source: `oracle/oracle/codemp/game/g_local.h:144`
+    pub r: entityShared_t,
+    /// Set in QuakeEd.
+    ///
+    /// Raven field source: `oracle/oracle/codemp/game/g_local.h:156`
+    pub classname: *mut c_char,
 }
 
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<bgEntity_t>() == 576);
+const _: () = assert!(core::mem::size_of::<bgEntity_t>() == 696);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(bgEntity_t, s) == 0);
 #[cfg(target_pointer_width = "64")]
@@ -55,3 +62,7 @@ const _: () = assert!(core::mem::offset_of!(bgEntity_t, ghoul2) == 552);
 const _: () = assert!(core::mem::offset_of!(bgEntity_t, localAnimIndex) == 560);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(bgEntity_t, modelScale) == 564);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(bgEntity_t, r) == 576);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(bgEntity_t, classname) == 688);

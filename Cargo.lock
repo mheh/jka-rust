@@ -86,9 +86,11 @@ version = "0.1.0"
 dependencies = [
  "mp_abi",
  "mp_engine_client",
+ "mp_engine_core",
  "mp_engine_qcommon",
  "mp_engine_server",
  "mp_renderer",
+ "native_platform",
 ]
 
 [[package]]

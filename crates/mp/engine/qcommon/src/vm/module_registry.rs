@@ -21,6 +21,17 @@ pub struct ModuleRegistry {
     slots: [Option<ModuleSlot>; MAX_VM],
 }
 
+/// The `Com_Init` step-30 `VM_Init` empty build (lifecycle.md: "a
+/// `ModuleRegistry::default()`-shaped empty build"; Raven zeroes `vmTable`,
+/// `vm.cpp:50-61`).
+impl Default for ModuleRegistry {
+    fn default() -> Self {
+        ModuleRegistry {
+            slots: [None, None, None],
+        }
+    }
+}
+
 impl ModuleRegistry {
     /// `VM_Create` slot semantics (`vm.cpp:471` region): bad-parms guard
     /// (`vm.cpp:480-482`) → `com_error(ERR_FATAL, "VM_Create: bad parms")` —
@@ -61,8 +72,41 @@ impl ModuleRegistry {
         system_calls: SlotSyscall,
         ctx: *mut c_void,
     ) -> Option<SlotId> {
-        let _ = (&self.slots, policy, name, syscall, system_calls, ctx);
-        todo!("Port VM_Create slot semantics — oracle/oracle/codemp/qcommon/vm.cpp:471-524")
+        use crate::common::error::{com_error, ErrorLevel};
+
+        // Bad-parms guard (vm.cpp:480-482); `name.is_empty()` only — the
+        // `!module`/`!systemCalls` disjuncts are structurally unreachable
+        // (round-5 resolution).
+        if name.is_empty() {
+            com_error(ErrorLevel::ERR_FATAL, "VM_Create: bad parms".into());
+        }
+        // Reuse a live slot whose stored name matches case-insensitively
+        // (Q_stricmp, vm.cpp:485-489) — returned as-is, NO reload.
+        for (i, slot) in self.slots.iter().enumerate() {
+            if let Some(s) = slot {
+                if s.name.eq_ignore_ascii_case(name) {
+                    return Some(SlotId(i as u32));
+                }
+            }
+        }
+        // First free slot (vm.cpp:493-494), else fatal when all MAX_VM are
+        // full (vm.cpp:499-500).
+        let Some(free) = self.slots.iter().position(|s| s.is_none()) else {
+            com_error(ErrorLevel::ERR_FATAL, "VM_Create: no free vm_t".into());
+        };
+        // Fresh slot: run the loader; None = artifact not found — surfaced to
+        // the caller, which owns the fatal disposition (LOAD-D11/LOAD-Q10;
+        // sv_game.cpp:1750-1752).
+        let module = native_platform::module_loader::sys_load_dll(policy, name, syscall)?;
+        self.slots[free] = Some(ModuleSlot {
+            name: name.to_string(),
+            module,
+            engine: super::engine_slot::EngineSlot {
+                ctx,
+                syscall: system_calls,
+            },
+        });
+        Some(SlotId(free as u32))
     }
 
     /// `VM_Free` (`vm.cpp:605-610`): `unload_module` the slot's module, clearing
@@ -70,8 +114,35 @@ impl ModuleRegistry {
     ///
     /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:605-610`
     pub fn unload(&mut self, slot: SlotId) {
-        let _ = (&self.slots, slot);
-        todo!("Port VM_Free — oracle/oracle/codemp/qcommon/vm.cpp:605-610")
+        if let Some(s) = self.slots[slot.0 as usize].take() {
+            native_platform::module_loader::unload_module(s.module);
+        }
+    }
+
+    /// Engine→module call into a loaded slot — Raven `VM_Call( vm_t *vm,
+    /// int callnum, ... )` (`vm.cpp:787-819`): the native arm packs `int
+    /// args[16]` and forwards to `vm->entryPoint`; the callee's fixed
+    /// 12-word parameter list silently drops the extras, so this typed dual
+    /// forwards `command` + exactly 12 words, extras zero-filled by the
+    /// caller.
+    ///
+    /// PROVISIONAL SIGNATURE (checkpoint-7 finding): no frozen doc pins a
+    /// `VM_Call` dual; minimal faithful shape pending its doc home.
+    /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:787-819`
+    pub fn vm_call(
+        &self,
+        slot: &SlotId,
+        command: core::ffi::c_int,
+        args: [isize; 12],
+    ) -> isize {
+        let s = self.slots[slot.0 as usize]
+            .as_ref()
+            .expect("vm_call on an empty slot");
+        let entry = s.module.entry();
+        entry(
+            command, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7],
+            args[8], args[9], args[10], args[11],
+        )
     }
 
     /// Native `VM_Restart` = drop+recreate in place (`vm.cpp:398-409`). `kind` is

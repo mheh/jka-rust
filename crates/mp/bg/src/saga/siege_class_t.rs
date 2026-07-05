@@ -4,6 +4,11 @@ use core::ffi::c_char;
 
 use mp_qshared::shared::{qboolean, NUM_FORCE_POWERS};
 
+/// Raven `MAX_SIEGE_CLASSES` — "up to 128 classes".
+///
+/// Source: `oracle/oracle/codemp/game/bg_saga.h:12`
+pub const MAX_SIEGE_CLASSES: usize = 128;
+
 /// Raven `siegeClass_t` — a siege gametype player class definition.
 ///
 /// Type definition source: `oracle/oracle/codemp/game/bg_saga.h:54-80`

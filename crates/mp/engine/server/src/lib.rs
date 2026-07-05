@@ -3,4 +3,4 @@
 pub mod server;
 pub mod server_host;
 
-pub use server_host::{sv_game_system_calls, Server, ServerGame};
+pub use server_host::{game_system_calls_shim, sv_game_system_calls, Server, ServerGame};

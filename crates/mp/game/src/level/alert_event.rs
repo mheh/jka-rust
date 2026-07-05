@@ -51,6 +51,24 @@ pub struct alertEvent_t {
     pub ID: c_int,                 // unique id (wraps, but only used for comparison)
     pub timestamp: c_int,          // when it was created
 }
+// Manual `Default` (not `derive`) since `alertEventLevel_e`/`alertEventType_e`
+// don't derive it; zero-valued first variants match Raven's zero-init idiom.
+impl Default for alertEvent_t {
+    fn default() -> Self {
+        alertEvent_t {
+            position: [0.0, 0.0, 0.0],
+            radius: 0.0,
+            level: alertEventLevel_e::AEL_MINOR,
+            r#type: alertEventType_e::AET_SIGHT,
+            owner: core::ptr::null_mut(),
+            light: 0.0,
+            addLight: 0.0,
+            ID: 0,
+            timestamp: 0,
+        }
+    }
+}
+
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<alertEvent_t>() == 48);
 #[cfg(target_pointer_width = "64")]

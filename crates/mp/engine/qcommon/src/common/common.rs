@@ -50,6 +50,12 @@ pub struct Common {
 ///
 /// Source: `oracle/oracle/codemp/qcommon/common.cpp:128`
 pub fn com_printf(common: &mut Common, msg: &str) {
-    let _ = (common, msg);
-    todo!("Port Com_Printf — oracle/oracle/codemp/qcommon/common.cpp:128")
+    let _ = common;
+    //TODO: Port Com_Printf rd_buffer redirect + logfile + console routing
+    // Source: oracle/oracle/codemp/qcommon/common.cpp:137-181
+    // Slice-0 minimal sink: the local-console write only (Sys_Print tail,
+    // common.cpp:168); redirect/logfile land with their Common fields.
+    print!("{msg}");
+    use std::io::Write as _;
+    let _ = std::io::stdout().flush();
 }

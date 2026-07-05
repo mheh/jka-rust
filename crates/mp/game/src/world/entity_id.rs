@@ -1,12 +1,11 @@
 //! `EntityId` — the entity handle (porting-rules §B5).
+//!
+//! The type itself now lives in `mp_qshared` (`common::mp::entity_id`) so that
+//! `gentity_t`'s stored entity fields can name it. This module
+//! re-exports it (and the `ent_id`/`ent_id_opt` seam helpers) at the historical
+//! `crate::world::EntityId` path so every existing game-side use keeps compiling
+//! unchanged.
+//!
+//! Source: `docs/architecture/state-ownership.md` § `EntityId`.
 
-/// Raven's `gentity_t*` become an index into `GameWorld.entities`
-/// (`mp_qshared::common::mp::gentity_t`, oracle home
-/// `oracle/oracle/codemp/game/g_shared.h`). Module logic passes `(world, id)`
-/// and re-indexes per access — GP2's `GpGroupId` precedent; no aliasing raw
-/// pointers in safe code (§B5).
-///
-/// Source: `docs/architecture/state-ownership.md` § `EntityId` — the entity
-/// handle (§B5).
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct EntityId(pub u32);
+pub use mp_qshared::common::mp::entity_id::{ent_id, ent_id_opt, EntityId};

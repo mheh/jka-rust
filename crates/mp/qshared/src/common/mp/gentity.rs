@@ -7,8 +7,11 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+use crate::common::mp::ent_fn_ids::{
+    EntBlocked, EntDie, EntPain, EntReached, EntThink, EntTouch, EntUse,
+};
+use crate::common::mp::entity_id::EntityId;
 use crate::common::mp::qcommon::{entityState_t, gitem_t, parms_t, playerState_t};
-use crate::common::mp::trace_t::trace_t;
 use crate::shared::{entityShared_t, qboolean, vec3_t};
 
 /// Raven MP `NUM_TIDS`.
@@ -20,6 +23,12 @@ pub const NUM_TIDS: usize = 10;
 ///
 /// Definition source: `oracle/oracle/codemp/game/g_public.h:642-663`
 pub const NUM_BSETS: usize = 17;
+
+/// Raven MP `BSET_FIRST` — alias for `BSET_SPAWN` (first `bSet_t` value), used
+/// as the loop start when walking `behaviorSet[]`.
+///
+/// Definition source: `oracle/oracle/codemp/game/g_public.h:642-663`
+pub const BSET_FIRST: usize = 0;
 
 /// Raven MP `MAX_FAILED_NODES`.
 ///
@@ -36,10 +45,38 @@ pub const HL_MAX: usize = 23;
 /// Type definition source: `oracle/oracle/codemp/game/g_local.h:89-94`
 pub type moverState_t = c_int;
 
+pub const MOVER_POS1: moverState_t = 0;
+pub const MOVER_POS2: moverState_t = 1;
+pub const MOVER_1TO2: moverState_t = 2;
+pub const MOVER_2TO1: moverState_t = 3;
+
 /// Raven MP `material_t`.
 ///
 /// Type definition source: `oracle/oracle/codemp/game/q_shared.h:990`
 pub type material_t = c_int;
+
+/// Raven `material_e` variants (`//# material_e`, anonymous-enum + `typedef int
+/// material_t` per enum-vs-alias fidelity).
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.h:967-987`
+pub const MAT_METAL: material_t = 0; // scorched blue-grey metal
+pub const MAT_GLASS: material_t = 1; // not a real chunk type, just plays an effect with glass sprites
+pub const MAT_ELECTRICAL: material_t = 2; // sparks only
+pub const MAT_ELEC_METAL: material_t = 3; // sparks/electrical type metal
+pub const MAT_DRK_STONE: material_t = 4; // brown
+pub const MAT_LT_STONE: material_t = 5; // tan
+pub const MAT_GLASS_METAL: material_t = 6; // glass sprites and METAl chunk
+pub const MAT_METAL2: material_t = 7; // electrical metal type
+pub const MAT_NONE: material_t = 8; // no chunks
+pub const MAT_GREY_STONE: material_t = 9; // grey
+pub const MAT_METAL3: material_t = 10; // METAL and METAL2 chunks
+pub const MAT_CRATE1: material_t = 11; // yellow multi-colored crate chunks
+pub const MAT_GRATE1: material_t = 12; // grate chunks
+pub const MAT_ROPE: material_t = 13; // for yavin trial...no chunks, just wispy bits
+pub const MAT_CRATE2: material_t = 14; // read multi-colored crate chunks
+pub const MAT_WHITE_METAL: material_t = 15; // white angular chunks
+pub const MAT_SNOWY_ROCK: material_t = 16; // gray & brown chunks
+pub const NUM_MATERIALS: material_t = 17;
 
 /// Raven MP `gentity_t`.
 ///
@@ -56,8 +93,13 @@ pub struct gentity_t {
     pub playerState: *mut playerState_t,
     //TODO: Port Vehicle_t
     // Source: oracle/oracle/codemp/game/bg_vehicles.h:477 (used *mut only via g_local.h:137)
-    // pub m_pVehicle: *mut Vehicle_t,
-    /// Placeholder for `Vehicle_t *m_pVehicle` until `Vehicle_t` is ported.
+    // `Vehicle_t` IS ported (`mp_bg::vehicles::vehicle_s::Vehicle_t`), but it
+    // cannot be named here: `gentity_t` lives in `mp_qshared` (the abi seam names
+    // `*mut gentity_t`) and `mp_qshared` sits below `mp_bg` in the tier graph
+    // (native < qshared < bg < game), so it may not depend on `mp_bg`. `*mut
+    // c_void` is ABI-identical to `*mut Vehicle_t` (pointer-sized). Restoring the
+    // real type needs the abi-seam refactor that moves `gentity_t` to a tier that
+    // can see `mp_bg` (same blocker as the `client: *mut c_void` field below).
     pub m_pVehicle: *mut c_void,
     /// G2 instance.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:138`
@@ -235,11 +277,11 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:240`
     pub soundLoop: c_int,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:241`
-    pub parent: *mut gentity_t,
+    pub parent: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:242`
-    pub nextTrain: *mut gentity_t,
+    pub nextTrain: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:243`
-    pub prevTrain: *mut gentity_t,
+    pub prevTrain: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:244`
     pub pos1: vec3_t,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:244`
@@ -276,7 +318,7 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:263`
     pub targetShaderNewName: *mut c_char,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:264`
-    pub target_ent: *mut gentity_t,
+    pub target_ent: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:266`
     pub closetarget: *mut c_char,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:267`
@@ -303,38 +345,20 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:283`
     pub nextthink: c_int,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:284`
-    pub think: Option<unsafe extern "C" fn(self_: *mut gentity_t)>,
+    pub think: Option<EntThink>,
     /// Movers call this when hitting endpoint.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:285`
-    pub reached: Option<unsafe extern "C" fn(self_: *mut gentity_t)>,
+    pub reached: Option<EntReached>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:286`
-    pub blocked: Option<unsafe extern "C" fn(self_: *mut gentity_t, other: *mut gentity_t)>,
+    pub blocked: Option<EntBlocked>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:287`
-    pub touch: Option<
-        unsafe extern "C" fn(self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t),
-    >,
+    pub touch: Option<EntTouch>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:288`
-    pub use_: Option<
-        unsafe extern "C" fn(
-            self_: *mut gentity_t,
-            other: *mut gentity_t,
-            activator: *mut gentity_t,
-        ),
-    >,
+    pub use_: Option<EntUse>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:289`
-    pub pain: Option<
-        unsafe extern "C" fn(self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int),
-    >,
+    pub pain: Option<EntPain>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:290`
-    pub die: Option<
-        unsafe extern "C" fn(
-            self_: *mut gentity_t,
-            inflictor: *mut gentity_t,
-            attacker: *mut gentity_t,
-            damage: c_int,
-            mod_: c_int,
-        ),
-    >,
+    pub die: Option<EntDie>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:292`
     pub pain_debounce_time: c_int,
     /// Wind tunnel.
@@ -371,19 +395,19 @@ pub struct gentity_t {
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:312`
     pub alt_fire: qboolean,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:314`
-    pub chain: *mut gentity_t,
+    pub chain: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:315`
-    pub enemy: *mut gentity_t,
+    pub enemy: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:316`
-    pub lastEnemy: *mut gentity_t,
+    pub lastEnemy: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:317`
-    pub activator: *mut gentity_t,
+    pub activator: Option<EntityId>,
     /// Next entity in team.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:318`
-    pub teamchain: *mut gentity_t,
+    pub teamchain: Option<EntityId>,
     /// Master of the team.
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:319`
-    pub teammaster: *mut gentity_t,
+    pub teammaster: Option<EntityId>,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:321`
     pub watertype: c_int,
     /// Raven field source: `oracle/oracle/codemp/game/g_local.h:322`
@@ -452,8 +476,16 @@ pub struct gentity_t {
 // `m_pVehicle`/`client`/`NPC` occupy the same 8 bytes as their real pointee
 // pointers, so these offsets hold regardless of those types being ported.
 // Source: `oracle/oracle/codemp/game/g_local.h:133-359`
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<gentity_t>() == 1832);
+//
+// The 10 stored `gentity_t*` fields (`parent`..`teammaster`, all after
+// `moverState`) became `Option<EntityId>`. Those pointers were never
+// ABI-visible — the engine only pins the SHARED PREFIX (`s`, then
+// `r`/`entityShared_t`, up through
+// `next_roff_time`, per the "DO NOT MODIFY ANYTHING ABOVE THIS" comment) and
+// learns the full stride at runtime via `trap_LocateGameData`. So the private
+// tail (`size_of` and every offset at/after the first flipped field `parent`)
+// is free and its literal asserts are dropped; only the fixed-prefix asserts
+// below (all BEFORE `parent`) are kept.
 const _: () = assert!(core::mem::offset_of!(gentity_t, s) == 0); // arch-independent anchor
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, r) == 576);
@@ -463,14 +495,6 @@ const _: () = assert!(core::mem::offset_of!(gentity_t, taskID) == 688);
 const _: () = assert!(core::mem::offset_of!(gentity_t, client) == 976);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gentity_t, moverState) == 1176);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gentity_t, think) == 1440);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gentity_t, material) == 1516);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gentity_t, locationDamage) == 1544);
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gentity_t, item) == 1824);
 
 // The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
 // all-zero bytes are a valid gentity_t — the same property the layout asserts above

@@ -36,6 +36,11 @@ pub struct gitem_t {
     pub sounds: *mut c_char,
     pub description: *mut c_char,
 }
+
+// Every pointer field is initialized from a `'static` string literal (Raven's
+// `bg_itemlist[]` is a compile-time const table) and never mutated, so sharing
+// `gitem_t` tables across threads is sound despite the raw pointers.
+unsafe impl Sync for gitem_t {}
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<gitem_t>() == 104);
 #[cfg(target_pointer_width = "64")]

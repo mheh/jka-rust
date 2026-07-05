@@ -7,6 +7,7 @@
 use core::ffi::{c_char, c_int, c_uint, c_void};
 
 use mp_qshared::common::mp::gentity::gentity_t;
+use mp_qshared::common::mp::entity_id::EntityId;
 use mp_qshared::common::mp::qcommon::{playerState_t, saberInfo_t, MAX_SABERS};
 use mp_qshared::shared::{qboolean, vec3_t, MAX_QPATH};
 
@@ -92,7 +93,7 @@ pub struct gclient_s {
     pub lastKillTime: c_int, // for multiple kill rewards
 
     pub fireHeld: qboolean,     // used for hook
-    pub hook: *mut gentity_t,   // grapple hook if out
+    pub hook: Option<EntityId>,   // grapple hook if out
 
     pub switchTeamTime: c_int, // time the player switched teams
 
@@ -168,9 +169,9 @@ pub struct gclient_s {
     pub playerTeam: npcteam_t,
     pub enemyTeam: npcteam_t,
     pub squadname: *mut c_char,
-    pub team_leader: *mut gentity_t,
-    pub leader: *mut gentity_t,
-    pub follower: *mut gentity_t,
+    pub team_leader: Option<EntityId>,
+    pub leader: Option<EntityId>,
+    pub follower: Option<EntityId>,
     pub numFollowers: c_int,
     pub formationGoal: *mut gentity_t,
     pub nextFormGoal: c_int,
@@ -231,7 +232,6 @@ pub struct gclient_s {
 pub type gclient_t = gclient_s;
 
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::size_of::<gclient_t>() == 7344);
 const _: () = assert!(core::mem::offset_of!(gclient_t, ps) == 0); // arch-independent anchor
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gclient_t, pers) == 1552);
@@ -240,11 +240,14 @@ const _: () = assert!(core::mem::offset_of!(gclient_t, sess) == 1708);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::offset_of!(gclient_t, saber) == 1992);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gclient_t, renderInfo) == 6776);
+// This struct's stored `gentity_t*` fields are ported as `Option<EntityId>`
+// (align 4 vs a pointer's align 8), so the private tail's byte offsets shift. This struct is
+// game-internal / not ABI-fixed beyond its prefix — the engine learns the full
+// stride at runtime via `trap_LocateGameData`. The `size_of` assert and every
+// `offset_of` assert at/after the first flipped field are therefore dropped;
+// only the fixed-prefix asserts above (declared before the first flip) remain.
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gclient_t, NPC_class) == 7204);
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(core::mem::offset_of!(gclient_t, lastGenCmdTime) == 7324);
 
 // The STATE-D9 zeroed-construction contract (round-5 STATE-Q10 resolution):
 // all-zero bytes are a valid gclient_t — the same property the layout asserts above

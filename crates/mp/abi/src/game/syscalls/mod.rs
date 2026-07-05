@@ -294,6 +294,8 @@ pub mod G_NAV_SHOWNODES;
 pub mod G_NAV_SHOWPATH;
 pub mod G_PERPENDICULARVECTOR;
 pub mod G_POINT_CONTENTS;
+/// Public alias for `G_POINT_CONTENTS` to support underscore-less path conventions.
+pub use G_POINT_CONTENTS as G_POINTCONTENTS;
 pub mod G_PRECISIONTIMER_END;
 pub mod G_PRECISIONTIMER_START;
 pub mod G_PRINT;

@@ -5,7 +5,8 @@
 
 use super::loaded_module::LoadedModule;
 use super::search_policy::ModuleSearchPolicy;
-use crate::entrypoints::RawSyscall;
+use super::search_step::SearchStep;
+use crate::entrypoints::{RawSyscall, RawVmMain};
 
 /// Faithful to `Sys_LoadDll` (`win_main.cpp:811-887`) MINUS the pure-server
 /// `Sys_UnpackDLL` pre-step (`:849-852`), which is IN SCOPE but DEFERRED to a
@@ -25,19 +26,70 @@ use crate::entrypoints::RawSyscall;
 ///
 /// Source: `oracle/oracle/codemp/win32/win_main.cpp:811-887`
 pub fn sys_load_dll(
-    _policy: &ModuleSearchPolicy,
-    _name: &str,
-    _syscall: RawSyscall,
+    policy: &ModuleSearchPolicy,
+    name: &str,
+    syscall: RawSyscall,
 ) -> Option<LoadedModule> {
-    todo!("Port Sys_LoadDll — oracle/oracle/codemp/win32/win_main.cpp:811-887")
-    //TODO: Port Sys_UnpackDLL — oracle/oracle/codemp/win32/win_main.cpp:762-800 (LOAD-D7)
+    use crate::entrypoints::RawDllEntry;
+
+    //TODO: Port Sys_UnpackDLL — pure-server pk3 unpack pre-step, deferred (LOAD-D7)
+    // Source: oracle/oracle/codemp/win32/win_main.cpp:762-800,849-852
+
+    // Filename synthesis (win_main.cpp:826 / unix_main.c:346). A `None` suffix
+    // is the LOAD-Q1 unresolved macOS arm — no filename can be synthesized.
+    let suffix = policy.naming.suffix?;
+    let filename = format!("{name}{suffix}");
+
+    // Win32-only direct probe (win_main.cpp:855); Unix policies set
+    // `direct_first: false` (unix_main.c:361-373 `#if 0`).
+    let mut lib: Option<libloading::Library> = None;
+    if policy.direct_first {
+        lib = unsafe { libloading::Library::new(&filename).ok() };
+    }
+    // Ordered FS_BuildOSPath probes ("<base>/<gamedir>/<file>",
+    // files.cpp:479-498); steps walked blindly (caller omitted empty-base
+    // steps, LOAD-D9), first hit wins (win_main.cpp:858-869).
+    if lib.is_none() {
+        for step in &policy.steps {
+            let SearchStep::FsPath { base, gamedir } = step;
+            let path = base.join(gamedir).join(&filename);
+            if let Ok(l) = unsafe { libloading::Library::new(&path) } {
+                lib = Some(l);
+                break;
+            }
+        }
+    }
+    let lib = lib?;
+
+    // Handshake (win_main.cpp:879-887): "dllEntry" + "vmMain" both required;
+    // on a miss the library is freed (drop) and None returned.
+    let (dll_entry, entry): (RawDllEntry, RawVmMain) = unsafe {
+        let de = lib.get::<RawDllEntry>(b"dllEntry\0").ok();
+        let vm = lib.get::<RawVmMain>(b"vmMain\0").ok();
+        match (de, vm) {
+            (Some(d), Some(v)) => (*d, *v),
+            _ => {
+                // Debug arm: print + None (unix_main.c:433-435). The release
+                // (`cfg(not(debug_assertions))`) in-loader receiverless fatal
+                // dual of unix_main.c:431-436 is sanctioned-open:
+                //TODO: Port NDEBUG in-loader fatal (LOAD-Q13 mechanism)
+                // Source: oracle/oracle/codemp/unix/unix_main.c:431-436
+                eprintln!("Sys_LoadDll({name}) failed dlsym(vmMain/dllEntry)");
+                return None;
+            }
+        }
+    };
+    // Hand the module the engine syscall trampoline (win_main.cpp:887).
+    dll_entry(syscall);
+    Some(LoadedModule { lib, entry })
 }
 
 /// Faithful to `Sys_UnloadDll` via `VM_Free` (`vm.cpp:605-610`): drop the
 /// library, clearing the slot. No global `currentVM`/`lastVM` clobber (LOAD-D5).
 ///
 /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:605-610`
-pub fn unload_module(_module: LoadedModule) {
-    // Drop of `LoadedModule` releases the `libloading::Library` handle.
-    //TODO: Port Sys_UnloadDll semantics beyond the Drop — oracle/oracle/codemp/qcommon/vm.cpp:605-610
+pub fn unload_module(module: LoadedModule) {
+    // Drop of the `libloading::Library` IS the Sys_UnloadDll/FreeLibrary
+    // (vm.cpp:605-610); no global currentVM/lastVM clobber (LOAD-D5).
+    drop(module);
 }

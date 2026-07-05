@@ -20,6 +20,12 @@ pub struct BG_field_t {
     pub flags: c_int,
 }
 
+// `name` is always initialized from a `'static` string literal (Raven's
+// spawn-field tables are `static const fieldDescriptor_t` arrays of C-string
+// literals cast to `char *`) and never mutated, so sharing a `BG_field_t`
+// table across threads is sound despite the raw pointer.
+unsafe impl Sync for BG_field_t {}
+
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<BG_field_t>() == 24);
 #[cfg(target_pointer_width = "64")]

@@ -4,6 +4,11 @@
 
 #![allow(non_camel_case_types)]
 
+/// Raven `#define EVENT_VALID_MSEC 300` — events are cleared this many ms
+/// after `eventTime` is set.
+/// Source: `oracle/oracle/codemp/game/bg_public.h:732`
+pub const EVENT_VALID_MSEC: i32 = 300;
+
 /// Raven `entity_event_t`.
 ///
 /// Raven: There is a maximum of 256 events (8 bits transmission, 2 high bits for uniqueness).

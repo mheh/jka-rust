@@ -36,9 +36,22 @@ impl CEngine {
     /// args[16]` (`vm.cpp:363-376`), extras zero-filled.
     ///
     /// Source: `oracle/oracle/codemp/qcommon/vm.cpp:363-376`
-    unsafe fn raw_syscall_words(&self, _import: c_int, _words: &[isize]) -> isize {
-        let _ = self.syscall;
-        todo!("Port CEngine::raw_syscall_words — oracle/oracle/codemp/qcommon/vm.cpp:363-376")
+    unsafe fn raw_syscall_words(&self, import: c_int, words: &[isize]) -> isize {
+        // Fixed 16-slot frame: the import word + 15 argument words, extras
+        // zero-filled — exactly the frame VM_DllSyscall's unpack loop consumes
+        // (vm.cpp:363-376; the callee reads only the indices its trap defines).
+        let mut w = [0isize; 15];
+        let n = words.len().min(15);
+        w[..n].copy_from_slice(&words[..n]);
+        // The C variadic call — through a VARIADIC fn-pointer type so the
+        // va_list ABI is correct on all targets (arm64 stack-passed va-args).
+        let f: unsafe extern "C-unwind" fn(isize, ...) -> isize =
+            core::mem::transmute(self.syscall);
+        f(
+            import as isize,
+            w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8], w[9], w[10], w[11], w[12],
+            w[13], w[14],
+        )
     }
 }
 

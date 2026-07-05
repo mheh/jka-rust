@@ -29,6 +29,8 @@ pub mod item_use_fail;
 pub mod limits;
 pub mod mark_fragment;
 pub mod print_parm;
+pub mod q_color;
+pub mod q_math_rand;
 #[path = "qint64.rs"]
 pub mod int64;
 pub mod saber_block_type;
@@ -38,6 +40,7 @@ pub mod shared_erag_effector;
 pub mod shared_erag_phase;
 pub mod sound_channel;
 pub mod string_id_table;
+pub mod surface_flags;
 pub mod trackchan;
 pub mod vec3struct;
 pub mod wl_e;
@@ -88,10 +91,15 @@ pub use fs_origin::fsOrigin_t;
 pub use gen_cmds::genCmds_t;
 pub use hunk_pref::ha_pref;
 pub use item_use_fail::itemUseFail_t;
-pub use limits::{MAX_CLIENTS, MAX_GENTITIES, MAX_STRING_CHARS};
+pub use limits::{
+    ENTITYNUM_MAX_NORMAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_CLIENTS_I32,
+    MAX_GENTITIES, MAX_STRING_CHARS,
+};
 pub use mark_fragment::markFragment_t;
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};
 pub use print_parm::printParm_t;
+pub use q_color::{Q_IsColorString, Q_COLOR_ESCAPE};
+pub use q_math_rand::RAND_MAX;
 pub use int64::qint64;
 pub use saber_block_type::saberBlockType_t;
 pub use saber_blocked_type::saberBlockedType_t;
@@ -105,6 +113,17 @@ pub use sound_channel::{
     CHAN_VOICE_GLOBAL, CHAN_WEAPON,
 };
 pub use string_id_table::stringID_table_t;
+pub use surface_flags::{
+    CONTENTS_ABSEIL, CONTENTS_BODY, CONTENTS_BOTCLIP, CONTENTS_CORPSE, CONTENTS_DETAIL,
+    CONTENTS_FOG, CONTENTS_INSIDE, CONTENTS_ITEM, CONTENTS_LADDER, CONTENTS_LAVA,
+    CONTENTS_LIGHTSABER, CONTENTS_MONSTERCLIP, CONTENTS_NODROP, CONTENTS_NOSHOT, CONTENTS_OPAQUE,
+    CONTENTS_OUTSIDE, CONTENTS_PLAYERCLIP, CONTENTS_SHOTCLIP, CONTENTS_SLIME, CONTENTS_SOLID,
+    CONTENTS_TELEPORTER, CONTENTS_TERRAIN, CONTENTS_TRANSLUCENT, CONTENTS_TRIGGER,
+    CONTENTS_WATER, MASK_ALL, MASK_DEADSOLID, MASK_NPCSOLID, MASK_OPAQUE, MASK_PLAYERSOLID,
+    MASK_SHOT, MASK_SOLID, MASK_WATER, SURF_FORCEFIELD, SURF_METALSTEPS, SURF_NODAMAGE,
+    SURF_NODLIGHT, SURF_NODRAW, SURF_NOIMPACT, SURF_NOMARKS, SURF_NOMISCENTS, SURF_NOSTEPS,
+    SURF_SKY, SURF_SLICK,
+};
 pub use trackchan::trackchan_t;
 pub use trajectory::{trType_t, trajectory_t};
 pub use vec3struct::vec3struct_t;
@@ -118,3 +137,5 @@ pub use native_types::{
     clipHandle_t, fileHandle_t, fxHandle_t, mdxaBone_t, qboolean, qhandle_t, sfxHandle_t,
     MAX_QPATH, QFALSE, QTRUE,
 };
+
+pub use native_math::eorientations::Eorientations;

@@ -18,6 +18,10 @@ pub unsafe trait ZeroValid {}
 // rule; the GameWorld `[gentity_t; MAX_GENTITIES]` boxes build through this).
 unsafe impl<T: ZeroValid, const N: usize> ZeroValid for [T; N] {}
 
+// Primitive integer byte-patterns: all-zero is a valid value. `u8` backs
+// `GameWorld`'s raw scratch `memoryPool` byte array.
+unsafe impl ZeroValid for u8 {}
+
 /// THE sanctioned construction idiom for large `#[repr(C)]` all-zeroes-valid
 /// types: `alloc_zeroed` the storage and `Box::from_raw` it, so a large array is
 /// built directly on the heap and never transits the stack (naive
@@ -27,5 +31,19 @@ unsafe impl<T: ZeroValid, const N: usize> ZeroValid for [T; N] {}
 ///
 /// Source: `docs/architecture/state-ownership.md` § `zeroed_box` (STATE-D9).
 pub fn zeroed_box<T: ZeroValid>() -> Box<T> {
-    todo!("Port zeroed_box — alloc_zeroed + Box::from_raw (STATE-D9)")
+    use std::alloc::{alloc_zeroed, handle_alloc_error, Layout};
+    let layout = Layout::new::<T>();
+    if layout.size() == 0 {
+        // ZST: all-zero is trivially the (only) value; no allocation.
+        return unsafe { Box::from_raw(core::ptr::NonNull::<T>::dangling().as_ptr()) };
+    }
+    // SAFETY: the ZeroValid bound carries the all-zero-validity contract; the
+    // allocation is exactly Layout::new::<T>() and ownership passes to the Box.
+    unsafe {
+        let p = alloc_zeroed(layout) as *mut T;
+        if p.is_null() {
+            handle_alloc_error(layout);
+        }
+        Box::from_raw(p)
+    }
 }
