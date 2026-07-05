@@ -1995,6 +1995,7 @@ pub fn G_ShipSurfaceForSurfName(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:2961-3039`
 pub fn G_SetVehDamageFlags(
+    ctx: GameContext<'_>,
     veh: *mut gentity_t,
     shipSurf: c_int,
     damageLevel: c_int,
@@ -2091,6 +2092,7 @@ pub fn G_SetVehDamageFlags(
 ///
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:3041-3100`
 pub fn G_VehicleSetDamageLocFlags(
+    ctx: GameContext<'_>,
     veh: *mut gentity_t,
     impactDir: c_int,
     deathPoint: c_int,
@@ -2136,13 +2138,13 @@ pub fn G_VehicleSetDamageLocFlags(
 
         if (*veh).locationDamage[impactDir as usize] >= deathPoint {
             // destroyed
-            G_SetVehDamageFlags(veh, impactDir, 3);
+            G_SetVehDamageFlags(ctx, veh, impactDir, 3);
         } else if (*veh).locationDamage[impactDir as usize] <= lightDamagePoint {
             // light only
-            G_SetVehDamageFlags(veh, impactDir, 1);
+            G_SetVehDamageFlags(ctx, veh, impactDir, 1);
         } else if (*veh).locationDamage[impactDir as usize] <= heavyDamagePoint {
             // heavy only
-            G_SetVehDamageFlags(veh, impactDir, 2);
+            G_SetVehDamageFlags(ctx, veh, impactDir, 2);
         }
     }
 }
@@ -2311,10 +2313,10 @@ pub fn G_FlyVehicleSurfaceDestruction(
                     // do it
                     if G_FlyVehicleDestroySurface(ctx, veh, impactDir) != qfalse {
                         // actually took off a surface
-                        G_VehicleSetDamageLocFlags(veh, impactDir, deathPoint);
+                        G_VehicleSetDamageLocFlags(ctx, veh, impactDir, deathPoint);
                     }
                 } else {
-                    G_VehicleSetDamageLocFlags(veh, impactDir, deathPoint);
+                    G_VehicleSetDamageLocFlags(ctx, veh, impactDir, deathPoint);
                 }
             }
 
@@ -2670,7 +2672,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                             (*pc).ps.origin,
                             999,
                             DAMAGE_NO_PROTECTION,
-                            MOD_EXPLOSIVE as c_int,
+                            MOD_SUICIDE as c_int, // #define MOD_EXPLOSIVE MOD_SUICIDE
                         );
                     }
                     if (*pVeh).m_iNumPassengers != 0 {
@@ -2687,7 +2689,7 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                                     (*pc).ps.origin,
                                     999,
                                     DAMAGE_NO_PROTECTION,
-                                    MOD_EXPLOSIVE as c_int,
+                                    MOD_SUICIDE as c_int, // #define MOD_EXPLOSIVE MOD_SUICIDE
                                 );
                             }
                             i += 1;

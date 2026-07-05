@@ -30,6 +30,7 @@
 use crate::prelude::*;
 use crate::npc::g_npc_t::gNPC_t;
 use mp_bg::local::force_power_needed::forcePowerNeeded;
+use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_LONE;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.
 // Source: `oracle/oracle/codemp/game/q_shared.h`
@@ -287,7 +288,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
         // branch overwrites `forcePowers` from the bot's personality file.
         if (*ent).r.svFlags & SVF_BOT != 0 && !(*ctx.world).globals.botstates[(*ent).s.number as usize].is_null() {
             //if it's a bot just copy the info directly from its personality
-            let bot_forceinfo = cstr_to_str((*(*ctx.world).globals.botstates[(*ent).s.number as usize]).forceinfo.as_ptr());
+            let bot_forceinfo = cstr_to_str((*(*ctx.world).globals.botstates[(*ent).s.number as usize]).forceinfo.as_ptr() as *const c_char);
             write_cstr_field(&mut forcePowers, &bot_forceinfo);
         }
 
@@ -347,7 +348,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     if i_r as c_int == FP_ABSORB {
                         fp_bytes[i] = b'3';
                     }
-                    if (*(*ctx.world).globals.botstates[(*ent).s.number as usize]).settings.skill >= 4 {
+                    if (*(*ctx.world).globals.botstates[(*ent).s.number as usize]).settings.skill >= 4.0 {
                         //cheat and give them more stuff
                         if i_r as c_int == FP_HEAL {
                             fp_bytes[i] = b'3';
@@ -356,7 +357,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         }
                     }
                 } else if (*cl).ps.fd.forceSide == FORCE_DARKSIDE as c_int {
-                    if (*(*ctx.world).globals.botstates[(*ent).s.number as usize]).settings.skill >= 4 {
+                    if (*(*ctx.world).globals.botstates[(*ent).s.number as usize]).settings.skill >= 4.0 {
                         if i_r as c_int == FP_GRIP {
                             fp_bytes[i] = b'3';
                         } else if i_r as c_int == FP_LIGHTNING {
@@ -5629,7 +5630,7 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                                 level_time + (*ctx.world).cvars.g_forceRegenTime.integer;
                         }
                     } else {
-                        if gametype == GT_POWERDUEL as c_int && (*cl).sess.duelTeam == DUELTEAM_LONE {
+                        if gametype == GT_POWERDUEL as c_int && (*cl).sess.duelTeam == DUELTEAM_LONE as c_int {
                             if (*ctx.world).cvars.g_duel_fraglimit.integer != 0 {
                                 (*cl).ps.fd.forcePowerRegenDebounceTime = level_time
                                     + ((*ctx.world).cvars.g_forceRegenTime.integer as f32

@@ -2528,6 +2528,7 @@ pub fn G_GetAttackDamage(
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
+            &(*ctx.world).bg_state,
         );
         let speedDif = (attackAnimLength - (attackAnimLength * animSpeedFactor)) as c_int;
         attackAnimLength += speedDif as f32;
@@ -2582,6 +2583,7 @@ pub fn G_GetAnimPoint(
             (*sc).ps.torsoAnim,
             &mut animSpeedFactor,
             (*sc).ps.brokenLimbs,
+            &(*ctx.world).bg_state,
         );
         let speedDif = (attackAnimLength - (attackAnimLength * animSpeedFactor)) as c_int;
         attackAnimLength += speedDif as f32;
@@ -4833,8 +4835,8 @@ pub fn CheckSaberDamage(
                 dmg = ((dmg as f32) * (*sc).saber[rSaberNum as usize].damageScale2).ceil() as c_int;
             }
 
-            if ((*sc).ps.brokenLimbs & (1 << BROKENLIMB_RARM)) != 0
-                || ((*sc).ps.brokenLimbs & (1 << BROKENLIMB_LARM)) != 0
+            if ((*sc).ps.brokenLimbs & (1 << BROKENLIMB_RARM as c_int)) != 0
+                || ((*sc).ps.brokenLimbs & (1 << BROKENLIMB_LARM as c_int)) != 0
             {
                 //weaken it if an arm is broken
                 dmg = (dmg as f64 * 0.3) as c_int;
@@ -4853,7 +4855,7 @@ pub fn CheckSaberDamage(
             && (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
             && (*sc).siegeClass != -1
             && ((*ctx.world).bg_state.bgSiegeClasses[(*sc).siegeClass as usize].classflags
-                & (1 << CFL_MORESABERDMG))
+                & (1 << CFL_MORESABERDMG as c_int))
                 != 0
         {
             //this class is flagged to do extra saber damage. I guess 2x will do for now.

@@ -877,6 +877,37 @@ pub fn Q_strchr(string: *const c_char, c: c_int) -> *mut c_char {
     }
 }
 
+/// Raven bare `strstr` call sites (e.g. `g_client.c` GLA-name matching).
+///
+/// House-authored wrapper, not a named Raven `Q_` fn: mirrors `Q_strchr`
+/// above — ported to this canonical string-fn home since call sites need a
+/// C-string `strstr` and none existed yet.
+///
+/// Source: `oracle/oracle/codemp/game/g_client.c` (bare `strstr` call sites).
+pub fn Q_strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char {
+    unsafe {
+        if *needle == 0 {
+            return haystack as *mut c_char;
+        }
+        let mut h = haystack;
+        loop {
+            if *h == 0 {
+                return std::ptr::null_mut();
+            }
+            let mut hh = h;
+            let mut nn = needle;
+            while *hh != 0 && *nn != 0 && *hh == *nn {
+                hh = hh.offset(1);
+                nn = nn.offset(1);
+            }
+            if *nn == 0 {
+                return h as *mut c_char;
+            }
+            h = h.offset(1);
+        }
+    }
+}
+
 /// Raven `Q_strncpyz`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.c:826-840`

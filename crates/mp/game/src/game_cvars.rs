@@ -331,6 +331,24 @@ pub struct GameCvars {
     /// registered ad hoc by `BotAISetup`). `"bot_attachments"` — default `"1"`, flags `0`.
     /// Source: `oracle/oracle/codemp/game/ai_main.c:7575-7616`.
     pub bot_attachments: vmCvar_t,
+    /// Raven `bot_forcepowers` — file-scope `vmCvar_t` (not in `gameCvarTable`;
+    /// registered ad hoc by `BotAISetup`). `"bot_forcepowers"` — default `"1"`, flags `CVAR_CHEAT`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:62`, registration `ai_main.c:7577`.
+    pub bot_forcepowers: vmCvar_t,
+    /// Raven `bot_forgimmick` — file-scope `vmCvar_t` (not in `gameCvarTable`;
+    /// registered ad hoc by `BotAISetup`). `"bot_forgimmick"` — default `"0"`, flags `CVAR_CHEAT`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:63`, registration `ai_main.c:7578`.
+    pub bot_forgimmick: vmCvar_t,
+    /// Raven `bot_honorableduelacceptance` — file-scope `vmCvar_t` (not in
+    /// `gameCvarTable`; registered ad hoc by `BotAISetup`).
+    /// `"bot_honorableduelacceptance"` — default `"0"`, flags `CVAR_CHEAT`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:64`, registration `ai_main.c:7579`.
+    pub bot_honorableduelacceptance: vmCvar_t,
+    /// Raven `bot_getinthecarrr` — file-scope `vmCvar_t` (not in `gameCvarTable`;
+    /// registered ad hoc by `BotAISetup`, `#ifndef FINAL_BUILD` only).
+    /// `"bot_getinthecarrr"` — default `"0"`, flags `0`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:68`, registration `ai_main.c:7583`-area.
+    pub bot_getinthecarrr: vmCvar_t,
 }
 
 /// One `gameCvarTable` row: registration data for `G_RegisterCvars`

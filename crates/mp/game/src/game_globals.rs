@@ -666,9 +666,9 @@ pub struct GameGlobals {
     /// `flagRed` (`wpobject_t *`; points into `gWPArray`).
     /// Source: `oracle/oracle/codemp/game/ai_main.c:86`
     pub flagRed: *mut wpobject_t,
-    //TODO: Port boteventtracker_t[MAX_CLIENTS]
-    // Source: oracle/oracle/codemp/game/ai_main.c:59
-    pub gBotEventTracker: (),
+    /// `boteventtracker_t gBotEventTracker[MAX_CLIENTS]`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:59`
+    pub gBotEventTracker: [crate::botai::boteventtracker_s::boteventtracker_t; mp_qshared::shared::MAX_CLIENTS],
     /// `gUpdateVars`. Source: `oracle/oracle/codemp/game/ai_main.c:7485`
     pub gUpdateVars: c_int,
     /// `static int lastbotthink_time` — bot-think cadence latch (function-scope

@@ -8,6 +8,7 @@ use mp_qshared::common::mp::qcommon::player_state::MAX_PS_EVENTS;
 ///
 /// Type definition source: `oracle/oracle/codemp/game/ai_main.h:130-135`
 #[repr(C)]
+#[derive(Clone, Copy, Default)]
 pub struct boteventtracker_t {
 	pub eventSequence: c_int,
 	pub events: [c_int; MAX_PS_EVENTS],

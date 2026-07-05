@@ -2862,9 +2862,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         pm.pmove_fixed = (*ctx.world).cvars.pmove_fixed.integer | (*client).pers.pmoveFixed;
         pm.pmove_msec = (*ctx.world).cvars.pmove_msec.integer;
 
-        pm.animations = (*ctx.world).bg_state.bgAllAnims[(*ent).localAnimIndex as usize]
-            .anims
-            .as_mut_ptr();
+        pm.animations = (*ctx.world).bg_state.bgAllAnims[(*ent).localAnimIndex as usize].anims;
 
         // rww - bgghoul2
         pm.ghoul2 = core::ptr::null_mut();
@@ -2877,11 +2875,11 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 pm.ghoul2 = (*ent).ghoul2;
                 pm.g2Bolts_LFoot = trap::G2API_AddBolt(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*l_leg_foot".as_ptr()),
+                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*l_leg_foot".to_owned()),
                 );
                 pm.g2Bolts_RFoot = trap::G2API_AddBolt(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*r_leg_foot".as_ptr()),
+                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*r_leg_foot".to_owned()),
                 );
             }
         }

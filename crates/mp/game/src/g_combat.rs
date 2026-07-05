@@ -795,7 +795,8 @@ pub fn G_CheckSpecialDeathAnim(
             }
         };
 
-        if crate::bg_panimate::BG_InRoll(&mut (*client).ps as *mut playerState_t, (*client).ps.legsAnim)
+        let legs_anim_for_roll = (*client).ps.legsAnim;
+        if crate::bg_panimate::BG_InRoll(&mut (*client).ps as *mut playerState_t, legs_anim_for_roll)
             != qfalse
         {
             deathAnim = BOTH_DEATH_ROLL as c_int; //# Death anim from a roll
@@ -2796,8 +2797,8 @@ pub fn G_ApplyKnockback(ctx: GameContext<'_>, targ: *mut gentity_t, newDir: vec3
     unsafe {
         let mut kvel: vec3_t = [0.0; 3];
 
-        let mass: f32 = if (*targ).physicsBounce > 0 {
-            (*targ).physicsBounce as f32 // override the mass
+        let mass: f32 = if (*targ).physicsBounce > 0.0 {
+            (*targ).physicsBounce // override the mass
         } else {
             200.0
         };
@@ -3364,7 +3365,7 @@ pub fn G_Dismember(
         }
 
         // Set up the ExPhys values for the entity.
-        (*limb).epGravFactor = 0;
+        (*limb).epGravFactor = 0.0;
         (*limb).epVelocity = [0.0; 3];
         crate::q_math::_VectorSubtract(point, (*ent).r.currentOrigin, &mut dir);
         crate::q_math::VectorNormalize(&mut dir);

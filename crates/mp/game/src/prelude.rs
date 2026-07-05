@@ -401,7 +401,8 @@ pub use crate::level::interest_point::{MAX_INTEREST_POINTS};  // .claude/worktre
 pub use crate::g_svcmds::{MAX_IPFILTERS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_svcmds.rs
 pub use crate::game_globals::{MAX_ITEMS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/game_globals.rs
 pub use mp_qshared::shared::wpobject::{MAX_NEIGHBOR_SIZE};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/wpobject.rs
-pub use mp_qshared::common::mp::qcommon::parms::{MAX_PARMS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/parms.rs
+pub use mp_qshared::common::mp::qcommon::parms::{MAX_PARMS, parms_t};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/parms.rs
+pub use crate::g_mem::G_Alloc;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/g_mem.rs
 pub use crate::NPC_AI_Utils::{MAX_RADIUS_ENTS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/NPC_AI_Utils.rs
 pub use mp_bg::vehicles::turret_stats_t::{MAX_VEHICLE_TURRET_MUZZLES};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/turret_stats_t.rs
 pub use mp_qshared::shared::q_color::{Q_COLOR_ESCAPE};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/q_color.rs

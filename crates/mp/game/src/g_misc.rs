@@ -330,7 +330,7 @@ pub fn locateCamera(
     unsafe {
         let owner = G_PickTarget(ctx, (*ent).target);
         if owner.is_null() {
-            G_Printf(c"Couldn't find target for misc_partal_surface\n".as_ptr());
+            G_Printf(ctx, c"Couldn't find target for misc_partal_surface\n".as_ptr());
             G_FreeEntity(ctx, ent);
             return;
         }
@@ -952,7 +952,7 @@ pub fn SP_misc_holocron(
             ),
         );
         if tr.startsolid != 0 {
-            G_Printf(cstr(&format!("SP_misc_holocron: misc_holocron startsolid at {}\n", cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr());
+            G_Printf(ctx, cstr(&format!("SP_misc_holocron: misc_holocron startsolid at {}\n", cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr());
             G_FreeEntity(ctx, ent);
             return;
         }
@@ -1293,13 +1293,13 @@ pub fn ammo_generic_power_converter_use(
             (*self_).fly_sound_debounce_time = (*ctx.world).level.time + 500;
             (*self_).activator = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), activator));
             while i < AMMO_MAX as c_int {
-                add = (crate::bg_misc::ammoData[i as usize].max as f32 * 0.05) as c_int;
+                add = (ammoData[i as usize].max as f32 * 0.05) as c_int;
                 if add < 1 {
                     add = 1;
                 }
                 if ((*((*activator).client as *mut gclient_t)).ps.eFlags & EF_DOUBLE_AMMO != 0
-                    && (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] < crate::bg_misc::ammoData[i as usize].max * 2)
-                    || (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] < crate::bg_misc::ammoData[i as usize].max
+                    && (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] < ammoData[i as usize].max * 2)
+                    || (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] < ammoData[i as usize].max
                 {
                     gave_some = true;
                     if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
@@ -1317,14 +1317,14 @@ pub fn ammo_generic_power_converter_use(
                         // fixme - this should SERIOUSLY be externed.
                         (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = 10;
                     } else if (*((*activator).client as *mut gclient_t)).ps.eFlags & EF_DOUBLE_AMMO != 0 {
-                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= crate::bg_misc::ammoData[i as usize].max * 2 {
-                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = crate::bg_misc::ammoData[i as usize].max * 2;
+                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= ammoData[i as usize].max * 2 {
+                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = ammoData[i as usize].max * 2;
                         } else {
                             stop = false;
                         }
                     } else {
-                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= crate::bg_misc::ammoData[i as usize].max {
-                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = crate::bg_misc::ammoData[i as usize].max;
+                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= ammoData[i as usize].max {
+                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = ammoData[i as usize].max;
                         } else {
                             stop = false;
                         }
@@ -1394,7 +1394,7 @@ pub fn SP_misc_ammo_floor_unit(
             ),
         );
         if tr.startsolid != 0 {
-            G_Printf(cstr(&format!("SP_misc_ammo_floor_unit: misc_ammo_floor_unit startsolid at {}\n", cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr());
+            G_Printf(ctx, cstr(&format!("SP_misc_ammo_floor_unit: misc_ammo_floor_unit startsolid at {}\n", cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr());
             G_FreeEntity(ctx, ent);
             return;
         }
@@ -1496,7 +1496,7 @@ pub fn SP_misc_shield_floor_unit(
             ),
         );
         if tr.startsolid != 0 {
-            G_Printf(cstr(&format!("SP_misc_shield_floor_unit: misc_shield_floor_unit startsolid at {}\n", cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr());
+            G_Printf(ctx, cstr(&format!("SP_misc_shield_floor_unit: misc_shield_floor_unit startsolid at {}\n", cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr());
             G_FreeEntity(ctx, ent);
             return;
         }
@@ -1646,14 +1646,14 @@ pub fn ammo_power_converter_use(
                 // Has it got any power left?
                 let mut i = AMMO_BLASTER as c_int;
                 while i < AMMO_MAX as c_int {
-                    add = (crate::bg_misc::ammoData[i as usize].max as f32 * 0.1) as c_int;
+                    add = (ammoData[i as usize].max as f32 * 0.1) as c_int;
                     if add < 1 {
                         add = 1;
                     }
-                    if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] < crate::bg_misc::ammoData[i as usize].max {
+                    if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] < ammoData[i as usize].max {
                         (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] += add;
-                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] > crate::bg_misc::ammoData[i as usize].max {
-                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = crate::bg_misc::ammoData[i as usize].max;
+                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] > ammoData[i as usize].max {
+                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = ammoData[i as usize].max;
                         }
                     }
                     i += 1;

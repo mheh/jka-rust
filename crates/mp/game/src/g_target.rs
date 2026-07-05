@@ -27,6 +27,9 @@ use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_ICARUS_ISINITIALIZED::GIcarusIsinitializedArgs;
+use mp_abi::game::syscalls::G_ICARUS_VALIDENT::GIcarusValidentArgs;
+use mp_abi::game::syscalls::G_ICARUS_INITENT::GIcarusInitentArgs;
+use mp_abi::game::syscalls::G_ICARUS_RUNSCRIPT::GIcarusRunscriptArgs;
 
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
@@ -954,11 +957,11 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
                         // DIVERGENCE: store owned string instead of va() pointer
                         let name = format!("newICARUSEnt{}", (*ctx.world).globals.numNewICARUSEnts);
                         (*ctx.world).globals.numNewICARUSEnts += 1;
-                        (*activator_ent).script_targetname = G_NewString(cstr(&name));
+                        (*activator_ent).script_targetname = G_NewString(cstr(&name).as_ptr());
                     }
 
-                    if trap::ICARUS_ValidEnt(ctx.engine, activator_ent) != 0 {
-                        trap::ICARUS_InitEnt(ctx.engine, activator_ent);
+                    if trap::ICARUS_ValidEnt(ctx.engine, GIcarusValidentArgs::new(activator_ent)) != 0 {
+                        trap::ICARUS_InitEnt(ctx.engine, GIcarusInitentArgs::new(activator_ent));
                     } else {
                         if (*ctx.world).cvars.g_developer.integer != 0 {
                             // Informational debug message
@@ -971,7 +974,7 @@ pub fn scriptrunner_run(ctx: GameContext<'_>, self_: *mut gentity_t,) {
                     // Informational debug message
                 }
                 let script_path = format!("{}/{}", cstr_to_str(Q3_SCRIPT_DIR.as_ptr()), cstr_to_str((*self_).behaviorSet[bSet_t::BSET_USE as usize]));
-                trap::ICARUS_RunScript(ctx.engine, activator_ent, cstr(&script_path));
+                trap::ICARUS_RunScript(ctx.engine, GIcarusRunscriptArgs::new(activator_ent, cstr(&script_path).as_ptr()));
             } else {
                 if (*ctx.world).cvars.g_developer.integer != 0 && (*self_).activator.is_some() {
                     // Informational debug message

@@ -2316,7 +2316,7 @@ impl PmoveContext<'_> {
             if (*ps).saberEntityNum != 0 {
                 if (*ps).weaponTime <= 0 && (*ps).torsoTimer <= 0 {
                     if (*ps).weapon != ((*self.pm).cmd.weapon) as i32 {
-                        PM_BeginWeaponChange((*self.pm).cmd.weapon);
+                        self.PM_BeginWeaponChange((*self.pm).cmd.weapon);
                     }
                 }
             }

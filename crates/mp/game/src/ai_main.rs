@@ -16,6 +16,7 @@ use crate::bg_panimate::{BG_SaberInKata, BG_SaberInSpecial};
 use crate::bg_misc::BG_GetItemIndexByTag;
 use crate::g_utils::G_Find;
 use crate::g_bot::G_CheckBotSpawn;
+use crate::game_globals::BotStates;
 use crate::w_force::ForcePowerUsableOn;
 // Weapon-id constants (Raven `weapon_t` values) used by the ported
 // pure-logic functions below; prelude re-exports only the type.
@@ -222,8 +223,6 @@ pub fn BotOrder(
     unsafe {
         let world = ctx.world;
         let base = (*world).g_entities.as_mut_ptr();
-        // PORT-NOTE(botstates): `globals.botstates` is still a `()` placeholder;
-        // indexed as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
         let botstates = &(*world).globals.botstates;
 
         let mut stateMin: c_int = 0;
@@ -903,8 +902,6 @@ pub fn BotAI(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:778-791`
 pub fn BotScheduleBotThink(ctx: GameContext<'_>) {
-    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder; indexed
-    // as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
     unsafe {
         let world = ctx.world;
         let mut botnum: c_int = 0;
@@ -1037,8 +1034,6 @@ pub fn BotAIShutdownClient(
     client: c_int,
     restart: qboolean,
 ) -> c_int {
-    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder; indexed
-    // as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
     unsafe {
         let world = ctx.world;
         let bs = (*world).globals.botstates[client as usize];
@@ -1120,8 +1115,6 @@ pub fn BotAILoadMap(
     ctx: GameContext<'_>,
     restart: c_int,
 ) -> c_int {
-    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder; indexed
-    // as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
     unsafe {
         let world = ctx.world;
         for i in 0..MAX_CLIENTS {
@@ -1677,8 +1670,7 @@ pub fn WPTouchRoutine(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
 ) {
-    // PORT-NOTE(bot_camp/FORCEJUMP_INSTANTMETHOD): the `bot_camp` cvar has no
-    // ported home (reported missing); instant-method macro undefined here.
+    // PORT-NOTE(FORCEJUMP_INSTANTMETHOD): instant-method macro undefined here.
     unsafe {
         let world = ctx.world;
         let lt = (*world).level.time;
@@ -1906,8 +1898,6 @@ pub fn BotTrace_Jump(
     bs: *mut bot_state_t,
     traceto: vec3_t,
 ) -> c_int {
-    // PORT-NOTE(botstates): `globals.botstates` is a `()` placeholder; indexed
-    // as the intended `[*mut bot_state_t; MAX_CLIENTS]` array.
     unsafe {
         let world = ctx.world;
         let base = (*world).g_entities.as_mut_ptr();
@@ -2283,8 +2273,6 @@ pub fn BotCanHear(
     en: *mut gentity_t,
     endist: f32,
 ) -> c_int {
-    // PORT-NOTE(gBotEventTracker): `globals.gBotEventTracker` is a `()`
-    // placeholder; indexed as the intended `[boteventtracker_t; MAX_CLIENTS]`.
     unsafe {
         let world = ctx.world;
 
@@ -2355,8 +2343,6 @@ pub fn BotCanHear(
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:2013-2031`
 pub fn UpdateEventTracker(ctx: GameContext<'_>) {
-    // PORT-NOTE(gBotEventTracker): `globals.gBotEventTracker` is a `()`
-    // placeholder; indexed as the intended `[boteventtracker_t; MAX_CLIENTS]`.
     unsafe {
         let world = ctx.world;
         let clients = (*world).level.clients;
@@ -2418,9 +2404,6 @@ pub fn PassLovedOneCheck(
     bs: *mut bot_state_t,
     ent: *mut gentity_t,
 ) -> c_int {
-    // PORT-NOTE(botstates/bot_attachments): `globals.botstates` is a `()`
-    // placeholder (indexed as intended); the `bot_attachments` cvar has no
-    // ported home yet (reported missing).
     unsafe {
         let world = ctx.world;
         let base = (*world).g_entities.as_mut_ptr();
@@ -5971,8 +5954,6 @@ pub fn BotLovedOneDied(
             return;
         }
 
-        // PORT-NOTE(bot_attachments): file-scope `bot_attachments` cvar (ai_main.c)
-        // — homes on GameCvars; field not yet present.
         if (*world).cvars.bot_attachments.integer == 0 {
             return;
         }
@@ -6024,8 +6005,6 @@ pub fn BotDeathNotify(
     unsafe {
         let world = ctx.world;
         let clients = (*world).level.clients;
-        // PORT-NOTE(botstates): `globals.botstates` is still a `()` placeholder;
-        // access assumes its settled `[*mut bot_state_t; MAX_CLIENTS]` typing.
         let mut i: usize = 0;
         while i < MAX_CLIENTS {
             let bi = (*world).globals.botstates[i];
@@ -6271,8 +6250,6 @@ pub fn CheckForFriendInLOF(
                     return trent;
                 }
 
-                // PORT-NOTE(botstates): `globals.botstates` still a `()` placeholder;
-                // access assumes `[*mut bot_state_t; MAX_CLIENTS]` typing.
                 let bstate = (*world).globals.botstates[(*trent).s.number as usize];
                 if !bstate.is_null() && GetLoveLevel(ctx, bs, bstate) > 1 {
                     return trent;
@@ -6303,8 +6280,6 @@ pub fn BotScanForLeader(
         }
 
         let mut i: usize = 0;
-        // PORT-NOTE(botstates): `globals.botstates` still a `()` placeholder;
-        // access assumes `[*mut bot_state_t; MAX_CLIENTS]` typing.
         while i < MAX_CLIENTS {
             let ent = base.add(i);
             let bstate = (*world).globals.botstates[i];
@@ -6344,8 +6319,6 @@ pub fn BotReplyGreetings(
         let mut i: usize = 0;
         let mut numhello: c_int = 0;
 
-        // PORT-NOTE(botstates): `globals.botstates` still a `()` placeholder;
-        // access assumes `[*mut bot_state_t; MAX_CLIENTS]` typing.
         while i < MAX_CLIENTS {
             let bi = (*world).globals.botstates[i];
 
@@ -6708,8 +6681,6 @@ pub fn Bot_SetForcedMovement(
 ) {
     unsafe {
         let world = ctx.world;
-        // PORT-NOTE(botstates): `globals.botstates` still a `()` placeholder;
-        // access assumes `[*mut bot_state_t; MAX_CLIENTS]` typing.
         let bs = (*world).globals.botstates[bot as usize];
 
         if bs.is_null() {
@@ -6746,8 +6717,6 @@ pub fn Bot_SetForcedMovement(
 /// Source: `oracle/oracle/codemp/game/ai_main.c:5931-7483`
 // PORT-NOTE(preproc): FORCEJUMP_INSTANTMETHOD/BOT_STRAFE_AVOIDANCE undefined,
 // FINAL_BUILD undefined (the `bot_getinthecarrr` debug block is ported, matching
-// the g_cmds.rs precedent). PORT-NOTE(botstates): `globals.botstates` still a
-// `()` placeholder; access assumes `[*mut bot_state_t; MAX_CLIENTS]`.
 pub fn StandardBotAI(
     ctx: GameContext<'_>,
     bs: *mut bot_state_t,
@@ -8414,8 +8383,6 @@ pub fn BotAIStartFrame(
         };
 
         // execute scheduled bot AI
-        // PORT-NOTE(botstates): `globals.botstates` still a `()` placeholder;
-        // access assumes `[*mut bot_state_t; MAX_CLIENTS]` typing.
         let mut i: usize = 0;
         while i < MAX_CLIENTS {
             let bi = (*world).globals.botstates[i];
@@ -8602,10 +8569,8 @@ pub fn BotAISetup(
         }
 
         //initialize the bot states
-        // PORT-NOTE(botstates): Raven `memset(botstates, 0, sizeof(botstates))`;
-        // `globals.botstates` still a `()` placeholder — zeroing assumes its
-        // settled `[*mut bot_state_t; MAX_CLIENTS]` typing.
-        (*world).globals.botstates = [core::ptr::null_mut(); MAX_CLIENTS];
+        // Raven `memset(botstates, 0, sizeof(botstates))`.
+        (*world).globals.botstates = BotStates::default();
 
         if trap::BotLibSetup(ctx.engine, BotlibSetupArgs::new()) == 0 {
             return qfalse; //wts?!
@@ -8628,8 +8593,6 @@ pub fn BotAIShutdown(
         //if the game is restarted for a tournament
         if restart != 0 {
             //shutdown all the bots in the botlib
-            // PORT-NOTE(botstates): `globals.botstates` still a `()` placeholder;
-            // access assumes `[*mut bot_state_t; MAX_CLIENTS]` typing.
             let mut i: usize = 0;
             while i < MAX_CLIENTS {
                 let bi = (*world).globals.botstates[i];

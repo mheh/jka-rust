@@ -2269,6 +2269,7 @@ pub fn G_UpdateClientAnims(
                 f,
                 &mut animSpeedScale as *mut f32,
                 (*((*self_).client as *mut gclient_t)).ps.brokenLimbs,
+                &(*ctx.world).bg_state,
             );
 
             let all_anims = &(*ctx.world).bg_state.bgAllAnims[(*self_).localAnimIndex as usize];

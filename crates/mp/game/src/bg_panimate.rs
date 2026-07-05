@@ -2185,16 +2185,17 @@ pub fn BG_SaberStartTransAnim(
     anim: c_int,
     animSpeed: *mut f32,
     broken: c_int,
+    bg: &BgState,
 ) {
     use animNumber_t::*;
     unsafe {
         if anim >= BOTH_A1_T__B_ as c_int && anim <= BOTH_ROLL_STAB as c_int {
             if weapon == WP_SABER {
-                let mut saber = BG_MySaber(clientNum, 0);
+                let mut saber = BG_MySaber(clientNum, 0, bg);
                 if !saber.is_null() && (*saber).animSpeedScale != 1.0 {
                     *animSpeed *= (*saber).animSpeedScale;
                 }
-                saber = BG_MySaber(clientNum, 1);
+                saber = BG_MySaber(clientNum, 1, bg);
                 if !saber.is_null() && (*saber).animSpeedScale != 1.0 {
                     *animSpeed *= (*saber).animSpeedScale;
                 }
@@ -2229,7 +2230,9 @@ pub fn BG_SaberStartTransAnim(
 /// Raven `BG_SetAnimFinal`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2800-2924`
+impl PmoveContext<'_> {
 pub fn BG_SetAnimFinal(
+    &mut self,
     ps: *mut playerState_t,
     animations: *mut animation_t,
     setAnimParts: c_int,
@@ -2259,6 +2262,7 @@ pub fn BG_SetAnimFinal(
             anim,
             &mut editAnimSpeed,
             (*ps).brokenLimbs,
+            self.bg,
         );
 
         // Set torso anim
@@ -2275,7 +2279,7 @@ pub fn BG_SetAnimFinal(
                     break 'torso;
                 }
 
-                BG_StartTorsoAnim(ps, anim);
+                self.BG_StartTorsoAnim(ps, anim);
 
                 if setAnimFlags & SETANIM_FLAG_HOLD != 0 {
                     let frame = &*animations.offset(anim as isize);
@@ -2316,7 +2320,7 @@ pub fn BG_SetAnimFinal(
                     break 'legs;
                 }
 
-                BG_StartLegsAnim(ps, anim);
+                self.BG_StartLegsAnim(ps, anim);
 
                 if setAnimFlags & SETANIM_FLAG_HOLD != 0 {
                     let frame = &*animations.offset(anim as isize);
@@ -2349,6 +2353,7 @@ pub fn BG_SetAnimFinal(
         }
     }
 }
+}
 
 /// Raven `PM_SetAnimFinal`.
 ///
@@ -2356,7 +2361,7 @@ pub fn BG_SetAnimFinal(
 impl PmoveContext<'_> {
     pub fn PM_SetAnimFinal(&mut self, setAnimParts: c_int, anim: c_int, setAnimFlags: c_int, blendTime: c_int) {
         unsafe {
-            BG_SetAnimFinal((*self.pm).ps, (*self.pm).animations, setAnimParts, anim, setAnimFlags, blendTime);
+            self.BG_SetAnimFinal((*self.pm).ps, (*self.pm).animations, setAnimParts, anim, setAnimFlags, blendTime);
         }
     }
 }
@@ -2494,7 +2499,7 @@ impl PmoveContext<'_> {
                 }
             }
 
-            BG_SetAnimFinal(ps, animations, setAnimParts, anim, setAnimFlags, blendTime);
+            self.BG_SetAnimFinal(ps, animations, setAnimParts, anim, setAnimFlags, blendTime);
         }
     }
 }
