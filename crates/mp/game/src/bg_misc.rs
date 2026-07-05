@@ -134,8 +134,10 @@ pub const forcePowerDarkLight: [c_int; 18] = [
 
 /// Raven `WeaponReadyAnim[WP_NUM_WEAPONS]` — weapon-ready animation per weapon type.
 ///
+/// Ruling 24: bg const table lives as a `static` in its owning bg module
+/// (the `bg_itemlist` precedent).
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:242-266`
-pub const WeaponReadyAnim: [c_int; 19] = [
+pub static WeaponReadyAnim: [c_int; 19] = [
     TORSO_DROPWEAP1 as c_int,     // WP_NONE
     TORSO_WEAPONREADY3 as c_int,  // WP_STUN_BATON
     TORSO_WEAPONREADY3 as c_int,  // WP_MELEE

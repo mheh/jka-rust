@@ -105,6 +105,24 @@ impl core::ops::IndexMut<usize> for ArenaInfos {
     }
 }
 
+/// Raven `#define MAX_NPC_DATA_SIZE 0x20000` (`NPC_stats.c:236`).
+pub const MAX_NPC_DATA_SIZE: usize = 0x20000;
+
+/// Raven `char NPCParms[MAX_NPC_DATA_SIZE]` / `char npcParseBuffer[MAX_NPC_DATA_SIZE]`
+/// (`NPC_stats.c:237-3238`) — a fixed 128 KB NPC-config parse buffer. Newtype so
+/// `GameGlobals` keeps `#[derive(Default)]` (arrays > 32 have no library `Default`);
+/// `#[repr(transparent)]` keeps the `&globals.NPCParms as *const _ as *const c_char`
+/// porter idiom valid — the wrapper's address is the buffer's first byte.
+/// Source: `oracle/oracle/codemp/game/NPC_stats.c:236-238`
+#[repr(transparent)]
+pub struct NpcDataBuffer(pub [c_char; MAX_NPC_DATA_SIZE]);
+
+impl Default for NpcDataBuffer {
+    fn default() -> Self {
+        NpcDataBuffer([0; MAX_NPC_DATA_SIZE])
+    }
+}
+
 /// `botSpawnQueue_t botSpawnQueue[BOT_SPAWN_QUEUE_DEPTH]` — spawn queue array (`g_bot.c:27`).
 /// Newtype for consistent interface with other large arrays.
 /// Source: `oracle/oracle/codemp/game/g_bot.c:27`
@@ -439,10 +457,13 @@ pub struct GameGlobals {
     pub gNPCPtrs: (),
     /// `showBBoxes`. Source: `oracle/oracle/codemp/game/NPC_spawn.c:4182`
     pub showBBoxes: qboolean,
-    // --- `NPC_stats.c` file-scope globals ---
-    //TODO: Port char[MAX_NPC_DATA_SIZE]
-    // Source: oracle/oracle/codemp/game/NPC_stats.c:3238
-    pub npcParseBuffer: (),
+    // --- `NPC_stats.c` file-scope globals (ruling 24 — file-scope mutable → globals) ---
+    /// Raven `char NPCParms[MAX_NPC_DATA_SIZE]` — the loaded NPC-config text.
+    /// Source: `oracle/oracle/codemp/game/NPC_stats.c:237`
+    pub NPCParms: NpcDataBuffer,
+    /// Raven `char npcParseBuffer[MAX_NPC_DATA_SIZE]` — scratch parse buffer.
+    /// Source: `oracle/oracle/codemp/game/NPC_stats.c:3238`
+    pub npcParseBuffer: NpcDataBuffer,
     // --- `ai_main.c` file-scope globals ---
     //TODO: Port bot_state_t *[MAX_CLIENTS]*
     // Source: oracle/oracle/codemp/game/ai_main.c:46

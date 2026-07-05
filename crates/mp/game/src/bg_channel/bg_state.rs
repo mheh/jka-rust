@@ -103,6 +103,29 @@ pub struct BgState {
     /// Source: `oracle/oracle/codemp/game/bg_saga.c:39`
     pub bgNumSiegeClasses: c_int,
 
+    // --- `bg_saga.c` siege team tables (ruling 24 — module-scope mutable → BgState) ---
+    /// Raven `siegeTeam_t bgSiegeTeams[MAX_SIEGE_TEAMS]` — siege team definitions.
+    /// Source: `oracle/oracle/codemp/game/bg_saga.c:41`
+    pub bgSiegeTeams: Vec<siegeTeam_t>,
+    /// Raven `int bgNumSiegeTeams = 0` — count of loaded siege teams.
+    /// Source: `oracle/oracle/codemp/game/bg_saga.c:42`
+    pub bgNumSiegeTeams: c_int,
+    /// Raven `siegeTeam_t *team1Theme` — theme team for side 1 (points into
+    /// `bgSiegeTeams`; NULL until set).
+    /// Source: `oracle/oracle/codemp/game/bg_saga.c:35`
+    pub team1Theme: *mut siegeTeam_t,
+    /// Raven `siegeTeam_t *team2Theme` — theme team for side 2.
+    /// Source: `oracle/oracle/codemp/game/bg_saga.c:36`
+    pub team2Theme: *mut siegeTeam_t,
+
+    // --- `g_cmds.c` `ConcatArgs` returned-string scratch ---
+    /// Raven `ConcatArgs` builds the joined-argument string in a
+    /// `static char line[MAX_STRING_CHARS]` and returns a pointer to it; ruling 24
+    /// formalizes the porter's `concat_args_line` scratch as the owned home for
+    /// that static, holding the NUL-terminated bytes across the return.
+    /// Source: `oracle/oracle/codemp/game/g_cmds.c:127-140`
+    pub concat_args_line: Vec<u8>,
+
     // --- `bg_misc.c` string pool ---
     /// Raven `static char bg_pool[MAX_POOL_SIZE]` — the `BG_Alloc` bump pool.
     /// Source: `oracle/oracle/codemp/game/bg_misc.c:3324`
@@ -150,6 +173,11 @@ impl BgState {
             VehicleParms: vec![0; crate::bg_vehicleLoad_tables::MAX_VEHICLE_DATA_SIZE],
             bgSiegeClasses: Vec::new(),
             bgNumSiegeClasses: 0,
+            bgSiegeTeams: Vec::new(),
+            bgNumSiegeTeams: 0,
+            team1Theme: core::ptr::null_mut(),
+            team2Theme: core::ptr::null_mut(),
+            concat_args_line: Vec::new(),
             bg_pool: Vec::new(),
             bg_poolSize: 0,
             bg_poolTail: 0,
