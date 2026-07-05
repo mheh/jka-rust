@@ -4020,14 +4020,14 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
             return;
         }
 
-        if pVeh.m_pVehicleInfo.as_ref().unwrap().vtype == crate::shared::VH_WALKER
+        if pVeh.m_pVehicleInfo.as_ref().unwrap().vtype == VH_WALKER
             && (*(*ent).client).ps.electrifyTime > (*ctx.world).level.time
         {
             return;
         }
 
         if !pVeh.m_pVehicleInfo.is_null() &&
-            (pVeh.m_pVehicleInfo.as_ref().unwrap().vtype != crate::shared::VH_FIGHTER || (pVeh.m_ulFlags & crate::shared::VEH_WINGSOPEN) != 0)
+            (pVeh.m_pVehicleInfo.as_ref().unwrap().vtype != VH_FIGHTER || (pVeh.m_ulFlags & crate::shared::VEH_WINGSOPEN) != 0)
         {
             let mut weaponNum: c_int = 0;
             let mut vehWeaponIndex = crate::shared::VEH_WEAPON_NONE;
@@ -4178,7 +4178,7 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
                             let mut ang = [0.0f32; 3];
                             let mut fixedDir = [0.0f32; 3];
 
-                            if pVeh.m_pVehicleInfo.as_ref().unwrap().vtype == crate::shared::VH_SPEEDER {
+                            if pVeh.m_pVehicleInfo.as_ref().unwrap().vtype == VH_SPEEDER {
                                 crate::q_math::VectorSet(&mut ang, 0.0f32, pVeh.m_vOrientation[1], 0.0f32);
                             } else {
                                 crate::q_math::VectorCopy(&pVeh.m_vOrientation, &mut ang);

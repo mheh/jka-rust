@@ -55,10 +55,6 @@ const MAT_METAL: c_int = 5;
 // Source: oracle/oracle/codemp/game/teams.h
 const CLASS_VEHICLE: c_int = 10;
 
-//TODO: Port VH_WALKER
-// Source: oracle/oracle/codemp/game/bg_vehicles.h
-pub const VH_WALKER: c_int = 1;
-
 /// Raven `TurretPain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_turret.c:11-32`
