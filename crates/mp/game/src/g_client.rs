@@ -1180,7 +1180,7 @@ pub fn CopyToBodyQue(
         (*body).s.number = ent_id((*ctx.world).g_entities.as_ptr(), body).index() as c_int;
         (*body).timestamp = (*ctx.world).level.time;
         (*body).physicsObject = qtrue;
-        (*body).physicsBounce = 0; // don't bounce
+        (*body).physicsBounce = (0) as f32; // don't bounce
         if (*body).s.groundEntityNum == ENTITYNUM_NONE {
             (*body).s.pos.trType = TR_GRAVITY;
             (*body).s.pos.trTime = (*ctx.world).level.time;
@@ -2616,7 +2616,7 @@ pub fn ClientSpawn(
         let mut g2_weapon_ptrs: [*mut c_void; MAX_SABERS as usize] = (*client).weaponGhoul2;
 
         i = 0;
-        while i < crate::entity::hit_location::HL_MAX {
+        while i < (crate::entity::hit_location::HL_MAX) as usize {
             (*ent).locationDamage[i as usize] = 0;
             i += 1;
         }
@@ -2911,7 +2911,7 @@ pub fn ClientSpawn(
         }
 
         (*client).ps.rocketLockIndex = ENTITYNUM_NONE;
-        (*client).ps.rocketLockTime = 0;
+        (*client).ps.rocketLockTime = (0) as f32;
 
         (*client).ps.genericEnemyIndex = -1;
 

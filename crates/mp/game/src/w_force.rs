@@ -2098,7 +2098,7 @@ pub fn ForceDrainDamage(
             if !(*traceEnt).client.is_null()
                 && (OnSameTeam(ctx, self_, traceEnt) == 0
                     || (*ctx.world).cvars.g_friendlyFire.integer != 0)
-                && (*scl).ps.fd.forceDrainTime < level_time
+                && (*scl).ps.fd.forceDrainTime < (level_time) as f32
                 && (*tcl).ps.fd.forcePower != 0
             {
                 //an enemy or object
@@ -2615,7 +2615,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
         let cl = (*self_).client as *mut gclient_t;
         let mut targetLive = qfalse;
         let mut mindTrickDone = qfalse;
-        let radius: f32 = MAX_TRICK_DISTANCE;
+        let radius: f32 = (MAX_TRICK_DISTANCE) as f32;
 
         //Check for a direct usage on NPCs first
         let mut tfrom: vec3_t = (*cl).ps.origin;
@@ -4116,7 +4116,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
             return;
         }
 
-        if VectorLength(a) > MAX_GRIP_DISTANCE {
+        if VectorLength(a) > (MAX_GRIP_DISTANCE) as f32 {
             WP_ForcePowerStop(ctx, self_, forcePower);
             return;
         }
@@ -4483,7 +4483,7 @@ fn WP_ForcePowerRun(
             }
             FP_LEVITATION => {
                 if (*cl).ps.groundEntityNum != ENTITYNUM_NONE
-                    && (*cl).ps.fd.forceJumpZStart == 0
+                    && (*cl).ps.fd.forceJumpZStart == (0) as f32
                 {
                     //done with jump
                     WP_ForcePowerStop(ctx, self_, forcePower);
@@ -4844,15 +4844,15 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
             return;
         }
 
-        if (*cl).ps.droneExistTime >= level_time && (*cl).ps.droneExistTime < (level_time + 5000) {
+        if (*cl).ps.droneExistTime >= (level_time) as f32 && (*cl).ps.droneExistTime < ((level_time + 5000)) as f32 {
             (*cl).ps.genericEnemyIndex = 1024 + (*cl).ps.droneExistTime;
-            if (*cl).ps.droneFireTime < level_time {
+            if (*cl).ps.droneFireTime < (level_time) as f32 {
                 let snd = std::ffi::CString::new("sound/weapons/laser_trap/warning.wav").unwrap();
                 G_Sound(ctx, self_, CHAN_BODY, G_SoundIndex(snd.as_ptr()));
-                (*cl).ps.droneFireTime = level_time + 100;
+                (*cl).ps.droneFireTime = (level_time + 100) as f32;
             }
             return;
-        } else if (*cl).ps.droneExistTime < level_time {
+        } else if (*cl).ps.droneExistTime < (level_time) as f32 {
             let mut elevated: vec3_t = (*cl).ps.origin;
             elevated[2] += 40.0;
 
@@ -4939,7 +4939,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
             ];
 
             //org is now where the thing should be client-side because it uses the same time-based offset
-            if (*cl).ps.droneFireTime < level_time {
+            if (*cl).ps.droneFireTime < (level_time) as f32 {
                 let ecl = (*en).client as *mut gclient_t;
                 let mut tr: trace_t = core::mem::zeroed();
                 trap::Trace(
@@ -4969,7 +4969,7 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
                     let snd = std::ffi::CString::new("sound/weapons/bryar/fire.wav").unwrap();
                     G_SoundAtLoc(ctx, org, CHAN_WEAPON, G_SoundIndex(snd.as_ptr()));
 
-                    (*cl).ps.droneFireTime = level_time + (*ctx.world).bg_state.rng.Q_irand(400, 700);
+                    (*cl).ps.droneFireTime = (level_time + (*ctx.world).bg_state.rng.Q_irand(400, 700)) as f32;
                 }
             }
         }
@@ -5000,7 +5000,7 @@ pub fn HolocronUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         let mut i = 0;
         while i < NUM_FORCE_POWERS {
-            if (*cl).ps.holocronsCarried[i as usize] != 0 {
+            if (*cl).ps.holocronsCarried[i as usize] != (0) as f32 {
                 //carrying it, make sure we have the power
                 (*cl).ps.holocronBits |= 1 << i;
                 (*cl).ps.fd.forcePowersKnown |= 1 << i;

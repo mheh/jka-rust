@@ -2417,7 +2417,7 @@ pub fn Q3_SetWalkSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
 
         if int_data == 0 {
             (*npc).stats.walkSpeed = 1;
-            (*client).ps.speed = 1;
+            (*client).ps.speed = (1) as f32;
         }
 
         (*npc).stats.walkSpeed = int_data;
@@ -2449,7 +2449,7 @@ pub fn Q3_SetRunSpeed(ctx: GameContext<'_>, entID: c_int, int_data: c_int) {
 
         if int_data == 0 {
             (*npc).stats.runSpeed = 1;
-            (*client).ps.speed = 1;
+            (*client).ps.speed = (1) as f32;
         }
 
         (*npc).stats.runSpeed = int_data;

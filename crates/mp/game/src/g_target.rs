@@ -1005,7 +1005,7 @@ pub fn target_scriptrunner_use(
 
         (*self_).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
         (*self_).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), other);
-        if (*self_).delay != 0.0 {
+        if (*self_).delay != (0.0) as i32 {
             // delay before firing scriptrunner
             // TODO: Port fn-pointer assignment: (*self_).think = scriptrunner_run;
             (*self_).nextthink = (*ctx.world).level.time + (*self_).delay;
@@ -1030,7 +1030,7 @@ pub fn SP_target_scriptrunner(ctx: GameContext<'_>, self_: *mut gentity_t,) {
 
         let mut v = 0.0f32;
         G_SpawnFloat(ctx, b"delay\0".as_ptr() as *const c_char, b"0\0".as_ptr() as *const c_char, &mut v);
-        (*self_).delay = v * 1000.0; // sec to ms
+        (*self_).delay = (v * 1000.0) as i32; // sec to ms
         (*self_).wait *= 1000.0; // sec to ms
 
         G_SetOrigin(self_, (*self_).s.origin);

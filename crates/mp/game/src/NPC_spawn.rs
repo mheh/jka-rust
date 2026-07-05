@@ -577,7 +577,7 @@ pub fn NPC_Begin(
 
         if (*ent).spawnflags & SFB_NOTSOLID == 0 {
             if NPC_SpotWouldTelefrag(ctx, ent) != 0 {
-                if (*ent).wait < 0 {
+                if (*ent).wait < (0) as f32 {
                     let t3 = if (*ent).target3.is_null() { String::new() } else { cstr_to_str((*ent).target3 as *const c_char) };
                     let tn = if (*ent).targetname.is_null() { String::new() } else { cstr_to_str((*ent).targetname as *const c_char) };
                     G_DebugPrint(ctx, WL_DEBUG, cstr(&format!("NPC {} could not spawn, firing target3 ({}) and removing self\n", tn, t3)).as_ptr());
@@ -625,9 +625,9 @@ pub fn NPC_Begin(
         let rodian = cstr("rodian");
         if crate::q_shared::Q_stricmp(rodian.as_ptr(), (*ent).NPC_type) == 0 {
             match (*ctx.world).cvars.g_spskill.integer {
-                0 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = 1.0,
-                1 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = (*ctx.world).bg_state.rng.Q_irand(2, 3) as f32,
-                2 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = (*ctx.world).bg_state.rng.Q_irand(3, 4) as f32,
+                0 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = (1.0) as i32,
+                1 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = ((*ctx.world).bg_state.rng.Q_irand(2, 3) as f32) as i32,
+                2 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = ((*ctx.world).bg_state.rng.Q_irand(3, 4) as f32) as i32,
                 _ => {}
             }
         } else {
@@ -683,7 +683,7 @@ pub fn NPC_Begin(
         (*ent).waterlevel = 0;
         (*ent).watertype = 0;
         (*client).ps.rocketLockIndex = ENTITYNUM_NONE;
-        (*client).ps.rocketLockTime = 0;
+        (*client).ps.rocketLockTime = (0) as f32;
 
         if (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_R2D2
             && (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_R5D2
@@ -1163,7 +1163,7 @@ pub fn NPC_Spawn_Do(
             for parm_num in 0..MAX_PARMS {
                 let p = (*(*ent).parms).parm[parm_num as usize];
                 if !p.is_null() && *p != 0 {
-                    Q3_SetParm(ctx, (*newent).s.number, parm_num, p as *const c_char);
+                    Q3_SetParm(ctx, (*newent).s.number, (parm_num) as i32, p as *const c_char);
                 }
             }
         }
@@ -1352,8 +1352,8 @@ pub fn SP_NPC_spawner(
             }
         }
 
-        if (*self_).wait == 0 {
-            (*self_).wait = 500;
+        if (*self_).wait == (0) as f32 {
+            (*self_).wait = (500) as f32;
         } else {
             (*self_).wait *= 1000;
         }
@@ -1519,8 +1519,8 @@ pub fn SP_NPC_Vehicle(
             (*self_).classname = c"NPC_Vehicle".as_ptr() as *mut c_char;
         }
 
-        if (*self_).wait == 0 {
-            (*self_).wait = 500;
+        if (*self_).wait == (0) as f32 {
+            (*self_).wait = (500) as f32;
         } else {
             (*self_).wait *= 1000;
         }

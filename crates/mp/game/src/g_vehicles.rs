@@ -867,7 +867,7 @@ pub fn Initialize(
             G_VehUpdateShields(parent); // MP
             (*pc).ps.stats[STAT_ARMOR as usize] = (*pVeh).m_iShields;
         }
-        (*parent).mass = (*vi).mass;
+        (*parent).mass = ((*vi).mass) as f32;
 
         // initialize the ammo to max
         let mut i: c_int = 0;
@@ -1311,8 +1311,8 @@ pub fn Update(
         // Shifting Sounds
         if (*pVeh).m_iTurboTime < curTime
             && (*pVeh).m_iSoundDebounceTimer < curTime
-            && ((nextSpeed > prevSpeed && nextSpeed > halfMaxSpeed && prevSpeed < halfMaxSpeed)
-                || (nextSpeed > halfMaxSpeed
+            && ((nextSpeed > prevSpeed && nextSpeed > (halfMaxSpeed) as f32 && prevSpeed < (halfMaxSpeed) as f32)
+                || (nextSpeed > (halfMaxSpeed) as f32
                     && (*ctx.world).bg_state.rng.Q_irand(0, 1000) == 0))
         {
             let mut shiftSound = (*ctx.world).bg_state.rng.Q_irand(1, 4);
@@ -1416,7 +1416,7 @@ pub fn UpdateRider(
                 }
             } else if ((*pVeh).m_ulFlags & (VEH_FLYING as u64)) == 0 {
                 // If going too fast, roll off.
-                if (*pc).ps.speed <= 600 && (*pUmcd).rightmove != 0 {
+                if (*pc).ps.speed <= (600) as f32 && (*pUmcd).rightmove != 0 {
                     if crate::veh_dispatch::eject(ctx, pVeh, pRider, qfalse) != qfalse {
                         let iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS;
                         let iBlend = 300;

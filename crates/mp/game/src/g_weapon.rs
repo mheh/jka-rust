@@ -1108,7 +1108,7 @@ pub fn WP_BowcasterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*missile).classname = c"bowcaster_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_BOWCASTER;
 
-        (*missile).r.maxs = [BOWCASTER_SIZE, BOWCASTER_SIZE, BOWCASTER_SIZE];
+        (*missile).r.maxs = [(BOWCASTER_SIZE) as f32, (BOWCASTER_SIZE) as f32, (BOWCASTER_SIZE) as f32];
         for i in 0..3 {
             (*missile).r.mins[i] = -(*missile).r.maxs[i];
         }
@@ -1191,7 +1191,7 @@ pub fn WP_BowcasterMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*missile).classname = c"bowcaster_alt_proj".as_ptr() as *mut c_char;
             (*missile).s.weapon = WP_BOWCASTER;
 
-            (*missile).r.maxs = [BOWCASTER_SIZE, BOWCASTER_SIZE, BOWCASTER_SIZE];
+            (*missile).r.maxs = [(BOWCASTER_SIZE) as f32, (BOWCASTER_SIZE) as f32, (BOWCASTER_SIZE) as f32];
             for k in 0..3 {
                 (*missile).r.mins[k] = -(*missile).r.maxs[k];
             }
@@ -1270,7 +1270,7 @@ pub fn WP_RepeaterAltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*missile).classname = c"repeater_alt_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_REPEATER;
 
-        (*missile).r.maxs = [REPEATER_ALT_SIZE, REPEATER_ALT_SIZE, REPEATER_ALT_SIZE];
+        (*missile).r.maxs = [(REPEATER_ALT_SIZE) as f32, (REPEATER_ALT_SIZE) as f32, (REPEATER_ALT_SIZE) as f32];
         for i in 0..3 {
             (*missile).r.mins[i] = -(*missile).r.maxs[i];
         }
@@ -1340,7 +1340,7 @@ pub fn WP_DEMP2_MainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*missile).classname = c"demp2_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_DEMP2;
 
-        (*missile).r.maxs = [DEMP2_SIZE, DEMP2_SIZE, DEMP2_SIZE];
+        (*missile).r.maxs = [(DEMP2_SIZE) as f32, (DEMP2_SIZE) as f32, (DEMP2_SIZE) as f32];
         for i in 0..3 {
             (*missile).r.mins[i] = -(*missile).r.maxs[i];
         }
@@ -1679,7 +1679,7 @@ pub fn WP_FlechetteMainFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*missile).classname = c"flech_proj".as_ptr() as *mut c_char;
             (*missile).s.weapon = WP_FLECHETTE;
 
-            (*missile).r.maxs = [FLECHETTE_SIZE, FLECHETTE_SIZE, FLECHETTE_SIZE];
+            (*missile).r.maxs = [(FLECHETTE_SIZE) as f32, (FLECHETTE_SIZE) as f32, (FLECHETTE_SIZE) as f32];
             for k in 0..3 {
                 (*missile).r.mins[k] = -(*missile).r.maxs[k];
             }
@@ -1712,7 +1712,7 @@ pub fn prox_mine_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
             let count = crate::g_utils::G_RadiusList(
                 ctx,
                 (*ent).r.currentOrigin,
-                FLECHETTE_MINE_RADIUS_CHECK,
+                (FLECHETTE_MINE_RADIUS_CHECK) as f32,
                 ent,
                 qtrue,
                 ent_list.as_mut_ptr(),
@@ -1848,7 +1848,7 @@ pub fn WP_CreateFlechetteBouncyThing(
 
         (*missile).s.weapon = WP_FLECHETTE;
         (*missile).classname = c"flech_alt".as_ptr() as *mut c_char;
-        (*missile).mass = 4;
+        (*missile).mass = (4) as f32;
 
         // How 'bout we give this thing a size...
         (*missile).r.mins = [-3.0, -3.0, -3.0];
@@ -2166,15 +2166,15 @@ pub fn WP_FireRocket(ctx: GameContext<'_>, ent: *mut gentity_t, altFire: qboolea
             }
 
             (*((*ent).client as *mut gclient_t)).ps.rocketLockIndex = ENTITYNUM_NONE as c_int;
-            (*((*ent).client as *mut gclient_t)).ps.rocketLockTime = 0;
-            (*((*ent).client as *mut gclient_t)).ps.rocketTargetTime = 0;
+            (*((*ent).client as *mut gclient_t)).ps.rocketLockTime = (0) as f32;
+            (*((*ent).client as *mut gclient_t)).ps.rocketTargetTime = (0) as f32;
         }
 
         (*missile).classname = c"rocket_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_ROCKET_LAUNCHER;
 
         // Make it easier to hit things
-        (*missile).r.maxs = [ROCKET_SIZE, ROCKET_SIZE, ROCKET_SIZE];
+        (*missile).r.maxs = [(ROCKET_SIZE) as f32, (ROCKET_SIZE) as f32, (ROCKET_SIZE) as f32];
         for i in 0..3 {
             (*missile).r.mins[i] = -(*missile).r.maxs[i];
         }
@@ -2253,7 +2253,7 @@ pub fn thermalDetonatorExplode(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t
                 }),
                 (*ent).splashDamage as f32,
-                (*ent).splashRadius,
+                ((*ent).splashRadius) as f32,
                 ent,
                 ent,
                 (*ent).splashMethodOfDeath,
@@ -2606,7 +2606,7 @@ pub fn laserTrapExplode(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 (*self_).r.currentOrigin,
                 activator,
                 (*self_).splashDamage as f32,
-                (*self_).splashRadius,
+                ((*self_).splashRadius) as f32,
                 self_,
                 self_,
                 MOD_TRIP_MINE_SPLASH as c_int, /* MOD_LT_SPLASH */
@@ -3156,7 +3156,7 @@ pub fn charge_stick(
                     &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t
                 }),
                 (*self_).splashDamage as f32,
-                (*self_).splashRadius,
+                ((*self_).splashRadius) as f32,
                 self_,
                 self_,
                 MOD_DET_PACK_SPLASH as c_int,
@@ -3252,7 +3252,7 @@ pub fn DetPackBlow(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t
             }),
             (*self_).splashDamage as f32,
-            (*self_).splashRadius,
+            ((*self_).splashRadius) as f32,
             self_,
             self_,
             MOD_DET_PACK_SPLASH as c_int,
@@ -3327,7 +3327,7 @@ pub fn drop_charge(ctx: GameContext<'_>, self_: *mut gentity_t, start: vec3_t, d
         (*bolt).r.ownerNum = ((*self_).s.number as u32) as i32;
         (*bolt).damage = 100;
         (*bolt).splashDamage = 200;
-        (*bolt).splashRadius = 200.0;
+        (*bolt).splashRadius = (200.0) as i32;
         (*bolt).methodOfDeath = MOD_DET_PACK_SPLASH as c_int;
         (*bolt).splashMethodOfDeath = MOD_DET_PACK_SPLASH as c_int;
         (*bolt).clipmask = MASK_SHOT;
@@ -3813,10 +3813,10 @@ pub fn WP_FireConcussion(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         (*missile).classname = c"conc_proj".as_ptr() as *mut c_char;
         (*missile).s.weapon = WP_CONCUSSION;
-        (*missile).mass = 10;
+        (*missile).mass = (10) as f32;
 
         // Make it easier to hit things
-        (*missile).r.maxs = [ROCKET_SIZE, ROCKET_SIZE, ROCKET_SIZE];
+        (*missile).r.maxs = [(ROCKET_SIZE) as f32, (ROCKET_SIZE) as f32, (ROCKET_SIZE) as f32];
         for i in 0..3 {
             (*missile).r.mins[i] = -(*missile).r.maxs[i];
         }
@@ -3860,7 +3860,7 @@ pub fn WP_FireStunBaton(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbo
         let mut end: vec3_t = [0.0; 3];
         crate::q_math::_VectorMA(
             muzzleStun,
-            STUN_BATON_RANGE,
+            (STUN_BATON_RANGE) as f32,
             (*ctx.world).globals.forward,
             &mut end,
         );
@@ -3995,7 +3995,7 @@ pub fn WP_FireMelee(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qboolea
         let mut end: vec3_t = [0.0; 3];
         crate::q_math::_VectorMA(
             muzzlePunch,
-            MELEE_RANGE,
+            (MELEE_RANGE) as f32,
             (*ctx.world).globals.forward,
             &mut end,
         );
@@ -4364,7 +4364,7 @@ pub fn WP_FireVehicleWeapon(
             (*missile).s.genericenemyindex = (*ent).s.number + MAX_GENTITIES as c_int;
             (*missile).damage = (*vehWeapon).iDamage;
             (*missile).splashDamage = (*vehWeapon).iSplashDamage;
-            (*missile).splashRadius = (*vehWeapon).fSplashRadius;
+            (*missile).splashRadius = ((*vehWeapon).fSplashRadius) as i32;
 
             // FIXME: externalize some of these properties?
             (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
@@ -4387,7 +4387,7 @@ pub fn WP_FireVehicleWeapon(
                 // we don't want it to ever bounce
                 (*missile).bounceCount = 0;
 
-                (*missile).mass = 10;
+                (*missile).mass = (10) as f32;
             } else {
                 // a blaster-laser-like thing
                 (*missile).s.weapon = WP_BLASTER; // does this really matter?
@@ -5181,7 +5181,7 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
                             alt_fire,
                             qfalse,
                         );
-                        if (*vehWeapon).fHoming != 0 {
+                        if (*vehWeapon).fHoming != (0) as f32 {
                             clearRocketLockEntity = qtrue;
                         }
                     }
@@ -5259,8 +5259,8 @@ pub fn FireVehicleWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qb
 
             if clearRocketLockEntity != 0 {
                 (*((*ent).client as *mut gclient_t)).ps.rocketLockIndex = ENTITYNUM_NONE as c_int;
-                (*((*ent).client as *mut gclient_t)).ps.rocketLockTime = 0;
-                (*((*ent).client as *mut gclient_t)).ps.rocketTargetTime = 0;
+                (*((*ent).client as *mut gclient_t)).ps.rocketLockTime = (0) as f32;
+                (*((*ent).client as *mut gclient_t)).ps.rocketTargetTime = (0) as f32;
             }
 
             if !vehWeapon.is_null() && muzzlesFired > 0 {
@@ -5545,7 +5545,7 @@ pub fn emplaced_gun_use(
             return;
         }
 
-        if (*((*activator).client as *mut gclient_t)).ps.emplacedTime > (*ctx.world).level.time {
+        if (*((*activator).client as *mut gclient_t)).ps.emplacedTime > ((*ctx.world).level.time) as f32 {
             return;
         }
 
@@ -5790,7 +5790,7 @@ pub fn emplaced_gun_update(ctx: GameContext<'_>, self_: *mut gentity_t) {
             (*((*activator).client as *mut gclient_t)).ps.weapon = (*self_).s.weapon;
             (*self_).s.weapon = oldWeap;
             (*((*activator).client as *mut gclient_t)).ps.emplacedTime =
-                (*ctx.world).level.time + 1000;
+                ((*ctx.world).level.time + 1000) as f32;
             (*((*activator).client as *mut gclient_t)).ps.emplacedIndex = 0;
             (*((*activator).client as *mut gclient_t)).ps.saberHolstered = 0;
             (*activator).r.ownerNum = (ENTITYNUM_NONE as u32) as i32;

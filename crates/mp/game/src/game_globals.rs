@@ -142,6 +142,32 @@ impl core::ops::IndexMut<usize> for BotStates {
     }
 }
 
+/// `gNPC_t *gNPCPtrs[MAX_GENTITIES]` — per-entity NPC state pointers
+/// (`NPC_spawn.c` file-scope global). Newtype because a raw-pointer array has
+/// no library `Default` impl.
+/// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1276`
+pub struct GNpcPtrs(pub [*mut crate::npc::g_npc_t::gNPC_t; mp_qshared::shared::MAX_GENTITIES]);
+
+impl Default for GNpcPtrs {
+    fn default() -> Self {
+        GNpcPtrs([core::ptr::null_mut(); mp_qshared::shared::MAX_GENTITIES])
+    }
+}
+
+// Transparent indexing (`globals.gNPCPtrs[i]`) so call sites written against
+// a plain `gNPC_t *[MAX_GENTITIES]` need no change.
+impl core::ops::Index<usize> for GNpcPtrs {
+    type Output = *mut crate::npc::g_npc_t::gNPC_t;
+    fn index(&self, i: usize) -> &Self::Output {
+        &self.0[i]
+    }
+}
+impl core::ops::IndexMut<usize> for GNpcPtrs {
+    fn index_mut(&mut self, i: usize) -> &mut Self::Output {
+        &mut self.0[i]
+    }
+}
+
 /// `char *g_arenaInfos[MAX_ARENAS]` — arena info strings (`g_bot.c:13`). Newtype because
 /// a 1024-element array has no library `Default` impl (only arrays up to 32 elements do).
 /// Source: `oracle/oracle/codemp/game/g_bot.c:13`
@@ -629,9 +655,9 @@ pub struct GameGlobals {
     // Source: oracle/oracle/codemp/game/NPC_move.c:14
     pub frameNavInfo: (),
     // --- `NPC_spawn.c` file-scope globals ---
-    //TODO: Port gNPC_t *[MAX_GENTITIES]*
-    // Source: oracle/oracle/codemp/game/NPC_spawn.c:1276
-    pub gNPCPtrs: (),
+    /// `gNPCPtrs` (`gNPC_t *[MAX_GENTITIES]`; null-init raw pointers).
+    /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1276`
+    pub gNPCPtrs: GNpcPtrs,
     /// `showBBoxes`. Source: `oracle/oracle/codemp/game/NPC_spawn.c:4182`
     pub showBBoxes: qboolean,
     // --- `NPC_stats.c` file-scope globals ---

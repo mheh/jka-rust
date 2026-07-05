@@ -6783,9 +6783,9 @@ pub fn saberCheckRadiusDamage(
             &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
 
         if returning != 0 && returning != 2 {
-            dist = MIN_SABER_SLICE_RETURN_DISTANCE;
+            dist = (MIN_SABER_SLICE_RETURN_DISTANCE) as i32;
         } else {
-            dist = MIN_SABER_SLICE_DISTANCE;
+            dist = (MIN_SABER_SLICE_DISTANCE) as i32;
         }
 
         if (*saberOwner).client.is_null() {
@@ -6854,7 +6854,7 @@ pub fn DeadSaberThink(
     saberent: *mut gentity_t,
 ) {
     unsafe {
-        if (*saberent).speed < (*ctx.world).level.time {
+        if (*saberent).speed < ((*ctx.world).level.time) as f32 {
             (*saberent).think = Some(EntThink::G_FreeEntity);
             (*saberent).nextthink = (*ctx.world).level.time;
             return;
@@ -6947,7 +6947,7 @@ pub fn MakeDeadSaber(
         (*saberent).s.eType = ET_MISSILE as c_int;
         (*saberent).s.weapon = WP_SABER as c_int;
 
-        (*saberent).speed = (*ctx.world).level.time + 4000;
+        (*saberent).speed = ((*ctx.world).level.time + 4000) as f32;
 
         (*saberent).bounceCount = 12;
 
@@ -7071,7 +7071,7 @@ pub fn DownedSaberThink(
             (*saberent).touch = Some(EntTouch::SaberGotHit);
 
             (*saberent).think = Some(EntThink::saberBackToOwner);
-            (*saberent).speed = 0;
+            (*saberent).speed = (0) as f32;
             (*saberent).genericValue5 = 0;
             (*saberent).nextthink = level_time;
 
@@ -7182,7 +7182,7 @@ pub fn saberKnockDown(
         (*saberent).s.eType = ET_MISSILE as c_int;
         (*saberent).s.weapon = WP_SABER as c_int;
 
-        (*saberent).speed = level_time + 4000;
+        (*saberent).speed = (level_time + 4000) as f32;
 
         (*saberent).bounceCount = -5;
 
@@ -7739,7 +7739,7 @@ pub fn saberBackToOwner(
 
         ownerLen = VectorLength(dir);
 
-        if (*saberent).speed < level_time {
+        if (*saberent).speed < (level_time) as f32 {
             let baseSpeed;
 
             VectorNormalize(&mut dir);
@@ -7750,10 +7750,10 @@ pub fn saberBackToOwner(
             if (*soc).ps.fd.forcePowerLevel[FP_SABERTHROW as usize] >= FORCE_LEVEL_3 {
                 // allow players with high saber throw rank to control return speed
                 baseSpeed = 900.0f32;
-                (*saberent).speed = level_time;
+                (*saberent).speed = (level_time) as f32;
             } else {
                 baseSpeed = 700.0f32;
-                (*saberent).speed = level_time + 50;
+                (*saberent).speed = (level_time + 50) as f32;
             }
 
             // Gradually slow down as it approaches.
@@ -7859,7 +7859,7 @@ pub fn thrownSaberTouch(
             &mut (*ctx.world).g_entities[(*saberent).r.ownerNum as usize] as *mut gentity_t;
         CheckThrownSaberDamaged(ctx, saberent, saberOwner, hitEnt, 256, 0, qtrue);
 
-        (*saberent).speed = 0;
+        (*saberent).speed = (0) as f32;
     }
 }
 
@@ -7963,7 +7963,7 @@ pub fn saberFirstThrown(
             }
 
             if (*soc).ps.fd.forcePowerLevel[FP_SABERTHROW as usize] >= FORCE_LEVEL_2
-                && (*saberent).speed < level_time
+                && (*saberent).speed < (level_time) as f32
             {
                 // if owner is rank 3 in saber throwing, the saber goes where he points
                 let mut fwd: vec3_t = [0.0; 3];
@@ -8009,9 +8009,9 @@ pub fn saberFirstThrown(
                 (*saberent).s.pos.trTime = level_time;
 
                 if (*soc).ps.fd.forcePowerLevel[FP_SABERTHROW as usize] >= FORCE_LEVEL_3 {
-                    (*saberent).speed = level_time + 100;
+                    (*saberent).speed = (level_time + 100) as f32;
                 } else {
-                    (*saberent).speed = level_time + 400;
+                    (*saberent).speed = (level_time + 400) as f32;
                 }
             }
         }
