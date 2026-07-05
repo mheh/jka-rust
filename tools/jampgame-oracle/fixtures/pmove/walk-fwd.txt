@@ -1,0 +1,11 @@
+# Scenario 2: walk-forward. Run forward (forwardmove=127) for 40x50ms so the
+# player accelerates from rest across the flat floor, then hold BUTTON_WALKING
+# (16) to drop into the walk gait. Exercises bobCycle accumulation, the
+# run<->walk anim selection, PMF_BACKWARDS_RUN staying clear, and friction.
+# origin z 24.25 = 0x41c20000 (box bottom 0.25 above the floor top at z=0).
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+
+ps origin 0x00000000 0x00000000 0x41c20000
+start
+cmd 50 127 0 0 0 0 0 0 x40
+cmd 50 127 0 0 16 0 0 0 x20

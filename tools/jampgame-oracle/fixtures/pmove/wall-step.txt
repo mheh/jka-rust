@@ -1,0 +1,17 @@
+# Scenario 6: wall-step. Walk forward (forwardmove=127) into a 16-tall ledge
+# (below STEPSIZE=18, so PM_StepSlideMove steps up onto it), keep going into a
+# 128-tall wall (too tall to step -> the slide clips against the wall's -x plane
+# and the player slides along it / creases at the corner). The final row uses
+# dt=200 to force Pmove's chop loop (msec capped at 66 -> 66+66+66+2 = four
+# PmoveSingle calls in one Pmove; ntr aggregates them).
+#
+# Floor top z=0; a 16-tall ledge across x[32..200]; a 128-tall wall at
+# x[220..400] with a y-limited corner at y>=48 to make a crease.
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+brush 32 -256 0 200 256 16 surf=0x1000
+brush 220 -256 0 400 48 128 surf=0x1000
+
+ps origin 0x00000000 0x00000000 0x41c20000
+start
+cmd 50 127 0 0 0 0 0 0 x30
+cmd 200 127 0 0 0 0 0 0 x3

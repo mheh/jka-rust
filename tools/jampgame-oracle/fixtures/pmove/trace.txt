@@ -1,0 +1,42 @@
+# Raw-trace mini-fixture -- exercises the pmworld.h axial-brush trace stub in
+# isolation (main_trace.c). Player-sized box is mins=(-15,-15,-24)
+# maxs=(15,15,40) unless noted. Coordinates are plain integers, except the
+# 0x-prefixed f32 bit patterns used to probe the +/-0.125 clip epsilon exactly
+# (0x3e000000 = 0.125, 0xbe000000 = -0.125, 0x3dfae148 ~= 0.1225).
+#
+# World: a huge floor (top at z=0), a 16-tall step box at x[32..64], and a
+# 128-tall wall at x[96..128]. surf bits distinguish which brush was hit.
+
+brush -4096 -4096 -4096 4096 4096 0 surf=0x1
+brush 32 -32 0 64 32 16 surf=0x2
+brush 96 -64 0 128 64 128 surf=0x4
+
+# 0: straight down onto the floor from just above (box bottom at 1) -> hits +z
+sweep 0 0 25 0 0 -100 -15 -15 -24 15 15 40
+# 1: startsolid -- box already straddling the floor top, sweeping down further
+sweep 0 0 -10 0 0 -50 -15 -15 -24 15 15 40
+# 2: allsolid -- start AND end fully buried in the floor
+sweep 0 0 -60 0 0 -80 -15 -15 -24 15 15 40
+# 3: pure miss -- swept high above everything
+sweep -2000 0 500 2000 0 500 -15 -15 -24 15 15 40
+# 4: horizontal +x into the 16-tall step (box floats at z=25) -> hits -x face
+sweep 0 0 25 200 0 25 -15 -15 -24 15 15 40
+# 5: horizontal +x into the 128-tall wall, clearing the step in z -> -x wall
+sweep 0 0 90 200 0 90 -15 -15 -24 15 15 40
+# 6: horizontal -x back out through the wall's +x face
+sweep 200 0 90 0 0 90 -15 -15 -24 15 15 40
+# 7: +y into the wall's -y face
+sweep 112 -200 90 112 200 90 -15 -15 -24 15 15 40
+# 8: -y into the wall's +y face
+sweep 112 200 90 112 -200 90 -15 -15 -24 15 15 40
+# 9: step-up probe -- sweep the step-height box (maxs z = step top) forward,
+#    should slide onto the step (grazing hit at the -x face)
+sweep 0 8 25 100 8 25 -15 -15 0 15 15 16
+# 10: corner crease -- diagonal into the wall's -x/-y corner
+sweep 0 -200 90 200 0 90 -15 -15 -24 15 15 40
+# 11: epsilon boundary -- endpoint parks exactly 0.125 in front of the floor
+sweep 0 0 25 0 0 0x3e000000 -15 -15 -24 15 15 40
+# 12: down onto the top of the step box (z 0..16) from above it
+sweep 48 0 60 48 0 -100 -15 -15 -24 15 15 40
+# 13: point-thin box (mins==maxs) down onto floor -- degenerate zero-size sweep box
+sweep 0 0 25 0 0 -100 0 0 0 0 0 0

@@ -34,6 +34,17 @@ cp "$Q"/*.h build/codemp/qcommon/
 cp "$ORACLE/codemp/namespace_begin.h" "$ORACLE/codemp/namespace_end.h" build/codemp/
 cp "$ORACLE/codemp/cgame/animtable.h" build/codemp/game/
 
+# --- pmove slice extra sources/headers (all copied UNMODIFIED) ---
+# The pmove dumper compiles the on-foot movement closure with -DQAGAME, which
+# pulls g_local.h + ghoul2/G2.h, so it needs the ghoul2/cgame/icarus header
+# trees copied alongside game/qcommon.
+mkdir -p build/codemp/ghoul2 build/codemp/cgame build/codemp/icarus
+cp "$G/bg_pmove.c" "$G/bg_slidemove.c" "$G/bg_panimate.c" "$G/bg_saber.c" \
+   "$G/bg_misc.c" "$G/bg_weapons.c" build/codemp/game/
+cp "$ORACLE"/codemp/ghoul2/*.h build/codemp/ghoul2/ 2>/dev/null || true
+cp "$ORACLE"/codemp/cgame/*.h  build/codemp/cgame/  2>/dev/null || true
+cp "$ORACLE"/codemp/icarus/*.h build/codemp/icarus/ 2>/dev/null || true
+
 # shim.h (force-included first): pull real libm so Raven's 2-arg powf(float,int)
 # in q_shared.h/q_math.c is renamed out of the way of libm's powf(float,float).
 cat > build/codemp/game/shim.h <<'EOF'
@@ -96,6 +107,42 @@ SABERCFLAGS="-w -std=gnu11 -D__linux__ -DQAGAME -D_FORTIFY_SOURCE=0 -ffp-contrac
 cc $SABERCFLAGS -o build/saberload_dump main_saberload.c animtable_def.c \
    build/codemp/game/bg_saberLoad.c build/codemp/game/q_shared.c
 
+# --- pmove single-step slice ---------------------------------------------------
+# The trace dumper (main_trace.c) proves the pmworld.h axial-brush trace stub in
+# isolation; it links nothing else. The pmove dumper (main_pmove.c) links the
+# UNMODIFIED on-foot movement closure with -DQAGAME (jampgame == QAGAME) plus
+# -fgnu89-inline (Raven's non-static `inline` PM_* helpers need gnu89 external
+# inline semantics, else clang emits no out-of-line symbol at -O0 -- this only
+# affects symbol emission, never the IEEE math). q_math.c is recompiled here
+# with its holdrand RNG functions RENAMED (-DQ_irand=o_Q_irand, etc.) so
+# main_pmove.c's own 32-bit Q_irand + draw-counter tripwire wins the link
+# without a duplicate symbol (the RNG is never drawn on the basic path).
+# animtable.h is compiled INTO bg_panimate.c already, so -- unlike saberload --
+# no animtable_def.c is linked (it would duplicate the animTable symbol).
+PMCFLAGS="-w -std=gnu11 -fgnu89-inline -D__linux__ -DQAGAME -D_FORTIFY_SOURCE=0 \
+        -ffp-contract=off -include build/codemp/game/shim.h -I. -I build/codemp/game"
+PM_RNG_RENAME="-DRand_Init=o_Rand_Init -Dflrand=o_flrand -DQ_flrand=o_Q_flrand \
+        -Dirand=o_irand -DQ_irand=o_Q_irand"
+
+PMOBJS=""
+# shellcheck disable=SC2086
+for f in bg_pmove bg_slidemove bg_panimate bg_saber bg_saberLoad bg_misc bg_weapons q_shared; do
+	cc $PMCFLAGS -c build/codemp/game/$f.c -o build/pm_$f.o
+	PMOBJS="$PMOBJS build/pm_$f.o"
+done
+# shellcheck disable=SC2086
+cc $PMCFLAGS $PM_RNG_RENAME -c build/codemp/game/q_math.c -o build/pm_q_math.o
+# shellcheck disable=SC2086
+cc $PMCFLAGS -c main_pmove.c -o build/pm_main.o
+# shellcheck disable=SC2086
+cc build/pm_main.o $PMOBJS build/pm_q_math.o -lm -o build/pmove_dump
+
+# trace dumper: self-contained (only pmworld.h + fixture parsing), plain native.
+TRACECFLAGS="-w -std=gnu11 -D__linux__ -D_FORTIFY_SOURCE=0 -ffp-contract=off \
+        -include build/codemp/game/shim.h -I. -I build/codemp/game"
+# shellcheck disable=SC2086
+cc $TRACECFLAGS -o build/trace_dump main_trace.c -lm
+
 mkdir -p golden
 status=0
 run_one() {
@@ -108,10 +155,40 @@ run_one() {
 	fi
 }
 
+# A dumper taking a single fixture FILE argument (trace slice).
+run_file() {
+	name=$1; bin=$2; fix=$3
+	if [ "${REGEN:-}" = "1" ]; then
+		"$bin" "$fix" > "golden/$name.txt"
+		echo "regenerated $name"
+	else
+		"$bin" "$fix" | diff -u "golden/$name.txt" - || status=1
+	fi
+}
+
+# The pmove dumper runs over all six on-foot scenarios, concatenated (with a
+# per-scenario banner) into one golden. It takes <fixture-file> <fixture-dir>;
+# the dir holds the shared synthetic animation.cfg.
+PMOVE_SCENARIOS="idle walk-fwd strafe-turn jump-land fall-onto-box wall-step"
+run_pmove() {
+	out=$( for s in $PMOVE_SCENARIOS; do
+		echo "-- scenario $s --"
+		build/pmove_dump "fixtures/pmove/$s.txt" fixtures/pmove
+	done )
+	if [ "${REGEN:-}" = "1" ]; then
+		printf '%s\n' "$out" > golden/pmove.txt
+		echo "regenerated pmove"
+	else
+		printf '%s\n' "$out" | diff -u golden/pmove.txt - || status=1
+	fi
+}
+
 if [ "${1:-}" = "--regen" ]; then REGEN=1; fi
 run_one qmath build/qmath_dump
 run_one bglib build/bglib_dump
 run_one saberload build/saberload_dump
+run_file pmove_trace build/trace_dump fixtures/pmove/trace.txt
+run_pmove
 
 [ "$status" -eq 0 ] && echo "jampgame-oracle: OK"
 exit "$status"
