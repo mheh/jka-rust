@@ -39,8 +39,8 @@ unsafe fn veh_type(pVeh: *mut Vehicle_t) -> vehicleType_t {
 /// `FighterNPC.c:212`, `WalkerNPC.c:186`.
 pub fn board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean {
     match unsafe { veh_type(pVeh) } {
-        VH_FIGHTER => crate::FighterNPC::Board(ctx, pVeh, pEnt),
-        VH_WALKER => {
+        vehicleType_t::VH_FIGHTER => crate::FighterNPC::Board(ctx, pVeh, pEnt),
+        vehicleType_t::VH_WALKER => {
             if crate::WalkerNPC::Board(ctx, pVeh, pEnt) {
                 qtrue
             } else {
@@ -60,7 +60,7 @@ pub fn eject(
     forceEject: qboolean,
 ) -> qboolean {
     match unsafe { veh_type(pVeh) } {
-        VH_FIGHTER => crate::FighterNPC::Eject(ctx, pVeh, pEnt, forceEject),
+        vehicleType_t::VH_FIGHTER => crate::FighterNPC::Eject(ctx, pVeh, pEnt, forceEject),
         _ => crate::g_vehicles::Eject(ctx, pVeh, pEnt, forceEject),
     }
 }
@@ -75,7 +75,7 @@ pub fn eject_all(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1485` (generic), `AnimalNPC.c:...`.
 pub fn death_update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        VH_ANIMAL => crate::AnimalNPC::DeathUpdate(ctx, pVeh),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::DeathUpdate(ctx, pVeh),
         _ => crate::g_vehicles::DeathUpdate(ctx, pVeh),
     }
 }
@@ -84,7 +84,7 @@ pub fn death_update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// Source: `oracle/oracle/codemp/game/g_vehicles.c:1619` (generic), `WalkerNPC.c:...`.
 pub fn register_assets(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        VH_WALKER => crate::WalkerNPC::RegisterAssets(ctx, pVeh),
+        vehicleType_t::VH_WALKER => crate::WalkerNPC::RegisterAssets(ctx, pVeh),
         _ => unsafe { crate::g_vehicles::RegisterAssets(pVeh) },
     }
 }
@@ -137,12 +137,12 @@ pub fn un_ghost(pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) {
 /// Source: `oracle/oracle/codemp/game/{Speeder,Walker,Animal}NPC.c` (`AnimateVehicle`).
 pub fn animate_vehicle(pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        VH_SPEEDER => crate::SpeederNPC::AnimateVehicle(pVeh),
-        VH_WALKER => crate::WalkerNPC::AnimateVehicle(pVeh),
-        VH_ANIMAL => crate::AnimalNPC::AnimateVehicle(pVeh),
+        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateVehicle(pVeh),
+        vehicleType_t::VH_WALKER => crate::WalkerNPC::AnimateVehicle(pVeh),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::AnimateVehicle(pVeh),
         //TODO: Port FighterNPC::AnimateVehicle
         // Source: oracle/oracle/codemp/game/FighterNPC.c:1951
-        VH_FIGHTER => todo!("Port FighterNPC::AnimateVehicle — FighterNPC.c:1951"),
+        vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::AnimateVehicle — FighterNPC.c:1951"),
         _ => {}
     }
 }
@@ -152,11 +152,11 @@ pub fn animate_vehicle(pVeh: *mut Vehicle_t) {
 /// Source: `oracle/oracle/codemp/game/{Speeder,Animal}NPC.c` (`AnimateRiders`).
 pub fn animate_riders(pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        VH_SPEEDER => crate::SpeederNPC::AnimateRiders(pVeh),
-        VH_ANIMAL => crate::AnimalNPC::AnimateRiders(pVeh),
+        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::AnimateRiders(pVeh),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::AnimateRiders(pVeh),
         //TODO: Port FighterNPC::AnimateRiders
         // Source: oracle/oracle/codemp/game/FighterNPC.c:1952
-        VH_FIGHTER => todo!("Port FighterNPC::AnimateRiders — FighterNPC.c:1952"),
+        vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::AnimateRiders — FighterNPC.c:1952"),
         _ => {}
     }
 }
@@ -165,12 +165,12 @@ pub fn animate_riders(pVeh: *mut Vehicle_t) {
 /// Source: `oracle/oracle/codemp/game/{Speeder,Walker,Animal}NPC.c`.
 pub fn process_move_commands(pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        VH_SPEEDER => crate::SpeederNPC::ProcessMoveCommands(pVeh),
-        VH_WALKER => crate::WalkerNPC::ProcessMoveCommands(pVeh),
-        VH_ANIMAL => crate::AnimalNPC::ProcessMoveCommands(pVeh),
+        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessMoveCommands(pVeh),
+        vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessMoveCommands(pVeh),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessMoveCommands(pVeh),
         //TODO: Port FighterNPC::ProcessMoveCommands
         // Source: oracle/oracle/codemp/game/FighterNPC.c:1970
-        VH_FIGHTER => todo!("Port FighterNPC::ProcessMoveCommands — FighterNPC.c:1970"),
+        vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::ProcessMoveCommands — FighterNPC.c:1970"),
         _ => {}
     }
 }
@@ -179,12 +179,12 @@ pub fn process_move_commands(pVeh: *mut Vehicle_t) {
 /// Source: `oracle/oracle/codemp/game/{Speeder,Walker,Animal}NPC.c`.
 pub fn process_orient_commands(pVeh: *mut Vehicle_t) {
     match unsafe { veh_type(pVeh) } {
-        VH_SPEEDER => crate::SpeederNPC::ProcessOrientCommands(pVeh),
-        VH_WALKER => crate::WalkerNPC::ProcessOrientCommands(pVeh),
-        VH_ANIMAL => crate::AnimalNPC::ProcessOrientCommands(pVeh),
+        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::ProcessOrientCommands(pVeh),
+        vehicleType_t::VH_WALKER => crate::WalkerNPC::ProcessOrientCommands(pVeh),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::ProcessOrientCommands(pVeh),
         //TODO: Port FighterNPC::ProcessOrientCommands
         // Source: oracle/oracle/codemp/game/FighterNPC.c:1971
-        VH_FIGHTER => todo!("Port FighterNPC::ProcessOrientCommands — FighterNPC.c:1971"),
+        vehicleType_t::VH_FIGHTER => todo!("Port FighterNPC::ProcessOrientCommands — FighterNPC.c:1971"),
         _ => {}
     }
 }

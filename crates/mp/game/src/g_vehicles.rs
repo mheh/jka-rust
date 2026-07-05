@@ -743,7 +743,7 @@ pub fn EjectAll(
         // Throw them off.
         if !(*pVeh).m_pPilot.is_null() {
             let pilot = (*pVeh).m_pPilot as *mut gentity_t;
-            crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pPilot, qtrue);
+            crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pPilot as *mut bgEntity_t, qtrue);
             if (*vi).killRiderOnDeath != qfalse && !pilot.is_null() {
                 crate::g_utils::G_MuteSound(ctx, (*pilot).s.number, CHAN_VOICE);
                 crate::g_combat::G_Damage(
@@ -760,7 +760,7 @@ pub fn EjectAll(
         }
         if !(*pVeh).m_pOldPilot.is_null() {
             let pilot = (*pVeh).m_pOldPilot as *mut gentity_t;
-            crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pOldPilot, qtrue);
+            crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pOldPilot as *mut bgEntity_t, qtrue);
             if (*vi).killRiderOnDeath != qfalse && !pilot.is_null() {
                 crate::g_utils::G_MuteSound(ctx, (*pilot).s.number, CHAN_VOICE);
                 crate::g_combat::G_Damage(
@@ -1146,7 +1146,7 @@ pub fn Update(
                     || (*pilotEnt).health <= 0
                     || (*pec).pers.connected != CON_CONNECTED
                 {
-                    crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pPilot, qtrue);
+                    crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pPilot as *mut bgEntity_t, qtrue);
                     return qfalse;
                 }
             }
@@ -1185,7 +1185,7 @@ pub fn Update(
                     || (*pilotEnt).health <= 0
                     || (*pec).pers.connected != CON_CONNECTED
                 {
-                    crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pPilot, qtrue);
+                    crate::veh_dispatch::eject(ctx, pVeh, (*pVeh).m_pPilot as *mut bgEntity_t, qtrue);
                 }
             }
             // If we're not empty...
@@ -2421,7 +2421,7 @@ pub fn Eject(
         let mut taintedRider = qfalse;
         let mut deadRider = qfalse;
 
-        if pEnt == (*pVeh).m_pDroidUnit {
+        if pEnt == (*pVeh).m_pDroidUnit as *mut bgEntity_t {
             G_EjectDroidUnit(ctx, pVeh, qfalse);
             return qtrue;
         }
