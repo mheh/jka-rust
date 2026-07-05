@@ -28,6 +28,7 @@ use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
 use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::entity_type::entityType_t;
+use mp_bg::public::duel_team::duelTeam_t::{DUELTEAM_DOUBLE, DUELTEAM_LONE};
 use mp_bg::public::g2_model_parts::g2ModelParts_t;
 use mp_bg::public::stat_index::statIndex_t;
 use mp_qshared::shared::MAX_CLIENTS;
@@ -1245,7 +1246,9 @@ pub fn G_PickDeathAnim(
         }
 
         // Validate.....
-        if deathAnim == -1 || BG_HasAnimation((*self_).localAnimIndex, deathAnim) == qfalse {
+        if deathAnim == -1
+            || BG_HasAnimation(&(*ctx.world).bg_state, (*self_).localAnimIndex, deathAnim) == qfalse
+        {
             // I guess we'll take what we can get.....
             deathAnim = BG_PickAnim(
                 (*self_).localAnimIndex,
@@ -2668,12 +2671,12 @@ pub fn player_die(
             && (*ctx.world).globals.g_noPDuelCheck == 0
         {
             // powerduel checks
-            if (*cl).sess.duelTeam == DUELTEAM_LONE {
+            if (*cl).sess.duelTeam == DUELTEAM_LONE as c_int {
                 // automatically means a win as there is only one
-                G_AddPowerDuelScore(ctx, DUELTEAM_DOUBLE, 1);
-                G_AddPowerDuelLoserScore(ctx, DUELTEAM_LONE, 1);
+                G_AddPowerDuelScore(ctx, DUELTEAM_DOUBLE as c_int, 1);
+                G_AddPowerDuelLoserScore(ctx, DUELTEAM_LONE as c_int, 1);
                 (*ctx.world).globals.g_endPDuel = qtrue;
-            } else if (*cl).sess.duelTeam == DUELTEAM_DOUBLE {
+            } else if (*cl).sess.duelTeam == DUELTEAM_DOUBLE as c_int {
                 let mut i = 0;
                 let mut heLives: qboolean = qfalse;
 
@@ -2687,7 +2690,7 @@ pub fn player_die(
                         && (*checkClient).iAmALoser == qfalse
                         && (*checkClient).ps.stats[statIndex_t::STAT_HEALTH as usize] > 0
                         && (*checkClient).sess.sessionTeam != TEAM_SPECTATOR
-                        && (*checkClient).sess.duelTeam == DUELTEAM_DOUBLE
+                        && (*checkClient).sess.duelTeam == DUELTEAM_DOUBLE as c_int
                     {
                         // still an active living paired duelist so it's not over yet.
                         heLives = qtrue;
@@ -2698,8 +2701,8 @@ pub fn player_die(
 
                 if heLives == qfalse {
                     // they're all dead, give the lone duelist the win.
-                    G_AddPowerDuelScore(ctx, DUELTEAM_LONE, 1);
-                    G_AddPowerDuelLoserScore(ctx, DUELTEAM_DOUBLE, 1);
+                    G_AddPowerDuelScore(ctx, DUELTEAM_LONE as c_int, 1);
+                    G_AddPowerDuelLoserScore(ctx, DUELTEAM_DOUBLE as c_int, 1);
                     (*ctx.world).globals.g_endPDuel = qtrue;
                 }
             }

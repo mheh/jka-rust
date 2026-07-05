@@ -11,6 +11,9 @@
 
 use crate::prelude::*;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_abi::game::syscalls::G_ICARUS_ISINITIALIZED::GIcarusIsinitializedArgs;
+use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
+use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use crate::ent_fn_enums::EntThink;
 use crate::g_nav::NPC_SetMoveGoal;
 use crate::NPC_combat::{
@@ -223,8 +226,8 @@ pub fn NPC_BSAdvanceFight(ctx: GameContext<'_>) {
 
         if world.globals.ucmd.forwardmove == 0 && world.globals.ucmd.rightmove == 0 {
             // We reached our captureGoal.
-            if trap::ICARUS_IsInitialized(ctx.engine, (*NPC).s.number) != 0 {
-                trap::ICARUS_TaskIDComplete(ctx.engine, NPC, taskID_t::TID_BSTATE as c_int);
+            if trap::ICARUS_IsInitialized(ctx.engine, GIcarusIsinitializedArgs::new((*NPC).s.number)) != 0 {
+                trap::ICARUS_TaskIDComplete(ctx.engine, GIcarusTaskidcompleteArgs::new(NPC, taskID_t::TID_BSTATE as c_int));
             }
         }
     }
@@ -373,7 +376,7 @@ pub fn NPC_CheckInvestigate(
             return QFALSE;
         }
 
-        if trap::InPVS(ctx.engine, soundPos, (*NPC).r.currentOrigin) == 0 {
+        if trap::InPVS(ctx.engine, GInPvsArgs::new(&soundPos as *const _, &(*NPC).r.currentOrigin as *const _)) == 0 {
             // Can hear through doors?
             return QFALSE;
         }
@@ -783,7 +786,7 @@ pub fn NPC_BSJump(ctx: GameContext<'_>) {
                     (*NPCInfo).aiFlags &= !NPCAI_MOVING;
                     world.globals.ucmd.forwardmove = 0;
                     (*NPC).flags &= !FL_NO_KNOCKBACK;
-                    trap::ICARUS_TaskIDComplete(ctx.engine, NPC, taskID_t::TID_MOVE_NAV as c_int);
+                    trap::ICARUS_TaskIDComplete(ctx.engine, GIcarusTaskidcompleteArgs::new(NPC, taskID_t::TID_MOVE_NAV as c_int));
                 }
             }
             _ => {
@@ -802,7 +805,7 @@ pub fn NPC_BSRemove(ctx: GameContext<'_>) {
         let NPC = world.globals.NPC as *mut gentity_t;
 
         NPC_UpdateAngles(ctx, QTRUE, QTRUE);
-        if trap::InPVS(ctx.engine, (*NPC).r.currentOrigin, world.g_entities[0].r.currentOrigin) == 0 {
+        if trap::InPVS(ctx.engine, GInPvsArgs::new(&(*NPC).r.currentOrigin as *const _, &world.g_entities[0].r.currentOrigin as *const _)) == 0 {
             let target3 = (*NPC).target3;
             G_UseTargets2(ctx, NPC, NPC, target3);
             (*NPC).s.eFlags |= EF_NODRAW;
@@ -1158,7 +1161,7 @@ pub fn NPC_CheckSurrender(ctx: GameContext<'_>) -> qboolean {
                             return QFALSE;
                         } else if crate::q_math::DistanceSquared((*NPC).r.currentOrigin, (*enemy).r.currentOrigin) < 65536.0 {
                             return QFALSE;
-                        } else if trap::InPVS(ctx.engine, (*NPC).r.currentOrigin, (*enemy).r.currentOrigin) == 0 {
+                        } else if trap::InPVS(ctx.engine, GInPvsArgs::new(&(*NPC).r.currentOrigin as *const _, &(*enemy).r.currentOrigin as *const _)) == 0 {
                             return QFALSE;
                         }
                     }

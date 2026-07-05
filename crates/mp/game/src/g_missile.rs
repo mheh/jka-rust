@@ -130,7 +130,7 @@ pub fn G_DeflectMissile(
         let speed = crate::q_math::VectorNormalize(&mut (*missile).s.pos.trDelta);
 
         if !(*ent).client.is_null() {
-            crate::q_math::AngleVectors((*(*ent).client as *mut gclient_t).ps.viewangles, Some(&mut missile_dir), None, None);
+            crate::q_math::AngleVectors((*((*ent).client as *mut gclient_t)).ps.viewangles, Some(&mut missile_dir), None, None);
             crate::q_math::_VectorCopy(missile_dir, &mut bounce_dir);
             let dot = crate::q_math::_DotProduct(forward, missile_dir);
             crate::q_math::_VectorScale(bounce_dir, dot, &mut bounce_dir);
@@ -171,7 +171,8 @@ pub fn G_BounceMissile(
         let tr = &*trace;
 
         // Reflect the velocity on the trace plane
-        let hitTime = (*ctx.world).level.previousTime + ((*ctx.world).level.time - (*ctx.world).level.previousTime) as c_float * tr.fraction;
+        let hitTime = (*ctx.world).level.previousTime as c_float
+            + ((*ctx.world).level.time - (*ctx.world).level.previousTime) as c_float * tr.fraction;
         crate::bg_misc::BG_EvaluateTrajectoryDelta(&(*ent).s.pos, hitTime as c_int, &mut velocity);
         let dot = crate::q_math::_DotProduct(velocity, tr.plane.normal);
         crate::q_math::_VectorMA(velocity, -2.0 * dot, tr.plane.normal, &mut (*ent).s.pos.trDelta);

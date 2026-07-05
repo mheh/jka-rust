@@ -36,7 +36,7 @@ const VTYPE_FLOAT: c_int = 1;
 const VTYPE_STRING: c_int = 2;
 const VTYPE_VECTOR: c_int = 3;
 
-use crate::g_combat::G_Damage;
+use crate::g_combat::{G_Damage, player_die};
 use crate::g_mover::{G_PlayDoorSound, MatchTeam, BMS_END};
 use crate::g_utils::G_FreeEntity;
 use crate::g_misc::{TAG_GetOrigin, TAG_GetOrigin2, TAG_GetAngles, TAG_GetRadius};

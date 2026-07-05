@@ -39,8 +39,8 @@ use crate::g_combat::AddScore;
 use crate::g_items::RegisterItem;
 use crate::g_main::{G_Error, LogExit};
 use crate::g_utils::{
-    G_Find, G_PlayEffectID, G_SetOrigin, G_Sound, G_TempEntity, G_UseTargets2,
-    GlobalUse,
+    G_EffectIndex, G_Find, G_IconIndex, G_PlayEffectID, G_SetOrigin, G_Sound, G_TempEntity,
+    G_UseTargets2, GlobalUse,
 };
 use crate::g_exphysics::G_RunExPhys;
 use crate::q_shared::Info_SetValueForKey;

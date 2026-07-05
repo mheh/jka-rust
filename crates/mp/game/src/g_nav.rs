@@ -1800,19 +1800,19 @@ pub fn NAV_StoreWaypoint(
         }
         let i = (*ctx.world).globals.numStoredWaypoints as usize;
         if !(*ent).targetname.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].targetname.as_mut_ptr(), (*ent).targetname, MAX_QPATH);
+            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].targetname.as_mut_ptr(), (*ent).targetname, MAX_QPATH as c_int);
         }
         if !(*ent).target.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target.as_mut_ptr(), (*ent).target, MAX_QPATH);
+            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target.as_mut_ptr(), (*ent).target, MAX_QPATH as c_int);
         }
         if !(*ent).target2.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target2.as_mut_ptr(), (*ent).target2, MAX_QPATH);
+            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target2.as_mut_ptr(), (*ent).target2, MAX_QPATH as c_int);
         }
         if !(*ent).target3.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target3.as_mut_ptr(), (*ent).target3, MAX_QPATH);
+            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target3.as_mut_ptr(), (*ent).target3, MAX_QPATH as c_int);
         }
         if !(*ent).target4.is_null() {
-            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target4.as_mut_ptr(), (*ent).target4, MAX_QPATH);
+            Q_strncpyz((*ctx.world).globals.tempWaypointList[i].target4.as_mut_ptr(), (*ent).target4, MAX_QPATH as c_int);
         }
         (*ctx.world).globals.tempWaypointList[i].nodeID = (*ent).health;
 

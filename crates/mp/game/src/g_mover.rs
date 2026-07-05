@@ -913,7 +913,7 @@ pub fn Use_BinaryMover_Go(
 ) {
     unsafe {
         let activator = (*ent).activator;
-        (*ent).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
+        (*ent).activator = activator;
 
         if (*ent).moverState == MOVER_POS1 {
             let mut doorcenter: vec3_t = [0.0; 3];
@@ -1296,7 +1296,7 @@ pub fn Touch_DoorTriggerSpectator(
             ),
         );
 
-        if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction == 1.0f32 && tr.entityNum == ENTITYNUM_NONE {
+        if tr.startsolid == 0 && tr.allsolid == 0 && tr.fraction == 1.0f32 && tr.entityNum as c_int == ENTITYNUM_NONE {
             TeleportPlayer(ctx, other, origin, angles);
         }
     }
@@ -1367,7 +1367,7 @@ pub fn Touch_DoorTrigger(
                         None => core::ptr::null_mut(),
                     };
                 } else {
-                    relock_ent = (*ent).parent;
+                    relock_ent = crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent);
                 }
                 if !relock_ent.is_null() {
                     (*relock_ent).spawnflags &= !MOVER_LOCKED;
@@ -1377,7 +1377,7 @@ pub fn Touch_DoorTrigger(
 
         if (*parent).moverState != MOVER_1TO2 {
             // door is not already opening — if closed, opening or open, check this
-            Use_BinaryMover(ctx, (*ent).parent, ent, other);
+            Use_BinaryMover(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent), ent, other);
         }
         if !relock_ent.is_null() {
             // re-lock us
@@ -1649,7 +1649,7 @@ pub fn SP_func_door(
             ctx.engine,
             GSetBrushModelArgs::new(ent, std::ffi::CStr::from_ptr((*ent).model).to_owned()),
         );
-        G_SetMovedir((*ent).s.angles, (*ent).movedir);
+        G_SetMovedir(&mut (*ent).s.angles, &mut (*ent).movedir);
         let abs_movedir = [
             (*ent).movedir[0].abs(),
             (*ent).movedir[1].abs(),
@@ -1752,7 +1752,7 @@ pub fn Touch_PlatCenterTrigger(
             None => core::ptr::null_mut(),
         };
         if (*parent).moverState == MOVER_POS1 {
-            Use_BinaryMover(ctx, (*ent).parent, ent, other);
+            Use_BinaryMover(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*ent).parent), ent, other);
         }
     }
 }
@@ -1901,7 +1901,7 @@ pub fn SP_func_button(
         let mut lip = 0.0f32;
         G_SpawnFloat(ctx, c"lip".as_ptr(), c"4".as_ptr(), &mut lip as *mut f32);
 
-        G_SetMovedir((*ent).s.angles, (*ent).movedir);
+        G_SetMovedir(&mut (*ent).s.angles, &mut (*ent).movedir);
         let abs_movedir = [
             (*ent).movedir[0].abs(),
             (*ent).movedir[1].abs(),

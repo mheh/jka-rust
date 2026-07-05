@@ -162,15 +162,15 @@ pub fn Wampa_Move(
                 } else if !crate::g_timer::TIMER_Done(ctx, npc, c"walk".as_ptr()) != 0 {
                     // keep walking for a bit
                     (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
-                } else if visible != 0 && (*ctx.world).globals.enemyDist > 384 && (*npc_info).stats.runSpeed == 180 {
+                } else if visible != 0 && (*ctx.world).globals.enemyDist > 384.0 && (*npc_info).stats.runSpeed == 180 {
                     // fast run, all fours
                     (*npc_info).stats.runSpeed = 300;
                     crate::g_timer::TIMER_Set(ctx, npc, c"runfar".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
-                } else if (*ctx.world).globals.enemyDist > 256 && (*npc_info).stats.runSpeed == 300 {
+                } else if (*ctx.world).globals.enemyDist > 256.0 && (*npc_info).stats.runSpeed == 300 {
                     // slow run, upright
                     (*npc_info).stats.runSpeed = 180;
                     crate::g_timer::TIMER_Set(ctx, npc, c"runclose".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(3000, 5000));
-                } else if (*ctx.world).globals.enemyDist < 128 {
+                } else if (*ctx.world).globals.enemyDist < 128.0 {
                     // walk
                     (*npc_info).stats.runSpeed = 180;
                     (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
@@ -202,7 +202,7 @@ pub fn Wampa_Slash(
         let radiusSquared = radius * radius;
         let mut boltOrg: [f32; 3] = [0.0; 3];
 
-        let numEnts = crate::NPC_utils::NPC_GetEntsNearBolt(ctx, radiusEntNums.as_mut_ptr(), radius, boltIndex, boltOrg);
+        let numEnts = crate::NPC_utils::NPC_GetEntsNearBolt(ctx, radiusEntNums.as_mut_ptr(), radius, boltIndex, &mut boltOrg);
 
         for i in 0..(numEnts as usize) {
             let radiusEnt = (*ctx.world).g_entities.get_unchecked_mut(radiusEntNums[i] as usize) as *mut gentity_t;
@@ -237,7 +237,7 @@ pub fn Wampa_Slash(
                         && (*(radiusEnt.client as *mut gclient_t)).NPC_class != crate::prelude::CLASS_ATST
                     {
                         crate::g_utils::G_Throw(ctx, radiusEnt, pushDir, 65.0);
-                        if crate::bg_pmove::BG_KnockDownable(&mut (*(radiusEnt.client as *mut gclient_t)).ps) != 0
+                        if crate::bg_pmove::BG_KnockDownable(&mut (*(radiusEnt.client as *mut gclient_t)).ps as *mut _) != 0
                             && radiusEnt.health > 0
                             && (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0
                         {
@@ -453,7 +453,7 @@ pub fn NPC_Wampa_Pain(
         }
         if !attacker.is_null()
             && (*attacker).inuse != 0
-            && attacker != (*self_).enemy
+            && ent_id_opt((*ctx.world).g_entities.as_ptr(), attacker) != (*self_).enemy
             && ((*attacker).flags & crate::prelude::FL_NOTARGET) == 0
         {
             // Resolved once; only dereferenced downstream after the `is_none()`
@@ -570,7 +570,11 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                         crate::NPC_utils::NPC_CheckEnemyExt(ctx, qtrue);
                     }
                 } else {
-                    if crate::NPC_combat::ValidEnemy(ctx, (*npc).enemy) == qfalse {
+                    let enemy_for_valid = match (*npc).enemy {
+                        Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+                        None => core::ptr::null_mut(),
+                    };
+                    if crate::NPC_combat::ValidEnemy(ctx, enemy_for_valid) == qfalse {
                         crate::g_timer::TIMER_Remove(ctx, npc, c"lookForNewEnemy".as_ptr()); // make them look again right now
                         if !(*enemy_ptr).inuse != 0 || (*ctx.world).level.time - (*enemy_ptr).s.time > (*ctx.world).bg_state.rng.Q_irand(10000, 15000) {
                             // it's been a while since the enemy died, or enemy is completely gone, get bored with him
@@ -596,7 +600,7 @@ pub fn NPC_BSWampa_Default(ctx: GameContext<'_>) {
                         (*npc).enemy = None;
                         newEnemy = crate::NPC_combat::NPC_CheckEnemy(ctx, if (*npc_info).confusionTime < (*ctx.world).level.time { qtrue } else { qfalse }, qfalse, qfalse);
                         (*npc).enemy = sav_enemy;
-                        if !newEnemy.is_null() && newEnemy != sav_enemy {
+                        if !newEnemy.is_null() && ent_id_opt((*ctx.world).g_entities.as_ptr(), newEnemy) != sav_enemy {
                             // picked up a new enemy!
                             (*npc).lastEnemy = (*npc).enemy;
                             crate::NPC_combat::G_SetEnemy(ctx, npc, newEnemy);

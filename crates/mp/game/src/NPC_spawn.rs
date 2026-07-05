@@ -20,6 +20,9 @@ use crate::g_public_consts::SVF_NOCLIENT;
 /// Source: `oracle/oracle/codemp/game/b_local.h:139-141`
 pub const SFB_RIFLEMAN: c_int = 2;
 pub const SFB_PHASER: c_int = 4;
+/// Source: `oracle/oracle/codemp/game/b_local.h:147-148`
+pub const SFB_CINEMATIC: c_int = 32;
+pub const SFB_NOTSOLID: c_int = 64;
 
 // PORT-NOTE(packet-contract): this packet's manifest rows list callee
 // names (in-module callees / bg_ callees / traps / globals) but never give the

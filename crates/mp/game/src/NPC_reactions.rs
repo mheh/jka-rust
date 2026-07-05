@@ -280,7 +280,7 @@ pub fn NPC_ChoosePainAnimation(
                 pain_chance = NPC_GetPainChance(ctx, self_, damage);
             }
 
-            if !client.is_null() && (*client).NPC_class == CLASS_DESANN {
+            if !client.is_null() && (*client).NPC_class as c_int == CLASS_DESANN {
                 pain_chance *= 0.5f32;
             }
         }
@@ -290,7 +290,7 @@ pub fn NPC_ChoosePainAnimation(
             let mut pain_anim = -1;
 
             // Pick and play our animation
-            if !client.is_null() && (*client).ps.fd.forceGripBeingGripped < (*ctx.world).level.time {
+            if !client.is_null() && (*client).ps.fd.forceGripBeingGripped < (*ctx.world).level.time as f32 {
                 // Not being force-gripped or force-drained
                 let legs_anim = (*client).ps.legsAnim;
                 let torso_anim = (*client).ps.torsoAnim;
@@ -321,7 +321,7 @@ pub fn NPC_ChoosePainAnimation(
                     (*client).ps.saberMove = 0;  // LS_READY
 
                     let mut parts = SETANIM_BOTH;
-                    if crate::bg_panimate::BG_CrouchAnim((*client).ps.legsAnim) || crate::bg_panimate::PM_InCartwheel((*client).ps.legsAnim) {
+                    if crate::bg_panimate::BG_CrouchAnim((*client).ps.legsAnim) != qfalse || crate::bg_panimate::PM_InCartwheel((*client).ps.legsAnim) != qfalse {
                         parts = SETANIM_LEGS;
                     }
 

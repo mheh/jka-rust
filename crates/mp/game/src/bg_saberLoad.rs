@@ -1070,7 +1070,7 @@ pub fn WP_SaberParseParms(
             if qstricmp_eq(tok, c"forceRestrict") {
                 let value = parse_string_field!();
                 let fp = crate::q_shared::GetIDForString(FPTable.as_ptr() as *mut stringID_table_t, value);
-                if fp >= FP_FIRST && fp < NUM_FORCE_POWERS {
+                if fp >= FP_FIRST && fp < NUM_FORCE_POWERS as c_int {
                     s.forceRestrictions |= 1 << fp;
                 }
                 continue;
@@ -1982,10 +1982,10 @@ pub fn WP_SaberParseParm(
 /// Raven `WP_SaberValidForPlayerInMP`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:2647-2662`
-pub fn WP_SaberValidForPlayerInMP(saberName: *const c_char) -> qboolean {
+pub fn WP_SaberValidForPlayerInMP(saberName: *const c_char, bg: &mut BgState) -> qboolean {
     unsafe {
         let mut allowed: [c_char; 8] = [0; 8];
-        if WP_SaberParseParm(saberName, c"notInMP".as_ptr(), allowed.as_mut_ptr()) == QFALSE {
+        if WP_SaberParseParm(saberName, c"notInMP".as_ptr(), allowed.as_mut_ptr(), bg) == QFALSE {
             // not defined, default is yes
             return QTRUE;
         }
@@ -2045,7 +2045,7 @@ pub fn WP_SetSaber(
             return;
         }
 
-        if entNum < MAX_CLIENTS_I32 && WP_SaberValidForPlayerInMP(saberName) == QFALSE {
+        if entNum < MAX_CLIENTS_I32 && WP_SaberValidForPlayerInMP(saberName, bg) == QFALSE {
             WP_SaberParseParms(c"Kyle".as_ptr(), sabers.offset(saberNum as isize), bg, traps); // get saber info
         } else {
             WP_SaberParseParms(saberName, sabers.offset(saberNum as isize), bg, traps); // get saber info

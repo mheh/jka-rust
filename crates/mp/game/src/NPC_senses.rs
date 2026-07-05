@@ -240,7 +240,7 @@ pub fn InFOV2(
 
     if unsafe { !(*from).client.is_null() } {
         _VectorCopy(
-            unsafe { (*(*from).client).ps.viewangles },
+            unsafe { (*((*from).client as *mut gclient_t)).ps.viewangles },
             &mut fromAngles,
         );
     } else {
@@ -273,17 +273,17 @@ pub fn InFOV(
     if unsafe { !(*from).client.is_null() } {
         // Check if renderInfo.eyeAngles is not zero
         if !vector_compare(
-            unsafe { (*(*from).client).renderInfo.eyeAngles },
+            unsafe { (*((*from).client as *mut gclient_t)).renderInfo.eyeAngles },
             vec3_origin,
         ) {
             // Actual facing of tag_head!
             _VectorCopy(
-                unsafe { (*(*from).client).renderInfo.eyeAngles },
+                unsafe { (*((*from).client as *mut gclient_t)).renderInfo.eyeAngles },
                 &mut fromAngles,
             );
         } else {
             _VectorCopy(
-                unsafe { (*(*from).client).ps.viewangles },
+                unsafe { (*((*from).client as *mut gclient_t)).ps.viewangles },
                 &mut fromAngles,
             );
         }
@@ -746,7 +746,7 @@ pub fn G_CheckForDanger(
         // run away!
         let owner = world.level.alertEvents[alertEvent as usize].owner;
         let owner_team = if !owner.is_null() && !unsafe { (*owner).client.is_null() } {
-            Some(unsafe { (*(*owner).client).playerTeam })
+            Some(unsafe { (*((*owner).client as *mut gclient_t)).playerTeam })
         } else {
             None
         };
@@ -756,7 +756,7 @@ pub fn G_CheckForDanger(
                 && owner != self_
                 && unsafe { (*self_).client.is_null() }
                     == false
-                && team != unsafe { (*(*self_).client).playerTeam }
+                && team != unsafe { (*((*self_).client as *mut gclient_t)).playerTeam }
         } else {
             owner.is_null()
         };

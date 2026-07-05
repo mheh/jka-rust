@@ -142,9 +142,9 @@ pub fn Seeker_MaintainHeight(ctx: GameContext<'_>) {
 
             if !(*NPCInfo).goalEntity.is_none() {
                 // Is there a goal?
-                goal = (*NPCInfo).goalEntity;
+                goal = crate::ent_id::resolve(world.g_entities.as_mut_ptr(), (*NPCInfo).goalEntity);
             } else {
-                goal = (*NPCInfo).lastGoalEntity;
+                goal = crate::ent_id::resolve(world.g_entities.as_mut_ptr(), (*NPCInfo).lastGoalEntity);
             }
             if !goal.is_null() {
                 let dif = (*goal).r.currentOrigin[2] - (*NPC).r.currentOrigin[2];
@@ -372,7 +372,7 @@ pub fn Seeker_Hunt(
             // Get our direction from the navigator if we can't see our target
             let mut forward: vec3_t = [0.0f32; 3];
             let mut distance: f32 = 0.0f32;
-            if crate::NPC_move::NPC_GetMoveDirection(ctx, &mut forward, &mut distance) == qfalse {
+            if crate::NPC_move::NPC_GetMoveDirection(ctx, forward, &mut distance) == qfalse {
                 return;
             }
 
@@ -407,7 +407,7 @@ pub fn Seeker_Fire(ctx: GameContext<'_>) {
         let mut enemy_org: vec3_t = [0.0f32; 3];
         let mut muzzle: vec3_t = [0.0f32; 3];
 
-        crate::NPC_utils::CalcEntitySpot(ctx, (*NPC).enemy, spot_t::SPOT_HEAD, &mut enemy_org);
+        crate::NPC_utils::CalcEntitySpot(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*NPC).enemy), spot_t::SPOT_HEAD, &mut enemy_org);
         // Inline VectorSubtract: dir = enemy_org - origin
         for i in 0..3 {
             dir[i] = enemy_org[i] - (*NPC).r.currentOrigin[i];
@@ -492,7 +492,7 @@ pub fn Seeker_Attack(ctx: GameContext<'_>) {
         // Rate our distance to the target, and our visibilty
         let enemy = &mut (*ctx.world).g_entities[(*NPC).enemy.unwrap().index()] as *mut gentity_t;
         let distance = crate::q_math::DistanceHorizontalSquared((*NPC).r.currentOrigin, (*enemy).r.currentOrigin);
-        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, (*NPC).enemy);
+        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*NPC).enemy));
         let mut advance = if distance > MIN_DISTANCE_SQR as f32 { qtrue } else { qfalse };
 
         if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
@@ -527,7 +527,15 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
         let mut entityList: [c_int; mp_qshared::shared::MAX_GENTITIES] = [0; mp_qshared::shared::MAX_GENTITIES];
         let mut best: *mut gentity_t = core::ptr::null_mut();
 
-        numFound = crate::trap::EntitiesInBox(ctx.engine, mins, maxs, entityList.as_mut_ptr(), mp_qshared::shared::MAX_GENTITIES as c_int);
+        numFound = crate::trap::EntitiesInBox(
+            ctx.engine,
+            mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs::new(
+                mins.as_ptr() as *const vec3_t,
+                maxs.as_ptr() as *const vec3_t,
+                entityList.as_mut_ptr(),
+                mp_qshared::shared::MAX_GENTITIES as c_int,
+            ),
+        );
 
         for i in 0..numFound {
             let ent = &mut world.g_entities[entityList[i as usize] as usize];
@@ -558,7 +566,7 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
             // used to offset seekers around a circle so they don't occupy the same spot.  This is not a fool-proof method.
             (*NPC).random = (*ctx.world).bg_state.rng.random() * 6.3f32; // roughly 2pi
 
-            (*NPC).enemy = best;
+            (*NPC).enemy = ent_id_opt(world.g_entities.as_ptr(), best);
         }
     }
 }
@@ -581,7 +589,7 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
         Seeker_MaintainHeight(ctx);
 
         if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
-            owner = (*NPC).enemy;
+            owner = crate::ent_id::resolve(world.g_entities.as_mut_ptr(), (*NPC).enemy);
             if owner.is_null() {
                 return;
             }
@@ -638,10 +646,10 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
             }
 
             // Hey come back!
-            (*NPCInfo).goalEntity = owner;
+            (*NPCInfo).goalEntity = ent_id_opt(world.g_entities.as_ptr(), owner);
             (*NPCInfo).goalRadius = 32;
             crate::NPC_move::NPC_MoveToGoal(ctx, qtrue);
-            (*NPC).parent = owner;
+            (*NPC).parent = ent_id_opt(world.g_entities.as_ptr(), owner);
         }
 
         if (*NPCInfo).enemyCheckDebounceTime < world.level.time {

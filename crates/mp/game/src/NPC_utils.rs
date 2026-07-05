@@ -712,7 +712,11 @@ pub fn G_ActivateBehavior(
                 cstr_to_str(Q3_SCRIPT_DIR.as_ptr()),
                 cstr_to_str(bs_name)
             );
-            trap::ICARUS_RunScript(ctx.engine, GIcarusRunscriptArgs::new(self_, cstr(&script_path)));
+            let script_path_c = cstr(&script_path);
+            trap::ICARUS_RunScript(
+                ctx.engine,
+                GIcarusRunscriptArgs::new(self_, script_path_c.as_ptr()),
+            );
         }
         QTRUE
     }
@@ -1024,7 +1028,7 @@ pub fn NPC_ValidEnemy(
         //Must be an NPC
         if (*ent).client.is_null() {
             //	if ( ent->svFlags&SVF_NONNPC_ENEMY )
-            if (*ent).s.eType != ET_NPC {
+            if (*ent).s.eType != ET_NPC as c_int {
                 //still potentially valid
                 if (*ent).alliedTeam == (*npc_client).playerTeam as c_int {
                     return QFALSE;
@@ -1237,7 +1241,10 @@ pub fn NPC_PickEnemyExt(
                         let owner_client = (*owner).client as *mut gclient_t;
                         let npc_client = (*npc).client as *mut gclient_t;
                         if (*owner_client).playerTeam == (*npc_client).playerTeam {
-                            return (*owner).enemy;
+                            return (*owner)
+                                .enemy
+                                .map(|id| &mut (*ctx.world).g_entities[id.0 as usize] as *mut gentity_t)
+                                .unwrap_or(core::ptr::null_mut());
                         }
                     }
                 }

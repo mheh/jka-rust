@@ -683,17 +683,18 @@ pub fn BG_FindItemForWeapon(weapon: weapon_t) -> *mut gitem_t {
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1941-1952`
 pub fn BG_FindItemForAmmo(ammo: ammo_t) -> *mut gitem_t {
+    let ammo = ammo as c_int;
     let mut i: c_int = 1;
     while i < bg_numItems {
         if !bg_itemlist[i as usize].classname.is_null()
             && bg_itemlist[i as usize].giType == IT_AMMO
-            && bg_itemlist[i as usize].giTag == ammo as c_int
+            && bg_itemlist[i as usize].giTag == ammo
         {
             return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
         }
         i += 1;
     }
-    panic!("Couldn't find item for ammo {}", ammo as c_int);
+    panic!("Couldn't find item for ammo {}", ammo);
 }
 
 /// Raven `BG_FindItem`.
@@ -1720,13 +1721,23 @@ pub fn BG_ModelCache(
     bg: &BgState,
     traps: &dyn BgTraps,
 ) -> c_int {
-    // PORT-NOTE(qagame-cfg): Raven's oracle source uses #ifdef QAGAME / #else.
-    // QAGAME is not a valid Rust feature in this codebase; using the fallback path.
+    // PORT-NOTE(qagame-cfg): jampgame is the `QAGAME` build, so this ports the
+    // `#ifdef QAGAME` branch (the `#else` path's `trap_R_RegisterModel` has no
+    // game syscall). Precache the ghoul2 model, then discard it; return 0.
     unsafe {
+        let mut g2: *mut c_void = core::ptr::null_mut();
+
         if !skinName.is_null() && *skinName != 0 {
-            trap_R_RegisterSkin(skinName);
+            traps.r_register_skin(skinName);
         }
-        trap_R_RegisterModel(modelName)
+
+        // I could hook up a precache ghoul2 function, but oh well, this works
+        traps.g2api_init_ghoul2_model(&mut g2 as *mut *mut c_void, modelName, 0, 0, 0, 0, 0);
+        if !g2.is_null() {
+            // now get rid of it
+            traps.g2api_clean_ghoul2_models(&mut g2 as *mut *mut c_void);
+        }
+        0
     }
 }
 

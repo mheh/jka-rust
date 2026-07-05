@@ -611,7 +611,7 @@ pub fn ChangeWeapon(ctx: GameContext<'_>, ent: *mut gentity_t, newWeapon: c_int)
         let npc = (*ent).NPC as *mut gNPC_t;
 
         (*client).ps.weapon = newWeapon;
-        (*client).pers.cmd.weapon = newWeapon;
+        (*client).pers.cmd.weapon = newWeapon as u8;
         (*npc).shotTime = 0;
         (*npc).burstCount = 0;
         (*npc).attackHold = 0;
@@ -904,7 +904,7 @@ pub fn WeaponThink(ctx: GameContext<'_>, inCombat: qboolean) {
         if (*client).ps.weaponstate == WEAPON_RAISING as c_int
             || (*client).ps.weaponstate == WEAPON_DROPPING as c_int
         {
-            world.globals.ucmd.weapon = (*client).ps.weapon;
+            world.globals.ucmd.weapon = (*client).ps.weapon as u8;
             world.globals.ucmd.buttons &= !BUTTON_ATTACK;
             return;
         }
@@ -917,7 +917,7 @@ pub fn WeaponThink(ctx: GameContext<'_>, inCombat: qboolean) {
         }
         //MCG - End
 
-        world.globals.ucmd.weapon = (*client).ps.weapon;
+        world.globals.ucmd.weapon = (*client).ps.weapon as u8;
         ShootThink(ctx);
     }
 }

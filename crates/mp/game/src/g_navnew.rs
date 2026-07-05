@@ -851,7 +851,7 @@ pub fn NAVNEW_MoveToGoal(
             //just use current waypoints
             bestNode = trap::Nav_GetBestNodeAltRoute2(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_GETBESTALT2::GNavGetbestalt2Args::new(
+                mp_abi::game::syscalls::G_NAV_GETBESTNODEALT2::GNavGetbestnodealt2Args::new(
                     (*self_).waypoint,
                     if !goal_ent_ptr.is_null() { (*goal_ent_ptr).waypoint } else { NODE_NONE },
                     bestNode,
@@ -862,7 +862,7 @@ pub fn NAVNEW_MoveToGoal(
         else if {
             bestNode = trap::Nav_GetBestPathBetweenEnts(
                 ctx.engine,
-                mp_abi::game::syscalls::G_NAV_GETBESTPATH::GNavGetbestpathArgs::new(self_, goal_ent_ptr, NF_CLEAR_PATH),
+                mp_abi::game::syscalls::G_NAV_GETBESTPATHBETWEENENTS::GNavGetbestpathbetweenentsArgs::new(self_, goal_ent_ptr, NF_CLEAR_PATH),
             );
             bestNode == NODE_NONE
         } {
@@ -971,7 +971,7 @@ pub fn NAVNEW_MoveToGoal(
                     if (*self_).waypoint == (if !goal_ent_ptr.is_null() { (*goal_ent_ptr).waypoint } else { NODE_NONE }) {
                         //our waypoint is our goal's waypoint, nothing we can do
                         //remember that this node is blocked
-                        trap::Nav_AddFailedNode(ctx.engine, mp_abi::game::syscalls::G_NAV_ADDFAIL::GNavAddfailArgs::new(self_, (*self_).waypoint));
+                        trap::Nav_AddFailedNode(ctx.engine, mp_abi::game::syscalls::G_NAV_ADDFAILEDNODE::GNavAddfailednodeArgs::new(self_, (*self_).waypoint));
                         return WAYPOINT_NONE;
                     } else {
                         //try going for our waypoint this time
@@ -988,14 +988,14 @@ pub fn NAVNEW_MoveToGoal(
                         if (*ctx.world).cvars.d_patched.integer != 0 && //use patch-style navigation
                            (trap::Nav_NodesAreNeighbors(
                                ctx.engine,
-                               mp_abi::game::syscalls::G_NAV_NEIGHBORS::GNavNeighborsArgs::new((*self_).waypoint, bestNode),
+                               mp_abi::game::syscalls::G_NAV_NODESARENEIGHBORS::GNavNodesareneighborsArgs::new((*self_).waypoint, bestNode),
                            ) == QFALSE
                            || NAVNEW_TestNodeConnectionBlocked(ctx, (*self_).waypoint, bestNode, self_, (if !goal_ent_ptr.is_null() { (*goal_ent_ptr).s.number } else { ENTITYNUM_NONE }), QFALSE, QTRUE) != QFALSE)
                         {
                             //the direct path between these 2 nodes is blocked by an ent
                             trap::Nav_AddFailedEdge(
                                 ctx.engine,
-                                mp_abi::game::syscalls::G_NAV_ADDEDGE::GNavAddedgeArgs::new((*self_).s.number, (*self_).waypoint, bestNode),
+                                mp_abi::game::syscalls::G_NAV_ADDFAILEDEDGE::GNavAddfailededgeArgs::new((*self_).s.number, (*self_).waypoint, bestNode),
                             );
                         }
                         bestNode = (*self_).waypoint;
@@ -1007,7 +1007,7 @@ pub fn NAVNEW_MoveToGoal(
                     //we headed for *our* waypoint and couldn't get to it
                     if (*ctx.world).cvars.d_altRoutes.integer != 0 {
                         //remember that this node is blocked
-                        trap::Nav_AddFailedNode(ctx.engine, mp_abi::game::syscalls::G_NAV_ADDFAIL::GNavAddfailArgs::new(self_, (*self_).waypoint));
+                        trap::Nav_AddFailedNode(ctx.engine, mp_abi::game::syscalls::G_NAV_ADDFAILEDNODE::GNavAddfailednodeArgs::new(self_, (*self_).waypoint));
                         //Now we should get our waypoints again
                         //FIXME: cache the trace-data for subsequent calls as only the route info would have changed
                         return WAYPOINT_NONE;

@@ -106,6 +106,7 @@ use crate::q_math::{vectoangles, AngleVectors, VectorLength, VectorLengthSquared
 use crate::bg_pmove::Pmove;
 use crate::g_utils::G_EntitySound;
 use crate::w_force::G_PreDefSound;
+use crate::w_force::{ForceHeal, ForceSpeed, ForceThrow};
 
 use crate::npc::g_npc_t::gNPC_t;
 use crate::ent_fn_enums::EntTouch;

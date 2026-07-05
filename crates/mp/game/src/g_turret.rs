@@ -340,7 +340,7 @@ pub fn turret_head_think(
             let mut fwd = [0.0; 3];
             let mut org = [0.0; 3];
 
-            (*self_).setTime = (*ctx.world).level.time + (*self_).wait;
+            (*self_).setTime = (*ctx.world).level.time + (*self_).wait as c_int;
 
             // Get top entity's position and angles
             let top_origin = (*ctx.world).g_entities[top_num].r.currentOrigin;
@@ -428,7 +428,7 @@ pub fn turret_aim(
             if (*enemy).s.eType == ET_NPC as c_int && (*enemy).s.NPC_class == CLASS_VEHICLE && !(*enemy).m_pVehicle.is_null() {
                 let enemy_veh = (*enemy).m_pVehicle as *mut Vehicle_t;
                 if (*enemy_veh).m_pVehicleInfo as *const vehicleInfo_t != std::ptr::null() {
-                    if (*(*enemy_veh).m_pVehicleInfo).vehicle_type == VH_WALKER {
+                    if (*(*enemy_veh).m_pVehicleInfo).r#type == VH_WALKER {
                         org[2] += 32.0;
                     }
                 }
@@ -594,11 +594,11 @@ pub fn turret_find_enemies(
             if target == self_ || (*target).takedamage == qfalse || (*target).health <= 0 || ((*target).flags & FL_NOTARGET) != 0 {
                 continue;
             }
-            if !(*target).client.is_null() && (*(*target).client as *mut gclient_t).sess.sessionTeam == TEAM_SPECTATOR {
+            if !(*target).client.is_null() && (*((*target).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR {
                 continue;
             }
             if (*self_).alliedTeam != 0 {
-                if !(*target).client.is_null() && (*(*target).client as *mut gclient_t).sess.sessionTeam == (*self_).alliedTeam {
+                if !(*target).client.is_null() && (*((*target).client as *mut gclient_t)).sess.sessionTeam == (*self_).alliedTeam {
                     continue;
                 }
                 if (*target).teamnodmg == (*self_).alliedTeam {

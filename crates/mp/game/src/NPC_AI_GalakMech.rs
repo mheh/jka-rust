@@ -773,7 +773,7 @@ pub fn GM_CheckFireState(ctx: GameContext<'_>) {
                     let mut dist: f32;
 
                     crate::NPC_utils::CalcEntitySpot(ctx, npc_ent, SPOT_HEAD, &mut muzzle);
-                    if VectorCompare(IMPACT_POS_4, vec3_origin) {
+                    if VectorCompare(IMPACT_POS_4, vec3_origin) != 0 {
                         // never checked ShotEntity this frame, so must do a trace...
                         let mut tr: trace_t = core::mem::zeroed();
                         let mut forward: vec3_t = [0.0; 3];
@@ -1083,7 +1083,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 crate::g_timer::TIMER_Set(ctx, npc_ent, c"noRapid".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(2000, 6000));
                 (*npc_info).scriptFlags |= SCF_ALT_FIRE as i32;
                 (*npc_ent).alt_fire = qtrue;
-                if (*npc_ent).locationDamage[HL_GENERIC1 as usize] > GENERATOR_HEALTH as c_float {
+                if (*npc_ent).locationDamage[HL_GENERIC1 as usize] > GENERATOR_HEALTH {
                     if (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 || (*ctx.world).globals.enemyDist4 < MAX_LOB_DIST_SQUARED {
                         // shield down, use laser
                         NPC_GM_StartLaser(ctx);
@@ -1119,7 +1119,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     (*npc_info).blockedDebounceTime = 0;
                 }
             } else if (*npc_ent).lockCount == 0
-                && (*npc_ent).locationDamage[HL_GENERIC1 as usize] > GENERATOR_HEALTH as c_float
+                && (*npc_ent).locationDamage[HL_GENERIC1 as usize] > GENERATOR_HEALTH
                 && crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0
                 && InFront(
                     (*enemy_ent).r.currentOrigin,

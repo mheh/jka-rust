@@ -24,8 +24,37 @@
 
 use crate::prelude::*;
 use crate::q_shared::Q_stricmp;
+// `strlen` resolves to the crate's `Q_strlen` (the `g_spawn.rs` precedent for
+// aliasing the libc name); `strcpy`/`strcat` are the file-local unchecked
+// helpers below, matching the `c_strcpy` house pattern in `q_shared.rs` /
+// `bg_saberLoad.rs` (Raven uses raw libc on fixed buffers here).
+use crate::q_shared::Q_strlen as strlen;
 // Raven `saber_styles_t` variants (`SS_*`) spelled bare in the saber-style table.
 use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::*;
+
+/// Local helper mirroring libc `strcpy` (copies through the terminating NUL,
+/// no bounds check — faithful to Raven's unchecked fixed-buffer usage).
+unsafe fn strcpy(dst: *mut c_char, src: *const c_char) {
+    let mut i: isize = 0;
+    loop {
+        let c = *src.offset(i);
+        *dst.offset(i) = c;
+        if c == 0 {
+            break;
+        }
+        i += 1;
+    }
+}
+
+/// Local helper mirroring libc `strcat` (appends at the terminating NUL, no
+/// bounds check — faithful to Raven's unchecked fixed-buffer usage).
+unsafe fn strcat(dst: *mut c_char, src: *const c_char) {
+    let mut end: isize = 0;
+    while *dst.offset(end) != 0 {
+        end += 1;
+    }
+    strcpy(dst.offset(end), src);
+}
 
 /// Raven's `#define SIEGECHAR_TAB 9` (tab literal used by the hand-rolled
 /// siege-file parser instead of `'\t'`).
@@ -677,7 +706,7 @@ pub fn BG_SiegeTranslateForcePowers(buf: *mut c_char, siegeClass: *mut siegeClas
 
                     if Q_stricmp(check_power.as_ptr(), c"FP_JUMP".as_ptr()) == 0 {
                         unsafe {
-                            libc::strcpy(check_power.as_mut_ptr(), c"FP_LEVITATION".as_ptr());
+                            strcpy(check_power.as_mut_ptr(), c"FP_LEVITATION".as_ptr());
                         }
                     }
 

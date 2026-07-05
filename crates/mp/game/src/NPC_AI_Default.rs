@@ -460,7 +460,7 @@ pub fn NPC_BSShoot(ctx: GameContext<'_>) {
     (*world).globals.enemyVisibility = VIS_SHOOT;
 
     if client.ps.weaponstate as i32 != WEAPON_READY as i32 && client.ps.weaponstate as i32 != WEAPON_FIRING as i32 {
-        unsafe { (*(*ctx.world).globals.client).ps.weaponstate = WEAPON_READY };
+        unsafe { (*(*ctx.world).globals.client).ps.weaponstate = WEAPON_READY as i32 };
     }
 
     WeaponThink(ctx, qtrue);

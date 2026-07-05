@@ -2386,6 +2386,34 @@ impl PmoveContext<'_> {
     }
 }
 
+/// Raven `BG_HasAnimation` — free-function form for game-tier callers.
+///
+/// Game-tier callers without a PmoveContext receiver call this form, passing
+/// a reference to the BgState that owns the bgAllAnims table.
+///
+/// Source: `oracle/oracle/codemp/game/bg_panimate.c:2933-2955`
+pub fn BG_HasAnimation(
+    bg_state: &crate::bg_channel::BgState,
+    animIndex: c_int,
+    animation: c_int,
+) -> qboolean {
+    if animation < 0 || animation >= MAX_ANIMATIONS as c_int {
+        return 0;
+    }
+
+    if animIndex < 0 || animIndex > bg_state.bgNumAllAnims {
+        return 0;
+    }
+
+    let animations = bg_state.bgAllAnims[animIndex as usize].anims;
+
+    if unsafe { (*animations.offset(animation as isize)).numFrames } == 0 {
+        return 0;
+    }
+
+    1
+}
+
 /// Raven `BG_PickAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2957-2975`

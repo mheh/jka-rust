@@ -710,8 +710,8 @@ pub fn BG_VehWeaponLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
                 }
 
                 if total_len + len as usize >= MAX_VEH_WEAPON_DATA_SIZE as usize {
-                    Com_Error(
-                        ERR_DROP,
+                    crate::g_main::Com_Error(
+                        ERR_DROP as c_int,
                         cstr("Vehicle Weapon extensions (*.vwp) are too large").as_ptr(),
                     );
                 }
@@ -771,7 +771,10 @@ pub fn BG_VehicleLoadParms(bg: &mut BgState, traps: &dyn BgTraps) {
                 }
 
                 if total_len + len as usize >= MAX_VEHICLE_DATA_SIZE as usize {
-                    Com_Error(ERR_DROP, cstr("Vehicle extensions (*.veh) are too large").as_ptr());
+                    crate::g_main::Com_Error(
+                        ERR_DROP as c_int,
+                        cstr("Vehicle extensions (*.veh) are too large").as_ptr(),
+                    );
                 }
                 let appended = cstr_to_str(temp_read_buffer.as_ptr() as *const c_char);
                 for (i, byte) in appended.bytes().enumerate() {
@@ -826,8 +829,8 @@ pub fn BG_GetVehicleModelName(
 
         if v_index == VEHICLE_NONE {
             let name = cstr_to_str(veh_name);
-            Com_Error(
-                ERR_DROP,
+            crate::g_main::Com_Error(
+                ERR_DROP as c_int,
                 cstr(&format!("BG_GetVehicleModelName:  couldn't find vehicle {}", name)).as_ptr(),
             );
         }
@@ -855,8 +858,8 @@ pub fn BG_GetVehicleSkinName(
 
         if v_index == VEHICLE_NONE {
             let name = cstr_to_str(veh_name);
-            Com_Error(
-                ERR_DROP,
+            crate::g_main::Com_Error(
+                ERR_DROP as c_int,
                 cstr(&format!("BG_GetVehicleSkinName:  couldn't find vehicle {}", name)).as_ptr(),
             );
         }

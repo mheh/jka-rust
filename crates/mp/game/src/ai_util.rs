@@ -23,6 +23,7 @@ use crate::botai::bot_state_s::MAX_LOVED_ONES;
 use crate::prelude::*;
 use crate::trap;
 use mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValue;
+use mp_abi::game::syscalls::G_PRINT::GPrintArgs;
 use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFile;
 use mp_abi::game::syscalls::G_FS_READ::GFsRead;
 use mp_abi::game::syscalls::G_FS_FCLOSE_FILE::GFsFcloseFile;
@@ -284,7 +285,9 @@ pub fn BotDoChat(
         // Early exit: non-English language selected
         let lang_result = trap::Cvar_VariableIntegerValue(
             ctx.engine,
-            mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new("se_language")
+            mp_abi::game::syscalls::G_CVAR_VARIABLE_INTEGER_VALUE::GCvarVariableIntegerValueArgs::new(
+                std::ffi::CString::new("se_language").unwrap(),
+            )
         );
         if lang_result != 0 {
             return 0;
@@ -427,7 +430,7 @@ pub fn BotDoChat(
                     let mut inc_n = 0isize;
 
                     while pers.netname[inc_n as usize] != 0 {
-                        *currentChat_b.offset(inc_2) = pers.netname[inc_n as usize];
+                        *currentChat_b.offset(inc_2) = pers.netname[inc_n as usize] as u8;
                         inc_2 += 1;
                         inc_n += 1;
                     }
@@ -684,7 +687,10 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>,bs: *mut bot_state_t) {
 
         // Parse GeneralBotInfo group
         if GetValueGroup(buf, "GeneralBotInfo\0".as_ptr() as *mut c_char, group) == 0 {
-            trap::G_Printf(ctx.engine, "^1Personality file contains no GeneralBotInfo group\n\0".as_ptr() as *const c_char);
+            trap::Printf(
+                ctx.engine,
+                GPrintArgs::new(std::ffi::CString::new("^1Personality file contains no GeneralBotInfo group\n").unwrap()),
+            );
             failed = 1;
         }
 

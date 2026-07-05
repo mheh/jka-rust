@@ -246,7 +246,7 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:190-277`
 pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
     unsafe {
-        let world = &*ctx.world;
+        let world = &mut *ctx.world;
         let npc_ptr = world.globals.NPC;
         let npc_info_ptr = world.globals.NPCInfo;
 
@@ -343,7 +343,7 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:307-391`
 pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
     unsafe {
-        let world = &*ctx.world;
+        let world = &mut *ctx.world;
         let npc_ptr = world.globals.NPC;
         let npc_info_ptr = world.globals.NPCInfo;
 
@@ -568,7 +568,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
                         (*enemy_ent).clipmask,
                     ),
                 );
-                if !trace.allsolid && !trace.startsolid && (trace.fraction == 1.0 || trace.entityNum == (*enemy_ent).s.number) {
+                if trace.allsolid == 0 && trace.startsolid == 0 && (trace.fraction == 1.0 || trace.entityNum as c_int == (*enemy_ent).s.number) {
                     // I can get right to him
                     // reset fire-timing variables
                     NPC_ChangeWeapon(WP_STUN_BATON);

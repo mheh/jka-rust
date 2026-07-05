@@ -391,7 +391,7 @@ pub fn Boba_FlyStart(
         let world = ctx.world;
         if crate::g_timer::TIMER_Done(ctx, self_, c"jetRecharge".as_ptr()) != qfalse {
             let client = (*self_).client as *mut gclient_t;
-            (*client).ps.gravity = 0.0;
+            (*client).ps.gravity = 0;
             if !(*self_).NPC.is_null() {
                 let snpc = (*self_).NPC as *mut gNPC_t;
                 (*snpc).aiFlags |= NPCAI_CUSTOM_GRAVITY;
@@ -420,7 +420,7 @@ pub fn Boba_FlyStop(
     unsafe {
         let world = ctx.world;
         let client = (*self_).client as *mut gclient_t;
-        (*client).ps.gravity = (*world).cvars.g_gravity.value;
+        (*client).ps.gravity = (*world).cvars.g_gravity.value as c_int;
         if !(*self_).NPC.is_null() {
             let snpc = (*self_).NPC as *mut gNPC_t;
             (*snpc).aiFlags &= !NPCAI_CUSTOM_GRAVITY;
@@ -2089,7 +2089,7 @@ pub fn Jedi_CombatDistance(
                             crate::w_force::ForceLightning(ctx, npc);
                             if (*client).ps.fd.forcePowerLevel[FP_LIGHTNING as usize] > FORCE_LEVEL_1
                             {
-                                (*client).ps.weaponTime = rng
+                                (*client).ps.weaponTime = (*world).bg_state.rng
                                     .Q_irand(1000, 3000 + ((*world).cvars.g_spskill.integer * 500));
                                 crate::g_timer::TIMER_Set(
                                     ctx,

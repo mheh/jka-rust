@@ -1265,10 +1265,7 @@ pub fn SP_target_push(
         if (*self_).speed == 0.0 {
             (*self_).speed = 1000.0;
         }
-        // Cross-file `G_SetMovedir` resolves to a by-value/void signature (no
-        // out-param channel yet — fork-9 reshape is that shard's job); call
-        // as given, `s.origin2` written faithfully once that lands.
-        G_SetMovedir((*self_).s.angles, (*self_).s.origin2);
+        G_SetMovedir(&mut (*self_).s.angles, &mut (*self_).s.origin2);
         (*self_).s.origin2 = [
             (*self_).s.origin2[0] * (*self_).speed,
             (*self_).s.origin2[1] * (*self_).speed,
@@ -1354,7 +1351,7 @@ pub fn hurt_use(
     ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     unsafe {
         if !activator.is_null() && (*activator).inuse != 0 && !(*activator).client.is_null() {
-            (*self_).activator = activator;
+            (*self_).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
         } else {
             (*self_).activator = None;
         }
@@ -1867,7 +1864,7 @@ pub fn hyperspace_touch(
                         // teleport the pilot, too
                         TeleportPlayer(
                             ctx,
-                            (*((*other).m_pVehicle as *mut Vehicle_t)).m_pPilot,
+                            (*((*other).m_pVehicle as *mut Vehicle_t)).m_pPilot as *mut gentity_t,
                             new_org,
                             (*ent).s.angles,
                         );

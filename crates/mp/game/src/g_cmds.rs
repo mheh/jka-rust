@@ -24,6 +24,7 @@
 
 use crate::client::client_connected::CON_CONNECTED;
 use crate::client::player_team_state::playerTeamStateState_t;
+use crate::g_team::{COLOR_CYAN, COLOR_GREEN, COLOR_MAGENTA};
 use crate::prelude::*;
 use crate::trap;
 
@@ -37,7 +38,7 @@ const SAY_TELL: c_int = 2;
 /// Raven `LAST_USEABLE_WEAPON` — `WP_BRYAR_OLD`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_weapons.h:43`
-const LAST_USEABLE_WEAPON: c_int = crate::shared::WP_BRYAR_OLD;
+const LAST_USEABLE_WEAPON: c_int = WP_BRYAR_OLD;
 
 /// Raven `gc_orders[]` — canned "game command" voice-order strings.
 ///

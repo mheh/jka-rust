@@ -2335,7 +2335,7 @@ pub fn G_KickAllBots(ctx: GameContext<'_>) {
             }
             let mut netname: [c_char; 36] = [0; 36];
             write_cstr_field(&mut netname, &cstr_to_str(cl.pers.netname.as_ptr()));
-            Q_CleanStr(netname.as_mut_ptr());
+            crate::q_shared::Q_CleanStr(netname.as_mut_ptr());
             let cleaned = cstr_to_str(netname.as_ptr());
             trap::SendConsoleCommand(
                 ctx.engine,
@@ -2373,7 +2373,7 @@ pub fn CheckVote(ctx: GameContext<'_>) {
                 );
                 if cur != world.level.votingGametypeTo {
                     // If we're voting to a different game type, be sure to refresh all the map stuff
-                    let next_map_ptr = G_RefreshNextMap(ctx, world.level.votingGametypeTo, QTRUE);
+                    let next_map_ptr = crate::g_bot::G_RefreshNextMap(ctx, world.level.votingGametypeTo, QTRUE);
                     let next_map = if next_map_ptr.is_null() { String::new() } else { cstr_to_str(next_map_ptr) };
 
                     if world.level.votingGametypeTo == GT_SIEGE {
@@ -2389,7 +2389,7 @@ pub fn CheckVote(ctx: GameContext<'_>) {
                     }
                 } else {
                     // otherwise, just leave the map until a restart
-                    G_RefreshNextMap(ctx, world.level.votingGametypeTo, QFALSE);
+                    crate::g_bot::G_RefreshNextMap(ctx, world.level.votingGametypeTo, QFALSE);
                 }
 
                 if world.cvars.g_fraglimitVoteCorrection.integer != 0 {

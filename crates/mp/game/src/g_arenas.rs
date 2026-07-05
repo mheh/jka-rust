@@ -129,7 +129,7 @@ pub fn UpdateTournamentInfo(ctx: GameContext<'_>) {
         );
         write_cstr_field(&mut buf, &buf_str);
         buflen = buf.iter().position(|&c| c == 0).unwrap_or(0) as c_int;
-        if msglen + buflen + 1 >= MAX_STRING_CHARS {
+        if (msglen + buflen + 1) as usize >= MAX_STRING_CHARS {
             break;
         }
         // strcat(msg, buf)

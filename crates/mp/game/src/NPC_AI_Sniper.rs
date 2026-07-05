@@ -881,7 +881,7 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
 
                 hit = tr.entityNum;
                 // can we shoot our target?
-                if Sniper_EvaluateShot(ctx, hit) != 0 {
+                if Sniper_EvaluateShot(ctx, hit as c_int) != 0 {
                     world.globals.enemyCS2 = QTRUE;
                 }
             }

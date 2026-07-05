@@ -293,7 +293,7 @@ pub fn NPC_MineMonster_Pain(
     damage: c_int,
 ) { unsafe {
     let parm = ((((*self_).health as f32) / ((*((*self_).client as *mut gclient_t)).pers.maxHealth as f32)) * 100.0).floor() as c_int;
-    G_AddEvent(self_, EV_PAIN, parm);
+    G_AddEvent(self_, EV_PAIN as c_int, parm);
 
     if damage >= 10 {
         TIMER_Remove(ctx, self_, cstr("attacking").as_ptr());
@@ -301,12 +301,12 @@ pub fn NPC_MineMonster_Pain(
         TIMER_Remove(ctx, self_, cstr("attacking2_dmg").as_ptr());
         TIMER_Set(ctx, self_, cstr("takingPain").as_ptr(), 1350);
 
-        _VectorCopy((*(*self_).NPC).lastPathAngles, &mut (*self_).s.angles);
+        _VectorCopy((*((*self_).NPC as *mut gNPC_t)).lastPathAngles, &mut (*self_).s.angles);
 
-        NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
+        NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
 
         if !(*self_).NPC.is_null() {
-            (*(*self_).NPC).localState = LSTATE_WAITING;
+            (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_WAITING;
         }
     }
 }}

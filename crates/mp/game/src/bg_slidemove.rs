@@ -91,6 +91,8 @@ impl PmoveContext<'_> {
                         (*pEnt).s.number,
                         (*(*pSelfVeh).m_pParentEntity).s.number,
                         (*hitEnt).s.number,
+                        // Raven `G_DamageFromKiller` initializes `killer = attacker`.
+                        (*hitEnt).s.number,
                         core::ptr::null(),
                         core::ptr::addr_of!((*ps).origin) as *const vec3_t,
                         999999,
@@ -113,6 +115,8 @@ impl PmoveContext<'_> {
                         self.callbacks.damage_from_killer(
                             (*pEnt).s.number,
                             (*(*pSelfVeh).m_pParentEntity).s.number,
+                            (*hitEnt).s.number,
+                            // Raven `G_DamageFromKiller` initializes `killer = attacker`.
                             (*hitEnt).s.number,
                             core::ptr::null(),
                             core::ptr::addr_of!((*ps).origin) as *const vec3_t,

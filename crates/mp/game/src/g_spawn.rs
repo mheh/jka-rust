@@ -44,7 +44,7 @@
 //! is an out-of-file target with no such pointer to assign).
 #![allow(non_snake_case, unused, clippy::all)]
 
-use libc::strlen;
+use crate::q_shared::Q_strlen as strlen;
 use std::ffi::{CStr, CString};
 
 use crate::prelude::*;
@@ -56,6 +56,7 @@ use mp_qshared::shared::{QFALSE, QTRUE};
 use crate::bg_misc::{BG_FindItem, BG_ParseField};
 use crate::bg_panimate::BG_ParseAnimationFile;
 use crate::g_items::G_SpawnItem;
+use crate::g_misc::{SP_info_notnull, SP_info_null};
 use crate::g_main::{G_Error, G_Printf};
 use crate::g_mem::G_Alloc;
 use crate::g_utils::{G_FreeEntity, G_SetOrigin, G_SoundIndex, G_SoundSetIndex, G_Spawn};

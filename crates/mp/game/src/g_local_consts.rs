@@ -16,6 +16,11 @@ pub const INTERMISSION_DELAY_TIME: c_int = 1000;
 /// Source: `oracle/oracle/codemp/game/g_local.h:42`
 pub const SP_INTERMISSION_DELAY_TIME: c_int = 5000;
 
+/// Raven `CARNAGE_REWARD_TIME`.
+///
+/// Source: `oracle/oracle/codemp/game/g_local.h:38`
+pub const CARNAGE_REWARD_TIME: c_int = 3000;
+
 /// Raven `START_TIME_LINK_ENTS` — time-delay after map start at which all
 /// ents have been spawned, so can link them.
 ///

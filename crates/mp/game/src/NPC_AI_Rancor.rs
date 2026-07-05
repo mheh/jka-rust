@@ -233,7 +233,7 @@ pub fn Rancor_Swing(
 
         for i in 0..(numEnts as usize) {
             let radiusEnt = (*ctx.world).g_entities.get_unchecked_mut(radiusEntNums[i] as usize) as *mut gentity_t;
-            if !(*radiusEnt).inuse {
+            if (*radiusEnt).inuse == 0 {
                 continue;
             }
 
@@ -290,7 +290,7 @@ pub fn Rancor_Swing(
                         crate::ent_fn_enums::dispatch_pain(ctx, (*radiusEnt).pain.unwrap(), radiusEnt, npc, 100);
                         //GEntity_PainFunc( radiusEnt, NPC, NPC, radiusEnt->r.currentOrigin, 0, MOD_CRUSH );
                     } else if !(*radiusEnt).client.is_null() {
-                        (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtend = HANDEXTEND_NONE;
+                        (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                         (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtendTime = 0;
                         crate::npc_c::NPC_SetAnim(radiusEnt, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     }
@@ -307,7 +307,7 @@ pub fn Rancor_Swing(
                     pushDir[2] = Q_flrand( 100, 200 );
                     VectorNormalize( pushDir );
                     */
-                    crate::q_math::_VectorCopy(&(*((*npc).client as *mut gclient_t)).ps.viewangles, &mut angs);
+                    crate::q_math::_VectorCopy((*((*npc).client as *mut gclient_t)).ps.viewangles, &mut angs);
                     angs[1] += (*ctx.world).bg_state.rng.flrand(25.0, 50.0);
                     angs[0] = (*ctx.world).bg_state.rng.flrand(-25.0, -15.0);
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
@@ -344,7 +344,7 @@ pub fn Rancor_Smash(ctx: GameContext<'_>) {
 
         for i in 0..(numEnts as usize) {
             let radiusEnt = (*ctx.world).g_entities.get_unchecked_mut(radiusEntNums[i] as usize) as *mut gentity_t;
-            if !(*radiusEnt).inuse {
+            if (*radiusEnt).inuse == 0 {
                 continue;
             }
 
@@ -400,7 +400,7 @@ pub fn Rancor_Bite(ctx: GameContext<'_>) {
 
         for i in 0..(numEnts as usize) {
             let radiusEnt = (*ctx.world).g_entities.get_unchecked_mut(radiusEntNums[i] as usize) as *mut gentity_t;
-            if !(*radiusEnt).inuse {
+            if (*radiusEnt).inuse == 0 {
                 continue;
             }
 
@@ -526,7 +526,7 @@ pub fn Rancor_Attack(
                         let activator_client = (*activator).client as *mut gclient_t;
                         crate::g_combat::G_Dismember(ctx, activator, npc, (*activator).r.currentOrigin, G2_MODELPART_HEAD as c_int, 90.0, 0.0, (*activator_client).ps.torsoAnim, qtrue);
                         //G_DoDismemberment( NPC->activator, NPC->activator->r.currentOrigin, MOD_SABER, 1000, HL_HEAD, qtrue );
-                        (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE;
+                        (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                         (*activator_client).ps.forceHandExtendTime = 0;
                         crate::npc_c::NPC_SetAnim(activator, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     }
@@ -550,7 +550,7 @@ pub fn Rancor_Attack(
                     crate::g_combat::G_Damage(ctx, activator, npc, npc, Some(&mut [0.0; 3]), (*activator).r.currentOrigin, (*crate::ent_id::resolve(ent_base, (*npc).enemy)).health+10, DAMAGE_NO_PROTECTION|DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK|DAMAGE_NO_HIT_LOC, MOD_MELEE as c_int);//, HL_NONE );//
                     if !(*activator).client.is_null() {
                         let activator_client = (*activator).client as *mut gclient_t;
-                        (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE;
+                        (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                         (*activator_client).ps.forceHandExtendTime = 0;
                         crate::npc_c::NPC_SetAnim(activator, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                     }
@@ -587,7 +587,7 @@ pub fn Rancor_Attack(
                         //G_DoDismemberment( NPC->activator, NPC->enemy->r.currentOrigin, MOD_SABER, 1000, HL_WAIST, qtrue );
                         //KILL
                         crate::g_combat::G_Damage(ctx, activator, npc, npc, Some(&mut [0.0; 3]), (*activator).r.currentOrigin, (*crate::ent_id::resolve(ent_base, (*npc).enemy)).health+10, DAMAGE_NO_PROTECTION|DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK|DAMAGE_NO_HIT_LOC, MOD_MELEE as c_int);//, HL_NONE );
-                        (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE;
+                        (*activator_client).ps.forceHandExtend = HANDEXTEND_NONE as c_int;
                         (*activator_client).ps.forceHandExtendTime = 0;
                         crate::npc_c::NPC_SetAnim(activator, SETANIM_BOTH, BOTH_SWIM_IDLE1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                         crate::g_utils::G_AddEvent(activator, EV_JUMP as c_int, (*activator).health);
@@ -725,7 +725,7 @@ pub fn NPC_Rancor_Pain(
         if (hitByRancor != 0 || ((*self_).count == 1 && !(*self_).activator.is_none() && !(*ctx.world).bg_state.rng.Q_irand(0,4) != 0) || (*ctx.world).bg_state.rng.Q_irand(0, 200) < damage)
             && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_STAND1TO2
             && crate::g_timer::TIMER_Done(ctx, self_, c"takingPain".as_ptr()) != 0 {
-            if !Rancor_CheckRoar(ctx, self_) {
+            if Rancor_CheckRoar(ctx, self_) == qfalse {
                 if (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_MELEE1
                     && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_MELEE2
                     && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_ATTACK2 {

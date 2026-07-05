@@ -599,8 +599,8 @@ pub fn NPC_ParseParms(
             (*stats).health = 0;
 
             (*stats).yawSpeed = 90.0;
-            (*stats).walkSpeed = 90.0;
-            (*stats).runSpeed = 300.0;
+            (*stats).walkSpeed = 90;
+            (*stats).runSpeed = 300;
             (*stats).acceleration = 15; //Increase/descrease speed this much per frame (20fps)
         } else {
             stats = std::ptr::null_mut();
@@ -1320,7 +1320,7 @@ pub fn NPC_ParseParms(
                                 continue 'parse;
                             }
                             if !npc_ptr.is_null() {
-                                (*stats).$field = n0 as f32;
+                                (*stats).$field = n0;
                             }
                             continue 'parse;
                         }

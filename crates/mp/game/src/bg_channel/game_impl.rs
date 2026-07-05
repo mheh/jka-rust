@@ -102,6 +102,40 @@ impl BgTraps for GameBgTraps<'_> {
         )
     }
 
+    fn g2api_init_ghoul2_model(
+        &self,
+        ghoul2Ptr: *mut *mut c_void,
+        fileName: *const c_char,
+        modelIndex: c_int,
+        customSkin: qhandle_t,
+        customShader: qhandle_t,
+        modelFlags: c_int,
+        lodBias: c_int,
+    ) -> c_int {
+        // Mechanical delegation (ruling 13). Raven: `trap_G2API_InitGhoul2Model`
+        // (`G_G2_INITGHOUL2MODEL`).
+        let file_name = unsafe { std::ffi::CStr::from_ptr(fileName) }.to_owned();
+        crate::trap::G2API_InitGhoul2Model(
+            self.ctx.engine,
+            mp_abi::game::syscalls::G_G2_INITGHOUL2MODEL::GG2Initghoul2ModelArgs::new(
+                ghoul2Ptr,
+                file_name,
+                modelIndex,
+                customSkin,
+                customShader,
+                modelFlags,
+                lodBias,
+            ),
+        )
+    }
+    fn g2api_clean_ghoul2_models(&self, ghoul2Ptr: *mut *mut c_void) {
+        // Mechanical delegation (ruling 13). Raven: `trap_G2API_CleanGhoul2Models`
+        // (`G_G2_CLEANMODELS`).
+        crate::trap::G2API_CleanGhoul2Models(
+            self.ctx.engine,
+            mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs::new(ghoul2Ptr),
+        )
+    }
     fn g2api_add_bolt(&self, ghoul2: *mut c_void, modelIndex: c_int, boneName: *const c_char) -> c_int {
         // Real delegation to the already-wired `trap_G2API_AddBolt` seam
         // (`G_G2_ADDBOLT`); bg-visible callers (e.g. `AttachRidersGeneric`)

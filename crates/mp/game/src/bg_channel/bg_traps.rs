@@ -62,6 +62,27 @@ pub trait BgTraps {
     /// Source: `oracle/oracle/codemp/game/g_syscalls.c:1179-1182`
     fn r_register_skin(&self, name: *const c_char) -> qhandle_t;
 
+    /// Mirror of `trap_G2API_InitGhoul2Model` — the bg-visible surface
+    /// `BG_ModelCache`'s QAGAME branch needs to precache a ghoul2 model
+    /// without holding `&Engine`.
+    /// Source: `oracle/oracle/codemp/game/g_syscalls.c:1223-1227`
+    #[allow(clippy::too_many_arguments)]
+    fn g2api_init_ghoul2_model(
+        &self,
+        ghoul2Ptr: *mut *mut c_void,
+        fileName: *const c_char,
+        modelIndex: c_int,
+        customSkin: qhandle_t,
+        customShader: qhandle_t,
+        modelFlags: c_int,
+        lodBias: c_int,
+    ) -> c_int;
+
+    /// Mirror of `trap_G2API_CleanGhoul2Models` — bg-visible counterpart to
+    /// `g2api_init_ghoul2_model` (`BG_ModelCache`'s QAGAME branch).
+    /// Source: `oracle/oracle/codemp/game/g_syscalls.c:1303-1306`
+    fn g2api_clean_ghoul2_models(&self, ghoul2Ptr: *mut *mut c_void);
+
     // --- ghoul2 straps (the 10 strap_G2API_* wrappers, g_strap.c) ---
 
     /// Raven `trap_G2API_AddBolt` — the bg-visible mirror of `crate::trap::G2API_AddBolt`

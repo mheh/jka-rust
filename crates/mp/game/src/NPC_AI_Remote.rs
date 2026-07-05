@@ -233,7 +233,7 @@ pub fn Remote_Hunt(
     let npc = unsafe { (*ctx.world).globals.NPC };
     let npc_info = unsafe { (*ctx.world).globals.NPCInfo };
 
-    let mut distance: f32;
+    let mut distance: f32 = 0.0;
     let mut speed: f32;
     let mut forward: vec3_t = [0.0; 3];
 

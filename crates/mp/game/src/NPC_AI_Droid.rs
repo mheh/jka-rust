@@ -238,7 +238,7 @@ pub fn Droid_Spin(ctx: GameContext<'_>) {
                     G_PlayEffectID(G_EffectIndex(b"sparks/spark\0".as_ptr() as *const c_char), (*npc).r.currentOrigin, dir);
                 }
 
-                ucmd.forwardmove = (*ctx.world).bg_state.rng.Q_irand(-64, 64) as c_int as i8 as c_int;
+                ucmd.forwardmove = (*ctx.world).bg_state.rng.Q_irand(-64, 64) as c_int as i8;
 
                 if TIMER_Done(ctx, npc, b"roam\0".as_ptr() as *const c_char) != 0 {
                     TIMER_Set(ctx, npc, b"roam\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(250, 1000));
@@ -510,7 +510,7 @@ pub fn NPC_BSDroid_Default(ctx: GameContext<'_>) {
             Droid_Pain(ctx);
         } else if (*npc_info).localState == LSTATE_DROP {
             NPC_UpdateAngles(ctx, 1 as qboolean, 1 as qboolean); // qtrue, qtrue
-            (*ctx.world).globals.ucmd.upmove = ((*ctx.world).bg_state.rng.crandom() * 64.0) as c_int;
+            (*ctx.world).globals.ucmd.upmove = ((*ctx.world).bg_state.rng.crandom() * 64.0) as c_int as i8;
         } else if ((*npc_info).scriptFlags & 1) != 0 { // SCF_LOOK_FOR_ENEMIES = 1
             Droid_Patrol(ctx);
         } else {

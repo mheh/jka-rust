@@ -952,7 +952,7 @@ pub fn BotAISetupClient(
         let world = ctx.world;
         if (*world).globals.botstates[client as usize].is_null() {
             (*world).globals.botstates[client as usize] =
-                B_Alloc(ctx, core::mem::size_of::<bot_state_t>() as c_int) as *mut bot_state_t;
+                crate::ai_util::B_Alloc(ctx, core::mem::size_of::<bot_state_t>() as c_int) as *mut bot_state_t;
         }
 
         core::ptr::write_bytes((*world).globals.botstates[client as usize], 0, 1);
@@ -990,7 +990,7 @@ pub fn BotAISetupClient(
         (*bs).botWeaponWeights[WP_DET_PACK as usize] = 0.0;
         (*bs).botWeaponWeights[WP_MELEE as usize] = 1.0;
 
-        BotUtilizePersonality(ctx, bs);
+        crate::ai_util::BotUtilizePersonality(ctx, bs);
 
         let gt = (*world).cvars.g_gametype.integer;
         if gt == GT_DUEL || gt == GT_POWERDUEL {
@@ -1325,7 +1325,7 @@ pub fn BotPVSCheck(
     // PORT-NOTE(bot_pvstype): the `bot_pvstype` cvar has no ported home yet
     // (ungrouped bot cvar); referenced as cited and reported as missing.
     unsafe {
-        if (*ctx.world).cvars.g_RMG.integer != 0 && bot_pvstype.integer != 0 {
+        if (*ctx.world).cvars.g_RMG.integer != 0 && (*ctx.world).cvars.bot_pvstype.integer != 0 {
             let mut subPoint: vec3_t = [0.0; 3];
             crate::q_math::_VectorSubtract(p1, p2, &mut subPoint);
 

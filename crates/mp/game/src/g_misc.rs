@@ -21,7 +21,8 @@ use crate::prelude::*;
 use crate::g_utils::{
     G_AddEvent, G_EffectIndex, G_EntitySound, G_FindDoorTrigger, G_Find, G_FreeEntity, G_KillBox,
     G_ModelIndex, G_PickTarget, G_ScreenShake, G_SetAngles, G_SetMovedir, G_SetOrigin, G_Sound,
-    G_SoundIndex, G_SoundSetIndex, G_Spawn, G_TempEntity, G_UseTargets, G_UseTargets2,
+    G_SoundIndex, G_SoundSetIndex, G_Spawn, G_TempEntity, G_UseTargets, G_UseTargets2, G_IconIndex,
+    vtos,
 };
 use crate::NPC_utils::G_ActivateBehavior;
 use crate::g_exphysics::G_RunExPhys;

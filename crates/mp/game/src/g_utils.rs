@@ -27,6 +27,21 @@ use crate::trap;
 use crate::g_main::G_Printf;
 use crate::q_shared::Q_strcat;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
+
+/// Raven `EV_EVENT_BIT1`.
+///
+/// Source: `oracle/oracle/codemp/game/bg_public.h:728`
+pub const EV_EVENT_BIT1: c_int = 0x00000100;
+
+/// Raven `EV_EVENT_BIT2`.
+///
+/// Source: `oracle/oracle/codemp/game/bg_public.h:729`
+pub const EV_EVENT_BIT2: c_int = 0x00000200;
+
+/// Raven `EV_EVENT_BITS`.
+///
+/// Source: `oracle/oracle/codemp/game/bg_public.h:730`
+pub const EV_EVENT_BITS: c_int = EV_EVENT_BIT1 | EV_EVENT_BIT2;
 use mp_abi::game::syscalls::G_ERROR::GErrorArgs;
 use mp_abi::game::syscalls::G_G2_CLEANMODELS::GG2CleanmodelsArgs;
 use mp_abi::game::syscalls::G_GET_CONFIGSTRING::GGetConfigstringArgs;

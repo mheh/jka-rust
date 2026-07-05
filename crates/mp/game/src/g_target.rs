@@ -227,10 +227,11 @@ pub fn Use_Target_Print(
             if !activator.is_null() && (*activator).inuse != 0 {
                 if !(*activator).client.is_null() && !(*activator).client.is_null() {
                     // make sure there's a valid client ent to send it to
-                    if (*ent).message[0] == b'@' as c_char && (*ent).message[1] != b'@' as c_char {
-                        trap::SendServerCommand(ctx.engine, activator as *const _ as isize, va(b"cps \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                    let msg = crate::cstr_util::cstr_to_str((*ent).message);
+                    if *(*ent).message == b'@' as c_char && *(*ent).message.add(1) != b'@' as c_char {
+                        trap::SendServerCommand(ctx.engine, activator as *const _ as isize, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr());
                     } else {
-                        trap::SendServerCommand(ctx.engine, activator as *const _ as isize, va(b"cp \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                        trap::SendServerCommand(ctx.engine, activator as *const _ as isize, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr());
                     }
                 }
             }
@@ -238,28 +239,30 @@ pub fn Use_Target_Print(
         }
 
         if (*ent).spawnflags & 3 != 0 {
+            let msg = crate::cstr_util::cstr_to_str((*ent).message);
             if (*ent).spawnflags & 1 != 0 {
-                if (*ent).message[0] == b'@' as c_char && (*ent).message[1] != b'@' as c_char {
-                    G_TeamCommand(ctx, TEAM_RED, va(b"cps \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                if *(*ent).message == b'@' as c_char && *(*ent).message.add(1) != b'@' as c_char {
+                    G_TeamCommand(ctx, TEAM_RED, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr());
                 } else {
-                    G_TeamCommand(ctx, TEAM_RED, va(b"cp \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                    G_TeamCommand(ctx, TEAM_RED, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr());
                 }
             }
             if (*ent).spawnflags & 2 != 0 {
-                if (*ent).message[0] == b'@' as c_char && (*ent).message[1] != b'@' as c_char {
-                    G_TeamCommand(ctx, TEAM_BLUE, va(b"cps \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                if *(*ent).message == b'@' as c_char && *(*ent).message.add(1) != b'@' as c_char {
+                    G_TeamCommand(ctx, TEAM_BLUE, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr());
                 } else {
-                    G_TeamCommand(ctx, TEAM_BLUE, va(b"cp \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+                    G_TeamCommand(ctx, TEAM_BLUE, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr());
                 }
             }
             return;
         }
 
         // Send to all players
-        if (*ent).message[0] == b'@' as c_char && (*ent).message[1] != b'@' as c_char {
-            trap::SendServerCommand(ctx.engine, -1, va(b"cps \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+        let msg = crate::cstr_util::cstr_to_str((*ent).message);
+        if *(*ent).message == b'@' as c_char && *(*ent).message.add(1) != b'@' as c_char {
+            trap::SendServerCommand(ctx.engine, -1, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr());
         } else {
-            trap::SendServerCommand(ctx.engine, -1, va(b"cp \"%s\"\0".as_ptr() as *const c_char, (*ent).message));
+            trap::SendServerCommand(ctx.engine, -1, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr());
         }
     }
 }
@@ -491,7 +494,7 @@ pub fn target_laser_start(
             }
             (*self_).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
         } else {
-            G_SetMovedir((*self_).s.angles, (*self_).movedir);
+            G_SetMovedir(&mut (*self_).s.angles, &mut (*self_).movedir);
         }
 
         // TODO: Port fn-pointer assignments:
@@ -573,11 +576,11 @@ pub fn target_relay_use(
 ) {
     unsafe {
         if (*self_).spawnflags & 1 != 0 && !(*activator).client.is_null()
-            && (*(*activator).client).sess.sessionTeam != TEAM_RED {
+            && (*((*activator).client as *mut gclient_t)).sess.sessionTeam != TEAM_RED {
             return;
         }
         if (*self_).spawnflags & 2 != 0 && !(*activator).client.is_null()
-            && (*(*activator).client).sess.sessionTeam != TEAM_BLUE {
+            && (*((*activator).client as *mut gclient_t)).sess.sessionTeam != TEAM_BLUE {
             return;
         }
 

@@ -605,9 +605,9 @@ pub fn PlaceShield(
         let shieldItem = BG_FindItemForHoldable(HI_SHIELD);
 
         // can we place this in front of us?
-        AngleVectors((*(*playerent).client as *mut gclient_t).ps.viewangles, Some(&mut fwd), None, None);
+        AngleVectors((*((*playerent).client as *mut gclient_t)).ps.viewangles, Some(&mut fwd), None, None);
         fwd[2] = 0.0;
-        dest = (*(*playerent).client as *mut gclient_t).ps.origin;
+        dest = (*((*playerent).client as *mut gclient_t)).ps.origin;
         for i in 0..3 {
             dest[i] += SHIELD_PLACEDIST * fwd[i];
         }
@@ -615,7 +615,7 @@ pub fn PlaceShield(
             ctx.engine,
             GTraceArgs::new(
                 &mut tr as *mut trace_t,
-                &(*(*playerent).client as *mut gclient_t).ps.origin as *const vec3_t,
+                &(*((*playerent).client as *mut gclient_t)).ps.origin as *const vec3_t,
                 &mins as *const vec3_t,
                 &maxs as *const vec3_t,
                 &dest as *const vec3_t,
@@ -649,7 +649,7 @@ pub fn PlaceShield(
                 (*shield).parent = playerent;
 
                 // Set team number.
-                (*shield).s.otherEntityNum2 = (*(*playerent).client as *mut gclient_t).sess.sessionTeam;
+                (*shield).s.otherEntityNum2 = (*((*playerent).client as *mut gclient_t)).sess.sessionTeam;
 
                 (*shield).s.eType = ET_SPECIAL as c_int;
                 (*shield).s.modelindex = HI_SHIELD as c_int; // this'll be used in CG_Useable() for rendering.
@@ -674,7 +674,7 @@ pub fn PlaceShield(
                 (*shield).s.owner = (*playerent).s.number;
                 (*shield).s.shouldtarget = qtrue;
                 if (*ctx.world).cvars.g_gametype.integer >= GT_TEAM {
-                    (*shield).s.teamowner = (*(*playerent).client as *mut gclient_t).sess.sessionTeam;
+                    (*shield).s.teamowner = (*((*playerent).client as *mut gclient_t)).sess.sessionTeam;
                 } else {
                     (*shield).s.teamowner = 16;
                 }
@@ -704,19 +704,19 @@ pub fn ItemUse_Binoculars(
             return;
         }
 
-        if (*(*ent).client as *mut gclient_t).ps.weaponstate != WEAPON_READY {
+        if (*((*ent).client as *mut gclient_t)).ps.weaponstate != WEAPON_READY {
             // So we can't fool it and reactivate while switching to the saber or something.
             return;
         }
 
-        if (*(*ent).client as *mut gclient_t).ps.zoomMode == 0 {
+        if (*((*ent).client as *mut gclient_t)).ps.zoomMode == 0 {
             // not zoomed or currently zoomed with the disruptor
-            (*(*ent).client as *mut gclient_t).ps.zoomMode = 2;
-            (*(*ent).client as *mut gclient_t).ps.zoomLocked = qfalse;
-            (*(*ent).client as *mut gclient_t).ps.zoomFov = 40.0;
-        } else if (*(*ent).client as *mut gclient_t).ps.zoomMode == 2 {
-            (*(*ent).client as *mut gclient_t).ps.zoomMode = 0;
-            (*(*ent).client as *mut gclient_t).ps.zoomTime = (*ctx.world).level.time;
+            (*((*ent).client as *mut gclient_t)).ps.zoomMode = 2;
+            (*((*ent).client as *mut gclient_t)).ps.zoomLocked = qfalse;
+            (*((*ent).client as *mut gclient_t)).ps.zoomFov = 40.0;
+        } else if (*((*ent).client as *mut gclient_t)).ps.zoomMode == 2 {
+            (*((*ent).client as *mut gclient_t)).ps.zoomMode = 0;
+            (*((*ent).client as *mut gclient_t)).ps.zoomTime = (*ctx.world).level.time;
         }
     }
 }
