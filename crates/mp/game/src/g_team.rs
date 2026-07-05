@@ -932,7 +932,7 @@ pub fn Team_TouchOurFlag(
             if (*((*player).client as *mut gclient_t)).sess.sessionTeam as c_int != (*cl).sess.sessionTeam as c_int {
                 (*((*player).client as *mut gclient_t)).pers.teamState.lasthurtcarrier = -5.0;
             } else if (*((*player).client as *mut gclient_t)).sess.sessionTeam as c_int == (*cl).sess.sessionTeam as c_int {
-                if player != other {
+                if player as *mut gentity_t != other {
                     // AddScore(player, ent->r.currentOrigin, CTF_TEAM_BONUS);
                 }
                 // award extra points for capture assists

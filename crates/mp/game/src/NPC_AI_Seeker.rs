@@ -544,7 +544,7 @@ pub fn Seeker_FindEnemy(ctx: GameContext<'_>) {
                 continue;
             }
 
-            if (*ent.client).playerTeam == (*((*NPC).client as *mut gclient_t)).playerTeam || (*ent.client).playerTeam == crate::teams::npcteam::NPCTEAM_NEUTRAL {
+            if (*(ent.client as *mut gclient_t)).playerTeam == (*((*NPC).client as *mut gclient_t)).playerTeam || (*(ent.client as *mut gclient_t)).playerTeam == crate::teams::npcteam::NPCTEAM_NEUTRAL {
                 // don't attack same team or bots
                 continue;
             }
@@ -635,7 +635,7 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
         } else {
             if (*((*NPC).client as *mut gclient_t)).NPC_class != CLASS_BOBAFETT {
                 if crate::g_timer::TIMER_Done(ctx, NPC, c"seekerhiss".as_ptr()) != 0 {
-                    crate::g_timer::TIMER_Set(ctx, NPC, c"seekerhiss".as_ptr(), (1000 + (*ctx.world).bg_state.rng.random() * 1000.0f32) as c_int);
+                    crate::g_timer::TIMER_Set(ctx, NPC, c"seekerhiss".as_ptr(), (1000.0f32 + (*ctx.world).bg_state.rng.random() * 1000.0f32) as c_int);
                     crate::g_utils::G_Sound(
                         ctx,
                         NPC,

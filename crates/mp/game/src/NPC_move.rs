@@ -153,7 +153,7 @@ pub fn NPC_GetMoveInformation(
 
         // Make sure we have somewhere to go
         if let Some(goal_id) = npc_info.goalEntity {
-            let goal_ptr = entity_from_id((*ctx.world).g_entities.as_mut_ptr(), goal_id);
+            let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
 
             // Get our move info
             crate::q_math::_VectorSubtract((*goal_ptr).r.currentOrigin, (*npc).r.currentOrigin, dir);
@@ -218,7 +218,7 @@ pub fn NPC_GetMoveDirection(
 
         // Attempt a straight move to goal
         if let Some(goal_id) = npc_info.goalEntity {
-            let goal_ptr = entity_from_id((*ctx.world).g_entities.as_mut_ptr(), goal_id);
+            let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
             if NPC_ClearPathToGoal(ctx, FRAME_NAV_INFO.direction, goal_ptr) == qfalse {
                 // See if we're just stuck
                 if crate::g_nav::NAV_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO as *mut navInfo_t) == WAYPOINT_NONE {
@@ -236,7 +236,7 @@ pub fn NPC_GetMoveDirection(
 
         // Avoid any collisions on the way
         if let Some(goal_id) = npc_info.goalEntity {
-            let goal_ptr = entity_from_id((*ctx.world).g_entities.as_mut_ptr(), goal_id);
+            let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
             if NAV_AvoidCollision(ctx, npc, goal_ptr, &mut FRAME_NAV_INFO) == qfalse {
                 if (FRAME_NAV_INFO.flags & NIF_MACRO_NAV) == 0 {
                     // we had a clear path to goal and didn't try macro nav, but can't avoid collision so try macro nav here
@@ -301,7 +301,7 @@ pub fn NPC_GetMoveDirectionAltRoute(
 
         // Attempt a straight move to goal
         if let Some(goal_id) = npc_info.goalEntity {
-            let goal_ptr = entity_from_id((*ctx.world).g_entities.as_mut_ptr(), goal_id);
+            let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
             if tryStraight == qfalse || NPC_ClearPathToGoal(ctx, FRAME_NAV_INFO.direction, goal_ptr) == qfalse {
                 // blocked — Can't get straight to goal, use macro nav
                 if NAVNEW_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO) == WAYPOINT_NONE {

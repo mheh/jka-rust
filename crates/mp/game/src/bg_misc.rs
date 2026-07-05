@@ -187,6 +187,40 @@ pub static WeaponReadyLegsAnim: [c_int; 19] = [
     BOTH_STAND1 as c_int, // WP_TURRET
 ];
 
+/// Raven `WeaponAttackAnim[WP_NUM_WEAPONS]` — weapon-attack animation per
+/// weapon type.
+///
+/// Raven's initializer only supplies 18 of the 19 `WP_NUM_WEAPONS` slots (the
+/// trailing slot is C's implicit zero-init) and its inline `//` comments are
+/// stale relative to the `WP_CONCUSSION` insertion in the enum — ported
+/// positionally (by index), matching the oracle's actual (not commented)
+/// per-weapon assignment.
+///
+/// Ruling 24: bg const table lives as a `static` in its owning bg module
+/// (the `bg_itemlist` precedent).
+/// Source: `oracle/oracle/codemp/game/bg_misc.c:294-317`
+pub static WeaponAttackAnim: [c_int; 19] = [
+    BOTH_ATTACK1 as c_int,       // WP_NONE (shouldn't happen)
+    BOTH_ATTACK3 as c_int,       // WP_STUN_BATON
+    BOTH_ATTACK3 as c_int,       // WP_MELEE
+    BOTH_STAND2 as c_int,        // WP_SABER (has its own handling)
+    BOTH_ATTACK2 as c_int,       // WP_BRYAR_PISTOL
+    BOTH_ATTACK3 as c_int,       // WP_BLASTER
+    BOTH_ATTACK3 as c_int,       // WP_DISRUPTOR
+    BOTH_ATTACK3 as c_int,       // WP_BOWCASTER
+    BOTH_ATTACK3 as c_int,       // WP_REPEATER
+    BOTH_ATTACK3 as c_int,       // WP_DEMP2
+    BOTH_ATTACK3 as c_int,       // WP_FLECHETTE
+    BOTH_ATTACK3 as c_int,       // WP_ROCKET_LAUNCHER
+    BOTH_THERMAL_THROW as c_int, // WP_THERMAL
+    BOTH_ATTACK3 as c_int,       // WP_TRIP_MINE
+    BOTH_ATTACK3 as c_int,       // WP_DET_PACK
+    BOTH_ATTACK2 as c_int,       // WP_CONCUSSION
+    BOTH_STAND1 as c_int,        // WP_BRYAR_OLD
+    BOTH_ATTACK1 as c_int,       // WP_EMPLACED_GUN
+    0,                           // WP_TURRET (implicit C zero-init; oracle omits this slot)
+];
+
 /// Cost lookup helper folding `bgForcePowerCostSaberThrow` back into the
 /// `[fp index][fp level]` shape the Raven source indexes directly. See the
 /// note on `bgForcePowerCost` above.

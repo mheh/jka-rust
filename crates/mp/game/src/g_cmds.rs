@@ -3005,14 +3005,14 @@ pub fn G_ItemUsable(
             }
             HI_SEEKER => {
                 if (*ps).eFlags & EF_SEEKERDRONE != 0 {
-                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, SEEKER_ALREADYDEPLOYED);
+                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, mp_qshared::shared::itemUseFail_t::SEEKER_ALREADYDEPLOYED as c_int);
                     return 0;
                 }
                 1
             }
             HI_SENTRY_GUN => {
                 if (*ps).fd.sentryDeployed != 0 {
-                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, SENTRY_ALREADYPLACED);
+                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, mp_qshared::shared::itemUseFail_t::SENTRY_ALREADYPLACED as c_int);
                     return 0;
                 }
 
@@ -3053,7 +3053,7 @@ pub fn G_ItemUsable(
                 );
 
                 if (tr.fraction != 1.0 && tr.entityNum != (*ps).clientNum as c_short) || tr.startsolid != qfalse as u8 || tr.allsolid != qfalse as u8 {
-                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, SENTRY_NOROOM);
+                    crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, mp_qshared::shared::itemUseFail_t::SENTRY_NOROOM as c_int);
                     return 0;
                 }
 

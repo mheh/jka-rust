@@ -1974,7 +1974,7 @@ pub fn func_timer_think(
 pub fn func_timer_use(
     ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
     unsafe {
-        (*self_).activator = activator;
+        (*self_).activator = ent_id_opt(ent_base(ctx), activator);
 
         G_ActivateBehavior(ctx, self_, BSET_USE);
 

@@ -310,7 +310,7 @@ pub fn Mark2_FireBlaster(
         G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char),
     );
 
-    let missile = CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_ptr, qfalse);
+    let missile = crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_ptr, qfalse);
 
     (*missile).classname = b"bryar_proj\0".as_ptr() as *mut c_char;
     (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
@@ -460,7 +460,7 @@ pub fn Mark2_Patrol(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:337-340`
 pub fn Mark2_Idle(ctx: GameContext<'_>) {
-    NPC_BSIdle(ctx);
+    crate::NPC_AI_Default::NPC_BSIdle(ctx);
 }
 
 /// Raven `NPC_BSMark2_Default`.
@@ -474,7 +474,7 @@ pub fn NPC_BSMark2_Default(ctx: GameContext<'_>) {
     if (*npc_ptr).enemy.is_some() {
         (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
         Mark2_AttackDecision(ctx);
-    } else if ((*npc_info_ptr).scriptFlags & crate::npc_defs::SCF_LOOK_FOR_ENEMIES) != 0 {
+    } else if ((*npc_info_ptr).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
         Mark2_Patrol(ctx);
     } else {
         Mark2_Idle(ctx);

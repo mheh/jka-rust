@@ -20,7 +20,6 @@
 use crate::prelude::*;
 use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};
 use crate::bg_saber::BG_MySaber;
-use crate::q_math::Q_irand;
 use crate::q_shared::COM_Parse;
 
 // Raven `#define MAX_ANIM_FILES 64`.
@@ -2417,13 +2416,18 @@ pub fn BG_HasAnimation(
 /// Raven `BG_PickAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_panimate.c:2957-2975`
-pub fn BG_PickAnim(animIndex: c_int, minAnim: c_int, maxAnim: c_int) -> c_int {
+pub fn BG_PickAnim(
+    bg_state: &mut crate::bg_channel::BgState,
+    animIndex: c_int,
+    minAnim: c_int,
+    maxAnim: c_int,
+) -> c_int {
     let mut anim;
     let mut count = 0;
     loop {
-        anim = Q_irand(minAnim, maxAnim);
+        anim = bg_state.rng.Q_irand(minAnim, maxAnim);
         count += 1;
-        if BG_HasAnimation(animIndex, anim) != 0 || count >= 1000 {
+        if BG_HasAnimation(bg_state, animIndex, anim) != 0 || count >= 1000 {
             break;
         }
     }

@@ -525,7 +525,7 @@ pub fn NPC_Mark1_Pain(
                 [0.0, 0.0, 0.0],
                 (*self_).health,
                 0,
-                MOD_UNKNOWN,
+                MOD_UNKNOWN as c_int,
             );
         }
     }
@@ -861,7 +861,7 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
             else {
                 // It should never get here, but just in case
                 (*npc).health = 0;
-                (*((*npc).client as *mut gclient_t)).ps.stats[STAT_HEALTH] = 0;
+                (*((*npc).client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] = 0;
                 if let Some(die_fn) = (*npc).die {
                     crate::ent_fn_enums::dispatch_die(ctx, die_fn, npc, npc, npc, 100, MOD_UNKNOWN as c_int);
                 }

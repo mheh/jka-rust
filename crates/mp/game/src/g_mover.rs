@@ -1436,7 +1436,7 @@ pub fn Think_SpawnNewDoorTrigger(
         let other = G_Spawn(ctx);
         (*other).r.mins = mins;
         (*other).r.maxs = maxs;
-        (*other).parent = ent;
+        (*other).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
         (*other).r.contents = CONTENTS_TRIGGER;
         (*other).touch = Some(EntTouch::Touch_DoorTrigger);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(other));
@@ -1773,7 +1773,7 @@ pub fn SpawnPlatTrigger(
         let trigger = G_Spawn(ctx);
         (*trigger).touch = Some(EntTouch::Touch_PlatCenterTrigger);
         (*trigger).r.contents = CONTENTS_TRIGGER;
-        (*trigger).parent = ent;
+        (*trigger).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
 
         let mut tmin = [0.0f32; 3];
         let mut tmax = [0.0f32; 3];
@@ -1843,7 +1843,7 @@ pub fn SP_func_plat(
 
         (*ent).blocked = Some(EntBlocked::Blocked_Door);
 
-        (*ent).parent = ent; // so it can be treated as a door
+        (*ent).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent); // so it can be treated as a door
 
         // spawn the trigger if one hasn't been custom made
         if (*ent).targetname.is_null() {

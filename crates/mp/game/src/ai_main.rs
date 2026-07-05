@@ -45,6 +45,7 @@ use crate::botai::bweaponrange::{
     BWEAPONRANGE_LONG, BWEAPONRANGE_MELEE, BWEAPONRANGE_MID, BWEAPONRANGE_SABER,
 };
 use crate::client::client_connected::CON_CONNECTED;
+use crate::g_combat::G_ThereIsAMaster;
 use crate::trap;
 use crate::NPC_utils::{ANGLE2SHORT, SHORT2ANGLE};
 use mp_abi::game::syscalls::BOTLIB_AAS_ENTITY_INFO::BotlibAasEntityInfoArgs;
@@ -1696,7 +1697,7 @@ pub fn WPTouchRoutine(
         // #endif
 
         if (*bs).isCamper != 0
-            && bot_camp.integer != 0
+            && (*world).cvars.bot_camp.integer != 0
             && (BotIsAChickenWuss(ctx, bs) != 0
                 || BotCTFGuardDuty(ctx, bs) != qfalse
                 || (*bs).isCamper == 2)
@@ -2433,7 +2434,7 @@ pub fn PassLovedOneCheck(
             return 1;
         }
 
-        if bot_attachments.integer == 0 {
+        if (*world).cvars.bot_attachments.integer == 0 {
             return 1;
         }
 

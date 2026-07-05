@@ -20,6 +20,10 @@ use mp_bg::public::pmove_t::MAXTOUCH;
 // Source: `oracle/oracle/codemp/game/q_shared.h`
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
+
+/// Raven `#define MAX_WEAPON_CHARGE_TIME 5000`.
+/// Source: `oracle/oracle/codemp/game/bg_pmove.c:16`
+const MAX_WEAPON_CHARGE_TIME: c_int = 5000;
 use crate::g_strap::strap_G2API_SetBoneAngles;
 use crate::g_strap::{
     strap_G2API_AnimateG2Models, strap_G2API_GetBoltMatrix, strap_G2API_GetBoneAnim,

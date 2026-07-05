@@ -307,14 +307,14 @@ pub fn NPC_ChoosePainAnimation(
                     if !client.is_null() && (*client).NPC_class as c_int == CLASS_GALAKMECH {
                         pain_anim = BOTH_PAIN1;
                     } else if r#mod == MOD_MELEE {
-                        pain_anim = crate::bg_panimate::BG_PickAnim(local_anim_index, BOTH_PAIN2, BOTH_PAIN3);
+                        pain_anim = crate::bg_panimate::BG_PickAnim(&mut (*ctx.world).bg_state, local_anim_index, BOTH_PAIN2, BOTH_PAIN3);
                     } else if (*self_).s.weapon == WP_SABER {
                         // These are the only 2 pain anims that look good when holding a saber
-                        pain_anim = crate::bg_panimate::BG_PickAnim(local_anim_index, BOTH_PAIN2, BOTH_PAIN3);
+                        pain_anim = crate::bg_panimate::BG_PickAnim(&mut (*ctx.world).bg_state, local_anim_index, BOTH_PAIN2, BOTH_PAIN3);
                     }
 
                     if pain_anim == -1 {
-                        pain_anim = crate::bg_panimate::BG_PickAnim(local_anim_index, BOTH_PAIN1, BOTH_PAIN18);
+                        pain_anim = crate::bg_panimate::BG_PickAnim(&mut (*ctx.world).bg_state, local_anim_index, BOTH_PAIN1, BOTH_PAIN18);
                     }
 
                     (*client).ps.fd.saberAnimLevel = 1;  // FORCE_LEVEL_1
@@ -571,7 +571,7 @@ pub fn NPC_Touch(
                         let npc_info_ptr = (*ctx.world).globals.NPCInfo;
                         if !npc_info_ptr.is_null() &&
                            (*npc_info_ptr).behaviorState != BS_HUNT_AND_KILL &&
-                           (*npc_info_ptr).tempBehavior == 0 {
+                           (*npc_info_ptr).tempBehavior == bState_t::BS_DEFAULT {
                             let npc_ptr = (*ctx.world).globals.NPC;
                             if (*npc_ptr).enemy != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other)) {
                                 G_SetEnemy(ctx, npc_ptr, other);
@@ -700,7 +700,7 @@ pub fn NPC_Respond(ctx: GameContext<'_>, self_: *mut gentity_t, userNum: c_int) 
             return;
         }
 
-        let npc_class = (*client).NPC_class;
+        let npc_class = (*client).NPC_class as c_int;
         let npc = (*self_).NPC as *mut gNPC_t;
 
         match npc_class {

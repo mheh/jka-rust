@@ -117,6 +117,14 @@ pub struct BgState {
     /// Raven `siegeTeam_t *team2Theme` — theme team for side 2.
     /// Source: `oracle/oracle/codemp/game/bg_saga.c:36`
     pub team2Theme: *mut siegeTeam_t,
+    /// Raven `extern char siege_info[MAX_SIEGE_INFO_SIZE]` — accumulated siege
+    /// config text kept for lazy re-parse (`.siege` file contents).
+    /// Source: `oracle/oracle/codemp/game/bg_saga.h:112`
+    pub siege_info: Vec<u8>,
+    /// Raven `extern int siege_valid` — whether `siege_info` currently holds a
+    /// loaded siege config.
+    /// Source: `oracle/oracle/codemp/game/bg_saga.h:113`
+    pub siege_valid: c_int,
 
     // --- `g_cmds.c` `ConcatArgs` returned-string scratch ---
     /// Raven `ConcatArgs` builds the joined-argument string in a
@@ -177,6 +185,10 @@ impl BgState {
             bgNumSiegeTeams: 0,
             team1Theme: core::ptr::null_mut(),
             team2Theme: core::ptr::null_mut(),
+            // Sized like Raven's fixed `char[MAX_SIEGE_INFO_SIZE]` scratch buffer
+            // (loaders index it directly rather than push/grow).
+            siege_info: vec![0; 16384],
+            siege_valid: 0,
             concat_args_line: Vec::new(),
             bg_pool: Vec::new(),
             bg_poolSize: 0,

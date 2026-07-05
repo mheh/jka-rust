@@ -223,7 +223,7 @@ pub fn Wampa_Slash(
 
             if DistanceSquared((*radiusEnt).r.currentOrigin, boltOrg) <= radiusSquared {
                 // smack
-                crate::g_combat::G_Damage(ctx, radiusEnt, npc, npc, Some(&mut crate::prelude::vec3_origin), radiusEnt.r.currentOrigin, if backhand != 0 { (*ctx.world).bg_state.rng.Q_irand(10, 15) } else { (*ctx.world).bg_state.rng.Q_irand(20, 30) }, if backhand != 0 { crate::prelude::DAMAGE_NO_ARMOR } else { crate::prelude::DAMAGE_NO_ARMOR | crate::prelude::DAMAGE_NO_KNOCKBACK }, crate::prelude::MOD_MELEE);
+                crate::g_combat::G_Damage(ctx, radiusEnt, npc, npc, Some(&mut crate::prelude::vec3_origin), (*radiusEnt).r.currentOrigin, if backhand != 0 { (*ctx.world).bg_state.rng.Q_irand(10, 15) } else { (*ctx.world).bg_state.rng.Q_irand(20, 30) }, if backhand != 0 { crate::prelude::DAMAGE_NO_ARMOR } else { crate::prelude::DAMAGE_NO_ARMOR | crate::prelude::DAMAGE_NO_KNOCKBACK }, crate::prelude::MOD_MELEE as c_int);
                 if backhand != 0 {
                     // actually push the enemy
                     let mut pushDir: [f32; 3] = [0.0; 3];
@@ -232,23 +232,23 @@ pub fn Wampa_Slash(
                     angs[crate::prelude::YAW as usize] += (*ctx.world).bg_state.rng.flrand(25.0, 50.0);
                     angs[crate::prelude::PITCH as usize] = (*ctx.world).bg_state.rng.flrand(-25.0, -15.0);
                     crate::q_math::AngleVectors(angs, Some(&mut pushDir), None, None);
-                    if (*(radiusEnt.client as *mut gclient_t)).NPC_class != crate::prelude::CLASS_WAMPA
-                        && (*(radiusEnt.client as *mut gclient_t)).NPC_class != crate::prelude::CLASS_RANCOR
-                        && (*(radiusEnt.client as *mut gclient_t)).NPC_class != crate::prelude::CLASS_ATST
+                    if (*((*radiusEnt).client as *mut gclient_t)).NPC_class != crate::prelude::CLASS_WAMPA
+                        && (*((*radiusEnt).client as *mut gclient_t)).NPC_class != crate::prelude::CLASS_RANCOR
+                        && (*((*radiusEnt).client as *mut gclient_t)).NPC_class != crate::prelude::CLASS_ATST
                     {
                         crate::g_utils::G_Throw(ctx, radiusEnt, pushDir, 65.0);
-                        if crate::bg_pmove::BG_KnockDownable(&mut (*(radiusEnt.client as *mut gclient_t)).ps as *mut _) != 0
-                            && radiusEnt.health > 0
+                        if crate::bg_pmove::BG_KnockDownable(&mut (*((*radiusEnt).client as *mut gclient_t)).ps as *mut _) != 0
+                            && (*radiusEnt).health > 0
                             && (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0
                         {
                             // do pain on enemy
-                            (*(radiusEnt.client as *mut gclient_t)).ps.forceHandExtend = crate::prelude::HANDEXTEND_KNOCKDOWN;
-                            (*(radiusEnt.client as *mut gclient_t)).ps.forceDodgeAnim = 0;
-                            (*(radiusEnt.client as *mut gclient_t)).ps.forceHandExtendTime = (*ctx.world).level.time + 1100;
-                            (*(radiusEnt.client as *mut gclient_t)).ps.quickerGetup = qfalse;
+                            (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtend = crate::prelude::HANDEXTEND_KNOCKDOWN;
+                            (*((*radiusEnt).client as *mut gclient_t)).ps.forceDodgeAnim = 0;
+                            (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtendTime = (*ctx.world).level.time + 1100;
+                            (*((*radiusEnt).client as *mut gclient_t)).ps.quickerGetup = qfalse;
                         }
                     }
-                } else if radiusEnt.health <= 0 && !radiusEnt.client.is_null() {
+                } else if (*radiusEnt).health <= 0 && !(*radiusEnt).client.is_null() {
                     // killed them, chance of dismembering
                     if !(*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                         // bite something off
@@ -258,9 +258,9 @@ pub fn Wampa_Slash(
                         } else if hitLoc == crate::prelude::G2_MODELPART_WAIST {
                             crate::npc_c::NPC_SetAnim(radiusEnt, SETANIM_BOTH, crate::prelude::BOTH_DEATHBACKWARD2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                         }
-                        crate::g_combat::G_Dismember(ctx, radiusEnt, npc, radiusEnt.r.currentOrigin, hitLoc, 90.0, 0.0, (*(radiusEnt.client as *mut gclient_t)).ps.torsoAnim, qtrue);
+                        crate::g_combat::G_Dismember(ctx, radiusEnt, npc, (*radiusEnt).r.currentOrigin, hitLoc, 90.0, 0.0, (*((*radiusEnt).client as *mut gclient_t)).ps.torsoAnim, qtrue);
                     }
-                } else if !(*ctx.world).bg_state.rng.Q_irand(0, 3) != 0 && radiusEnt.health > 0 {
+                } else if !(*ctx.world).bg_state.rng.Q_irand(0, 3) != 0 && (*radiusEnt).health > 0 {
                     // one out of every 4 normal hits does a knockdown, too
                     let mut pushDir: [f32; 3] = [0.0; 3];
                     let mut angs: [f32; 3] = [0.0; 3];

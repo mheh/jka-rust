@@ -27,6 +27,9 @@ use crate::NPC_AI_Stormtrooper::MIN_ROCKET_DIST_SQUARED;
 // Explicit import to dedupe an E0659 glob ambiguity (known SFL_*/SVF_* debt);
 // canonical path per crate::saber::saber_flags.
 use crate::saber::saber_flags::SFL_NO_CARTWHEELS;
+// Dedupe MASK_SHOT glob ambiguity (surface_flags::* / mp_qshared::shared::* both
+// re-export it): canonical home is surface_flags per house convention.
+use mp_qshared::shared::surface_flags::MASK_SHOT;
 
 // Raven `rank_t` (anonymous enum, `ai.h:31-40`) — values pinned per file,
 // matching `NPC_combat.rs`'s `RANK_CREWMAN`/`NPC_AI_Utils.rs`'s `RANK_ENSIGN`.
@@ -472,7 +475,7 @@ pub fn Boba_FireFlameThrower(
 ) {
     unsafe {
         let world = ctx.world;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*self_).client as *mut gclient_t;
         let damage = (*world).bg_state.rng.Q_irand(20, 30);
         let mut tr: trace_t = core::mem::zeroed();
@@ -506,11 +509,11 @@ pub fn Boba_FireFlameThrower(
         crate::trap::Trace(
             ctx.engine,
             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                &mut tr,
-                start,
-                traceMins,
-                traceMaxs,
-                end,
+                &mut tr as *mut trace_t,
+                &start as *const vec3_t,
+                &traceMins as *const vec3_t,
+                &traceMaxs as *const vec3_t,
+                &end as *const vec3_t,
                 (*self_).s.number,
                 MASK_SHOT,
             ),
@@ -619,7 +622,7 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
 
         let mut enemyLOS: qboolean = qfalse;
@@ -822,11 +825,11 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
                                 crate::trap::Trace(
                                     ctx.engine,
                                     mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                                        &mut tr,
-                                        muzzle,
-                                        vec3_origin,
-                                        vec3_origin,
-                                        end,
+                                        &mut tr as *mut trace_t,
+                                        &muzzle as *const vec3_t,
+                                        &vec3_origin as *const vec3_t,
+                                        &vec3_origin as *const vec3_t,
+                                        &end as *const vec3_t,
                                         (*npc).s.number,
                                         MASK_SHOT,
                                     ),
@@ -1211,7 +1214,7 @@ pub fn Jedi_BattleTaunt(ctx: GameContext<'_>) -> qboolean {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         // PORT-NOTE(jediSpeechDebounceTime): field is a `()` placeholder in
         // game_globals.rs; needs porting to `[c_int; TEAM_NUM_TEAMS]`.
@@ -1292,11 +1295,11 @@ pub fn Jedi_ClearPathToSpot(
         crate::trap::Trace(
             ctx.engine,
             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                &mut trace,
-                (*npc).r.currentOrigin,
-                mins,
-                (*npc).r.maxs,
-                dest,
+                &mut trace as *mut trace_t,
+                &(*npc).r.currentOrigin as *const vec3_t,
+                &mins as *const vec3_t,
+                &(*npc).r.maxs as *const vec3_t,
+                &dest as *const vec3_t,
                 (*npc).s.number,
                 (*npc).clipmask,
             ),
@@ -1336,11 +1339,11 @@ pub fn Jedi_ClearPathToSpot(
             crate::trap::Trace(
                 ctx.engine,
                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                    &mut trace,
-                    start,
-                    mins,
-                    (*npc).r.maxs,
-                    end,
+                    &mut trace as *mut trace_t,
+                    &start as *const vec3_t,
+                    &mins as *const vec3_t,
+                    &(*npc).r.maxs as *const vec3_t,
+                    &end as *const vec3_t,
                     (*npc).s.number,
                     (*npc).clipmask,
                 ),
@@ -1371,7 +1374,7 @@ pub fn NPC_MoveDirClear(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
 
         let mut forward: vec3_t = [0.0; 3];
@@ -1413,11 +1416,11 @@ pub fn NPC_MoveDirClear(
         crate::trap::Trace(
             ctx.engine,
             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                &mut trace,
-                (*npc).r.currentOrigin,
-                mins,
-                (*npc).r.maxs,
-                testPos,
+                &mut trace as *mut trace_t,
+                &(*npc).r.currentOrigin as *const vec3_t,
+                &mins as *const vec3_t,
+                &(*npc).r.maxs as *const vec3_t,
+                &testPos as *const vec3_t,
                 (*npc).s.number,
                 (*npc).clipmask | CONTENTS_BOTCLIP,
             ),
@@ -1467,11 +1470,11 @@ pub fn NPC_MoveDirClear(
         crate::trap::Trace(
             ctx.engine,
             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                &mut trace,
-                trace_endpos,
-                mins,
-                (*npc).r.maxs,
-                testPos,
+                &mut trace as *mut trace_t,
+                &trace_endpos as *const vec3_t,
+                &mins as *const vec3_t,
+                &(*npc).r.maxs as *const vec3_t,
+                &testPos as *const vec3_t,
                 (*npc).s.number,
                 (*npc).clipmask,
             ),
@@ -1523,7 +1526,7 @@ pub fn Jedi_Move(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let moved: qboolean;
         let mut info: navInfo_t = core::mem::zeroed();
@@ -1599,7 +1602,7 @@ pub fn Jedi_Retreat(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         if crate::g_timer::TIMER_Done(ctx, npc, c"noRetreat".as_ptr()) == qfalse {
             //don't actually move
             return;
@@ -1619,7 +1622,7 @@ pub fn Jedi_Advance(ctx: GameContext<'_>) {
     unsafe {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         if (*client).ps.saberInFlight == qfalse {
             crate::w_saber::WP_ActivateSaber(ctx, npc);
@@ -1742,7 +1745,7 @@ pub fn Jedi_CombatDistance(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let enemy: *mut gentity_t = match (*npc).enemy {
             Some(id) => ge.add(id.0 as usize),
@@ -2216,7 +2219,7 @@ pub fn Jedi_Strafe(
     unsafe {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let enemy: *mut gentity_t = match (*npc).enemy {
             Some(id) => ge.add(id.0 as usize),
@@ -2298,7 +2301,7 @@ pub fn Jedi_CheckFlipEvasions(
 ) -> evasionType_t {
     unsafe {
         let world = ctx.world;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*self_).client as *mut gclient_t;
         let snpc = (*self_).NPC as *mut gNPC_t;
 
@@ -2445,11 +2448,11 @@ pub fn Jedi_CheckFlipEvasions(
             crate::trap::Trace(
                 ctx.engine,
                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                    &mut trace,
-                    (*self_).r.currentOrigin,
-                    mins,
-                    maxs,
-                    traceto,
+                    &mut trace as *mut trace_t,
+                    &(*self_).r.currentOrigin as *const vec3_t,
+                    &mins as *const vec3_t,
+                    &maxs as *const vec3_t,
+                    &traceto as *const vec3_t,
                     (*self_).s.number,
                     CONTENTS_SOLID | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP,
                 ),
@@ -2515,11 +2518,11 @@ pub fn Jedi_CheckFlipEvasions(
                             crate::trap::Trace(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                                    &mut trace,
-                                    (*self_).r.currentOrigin,
-                                    mins,
-                                    maxs,
-                                    traceto,
+                                    &mut trace as *mut trace_t,
+                                    &(*self_).r.currentOrigin as *const vec3_t,
+                                    &mins as *const vec3_t,
+                                    &maxs as *const vec3_t,
+                                    &traceto as *const vec3_t,
                                     (*self_).s.number,
                                     CONTENTS_SOLID | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP,
                                 ),
@@ -2606,11 +2609,11 @@ pub fn Jedi_CheckFlipEvasions(
                             crate::trap::Trace(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                                    &mut trace,
-                                    (*self_).r.currentOrigin,
-                                    mins,
-                                    maxs,
-                                    traceto,
+                                    &mut trace as *mut trace_t,
+                                    &(*self_).r.currentOrigin as *const vec3_t,
+                                    &mins as *const vec3_t,
+                                    &maxs as *const vec3_t,
+                                    &traceto as *const vec3_t,
                                     (*self_).s.number,
                                     CONTENTS_SOLID | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP,
                                 ),
@@ -2848,7 +2851,7 @@ pub fn Jedi_SaberBlockGo(
     unsafe {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*self_).client as *mut gclient_t;
 
         let mut hitloc: vec3_t = [0.0; 3];
@@ -3490,7 +3493,7 @@ pub fn Jedi_SaberBlock(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let d_jedi = (*world).cvars.d_JediAI.integer != 0;
 
@@ -3609,11 +3612,11 @@ pub fn Jedi_SaberBlock(
         crate::trap::Trace(
             ctx.engine,
             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                &mut tr,
-                saberPoint,
-                saberMins,
-                saberMaxs,
-                hitloc,
+                &mut tr as *mut trace_t,
+                &saberPoint as *const vec3_t,
+                &saberMins as *const vec3_t,
+                &saberMaxs as *const vec3_t,
+                &hitloc as *const vec3_t,
                 (*enemy).s.number,
                 CONTENTS_BODY,
             ),
@@ -3728,7 +3731,7 @@ pub fn Jedi_EvasionSaber(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let d_jedi = (*world).cvars.d_JediAI.integer != 0;
 
@@ -4040,7 +4043,7 @@ pub fn Jedi_FindEnemyInCone(
 ) -> *mut gentity_t {
     unsafe {
         let world = ctx.world;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let self_client = (*self_).client as *mut gclient_t;
 
         let mut forward: vec3_t = [0.0; 3];
@@ -4124,11 +4127,11 @@ pub fn Jedi_FindEnemyInCone(
             crate::trap::Trace(
                 ctx.engine,
                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                    &mut tr,
-                    (*self_).r.currentOrigin,
-                    vec3_origin,
-                    vec3_origin,
-                    (*check).r.currentOrigin,
+                    &mut tr as *mut trace_t,
+                    &(*self_).r.currentOrigin as *const vec3_t,
+                    &vec3_origin as *const vec3_t,
+                    &vec3_origin as *const vec3_t,
+                    &(*check).r.currentOrigin as *const vec3_t,
                     (*self_).s.number,
                     MASK_SHOT,
                 ),
@@ -4166,7 +4169,7 @@ pub fn Jedi_SetEnemyInfo(
     unsafe {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         if npc.is_null() || (*npc).enemy.is_none() {
             //no valid enemy
             return;
@@ -4213,7 +4216,7 @@ pub fn Jedi_FaceEnemy(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
 
         let mut enemy_eyes: vec3_t = [0.0; 3];
@@ -4504,7 +4507,7 @@ pub fn Jedi_CombatTimersUpdate(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let d_jedi = (*world).cvars.d_JediAI.integer != 0;
         let enemy: *mut gentity_t = match (*npc).enemy {
@@ -4764,7 +4767,7 @@ pub fn Jedi_AttackDecide(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let enemy: *mut gentity_t = match (*npc).enemy {
             Some(id) => ge.add(id.0 as usize),
@@ -4964,11 +4967,11 @@ pub fn Jedi_Jump(
                             crate::trap::Trace(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                                    &mut trace,
-                                    lastPos,
-                                    (*npc).r.mins,
-                                    (*npc).r.maxs,
-                                    testPos,
+                                    &mut trace as *mut trace_t,
+                                    &lastPos as *const vec3_t,
+                                    &(*npc).r.mins as *const vec3_t,
+                                    &(*npc).r.maxs as *const vec3_t,
+                                    &testPos as *const vec3_t,
                                     (*npc).s.number,
                                     (*npc).clipmask,
                                 ),
@@ -4978,11 +4981,11 @@ pub fn Jedi_Jump(
                             crate::trap::Trace(
                                 ctx.engine,
                                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                                    &mut trace,
-                                    lastPos,
-                                    (*npc).r.mins,
-                                    (*npc).r.maxs,
-                                    testPos,
+                                    &mut trace as *mut trace_t,
+                                    &lastPos as *const vec3_t,
+                                    &(*npc).r.mins as *const vec3_t,
+                                    &(*npc).r.maxs as *const vec3_t,
+                                    &testPos as *const vec3_t,
                                     (*npc).s.number,
                                     (*npc).clipmask | CONTENTS_BOTCLIP,
                                 ),
@@ -5030,11 +5033,11 @@ pub fn Jedi_Jump(
                                 crate::trap::Trace(
                                     ctx.engine,
                                     mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                                        &mut trace,
-                                        te,
-                                        (*npc).r.mins,
-                                        (*npc).r.maxs,
-                                        bottom,
+                                        &mut trace as *mut trace_t,
+                                        &te as *const vec3_t,
+                                        &(*npc).r.mins as *const vec3_t,
+                                        &(*npc).r.maxs as *const vec3_t,
+                                        &bottom as *const vec3_t,
                                         (*npc).s.number,
                                         (*npc).clipmask,
                                     ),
@@ -5088,7 +5091,7 @@ pub fn Jedi_TryJump(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let goal_client = (*goal).client as *mut gclient_t;
         let enemy: *mut gentity_t = match (*npc).enemy {
@@ -5154,11 +5157,11 @@ pub fn Jedi_TryJump(
                                         crate::trap::Trace(
                                             ctx.engine,
                                             mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                                                &mut trace,
-                                                dest,
-                                                (*npc).r.mins,
-                                                (*npc).r.maxs,
-                                                bottom,
+                                                &mut trace as *mut trace_t,
+                                                &dest as *const vec3_t,
+                                                &(*npc).r.mins as *const vec3_t,
+                                                &(*npc).r.maxs as *const vec3_t,
+                                                &bottom as *const vec3_t,
                                                 (*goal).s.number,
                                                 (*npc).clipmask,
                                             ),
@@ -5287,7 +5290,7 @@ pub fn Jedi_CheckEnemyMovement(
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
 
         if (*npc).enemy.is_none() {
@@ -5499,7 +5502,7 @@ pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
 
         let mut jumpVel: vec3_t = [0.0; 3];
@@ -5557,11 +5560,11 @@ pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
                     crate::trap::Trace(
                         ctx.engine,
                         mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                            &mut trace,
-                            lastPos,
-                            (*npc).r.mins,
-                            (*npc).r.maxs,
-                            testPos,
+                            &mut trace as *mut trace_t,
+                            &lastPos as *const vec3_t,
+                            &(*npc).r.mins as *const vec3_t,
+                            &(*npc).r.maxs as *const vec3_t,
+                            &testPos as *const vec3_t,
                             (*npc).s.number,
                             (*npc).clipmask,
                         ),
@@ -5571,11 +5574,11 @@ pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
                     crate::trap::Trace(
                         ctx.engine,
                         mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                            &mut trace,
-                            lastPos,
-                            (*npc).r.mins,
-                            (*npc).r.maxs,
-                            testPos,
+                            &mut trace as *mut trace_t,
+                            &lastPos as *const vec3_t,
+                            &(*npc).r.mins as *const vec3_t,
+                            &(*npc).r.maxs as *const vec3_t,
+                            &testPos as *const vec3_t,
                             (*npc).s.number,
                             (*npc).clipmask | CONTENTS_BOTCLIP,
                         ),
@@ -5609,11 +5612,11 @@ pub fn Jedi_CheckJumps(ctx: GameContext<'_>) {
             crate::trap::Trace(
                 ctx.engine,
                 mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
-                    &mut trace,
-                    te,
-                    (*npc).r.mins,
-                    (*npc).r.maxs,
-                    bottom,
+                    &mut trace as *mut trace_t,
+                    &te as *const vec3_t,
+                    &(*npc).r.mins as *const vec3_t,
+                    &(*npc).r.maxs as *const vec3_t,
+                    &bottom as *const vec3_t,
                     (*npc).s.number,
                     (*npc).clipmask,
                 ),
@@ -5648,7 +5651,7 @@ pub fn Jedi_Combat(ctx: GameContext<'_>) {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let enemy: *mut gentity_t = match (*npc).enemy {
             Some(id) => ge.add(id.0 as usize),
@@ -6018,7 +6021,7 @@ pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let mut i = 0;
         let mut target_dist: f32;
@@ -6164,7 +6167,7 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
 
         (*client).ps.saberBlocked = BLOCKED_NONE as c_int;
@@ -6406,7 +6409,7 @@ pub fn NPC_BSJedi_FollowLeader(ctx: GameContext<'_>) {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
 
         (*client).ps.saberBlocked = BLOCKED_NONE as c_int;
@@ -6503,7 +6506,7 @@ pub fn Jedi_Attack(ctx: GameContext<'_>) {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let npc_id = ent_id(ge, npc);
 
@@ -6885,7 +6888,7 @@ pub fn NPC_BSJedi_Default(ctx: GameContext<'_>) {
         let world = ctx.world;
         let npc = (*world).globals.NPC;
         let npc_info = (*world).globals.NPCInfo;
-        let ge = (*world).g_entities;
+        let ge = (*world).g_entities.as_mut_ptr();
         let client = (*npc).client as *mut gclient_t;
         let npc_id = ent_id(ge, npc);
 

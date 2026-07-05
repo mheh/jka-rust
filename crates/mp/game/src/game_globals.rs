@@ -377,6 +377,54 @@ impl core::ops::DerefMut for ParseObjectivesBuffer {
     }
 }
 
+/// Raven `static char team1[512]` (`g_saga.c:17`). Newtype (>32 array has no
+/// library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter idioms
+/// `.as_ptr()`/`.as_mut_ptr()` valid.
+/// Source: `oracle/oracle/codemp/game/g_saga.c:17`
+pub struct Team1Buf(pub [c_char; 512]);
+
+impl Default for Team1Buf {
+    fn default() -> Self {
+        Team1Buf([0; 512])
+    }
+}
+
+impl core::ops::Deref for Team1Buf {
+    type Target = [c_char];
+    fn deref(&self) -> &[c_char] {
+        &self.0
+    }
+}
+impl core::ops::DerefMut for Team1Buf {
+    fn deref_mut(&mut self) -> &mut [c_char] {
+        &mut self.0
+    }
+}
+
+/// Raven `static char team2[512]` (`g_saga.c:18`). Newtype (>32 array has no
+/// library `Default`); `Deref`/`DerefMut` to `[c_char]` keep the porter idioms
+/// `.as_ptr()`/`.as_mut_ptr()` valid.
+/// Source: `oracle/oracle/codemp/game/g_saga.c:18`
+pub struct Team2Buf(pub [c_char; 512]);
+
+impl Default for Team2Buf {
+    fn default() -> Self {
+        Team2Buf([0; 512])
+    }
+}
+
+impl core::ops::Deref for Team2Buf {
+    type Target = [c_char];
+    fn deref(&self) -> &[c_char] {
+        &self.0
+    }
+}
+impl core::ops::DerefMut for Team2Buf {
+    fn deref_mut(&mut self) -> &mut [c_char] {
+        &mut self.0
+    }
+}
+
 /// Raven `shaderRemap_t` (`g_utils.c:8-13`): `{ char oldShader[MAX_QPATH];
 /// char newShader[MAX_QPATH]; float timeOffset; }`.
 /// Source: `oracle/oracle/codemp/game/g_utils.c:8-13`
@@ -511,9 +559,8 @@ pub struct GameGlobals {
     /// `shoot3`. Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:38`
     pub shoot3: qboolean,
     // --- `NPC_AI_Jedi.c` file-scope globals ---
-    //TODO: Port int[TEAM_NUM_TEAMS]
-    // Source: oracle/oracle/codemp/game/NPC_AI_Jedi.c:94
-    pub jediSpeechDebounceTime: (),
+    /// `jediSpeechDebounceTime`. Source: `oracle/oracle/codemp/game/NPC_AI_Jedi.c:94`
+    pub jediSpeechDebounceTime: [c_int; TEAM_NUM_TEAMS as usize],
     // --- `NPC_AI_Sniper.c` file-scope globals ---
     /// `enemyCS2`. Source: `oracle/oracle/codemp/game/NPC_AI_Sniper.c:30`
     pub enemyCS2: qboolean,
@@ -850,6 +897,12 @@ pub struct GameGlobals {
     // --- `g_saga.c` file-scope globals ---
     /// `gImperialCountdown`. Source: `oracle/oracle/codemp/game/g_saga.c:30`
     pub gImperialCountdown: c_int,
+    /// `static char team1[512]` — theme text for siege team 1.
+    /// Source: `oracle/oracle/codemp/game/g_saga.c:17`
+    pub team1: Team1Buf,
+    /// `static char team2[512]` — theme text for siege team 2.
+    /// Source: `oracle/oracle/codemp/game/g_saga.c:18`
+    pub team2: Team2Buf,
     /// `static char gObjectiveCfgStr[1024]` — assembled objective config string.
     /// Source: `oracle/oracle/codemp/game/g_saga.c:47`
     pub gObjectiveCfgStr: ObjectiveCfgStr,

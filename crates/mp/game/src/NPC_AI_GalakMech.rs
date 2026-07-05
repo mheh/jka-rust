@@ -1139,7 +1139,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 NPC_GM_StartLaser(ctx);
             } else if (*ctx.world).globals.enemyDist4 < MIN_LOB_DIST_SQUARED
                 && ((*enemy_ent).s.weapon != WP_TURRET as c_int
-                    || crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname.as_ptr()) != 0)
+                    || crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname) != 0)
                 && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noRapid".as_ptr()) != 0
             {
                 // enemy within 256
@@ -1151,7 +1151,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 }
             } else if ((*ctx.world).globals.enemyDist4 > MAX_LOB_DIST_SQUARED
                 || ((*enemy_ent).s.weapon == WP_TURRET as c_int
-                    && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname.as_ptr()) == 0))
+                    && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname) == 0))
                 && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noLob".as_ptr()) != 0
             {
                 // enemy more than 448 away and we are ready to try lob fire again
@@ -1420,7 +1420,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         }
 
         // also:
-        if (*enemy_ent).s.weapon == WP_TURRET as c_int && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname.as_ptr()) == 0 {
+        if (*enemy_ent).s.weapon == WP_TURRET as c_int && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname) == 0 {
             // crush turrets
             if crate::NPC_goal::G_BoundsOverlap(
                 (*npc_ent).r.absmin,

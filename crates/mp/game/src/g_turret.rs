@@ -707,7 +707,7 @@ pub fn turret_base_think(
 
                 if enemyDist < ((*self_).radius * (*self_).radius) {
                     // Was in valid radius
-                    if trap::InPVS(ctx.engine, (*self_).r.currentOrigin, (*enemy).r.currentOrigin) {
+                    if trap::InPVS(ctx.engine, mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(&(*self_).r.currentOrigin as *const vec3_t, &(*enemy).r.currentOrigin as *const vec3_t)) != 0 {
                         // Every now and then, check if we can trace to enemy
                         let mut tr: trace_t = std::mem::zeroed();
                         let mut org = [0.0; 3];

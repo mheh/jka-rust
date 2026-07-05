@@ -24,6 +24,8 @@ use mp_bg::public::team::{TEAM_BLUE, TEAM_FREE, TEAM_RED};
 use mp_qshared::common::mp::qcommon::b_set_t::bSet_t;
 use mp_qshared::common::mp::qcommon::player_state::MAX_POWERUPS;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
+use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
+use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
@@ -330,7 +332,7 @@ pub fn SP_target_speaker(
             (*ent).s.soundSetIndex = G_SoundSetIndex(ctx, s);
             (*ent).s.eFlags = mp_bg::public::entity_flags::EF_PERMANENT;
             (*ent).s.pos.trBase = (*ent).s.origin;
-            trap::LinkEntity(ctx.engine, ent);
+            trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
             return;
         }
 
@@ -370,7 +372,7 @@ pub fn SP_target_speaker(
         (*ent).s.pos.trBase = (*ent).s.origin;
 
         // must link the entity so we get areas and clusters
-        trap::LinkEntity(ctx.engine, ent);
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(ent));
     }
 }
 
@@ -412,11 +414,22 @@ pub fn target_laser_think(
         end[1] = (*self_).s.origin[1] + 2048.0 * (*self_).movedir[1];
         end[2] = (*self_).s.origin[2] + 2048.0 * (*self_).movedir[2];
 
-        trap::Trace(ctx.engine, &mut tr, (*self_).s.origin, core::ptr::null(), core::ptr::null(), end, (*self_).s.number, CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE);
+        trap::Trace(
+            ctx.engine,
+            GTraceArgs::new(
+                &mut tr as *mut trace_t,
+                &(*self_).s.origin as *const vec3_t,
+                core::ptr::null(),
+                core::ptr::null(),
+                &end as *const vec3_t,
+                (*self_).s.number,
+                CONTENTS_SOLID | CONTENTS_BODY | CONTENTS_CORPSE,
+            ),
+        );
 
         if tr.entityNum != 0 {
             // hurt it if we can
-            let targ = &mut (*ctx.world).g_entities[tr.entityNum as usize];
+            let targ = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
             G_Damage(ctx, targ, self_, crate::ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*self_).activator), Some(&mut (*self_).movedir), tr.endpos, (*self_).damage, DAMAGE_NO_KNOCKBACK, meansOfDeath_t::MOD_TARGET_LASER as c_int);
         }
 
@@ -425,7 +438,7 @@ pub fn target_laser_think(
         (*self_).s.origin2[1] = tr.endpos[1];
         (*self_).s.origin2[2] = tr.endpos[2];
 
-        trap::LinkEntity(ctx.engine, self_);
+        trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
         (*self_).nextthink = (*ctx.world).level.time + crate::g_items::FRAMETIME;
     }
 }

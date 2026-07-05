@@ -216,7 +216,8 @@ pub fn ImperialProbe_Strafe(ctx: GameContext<'_>) {
 pub fn ImperialProbe_Hunt(
     ctx: GameContext<'_>, visible: qboolean, advance: qboolean,
 ) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
     let npc = world.globals.NPC;
     let npc_info = world.globals.NPCInfo;
 
@@ -269,6 +270,7 @@ pub fn ImperialProbe_Hunt(
         forward,
         &mut (*((*npc).client as *mut gclient_t)).ps.velocity,
     );
+  }
 }
 
 /// Raven `ImperialProbe_FireBlaster`.
@@ -287,7 +289,7 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
     let mut vright = [0.0; 3];
     let mut up = [0.0; 3];
 
-    let mut boltMatrix: mdxaBone_t = Default::default();
+    let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
 
     let gen_bolt_1 = trap::G2API_AddBolt(
         ctx.engine,
@@ -309,7 +311,7 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
         ),
     );
 
-    BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN, &mut muzzle1);
+    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
 
     G_PlayEffectID(G_EffectIndex(c"bryar/muzzle_flash".as_ptr()), muzzle1, [0.0; 3]);
 
@@ -354,7 +356,8 @@ pub fn ImperialProbe_FireBlaster(ctx: GameContext<'_>) {
 pub fn ImperialProbe_Ranged(
     ctx: GameContext<'_>, visible: qboolean, advance: qboolean,
 ) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
     let npc = world.globals.NPC;
     let npc_info = world.globals.NPCInfo;
 
@@ -374,6 +377,7 @@ pub fn ImperialProbe_Ranged(
     if ((*npc_info).scriptFlags & SCF_CHASE_ENEMIES) != 0 {
         ImperialProbe_Hunt(ctx, visible, advance);
     }
+  }
 }
 
 /// Raven `ImperialProbe_AttackDecision`.
@@ -442,15 +446,16 @@ pub fn ImperialProbe_AttackDecision(ctx: GameContext<'_>) {
 pub fn NPC_Probe_Pain(
     ctx: GameContext<'_>, self_: *mut gentity_t, attacker: *mut gentity_t, damage: c_int,
 ) {
-    let world = unsafe { &mut *ctx.world };
+  unsafe {
+    let world = &mut *ctx.world;
 
     let other = attacker;
     let mod_ = world.globals.gPainMOD;
 
     // VectorCopy( self->NPC->lastPathAngles, self->s.angles )
-    _VectorCopy((*(*self_).NPC).lastPathAngles, &mut (*self_).s.angles);
+    _VectorCopy((*((*self_).NPC as *mut gNPC_t)).lastPathAngles, &mut (*self_).s.angles);
 
-    if (*self_).health < 30 || mod_ == MOD_DEMP2 || mod_ == MOD_DEMP2_ALT {
+    if (*self_).health < 30 || mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
         let mut end_pos = [
             (*self_).r.currentOrigin[0],
             (*self_).r.currentOrigin[1],
@@ -471,8 +476,8 @@ pub fn NPC_Probe_Pain(
             ),
         );
 
-        if trace.fraction == 1.0 || mod_ == MOD_DEMP2 {
-            if (mod_ == MOD_DEMP2 || mod_ == MOD_DEMP2_ALT) && !other.is_null() {
+        if trace.fraction == 1.0 || mod_ == MOD_DEMP2 as c_int {
+            if (mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int) && !other.is_null() {
                 let mut dir = [0.0; 3];
 
                 NPC_SetAnim(self_, SETANIM_BOTH, BOTH_PAIN1 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
@@ -486,7 +491,7 @@ pub fn NPC_Probe_Pain(
 
             (*((*self_).client as *mut gclient_t)).ps.electrifyTime = world.level.time + 3000;
 
-            (*(*self_).NPC).localState = LSTATE_DROP;
+            (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_DROP;
         }
     } else {
         let pain_chance = NPC_GetPainChance(ctx, self_, damage);
@@ -497,6 +502,7 @@ pub fn NPC_Probe_Pain(
     }
 
     NPC_Pain(ctx, self_, attacker, damage);
+  }
 }
 
 /// Raven `ImperialProbe_Idle`.

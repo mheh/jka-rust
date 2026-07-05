@@ -999,8 +999,8 @@ pub fn CanShoot(
         let mut muzzle: vec3_t = [0.0; 3];
         let mut spot: vec3_t = [0.0; 3];
 
-        CalcEntitySpot(ctx, shooter, spot_t::SPOT_WEAPON, muzzle);
-        CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, spot); //FIXME preferred target locations for some weapons (feet for R/L)
+        CalcEntitySpot(ctx, shooter, spot_t::SPOT_WEAPON, &mut muzzle);
+        CalcEntitySpot(ctx, ent, spot_t::SPOT_ORIGIN, &mut spot); //FIXME preferred target locations for some weapons (feet for R/L)
 
         trap::Trace(
             ctx.engine,
@@ -1020,7 +1020,8 @@ pub fn CanShoot(
         let shooter_npc = (*shooter).NPC as *mut gNPC_t;
         if tr.startsolid != 0 && !shooter_npc.is_null() && !(*shooter_npc).touchedByPlayer.is_none()
         {
-            traceEnt = (*shooter_npc).touchedByPlayer;
+            traceEnt = &mut (*ctx.world).g_entities[(*shooter_npc).touchedByPlayer.unwrap().index()]
+                as *mut gentity_t;
         }
 
         if ShotThroughGlass(ctx, &mut tr as *mut trace_t, ent, spot, MASK_SHOT) != 0 {
@@ -1033,7 +1034,7 @@ pub fn CanShoot(
         }
         //MCG - Begin
         //ok, can't hit them in center, try their head
-        CalcEntitySpot(ctx, ent, spot_t::SPOT_HEAD, spot);
+        CalcEntitySpot(ctx, ent, spot_t::SPOT_HEAD, &mut spot);
         trap::Trace(
             ctx.engine,
             GTraceArgs::new(

@@ -68,7 +68,7 @@ pub fn sentry_use(
     activator: *mut gentity_t,
 ) {
     unsafe {
-        crate::NPC_utils::G_ActivateBehavior(ctx, self_, BSET_USE);
+        crate::NPC_utils::G_ActivateBehavior(ctx, self_, bSet_t::BSET_USE as c_int);
 
         (*self_).flags &= !FL_SHIELDED;
         crate::npc_c::NPC_SetAnim(
@@ -77,7 +77,7 @@ pub fn sentry_use(
             BOTH_POWERUP1 as c_int,
             SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
         );
-        (*(*self_).NPC).localState = LSTATE_ACTIVE;
+        (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_ACTIVE;
     }
 }
 
@@ -96,8 +96,8 @@ pub fn NPC_Sentry_Pain(
 
         crate::NPC_reactions::NPC_Pain(ctx, self_, attacker, damage);
 
-        if mod_ == MOD_DEMP2 || mod_ == MOD_DEMP2_ALT {
-            (*(*self_).NPC).burstCount = 0;
+        if mod_ == MOD_DEMP2 as c_int || mod_ == MOD_DEMP2_ALT as c_int {
+            (*((*self_).NPC as *mut gNPC_t)).burstCount = 0;
             crate::g_timer::TIMER_Set(
                 ctx,
                 self_,
@@ -118,7 +118,7 @@ pub fn NPC_Sentry_Pain(
                 crate::g_utils::G_SoundIndex(cstr("sound/chars/sentry/misc/sentry_pain").as_ptr()),
             );
 
-            (*(*self_).NPC).localState = LSTATE_ACTIVE;
+            (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_ACTIVE;
         }
     }
 }
@@ -243,7 +243,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
         (*missile).s.weapon = WP_BRYAR_PISTOL;
 
         (*missile).dflags = DAMAGE_DEATH_KNOCKBACK;
-        (*missile).methodOfDeath = MOD_BRYAR_PISTOL;
+        (*missile).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
         (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
 
         (*NPCInfo).burstCount += 1;

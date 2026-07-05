@@ -83,9 +83,16 @@ pub const TAUNT_GLOAT: c_int = 4;
 
 // Resolved cross-module fns (verbatim post-retrofit signatures — call surface).
 use crate::bg_misc::{BG_PlayerStateToEntityState, BG_PlayerStateToEntityStateExtraPolate, vectoyaw};
-use crate::bg_panimate::BG_AnimLength;
+use crate::bg_panimate::{
+    BG_AnimLength, BG_SaberInAttack, PM_SaberInReturn, PM_SaberInStart, PM_SaberInTransition,
+};
+use crate::bg_misc::BG_PlayerTouchesItem;
+use crate::bg_pmove::BG_KnockDownable;
+use crate::bg_saberLoad::WP_SaberStyleValidForSaber;
+use crate::g_team::OnSameTeam;
+use crate::NPC_AI_Jedi::Jedi_Cloak;
 use crate::g_client::{respawn, ClientBegin, SetClientViewAngle};
-use crate::g_cmds::{Cmd_FollowCycle_f, SetTeam, StopFollowing};
+use crate::g_cmds::{Cmd_FollowCycle_f, Cmd_SaberAttackCycle_f, G_ItemUsable, SetTeam, StopFollowing};
 use crate::g_combat::{G_ApplyKnockback, G_Damage};
 use crate::g_items::{
     ItemUse_Binoculars, ItemUse_Jetpack, ItemUse_MedPack, ItemUse_MedPack_Big, ItemUse_Seeker,
@@ -106,7 +113,10 @@ use crate::q_math::{vectoangles, AngleVectors, VectorLength, VectorLengthSquared
 use crate::bg_pmove::Pmove;
 use crate::g_utils::G_EntitySound;
 use crate::w_force::G_PreDefSound;
-use crate::w_force::{ForceHeal, ForceSpeed, ForceThrow};
+use crate::w_force::{
+    ForceAbsorb, ForceHeal, ForceProtect, ForceRage, ForceSeeing, ForceSpeed,
+    ForceTeamForceReplenish, ForceTeamHeal, ForceTelepathy, ForceThrow,
+};
 
 use crate::npc::g_npc_t::gNPC_t;
 use crate::ent_fn_enums::EntTouch;

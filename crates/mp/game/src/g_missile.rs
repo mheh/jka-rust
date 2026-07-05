@@ -226,7 +226,7 @@ pub fn G_ExplodeMissile(
         let mut origin: vec3_t = [0.0; 3];
 
         crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos, (*ctx.world).level.time, &mut origin);
-        trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvector::new(&mut origin));
+        trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut origin));
         G_SetOrigin(ent, origin);
 
         (*ent).s.eType = ET_GENERAL;
@@ -257,7 +257,7 @@ pub fn G_ExplodeMissile(
             }
         }
 
-        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentity::new(ent));
+        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
     }
 }
 
@@ -332,11 +332,11 @@ pub fn CreateMissile(
         (*missile).target_ent = None;
 
         let mut snapped_org = org;
-        trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvector::new(&mut snapped_org));
+        trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut snapped_org));
         crate::q_math::_VectorCopy(snapped_org, &mut (*missile).s.pos.trBase);
         crate::q_math::_VectorScale(dir, vel, &mut (*missile).s.pos.trDelta);
         crate::q_math::_VectorCopy(snapped_org, &mut (*missile).r.currentOrigin);
-        trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvector::new(&mut (*missile).s.pos.trDelta));
+        trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut (*missile).s.pos.trDelta));
 
         missile
     }
@@ -436,7 +436,7 @@ pub fn G_MissileImpact(
                 if (*ent).s.weapon == G2_MODEL_PART {
                     (*ent).freeAfterEvent = qfalse;
                 }
-                trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentity::new(ent));
+                trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
                 return;
             }
         } else if isKnockedSaber == 0 {
@@ -468,7 +468,7 @@ pub fn G_MissileImpact(
                 if (*ent).s.weapon == G2_MODEL_PART {
                     (*ent).freeAfterEvent = qfalse;
                 }
-                trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentity::new(ent));
+                trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
                 return;
             }
         }
@@ -689,7 +689,7 @@ pub fn G_MissileImpact(
             (*ent).freeAfterEvent = qfalse;
         }
 
-        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentity::new(ent));
+        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
     }
 }
 
@@ -753,7 +753,7 @@ pub fn G_RunMissile(
         } else {
             trap::Trace(
                 ctx.engine,
-                mp_abi::game::syscalls::G_TRACE::GTrace::new(
+                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                     &mut tr,
                     &(*ent).r.currentOrigin,
                     &(*ent).r.mins,
@@ -769,7 +769,7 @@ pub fn G_RunMissile(
             // Make sure tr.entityNum is set to the entity we're stuck in
             trap::Trace(
                 ctx.engine,
-                mp_abi::game::syscalls::G_TRACE::GTrace::new(
+                mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                     &mut tr,
                     &(*ent).r.currentOrigin,
                     &(*ent).r.mins,
@@ -786,10 +786,10 @@ pub fn G_RunMissile(
 
         if (*ent).passThroughNum != 0 && tr.entityNum as u32 == ((*ent).passThroughNum - 1) as u32 {
             crate::q_math::_VectorCopy(origin, &mut (*ent).r.currentOrigin);
-            trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentity::new(ent));
+            trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
             // Fall through to passthrough label
         } else {
-            trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentity::new(ent));
+            trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
 
             if (*ent).s.weapon == G2_MODEL_PART && (*ent).bounceCount == 0 {
                 let mut lowerOrg: vec3_t = [0.0; 3];
@@ -799,7 +799,7 @@ pub fn G_RunMissile(
                 lowerOrg[2] -= 1.0;
                 trap::Trace(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_TRACE::GTrace::new(
+                    mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
                         &mut trG,
                         &(*ent).r.currentOrigin,
                         &(*ent).r.mins,
@@ -855,7 +855,7 @@ pub fn G_RunMissile(
                     }
                 }
 
-                G_MissileImpact(ctx, ent, &mut tr);
+                G_MissileImpact(ctx, ent, &mut tr as *mut trace_t);
 
                 if tr.entityNum as u32 == (*ent).s.otherEntityNum as u32 {
                     (*ent).s.trickedentindex = 1;

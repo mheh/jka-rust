@@ -4,6 +4,7 @@
 ///
 /// Type definition source: `oracle/oracle/codemp/game/w_saber.h:44-57`
 #[repr(i32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum evasionType_t {
 	EVASION_NONE = 0,
 	EVASION_PARRY = 1,

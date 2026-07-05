@@ -79,9 +79,22 @@ use crate::q_math::{
 };
 use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
 use crate::NPC_senses::InFront;
+use crate::w_force::{ForceThrow, WP_ForcePowerUsable};
+use crate::ai_wpnav::G_TestLine;
+use crate::NPC_AI_Jedi::{Jedi_Ambush, Jedi_SaberBlockGo, Jedi_WaitingAmbush};
+use crate::g_timer::TIMER_Set;
+use crate::tri_coll_test::tri_tri_intersect;
+use crate::bg_saberLoad::WP_SaberBladeDoTransitionDamage;
+use crate::bg_saber::PM_SaberInBounce;
+use crate::g_team::OnSameTeam;
 use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 use crate::bg_misc::{BG_CanUseFPNow, BG_HasYsalamiri};
 use crate::bg_panimate::{BG_InExtraDefenseSaberMove, BG_SuperBreakLoseAnim};
+use crate::bg_panimate::{
+    BG_BrokenParryForParry, BG_InSpecialJump, BG_KnockawayForParry, BG_SaberInAttackPure, BG_SaberInReturn,
+    BG_SaberInSpecialAttack, BG_SpinningSaberAnim, BG_StabDownAnim, PM_InKnockDown,
+    PM_SaberInDeflect, PM_SaberInParry, PM_SaberInReflect,
+};
 use crate::saber::saber_flags::{
     SFL_NOT_DISARMABLE, SFL_NOT_THROWABLE, SFL_RETURN_DAMAGE, SFL_SINGLE_BLADE_THROWABLE,
 };
@@ -3939,6 +3952,7 @@ pub fn WP_SaberApplyDamage(
             dflags |= (*ctx.world).globals.saberKnockbackFlags[iu];
 
             G_Damage(
+                ctx,
                 victim,
                 self_,
                 self_,
@@ -4113,11 +4127,13 @@ pub fn WP_SaberRadiusDamage(
                 // must be a client
                 if G_EntIsBreakable(ctx, (*radiusEnt).s.number) != 0 {
                     // damage breakables within range, but not as much
+                    let mut zeroDir = vec3_origin;
                     G_Damage(
+                        ctx,
                         radiusEnt,
                         ent,
                         ent,
-                        Some(&mut vec3_origin),
+                        Some(&mut zeroDir),
                         (*radiusEnt).r.currentOrigin,
                         10,
                         0,
@@ -4141,11 +4157,13 @@ pub fn WP_SaberRadiusDamage(
                 if damage > 0 {
                     // do damage
                     let points = (damage as f32 * dist / radius).ceil() as c_int;
+                    let mut zeroDir = vec3_origin;
                     G_Damage(
+                        ctx,
                         radiusEnt,
                         ent,
                         ent,
-                        Some(&mut vec3_origin),
+                        Some(&mut zeroDir),
                         (*radiusEnt).r.currentOrigin,
                         points,
                         DAMAGE_NO_KNOCKBACK,
@@ -6553,6 +6571,7 @@ pub fn CheckThrownSaberDamaged(
                         if (*soc).ps.isJediMaster != 0 {
                             // 2x damage for the Jedi Master
                             G_Damage(
+                                ctx,
                                 ent,
                                 saberOwner,
                                 saberOwner,
@@ -6564,6 +6583,7 @@ pub fn CheckThrownSaberDamaged(
                             );
                         } else {
                             G_Damage(
+                                ctx,
                                 ent,
                                 saberOwner,
                                 saberOwner,
@@ -6672,9 +6692,9 @@ pub fn CheckThrownSaberDamaged(
 
                     if (*ent).s.eType == ET_NPC as c_int {
                         // an animent
-                        G_Damage(ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 40, dflags, MOD_SABER);
+                        G_Damage(ctx, ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 40, dflags, MOD_SABER);
                     } else {
-                        G_Damage(ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 5, dflags, MOD_SABER);
+                        G_Damage(ctx, ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 5, dflags, MOD_SABER);
                     }
 
                     let te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT);
@@ -9079,7 +9099,7 @@ pub fn G_GrabSomeMofos(
                     || (*grabbed).s.eType == ET_NPC as c_int)
                 && !(*grabbed).client.is_null()
                 && (*grabbed).health > 0
-                && G_CanBeEnemy(self_, grabbed) != 0
+                && G_CanBeEnemy(ctx, self_, grabbed) != 0
                 && G_PrettyCloseIGuess(
                     (*gcl).ps.origin[2],
                     (*client).ps.origin[2],

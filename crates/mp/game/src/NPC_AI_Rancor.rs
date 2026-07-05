@@ -505,17 +505,17 @@ pub fn Rancor_Attack(
         if crate::g_timer::TIMER_Done2(ctx, npc, c"attack_dmg".as_ptr(), qtrue) != 0 {
             let mut shakePos: vec3_t = [0.0; 3];
             match (*((*npc).client as *mut gclient_t)).ps.legsAnim {
-            BOTH_MELEE1 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_MELEE1 as c_int => {
                 Rancor_Smash(ctx);
                 crate::NPC_utils::G_GetBoltPosition(ctx, npc, (*((*npc).client as *mut gclient_t)).renderInfo.handLBolt, Some(&mut shakePos), 0);
                 crate::g_utils::G_ScreenShake(ctx, shakePos, core::ptr::null_mut(), 4.0, 1000, qfalse);
                 //CGCam_Shake( 1.0f*playerDist/128.0f, 1000 );
             },
-            BOTH_MELEE2 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_MELEE2 as c_int => {
                 Rancor_Bite(ctx);
                 crate::g_timer::TIMER_Set(ctx, npc, c"attack_dmg2".as_ptr(), 450);
             },
-            BOTH_ATTACK1 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_ATTACK1 as c_int => {
                 if (*npc).count == 1 && !(*npc).activator.is_none() {
                     let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
                     crate::g_combat::G_Damage(ctx, activator, npc, npc, Some(&mut [0.0; 3]), (*activator).r.currentOrigin, (*ctx.world).bg_state.rng.Q_irand(25, 40), DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK, MOD_MELEE as c_int);
@@ -533,11 +533,11 @@ pub fn Rancor_Attack(
                     crate::g_utils::G_Sound(ctx, activator, CHAN_AUTO, crate::g_utils::G_SoundIndex(c"sound/chars/rancor/chomp.wav".as_ptr()));
                 }
             },
-            BOTH_ATTACK2 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_ATTACK2 as c_int => {
                 //try to grab
                 Rancor_Swing(ctx, qtrue);
             },
-            BOTH_ATTACK3 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_ATTACK3 as c_int => {
                 if (*npc).count == 1 && !(*npc).activator.is_none() {
                     let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
                     //cut in half
@@ -563,16 +563,16 @@ pub fn Rancor_Attack(
             }
         } else if crate::g_timer::TIMER_Done2(ctx, npc, c"attack_dmg2".as_ptr(), qtrue) != 0 {
             match (*((*npc).client as *mut gclient_t)).ps.legsAnim {
-            BOTH_MELEE1 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_MELEE1 as c_int => {
             },
-            BOTH_MELEE2 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_MELEE2 as c_int => {
                 Rancor_Bite(ctx);
             },
-            BOTH_ATTACK1 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_ATTACK1 as c_int => {
             },
-            BOTH_ATTACK2 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_ATTACK2 as c_int => {
             },
-            BOTH_ATTACK3 => {
+            _ if (*((*npc).client as *mut gclient_t)).ps.legsAnim == BOTH_ATTACK3 as c_int => {
                 if (*npc).count == 1 && !(*npc).activator.is_none() {
                     let activator = crate::ent_id::resolve(ent_base, (*npc).activator);
                     //swallow victim
@@ -723,12 +723,12 @@ pub fn NPC_Rancor_Pain(
             }
         }
         if (hitByRancor != 0 || ((*self_).count == 1 && !(*self_).activator.is_none() && !(*ctx.world).bg_state.rng.Q_irand(0,4) != 0) || (*ctx.world).bg_state.rng.Q_irand(0, 200) < damage)
-            && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_STAND1TO2
+            && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_STAND1TO2 as c_int
             && crate::g_timer::TIMER_Done(ctx, self_, c"takingPain".as_ptr()) != 0 {
             if Rancor_CheckRoar(ctx, self_) == qfalse {
-                if (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_MELEE1
-                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_MELEE2
-                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_ATTACK2 {
+                if (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_MELEE1 as c_int
+                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_MELEE2 as c_int
+                    && (*((*self_).client as *mut gclient_t)).ps.legsAnim != BOTH_ATTACK2 as c_int {
                     //cant interrupt one of the big attack anims
                     /*
                     if ( self->count != 1

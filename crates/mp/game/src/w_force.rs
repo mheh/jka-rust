@@ -36,6 +36,13 @@ use mp_bg::local::force_power_needed::forcePowerNeeded;
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
 
+/// Per-file `g_entities` base-pointer helper for `EntityId` arena resolution
+/// (matches the `g_missile.rs`/`g_trigger.rs`/`NPC_combat.rs` precedent).
+#[inline]
+unsafe fn ent_base(ctx: GameContext<'_>) -> *const gentity_t {
+    unsafe { (*ctx.world).g_entities.as_ptr() }
+}
+
 // Raven force-mastery-level anonymous enum (bg_public.h) → int-wide consts per
 // the enum-vs-alias rule (anonymous enum → `const`s). Only the two spellings the
 // ported bodies name are surfaced.
@@ -428,10 +435,12 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         if (*ctx.world).cvars.g_teamAutoJoin.integer == 0 {
                             //Make them a spectator so they can set their powerups up without being bothered.
                             (*cl).sess.sessionTeam = TEAM_SPECTATOR;
-                            (*cl).sess.spectatorState = SPECTATOR_FREE;
+                            (*cl).sess.spectatorState =
+                                crate::client::spectator_state::spectatorState_t::SPECTATOR_FREE;
                             (*cl).sess.spectatorClient = 0;
 
-                            (*cl).pers.teamState.state = TEAM_BEGIN;
+                            (*cl).pers.teamState.state =
+                                crate::client::player_team_state::playerTeamStateState_t::TEAM_BEGIN;
                             trap::SendServerCommand(
                                 ctx.engine,
                                 GSendServerCommandArgs::new((*ent).s.number, cstr("spc")),
@@ -1826,7 +1835,7 @@ pub fn ForceLightningDamage(
 
                     if dmg != 0 {
                         //rww - Shields can now absorb lightning too.
-                        G_Damage(traceEnt, self_, self_, Some(&mut dir), impactPoint, dmg, 0, MOD_FORCE_DARK as c_int);
+                        G_Damage(ctx, traceEnt, self_, self_, Some(&mut dir), impactPoint, dmg, 0, MOD_FORCE_DARK as c_int);
                     }
                     if !(*traceEnt).client.is_null() {
                         if (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
@@ -4120,7 +4129,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
         if (*cl).ps.fd.forcePowerDebounce[FP_GRIP as usize] < level_time {
             //2 damage per second while choking, resulting in 10 damage total (not including The Squeeze<tm>)
             (*cl).ps.fd.forcePowerDebounce[FP_GRIP as usize] = level_time + 1000;
-            G_Damage(gripEnt, self_, self_, None, [0.0; 3], 2, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
+            G_Damage(ctx, gripEnt, self_, self_, None, [0.0; 3], 2, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
         }
 
         Jetpack_Off(gripEnt); //make sure the guy being gripped has his jetpack off.
@@ -4156,7 +4165,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
             {
                 //if we managed to lift him into the air for 2 seconds, give him a crack
                 (*cl).ps.fd.forceGripDamageDebounceTime = 1;
-                G_Damage(gripEnt, self_, self_, None, [0.0; 3], 20, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
+                G_Damage(ctx, gripEnt, self_, self_, None, [0.0; 3], 20, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
                 let snd = format!("*choke{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));
@@ -4240,7 +4249,7 @@ pub fn DoGripAction(ctx: GameContext<'_>, self_: *mut gentity_t, forcePower: for
             {
                 //if we managed to lift him into the air for 2 seconds, give him a crack
                 (*cl).ps.fd.forceGripDamageDebounceTime = 1;
-                G_Damage(gripEnt, self_, self_, None, [0.0; 3], 40, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
+                G_Damage(ctx, gripEnt, self_, self_, None, [0.0; 3], 40, DAMAGE_NO_ARMOR, MOD_FORCE_DARK as c_int);
 
                 //Must play custom sounds on the actual entity. Don't use G_Sound (it creates a temp entity for the sound)
                 let snd = format!("*choke{}.wav", (*ctx.world).bg_state.rng.Q_irand(1, 3));

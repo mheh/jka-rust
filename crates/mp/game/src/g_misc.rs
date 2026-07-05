@@ -38,6 +38,13 @@ use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use crate::ent_fn_enums::{EntDie, EntThink, EntTouch, EntUse};
 use crate::q_math::vec3_origin;
 use mp_bg::public::entity_type::entityType_t;
+use mp_bg::public::means_of_death::meansOfDeath_t::MOD_UNKNOWN;
+use crate::level::tag_owner::{MAX_TAG_OWNERS, MAX_TAGS, TAG_GENERIC_NAME};
+use crate::level::reference_tag::MAX_REFNAME;
+use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
+use mp_bg::public::configstring::{CS_SKYBOXORG, CS_TERRAINS};
+use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
+use crate::g_local_consts::{START_TIME_FIND_LINKS, START_TIME_LINK_ENTS};
 
 // Unported types referenced in this file (need porting before this compiles):
 // tagOwner_t
@@ -719,7 +726,7 @@ pub fn HolocronTouch(
             return;
         }
 
-        if (*other).client.as_ref().unwrap().ps.holocronsCarried[(*self_).count as usize] != 0.0 {
+        if (*((*other).client as *mut gclient_t)).ps.holocronsCarried[(*self_).count as usize] != 0.0 {
             return;
         }
 
@@ -1041,7 +1048,7 @@ pub fn Use_Shooter(
 pub fn InitShooter_Finish(
     ctx: GameContext<'_>,ent: *mut gentity_t) {
     unsafe {
-        (*ent).enemy = G_PickTarget(ctx, (*ent).target);
+        (*ent).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), G_PickTarget(ctx, (*ent).target));
         (*ent).think = None;
         (*ent).nextthink = 0;
     }
@@ -1738,7 +1745,7 @@ pub fn health_power_converter_use(
             }
             (*self_).setTime = (*ctx.world).level.time + 100;
 
-            let cl = &mut *(*activator).client;
+            let cl = &mut *((*activator).client as *mut gclient_t);
             let dif = cl.ps.stats[STAT_MAX_HEALTH as usize] - (*activator).health;
 
             if dif > 0 {
@@ -1750,7 +1757,7 @@ pub fn health_power_converter_use(
                 stop = false;
 
                 (*self_).fly_sound_debounce_time = (*ctx.world).level.time + 500;
-                (*self_).activator = activator;
+                (*self_).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
 
                 (*activator).health += add;
             }
@@ -1816,8 +1823,16 @@ pub fn SP_misc_model_health_power_converter(
     }
 }
 
-// PORT-NOTE(unported-const): `FX_STATE_CONTINUOUS`/`MOD_UNKNOWN` have no
-// ported home; referenced verbatim.
+//TODO: Port FX_STATE_ONE_SHOT
+// Source: oracle/oracle/codemp/game/bg_public.h:1183
+const FX_STATE_ONE_SHOT: c_int = 1;
+//TODO: Port FX_STATE_ONE_SHOT_LIMIT
+// Source: oracle/oracle/codemp/game/bg_public.h:1184
+const FX_STATE_ONE_SHOT_LIMIT: c_int = 10;
+//TODO: Port FX_STATE_CONTINUOUS
+// Source: oracle/oracle/codemp/game/bg_public.h:1185
+const FX_STATE_CONTINUOUS: c_int = 20;
+
 /// Raven `fx_runner_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2266-2310`
@@ -1844,7 +1859,7 @@ pub fn fx_runner_think(
 
         if (*ent).spawnflags & 4 != 0 {
             // damage
-            G_RadiusDamage(ctx, (*ent).r.currentOrigin, ent, (*ent).splashDamage as f32, (*ent).splashRadius as f32, ent, ent, MOD_UNKNOWN);
+            G_RadiusDamage(ctx, (*ent).r.currentOrigin, ent, (*ent).splashDamage as f32, (*ent).splashRadius as f32, ent, ent, MOD_UNKNOWN as c_int);
         }
 
         if !(*ent).target2.is_null() && *(*ent).target2 != 0 {
@@ -2384,8 +2399,8 @@ pub fn misc_faller_create(
         (*faller).s.customRGBA[2] = (*ctx.world).bg_state.rng.Q_irand(1, 255) as u8;
         (*faller).s.customRGBA[3] = 255;
 
-        (*faller).r.mins = [-15.0, -15.0, DEFAULT_MINS_2];
-        (*faller).r.maxs = [15.0, 15.0, DEFAULT_MAXS_2];
+        (*faller).r.mins = [-15.0, -15.0, DEFAULT_MINS_2 as f32];
+        (*faller).r.maxs = [15.0, 15.0, DEFAULT_MAXS_2 as f32];
 
         (*faller).clipmask = MASK_PLAYERSOLID;
         (*faller).r.contents = MASK_PLAYERSOLID;
@@ -2456,7 +2471,7 @@ pub fn SP_misc_faller(
 pub fn FirstFreeTagOwner(ctx: GameContext<'_>) -> *mut c_void {
     unsafe {
         let mut i: c_int = 0;
-        while i < MAX_TAG_OWNERS {
+        while i < MAX_TAG_OWNERS as c_int {
             if (*ctx.world).refTagOwnerMap[i as usize].inuse == 0 {
                 return &mut (*ctx.world).refTagOwnerMap[i as usize] as *mut _ as *mut c_void;
             }
@@ -2483,7 +2498,7 @@ pub fn FirstFreeRefTag(
         let owner = tagOwner as *mut crate::level::tag_owner::tagOwner_t;
         let mut i: c_int = 0;
 
-        while i < MAX_TAGS {
+        while i < MAX_TAGS as c_int {
             if (*owner).tags[i as usize].inuse == 0 {
                 return &mut (*owner).tags[i as usize] as *mut reference_tag_t;
             }
@@ -2501,9 +2516,9 @@ pub fn FirstFreeRefTag(
 pub fn TAG_Init(ctx: GameContext<'_>) {
     unsafe {
         let mut i: c_int = 0;
-        while i < MAX_TAG_OWNERS {
+        while i < MAX_TAG_OWNERS as c_int {
             let mut x: c_int = 0;
-            while x < MAX_TAGS {
+            while x < MAX_TAGS as c_int {
                 (*ctx.world).refTagOwnerMap[i as usize].tags[x as usize] = core::mem::zeroed();
                 x += 1;
             }
@@ -2522,7 +2537,7 @@ pub fn TAG_FindOwner(
     ctx: GameContext<'_>,owner: *const c_char) -> *mut c_void {
     unsafe {
         let mut i: c_int = 0;
-        while i < MAX_TAG_OWNERS {
+        while i < MAX_TAG_OWNERS as c_int {
             if (*ctx.world).refTagOwnerMap[i as usize].inuse != 0
                 && Q_stricmp((*ctx.world).refTagOwnerMap[i as usize].name.as_ptr(), owner) == 0
             {
@@ -2561,7 +2576,7 @@ pub fn TAG_Find(
         }
 
         let owner_ptr = tag_owner as *mut crate::level::tag_owner::tagOwner_t;
-        while i < MAX_TAGS {
+        while i < MAX_TAGS as c_int {
             if (*owner_ptr).tags[i as usize].inuse != 0 && Q_stricmp((*owner_ptr).tags[i as usize].name.as_ptr(), name) == 0 {
                 return &mut (*owner_ptr).tags[i as usize] as *mut reference_tag_t;
             }
@@ -2577,7 +2592,7 @@ pub fn TAG_Find(
 
         let generic_ptr = generic as *mut crate::level::tag_owner::tagOwner_t;
         i = 0;
-        while i < MAX_TAGS {
+        while i < MAX_TAGS as c_int {
             if (*generic_ptr).tags[i as usize].inuse != 0 && Q_stricmp((*generic_ptr).tags[i as usize].name.as_ptr(), name) == 0 {
                 return &mut (*generic_ptr).tags[i as usize] as *mut reference_tag_t;
             }
@@ -2650,11 +2665,11 @@ pub fn TAG_Add(
 
         let owner_ptr = tag_owner as *mut crate::level::tag_owner::tagOwner_t;
         // Copy the name
-        Q_strncpyz((*owner_ptr).name.as_mut_ptr(), owner, MAX_REFNAME);
+        Q_strncpyz((*owner_ptr).name.as_mut_ptr(), owner, MAX_REFNAME as c_int);
         Q_strlwr((*owner_ptr).name.as_mut_ptr()); //NOTENOTE: For case insensitive searches on a map
 
         // Copy the name
-        Q_strncpyz((*tag).name.as_mut_ptr(), name, MAX_REFNAME);
+        Q_strncpyz((*tag).name.as_mut_ptr(), name, MAX_REFNAME as c_int);
         Q_strlwr((*tag).name.as_mut_ptr());
 
         (*owner_ptr).inuse = qtrue;

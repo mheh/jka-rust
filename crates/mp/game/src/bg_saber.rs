@@ -38,7 +38,25 @@ use mp_bg::public::saber_move_transition_angle_table::saberMoveTransitionAngle;
 use mp_bg::public::parry_debounce_table::bg_parryDebounce;
 use crate::bg_channel::PmoveContext;
 use crate::bg_panimate::{BG_InSaberLock, PM_SaberBounceForAttack};
-use crate::q_math::{Q_random, AngleVectors, PITCH, ROLL, YAW};
+use crate::bg_panimate::{
+    BG_FlippingAnim, BG_InKataAnim, BG_InRoll, BG_InSaberLockOld, BG_InSaberStandAnim,
+    BG_InSpecialJump, BG_KickMove, BG_KickingAnim, BG_SaberInAttack, BG_SaberInIdle,
+    BG_SaberInKata, BG_SaberInSpecial, BG_SaberInSpecialAttack, BG_SaberInTransitionAny,
+    BG_SpinningSaberAnim, BG_SuperBreakLoseAnim, BG_SuperBreakWinAnim, PM_InKnockDown,
+    PM_JumpingAnim, PM_SaberInKnockaway, PM_SaberInParry, PM_SaberInReflect, PM_SaberInReturn,
+    PM_SaberInStart, PM_SaberInTransition,
+};
+use crate::q_math::{
+    DistanceSquared, Q_random, AngleVectors, VectorSet, _VectorMA, _VectorScale, _VectorSubtract,
+    PITCH, ROLL, YAW,
+};
+use crate::bg_misc::{
+    BG_AddPredictableEventToPlayerstate, BG_CanUseFPNow, BG_HasYsalamiri,
+};
+use crate::bg_pmove::{
+    BG_InKnockDown, BG_InSlopeAnim, BG_KnockDownable, BG_SabersOff, PM_RunningAnim, PM_SwimmingAnim,
+    PM_WalkingAnim,
+};
 use mp_bg::public::saber_move_name as ls;
 use mp_bg::public::anim_number::animNumber_t as A;
 // Raven `saber_styles_t` variants (`SS_*`) spelled bare in the ported bodies.
@@ -752,7 +770,7 @@ impl PmoveContext<'_> {
                 _ => {}
             }
             if winAnim != -1 {
-                PM_SetAnim(
+                self.PM_SetAnim(
                     SETANIM_BOTH as c_int,
                     winAnim,
                     (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD) as c_int,
@@ -884,7 +902,7 @@ impl PmoveContext<'_> {
 
             let ps = (*self.pm).ps;
             if (*duelist).clientNum == (*ps).clientNum {
-                PM_SetAnim(
+                self.PM_SetAnim(
                     SETANIM_BOTH as c_int,
                     baseAnim,
                     (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD) as c_int,
@@ -2021,7 +2039,7 @@ impl PmoveContext<'_> {
                 }
                 if (*ps).saberLockFrame != 0 {
                     (*ps).torsoTimer = 0;
-                    PM_SetAnim(SETANIM_TORSO as c_int, BOTH_STAND1 as c_int, SETANIM_FLAG_OVERRIDE as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_STAND1 as c_int, SETANIM_FLAG_OVERRIDE as c_int, 100);
                     (*ps).saberLockFrame = 0;
                 }
             }
@@ -2050,9 +2068,10 @@ impl PmoveContext<'_> {
                     && BG_InSlopeAnim((*ps).legsAnim) == 0
                     && (*ps).torsoTimer <= 0
                 {
-                    PM_SetAnim(SETANIM_TORSO as c_int, (*ps).legsAnim, SETANIM_FLAG_OVERRIDE as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, (*ps).legsAnim, SETANIM_FLAG_OVERRIDE as c_int, 100);
                 } else if BG_InSlopeAnim((*ps).legsAnim) != 0 && (*ps).torsoTimer <= 0 {
-                    PM_SetAnim(SETANIM_TORSO as c_int, PM_GetSaberStance(), SETANIM_FLAG_OVERRIDE as c_int, 100);
+                    let stance = self.PM_GetSaberStance();
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, stance, SETANIM_FLAG_OVERRIDE as c_int, 100);
                 }
 
                 if (*ps).weaponTime < 1
@@ -2159,7 +2178,7 @@ impl PmoveContext<'_> {
                             || PM_JumpingAnim((*ps).torsoAnim) != 0
                             || PM_SwimmingAnim((*ps).torsoAnim) != 0))
                 {
-                    PM_SetAnim(
+                    self.PM_SetAnim(
                         SETANIM_TORSO as c_int,
                         BOTH_SABERPULL as c_int,
                         (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD) as c_int,
@@ -2363,23 +2382,24 @@ impl PmoveContext<'_> {
             if (*ps).weaponstate == WEAPON_RAISING {
                 (*ps).weaponstate = WEAPON_IDLE;
                 if (*ps).legsAnim == BOTH_WALK1 as c_int {
-                    PM_SetAnim(SETANIM_TORSO as c_int, BOTH_WALK1 as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_WALK1 as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
                 } else if (*ps).legsAnim == BOTH_RUN1 as c_int {
-                    PM_SetAnim(SETANIM_TORSO as c_int, BOTH_RUN1 as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_RUN1 as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
                 } else if (*ps).legsAnim == BOTH_RUN2 as c_int {
-                    PM_SetAnim(SETANIM_TORSO as c_int, BOTH_RUN2 as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_RUN2 as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
                 } else if (*ps).legsAnim == BOTH_RUN_STAFF as c_int {
-                    PM_SetAnim(SETANIM_TORSO as c_int, BOTH_RUN_STAFF as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_RUN_STAFF as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
                 } else if (*ps).legsAnim == BOTH_RUN_DUAL as c_int {
-                    PM_SetAnim(SETANIM_TORSO as c_int, BOTH_RUN_DUAL as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_RUN_DUAL as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
                 } else if (*ps).legsAnim == BOTH_WALK2 as c_int {
-                    PM_SetAnim(SETANIM_TORSO as c_int, BOTH_WALK2 as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_WALK2 as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
                 } else if (*ps).legsAnim == BOTH_WALK_STAFF as c_int {
-                    PM_SetAnim(SETANIM_TORSO as c_int, BOTH_WALK_STAFF as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_WALK_STAFF as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
                 } else if (*ps).legsAnim == BOTH_WALK_DUAL as c_int {
-                    PM_SetAnim(SETANIM_TORSO as c_int, BOTH_WALK_DUAL as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_WALK_DUAL as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
                 } else {
-                    PM_SetAnim(SETANIM_TORSO as c_int, PM_GetSaberStance(), SETANIM_FLAG_NORMAL as c_int, 100);
+                    let stance = self.PM_GetSaberStance();
+                    self.PM_SetAnim(SETANIM_TORSO as c_int, stance, SETANIM_FLAG_NORMAL as c_int, 100);
                 }
 
                 if (*ps).weaponstate == WEAPON_RAISING {
@@ -2561,7 +2581,7 @@ impl PmoveContext<'_> {
                     {
                         (*ps).legsAnim
                     }
-                    _ => PM_GetSaberStance(),
+                    _ => self.PM_GetSaberStance(),
                 };
                 newmove = LS_READY;
             }
@@ -2569,7 +2589,7 @@ impl PmoveContext<'_> {
             self.PM_SetSaberMove(newmove as c_short);
 
             if both && (*ps).torsoAnim == anim {
-                PM_SetAnim(
+                self.PM_SetAnim(
                     SETANIM_LEGS as c_int,
                     anim,
                     (SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD) as c_int,
@@ -2678,10 +2698,10 @@ impl PmoveContext<'_> {
                 if (anim >= BOTH_STAND1 as c_int && anim <= BOTH_STAND4TOATTACK2 as c_int)
                     || (anim >= TORSO_DROPWEAP1 as c_int && anim <= TORSO_WEAPONIDLE10 as c_int)
                 {
-                    anim = PM_GetSaberStance();
+                    anim = self.PM_GetSaberStance();
                 }
                 if ((*ps).pm_flags & PMF_DUCKED as c_int) != 0 {
-                    anim = PM_GetSaberStance();
+                    anim = self.PM_GetSaberStance();
                 }
                 if anim == BOTH_WALKBACK1 as c_int || anim == BOTH_WALKBACK2 as c_int || anim == BOTH_WALK1 as c_int {
                     // PORT-NOTE(faithful-empty-branch): the oracle's `if`
@@ -2689,7 +2709,7 @@ impl PmoveContext<'_> {
                     // faithfully (no-op), not a missing case.
                 }
                 if BG_InSlopeAnim(anim) != 0 {
-                    anim = PM_GetSaberStance();
+                    anim = self.PM_GetSaberStance();
                 }
                 parts = SETANIM_TORSO as c_int;
             }
@@ -2738,7 +2758,7 @@ impl PmoveContext<'_> {
                         && PM_InKnockDown(ps) == 0
                         && PM_JumpingAnim((*ps).legsAnim) == 0
                         && BG_InSpecialJump((*ps).legsAnim) == 0
-                        && anim != PM_GetSaberStance()
+                        && anim != self.PM_GetSaberStance()
                         && (*ps).groundEntityNum != ENTITYNUM_NONE as c_int
                         && ((*ps).pm_flags & PMF_DUCKED as c_int) == 0
                     {
@@ -2750,7 +2770,7 @@ impl PmoveContext<'_> {
                     }
                 }
 
-                PM_SetAnim(parts, anim, setflags, saberMoveData[newMove as usize].blendTime);
+                self.PM_SetAnim(parts, anim, setflags, saberMoveData[newMove as usize].blendTime);
                 if parts != SETANIM_LEGS as c_int
                     && ((*ps).legsAnim == BOTH_ARIAL_LEFT as c_int
                         || (*ps).legsAnim == BOTH_ARIAL_RIGHT as c_int)

@@ -1,5 +1,10 @@
 use core::ffi::c_int;
 
+/// Raven `DEFAULT_MINS_2`.
+///
+/// Source: `oracle/oracle/codemp/game/bg_public.h:41`
+pub const DEFAULT_MINS_2: c_int = -24;
+
 /// Raven `DEFAULT_MAXS_2`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_public.h:42`

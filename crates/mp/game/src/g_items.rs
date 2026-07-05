@@ -646,7 +646,7 @@ pub fn PlaceShield(
                 }
                 (*shield).think = Some(EntThink::CreateShield);
                 (*shield).nextthink = (*ctx.world).level.time + 500; // power up after .5 seconds
-                (*shield).parent = playerent;
+                (*shield).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), playerent);
 
                 // Set team number.
                 (*shield).s.otherEntityNum2 = (*((*playerent).client as *mut gclient_t)).sess.sessionTeam;
@@ -704,7 +704,7 @@ pub fn ItemUse_Binoculars(
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.weaponstate != WEAPON_READY {
+        if (*((*ent).client as *mut gclient_t)).ps.weaponstate != WEAPON_READY as c_int {
             // So we can't fool it and reactivate while switching to the saber or something.
             return;
         }
@@ -1276,11 +1276,11 @@ pub fn ItemUse_Sentry(
         (*sentry).classname = c"sentryGun".as_ptr() as *mut c_char;
         (*sentry).s.modelindex = G_ModelIndex(c"models/items/psgun.glm".as_ptr()); // replace ASAP
 
-        (*sentry).s.g2radius = 30.0;
+        (*sentry).s.g2radius = 30;
         (*sentry).s.modelGhoul2 = 1;
 
         G_SetOrigin(sentry, fwdorg);
-        (*sentry).parent = ent;
+        (*sentry).parent = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), ent);
         (*sentry).r.contents = CONTENTS_SOLID;
         (*sentry).s.solid = 2;
         (*sentry).clipmask = MASK_SOLID;

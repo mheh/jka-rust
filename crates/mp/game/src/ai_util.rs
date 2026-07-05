@@ -340,7 +340,7 @@ pub fn BotDoChat(
 
         // Count newlines
         let mut inc_1 = 0isize;
-        let mut lines = 0c_int;
+        let mut lines = 0 as c_int;
 
         while *chatgroup_b.offset(inc_1) != 0 {
             if *chatgroup_b.offset(inc_1) == b'\n' as u8 {
@@ -365,7 +365,7 @@ pub fn BotDoChat(
         }
 
         // Find the start of the chosen line
-        let mut checkedline = 1c_int;
+        let mut checkedline = 1 as c_int;
         let mut inc_1 = 0isize;
 
         while checkedline != getthisline {
@@ -654,7 +654,7 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>,bs: *mut bot_state_t) {
             ),
         );
 
-        let mut failed = 0c_int;
+        let mut failed = 0 as c_int;
 
         if f == 0 {
             crate::g_main::G_Printf(ctx, "^1Error: Specified personality not found\n\0".as_ptr() as *const c_char);
@@ -883,7 +883,7 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>,bs: *mut bot_state_t) {
 
 /// Faithful `atoi` over a raw NUL-terminated C string.
 unsafe fn c_atoi_ptr(s: *const c_char) -> c_int {
-    let mut result = 0c_int;
+    let mut result = 0 as c_int;
     let mut negative = false;
     let mut i = 0isize;
 

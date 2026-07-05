@@ -24,6 +24,7 @@
 
 use crate::prelude::*;
 use crate::q_shared::Q_stricmp;
+use crate::q_shared::Q_strcmp;
 // `strlen` resolves to the crate's `Q_strlen` (the `g_spawn.rs` precedent for
 // aliasing the libc name); `strcpy`/`strcat` are the file-local unchecked
 // helpers below, matching the `c_strcpy` house pattern in `q_shared.rs` /
@@ -953,13 +954,13 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
             let title_length: usize = strlen(parse_buf.as_ptr());
             let mut found_class: bool = false;
             for i in 0..SPC_MAX as i16 {
-                let array_title_length: usize = strlen(classTitles[i as usize]);
+                let array_title_length: usize = strlen(classTitles[i as usize].as_ptr());
                 if array_title_length > title_length {
                     break;
                 }
 
                 let hold_buf = parse_buf.as_ptr().add(title_length - array_title_length);
-                if strcmp(hold_buf, classTitles[i as usize]) == 0 {
+                if Q_strcmp(hold_buf, classTitles[i as usize].as_ptr()) == 0 {
                     bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = i;
                     found_class = true;
                     break;
@@ -1210,10 +1211,11 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
                     break;
                 }
 
-                bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses as usize] =
-                    BG_SiegeFindClassByName(parse_buf.as_ptr(), bg);
+                let num_classes = bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses as usize;
+                let found_class = BG_SiegeFindClassByName(parse_buf.as_ptr(), bg);
+                bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[num_classes] = found_class;
 
-                if bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses as usize].is_null() {
+                if bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[num_classes].is_null() {
                     panic!("Invalid class specified: '{}'", cstr_to_str(parse_buf.as_ptr()));
                 }
 

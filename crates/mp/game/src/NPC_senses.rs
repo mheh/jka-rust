@@ -14,6 +14,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use crate::q_math::{
     _DotProduct, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleDelta,
@@ -381,8 +382,10 @@ pub fn NPC_CheckVisibility(
     if (flags & CHECK_PVS) != 0 {
         if trap::InPVS(
             ctx.engine,
-            unsafe { (*ent).r.currentOrigin },
-            unsafe { (*npc).r.currentOrigin },
+            GInPvsArgs::new(
+                unsafe { &(*ent).r.currentOrigin as *const vec3_t },
+                unsafe { &(*npc).r.currentOrigin as *const vec3_t },
+            ),
         ) == 0
         {
             return visibility_t::VIS_NOT;
@@ -650,8 +653,8 @@ pub fn G_CheckAlertEvents(
         bestSightEvent = G_CheckSightEvents(
             ctx,
             self_,
-            unsafe { (*(*self_).NPC).stats.hfov },
-            unsafe { (*(*self_).NPC).stats.vfov },
+            unsafe { (*((*self_).NPC as *mut gNPC_t)).stats.hfov },
+            unsafe { (*((*self_).NPC as *mut gNPC_t)).stats.vfov },
             maxSeeDist,
             ignoreAlert,
             mustHaveOwner,
@@ -1198,7 +1201,14 @@ pub fn G_FindLocalInterestPoint(
     CalcEntitySpot(ctx, self_, spot_t::SPOT_HEAD_LEAN, &mut eyes);
     for i in 0..world.level.numInterestPoints as usize {
         // Don't ignore portals?  If through a portal, need to look at portal!
-        if trap::InPVS(ctx.engine, world.level.interestPoints[i].origin, eyes) != 0 {
+        if trap::InPVS(
+            ctx.engine,
+            GInPvsArgs::new(
+                &world.level.interestPoints[i].origin as *const vec3_t,
+                &eyes as *const vec3_t,
+            ),
+        ) != 0
+        {
             _VectorSubtract(world.level.interestPoints[i].origin, eyes, &mut diff_vec);
             if ((diff_vec[0].abs() + diff_vec[1].abs()) / 2.0) < 48.0
                 && diff_vec[2].abs() > ((diff_vec[0].abs() + diff_vec[1].abs()) / 2.0)

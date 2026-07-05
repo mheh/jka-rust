@@ -15,6 +15,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::g_nav::NAV_FindClosestWaypointForEnt;
 use crate::q_math::vec3_origin;
 
 // Raven `qboolean` is `c_int`; keep the source spelling at assignment sites.

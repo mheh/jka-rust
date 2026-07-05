@@ -44,6 +44,7 @@ use crate::g_utils::{
 };
 use crate::g_exphysics::G_RunExPhys;
 use crate::q_shared::Info_SetValueForKey;
+use crate::q_shared::Q_strcat;
 use mp_qshared::shared::surface_flags::{CONTENTS_SOLID, CONTENTS_TERRAIN};
 use std::ffi::CString;
 use mp_bg::public::entity_event::entity_event_t;

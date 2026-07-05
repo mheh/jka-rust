@@ -593,7 +593,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
         }
 
         // can we see our target?
-        if NPC_ClearLOS4(ctx, (*npc_ptr).enemy) != QFALSE {
+        if NPC_ClearLOS4(ctx, enemy_ent) != QFALSE {
             (*npc_info_ptr).enemyLastSeenTime = world.level.time;
             world.globals.enemyLOS3 = QTRUE;
 
@@ -608,7 +608,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             } else if InFOV3((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin, (*((*npc_ptr).client as *mut gclient_t)).ps.viewangles, 45, 90) != QFALSE {
                 // in front of me
                 // can we shoot our target?
-                let hit = NPC_ShotEntity(ctx, (*npc_ptr).enemy, core::ptr::null_mut());
+                let hit = NPC_ShotEntity(ctx, enemy_ent, vec3_origin);
                 let hit_ent = &world.g_entities[hit as usize];
                 if hit == (*enemy_ent).s.number
                     || (!hit_ent.client.is_null()

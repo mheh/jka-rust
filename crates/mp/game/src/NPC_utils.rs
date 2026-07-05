@@ -1321,7 +1321,11 @@ pub fn NPC_FindEnemy(
         }
 
         //If we've gotten here alright, then our target it still valid
-        if NPC_ValidEnemy(ctx, (*npc).enemy) != QFALSE {
+        let npc_enemy = match (*npc).enemy {
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+        if NPC_ValidEnemy(ctx, npc_enemy) != QFALSE {
             return QTRUE;
         }
 
@@ -1453,11 +1457,13 @@ pub fn NPC_FaceEnemy(
             return QFALSE;
         }
 
-        if (*npc).enemy.is_none() {
-            return QFALSE;
-        }
+        let enemy_id = match (*npc).enemy {
+            Some(id) => id,
+            None => return QFALSE,
+        };
+        let enemy = &mut (*ctx.world).g_entities[enemy_id.index()] as *mut gentity_t;
 
-        NPC_FaceEntity(ctx, (*npc).enemy, doPitch)
+        NPC_FaceEntity(ctx, enemy, doPitch)
     }
 }
 
@@ -1480,7 +1486,11 @@ pub fn NPC_CheckCanAttackExt(ctx: GameContext<'_>) -> qboolean {
         }
 
         //Must have a clear line of sight to the target
-        if NPC_ClearShot(ctx, (*npc).enemy) == QFALSE {
+        let npc_enemy = match (*npc).enemy {
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+        if NPC_ClearShot(ctx, npc_enemy) == QFALSE {
             return QFALSE;
         }
 
@@ -1561,7 +1571,7 @@ pub fn NPC_CheckLookTarget(
                     NPC_ClearLookTarget(self_);
                 } else if !(*target).client.is_null()
                     && !(*self_).enemy.is_none()
-                    && target != (*self_).enemy
+                    && (*self_).enemy.map(|id| id.index()) != Some(lookTarget as usize)
                 {
                     //should always look at current enemy if engaged in
                     //battle... FIXME: this could override certain scripted
@@ -1698,7 +1708,13 @@ pub fn NPC_EnemyRangeFromBolt(
     ctx: GameContext<'_>,
     boltIndex: c_int,
 ) -> f32 {
-    unsafe { NPC_EntRangeFromBolt(ctx, (*(*ctx.world).globals.NPC).enemy, boltIndex) }
+    unsafe {
+        let enemy = match (*(*ctx.world).globals.NPC).enemy {
+            Some(id) => &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t,
+            None => core::ptr::null_mut(),
+        };
+        NPC_EntRangeFromBolt(ctx, enemy, boltIndex)
+    }
 }
 
 /// Raven `NPC_GetEntsNearBolt`.

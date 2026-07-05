@@ -12,6 +12,7 @@ use crate::prelude::*;
 // Dedupe SVF_NOCLIENT glob ambiguity (g_items::* / g_public_consts::* both
 // define it): the canonical home is g_public_consts, per house convention.
 use crate::g_public_consts::SVF_NOCLIENT;
+use crate::g_ICARUScb::G_DebugPrint;
 
 // Unported types referenced in this file (need porting before this compiles):
 // PAIN_FUNC, TOUCH_FUNC
@@ -23,6 +24,8 @@ pub const SFB_PHASER: c_int = 4;
 /// Source: `oracle/oracle/codemp/game/b_local.h:147-148`
 pub const SFB_CINEMATIC: c_int = 32;
 pub const SFB_NOTSOLID: c_int = 64;
+/// Source: `oracle/oracle/codemp/game/b_local.h:149`
+pub const SFB_STARTINSOLID: c_int = 128;
 
 // PORT-NOTE(packet-contract): this packet's manifest rows list callee
 // names (in-module callees / bg_ callees / traps / globals) but never give the
@@ -104,18 +107,18 @@ pub fn NPC_SetMiscDefaultData(
 ) {
     unsafe {
         if (*ent).spawnflags & SFB_CINEMATIC != 0 {
-            (*(*ent).NPC).behaviorState = BS_CINEMATIC;
+            (*((*ent).NPC as *mut gNPC_t)).behaviorState = BS_CINEMATIC;
         }
         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
             crate::NPC_AI_Jedi::Boba_Precache(ctx);
             (*((*ent).client as *mut gclient_t)).ps.fd.forcePowersKnown |= 1 << FP_LEVITATION;
             (*((*ent).client as *mut gclient_t)).ps.fd.forcePowerLevel[FP_LEVITATION as usize] = FORCE_LEVEL_3;
             (*((*ent).client as *mut gclient_t)).ps.fd.forcePower = 100;
-            (*(*ent).NPC).scriptFlags |= SCF_ALT_FIRE | SCF_NO_GROUPS;
+            (*((*ent).NPC as *mut gNPC_t)).scriptFlags |= SCF_ALT_FIRE | SCF_NO_GROUPS;
         }
-        if (*ent).s.NPC_class == CLASS_VEHICLE && (*ent).m_pVehicle != core::ptr::null_mut() {
+        if (*ent).s.NPC_class == CLASS_VEHICLE as c_int && (*ent).m_pVehicle != core::ptr::null_mut() {
             (*ent).s.g2radius = 255;
-            if (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).type_ == VH_WALKER {
+            if (*(*((*ent).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).r#type == VH_WALKER {
                 (*ent).mass = 2000;
                 (*ent).flags |= FL_SHIELDED | FL_NO_KNOCKBACK;
                 (*ent).pain = Some(crate::ent_fn_enums::EntPain::NPC_ATST_Pain);
@@ -148,11 +151,11 @@ pub fn NPC_SetMiscDefaultData(
         }
         let yoda = cstr("Yoda");
         if crate::q_shared::Q_stricmp(yoda.as_ptr(), (*ent).NPC_type) == 0 {
-            (*(*ent).NPC).scriptFlags |= SCF_NO_FORCE;
+            (*((*ent).NPC as *mut gNPC_t)).scriptFlags |= SCF_NO_FORCE;
         }
         let emperor = cstr("emperor");
         if crate::q_shared::Q_stricmp(emperor.as_ptr(), (*ent).NPC_type) == 0 {
-            (*(*ent).NPC).scriptFlags |= SCF_DONT_FIRE;
+            (*((*ent).NPC as *mut gNPC_t)).scriptFlags |= SCF_DONT_FIRE;
         }
         if (*((*ent).client as *mut gclient_t)).ps.weapon == WP_SABER {
             crate::w_saber::WP_SaberInitBladeData(ctx, ent);
@@ -164,9 +167,9 @@ pub fn NPC_SetMiscDefaultData(
             crate::w_force::WP_SpawnInitForcePowers(ctx, ent);
         }
         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SEEKER {
-            (*(*ent).NPC).defaultBehavior = BS_DEFAULT;
+            (*((*ent).NPC as *mut gNPC_t)).defaultBehavior = BS_DEFAULT;
             (*((*ent).client as *mut gclient_t)).ps.gravity = 0;
-            (*(*ent).NPC).aiFlags |= NPCAI_CUSTOM_GRAVITY;
+            (*((*ent).NPC as *mut gNPC_t)).aiFlags |= NPCAI_CUSTOM_GRAVITY;
             (*((*ent).client as *mut gclient_t)).ps.eFlags2 |= EF2_FLYING;
             (*ent).count = 30;
         }
@@ -175,14 +178,14 @@ pub fn NPC_SetMiscDefaultData(
                 if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_JEDI || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_LUKE {
                     (*((*ent).client as *mut gclient_t)).enemyTeam = NPCTEAM_ENEMY;
                     if (*ent).spawnflags & JSF_AMBUSH != 0 {
-                        (*(*ent).NPC).scriptFlags |= SCF_IGNORE_ALERTS;
+                        (*((*ent).NPC as *mut gNPC_t)).scriptFlags |= SCF_IGNORE_ALERTS;
                         (*((*ent).client as *mut gclient_t)).noclip = qtrue;
                     }
                 } else {
                     match (*((*ent).client as *mut gclient_t)).ps.weapon {
                         WP_THERMAL | WP_BLASTER => {
                             crate::NPC_AI_Stormtrooper::ST_ClearTimers(ctx, ent);
-                            if (*(*ent).NPC).rank >= RANK_LT || (*((*ent).client as *mut gclient_t)).ps.weapon == WP_THERMAL {
+                            if (*((*ent).NPC as *mut gNPC_t)).rank >= RANK_LT || (*((*ent).client as *mut gclient_t)).ps.weapon == WP_THERMAL {
                                 // officers/thermal alt-fire: commented out in oracle
                             }
                         }
@@ -193,7 +196,7 @@ pub fn NPC_SetMiscDefaultData(
                     || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE
                     || (*ent).spawnflags & SFB_CINEMATIC != 0
                 {
-                    (*(*ent).NPC).defaultBehavior = BS_CINEMATIC;
+                    (*((*ent).NPC as *mut gNPC_t)).defaultBehavior = BS_CINEMATIC;
                 }
             }
             NPCTEAM_NEUTRAL => {
@@ -203,7 +206,7 @@ pub fn NPC_SetMiscDefaultData(
                 }
             }
             NPCTEAM_ENEMY => {
-                (*(*ent).NPC).defaultBehavior = BS_DEFAULT;
+                (*((*ent).NPC as *mut gNPC_t)).defaultBehavior = BS_DEFAULT;
                 if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SHADOWTROOPER {
                     crate::NPC_AI_Jedi::Jedi_Cloak(ctx, ent);
                 }
@@ -214,7 +217,7 @@ pub fn NPC_SetMiscDefaultData(
                 {
                     (*((*ent).client as *mut gclient_t)).enemyTeam = NPCTEAM_PLAYER;
                     if (*ent).spawnflags & JSF_AMBUSH != 0 {
-                        (*(*ent).NPC).scriptFlags |= SCF_IGNORE_ALERTS;
+                        (*((*ent).NPC as *mut gNPC_t)).scriptFlags |= SCF_IGNORE_ALERTS;
                         (*((*ent).client as *mut gclient_t)).noclip = qtrue;
                     }
                 } else if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_PROBE
@@ -222,9 +225,9 @@ pub fn NPC_SetMiscDefaultData(
                     || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_INTERROGATOR
                     || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SENTRY
                 {
-                    (*(*ent).NPC).defaultBehavior = BS_DEFAULT;
+                    (*((*ent).NPC as *mut gNPC_t)).defaultBehavior = BS_DEFAULT;
                     (*((*ent).client as *mut gclient_t)).ps.gravity = 0;
-                    (*(*ent).NPC).aiFlags |= NPCAI_CUSTOM_GRAVITY;
+                    (*((*ent).NPC as *mut gNPC_t)).aiFlags |= NPCAI_CUSTOM_GRAVITY;
                     (*((*ent).client as *mut gclient_t)).ps.eFlags2 |= EF2_FLYING;
                 } else {
                     if (*((*ent).client as *mut gclient_t)).ps.weapon == WP_BLASTER {
@@ -241,7 +244,7 @@ pub fn NPC_SetMiscDefaultData(
 
         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SEEKER && (*ent).activator.is_some() {
             // teams already set correctly
-        } else if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE && (*ent).s.NPC_class != CLASS_VEHICLE {
+        } else if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE && (*ent).s.NPC_class != CLASS_VEHICLE as c_int {
             if (*((*ent).client as *mut gclient_t)).enemyTeam == NPCTEAM_PLAYER {
                 (*((*ent).client as *mut gclient_t)).sess.sessionTeam = SIEGETEAM_TEAM1;
             } else if (*((*ent).client as *mut gclient_t)).enemyTeam == NPCTEAM_ENEMY {
@@ -451,7 +454,7 @@ pub fn NPC_SetWeapons(
                 // subject until that global lands.
                 let ammo_index = weaponData[curWeap as usize].ammoIndex;
                 (*((*ent).client as *mut gclient_t)).ps.ammo[ammo_index as usize] = 100;
-                (*(*ent).NPC).currentAmmo = 100;
+                (*((*ent).NPC as *mut gNPC_t)).currentAmmo = 100;
 
                 if bestWeap == WP_SABER {
                     curWeap += 1;
@@ -492,7 +495,7 @@ pub fn NPC_SetFX_SpawnStates(
     ent: *mut gentity_t,
 ) {
     unsafe {
-        if (*(*ent).NPC).aiFlags & NPCAI_CUSTOM_GRAVITY == 0 {
+        if (*((*ent).NPC as *mut gNPC_t)).aiFlags & NPCAI_CUSTOM_GRAVITY == 0 {
             (*((*ent).client as *mut gclient_t)).ps.gravity = (*ctx.world).cvars.g_gravity.value as c_int;
         }
     }
@@ -574,9 +577,9 @@ pub fn NPC_Begin(
 
         crate::q_math::_VectorCopy((*((*ent).client as *mut gclient_t)).ps.origin, &mut spawn_origin);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut spawn_angles);
-        spawn_angles[YAW as usize] = (*(*ent).NPC).desiredYaw;
+        spawn_angles[YAW as usize] = (*((*ent).NPC as *mut gNPC_t)).desiredYaw;
 
-        let client = (*ent).client;
+        let client = (*ent).client as *mut gclient_t;
 
         (*client).ps.persistant[PERS_SPAWN_COUNT as usize] += 1;
         (*client).airOutTime = (*ctx.world).level.time + 12000;
@@ -585,15 +588,15 @@ pub fn NPC_Begin(
         if (*ent).health != 0 {
             (*client).pers.maxHealth = (*ent).health;
             (*client).ps.stats[STAT_MAX_HEALTH as usize] = (*ent).health;
-        } else if (*(*ent).NPC).stats.health != 0 {
+        } else if (*((*ent).NPC as *mut gNPC_t)).stats.health != 0 {
             if (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_REBORN
                 && (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_SHADOWTROOPER
                 && (*((*ent).client as *mut gclient_t)).NPC_class != CLASS_JEDI
             {
-                (*(*ent).NPC).stats.health += (*(*ent).NPC).stats.health / 4 * (*ctx.world).cvars.g_spskill.integer;
+                (*((*ent).NPC as *mut gNPC_t)).stats.health += (*((*ent).NPC as *mut gNPC_t)).stats.health / 4 * (*ctx.world).cvars.g_spskill.integer;
             }
-            (*client).pers.maxHealth = (*(*ent).NPC).stats.health;
-            (*client).ps.stats[STAT_MAX_HEALTH as usize] = (*(*ent).NPC).stats.health;
+            (*client).pers.maxHealth = (*((*ent).NPC as *mut gNPC_t)).stats.health;
+            (*client).ps.stats[STAT_MAX_HEALTH as usize] = (*((*ent).NPC as *mut gNPC_t)).stats.health;
         } else {
             (*client).pers.maxHealth = 100;
             (*client).ps.stats[STAT_MAX_HEALTH as usize] = 100;
@@ -602,9 +605,9 @@ pub fn NPC_Begin(
         let rodian = cstr("rodian");
         if crate::q_shared::Q_stricmp(rodian.as_ptr(), (*ent).NPC_type) == 0 {
             match (*ctx.world).cvars.g_spskill.integer {
-                0 => (*(*ent).NPC).stats.aim = 1,
-                1 => (*(*ent).NPC).stats.aim = (*ctx.world).bg_state.rng.Q_irand(2, 3) as f32,
-                2 => (*(*ent).NPC).stats.aim = (*ctx.world).bg_state.rng.Q_irand(3, 4) as f32,
+                0 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = 1.0,
+                1 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = (*ctx.world).bg_state.rng.Q_irand(2, 3) as f32,
+                2 => (*((*ent).NPC as *mut gNPC_t)).stats.aim = (*ctx.world).bg_state.rng.Q_irand(3, 4) as f32,
                 _ => {}
             }
         } else {
@@ -616,28 +619,28 @@ pub fn NPC_Begin(
             {
                 match (*ctx.world).cvars.g_spskill.integer {
                     0 => {
-                        (*(*ent).NPC).stats.yawSpeed = ((*(*ent).NPC).stats.yawSpeed as f64 * 0.75) as f32;
+                        (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed = ((*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed as f64 * 0.75) as f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
-                            (*(*ent).NPC).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(3, 6) as f32;
+                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(3, 6) as f32;
                         }
                     }
                     1 => {
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
-                            (*(*ent).NPC).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(2, 4) as f32;
+                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(2, 4) as f32;
                         }
                     }
                     2 => {
-                        (*(*ent).NPC).stats.yawSpeed *= 1.5f32;
+                        (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.5f32;
                         if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_IMPWORKER {
-                            (*(*ent).NPC).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(0, 2) as f32;
+                            (*((*ent).NPC as *mut gNPC_t)).stats.aim -= (*ctx.world).bg_state.rng.Q_irand(0, 2) as f32;
                         }
                     }
                     _ => {}
                 }
             } else if (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_REBORN || (*((*ent).client as *mut gclient_t)).NPC_class == CLASS_SHADOWTROOPER {
                 match (*ctx.world).cvars.g_spskill.integer {
-                    1 => (*(*ent).NPC).stats.yawSpeed *= 1.25f32,
-                    2 => (*(*ent).NPC).stats.yawSpeed *= 1.5f32,
+                    1 => (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.25f32,
+                    2 => (*((*ent).NPC as *mut gNPC_t)).stats.yawSpeed *= 1.5f32,
                     _ => {}
                 }
             }
@@ -677,7 +680,7 @@ pub fn NPC_Begin(
         if (*client).ps.weapon == WP_NONE {
             NPC_SetWeapons(ctx, ent);
         }
-        (*(*ent).NPC).currentAmmo = (*client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize];
+        (*((*ent).NPC as *mut gNPC_t)).currentAmmo = (*client).ps.ammo[weaponData[(*client).ps.weapon as usize].ammoIndex as usize];
         (*client).ps.weaponstate = WEAPON_IDLE;
         ChangeWeapon(ctx, ent, (*client).ps.weapon);
 
@@ -685,7 +688,7 @@ pub fn NPC_Begin(
 
         (*client).ps.pm_flags |= PMF_RESPAWNED;
 
-        (*ent).s.eType = ET_NPC;
+        (*ent).s.eType = ET_NPC as c_int;
 
         crate::q_math::_VectorCopy(spawn_origin, &mut (*ent).s.origin);
 
@@ -738,9 +741,9 @@ pub fn NPC_Begin(
         (*ent).pain = NPC_PainFunc(ent);
         (*ent).touch = NPC_TouchFunc(ent);
 
-        (*client).ps.ping = ((*(*ent).NPC).stats.reactions * 50.0) as c_int;
+        (*client).ps.ping = ((*((*ent).NPC as *mut gNPC_t)).stats.reactions * 50.0) as c_int;
 
-        if (*ent).s.NPC_class != CLASS_VEHICLE || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
+        if (*ent).s.NPC_class != CLASS_VEHICLE as c_int || (*ctx.world).cvars.g_gametype.integer != GT_SIEGE {
             (*client).ps.persistant[PERS_TEAM as usize] = (*client).playerTeam;
         }
 
@@ -766,7 +769,7 @@ pub fn NPC_Begin(
         if (*ent).spawnflags & SFB_STARTINSOLID == 0 {
             crate::g_utils::G_CheckInSolid(ctx, ent, qtrue);
         }
-        (*(*ent).NPC).lastClearOrigin = [0.0; 3];
+        (*((*ent).NPC as *mut gNPC_t)).lastClearOrigin = [0.0; 3];
 
         if crate::NPC_utils::G_ActivateBehavior(ctx, ent, BSET_SPAWN) != 0 {
             trap::ICARUS_MaintainTaskManager(ctx.engine, mp_abi::game::syscalls::G_ICARUS_MAINTAINTASKMANAGER::GIcarusMaintaintaskmanagerArgs::new((*ent).s.number));
@@ -786,12 +789,12 @@ pub fn NPC_Begin(
         trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
 
         if (*client).playerTeam == NPCTEAM_ENEMY {
-            if (*ent).spawnflags & SFB_CINEMATIC == 0 && (*(*ent).NPC).behaviorState != BS_CINEMATIC {
+            if (*ent).spawnflags & SFB_CINEMATIC == 0 && (*((*ent).NPC as *mut gNPC_t)).behaviorState != BS_CINEMATIC {
                 // g_entities[0].client stats bump: commented out / no-op in oracle
             }
         }
         (*ent).waypoint = WAYPOINT_NONE;
-        (*(*ent).NPC).homeWp = WAYPOINT_NONE;
+        (*((*ent).NPC as *mut gNPC_t)).homeWp = WAYPOINT_NONE;
 
         if !(*ent).m_pVehicle.is_null() {
             if (*((*ent).m_pVehicle as *mut Vehicle_t)).m_iDroidUnitTag != -1 {
@@ -834,8 +837,8 @@ pub fn NPC_Begin(
                             crate::q_math::_VectorCopy((*ent).r.currentAngles, &mut (*droid_ent).s.angles);
                             crate::g_utils::G_SetAngles(droid_ent, (*droid_ent).s.angles);
                             if !(*droid_ent).NPC.is_null() {
-                                (*(*droid_ent).NPC).desiredYaw = (*droid_ent).s.angles[YAW as usize];
-                                (*(*droid_ent).NPC).desiredPitch = (*droid_ent).s.angles[PITCH as usize];
+                                (*((*droid_ent).NPC as *mut gNPC_t)).desiredYaw = (*droid_ent).s.angles[YAW as usize];
+                                (*((*droid_ent).NPC as *mut gNPC_t)).desiredPitch = (*droid_ent).s.angles[PITCH as usize];
                             }
                             (*droid_ent).flags |= FL_UNDYING;
                         } else {
@@ -881,7 +884,7 @@ pub fn NPC_DefaultScriptFlags(
         if ent.is_null() || (*ent).NPC.is_null() {
             return;
         }
-        (*(*ent).NPC).scriptFlags = SCF_CHASE_ENEMIES | SCF_LOOK_FOR_ENEMIES;
+        (*((*ent).NPC as *mut gNPC_t)).scriptFlags = SCF_CHASE_ENEMIES | SCF_LOOK_FOR_ENEMIES;
     }
 }
 
@@ -947,18 +950,18 @@ pub fn NPC_Spawn_Do(
             return newent;
         }
 
-        crate::g_utils::G_CreateFakeClient(ctx, (*newent).s.number, &mut (*newent).client as *mut *mut gclient_t);
+        crate::g_utils::G_CreateFakeClient(ctx, (*newent).s.number, &mut (*newent).client as *mut *mut c_void as *mut *mut gclient_t);
 
-        (*(*newent).NPC).tempGoal = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), crate::g_utils::G_Spawn(ctx));
+        (*((*newent).NPC as *mut gNPC_t)).tempGoal = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), crate::g_utils::G_Spawn(ctx));
 
-        if (*(*newent).NPC).tempGoal.is_none() {
+        if (*((*newent).NPC as *mut gNPC_t)).tempGoal.is_none() {
             (*newent).NPC = core::ptr::null_mut();
             if (*ent).spawnflags & NSF_DROP_TO_FLOOR != 0 {
                 crate::g_utils::G_SetOrigin(ent, save_org);
             }
             return core::ptr::null_mut();
         }
-        let temp_goal = ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*(*newent).NPC).tempGoal);
+        let temp_goal = ent_id::resolve((*ctx.world).g_entities.as_mut_ptr(), (*((*newent).NPC as *mut gNPC_t)).tempGoal);
         (*temp_goal).classname = c"NPC_goal".as_ptr() as *mut c_char;
         (*temp_goal).parent = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), newent));
         (*temp_goal).r.svFlags |= SVF_NOCLIENT;
@@ -1006,7 +1009,7 @@ pub fn NPC_Spawn_Do(
                 return core::ptr::null_mut();
             }
 
-            match (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].type_ {
+            match (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].r#type {
                 VH_ANIMAL => {
                     crate::AnimalNPC::G_CreateAnimalNPC(ctx, (&mut (*newent).m_pVehicle as *mut *mut c_void) as *mut *mut Vehicle_t, (*ent).NPC_type as *const c_char);
                 }
@@ -1034,7 +1037,7 @@ pub fn NPC_Spawn_Do(
 
             crate::veh_dispatch::register_assets(ctx, (*newent).m_pVehicle as *mut Vehicle_t);
             (*((*newent).client as *mut gclient_t)).NPC_class = CLASS_VEHICLE;
-            if (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].type_ == VH_FIGHTER {
+            if (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].r#type == VH_FIGHTER {
                 (*newent).flags |= FL_NO_KNOCKBACK | FL_SHIELDED | FL_DMG_BY_HEAVY_WEAP_ONLY;
             }
             (*(*((*newent).m_pVehicle as *mut Vehicle_t)).m_vOrientation.add(YAW as usize)) = (*ent).s.angles[YAW as usize];
@@ -1074,7 +1077,7 @@ pub fn NPC_Spawn_Do(
             let kyle = cstr("kyle");
             let test = cstr("test");
             if crate::q_shared::Q_stricmp((*ent).NPC_type as *const c_char, kyle.as_ptr()) == 0 {
-                (*(*newent).NPC).aiFlags |= NPCAI_MATCHPLAYERWEAPON;
+                (*((*newent).NPC as *mut gNPC_t)).aiFlags |= NPCAI_MATCHPLAYERWEAPON;
             } else if crate::q_shared::Q_stricmp((*ent).NPC_type as *const c_char, test.as_ptr()) == 0 {
                 let base = (*ctx.world).g_entities.as_mut_ptr();
                 for n in 0..1 {
@@ -1086,8 +1089,8 @@ pub fn NPC_Spawn_Do(
                         break;
                     }
                 }
-                (*(*newent).NPC).defaultBehavior = BS_WAIT;
-                (*(*newent).NPC).behaviorState = BS_WAIT;
+                (*((*newent).NPC as *mut gNPC_t)).defaultBehavior = BS_WAIT;
+                (*((*newent).NPC as *mut gNPC_t)).behaviorState = BS_WAIT;
                 (*newent).classname = c"NPC".as_ptr() as *mut c_char;
             }
         }
@@ -1118,7 +1121,7 @@ pub fn NPC_Spawn_Do(
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*newent).s.angles);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*newent).r.currentAngles);
         crate::q_math::_VectorCopy((*ent).s.angles, &mut (*((*newent).client as *mut gclient_t)).ps.viewangles);
-        (*(*newent).NPC).desiredYaw = (*ent).s.angles[YAW as usize];
+        (*((*newent).NPC as *mut gNPC_t)).desiredYaw = (*ent).s.angles[YAW as usize];
 
         trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(newent));
         (*newent).spawnflags = (*ent).spawnflags;
@@ -1130,7 +1133,7 @@ pub fn NPC_Spawn_Do(
             (*newent).opentarget = (*ent).opentarget;
         }
 
-        (*newent).s.eType = ET_NPC;
+        (*newent).s.eType = ET_NPC as c_int;
 
         if !(*ent).parms.is_null() {
             for parm_num in 0..MAX_PARMS {
@@ -1152,7 +1155,7 @@ pub fn NPC_Spawn_Do(
         (*newent).s.apos.trDelta = [0.0; 3];
         (*newent).s.apos.trDuration = 0;
 
-        (*(*newent).NPC).combatPoint = -1;
+        (*((*newent).NPC as *mut gNPC_t)).combatPoint = -1;
 
         (*newent).flags |= FL_NOTARGET;
         (*newent).s.eFlags |= EF_NODRAW;
@@ -2685,7 +2688,7 @@ pub fn NPC_SpawnType(
     let mut end = [0.0f32; 3];
     let mut trace: trap::Trace = unsafe { std::mem::zeroed() };
 
-    AngleVectors(unsafe { (*ent).client.as_ref().unwrap().ps.viewangles }, Some(&mut forward), None, None);
+    AngleVectors(unsafe { (*((*ent).client as *mut gclient_t)).ps.viewangles }, Some(&mut forward), None, None);
     let _ = VectorNormalize(&mut forward);
 
     unsafe {
@@ -2713,7 +2716,7 @@ pub fn NPC_SpawnType(
 
     unsafe {
         (*npc_spawner).s.origin = (*npc_spawner).r.currentOrigin;
-        (*npc_spawner).s.angles[1] = (*ent).client.as_ref().unwrap().ps.viewangles[1];
+        (*npc_spawner).s.angles[1] = (*((*ent).client as *mut gclient_t)).ps.viewangles[1];
     }
 
     trap::LinkEntity(ctx.engine, npc_spawner);
@@ -2871,13 +2874,13 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
 
         if kill_non_sf != 0 {
             if !player.client.is_null() {
-                if unsafe { (*player.client).playerTeam } != NPCTEAM_PLAYER {
+                if unsafe { (*(player.client as *mut gclient_t)).playerTeam } != NPCTEAM_PLAYER {
                     Com_Printf(c"Killing NPC %s named %s\n".as_ptr() as *const c_char, player.NPC_type, player.targetname);
                     player.health = 0;
 
                     if !player.die.is_none() && !player.client.is_null() {
                         // PORT-NOTE(fn-ptr): die function pointer call with MOD_UNKNOWN
-                        // player.die(player, player, player, unsafe { (*player.client).pers.maxHealth }, MOD_UNKNOWN);
+                        // player.die(player, player, player, unsafe { (*(player.client as *mut gclient_t)).pers.maxHealth }, MOD_UNKNOWN);
                     }
                 }
             } else if !player.NPC_type.is_null() && !player.classname.is_null() {
@@ -2892,7 +2895,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
             }
         } else if !player.NPC.is_null() && !player.client.is_null() {
             if kill_team != TEAM_FREE {
-                if unsafe { (*player.client).playerTeam } == kill_team {
+                if unsafe { (*(player.client as *mut gclient_t)).playerTeam } == kill_team {
                     Com_Printf(c"Killing NPC %s named %s\n".as_ptr() as *const c_char, player.NPC_type, player.targetname);
                     player.health = 0;
                     if !player.die.is_none() {
@@ -2907,7 +2910,7 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 Com_Printf(c"Killing NPC %s named %s\n".as_ptr() as *const c_char, player.NPC_type, player.targetname);
                 player.health = 0;
                 unsafe {
-                    (*player.client).ps.stats[4] = 0; // STAT_HEALTH
+                    (*(player.client as *mut gclient_t)).ps.stats[4] = 0; // STAT_HEALTH
                 }
                 if !player.die.is_none() {
                     // PORT-NOTE(fn-ptr): die function pointer call

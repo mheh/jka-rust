@@ -1989,7 +1989,7 @@ fn goto_tryJetPack(ctx: GameContext<'_>, ent: *mut gentity_t) {
             let mut fwd = [0.0f32; 3];
 
             f_ang[0] = 0.0f32;
-            f_ang[1] = (*client).ps.viewangles[crate::q_shared::YAW as usize];
+            f_ang[1] = (*client).ps.viewangles[YAW as usize];
             f_ang[2] = 0.0f32;
 
             AngleVectors(f_ang, Some(&mut fwd), None, None);
@@ -2000,8 +2000,8 @@ fn goto_tryJetPack(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 GTraceArgs::new(
                     &mut tr_toss as *mut trace_t,
                     &(*client).ps.origin as *const vec3_t,
-                    &crate::q_shared::playerMins as *const vec3_t,
-                    &crate::q_shared::playerMaxs as *const vec3_t,
+                    &playerMins as *const vec3_t,
+                    &playerMaxs as *const vec3_t,
                     &fwd as *const vec3_t,
                     (*ent).s.number,
                     (*ent).clipmask,
