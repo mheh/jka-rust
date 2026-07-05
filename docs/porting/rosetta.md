@@ -136,9 +136,9 @@ if let Some(think_fn) = (*ent).think {
 ### `Option<EntityId>` stored fields — assign/compare ids, never pointers (ruling 22)
 ```rust
 // Raven: missile->parent = owner;
-(*missile).parent = Some(ent_id((*ctx.world).entities.as_mut_ptr(), owner));
+(*missile).parent = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), owner));
 // Raven: if ( client->hook == ent ) …
-if (*client_ptr).hook == Some(ent_id((*ctx.world).entities.as_mut_ptr(), ent)) { /* … */ }
+if (*client_ptr).hook == Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), ent)) { /* … */ }
 // Raven: if ( !ent->enemy ) …
 if (*ent).enemy.is_none() { /* … */ }
 // ent_id_opt(base, maybe_null_ptr) folds a nullable pointer straight to Option<EntityId>.
