@@ -526,7 +526,6 @@ pub fn NPC_Touch(
     unsafe {
         const MAX_CLIENTS: c_int = 64;
         const NPCAI_TOUCHED_GOAL: c_int = 0x00002000;
-        const BS_HUNT_AND_KILL: c_int = 1;
 
         let npc = (*self_).NPC as *mut gNPC_t;
         if npc.is_null() {
@@ -570,7 +569,7 @@ pub fn NPC_Touch(
                         // Bumped into an enemy
                         let npc_info_ptr = (*ctx.world).globals.NPCInfo;
                         if !npc_info_ptr.is_null() &&
-                           (*npc_info_ptr).behaviorState != BS_HUNT_AND_KILL &&
+                           (*npc_info_ptr).behaviorState != bState_t::BS_HUNT_AND_KILL &&
                            (*npc_info_ptr).tempBehavior == bState_t::BS_DEFAULT {
                             let npc_ptr = (*ctx.world).globals.NPC;
                             if (*npc_ptr).enemy != Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other)) {
@@ -951,7 +950,7 @@ pub fn NPC_Use(
         let npc = (*self_).NPC as *mut gNPC_t;
         if !client.is_null() && !npc.is_null() {
             // Check if this is a vehicle
-            if (*client).NPC_class == CLASS_VEHICLE {
+            if (*client).NPC_class as c_int == CLASS_VEHICLE {
                 // PORT-NOTE(vehicle-vtable): CLASS_VEHICLE entity calls C++ vehicleInfo_t vtable methods
                 // (EjectAll, Eject, Board) which are deferred per porting-rules §F (C++ track)
                 let m_vehicle = (*self_).m_pVehicle;
@@ -972,7 +971,7 @@ pub fn NPC_Use(
             }
 
             // Run any use instructions
-            if !activator.is_null() && (*activator).s.number == 0 && (*client).NPC_class == CLASS_GONK {
+            if !activator.is_null() && (*activator).s.number == 0 && (*client).NPC_class as c_int == CLASS_GONK {
                 // Must be using the gonk, so attempt to give battery power
                 // (deferred: Add_Batteries(activator, &self->client->ps.batteryCharge))
             }

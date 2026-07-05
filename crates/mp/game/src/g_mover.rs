@@ -2560,7 +2560,11 @@ pub fn funcBBrushDieGo(
         let up = [0.0f32, 0.0, 1.0];
 
         if !(*self_).target.is_null() && !attacker.is_none() {
-            G_UseTargets(ctx, self_, attacker);
+            G_UseTargets(
+                ctx,
+                self_,
+                attacker.map_or(std::ptr::null_mut(), |id| &mut (*ctx.world).g_entities[id.index()] as *mut gentity_t),
+            );
         }
 
         let org_size = [
@@ -2881,7 +2885,7 @@ pub fn SP_func_breakable(
             && (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
             && (*self_).teamnodmg == 0
         {
-            (*self_).teamnodmg = atoi_cstr((*self_).team);
+            (*self_).teamnodmg = crate::q_shared::c_atoi((*self_).team);
         }
         (*self_).team = core::ptr::null_mut();
         if (*self_).model.is_null() {

@@ -520,8 +520,9 @@ pub fn Boba_FireFlameThrower(
         );
 
         let traceEnt = ge.add(tr.entityNum as usize);
-        if tr.entityNum < ENTITYNUM_WORLD && (*traceEnt).takedamage != qfalse {
+        if (tr.entityNum as c_int) < ENTITYNUM_WORLD && (*traceEnt).takedamage != qfalse {
             crate::g_combat::G_Damage(
+                ctx,
                 traceEnt,
                 self_,
                 self_,
@@ -775,7 +776,13 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
                         enemyCS = qfalse; //not true, but should stop us from firing
                     }
                 }
-            } else if crate::trap::InPVS(ctx.engine, (*enemy).r.currentOrigin, (*npc).r.currentOrigin) != 0 {
+            } else if crate::trap::InPVS(
+                ctx.engine,
+                mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                    &(*enemy).r.currentOrigin as *const vec3_t,
+                    &(*npc).r.currentOrigin as *const vec3_t,
+                ),
+            ) != 0 {
                 (*npc_info).enemyLastSeenTime = (*world).level.time;
                 faceEnemy = qtrue;
             }
@@ -4077,7 +4084,7 @@ pub fn Jedi_FindEnemyInCone(
                 &mins as *const vec3_t,
                 &maxs as *const vec3_t,
                 entityList.as_mut_ptr(),
-                MAX_GENTITIES,
+                MAX_GENTITIES as c_int,
             ),
         );
 
@@ -4106,7 +4113,13 @@ pub fn Jedi_FindEnemyInCone(
                 continue;
             }
 
-            if crate::trap::InPVS(ctx.engine, (*check).r.currentOrigin, (*self_).r.currentOrigin) == 0
+            if crate::trap::InPVS(
+                ctx.engine,
+                mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                    &(*check).r.currentOrigin as *const vec3_t,
+                    &(*self_).r.currentOrigin as *const vec3_t,
+                ),
+            ) == 0
             {
                 e += 1;
                 continue;
@@ -6044,7 +6057,13 @@ pub fn Jedi_CheckAmbushPlayer(ctx: GameContext<'_>) -> qboolean {
                 || crate::NPC_utils::NPC_SomeoneLookingAtMe(ctx, npc) == qfalse
             {
                 //if I'm not cloaked and the player's crosshair is on me, I will wake up
-                if crate::trap::InPVS(ctx.engine, (*player).r.currentOrigin, (*npc).r.currentOrigin)
+                if crate::trap::InPVS(
+                ctx.engine,
+                mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                    &(*player).r.currentOrigin as *const vec3_t,
+                    &(*npc).r.currentOrigin as *const vec3_t,
+                ),
+            )
                     == 0
                 {
                     //must be in same room
@@ -6206,8 +6225,10 @@ pub fn Jedi_Patrol(ctx: GameContext<'_>) {
                     {
                         if crate::trap::InPVS(
                             ctx.engine,
-                            (*npc).r.currentOrigin,
-                            (*enemy).r.currentOrigin,
+                            mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                                &(*npc).r.currentOrigin as *const vec3_t,
+                                &(*enemy).r.currentOrigin as *const vec3_t,
+                            ),
                         ) != 0
                         {
                             //we could potentially see him

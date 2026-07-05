@@ -766,7 +766,7 @@ pub fn G_CheckForDanger(
 
         if should_flee {
             if unsafe { !(*self_).NPC.is_null() } {
-                if (unsafe { (*(*self_).NPC).scriptFlags } & SCF_DONT_FLEE) != 0 {
+                if (unsafe { (*((*self_).NPC as *mut gNPC_t)).scriptFlags } & SCF_DONT_FLEE) != 0 {
                     // can't flee
                     return 0;
                 } else {

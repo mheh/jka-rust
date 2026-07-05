@@ -261,7 +261,7 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
 
             // See if players should be specs or ingame preround
             if BG_SiegeGetPairedValue(
-                (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+                (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
                 b"preround_state\0".as_ptr() as *mut c_char,
                 teams.as_mut_ptr(),
             ) != 0
@@ -272,7 +272,7 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
             }
 
             if BG_SiegeGetValueGroup(
-                (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+                (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
                 b"Teams\0".as_ptr() as *mut c_char,
                 teams.as_mut_ptr(),
             ) != 0
@@ -305,7 +305,7 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
             }
 
             if BG_SiegeGetValueGroup(
-                (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+                (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
                 (*ctx.world).globals.team2.as_mut_ptr(),
                 (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
             ) != 0
@@ -337,7 +337,7 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
             }
 
             if BG_SiegeGetValueGroup(
-                (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+                (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
                 (*ctx.world).globals.team1.as_mut_ptr(),
                 (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
             ) != 0
@@ -390,7 +390,7 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
 
             // Get and set the team themes for each team.
             if BG_SiegeGetValueGroup(
-                (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+                (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
                 (*ctx.world).globals.team1.as_mut_ptr(),
                 (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
             ) != 0
@@ -409,7 +409,7 @@ pub fn InitSiegeMode(ctx: GameContext<'_>) {
                 }
             }
             if BG_SiegeGetValueGroup(
-                (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+                (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
                 (*ctx.world).globals.team2.as_mut_ptr(),
                 (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
             ) != 0
@@ -965,7 +965,7 @@ pub fn SiegeRoundComplete(
         (*ctx.world).globals.gSiegeRoundWinningTeam = winningteam;
 
         if BG_SiegeGetValueGroup(
-            (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+            (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
             teamstr.as_mut_ptr(),
             (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
         ) != 0
@@ -1213,7 +1213,7 @@ pub fn SiegeBeginRound(
         // Now check if there's something to fire off at the round start, if
         // so do it.
         if BG_SiegeGetPairedValue(
-            (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+            (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
             b"roundbegin_target\0".as_ptr() as *mut c_char,
             targname.as_mut_ptr(),
         ) != 0
@@ -1440,7 +1440,7 @@ pub fn siegeTriggerUse(
         }
 
         if BG_SiegeGetValueGroup(
-            (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+            (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
             teamstr.as_mut_ptr(),
             (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
         ) != 0
@@ -1636,7 +1636,7 @@ pub fn decompTriggerUse(
         }
 
         if BG_SiegeGetValueGroup(
-            (*ctx.world).bg_state.siege_info.as_mut_ptr(),
+            (*ctx.world).bg_state.siege_info.as_mut_ptr() as *mut c_char,
             teamstr.as_mut_ptr(),
             (*ctx.world).globals.gParseObjectives.as_mut_ptr(),
         ) != 0

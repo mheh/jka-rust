@@ -136,7 +136,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
         let mut forward: vec3_t = [0.0; 3];
         let mut vright: vec3_t = [0.0; 3];
         let mut up: vec3_t = [0.0; 3];
-        let mut boltMatrix: mdxaBone_t = [0; 12];
+        let mut boltMatrix: mdxaBone_t = core::mem::zeroed();
 
         (*NPC).flags &= !FL_SHIELDED;
 
@@ -145,7 +145,8 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
                 ctx,
                 NPC,
                 cstr("powerup").as_ptr(),
-            ) {
+            ) != 0
+            {
                 (*NPCInfo).localState = LSTATE_ATTACKING;
                 crate::npc_c::NPC_SetAnim(
                     NPC,
@@ -222,7 +223,11 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             ),
         );
 
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN, &mut muzzle);
+        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(
+            &boltMatrix,
+            Eorientations::ORIGIN as c_int,
+            &mut muzzle,
+        );
 
         crate::q_math::AngleVectors(
             (*NPC).r.currentAngles,

@@ -778,7 +778,7 @@ pub fn Rancor_CheckDropVictim(ctx: GameContext<'_>) {
                 &mut trace, &start, &mins, &maxs, &end, (*activator).s.number, (*activator).clipmask,
             ),
         );
-        if !trace.allsolid && !trace.startsolid && trace.fraction >= 1.0 {
+        if trace.allsolid == 0 && trace.startsolid == 0 && trace.fraction >= 1.0 {
             Rancor_DropVictim(ctx, npc);
         }
     }

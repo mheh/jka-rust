@@ -320,7 +320,7 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
         }
 
         // check item spawn functions
-        let mut item = bg_itemlist.add(1);
+        let mut item = (bg_itemlist.as_ptr() as *mut gitem_t).add(1);
         while !(*item).classname.is_null() {
             if Q_stricmp((*item).classname, (*ent).classname) == 0 {
                 G_SpawnItem(ctx, ent, item);
@@ -339,10 +339,10 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
             crate::ent_fn_enums::dispatch_spawn(ctx, sp, ent);
             return QTRUE;
         }
+        let classname_disp = CStr::from_ptr((*ent).classname).to_string_lossy();
         G_Printf(
             ctx,
-            c"%s doesn't have a spawn function\n".as_ptr(),
-            (*ent).classname,
+            cstr(&format!("{} doesn't have a spawn function\n", classname_disp)).as_ptr(),
         );
         QFALSE
     }
@@ -1485,7 +1485,7 @@ pub fn G_SpawnEntitiesFromString(ctx: GameContext<'_>, inSubBSP: qboolean) {
 /// filled them in).
 ///
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:1070-1236`
-pub static defaultStyles: [[*const c_char; 3]; 32] = [
+pub const defaultStyles: [[*const c_char; 3]; 32] = [
     [c"z".as_ptr(), c"z".as_ptr(), c"z".as_ptr()], // 0 normal
     [c"mmnmmommommnonmmonqnmmo".as_ptr(), c"mmnmmommommnonmmonqnmmo".as_ptr(), c"mmnmmommommnonmmonqnmmo".as_ptr()], // 1 FLICKER (first variety)
     [c"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcb".as_ptr(), c"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcb".as_ptr(), c"abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcb".as_ptr()], // 2 SLOW STRONG PULSE

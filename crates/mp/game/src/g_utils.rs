@@ -582,8 +582,10 @@ pub fn G_CreateFakeClient(
     unsafe {
         let world = &mut *ctx.world;
         if world.globals.gClPtrs.0[entNum as usize].is_null() {
-            world.globals.gClPtrs.0[entNum as usize] =
-                crate::bg_misc::BG_Alloc(core::mem::size_of::<gclient_t>() as c_int);
+            world.globals.gClPtrs.0[entNum as usize] = crate::bg_misc::BG_Alloc(
+                core::mem::size_of::<gclient_t>() as c_int,
+                &mut world.bg_state,
+            );
         }
         *cl = world.globals.gClPtrs.0[entNum as usize] as *mut gclient_t;
     }
@@ -1791,14 +1793,14 @@ pub fn TryUse(
 
         if ent.is_null() || (*ent).client.is_null()
             || ((*ent).client as *mut gclient_t != core::ptr::null_mut()
-                && ((*(*ent).client as *mut gclient_t).ps.weaponTime > 0
-                    && (*(*ent).client as *mut gclient_t).ps.torsoAnim != BOTH_BUTTON_HOLD
-                    && (*(*ent).client as *mut gclient_t).ps.torsoAnim != BOTH_CONSOLE1))
+                && ((*((*ent).client as *mut gclient_t)).ps.weaponTime > 0
+                    && (*((*ent).client as *mut gclient_t)).ps.torsoAnim != BOTH_BUTTON_HOLD
+                    && (*((*ent).client as *mut gclient_t)).ps.torsoAnim != BOTH_CONSOLE1))
             || (*ent).health < 1
-            || (((*(*ent).client as *mut gclient_t).ps.pm_flags & PMF_FOLLOW) != 0)
-            || ((*(*ent).client as *mut gclient_t).sess.sessionTeam == TEAM_SPECTATOR)
-            || (((*(*ent).client as *mut gclient_t).ps.forceHandExtend != HANDEXTEND_NONE
-                && (*(*ent).client as *mut gclient_t).ps.forceHandExtend != HANDEXTEND_DRAGGING))
+            || (((*((*ent).client as *mut gclient_t)).ps.pm_flags & PMF_FOLLOW) != 0)
+            || ((*((*ent).client as *mut gclient_t)).sess.sessionTeam == TEAM_SPECTATOR)
+            || (((*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_NONE
+                && (*((*ent).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_DRAGGING))
         {
             return;
         }

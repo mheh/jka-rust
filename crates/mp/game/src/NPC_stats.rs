@@ -1445,7 +1445,7 @@ pub fn NPC_ParseParms(
                 crate::bg_saga::FPTable.as_ptr() as *mut stringID_table_t,
                 token,
             );
-            if fp >= FP_FIRST && fp < NUM_FORCE_POWERS {
+            if fp >= FP_FIRST && fp < mp_qshared::shared::force_powers::NUM_FORCE_POWERS {
                 let mut n0: c_int = 0;
                 if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
                     crate::q_shared::SkipRestOfLine(&mut p as *mut *const c_char);

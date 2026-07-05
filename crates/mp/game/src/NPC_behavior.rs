@@ -11,6 +11,7 @@
 
 use crate::prelude::*;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+use mp_abi::game::syscalls::G_NAV_GETNODENUMEDGES::GNavGetnodenumedgesArgs;
 use mp_abi::game::syscalls::G_ICARUS_ISINITIALIZED::GIcarusIsinitializedArgs;
 use mp_abi::game::syscalls::G_ICARUS_TASKIDCOMPLETE::GIcarusTaskidcompleteArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
@@ -571,13 +572,13 @@ pub fn NPC_BSFollowLeader(ctx: GameContext<'_>) {
                         (*enemy).r.currentOrigin,
                         (*NPC).r.currentOrigin,
                         (*npc_client).ps.viewangles,
-                        (*NPCInfo).stats.hfov,
+                        (*NPCInfo).stats.hfov as f32,
                     ) > 0.6
                         && NPC_GetHFOVPercentage(
                             (*enemy).r.currentOrigin,
                             (*NPC).r.currentOrigin,
                             (*npc_client).ps.viewangles,
-                            (*NPCInfo).stats.vfov,
+                            (*NPCInfo).stats.vfov as f32,
                         ) > 0.5
                     {
                         WeaponThink(ctx, QTRUE);
@@ -892,7 +893,7 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
                     let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
                     if (*tempGoal).waypoint != WAYPOINT_NONE {
                         if world.bg_state.rng.Q_irand(0, 30) == 0 {
-                            let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, (*tempGoal).waypoint);
+                            let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, GNavGetnodenumedgesArgs::new((*tempGoal).waypoint));
                             if numEdges != WAYPOINT_NONE {
                                 let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
                                 let mut branchPos = [0.0f32; 3];
@@ -912,7 +913,7 @@ pub fn NPC_BSSearch(ctx: GameContext<'_>) {
                 if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
                     let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
                     if (*NPC).waypoint == (*NPCInfo).homeWp {
-                        let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, (*tempGoal).waypoint);
+                        let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, GNavGetnodenumedgesArgs::new((*tempGoal).waypoint));
                         if numEdges != WAYPOINT_NONE {
                             let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
                             let nextWp = trap::Nav_GetNodeEdge(ctx.engine, (*NPCInfo).homeWp, branchNum);
@@ -1054,7 +1055,7 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
                     let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
                     if (*tempGoal).waypoint != WAYPOINT_NONE {
                         if world.bg_state.rng.Q_irand(0, 30) == 0 {
-                            let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, (*tempGoal).waypoint);
+                            let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, GNavGetnodenumedgesArgs::new((*tempGoal).waypoint));
                             if numEdges != WAYPOINT_NONE {
                                 let branchNum = world.bg_state.rng.Q_irand(0, numEdges - 1);
                                 let mut branchPos = [0.0f32; 3];
@@ -1071,7 +1072,7 @@ pub fn NPC_BSWander(ctx: GameContext<'_>) {
                 (*NPC).waypoint = NAV_FindClosestWaypointForEnt(ctx, NPC, WAYPOINT_NONE);
 
                 if (*NPC).waypoint != WAYPOINT_NONE {
-                    let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, (*NPC).waypoint);
+                    let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, GNavGetnodenumedgesArgs::new((*NPC).waypoint));
                     if numEdges != WAYPOINT_NONE {
                         if let Some(tempGoal_id) = (*NPCInfo).tempGoal {
                             let tempGoal = &mut world.g_entities[tempGoal_id.index()] as *mut gentity_t;
@@ -1207,7 +1208,7 @@ pub fn NPC_BSFlee(ctx: GameContext<'_>) {
                 (*NPC).waypoint = NAV_GetNearestNode(ctx, NPC, (*NPC).lastWaypoint);
             }
             if (*NPC).waypoint != WAYPOINT_NONE {
-                let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, (*NPC).waypoint);
+                let numEdges = trap::Nav_GetNodeNumEdges(ctx.engine, GNavGetnodenumedgesArgs::new((*NPC).waypoint));
 
                 if numEdges != WAYPOINT_NONE {
                     let mut dangerDir = [0.0f32; 3];

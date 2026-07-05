@@ -1343,7 +1343,10 @@ pub fn TeamplayInfoMessage(
         let ent_idx = ((ent as usize) - ((*ctx.world).g_entities.as_ptr() as usize)) / core::mem::size_of::<gentity_t>();
         let cmd = format!("tinfo {} {}", cnt,
             String::from_iter(string[0..stringlength].iter().map(|&c| c as u8 as char)));
-        trap::SendServerCommand(ctx.engine, ent_idx as c_int, cstr(&cmd).as_ptr());
+        trap::SendServerCommand(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_idx as c_int, cstr(&cmd)),
+        );
     }
 }
 

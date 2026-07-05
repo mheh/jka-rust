@@ -450,8 +450,9 @@ pub fn BotDoChat(
         } else {
             bs_ref.doChat = 1;
         }
-        bs_ref.chatTime_stored = ((line_len as c_int) * 45) + (*ctx.world).bg_state.rng.Q_irand(1300, 1500);
-        bs_ref.chatTime = world.level.time + (bs_ref.chatTime_stored as f32);
+        bs_ref.chatTime_stored = (((line_len as c_int) * 45)
+            + (*ctx.world).bg_state.rng.Q_irand(1300, 1500)) as f32;
+        bs_ref.chatTime = (world.level.time as f32) + bs_ref.chatTime_stored;
 
         B_TempFree(ctx, crate::game_globals::MAX_CHAT_BUFFER_SIZE as c_int);
 
@@ -703,28 +704,28 @@ pub fn BotUtilizePersonality(ctx: GameContext<'_>,bs: *mut bot_state_t) {
 
         // Parse accuracy (default: 10.0)
         if failed == 0 && GetPairedValue(group, "accuracy\0".as_ptr() as *mut c_char, readbuf) != 0 {
-            bs_ref.skills.accuracy = atof(readbuf);
+            bs_ref.skills.accuracy = atof(readbuf) as f32;
         } else {
             bs_ref.skills.accuracy = 10.0;
         }
 
         // Parse turnspeed (default: 0.01)
         if failed == 0 && GetPairedValue(group, "turnspeed\0".as_ptr() as *mut c_char, readbuf) != 0 {
-            bs_ref.skills.turnspeed = atof(readbuf);
+            bs_ref.skills.turnspeed = atof(readbuf) as f32;
         } else {
             bs_ref.skills.turnspeed = 0.01;
         }
 
         // Parse turnspeed_combat (default: 0.05)
         if failed == 0 && GetPairedValue(group, "turnspeed_combat\0".as_ptr() as *mut c_char, readbuf) != 0 {
-            bs_ref.skills.turnspeed_combat = atof(readbuf);
+            bs_ref.skills.turnspeed_combat = atof(readbuf) as f32;
         } else {
             bs_ref.skills.turnspeed_combat = 0.05;
         }
 
         // Parse maxturn (default: 360.0)
         if failed == 0 && GetPairedValue(group, "maxturn\0".as_ptr() as *mut c_char, readbuf) != 0 {
-            bs_ref.skills.maxturn = atof(readbuf);
+            bs_ref.skills.maxturn = atof(readbuf) as f32;
         } else {
             bs_ref.skills.maxturn = 360.0;
         }

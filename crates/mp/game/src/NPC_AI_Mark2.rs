@@ -217,7 +217,7 @@ pub fn NPC_Mark2_Pain(
             [0.0; 3],
             (*self_).health,
             crate::level::damage_flags::DAMAGE_NO_PROTECTION,
-            MOD_UNKNOWN,
+            MOD_UNKNOWN as c_int,
         );
     }
   }

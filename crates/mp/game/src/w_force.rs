@@ -2733,13 +2733,13 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                         //somehow confuse them?  Set don't fire to true for a while?  Drop their aggression?  Maybe just take their enemy away and don't let them pick one up for a while unless shot?
                         (*npc).confusionTime = (*ctx.world).level.time
                             + mindTrickTime[(*cl).ps.fd.forcePowerLevel[FP_TELEPATHY as usize] as usize]; //confused for about 10 seconds
-                        NPC_PlayConfusionSound(ctx, traceEnt);
+                        crate::NPC_sounds::NPC_PlayConfusionSound(ctx, traceEnt);
                         if (*traceEnt).enemy.is_some() {
                             G_ClearEnemy(ctx, traceEnt);
                         }
                     }
                 } else {
-                    NPC_Jedi_PlayConfusionSound(ctx, traceEnt);
+                    crate::NPC_AI_Jedi::NPC_Jedi_PlayConfusionSound(ctx, traceEnt);
                 }
                 WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, over_ride);
             } else if (*tcl).playerTeam == (*cl).playerTeam {
@@ -2749,7 +2749,7 @@ pub fn ForceTelepathyCheckDirectNPCTarget(
                     && !(*traceEnt).NPC.is_null()
                     && (*npc).scriptFlags & SCF_NO_RESPONSE == 0
                 {
-                    NPC_UseResponse(ctx, traceEnt, self_, qfalse);
+                    crate::NPC_reactions::NPC_UseResponse(ctx, traceEnt, self_, qfalse);
                     WP_ForcePowerStart(ctx, self_, FP_TELEPATHY, 1);
                 }
             } //NOTE: no effect on TEAM_NEUTRAL?

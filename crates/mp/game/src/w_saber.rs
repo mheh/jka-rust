@@ -38,6 +38,7 @@ use mp_qshared::shared::CHAN_WEAPON;
 // (`DAMAGE_NO_KNOCKBACK`, `FL_NO_KNOCKBACK`). Per porting-rules the port
 // preserves the Raven spelling; their exact enum-qualification / module path is
 // resolved at integration (the mega-pass tree is not compiled per porter).
+use crate::client::render_info::renderInfo_t;
 use crate::g_object::G_RunObject;
 use crate::g_utils::{G_FreeEntity, G_InitGentity, G_Spawn};
 use crate::bg_pmove::{BG_InKnockDown, BG_KnockDownable};
@@ -459,9 +460,9 @@ pub fn SaberUpdateSelf(
             || (*oc).sess.sessionTeam == TEAM_SPECTATOR
             || (*oc).tempSpectate >= level_time
             || (*owner).health < 1
-            || BG_SabersOff(&(*oc).ps) != 0
+            || BG_SabersOff(&mut (*oc).ps as *mut playerState_t) != 0
             || ((*oc).ps.fd.forcePowerLevel[FP_SABER_OFFENSE as usize] == 0
-                && (*owner).s.eType != ET_NPC)
+                && (*owner).s.eType != ET_NPC as c_int)
         {
             // owner is not using saber, spectating, dead, saber holstered, or has no attack level
             (*ent).r.contents = 0;
@@ -1409,7 +1410,7 @@ pub fn WP_SabersCheckLock2(
         let ss_tavion = saber_styles_t::SS_TAVION as c_int;
 
         // MATCH ANIMS
-        if lockMode == LOCK_RANDOM {
+        if lockMode == LOCK_RANDOM as c_int {
             lockMode = (*ctx.world)
                 .bg_state
                 .rng
@@ -1421,43 +1422,43 @@ pub fn WP_SabersCheckLock2(
             && (*dc).ps.fd.saberAnimLevel <= ss_tavion
         {
             // 2 single sabers?  Just do it the old way...
-            if lockMode == LOCK_TOP {
+            if lockMode == LOCK_TOP as c_int {
                 attAnim = BOTH_BF2LOCK as c_int;
                 defAnim = BOTH_BF1LOCK as c_int;
                 attStart = 0.5f32;
                 defStart = 0.5f32;
                 idealDist = LOCK_IDEAL_DIST_TOP;
-            } else if lockMode == LOCK_DIAG_TR {
+            } else if lockMode == LOCK_DIAG_TR as c_int {
                 attAnim = BOTH_CCWCIRCLELOCK as c_int;
                 defAnim = BOTH_CWCIRCLELOCK as c_int;
                 attStart = 0.5f32;
                 defStart = 0.5f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_DIAG_TL {
+            } else if lockMode == LOCK_DIAG_TL as c_int {
                 attAnim = BOTH_CWCIRCLELOCK as c_int;
                 defAnim = BOTH_CCWCIRCLELOCK as c_int;
                 attStart = 0.5f32;
                 defStart = 0.5f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_DIAG_BR {
+            } else if lockMode == LOCK_DIAG_BR as c_int {
                 attAnim = BOTH_CWCIRCLELOCK as c_int;
                 defAnim = BOTH_CCWCIRCLELOCK as c_int;
                 attStart = 0.85f32;
                 defStart = 0.85f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_DIAG_BL {
+            } else if lockMode == LOCK_DIAG_BL as c_int {
                 attAnim = BOTH_CCWCIRCLELOCK as c_int;
                 defAnim = BOTH_CWCIRCLELOCK as c_int;
                 attStart = 0.85f32;
                 defStart = 0.85f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_R {
+            } else if lockMode == LOCK_R as c_int {
                 attAnim = BOTH_CCWCIRCLELOCK as c_int;
                 defAnim = BOTH_CWCIRCLELOCK as c_int;
                 attStart = 0.75f32;
                 defStart = 0.75f32;
                 idealDist = LOCK_IDEAL_DIST_CIRCLE;
-            } else if lockMode == LOCK_L {
+            } else if lockMode == LOCK_L as c_int {
                 attAnim = BOTH_CWCIRCLELOCK as c_int;
                 defAnim = BOTH_CCWCIRCLELOCK as c_int;
                 attStart = 0.75f32;
@@ -1469,7 +1470,7 @@ pub fn WP_SabersCheckLock2(
         } else {
             // use the new system — all new saberlocks are 46.08 apart
             idealDist = LOCK_IDEAL_DIST_JKA;
-            if lockMode == LOCK_TOP {
+            if lockMode == LOCK_TOP as c_int {
                 // top lock
                 attAnim = G_SaberLockAnim(
                     (*ac).ps.fd.saberAnimLevel,
@@ -1489,7 +1490,7 @@ pub fn WP_SabersCheckLock2(
                 defStart = 0.5f32;
             } else {
                 // side lock
-                if lockMode == LOCK_DIAG_TR {
+                if lockMode == LOCK_DIAG_TR as c_int {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1506,7 +1507,7 @@ pub fn WP_SabersCheckLock2(
                     );
                     attStart = 0.5f32;
                     defStart = 0.5f32;
-                } else if lockMode == LOCK_DIAG_TL {
+                } else if lockMode == LOCK_DIAG_TL as c_int {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1523,7 +1524,7 @@ pub fn WP_SabersCheckLock2(
                     );
                     attStart = 0.5f32;
                     defStart = 0.5f32;
-                } else if lockMode == LOCK_DIAG_BR {
+                } else if lockMode == LOCK_DIAG_BR as c_int {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1548,7 +1549,7 @@ pub fn WP_SabersCheckLock2(
                     } else {
                         defStart = 0.15f32;
                     }
-                } else if lockMode == LOCK_DIAG_BL {
+                } else if lockMode == LOCK_DIAG_BL as c_int {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1573,7 +1574,7 @@ pub fn WP_SabersCheckLock2(
                     } else {
                         defStart = 0.15f32;
                     }
-                } else if lockMode == LOCK_R {
+                } else if lockMode == LOCK_R as c_int {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1598,7 +1599,7 @@ pub fn WP_SabersCheckLock2(
                     } else {
                         defStart = 0.25f32;
                     }
-                } else if lockMode == LOCK_L {
+                } else if lockMode == LOCK_L as c_int {
                     attAnim = G_SaberLockAnim(
                         (*ac).ps.fd.saberAnimLevel,
                         (*dc).ps.fd.saberAnimLevel,
@@ -1748,7 +1749,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         let mut ent2BlockingPlayer: qboolean = qfalse;
 
         if (*ctx.world).cvars.g_debugSaberLocks.integer != 0 {
-            WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_RANDOM);
+            WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_RANDOM as c_int);
             return qtrue;
         }
         // for now.. it's not fair to the lone duelist (no dual saber lock anims).
@@ -1873,7 +1874,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
             || ta1 == BOTH_A7_T__B_ as c_int
         {
             // ent1 is attacking top-down
-            return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_TOP);
+            return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_TOP as c_int);
         }
 
         if ta2 == BOTH_A1_T__B_ as c_int
@@ -1885,7 +1886,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
             || ta2 == BOTH_A7_T__B_ as c_int
         {
             // ent2 is attacking top-down
-            return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_TOP);
+            return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_TOP as c_int);
         }
 
         if (*ent1).s.number == 0
@@ -1912,7 +1913,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         {
             // ent1 is attacking diagonally
             if ent2BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TR);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TR as c_int);
             }
             if ta2 == BOTH_A1_TR_BL as c_int
                 || ta2 == BOTH_A2_TR_BL as c_int
@@ -1923,7 +1924,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta2 == BOTH_A7_TR_BL as c_int
                 || ta2 == BOTH_P1_S1_TL as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TR);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TR as c_int);
             }
             if ta2 == BOTH_A1_BR_TL as c_int
                 || ta2 == BOTH_A2_BR_TL as c_int
@@ -1934,7 +1935,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta2 == BOTH_A7_BR_TL as c_int
                 || ta2 == BOTH_P1_S1_BL as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_BL);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_BL as c_int);
             }
             return qfalse;
         }
@@ -1949,7 +1950,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         {
             // ent2 is attacking diagonally
             if ent1BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TR);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TR as c_int);
             }
             if ta1 == BOTH_A1_TR_BL as c_int
                 || ta1 == BOTH_A2_TR_BL as c_int
@@ -1960,7 +1961,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta1 == BOTH_A7_TR_BL as c_int
                 || ta1 == BOTH_P1_S1_TL as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TR);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TR as c_int);
             }
             if ta1 == BOTH_A1_BR_TL as c_int
                 || ta1 == BOTH_A2_BR_TL as c_int
@@ -1971,7 +1972,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta1 == BOTH_A7_BR_TL as c_int
                 || ta1 == BOTH_P1_S1_BL as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_BL);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_BL as c_int);
             }
             return qfalse;
         }
@@ -1987,7 +1988,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         {
             // ent1 is attacking diagonally
             if ent2BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TL);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TL as c_int);
             }
             if ta2 == BOTH_A1_TL_BR as c_int
                 || ta2 == BOTH_A2_TL_BR as c_int
@@ -1998,7 +1999,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta2 == BOTH_A7_TL_BR as c_int
                 || ta2 == BOTH_P1_S1_TR as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TL);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_TL as c_int);
             }
             if ta2 == BOTH_A1_BL_TR as c_int
                 || ta2 == BOTH_A2_BL_TR as c_int
@@ -2009,7 +2010,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta2 == BOTH_A7_BL_TR as c_int
                 || ta2 == BOTH_P1_S1_BR as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_BR);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_DIAG_BR as c_int);
             }
             return qfalse;
         }
@@ -2024,7 +2025,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         {
             // ent2 is attacking diagonally
             if ent1BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TL);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TL as c_int);
             }
             if ta1 == BOTH_A1_TL_BR as c_int
                 || ta1 == BOTH_A2_TL_BR as c_int
@@ -2035,7 +2036,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta1 == BOTH_A7_TL_BR as c_int
                 || ta1 == BOTH_P1_S1_TR as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TL);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_TL as c_int);
             }
             if ta1 == BOTH_A1_BL_TR as c_int
                 || ta1 == BOTH_A2_BL_TR as c_int
@@ -2046,7 +2047,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta1 == BOTH_A7_BL_TR as c_int
                 || ta1 == BOTH_P1_S1_BR as c_int
             {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_BR);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_DIAG_BR as c_int);
             }
             return qfalse;
         }
@@ -2061,7 +2062,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         {
             // ent1 is attacking l to r
             if ent2BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_L);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_L as c_int);
             }
             if ta2 == BOTH_A1_TL_BR as c_int
                 || ta2 == BOTH_A2_TL_BR as c_int
@@ -2074,7 +2075,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta2 == BOTH_P1_S1_BL as c_int
             {
                 // ent2 is attacking or blocking on the r
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_L);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_L as c_int);
             }
             return qfalse;
         }
@@ -2088,7 +2089,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         {
             // ent2 is attacking l to r
             if ent1BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_L);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_L as c_int);
             }
             if ta1 == BOTH_A1_TL_BR as c_int
                 || ta1 == BOTH_A2_TL_BR as c_int
@@ -2101,7 +2102,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta1 == BOTH_P1_S1_BL as c_int
             {
                 // ent1 is attacking or blocking on the r
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_L);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_L as c_int);
             }
             return qfalse;
         }
@@ -2116,7 +2117,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         {
             // ent1 is attacking r to l
             if ent2BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_R);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_R as c_int);
             }
             if ta2 == BOTH_A1_TR_BL as c_int
                 || ta2 == BOTH_A2_TR_BL as c_int
@@ -2129,7 +2130,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta2 == BOTH_P1_S1_BR as c_int
             {
                 // ent2 is attacking or blocking on the l
-                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_R);
+                return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_R as c_int);
             }
             return qfalse;
         }
@@ -2143,7 +2144,7 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
         {
             // ent2 is attacking r to l
             if ent1BlockingPlayer != 0 {
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_R);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_R as c_int);
             }
             if ta1 == BOTH_A1_TR_BL as c_int
                 || ta1 == BOTH_A2_TR_BL as c_int
@@ -2156,12 +2157,12 @@ pub fn WP_SabersCheckLock(ctx: GameContext<'_>, ent1: *mut gentity_t, ent2: *mut
                 || ta1 == BOTH_P1_S1_BR as c_int
             {
                 // ent1 is attacking or blocking on the l
-                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_R);
+                return WP_SabersCheckLock2(ctx, ent2, ent1, LOCK_R as c_int);
             }
             return qfalse;
         }
         if (*ctx.world).bg_state.rng.Q_irand(0, 10) == 0 {
-            return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_RANDOM);
+            return WP_SabersCheckLock2(ctx, ent1, ent2, LOCK_RANDOM as c_int);
         }
         qfalse
     }
@@ -2275,19 +2276,19 @@ pub fn WP_GetSaberDeflectionAngle(
                     let s = format!(
                         "attack {} vs. parry {} bounced to {}\n",
                         cstr_to_str(
-                            (*ctx.world).bg_state.animTable[(*ctx.world).bg_state.saberMoveData
+                            animTable[(*ctx.world).bg_state.saberMoveData
                                 [attMove as usize]
                                 .animToUse as usize]
                                 .name
                         ),
                         cstr_to_str(
-                            (*ctx.world).bg_state.animTable[(*ctx.world).bg_state.saberMoveData
+                            animTable[(*ctx.world).bg_state.saberMoveData
                                 [(*dc).ps.saberMove as usize]
                                 .animToUse as usize]
                                 .name
                         ),
                         cstr_to_str(
-                            (*ctx.world).bg_state.animTable[(*ctx.world).bg_state.saberMoveData
+                            animTable[(*ctx.world).bg_state.saberMoveData
                                 [(*ac).ps.saberMove as usize]
                                 .animToUse as usize]
                                 .name
@@ -2335,19 +2336,19 @@ pub fn WP_GetSaberDeflectionAngle(
                         let s = format!(
                             "attack {} vs. parry {} bounced to {}\n",
                             cstr_to_str(
-                                (*ctx.world).bg_state.animTable[(*ctx.world).bg_state.saberMoveData
+                                animTable[(*ctx.world).bg_state.saberMoveData
                                     [attMove as usize]
                                     .animToUse as usize]
                                     .name
                             ),
                             cstr_to_str(
-                                (*ctx.world).bg_state.animTable[(*ctx.world).bg_state.saberMoveData
+                                animTable[(*ctx.world).bg_state.saberMoveData
                                     [(*dc).ps.saberMove as usize]
                                     .animToUse as usize]
                                     .name
                             ),
                             cstr_to_str(
-                                (*ctx.world).bg_state.animTable[(*ctx.world).bg_state.saberMoveData
+                                animTable[(*ctx.world).bg_state.saberMoveData
                                     [(*ac).ps.saberMove as usize]
                                     .animToUse as usize]
                                     .name
@@ -2365,19 +2366,19 @@ pub fn WP_GetSaberDeflectionAngle(
                         let s = format!(
                             "attack {} vs. parry {} deflected to {}\n",
                             cstr_to_str(
-                                (*ctx.world).bg_state.animTable[(*ctx.world).bg_state.saberMoveData
+                                animTable[(*ctx.world).bg_state.saberMoveData
                                     [attMove as usize]
                                     .animToUse as usize]
                                     .name
                             ),
                             cstr_to_str(
-                                (*ctx.world).bg_state.animTable[(*ctx.world).bg_state.saberMoveData
+                                animTable[(*ctx.world).bg_state.saberMoveData
                                     [(*dc).ps.saberMove as usize]
                                     .animToUse as usize]
                                     .name
                             ),
                             cstr_to_str(
-                                (*ctx.world).bg_state.animTable[(*ctx.world).bg_state.saberMoveData
+                                animTable[(*ctx.world).bg_state.saberMoveData
                                     [(*ac).ps.saberMove as usize]
                                     .animToUse as usize]
                                     .name
@@ -3960,7 +3961,7 @@ pub fn WP_SaberApplyDamage(
                 (*ctx.world).globals.dmgSpot[iu],
                 (*ctx.world).globals.totalDmg[iu],
                 dflags,
-                MOD_SABER,
+                MOD_SABER as c_int,
             );
             i += 1;
         }
@@ -4020,7 +4021,7 @@ pub fn WP_SaberDoHit(
                 }
             }
 
-            let te = G_TempEntity(ctx, (*ctx.world).globals.dmgSpot[iu], EV_SABER_HIT);
+            let te = G_TempEntity(ctx, (*ctx.world).globals.dmgSpot[iu], EV_SABER_HIT as c_int);
             if !te.is_null() {
                 (*te).s.otherEntityNum = (*ctx.world).globals.victimEntityNum[iu];
                 (*te).s.otherEntityNum2 = (*self_).s.number;
@@ -4063,7 +4064,7 @@ pub fn WP_SaberDoHit(
                         // don't do clash flare
                     } else {
                         if (*ctx.world).globals.totalDmg[iu] > SABER_NONATTACK_DAMAGE {
-                            let teS = G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE);
+                            let teS = G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
                             (*teS).s.origin = (*te).s.origin;
                         }
                         (*te).s.eventParm = 0;
@@ -4213,7 +4214,7 @@ pub fn WP_SaberDoClash(
 ) {
     unsafe {
         if (*ctx.world).globals.saberDoClashEffect != 0 {
-            let te = G_TempEntity(ctx, (*ctx.world).globals.saberClashPos, EV_SABER_BLOCK);
+            let te = G_TempEntity(ctx, (*ctx.world).globals.saberClashPos, EV_SABER_BLOCK as c_int);
             (*te).s.origin = (*ctx.world).globals.saberClashPos;
             (*te).s.angles = (*ctx.world).globals.saberClashNorm;
             (*te).s.eventParm = (*ctx.world).globals.saberClashEventParm;
@@ -4440,9 +4441,9 @@ pub fn CheckSaberDamage(
 
                 _VectorCopy(saberEnd, &mut lastValidStart);
                 _VectorCopy(saberStart, &mut lastValidEnd);
-                if tr.entityNum < MAX_CLIENTS as c_int {
+                if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                     G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
-                } else if tr.entityNum < ENTITYNUM_WORLD {
+                } else if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
                     let trHit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                     if (*trHit).inuse != 0 && !(*trHit).ghoul2.is_null() {
@@ -4453,7 +4454,7 @@ pub fn CheckSaberDamage(
 
                 trDif += 1.0;
 
-                while tr.fraction == 1.0 && traceTests < 4 && tr.entityNum >= ENTITYNUM_NONE {
+                while tr.fraction == 1.0 && traceTests < 4 && (tr.entityNum as c_int) >= ENTITYNUM_NONE {
                     if ((*ctx.world).level.time
                         - (*sc).saber[rSaberNum as usize].blade[rBladeNum as usize].trail.lastTime)
                         > 100
@@ -4502,9 +4503,9 @@ pub fn CheckSaberDamage(
 
                     _VectorCopy(saberEnd, &mut lastValidStart);
                     _VectorCopy(saberStart, &mut lastValidEnd);
-                    if tr.entityNum < MAX_CLIENTS as c_int {
+                    if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                         G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
-                    } else if tr.entityNum < ENTITYNUM_WORLD {
+                    } else if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
                         let trHit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                         if (*trHit).inuse != 0 && !(*trHit).ghoul2.is_null() {
@@ -4542,9 +4543,9 @@ pub fn CheckSaberDamage(
 
                 _VectorCopy(saberStart, &mut lastValidStart);
                 _VectorCopy(saberEndExtrapolated, &mut lastValidEnd);
-                if tr.entityNum < MAX_CLIENTS as c_int {
+                if (tr.entityNum as c_int) < MAX_CLIENTS as c_int {
                     G_G2TraceCollide(ctx, &mut tr, lastValidStart, lastValidEnd, saberTrMins, saberTrMaxs);
-                } else if tr.entityNum < ENTITYNUM_WORLD {
+                } else if (tr.entityNum as c_int) < ENTITYNUM_WORLD {
                     let trHit = &mut (*ctx.world).g_entities[tr.entityNum as usize] as *mut gentity_t;
 
                     if (*trHit).inuse != 0 && !(*trHit).ghoul2.is_null() {
@@ -4795,7 +4796,7 @@ pub fn CheckSaberDamage(
         }
 
         if dmg == 0 {
-            if tr.entityNum < MAX_CLIENTS as c_int
+            if (tr.entityNum as c_int) < MAX_CLIENTS as c_int
                 || ((*ctx.world).g_entities[tr.entityNum as usize].inuse != 0
                     && ((*ctx.world).g_entities[tr.entityNum as usize].r.contents
                         & CONTENTS_LIGHTSABER)
@@ -4854,7 +4855,7 @@ pub fn CheckSaberDamage(
         }
 
         if (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
-            && (*sc).sess.duelTeam == DUELTEAM_LONE
+            && (*sc).sess.duelTeam == DUELTEAM_LONE as c_int
         {
             //always x2 when we're powerdueling alone... er, so, we apparently no longer want this?  So they say.
             if (*ctx.world).cvars.g_duel_fraglimit.integer != 0 {
@@ -4871,7 +4872,7 @@ pub fn CheckSaberDamage(
         _VectorSubtract(saberEnd, saberStart, &mut dir);
         VectorNormalize(&mut dir);
 
-        if tr.entityNum == ENTITYNUM_WORLD
+        if tr.entityNum as c_int == ENTITYNUM_WORLD
             || (*ctx.world).g_entities[tr.entityNum as usize].s.eType == ET_TERRAIN as c_int
         {
             //register this as a wall hit for jedi AI
@@ -4907,7 +4908,7 @@ pub fn CheckSaberDamage(
                 //do bounce sound & force feedback
                 WP_SaberBounceSound(ctx, self_, rSaberNum, rBladeNum);
                 //do hit effect
-                te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT);
+                te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
                 (*te).s.otherEntityNum = ENTITYNUM_NONE; //we didn't hit anyone in particular
                 (*te).s.otherEntityNum2 = (*self_).s.number; //send this so it knows who we are
                 (*te).s.weapon = rSaberNum;
@@ -4954,7 +4955,7 @@ pub fn CheckSaberDamage(
             && (*ctx.world).g_entities[tr.entityNum as usize].takedamage != 0
             && ((*ctx.world).g_entities[tr.entityNum as usize].health > 0
                 || ((*ctx.world).g_entities[tr.entityNum as usize].s.eFlags & EF_DISINTEGRATION) == 0)
-            && tr.entityNum != (*self_).s.number
+            && tr.entityNum as c_int != (*self_).s.number
             && (*ctx.world).g_entities[tr.entityNum as usize].inuse != 0
         {
             //hit something that had health and takes damage
@@ -4999,7 +5000,7 @@ pub fn CheckSaberDamage(
             if (*ctx.world).cvars.d_saberSPStyleDamage.integer == 0
                 && !(*trEnt).client.is_null()
                 && unblockable == 0
-                && WP_SaberCanBlock(ctx, trEnt, tr.endpos, 0, MOD_SABER, qfalse, attackStr) != 0
+                && WP_SaberCanBlock(ctx, trEnt, tr.endpos, 0, MOD_SABER as c_int, qfalse, attackStr) != 0
             {
                 //hit a client who blocked the attack (fake: didn't actually hit their saber)
                 if dmg <= SABER_NONATTACK_DAMAGE {
@@ -5128,7 +5129,7 @@ pub fn CheckSaberDamage(
 
                 WP_SaberDamageAdd(
                     ctx,
-                    tr.entityNum,
+                    tr.entityNum as c_int,
                     dir,
                     tr.endpos,
                     dmg,
@@ -5217,7 +5218,7 @@ pub fn CheckSaberDamage(
             }
 
             if (*ctx.world).cvars.g_debugSaberLocks.integer != 0 {
-                WP_SabersCheckLock2(ctx, self_, otherOwner, LOCK_RANDOM);
+                WP_SabersCheckLock2(ctx, self_, otherOwner, LOCK_RANDOM as c_int);
                 return qtrue;
             }
             didHit = qtrue;
@@ -6158,7 +6159,7 @@ pub fn WP_SaberStartMissileBlockCheck(
                         ),
                     );
 
-                    if tr.fraction == 1.0f32 || tr.entityNum == (*ent).s.number {
+                    if tr.fraction == 1.0f32 || tr.entityNum as c_int == (*ent).s.number {
                         //we have a clear line of sight to him, so it's all good.
                         lookT = ent;
                         lookTDist = vecLen;
@@ -6293,8 +6294,8 @@ pub fn WP_SaberStartMissileBlockCheck(
                 if trace.allsolid != 0
                     || trace.startsolid != 0
                     || (trace.fraction < 1.0f32
-                        && trace.entityNum != (*self_).s.number
-                        && trace.entityNum != (*sc).ps.saberEntityNum)
+                        && trace.entityNum as c_int != (*self_).s.number
+                        && trace.entityNum as c_int != (*sc).ps.saberEntityNum)
                 {
                     //okay, try one more check
                     VectorNormalize2((*ent).s.pos.trDelta, &mut entDir);
@@ -6314,8 +6315,8 @@ pub fn WP_SaberStartMissileBlockCheck(
                     if trace.allsolid != 0
                         || trace.startsolid != 0
                         || (trace.fraction < 1.0f32
-                            && trace.entityNum != (*self_).s.number
-                            && trace.entityNum != (*sc).ps.saberEntityNum)
+                            && trace.entityNum as c_int != (*self_).s.number
+                            && trace.entityNum as c_int != (*sc).ps.saberEntityNum)
                     {
                         //can't hit me, ignore it
                         continue;
@@ -6374,7 +6375,7 @@ pub fn WP_SaberStartMissileBlockCheck(
                 }
                 if (*sc).NPC_class == CLASS_BOBAFETT
                     && (*sc).ps.eFlags2 & EF2_FLYING != 0
-                    && (*incoming).methodOfDeath != MOD_ROCKET_HOMING
+                    && (*incoming).methodOfDeath != MOD_ROCKET_HOMING as c_int
                 {
                     //a hovering Boba Fett, not a tracking rocket
                     if (*ctx.world).bg_state.rng.Q_irand(0, 1) == 0 {
@@ -6506,14 +6507,14 @@ pub fn CheckThrownSaberDamaged(
                     ),
                 );
 
-                if tr.fraction == 1.0 || tr.entityNum == (*ent).s.number {
+                if tr.fraction == 1.0 || tr.entityNum as c_int == (*ent).s.number {
                     if (*soc).ps.isJediMaster == 0
-                        && WP_SaberCanBlock(ctx, ent, tr.endpos, 0, MOD_SABER, qfalse, 999) != 0
+                        && WP_SaberCanBlock(ctx, ent, tr.endpos, 0, MOD_SABER as c_int, qfalse, 999) != 0
                     {
                         // they blocked it
                         WP_SaberBlockNonRandom(ent, tr.endpos, qfalse);
 
-                        te = G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK);
+                        te = G_TempEntity(ctx, tr.endpos, EV_SABER_BLOCK as c_int);
                         (*te).s.origin = tr.endpos;
                         (*te).s.angles = tr.plane.normal;
                         if (*te).s.angles[0] == 0.0
@@ -6579,7 +6580,7 @@ pub fn CheckThrownSaberDamaged(
                                 tr.endpos,
                                 (*saberent).damage * 2,
                                 dflags,
-                                MOD_SABER,
+                                MOD_SABER as c_int,
                             );
                         } else {
                             G_Damage(
@@ -6591,11 +6592,11 @@ pub fn CheckThrownSaberDamaged(
                                 tr.endpos,
                                 (*saberent).damage,
                                 dflags,
-                                MOD_SABER,
+                                MOD_SABER as c_int,
                             );
                         }
 
-                        te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT);
+                        te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
                         (*te).s.otherEntityNum = (*ent).s.number;
                         (*te).s.otherEntityNum2 = (*saberOwner).s.number;
                         (*te).s.weapon = 0;
@@ -6676,7 +6677,7 @@ pub fn CheckThrownSaberDamaged(
                     ),
                 );
 
-                if tr.fraction == 1.0 || tr.entityNum == (*ent).s.number {
+                if tr.fraction == 1.0 || tr.entityNum as c_int == (*ent).s.number {
                     let mut dir: vec3_t = [0.0; 3];
                     let mut dflags = 0;
 
@@ -6692,12 +6693,12 @@ pub fn CheckThrownSaberDamaged(
 
                     if (*ent).s.eType == ET_NPC as c_int {
                         // an animent
-                        G_Damage(ctx, ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 40, dflags, MOD_SABER);
+                        G_Damage(ctx, ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 40, dflags, MOD_SABER as c_int);
                     } else {
-                        G_Damage(ctx, ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 5, dflags, MOD_SABER);
+                        G_Damage(ctx, ent, saberOwner, saberOwner, Some(&mut dir), tr.endpos, 5, dflags, MOD_SABER as c_int);
                     }
 
-                    let te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT);
+                    let te = G_TempEntity(ctx, tr.endpos, EV_SABER_HIT as c_int);
                     (*te).s.otherEntityNum = ENTITYNUM_NONE;
                     (*te).s.otherEntityNum2 = (*saberOwner).s.number;
                     (*te).s.weapon = 0;
@@ -6719,7 +6720,7 @@ pub fn CheckThrownSaberDamaged(
                             // don't do clash flare
                             G_FreeEntity(ctx, te);
                         } else {
-                            let teS = G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE);
+                            let teS = G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
                             (*teS).s.origin = (*te).s.origin;
                             (*te).s.eventParm = 0;
                         }
@@ -7335,8 +7336,8 @@ pub fn saberKnockOutOfHand(
         (*saberent).parent = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), saberOwner));
 
         (*saberent).damage = SABER_THROWN_HIT_DAMAGE;
-        (*saberent).methodOfDeath = MOD_SABER;
-        (*saberent).splashMethodOfDeath = MOD_SABER;
+        (*saberent).methodOfDeath = MOD_SABER as c_int;
+        (*saberent).splashMethodOfDeath = MOD_SABER as c_int;
         (*saberent).s.solid = 2;
         (*saberent).r.contents = CONTENTS_LIGHTSABER;
 
@@ -8508,7 +8509,7 @@ pub fn G_KickTrace(
 
         //G_TestLine(traceOrg, traceEnd, 0x0000ff, 5000);
         if trace.fraction < 1.0f32 && trace.startsolid == 0 && trace.allsolid == 0 {
-            let client = (*ent).client;
+            let client = (*ent).client as *mut gclient_t;
             if (*client).jediKickTime > (*ctx.world).level.time {
                 if trace.entityNum as c_int == (*client).jediKickIndex {
                     //we are hitting the same ent we last hit in this same anim, don't hit it again
@@ -8538,7 +8539,7 @@ pub fn G_KickTrace(
                 if (*hitEnt).takedamage != 0 {
                     //hurt it
                     if !(*hitEnt).client.is_null() {
-                        let hitClient = (*hitEnt).client;
+                        let hitClient = (*hitEnt).client as *mut gclient_t;
                         (*hitClient).ps.otherKiller = (*ent).s.number;
                         (*hitClient).ps.otherKillerDebounceTime = (*ctx.world).level.time + 10000;
                         (*hitClient).ps.otherKillerTime = (*ctx.world).level.time + 10000;
@@ -8615,7 +8616,7 @@ pub fn G_KickTrace(
 /// Source: `oracle/oracle/codemp/game/w_saber.c:7644-7956`
 pub fn G_KickSomeMofos(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        let client = (*ent).client;
+        let client = (*ent).client as *mut gclient_t;
 
         let mut kickDir: vec3_t = [0.0; 3];
         let mut kickEnd: vec3_t = [0.0; 3];
@@ -9090,7 +9091,7 @@ pub fn G_GrabSomeMofos(
             ),
         );
 
-        if trace.fraction != 1.0 && trace.entityNum < ENTITYNUM_WORLD {
+        if trace.fraction != 1.0 && (trace.entityNum as c_int) < ENTITYNUM_WORLD {
             let grabbed = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
             let gcl = (*grabbed).client as *mut gclient_t;
 
@@ -9966,7 +9967,7 @@ pub fn WP_SaberPositionUpdate(
                         let te = G_TempEntity(
                             ctx,
                             (*ctx.world).g_entities[saberNum as usize].r.currentOrigin,
-                            EV_SABER_BLOCK,
+                            EV_SABER_BLOCK as c_int,
                         );
                         let mut dir: vec3_t = [0.0; 3];
                         crate::q_math::VectorSet(&mut dir, 0.0, 1.0, 0.0);

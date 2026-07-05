@@ -1208,8 +1208,10 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             }
         } else if trap::InPVS(
             ctx.engine,
-            (*enemy_ent).r.currentOrigin,
-            (*npc_ent).r.currentOrigin,
+            mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs::new(
+                &(*enemy_ent).r.currentOrigin as *const vec3_t,
+                &(*npc_ent).r.currentOrigin as *const vec3_t,
+            ),
         ) != 0
         {
             let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, IMPACT_POS_4);
@@ -1431,7 +1433,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             {
                 // have to do this test because placed turrets are not solid to NPCs (so they don't obstruct navigation)
                 if false {
-                    (*client).ps.powerups[statIndex_t::PW_BATTLESUIT as usize] =
+                    (*client).ps.powerups[PW_BATTLESUIT as usize] =
                         level_time + ARMOR_EFFECT_TIME;
                     crate::g_combat::G_Damage(
                         ctx,
@@ -1466,7 +1468,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 crate::g_timer::TIMER_Set(ctx, npc_ent, c"attackDelay".as_ptr(), (*client).ps.torsoTimer);
                 crate::g_timer::TIMER_Set(ctx, npc_ent, c"standTime".as_ptr(), (*client).ps.legsTimer);
                 (*npc_info).touchedByPlayer = None;
-                (*client).ps.powerups[statIndex_t::PW_BATTLESUIT as usize] = level_time + ARMOR_EFFECT_TIME;
+                (*client).ps.powerups[PW_BATTLESUIT as usize] = level_time + ARMOR_EFFECT_TIME;
 
                 _VectorSubtract((*enemy_ent).r.currentOrigin, (*npc_ent).r.currentOrigin, &mut smackDir);
                 smackDir[2] += 30.0;

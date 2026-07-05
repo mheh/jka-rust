@@ -92,8 +92,8 @@ pub use gen_cmds::genCmds_t;
 pub use hunk_pref::ha_pref;
 pub use item_use_fail::itemUseFail_t;
 pub use limits::{
-    ENTITYNUM_MAX_NORMAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_GENTITIES,
-    MAX_STRING_CHARS,
+    ENTITYNUM_MAX_NORMAL, ENTITYNUM_NONE, ENTITYNUM_WORLD, MAX_CLIENTS, MAX_CLIENTS_I32,
+    MAX_GENTITIES, MAX_STRING_CHARS,
 };
 pub use mark_fragment::markFragment_t;
 pub use pc_token::{pc_token_t, MAX_TOKENLENGTH};

@@ -3102,7 +3102,7 @@ pub fn G_ItemUsable(
                         return 1;
                     }
                 }
-                crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, SHIELD_NOROOM);
+                crate::g_utils::G_AddEvent(&mut (*world).g_entities[(*ps).clientNum as usize], EV_ITEMUSEFAIL as c_int, mp_qshared::shared::itemUseFail_t::SHIELD_NOROOM as c_int);
                 0
             }
             HI_JETPACK | HI_HEALTHDISP | HI_AMMODISP | HI_EWEB | HI_CLOAK => 1,
@@ -3208,7 +3208,7 @@ pub fn Cmd_SaberAttackCycle_f(
                 if (*client).ps.saberHolstered == 1 {
                     crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOn);
                     (*client).ps.saberHolstered = 0;
-                    (*client).ps.fd.saberAnimLevel = SS_DUAL as c_int;
+                    (*client).ps.fd.saberAnimLevel = saber_styles_t::SS_DUAL as c_int;
                 } else if (*client).ps.saberHolstered == 0 {
                     if (*client).saber[1].saberFlags2 & SFL2_NO_MANUAL_DEACTIVATE != 0 {
                         // can't turn it off manually
@@ -3217,7 +3217,7 @@ pub fn Cmd_SaberAttackCycle_f(
                     } else {
                         crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[1].soundOff);
                         (*client).ps.saberHolstered = 1;
-                        (*client).ps.fd.saberAnimLevel = SS_FAST as c_int;
+                        (*client).ps.fd.saberAnimLevel = saber_styles_t::SS_FAST as c_int;
                     }
                 }
 
@@ -3252,11 +3252,11 @@ pub fn Cmd_SaberAttackCycle_f(
                 } else {
                     crate::g_utils::G_Sound(ctx, ent, CHAN_AUTO as c_int, (*client).saber[0].soundOff);
                     (*client).ps.saberHolstered = 1;
-                    if (*client).saber[0].singleBladeStyle != SS_NONE {
+                    if (*client).saber[0].singleBladeStyle != saber_styles_t::SS_NONE {
                         if (*client).ps.weaponTime <= 0 {
-                            (*client).ps.fd.saberAnimLevel = (*client).saber[0].singleBladeStyle;
+                            (*client).ps.fd.saberAnimLevel = (*client).saber[0].singleBladeStyle as c_int;
                         } else {
-                            (*client).saberCycleQueue = (*client).saber[0].singleBladeStyle;
+                            (*client).saberCycleQueue = (*client).saber[0].singleBladeStyle as c_int;
                         }
                     }
                 }
@@ -3283,8 +3283,8 @@ pub fn Cmd_SaberAttackCycle_f(
             usingSiegeStyle = qtrue;
 
             while i != selectLevel {
-                if i >= SS_NUM_SABER_STYLES as c_int {
-                    i = SS_FAST as c_int;
+                if i >= saber_styles_t::SS_NUM_SABER_STYLES as c_int {
+                    i = saber_styles_t::SS_FAST as c_int;
                 }
 
                 if (*world).bg_state.bgSiegeClasses[(*client).siegeClass as usize].saberStance & (1 << i) != 0 {

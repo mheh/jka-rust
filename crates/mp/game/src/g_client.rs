@@ -38,6 +38,8 @@ use crate::prelude::*;
 use crate::entity::flags::{FL_NO_BOTS, FL_NO_HUMANS};
 use crate::trap;
 use crate::world::GameContext;
+use mp_bg::public::duel_team::duelTeam_t::DUELTEAM_FREE;
+use mp_qshared::common::mp::qcommon::saber::saber_styles::saber_styles_t::SS_STAFF;
 use crate::g_main::{CalculateRanks, G_GetStringEdString, G_LogPrintf};
 use crate::bg_vehicleLoad::BG_GetVehicleModelName;
 use crate::bg_misc::{BG_IsValidCharacterModel, BG_PlayerStateToEntityState, BG_ValidateSkinForTeam};
@@ -1872,7 +1874,7 @@ pub fn ClientBegin(
 
         (*client).pers.connected = CON_CONNECTED as _;
         (*client).pers.enterTime = (*ctx.world).level.time;
-        (*client).pers.teamState.state = TEAM_BEGIN;
+        (*client).pers.teamState.state = crate::client::player_team_state::playerTeamStateState_t::TEAM_BEGIN;
 
         // save eflags around this, because changing teams will cause this to happen with a
         // valid entity, and we want to make sure the teleport bit is set right so the
@@ -1882,7 +1884,7 @@ pub fn ClientBegin(
         let mut i = 0;
         while i < NUM_FORCE_POWERS {
             if (*((*ent).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << i) != 0 {
-                WP_ForcePowerStop(ctx, ent, i);
+                WP_ForcePowerStop(ctx, ent, i as forcePowers_t);
             }
             i += 1;
         }
@@ -1927,7 +1929,7 @@ pub fn ClientBegin(
 
         if (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
             && (*client).sess.sessionTeam != TEAM_SPECTATOR
-            && (*client).sess.duelTeam == DUELTEAM_FREE
+            && (*client).sess.duelTeam == DUELTEAM_FREE as c_int
         {
             SetTeam(ctx, ent, c"s".as_ptr() as *mut c_char);
         } else {
@@ -2074,7 +2076,7 @@ pub fn G_BreakArm(
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.fd.saberAnimLevel == SS_STAFF {
+        if (*((*ent).client as *mut gclient_t)).ps.fd.saberAnimLevel == SS_STAFF as c_int {
             // I'm too lazy to deal with this as well for now.
             return;
         }
@@ -2410,8 +2412,8 @@ pub fn ClientSpawn(
                 (*client).ps.fd.saberDrawAnimLevel = SS_DUAL;
             } else if (*client).saber[0].saberFlags & SFL_TWO_HANDED != 0 {
                 // staff
-                (*client).ps.fd.saberAnimLevel = SS_STAFF;
-                (*client).ps.fd.saberDrawAnimLevel = SS_STAFF;
+                (*client).ps.fd.saberAnimLevel = SS_STAFF as c_int;
+                (*client).ps.fd.saberDrawAnimLevel = SS_STAFF as c_int;
             } else {
                 if (*client).sess.saberLevel < SS_FAST {
                     (*client).sess.saberLevel = SS_FAST;
@@ -2461,7 +2463,7 @@ pub fn ClientSpawn(
             (*client).ps.fd.forceDoInit = 0;
         }
 
-        if (*client).ps.fd.saberAnimLevel != SS_STAFF
+        if (*client).ps.fd.saberAnimLevel != SS_STAFF as c_int
             && (*client).ps.fd.saberAnimLevel != SS_DUAL
             && (*client).ps.fd.saberAnimLevel == (*client).ps.fd.saberDrawAnimLevel
             && (*client).ps.fd.saberAnimLevel == (*client).sess.saberLevel
@@ -2498,7 +2500,7 @@ pub fn ClientSpawn(
             spawn_point = SelectCTFSpawnPoint(
                 ctx,
                 (*client).sess.sessionTeam,
-                (*client).pers.teamState.state,
+                (*client).pers.teamState.state as c_int,
                 &mut spawn_origin,
                 &mut spawn_angles,
             );
@@ -2507,7 +2509,7 @@ pub fn ClientSpawn(
                 ctx,
                 (*client).siegeClass,
                 (*client).sess.sessionTeam,
-                (*client).pers.teamState.state,
+                (*client).pers.teamState.state as c_int,
                 &mut spawn_origin,
                 &mut spawn_angles,
             );
@@ -2565,7 +2567,7 @@ pub fn ClientSpawn(
             }
             spawn_point = sp;
         }
-        (*client).pers.teamState.state = TEAM_ACTIVE;
+        (*client).pers.teamState.state = crate::client::player_team_state::playerTeamStateState_t::TEAM_ACTIVE;
 
         // toggle the teleport bit so the client knows to not lerp and never clear the
         // voted flag
@@ -3110,7 +3112,7 @@ pub fn ClientDisconnect(
         let mut i: c_int = 0;
         while i < NUM_FORCE_POWERS {
             if (*((*ent).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << i) != 0 {
-                WP_ForcePowerStop(ctx, ent, i);
+                WP_ForcePowerStop(ctx, ent, i as forcePowers_t);
             }
             i += 1;
         }

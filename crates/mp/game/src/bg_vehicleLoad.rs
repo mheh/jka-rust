@@ -900,7 +900,7 @@ pub fn AttachRidersGeneric(pVeh: *mut Vehicle_t, bg: &BgState, traps: &dyn BgTra
                 &mut boltMatrix as *mut mdxaBone_t,
                 &yawOnlyAngles as *const vec3_t,
                 &(*(*parent).playerState).origin as *const vec3_t,
-                BG_GetTime(),
+                crate::g_main::BG_GetTime(),
                 core::ptr::null_mut(),
                 &(*parent).modelScale as *const vec3_t,
             );

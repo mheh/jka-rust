@@ -864,7 +864,7 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
         }
 
         if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"saberstyle".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), StanceTable.as_mut_ptr(), qtrue);
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), StanceTable.as_ptr() as *mut _, qtrue);
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance = 0;
         }
@@ -884,7 +884,7 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
         }
 
         if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"weapons".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), WPTable.as_mut_ptr(), qtrue);
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), WPTable.as_ptr() as *mut _, qtrue);
         } else {
             panic!("Siege class without weapons entry");
         }
@@ -904,7 +904,7 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
         }
 
         if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"classflags".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), bgSiegeClassFlagNames.as_mut_ptr(), qtrue);
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), bgSiegeClassFlagNames.as_ptr() as *mut _, qtrue);
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags = 0;
         }

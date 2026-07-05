@@ -1885,7 +1885,7 @@ pub fn NPC_ClearShot(
             return QFALSE;
         }
 
-        if tr.entityNum == (*ent).s.number {
+        if tr.entityNum as c_int == (*ent).s.number {
             return QTRUE;
         }
 
@@ -1973,7 +1973,7 @@ pub fn NPC_ShotEntity(
         let mut impactPos = impactPos;
         impactPos = tr.endpos;
         let _ = impactPos; // write-only out per Raven contract; caller owns the array
-        tr.entityNum
+        tr.entityNum as c_int
     }
 }
 

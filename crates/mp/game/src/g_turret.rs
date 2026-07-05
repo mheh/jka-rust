@@ -947,8 +947,8 @@ pub fn turret_base_spawn_top(
         (*top).damage = (*base).damage;
 
         // How fast it turns
-        if (*base).speed == 0 {
-            (*base).speed = 20;
+        if (*base).speed == 0.0 {
+            (*base).speed = 20.0;
         }
         (*top).speed = (*base).speed;
 

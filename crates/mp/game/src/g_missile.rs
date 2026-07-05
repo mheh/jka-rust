@@ -198,11 +198,17 @@ pub fn G_BounceMissile(
 
         // Play bounce sound
         if (*ent).s.weapon == WP_THERMAL {
-            let sound_name = crate::q_shared::va(c"sound/weapons/thermal/bounce%i.wav".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1, 2));
-            G_Sound(ctx, ent, CHAN_BODY as c_int, G_SoundIndex(sound_name));
+            let sound_name = cstr(&format!(
+                "sound/weapons/thermal/bounce{}.wav",
+                (*ctx.world).bg_state.rng.Q_irand(1, 2)
+            ));
+            G_Sound(ctx, ent, CHAN_BODY as c_int, G_SoundIndex(sound_name.as_ptr()));
         } else if (*ent).s.weapon == WP_SABER {
-            let sound_name = crate::q_shared::va(c"sound/weapons/saber/bounce%i.wav".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(1, 3));
-            G_Sound(ctx, ent, CHAN_BODY as c_int, G_SoundIndex(sound_name));
+            let sound_name = cstr(&format!(
+                "sound/weapons/saber/bounce{}.wav",
+                (*ctx.world).bg_state.rng.Q_irand(1, 3)
+            ));
+            G_Sound(ctx, ent, CHAN_BODY as c_int, G_SoundIndex(sound_name.as_ptr()));
         }
 
         crate::q_math::_VectorAdd((*ent).r.currentOrigin, tr.plane.normal, &mut (*ent).r.currentOrigin);
@@ -229,7 +235,7 @@ pub fn G_ExplodeMissile(
         trap::SnapVector(ctx.engine, mp_abi::game::syscalls::G_SNAPVECTOR::GSnapvectorArgs::new(&mut origin));
         G_SetOrigin(ent, origin);
 
-        (*ent).s.eType = ET_GENERAL;
+        (*ent).s.eType = ET_GENERAL as c_int;
         G_AddEvent(ent, EV_MISSILE_MISS as c_int, DirToByte(dir));
 
         (*ent).freeAfterEvent = qtrue;
@@ -238,7 +244,7 @@ pub fn G_ExplodeMissile(
         // Splash damage
         if (*ent).splashDamage != 0 {
             // Check if we need to set parent for damage credit
-            if (*ent).s.eType == ET_MISSILE && (((*ent).s.eFlags & EF_JETPACK_ACTIVE) != 0) && ((*ent).r.ownerNum as usize) < MAX_CLIENTS {
+            if (*ent).s.eType == ET_MISSILE as c_int && (((*ent).s.eFlags & EF_JETPACK_ACTIVE) != 0) && ((*ent).r.ownerNum as usize) < MAX_CLIENTS {
                 (*ent).parent = Some(ent_id(ent_base(ctx), &(*ctx.world).g_entities[(*ent).r.ownerNum as usize]));
             }
 
@@ -318,7 +324,7 @@ pub fn CreateMissile(
 
         (*missile).nextthink = (*ctx.world).level.time + life;
         (*missile).think = Some(EntThink::G_FreeEntity);
-        (*missile).s.eType = ET_MISSILE;
+        (*missile).s.eType = ET_MISSILE as c_int;
         (*missile).r.svFlags = SVF_USE_CURRENT_ORIGIN;
         (*missile).parent = Some(ent_id(ent_base(ctx), owner));
         (*missile).r.ownerNum = (*owner).s.number;
@@ -421,7 +427,7 @@ pub fn G_MissileImpact(
                 }
                 if isKnockedSaber == 0 {
                     (*ent).freeAfterEvent = qtrue;
-                    (*ent).s.eType = ET_GENERAL;
+                    (*ent).s.eType = ET_GENERAL as c_int;
                 }
                 tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
                 G_SetOrigin(ent, tr.endpos);
@@ -453,7 +459,7 @@ pub fn G_MissileImpact(
                 }
                 if isKnockedSaber == 0 {
                     (*ent).freeAfterEvent = qtrue;
-                    (*ent).s.eType = ET_GENERAL;
+                    (*ent).s.eType = ET_GENERAL as c_int;
                 }
                 tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
                 G_SetOrigin(ent, tr.endpos);
@@ -635,7 +641,7 @@ pub fn G_MissileImpact(
             if (*ent).s.weapon == WP_DEMP2 {
                 if !other.is_null() && !(*other).client.is_null() && (*(*other).client as *mut gclient_t).NPC_class == CLASS_VEHICLE {
                     let other_vehicle = (*other).m_pVehicle as *mut Vehicle_t;
-                    if !other_vehicle.is_null() && !(*other_vehicle).m_pVehicleInfo.is_null() && ((*(*other_vehicle).m_pVehicleInfo).type_ == VH_SPEEDER || ((*(*other_vehicle).m_pVehicleInfo).type_ == VH_FIGHTER && !(*ent).classname.is_null() && crate::q_shared::Q_stricmp((*ent).classname, c"vehicle_proj".as_ptr() as *const c_char) == 0)) && FighterIsLanded(other_vehicle, &mut (*(*other).client as *mut gclient_t).ps) == 0 && (((*other).spawnflags & 2) == 0) {
+                    if !other_vehicle.is_null() && !(*other_vehicle).m_pVehicleInfo.is_null() && ((*(*other_vehicle).m_pVehicleInfo).r#type == VH_SPEEDER || ((*(*other_vehicle).m_pVehicleInfo).r#type == VH_FIGHTER && !(*ent).classname.is_null() && crate::q_shared::Q_stricmp((*ent).classname, c"vehicle_proj".as_ptr() as *const c_char) == 0)) && FighterIsLanded(other_vehicle, &mut (*(*other).client as *mut gclient_t).ps) == 0 && (((*other).spawnflags & 2) == 0) {
                         if (*(*other).client as *mut gclient_t).ps.electrifyTime > (*ctx.world).level.time {
                             (*(*other).client as *mut gclient_t).ps.electrifyTime += (*ctx.world).bg_state.rng.Q_irand(200, 500);
                             if (*(*other).client as *mut gclient_t).ps.electrifyTime > (*ctx.world).level.time + 4000 {
@@ -669,7 +675,7 @@ pub fn G_MissileImpact(
 
         if isKnockedSaber == 0 {
             (*ent).freeAfterEvent = qtrue;
-            (*ent).s.eType = ET_GENERAL;
+            (*ent).s.eType = ET_GENERAL as c_int;
         }
 
         tr.endpos = crate::g_weapon::SnapVectorTowards(tr.endpos, (*ent).s.pos.trBase);
@@ -846,7 +852,7 @@ pub fn G_RunMissile(
                 }
 
                 // Ghoul2 mark handling code is #if 0, so we skip to the active part
-                if (*ent).s.weapon > WP_NONE as c_int && (*ent).s.weapon < WP_NUM_WEAPONS as c_int && (tr.entityNum as usize) < MAX_CLIENTS || (*ctx.world).g_entities[tr.entityNum as usize].s.eType == ET_NPC {
+                if (*ent).s.weapon > WP_NONE as c_int && (*ent).s.weapon < WP_NUM_WEAPONS as c_int && (tr.entityNum as usize) < MAX_CLIENTS || (*ctx.world).g_entities[tr.entityNum as usize].s.eType == ET_NPC as c_int {
                     crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*ent).s.origin);
                     crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos, (*ctx.world).level.time, &mut (*ent).s.origin2);
 
@@ -861,7 +867,7 @@ pub fn G_RunMissile(
                     (*ent).s.trickedentindex = 1;
                 }
 
-                if (*ent).s.eType != ET_MISSILE && (*ent).s.weapon != G2_MODEL_PART {
+                if (*ent).s.eType != ET_MISSILE as c_int && (*ent).s.weapon != G2_MODEL_PART {
                     return; // Exploded
                 }
             }

@@ -206,7 +206,7 @@ pub fn Wampa_Slash(
 
         for i in 0..(numEnts as usize) {
             let radiusEnt = (*ctx.world).g_entities.get_unchecked_mut(radiusEntNums[i] as usize) as *mut gentity_t;
-            if !(*radiusEnt).inuse {
+            if (*radiusEnt).inuse == 0 {
                 continue;
             }
 
@@ -242,7 +242,7 @@ pub fn Wampa_Slash(
                             && (*ctx.world).bg_state.rng.Q_irand(0, 1) != 0
                         {
                             // do pain on enemy
-                            (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtend = crate::prelude::HANDEXTEND_KNOCKDOWN;
+                            (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtend = crate::prelude::HANDEXTEND_KNOCKDOWN as c_int;
                             (*((*radiusEnt).client as *mut gclient_t)).ps.forceDodgeAnim = 0;
                             (*((*radiusEnt).client as *mut gclient_t)).ps.forceHandExtendTime = (*ctx.world).level.time + 1100;
                             (*((*radiusEnt).client as *mut gclient_t)).ps.quickerGetup = qfalse;
@@ -252,10 +252,10 @@ pub fn Wampa_Slash(
                     // killed them, chance of dismembering
                     if !(*ctx.world).bg_state.rng.Q_irand(0, 1) != 0 {
                         // bite something off
-                        let hitLoc = (*ctx.world).bg_state.rng.Q_irand(crate::prelude::G2_MODELPART_HEAD, crate::prelude::G2_MODELPART_RLEG);
-                        if hitLoc == crate::prelude::G2_MODELPART_HEAD {
+                        let hitLoc = (*ctx.world).bg_state.rng.Q_irand(crate::prelude::G2_MODELPART_HEAD as c_int, crate::prelude::G2_MODELPART_RLEG as c_int);
+                        if hitLoc == crate::prelude::G2_MODELPART_HEAD as c_int {
                             crate::npc_c::NPC_SetAnim(radiusEnt, SETANIM_BOTH, crate::prelude::BOTH_DEATH17 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
-                        } else if hitLoc == crate::prelude::G2_MODELPART_WAIST {
+                        } else if hitLoc == crate::prelude::G2_MODELPART_WAIST as c_int {
                             crate::npc_c::NPC_SetAnim(radiusEnt, SETANIM_BOTH, crate::prelude::BOTH_DEATHBACKWARD2 as c_int, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD);
                         }
                         crate::g_combat::G_Dismember(ctx, radiusEnt, npc, (*radiusEnt).r.currentOrigin, hitLoc, 90.0, 0.0, (*((*radiusEnt).client as *mut gclient_t)).ps.torsoAnim, qtrue);

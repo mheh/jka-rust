@@ -95,7 +95,7 @@ unsafe fn c_strcpy(dst: *mut c_char, src: *const c_char) {
     }
 }
 
-unsafe fn c_atoi(s: *const c_char) -> c_int {
+pub(crate) unsafe fn c_atoi(s: *const c_char) -> c_int {
     let cstr = std::ffi::CStr::from_ptr(s);
     let text = String::from_utf8_lossy(cstr.to_bytes());
     let trimmed = text.trim_start();

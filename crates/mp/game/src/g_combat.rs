@@ -430,7 +430,7 @@ pub fn TossClientWeapon(ctx: GameContext<'_>, self_: *mut gentity_t, direction: 
 
         let mut ammoSub = (*client).ps.ammo
             [weaponData[weapon as usize].ammoIndex as usize]
-            - crate::bg_misc::bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
+            - bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
                 weapon,
                 itemType_t::IT_WEAPON as c_int,
             ) as usize]
@@ -455,14 +455,14 @@ pub fn TossClientWeapon(ctx: GameContext<'_>, self_: *mut gentity_t, direction: 
         (*launched).s.generic1 = (*self_).s.number;
         (*launched).s.powerups = (*ctx.world).level.time + 1500;
 
-        (*launched).count = crate::bg_misc::bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
+        (*launched).count = bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
             weapon,
             itemType_t::IT_WEAPON as c_int,
         ) as usize]
         .quantity;
 
         (*client).ps.ammo[weaponData[weapon as usize].ammoIndex as usize] -=
-            crate::bg_misc::bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
+            bg_itemlist[crate::bg_misc::BG_GetItemIndexByTag(
                 weapon,
                 itemType_t::IT_WEAPON as c_int,
             ) as usize]

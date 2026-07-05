@@ -1823,6 +1823,9 @@ pub fn SP_misc_model_health_power_converter(
     }
 }
 
+//TODO: Port FX_STATE_OFF
+// Source: oracle/oracle/codemp/game/bg_public.h:1182
+const FX_STATE_OFF: c_int = 0;
 //TODO: Port FX_STATE_ONE_SHOT
 // Source: oracle/oracle/codemp/game/bg_public.h:1183
 const FX_STATE_ONE_SHOT: c_int = 1;

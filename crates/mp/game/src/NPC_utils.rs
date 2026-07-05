@@ -1643,7 +1643,7 @@ pub fn G_GetBoltPosition(
         let mut angles: vec3_t = [0.0; 3];
         if !(*self_).client.is_null() {
             angles[0] = 0.0;
-            angles[1] = (*(*self_).client).ps.viewangles[YAW];
+            angles[1] = (*((*self_).client as *mut gclient_t)).ps.viewangles[YAW];
             angles[2] = 0.0;
         } else {
             angles[0] = 0.0;

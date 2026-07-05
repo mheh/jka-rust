@@ -256,6 +256,7 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     (*ent).pain_debounce_time = (*ctx.world).level.time + 200;
 
                     G_Damage(
+                        ctx,
                         ent,
                         core::ptr::null_mut(),
                         core::ptr::null_mut(),
@@ -280,6 +281,7 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 } else {
                     if (*ent).watertype & CONTENTS_LAVA != 0 {
                         G_Damage(
+                            ctx,
                             ent,
                             core::ptr::null_mut(),
                             core::ptr::null_mut(),
@@ -293,6 +295,7 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
                     if (*ent).watertype & CONTENTS_SLIME != 0 {
                         G_Damage(
+                            ctx,
                             ent,
                             core::ptr::null_mut(),
                             core::ptr::null_mut(),
@@ -407,6 +410,7 @@ pub fn DoImpact(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mut gentity
                     }
                     if (*other).takedamage != 0 {
                         G_Damage(
+                            ctx,
                             other,
                             self_,
                             self_,
@@ -452,6 +456,7 @@ pub fn DoImpact(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mut gentity
                     magnitude = magnitude - force / 2.0; //If damage other, subtract half of that damage off of own injury
                     if magnitude >= 1.0 {
                         G_Damage(
+                            ctx,
                             self_,
                             core::ptr::null_mut(),
                             core::ptr::null_mut(),
@@ -1110,6 +1115,7 @@ pub fn ClientEvents(ctx: GameContext<'_>, ent: *mut gentity_t, oldEventSequence:
                     let dir: vec3_t = [0.0, 0.0, 1.0];
                     (*ent).pain_debounce_time = (*ctx.world).level.time + 200; // no normal pain sound
                     G_Damage(
+                        ctx,
                         ent,
                         core::ptr::null_mut(),
                         core::ptr::null_mut(),

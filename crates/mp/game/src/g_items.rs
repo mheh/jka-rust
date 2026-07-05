@@ -1351,8 +1351,8 @@ pub fn ItemUse_Seeker(
             }
         } else {
             (*((*ent).client as *mut gclient_t)).ps.eFlags |= EF_SEEKERDRONE;
-            (*((*ent).client as *mut gclient_t)).ps.droneExistTime = (*ctx.world).level.time + 30000;
-            (*((*ent).client as *mut gclient_t)).ps.droneFireTime = (*ctx.world).level.time + 1500;
+            (*((*ent).client as *mut gclient_t)).ps.droneExistTime = ((*ctx.world).level.time + 30000) as f32;
+            (*((*ent).client as *mut gclient_t)).ps.droneFireTime = ((*ctx.world).level.time + 1500) as f32;
         }
     }
 }
@@ -1442,7 +1442,7 @@ pub fn Jetpack_On(
             return;
         }
 
-        if (*((*ent).client as *mut gclient_t)).ps.fd.forceGripBeingGripped >= (*ctx.world).level.time {
+        if (*((*ent).client as *mut gclient_t)).ps.fd.forceGripBeingGripped >= (*ctx.world).level.time as f32 {
             // can't turn on during grip interval
             return;
         }

@@ -27,6 +27,7 @@ use mp_bg::public::saber_move_name::{
 };
 use mp_bg::public::saber_quadrant::saberQuadrant_t;
 use mp_bg::public::anim_number::animNumber_t;
+use mp_bg::public::anim_number::SABER_ANIM_GROUP_SIZE;
 use mp_bg::public::saberlock::SABERLOCK_WIN;
 use mp_bg::local::force_power_needed::forcePowerNeeded;
 use mp_qshared::shared::force_powers::{
@@ -731,7 +732,7 @@ impl PmoveContext<'_> {
                     } else if victory == 0 {
                         winAnim = BOTH_BF1BREAK as c_int;
                     } else {
-                        (*ps).saberMove = LS_A_T2B as c_short;
+                        (*ps).saberMove = LS_A_T2B as c_int;
                         winAnim = BOTH_A3_T__B_ as c_int;
                     }
                 }
@@ -741,7 +742,7 @@ impl PmoveContext<'_> {
                     } else if victory == 0 {
                         winAnim = BOTH_KNOCKDOWN4 as c_int;
                     } else {
-                        (*ps).saberMove = LS_K1_T_ as c_short;
+                        (*ps).saberMove = LS_K1_T_ as c_int;
                         winAnim = BOTH_K1_S1_T_ as c_int;
                     }
                 }
@@ -749,7 +750,7 @@ impl PmoveContext<'_> {
                     if superBreak != 0 {
                         winAnim = BOTH_LK_S_S_S_SB_1_W as c_int;
                     } else if victory == 0 {
-                        (*ps).saberMove = LS_V1_BL as c_short;
+                        (*ps).saberMove = LS_V1_BL as c_int;
                         (*ps).saberBlocked = BLOCKED_PARRY_BROKEN as c_int;
                         winAnim = BOTH_V1_BL_S1 as c_int;
                     } else {
@@ -760,7 +761,7 @@ impl PmoveContext<'_> {
                     if superBreak != 0 {
                         winAnim = BOTH_LK_S_S_S_SB_1_W as c_int;
                     } else if victory == 0 {
-                        (*ps).saberMove = LS_V1_BR as c_short;
+                        (*ps).saberMove = LS_V1_BR as c_int;
                         (*ps).saberBlocked = BLOCKED_PARRY_BROKEN as c_int;
                         winAnim = BOTH_V1_BR_S1 as c_int;
                     } else {
@@ -778,7 +779,7 @@ impl PmoveContext<'_> {
                 );
                 (*ps).weaponTime = (*ps).torsoTimer;
                 (*ps).saberBlocked = BLOCKED_NONE as c_int;
-                (*ps).weaponstate = WEAPON_FIRING;
+                (*ps).weaponstate = WEAPON_FIRING as c_int;
             }
             winAnim
         }
@@ -801,7 +802,7 @@ impl PmoveContext<'_> {
                     } else if victory == 0 {
                         loseAnim = BOTH_BF1BREAK as c_int;
                     } else if victory == 0 {
-                        (*genemy).saberMove = LS_K1_T_ as c_short;
+                        (*genemy).saberMove = LS_K1_T_ as c_int;
                         loseAnim = BOTH_K1_S1_T_ as c_int;
                     } else {
                         loseAnim = BOTH_BF1BREAK as c_int;
@@ -813,7 +814,7 @@ impl PmoveContext<'_> {
                     } else if victory == 0 {
                         loseAnim = BOTH_KNOCKDOWN4 as c_int;
                     } else if victory == 0 {
-                        (*genemy).saberMove = LS_A_T2B as c_short;
+                        (*genemy).saberMove = LS_A_T2B as c_int;
                         loseAnim = BOTH_A3_T__B_ as c_int;
                     } else {
                         loseAnim = BOTH_KNOCKDOWN4 as c_int;
@@ -823,13 +824,13 @@ impl PmoveContext<'_> {
                     if superBreak != 0 {
                         loseAnim = BOTH_LK_S_S_S_SB_1_L as c_int;
                     } else if victory == 0 {
-                        (*genemy).saberMove = LS_V1_BL as c_short;
+                        (*genemy).saberMove = LS_V1_BL as c_int;
                         (*genemy).saberBlocked = BLOCKED_PARRY_BROKEN as c_int;
                         loseAnim = BOTH_V1_BL_S1 as c_int;
                     } else if victory == 0 {
                         loseAnim = BOTH_CCWCIRCLEBREAK as c_int;
                     } else {
-                        (*genemy).saberMove = LS_V1_BL as c_short;
+                        (*genemy).saberMove = LS_V1_BL as c_int;
                         (*genemy).saberBlocked = BLOCKED_PARRY_BROKEN as c_int;
                         loseAnim = BOTH_V1_BL_S1 as c_int;
                     }
@@ -838,13 +839,13 @@ impl PmoveContext<'_> {
                     if superBreak != 0 {
                         loseAnim = BOTH_LK_S_S_S_SB_1_L as c_int;
                     } else if victory == 0 {
-                        (*genemy).saberMove = LS_V1_BR as c_short;
+                        (*genemy).saberMove = LS_V1_BR as c_int;
                         (*genemy).saberBlocked = BLOCKED_PARRY_BROKEN as c_int;
                         loseAnim = BOTH_V1_BR_S1 as c_int;
                     } else if victory == 0 {
                         loseAnim = BOTH_CWCIRCLEBREAK as c_int;
                     } else {
-                        (*genemy).saberMove = LS_V1_BR as c_short;
+                        (*genemy).saberMove = LS_V1_BR as c_int;
                         (*genemy).saberBlocked = BLOCKED_PARRY_BROKEN as c_int;
                         loseAnim = BOTH_V1_BR_S1 as c_int;
                     }
@@ -863,7 +864,7 @@ impl PmoveContext<'_> {
                 );
                 (*genemy).weaponTime = (*genemy).torsoTimer;
                 (*genemy).saberBlocked = BLOCKED_NONE as c_int;
-                (*genemy).weaponstate = WEAPON_READY;
+                (*genemy).weaponstate = WEAPON_READY as c_int;
             }
             loseAnim
         }
@@ -919,7 +920,7 @@ impl PmoveContext<'_> {
 
             if superBreak != 0 && won == 0 {
                 // QAGAME: always true server-side.
-                (*duelist).saberMove = LS_NONE as c_short;
+                (*duelist).saberMove = LS_NONE as c_int;
                 (*duelist).torsoTimer += 250;
             }
 
@@ -947,9 +948,9 @@ impl PmoveContext<'_> {
             } else {
                 singleVsSingle = false;
                 self.PM_SaberLockResultAnim(ps, superBreak, 1);
-                (*ps).weaponstate = WEAPON_FIRING;
+                (*ps).weaponstate = WEAPON_FIRING as c_int;
                 self.PM_SaberLockResultAnim(genemy, superBreak, 0);
-                (*genemy).weaponstate = WEAPON_READY;
+                (*genemy).weaponstate = WEAPON_READY as c_int;
             }
             let _ = singleVsSingle;
 
@@ -1063,38 +1064,38 @@ impl PmoveContext<'_> {
                             || (*ps).torsoAnim == BOTH_BF2LOCK as c_int
                         {
                             curFrame = currentFrame.floor() as c_int - strength;
-                            if curFrame <= (*anim).firstFrame {
+                            if curFrame <= (*anim).firstFrame as c_int {
                                 self.PM_SaberLockBreak(genemy, 1, strength);
                                 return;
                             }
                             PM_SetAnimFrame(ps, curFrame, 1, 1);
-                            remaining = curFrame - (*anim).firstFrame;
+                            remaining = curFrame - (*anim).firstFrame as c_int;
                         } else {
                             curFrame = currentFrame.ceil() as c_int + strength;
-                            if curFrame >= (*anim).firstFrame + (*anim).numFrames {
+                            if curFrame >= (*anim).firstFrame as c_int + (*anim).numFrames as c_int {
                                 self.PM_SaberLockBreak(genemy, 1, strength);
                                 return;
                             }
                             PM_SetAnimFrame(ps, curFrame, 1, 1);
-                            remaining = (*anim).firstFrame + (*anim).numFrames - curFrame;
+                            remaining = (*anim).firstFrame as c_int + (*anim).numFrames as c_int - curFrame;
                         }
                     } else if BG_CheckIncrementLockAnim((*ps).torsoAnim, SABERLOCK_WIN as c_int) != 0
                     {
                         curFrame = currentFrame.ceil() as c_int + strength;
-                        if curFrame >= (*anim).firstFrame + (*anim).numFrames {
+                        if curFrame >= (*anim).firstFrame as c_int + (*anim).numFrames as c_int {
                             self.PM_SaberLockBreak(genemy, 1, strength);
                             return;
                         }
                         PM_SetAnimFrame(ps, curFrame, 1, 1);
-                        remaining = (*anim).firstFrame + (*anim).numFrames - curFrame;
+                        remaining = (*anim).firstFrame as c_int + (*anim).numFrames as c_int - curFrame;
                     } else {
                         curFrame = currentFrame.floor() as c_int - strength;
-                        if curFrame <= (*anim).firstFrame {
+                        if curFrame <= (*anim).firstFrame as c_int {
                             self.PM_SaberLockBreak(genemy, 1, strength);
                             return;
                         }
                         PM_SetAnimFrame(ps, curFrame, 1, 1);
-                        remaining = curFrame - (*anim).firstFrame;
+                        remaining = curFrame - (*anim).firstFrame as c_int;
                     }
 
                     if self.PM_irand_timesync(0, 2) == 0 {
@@ -1113,11 +1114,11 @@ impl PmoveContext<'_> {
                                     genemy,
                                 );
                             }
-                            PM_SetAnimFrame(genemy, (*anim2).firstFrame + remaining, 1, 1);
+                            PM_SetAnimFrame(genemy, (*anim2).firstFrame as c_int + remaining, 1, 1);
                         } else {
                             PM_SetAnimFrame(
                                 genemy,
-                                (*anim2).firstFrame + (*anim2).numFrames - remaining,
+                                (*anim2).firstFrame as c_int + (*anim2).numFrames as c_int - remaining,
                                 1,
                                 1,
                             );
@@ -1134,12 +1135,12 @@ impl PmoveContext<'_> {
                         }
                         PM_SetAnimFrame(
                             genemy,
-                            (*anim2).firstFrame + (*anim2).numFrames - remaining,
+                            (*anim2).firstFrame as c_int + (*anim2).numFrames as c_int - remaining,
                             1,
                             1,
                         );
                     } else {
-                        PM_SetAnimFrame(genemy, (*anim2).firstFrame + remaining, 1, 1);
+                        PM_SetAnimFrame(genemy, (*anim2).firstFrame as c_int + remaining, 1, 1);
                     }
                 }
             } else {
@@ -2023,7 +2024,7 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).saberLockTime > (*self.pm).cmd.serverTime {
-                (*ps).saberMove = LS_NONE as c_short;
+                (*ps).saberMove = LS_NONE as c_int;
                 self.PM_SaberLocked();
                 return;
             } else if (*ps).saberLockFrame != 0 {
@@ -2048,7 +2049,7 @@ impl PmoveContext<'_> {
                 if (*ps).legsTimer > 0 {
                     return;
                 }
-                (*ps).saberMove = LS_READY as c_short;
+                (*ps).saberMove = LS_READY as c_int;
                 (*ps).weaponTime = 0;
             }
 
@@ -2200,13 +2201,13 @@ impl PmoveContext<'_> {
                     (*ps).torsoTimer = 0;
                     (*ps).legsTimer = 0;
                     (*ps).forceHandExtend = HANDEXTEND_NONE as c_int;
-                    (*ps).weaponstate = WEAPON_READY;
+                    (*ps).weaponstate = WEAPON_READY as c_int;
                     self.PM_SetSaberMove(pullmove as c_short);
                     return;
                 }
                 (*ps).weaponTime -= self.pml.msec;
             } else {
-                (*ps).weaponstate = WEAPON_READY;
+                (*ps).weaponstate = WEAPON_READY as c_int;
             }
 
             if (*ps).saberBlocked != 0 {
@@ -2297,7 +2298,7 @@ impl PmoveContext<'_> {
                 }
 
                 (*ps).saberBlocked = 0;
-                (*ps).weaponstate = WEAPON_READY;
+                (*ps).weaponstate = WEAPON_READY as c_int;
                 return;
             }
 
@@ -2358,11 +2359,11 @@ impl PmoveContext<'_> {
                         }
                         _ => {}
                     }
-                    (*ps).weaponstate = WEAPON_FIRING;
+                    (*ps).weaponstate = WEAPON_FIRING as c_int;
                     BG_ForcePowerDrain(ps, FP_GRIP, SABER_ALT_ATTACK_POWER);
                 } else if overrideMove != LS_NONE {
                     self.PM_SetSaberMove(overrideMove as c_short);
-                    (*ps).weaponstate = WEAPON_FIRING;
+                    (*ps).weaponstate = WEAPON_FIRING as c_int;
                     BG_ForcePowerDrain(ps, FP_GRIP, SABER_ALT_ATTACK_POWER);
                 }
                 if overrideMove != LS_NONE {
@@ -2374,13 +2375,13 @@ impl PmoveContext<'_> {
                 return;
             }
 
-            if (*ps).weaponstate == WEAPON_DROPPING {
+            if (*ps).weaponstate == WEAPON_DROPPING as c_int {
                 PM_FinishWeaponChange();
                 return;
             }
 
-            if (*ps).weaponstate == WEAPON_RAISING {
-                (*ps).weaponstate = WEAPON_IDLE;
+            if (*ps).weaponstate == WEAPON_RAISING as c_int {
+                (*ps).weaponstate = WEAPON_IDLE as c_int;
                 if (*ps).legsAnim == BOTH_WALK1 as c_int {
                     self.PM_SetAnim(SETANIM_TORSO as c_int, BOTH_WALK1 as c_int, SETANIM_FLAG_NORMAL as c_int, 100);
                 } else if (*ps).legsAnim == BOTH_RUN1 as c_int {
@@ -2402,7 +2403,7 @@ impl PmoveContext<'_> {
                     self.PM_SetAnim(SETANIM_TORSO as c_int, stance, SETANIM_FLAG_NORMAL as c_int, 100);
                 }
 
-                if (*ps).weaponstate == WEAPON_RAISING {
+                if (*ps).weaponstate == WEAPON_RAISING as c_int {
                     return;
                 }
             }
@@ -2471,9 +2472,9 @@ impl PmoveContext<'_> {
                 (*ps).weaponTime = 0;
 
                 if (*ps).weaponTime > 0 {
-                    (*ps).weaponstate = WEAPON_FIRING;
-                } else if (*ps).weaponstate != WEAPON_READY {
-                    (*ps).weaponstate = WEAPON_IDLE;
+                    (*ps).weaponstate = WEAPON_FIRING as c_int;
+                } else if (*ps).weaponstate != WEAPON_READY as c_int {
+                    (*ps).weaponstate = WEAPON_IDLE as c_int;
                 }
 
                 if curmove >= LS_S_TL2BR && curmove <= LS_S_T2B {
@@ -2491,7 +2492,7 @@ impl PmoveContext<'_> {
             }
 
             if (*ps).weaponTime > 0 {
-                (*ps).weaponstate = WEAPON_FIRING;
+                (*ps).weaponstate = WEAPON_FIRING as c_int;
                 return;
             }
 
@@ -2599,7 +2600,7 @@ impl PmoveContext<'_> {
 
             (*ps).weaponTime = (*ps).torsoTimer;
 
-            (*ps).weaponstate = WEAPON_FIRING;
+            (*ps).weaponstate = WEAPON_FIRING as c_int;
             let amount = weaponData[(*ps).weapon as usize].energyPerShot;
             let _ = amount;
             let mut addTime = (*ps).weaponTime;
@@ -2814,7 +2815,7 @@ impl PmoveContext<'_> {
                     (*ps).weaponTime = (*ps).torsoTimer;
                 }
 
-                (*ps).saberMove = newMove as c_short;
+                (*ps).saberMove = newMove as c_int;
                 (*ps).saberBlocking = saberMoveData[newMove as usize].blocking;
                 (*ps).torsoAnim = anim;
 

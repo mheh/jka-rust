@@ -428,7 +428,7 @@ pub fn NPC_MoveToGoal(
 
         // If taking full body pain, don't move
         if PM_InKnockDown(&mut (*((*npc).client as *mut gclient_t)).ps) == qtrue
-            || ((*npc).s.legsAnim >= BOTH_PAIN1 && (*npc).s.legsAnim <= BOTH_PAIN18)
+            || ((*npc).s.legsAnim >= BOTH_PAIN1 as c_int && (*npc).s.legsAnim <= BOTH_PAIN18 as c_int)
         {
             return qtrue;
         }
@@ -443,9 +443,9 @@ pub fn NPC_MoveToGoal(
         // Convert the move to angles
         crate::q_math::vectoangles(dir, &mut npc_info.lastPathAngles);
         if (ucmd.buttons & BUTTON_WALKING) != 0 {
-            (*((*npc).client as *mut gclient_t)).ps.speed = npc_info.stats.walkSpeed;
+            (*((*npc).client as *mut gclient_t)).ps.speed = npc_info.stats.walkSpeed as f32;
         } else {
-            (*((*npc).client as *mut gclient_t)).ps.speed = npc_info.stats.runSpeed;
+            (*((*npc).client as *mut gclient_t)).ps.speed = npc_info.stats.runSpeed as f32;
         }
 
         // If in combat move, then move directly towards our goal

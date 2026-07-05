@@ -231,9 +231,21 @@ pub fn Use_Target_Print(
                     // make sure there's a valid client ent to send it to
                     let msg = crate::cstr_util::cstr_to_str((*ent).message);
                     if *(*ent).message == b'@' as c_char && *(*ent).message.add(1) != b'@' as c_char {
-                        trap::SendServerCommand(ctx.engine, activator as *const _ as isize, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr());
+                        trap::SendServerCommand(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                                (*activator).s.number,
+                                crate::cstr_util::cstr(&format!("cps \"{}\"", msg)),
+                            ),
+                        );
                     } else {
-                        trap::SendServerCommand(ctx.engine, activator as *const _ as isize, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr());
+                        trap::SendServerCommand(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                                (*activator).s.number,
+                                crate::cstr_util::cstr(&format!("cp \"{}\"", msg)),
+                            ),
+                        );
                     }
                 }
             }
@@ -244,16 +256,16 @@ pub fn Use_Target_Print(
             let msg = crate::cstr_util::cstr_to_str((*ent).message);
             if (*ent).spawnflags & 1 != 0 {
                 if *(*ent).message == b'@' as c_char && *(*ent).message.add(1) != b'@' as c_char {
-                    G_TeamCommand(ctx, TEAM_RED, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr());
+                    G_TeamCommand(ctx, TEAM_RED, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr() as *mut c_char);
                 } else {
-                    G_TeamCommand(ctx, TEAM_RED, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr());
+                    G_TeamCommand(ctx, TEAM_RED, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr() as *mut c_char);
                 }
             }
             if (*ent).spawnflags & 2 != 0 {
                 if *(*ent).message == b'@' as c_char && *(*ent).message.add(1) != b'@' as c_char {
-                    G_TeamCommand(ctx, TEAM_BLUE, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr());
+                    G_TeamCommand(ctx, TEAM_BLUE, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr() as *mut c_char);
                 } else {
-                    G_TeamCommand(ctx, TEAM_BLUE, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr());
+                    G_TeamCommand(ctx, TEAM_BLUE, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr() as *mut c_char);
                 }
             }
             return;
@@ -262,9 +274,21 @@ pub fn Use_Target_Print(
         // Send to all players
         let msg = crate::cstr_util::cstr_to_str((*ent).message);
         if *(*ent).message == b'@' as c_char && *(*ent).message.add(1) != b'@' as c_char {
-            trap::SendServerCommand(ctx.engine, -1, crate::cstr_util::cstr(&format!("cps \"{}\"", msg)).as_ptr());
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    -1,
+                    crate::cstr_util::cstr(&format!("cps \"{}\"", msg)),
+                ),
+            );
         } else {
-            trap::SendServerCommand(ctx.engine, -1, crate::cstr_util::cstr(&format!("cp \"{}\"", msg)).as_ptr());
+            trap::SendServerCommand(
+                ctx.engine,
+                mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                    -1,
+                    crate::cstr_util::cstr(&format!("cp \"{}\"", msg)),
+                ),
+            );
         }
     }
 }

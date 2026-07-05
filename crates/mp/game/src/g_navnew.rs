@@ -41,7 +41,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::g_nav::{G_DrawEdge, NAV_CheckAhead, NAV_TestForBlocked};
+use crate::g_nav::{G_DrawEdge, G_DrawNode, NAV_CheckAhead, NAV_TestBestNode, NAV_TestForBlocked};
 use crate::trap;
 use crate::world::GameContext;
 

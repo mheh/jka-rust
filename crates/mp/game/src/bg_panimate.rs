@@ -1654,9 +1654,12 @@ impl PmoveContext<'_> {
         if anim >= MAX_ANIMATIONS as c_int {
             return -1;
         }
-        (self.bg.bgAllAnims[index as usize].anims[anim as usize].numFrames as f32
-            * (self.bg.bgAllAnims[index as usize].anims[anim as usize].frameLerp as f32).abs())
-            as c_int
+        unsafe {
+            let anim_ptr = self.bg.bgAllAnims[index as usize]
+                .anims
+                .offset(anim as isize);
+            ((*anim_ptr).numFrames as f32 * ((*anim_ptr).frameLerp as f32).abs()) as c_int
+        }
     }
 }
 
