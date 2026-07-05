@@ -1937,8 +1937,12 @@ pub fn player_die(
                         killEnt = (*selfVeh).m_ppPassengers[((*selfVeh).m_iNumPassengers - 1) as usize]
                             as *mut gentity_t;
                         if !killEnt.is_null() {
-                            let eject = (*(*selfVeh).m_pVehicleInfo).Eject;
-                            eject(selfVeh, killEnt as *mut bgEntity_t, qtrue);
+                            crate::veh_dispatch::eject(
+                                ctx,
+                                selfVeh,
+                                killEnt as *mut bgEntity_t,
+                                qtrue,
+                            );
                             if (*killEnt).inuse != qfalse && !(*killEnt).client.is_null() {
                                 let mut zero_dir: vec3_t = [0.0; 3];
                                 G_Damage(
@@ -2020,8 +2024,7 @@ pub fn player_die(
                     .m_pVehicleInfo
                     .offset_from((*ctx.world).bg_state.g_vehicleInfo.as_ptr())
                     as c_int;
-                let eject = (*(*vehVeh).m_pVehicleInfo).Eject;
-                eject(vehVeh, self_ as *mut bgEntity_t, qtrue);
+                crate::veh_dispatch::eject(ctx, vehVeh, self_ as *mut bgEntity_t, qtrue);
 
                 if (*(*vehVeh).m_pVehicleInfo).r#type == VH_FIGHTER {
                     // go into "die in ship" mode with flag

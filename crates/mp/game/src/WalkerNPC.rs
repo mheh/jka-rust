@@ -23,11 +23,8 @@ pub fn RegisterAssets(
         let weapon = crate::bg_misc::BG_FindItemForWeapon(WP_TURRET);
         crate::g_items::RegisterItem(ctx, weapon);
 
-        // Call the standard RegisterAssets on the base vehicle info
-        let base_veh_info = &mut (*ctx.world).bg_state.g_vehicleInfo[VEHICLE_BASE as usize];
-        if let Some(register_assets_fn) = base_veh_info.RegisterAssets {
-            register_assets_fn(pVeh);
-        }
+        // Fork-7: the generic base RegisterAssets body (empty).
+        crate::g_vehicles::RegisterAssets(pVeh);
     }
 }
 
@@ -382,7 +379,7 @@ unsafe extern "C" fn RegisterAssets_extern(pVeh: *mut Vehicle_t) {
 ///
 /// Board the Walker vehicle (internal static, assigned to vehicleInfo_t.Board).
 /// Source: `oracle/oracle/codemp/game/WalkerNPC.c:106-115`
-fn Board(
+pub fn Board(
     ctx: GameContext<'_>,pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> bool {
     // PORT-ESCALATION(level-global): oracle line 188 accesses `level.time` global for boarding delay
     todo!("Port Board — parked: level.time not yet accessible in vehicle context")

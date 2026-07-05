@@ -141,7 +141,7 @@ pub extern "C" fn ProcessMoveCommands(pVeh: *mut Vehicle_t) {
         if (*pVeh).m_ulFlags & VEH_FLYING != 0 {
             speedInc = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.acceleration).unwrap_or(0.0)
                 * (*pVeh).m_fTimeModifier * 0.4f32;
-        } else if (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.Inhabited(pVeh)).unwrap_or(false) as c_int == 0 {
+        } else if crate::veh_dispatch::inhabited(pVeh) as c_int == 0 {
             // Drifts to a stop
             speedInc = 0.0f32;
         } else {

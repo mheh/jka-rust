@@ -1034,9 +1034,9 @@ pub fn NPC_Spawn_Do(
             (*(*newent).m_pVehicle).m_vOrientation = &mut (*(*newent).client).ps.vehOrientation[0] as *mut f32;
 
             (*(*newent).m_pVehicle).m_pParentEntity = newent as *mut bgEntity_t;
-            ((*(*(*newent).m_pVehicle).m_pVehicleInfo).Initialize)((*newent).m_pVehicle);
+            crate::veh_dispatch::initialize(ctx, (*newent).m_pVehicle);
 
-            ((*(*(*newent).m_pVehicle).m_pVehicleInfo).RegisterAssets)((*newent).m_pVehicle);
+            crate::veh_dispatch::register_assets(ctx, (*newent).m_pVehicle);
             (*(*newent).client).NPC_class = CLASS_VEHICLE;
             if (*ctx.world).bg_state.g_vehicleInfo[i_veh_index as usize].type_ == VH_FIGHTER {
                 (*newent).flags |= FL_NO_KNOCKBACK | FL_SHIELDED | FL_DMG_BY_HEAVY_WEAP_ONLY;

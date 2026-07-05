@@ -25,17 +25,14 @@ const YAW: usize = 1;
 /// Raven `DeathUpdate` — update death sequence.
 ///
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:97-148`
-pub extern "C" fn DeathUpdate(pVeh: *mut Vehicle_t) {
+pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
         let level_time = crate::g_main::level_time();
         if level_time >= (*pVeh).m_iDieTime {
-            // If the vehicle is not empty.
-            if let Some(inhabited_fn) = (*(*pVeh).m_pVehicleInfo).Inhabited {
-                if inhabited_fn(pVeh) {
-                    if let Some(eject_fn) = (*(*pVeh).m_pVehicleInfo).EjectAll {
-                        eject_fn(pVeh);
-                    }
-                }
+            // If the vehicle is not empty. (Fork-7: `Inhabited`/`EjectAll` have
+            // no Animal override, so dispatch resolves to the generic base.)
+            if crate::veh_dispatch::inhabited(pVeh) != qfalse {
+                crate::veh_dispatch::eject_all(ctx, pVeh);
             }
         }
     }
@@ -45,14 +42,10 @@ pub extern "C" fn DeathUpdate(pVeh: *mut Vehicle_t) {
 /// vehicle properties.
 ///
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:151-154`
-pub extern "C" fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
-        let base_info = &crate::g_main::g_vehicleInfo[VEHICLE_BASE as usize];
-        if let Some(update_fn) = base_info.Update {
-            update_fn(pVeh, pUcmd)
-        } else {
-            qfalse
-        }
+        // Fork-7: Animal `Update` delegates to the generic base body.
+        crate::g_vehicles::Update(ctx, pVeh, pUcmd)
     }
 }
 

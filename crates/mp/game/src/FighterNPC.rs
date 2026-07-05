@@ -38,8 +38,8 @@ pub fn Board(
     pEnt: *mut bgEntity_t,
 ) -> qboolean {
     unsafe {
-        // PORT-NOTE(vehicleInfo-Board): Calls Board method on base vehicle info; exact function-ptr signature depends on vehicleInfo_t field type
-        if !(*ctx.world).bg_state.g_vehicleInfo[VEHICLE_BASE as usize].Board(pVeh, pEnt) {
+        // Fork-7: `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
+        if crate::g_vehicles::Board(ctx, pVeh, pEnt) == qfalse {
             return qfalse;
         }
 
@@ -60,9 +60,12 @@ pub fn Eject(
     forceEject: qboolean,
 ) -> qboolean {
     unsafe {
-        // Delegate to base vehicle's Eject method through vehicleInfo vtable
-        // PORT-NOTE(vtable-dispatch): Need resolved vehicleInfo_t.Eject function ptr signature
-        qfalse  // parked: can't call base Eject without vtable resolution
+        // Fork-7: `g_vehicleInfo[VEHICLE_BASE].Eject` is the generic base body.
+        if crate::g_vehicles::Eject(ctx, pVeh, pEnt, forceEject) != qfalse {
+            qtrue
+        } else {
+            qfalse
+        }
     }
 }
 
