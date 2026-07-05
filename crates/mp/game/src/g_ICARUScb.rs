@@ -1,7 +1,8 @@
-// PORT-COMPLETE: g_ICARUScb.c 6/155
-// (Q3_TaskIDClear, Q3_GetAnimBoth, anglerCallback, moverCallback, Blocked_Mover,
-// moveAndRotateCallback fully ported; Q3_GetAnimLower/Upper partially ported —
-// null-client guard is real, the animTable lookup is parked on client-still-void.
+// PORT-COMPLETE: g_ICARUScb.c 8/155
+// (Q3_TaskIDClear, Q3_GetAnimBoth, Q3_GetAnimLower, Q3_GetAnimUpper,
+// anglerCallback, moverCallback, Blocked_Mover, moveAndRotateCallback fully
+// ported; the animTable anim reads dereference `client` via the standard
+// `*mut c_void as *mut gclient_t` cast idiom.
 // Remaining functions parked: 148 on entid-lookup (no g_entities/EntityId
 // accessor exposed to this raw *mut gentity_t-staged skeleton), 1 on
 // variadic-c-abi (G_DebugPrint).)
@@ -145,9 +146,7 @@ pub fn Q3_GetAnimLower(
     ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut c_char {
     unsafe {
         if (*ent).client.is_null() {
-            //TODO: Port g_entities[].client (still `*mut c_void`; legsAnim read needs the typed gclient_t)
-            // Source: oracle/oracle/codemp/game/g_ICARUScb.c:335-339
-            G_DebugPrint(ctx, 
+            G_DebugPrint(ctx,
                 WL_WARNING as c_int,
                 b"Q3_GetAnimLower: attempted to read animation state off non-client!\n\0".as_ptr()
                     as *const c_char,
@@ -155,9 +154,9 @@ pub fn Q3_GetAnimLower(
             return std::ptr::null_mut();
         }
 
-        //TODO: Port gclient_t::ps.legsAnim — client is still `*mut c_void` at this seam.
-        // Source: oracle/oracle/codemp/game/g_ICARUScb.c:341
-        todo!("Port Q3_GetAnimLower — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:341")
+        let anim: c_int = (*((*ent).client as *mut gclient_t)).ps.legsAnim;
+
+        animTable[anim as usize].name
     }
 }
 
@@ -168,9 +167,7 @@ pub fn Q3_GetAnimUpper(
     ctx: GameContext<'_>,ent: *mut gentity_t) -> *mut c_char {
     unsafe {
         if (*ent).client.is_null() {
-            //TODO: Port g_entities[].client (still `*mut c_void`; torsoAnim read needs the typed gclient_t)
-            // Source: oracle/oracle/codemp/game/g_ICARUScb.c:355-359
-            G_DebugPrint(ctx, 
+            G_DebugPrint(ctx,
                 WL_WARNING as c_int,
                 b"Q3_GetAnimUpper: attempted to read animation state off non-client!\n\0".as_ptr()
                     as *const c_char,
@@ -178,9 +175,9 @@ pub fn Q3_GetAnimUpper(
             return std::ptr::null_mut();
         }
 
-        //TODO: Port gclient_t::ps.torsoAnim — client is still `*mut c_void` at this seam.
-        // Source: oracle/oracle/codemp/game/g_ICARUScb.c:361
-        todo!("Port Q3_GetAnimUpper — parked (client-still-void): oracle/oracle/codemp/game/g_ICARUScb.c:361")
+        let anim: c_int = (*((*ent).client as *mut gclient_t)).ps.torsoAnim;
+
+        animTable[anim as usize].name
     }
 }
 

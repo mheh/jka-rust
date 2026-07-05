@@ -28,6 +28,27 @@ use crate::g_combat::G_DamageFromKiller;
 use crate::g_main::Com_Error;
 use crate::g_utils::G_AllocateVehicleObject;
 use crate::q_math::{AngleNormalize180, AngleNormalize360, AngleSubtract};
+use crate::q_math::{AngleVectors, VectorClear, VectorLength, _DotProduct, _VectorMA, _VectorScale};
+use crate::g_vehicles::{SHIPSURF_BROKEN_C, SHIPSURF_BROKEN_D, SHIPSURF_BROKEN_E, SHIPSURF_BROKEN_F};
+
+// Constants used by the vehicle move/orient/animate bodies below. Values from the
+// oracle; defined locally (mirroring `SpeederNPC.rs`) so the flight bodies don't
+// depend on scattered cross-module imports.
+// Source: `oracle/oracle/codemp/game/{bg_public.h,bg_vehicles.h,FighterNPC.c}`.
+const HYPERSPACE_SPEED: f32 = 10000.0; // bg_public.h:1681
+const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75; // bg_public.h
+const HYPERSPACE_TIME: c_int = 4000; // g_trigger.rs / bg
+const FIGHTER_MIN_TAKEOFF_FRACTION: f32 = 0.7; // FighterNPC.c:369
+const MIN_LANDING_SLOPE: f32 = 0.8; // bg_vehicles.h
+const MIN_LANDING_SPEED: f32 = 200.0; // bg_public.h
+const MAX_STRAFE_TIME: f32 = 2000.0; // q_shared.h
+const EF2_HYPERSPACE: c_int = 1 << 5;
+const EF_JETPACK_ACTIVE: c_int = 1 << 11;
+const EF_DEAD: c_int = 1 << 7;
+const CHAN_AUTO: c_int = 0; // soundChannel_t CHAN_AUTO
+// `vehFlags_t` masks as `u64` for `Vehicle_t::m_ulFlags`. Source: `bg_vehicles.h:417`.
+const VEH_WINGSOPEN: u64 = 0x0000_0020;
+const VEH_GEARSOPEN: u64 = 0x0000_0040;
 
 /// Raven `Board`.
 ///
@@ -619,6 +640,714 @@ pub fn FighterPitchClamp(
         }
     }
 }
+
+/// Raven `ProcessMoveCommands` — move the fighter forward/back/up/down.
+///
+/// Raven: MP RULE — ALL PROCESSMOVECOMMANDS FUNCTIONS MUST BE BG-COMPATIBLE.
+/// `curTime` is `pm->cmd.serverTime` in the oracle; `m_ucmd` is assigned
+/// `pm->cmd` before dispatch, so `m_ucmd.serverTime` is the faithful ctx-only
+/// source (same idiom this file already uses in `FighterWingMalfunctionCheck`).
+/// The `#ifndef _JK2MP` (SP) branches are dead in this build and dropped
+/// (porting-rules §10). `Inhabited()` dispatches through `veh_dispatch`.
+/// Source: `oracle/oracle/codemp/game/FighterNPC.c:370-889`
+pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+    unsafe {
+        let parent = (*pVeh).m_pParentEntity;
+        let curTime: c_int = (*pVeh).m_ucmd.serverTime;
+        let parentPS: *mut playerState_t = (*parent).playerState;
+        let vi = (*pVeh).m_pVehicleInfo;
+
+        // Going to Hyperspace: totally override movement.
+        if (*parentPS).hyperSpaceTime != 0
+            && curTime - (*parentPS).hyperSpaceTime < HYPERSPACE_TIME
+        {
+            let timeFrac =
+                (curTime - (*parentPS).hyperSpaceTime) as f32 / HYPERSPACE_TIME as f32;
+            if timeFrac < HYPERSPACE_TELEPORT_FRAC {
+                // for the first half, instantly jump to top speed
+                if (*parentPS).eFlags2 & EF2_HYPERSPACE == 0 {
+                    // waiting to face the right direction, do nothing
+                    (*parentPS).speed = 0.0;
+                } else {
+                    // (QAGAME hyperspace sound is commented out in the oracle)
+                    (*parentPS).speed = HYPERSPACE_SPEED;
+                }
+            } else {
+                // slow from top speed to 200...
+                (*parentPS).speed = 200.0
+                    + ((1.0 - timeFrac)
+                        * (1.0 / HYPERSPACE_TELEPORT_FRAC)
+                        * (HYPERSPACE_SPEED - 200.0));
+                if VectorLength((*parentPS).velocity) < (*parentPS).speed {
+                    _VectorScale((*parentPS).moveDir, (*parentPS).speed, &mut (*parentPS).velocity);
+                }
+            }
+            return;
+        }
+
+        if (*pVeh).m_iDropTime >= curTime {
+            // no speed, just drop
+            (*parentPS).speed = 0.0;
+            (*parentPS).gravity = 800;
+            return;
+        }
+
+        let isLandingOrLaunching: qboolean = if FighterIsLanding(pVeh, parentPS) != qfalse
+            || FighterIsLaunching(pVeh, parentPS) != qfalse
+        {
+            qtrue
+        } else {
+            qfalse
+        };
+
+        // If we are hitting the ground, just allow the fighter to go up and down.
+        if isLandingOrLaunching != qfalse
+            && ((*pVeh).m_ucmd.forwardmove <= 0
+                || (*pVeh).m_LandTrace.fraction <= FIGHTER_MIN_TAKEOFF_FRACTION)
+        {
+            if (*pVeh).m_ucmd.upmove > 0 {
+                if (*parentPS).velocity[2] <= 0.0 && (*vi).soundTakeOff != 0 {
+                    // taking off for the first time (QAGAME game-side)
+                    let parent_ent = parent as *mut gentity_t;
+                    crate::g_utils::G_EntitySound(ctx, parent_ent, CHAN_AUTO, (*vi).soundTakeOff);
+                }
+                (*parentPS).velocity[2] += (*vi).acceleration * (*pVeh).m_fTimeModifier;
+            } else if (*pVeh).m_ucmd.upmove < 0 {
+                (*parentPS).velocity[2] -= (*vi).acceleration * (*pVeh).m_fTimeModifier;
+            } else if (*pVeh).m_ucmd.forwardmove < 0 {
+                if (*pVeh).m_LandTrace.fraction != 0.0 {
+                    (*parentPS).velocity[2] -= (*vi).acceleration * (*pVeh).m_fTimeModifier;
+                }
+                if (*pVeh).m_LandTrace.fraction <= FIGHTER_MIN_TAKEOFF_FRACTION {
+                    (*parentPS).velocity[2] = PredictedAngularDecrement(
+                        (*pVeh).m_LandTrace.fraction,
+                        (*pVeh).m_fTimeModifier * 5.0,
+                        (*parentPS).velocity[2],
+                    );
+                    (*parentPS).speed = 0.0;
+                }
+            }
+            // Make sure they don't pitch as they near the ground.
+            *(*pVeh).m_vOrientation.add(0) = PredictedAngularDecrement(
+                0.7,
+                (*pVeh).m_fTimeModifier * 10.0,
+                *(*pVeh).m_vOrientation.add(0),
+            );
+            return;
+        }
+
+        if (*pVeh).m_ucmd.upmove > 0 && (*vi).turboSpeed != 0.0 {
+            if (curTime - (*pVeh).m_iTurboTime) > (*vi).turboRecharge {
+                (*pVeh).m_iTurboTime = curTime + (*vi).turboDuration;
+                if (*vi).soundTurbo != 0 {
+                    // QAGAME game-side turbo sound
+                    let parent_ent = parent as *mut gentity_t;
+                    crate::g_utils::G_EntitySound(ctx, parent_ent, CHAN_AUTO, (*vi).soundTurbo);
+                }
+            }
+        }
+
+        let mut speedInc = (*vi).acceleration * (*pVeh).m_fTimeModifier;
+        let mut speedMax;
+        if curTime < (*pVeh).m_iTurboTime {
+            // going turbo speed
+            speedMax = (*vi).turboSpeed;
+            speedInc = ((*vi).acceleration * 2.0) * (*pVeh).m_fTimeModifier;
+            // force us to move forward
+            (*pVeh).m_ucmd.forwardmove = 127;
+            // let cgame know to draw the iTurboFX effect (_JK2MP)
+            (*parentPS).eFlags |= EF_JETPACK_ACTIVE;
+        } else {
+            // normal max speed
+            speedMax = (*vi).speedMax;
+            if (*parentPS).eFlags & EF_JETPACK_ACTIVE != 0 {
+                // stop cgame from playing the turbo exhaust effect
+                (*parentPS).eFlags &= !EF_JETPACK_ACTIVE;
+            }
+        }
+        let mut speedIdleDec = (*vi).decelIdle * (*pVeh).m_fTimeModifier;
+        let speedIdle = (*vi).speedIdle;
+        let speedIdleAccel = (*vi).accelIdle * (*pVeh).m_fTimeModifier;
+        let speedMin = (*vi).speedMin;
+
+        if (*parentPS).brokenLimbs & (1 << 5) != 0 {
+            // SHIPSURF_DAMAGE_BACK_HEAVY (=5): engine heavy damage, 80% speed
+            speedMax *= 0.8;
+        } else if (*parentPS).brokenLimbs & (1 << 1) != 0 {
+            // SHIPSURF_DAMAGE_BACK_LIGHT (=1): engine light damage, 60% speed
+            speedMax *= 0.6;
+        }
+
+        if (*pVeh).m_iRemovedSurfaces != 0 || (*parentPS).electrifyTime >= curTime {
+            // go out of control
+            (*parentPS).speed += speedInc;
+            (*pVeh).m_ucmd.forwardmove = 127;
+        } else if FighterSuspended(pVeh, parentPS) != qfalse {
+            (*parentPS).speed = 0.0;
+            (*pVeh).m_ucmd.forwardmove = 0;
+        } else if crate::veh_dispatch::inhabited(ctx, pVeh) == qfalse && (*parentPS).speed > 0.0 {
+            // pilot jumped out while moving forward, keep the throttle locked
+            (*pVeh).m_ucmd.forwardmove = 127;
+        } else if ((*parentPS).speed != 0.0
+            || (*parentPS).groundEntityNum == ENTITYNUM_NONE
+            || (*pVeh).m_ucmd.forwardmove != 0
+            || (*pVeh).m_ucmd.upmove > 0)
+            && (*pVeh).m_LandTrace.fraction >= 0.05
+        {
+            if (*pVeh).m_ucmd.forwardmove > 0 && speedInc != 0.0 {
+                (*parentPS).speed += speedInc;
+                (*pVeh).m_ucmd.forwardmove = 127;
+            } else if (*pVeh).m_ucmd.forwardmove < 0 || (*pVeh).m_ucmd.upmove < 0 {
+                // decelerating or braking
+                if (*pVeh).m_ucmd.upmove < 0 {
+                    if (*pVeh).m_ucmd.forwardmove != 0 {
+                        speedInc += (*vi).braking;
+                        speedIdleDec += (*vi).braking;
+                    } else {
+                        speedInc = (*vi).braking;
+                        speedIdleDec = (*vi).braking;
+                    }
+                }
+                if (*parentPS).speed > speedIdle {
+                    (*parentPS).speed -= speedInc;
+                } else if (*parentPS).speed > speedMin {
+                    if FighterOverValidLandingSurface(pVeh) != qfalse {
+                        (*parentPS).speed -= speedInc;
+                    } else {
+                        (*parentPS).speed -= speedIdleDec;
+                        if (*parentPS).speed < MIN_LANDING_SPEED {
+                            (*parentPS).speed = MIN_LANDING_SPEED;
+                        }
+                    }
+                }
+                if (*vi).r#type == vehicleType_t::VH_FIGHTER {
+                    (*pVeh).m_ucmd.forwardmove = 127;
+                } else if speedMin >= 0.0 {
+                    (*pVeh).m_ucmd.forwardmove = 0;
+                }
+            } else if (*vi).throttleSticks != 0.0 {
+                // throttle that sticks at current speed
+                if (*parentPS).speed <= MIN_LANDING_SPEED {
+                    if FighterOverValidLandingSurface(pVeh) != qfalse {
+                        if (*parentPS).speed > 0.0 {
+                            (*parentPS).speed -= speedIdleDec;
+                        } else if (*parentPS).speed < 0.0 {
+                            (*parentPS).speed += speedIdleDec;
+                        }
+                    } else if (*parentPS).speed < speedIdle {
+                        (*parentPS).speed += speedIdleAccel;
+                        if (*parentPS).speed > speedIdle {
+                            (*parentPS).speed = speedIdle;
+                        }
+                    }
+                }
+            } else {
+                // speed up or slow down to idle speed
+                if ((*pVeh).m_LandTrace.fraction >= 1.0
+                    || (*pVeh).m_LandTrace.plane.normal[2] < MIN_LANDING_SLOPE)
+                    && speedIdle > 0.0
+                {
+                    if (*parentPS).speed < speedIdle {
+                        (*parentPS).speed += speedIdleAccel;
+                        if (*parentPS).speed > speedIdle {
+                            (*parentPS).speed = speedIdle;
+                        }
+                    } else if (*parentPS).speed > 0.0 {
+                        (*parentPS).speed -= speedIdleDec;
+                        if (*parentPS).speed < speedIdle {
+                            (*parentPS).speed = speedIdle;
+                        }
+                    }
+                } else if (*parentPS).speed > 0.0 {
+                    (*parentPS).speed -= speedIdleDec;
+                } else if (*parentPS).speed < 0.0 {
+                    (*parentPS).speed += speedIdleDec;
+                }
+            }
+        } else {
+            if (*pVeh).m_ucmd.forwardmove < 0 {
+                (*pVeh).m_ucmd.forwardmove = 0;
+            }
+            if (*pVeh).m_ucmd.upmove < 0 {
+                (*pVeh).m_ucmd.upmove = 0;
+            }
+            // `#ifndef _JK2MP` strafe-clear is SP-only dead code (dropped §10)
+        }
+
+        // STRAFING
+        if (*vi).strafePerc != 0.0
+            && crate::veh_dispatch::inhabited(ctx, pVeh) != qfalse
+            && (*pVeh).m_iRemovedSurfaces == 0
+            && (*parentPS).electrifyTime < curTime
+            && (*parentPS).vehTurnaroundTime < curTime
+            && ((*pVeh).m_LandTrace.fraction >= 1.0
+                || (*pVeh).m_LandTrace.plane.normal[2] < MIN_LANDING_SLOPE
+                || (*parentPS).speed > MIN_LANDING_SPEED)
+            && (*pVeh).m_ucmd.rightmove != 0
+        {
+            let mut vAngles: vec3_t = [
+                *(*pVeh).m_vOrientation.add(0),
+                *(*pVeh).m_vOrientation.add(1),
+                *(*pVeh).m_vOrientation.add(2),
+            ];
+            let mut strafeSpeed = ((*vi).strafePerc * speedMax) * 5.0;
+            vAngles[0] = 0.0; // PITCH
+            vAngles[2] = 0.0; // ROLL
+            let mut vRight: vec3_t = [0.0; 3];
+            AngleVectors(vAngles, None, Some(&mut vRight), None);
+
+            if (*pVeh).m_ucmd.rightmove > 0 {
+                // strafe right (can for 2 seconds)
+                if ((*parentPS).hackingTime as f32) > -MAX_STRAFE_TIME {
+                    let curStrafeSpeed = _DotProduct((*parentPS).velocity, vRight);
+                    if curStrafeSpeed > 0.0 {
+                        strafeSpeed -= curStrafeSpeed;
+                    }
+                    if strafeSpeed > 0.0 {
+                        _VectorMA(
+                            (*parentPS).velocity,
+                            strafeSpeed * (*pVeh).m_fTimeModifier,
+                            vRight,
+                            &mut (*parentPS).velocity,
+                        );
+                    }
+                    (*parentPS).hackingTime = ((*parentPS).hackingTime as f32
+                        - 50.0 * (*pVeh).m_fTimeModifier)
+                        as c_int;
+                }
+            } else if ((*parentPS).hackingTime as f32) < MAX_STRAFE_TIME {
+                // strafe left (can for 2 seconds)
+                let curStrafeSpeed = _DotProduct((*parentPS).velocity, vRight);
+                if curStrafeSpeed < 0.0 {
+                    strafeSpeed += curStrafeSpeed;
+                }
+                if strafeSpeed > 0.0 {
+                    _VectorMA(
+                        (*parentPS).velocity,
+                        -strafeSpeed * (*pVeh).m_fTimeModifier,
+                        vRight,
+                        &mut (*parentPS).velocity,
+                    );
+                }
+                (*parentPS).hackingTime = ((*parentPS).hackingTime as f32
+                    + 50.0 * (*pVeh).m_fTimeModifier) as c_int;
+            }
+        } else if (*parentPS).hackingTime > 0 {
+            (*parentPS).hackingTime =
+                ((*parentPS).hackingTime as f32 - 50.0 * (*pVeh).m_fTimeModifier) as c_int;
+            if (*parentPS).hackingTime < 0 {
+                (*parentPS).hackingTime = 0;
+            }
+        } else if (*parentPS).hackingTime < 0 {
+            (*parentPS).hackingTime =
+                ((*parentPS).hackingTime as f32 + 50.0 * (*pVeh).m_fTimeModifier) as c_int;
+            if (*parentPS).hackingTime > 0 {
+                (*parentPS).hackingTime = 0;
+            }
+        }
+
+        if (*parentPS).speed > speedMax {
+            (*parentPS).speed = speedMax;
+        } else if (*parentPS).speed < speedMin {
+            (*parentPS).speed = speedMin;
+        }
+
+        // QAGAME gravity/pitch handling (the `#else` one-liner is dead in this build).
+        if (*(*pVeh).m_vOrientation.add(0) * 0.1) > 10.0 {
+            // pitched downward: increase speed based on tilt
+            if FighterIsInSpace(parent as *mut gentity_t) != qfalse {
+                // in space, do nothing with speed based on pitch
+            } else {
+                let mut mult = *(*pVeh).m_vOrientation.add(0) * 0.1;
+                if mult < 1.0 {
+                    mult = 1.0;
+                }
+                (*parentPS).speed = PredictedAngularDecrement(
+                    mult,
+                    (*pVeh).m_fTimeModifier * 10.0,
+                    (*parentPS).speed,
+                );
+            }
+        }
+
+        if (*pVeh).m_iRemovedSurfaces != 0 || (*parentPS).electrifyTime >= curTime {
+            // going down
+            if FighterIsInSpace(parent as *mut gentity_t) != qfalse {
+                // in a valid trigger_space brush; simulate randomness
+                if (*parent).s.number & 3 == 0 {
+                    (*parentPS).gravity = 0;
+                } else if (*parent).s.number & 2 == 0 {
+                    (*parentPS).gravity = -500;
+                    (*parentPS).velocity[2] = 80.0;
+                } else {
+                    (*parentPS).gravity = 500;
+                    (*parentPS).velocity[2] = -80.0;
+                }
+            } else {
+                // over a planet
+                (*parentPS).gravity = 500;
+                (*parentPS).velocity[2] = -80.0;
+            }
+        } else if FighterSuspended(pVeh, parentPS) != qfalse {
+            (*parentPS).gravity = 0;
+        } else if ((*parentPS).speed == 0.0 || (*parentPS).speed < speedIdle)
+            && (*pVeh).m_ucmd.upmove <= 0
+        {
+            // slowing down or stopped and not trying to take off
+            if FighterIsInSpace(parent as *mut gentity_t) != qfalse {
+                if FighterOverValidLandingSurface(pVeh) != qfalse {
+                    (*parentPS).gravity = ((speedIdle - (*parentPS).speed) / 4.0) as c_int;
+                }
+            } else {
+                (*parentPS).gravity = ((speedIdle - (*parentPS).speed) / 4.0) as c_int;
+            }
+        } else {
+            (*parentPS).gravity = 0;
+        }
+    }
+}
+
+/// Raven `ProcessOrientCommands` — keep the fighter properly oriented.
+///
+/// Raven: MP RULE — ALL PROCESSORIENTCOMMANDS FUNCTIONS MUST BE BG-COMPATIBLE.
+/// The `VEH_CONTROL_SCHEME_4` and `#ifndef _JK2MP` (SP) paths are not compiled in
+/// this build and are dropped (porting-rules §10). `curTime` uses
+/// `m_ucmd.serverTime` (see `ProcessMoveCommands`). The rider is resolved from the
+/// world arena (the QAGAME `PM_BGEntForNum` result) since no `PmoveContext` is
+/// threaded here. Source: `oracle/oracle/codemp/game/FighterNPC.c:1381-1835`
+pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+    unsafe {
+        let parent = (*pVeh).m_pParentEntity;
+        let vi = (*pVeh).m_pVehicleInfo;
+        let groundFraction = 0.1f32;
+        let mut curRoll = 0.0f32;
+        let curTime: c_int = (*pVeh).m_ucmd.serverTime;
+
+        // Resolve the rider (QAGAME `PM_BGEntForNum` == `&g_entities[owner]`).
+        let mut rider: *mut bgEntity_t = core::ptr::null_mut();
+        if (*parent).s.owner != ENTITYNUM_NONE {
+            rider = &mut (*ctx.world).g_entities[(*parent).s.owner as usize] as *mut gentity_t
+                as *mut bgEntity_t;
+        }
+        if rider.is_null() {
+            rider = parent as *mut gentity_t;
+        }
+
+        let parentPS: *mut playerState_t = (*parent).playerState;
+        let riderPS: *mut playerState_t = (*rider).playerState;
+        let isDead: qboolean = if (*parentPS).eFlags & EF_DEAD != 0 {
+            qtrue
+        } else {
+            qfalse
+        };
+
+        // Going to Hyperspace.
+        if (*parentPS).hyperSpaceTime != 0
+            && (curTime - (*parentPS).hyperSpaceTime) < HYPERSPACE_TIME
+        {
+            *(*pVeh).m_vOrientation.add(0) = (*riderPS).viewangles[0];
+            *(*pVeh).m_vOrientation.add(1) = (*riderPS).viewangles[1];
+            *(*pVeh).m_vOrientation.add(2) = (*riderPS).viewangles[2];
+            (*parentPS).viewangles = (*riderPS).viewangles;
+            return;
+        }
+
+        if (*pVeh).m_iDropTime >= curTime {
+            // you can only YAW during this
+            let ry = (*riderPS).viewangles[1];
+            *(*pVeh).m_vOrientation.add(1) = ry;
+            (*parentPS).viewangles[1] = ry;
+            return;
+        }
+
+        let angleTimeMod = (*pVeh).m_fTimeModifier;
+
+        if isDead != qfalse
+            || (*parentPS).electrifyTime >= curTime
+            || ((*vi).surfDestruction != 0
+                && (*pVeh).m_iRemovedSurfaces != 0
+                && (*pVeh).m_iRemovedSurfaces & SHIPSURF_BROKEN_C != 0
+                && (*pVeh).m_iRemovedSurfaces & SHIPSURF_BROKEN_D != 0
+                && (*pVeh).m_iRemovedSurfaces & SHIPSURF_BROKEN_E != 0
+                && (*pVeh).m_iRemovedSurfaces & SHIPSURF_BROKEN_F != 0)
+        {
+            // all wings torn off
+            FighterDamageRoutine(ctx, pVeh, parent as *mut gentity_t, parentPS, riderPS, isDead);
+            *(*pVeh).m_vOrientation.add(2) = AngleNormalize180(*(*pVeh).m_vOrientation.add(2));
+            return;
+        }
+
+        if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
+            *(*pVeh).m_vOrientation.add(2) =
+                PredictedAngularDecrement(0.95, angleTimeMod * 2.0, *(*pVeh).m_vOrientation.add(2));
+        }
+
+        let isLandingOrLanded: qboolean = if FighterIsLanding(pVeh, parentPS) != qfalse
+            || FighterIsLanded(pVeh, parentPS) != qfalse
+        {
+            qtrue
+        } else {
+            qfalse
+        };
+
+        if isLandingOrLanded == qfalse {
+            // don't spin in place while landed
+            FighterWingMalfunctionCheck(pVeh, parentPS);
+
+            let mut m: usize = 0;
+            while m < 3 {
+                let aVelDif = (*pVeh).m_vFullAngleVelocity[m];
+                if aVelDif != 0.0 {
+                    let dForVel = (aVelDif * 0.1) * (*pVeh).m_fTimeModifier;
+                    if dForVel > 1.0 || dForVel < -1.0 {
+                        *(*pVeh).m_vOrientation.add(m) += dForVel;
+                        *(*pVeh).m_vOrientation.add(m) =
+                            AngleNormalize180(*(*pVeh).m_vOrientation.add(m));
+                        if m == 0 {
+                            // PITCH: don't pitch downward into ground even more
+                            if *(*pVeh).m_vOrientation.add(m) > 90.0
+                                && (*(*pVeh).m_vOrientation.add(m) - dForVel) < 90.0
+                            {
+                                *(*pVeh).m_vOrientation.add(m) = 90.0;
+                                (*pVeh).m_vFullAngleVelocity[m] = -(*pVeh).m_vFullAngleVelocity[m];
+                            }
+                        }
+                        (*pVeh).m_vFullAngleVelocity[m] -= dForVel;
+                    } else {
+                        (*pVeh).m_vFullAngleVelocity[m] = 0.0;
+                    }
+                }
+                m += 1;
+            }
+        } else {
+            // clear decr/incr angles once landed
+            VectorClear(&mut (*pVeh).m_vFullAngleVelocity);
+        }
+
+        curRoll = *(*pVeh).m_vOrientation.add(2);
+
+        // If landed, we can only take off.
+        if isLandingOrLanded != qfalse
+            && (*pVeh).m_iRemovedSurfaces == 0
+            && (*parentPS).electrifyTime < curTime
+        {
+            if (*parentPS).speed > 0.0 {
+                if (*pVeh).m_LandTrace.fraction < 0.3 {
+                    *(*pVeh).m_vOrientation.add(0) = 0.0;
+                } else {
+                    *(*pVeh).m_vOrientation.add(0) = PredictedAngularDecrement(
+                        0.83,
+                        angleTimeMod * 10.0,
+                        *(*pVeh).m_vOrientation.add(0),
+                    );
+                }
+            }
+            if (*pVeh).m_LandTrace.fraction > 0.1
+                || (*pVeh).m_LandTrace.plane.normal[2] < MIN_LANDING_SLOPE
+            {
+                // off the ground (or not on a valid landing surf): dampen turn rate
+                FighterYawAdjust(pVeh, riderPS, parentPS);
+            }
+        } else if ((*pVeh).m_iRemovedSurfaces != 0 || (*parentPS).electrifyTime >= curTime)
+            && ((*parent).s.number % 2 == 0 || (*parent).s.number % 6 == 0)
+        {
+            // spiralling out of control: no yaw control
+        } else if !(*pVeh).m_pPilot.is_null()
+            && (*(*pVeh).m_pPilot).s.number < MAX_CLIENTS as c_int
+            && (*parentPS).speed > 0.0
+        {
+            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) != qfalse {
+                *(*pVeh).m_vOrientation.add(0) = (*riderPS).viewangles[0];
+                *(*pVeh).m_vOrientation.add(1) = (*riderPS).viewangles[1];
+                *(*pVeh).m_vOrientation.add(2) = (*riderPS).viewangles[2];
+                (*parentPS).viewangles = (*riderPS).viewangles;
+                curRoll = *(*pVeh).m_vOrientation.add(2);
+                FighterNoseMalfunctionCheck(pVeh, parentPS);
+            } else {
+                // Actual YAW
+                FighterYawAdjust(pVeh, riderPS, parentPS);
+
+                // If not hitting the ground, allow the fighter to pitch up/down.
+                if FighterOverValidLandingSurface(pVeh) == qfalse
+                    || (*parentPS).speed > MIN_LANDING_SPEED
+                {
+                    FighterPitchAdjust(pVeh, riderPS, parentPS);
+                    FighterNoseMalfunctionCheck(pVeh, parentPS);
+
+                    // Adjust the roll based on the turn amount and dampen it.
+                    let mut fYawDelta = AngleSubtract(
+                        *(*pVeh).m_vOrientation.add(1),
+                        (*pVeh).m_vPrevOrientation[1],
+                    );
+                    if fYawDelta > 8.0 {
+                        fYawDelta = 8.0;
+                    } else if fYawDelta < -8.0 {
+                        fYawDelta = -8.0;
+                    }
+                    curRoll -= fYawDelta;
+                    curRoll = PredictedAngularDecrement(0.93, angleTimeMod * 2.0, curRoll);
+
+                    // cap it reasonably
+                    if (*vi).rollLimit != -1.0 {
+                        if curRoll > (*vi).rollLimit {
+                            curRoll = (*vi).rollLimit;
+                        } else if curRoll < -(*vi).rollLimit {
+                            curRoll = -(*vi).rollLimit;
+                        }
+                    }
+                }
+            }
+        }
+
+        // If directly impacting the ground, even out the pitch.
+        if isLandingOrLanded != qfalse
+            && isDead == qfalse
+            && (*parentPS).electrifyTime < curTime
+            && ((*vi).surfDestruction == 0 || (*pVeh).m_iRemovedSurfaces == 0)
+        {
+            if *(*pVeh).m_vOrientation.add(0) > 0.0 {
+                *(*pVeh).m_vOrientation.add(0) =
+                    PredictedAngularDecrement(0.2, angleTimeMod * 10.0, *(*pVeh).m_vOrientation.add(0));
+            } else {
+                *(*pVeh).m_vOrientation.add(0) = PredictedAngularDecrement(
+                    0.75,
+                    angleTimeMod * 10.0,
+                    *(*pVeh).m_vOrientation.add(0),
+                );
+            }
+        }
+
+        // No one aboard and up in the sky: pitch forward as it tumbles down (QAGAME).
+        if crate::veh_dispatch::inhabited(ctx, pVeh) == qfalse
+            && (*pVeh).m_LandTrace.fraction >= groundFraction
+            && FighterIsInSpace(parent as *mut gentity_t) == qfalse
+            && FighterSuspended(pVeh, parentPS) == qfalse
+        {
+            (*pVeh).m_ucmd.upmove = 0;
+            *(*pVeh).m_vOrientation.add(0) += (*pVeh).m_fTimeModifier;
+            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse
+                && *(*pVeh).m_vOrientation.add(0) > 60.0
+            {
+                *(*pVeh).m_vOrientation.add(0) = 60.0;
+            }
+        }
+
+        if (*parentPS).hackingTime == 0 {
+            // use that roll
+            *(*pVeh).m_vOrientation.add(2) = curRoll;
+            if *(*pVeh).m_vOrientation.add(2) != 0.0 {
+                // continually adjust the yaw based on the roll
+                if ((*pVeh).m_iRemovedSurfaces != 0 || (*parentPS).electrifyTime >= curTime)
+                    && ((*parent).s.number % 2 == 0 || (*parent).s.number % 6 == 0)
+                {
+                    // spiralling out of control: leave YAW alone
+                } else if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
+                    *(*pVeh).m_vOrientation.add(1) -=
+                        (*(*pVeh).m_vOrientation.add(2) * 0.05) * (*pVeh).m_fTimeModifier;
+                }
+            }
+        } else {
+            // add in strafing roll
+            let strafeRoll = ((*parentPS).hackingTime as f32 / MAX_STRAFE_TIME) * (*vi).rollLimit;
+            let strafeDif = AngleSubtract(strafeRoll, *(*pVeh).m_vOrientation.add(2));
+            *(*pVeh).m_vOrientation.add(2) += (strafeDif * 0.1) * (*pVeh).m_fTimeModifier;
+            if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse
+                && (*vi).rollLimit != -1.0
+                && (*pVeh).m_iRemovedSurfaces == 0
+                && (*parentPS).electrifyTime < curTime
+            {
+                if *(*pVeh).m_vOrientation.add(2) > (*vi).rollLimit {
+                    *(*pVeh).m_vOrientation.add(2) = (*vi).rollLimit;
+                } else if *(*pVeh).m_vOrientation.add(2) < -(*vi).rollLimit {
+                    *(*pVeh).m_vOrientation.add(2) = -(*vi).rollLimit;
+                }
+            }
+        }
+
+        if (*vi).surfDestruction != 0 {
+            FighterDamageRoutine(ctx, pVeh, parent as *mut gentity_t, parentPS, riderPS, isDead);
+        }
+        *(*pVeh).m_vOrientation.add(2) = AngleNormalize180(*(*pVeh).m_vOrientation.add(2));
+    }
+}
+
+/// Raven `AnimateVehicle` — sync the fighter's wing/gear/hyperspace anim state to
+/// its flight state.
+///
+/// Raven: MP (`_JK2MP` + `QAGAME`) build; `curTime` is `level.time`. The final
+/// `BG_SetAnim` dispatch needs a `PmoveContext` (`bgAllAnims`) that this ctx-only
+/// dispatch entry does not thread, so — as in `SpeederNPC::AnimateRiders` — the
+/// state-flag mutations are ported and the client-anim dispatch is a `PORT-NOTE`.
+/// Source: `oracle/oracle/codemp/game/FighterNPC.c:1836-1937`
+pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
+    unsafe {
+        let mut Anim: c_int = -1;
+        let parentPS: *mut playerState_t = (*(*pVeh).m_pParentEntity).playerState;
+        let curTime: c_int = (*ctx.world).level.time;
+        let vi = (*pVeh).m_pVehicleInfo;
+
+        if (*parentPS).hyperSpaceTime != 0
+            && curTime - (*parentPS).hyperSpaceTime < HYPERSPACE_TIME
+        {
+            // Going to Hyperspace: close the wings.
+            if (*pVeh).m_ulFlags & VEH_WINGSOPEN != 0 {
+                (*pVeh).m_ulFlags &= !VEH_WINGSOPEN;
+                Anim = BOTH_WINGS_CLOSE as c_int;
+            }
+        } else {
+            let isLanding = FighterIsLanding(pVeh, parentPS);
+            let isLanded = FighterIsLanded(pVeh, parentPS);
+
+            if isLanding == qfalse && isLanded == qfalse {
+                // way up in the air: open wings, close gears
+                if (*pVeh).m_ulFlags & VEH_WINGSOPEN == 0 {
+                    (*pVeh).m_ulFlags |= VEH_WINGSOPEN;
+                    (*pVeh).m_ulFlags &= !VEH_GEARSOPEN;
+                    Anim = BOTH_WINGS_OPEN as c_int;
+                }
+            } else if ((*pVeh).m_ucmd.forwardmove < 0
+                || (*pVeh).m_ucmd.upmove < 0
+                || isLanded != qfalse)
+                && (*pVeh).m_LandTrace.fraction <= 0.4
+                && (*pVeh).m_LandTrace.plane.normal[2] >= MIN_LANDING_SLOPE
+            {
+                // already landed / close to ground: open gears
+                if (*pVeh).m_ulFlags & VEH_GEARSOPEN == 0 {
+                    if (*vi).soundLand != 0 {
+                        // just landed (QAGAME game-side)
+                        let parent_ent = (*pVeh).m_pParentEntity as *mut gentity_t;
+                        crate::g_utils::G_EntitySound(ctx, parent_ent, CHAN_AUTO, (*vi).soundLand);
+                    }
+                    (*pVeh).m_ulFlags |= VEH_GEARSOPEN;
+                    Anim = BOTH_GEARS_OPEN as c_int;
+                }
+            } else if (*pVeh).m_ulFlags & VEH_GEARSOPEN != 0 {
+                // taking off, almost halfway off the ground: close gears
+                (*pVeh).m_ulFlags &= !VEH_GEARSOPEN;
+                Anim = BOTH_GEARS_CLOSE as c_int;
+            } else if (*pVeh).m_ulFlags & VEH_WINGSOPEN != 0 {
+                // gears closed and below launch height: close wings
+                (*pVeh).m_ulFlags &= !VEH_WINGSOPEN;
+                Anim = BOTH_WINGS_CLOSE as c_int;
+            }
+        }
+
+        if Anim != -1 {
+            // PORT-NOTE(bg-anim-dispatch): the oracle calls
+            //   BG_SetAnim(pVeh->m_pParentEntity->playerState,
+            //     bgAllAnims[pVeh->m_pParentEntity->localAnimIndex].anims,
+            //     SETANIM_BOTH, Anim, SETANIM_FLAG_NORMAL, 300);
+            // which needs a `PmoveContext` (`bgAllAnims`) this ctx-only dispatch
+            // entry does not thread — matching `SpeederNPC::AnimateRiders`.
+            let _ = Anim;
+        }
+    }
+}
+
+/// Raven `AnimateRiders` — the `_JK2MP`/`QAGAME` body is empty (a deliberate
+/// no-op, like `SpeederNPC`'s).
+/// Source: `oracle/oracle/codemp/game/FighterNPC.c:1938-1944`
+pub fn AnimateRiders(_ctx: GameContext<'_>, _pVeh: *mut Vehicle_t) {}
 
 // `G_SetFighterVehicleFunctions` retired — it only assigned the now-removed
 // `vehicleInfo_t` fn-ptr slots. Vehicle dispatch is `vehicleType_t`-keyed in

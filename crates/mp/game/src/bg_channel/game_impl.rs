@@ -8,8 +8,12 @@
 //!
 //! Exercised in the pmove slice: [`GameBgTraps::pointcontents`] delegates to
 //! `crate::trap::PointContents` with a real `Engine` handle — the end-to-end
-//! plumbing proof. Un-exercised methods carry `todo!()` bodies (their target
-//! `trap_*`/`G_*` are noted); the wiring, not full coverage, is the gate.
+//! plumbing proof. Every other `BgTraps`/`GameCallbacks` method now delegates the
+//! same way (resolve entity nums against the world arena, rebuild `GameContext`,
+//! call the ported `trap_*`/`G_*` body). One exception remains:
+//! [`GameCallbacksImpl::flyveh_surface_destruction`] is a loud `todo!()`
+//! escalation — its bg-visible signature cannot carry the impact `trace_t*`/force
+//! flag its game-tier target needs (see the method for the full note).
 #![allow(non_snake_case, unused_variables, clippy::too_many_arguments)]
 
 use core::ffi::{c_char, c_int, c_void};
@@ -51,9 +55,12 @@ impl BgTraps for GameBgTraps<'_> {
         passEntityNum: c_int,
         contentMask: c_int,
     ) {
-        // Target: crate::trap::Trace (G_TRACE). Args plumbing lands with the
-        // pmove-trace slice; the pointcontents path is the proven one here.
-        todo!("Port BgTraps::trace delegation — crate::trap::Trace (G_TRACE)")
+        // Mechanical delegation. Raven: `trap_Trace` (`G_TRACE`).
+        use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
+        crate::trap::Trace(
+            self.ctx.engine,
+            GTraceArgs::new(results, start, mins, maxs, end, passEntityNum, contentMask),
+        )
     }
 
     fn pointcontents(&self, point: *const vec3_t, passEntityNum: c_int) -> c_int {
@@ -64,7 +71,13 @@ impl BgTraps for GameBgTraps<'_> {
     }
 
     fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
-        todo!("Port BgTraps::fs_fopen delegation — crate::trap::FS_FOpenFile")
+        // Raven: `trap_FS_FOpenFile` (`G_FS_FOPEN_FILE`). `Args::new` is `unsafe`
+        // (raw out-param `f`); the caller guarantees `f` is valid.
+        use mp_abi::game::syscalls::G_FS_FOPEN_FILE::GFsFopenFileArgs;
+        let qpath = unsafe { std::ffi::CStr::from_ptr(qpath) }.to_owned();
+        crate::trap::FS_FOpenFile(self.ctx.engine, unsafe {
+            GFsFopenFileArgs::new(qpath, f, mode)
+        })
     }
     fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
         // Mechanical delegation — matches the proven `pointcontents`
@@ -89,7 +102,14 @@ impl BgTraps for GameBgTraps<'_> {
         listbuf: *mut c_char,
         bufsize: c_int,
     ) -> c_int {
-        todo!("Port BgTraps::fs_getfilelist delegation — crate::trap::FS_GetFileList")
+        // Raven: `trap_FS_GetFileList` (`G_FS_GETFILELIST`).
+        use mp_abi::game::syscalls::G_FS_GETFILELIST::GFsGetfilelistArgs;
+        let path = unsafe { std::ffi::CStr::from_ptr(path) }.to_owned();
+        let extension = unsafe { std::ffi::CStr::from_ptr(extension) }.to_owned();
+        crate::trap::FS_GetFileList(
+            self.ctx.engine,
+            GFsGetfilelistArgs::new(path, extension, listbuf as *mut u8, bufsize),
+        )
     }
 
     fn r_register_skin(&self, name: *const c_char) -> qhandle_t {
@@ -187,7 +207,24 @@ impl BgTraps for GameBgTraps<'_> {
         modelList: *mut qhandle_t,
         scale: *const vec3_t,
     ) -> qboolean {
-        todo!("Port BgTraps::g2api_get_bolt_matrix_no_reconstruct — strap_G2API_GetBoltMatrix_NoReconstruct")
+        // Raven: `trap_G2API_GetBoltMatrix_NoReconstruct` (`G_G2_GETBOLT_NOREC`).
+        // The syscall `Args` takes `scale` as `*mut vec3_t`; the bg-visible sig is
+        // `*const`, so cast at the seam (the engine never mutates it here).
+        use mp_abi::game::syscalls::G_G2_GETBOLT_NOREC::GG2GetboltNorecArgs;
+        crate::trap::G2API_GetBoltMatrix_NoReconstruct(
+            self.ctx.engine,
+            GG2GetboltNorecArgs::new(
+                ghoul2,
+                modelIndex,
+                boltIndex,
+                matrix,
+                angles,
+                position,
+                frameNum,
+                modelList,
+                scale as *mut vec3_t,
+            ),
+        )
     }
     fn g2api_get_bolt_matrix_no_rec_no_rot(
         &self,
@@ -201,7 +238,22 @@ impl BgTraps for GameBgTraps<'_> {
         modelList: *mut qhandle_t,
         scale: *const vec3_t,
     ) -> qboolean {
-        todo!("Port BgTraps::g2api_get_bolt_matrix_no_rec_no_rot — strap_G2API_GetBoltMatrix_NoRecNoRot")
+        // Raven: `trap_G2API_GetBoltMatrix_NoRecNoRot` (`G_G2_GETBOLT_NOREC_NOROT`).
+        use mp_abi::game::syscalls::G_G2_GETBOLT_NOREC_NOROT::GG2GetboltNorecNorotArgs;
+        crate::trap::G2API_GetBoltMatrix_NoRecNoRot(
+            self.ctx.engine,
+            GG2GetboltNorecNorotArgs::new(
+                ghoul2,
+                modelIndex,
+                boltIndex,
+                matrix,
+                angles,
+                position,
+                frameNum,
+                modelList,
+                scale,
+            ),
+        )
     }
     fn g2api_set_bone_angles(
         &self,
@@ -217,7 +269,16 @@ impl BgTraps for GameBgTraps<'_> {
         blendTime: c_int,
         currentTime: c_int,
     ) -> qboolean {
-        todo!("Port BgTraps::g2api_set_bone_angles — strap_G2API_SetBoneAngles")
+        // Raven: `trap_G2API_SetBoneAngles` (`G_G2_ANGLEOVERRIDE`).
+        use mp_abi::game::syscalls::G_G2_ANGLEOVERRIDE::GG2AngleoverrideArgs;
+        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
+        crate::trap::G2API_SetBoneAngles(
+            self.ctx.engine,
+            GG2AngleoverrideArgs::new(
+                ghoul2, modelIndex, bone_name, angles, flags, up, right, forward, modelList,
+                blendTime, currentTime,
+            ),
+        )
     }
     fn g2api_set_bone_anim(
         &self,
@@ -232,7 +293,15 @@ impl BgTraps for GameBgTraps<'_> {
         setFrame: f32,
         blendTime: c_int,
     ) -> qboolean {
-        todo!("Port BgTraps::g2api_set_bone_anim — strap_G2API_SetBoneAnim")
+        // Raven: `trap_G2API_SetBoneAnim` (`G_G2_PLAYANIM`).
+        use mp_abi::game::syscalls::G_G2_PLAYANIM::GG2PlayanimArgs;
+        crate::trap::G2API_SetBoneAnim(
+            self.ctx.engine,
+            GG2PlayanimArgs::new(
+                ghoul2, modelIndex, boneName, startFrame, endFrame, flags, animSpeed, currentTime,
+                setFrame, blendTime,
+            ),
+        )
     }
     fn g2api_get_bone_anim(
         &self,
@@ -247,10 +316,21 @@ impl BgTraps for GameBgTraps<'_> {
         modelList: *mut c_int,
         modelIndex: c_int,
     ) -> qboolean {
-        todo!("Port BgTraps::g2api_get_bone_anim — strap_G2API_GetBoneAnim")
+        // Raven: `trap_G2API_GetBoneAnim` (`G_G2_GETBONEANIM`).
+        use mp_abi::game::syscalls::G_G2_GETBONEANIM::GG2GetboneanimArgs;
+        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
+        crate::trap::G2API_GetBoneAnim(
+            self.ctx.engine,
+            GG2GetboneanimArgs::new(
+                ghoul2, bone_name, currentTime, currentFrame, startFrame, endFrame, flags,
+                animSpeed, modelList, modelIndex,
+            ),
+        )
     }
     fn g2api_set_rag_doll(&self, ghoul2: *mut c_void, params: *mut sharedRagDollParams_t) {
-        todo!("Port BgTraps::g2api_set_rag_doll — strap_G2API_SetRagDoll")
+        // Raven: `trap_G2API_SetRagDoll` (`G_G2_SETRAGDOLL`).
+        use mp_abi::game::syscalls::G_G2_SETRAGDOLL::GG2SetragdollArgs;
+        crate::trap::G2API_SetRagDoll(self.ctx.engine, GG2SetragdollArgs::new(ghoul2, params))
     }
     fn g2api_animate_g2_models(
         &self,
@@ -258,7 +338,12 @@ impl BgTraps for GameBgTraps<'_> {
         time: c_int,
         params: *mut sharedRagDollUpdateParams_t,
     ) {
-        todo!("Port BgTraps::g2api_animate_g2_models — strap_G2API_AnimateG2Models")
+        // Raven: `trap_G2API_AnimateG2Models` (`G_G2_ANIMATEG2MODELS`).
+        use mp_abi::game::syscalls::G_G2_ANIMATEG2MODELS::GG2Animateg2ModelsArgs;
+        crate::trap::G2API_AnimateG2Models(
+            self.ctx.engine,
+            GG2Animateg2ModelsArgs::new(ghoul2, time, params),
+        )
     }
     fn g2api_set_bone_ik_state(
         &self,
@@ -268,7 +353,13 @@ impl BgTraps for GameBgTraps<'_> {
         ikState: c_int,
         params: *mut sharedSetBoneIKStateParams_t,
     ) -> qboolean {
-        todo!("Port BgTraps::g2api_set_bone_ik_state — strap_G2API_SetBoneIKState")
+        // Raven: `trap_G2API_SetBoneIKState` (`G_G2_SETBONEIKSTATE`).
+        use mp_abi::game::syscalls::G_G2_SETBONEIKSTATE::GG2SetboneikstateArgs;
+        let bone_name = unsafe { std::ffi::CStr::from_ptr(boneName) }.to_owned();
+        crate::trap::G2API_SetBoneIKState(
+            self.ctx.engine,
+            GG2SetboneikstateArgs::new(ghoul2, time, bone_name, ikState, params),
+        )
     }
     fn g2api_ik_move(
         &self,
@@ -276,7 +367,9 @@ impl BgTraps for GameBgTraps<'_> {
         time: c_int,
         params: *mut sharedIKMoveParams_t,
     ) -> qboolean {
-        todo!("Port BgTraps::g2api_ik_move — strap_G2API_IKMove")
+        // Raven: `trap_G2API_IKMove` (`G_G2_IKMOVE`).
+        use mp_abi::game::syscalls::G_G2_IKMOVE::GG2IkmoveArgs;
+        crate::trap::G2API_IKMove(self.ctx.engine, GG2IkmoveArgs::new(ghoul2, time, params))
     }
     fn g2api_get_surface_render_status(
         &self,
@@ -302,7 +395,14 @@ impl BgTraps for GameBgTraps<'_> {
         vol: c_int,
         rad: c_int,
     ) {
-        todo!("Port BgTraps::fx_play_effect_id — crate::trap::FX_PlayEffectID")
+        // `trap_FX_PlayEffectID` is cgame-only: in the oracle it is declared and
+        // called only under `#ifndef QAGAME` (bg_slidemove.c:38,122,550), while
+        // the QAGAME (server/game) build routes the same effect through
+        // `G_PlayEffectID` (a `GameCallbacks` upcall). There is no
+        // `G_FX_PLAY_EFFECT_ID` in the game syscall table, so this method is dead
+        // surface on the game side and must never be reached here.
+        // Source: `oracle/oracle/codemp/game/bg_slidemove.c:37-39,116-124`
+        unreachable!("trap_FX_PlayEffectID is cgame-only (#ifndef QAGAME); QAGAME uses G_PlayEffectID")
     }
     fn snap_vector(&self, v: *mut f32) {
         // Raven: `trap_SnapVector` (`G_SNAPVECTOR`); the `vec3_t*` is the caller's
@@ -317,16 +417,24 @@ impl BgTraps for GameBgTraps<'_> {
         value: *const c_char,
         flags: c_int,
     ) {
-        todo!("Port BgTraps::cvar_register — crate::trap::Cvar_Register")
+        // Raven: `trap_Cvar_Register` (`G_CVAR_REGISTER`). `Args::new` wants owned
+        // `CString`s (`impl Into<CString>`); copy the borrowed C strings.
+        use mp_abi::game::syscalls::G_CVAR_REGISTER::GCvarRegisterArgs;
+        let var_name = unsafe { std::ffi::CStr::from_ptr(var_name) }.to_owned();
+        let value = unsafe { std::ffi::CStr::from_ptr(value) }.to_owned();
+        crate::trap::Cvar_Register(
+            self.ctx.engine,
+            GCvarRegisterArgs::new(cvar, var_name, value, flags),
+        )
     }
 }
 
 /// The game-side `GameCallbacks` implementation. Carries the game handles the
 /// `G_*` upcalls need (the world island + the engine); each method resolves the
 /// bg-visible entity nums against the world and delegates to the ported `G_*`
-/// body. Bodies are `todo!()` until their targets land — the slice does not
-/// drive any upcall (`G_Damage` is reachable only through the `PmoveSingle`
-/// remainder), so this proves the shape, not the delegation.
+/// body. All upcalls now delegate; the sole exception is
+/// [`GameCallbacksImpl::flyveh_surface_destruction`], a documented escalation
+/// (its signature cannot carry the impact `trace_t*`/force the target requires).
 pub struct GameCallbacksImpl<'a> {
     /// The one owned `GameWorld` island (raw so a `&mut dyn GameCallbacks` and a
     /// `&mut BgState` borrowed from the same world can coexist across the seam;
@@ -347,7 +455,28 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         dflags: c_int,
         mod_: c_int,
     ) {
-        todo!("Port GameCallbacks::damage delegation — G_Damage (g_combat.c)")
+        // Resolves the entity nums against the world arena, rebuilds the module
+        // `GameContext`, and delegates to the ported `G_Damage`. `dir`/`point` are
+        // bg-visible raw pointers; the ported body takes `dir: Option<&mut vec3_t>`
+        // and `point` by value. Every bg caller passes `dir = null` and a non-null
+        // `point`. Source: `oracle/oracle/codemp/game/g_combat.c` (`G_Damage`).
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let targ = &mut (*self.world).g_entities[targNum as usize] as *mut gentity_t;
+            let inflictor = &mut (*self.world).g_entities[inflictorNum as usize] as *mut gentity_t;
+            let attacker = &mut (*self.world).g_entities[attackerNum as usize] as *mut gentity_t;
+            let dir = if dir.is_null() {
+                None
+            } else {
+                Some(&mut *(dir as *mut vec3_t))
+            };
+            crate::g_combat::G_Damage(
+                ctx, targ, inflictor, attacker, dir, *point, damage, dflags, mod_,
+            );
+        }
     }
     fn damage_from_killer(
         &mut self,
@@ -361,10 +490,33 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         dflags: c_int,
         mod_: c_int,
     ) {
-        todo!("Port GameCallbacks::damage_from_killer delegation — G_Damage")
+        // Delegates to `G_DamageFromKiller(pEnt, pVehEnt, attacker, org, ...)`: the
+        // bg-visible `targNum`->`pEnt`, `inflictorNum`->`pVehEnt`, `attackerNum`->
+        // `attacker`. `killerNum` is not a body parameter — `G_DamageFromKiller`
+        // initializes `killer = attacker` internally (bg passes it equal to
+        // `attackerNum`); `dir` is unused (bg passes null). `point`->`org` by value.
+        // Source: `oracle/oracle/codemp/game/g_combat.c` (`G_DamageFromKiller`).
+        let _ = (killerNum, dir);
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let pEnt = &mut (*self.world).g_entities[targNum as usize] as *mut gentity_t;
+            let pVehEnt = &mut (*self.world).g_entities[inflictorNum as usize] as *mut gentity_t;
+            let attacker = &mut (*self.world).g_entities[attackerNum as usize] as *mut gentity_t;
+            crate::g_combat::G_DamageFromKiller(
+                ctx, pEnt, pVehEnt, attacker, *point, damage, dflags, mod_,
+            );
+        }
     }
     fn add_event(&mut self, entNum: c_int, event: c_int, eventParm: c_int) {
-        todo!("Port GameCallbacks::add_event delegation — G_AddEvent (g_utils.c)")
+        // `G_AddEvent` is ctx-free and takes a `gentity_t*`; resolve `entNum`.
+        // Source: `oracle/oracle/codemp/game/g_utils.c` (`G_AddEvent`).
+        unsafe {
+            let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            crate::g_utils::G_AddEvent(ent, event, eventParm);
+        }
     }
     fn entity_legs_anim(&self, entNum: c_int) -> c_int {
         unsafe { (*self.world).g_entities[entNum as usize].s.legsAnim }
@@ -373,34 +525,90 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         unsafe { (*self.world).g_entities[entNum as usize].s.torsoAnim }
     }
     fn alloc(&mut self, size: c_int) -> *mut c_void {
-        todo!("Port GameCallbacks::alloc delegation — G_Alloc (g_mem.c)")
+        // `G_Alloc` is a ctx-free bump allocator.
+        // Source: `oracle/oracle/codemp/game/g_mem.c` (`G_Alloc`).
+        crate::g_mem::G_Alloc(size)
     }
     fn new_string(&mut self, string: *const c_char) -> *mut c_char {
-        todo!("Port GameCallbacks::new_string delegation — G_NewString (g_spawn.c)")
+        // `G_NewString` is ctx-free.
+        // Source: `oracle/oracle/codemp/game/g_spawn.c` (`G_NewString`).
+        crate::g_spawn::G_NewString(string)
     }
     fn play_effect(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) {
-        todo!("Port GameCallbacks::play_effect delegation — G_PlayEffect")
+        // `G_PlayEffect` is ctx-free and takes `org`/`ang` by value; the spawned
+        // temp-entity return is discarded (as at the bg call sites).
+        // Source: `oracle/oracle/codemp/game/g_utils.c` (`G_PlayEffect`).
+        unsafe {
+            crate::g_utils::G_PlayEffect(fxID, *org, *ang);
+        }
     }
     fn play_effect_id(&mut self, fxID: c_int, org: *const vec3_t, ang: *const vec3_t) -> c_int {
-        todo!("Port GameCallbacks::play_effect_id delegation — G_PlayEffectID")
+        // `G_PlayEffectID` returns the spawned temp-entity; the bg-visible upcall
+        // yields its entity number (`ENTITYNUM_NONE` when none was spawned).
+        // Source: `oracle/oracle/codemp/game/g_utils.c` (`G_PlayEffectID`).
+        unsafe {
+            let te = crate::g_utils::G_PlayEffectID(fxID, *org, *ang);
+            if te.is_null() {
+                ENTITYNUM_NONE
+            } else {
+                (*te).s.number
+            }
+        }
     }
     fn sound_index(&mut self, name: *const c_char) -> c_int {
-        todo!("Port GameCallbacks::sound_index delegation — G_SoundIndex")
+        // ctx-free configstring lookup. Source: `g_utils.c` (`G_SoundIndex`).
+        crate::g_utils::G_SoundIndex(name)
     }
     fn model_index(&mut self, name: *const c_char) -> c_int {
-        todo!("Port GameCallbacks::model_index delegation — G_ModelIndex")
+        // ctx-free configstring lookup. Source: `g_utils.c` (`G_ModelIndex`).
+        crate::g_utils::G_ModelIndex(name)
     }
     fn effect_index(&mut self, name: *const c_char) -> c_int {
-        todo!("Port GameCallbacks::effect_index delegation — G_EffectIndex")
+        // ctx-free configstring lookup. Source: `g_utils.c` (`G_EffectIndex`).
+        crate::g_utils::G_EffectIndex(name)
     }
     fn cheap_weapon_fire(&mut self, entNum: c_int, weapon: c_int) {
-        todo!("Port GameCallbacks::cheap_weapon_fire delegation — g_weapon.c")
+        // Raven `G_CheapWeaponFire(entNum, ev)` takes the entity number directly.
+        // Source: `oracle/oracle/codemp/game/g_active.c` (`G_CheapWeaponFire`).
+        let ctx = GameContext {
+            world: self.world,
+            engine: self.engine,
+        };
+        crate::g_active::G_CheapWeaponFire(ctx, entNum, weapon);
     }
     fn client_check_impact_bbrush(&mut self, entNum: c_int, impactNum: c_int) {
-        todo!("Port GameCallbacks::client_check_impact_bbrush delegation — g_active.c")
+        // Raven `Client_CheckImpactBBrush(self, other)`; resolve both nums.
+        // Source: `oracle/oracle/codemp/game/g_active.c` (`Client_CheckImpactBBrush`).
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let self_ = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            let other = &mut (*self.world).g_entities[impactNum as usize] as *mut gentity_t;
+            crate::g_active::Client_CheckImpactBBrush(ctx, self_, other);
+        }
     }
     fn flyveh_surface_destruction(&mut self, entNum: c_int, trNum: c_int, magnitude: f32) {
-        todo!("Port GameCallbacks::flyveh_surface_destruction delegation — g_vehicles.c")
+        // ESCALATION — lossy seam. Target `G_FlyVehicleSurfaceDestruction(ctx, veh,
+        // trace: *mut trace_t, magnitude: c_int, force: qboolean)` exists
+        // (`crate::g_vehicles`, oracle `g_vehicles.c:3190`), but this bg-visible
+        // trait signature cannot supply two of its arguments: the impact `trace_t*`
+        // (bg passes `trNum = 0`, a sentinel — see `bg_slidemove.rs:437`) and the
+        // `force` flag (dropped). The oracle call passes the live slide-move impact
+        // trace and `forceSurfDestruction` (`bg_slidemove.c:472`). Reconstructing
+        // them here would be invented behavior (porting-rules §A2), and the fix —
+        // widening the `GameCallbacks::flyveh_surface_destruction` signature to
+        // carry the trace + force, plus the matching `bg_slidemove` call site —
+        // lives in files this porter does not own (`game_callbacks.rs`,
+        // `bg_slidemove.rs`). Left as a loud, greppable stub pending that decision.
+        //TODO: Port GameCallbacks::flyveh_surface_destruction (lossy seam: trace_t*/force unsendable)
+        // Source: oracle/oracle/codemp/game/g_vehicles.c:3190; bg_slidemove.c:25,472
+        todo!(
+            "ESCALATION: GameCallbacks::flyveh_surface_destruction — trait sig drops the impact \
+             trace_t* (trNum={trNum}) and force flag G_FlyVehicleSurfaceDestruction needs; \
+             widening the seam is out of this porter's file scope"
+        )
     }
     fn set_anim(
         &mut self,
@@ -411,10 +619,20 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         setAnimFlags: c_int,
         blendTime: c_int,
     ) {
-        todo!("Port GameCallbacks::set_anim delegation — G_SetAnim")
+        // `G_SetAnim` is ctx-free and takes a `gentity_t*`; resolve `entNum` and
+        // pass the bg-owned `ucmd` through. Source: `g_utils.c` (`G_SetAnim`).
+        unsafe {
+            let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            crate::g_utils::G_SetAnim(ent, ucmd, setAnimParts, anim, setAnimFlags, blendTime);
+        }
     }
     fn npc_set_anim(&mut self, entNum: c_int, type_: c_int, anim: c_int, priority: c_int) {
-        todo!("Port GameCallbacks::npc_set_anim delegation — NPC_SetAnim")
+        // Raven `NPC_SetAnim(ent, setAnimParts=type, anim, setFlags=priority)` is
+        // ctx-free; resolve `entNum`. Source: `npc.cpp` (`NPC_SetAnim`).
+        unsafe {
+            let ent = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            crate::npc_c::NPC_SetAnim(ent, type_, anim, priority);
+        }
     }
     fn wp_get_vehicle_cam_pos(&mut self, vehEntNum: c_int, pilotEntNum: c_int, camPos: *mut vec3_t) {
         // Resolves the vehicle + pilot nums against the world arena, rebuilds the
@@ -431,10 +649,21 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn can_be_enemy(&mut self, entNum: c_int, otherNum: c_int) -> qboolean {
-        todo!("Port GameCallbacks::can_be_enemy delegation — g_combat.c")
+        // Raven `G_CanBeEnemy(self, enemy)`; resolve both nums.
+        // Source: `oracle/oracle/codemp/game/w_saber.c` (`G_CanBeEnemy`).
+        unsafe {
+            let ctx = GameContext {
+                world: self.world,
+                engine: self.engine,
+            };
+            let self_ = &mut (*self.world).g_entities[entNum as usize] as *mut gentity_t;
+            let enemy = &mut (*self.world).g_entities[otherNum as usize] as *mut gentity_t;
+            crate::w_saber::G_CanBeEnemy(ctx, self_, enemy)
+        }
     }
     fn get_time(&self) -> c_int {
-        todo!("Port GameCallbacks::get_time — level.time accessor")
+        // Raven `level.time`. Source: `oracle/oracle/codemp/game/g_local.h`.
+        unsafe { (*self.world).level.time }
     }
     fn try_grapple(&mut self, entNum: c_int) -> qboolean {
         // Resolves `entNum` against the world arena, rebuilds the module
@@ -451,7 +680,13 @@ impl GameCallbacks for GameCallbacksImpl<'_> {
         }
     }
     fn q3_set_parm(&mut self, entID: c_int, parmNum: c_int, parmValue: *const c_char) {
-        todo!("Port GameCallbacks::q3_set_parm delegation — Q3_SetParm (g_ICARUScb.c)")
+        // `Q3_SetParm` takes `entID` as a raw index and resolves it internally.
+        // Source: `oracle/oracle/codemp/game/g_ICARUScb.c` (`Q3_SetParm`).
+        let ctx = GameContext {
+            world: self.world,
+            engine: self.engine,
+        };
+        crate::g_ICARUScb::Q3_SetParm(ctx, entID, parmNum, parmValue);
     }
     fn board_vehicle(&mut self, vehEntNum: c_int, entNum: c_int) -> qboolean {
         // Resolves `vehEntNum`->`m_pVehicle` and `entNum`->`bgEntity_t` against
