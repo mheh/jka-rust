@@ -162,12 +162,50 @@ unsafe fn c_atoi(s: *const c_char) -> c_int {
     trimmed[..end].parse::<c_int>().unwrap_or(0)
 }
 
+// Differential-test observation seam. `BG_SoundIndex` is called context-free
+// (e.g. from `WP_SaberSetDefaults`, which threads no `BgState`), so the saber
+// differential test (`tests/jampgame_parity.rs`) observes its
+// registration-name sequence through this thread-local tape rather than a
+// threaded sink. When no tape is installed (production) the tape is `None` and
+// `BG_SoundIndex` behaves exactly as before — the hook only *observes*, never
+// changes the return value. Mirrors the oracle dumper's `G_SoundIndex` name log
+// (`tools/jampgame-oracle/main_saberload.c`).
+thread_local! {
+    static SABER_SND_TAPE: std::cell::RefCell<Option<Vec<String>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Install (or clear) the sound-registration observation tape. Test-only.
+pub fn saber_snd_tape_enable() {
+    SABER_SND_TAPE.with(|t| *t.borrow_mut() = Some(Vec::new()));
+}
+
+/// Drain the observed sound-registration names since the last drain, keeping
+/// the tape installed. Test-only.
+pub fn saber_snd_tape_drain() -> Vec<String> {
+    SABER_SND_TAPE.with(|t| {
+        t.borrow_mut()
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default()
+    })
+}
+
 /// Raven `BG_SoundIndex`.
 ///
 /// Raven: builds under both `QAGAME` and `CGAME`; only the `QAGAME` branch
 /// (`G_SoundIndex`) is live in this crate (jampgame).
 /// Source: `oracle/oracle/codemp/game/bg_saberLoad.c:32-39`
 pub fn BG_SoundIndex(sound: *mut c_char) -> c_int {
+    SABER_SND_TAPE.with(|t| {
+        if let Some(v) = t.borrow_mut().as_mut() {
+            if !sound.is_null() {
+                v.push(unsafe { cstr_to_str(sound as *const c_char) });
+            } else {
+                v.push(String::new());
+            }
+        }
+    });
     crate::g_utils::G_SoundIndex(sound as *const c_char)
 }
 

@@ -1,0 +1,34 @@
+// edge.sab — edge cases: unknown tokens (SkipRestOfLine), a saberType
+// variant (SABER_ARC), below-cap length/radius (clamped to 4.0 / 0.25),
+// negative & large numerics, force-restrict/style bitfields, anim-name
+// lookups (animTable), a hitSound list, a customSkin registration, and a
+// value-less trailing keyword.
+edge_saber
+{
+	name				"Edge Case Saber"
+	saberType			SABER_ARC
+	someUnknownToken	"this whole line is skipped"
+	saberColor			purple
+	saberLength			2			// below 4.0 cap -> clamped to 4.0
+	saberRadius			0.1			// below 0.25 cap -> clamped to 0.25
+	maxChain			-1
+	splashDamage		9999
+	moveSpeedScale		0.75
+	animSpeedScale		1.25
+	knockbackScale		2.5
+	forceRestrict		FP_LIGHTNING
+	saberStyleLearned	fast
+	saberStyleForbidden	strong
+	lockBonus			3
+	parryBonus			-2
+	returnDamage		1
+	boltToWrist			1
+	readyAnim			BOTH_STAND1
+	drawAnim			BOTH_STAND2
+	hitSound1			"sound/weapons/saber/saberhit1.wav"
+	hitSound2			"sound/weapons/saber/saberhit2.wav"
+	hitSound3			"sound/weapons/saber/saberhit3.wav"
+	customSkin			"models/weapons2/saber_arc/model_default"
+	kataMove			LS_A_LUNGE
+	bogusFieldNoValue
+}

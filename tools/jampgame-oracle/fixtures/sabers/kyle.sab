@@ -1,0 +1,20 @@
+// kyle.sab — a realistic base-game single saber. Also named "Kyle" so it
+// doubles as WP_SaberParseParms' DEFAULT_SABER fallback target.
+Kyle
+{
+	name				"Kyle Katarn's Lightsaber"	// UI fullName
+	saberType			SABER_SINGLE
+	saberModel			"models/weapons2/saber_reborn/saber_w.glm"
+	soundOn				"sound/weapons/saber/enemy_saber_on.wav"
+	soundLoop			"sound/weapons/saber/saberhum3.wav"
+	soundOff			"sound/weapons/saber/enemy_saber_off.wav"
+	saberColor			blue
+	saberLength			40
+	saberRadius			3.0
+	numBlades			1
+	moveSpeedScale		1.0
+	animSpeedScale		1.0
+	damageScale			1.0
+	throwable			1
+	lockable			1
+}

@@ -1,0 +1,534 @@
+== saberload ==
+saber "Kyle"
+ret 1
+name "Kyle"
+fullName "Kyle Katarn's Lightsaber"
+type 1
+model "models/weapons2/saber_reborn/saber_w.glm"
+skin 0
+soundOn 0
+soundLoop 0
+soundOff 0
+numBlades 1
+blade0 color 4 radius 40400000 lengthMax 42200000
+blade1 color 4 radius 40400000 lengthMax 42200000
+blade2 color 4 radius 40400000 lengthMax 42200000
+blade3 color 4 radius 40400000 lengthMax 42200000
+blade4 color 4 radius 40400000 lengthMax 42200000
+blade5 color 4 radius 40400000 lengthMax 42200000
+blade6 color 4 radius 40400000 lengthMax 42200000
+blade7 color 4 radius 40400000 lengthMax 42200000
+stylesLearned 0
+stylesForbidden 0
+maxChain 0
+forceRestrictions 0
+lockBonus 0
+parryBonus 0
+breakParryBonus 0
+breakParryBonus2 0
+disarmBonus 0
+disarmBonus2 0
+singleBladeStyle 0
+saberFlags 0
+saberFlags2 0
+spinSound 0
+swingSound 0 0 0
+moveSpeedScale 3f800000
+animSpeedScale 3f800000
+kataMove -1
+lungeAtkMove -1
+jumpAtkUpMove -1
+jumpAtkFwdMove -1
+jumpAtkBackMove -1
+jumpAtkRightMove -1
+jumpAtkLeftMove -1
+readyAnim -1
+drawAnim -1
+putawayAnim -1
+tauntAnim -1
+bowAnim -1
+meditateAnim -1
+flourishAnim -1
+gloatAnim -1
+bladeStyle2Start 0
+trailStyle 0
+g2MarksShader 0
+g2WeaponMarkShader 0
+hitSound 0 0 0
+blockSound 0 0 0
+bounceSound 0 0 0
+blockEffect 0
+hitPersonEffect 0
+hitOtherEffect 0
+bladeEffect 0
+knockbackScale 00000000
+damageScale 3f800000
+splashRadius 00000000
+splashDamage 0
+splashKnockback 00000000
+trailStyle2 0
+g2MarksShader2 0
+g2WeaponMarkShader2 0
+hit2Sound 0 0 0
+block2Sound 0 0 0
+bounce2Sound 0 0 0
+blockEffect2 0
+hitPersonEffect2 0
+hitOtherEffect2 0
+bladeEffect2 0
+knockbackScale2 00000000
+damageScale2 3f800000
+splashRadius2 00000000
+splashDamage2 0
+splashKnockback2 00000000
+regsound "sound/weapons/saber/enemy_saber_on.wav"
+regsound "sound/weapons/saber/saberhum3.wav"
+regsound "sound/weapons/saber/enemy_saber_off.wav"
+regsound "sound/weapons/saber/enemy_saber_on.wav"
+regsound "sound/weapons/saber/saberhum3.wav"
+regsound "sound/weapons/saber/enemy_saber_off.wav"
+--
+saber "staff_saber"
+ret 1
+name "staff_saber"
+fullName "Training Staff"
+type 2
+model "models/weapons2/saber_staff/saber_staff_w.glm"
+skin 0
+soundOn 0
+soundLoop 0
+soundOff 0
+numBlades 2
+blade0 color 0 radius 40800000 lengthMax 42100000
+blade1 color 3 radius 40800000 lengthMax 42000000
+blade2 color 0 radius 40800000 lengthMax 42100000
+blade3 color 0 radius 40800000 lengthMax 42100000
+blade4 color 0 radius 40800000 lengthMax 42100000
+blade5 color 0 radius 40800000 lengthMax 42100000
+blade6 color 0 radius 40800000 lengthMax 42100000
+blade7 color 0 radius 40800000 lengthMax 42100000
+stylesLearned 128
+stylesForbidden 126
+maxChain 8
+forceRestrictions 0
+lockBonus 0
+parryBonus 0
+breakParryBonus 0
+breakParryBonus2 0
+disarmBonus 0
+disarmBonus2 0
+singleBladeStyle 2
+saberFlags 48
+saberFlags2 65536
+spinSound 0
+swingSound 0 0 0
+moveSpeedScale 3f800000
+animSpeedScale 3f800000
+kataMove -1
+lungeAtkMove -1
+jumpAtkUpMove -1
+jumpAtkFwdMove -1
+jumpAtkBackMove -1
+jumpAtkRightMove -1
+jumpAtkLeftMove -1
+readyAnim -1
+drawAnim -1
+putawayAnim -1
+tauntAnim -1
+bowAnim -1
+meditateAnim -1
+flourishAnim -1
+gloatAnim -1
+bladeStyle2Start 1
+trailStyle 1
+g2MarksShader 0
+g2WeaponMarkShader 0
+hitSound 0 0 0
+blockSound 0 0 0
+bounceSound 0 0 0
+blockEffect 0
+hitPersonEffect 0
+hitOtherEffect 0
+bladeEffect 0
+knockbackScale 00000000
+damageScale 3f800000
+splashRadius 00000000
+splashDamage 0
+splashKnockback 00000000
+trailStyle2 2
+g2MarksShader2 0
+g2WeaponMarkShader2 0
+hit2Sound 0 0 0
+block2Sound 0 0 0
+bounce2Sound 0 0 0
+blockEffect2 0
+hitPersonEffect2 0
+hitOtherEffect2 0
+bladeEffect2 0
+knockbackScale2 00000000
+damageScale2 3fc00000
+splashRadius2 42000000
+splashDamage2 25
+splashKnockback2 3fa00000
+regsound "sound/weapons/saber/enemy_saber_on.wav"
+regsound "sound/weapons/saber/saberhum3.wav"
+regsound "sound/weapons/saber/enemy_saber_off.wav"
+regsound "sound/weapons/saber/saberhup1.wav"
+regsound "sound/weapons/saber/saberhup2.wav"
+regsound "sound/weapons/saber/saberhup3.wav"
+regsound "sound/weapons/saber/saberhit1.wav"
+regsound "sound/weapons/saber/saberhit2.wav"
+regsound "sound/weapons/saber/saberhit3.wav"
+--
+saber "edge_saber"
+ret 1
+name "edge_saber"
+fullName "Edge Case Saber"
+type 6
+model "models/weapons2/saber_reborn/saber_w.glm"
+skin 1
+soundOn 0
+soundLoop 0
+soundOff 0
+numBlades 1
+blade0 color 5 radius 3e800000 lengthMax 40800000
+blade1 color 5 radius 3e800000 lengthMax 40800000
+blade2 color 5 radius 3e800000 lengthMax 40800000
+blade3 color 5 radius 3e800000 lengthMax 40800000
+blade4 color 5 radius 3e800000 lengthMax 40800000
+blade5 color 5 radius 3e800000 lengthMax 40800000
+blade6 color 5 radius 3e800000 lengthMax 40800000
+blade7 color 5 radius 3e800000 lengthMax 40800000
+stylesLearned 2
+stylesForbidden 8
+maxChain -1
+forceRestrictions 128
+lockBonus 3
+parryBonus -2
+breakParryBonus 0
+breakParryBonus2 0
+disarmBonus 0
+disarmBonus2 0
+singleBladeStyle 0
+saberFlags 576
+saberFlags2 0
+spinSound 0
+swingSound 0 0 0
+moveSpeedScale 3f400000
+animSpeedScale 3fa00000
+kataMove 15
+lungeAtkMove -1
+jumpAtkUpMove -1
+jumpAtkFwdMove -1
+jumpAtkBackMove -1
+jumpAtkRightMove -1
+jumpAtkLeftMove -1
+readyAnim 915
+drawAnim 917
+putawayAnim -1
+tauntAnim -1
+bowAnim -1
+meditateAnim -1
+flourishAnim -1
+gloatAnim -1
+bladeStyle2Start 0
+trailStyle 0
+g2MarksShader 0
+g2WeaponMarkShader 0
+hitSound 0 0 0
+blockSound 0 0 0
+bounceSound 0 0 0
+blockEffect 0
+hitPersonEffect 0
+hitOtherEffect 0
+bladeEffect 0
+knockbackScale 40200000
+damageScale 3f800000
+splashRadius 00000000
+splashDamage 9999
+splashKnockback 00000000
+trailStyle2 0
+g2MarksShader2 0
+g2WeaponMarkShader2 0
+hit2Sound 0 0 0
+block2Sound 0 0 0
+bounce2Sound 0 0 0
+blockEffect2 0
+hitPersonEffect2 0
+hitOtherEffect2 0
+bladeEffect2 0
+knockbackScale2 00000000
+damageScale2 3f800000
+splashRadius2 00000000
+splashDamage2 0
+splashKnockback2 00000000
+regskin 1 "models/weapons2/saber_arc/model_default"
+regsound "sound/weapons/saber/enemy_saber_on.wav"
+regsound "sound/weapons/saber/saberhum3.wav"
+regsound "sound/weapons/saber/enemy_saber_off.wav"
+regsound "sound/weapons/saber/saberhit1.wav"
+regsound "sound/weapons/saber/saberhit2.wav"
+regsound "sound/weapons/saber/saberhit3.wav"
+--
+saber "broken_saber"
+ret 0
+name "broken_saber"
+fullName "Broken Saber"
+type 1
+model "models/weapons2/saber_reborn/saber_w.glm"
+skin 0
+soundOn 0
+soundLoop 0
+soundOff 0
+numBlades 1
+blade0 color 2 radius 40400000 lengthMax 41f00000
+blade1 color 2 radius 40400000 lengthMax 41f00000
+blade2 color 2 radius 40400000 lengthMax 41f00000
+blade3 color 2 radius 40400000 lengthMax 41f00000
+blade4 color 2 radius 40400000 lengthMax 41f00000
+blade5 color 2 radius 40400000 lengthMax 41f00000
+blade6 color 2 radius 40400000 lengthMax 41f00000
+blade7 color 2 radius 40400000 lengthMax 41f00000
+stylesLearned 0
+stylesForbidden 0
+maxChain 0
+forceRestrictions 0
+lockBonus 0
+parryBonus 0
+breakParryBonus 0
+breakParryBonus2 0
+disarmBonus 0
+disarmBonus2 0
+singleBladeStyle 0
+saberFlags 0
+saberFlags2 0
+spinSound 0
+swingSound 0 0 0
+moveSpeedScale 3f800000
+animSpeedScale 3f800000
+kataMove -1
+lungeAtkMove -1
+jumpAtkUpMove -1
+jumpAtkFwdMove -1
+jumpAtkBackMove -1
+jumpAtkRightMove -1
+jumpAtkLeftMove -1
+readyAnim -1
+drawAnim -1
+putawayAnim -1
+tauntAnim -1
+bowAnim -1
+meditateAnim -1
+flourishAnim -1
+gloatAnim -1
+bladeStyle2Start 0
+trailStyle 0
+g2MarksShader 0
+g2WeaponMarkShader 0
+hitSound 0 0 0
+blockSound 0 0 0
+bounceSound 0 0 0
+blockEffect 0
+hitPersonEffect 0
+hitOtherEffect 0
+bladeEffect 0
+knockbackScale 00000000
+damageScale 3f800000
+splashRadius 00000000
+splashDamage 0
+splashKnockback 00000000
+trailStyle2 0
+g2MarksShader2 0
+g2WeaponMarkShader2 0
+hit2Sound 0 0 0
+block2Sound 0 0 0
+bounce2Sound 0 0 0
+blockEffect2 0
+hitPersonEffect2 0
+hitOtherEffect2 0
+bladeEffect2 0
+knockbackScale2 00000000
+damageScale2 3f800000
+splashRadius2 00000000
+splashDamage2 0
+splashKnockback2 00000000
+regsound "sound/weapons/saber/enemy_saber_on.wav"
+regsound "sound/weapons/saber/saberhum3.wav"
+regsound "sound/weapons/saber/enemy_saber_off.wav"
+--
+saber "nonexistent_xyz"
+ret 0
+name "default"
+fullName "lightsaber"
+type 1
+model "models/weapons2/saber_reborn/saber_w.glm"
+skin 0
+soundOn 0
+soundLoop 0
+soundOff 0
+numBlades 1
+blade0 color 0 radius 40400000 lengthMax 42000000
+blade1 color 0 radius 40400000 lengthMax 42000000
+blade2 color 0 radius 40400000 lengthMax 42000000
+blade3 color 0 radius 40400000 lengthMax 42000000
+blade4 color 0 radius 40400000 lengthMax 42000000
+blade5 color 0 radius 40400000 lengthMax 42000000
+blade6 color 0 radius 40400000 lengthMax 42000000
+blade7 color 0 radius 40400000 lengthMax 42000000
+stylesLearned 0
+stylesForbidden 0
+maxChain 0
+forceRestrictions 0
+lockBonus 0
+parryBonus 0
+breakParryBonus 0
+breakParryBonus2 0
+disarmBonus 0
+disarmBonus2 0
+singleBladeStyle 0
+saberFlags 0
+saberFlags2 0
+spinSound 0
+swingSound 0 0 0
+moveSpeedScale 3f800000
+animSpeedScale 3f800000
+kataMove -1
+lungeAtkMove -1
+jumpAtkUpMove -1
+jumpAtkFwdMove -1
+jumpAtkBackMove -1
+jumpAtkRightMove -1
+jumpAtkLeftMove -1
+readyAnim -1
+drawAnim -1
+putawayAnim -1
+tauntAnim -1
+bowAnim -1
+meditateAnim -1
+flourishAnim -1
+gloatAnim -1
+bladeStyle2Start 0
+trailStyle 0
+g2MarksShader 0
+g2WeaponMarkShader 0
+hitSound 0 0 0
+blockSound 0 0 0
+bounceSound 0 0 0
+blockEffect 0
+hitPersonEffect 0
+hitOtherEffect 0
+bladeEffect 0
+knockbackScale 00000000
+damageScale 3f800000
+splashRadius 00000000
+splashDamage 0
+splashKnockback 00000000
+trailStyle2 0
+g2MarksShader2 0
+g2WeaponMarkShader2 0
+hit2Sound 0 0 0
+block2Sound 0 0 0
+bounce2Sound 0 0 0
+blockEffect2 0
+hitPersonEffect2 0
+hitOtherEffect2 0
+bladeEffect2 0
+knockbackScale2 00000000
+damageScale2 3f800000
+splashRadius2 00000000
+splashDamage2 0
+splashKnockback2 00000000
+regsound "sound/weapons/saber/enemy_saber_on.wav"
+regsound "sound/weapons/saber/saberhum3.wav"
+regsound "sound/weapons/saber/enemy_saber_off.wav"
+--
+saber ""
+ret 1
+name "Kyle"
+fullName "Kyle Katarn's Lightsaber"
+type 1
+model "models/weapons2/saber_reborn/saber_w.glm"
+skin 0
+soundOn 0
+soundLoop 0
+soundOff 0
+numBlades 1
+blade0 color 4 radius 40400000 lengthMax 42200000
+blade1 color 4 radius 40400000 lengthMax 42200000
+blade2 color 4 radius 40400000 lengthMax 42200000
+blade3 color 4 radius 40400000 lengthMax 42200000
+blade4 color 4 radius 40400000 lengthMax 42200000
+blade5 color 4 radius 40400000 lengthMax 42200000
+blade6 color 4 radius 40400000 lengthMax 42200000
+blade7 color 4 radius 40400000 lengthMax 42200000
+stylesLearned 0
+stylesForbidden 0
+maxChain 0
+forceRestrictions 0
+lockBonus 0
+parryBonus 0
+breakParryBonus 0
+breakParryBonus2 0
+disarmBonus 0
+disarmBonus2 0
+singleBladeStyle 0
+saberFlags 0
+saberFlags2 0
+spinSound 0
+swingSound 0 0 0
+moveSpeedScale 3f800000
+animSpeedScale 3f800000
+kataMove -1
+lungeAtkMove -1
+jumpAtkUpMove -1
+jumpAtkFwdMove -1
+jumpAtkBackMove -1
+jumpAtkRightMove -1
+jumpAtkLeftMove -1
+readyAnim -1
+drawAnim -1
+putawayAnim -1
+tauntAnim -1
+bowAnim -1
+meditateAnim -1
+flourishAnim -1
+gloatAnim -1
+bladeStyle2Start 0
+trailStyle 0
+g2MarksShader 0
+g2WeaponMarkShader 0
+hitSound 0 0 0
+blockSound 0 0 0
+bounceSound 0 0 0
+blockEffect 0
+hitPersonEffect 0
+hitOtherEffect 0
+bladeEffect 0
+knockbackScale 00000000
+damageScale 3f800000
+splashRadius 00000000
+splashDamage 0
+splashKnockback 00000000
+trailStyle2 0
+g2MarksShader2 0
+g2WeaponMarkShader2 0
+hit2Sound 0 0 0
+block2Sound 0 0 0
+bounce2Sound 0 0 0
+blockEffect2 0
+hitPersonEffect2 0
+hitOtherEffect2 0
+bladeEffect2 0
+knockbackScale2 00000000
+damageScale2 3f800000
+splashRadius2 00000000
+splashDamage2 0
+splashKnockback2 00000000
+regsound "sound/weapons/saber/enemy_saber_on.wav"
+regsound "sound/weapons/saber/saberhum3.wav"
+regsound "sound/weapons/saber/enemy_saber_off.wav"
+regsound "sound/weapons/saber/enemy_saber_on.wav"
+regsound "sound/weapons/saber/saberhum3.wav"
+regsound "sound/weapons/saber/enemy_saber_off.wav"
+--
+== end ==

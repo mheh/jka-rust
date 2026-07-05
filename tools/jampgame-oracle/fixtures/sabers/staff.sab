@@ -1,0 +1,35 @@
+// staff.sab — a dual-bladed staff saber exercising two blade styles, the
+// secondary-blade fields (bladeStyle2Start + *2 values), per-index blade
+// overrides (saberColor2/saberLength2), the swing/hit2 sound lists, and the
+// SFL_TWO_HANDED / style-forbid machinery.
+staff_saber
+{
+	name					"Training Staff"
+	saberType				SABER_STAFF
+	saberModel				"models/weapons2/saber_staff/saber_staff_w.glm"
+	numBlades				2
+	saberColor				red				// all blades red...
+	saberColor2				green			// ...blade 2 overridden green
+	saberLength				36
+	saberLength2			32
+	saberRadius				4.0
+	saberStyle				staff
+	twoHanded				1
+	bladeStyle2Start		1
+	trailStyle				1
+	trailStyle2				2
+	damageScale2			1.5
+	splashDamage2			25
+	splashRadius2			32
+	splashKnockback2		1.25
+	swingSound1				"sound/weapons/saber/saberhup1.wav"
+	swingSound2				"sound/weapons/saber/saberhup2.wav"
+	swingSound3				"sound/weapons/saber/saberhup3.wav"
+	hit2Sound1				"sound/weapons/saber/saberhit1.wav"
+	hit2Sound2				"sound/weapons/saber/saberhit2.wav"
+	hit2Sound3				"sound/weapons/saber/saberhit3.wav"
+	noManualDeactivate2		1
+	singleBladeStyle		medium
+	singleBladeThrowable	1
+	maxChain				8
+}

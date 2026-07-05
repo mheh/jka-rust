@@ -558,3 +558,515 @@ fn bglib_parity() {
     o.push_str("== end ==\n");
     compare("bglib", &o);
 }
+
+// ============================ bg_saberLoad family ============================
+//
+// Reproduces `tools/jampgame-oracle/golden/saberload.txt` by driving the
+// PORTED `WP_SaberLoadParms` + `WP_SaberParseParms` over the same
+// `fixtures/sabers/*.sab`. A tiny `TestTraps` serves the fixtures dir through
+// the real `BgTraps` FS seam and mints deterministic skin handles; the
+// context-free sound-registration order is observed through the port's
+// `saber_snd_tape_*` seam. See `tools/jampgame-oracle/README.md`.
+mod saberload {
+    use super::{compare, oracle_dir};
+    use core::ffi::{c_char, c_int, c_void};
+    use std::cell::{Cell, RefCell};
+    use std::fmt::Write as _;
+    use std::path::PathBuf;
+
+    use mp_game::bg_channel::{BgState, BgTraps};
+    use mp_game::bg_saberLoad::{
+        saber_snd_tape_drain, saber_snd_tape_enable, WP_SaberLoadParms, WP_SaberParseParms,
+    };
+    use mp_game::prelude::*;
+
+    // The saber names parsed, in order. Mirrors main_saberload.c's g_names.
+    const NAMES: &[&str] = &[
+        "Kyle",
+        "staff_saber",
+        "edge_saber",
+        "broken_saber",
+        "nonexistent_xyz",
+        "",
+    ];
+
+    /// A fixtures-backed `BgTraps`: the FS calls read `<dir>/sabers/*`, and
+    /// `r_register_skin` mints a per-saber counter with a name log. Every other
+    /// trait method is unreachable in the saber-load path.
+    struct TestTraps {
+        dir: PathBuf, // fixtures dir; sabers live in <dir>/sabers
+        files: RefCell<Vec<Option<(Vec<u8>, usize)>>>, // handle -> (bytes, pos); index 0 unused
+        skin_ctr: Cell<c_int>,
+        skin_log: RefCell<Vec<(c_int, String)>>,
+    }
+
+    impl TestTraps {
+        fn new(dir: PathBuf) -> Self {
+            Self {
+                dir,
+                files: RefCell::new(vec![None]), // reserve handle 0
+                skin_ctr: Cell::new(0),
+                skin_log: RefCell::new(Vec::new()),
+            }
+        }
+        // Reset the per-saber registration observation state.
+        fn reset_regs(&self) {
+            self.skin_ctr.set(0);
+            self.skin_log.borrow_mut().clear();
+        }
+        fn take_skins(&self) -> Vec<(c_int, String)> {
+            std::mem::take(&mut *self.skin_log.borrow_mut())
+        }
+        // Map a Raven vpath ("ext_data/sabers[/name]") onto the fixtures tree.
+        fn mappath(&self, vpath: &str) -> PathBuf {
+            let rel = vpath.strip_prefix("ext_data/").unwrap_or(vpath);
+            self.dir.join(rel)
+        }
+    }
+
+    impl BgTraps for TestTraps {
+        fn fs_getfilelist(
+            &self,
+            path: *const c_char,
+            extension: *const c_char,
+            listbuf: *mut c_char,
+            bufsize: c_int,
+        ) -> c_int {
+            let dir = self.mappath(&cstr_to_str_p(path));
+            let ext = cstr_to_str_p(extension);
+            let mut names: Vec<String> = match std::fs::read_dir(&dir) {
+                Ok(rd) => rd
+                    .filter_map(|e| e.ok())
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .filter(|n| n.ends_with(&ext))
+                    .collect(),
+                Err(_) => return 0,
+            };
+            names.sort(); // byte-lexicographic, matches the C dumper's qsort/strcmp
+            let n = names.len() as c_int;
+            let mut off = 0usize;
+            for nm in &names {
+                let b = nm.as_bytes();
+                if off + b.len() + 1 > bufsize as usize {
+                    break;
+                }
+                unsafe {
+                    std::ptr::copy_nonoverlapping(b.as_ptr(), listbuf.add(off) as *mut u8, b.len());
+                    *listbuf.add(off + b.len()) = 0;
+                }
+                off += b.len() + 1;
+            }
+            n
+        }
+
+        fn fs_fopen(&self, qpath: *const c_char, f: *mut fileHandle_t, mode: fsMode_t) -> c_int {
+            let _ = mode;
+            let real = self.mappath(&cstr_to_str_p(qpath));
+            match std::fs::read(&real) {
+                Ok(bytes) => {
+                    let len = bytes.len() as c_int;
+                    let mut files = self.files.borrow_mut();
+                    let h = files.len() as fileHandle_t;
+                    files.push(Some((bytes, 0)));
+                    unsafe {
+                        if !f.is_null() {
+                            *f = h;
+                        }
+                    }
+                    len
+                }
+                Err(_) => {
+                    unsafe {
+                        if !f.is_null() {
+                            *f = 0;
+                        }
+                    }
+                    -1
+                }
+            }
+        }
+
+        fn fs_read(&self, buffer: *mut c_void, len: c_int, f: fileHandle_t) {
+            let mut files = self.files.borrow_mut();
+            let idx = f as usize;
+            if idx == 0 || idx >= files.len() {
+                return;
+            }
+            if let Some((bytes, pos)) = files[idx].as_mut() {
+                let want = len as usize;
+                let avail = bytes.len().saturating_sub(*pos);
+                let n = want.min(avail);
+                unsafe {
+                    std::ptr::copy_nonoverlapping(bytes[*pos..].as_ptr(), buffer as *mut u8, n);
+                }
+                *pos += n;
+            }
+        }
+
+        fn fs_write(&self, _buffer: *const c_void, _len: c_int, _f: fileHandle_t) {}
+
+        fn fs_fclose(&self, f: fileHandle_t) {
+            let mut files = self.files.borrow_mut();
+            let idx = f as usize;
+            if idx != 0 && idx < files.len() {
+                files[idx] = None;
+            }
+        }
+
+        fn r_register_skin(&self, name: *const c_char) -> qhandle_t {
+            let id = self.skin_ctr.get() + 1;
+            self.skin_ctr.set(id);
+            self.skin_log.borrow_mut().push((id, cstr_to_str_p(name)));
+            id
+        }
+
+        // --- unreachable in the saber-load path ---
+        fn trace(
+            &self,
+            _r: *mut trace_t,
+            _s: *const vec3_t,
+            _mn: *const vec3_t,
+            _mx: *const vec3_t,
+            _e: *const vec3_t,
+            _p: c_int,
+            _c: c_int,
+        ) {
+            unreachable!()
+        }
+        fn pointcontents(&self, _p: *const vec3_t, _e: c_int) -> c_int {
+            unreachable!()
+        }
+        fn g2api_init_ghoul2_model(
+            &self,
+            _a: *mut *mut c_void,
+            _b: *const c_char,
+            _c: c_int,
+            _d: qhandle_t,
+            _e: qhandle_t,
+            _f: c_int,
+            _g: c_int,
+        ) -> c_int {
+            unreachable!()
+        }
+        fn g2api_clean_ghoul2_models(&self, _a: *mut *mut c_void) {
+            unreachable!()
+        }
+        fn g2api_add_bolt(&self, _a: *mut c_void, _b: c_int, _c: *const c_char) -> c_int {
+            unreachable!()
+        }
+        fn g2api_get_bolt_matrix(
+            &self,
+            _a: *mut c_void,
+            _b: c_int,
+            _c: c_int,
+            _d: *mut mdxaBone_t,
+            _e: *const vec3_t,
+            _f: *const vec3_t,
+            _g: c_int,
+            _h: *mut qhandle_t,
+            _i: *const vec3_t,
+        ) -> qboolean {
+            unreachable!()
+        }
+        fn g2api_get_bolt_matrix_no_reconstruct(
+            &self,
+            _a: *mut c_void,
+            _b: c_int,
+            _c: c_int,
+            _d: *mut mdxaBone_t,
+            _e: *const vec3_t,
+            _f: *const vec3_t,
+            _g: c_int,
+            _h: *mut qhandle_t,
+            _i: *const vec3_t,
+        ) -> qboolean {
+            unreachable!()
+        }
+        fn g2api_get_bolt_matrix_no_rec_no_rot(
+            &self,
+            _a: *mut c_void,
+            _b: c_int,
+            _c: c_int,
+            _d: *mut mdxaBone_t,
+            _e: *const vec3_t,
+            _f: *const vec3_t,
+            _g: c_int,
+            _h: *mut qhandle_t,
+            _i: *const vec3_t,
+        ) -> qboolean {
+            unreachable!()
+        }
+        fn g2api_set_bone_angles(
+            &self,
+            _a: *mut c_void,
+            _b: c_int,
+            _c: *const c_char,
+            _d: *const vec3_t,
+            _e: c_int,
+            _f: c_int,
+            _g: c_int,
+            _h: c_int,
+            _i: *mut qhandle_t,
+            _j: c_int,
+            _k: c_int,
+        ) -> qboolean {
+            unreachable!()
+        }
+        fn g2api_set_bone_anim(
+            &self,
+            _a: *mut c_void,
+            _b: c_int,
+            _c: *const c_char,
+            _d: c_int,
+            _e: c_int,
+            _f: c_int,
+            _g: f32,
+            _h: c_int,
+            _i: f32,
+            _j: c_int,
+        ) -> qboolean {
+            unreachable!()
+        }
+        fn g2api_get_bone_anim(
+            &self,
+            _a: *mut c_void,
+            _b: *const c_char,
+            _c: c_int,
+            _d: *mut f32,
+            _e: *mut c_int,
+            _f: *mut c_int,
+            _g: *mut c_int,
+            _h: *mut f32,
+            _i: *mut c_int,
+            _j: c_int,
+        ) -> qboolean {
+            unreachable!()
+        }
+        fn g2api_set_rag_doll(&self, _a: *mut c_void, _b: *mut sharedRagDollParams_t) {
+            unreachable!()
+        }
+        fn g2api_animate_g2_models(
+            &self,
+            _a: *mut c_void,
+            _b: c_int,
+            _c: *mut sharedRagDollUpdateParams_t,
+        ) {
+            unreachable!()
+        }
+        fn g2api_set_bone_ik_state(
+            &self,
+            _a: *mut c_void,
+            _b: c_int,
+            _c: *const c_char,
+            _d: c_int,
+            _e: *mut sharedSetBoneIKStateParams_t,
+        ) -> qboolean {
+            unreachable!()
+        }
+        fn g2api_ik_move(
+            &self,
+            _a: *mut c_void,
+            _b: c_int,
+            _c: *mut sharedIKMoveParams_t,
+        ) -> qboolean {
+            unreachable!()
+        }
+        fn g2api_get_surface_render_status(
+            &self,
+            _a: *mut c_void,
+            _b: c_int,
+            _c: *const c_char,
+        ) -> c_int {
+            unreachable!()
+        }
+        fn fx_play_effect_id(
+            &self,
+            _a: c_int,
+            _b: *const vec3_t,
+            _c: *const vec3_t,
+            _d: c_int,
+            _e: c_int,
+        ) {
+            unreachable!()
+        }
+        fn snap_vector(&self, _v: *mut f32) {
+            unreachable!()
+        }
+        fn cvar_register(
+            &self,
+            _a: *mut vmCvar_t,
+            _b: *const c_char,
+            _c: *const c_char,
+            _d: c_int,
+        ) {
+            unreachable!()
+        }
+    }
+
+    fn cstr_to_str_p(p: *const c_char) -> String {
+        unsafe { std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned() }
+    }
+
+    // Read a fixed C-char array field as a displayable string (up to NUL).
+    fn field_str(buf: &[c_char]) -> String {
+        let bytes: Vec<u8> = buf.iter().take_while(|&&c| c != 0).map(|&c| c as u8).collect();
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+
+    #[test]
+    fn saberload_parity() {
+        let dir = oracle_dir().join("fixtures");
+        let traps = TestTraps::new(dir);
+        let mut bg = BgState::new();
+
+        saber_snd_tape_enable();
+        WP_SaberLoadParms(&mut bg, &traps);
+
+        let mut o = String::new();
+        o.push_str("== saberload ==\n");
+
+        for name in NAMES {
+            let _ = saber_snd_tape_drain(); // clear any leftover
+            traps.reset_regs();
+
+            let mut saber: saberInfo_t = unsafe { core::mem::zeroed() };
+            let cname = cstr(name);
+            let ret = WP_SaberParseParms(cname.as_ptr(), &mut saber, &mut bg, &traps);
+
+            let pi = |o: &mut String, tag: &str, v: c_int| {
+                let _ = writeln!(o, "{tag} {v}");
+            };
+            let pfh = |o: &mut String, tag: &str, v: f32| {
+                let _ = writeln!(o, "{tag} {:08x}", v.to_bits());
+            };
+            let qstr = |o: &mut String, tag: &str, s: &str| {
+                let _ = writeln!(o, "{tag} \"{s}\"");
+            };
+
+            let _ = writeln!(o, "saber \"{name}\"");
+            pi(&mut o, "ret", if ret != QFALSE { 1 } else { 0 });
+            qstr(&mut o, "name", &field_str(&saber.name));
+            qstr(&mut o, "fullName", &field_str(&saber.fullName));
+            pi(&mut o, "type", saber.r#type as c_int);
+            qstr(&mut o, "model", &field_str(&saber.model));
+            pi(&mut o, "skin", saber.skin);
+            pi(&mut o, "soundOn", saber.soundOn);
+            pi(&mut o, "soundLoop", saber.soundLoop);
+            pi(&mut o, "soundOff", saber.soundOff);
+            pi(&mut o, "numBlades", saber.numBlades);
+            for i in 0..MAX_BLADES {
+                let b = &saber.blade[i];
+                let _ = writeln!(
+                    o,
+                    "blade{i} color {} radius {:08x} lengthMax {:08x}",
+                    b.color as c_int,
+                    b.radius.to_bits(),
+                    b.lengthMax.to_bits()
+                );
+            }
+            pi(&mut o, "stylesLearned", saber.stylesLearned);
+            pi(&mut o, "stylesForbidden", saber.stylesForbidden);
+            pi(&mut o, "maxChain", saber.maxChain);
+            pi(&mut o, "forceRestrictions", saber.forceRestrictions);
+            pi(&mut o, "lockBonus", saber.lockBonus);
+            pi(&mut o, "parryBonus", saber.parryBonus);
+            pi(&mut o, "breakParryBonus", saber.breakParryBonus);
+            pi(&mut o, "breakParryBonus2", saber.breakParryBonus2);
+            pi(&mut o, "disarmBonus", saber.disarmBonus);
+            pi(&mut o, "disarmBonus2", saber.disarmBonus2);
+            pi(&mut o, "singleBladeStyle", saber.singleBladeStyle as c_int);
+            pi(&mut o, "saberFlags", saber.saberFlags);
+            pi(&mut o, "saberFlags2", saber.saberFlags2);
+            pi(&mut o, "spinSound", saber.spinSound);
+            let _ = writeln!(
+                o,
+                "swingSound {} {} {}",
+                saber.swingSound[0], saber.swingSound[1], saber.swingSound[2]
+            );
+            pfh(&mut o, "moveSpeedScale", saber.moveSpeedScale);
+            pfh(&mut o, "animSpeedScale", saber.animSpeedScale);
+            pi(&mut o, "kataMove", saber.kataMove);
+            pi(&mut o, "lungeAtkMove", saber.lungeAtkMove);
+            pi(&mut o, "jumpAtkUpMove", saber.jumpAtkUpMove);
+            pi(&mut o, "jumpAtkFwdMove", saber.jumpAtkFwdMove);
+            pi(&mut o, "jumpAtkBackMove", saber.jumpAtkBackMove);
+            pi(&mut o, "jumpAtkRightMove", saber.jumpAtkRightMove);
+            pi(&mut o, "jumpAtkLeftMove", saber.jumpAtkLeftMove);
+            pi(&mut o, "readyAnim", saber.readyAnim);
+            pi(&mut o, "drawAnim", saber.drawAnim);
+            pi(&mut o, "putawayAnim", saber.putawayAnim);
+            pi(&mut o, "tauntAnim", saber.tauntAnim);
+            pi(&mut o, "bowAnim", saber.bowAnim);
+            pi(&mut o, "meditateAnim", saber.meditateAnim);
+            pi(&mut o, "flourishAnim", saber.flourishAnim);
+            pi(&mut o, "gloatAnim", saber.gloatAnim);
+            pi(&mut o, "bladeStyle2Start", saber.bladeStyle2Start);
+            pi(&mut o, "trailStyle", saber.trailStyle);
+            pi(&mut o, "g2MarksShader", saber.g2MarksShader);
+            pi(&mut o, "g2WeaponMarkShader", saber.g2WeaponMarkShader);
+            let _ = writeln!(
+                o,
+                "hitSound {} {} {}",
+                saber.hitSound[0], saber.hitSound[1], saber.hitSound[2]
+            );
+            let _ = writeln!(
+                o,
+                "blockSound {} {} {}",
+                saber.blockSound[0], saber.blockSound[1], saber.blockSound[2]
+            );
+            let _ = writeln!(
+                o,
+                "bounceSound {} {} {}",
+                saber.bounceSound[0], saber.bounceSound[1], saber.bounceSound[2]
+            );
+            pi(&mut o, "blockEffect", saber.blockEffect);
+            pi(&mut o, "hitPersonEffect", saber.hitPersonEffect);
+            pi(&mut o, "hitOtherEffect", saber.hitOtherEffect);
+            pi(&mut o, "bladeEffect", saber.bladeEffect);
+            pfh(&mut o, "knockbackScale", saber.knockbackScale);
+            pfh(&mut o, "damageScale", saber.damageScale);
+            pfh(&mut o, "splashRadius", saber.splashRadius);
+            pi(&mut o, "splashDamage", saber.splashDamage);
+            pfh(&mut o, "splashKnockback", saber.splashKnockback);
+            pi(&mut o, "trailStyle2", saber.trailStyle2);
+            pi(&mut o, "g2MarksShader2", saber.g2MarksShader2);
+            pi(&mut o, "g2WeaponMarkShader2", saber.g2WeaponMarkShader2);
+            let _ = writeln!(
+                o,
+                "hit2Sound {} {} {}",
+                saber.hit2Sound[0], saber.hit2Sound[1], saber.hit2Sound[2]
+            );
+            let _ = writeln!(
+                o,
+                "block2Sound {} {} {}",
+                saber.block2Sound[0], saber.block2Sound[1], saber.block2Sound[2]
+            );
+            let _ = writeln!(
+                o,
+                "bounce2Sound {} {} {}",
+                saber.bounce2Sound[0], saber.bounce2Sound[1], saber.bounce2Sound[2]
+            );
+            pi(&mut o, "blockEffect2", saber.blockEffect2);
+            pi(&mut o, "hitPersonEffect2", saber.hitPersonEffect2);
+            pi(&mut o, "hitOtherEffect2", saber.hitOtherEffect2);
+            pi(&mut o, "bladeEffect2", saber.bladeEffect2);
+            pfh(&mut o, "knockbackScale2", saber.knockbackScale2);
+            pfh(&mut o, "damageScale2", saber.damageScale2);
+            pfh(&mut o, "splashRadius2", saber.splashRadius2);
+            pi(&mut o, "splashDamage2", saber.splashDamage2);
+            pfh(&mut o, "splashKnockback2", saber.splashKnockback2);
+
+            let sounds = saber_snd_tape_drain();
+            for (id, nm) in traps.take_skins() {
+                let _ = writeln!(o, "regskin {id} \"{nm}\"");
+            }
+            for nm in sounds {
+                let _ = writeln!(o, "regsound \"{nm}\"");
+            }
+            o.push_str("--\n");
+        }
+
+        o.push_str("== end ==\n");
+        compare("saberload", &o);
+    }
+}
