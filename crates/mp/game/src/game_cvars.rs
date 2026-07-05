@@ -318,6 +318,19 @@ pub struct GameCvars {
     /// `"bot_normgpath"` — default `"1"`, flags `CVAR_CHEAT`.
     /// Source: `oracle/oracle/codemp/game/ai_main.c:66`, registration `ai_wpnav.c:3360`.
     pub bot_normgpath: vmCvar_t,
+    /// Raven `bot_pvstype` — file-scope `vmCvar_t` (not in `gameCvarTable`;
+    /// registered ad hoc by `BotAISetup`). `"bot_pvstype"` — default `"1"`,
+    /// flags `CVAR_CHEAT`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:7575-7616` (registration `:7593`-area).
+    pub bot_pvstype: vmCvar_t,
+    /// Raven `bot_camp` — file-scope `vmCvar_t` (not in `gameCvarTable`;
+    /// registered ad hoc by `BotAISetup`). `"bot_camp"` — default `"1"`, flags `0`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:7575-7616`.
+    pub bot_camp: vmCvar_t,
+    /// Raven `bot_attachments` — file-scope `vmCvar_t` (not in `gameCvarTable`;
+    /// registered ad hoc by `BotAISetup`). `"bot_attachments"` — default `"1"`, flags `0`.
+    /// Source: `oracle/oracle/codemp/game/ai_main.c:7575-7616`.
+    pub bot_attachments: vmCvar_t,
 }
 
 /// One `gameCvarTable` row: registration data for `G_RegisterCvars`

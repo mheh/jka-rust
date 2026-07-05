@@ -449,6 +449,27 @@ pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
     }
 }
 
+/// Raven `teamAward_e`.
+///
+/// Raven comments: TEAM_NONE "ha ha! you suck!"; TEAM_MVP "most overall
+/// points"; TEAM_DEFENDER "killed the most baddies near your flag";
+/// TEAM_WARRIOR "most frags"; TEAM_CARRIER "infected the most people with
+/// plague"; TEAM_INTERCEPTOR "returned your own flag the most";
+/// TEAM_BRAVERY "Red Shirt Award (tm). you died more than anybody."
+/// Source: `oracle/oracle/codemp/game/g_log.c:1438-1447`
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TeamAward_e {
+    TeamNone = 0,
+    TeamMvp,
+    TeamDefender,
+    TeamWarrior,
+    TeamCarrier,
+    TeamInterceptor,
+    TeamBravery,
+    TeamMax,
+}
+
 /// Raven `CalculateTeamAward`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1451-1484`
@@ -460,27 +481,27 @@ pub fn CalculateTeamAward(
         let mut team_awards: c_int = 0;
 
         if CalculateTeamMVP(ctx, ent) != QFALSE {
-            team_awards |= 1 << TEAM_MVP;
+            team_awards |= 1 << TeamAward_e::TeamMvp as i32;
         }
         if (*ctx.world).cvars.g_gametype.integer == GT_CTF
             || (*ctx.world).cvars.g_gametype.integer == GT_CTY
         {
             if CalculateTeamDefender(ctx, ent) != QFALSE {
-                team_awards |= 1 << TEAM_DEFENDER;
+                team_awards |= 1 << TeamAward_e::TeamDefender as i32;
             }
             if CalculateTeamWarrior(ctx, ent) != QFALSE {
-                team_awards |= 1 << TEAM_WARRIOR;
+                team_awards |= 1 << TeamAward_e::TeamWarrior as i32;
             }
             if CalculateTeamCarrier(ctx, ent) != QFALSE {
-                team_awards |= 1 << TEAM_CARRIER;
+                team_awards |= 1 << TeamAward_e::TeamCarrier as i32;
             }
             if CalculateTeamInterceptor(ctx, ent) != QFALSE {
-                team_awards |= 1 << TEAM_INTERCEPTOR;
+                team_awards |= 1 << TeamAward_e::TeamInterceptor as i32;
             }
         }
         if team_awards == 0 && CalculateTeamRedShirt(ctx, ent) != QFALSE {
             // if you got nothing else and died a lot, at least get bravery
-            team_awards |= 1 << TEAM_BRAVERY;
+            team_awards |= 1 << TeamAward_e::TeamBravery as i32;
         }
         team_awards
     }
@@ -614,6 +635,60 @@ pub fn GetWorstEnemyForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
         n_worst_enemy
     }
 }
+
+/// Raven `weaponFromMOD`.
+///
+/// MOD-weapon mapping array. Raven declares it `int weaponFromMOD[MOD_MAX]`
+/// (not a named enum), so this stays a plain array of `c_int`, not an enum.
+/// The designated-initializer list only covers the first 38 of `MOD_MAX`(45)
+/// entries — the trailing entries (`MOD_FORCE_DARK`..`MOD_TRIGGER_HURT`) are
+/// C zero-init, which is `WP_NONE` (0) anyway, so this array is faithfully
+/// padded with `WP_NONE`.
+/// Source: `oracle/oracle/codemp/game/g_log.c:35-77`
+pub const weaponFromMOD: [c_int; meansOfDeath_t::MOD_MAX as usize] = {
+    let mut table = [WP_NONE; meansOfDeath_t::MOD_MAX as usize];
+    table[meansOfDeath_t::MOD_UNKNOWN as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_STUN_BATON as usize] = WP_STUN_BATON;
+    table[meansOfDeath_t::MOD_MELEE as usize] = WP_MELEE;
+    table[meansOfDeath_t::MOD_SABER as usize] = WP_SABER;
+    table[meansOfDeath_t::MOD_BRYAR_PISTOL as usize] = WP_BRYAR_PISTOL;
+    table[meansOfDeath_t::MOD_BRYAR_PISTOL_ALT as usize] = WP_BRYAR_PISTOL;
+    table[meansOfDeath_t::MOD_BLASTER as usize] = WP_BLASTER;
+    table[meansOfDeath_t::MOD_TURBLAST as usize] = WP_TURRET;
+    table[meansOfDeath_t::MOD_DISRUPTOR as usize] = WP_DISRUPTOR;
+    table[meansOfDeath_t::MOD_DISRUPTOR_SPLASH as usize] = WP_DISRUPTOR;
+    table[meansOfDeath_t::MOD_DISRUPTOR_SNIPER as usize] = WP_DISRUPTOR;
+    table[meansOfDeath_t::MOD_BOWCASTER as usize] = WP_BOWCASTER;
+    table[meansOfDeath_t::MOD_REPEATER as usize] = WP_REPEATER;
+    table[meansOfDeath_t::MOD_REPEATER_ALT as usize] = WP_REPEATER;
+    table[meansOfDeath_t::MOD_REPEATER_ALT_SPLASH as usize] = WP_REPEATER;
+    table[meansOfDeath_t::MOD_DEMP2 as usize] = WP_DEMP2;
+    table[meansOfDeath_t::MOD_DEMP2_ALT as usize] = WP_DEMP2;
+    table[meansOfDeath_t::MOD_FLECHETTE as usize] = WP_FLECHETTE;
+    table[meansOfDeath_t::MOD_FLECHETTE_ALT_SPLASH as usize] = WP_FLECHETTE;
+    table[meansOfDeath_t::MOD_ROCKET as usize] = WP_ROCKET_LAUNCHER;
+    table[meansOfDeath_t::MOD_ROCKET_SPLASH as usize] = WP_ROCKET_LAUNCHER;
+    table[meansOfDeath_t::MOD_ROCKET_HOMING as usize] = WP_ROCKET_LAUNCHER;
+    table[meansOfDeath_t::MOD_ROCKET_HOMING_SPLASH as usize] = WP_ROCKET_LAUNCHER;
+    table[meansOfDeath_t::MOD_THERMAL as usize] = WP_THERMAL;
+    table[meansOfDeath_t::MOD_THERMAL_SPLASH as usize] = WP_THERMAL;
+    table[meansOfDeath_t::MOD_TRIP_MINE_SPLASH as usize] = WP_TRIP_MINE;
+    table[meansOfDeath_t::MOD_TIMED_MINE_SPLASH as usize] = WP_TRIP_MINE;
+    table[meansOfDeath_t::MOD_DET_PACK_SPLASH as usize] = WP_DET_PACK;
+    table[meansOfDeath_t::MOD_FORCE_DARK as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_SENTRY as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_WATER as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_SLIME as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_LAVA as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_CRUSH as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_TELEFRAG as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_FALLING as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_COLLISION as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_SUICIDE as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_TARGET_LASER as usize] = WP_NONE;
+    table[meansOfDeath_t::MOD_TRIGGER_HURT as usize] = WP_NONE;
+    table
+};
 
 /// Raven `GetFavoriteWeaponForClient`.
 ///

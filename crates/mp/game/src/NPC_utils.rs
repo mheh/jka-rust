@@ -52,6 +52,7 @@ use crate::bg_lib::atof;
 use mp_qshared::shared::force_powers::FP_SPEED;
 use crate::trap;
 use crate::world::GameContext;
+pub use crate::NPC_goal::UpdateGoal;
 
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
@@ -93,13 +94,13 @@ const SCF_DONT_FIRE: c_int = 0x00004000;
 
 /// Raven `ANGLE2SHORT(x)` — `((int)((x)*65536/360) & 65535)`.
 /// Source: `oracle/oracle/codemp/game/q_shared.h:1972`
-fn ANGLE2SHORT(x: f32) -> c_int {
+pub(crate) fn ANGLE2SHORT(x: f32) -> c_int {
     (((x * 65536.0 / 360.0) as c_int) & 65535) as c_int
 }
 
 /// Raven `SHORT2ANGLE(x)` — `((x)*(360.0/65536))`.
 /// Source: `oracle/oracle/codemp/game/q_shared.h:1973`
-fn SHORT2ANGLE(x: c_int) -> f32 {
+pub(crate) fn SHORT2ANGLE(x: c_int) -> f32 {
     (x as f32) * (360.0 / 65536.0)
 }
 

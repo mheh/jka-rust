@@ -828,6 +828,55 @@ pub fn Q_strrchr(string: *const c_char, c: c_int) -> *mut c_char {
     }
 }
 
+/// C standard-library `strcmp` (case-sensitive), as called bare (not via a
+/// `Q_*` wrapper) at various `q_shared.c` sites (e.g. lines 548, 565, 670,
+/// 1185, 1240). Housed alongside the other `q_shared.c` string helpers per
+/// the file's existing string-fn family.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.c` (bare `strcmp` call sites).
+pub fn Q_strcmp(s1: *const c_char, s2: *const c_char) -> c_int {
+    unsafe {
+        let mut p1 = s1;
+        let mut p2 = s2;
+        loop {
+            let c1 = *p1 as c_int;
+            let c2 = *p2 as c_int;
+            p1 = p1.offset(1);
+            p2 = p2.offset(1);
+
+            if c1 != c2 {
+                return if c1 < c2 { -1 } else { 1 };
+            }
+            if c1 == 0 {
+                return 0;
+            }
+        }
+    }
+}
+
+/// C standard-library `strchr` (first-occurrence character search), as
+/// called bare (not via a `Q_*` wrapper) at various `q_shared.c` sites (e.g.
+/// lines 1157, 1212, 1264, 1267, 1287, 1293, 1299, 1335, 1341, 1347). Housed
+/// alongside the other `q_shared.c` string helpers per the file's existing
+/// string-fn family.
+///
+/// Source: `oracle/oracle/codemp/game/q_shared.c` (bare `strchr` call sites).
+pub fn Q_strchr(string: *const c_char, c: c_int) -> *mut c_char {
+    unsafe {
+        let cc = c as c_char;
+        let mut s = string;
+        loop {
+            if *s == cc {
+                return s as *mut c_char;
+            }
+            if *s == 0 {
+                return std::ptr::null_mut();
+            }
+            s = s.offset(1);
+        }
+    }
+}
+
 /// Raven `Q_strncpyz`.
 ///
 /// Source: `oracle/oracle/codemp/game/q_shared.c:826-840`

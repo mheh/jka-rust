@@ -19,7 +19,7 @@ pub struct GameWorld {
     pub level: level_locals_t,
     /// `g_entities[MAX_GENTITIES]` (`g_main.c:27`; contiguous `#[repr(C)]`,
     /// size-asserted 1832 B).
-    pub entities: Box<[gentity_t; MAX_GENTITIES]>,
+    pub g_entities: Box<[gentity_t; MAX_GENTITIES]>,
     /// `g_clients[MAX_CLIENTS]` (reached as `level.clients`, `g_main.c:28`;
     /// asserted 7344 B). MP only.
     pub clients: Box<[gclient_t; MAX_CLIENTS]>,
@@ -87,7 +87,7 @@ impl GameWorld {
         // level.gentities/clients + entities[i].client back-pointers alias them
         // AFTER they exist, in G_InitGame's dispatched arm (g_main.c:978-988) —
         // not here.
-        let entities = native_platform::zeroed_box::<[gentity_t; MAX_GENTITIES]>();
+        let g_entities = native_platform::zeroed_box::<[gentity_t; MAX_GENTITIES]>();
         let clients = native_platform::zeroed_box::<[gclient_t; MAX_CLIENTS]>();
         let level = *native_platform::zeroed_box::<level_locals_t>();
         let memoryPool = native_platform::zeroed_box::<[u8; 262144]>();
@@ -96,7 +96,7 @@ impl GameWorld {
         >();
         GameWorld {
             level,
-            entities,
+            g_entities,
             clients,
             cvars: GameCvars::default(),
             globals: crate::game_globals::GameGlobals::default(),

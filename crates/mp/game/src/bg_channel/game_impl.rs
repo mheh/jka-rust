@@ -114,7 +114,22 @@ impl BgTraps for GameBgTraps<'_> {
         modelList: *mut qhandle_t,
         scale: *const vec3_t,
     ) -> qboolean {
-        todo!("Port BgTraps::g2api_get_bolt_matrix — strap_G2API_GetBoltMatrix")
+        // Raven: `trap_G2API_GetBoltMatrix` (`G_G2_GETBOLT`).
+        use mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs;
+        crate::trap::G2API_GetBoltMatrix(
+            self.ctx.engine,
+            GG2GetboltArgs::new(
+                ghoul2,
+                modelIndex,
+                boltIndex,
+                matrix,
+                angles,
+                position,
+                frameNum,
+                modelList,
+                scale,
+            ),
+        )
     }
     fn g2api_get_bolt_matrix_no_reconstruct(
         &self,
@@ -218,6 +233,21 @@ impl BgTraps for GameBgTraps<'_> {
         params: *mut sharedIKMoveParams_t,
     ) -> qboolean {
         todo!("Port BgTraps::g2api_ik_move — strap_G2API_IKMove")
+    }
+    fn g2api_get_surface_render_status(
+        &self,
+        ghoul2: *mut c_void,
+        modelIndex: c_int,
+        surfaceName: *const c_char,
+    ) -> c_int {
+        use mp_abi::game::syscalls::G_G2_GETSURFACERENDERSTATUS::GG2GetsurfacerenderstatusArgs;
+        // Delegates via `crate::trap::G2API_GetSurfaceRenderStatus` (G_G2_GETSURFACERENDERSTATUS);
+        // args ABI wants an owned `CString`, so the borrowed C string is copied.
+        let surface_name = unsafe { core::ffi::CStr::from_ptr(surfaceName) }.to_owned();
+        crate::trap::G2API_GetSurfaceRenderStatus(
+            self.ctx.engine,
+            GG2GetsurfacerenderstatusArgs::new(ghoul2, modelIndex, surface_name),
+        )
     }
 
     fn fx_play_effect_id(

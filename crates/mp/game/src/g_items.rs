@@ -112,7 +112,7 @@ const MASK_SHOT: c_int = CONTENTS_SOLID
 // Raven `g_local.h` SVF_* svflags #defines — transcribed locally per the
 // `g_combat.rs:876` precedent (not yet ported).
 // Source: `oracle/oracle/codemp/game/g_local.h`
-const SVF_NOCLIENT: c_int = 0x0000_0001;
+pub(crate) const SVF_NOCLIENT: c_int = 0x0000_0001;
 const SVF_BROADCAST: c_int = 0x0000_0020;
 const SVF_SINGLECLIENT: c_int = 0x0000_0040;
 

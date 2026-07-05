@@ -172,6 +172,18 @@ pub use crate::trap::R_RegisterSkin as trap_R_RegisterSkin;
 // transcribe the bare Raven spellings (oracle/oracle/codemp/game/g_syscalls.c)
 pub use crate::trap::G2API_InitGhoul2Model as trap_G2API_InitGhoul2Model;
 pub use crate::trap::G2API_CleanGhoul2Models as trap_G2API_CleanGhoul2Models;
+pub use crate::trap::G2API_GetBoltMatrix as trap_G2API_GetBoltMatrix;
+pub use crate::trap::G2API_GetBoltMatrix_NoReconstruct as trap_G2API_GetBoltMatrix_NoReconstruct;
+pub use crate::trap::G2API_GetBoltMatrix_NoRecNoRot as trap_G2API_GetBoltMatrix_NoRecNoRot;
+pub use crate::trap::G2API_SetBoneAngles as trap_G2API_SetBoneAngles;
+pub use crate::trap::G2API_SetBoneAnim as trap_G2API_SetBoneAnim;
+pub use crate::trap::G2API_GetBoneAnim as trap_G2API_GetBoneAnim;
+pub use crate::trap::G2API_SetRagDoll as trap_G2API_SetRagDoll;
+pub use crate::trap::G2API_AnimateG2Models as trap_G2API_AnimateG2Models;
+pub use crate::trap::G2API_SetBoneIKState as trap_G2API_SetBoneIKState;
+pub use crate::trap::G2API_IKMove as trap_G2API_IKMove;
+pub use crate::trap::TrueMalloc as trap_TrueMalloc;
+pub use crate::trap::TrueFree as trap_TrueFree;
 
 // The entity fn-ID dispatch enums (ruling 2 / `ent_fn_enums`), named bare in the
 // spawn/think/touch/… assignment sites.
@@ -310,7 +322,7 @@ pub use crate::g_timer::TIMER_Done;
 pub use crate::g_utils::{G_AddEvent, G_Find, G_FreeEntity, G_ModelIndex, G_PlayEffect, G_ScaleNetHealth, G_SetAnim, G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_SoundSetIndex, G_Spawn, G_TeamCommand, G_TempEntity, G_UseTargets2, TryHeal};
 pub use crate::g_weapon::{LogAccuracyHit, laserTrapStick};
 pub use crate::q_math::{AddPointToBounds, AngleSubtract, AngleVectors, CrossProduct, DirToByte, Distance, DistanceHorizontalSquared, G_FindClosestPointOnLineSegment, Q_fabs, VectorCompare, VectorLength, VectorLengthSquared, VectorNormalize};
-pub use crate::q_shared::{COM_StripExtension, GetIDForString, Q_stricmp, Q_strncmp, Q_strncpyz, Q_strupr, va};
+pub use crate::q_shared::{COM_StripExtension, GetIDForString, Info_ValueForKey, Q_strchr, Q_strcmp, Q_stricmp, Q_strncmp, Q_strncpyz, Q_strupr, va};
 pub use crate::w_saber::WP_SaberCanBlock;
 
 // preflight.py: file-level symbol re-exports (aggregate re-export plan)
@@ -359,6 +371,7 @@ pub use crate::NPC_utils::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crate
 pub use crate::client::client_connected::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/client/client_connected.rs
 pub use mp_qshared::shared::flag_status::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/flag_status.rs
 pub use crate::ai::consts::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/consts.rs
+pub use crate::ai::distance::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/ai/distance.rs
 pub use mp_qshared::common::mp::qcommon::player_state::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/player_state.rs
 pub use mp_bg::vehicles::vehicle_s::*;  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/vehicles/vehicle_s.rs
 pub use mp_qshared::shared::trajectory::{ trType_t::*};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/shared/trajectory.rs
@@ -406,3 +419,9 @@ pub use mp_qshared::common::mp::gentity::{NUM_BSETS};  // .claude/worktrees/agen
 pub use mp_qshared::common::mp::qcommon::player_state::{NUM_FORCE_POWERS};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/qshared/src/common/mp/qcommon/player_state.rs
 pub use mp_bg::public::saber_move_data_table::{saberMoveData};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/bg/src/public/saber_move_data_table.rs
 pub use crate::bg_vehicleLoad::{BG_VehicleGetIndex};  // .claude/worktrees/agent-a43cc53200d2fdf54/crates/mp/game/src/bg_vehicleLoad.rs
+
+// Raven `G_ICARUS_TASKIDPENDING` args re-export under the misspelled
+// `GICARUSTaskIDPendingArgs` spelling that `NPC_sounds.rs` transcribes bare;
+// the canonical camelCase port is `GIcarusTaskidpendingArgs`.
+// Source: oracle/oracle/codemp/game/g_syscalls.c:329-332
+pub use mp_abi::game::syscalls::G_ICARUS_TASKIDPENDING::GIcarusTaskidpendingArgs as GICARUSTaskIDPendingArgs;

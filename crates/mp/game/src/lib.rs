@@ -133,6 +133,7 @@ pub use world::{EntityId, GameContext, GameWorld};
 // the absolute-path references without touching each call site.
 pub use mp_qshared::shared;
 pub use mp_qshared::shared::trajectory;
+pub use mp_qshared::shared::qcommon::taskID_t;
 
 // The export-command enum, re-exported so the jampgame shell names it through
 // its existing two edges (round-7 item 25; SEAM-D10's exactly-two-edges shell

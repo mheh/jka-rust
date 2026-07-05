@@ -171,6 +171,13 @@ pub trait BgTraps {
         time: c_int,
         params: *mut sharedIKMoveParams_t,
     ) -> qboolean;
+    /// Raven `trap_G2API_GetSurfaceRenderStatus`. Source: `g_syscalls.c:1370`
+    fn g2api_get_surface_render_status(
+        &self,
+        ghoul2: *mut c_void,
+        modelIndex: c_int,
+        surfaceName: *const c_char,
+    ) -> c_int;
 
     // --- effects / misc ---
 

@@ -16,6 +16,7 @@ use crate::prelude::*;
 use crate::entity::flags::FL_INACTIVE;
 use crate::ent_fn_enums::{EntThink, EntTouch, EntUse};
 use crate::g_combat::{G_Damage, G_RadiusDamage};
+use crate::g_items::SVF_NOCLIENT;
 use crate::g_misc::TeleportPlayer;
 use crate::g_utils::{
     G_EffectIndex, G_FreeEntity, G_PickTarget, G_PlayEffectID, G_ScaleNetHealth, G_SetAngles,

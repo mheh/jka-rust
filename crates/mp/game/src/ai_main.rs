@@ -25,6 +25,7 @@ use crate::botai::bweaponrange::{
 };
 use crate::client::client_connected::CON_CONNECTED;
 use crate::trap;
+use crate::NPC_utils::{ANGLE2SHORT, SHORT2ANGLE};
 use mp_abi::game::syscalls::BOTLIB_AAS_ENTITY_INFO::BotlibAasEntityInfoArgs;
 use mp_abi::game::syscalls::BOTLIB_AI_RESET_AVOID_GOALS::BotlibAiResetAvoidGoalsArgs;
 use mp_abi::game::syscalls::BOTLIB_AI_RESET_AVOID_REACH::BotlibAiResetAvoidReachArgs;
@@ -66,9 +67,11 @@ use mp_abi::game::syscalls::BOTLIB_EA_RESET_INPUT::BotlibEaResetInputArgs;
 use mp_abi::game::syscalls::BOTLIB_GET_CONSOLE_MESSAGE::BotlibGetConsoleMessageArgs;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use crate::ai_main_consts::{
-    BOT_FLAG_GET_DISTANCE, BOT_PLANT_BLOW_DISTANCE, BOT_PLANT_DISTANCE, BOT_PLANT_INTERVAL,
+    BASE_FLAGWAIT_DISTANCE, BOT_FLAG_GET_DISTANCE, BOT_MAX_WEAPON_CHASE_CTF,
+    BOT_MAX_WEAPON_CHASE_TIME, BOT_MAX_WEAPON_GATHER_TIME, BOT_MIN_SIEGE_GOAL_SHOOT,
+    BOT_MIN_SIEGE_GOAL_TRAVEL, BOT_PLANT_BLOW_DISTANCE, BOT_PLANT_DISTANCE, BOT_PLANT_INTERVAL,
     BOT_SABER_THROW_RANGE, BOT_THINK_TIME, BOT_WPTOUCH_DISTANCE, LEVELFLAG_NOPOINTPREDICTION,
-    MELEE_ATTACK_RANGE, SABER_ATTACK_RANGE,
+    MELEE_ATTACK_RANGE, SABER_ATTACK_RANGE, WP_KEEP_FLAG_DIST,
 };
 use crate::entity::flags::FL_DROPPED_ITEM;
 use mp_qshared::shared::connstate::connstate_t;
@@ -723,12 +726,27 @@ pub fn BotUpdateInput(
     }
 }
 
+/// Raven `FloatTime()` (`#define FloatTime() floattime`).
+///
+/// `floattime` is a genuine Raven module-global (`ai_main.c:50`, `extern float
+/// floattime` in `ai_main.h:410`) updated once per bot frame — narrower than the
+/// `level`/`g_entities` state spine, so it is mirrored here as a monotonic
+/// seconds clock via an atomic bit-store rather than threaded through
+/// `GameContext`, matching the call sites' bare `FloatTime()` usage.
+/// Source: `oracle/oracle/codemp/game/ai_main.c:663,665,871`; `ai_main.h:410-411`
+static FLOATTIME_BITS: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+/// Raven `FloatTime()`.
+///
+/// Source: `oracle/oracle/codemp/game/ai_main.c:663,665,871`
+pub fn FloatTime() -> f32 {
+    f32::from_bits(FLOATTIME_BITS.load(core::sync::atomic::Ordering::Relaxed))
+}
+
 /// Raven `BotAIRegularUpdate`.
 ///
 /// Source: `oracle/oracle/codemp/game/ai_main.c:662-667`
 pub fn BotAIRegularUpdate(ctx: GameContext<'_>) {
-    // PORT-NOTE(FloatTime): the bot floattime clock `FloatTime()` is not ported
-    // and not in the call surface; referenced as cited and reported as missing.
     unsafe {
         let world = ctx.world;
         if (*world).globals.regularupdate_time < FloatTime() {
@@ -905,9 +923,9 @@ pub fn BotAISetupClient(
     settings: *mut c_void,
     restart: qboolean,
 ) -> c_int {
-    // PORT-NOTE(botstates/FloatTime/PRT_FATAL): `globals.botstates` is a `()`
-    // placeholder (indexed as intended); `FloatTime` and `PRT_FATAL` have no
-    // ported home yet; `settings` kept as `*mut c_void` (bot_settings_s cast).
+    // PORT-NOTE(botstates/PRT_FATAL): `globals.botstates` is a `()`
+    // placeholder (indexed as intended); `PRT_FATAL` has no ported home yet;
+    // `settings` kept as `*mut c_void` (bot_settings_s cast).
     unsafe {
         let world = ctx.world;
         if (*world).globals.botstates[client as usize].is_null() {

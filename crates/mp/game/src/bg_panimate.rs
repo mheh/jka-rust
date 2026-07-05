@@ -699,6 +699,30 @@ impl PmoveContext<'_> {
     }
 }
 
+/// Raven `BG_BrokenParryForAttack` — free-function form for game-tier callers.
+///
+/// Our attack was knocked away by a knockaway parry.
+/// FIXME (Raven): need actual anims for this; need to know which side of the
+/// saber was hit — for now presumes the saber gets knocked away from center.
+///
+/// Game-tier callers without a PmoveContext receiver call this form, passing
+/// a reference to the BgState that owns the saberMoveData table.
+///
+/// Source: `oracle/oracle/codemp/game/bg_panimate.c:692-725`
+pub fn BG_BrokenParryForAttack(bg_state: &crate::bg_channel::BgState, r#move: c_int) -> c_int {
+    match bg_state.saberMoveData[r#move as usize].startQuad {
+        Q_B => LS_V1_B_,
+        Q_BR => LS_V1_BR,
+        Q_R => LS_V1__R,
+        Q_TR => LS_V1_TR,
+        Q_T => LS_V1_T_,
+        Q_TL => LS_V1_TL,
+        Q_L => LS_V1__L,
+        Q_BL => LS_V1_BL,
+        _ => LS_NONE,
+    }
+}
+
 /// Raven `BG_BrokenParryForParry`.
 ///
 /// FIXME (Raven): need actual anims for this; need to know which side of the
@@ -1035,6 +1059,60 @@ impl PmoveContext<'_> {
                 }
                 _ => 0,
             }
+        }
+    }
+}
+
+/// Raven `BG_InKnockDownOnGround` — free-function form for game-tier callers.
+///
+/// Game-tier callers without a PmoveContext receiver call this form, passing
+/// a reference to the BgState that owns the bgAllAnims table used by
+/// `BG_AnimLength`.
+///
+/// Source: `oracle/oracle/codemp/game/bg_panimate.c:1010-1072`
+pub fn BG_InKnockDownOnGround(
+    bg_state: &crate::bg_channel::BgState,
+    ps: *mut playerState_t,
+) -> qboolean {
+    unsafe {
+        match (*ps).legsAnim {
+            BOTH_KNOCKDOWN1 | BOTH_KNOCKDOWN2 | BOTH_KNOCKDOWN3 | BOTH_KNOCKDOWN4
+            | BOTH_KNOCKDOWN5 | BOTH_RELEASED => 1,
+            BOTH_GETUP1 | BOTH_GETUP2 | BOTH_GETUP3 | BOTH_GETUP4 | BOTH_GETUP5
+            | BOTH_GETUP_CROUCH_F1 | BOTH_GETUP_CROUCH_B1 | BOTH_FORCE_GETUP_F1
+            | BOTH_FORCE_GETUP_F2 | BOTH_FORCE_GETUP_B1 | BOTH_FORCE_GETUP_B2
+            | BOTH_FORCE_GETUP_B3 | BOTH_FORCE_GETUP_B4 | BOTH_FORCE_GETUP_B5
+            | BOTH_FORCE_GETUP_B6 => {
+                if BG_AnimLength(bg_state, 0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
+                    1
+                } else {
+                    0
+                }
+            }
+            BOTH_GETUP_BROLL_B | BOTH_GETUP_BROLL_F | BOTH_GETUP_BROLL_L | BOTH_GETUP_BROLL_R
+            | BOTH_GETUP_FROLL_B | BOTH_GETUP_FROLL_F | BOTH_GETUP_FROLL_L
+            | BOTH_GETUP_FROLL_R => {
+                if BG_AnimLength(bg_state, 0, (*ps).legsAnim as c_int) - (*ps).legsTimer < 500 {
+                    1
+                } else {
+                    0
+                }
+            }
+            BOTH_LK_DL_ST_T_SB_1_L => {
+                if (*ps).legsTimer < 1000 {
+                    1
+                } else {
+                    0
+                }
+            }
+            BOTH_PLAYER_PA_3_FLY => {
+                if (*ps).legsTimer < 300 {
+                    1
+                } else {
+                    0
+                }
+            }
+            _ => 0,
         }
     }
 }
@@ -1925,6 +2003,22 @@ impl PmoveContext<'_> {
 
         usedIndex
     }
+}
+
+/// Standalone `BG_ParseAnimationFile` wrapper threading `BgState` directly,
+/// for call sites (e.g. `g_spawn.rs`) that have no live `PmoveContext`.
+///
+/// Source: `oracle/oracle/codemp/game/bg_panimate.c:2339-2580`
+pub fn BG_ParseAnimationFile(
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+    callbacks: &mut dyn GameCallbacks,
+    filename: *const c_char,
+    animset: *mut animation_t,
+    isHumanoid: qboolean,
+) -> c_int {
+    let mut ctx = PmoveContext::new(bg, traps, callbacks);
+    ctx.BG_ParseAnimationFile(filename, animset, isHumanoid)
 }
 
 /// Raven `BG_StartLegsAnim`.

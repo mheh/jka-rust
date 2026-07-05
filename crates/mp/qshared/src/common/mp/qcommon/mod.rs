@@ -65,4 +65,5 @@ pub use shared_ragdoll_params::sharedRagDollParams_t;
 pub use shared_ragdoll_update_params::sharedRagDollUpdateParams_t;
 pub use shared_set_bone_ik_state_params::sharedSetBoneIKStateParams_t;
 pub use siege_pers::siegePers_t;
+pub use task_id_t::taskID_t;
 pub use usercmd::usercmd_t;

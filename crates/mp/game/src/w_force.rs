@@ -2332,7 +2332,7 @@ pub fn ForceShootDrain(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
 /// Raven `ForceJumpCharge`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:2317-2375`
-// MISSING-SYMBOL: `forceJumpStrength`, `forcePowerNeeded`.
+// MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceJumpCharge(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut usercmd_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
@@ -2497,7 +2497,7 @@ pub fn WP_GetVelocityForForceJump(
 /// Raven `ForceJump`.
 ///
 /// Source: `oracle/oracle/codemp/game/w_force.c:2462-2500`
-// MISSING-SYMBOL: `forceJumpStrength`, `forcePowerNeeded`.
+// MISSING-SYMBOL: `forcePowerNeeded`.
 pub fn ForceJump(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mut usercmd_t) {
     unsafe {
         let cl = (*self_).client as *mut gclient_t;
