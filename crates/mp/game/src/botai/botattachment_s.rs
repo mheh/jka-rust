@@ -11,8 +11,8 @@ pub const MAX_ATTACHMENT_NAME: usize = 64;
 /// Type definition source: `oracle/oracle/codemp/game/ai_main.h:109-113`
 #[repr(C)]
 pub struct botattachment_t {
-	pub level: c_int,
-	pub name: [u8; MAX_ATTACHMENT_NAME],
+    pub level: c_int,
+    pub name: [u8; MAX_ATTACHMENT_NAME],
 }
 
 const _: () = assert!(core::mem::size_of::<botattachment_t>() == 68);

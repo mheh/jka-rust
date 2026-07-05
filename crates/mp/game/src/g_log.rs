@@ -22,90 +22,49 @@ pub fn G_LogWeaponInit(ctx: GameContext<'_>) {}
 ///
 /// Raven: entirely `LOGGING_WEAPONS`-gated (never defined) — no-op.
 /// Source: `oracle/oracle/codemp/game/g_log.c:123-129`
-pub fn G_LogWeaponPickup(
-    ctx: GameContext<'_>,
-    client: c_int,
-    weaponid: c_int,
-) {
-}
+pub fn G_LogWeaponPickup(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {}
 
 /// Raven `G_LogWeaponFire`.
 ///
 /// Raven: entirely `LOGGING_WEAPONS`-gated (never defined) — no-op.
 /// Source: `oracle/oracle/codemp/game/g_log.c:131-145`
-pub fn G_LogWeaponFire(
-    ctx: GameContext<'_>,
-    client: c_int,
-    weaponid: c_int,
-) {
-}
+pub fn G_LogWeaponFire(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {}
 
 /// Raven `G_LogWeaponDamage`.
 ///
 /// Raven: entirely `LOGGING_WEAPONS`-gated (never defined) — no-op.
 /// Source: `oracle/oracle/codemp/game/g_log.c:147-155`
-pub fn G_LogWeaponDamage(
-    ctx: GameContext<'_>,
-    client: c_int,
-    r#mod: c_int,
-    amount: c_int,
-) {
-}
+pub fn G_LogWeaponDamage(ctx: GameContext<'_>, client: c_int, r#mod: c_int, amount: c_int) {}
 
 /// Raven `G_LogWeaponKill`.
 ///
 /// Raven: entirely `LOGGING_WEAPONS`-gated (never defined) — no-op.
 /// Source: `oracle/oracle/codemp/game/g_log.c:157-165`
-pub fn G_LogWeaponKill(
-    ctx: GameContext<'_>,
-    client: c_int,
-    r#mod: c_int,
-) {
-}
+pub fn G_LogWeaponKill(ctx: GameContext<'_>, client: c_int, r#mod: c_int) {}
 
 /// Raven `G_LogWeaponFrag`.
 ///
 /// Raven: entirely `LOGGING_WEAPONS`-gated (never defined) — no-op.
 /// Source: `oracle/oracle/codemp/game/g_log.c:167-175`
-pub fn G_LogWeaponFrag(
-    ctx: GameContext<'_>,
-    attacker: c_int,
-    deadguy: c_int,
-) {
-}
+pub fn G_LogWeaponFrag(ctx: GameContext<'_>, attacker: c_int, deadguy: c_int) {}
 
 /// Raven `G_LogWeaponDeath`.
 ///
 /// Raven: entirely `LOGGING_WEAPONS`-gated (never defined) — no-op.
 /// Source: `oracle/oracle/codemp/game/g_log.c:177-185`
-pub fn G_LogWeaponDeath(
-    ctx: GameContext<'_>,
-    client: c_int,
-    weaponid: c_int,
-) {
-}
+pub fn G_LogWeaponDeath(ctx: GameContext<'_>, client: c_int, weaponid: c_int) {}
 
 /// Raven `G_LogWeaponPowerup`.
 ///
 /// Raven: entirely `LOGGING_WEAPONS`-gated (never defined) — no-op.
 /// Source: `oracle/oracle/codemp/game/g_log.c:187-195`
-pub fn G_LogWeaponPowerup(
-    ctx: GameContext<'_>,
-    client: c_int,
-    powerupid: c_int,
-) {
-}
+pub fn G_LogWeaponPowerup(ctx: GameContext<'_>, client: c_int, powerupid: c_int) {}
 
 /// Raven `G_LogWeaponItem`.
 ///
 /// Raven: entirely `LOGGING_WEAPONS`-gated (never defined) — no-op.
 /// Source: `oracle/oracle/codemp/game/g_log.c:197-205`
-pub fn G_LogWeaponItem(
-    ctx: GameContext<'_>,
-    client: c_int,
-    itemid: c_int,
-) {
-}
+pub fn G_LogWeaponItem(ctx: GameContext<'_>, client: c_int, itemid: c_int) {}
 
 /// Raven `G_LogWeaponOutput`.
 ///
@@ -146,10 +105,7 @@ pub fn CalculateSharpshooter(
 /// Raven: entirely `LOGGING_WEAPONS`-gated; only the trailing `return
 /// qfalse` compiles.
 /// Source: `oracle/oracle/codemp/game/g_log.c:906-928`
-pub fn CalculateUntouchable(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn CalculateUntouchable(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     QFALSE
 }
 
@@ -199,9 +155,7 @@ pub fn CalculateDemolitionist(
 /// comment above it says "No streak calculation, at least for now"); the
 /// only compiled statement is the trailing `return 0`.
 /// Source: `oracle/oracle/codemp/game/g_log.c:1136-1158`
-pub fn CalculateStreak(
-    ent: *mut gentity_t,
-) -> c_int {
+pub fn CalculateStreak(ent: *mut gentity_t) -> c_int {
     0
 }
 
@@ -218,7 +172,8 @@ pub fn CalculateTeamMVP(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
+            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            {
                 continue;
             }
             let n_score = (*pc).ps.persistant[persEnum_t::PERS_SCORE as usize];
@@ -291,7 +246,8 @@ pub fn CalculateTeamDefender(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
+            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            {
                 continue;
             }
             let n_score = (*pc).pers.teamState.basedefense;
@@ -325,7 +281,8 @@ pub fn CalculateTeamWarrior(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
+            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            {
                 continue;
             }
             let n_score = (*pc).ps.persistant[persEnum_t::PERS_SCORE as usize];
@@ -359,7 +316,8 @@ pub fn CalculateTeamCarrier(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboole
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
+            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            {
                 continue;
             }
             let n_score = (*pc).pers.teamState.captures;
@@ -393,7 +351,8 @@ pub fn CalculateTeamInterceptor(ctx: GameContext<'_>, ent: *mut gentity_t) -> qb
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
+            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            {
                 continue;
             }
             let mut n_score = (*pc).pers.teamState.flagrecovery;
@@ -428,7 +387,8 @@ pub fn CalculateTeamRedShirt(ctx: GameContext<'_>, ent: *mut gentity_t) -> qbool
         for i in 0..maxclients {
             let player = &(*ctx.world).g_entities[i as usize];
             let pc = player.client as *mut gclient_t;
-            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team {
+            if player.inuse == QFALSE || (*pc).ps.persistant[persEnum_t::PERS_TEAM as usize] != team
+            {
                 continue;
             }
             // Raven: suicides don't count, you big cheater.
@@ -473,10 +433,7 @@ pub enum TeamAward_e {
 /// Raven `CalculateTeamAward`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1451-1484`
-pub fn CalculateTeamAward(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> c_int {
+pub fn CalculateTeamAward(ctx: GameContext<'_>, ent: *mut gentity_t) -> c_int {
     unsafe {
         let mut team_awards: c_int = 0;
 
@@ -515,10 +472,7 @@ pub fn CalculateTeamAward(
 /// is always true and the loop always `continue`s; the faithful compiled
 /// behavior is "always `qfalse`".
 /// Source: `oracle/oracle/codemp/game/g_log.c:1486-1514`
-pub fn CalculateSection31Award(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-) -> qboolean {
+pub fn CalculateSection31Award(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
     unsafe {
         let maxclients = (*ctx.world).cvars.g_maxclients.integer;
         let mut efficiency: c_int = 0;
@@ -546,12 +500,7 @@ pub fn CalculateSection31Award(
 /// Raven: the entire body is `LOGGING_WEAPONS`-gated (never defined
 /// anywhere in the tree) — `msg` is left untouched, no-op.
 /// Source: `oracle/oracle/codemp/game/g_log.c:1518-1587`
-pub fn CalculateAwards(
-    ctx: GameContext<'_>,
-    ent: *mut gentity_t,
-    msg: *mut c_char,
-) {
-}
+pub fn CalculateAwards(ctx: GameContext<'_>, ent: *mut gentity_t, msg: *mut c_char) {}
 
 /// Raven `GetMaxDeathsForClient`.
 ///
@@ -693,10 +642,7 @@ pub const weaponFromMOD: [c_int; meansOfDeath_t::MOD_MAX as usize] = {
 /// Raven `GetFavoriteWeaponForClient`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_log.c:1668-1702`
-pub fn GetFavoriteWeaponForClient(
-    ctx: GameContext<'_>,
-    nClient: c_int,
-) -> c_int {
+pub fn GetFavoriteWeaponForClient(ctx: GameContext<'_>, nClient: c_int) -> c_int {
     let mut i: c_int = 0;
     let mut n_most_kills: c_int = 0;
     let mut fav: c_int = 0;
@@ -716,7 +662,8 @@ pub fn GetFavoriteWeaponForClient(
 
             if weapon != WP_NONE as c_int {
                 kills_with_weapon[weapon as usize] +=
-                    (*ctx.world).globals.G_WeaponLogKills.0[nClient as usize][i as usize]; // Store Num Kills With Weapon
+                    (*ctx.world).globals.G_WeaponLogKills.0[nClient as usize][i as usize];
+                // Store Num Kills With Weapon
             }
         }
     }

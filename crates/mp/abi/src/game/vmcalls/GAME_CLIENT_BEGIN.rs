@@ -2,7 +2,9 @@ use core::ffi::c_int;
 
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 // Flow:
 //
@@ -41,4 +43,19 @@ impl InboundVmCall for GameClientBegin {
     type Output = ();
 
     const COMMAND: MpGameExport = MpGameExport::GAME_CLIENT_BEGIN;
+}
+
+impl DecodeVmMain for GameClientBegin {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `ClientBegin( arg0, qtrue )` — g_main.c:535. The `qtrue`
+        // `allowTeamReset` is supplied at the dispatch call site.
+        GameClientBeginArgs::new(word_to_c_int(t.arg(0)))
+    }
+}
+
+impl EncodeVmMainReturn for GameClientBegin {
+    fn encode_return(_output: Self::Output) -> isize {
+        // `ClientBegin(...); return 0;` — g_main.c:535-536.
+        0
+    }
 }

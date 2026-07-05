@@ -1,7 +1,7 @@
 use super::super::MpGameExport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport};
 
 // Flow:
 //
@@ -28,4 +28,16 @@ impl InboundVmCall for GameConsoleCommand {
     type Output = qboolean;
 
     const COMMAND: MpGameExport = MpGameExport::GAME_CONSOLE_COMMAND;
+}
+
+impl DecodeVmMain for GameConsoleCommand {
+    // `ConsoleCommand()` takes no vmMain arg words — g_main.c:544.
+    fn decode_vm_main(_t: VmMainTransport) -> Self::Args {}
+}
+
+impl EncodeVmMainReturn for GameConsoleCommand {
+    fn encode_return(output: Self::Output) -> isize {
+        // `return ConsoleCommand();` — g_main.c:544. `qboolean` (= `c_int`).
+        output as isize
+    }
 }

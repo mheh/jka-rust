@@ -23,8 +23,8 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::q_shared::Q_stricmp;
 use crate::q_shared::Q_strcmp;
+use crate::q_shared::Q_stricmp;
 // `strlen` resolves to the crate's `Q_strlen` (the `g_spawn.rs` precedent for
 // aliasing the libc name); `strcpy`/`strcat` are the file-local unchecked
 // helpers below, matching the `c_strcpy` house pattern in `q_shared.rs` /
@@ -67,124 +67,388 @@ pub const SIEGECHAR_TAB: c_char = 9;
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:45-56`
 pub static bgSiegeClassFlagNames: [stringID_table_t; 9] = [
-    stringID_table_t { name: c"CFL_MORESABERDMG".as_ptr() as *mut c_char, id: CFL_MORESABERDMG as c_int },
-    stringID_table_t { name: c"CFL_STRONGAGAINSTPHYSICAL".as_ptr() as *mut c_char, id: CFL_STRONGAGAINSTPHYSICAL as c_int },
-    stringID_table_t { name: c"CFL_FASTFORCEREGEN".as_ptr() as *mut c_char, id: CFL_FASTFORCEREGEN as c_int },
-    stringID_table_t { name: c"CFL_STATVIEWER".as_ptr() as *mut c_char, id: CFL_STATVIEWER as c_int },
-    stringID_table_t { name: c"CFL_HEAVYMELEE".as_ptr() as *mut c_char, id: CFL_HEAVYMELEE as c_int },
-    stringID_table_t { name: c"CFL_SINGLE_ROCKET".as_ptr() as *mut c_char, id: CFL_SINGLE_ROCKET as c_int },
-    stringID_table_t { name: c"CFL_CUSTOMSKEL".as_ptr() as *mut c_char, id: CFL_CUSTOMSKEL as c_int },
-    stringID_table_t { name: c"CFL_EXTRA_AMMO".as_ptr() as *mut c_char, id: CFL_EXTRA_AMMO as c_int },
-    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+    stringID_table_t {
+        name: c"CFL_MORESABERDMG".as_ptr() as *mut c_char,
+        id: CFL_MORESABERDMG as c_int,
+    },
+    stringID_table_t {
+        name: c"CFL_STRONGAGAINSTPHYSICAL".as_ptr() as *mut c_char,
+        id: CFL_STRONGAGAINSTPHYSICAL as c_int,
+    },
+    stringID_table_t {
+        name: c"CFL_FASTFORCEREGEN".as_ptr() as *mut c_char,
+        id: CFL_FASTFORCEREGEN as c_int,
+    },
+    stringID_table_t {
+        name: c"CFL_STATVIEWER".as_ptr() as *mut c_char,
+        id: CFL_STATVIEWER as c_int,
+    },
+    stringID_table_t {
+        name: c"CFL_HEAVYMELEE".as_ptr() as *mut c_char,
+        id: CFL_HEAVYMELEE as c_int,
+    },
+    stringID_table_t {
+        name: c"CFL_SINGLE_ROCKET".as_ptr() as *mut c_char,
+        id: CFL_SINGLE_ROCKET as c_int,
+    },
+    stringID_table_t {
+        name: c"CFL_CUSTOMSKEL".as_ptr() as *mut c_char,
+        id: CFL_CUSTOMSKEL as c_int,
+    },
+    stringID_table_t {
+        name: c"CFL_EXTRA_AMMO".as_ptr() as *mut c_char,
+        id: CFL_EXTRA_AMMO as c_int,
+    },
+    stringID_table_t {
+        name: c"".as_ptr() as *mut c_char,
+        id: -1,
+    },
 ];
 
 /// Raven `StanceTable` — saber stance name/id table.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:59-69`
 pub static StanceTable: [stringID_table_t; 9] = [
-    stringID_table_t { name: c"SS_NONE".as_ptr() as *mut c_char, id: SS_NONE as c_int },
-    stringID_table_t { name: c"SS_FAST".as_ptr() as *mut c_char, id: SS_FAST as c_int },
-    stringID_table_t { name: c"SS_MEDIUM".as_ptr() as *mut c_char, id: SS_MEDIUM as c_int },
-    stringID_table_t { name: c"SS_STRONG".as_ptr() as *mut c_char, id: SS_STRONG as c_int },
-    stringID_table_t { name: c"SS_DESANN".as_ptr() as *mut c_char, id: SS_DESANN as c_int },
-    stringID_table_t { name: c"SS_TAVION".as_ptr() as *mut c_char, id: SS_TAVION as c_int },
-    stringID_table_t { name: c"SS_DUAL".as_ptr() as *mut c_char, id: SS_DUAL as c_int },
-    stringID_table_t { name: c"SS_STAFF".as_ptr() as *mut c_char, id: SS_STAFF as c_int },
-    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: 0 },
+    stringID_table_t {
+        name: c"SS_NONE".as_ptr() as *mut c_char,
+        id: SS_NONE as c_int,
+    },
+    stringID_table_t {
+        name: c"SS_FAST".as_ptr() as *mut c_char,
+        id: SS_FAST as c_int,
+    },
+    stringID_table_t {
+        name: c"SS_MEDIUM".as_ptr() as *mut c_char,
+        id: SS_MEDIUM as c_int,
+    },
+    stringID_table_t {
+        name: c"SS_STRONG".as_ptr() as *mut c_char,
+        id: SS_STRONG as c_int,
+    },
+    stringID_table_t {
+        name: c"SS_DESANN".as_ptr() as *mut c_char,
+        id: SS_DESANN as c_int,
+    },
+    stringID_table_t {
+        name: c"SS_TAVION".as_ptr() as *mut c_char,
+        id: SS_TAVION as c_int,
+    },
+    stringID_table_t {
+        name: c"SS_DUAL".as_ptr() as *mut c_char,
+        id: SS_DUAL as c_int,
+    },
+    stringID_table_t {
+        name: c"SS_STAFF".as_ptr() as *mut c_char,
+        id: SS_STAFF as c_int,
+    },
+    stringID_table_t {
+        name: c"".as_ptr() as *mut c_char,
+        id: 0,
+    },
 ];
 
 /// Raven `WPTable` — weapon name/id table (also used by NPC parsing).
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:72-97`
 pub static WPTable: [stringID_table_t; 21] = [
-    stringID_table_t { name: c"NULL".as_ptr() as *mut c_char, id: WP_NONE },
-    stringID_table_t { name: c"WP_NONE".as_ptr() as *mut c_char, id: WP_NONE },
-    stringID_table_t { name: c"WP_STUN_BATON".as_ptr() as *mut c_char, id: WP_STUN_BATON },
-    stringID_table_t { name: c"WP_MELEE".as_ptr() as *mut c_char, id: WP_MELEE },
-    stringID_table_t { name: c"WP_SABER".as_ptr() as *mut c_char, id: WP_SABER },
-    stringID_table_t { name: c"WP_BRYAR_PISTOL".as_ptr() as *mut c_char, id: WP_BRYAR_PISTOL },
-    stringID_table_t { name: c"WP_BLASTER_PISTOL".as_ptr() as *mut c_char, id: WP_BRYAR_PISTOL },
-    stringID_table_t { name: c"WP_BLASTER".as_ptr() as *mut c_char, id: WP_BLASTER },
-    stringID_table_t { name: c"WP_DISRUPTOR".as_ptr() as *mut c_char, id: WP_DISRUPTOR },
-    stringID_table_t { name: c"WP_BOWCASTER".as_ptr() as *mut c_char, id: WP_BOWCASTER },
-    stringID_table_t { name: c"WP_REPEATER".as_ptr() as *mut c_char, id: WP_REPEATER },
-    stringID_table_t { name: c"WP_DEMP2".as_ptr() as *mut c_char, id: WP_DEMP2 },
-    stringID_table_t { name: c"WP_FLECHETTE".as_ptr() as *mut c_char, id: WP_FLECHETTE },
-    stringID_table_t { name: c"WP_ROCKET_LAUNCHER".as_ptr() as *mut c_char, id: WP_ROCKET_LAUNCHER },
-    stringID_table_t { name: c"WP_THERMAL".as_ptr() as *mut c_char, id: WP_THERMAL },
-    stringID_table_t { name: c"WP_TRIP_MINE".as_ptr() as *mut c_char, id: WP_TRIP_MINE },
-    stringID_table_t { name: c"WP_DET_PACK".as_ptr() as *mut c_char, id: WP_DET_PACK },
-    stringID_table_t { name: c"WP_CONCUSSION".as_ptr() as *mut c_char, id: WP_CONCUSSION },
-    stringID_table_t { name: c"WP_BRYAR_OLD".as_ptr() as *mut c_char, id: WP_BRYAR_OLD },
-    stringID_table_t { name: c"WP_EMPLACED_GUN".as_ptr() as *mut c_char, id: WP_EMPLACED_GUN },
-    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: 0 },
+    stringID_table_t {
+        name: c"NULL".as_ptr() as *mut c_char,
+        id: WP_NONE,
+    },
+    stringID_table_t {
+        name: c"WP_NONE".as_ptr() as *mut c_char,
+        id: WP_NONE,
+    },
+    stringID_table_t {
+        name: c"WP_STUN_BATON".as_ptr() as *mut c_char,
+        id: WP_STUN_BATON,
+    },
+    stringID_table_t {
+        name: c"WP_MELEE".as_ptr() as *mut c_char,
+        id: WP_MELEE,
+    },
+    stringID_table_t {
+        name: c"WP_SABER".as_ptr() as *mut c_char,
+        id: WP_SABER,
+    },
+    stringID_table_t {
+        name: c"WP_BRYAR_PISTOL".as_ptr() as *mut c_char,
+        id: WP_BRYAR_PISTOL,
+    },
+    stringID_table_t {
+        name: c"WP_BLASTER_PISTOL".as_ptr() as *mut c_char,
+        id: WP_BRYAR_PISTOL,
+    },
+    stringID_table_t {
+        name: c"WP_BLASTER".as_ptr() as *mut c_char,
+        id: WP_BLASTER,
+    },
+    stringID_table_t {
+        name: c"WP_DISRUPTOR".as_ptr() as *mut c_char,
+        id: WP_DISRUPTOR,
+    },
+    stringID_table_t {
+        name: c"WP_BOWCASTER".as_ptr() as *mut c_char,
+        id: WP_BOWCASTER,
+    },
+    stringID_table_t {
+        name: c"WP_REPEATER".as_ptr() as *mut c_char,
+        id: WP_REPEATER,
+    },
+    stringID_table_t {
+        name: c"WP_DEMP2".as_ptr() as *mut c_char,
+        id: WP_DEMP2,
+    },
+    stringID_table_t {
+        name: c"WP_FLECHETTE".as_ptr() as *mut c_char,
+        id: WP_FLECHETTE,
+    },
+    stringID_table_t {
+        name: c"WP_ROCKET_LAUNCHER".as_ptr() as *mut c_char,
+        id: WP_ROCKET_LAUNCHER,
+    },
+    stringID_table_t {
+        name: c"WP_THERMAL".as_ptr() as *mut c_char,
+        id: WP_THERMAL,
+    },
+    stringID_table_t {
+        name: c"WP_TRIP_MINE".as_ptr() as *mut c_char,
+        id: WP_TRIP_MINE,
+    },
+    stringID_table_t {
+        name: c"WP_DET_PACK".as_ptr() as *mut c_char,
+        id: WP_DET_PACK,
+    },
+    stringID_table_t {
+        name: c"WP_CONCUSSION".as_ptr() as *mut c_char,
+        id: WP_CONCUSSION,
+    },
+    stringID_table_t {
+        name: c"WP_BRYAR_OLD".as_ptr() as *mut c_char,
+        id: WP_BRYAR_OLD,
+    },
+    stringID_table_t {
+        name: c"WP_EMPLACED_GUN".as_ptr() as *mut c_char,
+        id: WP_EMPLACED_GUN,
+    },
+    stringID_table_t {
+        name: c"".as_ptr() as *mut c_char,
+        id: 0,
+    },
 ];
 
 /// Raven `FPTable` — force-power name/id table.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:100-121`
 pub static FPTable: [stringID_table_t; 19] = [
-    stringID_table_t { name: c"FP_HEAL".as_ptr() as *mut c_char, id: FP_HEAL },
-    stringID_table_t { name: c"FP_LEVITATION".as_ptr() as *mut c_char, id: FP_LEVITATION },
-    stringID_table_t { name: c"FP_SPEED".as_ptr() as *mut c_char, id: FP_SPEED },
-    stringID_table_t { name: c"FP_PUSH".as_ptr() as *mut c_char, id: FP_PUSH },
-    stringID_table_t { name: c"FP_PULL".as_ptr() as *mut c_char, id: FP_PULL },
-    stringID_table_t { name: c"FP_TELEPATHY".as_ptr() as *mut c_char, id: FP_TELEPATHY },
-    stringID_table_t { name: c"FP_GRIP".as_ptr() as *mut c_char, id: FP_GRIP },
-    stringID_table_t { name: c"FP_LIGHTNING".as_ptr() as *mut c_char, id: FP_LIGHTNING },
-    stringID_table_t { name: c"FP_RAGE".as_ptr() as *mut c_char, id: FP_RAGE },
-    stringID_table_t { name: c"FP_PROTECT".as_ptr() as *mut c_char, id: FP_PROTECT },
-    stringID_table_t { name: c"FP_ABSORB".as_ptr() as *mut c_char, id: FP_ABSORB },
-    stringID_table_t { name: c"FP_TEAM_HEAL".as_ptr() as *mut c_char, id: FP_TEAM_HEAL },
-    stringID_table_t { name: c"FP_TEAM_FORCE".as_ptr() as *mut c_char, id: FP_TEAM_FORCE },
-    stringID_table_t { name: c"FP_DRAIN".as_ptr() as *mut c_char, id: FP_DRAIN },
-    stringID_table_t { name: c"FP_SEE".as_ptr() as *mut c_char, id: FP_SEE },
-    stringID_table_t { name: c"FP_SABER_OFFENSE".as_ptr() as *mut c_char, id: FP_SABER_OFFENSE },
-    stringID_table_t { name: c"FP_SABER_DEFENSE".as_ptr() as *mut c_char, id: FP_SABER_DEFENSE },
-    stringID_table_t { name: c"FP_SABERTHROW".as_ptr() as *mut c_char, id: FP_SABERTHROW },
-    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+    stringID_table_t {
+        name: c"FP_HEAL".as_ptr() as *mut c_char,
+        id: FP_HEAL,
+    },
+    stringID_table_t {
+        name: c"FP_LEVITATION".as_ptr() as *mut c_char,
+        id: FP_LEVITATION,
+    },
+    stringID_table_t {
+        name: c"FP_SPEED".as_ptr() as *mut c_char,
+        id: FP_SPEED,
+    },
+    stringID_table_t {
+        name: c"FP_PUSH".as_ptr() as *mut c_char,
+        id: FP_PUSH,
+    },
+    stringID_table_t {
+        name: c"FP_PULL".as_ptr() as *mut c_char,
+        id: FP_PULL,
+    },
+    stringID_table_t {
+        name: c"FP_TELEPATHY".as_ptr() as *mut c_char,
+        id: FP_TELEPATHY,
+    },
+    stringID_table_t {
+        name: c"FP_GRIP".as_ptr() as *mut c_char,
+        id: FP_GRIP,
+    },
+    stringID_table_t {
+        name: c"FP_LIGHTNING".as_ptr() as *mut c_char,
+        id: FP_LIGHTNING,
+    },
+    stringID_table_t {
+        name: c"FP_RAGE".as_ptr() as *mut c_char,
+        id: FP_RAGE,
+    },
+    stringID_table_t {
+        name: c"FP_PROTECT".as_ptr() as *mut c_char,
+        id: FP_PROTECT,
+    },
+    stringID_table_t {
+        name: c"FP_ABSORB".as_ptr() as *mut c_char,
+        id: FP_ABSORB,
+    },
+    stringID_table_t {
+        name: c"FP_TEAM_HEAL".as_ptr() as *mut c_char,
+        id: FP_TEAM_HEAL,
+    },
+    stringID_table_t {
+        name: c"FP_TEAM_FORCE".as_ptr() as *mut c_char,
+        id: FP_TEAM_FORCE,
+    },
+    stringID_table_t {
+        name: c"FP_DRAIN".as_ptr() as *mut c_char,
+        id: FP_DRAIN,
+    },
+    stringID_table_t {
+        name: c"FP_SEE".as_ptr() as *mut c_char,
+        id: FP_SEE,
+    },
+    stringID_table_t {
+        name: c"FP_SABER_OFFENSE".as_ptr() as *mut c_char,
+        id: FP_SABER_OFFENSE,
+    },
+    stringID_table_t {
+        name: c"FP_SABER_DEFENSE".as_ptr() as *mut c_char,
+        id: FP_SABER_DEFENSE,
+    },
+    stringID_table_t {
+        name: c"FP_SABERTHROW".as_ptr() as *mut c_char,
+        id: FP_SABERTHROW,
+    },
+    stringID_table_t {
+        name: c"".as_ptr() as *mut c_char,
+        id: -1,
+    },
 ];
 
 /// Raven `HoldableTable` — holdable item name/id table.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:123-138`
 pub static HoldableTable: [stringID_table_t; 13] = [
-    stringID_table_t { name: c"HI_NONE".as_ptr() as *mut c_char, id: HI_NONE },
-    stringID_table_t { name: c"HI_SEEKER".as_ptr() as *mut c_char, id: HI_SEEKER },
-    stringID_table_t { name: c"HI_SHIELD".as_ptr() as *mut c_char, id: HI_SHIELD },
-    stringID_table_t { name: c"HI_MEDPAC".as_ptr() as *mut c_char, id: HI_MEDPAC },
-    stringID_table_t { name: c"HI_MEDPAC_BIG".as_ptr() as *mut c_char, id: HI_MEDPAC_BIG },
-    stringID_table_t { name: c"HI_BINOCULARS".as_ptr() as *mut c_char, id: HI_BINOCULARS },
-    stringID_table_t { name: c"HI_SENTRY_GUN".as_ptr() as *mut c_char, id: HI_SENTRY_GUN },
-    stringID_table_t { name: c"HI_JETPACK".as_ptr() as *mut c_char, id: HI_JETPACK },
-    stringID_table_t { name: c"HI_HEALTHDISP".as_ptr() as *mut c_char, id: HI_HEALTHDISP },
-    stringID_table_t { name: c"HI_AMMODISP".as_ptr() as *mut c_char, id: HI_AMMODISP },
-    stringID_table_t { name: c"HI_EWEB".as_ptr() as *mut c_char, id: HI_EWEB },
-    stringID_table_t { name: c"HI_CLOAK".as_ptr() as *mut c_char, id: HI_CLOAK },
-    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+    stringID_table_t {
+        name: c"HI_NONE".as_ptr() as *mut c_char,
+        id: HI_NONE,
+    },
+    stringID_table_t {
+        name: c"HI_SEEKER".as_ptr() as *mut c_char,
+        id: HI_SEEKER,
+    },
+    stringID_table_t {
+        name: c"HI_SHIELD".as_ptr() as *mut c_char,
+        id: HI_SHIELD,
+    },
+    stringID_table_t {
+        name: c"HI_MEDPAC".as_ptr() as *mut c_char,
+        id: HI_MEDPAC,
+    },
+    stringID_table_t {
+        name: c"HI_MEDPAC_BIG".as_ptr() as *mut c_char,
+        id: HI_MEDPAC_BIG,
+    },
+    stringID_table_t {
+        name: c"HI_BINOCULARS".as_ptr() as *mut c_char,
+        id: HI_BINOCULARS,
+    },
+    stringID_table_t {
+        name: c"HI_SENTRY_GUN".as_ptr() as *mut c_char,
+        id: HI_SENTRY_GUN,
+    },
+    stringID_table_t {
+        name: c"HI_JETPACK".as_ptr() as *mut c_char,
+        id: HI_JETPACK,
+    },
+    stringID_table_t {
+        name: c"HI_HEALTHDISP".as_ptr() as *mut c_char,
+        id: HI_HEALTHDISP,
+    },
+    stringID_table_t {
+        name: c"HI_AMMODISP".as_ptr() as *mut c_char,
+        id: HI_AMMODISP,
+    },
+    stringID_table_t {
+        name: c"HI_EWEB".as_ptr() as *mut c_char,
+        id: HI_EWEB,
+    },
+    stringID_table_t {
+        name: c"HI_CLOAK".as_ptr() as *mut c_char,
+        id: HI_CLOAK,
+    },
+    stringID_table_t {
+        name: c"".as_ptr() as *mut c_char,
+        id: -1,
+    },
 ];
 
 /// Raven `PowerupTable` — powerup name/id table.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:142-161`
 pub static PowerupTable: [stringID_table_t; 17] = [
-    stringID_table_t { name: c"PW_NONE".as_ptr() as *mut c_char, id: PW_NONE },
-    stringID_table_t { name: c"PW_QUAD".as_ptr() as *mut c_char, id: PW_QUAD },
-    stringID_table_t { name: c"PW_BATTLESUIT".as_ptr() as *mut c_char, id: PW_BATTLESUIT },
-    stringID_table_t { name: c"PW_PULL".as_ptr() as *mut c_char, id: PW_PULL },
-    stringID_table_t { name: c"PW_REDFLAG".as_ptr() as *mut c_char, id: PW_REDFLAG },
-    stringID_table_t { name: c"PW_BLUEFLAG".as_ptr() as *mut c_char, id: PW_BLUEFLAG },
-    stringID_table_t { name: c"PW_NEUTRALFLAG".as_ptr() as *mut c_char, id: PW_NEUTRALFLAG },
-    stringID_table_t { name: c"PW_SHIELDHIT".as_ptr() as *mut c_char, id: PW_SHIELDHIT },
-    stringID_table_t { name: c"PW_SPEEDBURST".as_ptr() as *mut c_char, id: PW_SPEEDBURST },
-    stringID_table_t { name: c"PW_DISINT_4".as_ptr() as *mut c_char, id: PW_DISINT_4 },
-    stringID_table_t { name: c"PW_SPEED".as_ptr() as *mut c_char, id: PW_SPEED },
-    stringID_table_t { name: c"PW_CLOAKED".as_ptr() as *mut c_char, id: PW_CLOAKED },
-    stringID_table_t { name: c"PW_FORCE_ENLIGHTENED_LIGHT".as_ptr() as *mut c_char, id: PW_FORCE_ENLIGHTENED_LIGHT },
-    stringID_table_t { name: c"PW_FORCE_ENLIGHTENED_DARK".as_ptr() as *mut c_char, id: PW_FORCE_ENLIGHTENED_DARK },
-    stringID_table_t { name: c"PW_FORCE_BOON".as_ptr() as *mut c_char, id: PW_FORCE_BOON },
-    stringID_table_t { name: c"PW_YSALAMIRI".as_ptr() as *mut c_char, id: PW_YSALAMIRI },
-    stringID_table_t { name: c"".as_ptr() as *mut c_char, id: -1 },
+    stringID_table_t {
+        name: c"PW_NONE".as_ptr() as *mut c_char,
+        id: PW_NONE,
+    },
+    stringID_table_t {
+        name: c"PW_QUAD".as_ptr() as *mut c_char,
+        id: PW_QUAD,
+    },
+    stringID_table_t {
+        name: c"PW_BATTLESUIT".as_ptr() as *mut c_char,
+        id: PW_BATTLESUIT,
+    },
+    stringID_table_t {
+        name: c"PW_PULL".as_ptr() as *mut c_char,
+        id: PW_PULL,
+    },
+    stringID_table_t {
+        name: c"PW_REDFLAG".as_ptr() as *mut c_char,
+        id: PW_REDFLAG,
+    },
+    stringID_table_t {
+        name: c"PW_BLUEFLAG".as_ptr() as *mut c_char,
+        id: PW_BLUEFLAG,
+    },
+    stringID_table_t {
+        name: c"PW_NEUTRALFLAG".as_ptr() as *mut c_char,
+        id: PW_NEUTRALFLAG,
+    },
+    stringID_table_t {
+        name: c"PW_SHIELDHIT".as_ptr() as *mut c_char,
+        id: PW_SHIELDHIT,
+    },
+    stringID_table_t {
+        name: c"PW_SPEEDBURST".as_ptr() as *mut c_char,
+        id: PW_SPEEDBURST,
+    },
+    stringID_table_t {
+        name: c"PW_DISINT_4".as_ptr() as *mut c_char,
+        id: PW_DISINT_4,
+    },
+    stringID_table_t {
+        name: c"PW_SPEED".as_ptr() as *mut c_char,
+        id: PW_SPEED,
+    },
+    stringID_table_t {
+        name: c"PW_CLOAKED".as_ptr() as *mut c_char,
+        id: PW_CLOAKED,
+    },
+    stringID_table_t {
+        name: c"PW_FORCE_ENLIGHTENED_LIGHT".as_ptr() as *mut c_char,
+        id: PW_FORCE_ENLIGHTENED_LIGHT,
+    },
+    stringID_table_t {
+        name: c"PW_FORCE_ENLIGHTENED_DARK".as_ptr() as *mut c_char,
+        id: PW_FORCE_ENLIGHTENED_DARK,
+    },
+    stringID_table_t {
+        name: c"PW_FORCE_BOON".as_ptr() as *mut c_char,
+        id: PW_FORCE_BOON,
+    },
+    stringID_table_t {
+        name: c"PW_YSALAMIRI".as_ptr() as *mut c_char,
+        id: PW_YSALAMIRI,
+    },
+    stringID_table_t {
+        name: c"".as_ptr() as *mut c_char,
+        id: -1,
+    },
 ];
 
 /// Raven `classTitles` — Raven icon suffix strings for player-class detection,
@@ -192,12 +456,12 @@ pub static PowerupTable: [stringID_table_t; 17] = [
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:748-756`
 pub static classTitles: [&core::ffi::CStr; SPC_MAX as usize] = [
-    c"infantry",       // SPC_INFANTRY
-    c"vanguard",       // SPC_VANGUARD
-    c"support",        // SPC_SUPPORT
-    c"jedi_general",   // SPC_JEDI
-    c"demolitionist",  // SPC_DEMOLITIONIST
-    c"heavy_weapons",  // SPC_HEAVY_WEAPONS
+    c"infantry",      // SPC_INFANTRY
+    c"vanguard",      // SPC_VANGUARD
+    c"support",       // SPC_SUPPORT
+    c"jedi_general",  // SPC_JEDI
+    c"demolitionist", // SPC_DEMOLITIONIST
+    c"heavy_weapons", // SPC_HEAVY_WEAPONS
 ];
 
 /// Raven `BG_SiegeStripTabs`.
@@ -341,7 +605,8 @@ pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut 
 
                                 if parse_groups < 0 {
                                     // Syntax error, I guess.
-                                    panic!("Found a closing bracket without an opening bracket while looking for group"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                                    panic!("Found a closing bracket without an opening bracket while looking for group");
+                                    // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                                 }
 
                                 if (*buf.offset(i) != b'{' as c_char || parse_groups > 1)
@@ -372,7 +637,8 @@ pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut 
 
                             return 1; // we got it, so return 1.
                         } else {
-                            panic!("Error parsing group in file, unexpected EOF before opening bracket while looking for group"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                            panic!("Error parsing group in file, unexpected EOF before opening bracket while looking for group");
+                            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                         }
                     } else if !is_group {
                         // if it wasn't a group, parse to the end of the line
@@ -397,7 +663,8 @@ pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut 
 
                             if parse_groups < 0 {
                                 // Syntax error, I guess.
-                                panic!("Found a closing bracket without an opening bracket while looking for group"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                                panic!("Found a closing bracket without an opening bracket while looking for group");
+                                // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                             }
 
                             if *buf.offset(i) == b'}' as c_char && parse_groups == 0 {
@@ -409,7 +676,8 @@ pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut 
                         }
 
                         if *buf.offset(i) != b'}' as c_char {
-                            panic!("Found an opening bracket without a matching closing bracket while looking for group"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                            panic!("Found an opening bracket without a matching closing bracket while looking for group");
+                            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                         }
 
                         i += 1;
@@ -419,8 +687,7 @@ pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut 
                 // we're in a group that isn't the one we want, so parse to the end.
                 parse_groups = 0;
 
-                while *buf.offset(i) != 0
-                    && (*buf.offset(i) != b'}' as c_char || parse_groups != 0)
+                while *buf.offset(i) != 0 && (*buf.offset(i) != b'}' as c_char || parse_groups != 0)
                 {
                     if *buf.offset(i) == b'{' as c_char {
                         parse_groups += 1;
@@ -430,7 +697,8 @@ pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut 
 
                     if parse_groups < 0 {
                         // Syntax error, I guess.
-                        panic!("Found a closing bracket without an opening bracket while looking for group"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                        panic!("Found a closing bracket without an opening bracket while looking for group");
+                        // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                     }
 
                     if *buf.offset(i) == b'}' as c_char && parse_groups == 0 {
@@ -442,7 +710,8 @@ pub fn BG_SiegeGetValueGroup(buf: *mut c_char, group: *mut c_char, outbuf: *mut 
                 }
 
                 if *buf.offset(i) != b'}' as c_char {
-                    panic!("Found an opening bracket without a matching closing bracket while looking for group"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                    panic!("Found an opening bracket without a matching closing bracket while looking for group");
+                    // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                 }
             }
 
@@ -529,7 +798,8 @@ pub fn BG_SiegeGetPairedValue(buf: *mut c_char, key: *mut c_char, outbuf: *mut c
                             }
 
                             if open_b < 0 {
-                                panic!("Unexpected closing bracket (too many) while parsing to end of group"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                                panic!("Unexpected closing bracket (too many) while parsing to end of group");
+                                // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                             }
 
                             if *buf.offset(i) == b'}' as c_char && open_b == 0 {
@@ -587,9 +857,11 @@ pub fn BG_SiegeGetPairedValue(buf: *mut c_char, key: *mut c_char, outbuf: *mut c
 
                                         if *buf.offset(i) == 0 {
                                             if parse_to_quote {
-                                                panic!("Unexpected EOF while looking for endquote, error finding paired value for"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                                                panic!("Unexpected EOF while looking for endquote, error finding paired value for");
+                                            // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                                             } else {
-                                                panic!("Unexpected EOF while looking for space or endline, error finding paired value for"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                                                panic!("Unexpected EOF while looking for space or endline, error finding paired value for");
+                                                // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                                             }
                                         }
                                     }
@@ -597,7 +869,8 @@ pub fn BG_SiegeGetPairedValue(buf: *mut c_char, key: *mut c_char, outbuf: *mut c
 
                                     return 1; // we got it, so return 1.
                                 } else {
-                                    panic!("Error parsing file, unexpected EOF while looking for valud"); // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
+                                    panic!("Error parsing file, unexpected EOF while looking for valud");
+                                    // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
                                 }
                             } else {
                                 // if that wasn't the desired key, then make sure we parse to the end of the line, so we don't mistake a value for a key
@@ -711,7 +984,8 @@ pub fn BG_SiegeTranslateForcePowers(buf: *mut c_char, siegeClass: *mut siegeClas
                         }
                     }
 
-                    while FPTable[k as usize].id != -1 && !FPTable[k as usize].name.is_null()
+                    while FPTable[k as usize].id != -1
+                        && !FPTable[k as usize].name.is_null()
                         && *FPTable[k as usize].name as u8 != 0
                     {
                         if Q_stricmp(check_power.as_ptr(), FPTable[k as usize].name) == 0 {
@@ -806,7 +1080,12 @@ pub fn BG_SiegeTranslateGenericTable(
 /// Raven `BG_SiegeParseClassFile`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:759-1068`
-pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeClassDesc_t, bg: &mut BgState, traps: &dyn BgTraps) {
+pub fn BG_SiegeParseClassFile(
+    filename: *const c_char,
+    descBuffer: *mut siegeClassDesc_t,
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+) {
     unsafe {
         let mut f: fileHandle_t = 0;
         let mut len: c_int;
@@ -825,66 +1104,160 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
         class_info[len as usize] = 0;
 
         if !descBuffer.is_null() {
-            if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"description".as_ptr() as *mut c_char, descBuffer.as_mut().unwrap().desc.as_mut_ptr()) == 0 {
-                strcpy((*descBuffer).desc.as_mut_ptr(), c"DESCRIPTION UNAVAILABLE".as_ptr());
+            if BG_SiegeGetPairedValue(
+                class_info.as_mut_ptr(),
+                c"description".as_ptr() as *mut c_char,
+                descBuffer.as_mut().unwrap().desc.as_mut_ptr(),
+            ) == 0
+            {
+                strcpy(
+                    (*descBuffer).desc.as_mut_ptr(),
+                    c"DESCRIPTION UNAVAILABLE".as_ptr(),
+                );
             }
             assert!(strlen((*descBuffer).desc.as_ptr()) < SIEGE_CLASS_DESC_LEN as usize);
         }
 
-        BG_SiegeGetValueGroup(class_info.as_mut_ptr(), c"ClassInfo".as_ptr() as *mut c_char, class_info.as_mut_ptr());
+        BG_SiegeGetValueGroup(
+            class_info.as_mut_ptr(),
+            c"ClassInfo".as_ptr() as *mut c_char,
+            class_info.as_mut_ptr(),
+        );
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"name".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].name.as_mut_ptr(), parse_buf.as_ptr());
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"name".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            strcpy(
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
+                    .name
+                    .as_mut_ptr(),
+                parse_buf.as_ptr(),
+            );
         } else {
             panic!("Siege class without name entry");
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"model".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedModel.as_mut_ptr(), parse_buf.as_ptr());
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"model".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            strcpy(
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
+                    .forcedModel
+                    .as_mut_ptr(),
+                parse_buf.as_ptr(),
+            );
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedModel[0] = 0;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"skin".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSkin.as_mut_ptr(), parse_buf.as_ptr());
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"skin".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            strcpy(
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
+                    .forcedSkin
+                    .as_mut_ptr(),
+                parse_buf.as_ptr(),
+            );
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSkin[0] = 0;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"saber1".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber1.as_mut_ptr(), parse_buf.as_ptr());
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"saber1".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            strcpy(
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
+                    .saber1
+                    .as_mut_ptr(),
+                parse_buf.as_ptr(),
+            );
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber1[0] = 0;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"saber2".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            strcpy(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber2.as_mut_ptr(), parse_buf.as_ptr());
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"saber2".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            strcpy(
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
+                    .saber2
+                    .as_mut_ptr(),
+                parse_buf.as_ptr(),
+            );
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saber2[0] = 0;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"saberstyle".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), StanceTable.as_ptr() as *mut _, qtrue);
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"saberstyle".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance =
+                BG_SiegeTranslateGenericTable(
+                    parse_buf.as_mut_ptr(),
+                    StanceTable.as_ptr() as *mut _,
+                    qtrue,
+                );
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].saberStance = 0;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"sabercolor".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSaberColor = atoi(parse_buf.as_ptr());
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"sabercolor".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSaberColor =
+                atoi(parse_buf.as_ptr());
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaberColor = qtrue;
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaberColor = qfalse;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"saber2color".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSaber2Color = atoi(parse_buf.as_ptr());
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"saber2color".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].forcedSaber2Color =
+                atoi(parse_buf.as_ptr());
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaber2Color = qtrue;
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].hasForcedSaber2Color = qfalse;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"weapons".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), WPTable.as_ptr() as *mut _, qtrue);
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"weapons".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons =
+                BG_SiegeTranslateGenericTable(
+                    parse_buf.as_mut_ptr(),
+                    WPTable.as_ptr() as *mut _,
+                    qtrue,
+                );
         } else {
             panic!("Siege class without weapons entry");
         }
@@ -893,8 +1266,16 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].weapons |= 1 << WP_MELEE;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"forcepowers".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            BG_SiegeTranslateForcePowers(parse_buf.as_mut_ptr(), &mut bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]);
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"forcepowers".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            BG_SiegeTranslateForcePowers(
+                parse_buf.as_mut_ptr(),
+                &mut bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize],
+            );
         } else {
             i = 0;
             while i < NUM_FORCE_POWERS as isize {
@@ -903,53 +1284,110 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
             }
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"classflags".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), bgSiegeClassFlagNames.as_ptr() as *mut _, qtrue);
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"classflags".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags =
+                BG_SiegeTranslateGenericTable(
+                    parse_buf.as_mut_ptr(),
+                    bgSiegeClassFlagNames.as_ptr() as *mut _,
+                    qtrue,
+                );
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classflags = 0;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"maxhealth".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"maxhealth".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth = atoi(parse_buf.as_ptr());
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth = 100;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"starthealth".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"starthealth".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].starthealth = atoi(parse_buf.as_ptr());
         } else {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].starthealth = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth;
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].starthealth =
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxhealth;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"maxarmor".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"maxarmor".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor = atoi(parse_buf.as_ptr());
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor = 0;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"startarmor".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"startarmor".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].startarmor = atoi(parse_buf.as_ptr());
             if bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor == 0 {
-                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].startarmor;
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor =
+                    bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].startarmor;
             }
         } else {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].startarmor = bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor;
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].startarmor =
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].maxarmor;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"speed".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].speed = atof(parse_buf.as_ptr()) as f32;
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"speed".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].speed =
+                atof(parse_buf.as_ptr()) as f32;
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].speed = 1.0f32;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"uishader".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"uishader".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortraitShader = 0;
-            core::ptr::write_bytes(bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortrait.as_mut_ptr(), 0, bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].uiPortrait.len());
+            core::ptr::write_bytes(
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
+                    .uiPortrait
+                    .as_mut_ptr(),
+                0,
+                bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize]
+                    .uiPortrait
+                    .len(),
+            );
         } else {
             panic!("Siege class without uishader entry");
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"class_shader".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"class_shader".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].classShader = 0;
             let title_length: usize = strlen(parse_buf.as_ptr());
             // Oracle only falls back to SPC_INFANTRY when the loop runs to
@@ -978,14 +1416,34 @@ pub fn BG_SiegeParseClassFile(filename: *const c_char, descBuffer: *mut siegeCla
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].playerClass = SPC_INFANTRY as i16;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"holdables".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), HoldableTable.as_ptr() as *mut stringID_table_t, qtrue);
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"holdables".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems =
+                BG_SiegeTranslateGenericTable(
+                    parse_buf.as_mut_ptr(),
+                    HoldableTable.as_ptr() as *mut stringID_table_t,
+                    qtrue,
+                );
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].invenItems = 0;
         }
 
-        if BG_SiegeGetPairedValue(class_info.as_mut_ptr(), c"powerups".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].powerups = BG_SiegeTranslateGenericTable(parse_buf.as_mut_ptr(), PowerupTable.as_ptr() as *mut stringID_table_t, qtrue);
+        if BG_SiegeGetPairedValue(
+            class_info.as_mut_ptr(),
+            c"powerups".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].powerups =
+                BG_SiegeTranslateGenericTable(
+                    parse_buf.as_mut_ptr(),
+                    PowerupTable.as_ptr() as *mut stringID_table_t,
+                    qtrue,
+                );
         } else {
             bg.bgSiegeClasses[bg.bgNumSiegeClasses as usize].powerups = 0;
         }
@@ -1022,7 +1480,12 @@ pub fn BG_SiegeCountBaseClass(team: c_int, classIndex: c_short, bg: &BgState) ->
 /// Raven `BG_GetUIPortraitFile`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1094-1121`
-pub fn BG_GetUIPortraitFile(team: c_int, classIndex: c_short, cntIndex: c_short, bg: &BgState) -> *mut c_char {
+pub fn BG_GetUIPortraitFile(
+    team: c_int,
+    classIndex: c_short,
+    cntIndex: c_short,
+    bg: &BgState,
+) -> *mut c_char {
     unsafe {
         let mut count: isize = 0;
         let mut i: isize;
@@ -1050,7 +1513,12 @@ pub fn BG_GetUIPortraitFile(team: c_int, classIndex: c_short, cntIndex: c_short,
 /// Raven `BG_GetUIPortrait`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1123-1150`
-pub fn BG_GetUIPortrait(team: c_int, classIndex: c_short, cntIndex: c_short, bg: &BgState) -> c_int {
+pub fn BG_GetUIPortrait(
+    team: c_int,
+    classIndex: c_short,
+    cntIndex: c_short,
+    bg: &BgState,
+) -> c_int {
     unsafe {
         let mut count: isize = 0;
         let mut i: isize;
@@ -1113,7 +1581,11 @@ pub fn BG_GetClassOnBaseClass(
 /// Raven `BG_SiegeLoadClasses`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:1181-1210`
-pub fn BG_SiegeLoadClasses(descBuffer: *mut siegeClassDesc_t, bg: &mut BgState, traps: &dyn BgTraps) {
+pub fn BG_SiegeLoadClasses(
+    descBuffer: *mut siegeClassDesc_t,
+    bg: &mut BgState,
+    traps: &dyn BgTraps,
+) {
     unsafe {
         let mut num_files: c_int;
         let mut filelen: usize;
@@ -1191,8 +1663,18 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
         traps.fs_fclose(f);
         team_info[len as usize] = 0;
 
-        if BG_SiegeGetPairedValue(team_info.as_mut_ptr(), c"name".as_ptr() as *mut c_char, parse_buf.as_mut_ptr()) != 0 {
-            strcpy(bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].name.as_mut_ptr(), parse_buf.as_ptr());
+        if BG_SiegeGetPairedValue(
+            team_info.as_mut_ptr(),
+            c"name".as_ptr() as *mut c_char,
+            parse_buf.as_mut_ptr(),
+        ) != 0
+        {
+            strcpy(
+                bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize]
+                    .name
+                    .as_mut_ptr(),
+                parse_buf.as_ptr(),
+            );
         } else {
             panic!("Siege team with no name definition");
         }
@@ -1201,7 +1683,12 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
 
         bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses = 0;
 
-        if BG_SiegeGetValueGroup(team_info.as_mut_ptr(), c"Classes".as_ptr() as *mut c_char, team_info.as_mut_ptr()) != 0 {
+        if BG_SiegeGetValueGroup(
+            team_info.as_mut_ptr(),
+            c"Classes".as_ptr() as *mut c_char,
+            team_info.as_mut_ptr(),
+        ) != 0
+        {
             while success && i < MAX_SIEGE_CLASSES as isize {
                 // Build the lookString for class#i
                 let look_string_str = format!("class{}", i);
@@ -1209,7 +1696,11 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
                 let num_str = format!("{}", i);
                 strcat(look_string.as_mut_ptr(), cstr(&num_str).as_ptr());
 
-                success = BG_SiegeGetPairedValue(team_info.as_mut_ptr(), look_string.as_mut_ptr(), parse_buf.as_mut_ptr()) != 0;
+                success = BG_SiegeGetPairedValue(
+                    team_info.as_mut_ptr(),
+                    look_string.as_mut_ptr(),
+                    parse_buf.as_mut_ptr(),
+                ) != 0;
 
                 if !success {
                     break;
@@ -1220,7 +1711,10 @@ pub fn BG_SiegeParseTeamFile(filename: *const c_char, bg: &mut BgState, traps: &
                 bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[num_classes] = found_class;
 
                 if bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].classes[num_classes].is_null() {
-                    panic!("Invalid class specified: '{}'", cstr_to_str(parse_buf.as_ptr()));
+                    panic!(
+                        "Invalid class specified: '{}'",
+                        cstr_to_str(parse_buf.as_ptr())
+                    );
                 }
 
                 bg.bgSiegeTeams[bg.bgNumSiegeTeams as usize].numClasses += 1;

@@ -10,12 +10,12 @@ use mp_qshared::shared::vec3_t;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct navInfo_t {
-	pub blocker: *mut gentity_t,
-	pub direction: vec3_t,
-	pub pathDirection: vec3_t,
-	pub distance: f32,
-	pub trace: trace_t,
-	pub flags: i32,
+    pub blocker: *mut gentity_t,
+    pub direction: vec3_t,
+    pub pathDirection: vec3_t,
+    pub distance: f32,
+    pub trace: trace_t,
+    pub flags: i32,
 }
 
 const _: () = assert!(core::mem::size_of::<navInfo_t>() == 88);

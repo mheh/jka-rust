@@ -11,8 +11,8 @@
 #![allow(non_snake_case, non_camel_case_types, unused, clippy::all)]
 
 use crate::prelude::*;
-use crate::trap;
 use crate::q_math::vec3_origin;
+use crate::trap;
 
 // Const families ported elsewhere but not in the shared prelude glob.
 use crate::client::client_connected::CON_CONNECTED;
@@ -49,12 +49,12 @@ const PMF_FOLLOW: c_int = 4096;
 // and are prelude-globbed; the combo mask itself is transcribed locally,
 // matching the `g_items.rs:106` precedent).
 // Source: `oracle/oracle/codemp/game/bg_public.h:29`
-const MASK_PLAYERSOLID: c_int = CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_BODY | CONTENTS_TERRAIN;
+const MASK_PLAYERSOLID: c_int =
+    CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_BODY | CONTENTS_TERRAIN;
 
 // Raven `#define FALL_FADE_TIME 3000` (q_shared.h).
 // Source: `oracle/oracle/codemp/game/q_shared.h:2148`
 pub const FALL_FADE_TIME: c_int = 3000;
-
 
 // MAT_*/SVF_*/PMF_SCOREBOARD now resolve via the crate prelude (pass-3 symbol
 // backfill: `mp_qshared::common::mp::gentity`, `crate::g_public_consts`,
@@ -82,46 +82,52 @@ pub const TAUNT_GLOAT: c_int = 4;
 //TODO: Port VectorCompare           // Source: oracle/oracle/codemp/game/q_shared.h
 
 // Resolved cross-module fns (verbatim post-retrofit signatures — call surface).
-use crate::bg_misc::{BG_PlayerStateToEntityState, BG_PlayerStateToEntityStateExtraPolate, vectoyaw};
+use crate::ai_main::InFieldOfVision;
+use crate::bg_g2_utils::BG_AttachToRancor;
+use crate::bg_misc::BG_PlayerTouchesItem;
+use crate::bg_misc::{
+    vectoyaw, BG_PlayerStateToEntityState, BG_PlayerStateToEntityStateExtraPolate,
+};
 use crate::bg_panimate::{
     BG_AnimLength, BG_SaberInAttack, PM_SaberInReturn, PM_SaberInStart, PM_SaberInTransition,
 };
-use crate::bg_misc::BG_PlayerTouchesItem;
 use crate::bg_pmove::BG_KnockDownable;
+use crate::bg_pmove::Pmove;
 use crate::bg_saberLoad::WP_SaberStyleValidForSaber;
-use crate::g_team::OnSameTeam;
-use crate::NPC_AI_Jedi::Jedi_Cloak;
 use crate::g_client::{respawn, ClientBegin, SetClientViewAngle};
-use crate::g_cmds::{Cmd_FollowCycle_f, Cmd_SaberAttackCycle_f, G_ItemUsable, SetTeam, StopFollowing};
+use crate::g_cmds::{
+    Cmd_FollowCycle_f, Cmd_SaberAttackCycle_f, G_ItemUsable, SetTeam, StopFollowing,
+};
+use crate::g_combat::G_CheckForDismemberment;
 use crate::g_combat::{G_ApplyKnockback, G_Damage};
 use crate::g_items::{
     ItemUse_Binoculars, ItemUse_Jetpack, ItemUse_MedPack, ItemUse_MedPack_Big, ItemUse_Seeker,
     ItemUse_Sentry, ItemUse_Shield, ItemUse_UseCloak, ItemUse_UseEWeb,
 };
 use crate::g_nav::FlyingCreature;
+use crate::g_team::OnSameTeam;
+use crate::g_utils::G_EntitySound;
 use crate::g_utils::{
     G_AddEvent, G_MuteSound, G_SetAngles, G_SetAnim, G_SetOrigin, G_Sound, G_SoundIndex,
     G_TempEntity, TryUse,
 };
-use crate::g_combat::G_CheckForDismemberment;
-use crate::w_saber::saberCheckKnockdown_DuelLoss;
 use crate::g_weapon::FireWeapon;
-use crate::ai_main::InFieldOfVision;
-use crate::bg_g2_utils::BG_AttachToRancor;
 use crate::npc_c::NPC_SetAnim;
-use crate::q_math::{vectoangles, AngleVectors, VectorLength, VectorLengthSquared, VectorNormalize};
-use crate::bg_pmove::Pmove;
-use crate::g_utils::G_EntitySound;
+use crate::q_math::{
+    vectoangles, AngleVectors, VectorLength, VectorLengthSquared, VectorNormalize,
+};
 use crate::w_force::G_PreDefSound;
 use crate::w_force::{
     ForceAbsorb, ForceHeal, ForceProtect, ForceRage, ForceSeeing, ForceSpeed,
     ForceTeamForceReplenish, ForceTeamHeal, ForceTelepathy, ForceThrow,
 };
+use crate::w_saber::saberCheckKnockdown_DuelLoss;
+use crate::NPC_AI_Jedi::Jedi_Cloak;
 
-use crate::npc::g_npc_t::gNPC_t;
-use crate::ent_fn_enums::EntTouch;
-use mp_bg::public::dm_flags::DF_NO_FOOTSTEPS;
 use crate::bg_channel::{GameBgTraps, GameCallbacksImpl};
+use crate::ent_fn_enums::EntTouch;
+use crate::npc::g_npc_t::gNPC_t;
+use mp_bg::public::dm_flags::DF_NO_FOOTSTEPS;
 
 /// Raven `P_SetTwitchInfo`.
 ///
@@ -245,11 +251,26 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
                     // play a gurp sound instead of a normal pain sound
                     if (*ent).health <= (*ent).damage {
-                        G_Sound(ctx, ent, CHAN_VOICE as c_int, G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()));
+                        G_Sound(
+                            ctx,
+                            ent,
+                            CHAN_VOICE as c_int,
+                            G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()),
+                        );
                     } else if (*ctx.world).bg_state.rng.rand() & 1 != 0 {
-                        G_Sound(ctx, ent, CHAN_VOICE as c_int, G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()));
+                        G_Sound(
+                            ctx,
+                            ent,
+                            CHAN_VOICE as c_int,
+                            G_SoundIndex(cstr("sound/player/gurp1.wav").as_ptr()),
+                        );
                     } else {
-                        G_Sound(ctx, ent, CHAN_VOICE as c_int, G_SoundIndex(cstr("sound/player/gurp2.wav").as_ptr()));
+                        G_Sound(
+                            ctx,
+                            ent,
+                            CHAN_VOICE as c_int,
+                            G_SoundIndex(cstr("sound/player/gurp2.wav").as_ptr()),
+                        );
                     }
 
                     // don't play a normal pain sound
@@ -315,7 +336,12 @@ pub fn P_WorldEffects(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Raven `DoImpact` — collision impact damage (crush/fall).
 ///
 /// Source: `oracle/oracle/codemp/game/g_active.c:213-405`
-pub fn DoImpact(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mut gentity_t, damageSelf: qboolean) {
+pub fn DoImpact(
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    damageSelf: qboolean,
+) {
     unsafe {
         let mut velocity: vec3_t = [0.0; 3];
         let mut my_mass: f32;
@@ -349,7 +375,7 @@ pub fn DoImpact(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mut gentity
         if (*other).material == MAT_GLASS
             || (*other).material == MAT_GLASS_METAL
             || (*other).material == MAT_GRATE1
-            || (((*other).flags & FL_BBRUSH) != 0 && ((*other).spawnflags & 8 /*THIN*/) != 0)
+            || (((*other).flags & FL_BBRUSH) != 0 && ((*other).spawnflags & 8/*THIN*/) != 0)
             || ((*other).r.svFlags & SVF_GLASS_BRUSH) != 0
         {
             easyBreakBrush = qtrue;
@@ -476,7 +502,11 @@ pub fn DoImpact(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mut gentity
 /// Raven `Client_CheckImpactBBrush` — clients only do impact damage vs easy-break breakables.
 ///
 /// Source: `oracle/oracle/codemp/game/g_active.c:407-436`
-pub fn Client_CheckImpactBBrush(ctx: GameContext<'_>, self_: *mut gentity_t, other: *mut gentity_t) {
+pub fn Client_CheckImpactBBrush(
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+) {
     unsafe {
         if other.is_null() || (*other).inuse == 0 {
             return;
@@ -499,7 +529,7 @@ pub fn Client_CheckImpactBBrush(ctx: GameContext<'_>, self_: *mut gentity_t, oth
         if (*other).material == MAT_GLASS
             || (*other).material == MAT_GLASS_METAL
             || (*other).material == MAT_GRATE1
-            || (((*other).flags & FL_BBRUSH) != 0 && ((*other).spawnflags & 8 /*THIN*/) != 0)
+            || (((*other).flags & FL_BBRUSH) != 0 && ((*other).spawnflags & 8/*THIN*/) != 0)
             || (((*other).flags & FL_BBRUSH) != 0 && (*other).health <= 10)
             || ((*other).r.svFlags & SVF_GLASS_BRUSH) != 0
         {
@@ -528,7 +558,9 @@ pub fn G_SetClientSound(ctx: GameContext<'_>, ent: *mut gentity_t) {
             //loop supplying sound
             (*client).ps.loopSound = (*ctx.world).level.snd_medSupplied;
             (*ent).s.loopIsSoundset = qfalse;
-        } else if (*ent).waterlevel != 0 && ((*ent).watertype & (CONTENTS_LAVA | CONTENTS_SLIME)) != 0 {
+        } else if (*ent).waterlevel != 0
+            && ((*ent).watertype & (CONTENTS_LAVA | CONTENTS_SLIME)) != 0
+        {
             (*client).ps.loopSound = (*ctx.world).level.snd_fry;
             (*ent).s.loopIsSoundset = qfalse;
         } else {
@@ -560,12 +592,18 @@ pub fn ClientImpacts(ctx: GameContext<'_>, ent: *mut gentity_t, pm: *mut pmove_t
                 i += 1;
                 continue; // duplicated
             }
-            let other =
-                &mut (*ctx.world).g_entities[(*pm).touchents[i as usize] as usize] as *mut gentity_t;
+            let other = &mut (*ctx.world).g_entities[(*pm).touchents[i as usize] as usize]
+                as *mut gentity_t;
 
             if (*ent).r.svFlags & SVF_BOT != 0 {
                 if let Some(t) = (*ent).touch {
-                    crate::ent_fn_enums::dispatch_touch(ctx, t, ent, other, &mut trace as *mut trace_t);
+                    crate::ent_fn_enums::dispatch_touch(
+                        ctx,
+                        t,
+                        ent,
+                        other,
+                        &mut trace as *mut trace_t,
+                    );
                 }
             }
 
@@ -575,7 +613,13 @@ pub fn ClientImpacts(ctx: GameContext<'_>, ent: *mut gentity_t, pm: *mut pmove_t
                 continue;
             };
 
-            crate::ent_fn_enums::dispatch_touch(ctx, other_touch, other, ent, &mut trace as *mut trace_t);
+            crate::ent_fn_enums::dispatch_touch(
+                ctx,
+                other_touch,
+                other,
+                ent,
+                &mut trace as *mut trace_t,
+            );
             i += 1;
         }
     }
@@ -651,7 +695,9 @@ pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: *mut gentity_t) {
             // use seperate code for determining if an item is picked up
             // so you don't have to actually contact its bounding box
             if (*hit).s.eType == ET_ITEM as c_int {
-                if BG_PlayerTouchesItem(&mut (*client).ps, &mut (*hit).s, (*ctx.world).level.time) == qfalse {
+                if BG_PlayerTouchesItem(&mut (*client).ps, &mut (*hit).s, (*ctx.world).level.time)
+                    == qfalse
+                {
                     i += 1;
                     continue;
                 }
@@ -676,7 +722,13 @@ pub fn G_TouchTriggers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
             if (*ent).r.svFlags & SVF_BOT != 0 {
                 if let Some(t) = (*ent).touch {
-                    crate::ent_fn_enums::dispatch_touch(ctx, t, ent, hit, &mut trace as *mut trace_t);
+                    crate::ent_fn_enums::dispatch_touch(
+                        ctx,
+                        t,
+                        ent,
+                        hit,
+                        &mut trace as *mut trace_t,
+                    );
                 }
             }
 
@@ -745,7 +797,8 @@ pub fn G_MoverTouchPushTriggers(ctx: GameContext<'_>, ent: *mut gentity_t, oldOr
 
             let mut i = 0;
             while i < num {
-                let hit = &mut (*ctx.world).g_entities[touch[i as usize] as usize] as *mut gentity_t;
+                let hit =
+                    &mut (*ctx.world).g_entities[touch[i as usize] as usize] as *mut gentity_t;
 
                 if (*hit).s.eType != ET_PUSH_TRIGGER as c_int {
                     i += 1;
@@ -778,7 +831,13 @@ pub fn G_MoverTouchPushTriggers(ctx: GameContext<'_>, ent: *mut gentity_t, oldOr
                 trace = core::mem::zeroed();
 
                 if let Some(t) = (*hit).touch {
-                    crate::ent_fn_enums::dispatch_touch(ctx, t, hit, ent, &mut trace as *mut trace_t);
+                    crate::ent_fn_enums::dispatch_touch(
+                        ctx,
+                        t,
+                        hit,
+                        ent,
+                        &mut trace as *mut trace_t,
+                    );
                 }
 
                 i += 1;
@@ -831,8 +890,16 @@ pub fn SpectatorThink(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut user
 
             // perform a pmove
             let traps = GameBgTraps::new(ctx.engine);
-            let mut callbacks = GameCallbacksImpl { world: ctx.world, engine: ctx.engine };
-            Pmove(&mut pm as *mut pmove_t, &mut (*ctx.world).bg_state, &traps, &mut callbacks);
+            let mut callbacks = GameCallbacksImpl {
+                world: ctx.world,
+                engine: ctx.engine,
+            };
+            Pmove(
+                &mut pm as *mut pmove_t,
+                &mut (*ctx.world).bg_state,
+                &traps,
+                &mut callbacks,
+            );
             // save results of pmove
             crate::q_math::_VectorCopy((*client).ps.origin, &mut (*ent).s.origin);
 
@@ -925,7 +992,8 @@ pub fn ClientTimerActions(ent: *mut gentity_t, msec: c_int) {
             }
 
             // count down armor when over max
-            if (*client).ps.stats[STAT_ARMOR as usize] > (*client).ps.stats[STAT_MAX_HEALTH as usize]
+            if (*client).ps.stats[STAT_ARMOR as usize]
+                > (*client).ps.stats[STAT_MAX_HEALTH as usize]
             {
                 (*client).ps.stats[STAT_ARMOR as usize] -= 1;
             }
@@ -944,7 +1012,9 @@ pub fn ClientIntermissionThink(client: *mut gclient_t) {
         // swap and latch button actions
         (*client).oldbuttons = (*client).buttons;
         (*client).buttons = (*client).pers.cmd.buttons;
-        if (*client).buttons & (BUTTON_ATTACK | BUTTON_USE_HOLDABLE) & ((*client).oldbuttons ^ (*client).buttons)
+        if (*client).buttons
+            & (BUTTON_ATTACK | BUTTON_USE_HOLDABLE)
+            & ((*client).oldbuttons ^ (*client).buttons)
             != 0
         {
             // this used to be an ^1 but once a player says ready, it should stick
@@ -999,7 +1069,8 @@ pub fn G_VehicleAttachDroidUnit(ctx: GameContext<'_>, vehEnt: *mut gentity_t) {
             );
 
             if !(*droidEnt).NPC.is_null() {
-                NPC_SetAnim(ctx,
+                NPC_SetAnim(
+                    ctx,
                     droidEnt,
                     SETANIM_BOTH as c_int,
                     BOTH_STAND2 as c_int,
@@ -1127,7 +1198,12 @@ pub fn ClientEvents(ctx: GameContext<'_>, ent: *mut gentity_t, oldEventSequence:
                     );
 
                     if (*ent).health < 1 {
-                        G_Sound(ctx, ent, CHAN_AUTO as c_int, G_SoundIndex(cstr("sound/player/fallsplat.wav").as_ptr()));
+                        G_Sound(
+                            ctx,
+                            ent,
+                            CHAN_AUTO as c_int,
+                            G_SoundIndex(cstr("sound/player/fallsplat.wav").as_ptr()),
+                        );
                     }
                     break 'blk;
                 }
@@ -1357,7 +1433,12 @@ pub fn G_AddPushVecToUcmd(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mu
             return;
         }
 
-        AngleVectors((*cl).ps.viewangles, Some(&mut forward), Some(&mut right), None);
+        AngleVectors(
+            (*cl).ps.viewangles,
+            Some(&mut forward),
+            Some(&mut right),
+            None,
+        );
         for i in 0..3 {
             moveDir[i] = forward[i] * ((*ucmd).forwardmove as f32 / 127.0 * (*cl).ps.speed);
         }
@@ -1374,8 +1455,7 @@ pub fn G_AddPushVecToUcmd(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *mu
 
         let fMove =
             127.0 * (forward[0] * moveDir[0] + forward[1] * moveDir[1] + forward[2] * moveDir[2]);
-        let rMove =
-            127.0 * (right[0] * moveDir[0] + right[1] * moveDir[1] + right[2] * moveDir[2]);
+        let rMove = 127.0 * (right[0] * moveDir[0] + right[1] * moveDir[1] + right[2] * moveDir[2]);
         (*ucmd).forwardmove = fMove.floor() as i8; //If in the same dir , will be positive
         (*ucmd).rightmove = rMove.floor() as i8; //If in the same dir , will be positive
 
@@ -1481,7 +1561,8 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
             || (*cl).ps.saberBlocked != BLOCKED_NONE as c_int
             || (*cl).ps.saberBlocking >= level_time
             || (*cl).ps.weapon == WP_MELEE
-            || ((*cl).ps.weapon != ((*cl).pers.cmd.weapon) as i32 && (*ent).s.eType != ET_NPC as c_int)
+            || ((*cl).ps.weapon != ((*cl).pers.cmd.weapon) as i32
+                && (*ent).s.eType != ET_NPC as c_int)
         {
             //FIXME: also check for turning?
             let mut brokeOut: qboolean = qfalse;
@@ -1501,7 +1582,8 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
                 || (*cl).ps.saberBlocked != BLOCKED_NONE as c_int
                 || (*cl).ps.saberBlocking >= level_time
                 || (*cl).ps.weapon == WP_MELEE
-                || ((*cl).ps.weapon != ((*cl).pers.cmd.weapon) as i32 && (*ent).s.eType != ET_NPC as c_int)
+                || ((*cl).ps.weapon != ((*cl).pers.cmd.weapon) as i32
+                    && (*ent).s.eType != ET_NPC as c_int)
             {
                 //if in an idle, break out
                 let la = (*cl).ps.legsAnim;
@@ -1554,12 +1636,15 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
                 idleAnim = BOTH_STAND5IDLE1 as c_int;
             }
 
-            if idleAnim == BOTH_STAND2IDLE1 as c_int && (*ctx.world).bg_state.rng.Q_irand(1, 10) <= 5 {
+            if idleAnim == BOTH_STAND2IDLE1 as c_int
+                && (*ctx.world).bg_state.rng.Q_irand(1, 10) <= 5
+            {
                 idleAnim = BOTH_STAND2IDLE2 as c_int;
             }
 
             if idleAnim != -1 && idleAnim > 0 && idleAnim < MAX_ANIMATIONS as c_int {
-                G_SetAnim(ctx,
+                G_SetAnim(
+                    ctx,
                     ent,
                     ucmd,
                     SETANIM_BOTH as c_int,
@@ -1569,7 +1654,8 @@ pub fn G_CheckClientIdle(ctx: GameContext<'_>, ent: *mut gentity_t, ucmd: *mut u
                 );
 
                 //don't idle again after this anim for a while
-                (*cl).idleTime = level_time + (*cl).ps.legsTimer + (*ctx.world).bg_state.rng.Q_irand(0, 2000);
+                (*cl).idleTime =
+                    level_time + (*cl).ps.legsTimer + (*ctx.world).bg_state.rng.Q_irand(0, 2000);
             }
         }
     }
@@ -1780,7 +1866,9 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: *mut gentity_t, taunt: c_int) {
         let cl = (*ent).client as *mut gclient_t;
         let level_time = (*ctx.world).level.time;
 
-        if (*cl).pers.cmd.upmove != 0 || (*cl).pers.cmd.forwardmove != 0 || (*cl).pers.cmd.rightmove != 0
+        if (*cl).pers.cmd.upmove != 0
+            || (*cl).pers.cmd.forwardmove != 0
+            || (*cl).pers.cmd.rightmove != 0
         {
             //hack, don't do while moving
             return;
@@ -1891,7 +1979,9 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: *mut gentity_t, taunt: c_int) {
                     } else if (*cl).saber[1].model[0] != 0 && (*cl).saber[1].flourishAnim != -1 {
                         anim = (*cl).saber[1].flourishAnim;
                     } else {
-                        if saberAnimLevel == SS_FAST as c_int || saberAnimLevel == SS_TAVION as c_int {
+                        if saberAnimLevel == SS_FAST as c_int
+                            || saberAnimLevel == SS_TAVION as c_int
+                        {
                             anim = BOTH_SHOWOFF_FAST as c_int;
                         } else if saberAnimLevel == SS_MEDIUM as c_int {
                             anim = BOTH_SHOWOFF_MEDIUM as c_int;
@@ -1950,7 +2040,11 @@ pub fn G_SetTauntAnim(ctx: GameContext<'_>, ent: *mut gentity_t, taunt: c_int) {
                     (*cl).ps.forceHandExtend = HANDEXTEND_TAUNT as c_int;
                     (*cl).ps.forceDodgeAnim = anim;
                     (*cl).ps.forceHandExtendTime = level_time
-                        + crate::bg_panimate::BG_AnimLength(&(*ctx.world).bg_state, (*ent).localAnimIndex, anim);
+                        + crate::bg_panimate::BG_AnimLength(
+                            &(*ctx.world).bg_state,
+                            (*ent).localAnimIndex,
+                            anim,
+                        );
                 }
                 if taunt != TAUNT_MEDITATE && taunt != TAUNT_BOW {
                     //no sound for meditate or bow
@@ -2043,7 +2137,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                             {
                                 // one saber or blade should be off, adjust saberAnimLevel accordinly
                                 (*client).ps.fd.saberAnimLevelBase = i;
-                                (*client).ps.fd.saberAnimLevel = (*client).saber[0].singleBladeStyle as c_int;
+                                (*client).ps.fd.saberAnimLevel =
+                                    (*client).saber[0].singleBladeStyle as c_int;
                                 (*client).ps.fd.saberDrawAnimLevel = (*client).ps.fd.saberAnimLevel;
                             } else {
                                 (*client).ps.fd.saberAnimLevelBase = i;
@@ -2087,7 +2182,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         && (*client).saber[0].singleBladeStyle != SS_NONE
                     {
                         // one blade should be off, adjust saberAnimLevel accordinly
-                        (*client).ps.fd.saberAnimLevel = (*client).saber[0].singleBladeStyle as c_int;
+                        (*client).ps.fd.saberAnimLevel =
+                            (*client).saber[0].singleBladeStyle as c_int;
                         (*client).ps.fd.saberDrawAnimLevel = (*client).ps.fd.saberAnimLevel;
                     } else {
                         (*client).ps.fd.saberAnimLevel = SS_STAFF as c_int;
@@ -2130,12 +2226,18 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ctx.world).cvars.pmove_msec.integer < 8 {
             trap::Cvar_Set(
                 ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("pmove_msec"), cstr("8")),
+                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
+                    cstr("pmove_msec"),
+                    cstr("8"),
+                ),
             );
         } else if (*ctx.world).cvars.pmove_msec.integer > 33 {
             trap::Cvar_Set(
                 ctx.engine,
-                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(cstr("pmove_msec"), cstr("33")),
+                mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
+                    cstr("pmove_msec"),
+                    cstr("33"),
+                ),
             );
         }
 
@@ -2147,8 +2249,7 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         // check for exiting intermission
         if (*ctx.world).level.intermissiontime != 0 {
-            if (*ent).s.number < MAX_CLIENTS as c_int || (*client).NPC_class == CLASS_VEHICLE
-            {
+            if (*ent).s.number < MAX_CLIENTS as c_int || (*client).NPC_class == CLASS_VEHICLE {
                 // players and vehicles do nothing in intermissions
                 ClientIntermissionThink(client);
                 return;
@@ -2156,7 +2257,9 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         // spectators don't do much
-        if (*client).sess.sessionTeam == TEAM_SPECTATOR || (*client).tempSpectate > (*ctx.world).level.time {
+        if (*client).sess.sessionTeam == TEAM_SPECTATOR
+            || (*client).tempSpectate > (*ctx.world).level.time
+        {
             if (*client).sess.spectatorState == SPECTATOR_SCOREBOARD {
                 return;
             }
@@ -2164,7 +2267,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             return;
         }
 
-        if !ent.is_null() && !(*ent).client.is_null() && (*client).ps.eFlags & EF_INVULNERABLE != 0 {
+        if !ent.is_null() && !(*ent).client.is_null() && (*client).ps.eFlags & EF_INVULNERABLE != 0
+        {
             if (*client).invulnerableTimer <= (*ctx.world).level.time {
                 (*client).ps.eFlags &= !EF_INVULNERABLE;
             }
@@ -2217,7 +2321,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         const MIN_NPC_SPEED: c_int = 16;
 
         if (*client).bodyGrabIndex != ENTITYNUM_NONE as c_int {
-            let grabbed = &mut (*ctx.world).g_entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
+            let grabbed =
+                &mut (*ctx.world).g_entities[(*client).bodyGrabIndex as usize] as *mut gentity_t;
 
             if (*grabbed).inuse == qfalse
                 || (*grabbed).s.eType != ET_BODY as c_int
@@ -2266,8 +2371,17 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     (*client).bodyGrabIndex = ENTITYNUM_NONE as c_int;
                 } else if bodyDist > 24.0 {
                     bodyDir[2] = 0.0; // don't want it floating
-                    crate::q_math::_VectorAdd((*grabbed).epVelocity, bodyDir, &mut (*grabbed).epVelocity);
-                    G_Sound(ctx, grabbed, CHAN_AUTO as c_int, G_SoundIndex(cstr("sound/player/roll1.wav").as_ptr()));
+                    crate::q_math::_VectorAdd(
+                        (*grabbed).epVelocity,
+                        bodyDir,
+                        &mut (*grabbed).epVelocity,
+                    );
+                    G_Sound(
+                        ctx,
+                        grabbed,
+                        CHAN_AUTO as c_int,
+                        G_SoundIndex(cstr("sound/player/roll1.wav").as_ptr()),
+                    );
                 }
             }
         } else if (*client).ps.forceHandExtend == HANDEXTEND_DRAGGING as c_int {
@@ -2295,9 +2409,13 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     if (*npc).currentSpeed >= 80 && controlledByPlayer == qfalse {
                         // At higher speeds, need to slow down close to stuff
                         // Slow down as you approach your goal
-                        if (*npc).distToGoal < SLOWDOWN_DIST && (*npc).aiFlags & NPCAI_NO_SLOWDOWN == 0 {
+                        if (*npc).distToGoal < SLOWDOWN_DIST
+                            && (*npc).aiFlags & NPCAI_NO_SLOWDOWN == 0
+                        {
                             if (*npc).desiredSpeed > MIN_NPC_SPEED {
-                                let slowdownSpeed = ((*npc).desiredSpeed as f32) * (*npc).distToGoal / SLOWDOWN_DIST;
+                                let slowdownSpeed = ((*npc).desiredSpeed as f32)
+                                    * (*npc).distToGoal
+                                    / SLOWDOWN_DIST;
 
                                 (*npc).desiredSpeed = slowdownSpeed.ceil() as c_int;
                                 if (*npc).desiredSpeed < MIN_NPC_SPEED {
@@ -2350,7 +2468,13 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     let mut turndelta = 0.0f32;
                     // rwwFIXMEFIXME: locked-yaw RF_LOCKEDANGLE path is unreachable
                     // (Raven guards it with `if (0)`) — port the always-taken branch.
-                    turndelta = (180.0 - crate::q_math::AngleDelta((*ent).r.currentAngles[YAW], (*npc).desiredYaw).abs()) / 180.0;
+                    turndelta = (180.0
+                        - crate::q_math::AngleDelta(
+                            (*ent).r.currentAngles[YAW],
+                            (*npc).desiredYaw,
+                        )
+                        .abs())
+                        / 180.0;
 
                     if turndelta < 0.75 {
                         (*client).ps.speed = 0.0;
@@ -2394,7 +2518,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
             // Check for a siege class speed multiplier
             if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE && (*client).siegeClass != -1 {
-                (*client).ps.speed *= (*ctx.world).bg_state.bgSiegeClasses[(*client).siegeClass as usize].speed;
+                (*client).ps.speed *=
+                    (*ctx.world).bg_state.bgSiegeClasses[(*client).siegeClass as usize].speed;
             }
 
             if (*client).bodyGrabIndex != ENTITYNUM_NONE as c_int {
@@ -2417,11 +2542,17 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             {
                 // use custom veh gravity
                 (*client).ps.gravity = (*(*vehVehicle).m_pVehicleInfo).gravity;
-            } else if (*client).inSpaceIndex != 0 && (*client).inSpaceIndex != ENTITYNUM_NONE as c_int {
+            } else if (*client).inSpaceIndex != 0
+                && (*client).inSpaceIndex != ENTITYNUM_NONE as c_int
+            {
                 // in space, so no gravity...
                 (*client).ps.gravity = 1;
                 if (*ent).s.number < MAX_CLIENTS as c_int {
-                    crate::q_math::_VectorScale((*client).ps.velocity, 0.8, &mut (*client).ps.velocity);
+                    crate::q_math::_VectorScale(
+                        (*client).ps.velocity,
+                        0.8,
+                        &mut (*client).ps.velocity,
+                    );
                 }
             } else if (*client).ps.eFlags2 & EF2_SHIP_DEATH != 0 {
                 // float there
@@ -2433,7 +2564,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if (*client).ps.duelInProgress != qfalse {
-            let duelAgainst = &mut (*ctx.world).g_entities[(*client).ps.duelIndex as usize] as *mut gentity_t;
+            let duelAgainst =
+                &mut (*ctx.world).g_entities[(*client).ps.duelIndex as usize] as *mut gentity_t;
 
             // Keep the time updated, so once this duel ends this player can't engage in a duel for another
             // 10 seconds. This will give other people a chance to engage in duels in case this player wants
@@ -2464,17 +2596,30 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     && !(*duelAgainst).client.is_null()
                     && (*duelAgainst).inuse != qfalse
                     && (*((*duelAgainst).client as *mut gclient_t)).ps.weapon == WP_SABER
-                    && (*((*duelAgainst).client as *mut gclient_t)).ps.saberHolstered != 0
+                    && (*((*duelAgainst).client as *mut gclient_t))
+                        .ps
+                        .saberHolstered
+                        != 0
                     && (*((*duelAgainst).client as *mut gclient_t)).ps.duelTime != 0
                 {
                     let daClient = (*duelAgainst).client as *mut gclient_t;
                     (*daClient).ps.saberHolstered = 0;
 
                     if (*daClient).saber[0].soundOn != 0 {
-                        G_Sound(ctx, duelAgainst, CHAN_AUTO as c_int, (*daClient).saber[0].soundOn);
+                        G_Sound(
+                            ctx,
+                            duelAgainst,
+                            CHAN_AUTO as c_int,
+                            (*daClient).saber[0].soundOn,
+                        );
                     }
                     if (*daClient).saber[1].soundOn != 0 {
-                        G_Sound(ctx, duelAgainst, CHAN_AUTO as c_int, (*daClient).saber[1].soundOn);
+                        G_Sound(
+                            ctx,
+                            duelAgainst,
+                            CHAN_AUTO as c_int,
+                            (*daClient).saber[1].soundOn,
+                        );
                     }
 
                     G_AddEvent(duelAgainst, EV_PRIVATE_DUEL as c_int, 2);
@@ -2509,14 +2654,15 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 // Winner gets full health.. providing he's still alive
                 if (*ent).health > 0 && (*client).ps.stats[STAT_HEALTH as usize] > 0 {
                     if (*ent).health < (*client).ps.stats[STAT_MAX_HEALTH as usize] {
-                        (*client).ps.stats[STAT_HEALTH as usize] = (*client).ps.stats[STAT_MAX_HEALTH as usize];
+                        (*client).ps.stats[STAT_HEALTH as usize] =
+                            (*client).ps.stats[STAT_MAX_HEALTH as usize];
                         (*ent).health = (*client).ps.stats[STAT_HEALTH as usize];
                     }
 
                     if (*ctx.world).cvars.g_spawnInvulnerability.integer != 0 {
                         (*client).ps.eFlags |= EF_INVULNERABLE;
-                        (*client).invulnerableTimer =
-                            (*ctx.world).level.time + (*ctx.world).cvars.g_spawnInvulnerability.integer;
+                        (*client).invulnerableTimer = (*ctx.world).level.time
+                            + (*ctx.world).cvars.g_spawnInvulnerability.integer;
                     }
                 }
 
@@ -2535,7 +2681,10 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     );
                     trap::SendServerCommand(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                            -1,
+                            cstr(&s),
+                        ),
                     );
                 } else {
                     // it was a draw, because we both managed to die in the same frame
@@ -2547,12 +2696,19 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     let s = format!("cp \"{}\n\"", cstr_to_str(m));
                     trap::SendServerCommand(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                            -1,
+                            cstr(&s),
+                        ),
                     );
                 }
             } else {
                 let mut vSub: vec3_t = [0.0; 3];
-                crate::q_math::_VectorSubtract((*client).ps.origin, (*((*duelAgainst).client as *mut gclient_t)).ps.origin, &mut vSub);
+                crate::q_math::_VectorSubtract(
+                    (*client).ps.origin,
+                    (*((*duelAgainst).client as *mut gclient_t)).ps.origin,
+                    &mut vSub,
+                );
                 let subLen = VectorLength(vSub);
 
                 if subLen >= 1024.0 {
@@ -2571,14 +2727,18 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     let s = format!("print \"{}\n\"", cstr_to_str(m));
                     trap::SendServerCommand(
                         ctx.engine,
-                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(-1, cstr(&s)),
+                        mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                            -1,
+                            cstr(&s),
+                        ),
                     );
                 }
             }
         }
 
         if (*client).doingThrow > (*ctx.world).level.time {
-            let throwee = &mut (*ctx.world).g_entities[(*client).throwingIndex as usize] as *mut gentity_t;
+            let throwee =
+                &mut (*ctx.world).g_entities[(*client).throwingIndex as usize] as *mut gentity_t;
 
             if (*throwee).inuse == qfalse
                 || (*throwee).client.is_null()
@@ -2603,7 +2763,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if (*client).beingThrown > (*ctx.world).level.time {
-            let thrower = &mut (*ctx.world).g_entities[(*client).throwingIndex as usize] as *mut gentity_t;
+            let thrower =
+                &mut (*ctx.world).g_entities[(*client).throwingIndex as usize] as *mut gentity_t;
 
             if (*thrower).inuse == qfalse
                 || (*thrower).client.is_null()
@@ -2797,7 +2958,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 if (*client).ps.otherKillerTime > (*ctx.world).level.time
                     && (*client).ps.otherKiller != ENTITYNUM_NONE as c_int
                 {
-                    otherKiller = &mut (*ctx.world).g_entities[(*client).ps.otherKiller as usize] as *mut gentity_t;
+                    otherKiller = &mut (*ctx.world).g_entities[(*client).ps.otherKiller as usize]
+                        as *mut gentity_t;
 
                     if (*otherKiller).inuse == qfalse {
                         otherKiller = ent;
@@ -2875,11 +3037,19 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 pm.ghoul2 = (*ent).ghoul2;
                 pm.g2Bolts_LFoot = trap::G2API_AddBolt(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*l_leg_foot".to_owned()),
+                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                        (*ent).ghoul2,
+                        0,
+                        c"*l_leg_foot".to_owned(),
+                    ),
                 );
                 pm.g2Bolts_RFoot = trap::G2API_AddBolt(
                     ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new((*ent).ghoul2, 0, c"*r_leg_foot".to_owned()),
+                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                        (*ent).ghoul2,
+                        0,
+                        c"*r_leg_foot".to_owned(),
+                    ),
                 );
             }
         }
@@ -2904,13 +3074,18 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         pm.entSize = core::mem::size_of::<gentity_t>() as c_int;
 
         if (*client).ps.saberLockTime > (*ctx.world).level.time {
-            let blockOpp = &mut (*ctx.world).g_entities[(*client).ps.saberLockEnemy as usize] as *mut gentity_t;
+            let blockOpp = &mut (*ctx.world).g_entities[(*client).ps.saberLockEnemy as usize]
+                as *mut gentity_t;
 
             if !(*blockOpp).client.is_null() && (*blockOpp).inuse != qfalse {
                 let mut lockDir: vec3_t = [0.0; 3];
                 let mut lockAng: vec3_t = [0.0; 3];
 
-                crate::q_math::_VectorSubtract((*blockOpp).r.currentOrigin, (*ent).r.currentOrigin, &mut lockDir);
+                crate::q_math::_VectorSubtract(
+                    (*blockOpp).r.currentOrigin,
+                    (*ent).r.currentOrigin,
+                    &mut lockDir,
+                );
                 vectoangles(lockDir, &mut lockAng);
                 SetClientViewAngle(ent, lockAng);
             }
@@ -2918,12 +3093,14 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if (*client).ps.saberLockHitCheckTime < (*ctx.world).level.time {
                 // have moved to next frame since last lock push
                 (*client).ps.saberLockHitCheckTime = (*ctx.world).level.time; // so we don't push more than once per server frame
-                if (*client).buttons & BUTTON_ATTACK != 0 && (*client).oldbuttons & BUTTON_ATTACK == 0 {
+                if (*client).buttons & BUTTON_ATTACK != 0
+                    && (*client).oldbuttons & BUTTON_ATTACK == 0
+                {
                     if (*client).ps.saberLockHitIncrementTime < (*ctx.world).level.time {
                         // have moved to next frame since last saberlock attack button press
                         let mut lockHits: c_int;
                         (*client).ps.saberLockHitIncrementTime = (*ctx.world).level.time; // so we don't register an attack key press more than once per server frame
-                        // NOTE: FP_SABER_OFFENSE level already taken into account in PM_SaberLocked
+                                                                                          // NOTE: FP_SABER_OFFENSE level already taken into account in PM_SaberLocked
                         if (*client).ps.fd.forcePowersActive & (1 << FP_RAGE) != 0 {
                             // raging: push harder
                             lockHits = 1 + (*client).ps.fd.forcePowerLevel[FP_RAGE as usize];
@@ -3008,13 +3185,15 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     // NOTE: button presses were getting lost!
                     let pilotEnt = (*vehVehicle).m_pPilot as *mut gentity_t;
                     let pilotClient = (*pilotEnt).client as *mut gclient_t;
-                    pm.cmd.buttons = (*pilotClient).pers.cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK);
+                    pm.cmd.buttons =
+                        (*pilotClient).pers.cmd.buttons & (BUTTON_ATTACK | BUTTON_ALT_ATTACK);
                 }
                 if (*(*vehVehicle).m_pVehicleInfo).r#type == VH_WALKER {
                     if (*client).ps.groundEntityNum != ENTITYNUM_NONE as c_int {
                         // ATST crushes anything underneath it
-                        let under =
-                            &mut (*ctx.world).g_entities[(*client).ps.groundEntityNum as usize] as *mut gentity_t;
+                        let under = &mut (*ctx.world).g_entities
+                            [(*client).ps.groundEntityNum as usize]
+                            as *mut gentity_t;
                         if (*under).health != 0 && (*under).takedamage != qfalse {
                             let down: vec3_t = [0.0, 0.0, -1.0];
                             // FIXME: we'll be doing traces down from each foot, so we'll have a real impact origin
@@ -3037,8 +3216,16 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         {
             let traps = GameBgTraps::new(ctx.engine);
-            let mut callbacks = GameCallbacksImpl { world: ctx.world, engine: ctx.engine };
-            Pmove(&mut pm as *mut pmove_t, &mut (*ctx.world).bg_state, &traps, &mut callbacks);
+            let mut callbacks = GameCallbacksImpl {
+                world: ctx.world,
+                engine: ctx.engine,
+            };
+            Pmove(
+                &mut pm as *mut pmove_t,
+                &mut (*ctx.world).bg_state,
+                &traps,
+                &mut callbacks,
+            );
         }
 
         if (*client).solidHack != 0 {
@@ -3059,7 +3246,10 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if pm.checkDuelLoss > 0
                 && (pm.checkDuelLoss <= MAX_CLIENTS as c_int
                     || (pm.checkDuelLoss < (mp_qshared::shared::MAX_GENTITIES as c_int - 1)
-                        && (*ctx.world).g_entities[(pm.checkDuelLoss - 1) as usize].s.eType == ET_NPC as c_int))
+                        && (*ctx.world).g_entities[(pm.checkDuelLoss - 1) as usize]
+                            .s
+                            .eType
+                            == ET_NPC as c_int))
             {
                 let clientLost =
                     &mut (*ctx.world).g_entities[(pm.checkDuelLoss - 1) as usize] as *mut gentity_t;
@@ -3070,7 +3260,11 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 {
                     let clClient = (*clientLost).client as *mut gclient_t;
                     let mut attDir: vec3_t = [0.0; 3];
-                    crate::q_math::_VectorSubtract((*client).ps.origin, (*clClient).ps.origin, &mut attDir);
+                    crate::q_math::_VectorSubtract(
+                        (*client).ps.origin,
+                        (*clClient).ps.origin,
+                        &mut attDir,
+                    );
                     VectorNormalize(&mut attDir);
 
                     (*clClient).ps.velocity = [0.0; 3];
@@ -3106,13 +3300,21 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     (*ctx.world).globals.gGAvoidDismember = 0;
                 } else if !(*clientLost).client.is_null()
                     && (*clientLost).inuse != qfalse
-                    && (*(( *clientLost).client as *mut gclient_t)).ps.forceHandExtend != HANDEXTEND_KNOCKDOWN as c_int
-                    && (*(( *clientLost).client as *mut gclient_t)).ps.saberEntityNum != 0
+                    && (*((*clientLost).client as *mut gclient_t))
+                        .ps
+                        .forceHandExtend
+                        != HANDEXTEND_KNOCKDOWN as c_int
+                    && (*((*clientLost).client as *mut gclient_t))
+                        .ps
+                        .saberEntityNum
+                        != 0
                 {
                     // if we didn't knock down it was a circle lock. So as punishment,
                     // make them lose their saber and go into a proper anim
                     let clClient = (*clientLost).client as *mut gclient_t;
-                    let saberEnt = &mut (*ctx.world).g_entities[(*clClient).ps.saberEntityNum as usize] as *mut gentity_t;
+                    let saberEnt = &mut (*ctx.world).g_entities
+                        [(*clClient).ps.saberEntityNum as usize]
+                        as *mut gentity_t;
                     saberCheckKnockdown_DuelLoss(ctx, saberEnt, clientLost, ent);
                 }
             }
@@ -3122,7 +3324,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if (*client).ps.groundEntityNum < ENTITYNUM_WORLD as c_int {
             // standing on an ent
-            let groundEnt = &mut (*ctx.world).g_entities[(*client).ps.groundEntityNum as usize] as *mut gentity_t;
+            let groundEnt = &mut (*ctx.world).g_entities[(*client).ps.groundEntityNum as usize]
+                as *mut gentity_t;
             if (*groundEnt).s.eType == ET_NPC as c_int
                 && (*groundEnt).s.NPC_class == CLASS_VEHICLE as c_int
                 && (*groundEnt).inuse != qfalse
@@ -3153,7 +3356,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         }
 
         if pm.cmd.generic_cmd != 0
-            && (pm.cmd.generic_cmd as c_int != (*client).lastGenCmd || (*client).lastGenCmdTime < (*ctx.world).level.time)
+            && (pm.cmd.generic_cmd as c_int != (*client).lastGenCmd
+                || (*client).lastGenCmdTime < (*ctx.world).level.time)
         {
             (*client).lastGenCmd = pm.cmd.generic_cmd as c_int;
             if pm.cmd.generic_cmd as c_int != GENCMD_FORCE_THROW as c_int
@@ -3167,7 +3371,9 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if gc == GENCMD_SABERSWITCH as c_int {
                 Cmd_ToggleSaber_f(ctx, ent);
             } else if gc == GENCMD_ENGAGE_DUEL as c_int {
-                if (*ctx.world).cvars.g_gametype.integer == GT_DUEL || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL {
+                if (*ctx.world).cvars.g_gametype.integer == GT_DUEL
+                    || (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL
+                {
                     // already in a duel, made it a taunt command
                 } else {
                     Cmd_EngageDuel_f(ctx, ent);
@@ -3219,15 +3425,18 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_MEDPAC as c_int);
                 }
             } else if gc == GENCMD_USE_BACTABIG as c_int {
-                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_MEDPAC_BIG as c_int) != 0
+                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_MEDPAC_BIG as c_int)
+                    != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_MEDPAC_BIG as c_int) != 0
                 {
                     ItemUse_MedPack_Big(ent);
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_MEDPAC_BIG as c_int, 0);
-                    (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_MEDPAC_BIG as c_int);
+                    (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
+                        !(1 << HI_MEDPAC_BIG as c_int);
                 }
             } else if gc == GENCMD_USE_ELECTROBINOCULARS as c_int {
-                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_BINOCULARS as c_int) != 0
+                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_BINOCULARS as c_int)
+                    != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_BINOCULARS as c_int) != 0
                 {
                     ItemUse_Binoculars(ctx, ent);
@@ -3238,7 +3447,8 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     }
                 }
             } else if gc == GENCMD_ZOOM as c_int {
-                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_BINOCULARS as c_int) != 0
+                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_BINOCULARS as c_int)
+                    != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_BINOCULARS as c_int) != 0
                 {
                     ItemUse_Binoculars(ctx, ent);
@@ -3249,29 +3459,34 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     }
                 }
             } else if gc == GENCMD_USE_SENTRY as c_int {
-                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_SENTRY_GUN as c_int) != 0
+                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_SENTRY_GUN as c_int)
+                    != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_SENTRY_GUN as c_int) != 0
                 {
                     ItemUse_Sentry(ctx, ent);
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_SENTRY_GUN as c_int, 0);
-                    (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &= !(1 << HI_SENTRY_GUN as c_int);
+                    (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] &=
+                        !(1 << HI_SENTRY_GUN as c_int);
                 }
             } else if gc == GENCMD_USE_JETPACK as c_int {
-                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_JETPACK as c_int) != 0
+                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_JETPACK as c_int)
+                    != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_JETPACK as c_int) != 0
                 {
                     ItemUse_Jetpack(ctx, ent);
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_JETPACK as c_int, 0);
                 }
             } else if gc == GENCMD_USE_HEALTHDISP as c_int {
-                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_HEALTHDISP as c_int) != 0
+                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_HEALTHDISP as c_int)
+                    != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_HEALTHDISP as c_int) != 0
                 {
                     // ItemUse_UseDisp(ent, HI_HEALTHDISP);
                     G_AddEvent(ent, EV_USE_ITEM0 as c_int + HI_HEALTHDISP as c_int, 0);
                 }
             } else if gc == GENCMD_USE_AMMODISP as c_int {
-                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_AMMODISP as c_int) != 0
+                if (*client).ps.stats[STAT_HOLDABLE_ITEMS as usize] & (1 << HI_AMMODISP as c_int)
+                    != 0
                     && G_ItemUsable(ctx, &mut (*client).ps, HI_AMMODISP as c_int) != 0
                 {
                     // ItemUse_UseDisp(ent, HI_AMMODISP);
@@ -3316,7 +3531,12 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).eventTime = (*ctx.world).level.time;
         }
         if (*ctx.world).cvars.g_smoothClients.integer != 0 {
-            BG_PlayerStateToEntityStateExtraPolate(&mut (*client).ps, &mut (*ent).s, (*client).ps.commandTime, qfalse);
+            BG_PlayerStateToEntityStateExtraPolate(
+                &mut (*client).ps,
+                &mut (*ent).s,
+                (*client).ps.commandTime,
+                qfalse,
+            );
             // rww - 12-03-02 - Don't snap the origin of players! It screws prediction all up.
         } else {
             BG_PlayerStateToEntityState(&mut (*client).ps, &mut (*ent).s, qfalse);
@@ -3356,13 +3576,18 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             //TODO: Use
             // TryUse( ent );
         }
-        if (*client).pers.cmd.buttons & BUTTON_USE != 0 && (*client).ps.useDelay < (*ctx.world).level.time {
+        if (*client).pers.cmd.buttons & BUTTON_USE != 0
+            && (*client).ps.useDelay < (*ctx.world).level.time
+        {
             TryUse(ctx, ent);
             (*client).ps.useDelay = (*ctx.world).level.time + 100;
         }
 
         // link entity now, after any personal teleporters have been used
-        trap::LinkEntity(ctx.engine, mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent));
+        trap::LinkEntity(
+            ctx.engine,
+            mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs::new(ent),
+        );
         if (*client).noclip == qfalse {
             G_TouchTriggers(ctx, ent);
         }
@@ -3385,20 +3610,30 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         // Did we kick someone in our pmove sequence?
         if (*client).ps.forceKickFlip != 0 {
-            let faceKicked =
-                &mut (*ctx.world).g_entities[((*client).ps.forceKickFlip - 1) as usize] as *mut gentity_t;
+            let faceKicked = &mut (*ctx.world).g_entities[((*client).ps.forceKickFlip - 1) as usize]
+                as *mut gentity_t;
 
             if !(*faceKicked).client.is_null()
-                && (OnSameTeam(ctx, ent, faceKicked) == qfalse || (*ctx.world).cvars.g_friendlyFire.integer != 0)
-                && ((*((*faceKicked).client as *mut gclient_t)).ps.duelInProgress == qfalse
+                && (OnSameTeam(ctx, ent, faceKicked) == qfalse
+                    || (*ctx.world).cvars.g_friendlyFire.integer != 0)
+                && ((*((*faceKicked).client as *mut gclient_t))
+                    .ps
+                    .duelInProgress
+                    == qfalse
                     || (*((*faceKicked).client as *mut gclient_t)).ps.duelIndex == (*ent).s.number)
-                && ((*client).ps.duelInProgress == qfalse || (*client).ps.duelIndex == (*faceKicked).s.number)
+                && ((*client).ps.duelInProgress == qfalse
+                    || (*client).ps.duelIndex == (*faceKicked).s.number)
             {
                 let fkClient = (*faceKicked).client as *mut gclient_t;
-                if !(*faceKicked).client.is_null() && (*faceKicked).health != 0 && (*faceKicked).takedamage != qfalse {
+                if !(*faceKicked).client.is_null()
+                    && (*faceKicked).health != 0
+                    && (*faceKicked).takedamage != qfalse
+                {
                     // push them away and do pain
                     let mut oppDir: vec3_t = [0.0; 3];
-                    let mut strength = crate::q_math::VectorNormalize2((*client).ps.velocity, &mut oppDir) as c_int;
+                    let mut strength =
+                        crate::q_math::VectorNormalize2((*client).ps.velocity, &mut oppDir)
+                            as c_int;
 
                     strength = ((strength as f64) * 0.05) as c_int;
 
@@ -3453,7 +3688,13 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
                         ctx,
                         faceKicked,
                         CHAN_AUTO as c_int,
-                        G_SoundIndex(cstr(&format!("sound/weapons/melee/punch{}", (*ctx.world).bg_state.rng.Q_irand(1, 4))).as_ptr()),
+                        G_SoundIndex(
+                            cstr(&format!(
+                                "sound/weapons/melee/punch{}",
+                                (*ctx.world).bg_state.rng.Q_irand(1, 4)
+                            ))
+                            .as_ptr(),
+                        ),
                     );
                 }
             }
@@ -3467,18 +3708,24 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
             && (*ent).s.eType != ET_NPC as c_int
         {
             // wait for the attack button to be pressed
-            if (*ctx.world).level.time > (*client).respawnTime && (*ctx.world).globals.gDoSlowMoDuel == qfalse {
+            if (*ctx.world).level.time > (*client).respawnTime
+                && (*ctx.world).globals.gDoSlowMoDuel == qfalse
+            {
                 // forcerespawn is to prevent users from waiting out powerups
                 let mut forceRes = (*ctx.world).cvars.g_forcerespawn.integer;
 
                 if (*ctx.world).cvars.g_gametype.integer == GT_POWERDUEL {
                     forceRes = 1;
-                } else if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE && (*ctx.world).cvars.g_siegeRespawn.integer != 0 {
+                } else if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
+                    && (*ctx.world).cvars.g_siegeRespawn.integer != 0
+                {
                     // wave respawning on
                     forceRes = 1;
                 }
 
-                if forceRes > 0 && ((*ctx.world).level.time - (*client).respawnTime) > forceRes * 1000 {
+                if forceRes > 0
+                    && ((*ctx.world).level.time - (*client).respawnTime) > forceRes * 1000
+                {
                     respawn(ctx, ent);
                     return;
                 }
@@ -3506,10 +3753,15 @@ pub fn ClientThink_real(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if (*ent).s.number < MAX_CLIENTS as c_int && (*client).ps.m_iVehicleNum != 0 {
             // driving a vehicle
             // run it
-            let vehEnt = &mut (*ctx.world).g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
+            let vehEnt =
+                &mut (*ctx.world).g_entities[(*client).ps.m_iVehicleNum as usize] as *mut gentity_t;
             if (*vehEnt).inuse != qfalse && !(*vehEnt).client.is_null() {
                 let vehVehicle = (*vehEnt).m_pVehicle as *mut Vehicle_t;
-                ClientThink(ctx, (*client).ps.m_iVehicleNum, &mut (*vehVehicle).m_ucmd as *mut usercmd_t);
+                ClientThink(
+                    ctx,
+                    (*client).ps.m_iVehicleNum,
+                    &mut (*vehVehicle).m_ucmd as *mut usercmd_t,
+                );
             } else {
                 // vehicle no longer valid?
                 (*client).ps.m_iVehicleNum = 0;
@@ -3620,8 +3872,7 @@ pub fn SpectatorClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
             }
             if clientNum >= 0 {
                 let cl = (*ctx.world).level.clients.add(clientNum as usize);
-                if (*cl).pers.connected == CON_CONNECTED
-                    && (*cl).sess.sessionTeam != TEAM_SPECTATOR
+                if (*cl).pers.connected == CON_CONNECTED && (*cl).sess.sessionTeam != TEAM_SPECTATOR
                 {
                     (*entCl).ps.eFlags = (*cl).ps.eFlags;
                     (*entCl).ps = (*cl).ps;
@@ -3631,8 +3882,7 @@ pub fn SpectatorClientEndFrame(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     // drop them to free spectators unless they are dedicated camera followers
                     if (*entCl).sess.spectatorClient >= 0 {
                         (*entCl).sess.spectatorState = SPECTATOR_FREE;
-                        let idx = (entCl as *mut gclient_t)
-                            .offset_from((*ctx.world).level.clients)
+                        let idx = (entCl as *mut gclient_t).offset_from((*ctx.world).level.clients)
                             as c_int;
                         ClientBegin(ctx, idx, qtrue);
                     }

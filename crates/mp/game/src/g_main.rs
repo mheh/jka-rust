@@ -856,7 +856,9 @@ pub fn G_ResetDuelists(ctx: GameContext<'_>) {
             ClientSpawn(ctx, ent);
 
             // add a teleportation effect
-            let origin = (*((*ent).client as *mut crate::client::gclient_t)).ps.origin;
+            let origin = (*((*ent).client as *mut crate::client::gclient_t))
+                .ps
+                .origin;
             let tent = G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_IN as c_int);
             (*tent).s.clientNum = (*ent).s.clientNum;
             i += 1;
@@ -1291,7 +1293,10 @@ pub fn BeginIntermission(ctx: GameContext<'_>) {
             if (*client).health <= 0 {
                 if world.cvars.g_gametype.integer != GT_POWERDUEL
                     || (*client).client.is_null()
-                    || (*((*client).client as *mut crate::client::gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
+                    || (*((*client).client as *mut crate::client::gclient_t))
+                        .sess
+                        .sessionTeam
+                        != TEAM_SPECTATOR
                 {
                     // don't respawn spectators in powerduel or it will mess the line order all up
                     respawn(ctx, client);
@@ -3206,8 +3211,12 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 let cl_ent = world.g_entities.as_mut_ptr().add(i as usize);
                 if (*cl_ent).inuse != qfalse
                     && !(*cl_ent).client.is_null()
-                    && (*((*cl_ent).client as *mut crate::client::gclient_t)).tempSpectate > world.level.time
-                    && (*((*cl_ent).client as *mut crate::client::gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
+                    && (*((*cl_ent).client as *mut crate::client::gclient_t)).tempSpectate
+                        > world.level.time
+                    && (*((*cl_ent).client as *mut crate::client::gclient_t))
+                        .sess
+                        .sessionTeam
+                        != TEAM_SPECTATOR
                 {
                     respawn(ctx, cl_ent);
                     (*((*cl_ent).client as *mut crate::client::gclient_t)).tempSpectate = 0;
@@ -3368,7 +3377,9 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                 if (*ent).s.event != 0 {
                     (*ent).s.event = 0; // &= EV_EVENT_BITS;
                     if !(*ent).client.is_null() {
-                        (*((*ent).client as *mut crate::client::gclient_t)).ps.externalEvent = 0;
+                        (*((*ent).client as *mut crate::client::gclient_t))
+                            .ps
+                            .externalEvent = 0;
                     }
                 }
                 if (*ent).freeAfterEvent != qfalse {
@@ -3497,7 +3508,8 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
 
                     // keep him in the "use" anim
                     if (*client).ps.torsoAnim != BOTH_CONSOLE1 as c_int {
-                        G_SetAnim(ctx,
+                        G_SetAnim(
+                            ctx,
                             ent,
                             std::ptr::null_mut(),
                             SETANIM_TORSO,

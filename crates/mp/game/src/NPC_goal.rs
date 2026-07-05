@@ -19,27 +19,19 @@ const qfalse: qboolean = 0;
 /// Raven `SetGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:10-24`
-pub fn SetGoal(
-    ctx: GameContext<'_>,
-    goal: *mut gentity_t,
-    rating: f32,
-) {
-unsafe {
+pub fn SetGoal(ctx: GameContext<'_>, goal: *mut gentity_t, rating: f32) {
+    unsafe {
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
         npc_info.goalEntity = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), goal);
         npc_info.goalTime = (*ctx.world).level.time;
-}
+    }
 }
 
 /// Raven `NPC_SetGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:31-58`
-pub fn NPC_SetGoal(
-    ctx: GameContext<'_>,
-    goal: *mut gentity_t,
-    rating: f32,
-) {
-unsafe {
+pub fn NPC_SetGoal(ctx: GameContext<'_>, goal: *mut gentity_t, rating: f32) {
+    unsafe {
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
         let entity_base = (*ctx.world).g_entities.as_mut_ptr();
         let goal_id = ent_id_opt(entity_base, goal);
@@ -61,14 +53,14 @@ unsafe {
         }
 
         SetGoal(ctx, goal, rating);
-}
+    }
 }
 
 /// Raven `NPC_ClearGoal`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:65-86`
 pub fn NPC_ClearGoal(ctx: GameContext<'_>) {
-unsafe {
+    unsafe {
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
 
         if npc_info.lastGoalEntity.is_none() {
@@ -90,7 +82,7 @@ unsafe {
         }
 
         SetGoal(ctx, core::ptr::null_mut(), 0.0);
-}
+    }
 }
 
 /// Raven `G_BoundsOverlap`.
@@ -100,12 +92,7 @@ unsafe {
 /// compares use `<=`/`>=`).
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:94-115`
-pub fn G_BoundsOverlap(
-    mins1: vec3_t,
-    maxs1: vec3_t,
-    mins2: vec3_t,
-    maxs2: vec3_t,
-) -> qboolean {
+pub fn G_BoundsOverlap(mins1: vec3_t, maxs1: vec3_t, mins2: vec3_t, maxs2: vec3_t) -> qboolean {
     // Check if mins1 is beyond maxs2 on any axis
     if mins1[0] > maxs2[0] {
         return qfalse;
@@ -135,9 +122,9 @@ pub fn G_BoundsOverlap(
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:117-129`
 pub fn NPC_ReachedGoal(ctx: GameContext<'_>) {
-NPC_ClearGoal(ctx);
+    NPC_ClearGoal(ctx);
 
-unsafe {
+    unsafe {
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
         npc_info.goalTime = (*ctx.world).level.time;
 
@@ -152,7 +139,7 @@ unsafe {
                 TID_MOVE_NAV as c_int,
             ),
         );
-}
+    }
 }
 
 /// Raven `ReachedGoal`.
@@ -162,11 +149,8 @@ unsafe {
 /// logic is commented out; only the final nav-system check is active.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:136-231`
-pub fn ReachedGoal(
-    ctx: GameContext<'_>,
-    goal: *mut gentity_t,
-) -> qboolean {
-unsafe {
+pub fn ReachedGoal(ctx: GameContext<'_>, goal: *mut gentity_t) -> qboolean {
+    unsafe {
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
 
         if (npc_info.aiFlags & NPCAI_TOUCHED_GOAL) != 0 {
@@ -185,7 +169,7 @@ unsafe {
             npc_info.goalRadius,
             flying,
         )
-}
+    }
 }
 
 /// Raven `UpdateGoal`.
@@ -196,7 +180,7 @@ unsafe {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_goal.c:243-267`
 pub fn UpdateGoal(ctx: GameContext<'_>) -> *mut gentity_t {
-unsafe {
+    unsafe {
         let npc_info = &*(*ctx.world).globals.NPCInfo;
 
         if npc_info.goalEntity.is_none() {
@@ -218,5 +202,5 @@ unsafe {
         }
 
         goal
-}
+    }
 }

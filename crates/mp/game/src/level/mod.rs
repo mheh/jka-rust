@@ -11,7 +11,7 @@ pub mod spawn_flags;
 pub mod tag_owner;
 pub mod waypoint_data;
 
-pub use alert_event::{alertEvent_t, alertEventLevel_e, alertEventType_e, MAX_ALERT_EVENTS};
+pub use alert_event::{alertEventLevel_e, alertEventType_e, alertEvent_t, MAX_ALERT_EVENTS};
 pub use bot_settings::{bot_settings_t, MAX_FILEPATH};
 pub use combat_point::{combatPoint_t, MAX_COMBAT_POINTS};
 pub use interest_point::{interestPoint_t, MAX_INTEREST_POINTS};

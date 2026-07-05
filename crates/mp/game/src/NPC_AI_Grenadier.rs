@@ -8,12 +8,14 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_timer::TIMER_Set;
 use crate::prelude::*;
 use crate::NPC_combat::G_ClearEnemy;
 use crate::NPC_reactions::NPC_Pain;
 use crate::NPC_sounds::G_AddVoiceEvent;
-use crate::g_timer::TIMER_Set;
-use mp_bg::public::entity_event::entity_event_t::{EV_CONFUSE1, EV_CONFUSE3, EV_PUSHED1, EV_PUSHED3};
+use mp_bg::public::entity_event::entity_event_t::{
+    EV_CONFUSE1, EV_CONFUSE3, EV_PUSHED1, EV_PUSHED3,
+};
 use mp_qshared::common::mp::qcommon::b_state_t::bState_t;
 
 // Raven's anonymous `enum { LSTATE_NONE, LSTATE_UNDERFIRE, LSTATE_INVESTIGATE }`
@@ -51,13 +53,13 @@ const SCF_LOOK_FOR_ENEMIES: i32 = 0x00000800;
 
 // Combat point flags.
 // Source: `oracle/oracle/codemp/game/b_public.h`
-pub const CP_CLEAR: c_int = 0x00000002;           // Has a clear shot to the enemy
-pub const CP_NEAREST: c_int = 0x00000010;         // Find the nearest combat point
-pub const CP_APPROACH_ENEMY: c_int = 0x00000200;  // Try to get closer to enemy
-pub const CP_CLOSEST: c_int = 0x00000400;         // Take closest to enemy
-pub const CP_FLANK: c_int = 0x00000800;           // Pick a combatPoint behind enemy
-pub const CP_HAS_ROUTE: c_int = 0x00001000;       // We have a route to this point
-pub const CP_HORZ_DIST_COLL: c_int = 0x00008000;  // Collect within horizontal dist
+pub const CP_CLEAR: c_int = 0x00000002; // Has a clear shot to the enemy
+pub const CP_NEAREST: c_int = 0x00000010; // Find the nearest combat point
+pub const CP_APPROACH_ENEMY: c_int = 0x00000200; // Try to get closer to enemy
+pub const CP_CLOSEST: c_int = 0x00000400; // Take closest to enemy
+pub const CP_FLANK: c_int = 0x00000800; // Pick a combatPoint behind enemy
+pub const CP_HAS_ROUTE: c_int = 0x00001000; // We have a route to this point
+pub const CP_HORZ_DIST_COLL: c_int = 0x00008000; // Collect within horizontal dist
 
 // Angle indices for vec3 arrays.
 const PITCH: usize = 0;
@@ -65,13 +67,12 @@ const YAW: usize = 1;
 
 // Entity state flags.
 // Source: `oracle/oracle/codemp/game/g_public.h`
-const SVF_GLASS_BRUSH: i32 = 0x08000000;  // Ent is a glass brush
+const SVF_GLASS_BRUSH: i32 = 0x08000000; // Ent is a glass brush
 
 /// Raven `Grenadier_ClearTimers`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:49-63`
-pub fn Grenadier_ClearTimers(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn Grenadier_ClearTimers(ctx: GameContext<'_>, ent: *mut gentity_t) {
     TIMER_Set(ctx, ent, c"chatter".as_ptr() as *const c_char, 0);
     TIMER_Set(ctx, ent, c"duck".as_ptr() as *const c_char, 0);
     TIMER_Set(ctx, ent, c"stand".as_ptr() as *const c_char, 0);
@@ -90,14 +91,17 @@ pub fn Grenadier_ClearTimers(
 /// Raven `NPC_Grenadier_PlayConfusionSound`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:65-81`
-pub fn NPC_Grenadier_PlayConfusionSound(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn NPC_Grenadier_PlayConfusionSound(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // FIXME: make this a custom sound in sound set (Raven comment).
         if (*self_).health > 0 {
-            G_AddVoiceEvent(ctx, 
+            G_AddVoiceEvent(
+                ctx,
                 self_,
-                (*ctx.world).bg_state.rng.Q_irand(EV_CONFUSE1 as c_int, EV_CONFUSE3 as c_int),
+                (*ctx.world)
+                    .bg_state
+                    .rng
+                    .Q_irand(EV_CONFUSE1 as c_int, EV_CONFUSE3 as c_int),
                 2000,
             );
         }
@@ -132,9 +136,13 @@ pub fn NPC_Grenadier_Pain(
 
         if damage == 0 && (*self_).health > 0 {
             // FIXME: better way to know I was pushed (Raven comment).
-            G_AddVoiceEvent(ctx, 
+            G_AddVoiceEvent(
+                ctx,
                 self_,
-                (*ctx.world).bg_state.rng.Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int),
+                (*ctx.world)
+                    .bg_state
+                    .rng
+                    .Q_irand(EV_PUSHED1 as c_int, EV_PUSHED3 as c_int),
                 2000,
             );
         }
@@ -219,7 +227,9 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
                         ctx,
                         (*npc_ptr).r.currentOrigin,
                         (*npc_ptr).r.currentOrigin,
-                        world.g_entities[(*npc_ptr).enemy.unwrap().index()].r.currentOrigin,
+                        world.g_entities[(*npc_ptr).enemy.unwrap().index()]
+                            .r
+                            .currentOrigin,
                         CP_CLEAR | CP_HAS_ROUTE | CP_HORZ_DIST_COLL,
                         32.0,
                         -1,
@@ -230,7 +240,15 @@ pub fn Grenadier_Move(ctx: GameContext<'_>) -> qboolean {
                 if cp != -1 {
                     // found a combat point that has a clear shot to enemy
                     NPC_SetCombatPoint(ctx, cp);
-                    NPC_SetMoveGoal(ctx, npc_ptr, world.level.combatPoints[cp as usize].origin, 8, QTRUE, cp, core::ptr::null_mut());
+                    NPC_SetMoveGoal(
+                        ctx,
+                        npc_ptr,
+                        world.level.combatPoints[cp as usize].origin,
+                        8,
+                        QTRUE,
+                        cp,
+                        core::ptr::null_mut(),
+                    );
                     return moved;
                 }
             }
@@ -266,26 +284,51 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
 
             if ((*npc_info_ptr).scriptFlags & SCF_IGNORE_ALERTS) == 0 {
                 // Is there danger nearby
-                let alertEvent =
-                    NPC_CheckAlertEvents(ctx, QTRUE, QTRUE, -1, QFALSE, alertEventLevel_e::AEL_SUSPICIOUS as c_int);
+                let alertEvent = NPC_CheckAlertEvents(
+                    ctx,
+                    QTRUE,
+                    QTRUE,
+                    -1,
+                    QFALSE,
+                    alertEventLevel_e::AEL_SUSPICIOUS as c_int,
+                );
                 if NPC_CheckForDanger(ctx, alertEvent) != QFALSE {
                     NPC_UpdateAngles(ctx, QTRUE, QTRUE);
                     return;
                 } else {
                     // check for other alert events
                     // There is an event to look at
-                    if alertEvent >= 0 && world.level.alertEvents[alertEvent as usize].ID != (*npc_info_ptr).lastAlertID {
-                        (*npc_info_ptr).lastAlertID = world.level.alertEvents[alertEvent as usize].ID;
-                        if world.level.alertEvents[alertEvent as usize].level == alertEventLevel_e::AEL_DISCOVERED {
+                    if alertEvent >= 0
+                        && world.level.alertEvents[alertEvent as usize].ID
+                            != (*npc_info_ptr).lastAlertID
+                    {
+                        (*npc_info_ptr).lastAlertID =
+                            world.level.alertEvents[alertEvent as usize].ID;
+                        if world.level.alertEvents[alertEvent as usize].level
+                            == alertEventLevel_e::AEL_DISCOVERED
+                        {
                             if !world.level.alertEvents[alertEvent as usize].owner.is_null()
-                                && !(*world.level.alertEvents[alertEvent as usize].owner).client.is_null()
+                                && !(*world.level.alertEvents[alertEvent as usize].owner)
+                                    .client
+                                    .is_null()
                                 && (*world.level.alertEvents[alertEvent as usize].owner).health >= 0
-                                && (*((*world.level.alertEvents[alertEvent as usize].owner).client as *mut gclient_t)).playerTeam
+                                && (*((*world.level.alertEvents[alertEvent as usize].owner).client
+                                    as *mut gclient_t))
+                                    .playerTeam
                                     == (*((*npc_ptr).client as *mut gclient_t)).enemyTeam
                             {
                                 // an enemy
-                                G_SetEnemy(ctx, npc_ptr, world.level.alertEvents[alertEvent as usize].owner);
-                                TIMER_Set(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(500, 2500));
+                                G_SetEnemy(
+                                    ctx,
+                                    npc_ptr,
+                                    world.level.alertEvents[alertEvent as usize].owner,
+                                );
+                                TIMER_Set(
+                                    ctx,
+                                    npc_ptr,
+                                    c"attackDelay".as_ptr() as *const c_char,
+                                    (*ctx.world).bg_state.rng.Q_irand(500, 2500),
+                                );
                             }
                         } else {
                             // Save the position for movement (if necessary)
@@ -293,10 +336,14 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
                                 world.level.alertEvents[alertEvent as usize].position,
                                 &mut (*npc_info_ptr).investigateGoal,
                             );
-                            (*npc_info_ptr).investigateDebounceTime = world.level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1000);
-                            if world.level.alertEvents[alertEvent as usize].level == alertEventLevel_e::AEL_SUSPICIOUS {
+                            (*npc_info_ptr).investigateDebounceTime =
+                                world.level.time + (*ctx.world).bg_state.rng.Q_irand(500, 1000);
+                            if world.level.alertEvents[alertEvent as usize].level
+                                == alertEventLevel_e::AEL_SUSPICIOUS
+                            {
                                 // suspicious looks longer
-                                (*npc_info_ptr).investigateDebounceTime += (*ctx.world).bg_state.rng.Q_irand(500, 2500);
+                                (*npc_info_ptr).investigateDebounceTime +=
+                                    (*ctx.world).bg_state.rng.Q_irand(500, 2500);
                             }
                         }
                     }
@@ -331,7 +378,8 @@ pub fn NPC_BSGrenadier_Patrol(ctx: GameContext<'_>) {
 
         // If we have somewhere to go, then do that
         if !UpdateGoal(ctx).is_null() {
-            world.globals.ucmd.buttons |= mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING as c_int;
+            world.globals.ucmd.buttons |=
+                mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING as c_int;
             NPC_MoveToGoal(ctx, QTRUE);
         }
 
@@ -376,7 +424,9 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                 (*npc_ptr).r.mins,
                 (*npc_ptr).r.maxs,
                 // guarded by `!goalEntity.is_none()` above.
-                world.g_entities[(*npc_info_ptr).goalEntity.unwrap().index()].r.currentOrigin,
+                world.g_entities[(*npc_info_ptr).goalEntity.unwrap().index()]
+                    .r
+                    .currentOrigin,
                 16,
                 FlyingCreature(npc_ptr),
             ) != QFALSE
@@ -396,16 +446,27 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                             ctx,
                             npc_ptr,
                             c"duck".as_ptr() as *const c_char,
-                            ((*npc_ptr).client as *mut gclient_t).as_ref()
+                            ((*npc_ptr).client as *mut gclient_t)
+                                .as_ref()
                                 .map(|c| ((c.pers.maxHealth - (*npc_ptr).health) * 100) as c_int)
                                 .unwrap_or(0),
                         );
-                        TIMER_Set(ctx, npc_ptr, c"hideTime".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 7000));
+                        TIMER_Set(
+                            ctx,
+                            npc_ptr,
+                            c"hideTime".as_ptr() as *const c_char,
+                            (*ctx.world).bg_state.rng.Q_irand(3000, 7000),
+                        );
                         newSquadState = SQUAD_COVER;
                     }
                     SQUAD_TRANSITION => {
                         // was heading for a combat point
-                        TIMER_Set(ctx, npc_ptr, c"hideTime".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+                        TIMER_Set(
+                            ctx,
+                            npc_ptr,
+                            c"hideTime".as_ptr() as *const c_char,
+                            (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
+                        );
                     }
                     SQUAD_SCOUT => {
                         // was running after player
@@ -414,19 +475,39 @@ pub fn Grenadier_CheckMoveState(ctx: GameContext<'_>) {
                 }
                 NPC_ReachedGoal(ctx);
                 // don't attack right away
-                TIMER_Set(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(250, 500));
+                TIMER_Set(
+                    ctx,
+                    npc_ptr,
+                    c"attackDelay".as_ptr() as *const c_char,
+                    (*ctx.world).bg_state.rng.Q_irand(250, 500),
+                );
                 // don't do something else just yet
-                TIMER_Set(ctx, npc_ptr, c"roamTime".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(1000, 4000));
+                TIMER_Set(
+                    ctx,
+                    npc_ptr,
+                    c"roamTime".as_ptr() as *const c_char,
+                    (*ctx.world).bg_state.rng.Q_irand(1000, 4000),
+                );
                 // stop fleeing
                 if (*npc_info_ptr).squadState == SQUAD_RETREAT {
-                    TIMER_Set(ctx, npc_ptr, c"flee".as_ptr() as *const c_char, -world.level.time);
+                    TIMER_Set(
+                        ctx,
+                        npc_ptr,
+                        c"flee".as_ptr() as *const c_char,
+                        -world.level.time,
+                    );
                     (*npc_info_ptr).squadState = SQUAD_IDLE;
                 }
                 return;
             }
 
             // keep going, hold of roamTimer until we get there
-            TIMER_Set(ctx, npc_ptr, c"roamTime".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(4000, 8000));
+            TIMER_Set(
+                ctx,
+                npc_ptr,
+                c"roamTime".as_ptr() as *const c_char,
+                (*ctx.world).bg_state.rng.Q_irand(4000, 8000),
+            );
         }
 
         if (*npc_info_ptr).goalEntity.is_none() {
@@ -463,7 +544,11 @@ pub fn Grenadier_CheckFireState(ctx: GameContext<'_>) {
             return;
         }
 
-        if crate::q_math::VectorCompare((*((*npc_ptr).client as *mut gclient_t)).ps.velocity, crate::q_math::vec3_origin) == QFALSE {
+        if crate::q_math::VectorCompare(
+            (*((*npc_ptr).client as *mut gclient_t)).ps.velocity,
+            crate::q_math::vec3_origin,
+        ) == QFALSE
+        {
             // if moving at all, don't do this
             return;
         }
@@ -473,8 +558,7 @@ pub fn Grenadier_CheckFireState(ctx: GameContext<'_>) {
 /// Raven `Grenadier_EvaluateShot`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Grenadier.c:441-453`
-pub fn Grenadier_EvaluateShot(
-    ctx: GameContext<'_>,hit: c_int) -> qboolean {
+pub fn Grenadier_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
     unsafe {
         let world = &*ctx.world;
         let npc_ptr = world.globals.NPC;
@@ -527,7 +611,17 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
         }
 
         if TIMER_Done(ctx, npc_ptr, c"flee".as_ptr() as *const c_char) != QFALSE
-            && NPC_CheckForDanger(ctx, NPC_CheckAlertEvents(ctx, QTRUE, QTRUE, -1, QFALSE, alertEventLevel_e::AEL_DANGER as c_int)) != QFALSE
+            && NPC_CheckForDanger(
+                ctx,
+                NPC_CheckAlertEvents(
+                    ctx,
+                    QTRUE,
+                    QTRUE,
+                    -1,
+                    QFALSE,
+                    alertEventLevel_e::AEL_DANGER as c_int,
+                ),
+            ) != QFALSE
         {
             // going to run
             NPC_UpdateAngles(ctx, QTRUE, QTRUE);
@@ -541,19 +635,22 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
         }
 
         // Guaranteed `Some` from here to the end of the function by the guard above.
-        let enemy_ent = &mut (*ctx.world).g_entities[(*npc_ptr).enemy.unwrap().index()] as *mut gentity_t;
+        let enemy_ent =
+            &mut (*ctx.world).g_entities[(*npc_ptr).enemy.unwrap().index()] as *mut gentity_t;
 
         world.globals.enemyLOS3 = QFALSE;
         world.globals.enemyCS3 = QFALSE;
         world.globals.move3 = QTRUE;
         world.globals.faceEnemy3 = QFALSE;
         world.globals.shoot3 = QFALSE;
-        world.globals.enemyDist3 = DistanceSquared((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin);
+        world.globals.enemyDist3 =
+            DistanceSquared((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin);
 
         // See if we should switch to melee attack
         if world.globals.enemyDist3 < 16384.0
             && ((*enemy_ent).client.is_null()
-                || (*((*enemy_ent).client as *mut gclient_t)).ps.weapon != mp_bg::weapons::weapon_t::WP_SABER
+                || (*((*enemy_ent).client as *mut gclient_t)).ps.weapon
+                    != mp_bg::weapons::weapon_t::WP_SABER
                 || BG_SabersOff(&mut (*((*enemy_ent).client as *mut gclient_t)).ps) != QFALSE)
         {
             // enemy is close and not using saber
@@ -572,7 +669,10 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
                         (*enemy_ent).clipmask,
                     ),
                 );
-                if trace.allsolid == 0 && trace.startsolid == 0 && (trace.fraction == 1.0 || trace.entityNum as c_int == (*enemy_ent).s.number) {
+                if trace.allsolid == 0
+                    && trace.startsolid == 0
+                    && (trace.fraction == 1.0 || trace.entityNum as c_int == (*enemy_ent).s.number)
+                {
                     // I can get right to him
                     // reset fire-timing variables
                     NPC_ChangeWeapon(WP_STUN_BATON);
@@ -583,12 +683,15 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             }
         } else if world.globals.enemyDist3 > 65536.0
             || (!(*enemy_ent).client.is_null()
-                && (*((*enemy_ent).client as *mut gclient_t)).ps.weapon == mp_bg::weapons::weapon_t::WP_SABER
+                && (*((*enemy_ent).client as *mut gclient_t)).ps.weapon
+                    == mp_bg::weapons::weapon_t::WP_SABER
                 && (*((*enemy_ent).client as *mut gclient_t)).ps.saberHolstered == 0)
         {
             // enemy is far or using saber
             if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_STUN_BATON
-                && (((*((*npc_ptr).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] & (1 << WP_THERMAL)) != 0)
+                && (((*((*npc_ptr).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize]
+                    & (1 << WP_THERMAL))
+                    != 0)
             {
                 // fisticuffs, make switch to thermal if have it
                 // reset fire-timing variables
@@ -603,23 +706,46 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
 
             if (*((*npc_ptr).client as *mut gclient_t)).ps.weapon == WP_STUN_BATON {
                 if world.globals.enemyDist3 <= 4096.0
-                    && InFOV3((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin, (*((*npc_ptr).client as *mut gclient_t)).ps.viewangles, 90, 45) != QFALSE
+                    && InFOV3(
+                        (*enemy_ent).r.currentOrigin,
+                        (*npc_ptr).r.currentOrigin,
+                        (*((*npc_ptr).client as *mut gclient_t)).ps.viewangles,
+                        90,
+                        45,
+                    ) != QFALSE
                 {
                     // within 64 & infront
-                    crate::q_math::_VectorCopy((*enemy_ent).r.currentOrigin, &mut (*npc_info_ptr).enemyLastSeenLocation);
+                    crate::q_math::_VectorCopy(
+                        (*enemy_ent).r.currentOrigin,
+                        &mut (*npc_info_ptr).enemyLastSeenLocation,
+                    );
                     world.globals.enemyCS3 = QTRUE;
                 }
-            } else if InFOV3((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin, (*((*npc_ptr).client as *mut gclient_t)).ps.viewangles, 45, 90) != QFALSE {
+            } else if InFOV3(
+                (*enemy_ent).r.currentOrigin,
+                (*npc_ptr).r.currentOrigin,
+                (*((*npc_ptr).client as *mut gclient_t)).ps.viewangles,
+                45,
+                90,
+            ) != QFALSE
+            {
                 // in front of me
                 // can we shoot our target?
                 let hit = NPC_ShotEntity(ctx, enemy_ent, vec3_origin);
                 let hit_ent = &world.g_entities[hit as usize];
                 if hit == (*enemy_ent).s.number
                     || (!hit_ent.client.is_null()
-                        && (*(hit_ent.client as *mut gclient_t)).playerTeam == (*((*npc_ptr).client as *mut gclient_t)).enemyTeam)
+                        && (*(hit_ent.client as *mut gclient_t)).playerTeam
+                            == (*((*npc_ptr).client as *mut gclient_t)).enemyTeam)
                 {
-                    let enemyHorzDist = DistanceHorizontalSquared((*enemy_ent).r.currentOrigin, (*npc_ptr).r.currentOrigin);
-                    crate::q_math::_VectorCopy((*enemy_ent).r.currentOrigin, &mut (*npc_info_ptr).enemyLastSeenLocation);
+                    let enemyHorzDist = DistanceHorizontalSquared(
+                        (*enemy_ent).r.currentOrigin,
+                        (*npc_ptr).r.currentOrigin,
+                    );
+                    crate::q_math::_VectorCopy(
+                        (*enemy_ent).r.currentOrigin,
+                        &mut (*npc_info_ptr).enemyLastSeenLocation,
+                    );
 
                     if enemyHorzDist < 1048576.0 {
                         // within 1024
@@ -703,7 +829,12 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
                 if ((*npc_info_ptr).scriptFlags & SCF_FIRE_WEAPON) == 0 {
                     // we've already fired, no need to do it again here
                     WeaponThink(ctx, QTRUE);
-                    TIMER_Set(ctx, npc_ptr, c"attackDelay".as_ptr() as *const c_char, (*npc_info_ptr).shotTime - world.level.time);
+                    TIMER_Set(
+                        ctx,
+                        npc_ptr,
+                        c"attackDelay".as_ptr() as *const c_char,
+                        (*npc_info_ptr).shotTime - world.level.time,
+                    );
                 }
             }
         }

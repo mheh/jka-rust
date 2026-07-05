@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameExport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 // Flow:
 //
@@ -41,4 +43,18 @@ impl InboundVmCall for GameNavEntIsDoor {
     type Output = qboolean;
 
     const COMMAND: MpGameExport = MpGameExport::GAME_NAV_ENTISDOOR;
+}
+
+impl DecodeVmMain for GameNavEntIsDoor {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `G_EntIsDoor(arg0)` — g_main.c:683.
+        GameNavEntIsDoorArgs::new(word_to_c_int(t.arg(0)))
+    }
+}
+
+impl EncodeVmMainReturn for GameNavEntIsDoor {
+    fn encode_return(output: Self::Output) -> isize {
+        // `return G_EntIsDoor(arg0);` — g_main.c:683. `qboolean`.
+        output as isize
+    }
 }

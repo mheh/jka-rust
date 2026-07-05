@@ -6,8 +6,8 @@
 
 use core::ffi::{c_char, c_int, c_uint, c_void};
 
-use mp_qshared::common::mp::gentity::gentity_t;
 use mp_qshared::common::mp::entity_id::EntityId;
+use mp_qshared::common::mp::gentity::gentity_t;
 use mp_qshared::common::mp::qcommon::{playerState_t, saberInfo_t, MAX_SABERS};
 use mp_qshared::shared::{qboolean, vec3_t, MAX_QPATH};
 
@@ -93,7 +93,7 @@ pub struct gclient_s {
     pub lastKillTime: c_int, // for multiple kill rewards
 
     pub fireHeld: qboolean,     // used for hook
-    pub hook: Option<EntityId>,   // grapple hook if out
+    pub hook: Option<EntityId>, // grapple hook if out
 
     pub switchTeamTime: c_int, // time the player switched teams
 
@@ -105,7 +105,7 @@ pub struct gclient_s {
 
     pub areabits: *mut c_char,
 
-    pub g2LastSurfaceHit: c_int,  // index of surface hit during the most recent ghoul2 collision
+    pub g2LastSurfaceHit: c_int, // index of surface hit during the most recent ghoul2 collision
     pub g2LastSurfaceTime: c_int, // time when the surface index was set
 
     pub corrTime: c_int,
@@ -135,9 +135,9 @@ pub struct gclient_s {
     pub olderSaberBase: vec3_t, // previous lastSaberBase_Always
     pub olderIsValid: qboolean,
 
-    pub lastSaberDir_Always: vec3_t,  // every getboltmatrix, set to saber dir
+    pub lastSaberDir_Always: vec3_t, // every getboltmatrix, set to saber dir
     pub lastSaberBase_Always: vec3_t, // every getboltmatrix, set to saber base
-    pub lastSaberStorageTime: c_int,  // server time the above two values were updated
+    pub lastSaberStorageTime: c_int, // server time the above two values were updated
 
     pub hasCurrentPosition: qboolean, // are lastSaberTip and lastSaberBase valid?
 

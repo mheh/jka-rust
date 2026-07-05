@@ -3,7 +3,9 @@ use core::ffi::c_int;
 use super::super::MpGameExport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport,
+};
 
 /// `GAME_NAV_CHECKNODEFAILEDFORENT` MP game exports vmMain ABI token.
 ///
@@ -42,4 +44,18 @@ impl InboundVmCall for GameNavChecknodefailedforent {
     type Output = qboolean;
 
     const COMMAND: MpGameExport = MpGameExport::GAME_NAV_CHECKNODEFAILEDFORENT;
+}
+
+impl DecodeVmMain for GameNavChecknodefailedforent {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `NAV_CheckNodeFailedForEnt(&g_entities[arg0], arg1)` — g_main.c:679.
+        GameNavChecknodefailedforentArgs::new(word_to_c_int(t.arg(0)), word_to_c_int(t.arg(1)))
+    }
+}
+
+impl EncodeVmMainReturn for GameNavChecknodefailedforent {
+    fn encode_return(output: Self::Output) -> isize {
+        // `return NAV_CheckNodeFailedForEnt(...);` — g_main.c:679. `qboolean`.
+        output as isize
+    }
 }

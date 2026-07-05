@@ -9,11 +9,11 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
-use crate::g_utils::G_SpeechEvent;
 use crate::g_timer::{TIMER_Done, TIMER_Set};
-use crate::NPC_combat::G_ClearEnemy;
+use crate::g_utils::G_SpeechEvent;
+use crate::prelude::*;
 use crate::trap;
+use crate::NPC_combat::G_ClearEnemy;
 
 /// Raven `G_AddVoiceEvent`.
 ///

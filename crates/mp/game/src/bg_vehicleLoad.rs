@@ -13,8 +13,8 @@
 //! in the port report.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::g_utils::G_EffectIndex;
+use crate::prelude::*;
 use crate::q_shared::{COM_BeginParseSession, COM_ParseExt, SkipBracedSection, SkipRestOfLine};
 use mp_bg::vehicles::vehicle_s::VEH_MAX_PASSENGERS;
 
@@ -91,7 +91,11 @@ pub fn BG_ParseVehWeaponParm(
                     }
                     VF_BOOL => {
                         *(b.add(field.ofs as usize) as *mut qboolean) =
-                            if atof(cstr(&value).as_ptr()) != 0.0 { qtrue } else { qfalse };
+                            if atof(cstr(&value).as_ptr()) != 0.0 {
+                                qtrue
+                            } else {
+                                qfalse
+                            };
                     }
                     VF_VEHTYPE => {
                         let vt = GetIDForString(
@@ -132,7 +136,11 @@ pub fn BG_ParseVehWeaponParm(
             }
             i += 1;
         }
-        if i == NUM_VWEAP_PARMS { qfalse } else { qtrue }
+        if i == NUM_VWEAP_PARMS {
+            qfalse
+        } else {
+            qtrue
+        }
     }
 }
 
@@ -141,10 +149,7 @@ pub fn BG_ParseVehWeaponParm(
 /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:309-411`
 // MISSING-SYMBOL: `BgState::VehWeaponParms` scratch buffer field (see
 // `BG_ClearVehicleParseParms`); referenced as `bg.VehWeaponParms`.
-pub fn VEH_LoadVehWeapon(
-    vehWeaponName: *const c_char,
-    bg: &mut BgState,
-) -> c_int {
+pub fn VEH_LoadVehWeapon(vehWeaponName: *const c_char, bg: &mut BgState) -> c_int {
     unsafe {
         // `p` walks the `VehWeaponParms` text buffer via `COM_ParseExt`'s
         // `*const *const c_char` cursor idiom.
@@ -242,10 +247,7 @@ pub fn VEH_LoadVehWeapon(
 // `MAX_VEH_WEAPONS` (referenced elsewhere in this crate, e.g. `g_weapon.rs`,
 // but not resolvable from this file without an import path); see
 // missing_symbols.
-pub fn VEH_VehWeaponIndexForName(
-    vehWeaponName: *const c_char,
-    bg: &mut BgState,
-) -> c_int {
+pub fn VEH_VehWeaponIndexForName(vehWeaponName: *const c_char, bg: &mut BgState) -> c_int {
     unsafe {
         if vehWeaponName.is_null() || *vehWeaponName == 0 {
             Com_Printf(
@@ -314,9 +316,7 @@ pub fn BG_SetSharedVehicleFunctions(_pVehInfo: *mut vehicleInfo_t) {}
 /// alone.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:709-810`
-pub fn BG_VehicleSetDefaults(
-    vehicle: *mut vehicleInfo_t,
-) {
+pub fn BG_VehicleSetDefaults(vehicle: *mut vehicleInfo_t) {
     unsafe {
         std::ptr::write_bytes(vehicle, 0, 1);
     }
@@ -327,9 +327,7 @@ pub fn BG_VehicleSetDefaults(
 /// Raven: sanity check and clamp the vehicle's data.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:812-837`
-pub fn BG_VehicleClampData(
-    vehicle: *mut vehicleInfo_t,
-) {
+pub fn BG_VehicleClampData(vehicle: *mut vehicleInfo_t) {
     unsafe {
         for i in 0..3usize {
             if (*vehicle).centerOfGravity[i] > 1.0 {
@@ -410,7 +408,11 @@ pub fn BG_ParseVehicleParm(
                     }
                     VF_BOOL => {
                         *(b.add(field.ofs as usize) as *mut qboolean) =
-                            if atof(cstr(&value).as_ptr()) != 0.0 { qtrue } else { qfalse };
+                            if atof(cstr(&value).as_ptr()) != 0.0 {
+                                qtrue
+                            } else {
+                                qfalse
+                            };
                     }
                     VF_VEHTYPE => {
                         let vt = GetIDForString(
@@ -455,7 +457,11 @@ pub fn BG_ParseVehicleParm(
             }
             i += 1;
         }
-        if vehicleFields[i].ofs == -1 { qfalse } else { qtrue }
+        if vehicleFields[i].ofs == -1 {
+            qfalse
+        } else {
+            qtrue
+        }
     }
 }
 
@@ -464,11 +470,7 @@ pub fn BG_ParseVehicleParm(
 /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:983-1362`
 // MISSING-SYMBOL: `BgState::VehicleParms` scratch buffer field; see
 // `BG_ClearVehicleParseParms`/missing_symbols.
-pub fn VEH_LoadVehicle(
-    vehicleName: *const c_char,
-    bg: &mut BgState,
-    traps: &dyn BgTraps,
-) -> c_int {
+pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn BgTraps) -> c_int {
     unsafe {
         if bg.numVehicles == 0 {
             // `BG_VehicleLoadParms` reaches the engine, so `traps: &dyn BgTraps`
@@ -548,9 +550,12 @@ pub fn VEH_LoadVehicle(
                 Q_strncpyz(weap1.as_mut_ptr(), value, 128);
             } else if Q_stricmp(cstr("weap2").as_ptr(), parmName.as_ptr()) == 0 {
                 Q_strncpyz(weap2.as_mut_ptr(), value, 128);
-            } else if let Some(n) = (1..=10)
-                .find(|n| Q_stricmp(cstr(&format!("weapMuzzle{}", n)).as_ptr(), parmName.as_ptr()) == 0)
-            {
+            } else if let Some(n) = (1..=10).find(|n| {
+                Q_stricmp(
+                    cstr(&format!("weapMuzzle{}", n)).as_ptr(),
+                    parmName.as_ptr(),
+                ) == 0
+            }) {
                 Q_strncpyz(weap_muzzle[n - 1].as_mut_ptr(), value, 128);
             } else if BG_ParseVehicleParm(vehicle, parmName.as_mut_ptr(), value) == qfalse {
                 let pn = cstr_to_str(parmName.as_ptr());
@@ -569,23 +574,60 @@ pub fn VEH_LoadVehicle(
 
         // NOW: if we have any weapons, go ahead and load them.
         if weap1[0] != 0 {
-            if BG_ParseVehicleParm(vehicle, cstr("weap1").as_ptr() as *mut c_char, weap1.as_mut_ptr()) == qfalse {
+            if BG_ParseVehicleParm(
+                vehicle,
+                cstr("weap1").as_ptr() as *mut c_char,
+                weap1.as_mut_ptr(),
+            ) == qfalse
+            {
                 let w = cstr_to_str(weap1.as_ptr());
-                Com_Printf(cstr(&format!("{}ERROR: Unknown Vehicle key/value pair 'weap1', '{}'!\n", S_COLOR_RED.to_str().unwrap(), w)).as_ptr());
+                Com_Printf(
+                    cstr(&format!(
+                        "{}ERROR: Unknown Vehicle key/value pair 'weap1', '{}'!\n",
+                        S_COLOR_RED.to_str().unwrap(),
+                        w
+                    ))
+                    .as_ptr(),
+                );
             }
         }
         if weap2[0] != 0 {
-            if BG_ParseVehicleParm(vehicle, cstr("weap2").as_ptr() as *mut c_char, weap2.as_mut_ptr()) == qfalse {
+            if BG_ParseVehicleParm(
+                vehicle,
+                cstr("weap2").as_ptr() as *mut c_char,
+                weap2.as_mut_ptr(),
+            ) == qfalse
+            {
                 let w = cstr_to_str(weap2.as_ptr());
-                Com_Printf(cstr(&format!("{}ERROR: Unknown Vehicle key/value pair 'weap2', '{}'!\n", S_COLOR_RED.to_str().unwrap(), w)).as_ptr());
+                Com_Printf(
+                    cstr(&format!(
+                        "{}ERROR: Unknown Vehicle key/value pair 'weap2', '{}'!\n",
+                        S_COLOR_RED.to_str().unwrap(),
+                        w
+                    ))
+                    .as_ptr(),
+                );
             }
         }
         for n in 1..=10usize {
             if weap_muzzle[n - 1][0] != 0 {
                 let key = format!("weapMuzzle{}", n);
-                if BG_ParseVehicleParm(vehicle, cstr(&key).as_ptr() as *mut c_char, weap_muzzle[n - 1].as_mut_ptr()) == qfalse {
+                if BG_ParseVehicleParm(
+                    vehicle,
+                    cstr(&key).as_ptr() as *mut c_char,
+                    weap_muzzle[n - 1].as_mut_ptr(),
+                ) == qfalse
+                {
                     let w = cstr_to_str(weap_muzzle[n - 1].as_ptr());
-                    Com_Printf(cstr(&format!("{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n", S_COLOR_RED.to_str().unwrap(), key, w)).as_ptr());
+                    Com_Printf(
+                        cstr(&format!(
+                            "{}ERROR: Unknown Vehicle key/value pair '{}', '{}'!\n",
+                            S_COLOR_RED.to_str().unwrap(),
+                            key,
+                            w
+                        ))
+                        .as_ptr(),
+                    );
                 }
             }
         }
@@ -641,7 +683,13 @@ pub fn VEH_VehicleIndexForName(
 ) -> c_int {
     unsafe {
         if vehicleName.is_null() || *vehicleName == 0 {
-            Com_Printf(cstr(&format!("{}ERROR: Trying to read Vehicle with no name!\n", S_COLOR_RED.to_str().unwrap())).as_ptr());
+            Com_Printf(
+                cstr(&format!(
+                    "{}ERROR: Trying to read Vehicle with no name!\n",
+                    S_COLOR_RED.to_str().unwrap()
+                ))
+                .as_ptr(),
+            );
             return VEHICLE_NONE;
         }
         let mut v = VEHICLE_BASE;
@@ -654,13 +702,27 @@ pub fn VEH_VehicleIndexForName(
         }
         if v >= MAX_VEHICLES as c_int {
             let name = cstr_to_str(vehicleName);
-            Com_Printf(cstr(&format!("{}ERROR: Too many Vehicles (max 64), aborting load on {}!\n", S_COLOR_RED.to_str().unwrap(), name)).as_ptr());
+            Com_Printf(
+                cstr(&format!(
+                    "{}ERROR: Too many Vehicles (max 64), aborting load on {}!\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    name
+                ))
+                .as_ptr(),
+            );
             return VEHICLE_NONE;
         }
         v = VEH_LoadVehicle(vehicleName, bg, traps);
         if v == VEHICLE_NONE {
             let name = cstr_to_str(vehicleName);
-            Com_Printf(cstr(&format!("{}ERROR: Could not find Vehicle {}!\n", S_COLOR_RED.to_str().unwrap(), name)).as_ptr());
+            Com_Printf(
+                cstr(&format!(
+                    "{}ERROR: Could not find Vehicle {}!\n",
+                    S_COLOR_RED.to_str().unwrap(),
+                    name
+                ))
+                .as_ptr(),
+            );
         }
         v
     }
@@ -820,11 +882,7 @@ pub fn BG_VehicleGetIndex(
 /// Source: `oracle/oracle/codemp/game/bg_vehicleLoad.c:1599-1611`
 // PORT-NOTE(traps-cascade): gained `traps: &dyn BgTraps` so `BG_VehicleGetIndex`
 // (now `(name, bg, traps)`) can load an as-yet-unregistered vehicle.
-pub fn BG_GetVehicleModelName(
-    modelname: *mut c_char,
-    bg: &mut BgState,
-    traps: &dyn BgTraps,
-) {
+pub fn BG_GetVehicleModelName(modelname: *mut c_char, bg: &mut BgState, traps: &dyn BgTraps) {
     unsafe {
         let veh_name = modelname.add(1);
         let v_index = BG_VehicleGetIndex(veh_name, bg, traps);
@@ -834,13 +892,21 @@ pub fn BG_GetVehicleModelName(
             let name = cstr_to_str(veh_name);
             crate::g_main::Com_Error(
                 ERR_DROP as c_int,
-                cstr(&format!("BG_GetVehicleModelName:  couldn't find vehicle {}", name)).as_ptr(),
+                cstr(&format!(
+                    "BG_GetVehicleModelName:  couldn't find vehicle {}",
+                    name
+                ))
+                .as_ptr(),
             );
         }
 
         let model = bg.g_vehicleInfo[v_index as usize].model;
         let model_str = cstr_to_str(model);
-        Q_strncpyz(modelname, cstr(&model_str).as_ptr(), (model_str.len() + 1) as c_int);
+        Q_strncpyz(
+            modelname,
+            cstr(&model_str).as_ptr(),
+            (model_str.len() + 1) as c_int,
+        );
     }
 }
 
@@ -850,11 +916,7 @@ pub fn BG_GetVehicleModelName(
 // MISSING-SYMBOL: `ERR_DROP` (`Com_Error` level const) not yet ported; see
 // missing_symbols.
 // PORT-NOTE(traps-cascade): gained `traps: &dyn BgTraps` for `BG_VehicleGetIndex`.
-pub fn BG_GetVehicleSkinName(
-    skinname: *mut c_char,
-    bg: &mut BgState,
-    traps: &dyn BgTraps,
-) {
+pub fn BG_GetVehicleSkinName(skinname: *mut c_char, bg: &mut BgState, traps: &dyn BgTraps) {
     unsafe {
         let veh_name = skinname.add(1);
         let v_index = BG_VehicleGetIndex(veh_name, bg, traps);
@@ -864,7 +926,11 @@ pub fn BG_GetVehicleSkinName(
             let name = cstr_to_str(veh_name);
             crate::g_main::Com_Error(
                 ERR_DROP as c_int,
-                cstr(&format!("BG_GetVehicleSkinName:  couldn't find vehicle {}", name)).as_ptr(),
+                cstr(&format!(
+                    "BG_GetVehicleSkinName:  couldn't find vehicle {}",
+                    name
+                ))
+                .as_ptr(),
             );
         }
 
@@ -873,7 +939,11 @@ pub fn BG_GetVehicleSkinName(
             *skinname = 0;
         } else {
             let skin_str = cstr_to_str(skin);
-            Q_strncpyz(skinname, cstr(&skin_str).as_ptr(), (skin_str.len() + 1) as c_int);
+            Q_strncpyz(
+                skinname,
+                cstr(&skin_str).as_ptr(),
+                (skin_str.len() + 1) as c_int,
+            );
         }
     }
 }
@@ -895,7 +965,12 @@ pub fn AttachRidersGeneric(pVeh: *mut Vehicle_t, bg: &BgState, traps: &dyn BgTra
 
             debug_assert!(!(*parent).playerState.is_null());
 
-            VectorSet(&mut yawOnlyAngles, 0.0, (*(*parent).playerState).viewangles[YAW], 0.0);
+            VectorSet(
+                &mut yawOnlyAngles,
+                0.0,
+                (*(*parent).playerState).viewangles[YAW],
+                0.0,
+            );
 
             traps.g2api_get_bolt_matrix(
                 (*parent).ghoul2,

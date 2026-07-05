@@ -13,28 +13,28 @@
 
 use crate::prelude::*;
 
-use crate::entity::flags::FL_INACTIVE;
 use crate::ent_fn_enums::{EntThink, EntTouch, EntUse};
+use crate::entity::flags::FL_INACTIVE;
 use crate::g_combat::{G_Damage, G_RadiusDamage};
+use crate::g_main::{G_Error, G_Printf};
 use crate::g_misc::TeleportPlayer;
+use crate::g_mover::SP_func_rotating;
+use crate::g_spawn::{G_SpawnFloat, G_SpawnInt, G_SpawnString};
 use crate::g_utils::{
     G_EffectIndex, G_EntitySound, G_FreeEntity, G_PickTarget, G_PlayEffectID, G_PointInBounds,
     G_ScaleNetHealth, G_SetAngles, G_SetMovedir, G_SetOrigin, G_Sound, G_SoundIndex, G_Spawn,
     G_UseTargets,
 };
-use crate::g_main::{G_Error, G_Printf};
-use crate::g_mover::SP_func_rotating;
-use crate::g_spawn::{G_SpawnFloat, G_SpawnInt, G_SpawnString};
-use crate::NPC_utils::G_ActivateBehavior;
 use crate::q_math::vec3_origin;
-use mp_qshared::shared::trajectory::trType_t::TR_LINEAR;
 use crate::q_shared::Q_stricmp;
 use crate::trap;
+use crate::NPC_utils::G_ActivateBehavior;
 use mp_abi::game::syscalls::G_ENTITIES_IN_BOX::GEntitiesInBoxArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
+use mp_qshared::shared::trajectory::trType_t::TR_LINEAR;
 
 // Pass-2: a handful of cross-file resolved signatures still
 // take a `vec3_t` by value where Raven passed `NULL` (e.g. `G_Damage`'s
@@ -133,8 +133,7 @@ unsafe fn ent_resolve_opt(ctx: GameContext<'_>, id: Option<EntityId>) -> *mut ge
 /// Raven `InitTrigger`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:8-20`
-pub fn InitTrigger(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn InitTrigger(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if VectorCompare((*self_).s.angles, vec3_origin) == 0 {
             G_SetMovedir(&mut (*self_).s.angles, &mut (*self_).movedir);
@@ -169,8 +168,7 @@ pub fn multi_wait(ent: *mut gentity_t) {
 /// ent->activator should be set to the activator so it can be held through a
 /// delay so wait for the delay time before firing
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:32-94`
-pub fn multi_trigger_run(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn multi_trigger_run(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).think = None;
 
@@ -217,7 +215,8 @@ pub fn multi_trigger_run(
             if (*ent).painDebounceTime != (*ctx.world).level.time {
                 // first ent to touch it this frame
                 (*ent).nextthink = (*ctx.world).level.time
-                    + ((((*ent).wait + (*ent).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0) as c_int);
+                    + ((((*ent).wait + (*ent).random * (*ctx.world).bg_state.rng.crandom())
+                        * 1000.0) as c_int);
                 (*ent).painDebounceTime = (*ctx.world).level.time;
             }
         } else if (*ent).wait < 0.0 {
@@ -274,8 +273,7 @@ pub fn G_NameInTriggerClassList(list: *mut c_char, str: *mut c_char) -> qboolean
 /// Raven `multi_trigger`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:130-341`
-pub fn multi_trigger(
-    ctx: GameContext<'_>,ent: *mut gentity_t, activator: *mut gentity_t) {
+pub fn multi_trigger(ctx: GameContext<'_>, ent: *mut gentity_t, activator: *mut gentity_t) {
     unsafe {
         let mut halt_trigger = false;
 
@@ -423,8 +421,7 @@ pub fn multi_trigger(
                         && ((*((*cl).client as *mut gclient_t)).ps.eFlags & EF_DEAD) == 0
                     {
                         // See which team he's on
-                        if (*((*cl).client as *mut gclient_t)).sess.sessionTeam == SIEGETEAM_TEAM1
-                        {
+                        if (*((*cl).client as *mut gclient_t)).sess.sessionTeam == SIEGETEAM_TEAM1 {
                             team1_cl_num += 1;
                         } else {
                             team2_cl_num += 1;
@@ -471,7 +468,8 @@ pub fn multi_trigger(
         if (*ent).nextthink > (*ctx.world).level.time {
             if (*ent).spawnflags & 2048 != 0 {
                 // MULTIPLE - allow multiple entities to touch this trigger in a single frame
-                if (*ent).painDebounceTime != 0 && (*ent).painDebounceTime != (*ctx.world).level.time
+                if (*ent).painDebounceTime != 0
+                    && (*ent).painDebounceTime != (*ctx.world).level.time
                 {
                     // this should still allow subsequent ents to fire this trigger in the current frame
                     return; // can't retrigger until the wait is over
@@ -511,7 +509,11 @@ pub fn multi_trigger(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:343-346`
 pub fn Use_Multi(
-    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     multi_trigger(ctx, ent, activator);
 }
 
@@ -519,7 +521,11 @@ pub fn Use_Multi(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:350-547`
 pub fn Touch_Multi(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     unsafe {
         if (*other).client.is_null() {
             return;
@@ -570,7 +576,12 @@ pub fn Touch_Multi(
         if (*self_).spawnflags & 2 != 0 {
             // FACING
             let mut forward: vec3_t = [0.0; 3];
-            AngleVectors((*other_client).ps.viewangles, Some(&mut forward), None, None);
+            AngleVectors(
+                (*other_client).ps.viewangles,
+                Some(&mut forward),
+                None,
+                None,
+            );
 
             let dot = (*self_).movedir[0] * forward[0]
                 + (*self_).movedir[1] * forward[1]
@@ -608,7 +619,9 @@ pub fn Touch_Multi(
                     && *(*self_).idealclass != 0
                 {
                     // only certain classes can activate it
-                    if other.is_null() || (*other).client.is_null() || (*other_client).siegeClass < 0
+                    if other.is_null()
+                        || (*other).client.is_null()
+                        || (*other_client).siegeClass < 0
                     {
                         // no class
                         return;
@@ -618,16 +631,21 @@ pub fn Touch_Multi(
                         [(*other_client).siegeClass as usize]
                         .name
                         .as_ptr();
-                    if G_NameInTriggerClassList(siege_class_name as *mut c_char, (*self_).idealclass)
-                        == 0
+                    if G_NameInTriggerClassList(
+                        siege_class_name as *mut c_char,
+                        (*self_).idealclass,
+                    ) == 0
                     {
                         // wasn't in the list
                         return;
                     }
                 }
 
-                if G_PointInBounds((*other_client).ps.origin, (*self_).r.absmin, (*self_).r.absmax)
-                    == 0
+                if G_PointInBounds(
+                    (*other_client).ps.origin,
+                    (*self_).r.absmin,
+                    (*self_).r.absmax,
+                ) == 0
                 {
                     return;
                 } else if (*other_client).isHacking != (*self_).s.number
@@ -690,7 +708,8 @@ pub fn Touch_Multi(
             if (*other_client).ps.torsoAnim != BOTH_BUTTON_HOLD as c_int
                 && (*other_client).ps.torsoAnim != BOTH_CONSOLE1 as c_int
             {
-                G_SetAnim(ctx,
+                G_SetAnim(
+                    ctx,
                     other,
                     core::ptr::null_mut(),
                     SETANIM_TORSO as c_int,
@@ -717,8 +736,7 @@ pub fn Touch_Multi(
 /// Raven `trigger_cleared_fire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:549-558`
-pub fn trigger_cleared_fire(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn trigger_cleared_fire(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let activator_ptr = ent_resolve_opt(ctx, (*self_).activator);
         G_UseTargets2(ctx, self_, activator_ptr, (*self_).target2);
@@ -727,7 +745,8 @@ pub fn trigger_cleared_fire(
         // cleared, so we must "wait" from this point
         if (*self_).wait > 0.0 {
             (*self_).nextthink = (*ctx.world).level.time
-                + (((*self_).wait + (*self_).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0) as c_int;
+                + (((*self_).wait + (*self_).random * (*ctx.world).bg_state.rng.crandom()) * 1000.0)
+                    as c_int;
         }
     }
 }
@@ -735,11 +754,16 @@ pub fn trigger_cleared_fire(
 /// Raven `SP_trigger_multiple`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:607-656`
-pub fn SP_trigger_multiple(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_trigger_multiple(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut s: *mut c_char = core::ptr::null_mut();
-        if G_SpawnString(ctx, c"noise".as_ptr(), c"".as_ptr(), &mut s as *mut *mut c_char) != 0 {
+        if G_SpawnString(
+            ctx,
+            c"noise".as_ptr(),
+            c"".as_ptr(),
+            &mut s as *mut *mut c_char,
+        ) != 0
+        {
             if !s.is_null() && *s != 0 {
                 (*ent).noise_index = G_SoundIndex(s);
             } else {
@@ -747,11 +771,26 @@ pub fn SP_trigger_multiple(
             }
         }
 
-        G_SpawnInt(ctx, c"usetime".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue7);
+        G_SpawnInt(
+            ctx,
+            c"usetime".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue7,
+        );
 
         // For siege gametype
-        G_SpawnInt(ctx, c"siegetrig".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue1);
-        G_SpawnInt(ctx, c"teambalance".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue2);
+        G_SpawnInt(
+            ctx,
+            c"siegetrig".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue1,
+        );
+        G_SpawnInt(
+            ctx,
+            c"teambalance".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue2,
+        );
 
         G_SpawnInt(ctx, c"delay".as_ptr(), c"0".as_ptr(), &mut (*ent).delay);
 
@@ -786,11 +825,16 @@ pub fn SP_trigger_multiple(
 /// Raven `SP_trigger_once`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:694-731`
-pub fn SP_trigger_once(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_trigger_once(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut s: *mut c_char = core::ptr::null_mut();
-        if G_SpawnString(ctx, c"noise".as_ptr(), c"".as_ptr(), &mut s as *mut *mut c_char) != 0 {
+        if G_SpawnString(
+            ctx,
+            c"noise".as_ptr(),
+            c"".as_ptr(),
+            &mut s as *mut *mut c_char,
+        ) != 0
+        {
             if !s.is_null() && *s != 0 {
                 (*ent).noise_index = G_SoundIndex(s);
             } else {
@@ -798,10 +842,20 @@ pub fn SP_trigger_once(
             }
         }
 
-        G_SpawnInt(ctx, c"usetime".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue7);
+        G_SpawnInt(
+            ctx,
+            c"usetime".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue7,
+        );
 
         // For siege gametype
-        G_SpawnInt(ctx, c"siegetrig".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue1);
+        G_SpawnInt(
+            ctx,
+            c"siegetrig".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue1,
+        );
 
         G_SpawnInt(ctx, c"delay".as_ptr(), c"0".as_ptr(), &mut (*ent).delay);
 
@@ -826,25 +880,26 @@ pub fn SP_trigger_once(
 ///
 /// lightning strike trigger lightning strike event
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:739-786`
-pub fn Do_Strike(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn Do_Strike(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // maybe allow custom fx direction at some point?
         let fx_ang: vec3_t = [90.0, 0.0, 0.0];
 
         // choose a random point to strike within the bounds of the trigger
         let mut strike_point: vec3_t = [0.0; 3];
-        strike_point[0] = (*ctx.world).bg_state.rng.flrand((*ent).r.absmin[0], (*ent).r.absmax[0]);
-        strike_point[1] = (*ctx.world).bg_state.rng.flrand((*ent).r.absmin[1], (*ent).r.absmax[1]);
+        strike_point[0] = (*ctx.world)
+            .bg_state
+            .rng
+            .flrand((*ent).r.absmin[0], (*ent).r.absmax[0]);
+        strike_point[1] = (*ctx.world)
+            .bg_state
+            .rng
+            .flrand((*ent).r.absmin[1], (*ent).r.absmax[1]);
         // consider the bottom mins the ground level
         strike_point[2] = (*ent).r.absmin[2];
 
         // set the from point
-        let mut strike_from: vec3_t = [
-            strike_point[0],
-            strike_point[1],
-            (*ent).r.absmax[2] - 4.0,
-        ];
+        let mut strike_from: vec3_t = [strike_point[0], strike_point[1], (*ent).r.absmax[2] - 4.0];
 
         // now trace for damaging stuff, and do the effect
         // Raven's `NULL` mins/maxs (point trace) — `zero` stands in since the
@@ -885,7 +940,8 @@ pub fn Do_Strike(
             );
         } else {
             // only damage individuals
-            let tr_hit = &mut (*ctx.world).g_entities[local_trace.entityNum as usize] as *mut gentity_t;
+            let tr_hit =
+                &mut (*ctx.world).g_entities[local_trace.entityNum as usize] as *mut gentity_t;
 
             if (*tr_hit).inuse != 0 && (*tr_hit).takedamage != 0 {
                 // damage it then
@@ -911,16 +967,16 @@ pub fn Do_Strike(
 ///
 /// lightning strike trigger think loop
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:789-798`
-pub fn Think_Strike(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn Think_Strike(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if (*ent).genericValue1 != 0 {
             // turned off currently
             return;
         }
 
-        (*ent).nextthink =
-            (*ctx.world).level.time + (*ent).wait as c_int + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).random as c_int);
+        (*ent).nextthink = (*ctx.world).level.time
+            + (*ent).wait as c_int
+            + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).random as c_int);
         Do_Strike(ctx, ent);
     }
 }
@@ -930,7 +986,11 @@ pub fn Think_Strike(
 /// lightning strike trigger use event function
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:801-809`
 pub fn Use_Strike(
-    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     unsafe {
         (*ent).genericValue1 = (((*ent).genericValue1 == 0) as c_int);
 
@@ -944,15 +1004,19 @@ pub fn Use_Strike(
 /// Raven `SP_trigger_lightningstrike`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:824-861`
-pub fn SP_trigger_lightningstrike(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_trigger_lightningstrike(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).use_ = Some(EntUse::Use_Strike);
         (*ent).think = Some(EntThink::Think_Strike);
         (*ent).nextthink = (*ctx.world).level.time + 500;
 
         let mut s: *mut c_char = core::ptr::null_mut();
-        G_SpawnString(ctx, c"lightningfx".as_ptr(), c"".as_ptr(), &mut s as *mut *mut c_char);
+        G_SpawnString(
+            ctx,
+            c"lightningfx".as_ptr(),
+            c"".as_ptr(),
+            &mut s as *mut *mut c_char,
+        );
         if s.is_null() || *s == 0 {
             // Com_Error(ERR_DROP, ...) -> panic (frozen Group A).
             panic!("trigger_lightningstrike with no lightningfx");
@@ -987,8 +1051,7 @@ pub fn SP_trigger_lightningstrike(
 /// Raven `trigger_always_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:872-875`
-pub fn trigger_always_think(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn trigger_always_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
     G_UseTargets(ctx, ent, ent);
     G_FreeEntity(ctx, ent);
 }
@@ -997,8 +1060,7 @@ pub fn trigger_always_think(
 ///
 /// This trigger will always fire.  It is activated by the world.
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:880-884`
-pub fn SP_trigger_always(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_trigger_always(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         // we must have some delay to make sure our use targets are present
         (*ent).nextthink = (*ctx.world).level.time + 300;
@@ -1010,7 +1072,11 @@ pub fn SP_trigger_always(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:901-1029`
 pub fn trigger_push_touch(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     unsafe {
         if (*self_).flags & FL_INACTIVE != 0 {
             // set by target_deactivate
@@ -1078,7 +1144,11 @@ pub fn trigger_push_touch(
             ];
             if (*self_).speed != 0.0 {
                 VectorNormalize(&mut dir);
-                dir = [dir[0] * (*self_).speed, dir[1] * (*self_).speed, dir[2] * (*self_).speed];
+                dir = [
+                    dir[0] * (*self_).speed,
+                    dir[1] * (*self_).speed,
+                    dir[2] * (*self_).speed,
+                ];
             }
             (*other_client).ps.velocity = dir;
         } else if (*self_).spawnflags & PUSH_LINEAR != 0 {
@@ -1109,8 +1179,7 @@ pub fn trigger_push_touch(
 ///
 /// Calculate origin2 so the target apogee will be hit
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1039-1097`
-pub fn AimAtTarget(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn AimAtTarget(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let mut origin: vec3_t = [
             (*self_).r.absmin[0] + (*self_).r.absmax[0],
@@ -1196,8 +1265,7 @@ pub fn AimAtTarget(
 /// Must point at a target_position, which will be the apex of the leap.
 /// This will be client side predicted, unlike target_push
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1112-1136`
-pub fn SP_trigger_push(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_trigger_push(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         InitTrigger(ctx, self_);
 
@@ -1229,15 +1297,18 @@ pub fn SP_trigger_push(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1138-1159`
 pub fn Use_target_push(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     unsafe {
         if (*activator).client.is_null() {
             return;
         }
 
         let client = (*activator).client as *mut gclient_t;
-        if (*client).ps.pm_type != PM_NORMAL as c_int && (*client).ps.pm_type != PM_FLOAT as c_int
-        {
+        if (*client).ps.pm_type != PM_NORMAL as c_int && (*client).ps.pm_type != PM_FLOAT as c_int {
             return;
         }
 
@@ -1259,8 +1330,7 @@ pub fn Use_target_push(
 ///
 /// CONSTANT will push activator in direction of 'target' at constant 'speed'
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1168-1187`
-pub fn SP_target_push(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_target_push(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).speed == 0.0 {
             (*self_).speed = 1000.0;
@@ -1292,7 +1362,11 @@ pub fn SP_target_push(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1197-1225`
 pub fn trigger_teleporter_touch(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     unsafe {
         if (*self_).flags & FL_INACTIVE != 0 {
             // set by target_deactivate
@@ -1309,7 +1383,10 @@ pub fn trigger_teleporter_touch(
 
         let dest = G_PickTarget(ctx, (*self_).target);
         if dest.is_null() {
-            G_Printf(ctx, b"Couldn't find teleporter destination\n\0".as_ptr() as *const c_char);
+            G_Printf(
+                ctx,
+                b"Couldn't find teleporter destination\n\0".as_ptr() as *const c_char,
+            );
             return;
         }
 
@@ -1321,8 +1398,7 @@ pub fn trigger_teleporter_touch(
 ///
 /// Allows client side prediction of teleportation events.
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1236-1254`
-pub fn SP_trigger_teleport(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_trigger_teleport(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         InitTrigger(ctx, self_);
 
@@ -1348,7 +1424,11 @@ pub fn SP_trigger_teleport(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1280-1297`
 pub fn hurt_use(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     unsafe {
         if !activator.is_null() && (*activator).inuse != 0 && !(*activator).client.is_null() {
             (*self_).activator = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), activator);
@@ -1371,7 +1451,11 @@ pub fn hurt_use(
 /// Any entity that touches this will be hurt.
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1299-1411`
 pub fn hurt_touch(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     unsafe {
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
             && !(*self_).team.is_null()
@@ -1410,7 +1494,10 @@ pub fn hurt_touch(
             return;
         }
 
-        if (*self_).damage == -1 && !other.is_null() && !(*other).client.is_null() && (*other).health < 1
+        if (*self_).damage == -1
+            && !other.is_null()
+            && !(*other).client.is_null()
+            && (*other).health < 1
         {
             (*((*other).client as *mut gclient_t)).ps.fallingToDeath = 0;
             respawn(ctx, other);
@@ -1530,8 +1617,7 @@ pub fn hurt_touch(
 /// Raven `SP_trigger_hurt`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1413-1439`
-pub fn SP_trigger_hurt(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_trigger_hurt(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         InitTrigger(ctx, self_);
 
@@ -1563,11 +1649,15 @@ pub fn SP_trigger_hurt(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1442-1478`
 pub fn space_touch(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     unsafe {
         if other.is_null() || (*other).inuse == 0 || (*other).client.is_null()
-            // NOTE: we need vehicles to know this, too...
-            // || other->s.number >= MAX_CLIENTS
+        // NOTE: we need vehicles to know this, too...
+        // || other->s.number >= MAX_CLIENTS
         {
             return;
         }
@@ -1594,14 +1684,20 @@ pub fn space_touch(
             }
         }
 
-        if G_PointInBounds((*other_client).ps.origin, (*self_).r.absmin, (*self_).r.absmax) == 0 {
+        if G_PointInBounds(
+            (*other_client).ps.origin,
+            (*self_).r.absmin,
+            (*self_).r.absmax,
+        ) == 0
+        {
             // his origin must be inside the trigger
             return;
         }
 
         if (*other_client).inSpaceIndex == 0 || (*other_client).inSpaceIndex == ENTITYNUM_NONE {
             // freshly entering space
-            (*other_client).inSpaceSuffocation = (*ctx.world).level.time + INITIAL_SUFFOCATION_DELAY;
+            (*other_client).inSpaceSuffocation =
+                (*ctx.world).level.time + INITIAL_SUFFOCATION_DELAY;
         }
 
         (*other_client).inSpaceIndex = (*self_).s.number;
@@ -1612,8 +1708,7 @@ pub fn space_touch(
 ///
 /// causes human clients to suffocate and have no gravity.
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1484-1492`
-pub fn SP_trigger_space(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_trigger_space(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         InitTrigger(ctx, self_);
         (*self_).r.contents = CONTENTS_TRIGGER;
@@ -1628,7 +1723,11 @@ pub fn SP_trigger_space(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1494-1531`
 pub fn shipboundary_touch(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     unsafe {
         if other.is_null()
             || (*other).inuse == 0
@@ -1657,7 +1756,10 @@ pub fn shipboundary_touch(
         );
         if ent.is_null() || (*ent).inuse == 0 {
             // this is bad
-            G_Error(ctx, c"trigger_shipboundary has invalid target '%s'\n".as_ptr());
+            G_Error(
+                ctx,
+                c"trigger_shipboundary has invalid target '%s'\n".as_ptr(),
+            );
             return;
         }
 
@@ -1693,8 +1795,7 @@ pub fn shipboundary_touch(
 /// Raven `shipboundary_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1533-1565`
-pub fn shipboundary_think(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn shipboundary_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).nextthink = (*ctx.world).level.time + 100;
 
@@ -1744,8 +1845,7 @@ pub fn shipboundary_think(
 /// causes vehicle to turn toward target and travel in that direction for a
 /// set time when hit.
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1574-1595`
-pub fn SP_trigger_shipboundary(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_trigger_shipboundary(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         InitTrigger(ctx, self_);
         (*self_).r.contents = CONTENTS_TRIGGER;
@@ -1753,7 +1853,12 @@ pub fn SP_trigger_shipboundary(
         if (*self_).target.is_null() || *(*self_).target == 0 {
             G_Error(ctx, c"trigger_shipboundary without a target.".as_ptr());
         }
-        G_SpawnInt(ctx, c"traveltime".as_ptr(), c"0".as_ptr(), &mut (*self_).genericValue1);
+        G_SpawnInt(
+            ctx,
+            c"traveltime".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*self_).genericValue1,
+        );
 
         if (*self_).genericValue1 == 0 {
             G_Error(ctx, c"trigger_shipboundary without traveltime.".as_ptr());
@@ -1771,7 +1876,11 @@ pub fn SP_trigger_shipboundary(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1597-1680`
 pub fn hyperspace_touch(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     unsafe {
         if other.is_null()
             || (*other).inuse == 0
@@ -1791,7 +1900,8 @@ pub fn hyperspace_touch(
             // already hyperspacing, just keep us moving
             if (*other_client).ps.eFlags2 & EF2_HYPERSPACE != 0 {
                 // they've started the hyperspace but haven't been teleported yet
-                let time_frac = ((*ctx.world).level.time - (*other_client).ps.hyperSpaceTime) as f32
+                let time_frac = ((*ctx.world).level.time - (*other_client).ps.hyperSpaceTime)
+                    as f32
                     / HYPERSPACE_TIME as f32;
                 if time_frac >= HYPERSPACE_TELEPORT_FRAC {
                     // half-way, now teleport them!
@@ -1806,7 +1916,10 @@ pub fn hyperspace_touch(
                     );
                     if ent.is_null() || (*ent).inuse == 0 {
                         // this is bad
-                        G_Error(ctx, c"trigger_hyperspace has invalid target '%s'\n".as_ptr());
+                        G_Error(
+                            ctx,
+                            c"trigger_hyperspace has invalid target '%s'\n".as_ptr(),
+                        );
                         return;
                     }
                     let diff: vec3_t = [
@@ -1817,7 +1930,12 @@ pub fn hyperspace_touch(
                     let mut fwd: vec3_t = [0.0; 3];
                     let mut right: vec3_t = [0.0; 3];
                     let mut up: vec3_t = [0.0; 3];
-                    AngleVectors((*ent).s.angles, Some(&mut fwd), Some(&mut right), Some(&mut up));
+                    AngleVectors(
+                        (*ent).s.angles,
+                        Some(&mut fwd),
+                        Some(&mut right),
+                        Some(&mut up),
+                    );
                     let f_diff = fwd[0] * diff[0] + fwd[1] * diff[1] + fwd[2] * diff[2];
                     let r_diff = right[0] * diff[0] + right[1] * diff[1] + right[2] * diff[2];
                     let u_diff = up[0] * diff[0] + up[1] * diff[1] + up[2] * diff[2];
@@ -1831,12 +1949,20 @@ pub fn hyperspace_touch(
                     );
                     if ent.is_null() || (*ent).inuse == 0 {
                         // this is bad
-                        G_Error(ctx, c"trigger_hyperspace has invalid target2 '%s'\n".as_ptr());
+                        G_Error(
+                            ctx,
+                            c"trigger_hyperspace has invalid target2 '%s'\n".as_ptr(),
+                        );
                         return;
                     }
                     let mut new_org: vec3_t = (*ent).s.origin;
                     // finally, add the offset into the new origin
-                    AngleVectors((*ent).s.angles, Some(&mut fwd), Some(&mut right), Some(&mut up));
+                    AngleVectors(
+                        (*ent).s.angles,
+                        Some(&mut fwd),
+                        Some(&mut right),
+                        Some(&mut up),
+                    );
                     let f_scale = f_diff * (*self_).radius;
                     new_org = [
                         new_org[0] + f_scale * fwd[0],
@@ -1859,7 +1985,9 @@ pub fn hyperspace_touch(
                     // that position wants them to be facing
                     TeleportPlayer(ctx, other, new_org, (*ent).s.angles);
                     if !(*other).m_pVehicle.is_null()
-                        && !(*((*other).m_pVehicle as *mut Vehicle_t)).m_pPilot.is_null()
+                        && !(*((*other).m_pVehicle as *mut Vehicle_t))
+                            .m_pPilot
+                            .is_null()
                     {
                         // teleport the pilot, too
                         TeleportPlayer(
@@ -1891,7 +2019,10 @@ pub fn hyperspace_touch(
             );
             if ent.is_null() || (*ent).inuse == 0 {
                 // this is bad
-                G_Error(ctx, c"trigger_hyperspace has invalid target '%s'\n".as_ptr());
+                G_Error(
+                    ctx,
+                    c"trigger_hyperspace has invalid target '%s'\n".as_ptr(),
+                );
                 return;
             }
 
@@ -1925,10 +2056,14 @@ pub fn hyperspace_touch(
 /// forward, playing the hyperspace effect, then pop out at a relative point
 /// around the target.
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1709-1736`
-pub fn SP_trigger_hyperspace(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_trigger_hyperspace(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        G_SpawnFloat(ctx, c"exitscale".as_ptr(), c"1".as_ptr(), &mut (*self_).radius);
+        G_SpawnFloat(
+            ctx,
+            c"exitscale".as_ptr(),
+            c"1".as_ptr(),
+            &mut (*self_).radius,
+        );
 
         // register the hyperspace end sound (start sounds are customized)
         G_SoundIndex(c"sound/vehicles/common/hyperend.wav".as_ptr());
@@ -1957,14 +2092,14 @@ pub fn SP_trigger_hyperspace(
 /// Raven `func_timer_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1757-1761`
-pub fn func_timer_think(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn func_timer_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let activator_ptr = ent_resolve_opt(ctx, (*self_).activator);
         G_UseTargets(ctx, self_, activator_ptr);
         // set time before next firing
         (*self_).nextthink = (*ctx.world).level.time
-            + (1000.0 * ((*self_).wait + (*ctx.world).bg_state.rng.crandom() * (*self_).random)) as c_int;
+            + (1000.0 * ((*self_).wait + (*ctx.world).bg_state.rng.crandom() * (*self_).random))
+                as c_int;
     }
 }
 
@@ -1972,7 +2107,11 @@ pub fn func_timer_think(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1763-1776`
 pub fn func_timer_use(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     unsafe {
         (*self_).activator = ent_id_opt(ent_base(ctx), activator);
 
@@ -1995,8 +2134,7 @@ pub fn func_timer_use(
 /// Repeatedly fires its targets.
 /// Can be turned on or off by using.
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1778-1796`
-pub fn SP_func_timer(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_func_timer(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         G_SpawnFloat(ctx, c"random".as_ptr(), c"1".as_ptr(), &mut (*self_).random);
         G_SpawnFloat(ctx, c"wait".as_ptr(), c"1".as_ptr(), &mut (*self_).wait);
@@ -2006,14 +2144,17 @@ pub fn SP_func_timer(
 
         if (*self_).random >= (*self_).wait {
             (*self_).random = (*self_).wait - 1.0; // NOTE: was - FRAMETIME, but FRAMETIME is
-                                                    // in msec (100) and these numbers are in
-                                                    // *seconds*!
-            // PORT-NOTE(variadic-c-abi): `G_Printf`'s seam takes a fixed
-            // format string with no real vararg substitution yet (same gap
-            // as the other `G_Printf`/`G_Error` sites in this file); the
-            // `vtos(self->s.origin)` substitution is dropped, matching the
-            // codebase-wide convention at other still-todo `G_Printf` sites.
-            G_Printf(ctx, c"func_timer at (unresolved-vtos) has random >= wait\n".as_ptr());
+                                                   // in msec (100) and these numbers are in
+                                                   // *seconds*!
+                                                   // PORT-NOTE(variadic-c-abi): `G_Printf`'s seam takes a fixed
+                                                   // format string with no real vararg substitution yet (same gap
+                                                   // as the other `G_Printf`/`G_Error` sites in this file); the
+                                                   // `vtos(self->s.origin)` substitution is dropped, matching the
+                                                   // codebase-wide convention at other still-todo `G_Printf` sites.
+            G_Printf(
+                ctx,
+                c"func_timer at (unresolved-vtos) has random >= wait\n".as_ptr(),
+            );
         }
 
         if (*self_).spawnflags & 1 != 0 {
@@ -2029,7 +2170,9 @@ pub fn SP_func_timer(
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1798-1841`
 pub fn asteroid_pick_random_asteroid(
-    ctx: GameContext<'_>,self_: *mut gentity_t) -> *mut gentity_t {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+) -> *mut gentity_t {
     unsafe {
         let mut t_count: c_int = 0;
         let mut t: *mut gentity_t = core::ptr::null_mut();
@@ -2093,8 +2236,7 @@ pub fn asteroid_pick_random_asteroid(
 /// Raven `asteroid_count_num_asteroids`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1843-1859`
-pub fn asteroid_count_num_asteroids(
-    ctx: GameContext<'_>,self_: *mut gentity_t) -> c_int {
+pub fn asteroid_count_num_asteroids(ctx: GameContext<'_>, self_: *mut gentity_t) -> c_int {
     unsafe {
         let mut count: c_int = 0;
         let mut i = MAX_CLIENTS as c_int;
@@ -2117,11 +2259,17 @@ pub fn asteroid_count_num_asteroids(
 /// move asteroid to a new start position
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1864-1920`
 pub fn asteroid_move_to_start2(
-    ctx: GameContext<'_>,self_: *mut gentity_t, ownerTrigger: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    ownerTrigger: *mut gentity_t,
+) {
     unsafe {
         if !ownerTrigger.is_null() {
             // move it
-            let speed = (*ctx.world).bg_state.rng.flrand((*self_).speed * 0.25, (*self_).speed * 2.0);
+            let speed = (*ctx.world)
+                .bg_state
+                .rng
+                .flrand((*self_).speed * 0.25, (*self_).speed * 2.0);
             let cap_axis = (*ctx.world).bg_state.rng.Q_irand(0, 2);
 
             let mut start_spot: vec3_t = [0.0; 3];
@@ -2138,9 +2286,11 @@ pub fn asteroid_move_to_start2(
                     }
                 } else {
                     start_spot[axis] = (*ownerTrigger).r.mins[axis]
-                        + ((*ctx.world).bg_state.rng.flrand(0.0, 1.0) * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
+                        + ((*ctx.world).bg_state.rng.flrand(0.0, 1.0)
+                            * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
                     end_spot[axis] = (*ownerTrigger).r.mins[axis]
-                        + ((*ctx.world).bg_state.rng.flrand(0.0, 1.0) * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
+                        + ((*ctx.world).bg_state.rng.flrand(0.0, 1.0)
+                            * ((*ownerTrigger).r.maxs[axis] - (*ownerTrigger).r.mins[axis]));
                 }
             }
             // FIXME: maybe trace from start to end to make sure nothing is in
@@ -2158,7 +2308,11 @@ pub fn asteroid_move_to_start2(
                 (*ctx.world).bg_state.rng.flrand(-360.0, 360.0),
             ];
             G_SetAngles(self_, start_angles);
-            (*self_).s.apos.trDelta = [(*ctx.world).bg_state.rng.flrand(-100.0, 100.0), (*ctx.world).bg_state.rng.flrand(-100.0, 100.0), (*ctx.world).bg_state.rng.flrand(-100.0, 100.0)];
+            (*self_).s.apos.trDelta = [
+                (*ctx.world).bg_state.rng.flrand(-100.0, 100.0),
+                (*ctx.world).bg_state.rng.flrand(-100.0, 100.0),
+                (*ctx.world).bg_state.rng.flrand(-100.0, 100.0),
+            ];
             (*self_).s.apos.trTime = (*ctx.world).level.time;
             (*self_).s.apos.trType = TR_LINEAR;
             // move it back to a new start when done
@@ -2176,8 +2330,7 @@ pub fn asteroid_move_to_start2(
 ///
 /// move asteroid to a new start position
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1922-1925`
-pub fn asteroid_move_to_start(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn asteroid_move_to_start(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let owner_trigger =
             &mut (*ctx.world).g_entities[(*self_).r.ownerNum as usize] as *mut gentity_t;
@@ -2188,8 +2341,7 @@ pub fn asteroid_move_to_start(
 /// Raven `asteroid_field_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1927-1979`
-pub fn asteroid_field_think(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn asteroid_field_think(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         let num_asteroids = asteroid_count_num_asteroids(ctx, self_);
 
@@ -2243,8 +2395,7 @@ pub fn asteroid_field_think(
 /// Raven `SP_trigger_asteroid_field`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_trigger.c:1986-2007`
-pub fn SP_trigger_asteroid_field(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_trigger_asteroid_field(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         trap::SetBrushModel(
             ctx.engine,

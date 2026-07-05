@@ -8,8 +8,8 @@
 //! ctx.engine; RNG via BgState; vec3 helpers use reshaped q_math signatures.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::g_utils::{G_EffectIndex, G_SoundIndex};
+use crate::prelude::*;
 use crate::trap;
 
 /// Local state enums for Interrogator blade movement.
@@ -48,19 +48,15 @@ const HUNTER_FORWARD_MULTIPLIER: c_int = 2;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:338`
 const MIN_DISTANCE: c_int = 64;
 
-
 /// Raven `NPC_Interrogator_Precache`.
 ///
 /// Precache sounds and effects for the Interrogator NPC.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Interrogator.c:20-28`
-pub fn NPC_Interrogator_Precache(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn NPC_Interrogator_Precache(ctx: GameContext<'_>, self_: *mut gentity_t) {
     G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr() as *const c_char);
     G_SoundIndex(c"sound/chars/mark1/misc/anger.wav".as_ptr() as *const c_char);
     G_SoundIndex(c"sound/chars/probe/misc/talk".as_ptr() as *const c_char);
-    G_SoundIndex(
-        c"sound/chars/interrogator/misc/torture_droid_inject".as_ptr() as *const c_char,
-    );
+    G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_inject".as_ptr() as *const c_char);
     G_SoundIndex(c"sound/chars/interrogator/misc/int_droid_explo".as_ptr() as *const c_char);
     G_EffectIndex(c"explosions/droidexplosion1".as_ptr() as *const c_char);
 }
@@ -120,9 +116,19 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
                 (*npc).pos1[1] = (*ctx.world).bg_state.rng.Q_irand(0, 60) as f32;
             }
 
-            crate::NPC_utils::NPC_SetBoneAngles(ctx, npc, c"left_arm".as_ptr() as *mut c_char, (*npc).pos1);
+            crate::NPC_utils::NPC_SetBoneAngles(
+                ctx,
+                npc,
+                c"left_arm".as_ptr() as *mut c_char,
+                (*npc).pos1,
+            );
 
-            crate::g_timer::TIMER_Set(ctx, npc, c"syringeDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(100, 1000));
+            crate::g_timer::TIMER_Set(
+                ctx,
+                npc,
+                c"syringeDelay".as_ptr(),
+                (*ctx.world).bg_state.rng.Q_irand(100, 1000),
+            );
         }
 
         // Scalpel
@@ -133,21 +139,31 @@ pub fn Interrogator_PartsMove(ctx: GameContext<'_>) {
                 (*npc).pos2[0] -= 30.0;
                 if (*npc).pos2[0] < 180.0 {
                     (*npc).pos2[0] = 180.0;
-                    (*npc_info).localState = LSTATE_BLADEUP;	// Make it move up
+                    (*npc_info).localState = LSTATE_BLADEUP; // Make it move up
                 }
             } else {
                 // Blade is coming back up
                 (*npc).pos2[0] += 30.0;
                 if (*npc).pos2[0] >= 360.0 {
                     (*npc).pos2[0] = 360.0;
-                    (*npc_info).localState = LSTATE_BLADEDOWN;	// Make it move down
-                    crate::g_timer::TIMER_Set(ctx, npc, c"scalpelDelay".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(100, 1000));
+                    (*npc_info).localState = LSTATE_BLADEDOWN; // Make it move down
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        npc,
+                        c"scalpelDelay".as_ptr(),
+                        (*ctx.world).bg_state.rng.Q_irand(100, 1000),
+                    );
                 }
             }
 
             (*npc).pos2[0] = crate::q_math::AngleNormalize360((*npc).pos2[0]);
 
-            crate::NPC_utils::NPC_SetBoneAngles(ctx, npc, c"right_arm".as_ptr() as *mut c_char, (*npc).pos2);
+            crate::NPC_utils::NPC_SetBoneAngles(
+                ctx,
+                npc,
+                c"right_arm".as_ptr() as *mut c_char,
+                (*npc).pos2,
+            );
         }
 
         // Claw
@@ -168,7 +184,9 @@ pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
         let ucmd = &mut (*ctx.world).globals.ucmd;
         let base = (*ctx.world).g_entities.as_mut_ptr();
 
-        (*npc).s.loopSound = crate::g_utils::G_SoundIndex(c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr());
+        (*npc).s.loopSound = crate::g_utils::G_SoundIndex(
+            c"sound/chars/interrogator/misc/torture_droid_lp".as_ptr(),
+        );
 
         // Update our angles regardless
         crate::NPC_utils::NPC_UpdateAngles(ctx, 1, 1);
@@ -184,7 +202,8 @@ pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
 
             if !enemy_ptr.is_null() {
                 // Find the height difference
-                dif = ((*enemy_ptr).r.currentOrigin[2] + (*enemy_ptr).r.maxs[2]) - (*npc).r.currentOrigin[2];
+                dif = ((*enemy_ptr).r.currentOrigin[2] + (*enemy_ptr).r.maxs[2])
+                    - (*npc).r.currentOrigin[2];
 
                 // cap to prevent dramatic height shifts
                 if dif.abs() > 2.0 {
@@ -192,7 +211,8 @@ pub fn Interrogator_MaintainHeight(ctx: GameContext<'_>) {
                         dif = if dif < 0.0 { -16.0 } else { 16.0 };
                     }
 
-                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] = ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
+                    (*((*npc).client as *mut gclient_t)).ps.velocity[2] =
+                        ((*((*npc).client as *mut gclient_t)).ps.velocity[2] + dif) / 2.0;
                 }
             }
         } else {
@@ -278,8 +298,17 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
 
         // Pick a random strafe direction, then check to see if doing a strafe would be
         // reasonable valid
-        let dir = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 { -1 } else { 1 };
-        crate::q_math::_VectorMA((*npc).r.currentOrigin, (HUNTER_STRAFE_DIS * dir) as f32, right, &mut end);
+        let dir = if ((*ctx.world).bg_state.rng.rand() & 1) != 0 {
+            -1
+        } else {
+            1
+        };
+        crate::q_math::_VectorMA(
+            (*npc).r.currentOrigin,
+            (HUNTER_STRAFE_DIS * dir) as f32,
+            right,
+            &mut end,
+        );
 
         trap::Trace(
             ctx.engine,
@@ -312,11 +341,16 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
 
                 if !enemy_ptr.is_null() {
                     // Find the height difference
-                    let mut dif = ((*enemy_ptr).r.currentOrigin[2] + 32.0) - (*npc).r.currentOrigin[2];
+                    let mut dif =
+                        ((*enemy_ptr).r.currentOrigin[2] + 32.0) - (*npc).r.currentOrigin[2];
 
                     // cap to prevent dramatic height shifts
                     if dif.abs() > 8.0 {
-                        dif = if dif < 0.0 { -(HUNTER_UPWARD_PUSH as f32) } else { HUNTER_UPWARD_PUSH as f32 };
+                        dif = if dif < 0.0 {
+                            -(HUNTER_UPWARD_PUSH as f32)
+                        } else {
+                            HUNTER_UPWARD_PUSH as f32
+                        };
                     }
 
                     (*((*npc).client as *mut gclient_t)).ps.velocity[2] += dif;
@@ -324,7 +358,9 @@ pub fn Interrogator_Strafe(ctx: GameContext<'_>) {
             }
 
             // Set the strafe start time
-            (*npc_info).standTime = (*ctx.world).level.time + 3000 + ((*ctx.world).bg_state.rng.random() * 500.0) as c_int;
+            (*npc_info).standTime = (*ctx.world).level.time
+                + 3000
+                + ((*ctx.world).bg_state.rng.random() * 500.0) as c_int;
         }
     }
 }
@@ -388,7 +424,8 @@ pub fn Interrogator_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qbool
             distance = crate::q_math::VectorNormalize(&mut forward);
         }
 
-        let speed = HUNTER_FORWARD_BASE_SPEED as f32 + (HUNTER_FORWARD_MULTIPLIER as f32) * (*ctx.world).cvars.g_spskill.integer as f32;
+        let speed = HUNTER_FORWARD_BASE_SPEED as f32
+            + (HUNTER_FORWARD_MULTIPLIER as f32) * (*ctx.world).cvars.g_spskill.integer as f32;
         crate::q_math::_VectorMA(
             (*((*npc).client as *mut gclient_t)).ps.velocity,
             speed,
@@ -416,7 +453,8 @@ pub fn Interrogator_Melee(ctx: GameContext<'_>, visible: qboolean, advance: qboo
 
             if !enemy_ptr.is_null() {
                 // Make sure that we are within the height range before we allow any damage to happen
-                if (*npc).r.currentOrigin[2] >= (*enemy_ptr).r.currentOrigin[2] + (*enemy_ptr).r.mins[2]
+                if (*npc).r.currentOrigin[2]
+                    >= (*enemy_ptr).r.currentOrigin[2] + (*enemy_ptr).r.mins[2]
                     && (*npc).r.currentOrigin[2] + (*npc).r.mins[2] + 8.0
                         < (*enemy_ptr).r.currentOrigin[2] + (*enemy_ptr).r.maxs[2]
                 {
@@ -510,15 +548,22 @@ pub fn Interrogator_Attack(ctx: GameContext<'_>) {
             },
         )) as c_int;
 
-        let visible = crate::NPC_utils::NPC_ClearLOS4(ctx, match (*npc).enemy {
-            Some(id) => {
-                let base = (*ctx.world).g_entities.as_mut_ptr();
-                base.add(id.index())
-            }
-            None => core::ptr::null_mut(),
-        });
+        let visible = crate::NPC_utils::NPC_ClearLOS4(
+            ctx,
+            match (*npc).enemy {
+                Some(id) => {
+                    let base = (*ctx.world).g_entities.as_mut_ptr();
+                    base.add(id.index())
+                }
+                None => core::ptr::null_mut(),
+            },
+        );
 
-        let mut advance = if distance > MIN_DISTANCE * MIN_DISTANCE { 1 } else { 0 };
+        let mut advance = if distance > MIN_DISTANCE * MIN_DISTANCE {
+            1
+        } else {
+            0
+        };
 
         if visible == 0 {
             advance = 1;

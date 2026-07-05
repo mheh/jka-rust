@@ -3,7 +3,10 @@ use core::ffi::{c_float, c_int};
 use super::super::MpGameExport;
 use mp_qshared::shared::qboolean;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, word_to_const_ptr, DecodeVmMain, EncodeVmMainReturn, InboundVmCall,
+    VmMainTransport,
+};
 
 /// `GAME_NAV_CLEARPATHTOPOINT` MP game exports vmMain ABI token.
 ///
@@ -73,4 +76,27 @@ impl InboundVmCall for GameNavClearpathtopoint {
     type Output = qboolean;
 
     const COMMAND: MpGameExport = MpGameExport::GAME_NAV_CLEARPATHTOPOINT;
+}
+
+impl DecodeVmMain for GameNavClearpathtopoint {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `NAV_ClearPathToPoint(&g_entities[arg0], (float *)arg1, (float *)arg2,
+        //  (float *)arg3, arg4, arg5)` — g_main.c:673. The `float *` vectors
+        // cross as real `intptr_t`-width pointers.
+        GameNavClearpathtopointArgs::new(
+            word_to_c_int(t.arg(0)),
+            word_to_const_ptr(t.arg(1)),
+            word_to_const_ptr(t.arg(2)),
+            word_to_const_ptr(t.arg(3)),
+            word_to_c_int(t.arg(4)),
+            word_to_c_int(t.arg(5)),
+        )
+    }
+}
+
+impl EncodeVmMainReturn for GameNavClearpathtopoint {
+    fn encode_return(output: Self::Output) -> isize {
+        // `return NAV_ClearPathToPoint(...);` — g_main.c:673. `qboolean`.
+        output as isize
+    }
 }

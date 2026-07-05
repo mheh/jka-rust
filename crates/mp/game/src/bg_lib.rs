@@ -23,12 +23,7 @@ type CmpFn = extern "C" fn(*const c_void, *const c_void) -> c_int;
 /// - swaptype 2: byte-by-byte swaps
 ///
 /// Source: `oracle/oracle/codemp/game/bg_lib.c:80-86`
-pub fn swapfunc(
-    a: *mut c_char,
-    b: *mut c_char,
-    n: c_int,
-    swaptype: c_int,
-) {
+pub fn swapfunc(a: *mut c_char, b: *mut c_char, n: c_int, swaptype: c_int) {
     let n_usize = n as usize;
 
     unsafe {
@@ -71,12 +66,7 @@ pub fn swapfunc(
 /// Used by qsort to choose a pivot element.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_lib.c:98-103`
-pub fn med3(
-    a: *mut c_char,
-    b: *mut c_char,
-    c: *mut c_char,
-    cmp: *mut c_void,
-) -> *mut c_char {
+pub fn med3(a: *mut c_char, b: *mut c_char, c: *mut c_char, cmp: *mut c_void) -> *mut c_char {
     unsafe {
         let cmp_fn = std::mem::transmute::<*mut c_void, CmpFn>(cmp);
 
@@ -87,14 +77,22 @@ pub fn med3(
                 return b;
             }
             let ac = cmp_fn(a as *const c_void, c as *const c_void);
-            if ac < 0 { c } else { a }
+            if ac < 0 {
+                c
+            } else {
+                a
+            }
         } else {
             let bc = cmp_fn(b as *const c_void, c as *const c_void);
             if bc > 0 {
                 return b;
             }
             let ac = cmp_fn(a as *const c_void, c as *const c_void);
-            if ac < 0 { a } else { c }
+            if ac < 0 {
+                a
+            } else {
+                c
+            }
         }
     }
 }
@@ -106,12 +104,7 @@ pub fn med3(
 /// optimization via a loop instead of recursive calls.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_lib.c:105-181`
-pub fn qsort(
-    a: *mut c_void,
-    n: usize,
-    es: usize,
-    cmp: *mut c_void,
-) {
+pub fn qsort(a: *mut c_void, n: usize, es: usize, cmp: *mut c_void) {
     let cmp_fn = unsafe { std::mem::transmute::<*mut c_void, CmpFn>(cmp) };
 
     unsafe {
@@ -222,7 +215,11 @@ pub fn qsort(
             // Calculate min(pa - a, pb - pa) using byte offsets
             let pa_offset = pa.offset_from(a) as usize;
             let pb_pa_offset = pb.offset_from(pa) as usize;
-            let r = if pa_offset < pb_pa_offset { pa_offset } else { pb_pa_offset };
+            let r = if pa_offset < pb_pa_offset {
+                pa_offset
+            } else {
+                pb_pa_offset
+            };
 
             if r > 0 {
                 swapfunc(a, pb.sub(r), r as c_int, swaptype);
@@ -231,7 +228,11 @@ pub fn qsort(
             // Calculate min(pd - pc, pn - pd - es)
             let pd_pc_offset = pd.offset_from(pc) as usize;
             let pn_pd_es_offset = pn.offset_from(pd.add(es)) as usize;
-            let r = if pd_pc_offset < pn_pd_es_offset { pd_pc_offset } else { pn_pd_es_offset };
+            let r = if pd_pc_offset < pn_pd_es_offset {
+                pd_pc_offset
+            } else {
+                pn_pd_es_offset
+            };
 
             if r > 0 {
                 swapfunc(pb, pn.sub(r), r as c_int, swaptype);
@@ -389,9 +390,7 @@ pub fn atof(string: *const c_char) -> f64 {
                 string = string.add(1);
                 -1.0
             }
-            _ => {
-                1.0
-            }
+            _ => 1.0,
         };
 
         // Read integer digits
@@ -472,9 +471,7 @@ pub fn _atof(stringPtr: *mut *const c_char) -> f64 {
                 string = string.add(1);
                 -1.0
             }
-            _ => {
-                1.0
-            }
+            _ => 1.0,
         };
 
         // Read integer digits

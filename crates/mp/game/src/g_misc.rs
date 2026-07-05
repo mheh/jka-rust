@@ -13,36 +13,35 @@
 
 use crate::prelude::*;
 
-use crate::g_utils::{
-    G_AddEvent, G_EffectIndex, G_EntitySound, G_Find, G_FreeEntity, G_KillBox,
-    G_ModelIndex, G_PickTarget, G_ScreenShake, G_SetAngles, G_SetMovedir, G_SetOrigin, G_Sound,
-    G_SoundIndex, G_SoundSetIndex, G_Spawn, G_TempEntity, G_UseTargets, G_UseTargets2, G_IconIndex,
-    vtos,
-};
-use crate::g_mover::G_FindDoorTrigger;
+use crate::ent_fn_enums::{EntDie, EntThink, EntTouch, EntUse};
 use crate::g_client::SetClientViewAngle;
-use crate::NPC_utils::G_ActivateBehavior;
-use crate::g_exphysics::G_RunExPhys;
 use crate::g_combat::AddScore;
+use crate::g_exphysics::G_RunExPhys;
+use crate::g_local_consts::{START_TIME_FIND_LINKS, START_TIME_LINK_ENTS};
 use crate::g_main::{G_Printf, LogExit};
+use crate::g_mover::G_FindDoorTrigger;
 use crate::g_object::G_RunObject;
 use crate::g_spawn::{G_SpawnFloat, G_SpawnInt};
+use crate::g_utils::{
+    vtos, G_AddEvent, G_EffectIndex, G_EntitySound, G_Find, G_FreeEntity, G_IconIndex, G_KillBox,
+    G_ModelIndex, G_PickTarget, G_ScreenShake, G_SetAngles, G_SetMovedir, G_SetOrigin, G_Sound,
+    G_SoundIndex, G_SoundSetIndex, G_Spawn, G_TempEntity, G_UseTargets, G_UseTargets2,
+};
+use crate::level::reference_tag::MAX_REFNAME;
+use crate::level::tag_owner::{MAX_TAGS, MAX_TAG_OWNERS, TAG_GENERIC_NAME};
+use crate::q_math::vec3_origin;
 use crate::q_math::{DirToByte, PerpendicularVector, VectorNormalize};
 use crate::q_shared::{Info_SetValueForKey, Q_strlwr};
 use crate::trap;
+use crate::NPC_utils::G_ActivateBehavior;
+use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
-use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
-use crate::ent_fn_enums::{EntDie, EntThink, EntTouch, EntUse};
-use crate::q_math::vec3_origin;
+use mp_bg::public::configstring::{CS_SKYBOXORG, CS_TERRAINS};
 use mp_bg::public::entity_type::entityType_t;
 use mp_bg::public::means_of_death::meansOfDeath_t::MOD_UNKNOWN;
-use crate::level::tag_owner::{MAX_TAG_OWNERS, MAX_TAGS, TAG_GENERIC_NAME};
-use crate::level::reference_tag::MAX_REFNAME;
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
-use mp_bg::public::configstring::{CS_SKYBOXORG, CS_TERRAINS};
 use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
-use crate::g_local_consts::{START_TIME_FIND_LINKS, START_TIME_LINK_ENTS};
 
 // Unported types referenced in this file (need porting before this compiles):
 // tagOwner_t
@@ -117,8 +116,7 @@ pub fn SP_info_camp(self_: *mut gentity_t) {
 /// Used as a positional target for calculations in the utilities
 /// (spotlights, etc), but removed during gameplay.
 /// Source: `oracle/oracle/codemp/game/g_misc.c:33-35`
-pub fn SP_info_null(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_info_null(ctx: GameContext<'_>, self_: *mut gentity_t) {
     G_FreeEntity(ctx, self_);
 }
 
@@ -136,8 +134,7 @@ pub fn SP_info_notnull(self_: *mut gentity_t) {
 /// Raven `misc_lightstyle_set`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:86-132`
-pub fn misc_lightstyle_set(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn misc_lightstyle_set(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_abi::game::syscalls::G_GET_CONFIGSTRING::GGetConfigstringArgs;
     use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
     unsafe {
@@ -151,15 +148,34 @@ pub fn misc_lightstyle_set(
                     let mut lightstyle: [c_char; 32] = [0; 32];
                     trap::GetConfigstring(
                         ctx.engine,
-                        GGetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_off_style * 3) + slot, lightstyle.as_mut_ptr(), 32),
+                        GGetConfigstringArgs::new(
+                            CS_LIGHT_STYLES + (m_light_off_style * 3) + slot,
+                            lightstyle.as_mut_ptr(),
+                            32,
+                        ),
                     );
                     let s = cstr_to_str(lightstyle.as_ptr());
-                    trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + slot, cstr(&s)));
+                    trap::SetConfigstring(
+                        ctx.engine,
+                        GSetConfigstringArgs::new(
+                            CS_LIGHT_STYLES + (m_light_style * 3) + slot,
+                            cstr(&s),
+                        ),
+                    );
                 }
             } else {
-                trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 0, cstr("a")));
-                trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 1, cstr("a")));
-                trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 2, cstr("a")));
+                trap::SetConfigstring(
+                    ctx.engine,
+                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 0, cstr("a")),
+                );
+                trap::SetConfigstring(
+                    ctx.engine,
+                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 1, cstr("a")),
+                );
+                trap::SetConfigstring(
+                    ctx.engine,
+                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 2, cstr("a")),
+                );
             }
         } else {
             // Turn myself on now
@@ -168,15 +184,34 @@ pub fn misc_lightstyle_set(
                     let mut lightstyle: [c_char; 32] = [0; 32];
                     trap::GetConfigstring(
                         ctx.engine,
-                        GGetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_switch_style * 3) + slot, lightstyle.as_mut_ptr(), 32),
+                        GGetConfigstringArgs::new(
+                            CS_LIGHT_STYLES + (m_light_switch_style * 3) + slot,
+                            lightstyle.as_mut_ptr(),
+                            32,
+                        ),
                     );
                     let s = cstr_to_str(lightstyle.as_ptr());
-                    trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + slot, cstr(&s)));
+                    trap::SetConfigstring(
+                        ctx.engine,
+                        GSetConfigstringArgs::new(
+                            CS_LIGHT_STYLES + (m_light_style * 3) + slot,
+                            cstr(&s),
+                        ),
+                    );
                 }
             } else {
-                trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 0, cstr("z")));
-                trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 1, cstr("z")));
-                trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 2, cstr("z")));
+                trap::SetConfigstring(
+                    ctx.engine,
+                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 0, cstr("z")),
+                );
+                trap::SetConfigstring(
+                    ctx.engine,
+                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 1, cstr("z")),
+                );
+                trap::SetConfigstring(
+                    ctx.engine,
+                    GSetConfigstringArgs::new(CS_LIGHT_STYLES + (m_light_style * 3) + 2, cstr("z")),
+                );
             }
         }
     }
@@ -186,10 +221,18 @@ pub fn misc_lightstyle_set(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:134-140`
 pub fn misc_dlight_use(
-    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     unsafe {
         G_ActivateBehavior(ctx, ent, BSET_USE);
-        (*ent).alt_fire = if (*ent).alt_fire != qfalse { qfalse } else { qtrue };
+        (*ent).alt_fire = if (*ent).alt_fire != qfalse {
+            qfalse
+        } else {
+            qtrue
+        };
         misc_lightstyle_set(ctx, ent);
     }
 }
@@ -197,8 +240,7 @@ pub fn misc_dlight_use(
 /// Raven `SP_light`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:142-166`
-pub fn SP_light(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_light(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*self_).targetname.is_null() || *(*self_).targetname == 0 {
             // if i don't have a light style switch, then i go away
@@ -206,9 +248,24 @@ pub fn SP_light(
             return;
         }
 
-        G_SpawnInt(ctx, c"style".as_ptr(), c"0".as_ptr(), &mut (*self_).count as *mut c_int);
-        G_SpawnInt(ctx, c"switch_style".as_ptr(), c"0".as_ptr(), &mut (*self_).bounceCount as *mut c_int);
-        G_SpawnInt(ctx, c"style_off".as_ptr(), c"0".as_ptr(), &mut (*self_).fly_sound_debounce_time as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"style".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*self_).count as *mut c_int,
+        );
+        G_SpawnInt(
+            ctx,
+            c"switch_style".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*self_).bounceCount as *mut c_int,
+        );
+        G_SpawnInt(
+            ctx,
+            c"style_off".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*self_).fly_sound_debounce_time as *mut c_int,
+        );
         G_SetOrigin(self_, (*self_).s.origin);
         trap::LinkEntity(ctx.engine, GLinkentityArgs::new(self_));
 
@@ -230,7 +287,11 @@ pub fn SP_light(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:177-231`
 pub fn TeleportPlayer(
-    ctx: GameContext<'_>,player: *mut gentity_t, origin: vec3_t, angles: vec3_t) {
+    ctx: GameContext<'_>,
+    player: *mut gentity_t,
+    origin: vec3_t,
+    angles: vec3_t,
+) {
     use mp_abi::game::syscalls::G_UNLINKENTITY::GUnlinkentityArgs;
     use mp_bg::public::team::TEAM_SPECTATOR;
     unsafe {
@@ -242,7 +303,11 @@ pub fn TeleportPlayer(
         // use temp events at source and destination to prevent the effect
         // from getting dropped by a second player event
         if (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR {
-            let tent = G_TempEntity(ctx, (*((*player).client as *mut gclient_t)).ps.origin, EV_PLAYER_TELEPORT_OUT as c_int);
+            let tent = G_TempEntity(
+                ctx,
+                (*((*player).client as *mut gclient_t)).ps.origin,
+                EV_PLAYER_TELEPORT_OUT as c_int,
+            );
             (*tent).s.clientNum = (*player).s.clientNum;
 
             let tent = G_TempEntity(ctx, origin, EV_PLAYER_TELEPORT_IN as c_int);
@@ -252,13 +317,20 @@ pub fn TeleportPlayer(
         // unlink to make sure it can't possibly interfere with G_KillBox
         trap::UnlinkEntity(ctx.engine, GUnlinkentityArgs::new(player));
 
-        crate::q_math::_VectorCopy(origin, &mut (*((*player).client as *mut gclient_t)).ps.origin);
+        crate::q_math::_VectorCopy(
+            origin,
+            &mut (*((*player).client as *mut gclient_t)).ps.origin,
+        );
         (*((*player).client as *mut gclient_t)).ps.origin[2] += 1.0;
 
         // spit the player out
         let mut vel: vec3_t = [0.0, 0.0, 0.0];
         AngleVectors(angles, Some(&mut vel), None, None);
-        crate::q_math::_VectorScale(vel, 400.0, &mut (*((*player).client as *mut gclient_t)).ps.velocity);
+        crate::q_math::_VectorScale(
+            vel,
+            400.0,
+            &mut (*((*player).client as *mut gclient_t)).ps.velocity,
+        );
         (*((*player).client as *mut gclient_t)).ps.pm_time = 160; // hold time
         (*((*player).client as *mut gclient_t)).ps.pm_flags |= PMF_TIME_KNOCKBACK;
 
@@ -274,13 +346,20 @@ pub fn TeleportPlayer(
         }
 
         // save results of pmove
-        BG_PlayerStateToEntityState(&mut (*((*player).client as *mut gclient_t)).ps, &mut (*player).s, qtrue);
+        BG_PlayerStateToEntityState(
+            &mut (*((*player).client as *mut gclient_t)).ps,
+            &mut (*player).s,
+            qtrue,
+        );
         if is_npc != qfalse {
             (*player).s.eType = entityType_t::ET_NPC as c_int;
         }
 
         // use the precise origin for linking
-        crate::q_math::_VectorCopy((*((*player).client as *mut gclient_t)).ps.origin, &mut (*player).r.currentOrigin);
+        crate::q_math::_VectorCopy(
+            (*((*player).client as *mut gclient_t)).ps.origin,
+            &mut (*player).r.currentOrigin,
+        );
 
         if (*((*player).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR {
             trap::LinkEntity(ctx.engine, GLinkentityArgs::new(player));
@@ -300,16 +379,14 @@ pub fn SP_misc_teleporter_dest(ent: *mut gentity_t) {}
 /// The live (non-`#if 0`) path just frees the entity — map triangle
 /// generation was compiled out.
 /// Source: `oracle/oracle/codemp/game/g_misc.c:249-262`
-pub fn SP_misc_model(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_model(ctx: GameContext<'_>, ent: *mut gentity_t) {
     G_FreeEntity(ctx, ent);
 }
 
 /// Raven `SP_misc_model_static`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:277-280`
-pub fn SP_misc_model_static(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_model_static(ctx: GameContext<'_>, ent: *mut gentity_t) {
     G_FreeEntity(ctx, ent);
 }
 
@@ -317,20 +394,21 @@ pub fn SP_misc_model_static(
 ///
 /// The live (non-`#if 0`) path just frees the entity.
 /// Source: `oracle/oracle/codemp/game/g_misc.c:285-301`
-pub fn SP_misc_G2model(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_G2model(ctx: GameContext<'_>, ent: *mut gentity_t) {
     G_FreeEntity(ctx, ent);
 }
 
 /// Raven `locateCamera`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:305-349`
-pub fn locateCamera(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn locateCamera(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let owner = G_PickTarget(ctx, (*ent).target);
         if owner.is_null() {
-            G_Printf(ctx, c"Couldn't find target for misc_partal_surface\n".as_ptr());
+            G_Printf(
+                ctx,
+                c"Couldn't find target for misc_partal_surface\n".as_ptr(),
+            );
             G_FreeEntity(ctx, ent);
             return;
         }
@@ -373,8 +451,7 @@ pub fn locateCamera(
 /// Raven `SP_misc_portal_surface`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:355-369`
-pub fn SP_misc_portal_surface(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_portal_surface(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).r.mins = [0.0, 0.0, 0.0];
         (*ent).r.maxs = [0.0, 0.0, 0.0];
@@ -396,8 +473,7 @@ pub fn SP_misc_portal_surface(
 /// Raven `SP_misc_portal_camera`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:375-385`
-pub fn SP_misc_portal_camera(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_portal_camera(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         (*ent).r.mins = [0.0, 0.0, 0.0];
         (*ent).r.maxs = [0.0, 0.0, 0.0];
@@ -413,14 +489,18 @@ pub fn SP_misc_portal_camera(
 /// Raven `SP_misc_bsp`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:390-462`
-pub fn SP_misc_bsp(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_bsp(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_abi::game::syscalls::G_SET_ACTIVE_SUBBSP::GSetActiveSubbspArgs;
     use mp_abi::game::syscalls::G_SET_BRUSH_MODEL::GSetBrushModelArgs;
     use mp_qshared::shared::MAX_QPATH;
     unsafe {
         let mut new_angle: f32 = 0.0;
-        G_SpawnFloat(ctx, c"angle".as_ptr(), c"0".as_ptr(), &mut new_angle as *mut f32);
+        G_SpawnFloat(
+            ctx,
+            c"angle".as_ptr(),
+            c"0".as_ptr(),
+            &mut new_angle as *mut f32,
+        );
         if new_angle != 0.0 {
             (*ent).s.angles[1] = new_angle;
         }
@@ -435,9 +515,19 @@ pub fn SP_misc_bsp(
 
         // Mainly for debugging
         let mut tempint: c_int = 0;
-        G_SpawnInt(ctx, c"spacing".as_ptr(), c"0".as_ptr(), &mut tempint as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"spacing".as_ptr(),
+            c"0".as_ptr(),
+            &mut tempint as *mut c_int,
+        );
         (*ent).s.time2 = tempint;
-        G_SpawnInt(ctx, c"flatten".as_ptr(), c"0".as_ptr(), &mut tempint as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"flatten".as_ptr(),
+            c"0".as_ptr(),
+            &mut tempint as *mut c_int,
+        );
         (*ent).s.time = tempint;
 
         // NOTE: Raven's own `char temp[MAX_QPATH]` is a stack local later
@@ -447,19 +537,33 @@ pub fn SP_misc_bsp(
         // invent a fix.
         let mut temp: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         write_cstr_field(&mut temp, &format!("#{}", cstr_to_str(out)));
-        trap::SetBrushModel(ctx.engine, GSetBrushModelArgs::new(ent, cstr(&cstr_to_str(temp.as_ptr())))); // SV_SetBrushModel -- sets mins and maxs
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, cstr(&cstr_to_str(temp.as_ptr()))),
+        ); // SV_SetBrushModel -- sets mins and maxs
         crate::g_utils::G_BSPIndex(ctx, temp.as_ptr());
 
         (*ctx.world).level.mNumBSPInstances += 1;
-        write_cstr_field(&mut temp, &format!("{}-", (*ctx.world).level.mNumBSPInstances));
+        write_cstr_field(
+            &mut temp,
+            &format!("{}-", (*ctx.world).level.mNumBSPInstances),
+        );
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*ctx.world).level.mOriginAdjust);
         (*ctx.world).level.mRotationAdjust = (*ent).s.angles[1];
         (*ctx.world).level.mTargetAdjust = temp.as_mut_ptr();
         (*ctx.world).level.mBSPInstanceDepth += 1;
 
         let mut teamfilter_out: *mut c_char = core::ptr::null_mut();
-        G_SpawnString(ctx, c"teamfilter".as_ptr(), c"".as_ptr(), &mut teamfilter_out);
-        write_cstr_field(&mut (*ctx.world).level.mTeamFilter, &cstr_to_str(teamfilter_out));
+        G_SpawnString(
+            ctx,
+            c"teamfilter".as_ptr(),
+            c"".as_ptr(),
+            &mut teamfilter_out,
+        );
+        write_cstr_field(
+            &mut (*ctx.world).level.mTeamFilter,
+            &cstr_to_str(teamfilter_out),
+        );
 
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*ent).s.pos.trBase);
         crate::q_math::_VectorCopy((*ent).s.origin, &mut (*ent).r.currentOrigin);
@@ -485,8 +589,7 @@ pub fn SP_misc_bsp(
 /// Raven `SP_terrain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:484-631`
-pub fn SP_terrain(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_terrain(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_abi::game::syscalls::G_CM_REGISTER_TERRAIN::GCmRegisterTerrainArgs;
     use mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs;
     use mp_abi::game::syscalls::G_CVAR_VARIABLE_STRING_BUFFER::GCvarVariableStringBufferArgs;
@@ -500,7 +603,10 @@ pub fn SP_terrain(
         (*ctx.world).cvars.g_RMG.integer = 1;
 
         (*ent).s.angles = [0.0, 0.0, 0.0];
-        trap::SetBrushModel(ctx.engine, GSetBrushModelArgs::new(ent, cstr(&cstr_to_str((*ent).model))));
+        trap::SetBrushModel(
+            ctx.engine,
+            GSetBrushModelArgs::new(ent, cstr(&cstr_to_str((*ent).model))),
+        );
 
         // Get the shader from the top of the brush
         let shader_num: c_int = 0;
@@ -508,8 +614,22 @@ pub fn SP_terrain(
         let mut seed: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         let mut mission_type: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
         if (*ctx.world).cvars.g_RMG.integer != 0 {
-            trap::Cvar_VariableStringBuffer(ctx.engine, GCvarVariableStringBufferArgs::new(cstr("RMG_seed"), seed.as_mut_ptr(), (MAX_QPATH) as i32));
-            trap::Cvar_VariableStringBuffer(ctx.engine, GCvarVariableStringBufferArgs::new(cstr("RMG_mission"), mission_type.as_mut_ptr(), (MAX_QPATH) as i32));
+            trap::Cvar_VariableStringBuffer(
+                ctx.engine,
+                GCvarVariableStringBufferArgs::new(
+                    cstr("RMG_seed"),
+                    seed.as_mut_ptr(),
+                    (MAX_QPATH) as i32,
+                ),
+            );
+            trap::Cvar_VariableStringBuffer(
+                ctx.engine,
+                GCvarVariableStringBufferArgs::new(
+                    cstr("RMG_mission"),
+                    mission_type.as_mut_ptr(),
+                    (MAX_QPATH) as i32,
+                ),
+            );
         }
 
         // Get info required for the common init
@@ -521,22 +641,63 @@ pub fn SP_terrain(
         Info_SetValueForKey(temp.as_mut_ptr(), c"heightMap".as_ptr(), value);
 
         G_SpawnString(ctx, c"numpatches".as_ptr(), c"400".as_ptr(), &mut value);
-        Info_SetValueForKey(temp.as_mut_ptr(), c"numPatches".as_ptr(), cstr(&format!("{}", crate::bg_lib::atoi(value))).as_ptr());
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"numPatches".as_ptr(),
+            cstr(&format!("{}", crate::bg_lib::atoi(value))).as_ptr(),
+        );
 
         G_SpawnString(ctx, c"terxels".as_ptr(), c"4".as_ptr(), &mut value);
-        Info_SetValueForKey(temp.as_mut_ptr(), c"terxels".as_ptr(), cstr(&format!("{}", crate::bg_lib::atoi(value))).as_ptr());
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"terxels".as_ptr(),
+            cstr(&format!("{}", crate::bg_lib::atoi(value))).as_ptr(),
+        );
 
         Info_SetValueForKey(temp.as_mut_ptr(), c"seed".as_ptr(), seed.as_ptr());
-        Info_SetValueForKey(temp.as_mut_ptr(), c"minx".as_ptr(), cstr(&format!("{}", (*ent).r.mins[0])).as_ptr());
-        Info_SetValueForKey(temp.as_mut_ptr(), c"miny".as_ptr(), cstr(&format!("{}", (*ent).r.mins[1])).as_ptr());
-        Info_SetValueForKey(temp.as_mut_ptr(), c"minz".as_ptr(), cstr(&format!("{}", (*ent).r.mins[2])).as_ptr());
-        Info_SetValueForKey(temp.as_mut_ptr(), c"maxx".as_ptr(), cstr(&format!("{}", (*ent).r.maxs[0])).as_ptr());
-        Info_SetValueForKey(temp.as_mut_ptr(), c"maxy".as_ptr(), cstr(&format!("{}", (*ent).r.maxs[1])).as_ptr());
-        Info_SetValueForKey(temp.as_mut_ptr(), c"maxz".as_ptr(), cstr(&format!("{}", (*ent).r.maxs[2])).as_ptr());
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"minx".as_ptr(),
+            cstr(&format!("{}", (*ent).r.mins[0])).as_ptr(),
+        );
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"miny".as_ptr(),
+            cstr(&format!("{}", (*ent).r.mins[1])).as_ptr(),
+        );
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"minz".as_ptr(),
+            cstr(&format!("{}", (*ent).r.mins[2])).as_ptr(),
+        );
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"maxx".as_ptr(),
+            cstr(&format!("{}", (*ent).r.maxs[0])).as_ptr(),
+        );
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"maxy".as_ptr(),
+            cstr(&format!("{}", (*ent).r.maxs[1])).as_ptr(),
+        );
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"maxz".as_ptr(),
+            cstr(&format!("{}", (*ent).r.maxs[2])).as_ptr(),
+        );
 
-        Info_SetValueForKey(temp.as_mut_ptr(), c"modelIndex".as_ptr(), cstr(&format!("{}", (*ent).s.modelindex)).as_ptr());
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"modelIndex".as_ptr(),
+            cstr(&format!("{}", (*ent).s.modelindex)).as_ptr(),
+        );
 
-        G_SpawnString(ctx, c"terraindef".as_ptr(), c"grassyhills".as_ptr(), &mut value);
+        G_SpawnString(
+            ctx,
+            c"terraindef".as_ptr(),
+            c"grassyhills".as_ptr(),
+            &mut value,
+        );
         Info_SetValueForKey(temp.as_mut_ptr(), c"terrainDef".as_ptr(), value);
 
         G_SpawnString(ctx, c"instancedef".as_ptr(), c"".as_ptr(), &mut value);
@@ -545,15 +706,30 @@ pub fn SP_terrain(
         G_SpawnString(ctx, c"miscentdef".as_ptr(), c"".as_ptr(), &mut value);
         Info_SetValueForKey(temp.as_mut_ptr(), c"miscentDef".as_ptr(), value);
 
-        Info_SetValueForKey(temp.as_mut_ptr(), c"missionType".as_ptr(), mission_type.as_ptr());
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"missionType".as_ptr(),
+            mission_type.as_ptr(),
+        );
 
         const MAX_INSTANCE_TYPES: c_int = 8;
         let mut i: c_int = 0;
         while i < MAX_INSTANCE_TYPES {
             let mut final_: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
-            trap::Cvar_VariableStringBuffer(ctx.engine, GCvarVariableStringBufferArgs::new(cstr(&format!("RMG_instance{}", i)), final_.as_mut_ptr(), (MAX_QPATH) as i32));
+            trap::Cvar_VariableStringBuffer(
+                ctx.engine,
+                GCvarVariableStringBufferArgs::new(
+                    cstr(&format!("RMG_instance{}", i)),
+                    final_.as_mut_ptr(),
+                    (MAX_QPATH) as i32,
+                ),
+            );
             if *final_.as_ptr() != 0 {
-                Info_SetValueForKey(temp.as_mut_ptr(), cstr(&format!("inst{}", i)).as_ptr(), final_.as_ptr());
+                Info_SetValueForKey(
+                    temp.as_mut_ptr(),
+                    cstr(&format!("inst{}", i)).as_ptr(),
+                    final_.as_ptr(),
+                );
             }
             i += 1;
         }
@@ -562,17 +738,38 @@ pub fn SP_terrain(
         G_SpawnString(ctx, c"densitymap".as_ptr(), c"".as_ptr(), &mut value);
         Info_SetValueForKey(temp.as_mut_ptr(), c"densityMap".as_ptr(), value);
 
-        Info_SetValueForKey(temp.as_mut_ptr(), c"shader".as_ptr(), cstr(&format!("{}", shader_num)).as_ptr());
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"shader".as_ptr(),
+            cstr(&format!("{}", shader_num)).as_ptr(),
+        );
         G_SpawnString(ctx, c"texturescale".as_ptr(), c"0.005".as_ptr(), &mut value);
-        Info_SetValueForKey(temp.as_mut_ptr(), c"texturescale".as_ptr(), cstr(&format!("{}", crate::bg_lib::atof(value))).as_ptr());
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"texturescale".as_ptr(),
+            cstr(&format!("{}", crate::bg_lib::atof(value))).as_ptr(),
+        );
 
         // Initialise the common aspects of the terrain
-        let terrain_id = trap::CM_RegisterTerrain(ctx.engine, GCmRegisterTerrainArgs::new(cstr(&cstr_to_str(temp.as_ptr()))));
+        let terrain_id = trap::CM_RegisterTerrain(
+            ctx.engine,
+            GCmRegisterTerrainArgs::new(cstr(&cstr_to_str(temp.as_ptr()))),
+        );
 
-        Info_SetValueForKey(temp.as_mut_ptr(), c"terrainId".as_ptr(), cstr(&format!("{}", terrain_id)).as_ptr());
+        Info_SetValueForKey(
+            temp.as_mut_ptr(),
+            c"terrainId".as_ptr(),
+            cstr(&format!("{}", terrain_id)).as_ptr(),
+        );
 
         // Send all the data down to the client
-        trap::SetConfigstring(ctx.engine, mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(CS_TERRAINS + terrain_id, cstr(&cstr_to_str(temp.as_ptr()))));
+        trap::SetConfigstring(
+            ctx.engine,
+            mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs::new(
+                CS_TERRAINS + terrain_id,
+                cstr(&cstr_to_str(temp.as_ptr())),
+            ),
+        );
 
         // Make sure the contents are properly set
         (*ent).r.contents = mp_qshared::shared::surface_flags::CONTENTS_TERRAIN;
@@ -596,8 +793,7 @@ pub fn SP_terrain(
 /// Raven `G_PortalifyEntities`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:638-667`
-pub fn G_PortalifyEntities(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn G_PortalifyEntities(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_qshared::shared::limits::{ENTITYNUM_NONE, ENTITYNUM_WORLD};
     unsafe {
         let mut i: usize = 0;
@@ -607,7 +803,10 @@ pub fn G_PortalifyEntities(
                 && (*scan).s.number != (*ent).s.number
                 && trap::InPVS(
                     ctx.engine,
-                    GInPvsArgs::new(&(*ent).s.origin as *const vec3_t, &(*scan).r.currentOrigin as *const vec3_t),
+                    GInPvsArgs::new(
+                        &(*ent).s.origin as *const vec3_t,
+                        &(*scan).r.currentOrigin as *const vec3_t,
+                    ),
                 ) != 0
             {
                 let mut tr: trace_t = core::mem::zeroed();
@@ -628,7 +827,8 @@ pub fn G_PortalifyEntities(
                         && tr.entityNum != (ENTITYNUM_NONE) as i16
                         && tr.entityNum != (ENTITYNUM_WORLD) as i16)
                 {
-                    if (*scan).client.is_null() || (*scan).s.eType == entityType_t::ET_NPC as c_int {
+                    if (*scan).client.is_null() || (*scan).s.eType == entityType_t::ET_NPC as c_int
+                    {
                         (*scan).s.isPortalEnt = qtrue;
                     }
                 }
@@ -644,16 +844,14 @@ pub fn G_PortalifyEntities(
 /// Raven `SP_misc_skyportal_orient`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:675-678`
-pub fn SP_misc_skyportal_orient(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_skyportal_orient(ctx: GameContext<'_>, ent: *mut gentity_t) {
     G_FreeEntity(ctx, ent);
 }
 
 /// Raven `SP_misc_skyportal`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:694-715`
-pub fn SP_misc_skyportal(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_skyportal(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_abi::game::syscalls::G_SET_CONFIGSTRING::GSetConfigstringArgs;
     unsafe {
         let mut fov: *mut c_char = core::ptr::null_mut();
@@ -662,17 +860,44 @@ pub fn SP_misc_skyportal(
 
         let mut fogv: vec3_t = [0.0, 0.0, 0.0];
         let mut isfog: c_int = 0;
-        isfog += G_SpawnVector(ctx, c"fogcolor".as_ptr(), c"0 0 0".as_ptr(), fogv.as_mut_ptr());
+        isfog += G_SpawnVector(
+            ctx,
+            c"fogcolor".as_ptr(),
+            c"0 0 0".as_ptr(),
+            fogv.as_mut_ptr(),
+        );
         let mut fogn: c_int = 0;
-        isfog += G_SpawnInt(ctx, c"fognear".as_ptr(), c"0".as_ptr(), &mut fogn as *mut c_int);
+        isfog += G_SpawnInt(
+            ctx,
+            c"fognear".as_ptr(),
+            c"0".as_ptr(),
+            &mut fogn as *mut c_int,
+        );
         let mut fogf: c_int = 0;
-        isfog += G_SpawnInt(ctx, c"fogfar".as_ptr(), c"300".as_ptr(), &mut fogf as *mut c_int);
+        isfog += G_SpawnInt(
+            ctx,
+            c"fogfar".as_ptr(),
+            c"300".as_ptr(),
+            &mut fogf as *mut c_int,
+        );
 
         let s = format!(
             "{:.2} {:.2} {:.2} {:.1} {} {:.2} {:.2} {:.2} {} {}",
-            (*ent).s.origin[0], (*ent).s.origin[1], (*ent).s.origin[2], fov_x, isfog, fogv[0], fogv[1], fogv[2], fogn, fogf
+            (*ent).s.origin[0],
+            (*ent).s.origin[1],
+            (*ent).s.origin[2],
+            fov_x,
+            isfog,
+            fogv[0],
+            fogv[1],
+            fogv[2],
+            fogn,
+            fogf
         );
-        trap::SetConfigstring(ctx.engine, GSetConfigstringArgs::new(CS_SKYBOXORG, cstr(&s)));
+        trap::SetConfigstring(
+            ctx.engine,
+            GSetConfigstringArgs::new(CS_SKYBOXORG, cstr(&s)),
+        );
 
         (*ent).think = Some(EntThink::G_PortalifyEntities);
         (*ent).nextthink = (*ctx.world).level.time + 1050; // give it some time first so that all other entities are spawned.
@@ -691,8 +916,7 @@ pub fn HolocronRespawn(self_: *mut gentity_t) {
 /// Raven `HolocronPopOut`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:765-784`
-pub fn HolocronPopOut(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn HolocronPopOut(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         if (*ctx.world).bg_state.rng.Q_irand(1, 10) < 5 {
             (*self_).s.pos.trDelta[0] = 150.0 + (*ctx.world).bg_state.rng.Q_irand(1, 100) as f32;
@@ -715,7 +939,11 @@ pub fn HolocronPopOut(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:786-905`
 pub fn HolocronTouch(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
     unsafe {
         let mut i: c_int = 0;
@@ -741,12 +969,17 @@ pub fn HolocronTouch(
             return;
         }
 
-        if (*((*other).client as *mut gclient_t)).ps.holocronsCarried[(*self_).count as usize] != 0.0 {
+        if (*((*other).client as *mut gclient_t)).ps.holocronsCarried[(*self_).count as usize]
+            != 0.0
+        {
             return;
         }
 
         if (*((*other).client as *mut gclient_t)).ps.holocronCantTouch == (*self_).s.number
-            && (*((*other).client as *mut gclient_t)).ps.holocronCantTouchTime > (*ctx.world).level.time as f32
+            && (*((*other).client as *mut gclient_t))
+                .ps
+                .holocronCantTouchTime
+                > (*ctx.world).level.time as f32
         {
             return;
         }
@@ -755,9 +988,13 @@ pub fn HolocronTouch(
             if (*((*other).client as *mut gclient_t)).ps.holocronsCarried[i as usize] != 0.0 {
                 othercarrying += 1;
 
-                if index_lowest == -1 || (*((*other).client as *mut gclient_t)).ps.holocronsCarried[i as usize] < time_lowest {
+                if index_lowest == -1
+                    || (*((*other).client as *mut gclient_t)).ps.holocronsCarried[i as usize]
+                        < time_lowest
+                {
                     index_lowest = i;
-                    time_lowest = (*((*other).client as *mut gclient_t)).ps.holocronsCarried[i as usize];
+                    time_lowest =
+                        (*((*other).client as *mut gclient_t)).ps.holocronsCarried[i as usize];
                 }
             } else if i != (*self_).count {
                 hasall = false;
@@ -770,27 +1007,46 @@ pub fn HolocronTouch(
             //G_Printf("You deserve a pat on the back.\n");
         }
 
-        if (*((*other).client as *mut gclient_t)).ps.fd.forcePowersActive & (1 << (*((*other).client as *mut gclient_t)).ps.fd.forcePowerSelected) == 0 {
+        if (*((*other).client as *mut gclient_t))
+            .ps
+            .fd
+            .forcePowersActive
+            & (1 << (*((*other).client as *mut gclient_t))
+                .ps
+                .fd
+                .forcePowerSelected)
+            == 0
+        {
             // If the player isn't using his currently selected force power, select this one
             if (*self_).count != FP_SABER_OFFENSE
                 && (*self_).count != FP_SABER_DEFENSE
                 && (*self_).count != FP_SABERTHROW
                 && (*self_).count != FP_LEVITATION
             {
-                (*((*other).client as *mut gclient_t)).ps.fd.forcePowerSelected = (*self_).count;
+                (*((*other).client as *mut gclient_t))
+                    .ps
+                    .fd
+                    .forcePowerSelected = (*self_).count;
             }
         }
 
-        if (*ctx.world).cvars.g_MaxHolocronCarry.integer != 0 && othercarrying >= (*ctx.world).cvars.g_MaxHolocronCarry.integer {
+        if (*ctx.world).cvars.g_MaxHolocronCarry.integer != 0
+            && othercarrying >= (*ctx.world).cvars.g_MaxHolocronCarry.integer
+        {
             // make the oldest holocron carried by the player pop out to make room for this one
             (*((*other).client as *mut gclient_t)).ps.holocronsCarried[index_lowest as usize] = 0.0;
             //NOTE: No longer valid as we are now always giving a force level 1 saber attack level in holocron
         }
 
         //G_Sound(other, CHAN_AUTO, G_SoundIndex("sound/weapons/w_pkup.wav"));
-        G_AddEvent(other, mp_bg::public::entity_event::entity_event_t::EV_ITEM_PICKUP as c_int, (*self_).s.number);
+        G_AddEvent(
+            other,
+            mp_bg::public::entity_event::entity_event_t::EV_ITEM_PICKUP as c_int,
+            (*self_).s.number,
+        );
 
-        (*((*other).client as *mut gclient_t)).ps.holocronsCarried[(*self_).count as usize] = (*ctx.world).level.time as f32;
+        (*((*other).client as *mut gclient_t)).ps.holocronsCarried[(*self_).count as usize] =
+            (*ctx.world).level.time as f32;
         (*self_).s.modelindex = 0;
         (*self_).enemy = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), other));
 
@@ -798,7 +1054,11 @@ pub fn HolocronTouch(
         (*self_).pos2[1] = ((*ctx.world).level.time + HOLOCRON_RESPAWN_TIME) as f32;
 
         if force_reselect != WP_NONE {
-            G_AddEvent(other, mp_bg::public::entity_event::entity_event_t::EV_NOAMMO as c_int, force_reselect);
+            G_AddEvent(
+                other,
+                mp_bg::public::entity_event::entity_event_t::EV_NOAMMO as c_int,
+                force_reselect,
+            );
         }
 
         //G_Printf("DON'T TOUCH ME\n");
@@ -811,54 +1071,92 @@ pub fn HolocronTouch(
 /// Raven `HolocronThink`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:907-991`
-pub fn HolocronThink(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn HolocronThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let base = (*ctx.world).g_entities.as_mut_ptr();
 
         let justthink = |ent: *mut gentity_t, ctx: GameContext<'_>| {
             (*ent).nextthink = (*ctx.world).level.time + 50;
-            if (*ent).s.pos.trDelta[0] != 0.0 || (*ent).s.pos.trDelta[1] != 0.0 || (*ent).s.pos.trDelta[2] != 0.0 {
+            if (*ent).s.pos.trDelta[0] != 0.0
+                || (*ent).s.pos.trDelta[1] != 0.0
+                || (*ent).s.pos.trDelta[2] != 0.0
+            {
                 G_RunObject(ctx, ent);
             }
         };
 
         if (*ent).pos2[0] != 0.0
             && ((*ent).enemy.is_none()
-                || (*ent).enemy.map_or(true, |e| (*(base.add(e.index()))).client.is_null())
-                || (*ent).enemy.map_or(false, |e| (*(base.add(e.index()))).health < 1))
+                || (*ent)
+                    .enemy
+                    .map_or(true, |e| (*(base.add(e.index()))).client.is_null())
+                || (*ent)
+                    .enemy
+                    .map_or(false, |e| (*(base.add(e.index()))).health < 1))
         {
             if let Some(e) = (*ent).enemy {
                 let enemy_ptr = base.add(e.index());
                 if !(*enemy_ptr).client.is_null() {
                     HolocronRespawn(ent);
-                    crate::q_math::_VectorCopy((*((*enemy_ptr).client as *mut gclient_t)).ps.origin, &mut (*ent).s.pos.trBase);
-                    crate::q_math::_VectorCopy((*((*enemy_ptr).client as *mut gclient_t)).ps.origin, &mut (*ent).s.origin);
-                    crate::q_math::_VectorCopy((*((*enemy_ptr).client as *mut gclient_t)).ps.origin, &mut (*ent).r.currentOrigin);
+                    crate::q_math::_VectorCopy(
+                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        &mut (*ent).s.pos.trBase,
+                    );
+                    crate::q_math::_VectorCopy(
+                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        &mut (*ent).s.origin,
+                    );
+                    crate::q_math::_VectorCopy(
+                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        &mut (*ent).r.currentOrigin,
+                    );
                     // copy to person carrying's origin before popping out of them
                     HolocronPopOut(ctx, ent);
-                    (*((*enemy_ptr).client as *mut gclient_t)).ps.holocronsCarried[(*ent).count as usize] = 0.0;
+                    (*((*enemy_ptr).client as *mut gclient_t))
+                        .ps
+                        .holocronsCarried[(*ent).count as usize] = 0.0;
                     (*ent).enemy = None;
 
                     justthink(ent, ctx);
                     return;
                 }
             }
-        } else if (*ent).pos2[0] != 0.0 && (*ent).enemy.map_or(false, |e| !(*(base.add(e.index()))).client.is_null()) {
+        } else if (*ent).pos2[0] != 0.0
+            && (*ent)
+                .enemy
+                .map_or(false, |e| !(*(base.add(e.index()))).client.is_null())
+        {
             (*ent).pos2[1] = ((*ctx.world).level.time + HOLOCRON_RESPAWN_TIME) as f32;
         }
 
         if let Some(e) = (*ent).enemy {
             let enemy_ptr = base.add(e.index());
             if !(*enemy_ptr).client.is_null() {
-                if (*((*enemy_ptr).client as *mut gclient_t)).ps.holocronsCarried[(*ent).count as usize] == 0.0 {
-                    (*((*enemy_ptr).client as *mut gclient_t)).ps.holocronCantTouch = (*ent).s.number;
-                    (*((*enemy_ptr).client as *mut gclient_t)).ps.holocronCantTouchTime = ((*ctx.world).level.time + 5000) as f32;
+                if (*((*enemy_ptr).client as *mut gclient_t))
+                    .ps
+                    .holocronsCarried[(*ent).count as usize]
+                    == 0.0
+                {
+                    (*((*enemy_ptr).client as *mut gclient_t))
+                        .ps
+                        .holocronCantTouch = (*ent).s.number;
+                    (*((*enemy_ptr).client as *mut gclient_t))
+                        .ps
+                        .holocronCantTouchTime = ((*ctx.world).level.time + 5000) as f32;
 
                     HolocronRespawn(ent);
-                    crate::q_math::_VectorCopy((*((*enemy_ptr).client as *mut gclient_t)).ps.origin, &mut (*ent).s.pos.trBase);
-                    crate::q_math::_VectorCopy((*((*enemy_ptr).client as *mut gclient_t)).ps.origin, &mut (*ent).s.origin);
-                    crate::q_math::_VectorCopy((*((*enemy_ptr).client as *mut gclient_t)).ps.origin, &mut (*ent).r.currentOrigin);
+                    crate::q_math::_VectorCopy(
+                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        &mut (*ent).s.pos.trBase,
+                    );
+                    crate::q_math::_VectorCopy(
+                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        &mut (*ent).s.origin,
+                    );
+                    crate::q_math::_VectorCopy(
+                        (*((*enemy_ptr).client as *mut gclient_t)).ps.origin,
+                        &mut (*ent).r.currentOrigin,
+                    );
                     // copy to person carrying's origin before popping out of them
                     HolocronPopOut(ctx, ent);
                     (*ent).enemy = None;
@@ -867,10 +1165,15 @@ pub fn HolocronThink(
                     return;
                 }
 
-                if (*enemy_ptr).inuse == 0 || ((*((*enemy_ptr).client as *mut gclient_t)).ps.fallingToDeath != 0) {
+                if (*enemy_ptr).inuse == 0
+                    || ((*((*enemy_ptr).client as *mut gclient_t)).ps.fallingToDeath != 0)
+                {
                     if (*enemy_ptr).inuse != 0 && !(*enemy_ptr).client.is_null() {
-                        (*((*enemy_ptr).client as *mut gclient_t)).ps.holocronBits &= !(1 << (*ent).count);
-                        (*((*enemy_ptr).client as *mut gclient_t)).ps.holocronsCarried[(*ent).count as usize] = 0.0;
+                        (*((*enemy_ptr).client as *mut gclient_t)).ps.holocronBits &=
+                            !(1 << (*ent).count);
+                        (*((*enemy_ptr).client as *mut gclient_t))
+                            .ps
+                            .holocronsCarried[(*ent).count as usize] = 0.0;
                     }
                     (*ent).enemy = None;
                     HolocronRespawn(ent);
@@ -910,8 +1213,7 @@ pub fn HolocronThink(
 /// Raven `SP_misc_holocron`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:993-1097`
-pub fn SP_misc_holocron(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_holocron(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_HOLOCRON;
     unsafe {
         let mut dest: vec3_t;
@@ -923,7 +1225,10 @@ pub fn SP_misc_holocron(
         }
 
         if crate::w_saber::HasSetSaberOnly(ctx) != qfalse {
-            if (*ent).count == FP_SABER_OFFENSE || (*ent).count == FP_SABER_DEFENSE || (*ent).count == FP_SABERTHROW {
+            if (*ent).count == FP_SABER_OFFENSE
+                || (*ent).count == FP_SABER_DEFENSE
+                || (*ent).count == FP_SABERTHROW
+            {
                 // having saber holocrons in saber only mode is pointless
                 G_FreeEntity(ctx, ent);
                 return;
@@ -938,7 +1243,11 @@ pub fn SP_misc_holocron(
         (*ent).s.origin[2] += 0.1;
         (*ent).r.maxs[2] -= 0.1;
 
-        dest = [(*ent).s.origin[0], (*ent).s.origin[1], (*ent).s.origin[2] - 4096.0];
+        dest = [
+            (*ent).s.origin[0],
+            (*ent).s.origin[1],
+            (*ent).s.origin[2] - 4096.0,
+        ];
         trap::Trace(
             ctx.engine,
             GTraceArgs::new(
@@ -952,7 +1261,14 @@ pub fn SP_misc_holocron(
             ),
         );
         if tr.startsolid != 0 {
-            G_Printf(ctx, cstr(&format!("SP_misc_holocron: misc_holocron startsolid at {}\n", cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr());
+            G_Printf(
+                ctx,
+                cstr(&format!(
+                    "SP_misc_holocron: misc_holocron startsolid at {}\n",
+                    cstr_to_str(vtos(ctx, (*ent).s.origin))
+                ))
+                .as_ptr(),
+            );
             G_FreeEntity(ctx, ent);
             return;
         }
@@ -1014,7 +1330,11 @@ pub fn SP_misc_holocron(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1107-1139`
 pub fn Use_Shooter(
-    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     unsafe {
         let mut dir: vec3_t;
         let mut up: vec3_t = [0.0, 0.0, 0.0];
@@ -1053,17 +1373,23 @@ pub fn Use_Shooter(
             _ => {}
         }
 
-        G_AddEvent(ent, mp_bg::public::entity_event::entity_event_t::EV_FIRE_WEAPON as c_int, 0);
+        G_AddEvent(
+            ent,
+            mp_bg::public::entity_event::entity_event_t::EV_FIRE_WEAPON as c_int,
+            0,
+        );
     }
 }
 
 /// Raven `InitShooter_Finish`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1142-1146`
-pub fn InitShooter_Finish(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn InitShooter_Finish(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        (*ent).enemy = ent_id_opt((*ctx.world).g_entities.as_mut_ptr(), G_PickTarget(ctx, (*ent).target));
+        (*ent).enemy = ent_id_opt(
+            (*ctx.world).g_entities.as_mut_ptr(),
+            G_PickTarget(ctx, (*ent).target),
+        );
         (*ent).think = None;
         (*ent).nextthink = 0;
     }
@@ -1072,8 +1398,7 @@ pub fn InitShooter_Finish(
 /// Raven `InitShooter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1148-1166`
-pub fn InitShooter(
-    ctx: GameContext<'_>,ent: *mut gentity_t, weapon: c_int) {
+pub fn InitShooter(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int) {
     unsafe {
         (*ent).use_ = Some(EntUse::Use_Shooter);
         (*ent).s.weapon = weapon;
@@ -1098,8 +1423,7 @@ pub fn InitShooter(
 /// Raven `SP_shooter_blaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1172-1174`
-pub fn SP_shooter_blaster(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_shooter_blaster(ctx: GameContext<'_>, ent: *mut gentity_t) {
     InitShooter(ctx, ent, mp_bg::weapons::weapon_t::WP_BLASTER);
 }
 
@@ -1107,8 +1431,7 @@ pub fn SP_shooter_blaster(
 /// Raven `check_recharge`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1176-1206`
-pub fn check_recharge(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn check_recharge(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_USE;
     use mp_qshared::shared::sound_channel::CHAN_AUTO;
     unsafe {
@@ -1153,12 +1476,21 @@ pub fn check_recharge(
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1213-1223`
 // PORT-NOTE(unported-const): `STATION_RECHARGE_TIME` (`g_local.h`) has no
 // ported home anywhere in the crate graph; referenced verbatim.
-pub fn EnergyShieldStationSettings(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn EnergyShieldStationSettings(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        G_SpawnInt(ctx, c"count".as_ptr(), c"200".as_ptr(), &mut (*ent).count as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"count".as_ptr(),
+            c"200".as_ptr(),
+            &mut (*ent).count as *mut c_int,
+        );
 
-        G_SpawnInt(ctx, c"chargerate".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue5 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"chargerate".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue5 as *mut c_int,
+        );
 
         if (*ent).genericValue5 == 0 {
             (*ent).genericValue5 = STATION_RECHARGE_TIME;
@@ -1192,9 +1524,18 @@ pub fn shield_power_converter_use(
             && !(*other).client.is_null()
             && (*((*other).client as *mut gclient_t)).siegeClass != 0
         {
-            if (*ctx.world).bg_state.bgSiegeClasses[(*((*other).client as *mut gclient_t)).siegeClass as usize].maxarmor == 0 {
+            if (*ctx.world).bg_state.bgSiegeClasses
+                [(*((*other).client as *mut gclient_t)).siegeClass as usize]
+                .maxarmor
+                == 0
+            {
                 // can't use it!
-                G_Sound(ctx, self_, CHAN_AUTO as c_int, G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr()));
+                G_Sound(
+                    ctx,
+                    self_,
+                    CHAN_AUTO as c_int,
+                    G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr()),
+                );
                 return;
             }
         }
@@ -1212,11 +1553,15 @@ pub fn shield_power_converter_use(
                 && !(*other).client.is_null()
                 && (*((*other).client as *mut gclient_t)).siegeClass != -1
             {
-                max_armor = (*ctx.world).bg_state.bgSiegeClasses[(*((*other).client as *mut gclient_t)).siegeClass as usize].maxarmor;
+                max_armor = (*ctx.world).bg_state.bgSiegeClasses
+                    [(*((*other).client as *mut gclient_t)).siegeClass as usize]
+                    .maxarmor;
             } else {
-                max_armor = (*((*activator).client as *mut gclient_t)).ps.stats[STAT_MAX_HEALTH as usize];
+                max_armor =
+                    (*((*activator).client as *mut gclient_t)).ps.stats[STAT_MAX_HEALTH as usize];
             }
-            dif = max_armor - (*((*activator).client as *mut gclient_t)).ps.stats[STAT_ARMOR as usize];
+            dif = max_armor
+                - (*((*activator).client as *mut gclient_t)).ps.stats[STAT_ARMOR as usize];
 
             if dif > 0 {
                 // Already at full armor?
@@ -1248,7 +1593,12 @@ pub fn shield_power_converter_use(
         if stop || (*self_).count <= 0 {
             if (*self_).s.loopSound != 0 && (*self_).setTime < (*ctx.world).level.time {
                 if (*self_).count <= 0 {
-                    G_Sound(ctx, self_, CHAN_AUTO as c_int, G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr()));
+                    G_Sound(
+                        ctx,
+                        self_,
+                        CHAN_AUTO as c_int,
+                        G_SoundIndex(c"sound/interface/shieldcon_empty".as_ptr()),
+                    );
                 } else {
                     G_Sound(ctx, self_, CHAN_AUTO as c_int, (*self_).genericValue7);
                 }
@@ -1298,8 +1648,10 @@ pub fn ammo_generic_power_converter_use(
                     add = 1;
                 }
                 if ((*((*activator).client as *mut gclient_t)).ps.eFlags & EF_DOUBLE_AMMO != 0
-                    && (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] < ammoData[i as usize].max * 2)
-                    || (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] < ammoData[i as usize].max
+                    && (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
+                        < ammoData[i as usize].max * 2)
+                    || (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
+                        < ammoData[i as usize].max
                 {
                     gave_some = true;
                     if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE
@@ -1316,15 +1668,23 @@ pub fn ammo_generic_power_converter_use(
                     {
                         // fixme - this should SERIOUSLY be externed.
                         (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = 10;
-                    } else if (*((*activator).client as *mut gclient_t)).ps.eFlags & EF_DOUBLE_AMMO != 0 {
-                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= ammoData[i as usize].max * 2 {
-                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = ammoData[i as usize].max * 2;
+                    } else if (*((*activator).client as *mut gclient_t)).ps.eFlags & EF_DOUBLE_AMMO
+                        != 0
+                    {
+                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
+                            >= ammoData[i as usize].max * 2
+                        {
+                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] =
+                                ammoData[i as usize].max * 2;
                         } else {
                             stop = false;
                         }
                     } else {
-                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] >= ammoData[i as usize].max {
-                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = ammoData[i as usize].max;
+                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
+                            >= ammoData[i as usize].max
+                        {
+                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] =
+                                ammoData[i as usize].max;
                         } else {
                             stop = false;
                         }
@@ -1349,7 +1709,12 @@ pub fn ammo_generic_power_converter_use(
         if stop || (*self_).count <= 0 {
             if (*self_).s.loopSound != 0 && (*self_).setTime < (*ctx.world).level.time {
                 if (*self_).count <= 0 {
-                    G_Sound(ctx, self_, CHAN_AUTO as c_int, G_SoundIndex(c"sound/interface/ammocon_empty".as_ptr()));
+                    G_Sound(
+                        ctx,
+                        self_,
+                        CHAN_AUTO as c_int,
+                        G_SoundIndex(c"sound/interface/ammocon_empty".as_ptr()),
+                    );
                 } else {
                     G_Sound(ctx, self_, CHAN_AUTO as c_int, (*self_).genericValue7);
                 }
@@ -1366,8 +1731,7 @@ pub fn ammo_generic_power_converter_use(
 /// Raven `SP_misc_ammo_floor_unit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1515-1592`
-pub fn SP_misc_ammo_floor_unit(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_ammo_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_SIEGE;
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
@@ -1380,7 +1744,11 @@ pub fn SP_misc_ammo_floor_unit(
         (*ent).s.origin[2] += 0.1;
         (*ent).r.maxs[2] -= 0.1;
 
-        dest = [(*ent).s.origin[0], (*ent).s.origin[1], (*ent).s.origin[2] - 4096.0];
+        dest = [
+            (*ent).s.origin[0],
+            (*ent).s.origin[1],
+            (*ent).s.origin[2] - 4096.0,
+        ];
         trap::Trace(
             ctx.engine,
             GTraceArgs::new(
@@ -1394,7 +1762,14 @@ pub fn SP_misc_ammo_floor_unit(
             ),
         );
         if tr.startsolid != 0 {
-            G_Printf(ctx, cstr(&format!("SP_misc_ammo_floor_unit: misc_ammo_floor_unit startsolid at {}\n", cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr());
+            G_Printf(
+                ctx,
+                cstr(&format!(
+                    "SP_misc_ammo_floor_unit: misc_ammo_floor_unit startsolid at {}\n",
+                    cstr_to_str(vtos(ctx, (*ent).s.origin))
+                ))
+                .as_ptr(),
+            );
             G_FreeEntity(ctx, ent);
             return;
         }
@@ -1427,7 +1802,12 @@ pub fn SP_misc_ammo_floor_unit(
         (*ent).genericValue4 = (*ent).count; // initial value
         (*ent).think = Some(EntThink::check_recharge);
 
-        G_SpawnInt(ctx, c"nodrain".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue12 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"nodrain".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue12 as *mut c_int,
+        );
 
         if (*ent).genericValue12 == 0 {
             (*ent).s.maxhealth = (*ent).count;
@@ -1452,7 +1832,8 @@ pub fn SP_misc_ammo_floor_unit(
             // show on radar from everywhere
             (*ent).r.svFlags |= SVF_BROADCAST;
             (*ent).s.eFlags |= EF_RADAROBJECT;
-            (*ent).s.genericenemyindex = G_IconIndex(ctx, c"gfx/mp/siegeicons/desert/weapon_recharge".as_ptr());
+            (*ent).s.genericenemyindex =
+                G_IconIndex(ctx, c"gfx/mp/siegeicons/desert/weapon_recharge".as_ptr());
         }
     }
 }
@@ -1460,8 +1841,7 @@ pub fn SP_misc_ammo_floor_unit(
 /// Raven `SP_misc_shield_floor_unit`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1602-1687`
-pub fn SP_misc_shield_floor_unit(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_shield_floor_unit(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::{GT_CTF, GT_CTY, GT_SIEGE};
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
@@ -1482,7 +1862,11 @@ pub fn SP_misc_shield_floor_unit(
         (*ent).s.origin[2] += 0.1;
         (*ent).r.maxs[2] -= 0.1;
 
-        dest = [(*ent).s.origin[0], (*ent).s.origin[1], (*ent).s.origin[2] - 4096.0];
+        dest = [
+            (*ent).s.origin[0],
+            (*ent).s.origin[1],
+            (*ent).s.origin[2] - 4096.0,
+        ];
         trap::Trace(
             ctx.engine,
             GTraceArgs::new(
@@ -1496,7 +1880,14 @@ pub fn SP_misc_shield_floor_unit(
             ),
         );
         if tr.startsolid != 0 {
-            G_Printf(ctx, cstr(&format!("SP_misc_shield_floor_unit: misc_shield_floor_unit startsolid at {}\n", cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr());
+            G_Printf(
+                ctx,
+                cstr(&format!(
+                    "SP_misc_shield_floor_unit: misc_shield_floor_unit startsolid at {}\n",
+                    cstr_to_str(vtos(ctx, (*ent).s.origin))
+                ))
+                .as_ptr(),
+            );
             G_FreeEntity(ctx, ent);
             return;
         }
@@ -1529,7 +1920,12 @@ pub fn SP_misc_shield_floor_unit(
         (*ent).genericValue4 = (*ent).count;
         (*ent).think = Some(EntThink::check_recharge);
 
-        G_SpawnInt(ctx, c"nodrain".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue12 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"nodrain".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue12 as *mut c_int,
+        );
 
         if (*ent).genericValue12 == 0 {
             (*ent).s.maxhealth = (*ent).count;
@@ -1553,7 +1949,8 @@ pub fn SP_misc_shield_floor_unit(
         if (*ctx.world).cvars.g_gametype.integer == GT_SIEGE {
             (*ent).r.svFlags |= SVF_BROADCAST;
             (*ent).s.eFlags |= EF_RADAROBJECT;
-            (*ent).s.genericenemyindex = G_IconIndex(ctx, c"gfx/mp/siegeicons/desert/shield_recharge".as_ptr());
+            (*ent).s.genericenemyindex =
+                G_IconIndex(ctx, c"gfx/mp/siegeicons/desert/shield_recharge".as_ptr());
         }
     }
 }
@@ -1561,8 +1958,7 @@ pub fn SP_misc_shield_floor_unit(
 /// Raven `SP_misc_model_shield_power_converter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1697-1735`
-pub fn SP_misc_model_shield_power_converter(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_model_shield_power_converter(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
         if (*ent).health == 0 {
@@ -1600,7 +1996,8 @@ pub fn SP_misc_model_shield_power_converter(
 
         //G_SoundIndex("sound/movers/objects/useshieldstation.wav");
 
-        (*ent).s.modelindex2 = G_ModelIndex(c"/models/items/psd_big.md3".as_ptr()); // Precache model
+        (*ent).s.modelindex2 = G_ModelIndex(c"/models/items/psd_big.md3".as_ptr());
+        // Precache model
     }
 }
 
@@ -1610,10 +2007,14 @@ pub fn SP_misc_model_shield_power_converter(
 // PORT-NOTE(seam-threading): faithful skeleton signature carries no
 // `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one —
 // how is state threaded in?
-pub fn EnergyAmmoStationSettings(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn EnergyAmmoStationSettings(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        G_SpawnInt(ctx, c"count".as_ptr(), c"200".as_ptr(), &mut (*ent).count as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"count".as_ptr(),
+            c"200".as_ptr(),
+            &mut (*ent).count as *mut c_int,
+        );
     }
 }
 
@@ -1650,10 +2051,15 @@ pub fn ammo_power_converter_use(
                     if add < 1 {
                         add = 1;
                     }
-                    if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] < ammoData[i as usize].max {
+                    if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
+                        < ammoData[i as usize].max
+                    {
                         (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] += add;
-                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] > ammoData[i as usize].max {
-                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] = ammoData[i as usize].max;
+                        if (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize]
+                            > ammoData[i as usize].max
+                        {
+                            (*((*activator).client as *mut gclient_t)).ps.ammo[i as usize] =
+                                ammoData[i as usize].max;
                         }
                     }
                     i += 1;
@@ -1678,8 +2084,7 @@ pub fn ammo_power_converter_use(
 /// Raven `SP_misc_model_ammo_power_converter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1864-1904`
-pub fn SP_misc_model_ammo_power_converter(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_model_ammo_power_converter(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
         if (*ent).health == 0 {
@@ -1696,7 +2101,12 @@ pub fn SP_misc_model_ammo_power_converter(
         (*ent).r.contents = CONTENTS_SOLID;
         (*ent).clipmask = MASK_SOLID;
 
-        G_SpawnInt(ctx, c"nodrain".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue12 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"nodrain".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue12 as *mut c_int,
+        );
         (*ent).use_ = Some(EntUse::ammo_power_converter_use);
 
         EnergyAmmoStationSettings(ctx, ent);
@@ -1728,10 +2138,14 @@ pub fn SP_misc_model_ammo_power_converter(
 // PORT-NOTE(seam-threading): faithful skeleton signature carries no
 // `GameContext`/`&Engine` receiver, but `G_SpawnInt` needs one —
 // how is state threaded in?
-pub fn EnergyHealthStationSettings(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn EnergyHealthStationSettings(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        G_SpawnInt(ctx, c"count".as_ptr(), c"200".as_ptr(), &mut (*ent).count as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"count".as_ptr(),
+            c"200".as_ptr(),
+            &mut (*ent).count as *mut c_int,
+        );
     }
 }
 
@@ -1788,8 +2202,7 @@ pub fn health_power_converter_use(
 /// Raven `SP_misc_model_health_power_converter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:1982-2027`
-pub fn SP_misc_model_health_power_converter(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_model_health_power_converter(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_SIEGE;
     use mp_qshared::shared::limits::ENTITYNUM_NONE;
     unsafe {
@@ -1833,7 +2246,8 @@ pub fn SP_misc_model_health_power_converter(
             // show on radar from everywhere
             (*ent).r.svFlags |= SVF_BROADCAST;
             (*ent).s.eFlags |= EF_RADAROBJECT;
-            (*ent).s.genericenemyindex = G_IconIndex(ctx, c"gfx/mp/siegeicons/desert/bacta".as_ptr());
+            (*ent).s.genericenemyindex =
+                G_IconIndex(ctx, c"gfx/mp/siegeicons/desert/bacta".as_ptr());
         }
     }
 }
@@ -1854,11 +2268,18 @@ const FX_STATE_CONTINUOUS: c_int = 20;
 /// Raven `fx_runner_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2266-2310`
-pub fn fx_runner_think(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn fx_runner_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.pos as *const trajectory_t, (*ctx.world).level.time, &mut (*ent).r.currentOrigin);
-        crate::bg_misc::BG_EvaluateTrajectory(&(*ent).s.apos as *const trajectory_t, (*ctx.world).level.time, &mut (*ent).r.currentAngles);
+        crate::bg_misc::BG_EvaluateTrajectory(
+            &(*ent).s.pos as *const trajectory_t,
+            (*ctx.world).level.time,
+            &mut (*ent).r.currentOrigin,
+        );
+        crate::bg_misc::BG_EvaluateTrajectory(
+            &(*ent).s.apos as *const trajectory_t,
+            (*ctx.world).level.time,
+            &mut (*ent).r.currentAngles,
+        );
 
         // call the effect with the desired position and orientation
         if (*ent).s.isPortalEnt != 0 {
@@ -1873,11 +2294,22 @@ pub fn fx_runner_think(
         crate::q_math::_VectorCopy((*ent).r.currentAngles, &mut (*ent).s.angles);
         crate::q_math::_VectorCopy((*ent).r.currentOrigin, &mut (*ent).s.origin);
 
-        (*ent).nextthink = (*ctx.world).level.time + (*ent).delay + ((*ctx.world).bg_state.rng.random() * (*ent).random) as c_int;
+        (*ent).nextthink = (*ctx.world).level.time
+            + (*ent).delay
+            + ((*ctx.world).bg_state.rng.random() * (*ent).random) as c_int;
 
         if (*ent).spawnflags & 4 != 0 {
             // damage
-            G_RadiusDamage(ctx, (*ent).r.currentOrigin, ent, (*ent).splashDamage as f32, (*ent).splashRadius as f32, ent, ent, MOD_UNKNOWN as c_int);
+            G_RadiusDamage(
+                ctx,
+                (*ent).r.currentOrigin,
+                ent,
+                (*ent).splashDamage as f32,
+                (*ent).splashRadius as f32,
+                ent,
+                ent,
+                MOD_UNKNOWN as c_int,
+            );
         }
 
         if !(*ent).target2.is_null() && *(*ent).target2 != 0 {
@@ -1900,7 +2332,11 @@ pub fn fx_runner_think(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2313-2384`
 pub fn fx_runner_use(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     unsafe {
         if (*self_).s.isPortalEnt != 0 {
             // rww - mark it as broadcast upon first use if it's within the area of a skyportal
@@ -1928,7 +2364,11 @@ pub fn fx_runner_use(
 
             if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
                 (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
-                G_AddEvent(self_, mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int, BMS_START);
+                G_AddEvent(
+                    self_,
+                    mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int,
+                    BMS_START,
+                );
             }
         } else {
             // ensure we are working with the right think function
@@ -1942,7 +2382,11 @@ pub fn fx_runner_use(
 
                 if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
                     (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
-                    G_AddEvent(self_, mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int, BMS_START);
+                    G_AddEvent(
+                        self_,
+                        mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int,
+                        BMS_START,
+                    );
                     (*self_).s.loopSound = BMS_MID;
                     (*self_).s.loopIsSoundset = qtrue;
                 }
@@ -1955,7 +2399,11 @@ pub fn fx_runner_use(
 
                 if !(*self_).soundSet.is_null() && *(*self_).soundSet != 0 {
                     (*self_).s.soundSetIndex = G_SoundSetIndex(ctx, (*self_).soundSet);
-                    G_AddEvent(self_, mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int, BMS_END);
+                    G_AddEvent(
+                        self_,
+                        mp_bg::public::entity_event::entity_event_t::EV_BMODEL_SOUND as c_int,
+                        BMS_END,
+                    );
                     (*self_).s.loopSound = 0;
                     (*self_).s.loopIsSoundset = qfalse;
                 }
@@ -1967,18 +2415,28 @@ pub fn fx_runner_use(
 /// Raven `fx_runner_link`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2387-2453`
-pub fn fx_runner_link(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn fx_runner_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut dir: vec3_t;
 
         if !(*ent).target.is_null() && *(*ent).target != 0 {
             // try to use the target to override the orientation
-            let target = G_Find(ctx, core::ptr::null_mut(), core::mem::offset_of!(gentity_t, targetname) as c_int, (*ent).target);
+            let target = G_Find(
+                ctx,
+                core::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                (*ent).target,
+            );
 
             if target.is_null() {
                 // Bah, no good, dump a warning, but continue on and use the UP vector
-                crate::g_main::Com_Printf(cstr(&format!("fx_runner_link: target specified but not found: {}\n", cstr_to_str((*ent).target))).as_ptr());
+                crate::g_main::Com_Printf(
+                    cstr(&format!(
+                        "fx_runner_link: target specified but not found: {}\n",
+                        cstr_to_str((*ent).target)
+                    ))
+                    .as_ptr(),
+                );
                 crate::g_main::Com_Printf(c"  -assuming UP orientation.\n".as_ptr());
             } else {
                 // Our target is valid so let's override the default UP vector
@@ -1991,11 +2449,22 @@ pub fn fx_runner_link(
 
         // don't really do anything with this right now other than do a check to warn the designers if the target2 is bogus
         if !(*ent).target2.is_null() && *(*ent).target2 != 0 {
-            let target = G_Find(ctx, core::ptr::null_mut(), core::mem::offset_of!(gentity_t, targetname) as c_int, (*ent).target2);
+            let target = G_Find(
+                ctx,
+                core::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                (*ent).target2,
+            );
 
             if target.is_null() {
                 // Target2 is bogus, but we can still continue
-                crate::g_main::Com_Printf(cstr(&format!("fx_runner_link: target2 was specified but is not valid: {}\n", cstr_to_str((*ent).target2))).as_ptr());
+                crate::g_main::Com_Printf(
+                    cstr(&format!(
+                        "fx_runner_link: target2 was specified but is not valid: {}\n",
+                        cstr_to_str((*ent).target2)
+                    ))
+                    .as_ptr(),
+                );
             }
         }
 
@@ -2027,17 +2496,36 @@ pub fn fx_runner_link(
 /// Raven `SP_fx_runner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2456-2501`
-pub fn SP_fx_runner(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_fx_runner(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         let mut fx_file: *mut c_char = core::ptr::null_mut();
 
         G_SpawnString(ctx, c"fxFile".as_ptr(), c"".as_ptr(), &mut fx_file);
         // Get our defaults
-        G_SpawnInt(ctx, c"delay".as_ptr(), c"200".as_ptr(), &mut (*ent).delay as *mut c_int);
-        G_SpawnFloat(ctx, c"random".as_ptr(), c"0".as_ptr(), &mut (*ent).random as *mut f32);
-        G_SpawnInt(ctx, c"splashRadius".as_ptr(), c"16".as_ptr(), &mut (*ent).splashRadius as *mut c_int);
-        G_SpawnInt(ctx, c"splashDamage".as_ptr(), c"5".as_ptr(), &mut (*ent).splashDamage as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"delay".as_ptr(),
+            c"200".as_ptr(),
+            &mut (*ent).delay as *mut c_int,
+        );
+        G_SpawnFloat(
+            ctx,
+            c"random".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).random as *mut f32,
+        );
+        G_SpawnInt(
+            ctx,
+            c"splashRadius".as_ptr(),
+            c"16".as_ptr(),
+            &mut (*ent).splashRadius as *mut c_int,
+        );
+        G_SpawnInt(
+            ctx,
+            c"splashDamage".as_ptr(),
+            c"5".as_ptr(),
+            &mut (*ent).splashDamage as *mut c_int,
+        );
 
         if (*ent).s.angles[0] == 0.0 && (*ent).s.angles[1] == 0.0 && (*ent).s.angles[2] == 0.0 {
             // didn't have angles, so give us the default of up
@@ -2046,7 +2534,12 @@ pub fn SP_fx_runner(
 
         if fx_file.is_null() || *fx_file == 0 {
             crate::g_main::Com_Printf(
-                cstr(&format!("^1ERROR: fx_runner {} at {} has no fxFile specified\n", cstr_to_str((*ent).targetname), cstr_to_str(vtos(ctx, (*ent).s.origin)))).as_ptr(),
+                cstr(&format!(
+                    "^1ERROR: fx_runner {} at {} has no fxFile specified\n",
+                    cstr_to_str((*ent).targetname),
+                    cstr_to_str(vtos(ctx, (*ent).s.origin))
+                ))
+                .as_ptr(),
             );
             G_FreeEntity(ctx, ent);
             return;
@@ -2079,8 +2572,7 @@ pub fn SP_fx_runner(
 /// Raven `SP_CreateSpaceDust`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2509-2513`
-pub fn SP_CreateSpaceDust(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_CreateSpaceDust(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         G_EffectIndex(cstr(&format!("*spacedust {}", (*ent).count)).as_ptr());
         //G_EffectIndex("*constantwind ( 10 -10 0 )");
@@ -2090,8 +2582,7 @@ pub fn SP_CreateSpaceDust(
 /// Raven `SP_CreateSnow`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2522-2527`
-pub fn SP_CreateSnow(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_CreateSnow(ctx: GameContext<'_>, ent: *mut gentity_t) {
     G_EffectIndex(b"*snow\0".as_ptr() as *const c_char);
     G_EffectIndex(b"*fog\0".as_ptr() as *const c_char);
     G_EffectIndex(b"*constantwind (100 100 -100)\0".as_ptr() as *const c_char);
@@ -2100,8 +2591,7 @@ pub fn SP_CreateSnow(
 /// Raven `SP_CreateRain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2535-2538`
-pub fn SP_CreateRain(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_CreateRain(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         G_EffectIndex(cstr(&format!("*rain init {}", (*ent).count)).as_ptr());
     }
@@ -2111,10 +2601,25 @@ pub fn SP_CreateRain(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2543-2553`
 pub fn Use_Target_Screenshake(
-    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     unsafe {
-        let bGlobal: qboolean = if (*ent).genericValue6 != 0 { qtrue } else { qfalse };
-        G_ScreenShake(ctx, (*ent).s.origin, std::ptr::null_mut(), (*ent).speed, (*ent).genericValue5, bGlobal);
+        let bGlobal: qboolean = if (*ent).genericValue6 != 0 {
+            qtrue
+        } else {
+            qfalse
+        };
+        G_ScreenShake(
+            ctx,
+            (*ent).s.origin,
+            std::ptr::null_mut(),
+            (*ent).speed,
+            (*ent).genericValue5,
+            bGlobal,
+        );
     }
 }
 
@@ -2125,12 +2630,26 @@ pub fn Use_Target_Screenshake(
 /// Raven `SP_target_screenshake`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2555-2565`
-pub fn SP_target_screenshake(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_target_screenshake(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
-        G_SpawnFloat(ctx, c"intensity".as_ptr(), c"10".as_ptr(), &mut (*ent).speed as *mut f32);
-        G_SpawnInt(ctx, c"duration".as_ptr(), c"800".as_ptr(), &mut (*ent).genericValue5 as *mut c_int);
-        G_SpawnInt(ctx, c"globalshake".as_ptr(), c"1".as_ptr(), &mut (*ent).genericValue6 as *mut c_int);
+        G_SpawnFloat(
+            ctx,
+            c"intensity".as_ptr(),
+            c"10".as_ptr(),
+            &mut (*ent).speed as *mut f32,
+        );
+        G_SpawnInt(
+            ctx,
+            c"duration".as_ptr(),
+            c"800".as_ptr(),
+            &mut (*ent).genericValue5 as *mut c_int,
+        );
+        G_SpawnInt(
+            ctx,
+            c"globalshake".as_ptr(),
+            c"1".as_ptr(),
+            &mut (*ent).genericValue6 as *mut c_int,
+        );
 
         (*ent).use_ = Some(EntUse::Use_Target_Screenshake);
     }
@@ -2142,7 +2661,11 @@ pub fn SP_target_screenshake(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2569-2597`
 pub fn Use_Target_Escapetrig(
-    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     use mp_bg::public::team::TEAM_SPECTATOR;
     unsafe {
         if (*ent).genericValue6 == 0 {
@@ -2166,7 +2689,12 @@ pub fn Use_Target_Escapetrig(
             }
             if !activator.is_null() && (*activator).inuse != 0 && !(*activator).client.is_null() {
                 // the one who escaped gets 500
-                AddScore(ctx, activator, (*((*activator).client as *mut gclient_t)).ps.origin, 500);
+                AddScore(
+                    ctx,
+                    activator,
+                    (*((*activator).client as *mut gclient_t)).ps.origin,
+                    500,
+                );
             }
 
             LogExit(ctx, c"Escaped!".as_ptr());
@@ -2179,8 +2707,7 @@ pub fn Use_Target_Escapetrig(
 /// Raven `SP_target_escapetrig`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2599-2613`
-pub fn SP_target_escapetrig(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_target_escapetrig(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_bg::public::gametype::GT_SINGLE_PLAYER;
     unsafe {
         if (*ctx.world).cvars.g_gametype.integer != GT_SINGLE_PLAYER {
@@ -2188,8 +2715,18 @@ pub fn SP_target_escapetrig(
             return;
         }
 
-        G_SpawnInt(ctx, c"escapetime".as_ptr(), c"60000".as_ptr(), &mut (*ent).genericValue5 as *mut c_int);
-        G_SpawnInt(ctx, c"escapegoal".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue6 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"escapetime".as_ptr(),
+            c"60000".as_ptr(),
+            &mut (*ent).genericValue5 as *mut c_int,
+        );
+        G_SpawnInt(
+            ctx,
+            c"escapegoal".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue6 as *mut c_int,
+        );
 
         (*ent).use_ = Some(EntUse::Use_Target_Escapetrig);
     }
@@ -2227,31 +2764,31 @@ pub fn maglock_die(
 /// Raven `SP_misc_maglock`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2645-2658`
-pub fn SP_misc_maglock(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_misc_maglock(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // NOTE: May have to make these only work on doors that are either untargeted
         //		or are targeted by a trigger, not doors fired off by scripts, counters
         //		or other such things?
-        (*self_).s.modelindex = G_ModelIndex(c"models/map_objects/imp_detention/door_lock.md3".as_ptr());
+        (*self_).s.modelindex =
+            G_ModelIndex(c"models/map_objects/imp_detention/door_lock.md3".as_ptr());
         (*self_).genericValue1 = G_EffectIndex(c"maglock/explosion".as_ptr());
 
         G_SetOrigin(self_, (*self_).s.origin);
 
         (*self_).think = Some(EntThink::maglock_link);
         //FIXME: for some reason, when you re-load a level, these fail to find their doors...?  Random?  Testing an additional 200ms after the START_TIME_FIND_LINKS
-        (*self_).nextthink = (*ctx.world).level.time + START_TIME_FIND_LINKS + 200; //because we need to let the doors link up and spawn their triggers first!
+        (*self_).nextthink = (*ctx.world).level.time + START_TIME_FIND_LINKS + 200;
+        //because we need to let the doors link up and spawn their triggers first!
     }
 }
 
 /// Raven `maglock_link`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2659-2728`
-pub fn maglock_link(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
-    use mp_qshared::shared::limits::ENTITYNUM_WORLD;
-    use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
+pub fn maglock_link(ctx: GameContext<'_>, self_: *mut gentity_t) {
     use crate::q_math::vectoangles;
+    use mp_qshared::shared::error_parm::errorParm_t::ERR_DROP;
+    use mp_qshared::shared::limits::ENTITYNUM_WORLD;
     unsafe {
         // find what we're supposed to be attached to
         let mut forward: vec3_t = [0.0, 0.0, 0.0];
@@ -2277,7 +2814,14 @@ pub fn maglock_link(
         );
 
         if trace.allsolid != 0 || trace.startsolid != 0 {
-            crate::g_main::Com_Error(ERR_DROP as c_int, cstr(&format!("misc_maglock at {} in solid\n", cstr_to_str(vtos(ctx, (*self_).s.origin)))).as_ptr());
+            crate::g_main::Com_Error(
+                ERR_DROP as c_int,
+                cstr(&format!(
+                    "misc_maglock at {} in solid\n",
+                    cstr_to_str(vtos(ctx, (*self_).s.origin))
+                ))
+                .as_ptr(),
+            );
             G_FreeEntity(ctx, self_);
             return;
         }
@@ -2287,7 +2831,10 @@ pub fn maglock_link(
             return;
         }
         let trace_ent = &mut (*ctx.world).g_entities[trace.entityNum as usize] as *mut gentity_t;
-        if trace.entityNum >= (ENTITYNUM_WORLD as c_int) as i16 || trace_ent.is_null() || Q_stricmp(c"func_door".as_ptr(), (*trace_ent).classname) != 0 {
+        if trace.entityNum >= (ENTITYNUM_WORLD as c_int) as i16
+            || trace_ent.is_null()
+            || Q_stricmp(c"func_door".as_ptr(), (*trace_ent).classname) != 0
+        {
             (*self_).think = Some(EntThink::maglock_link);
             (*self_).nextthink = (*ctx.world).level.time + 100;
             return;
@@ -2301,7 +2848,10 @@ pub fn maglock_link(
         } else {
             Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), trace_ent))
         };
-        let activator_ptr = (*ctx.world).g_entities.as_mut_ptr().add((*self_).activator.unwrap().index());
+        let activator_ptr = (*ctx.world)
+            .g_entities
+            .as_mut_ptr()
+            .add((*self_).activator.unwrap().index());
         (*activator_ptr).lockCount += 1;
         (*activator_ptr).flags |= FL_INACTIVE;
 
@@ -2330,7 +2880,11 @@ pub fn maglock_link(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2730-2756`
 pub fn faller_touch(
-    ctx: GameContext<'_>,self_: *mut gentity_t, other: *mut gentity_t, trace: *mut trace_t) {
+    ctx: GameContext<'_>,
+    self_: *mut gentity_t,
+    other: *mut gentity_t,
+    trace: *mut trace_t,
+) {
     use mp_qshared::shared::sound_channel::{CHAN_AUTO, CHAN_VOICE};
     unsafe {
         if (*self_).epVelocity[2] < -100.0 && (*self_).genericValue7 < (*ctx.world).level.time {
@@ -2358,8 +2912,7 @@ pub fn faller_touch(
 /// Raven `faller_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2758-2787`
-pub fn faller_think(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn faller_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use mp_qshared::shared::sound_channel::CHAN_VOICE;
     unsafe {
         let gravity: f32 = 3.0;
@@ -2381,7 +2934,16 @@ pub fn faller_think(
             (*ent).genericValue8 = 0;
         }
 
-        G_RunExPhys(ctx, ent, gravity, mass, bounce, qtrue, core::ptr::null_mut(), 0);
+        G_RunExPhys(
+            ctx,
+            ent,
+            gravity,
+            mass,
+            bounce,
+            qtrue,
+            core::ptr::null_mut(),
+            0,
+        );
         (*ent).s.pos.trDelta = [
             (*ent).epVelocity[0] * 10.0,
             (*ent).epVelocity[1] * 10.0,
@@ -2395,7 +2957,11 @@ pub fn faller_think(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2789-2828`
 pub fn misc_faller_create(
-    ctx: GameContext<'_>,ent: *mut gentity_t, other: *mut gentity_t, activator: *mut gentity_t) {
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    other: *mut gentity_t,
+    activator: *mut gentity_t,
+) {
     unsafe {
         let faller = G_Spawn(ctx);
 
@@ -2441,12 +3007,12 @@ pub fn misc_faller_create(
 /// Raven `misc_faller_think`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2830-2834`
-pub fn misc_faller_think(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn misc_faller_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         misc_faller_create(ctx, ent, ent, ent);
-        (*ent).nextthink =
-            (*ctx.world).level.time + (*ent).genericValue1 + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).genericValue2);
+        (*ent).nextthink = (*ctx.world).level.time
+            + (*ent).genericValue1
+            + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).genericValue2);
     }
 }
 
@@ -2455,8 +3021,7 @@ pub fn misc_faller_think(
 /// Raven `SP_misc_faller`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2844-2865`
-pub fn SP_misc_faller(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_faller(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         G_ModelIndex(c"models/players/stormtrooper/model.glm".as_ptr());
         G_SoundIndex(c"sound/chars/stofficer1/misc/pain25".as_ptr());
@@ -2465,13 +3030,24 @@ pub fn SP_misc_faller(
         G_SoundIndex(c"sound/chars/stofficer1/misc/falling1".as_ptr());
         G_SoundIndex(c"sound/player/fallsplat".as_ptr());
 
-        G_SpawnInt(ctx, c"interval".as_ptr(), c"500".as_ptr(), &mut (*ent).genericValue1 as *mut c_int);
-        G_SpawnInt(ctx, c"fudgefactor".as_ptr(), c"0".as_ptr(), &mut (*ent).genericValue2 as *mut c_int);
+        G_SpawnInt(
+            ctx,
+            c"interval".as_ptr(),
+            c"500".as_ptr(),
+            &mut (*ent).genericValue1 as *mut c_int,
+        );
+        G_SpawnInt(
+            ctx,
+            c"fudgefactor".as_ptr(),
+            c"0".as_ptr(),
+            &mut (*ent).genericValue2 as *mut c_int,
+        );
 
         if (*ent).targetname.is_null() || *(*ent).targetname == 0 {
             (*ent).think = Some(EntThink::misc_faller_think);
-            (*ent).nextthink =
-                (*ctx.world).level.time + (*ent).genericValue1 + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).genericValue2);
+            (*ent).nextthink = (*ctx.world).level.time
+                + (*ent).genericValue1
+                + (*ctx.world).bg_state.rng.Q_irand(0, (*ent).genericValue2);
         } else {
             (*ent).use_ = Some(EntUse::misc_faller_create);
         }
@@ -2496,7 +3072,13 @@ pub fn FirstFreeTagOwner(ctx: GameContext<'_>) -> *mut c_void {
             i += 1;
         }
 
-        crate::g_main::Com_Printf(cstr(&format!("WARNING: MAX_TAG_OWNERS ({}) REF TAG LIMIT HIT\n", MAX_TAG_OWNERS)).as_ptr());
+        crate::g_main::Com_Printf(
+            cstr(&format!(
+                "WARNING: MAX_TAG_OWNERS ({}) REF TAG LIMIT HIT\n",
+                MAX_TAG_OWNERS
+            ))
+            .as_ptr(),
+        );
         core::ptr::null_mut()
     }
 }
@@ -2523,7 +3105,13 @@ pub fn FirstFreeRefTag(
             i += 1;
         }
 
-        crate::g_main::Com_Printf(cstr(&format!("WARNING: MAX_TAGS ({}) REF TAG LIMIT HIT\n", MAX_TAGS)).as_ptr());
+        crate::g_main::Com_Printf(
+            cstr(&format!(
+                "WARNING: MAX_TAGS ({}) REF TAG LIMIT HIT\n",
+                MAX_TAGS
+            ))
+            .as_ptr(),
+        );
         core::ptr::null_mut()
     }
 }
@@ -2551,8 +3139,7 @@ pub fn TAG_Init(ctx: GameContext<'_>) {
 /// Raven `TAG_FindOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2953-2967`
-pub fn TAG_FindOwner(
-    ctx: GameContext<'_>,owner: *const c_char) -> *mut c_void {
+pub fn TAG_FindOwner(ctx: GameContext<'_>, owner: *const c_char) -> *mut c_void {
     unsafe {
         let mut i: c_int = 0;
         while i < MAX_TAG_OWNERS as c_int {
@@ -2572,7 +3159,10 @@ pub fn TAG_FindOwner(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2975-3028`
 pub fn TAG_Find(
-    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char) -> *mut reference_tag_t {
+    ctx: GameContext<'_>,
+    owner: *const c_char,
+    name: *const c_char,
+) -> *mut reference_tag_t {
     unsafe {
         let mut tag_owner: *mut c_void = core::ptr::null_mut();
         let mut i: c_int = 0;
@@ -2595,7 +3185,9 @@ pub fn TAG_Find(
 
         let owner_ptr = tag_owner as *mut crate::level::tag_owner::tagOwner_t;
         while i < MAX_TAGS as c_int {
-            if (*owner_ptr).tags[i as usize].inuse != 0 && Q_stricmp((*owner_ptr).tags[i as usize].name.as_ptr(), name) == 0 {
+            if (*owner_ptr).tags[i as usize].inuse != 0
+                && Q_stricmp((*owner_ptr).tags[i as usize].name.as_ptr(), name) == 0
+            {
                 return &mut (*owner_ptr).tags[i as usize] as *mut reference_tag_t;
             }
             i += 1;
@@ -2611,7 +3203,9 @@ pub fn TAG_Find(
         let generic_ptr = generic as *mut crate::level::tag_owner::tagOwner_t;
         i = 0;
         while i < MAX_TAGS as c_int {
-            if (*generic_ptr).tags[i as usize].inuse != 0 && Q_stricmp((*generic_ptr).tags[i as usize].name.as_ptr(), name) == 0 {
+            if (*generic_ptr).tags[i as usize].inuse != 0
+                && Q_stricmp((*generic_ptr).tags[i as usize].name.as_ptr(), name) == 0
+            {
                 return &mut (*generic_ptr).tags[i as usize] as *mut reference_tag_t;
             }
             i += 1;
@@ -2637,7 +3231,9 @@ pub fn TAG_Add(
         let mut owner = owner;
         // Make sure this tag's name isn't already in use
         if !TAG_Find(ctx, owner, name).is_null() {
-            crate::g_main::Com_Printf(cstr(&format!("^1Duplicate tag name \"{}\"\n", cstr_to_str(name))).as_ptr());
+            crate::g_main::Com_Printf(
+                cstr(&format!("^1Duplicate tag name \"{}\"\n", cstr_to_str(name))).as_ptr(),
+            );
             return core::ptr::null_mut();
         }
 
@@ -2676,7 +3272,11 @@ pub fn TAG_Add(
 
         if name.is_null() || *name == 0 {
             crate::g_main::Com_Printf(
-                cstr(&format!("^1ERROR: Nameless ref_tag found at ({} {} {})\n", origin[0] as c_int, origin[1] as c_int, origin[2] as c_int)).as_ptr(),
+                cstr(&format!(
+                    "^1ERROR: Nameless ref_tag found at ({} {} {})\n",
+                    origin[0] as c_int, origin[1] as c_int, origin[2] as c_int
+                ))
+                .as_ptr(),
             );
             return core::ptr::null_mut();
         }
@@ -2705,7 +3305,11 @@ pub fn TAG_Add(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3112-3125`
 pub fn TAG_GetOrigin(
-    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char, origin: &mut vec3_t) -> c_int {
+    ctx: GameContext<'_>,
+    owner: *const c_char,
+    name: *const c_char,
+    origin: &mut vec3_t,
+) -> c_int {
     let tag = TAG_Find(ctx, owner, name);
     unsafe {
         if tag.is_null() {
@@ -2723,7 +3327,11 @@ pub fn TAG_GetOrigin(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3134-3146`
 pub fn TAG_GetOrigin2(
-    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char, origin: &mut vec3_t) -> c_int {
+    ctx: GameContext<'_>,
+    owner: *const c_char,
+    name: *const c_char,
+    origin: &mut vec3_t,
+) -> c_int {
     let tag = TAG_Find(ctx, owner, name);
     if tag.is_null() {
         return 0;
@@ -2740,7 +3348,11 @@ pub fn TAG_GetOrigin2(
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3153-3166`
 pub fn TAG_GetAngles(
-    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char, angles: &mut vec3_t) -> c_int {
+    ctx: GameContext<'_>,
+    owner: *const c_char,
+    name: *const c_char,
+    angles: &mut vec3_t,
+) -> c_int {
     let tag = TAG_Find(ctx, owner, name);
     if tag.is_null() {
         // Raven `assert(0)` on the not-found path (UB in a release build,
@@ -2757,8 +3369,7 @@ pub fn TAG_GetAngles(
 /// Raven `TAG_GetRadius`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3174-3185`
-pub fn TAG_GetRadius(
-    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char) -> c_int {
+pub fn TAG_GetRadius(ctx: GameContext<'_>, owner: *const c_char, name: *const c_char) -> c_int {
     let tag = TAG_Find(ctx, owner, name);
     if tag.is_null() {
         // Raven `assert(0)` on the not-found path (UB in a release build,
@@ -2772,8 +3383,7 @@ pub fn TAG_GetRadius(
 /// Raven `TAG_GetFlags`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3193-3204`
-pub fn TAG_GetFlags(
-    ctx: GameContext<'_>,owner: *const c_char, name: *const c_char) -> c_int {
+pub fn TAG_GetFlags(ctx: GameContext<'_>, owner: *const c_char, name: *const c_char) -> c_int {
     let tag = TAG_Find(ctx, owner, name);
     if tag.is_null() {
         // Raven `assert(0)` on the not-found path (UB in a release build,
@@ -2786,13 +3396,17 @@ pub fn TAG_GetFlags(
 /// Raven `ref_link`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3267-3298`
-pub fn ref_link(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn ref_link(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use crate::q_math::vectoangles;
     unsafe {
         if !(*ent).target.is_null() {
             //TODO: Find the target and set our angles to that direction
-            let target = G_Find(ctx, core::ptr::null_mut(), core::mem::offset_of!(gentity_t, targetname) as c_int, (*ent).target);
+            let target = G_Find(
+                ctx,
+                core::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                (*ent).target,
+            );
             let mut dir: vec3_t = [0.0, 0.0, 0.0];
 
             if !target.is_null() {
@@ -2803,13 +3417,26 @@ pub fn ref_link(
                 //FIXME: Does pitch get flipped?
             } else {
                 crate::g_main::Com_Printf(
-                    cstr(&format!("^1ERROR: ref_tag ({}) has invalid target ({})", cstr_to_str((*ent).targetname), cstr_to_str((*ent).target))).as_ptr(),
+                    cstr(&format!(
+                        "^1ERROR: ref_tag ({}) has invalid target ({})",
+                        cstr_to_str((*ent).targetname),
+                        cstr_to_str((*ent).target)
+                    ))
+                    .as_ptr(),
                 );
             }
         }
 
         // Add the tag
-        TAG_Add(ctx, (*ent).targetname, (*ent).ownername, (*ent).s.origin, (*ent).s.angles, 16, 0);
+        TAG_Add(
+            ctx,
+            (*ent).targetname,
+            (*ent).ownername,
+            (*ent).s.origin,
+            (*ent).s.angles,
+            16,
+            0,
+        );
 
         // Delete immediately, cannot be refered to as an entity again
         // NOTE: this means if you wanted to link them in a chain for, say, a path, you can't
@@ -2822,8 +3449,7 @@ pub fn ref_link(
 /// Raven `SP_reference_tag`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3300-3312`
-pub fn SP_reference_tag(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_reference_tag(ctx: GameContext<'_>, ent: *mut gentity_t) {
     unsafe {
         if !(*ent).target.is_null() {
             // Init cannot occur until all entities have been spawned
@@ -2857,7 +3483,10 @@ pub fn G_ClientForShooter(ctx: GameContext<'_>) -> *mut gclient_t {
             i += 1;
         }
 
-        crate::g_main::Com_Error(mp_qshared::shared::error_parm::errorParm_t::ERR_DROP as c_int, c"No free shooter clients - hit MAX_SHOOTERS".as_ptr());
+        crate::g_main::Com_Error(
+            mp_qshared::shared::error_parm::errorParm_t::ERR_DROP as c_int,
+            c"No free shooter clients - hit MAX_SHOOTERS".as_ptr(),
+        );
         core::ptr::null_mut()
     }
 }
@@ -2865,8 +3494,7 @@ pub fn G_ClientForShooter(ctx: GameContext<'_>) -> *mut gclient_t {
 /// Raven `G_FreeClientForShooter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3377-3389`
-pub fn G_FreeClientForShooter(
-    ctx: GameContext<'_>,cl: *mut gclient_t) {
+pub fn G_FreeClientForShooter(ctx: GameContext<'_>, cl: *mut gclient_t) {
     unsafe {
         let mut i: usize = 0;
         while i < (MAX_SHOOTERS) as usize {
@@ -2884,8 +3512,7 @@ pub fn G_FreeClientForShooter(
 /// Raven `misc_weapon_shooter_fire`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3391-3399`
-pub fn misc_weapon_shooter_fire(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn misc_weapon_shooter_fire(ctx: GameContext<'_>, self_: *mut gentity_t) {
     use crate::g_weapon::FireWeapon;
     unsafe {
         FireWeapon(ctx, self_, (((*self_).spawnflags & 1) != 0) as qboolean);
@@ -2924,18 +3551,29 @@ pub fn misc_weapon_shooter_use(
 /// Raven `misc_weapon_shooter_aim`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3417-3438`
-pub fn misc_weapon_shooter_aim(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn misc_weapon_shooter_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
     use crate::q_math::vectoangles;
     unsafe {
         // update my aim
         if !(*self_).target.is_null() {
-            let targ = G_Find(ctx, core::ptr::null_mut(), core::mem::offset_of!(gentity_t, targetname) as c_int, (*self_).target);
+            let targ = G_Find(
+                ctx,
+                core::ptr::null_mut(),
+                core::mem::offset_of!(gentity_t, targetname) as c_int,
+                (*self_).target,
+            );
             if !targ.is_null() {
                 (*self_).enemy = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), targ));
-                crate::q_math::_VectorSubtract((*targ).r.currentOrigin, (*self_).r.currentOrigin, &mut (*self_).pos1);
+                crate::q_math::_VectorSubtract(
+                    (*targ).r.currentOrigin,
+                    (*self_).r.currentOrigin,
+                    &mut (*self_).pos1,
+                );
                 crate::q_math::_VectorCopy((*targ).r.currentOrigin, &mut (*self_).pos1);
-                vectoangles((*self_).pos1, &mut (*((*self_).client as *mut gclient_t)).ps.viewangles);
+                vectoangles(
+                    (*self_).pos1,
+                    &mut (*((*self_).client as *mut gclient_t)).ps.viewangles,
+                );
                 SetClientViewAngle(self_, (*((*self_).client as *mut gclient_t)).ps.viewangles);
                 //FIXME: don't keep doing this unless target is a moving target?
                 (*self_).nextthink = (*ctx.world).level.time + FRAMETIME;
@@ -2949,8 +3587,7 @@ pub fn misc_weapon_shooter_aim(
 /// Raven `SP_misc_weapon_shooter`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3444-3486`
-pub fn SP_misc_weapon_shooter(
-    ctx: GameContext<'_>,self_: *mut gentity_t) {
+pub fn SP_misc_weapon_shooter(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
         // alloc a client just for the weapon code to use
         (*self_).client = G_ClientForShooter(ctx) as *mut c_void;
@@ -2971,7 +3608,12 @@ pub fn SP_misc_weapon_shooter(
         crate::g_items::RegisterItem(ctx, crate::bg_misc::BG_FindItemForWeapon((*self_).s.weapon));
 
         // set where our muzzle is
-        crate::q_math::_VectorCopy((*self_).s.origin, &mut (*((*self_).client as *mut gclient_t)).renderInfo.muzzlePoint);
+        crate::q_math::_VectorCopy(
+            (*self_).s.origin,
+            &mut (*((*self_).client as *mut gclient_t))
+                .renderInfo
+                .muzzlePoint,
+        );
         // permanently updated (don't need for MP)
         //self->client->renderInfo.mPCalcTime = Q3_INFINITE;
 
@@ -2981,7 +3623,10 @@ pub fn SP_misc_weapon_shooter(
             (*self_).nextthink = (*ctx.world).level.time + START_TIME_LINK_ENTS;
         } else {
             // just set aim angles
-            crate::q_math::_VectorCopy((*self_).s.angles, &mut (*((*self_).client as *mut gclient_t)).ps.viewangles);
+            crate::q_math::_VectorCopy(
+                (*self_).s.angles,
+                &mut (*((*self_).client as *mut gclient_t)).ps.viewangles,
+            );
             AngleVectors((*self_).s.angles, Some(&mut (*self_).pos1), None, None);
         }
 
@@ -2997,8 +3642,7 @@ pub fn SP_misc_weapon_shooter(
 /// Raven `SP_misc_weather_zone`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:3491-3494`
-pub fn SP_misc_weather_zone(
-    ctx: GameContext<'_>,ent: *mut gentity_t) {
+pub fn SP_misc_weather_zone(ctx: GameContext<'_>, ent: *mut gentity_t) {
     G_FreeEntity(ctx, ent);
 }
 

@@ -8,17 +8,17 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
-use crate::NPC_reactions::NPC_Pain;
-use crate::NPC_utils::NPC_SetSurfaceOnOff;
 use crate::bg_misc::{BG_FindItemForAmmo, BG_FindItemForWeapon};
-use crate::level::damage_flags::DAMAGE_NO_PROTECTION;
+use crate::entity::hit_location::HL_GENERIC1;
 use crate::g_combat::G_Damage;
 use crate::g_items::RegisterItem;
 use crate::g_utils::{G_EffectIndex, G_PlayEffectID, G_Sound, G_SoundIndex};
-use crate::entity::hit_location::HL_GENERIC1;
+use crate::level::damage_flags::DAMAGE_NO_PROTECTION;
+use crate::prelude::*;
 use crate::q_shared::va;
 use crate::trap;
+use crate::NPC_reactions::NPC_Pain;
+use crate::NPC_utils::NPC_SetSurfaceOnOff;
 
 // Matrix flags for BG_GiveMeVectorFromMatrix are Raven `Eorientations`
 // (`q_shared.h:3086-3095`, enumerator order X, Z, Y) — glob-imported via the
@@ -128,41 +128,45 @@ pub fn NPC_Mark2_Precache(ctx: GameContext<'_>) {
 /// Raven `NPC_Mark2_Part_Explode`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:50-72`
-pub fn NPC_Mark2_Part_Explode(
-    ctx: GameContext<'_>,
-    self_: *mut gentity_t,
-    bolt: c_int,
-) {
-  unsafe {
-    if bolt >= 0 {
-        let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
-        let mut org: vec3_t = [0.0; 3];
-        let mut dir: vec3_t = [0.0; 3];
+pub fn NPC_Mark2_Part_Explode(ctx: GameContext<'_>, self_: *mut gentity_t, bolt: c_int) {
+    unsafe {
+        if bolt >= 0 {
+            let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
+            let mut org: vec3_t = [0.0; 3];
+            let mut dir: vec3_t = [0.0; 3];
 
-        trap::G2API_GetBoltMatrix(
-            ctx.engine,
-            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
-                (*self_).ghoul2,
-                0,
-                bolt,
-                &mut boltMatrix as *mut mdxaBone_t,
-                &(*self_).r.currentAngles as *const vec3_t,
-                &(*self_).r.currentOrigin as *const vec3_t,
-                (*ctx.world).level.time,
-                core::ptr::null_mut(),
-                &(*self_).modelScale as *const vec3_t,
-            ),
-        );
+            trap::G2API_GetBoltMatrix(
+                ctx.engine,
+                mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                    (*self_).ghoul2,
+                    0,
+                    bolt,
+                    &mut boltMatrix as *mut mdxaBone_t,
+                    &(*self_).r.currentAngles as *const vec3_t,
+                    &(*self_).r.currentOrigin as *const vec3_t,
+                    (*ctx.world).level.time,
+                    core::ptr::null_mut(),
+                    &(*self_).modelScale as *const vec3_t,
+                ),
+            );
 
-        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut org);
-        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
+            BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut org);
+            BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::NEGATIVE_Y as c_int, &mut dir);
 
-        G_PlayEffectID(G_EffectIndex(b"env/med_explode2\0".as_ptr() as *const c_char), org, dir);
-        G_PlayEffectID(G_EffectIndex(b"blaster/smoke_bolton\0".as_ptr() as *const c_char), org, dir);
+            G_PlayEffectID(
+                G_EffectIndex(b"env/med_explode2\0".as_ptr() as *const c_char),
+                org,
+                dir,
+            );
+            G_PlayEffectID(
+                G_EffectIndex(b"blaster/smoke_bolton\0".as_ptr() as *const c_char),
+                org,
+                dir,
+            );
+        }
+
+        (*self_).count += 1;
     }
-
-    (*self_).count += 1;
-  }
 }
 
 /// Raven `NPC_Mark2_Pain`.
@@ -174,286 +178,359 @@ pub fn NPC_Mark2_Pain(
     attacker: *mut gentity_t,
     damage: c_int,
 ) {
-  unsafe {
-    let hit_loc = (*ctx.world).globals.gPainHitLoc;
+    unsafe {
+        let hit_loc = (*ctx.world).globals.gPainHitLoc;
 
-    NPC_Pain(ctx, self_, attacker, damage);
+        NPC_Pain(ctx, self_, attacker, damage);
 
-    for i in 0..3 {
-        if hit_loc == HL_GENERIC1 + i && (*self_).locationDamage[(HL_GENERIC1 + i) as usize] > AMMO_POD_HEALTH {
-            if (*self_).locationDamage[hit_loc as usize] >= AMMO_POD_HEALTH {
-                let surface_name = cstr(&format!("torso_canister{}", (i + 1) as c_int));
-                let new_bolt = trap::G2API_AddBolt(
-                    ctx.engine,
-                    mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-                        (*self_).ghoul2,
-                        0,
-                        surface_name.clone(),
-                    ),
-                );
-                if new_bolt != -1 {
-                    NPC_Mark2_Part_Explode(ctx, self_, new_bolt);
+        for i in 0..3 {
+            if hit_loc == HL_GENERIC1 + i
+                && (*self_).locationDamage[(HL_GENERIC1 + i) as usize] > AMMO_POD_HEALTH
+            {
+                if (*self_).locationDamage[hit_loc as usize] >= AMMO_POD_HEALTH {
+                    let surface_name = cstr(&format!("torso_canister{}", (i + 1) as c_int));
+                    let new_bolt = trap::G2API_AddBolt(
+                        ctx.engine,
+                        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                            (*self_).ghoul2,
+                            0,
+                            surface_name.clone(),
+                        ),
+                    );
+                    if new_bolt != -1 {
+                        NPC_Mark2_Part_Explode(ctx, self_, new_bolt);
+                    }
+                    NPC_SetSurfaceOnOff(ctx, self_, surface_name.as_ptr(), TURN_OFF);
+                    break;
                 }
-                NPC_SetSurfaceOnOff(ctx, self_, surface_name.as_ptr(), TURN_OFF);
-                break;
             }
         }
-    }
 
-    G_Sound(
-        ctx,
-        self_,
-        CHAN_AUTO,
-        G_SoundIndex(b"sound/chars/mark2/misc/mark2_pain\0".as_ptr() as *const c_char),
-    );
-
-    if (*self_).count > 0 {
-        G_Damage(
+        G_Sound(
             ctx,
             self_,
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
-            None,
-            [0.0; 3],
-            (*self_).health,
-            crate::level::damage_flags::DAMAGE_NO_PROTECTION,
-            MOD_UNKNOWN as c_int,
+            CHAN_AUTO,
+            G_SoundIndex(b"sound/chars/mark2/misc/mark2_pain\0".as_ptr() as *const c_char),
         );
+
+        if (*self_).count > 0 {
+            G_Damage(
+                ctx,
+                self_,
+                core::ptr::null_mut(),
+                core::ptr::null_mut(),
+                None,
+                [0.0; 3],
+                (*self_).health,
+                crate::level::damage_flags::DAMAGE_NO_PROTECTION,
+                MOD_UNKNOWN as c_int,
+            );
+        }
     }
-  }
 }
 
 /// Raven `Mark2_Hunt`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:118-130`
 pub fn Mark2_Hunt(ctx: GameContext<'_>) {
-  unsafe {
-    let npc_ptr = (*ctx.world).globals.NPC;
-    let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+    unsafe {
+        let npc_ptr = (*ctx.world).globals.NPC;
+        let npc_info_ptr = (*ctx.world).globals.NPCInfo;
 
-    if (*npc_info_ptr).goalEntity.is_none() {
-        (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
+        if (*npc_info_ptr).goalEntity.is_none() {
+            (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
+        }
+
+        NPC_FaceEnemy(ctx, qtrue);
+
+        (*npc_info_ptr).combatMove = qtrue;
+        NPC_MoveToGoal(ctx, qtrue);
     }
-
-    NPC_FaceEnemy(ctx, qtrue);
-
-    (*npc_info_ptr).combatMove = qtrue;
-    NPC_MoveToGoal(ctx, qtrue);
-  }
 }
 
 /// Raven `Mark2_FireBlaster`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:137-179`
-pub fn Mark2_FireBlaster(
-    ctx: GameContext<'_>,
-    advance: qboolean,
-) {
-  unsafe {
-    let mut muzzle1: vec3_t = [0.0; 3];
-    let mut enemy_org1: vec3_t = [0.0; 3];
-    let mut delta1: vec3_t = [0.0; 3];
-    let mut angleToEnemy1: vec3_t = [0.0; 3];
-    let mut forward: vec3_t = [0.0; 3];
-    let mut vright: vec3_t = [0.0; 3];
-    let mut up: vec3_t = [0.0; 3];
+pub fn Mark2_FireBlaster(ctx: GameContext<'_>, advance: qboolean) {
+    unsafe {
+        let mut muzzle1: vec3_t = [0.0; 3];
+        let mut enemy_org1: vec3_t = [0.0; 3];
+        let mut delta1: vec3_t = [0.0; 3];
+        let mut angleToEnemy1: vec3_t = [0.0; 3];
+        let mut forward: vec3_t = [0.0; 3];
+        let mut vright: vec3_t = [0.0; 3];
+        let mut up: vec3_t = [0.0; 3];
 
-    let npc_ptr = (*ctx.world).globals.NPC;
-    let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
+        let npc_ptr = (*ctx.world).globals.NPC;
+        let mut boltMatrix: mdxaBone_t = unsafe { core::mem::zeroed() };
 
-    let bolt = trap::G2API_AddBolt(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
-            (*npc_ptr).ghoul2,
-            0,
-            c"*flash".to_owned(),
-        ),
-    );
+        let bolt = trap::G2API_AddBolt(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2_ADDBOLT::GG2AddboltArgs::new(
+                (*npc_ptr).ghoul2,
+                0,
+                c"*flash".to_owned(),
+            ),
+        );
 
-    trap::G2API_GetBoltMatrix(
-        ctx.engine,
-        mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
-            (*npc_ptr).ghoul2,
-            0,
-            bolt,
-            &mut boltMatrix as *mut mdxaBone_t,
-            &(*npc_ptr).r.currentAngles as *const vec3_t,
-            &(*npc_ptr).r.currentOrigin as *const vec3_t,
-            (*ctx.world).level.time,
-            core::ptr::null_mut(),
-            &(*npc_ptr).modelScale as *const vec3_t,
-        ),
-    );
+        trap::G2API_GetBoltMatrix(
+            ctx.engine,
+            mp_abi::game::syscalls::G_G2_GETBOLT::GG2GetboltArgs::new(
+                (*npc_ptr).ghoul2,
+                0,
+                bolt,
+                &mut boltMatrix as *mut mdxaBone_t,
+                &(*npc_ptr).r.currentAngles as *const vec3_t,
+                &(*npc_ptr).r.currentOrigin as *const vec3_t,
+                (*ctx.world).level.time,
+                core::ptr::null_mut(),
+                &(*npc_ptr).modelScale as *const vec3_t,
+            ),
+        );
 
-    BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
+        BG_GiveMeVectorFromMatrix(&boltMatrix, Eorientations::ORIGIN as c_int, &mut muzzle1);
 
-    if (*npc_ptr).health != 0 {
-        let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
-            &(*ctx.world).g_entities[eid.0 as usize] as *const gentity_t
+        if (*npc_ptr).health != 0 {
+            let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
+                &(*ctx.world).g_entities[eid.0 as usize] as *const gentity_t
+            } else {
+                core::ptr::null()
+            };
+            CalcEntitySpot(
+                ctx,
+                enemy_ptr,
+                crate::npc::spot_t::spot_t::SPOT_HEAD,
+                &mut enemy_org1,
+            );
+            crate::q_math::_VectorSubtract(enemy_org1, muzzle1, &mut delta1);
+            vectoangles(delta1, &mut angleToEnemy1);
+            AngleVectors(
+                angleToEnemy1,
+                Some(&mut forward),
+                Some(&mut vright),
+                Some(&mut up),
+            );
         } else {
-            core::ptr::null()
-        };
-        CalcEntitySpot(ctx, enemy_ptr, crate::npc::spot_t::spot_t::SPOT_HEAD, &mut enemy_org1);
-        crate::q_math::_VectorSubtract(enemy_org1, muzzle1, &mut delta1);
-        vectoangles(delta1, &mut angleToEnemy1);
-        AngleVectors(angleToEnemy1, Some(&mut forward), Some(&mut vright), Some(&mut up));
-    } else {
-        AngleVectors((*npc_ptr).r.currentAngles, Some(&mut forward), Some(&mut vright), Some(&mut up));
+            AngleVectors(
+                (*npc_ptr).r.currentAngles,
+                Some(&mut forward),
+                Some(&mut vright),
+                Some(&mut up),
+            );
+        }
+
+        G_PlayEffectID(
+            G_EffectIndex(b"bryar/muzzle_flash\0".as_ptr() as *const c_char),
+            muzzle1,
+            forward,
+        );
+
+        G_Sound(
+            ctx,
+            npc_ptr,
+            CHAN_AUTO,
+            G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char),
+        );
+
+        let missile =
+            crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_ptr, qfalse);
+
+        (*missile).classname = b"bryar_proj\0".as_ptr() as *mut c_char;
+        (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
+
+        (*missile).damage = 1;
+        (*missile).dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
+        (*missile).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
+        (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
     }
-
-    G_PlayEffectID(G_EffectIndex(b"bryar/muzzle_flash\0".as_ptr() as *const c_char), muzzle1, forward);
-
-    G_Sound(
-        ctx,
-        npc_ptr,
-        CHAN_AUTO,
-        G_SoundIndex(b"sound/chars/mark2/misc/mark2_fire\0".as_ptr() as *const c_char),
-    );
-
-    let missile = crate::g_missile::CreateMissile(ctx, muzzle1, forward, 1600.0, 10000, npc_ptr, qfalse);
-
-    (*missile).classname = b"bryar_proj\0".as_ptr() as *mut c_char;
-    (*missile).s.weapon = WP_BRYAR_PISTOL as c_int;
-
-    (*missile).damage = 1;
-    (*missile).dflags = crate::level::damage_flags::DAMAGE_DEATH_KNOCKBACK;
-    (*missile).methodOfDeath = MOD_BRYAR_PISTOL as c_int;
-    (*missile).clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
-  }
 }
 
 /// Raven `Mark2_BlasterAttack`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:186-205`
-pub fn Mark2_BlasterAttack(
-    ctx: GameContext<'_>,
-    advance: qboolean,
-) {
-  unsafe {
-    let npc_ptr = (*ctx.world).globals.NPC;
-    let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+pub fn Mark2_BlasterAttack(ctx: GameContext<'_>, advance: qboolean) {
+    unsafe {
+        let npc_ptr = (*ctx.world).globals.NPC;
+        let npc_info_ptr = (*ctx.world).globals.NPCInfo;
 
-    if TIMER_Done(ctx, npc_ptr, b"attackDelay\0".as_ptr() as *const c_char) == qtrue {
-        if (*npc_info_ptr).localState == LSTATE_NONE {
-            TIMER_Set(
-                ctx,
-                npc_ptr,
-                b"attackDelay\0".as_ptr() as *const c_char,
-                (*ctx.world).bg_state.rng.Q_irand(500, 2000),
-            );
-        } else {
-            TIMER_Set(
-                ctx,
-                npc_ptr,
-                b"attackDelay\0".as_ptr() as *const c_char,
-                (*ctx.world).bg_state.rng.Q_irand(100, 500),
-            );
+        if TIMER_Done(ctx, npc_ptr, b"attackDelay\0".as_ptr() as *const c_char) == qtrue {
+            if (*npc_info_ptr).localState == LSTATE_NONE {
+                TIMER_Set(
+                    ctx,
+                    npc_ptr,
+                    b"attackDelay\0".as_ptr() as *const c_char,
+                    (*ctx.world).bg_state.rng.Q_irand(500, 2000),
+                );
+            } else {
+                TIMER_Set(
+                    ctx,
+                    npc_ptr,
+                    b"attackDelay\0".as_ptr() as *const c_char,
+                    (*ctx.world).bg_state.rng.Q_irand(100, 500),
+                );
+            }
+            Mark2_FireBlaster(ctx, advance);
+            return;
+        } else if advance == qtrue {
+            Mark2_Hunt(ctx);
         }
-        Mark2_FireBlaster(ctx, advance);
-        return;
-    } else if advance == qtrue {
-        Mark2_Hunt(ctx);
     }
-  }
 }
 
 /// Raven `Mark2_AttackDecision`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:212-295`
 pub fn Mark2_AttackDecision(ctx: GameContext<'_>) {
-  unsafe {
-    let npc_ptr = (*ctx.world).globals.NPC;
-    let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+    unsafe {
+        let npc_ptr = (*ctx.world).globals.NPC;
+        let npc_info_ptr = (*ctx.world).globals.NPCInfo;
 
-    NPC_FaceEnemy(ctx, qtrue);
+        NPC_FaceEnemy(ctx, qtrue);
 
-    let distance = {
-        let d = crate::q_math::DistanceHorizontalSquared((*npc_ptr).r.currentOrigin, (*npc_ptr).enemy.map(|eid| {
-            (*ctx.world).g_entities[eid.0 as usize].r.currentOrigin
-        }).unwrap_or([0.0; 3]));
-        d as c_int
-    } as i64;
-    let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
-        &mut (*ctx.world).g_entities[eid.0 as usize] as *mut gentity_t
-    } else {
-        core::ptr::null_mut()
-    };
-    let visible = NPC_ClearLOS4(ctx, enemy_ptr);
-    let advance = (distance > MIN_DISTANCE_SQR as i64) as qboolean;
-
-    if (*npc_info_ptr).localState == LSTATE_RISINGUP {
-        (*npc_ptr).flags &= !FL_SHIELDED;
-        NPC_SetAnim(ctx, npc_ptr, SETANIM_BOTH, BOTH_RUN1START as c_int, SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE);
-        if (*((*npc_ptr).client as *mut gclient_t)).ps.legsTimer <= 0 && (*((*npc_ptr).client as *mut gclient_t)).ps.torsoAnim == BOTH_RUN1START as c_int {
-            (*npc_info_ptr).localState = LSTATE_NONE;
-        }
-        return;
-    }
-
-    if visible == qfalse || NPC_FaceEnemy(ctx, qtrue) == qfalse {
-        if (*npc_info_ptr).localState == LSTATE_DOWN || (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN {
-            if TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue {
-                (*npc_info_ptr).localState = LSTATE_RISINGUP;
-                NPC_SetAnim(ctx, npc_ptr, SETANIM_BOTH, BOTH_RUN1STOP as c_int, SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE);
-                TIMER_Set(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 8000));
-            }
+        let distance = {
+            let d = crate::q_math::DistanceHorizontalSquared(
+                (*npc_ptr).r.currentOrigin,
+                (*npc_ptr)
+                    .enemy
+                    .map(|eid| (*ctx.world).g_entities[eid.0 as usize].r.currentOrigin)
+                    .unwrap_or([0.0; 3]),
+            );
+            d as c_int
+        } as i64;
+        let enemy_ptr = if let Some(eid) = (*npc_ptr).enemy {
+            &mut (*ctx.world).g_entities[eid.0 as usize] as *mut gentity_t
         } else {
-            Mark2_Hunt(ctx);
+            core::ptr::null_mut()
+        };
+        let visible = NPC_ClearLOS4(ctx, enemy_ptr);
+        let advance = (distance > MIN_DISTANCE_SQR as i64) as qboolean;
+
+        if (*npc_info_ptr).localState == LSTATE_RISINGUP {
+            (*npc_ptr).flags &= !FL_SHIELDED;
+            NPC_SetAnim(
+                ctx,
+                npc_ptr,
+                SETANIM_BOTH,
+                BOTH_RUN1START as c_int,
+                SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+            );
+            if (*((*npc_ptr).client as *mut gclient_t)).ps.legsTimer <= 0
+                && (*((*npc_ptr).client as *mut gclient_t)).ps.torsoAnim == BOTH_RUN1START as c_int
+            {
+                (*npc_info_ptr).localState = LSTATE_NONE;
+            }
+            return;
         }
-        return;
-    }
 
-    if advance == qtrue && TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue && (*npc_info_ptr).localState == LSTATE_DOWN {
-        (*npc_info_ptr).localState = LSTATE_RISINGUP;
-        NPC_SetAnim(ctx, npc_ptr, SETANIM_BOTH, BOTH_RUN1STOP as c_int, SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE);
-        TIMER_Set(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 8000));
-    }
+        if visible == qfalse || NPC_FaceEnemy(ctx, qtrue) == qfalse {
+            if (*npc_info_ptr).localState == LSTATE_DOWN
+                || (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN
+            {
+                if TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue {
+                    (*npc_info_ptr).localState = LSTATE_RISINGUP;
+                    NPC_SetAnim(
+                        ctx,
+                        npc_ptr,
+                        SETANIM_BOTH,
+                        BOTH_RUN1STOP as c_int,
+                        SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+                    );
+                    TIMER_Set(
+                        ctx,
+                        npc_ptr,
+                        b"runTime\0".as_ptr() as *const c_char,
+                        (*ctx.world).bg_state.rng.Q_irand(3000, 8000),
+                    );
+                }
+            } else {
+                Mark2_Hunt(ctx);
+            }
+            return;
+        }
 
-    NPC_FaceEnemy(ctx, qtrue);
+        if advance == qtrue
+            && TIMER_Done(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char) == qtrue
+            && (*npc_info_ptr).localState == LSTATE_DOWN
+        {
+            (*npc_info_ptr).localState = LSTATE_RISINGUP;
+            NPC_SetAnim(
+                ctx,
+                npc_ptr,
+                SETANIM_BOTH,
+                BOTH_RUN1STOP as c_int,
+                SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+            );
+            TIMER_Set(
+                ctx,
+                npc_ptr,
+                b"runTime\0".as_ptr() as *const c_char,
+                (*ctx.world).bg_state.rng.Q_irand(3000, 8000),
+            );
+        }
 
-    if (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN {
-        NPC_SetAnim(ctx, npc_ptr, SETANIM_BOTH, BOTH_RUN1STOP as c_int, SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE);
-        TIMER_Set(ctx, npc_ptr, b"downTime\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(3000, 9000));
+        NPC_FaceEnemy(ctx, qtrue);
 
-        if (*((*npc_ptr).client as *mut gclient_t)).ps.legsTimer <= 0 && (*((*npc_ptr).client as *mut gclient_t)).ps.torsoAnim == BOTH_RUN1STOP as c_int {
+        if (*npc_info_ptr).localState == LSTATE_DROPPINGDOWN {
+            NPC_SetAnim(
+                ctx,
+                npc_ptr,
+                SETANIM_BOTH,
+                BOTH_RUN1STOP as c_int,
+                SETANIM_FLAG_HOLD | SETANIM_FLAG_OVERRIDE,
+            );
+            TIMER_Set(
+                ctx,
+                npc_ptr,
+                b"downTime\0".as_ptr() as *const c_char,
+                (*ctx.world).bg_state.rng.Q_irand(3000, 9000),
+            );
+
+            if (*((*npc_ptr).client as *mut gclient_t)).ps.legsTimer <= 0
+                && (*((*npc_ptr).client as *mut gclient_t)).ps.torsoAnim == BOTH_RUN1STOP as c_int
+            {
+                (*npc_ptr).flags |= FL_SHIELDED;
+                (*npc_info_ptr).localState = LSTATE_DOWN;
+            }
+        } else if (*npc_info_ptr).localState == LSTATE_DOWN {
             (*npc_ptr).flags |= FL_SHIELDED;
-            (*npc_info_ptr).localState = LSTATE_DOWN;
+            Mark2_BlasterAttack(ctx, qfalse);
+        } else if TIMER_Done(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char) == qtrue {
+            (*npc_info_ptr).localState = LSTATE_DROPPINGDOWN;
+        } else if advance == qtrue {
+            Mark2_BlasterAttack(ctx, advance);
         }
-    } else if (*npc_info_ptr).localState == LSTATE_DOWN {
-        (*npc_ptr).flags |= FL_SHIELDED;
-        Mark2_BlasterAttack(ctx, qfalse);
-    } else if TIMER_Done(ctx, npc_ptr, b"runTime\0".as_ptr() as *const c_char) == qtrue {
-        (*npc_info_ptr).localState = LSTATE_DROPPINGDOWN;
-    } else if advance == qtrue {
-        Mark2_BlasterAttack(ctx, advance);
     }
-  }
 }
 
 /// Raven `Mark2_Patrol`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:303-330`
 pub fn Mark2_Patrol(ctx: GameContext<'_>) {
-  unsafe {
-    let npc_ptr = (*ctx.world).globals.NPC;
+    unsafe {
+        let npc_ptr = (*ctx.world).globals.NPC;
 
-    if NPC_CheckPlayerTeamStealth(ctx) == qtrue {
-        NPC_UpdateAngles(ctx, qtrue, qtrue);
-        return;
-    }
-
-    if (*npc_ptr).enemy.is_none() {
-        if UpdateGoal(ctx) != core::ptr::null_mut() {
-            (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
-            NPC_MoveToGoal(ctx, qtrue);
+        if NPC_CheckPlayerTeamStealth(ctx) == qtrue {
             NPC_UpdateAngles(ctx, qtrue, qtrue);
+            return;
         }
 
-        if TIMER_Done(ctx, npc_ptr, b"patrolNoise\0".as_ptr() as *const c_char) == qtrue {
-            TIMER_Set(ctx, npc_ptr, b"patrolNoise\0".as_ptr() as *const c_char, (*ctx.world).bg_state.rng.Q_irand(2000, 4000));
+        if (*npc_ptr).enemy.is_none() {
+            if UpdateGoal(ctx) != core::ptr::null_mut() {
+                (*ctx.world).globals.ucmd.buttons |= BUTTON_WALKING;
+                NPC_MoveToGoal(ctx, qtrue);
+                NPC_UpdateAngles(ctx, qtrue, qtrue);
+            }
+
+            if TIMER_Done(ctx, npc_ptr, b"patrolNoise\0".as_ptr() as *const c_char) == qtrue {
+                TIMER_Set(
+                    ctx,
+                    npc_ptr,
+                    b"patrolNoise\0".as_ptr() as *const c_char,
+                    (*ctx.world).bg_state.rng.Q_irand(2000, 4000),
+                );
+            }
         }
     }
-  }
 }
 
 /// Raven `Mark2_Idle`.
@@ -467,17 +544,17 @@ pub fn Mark2_Idle(ctx: GameContext<'_>) {
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:347-362`
 pub fn NPC_BSMark2_Default(ctx: GameContext<'_>) {
-  unsafe {
-    let npc_ptr = (*ctx.world).globals.NPC;
-    let npc_info_ptr = (*ctx.world).globals.NPCInfo;
+    unsafe {
+        let npc_ptr = (*ctx.world).globals.NPC;
+        let npc_info_ptr = (*ctx.world).globals.NPCInfo;
 
-    if (*npc_ptr).enemy.is_some() {
-        (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
-        Mark2_AttackDecision(ctx);
-    } else if ((*npc_info_ptr).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
-        Mark2_Patrol(ctx);
-    } else {
-        Mark2_Idle(ctx);
+        if (*npc_ptr).enemy.is_some() {
+            (*npc_info_ptr).goalEntity = (*npc_ptr).enemy;
+            Mark2_AttackDecision(ctx);
+        } else if ((*npc_info_ptr).scriptFlags & SCF_LOOK_FOR_ENEMIES) != 0 {
+            Mark2_Patrol(ctx);
+        } else {
+            Mark2_Idle(ctx);
+        }
     }
-  }
 }

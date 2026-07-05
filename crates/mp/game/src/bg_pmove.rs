@@ -24,33 +24,34 @@ const qfalse: qboolean = 0;
 /// Raven `#define MAX_WEAPON_CHARGE_TIME 5000`.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:16`
 const MAX_WEAPON_CHARGE_TIME: c_int = 5000;
-use crate::g_strap::strap_G2API_SetBoneAngles;
-use crate::g_strap::{
-    strap_G2API_AnimateG2Models, strap_G2API_GetBoltMatrix, strap_G2API_GetBoneAnim,
-    strap_G2API_IKMove, strap_G2API_SetBoneAnim, strap_G2API_SetBoneIKState,
-};
-use crate::q_math::{AngleMod, AngleSubtract};
-use crate::q_math::{AngleVectors, Q_fabs, vectoangles};
-use crate::q_math::{PITCH, ROLL, YAW};
-use crate::q_math::{
-    AngleNormalize180, AngleNormalize360, AnglesSubtract, AnglesToAxis, VectorClear, VectorCompare,
-    VectorNormalize, VectorSet, _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract,
-};
 use crate::bg_panimate::{
     BG_InRoll, BG_SaberInAttack, BG_SaberInSpecial, BG_SaberLockBreakAnim, BG_SpinningSaberAnim,
     PM_CanRollFromSoulCal, PM_SaberInTransition,
 };
 use crate::bg_saber::BG_MySaber;
+use crate::g_strap::strap_G2API_SetBoneAngles;
+use crate::g_strap::{
+    strap_G2API_AnimateG2Models, strap_G2API_GetBoltMatrix, strap_G2API_GetBoneAnim,
+    strap_G2API_IKMove, strap_G2API_SetBoneAnim, strap_G2API_SetBoneIKState,
+};
+use crate::q_math::{
+    _VectorAdd, _VectorCopy, _VectorMA, _VectorScale, _VectorSubtract, AngleNormalize180,
+    AngleNormalize360, AnglesSubtract, AnglesToAxis, VectorClear, VectorCompare, VectorNormalize,
+    VectorSet,
+};
+use crate::q_math::{vectoangles, AngleVectors, Q_fabs};
+use crate::q_math::{AngleMod, AngleSubtract};
+use crate::q_math::{PITCH, ROLL, YAW};
 // Additional bg helpers reached by the pmove pipeline (pass-3 call surface).
+use crate::bg_misc::{
+    vectoyaw, BG_AddPredictableEventToPlayerstate, BG_CanUseFPNow, BG_CycleInven, BG_HasYsalamiri,
+    BG_IsItemSelectable,
+};
 use crate::bg_panimate::{
     BG_FlippingAnim, BG_FullBodyTauntAnim, BG_InBackFlip, BG_InDeathAnim, BG_InGrappleMove,
     BG_InKataAnim, BG_InReboundHold, BG_InReboundJump, BG_InSpecialJump, BG_KickMove,
     BG_KickingAnim, BG_SaberInKata, BG_SaberInSpecialAttack, PM_InKnockDown, PM_InOnGroundAnim,
     PM_InRollComplete, PM_InSaberAnim, PM_LandingAnim, PM_PainAnim, PM_SaberInStart,
-};
-use crate::bg_misc::{
-    BG_AddPredictableEventToPlayerstate, BG_CanUseFPNow, BG_CycleInven, BG_HasYsalamiri,
-    BG_IsItemSelectable, vectoyaw,
 };
 use crate::bg_saber::BG_ForcePowerDrain;
 use crate::q_math::{CrossProduct, VectorLength};
@@ -129,16 +130,13 @@ const BUTTON_ALT_ATTACK: c_int = 128;
 /// Source: `oracle/oracle/code/game/ghoul2_shared.h:54`
 const BONE_ANGLES_POSTMULT: c_int = 0x0002;
 
-
 // `PM_BGEntForNum` is a `PmoveContext<'_>` method below (already filled); the stale
 // free-fn stub is removed (no dead duplicate).
 
 /// Raven `BG_SabersOff`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:201-216`
-pub fn BG_SabersOff(
-    ps: *mut playerState_t,
-) -> qboolean {
+pub fn BG_SabersOff(ps: *mut playerState_t) -> qboolean {
     unsafe {
         if (*ps).saberHolstered == 0 {
             return qfalse;
@@ -157,9 +155,7 @@ pub fn BG_SabersOff(
 /// Raven `BG_KnockDownable`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:218-237`
-pub fn BG_KnockDownable(
-    ps: *mut playerState_t,
-) -> qboolean {
+pub fn BG_KnockDownable(ps: *mut playerState_t) -> qboolean {
     unsafe {
         if ps.is_null() {
             // just for safety
@@ -303,7 +299,12 @@ impl PmoveContext<'_> {
                 tempAngles[YAW] = (*(*pVeh).m_vOrientation.add(YAW));
                 AngleVectors(tempAngles, Some(&mut ovf), Some(&mut ovr), None);
             } else {
-                AngleVectors((*(*self.pm).ps).viewangles, Some(&mut ovf), Some(&mut ovr), None);
+                AngleVectors(
+                    (*(*self.pm).ps).viewangles,
+                    Some(&mut ovf),
+                    Some(&mut ovr),
+                    None,
+                );
             }
 
             vectoangles(slope, &mut new_angles);
@@ -349,7 +350,8 @@ impl PmoveContext<'_> {
                     self.pm_flying = FLY_NORMAL;
                 } else if (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int {
                     let pv = (*pEnt).m_pVehicle as *mut Vehicle_t;
-                    if (*(*pv).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_FIGHTER as c_int {
+                    if (*(*pv).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_FIGHTER as c_int
+                    {
                         self.pm_flying = FLY_VEHICLE;
                     } else if (*(*pv).m_pVehicleInfo).hoverHeight > 0.0 {
                         self.pm_flying = FLY_HOVER;
@@ -378,8 +380,7 @@ impl PmoveContext<'_> {
 
             let mut vehicleBankingSpeed = ((*info).bankingSpeed * 32.0) * self.pml.frametime;
 
-            if vehicleBankingSpeed <= 0.0
-                || ((*info).pitchLimit == 0.0 && (*info).rollLimit == 0.0)
+            if vehicleBankingSpeed <= 0.0 || ((*info).pitchLimit == 0.0 && (*info).rollLimit == 0.0)
             {
                 //don't bother, this vehicle doesn't bank
                 return;
@@ -476,10 +477,7 @@ impl PmoveContext<'_> {
 /// Raven: the entire body is commented out in the oracle (a debug-recompile
 /// hook); it is a no-op.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:641-674`
-pub fn BG_ExternThisSoICanRecompileInDebug(
-    pVeh: *mut Vehicle_t,
-    riderPS: *mut playerState_t,
-) {
+pub fn BG_ExternThisSoICanRecompileInDebug(pVeh: *mut Vehicle_t, riderPS: *mut playerState_t) {
     // No-op: the oracle body is entirely `/* ... */`-commented.
 }
 
@@ -801,13 +799,7 @@ impl PmoveContext<'_> {
     /// into `out` (§C7 out-param shape; `in`/`normal` by value permit the
     /// `PM_ClipVelocity(pml.forward, …, pml.forward, …)` self-aliasing callers).
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:954-988`
-    pub fn PM_ClipVelocity(
-        &self,
-        r#in: vec3_t,
-        normal: vec3_t,
-        out: &mut vec3_t,
-        overbounce: f32,
-    ) {
+    pub fn PM_ClipVelocity(&self, r#in: vec3_t, normal: vec3_t, out: &mut vec3_t, overbounce: f32) {
         unsafe {
             let ps = &*(*self.pm).ps;
             if ps.pm_flags & PMF_STUCK_TO_WALL != 0 {
@@ -868,7 +860,7 @@ impl PmoveContext<'_> {
             let mut drop: f32 = 0.0;
 
             let mut pEnt: *mut bgEntity_t = core::ptr::null_mut();
-            if (*ps).clientNum >= MAX_CLIENTS as c_int{
+            if (*ps).clientNum >= MAX_CLIENTS as c_int {
                 pEnt = self.pm_entSelf;
             }
 
@@ -885,7 +877,11 @@ impl PmoveContext<'_> {
             {
                 let friction = (*(*((*pEnt).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).friction;
                 if (*ps).pm_flags & PMF_TIME_KNOCKBACK == 0 {
-                    let control = if speed < pm_stopspeed { pm_stopspeed } else { speed };
+                    let control = if speed < pm_stopspeed {
+                        pm_stopspeed
+                    } else {
+                        speed
+                    };
                     drop += control * friction * self.pml.frametime;
                 }
             } else if self.pm_flying != FLY_NORMAL && self.pm_flying != FLY_VEHICLE {
@@ -896,7 +892,11 @@ impl PmoveContext<'_> {
                     && (*ps).pm_flags & PMF_TIME_KNOCKBACK == 0
                 {
                     // if getting knocked back, no friction
-                    let control = if speed < pm_stopspeed { pm_stopspeed } else { speed };
+                    let control = if speed < pm_stopspeed {
+                        pm_stopspeed
+                    } else {
+                        speed
+                    };
                     drop += control * pm_friction * self.pml.frametime;
                 }
             }
@@ -911,7 +911,7 @@ impl PmoveContext<'_> {
                 drop += speed * pm_waterfriction * (*pm).waterlevel as f32 * self.pml.frametime;
             }
             // If on a client then there is no friction
-            else if (*ps).groundEntityNum < MAX_CLIENTS as c_int{
+            else if (*ps).groundEntityNum < MAX_CLIENTS as c_int {
                 drop = 0.0;
             }
 
@@ -919,9 +919,7 @@ impl PmoveContext<'_> {
                 if (*ps).pm_type == PM_FLOAT as c_int {
                     // almost no friction while floating (Raven's `0.1` is a
                     // `double` literal; compute in f64 to preserve parity).
-                    drop = (drop as f64
-                        + speed as f64 * 0.1 * self.pml.frametime as f64)
-                        as f32;
+                    drop = (drop as f64 + speed as f64 * 0.1 * self.pml.frametime as f64) as f32;
                 } else {
                     drop += speed * pm_spectatorfriction * self.pml.frametime;
                 }
@@ -1023,7 +1021,7 @@ impl PmoveContext<'_> {
             // set up these "global" bg ents
             self.pm_entSelf = self.PM_BGEntForNum((*(*pm).ps).clientNum);
             if (*(*pm).ps).m_iVehicleNum != 0 {
-                if (*(*pm).ps).clientNum < MAX_CLIENTS as c_int{
+                if (*(*pm).ps).clientNum < MAX_CLIENTS as c_int {
                     // player riding vehicle
                     self.pm_entVeh = self.PM_BGEntForNum((*(*pm).ps).m_iVehicleNum);
                 } else {
@@ -1354,7 +1352,8 @@ impl PmoveContext<'_> {
                 // we are a vehicle
                 let veh = self.pm_entSelf;
                 if !veh.is_null() && !(*veh).m_pVehicle.is_null() {
-                    (*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_fTimeModifier = self.pml.frametime * 60.0;
+                    (*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_fTimeModifier =
+                        self.pml.frametime * 60.0;
                 }
             } else if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int
                 && (*ps).m_iVehicleNum != 0
@@ -1575,7 +1574,9 @@ impl PmoveContext<'_> {
                 if (*ps).clientNum >= MAX_CLIENTS as c_int
                     && !self.pm_entSelf.is_null()
                     && (*self.pm_entSelf).s.NPC_class == CLASS_VEHICLE as c_int
-                    && (*(*((*self.pm_entSelf).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_pVehicleInfo).r#type as c_int
+                    && (*(*((*self.pm_entSelf).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t))
+                        .m_pVehicleInfo)
+                        .r#type as c_int
                         != VH_ANIMAL as c_int
                 {
                     // vehicles don't use deadmove
@@ -1593,8 +1594,12 @@ impl PmoveContext<'_> {
 
                 if !veh.is_null()
                     && !(*veh).m_pVehicle.is_null()
-                    && ((*(*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_pVehicleInfo).r#type as c_int == VH_WALKER as c_int
-                        || (*(*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_pVehicleInfo).r#type as c_int
+                    && ((*(*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t)).m_pVehicleInfo)
+                        .r#type as c_int
+                        == VH_WALKER as c_int
+                        || (*(*((*veh).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t))
+                            .m_pVehicleInfo)
+                            .r#type as c_int
                             == VH_FIGHTER as c_int)
                 {
                     // *sigh*, until we get forced weapon-switching working?
@@ -1670,7 +1675,8 @@ impl PmoveContext<'_> {
                     // `Update`/`Animate` virtuals are game-tier; bg reaches them via
                     // the GameCallbacks upcalls (by entity number).
                     // Source: oracle/oracle/codemp/game/bg_pmove.c:10919-10922
-                    self.callbacks.update_vehicle((*veh).s.number, &(*self.pm).cmd);
+                    self.callbacks
+                        .update_vehicle((*veh).s.number, &(*self.pm).cmd);
                     self.callbacks.pm_animate_vehicle((*veh).s.number);
                 } else {
                     let selfEnt = self.pm_entVeh;
@@ -2013,8 +2019,12 @@ impl PmoveContext<'_> {
                 return qfalse;
             }
 
-            if BG_CanUseFPNow((*self.pm).gametype, ps, (*self.pm).cmd.serverTime, FP_LEVITATION)
-                == qfalse
+            if BG_CanUseFPNow(
+                (*self.pm).gametype,
+                ps,
+                (*self.pm).cmd.serverTime,
+                FP_LEVITATION,
+            ) == qfalse
             {
                 return qfalse;
             }
@@ -2065,11 +2075,7 @@ impl PmoveContext<'_> {
 /// Raven `PM_SetPMViewAngle`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:1342-1354`
-pub fn PM_SetPMViewAngle(
-    ps: *mut playerState_t,
-    angle: vec3_t,
-    ucmd: *mut usercmd_t,
-) {
+pub fn PM_SetPMViewAngle(ps: *mut playerState_t, angle: vec3_t, ucmd: *mut usercmd_t) {
     unsafe {
         for i in 0..3 {
             // set the delta angle. Raven `ANGLE2SHORT(x)` == `((int)((x)*65536/360) & 65535)`.
@@ -2180,10 +2186,9 @@ impl PmoveContext<'_> {
 
                     PM_SetPMViewAngle(ps, (*ps).viewangles, ucmd);
 
-                    (*ucmd).angles[YAW] = ((((*ps).viewangles[YAW] * 65536.0 / 360.0) as c_int
-                        & 65535)
-                        - (*ps).delta_angles[YAW] as c_int)
-                        as c_int;
+                    (*ucmd).angles[YAW] =
+                        ((((*ps).viewangles[YAW] * 65536.0 / 360.0) as c_int & 65535)
+                            - (*ps).delta_angles[YAW] as c_int) as c_int;
                     if doMove != qfalse {
                         //push me forward
                         let zVel = (*ps).velocity[2];
@@ -2198,7 +2203,7 @@ impl PmoveContext<'_> {
                             _VectorScale(fwd, speed, &mut (*ps).velocity);
                         }
                         (*ps).velocity[2] = zVel; //preserve z velocity
-                        //pull me toward the wall, too
+                                                  //pull me toward the wall, too
                         let v = (*ps).velocity;
                         _VectorMA(v, dist, rt, &mut (*ps).velocity);
                     }
@@ -2342,8 +2347,7 @@ impl PmoveContext<'_> {
                         //make me face the wall
                         (*ps).viewangles[YAW] = vectoyaw(trace.plane.normal) + 180.0;
                         PM_SetPMViewAngle(ps, (*ps).viewangles, ucmd);
-                        (*ucmd).angles[YAW] = ((((*ps).viewangles[YAW] * 65536.0 / 360.0)
-                            as c_int
+                        (*ucmd).angles[YAW] = ((((*ps).viewangles[YAW] * 65536.0 / 360.0) as c_int
                             & 65535)
                             - (*ps).delta_angles[YAW] as c_int)
                             as c_int;
@@ -2505,10 +2509,9 @@ impl PmoveContext<'_> {
                     //align me to the wall
                     (*ps).viewangles[YAW] = vectoyaw(trace.plane.normal) + yawAdjust;
                     PM_SetPMViewAngle(ps, (*ps).viewangles, ucmd);
-                    (*ucmd).angles[YAW] = ((((*ps).viewangles[YAW] * 65536.0 / 360.0) as c_int
-                        & 65535)
-                        - (*ps).delta_angles[YAW] as c_int)
-                        as c_int;
+                    (*ucmd).angles[YAW] =
+                        ((((*ps).viewangles[YAW] * 65536.0 / 360.0) as c_int & 65535)
+                            - (*ps).delta_angles[YAW] as c_int) as c_int;
                     if true {
                         if doMove != qfalse {
                             //pull me toward the wall
@@ -2649,8 +2652,7 @@ impl PmoveContext<'_> {
                 }
             }
 
-            if (*ps).groundEntityNum != ENTITYNUM_NONE
-                || (*ps).origin[2] < (*ps).fd.forceJumpZStart
+            if (*ps).groundEntityNum != ENTITYNUM_NONE || (*ps).origin[2] < (*ps).fd.forceJumpZStart
             {
                 (*ps).fd.forcePowersActive &= !(1 << FP_LEVITATION);
             }
@@ -2922,8 +2924,7 @@ impl PmoveContext<'_> {
                 && ((*ps).weapon == WP_SABER as c_int || (*ps).weapon == WP_MELEE as c_int)
                 && PM_IsRocketTrooper() == qfalse
                 && BG_HasYsalamiri((*pm).gametype, ps) == qfalse
-                && BG_CanUseFPNow((*pm).gametype, ps, (*pm).cmd.serverTime, FP_LEVITATION)
-                    != qfalse
+                && BG_CanUseFPNow((*pm).gametype, ps, (*pm).cmd.serverTime, FP_LEVITATION) != qfalse
             {
                 let mut allowWallRuns = qtrue;
                 let mut allowWallFlips = qtrue;
@@ -2997,9 +2998,7 @@ impl PmoveContext<'_> {
                                 anim = BOTH_WALL_FLIP_LEFT as c_int;
                             }
                         }
-                    } else if (*pm).cmd.forwardmove < 0
-                        && (*pm).cmd.buttons & BUTTON_ATTACK == 0
-                    {
+                    } else if (*pm).cmd.forwardmove < 0 && (*pm).cmd.buttons & BUTTON_ATTACK == 0 {
                         //backflip
                         if allowFlips != qfalse {
                             vertPush = JUMP_VELOCITY;
@@ -3703,7 +3702,8 @@ impl PmoveContext<'_> {
 
             let mut scale = self.PM_CmdScale(core::ptr::addr_of_mut!((*pm).cmd));
 
-            if (*ps).pm_type == PM_SPECTATOR as c_int && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0 {
+            if (*ps).pm_type == PM_SPECTATOR as c_int && (*pm).cmd.buttons & BUTTON_ALT_ATTACK != 0
+            {
                 //turbo boost
                 scale *= 10.0;
             }
@@ -4049,7 +4049,11 @@ impl PmoveContext<'_> {
                 let mut drop = 0.0f32;
 
                 let friction = (pm_friction as f64 * 1.5) as f32; // extra friction
-                let control = if speed < pm_stopspeed { pm_stopspeed } else { speed };
+                let control = if speed < pm_stopspeed {
+                    pm_stopspeed
+                } else {
+                    speed
+                };
                 drop += control * friction * self.pml.frametime;
 
                 // scale the velocity
@@ -4136,8 +4140,7 @@ impl PmoveContext<'_> {
             if ((*ps).weapon != WP_SABER as c_int && (*ps).weapon != WP_MELEE as c_int)
                 || PM_IsRocketTrooper() != qfalse
                 || BG_HasYsalamiri((*pm).gametype, ps) != qfalse
-                || BG_CanUseFPNow((*pm).gametype, ps, (*pm).cmd.serverTime, FP_LEVITATION)
-                    == qfalse
+                || BG_CanUseFPNow((*pm).gametype, ps, (*pm).cmd.serverTime, FP_LEVITATION) == qfalse
             {
                 //Not using saber, or can't use jump
                 return 0;
@@ -4160,7 +4163,12 @@ impl PmoveContext<'_> {
                 (*pm).mins[1],
                 (*pm).mins[2] + STEPSIZE,
             );
-            VectorSet(&mut maxs, (*pm).maxs[0], (*pm).maxs[1], (*ps).crouchheight as f32);
+            VectorSet(
+                &mut maxs,
+                (*pm).maxs[0],
+                (*pm).maxs[1],
+                (*ps).crouchheight as f32,
+            );
 
             VectorSet(&mut fwdAngles, 0.0, (*ps).viewangles[YAW], 0.0);
 
@@ -4336,7 +4344,12 @@ impl PmoveContext<'_> {
                 } else {
                     fjAnim = BOTH_LAND1 as c_int;
                 }
-                self.PM_SetAnim(SETANIM_BOTH, fjAnim, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD, 0);
+                self.PM_SetAnim(
+                    SETANIM_BOTH,
+                    fjAnim,
+                    SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
+                    0,
+                );
             }
             // decide which landing animation to use
             else if BG_InRoll(ps, (*ps).legsAnim) == qfalse
@@ -4476,8 +4489,8 @@ impl PmoveContext<'_> {
                             }
                         } else {
                             if delta_send > 8 {
-                                let dif =
-                                    ((*ps).fd.forceJumpZStart as c_int) - ((*ps).origin[2] as c_int);
+                                let dif = ((*ps).fd.forceJumpZStart as c_int)
+                                    - ((*ps).origin[2] as c_int);
                                 let lvl = (*ps).fd.forcePowerLevel[FP_LEVITATION as usize] as usize;
                                 let mut dmgLess = (forceJumpHeight[lvl] - dif as f32) as c_int;
 
@@ -4592,7 +4605,12 @@ impl PmoveContext<'_> {
 
             if (*ps).pm_type == PM_FLOAT as c_int {
                 //we're assuming this is because you're being choked
-                self.PM_SetAnim(SETANIM_LEGS, BOTH_CHOKE3 as c_int, SETANIM_FLAG_OVERRIDE, 100);
+                self.PM_SetAnim(
+                    SETANIM_LEGS,
+                    BOTH_CHOKE3 as c_int,
+                    SETANIM_FLAG_OVERRIDE,
+                    100,
+                );
             } else if (*ps).pm_type == PM_JETPACK as c_int {
                 //jetpacking (nothing)
             }
@@ -4824,15 +4842,18 @@ impl PmoveContext<'_> {
                             if (*pm).gametype < GT_TEAM as c_int
                                 || (*trEnt).alliedTeam as c_int == 0
                                 || (*trEnt).alliedTeam as c_int
-                                    == (*((*servEnt).client as *mut gclient_t)).sess.sessionTeam as c_int
+                                    == (*((*servEnt).client as *mut gclient_t)).sess.sessionTeam
+                                        as c_int
                             {
                                 //not belonging to a team, or client is on same team
                                 // The vehicle `Board` body is game-tier;
                                 // bg reaches it via the GameCallbacks upcall (by
                                 // entity number), which dispatches through
                                 // `crate::veh_dispatch::board`.
-                                self.callbacks
-                                    .board_vehicle(trace.entityNum as c_int, (*self.pm_entSelf).s.number);
+                                self.callbacks.board_vehicle(
+                                    trace.entityNum as c_int,
+                                    (*self.pm_entSelf).s.number,
+                                );
                             }
                         }
                     }
@@ -4903,7 +4924,12 @@ impl PmoveContext<'_> {
                     (*ps).origin[2] + MINS_Z as f32,
                 );
                 VectorSet(&mut curMins, (*pm).mins[0], (*pm).mins[1], 0.0);
-                VectorSet(&mut curMaxs, (*pm).maxs[0], (*pm).maxs[1], (*ps).standheight as f32);
+                VectorSet(
+                    &mut curMaxs,
+                    (*pm).maxs[0],
+                    (*pm).maxs[1],
+                    (*ps).standheight as f32,
+                );
 
                 self.traps.trace(
                     &mut trace,
@@ -5008,17 +5034,15 @@ impl PmoveContext<'_> {
                         (*ps).m_iVehicleNum,
                         (*pm).tracemask,
                     );
-                    if solidTr.startsolid != 0
-                        || solidTr.allsolid != 0
-                        || solidTr.fraction != 1.0
-                    {
+                    if solidTr.startsolid != 0 || solidTr.allsolid != 0 || solidTr.fraction != 1.0 {
                         //whoops, can't fit here. Down to 0!
                         VectorClear(&mut (*pm).mins);
                         VectorClear(&mut (*pm).maxs);
                         // QAGAME solidHack
                         let me = self.PM_BGEntForNum((*ps).clientNum) as *mut gentity_t;
                         if (*me).inuse != 0 && !(*me).client.is_null() {
-                            (*((*me).client as *mut gclient_t)).solidHack = self.callbacks.get_time() + 200;
+                            (*((*me).client as *mut gclient_t)).solidHack =
+                                self.callbacks.get_time() + 200;
                         }
                     }
                 }
@@ -5140,9 +5164,7 @@ impl PmoveContext<'_> {
 /// Raven `PM_WalkingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4579-4598`
-pub fn PM_WalkingAnim(
-    anim: c_int,
-) -> qboolean {
+pub fn PM_WalkingAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
         BOTH_WALK1,          //# Normal walk
@@ -5167,9 +5189,7 @@ pub fn PM_WalkingAnim(
 /// Raven `PM_RunningAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4600-4620`
-pub fn PM_RunningAnim(
-    anim: c_int,
-) -> qboolean {
+pub fn PM_RunningAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
         BOTH_RUN1,
@@ -5195,12 +5215,10 @@ pub fn PM_RunningAnim(
 /// Raven `PM_SwimmingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4622-4633`
-pub fn PM_SwimmingAnim(
-    anim: c_int,
-) -> qboolean {
+pub fn PM_SwimmingAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
-        BOTH_SWIM_IDLE1, //# Swimming Idle 1
+        BOTH_SWIM_IDLE1,   //# Swimming Idle 1
         BOTH_SWIMFORWARD,  //# Swim forward loop
         BOTH_SWIMBACKWARD, //# Swim backward loop
     ];
@@ -5214,9 +5232,7 @@ pub fn PM_SwimmingAnim(
 /// Raven `PM_RollingAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4635-4647`
-pub fn PM_RollingAnim(
-    anim: c_int,
-) -> qboolean {
+pub fn PM_RollingAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
         BOTH_ROLL_F, //# Roll forward
@@ -5236,11 +5252,7 @@ pub fn PM_RollingAnim(
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4649-4675`
 // `angles` is a written-through out-param → `&mut [f32;3]`; `slope` stays a
 // read-only by-value input. Cross-file callers are updated by the fixer.
-pub fn PM_AnglesForSlope(
-    yaw: f32,
-    slope: vec3_t,
-    angles: &mut [f32; 3],
-) {
+pub fn PM_AnglesForSlope(yaw: f32, slope: vec3_t, angles: &mut [f32; 3]) {
     let mut nvf: vec3_t = [0.0; 3];
     let mut ovf: vec3_t = [0.0; 3];
     let mut ovr: vec3_t = [0.0; 3];
@@ -5395,9 +5407,7 @@ impl PmoveContext<'_> {
 /// Raven `BG_InSlopeAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:4742-4800`
-pub fn BG_InSlopeAnim(
-    anim: c_int,
-) -> qboolean {
+pub fn BG_InSlopeAnim(anim: c_int) -> qboolean {
     use animNumber_t::*;
     const ANIMS: &[animNumber_t] = &[
         LEGS_LEFTUP1,  //# On a slope with left foot 4 higher than right
@@ -5410,14 +5420,46 @@ pub fn BG_InSlopeAnim(
         LEGS_RIGHTUP3, //# On a slope with RIGHT foot 12 higher than left
         LEGS_RIGHTUP4, //# On a slope with RIGHT foot 16 higher than left
         LEGS_RIGHTUP5, //# On a slope with RIGHT foot 20 higher than left
-        LEGS_S1_LUP1, LEGS_S1_LUP2, LEGS_S1_LUP3, LEGS_S1_LUP4, LEGS_S1_LUP5,
-        LEGS_S1_RUP1, LEGS_S1_RUP2, LEGS_S1_RUP3, LEGS_S1_RUP4, LEGS_S1_RUP5,
-        LEGS_S3_LUP1, LEGS_S3_LUP2, LEGS_S3_LUP3, LEGS_S3_LUP4, LEGS_S3_LUP5,
-        LEGS_S3_RUP1, LEGS_S3_RUP2, LEGS_S3_RUP3, LEGS_S3_RUP4, LEGS_S3_RUP5,
-        LEGS_S4_LUP1, LEGS_S4_LUP2, LEGS_S4_LUP3, LEGS_S4_LUP4, LEGS_S4_LUP5,
-        LEGS_S4_RUP1, LEGS_S4_RUP2, LEGS_S4_RUP3, LEGS_S4_RUP4, LEGS_S4_RUP5,
-        LEGS_S5_LUP1, LEGS_S5_LUP2, LEGS_S5_LUP3, LEGS_S5_LUP4, LEGS_S5_LUP5,
-        LEGS_S5_RUP1, LEGS_S5_RUP2, LEGS_S5_RUP3, LEGS_S5_RUP4, LEGS_S5_RUP5,
+        LEGS_S1_LUP1,
+        LEGS_S1_LUP2,
+        LEGS_S1_LUP3,
+        LEGS_S1_LUP4,
+        LEGS_S1_LUP5,
+        LEGS_S1_RUP1,
+        LEGS_S1_RUP2,
+        LEGS_S1_RUP3,
+        LEGS_S1_RUP4,
+        LEGS_S1_RUP5,
+        LEGS_S3_LUP1,
+        LEGS_S3_LUP2,
+        LEGS_S3_LUP3,
+        LEGS_S3_LUP4,
+        LEGS_S3_LUP5,
+        LEGS_S3_RUP1,
+        LEGS_S3_RUP2,
+        LEGS_S3_RUP3,
+        LEGS_S3_RUP4,
+        LEGS_S3_RUP5,
+        LEGS_S4_LUP1,
+        LEGS_S4_LUP2,
+        LEGS_S4_LUP3,
+        LEGS_S4_LUP4,
+        LEGS_S4_LUP5,
+        LEGS_S4_RUP1,
+        LEGS_S4_RUP2,
+        LEGS_S4_RUP3,
+        LEGS_S4_RUP4,
+        LEGS_S4_RUP5,
+        LEGS_S5_LUP1,
+        LEGS_S5_LUP2,
+        LEGS_S5_LUP3,
+        LEGS_S5_LUP4,
+        LEGS_S5_LUP5,
+        LEGS_S5_RUP1,
+        LEGS_S5_RUP2,
+        LEGS_S5_RUP3,
+        LEGS_S5_RUP4,
+        LEGS_S5_RUP5,
     ];
     if ANIMS.iter().any(|&a| a as c_int == anim) {
         qtrue
@@ -5512,7 +5554,8 @@ impl PmoveContext<'_> {
                 return qfalse;
             }
 
-            let in_leftup = (legsAnim >= LEGS_LEFTUP1 as c_int && legsAnim <= LEGS_LEFTUP5 as c_int)
+            let in_leftup = (legsAnim >= LEGS_LEFTUP1 as c_int
+                && legsAnim <= LEGS_LEFTUP5 as c_int)
                 || (legsAnim >= LEGS_S1_LUP1 as c_int && legsAnim <= LEGS_S1_LUP5 as c_int)
                 || (legsAnim >= LEGS_S3_LUP1 as c_int && legsAnim <= LEGS_S3_LUP5 as c_int)
                 || (legsAnim >= LEGS_S4_LUP1 as c_int && legsAnim <= LEGS_S4_LUP5 as c_int)
@@ -5559,8 +5602,7 @@ impl PmoveContext<'_> {
                     if destAnim >= LEGS_S1_LUP1 as c_int && destAnim <= LEGS_S1_LUP5 as c_int {
                         destAnim = LEGS_S1_LUP1 as c_int;
                         (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
-                    } else if destAnim >= LEGS_S1_RUP1 as c_int
-                        && destAnim <= LEGS_S1_RUP5 as c_int
+                    } else if destAnim >= LEGS_S1_RUP1 as c_int && destAnim <= LEGS_S1_RUP5 as c_int
                     {
                         destAnim = LEGS_S1_RUP1 as c_int;
                         (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
@@ -5587,8 +5629,7 @@ impl PmoveContext<'_> {
                     if destAnim >= LEGS_S3_LUP1 as c_int && destAnim <= LEGS_S3_LUP5 as c_int {
                         destAnim = LEGS_S3_LUP1 as c_int;
                         (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
-                    } else if destAnim >= LEGS_S3_RUP1 as c_int
-                        && destAnim <= LEGS_S3_RUP5 as c_int
+                    } else if destAnim >= LEGS_S3_RUP1 as c_int && destAnim <= LEGS_S3_RUP5 as c_int
                     {
                         destAnim = LEGS_S3_RUP1 as c_int;
                         (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
@@ -5599,8 +5640,7 @@ impl PmoveContext<'_> {
                     if destAnim >= LEGS_S4_LUP1 as c_int && destAnim <= LEGS_S4_LUP5 as c_int {
                         destAnim = LEGS_S4_LUP1 as c_int;
                         (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
-                    } else if destAnim >= LEGS_S4_RUP1 as c_int
-                        && destAnim <= LEGS_S4_RUP5 as c_int
+                    } else if destAnim >= LEGS_S4_RUP1 as c_int && destAnim <= LEGS_S4_RUP5 as c_int
                     {
                         destAnim = LEGS_S4_RUP1 as c_int;
                         (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
@@ -5611,8 +5651,7 @@ impl PmoveContext<'_> {
                     if destAnim >= LEGS_S5_LUP1 as c_int && destAnim <= LEGS_S5_LUP5 as c_int {
                         destAnim = LEGS_S5_LUP1 as c_int;
                         (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
-                    } else if destAnim >= LEGS_S5_RUP1 as c_int
-                        && destAnim <= LEGS_S5_RUP5 as c_int
+                    } else if destAnim >= LEGS_S5_RUP1 as c_int && destAnim <= LEGS_S5_RUP5 as c_int
                     {
                         destAnim = LEGS_S5_RUP1 as c_int;
                         (*ps).slopeRecalcTime = (*pm).cmd.serverTime + SLOPE_RECALC_INT;
@@ -5741,7 +5780,12 @@ impl PmoveContext<'_> {
                     } else if (*ps).pm_flags & PMF_DUCKED != 0 || (*ps).pm_flags & PMF_ROLLING != 0
                     {
                         if (*ps).legsAnim != BOTH_CROUCH1IDLE as c_int {
-                            self.PM_SetAnim(SETANIM_LEGS, BOTH_CROUCH1IDLE as c_int, setAnimFlags, 100);
+                            self.PM_SetAnim(
+                                SETANIM_LEGS,
+                                BOTH_CROUCH1IDLE as c_int,
+                                setAnimFlags,
+                                100,
+                            );
                         } else {
                             self.PM_ContinueLegsAnim(BOTH_CROUCH1IDLE as c_int);
                         }
@@ -5799,13 +5843,23 @@ impl PmoveContext<'_> {
                     //standard crouching anim stuff
                     if (*ps).pm_flags & PMF_BACKWARDS_RUN != 0 {
                         if (*ps).legsAnim != BOTH_CROUCH1WALKBACK as c_int {
-                            self.PM_SetAnim(SETANIM_LEGS, BOTH_CROUCH1WALKBACK as c_int, setAnimFlags, 100);
+                            self.PM_SetAnim(
+                                SETANIM_LEGS,
+                                BOTH_CROUCH1WALKBACK as c_int,
+                                setAnimFlags,
+                                100,
+                            );
                         } else {
                             self.PM_ContinueLegsAnim(BOTH_CROUCH1WALKBACK as c_int);
                         }
                     } else {
                         if (*ps).legsAnim != BOTH_CROUCH1WALK as c_int {
-                            self.PM_SetAnim(SETANIM_LEGS, BOTH_CROUCH1WALK as c_int, setAnimFlags, 100);
+                            self.PM_SetAnim(
+                                SETANIM_LEGS,
+                                BOTH_CROUCH1WALK as c_int,
+                                setAnimFlags,
+                                100,
+                            );
                         } else {
                             self.PM_ContinueLegsAnim(BOTH_CROUCH1WALK as c_int);
                         }
@@ -5834,7 +5888,12 @@ impl PmoveContext<'_> {
 
                 if (*ps).pm_flags & PMF_BACKWARDS_RUN != 0 {
                     if (*ps).legsAnim != BOTH_CROUCH1WALKBACK as c_int {
-                        self.PM_SetAnim(SETANIM_LEGS, BOTH_CROUCH1WALKBACK as c_int, setAnimFlags, 100);
+                        self.PM_SetAnim(
+                            SETANIM_LEGS,
+                            BOTH_CROUCH1WALKBACK as c_int,
+                            setAnimFlags,
+                            100,
+                        );
                     } else {
                         self.PM_ContinueLegsAnim(BOTH_CROUCH1WALKBACK as c_int);
                     }
@@ -6001,8 +6060,7 @@ impl PmoveContext<'_> {
 
             // check for footstep / splash sounds
             let old = (*ps).bobCycle;
-            (*ps).bobCycle =
-                ((old as f32 + bobmove * self.pml.msec as f32) as c_int) & 255;
+            (*ps).bobCycle = ((old as f32 + bobmove * self.pml.msec as f32) as c_int) & 255;
 
             // if we just crossed a cycle boundary, play an appropriate footstep event
             if ((old + 64) ^ ((*ps).bobCycle + 64)) & 128 != 0 {
@@ -6102,9 +6160,7 @@ impl PmoveContext<'_> {
 /// Raven `BG_ClearRocketLock`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5750-5759`
-pub fn BG_ClearRocketLock(
-    ps: *mut playerState_t,
-) {
+pub fn BG_ClearRocketLock(ps: *mut playerState_t) {
     unsafe {
         if !ps.is_null() {
             (*ps).rocketLockIndex = ENTITYNUM_NONE;
@@ -6143,7 +6199,12 @@ impl PmoveContext<'_> {
             self.PM_AddEventWithParm(EV_CHANGE_WEAPON as c_int, weapon);
             (*ps).weaponstate = WEAPON_DROPPING as c_int;
             (*ps).weaponTime += 200;
-            self.PM_SetAnim(SETANIM_TORSO, TORSO_DROPWEAP1 as c_int, SETANIM_FLAG_OVERRIDE, 0);
+            self.PM_SetAnim(
+                SETANIM_TORSO,
+                TORSO_DROPWEAP1 as c_int,
+                SETANIM_FLAG_OVERRIDE,
+                0,
+            );
 
             BG_ClearRocketLock((*pm).ps);
         }
@@ -6167,7 +6228,12 @@ impl PmoveContext<'_> {
             if weapon == WP_SABER as c_int {
                 self.PM_SetSaberMove(LS_DRAW as c_short);
             } else {
-                self.PM_SetAnim(SETANIM_TORSO, TORSO_RAISEWEAP1 as c_int, SETANIM_FLAG_OVERRIDE, 0);
+                self.PM_SetAnim(
+                    SETANIM_TORSO,
+                    TORSO_RAISEWEAP1 as c_int,
+                    SETANIM_FLAG_OVERRIDE,
+                    0,
+                );
             }
             (*ps).weapon = weapon;
             (*ps).weaponstate = WEAPON_RAISING as c_int;
@@ -6393,7 +6459,11 @@ impl PmoveContext<'_> {
     /// Raven `PM_DoChargedWeapons`. `_DEBUG` prints are dropped. The C `goto rest` is
     /// modeled with a labeled block whose value short-circuits the `return qtrue`.
     /// Source: `oracle/oracle/codemp/game/bg_pmove.c:5980-6233`
-    pub fn PM_DoChargedWeapons(&mut self, vehicleRocketLock: qboolean, veh: *mut bgEntity_t) -> qboolean {
+    pub fn PM_DoChargedWeapons(
+        &mut self,
+        vehicleRocketLock: qboolean,
+        veh: *mut bgEntity_t,
+    ) -> qboolean {
         unsafe {
             let pm = self.pm;
             let ps = (*pm).ps;
@@ -6623,8 +6693,9 @@ impl PmoveContext<'_> {
 
             let mut forcedUse = forcedUse;
             if forcedUse == 0 {
-                forcedUse =
-                    bg_itemlist[(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize].giTag;
+                forcedUse = bg_itemlist
+                    [(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize]
+                    .giTag;
             }
 
             if BG_IsItemSelectable(ps, forcedUse) == qfalse {
@@ -6858,14 +6929,16 @@ impl PmoveContext<'_> {
                     }
                 } else if !(*veh).playerState.is_null()
                     && (*(*veh).playerState).speed < 0.0
-                    && (*(*pVeh).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_ANIMAL as c_int
+                    && (*(*pVeh).m_pVehicleInfo).r#type as c_int
+                        == vehicleType_t::VH_ANIMAL as c_int
                 {
                     //tauntaun is going backwards
                     Anim = BOTH_VT_WALK_REV as c_int;
                     iBlend = 600;
                 } else if !(*veh).playerState.is_null()
                     && (*(*veh).playerState).speed < 0.0
-                    && (*(*pVeh).m_pVehicleInfo).r#type as c_int == vehicleType_t::VH_SPEEDER as c_int
+                    && (*(*pVeh).m_pVehicleInfo).r#type as c_int
+                        == vehicleType_t::VH_SPEEDER as c_int
                 {
                     //speeder is going backwards
                     Anim = BOTH_VS_REV as c_int;
@@ -7004,7 +7077,8 @@ impl PmoveContext<'_> {
                 }
             }
 
-            if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int && (*ps).m_iVehicleNum != 0 {
+            if (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int && (*ps).m_iVehicleNum != 0
+            {
                 //riding a vehicle
                 veh = self.pm_entVeh;
                 if !veh.is_null() && {
@@ -7719,7 +7793,8 @@ impl PmoveContext<'_> {
             if (*ps).clientNum < MAX_CLIENTS as c_int
                 && (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] != -1
             {
-                if ((*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] - amount) >= 0 {
+                if ((*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] - amount) >= 0
+                {
                     (*ps).ammo[weaponData[(*ps).weapon as usize].ammoIndex as usize] -= amount;
                 } else {
                     // Not enough energy: Switch weapons
@@ -8070,8 +8145,8 @@ pub fn BG_CmdForRoll(
     pCmd: *mut usercmd_t,
     bg: &crate::bg_channel::BgState,
 ) {
-    use animNumber_t::*;
     use crate::bg_panimate::BG_AnimLength;
+    use animNumber_t::*;
     unsafe {
         if anim == BOTH_ROLL_F as c_int {
             (*pCmd).forwardmove = 127;
@@ -8251,7 +8326,8 @@ impl PmoveContext<'_> {
                 } else {
                     (*ps).speed *= 0.5;
                 }
-            } else if (*ps).weapon == WP_SABER as c_int && BG_SaberInAttack((*ps).saberMove) == qtrue
+            } else if (*ps).weapon == WP_SABER as c_int
+                && BG_SaberInAttack((*ps).saberMove) == qtrue
             {
                 // if attacking with saber while running, drop your speed
                 let lvl = (*ps).fd.saberAnimLevel;
@@ -8312,9 +8388,7 @@ impl PmoveContext<'_> {
 /// Raven `BG_InRollAnim`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8512-8523`
-pub fn BG_InRollAnim(
-    cent: *mut entityState_t,
-) -> qboolean {
+pub fn BG_InRollAnim(cent: *mut entityState_t) -> qboolean {
     use animNumber_t::*;
     unsafe {
         let a = (*cent).legsAnim;
@@ -8332,9 +8406,7 @@ pub fn BG_InRollAnim(
 /// Raven `BG_InKnockDown`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8525-8560`
-pub fn BG_InKnockDown(
-    anim: c_int,
-) -> qboolean {
+pub fn BG_InKnockDown(anim: c_int) -> qboolean {
     use animNumber_t::*;
     if anim == BOTH_KNOCKDOWN1 as c_int
         || anim == BOTH_KNOCKDOWN2 as c_int
@@ -8373,10 +8445,7 @@ pub fn BG_InKnockDown(
 /// Raven `BG_InRollES`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:8562-8574`
-pub fn BG_InRollES(
-    ps: *mut entityState_t,
-    anim: c_int,
-) -> qboolean {
+pub fn BG_InRollES(ps: *mut entityState_t, anim: c_int) -> qboolean {
     use animNumber_t::*;
     // Raven's `ps` param is unreferenced; the switch keys off `anim`.
     let _ = ps;
@@ -8894,7 +8963,9 @@ pub fn BG_G2ClientSpineAngles(
         if doCorr == qtrue {
             //FIXME: no need to do this if legs and torso on are same frame
             //adjust for motion offset
-            let mut boltMatrix = mdxaBone_t { matrix: [[0.0; 4]; 3] };
+            let mut boltMatrix = mdxaBone_t {
+                matrix: [[0.0; 4]; 3],
+            };
             let mut motionFwd: vec3_t = [0.0; 3];
             let mut motionAngles: vec3_t = [0.0; 3];
             let mut motionRt: vec3_t = [0.0; 3];
@@ -9023,9 +9094,7 @@ pub fn BG_SwingAngles(
 /// Raven `BG_InRoll2`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9058-9078`
-pub fn BG_InRoll2(
-    es: *mut entityState_t,
-) -> qboolean {
+pub fn BG_InRoll2(es: *mut entityState_t) -> qboolean {
     use animNumber_t::*;
     unsafe {
         let a = (*es).legsAnim;
@@ -9299,7 +9368,15 @@ pub fn BG_G2PlayerAngles(
             // swing instantly on vehicles
             *lYawAngle = legsAngles[YAW];
         } else {
-            BG_SwingAngles(legsAngles[YAW], 0.0, 90.0, 0.65, lYawAngle, lYawing, frametime);
+            BG_SwingAngles(
+                legsAngles[YAW],
+                0.0,
+                90.0,
+                0.65,
+                lYawAngle,
+                lYawing,
+                frametime,
+            );
         }
         legsAngles[YAW] = *lYawAngle;
 
@@ -9605,11 +9682,7 @@ pub fn BG_G2PlayerAngles(
 /// Raven `BG_G2ATSTAngles`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9459-9462`
-pub fn BG_G2ATSTAngles(
-    ghoul2: *mut c_void,
-    time: c_int,
-    cent_lerpAngles: vec3_t,
-) {
+pub fn BG_G2ATSTAngles(ghoul2: *mut c_void, time: c_int, cent_lerpAngles: vec3_t) {
     unsafe {
         // up = POSITIVE_X, right = NEGATIVE_Y, fwd = NEGATIVE_Z
         strap_G2API_SetBoneAngles(
@@ -9633,10 +9706,7 @@ pub fn BG_G2ATSTAngles(
 /// Raven: the pitch/yaw ucmd override is commented out in the oracle; the live
 /// path unconditionally returns qtrue.
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9464-9469`
-pub fn PM_AdjustAnglesForDualJumpAttack(
-    ps: *mut playerState_t,
-    ucmd: *mut usercmd_t,
-) -> qboolean {
+pub fn PM_AdjustAnglesForDualJumpAttack(ps: *mut playerState_t, ucmd: *mut usercmd_t) -> qboolean {
     qtrue
 }
 
@@ -9805,7 +9875,10 @@ pub fn PM_VehicleViewAngles(
         let mut clampMax: vec3_t = [0.0; 3];
 
         if !(*((*veh).m_pVehicle as *mut Vehicle_t)).m_pPilot.is_null()
-            && (*(*((*veh).m_pVehicle as *mut Vehicle_t)).m_pPilot).s.number == (*ps).clientNum
+            && (*(*((*veh).m_pVehicle as *mut Vehicle_t)).m_pPilot)
+                .s
+                .number
+                == (*ps).clientNum
         {
             // set the pilot's viewangles to the vehicle's viewangles, but only if
             // not doing special free-roll/pitch control
@@ -9821,7 +9894,8 @@ pub fn PM_VehicleViewAngles(
         } else {
             // passengers can look around freely, UNLESS they're controlling a turret!
             for i in 0..MAX_VEHICLE_TURRETS {
-                if (*(*((*veh).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).turret[i as usize].passengerNum
+                if (*(*((*veh).m_pVehicle as *mut Vehicle_t)).m_pVehicleInfo).turret[i as usize]
+                    .passengerNum
                     == (*ps).generic1
                 {
                     // this turret is my station — don't clamp
@@ -9855,14 +9929,9 @@ pub fn PM_VehicleViewAngles(
 /// Raven `PM_WeaponOkOnVehicle`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_pmove.c:9745-9759`
-pub fn PM_WeaponOkOnVehicle(
-    weapon: c_int,
-) -> qboolean {
+pub fn PM_WeaponOkOnVehicle(weapon: c_int) -> qboolean {
     // FIXME (Raven): check g_vehicleInfo for our vehicle?
-    if weapon == WP_MELEE as c_int
-        || weapon == WP_SABER as c_int
-        || weapon == WP_BLASTER as c_int
-    {
+    if weapon == WP_MELEE as c_int || weapon == WP_SABER as c_int || weapon == WP_BLASTER as c_int {
         return qtrue;
     }
     qfalse
@@ -9976,8 +10045,7 @@ impl PmoveContext<'_> {
                     );
                     if Q_fabs(aDelta) < turnRate {
                         // all is good
-                        (*(*self.pm).ps).viewangles[i] =
-                            (*(*veh).playerState).hyperSpaceAngles[i];
+                        (*(*self.pm).ps).viewangles[i] = (*(*veh).playerState).hyperSpaceAngles[i];
                         matchedAxes += 1;
                     } else {
                         aDelta = AngleSubtract(
@@ -10051,106 +10119,101 @@ impl PmoveContext<'_> {
         const DEFAULT_MINS_2: f32 = -24.0;
 
         unsafe {
-        if veh.is_null() {
-            return;
-        }
-        let vi = (*veh).m_pVehicleInfo;
-        if (*vi).length == 0.0 || (*vi).width == 0.0 || (*vi).height == 0.0 {
-            return;
-        } else if (*vi).r#type as c_int != vehicleType_t::VH_FIGHTER as c_int
-            && (*vi).r#type as c_int != vehicleType_t::VH_FLIER as c_int
-        {
-            // only those types have dynamic bboxes, the rest use a static bbox
-            VectorSet(
-                maxs,
-                (*vi).width / 2.0,
-                (*vi).width / 2.0,
-                (*vi).height + DEFAULT_MINS_2,
-            );
-            VectorSet(
-                mins,
-                (*vi).width / -2.0,
-                (*vi).width / -2.0,
-                DEFAULT_MINS_2,
-            );
-            return;
-        } else {
-            let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
-            let mut point: [vec3_t; 8] = [[0.0; 3]; 8];
-            let mut newMins: vec3_t = [0.0; 3];
-            let mut newMaxs: vec3_t = [0.0; 3];
-            let mut trace: trace_t = core::mem::zeroed();
+            if veh.is_null() {
+                return;
+            }
+            let vi = (*veh).m_pVehicleInfo;
+            if (*vi).length == 0.0 || (*vi).width == 0.0 || (*vi).height == 0.0 {
+                return;
+            } else if (*vi).r#type as c_int != vehicleType_t::VH_FIGHTER as c_int
+                && (*vi).r#type as c_int != vehicleType_t::VH_FLIER as c_int
+            {
+                // only those types have dynamic bboxes, the rest use a static bbox
+                VectorSet(
+                    maxs,
+                    (*vi).width / 2.0,
+                    (*vi).width / 2.0,
+                    (*vi).height + DEFAULT_MINS_2,
+                );
+                VectorSet(mins, (*vi).width / -2.0, (*vi).width / -2.0, DEFAULT_MINS_2);
+                return;
+            } else {
+                let mut axis: [vec3_t; 3] = [[0.0; 3]; 3];
+                let mut point: [vec3_t; 8] = [[0.0; 3]; 8];
+                let mut newMins: vec3_t = [0.0; 3];
+                let mut newMaxs: vec3_t = [0.0; 3];
+                let mut trace: trace_t = core::mem::zeroed();
 
-            let len = (*vi).length;
-            let wid = (*vi).width;
-            let hgt = (*vi).height;
+                let len = (*vi).length;
+                let wid = (*vi).width;
+                let hgt = (*vi).height;
 
-            // m_vOrientation is a `vec3_t*` into the owner; read the 3 floats.
-            let orient: vec3_t = [
-                *(*veh).m_vOrientation.add(0),
-                *(*veh).m_vOrientation.add(1),
-                *(*veh).m_vOrientation.add(2),
-            ];
-            AnglesToAxis(orient, axis.as_mut_ptr());
-            _VectorMA(origin, len / 2.0, axis[0], &mut point[0]);
-            _VectorMA(origin, -len / 2.0, axis[0], &mut point[1]);
-            // extrapolate each side up and down
-            let p0 = point[0];
-            _VectorMA(p0, hgt / 2.0, axis[2], &mut point[0]);
-            let p0 = point[0];
-            _VectorMA(p0, -hgt, axis[2], &mut point[2]);
-            let p1 = point[1];
-            _VectorMA(p1, hgt / 2.0, axis[2], &mut point[1]);
-            let p1 = point[1];
-            _VectorMA(p1, -hgt, axis[2], &mut point[3]);
+                // m_vOrientation is a `vec3_t*` into the owner; read the 3 floats.
+                let orient: vec3_t = [
+                    *(*veh).m_vOrientation.add(0),
+                    *(*veh).m_vOrientation.add(1),
+                    *(*veh).m_vOrientation.add(2),
+                ];
+                AnglesToAxis(orient, axis.as_mut_ptr());
+                _VectorMA(origin, len / 2.0, axis[0], &mut point[0]);
+                _VectorMA(origin, -len / 2.0, axis[0], &mut point[1]);
+                // extrapolate each side up and down
+                let p0 = point[0];
+                _VectorMA(p0, hgt / 2.0, axis[2], &mut point[0]);
+                let p0 = point[0];
+                _VectorMA(p0, -hgt, axis[2], &mut point[2]);
+                let p1 = point[1];
+                _VectorMA(p1, hgt / 2.0, axis[2], &mut point[1]);
+                let p1 = point[1];
+                _VectorMA(p1, -hgt, axis[2], &mut point[3]);
 
-            _VectorMA(origin, wid / 2.0, axis[1], &mut point[4]);
-            _VectorMA(origin, -wid / 2.0, axis[1], &mut point[5]);
-            // extrapolate each side up and down
-            let p4 = point[4];
-            _VectorMA(p4, hgt / 2.0, axis[2], &mut point[4]);
-            let p4 = point[4];
-            _VectorMA(p4, -hgt, axis[2], &mut point[6]);
-            let p5 = point[5];
-            _VectorMA(p5, hgt / 2.0, axis[2], &mut point[5]);
-            let p5 = point[5];
-            _VectorMA(p5, -hgt, axis[2], &mut point[7]);
+                _VectorMA(origin, wid / 2.0, axis[1], &mut point[4]);
+                _VectorMA(origin, -wid / 2.0, axis[1], &mut point[5]);
+                // extrapolate each side up and down
+                let p4 = point[4];
+                _VectorMA(p4, hgt / 2.0, axis[2], &mut point[4]);
+                let p4 = point[4];
+                _VectorMA(p4, -hgt, axis[2], &mut point[6]);
+                let p5 = point[5];
+                _VectorMA(p5, hgt / 2.0, axis[2], &mut point[5]);
+                let p5 = point[5];
+                _VectorMA(p5, -hgt, axis[2], &mut point[7]);
 
-            // Now inflate a bbox around these points
-            _VectorCopy(origin, &mut newMins);
-            _VectorCopy(origin, &mut newMaxs);
-            for curAxis in 0..3usize {
-                for i in 0..8usize {
-                    if point[i][curAxis] > newMaxs[curAxis] {
-                        newMaxs[curAxis] = point[i][curAxis];
-                    } else if point[i][curAxis] < newMins[curAxis] {
-                        newMins[curAxis] = point[i][curAxis];
+                // Now inflate a bbox around these points
+                _VectorCopy(origin, &mut newMins);
+                _VectorCopy(origin, &mut newMaxs);
+                for curAxis in 0..3usize {
+                    for i in 0..8usize {
+                        if point[i][curAxis] > newMaxs[curAxis] {
+                            newMaxs[curAxis] = point[i][curAxis];
+                        } else if point[i][curAxis] < newMins[curAxis] {
+                            newMins[curAxis] = point[i][curAxis];
+                        }
                     }
                 }
+                let nmn = newMins;
+                _VectorSubtract(nmn, origin, &mut newMins);
+                let nmx = newMaxs;
+                _VectorSubtract(nmx, origin, &mut newMaxs);
+                // now see if that's a valid way to be
+                self.traps.trace(
+                    &mut trace,
+                    &origin as *const vec3_t,
+                    &newMins as *const vec3_t,
+                    &newMaxs as *const vec3_t,
+                    &origin as *const vec3_t,
+                    clientNum,
+                    tracemask,
+                );
+                if trace.startsolid == 0 && trace.allsolid == 0 {
+                    // let's use it!
+                    _VectorCopy(newMins, mins);
+                    _VectorCopy(newMaxs, maxs);
+                }
+                // else: just use the last one
             }
-            let nmn = newMins;
-            _VectorSubtract(nmn, origin, &mut newMins);
-            let nmx = newMaxs;
-            _VectorSubtract(nmx, origin, &mut newMaxs);
-            // now see if that's a valid way to be
-            self.traps.trace(
-                &mut trace,
-                &origin as *const vec3_t,
-                &newMins as *const vec3_t,
-                &newMaxs as *const vec3_t,
-                &origin as *const vec3_t,
-                clientNum,
-                tracemask,
-            );
-            if trace.startsolid == 0 && trace.allsolid == 0 {
-                // let's use it!
-                _VectorCopy(newMins, mins);
-                _VectorCopy(newMaxs, maxs);
-            }
-            // else: just use the last one
         }
     }
-}
 }
 
 /// Raven `PM_MoveForKata` — force movement/jump commands during the soulcal and

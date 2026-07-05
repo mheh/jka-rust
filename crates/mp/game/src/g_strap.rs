@@ -97,14 +97,7 @@ pub fn strap_G2API_GetBoltMatrix_NoReconstruct(
     crate::trap::G2API_GetBoltMatrix_NoReconstruct(
         strap_engine(),
         mp_abi::game::syscalls::G_G2_GETBOLT_NOREC::GG2GetboltNorecArgs::new(
-            ghoul2,
-            modelIndex,
-            boltIndex,
-            matrix,
-            &angles,
-            &position,
-            frameNum,
-            modelList,
+            ghoul2, modelIndex, boltIndex, matrix, &angles, &position, frameNum, modelList,
             &mut scale,
         ),
     )

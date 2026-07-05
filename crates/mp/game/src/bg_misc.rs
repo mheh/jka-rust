@@ -29,7 +29,7 @@ use crate::prelude::*;
 use crate::bg_lib::atof;
 use crate::g_ICARUScb::Q3_SetParm;
 use crate::g_spawn::G_NewString;
-use crate::q_math::{AngleNormalize180, AngleSubtract, vectoangles};
+use crate::q_math::{vectoangles, AngleNormalize180, AngleSubtract};
 use crate::q_shared::Q_stricmp;
 
 /// Raven `GIB_HEALTH` — health threshold below which a corpse gibs.
@@ -57,28 +57,28 @@ pub const forceMasteryPoints: [c_int; 8] = [0, 5, 10, 20, 30, 50, 75, 100];
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:174-195`
 pub const bgForcePowerCost: [[c_int; 4]; 17] = [
-    [0, 2, 4, 6],  // FP_HEAL
-    [0, 0, 2, 6],  // FP_LEVITATION
-    [0, 2, 4, 6],  // FP_SPEED
-    [0, 1, 3, 6],  // FP_PUSH
-    [0, 1, 3, 6],  // FP_PULL
-    [0, 4, 6, 8],  // FP_TELEPATHY
-    [0, 1, 3, 6],  // FP_GRIP
-    [0, 2, 5, 8],  // FP_LIGHTNING
-    [0, 4, 6, 8],  // FP_RAGE
-    [0, 2, 5, 8],  // FP_PROTECT
-    [0, 1, 3, 6],  // FP_ABSORB
-    [0, 1, 3, 6],  // FP_TEAM_HEAL
-    [0, 1, 3, 6],  // FP_TEAM_FORCE
-    [0, 2, 4, 6],  // FP_DRAIN
-    [0, 2, 5, 8],  // FP_SEE
-    [0, 1, 5, 8],  // FP_SABER_OFFENSE
-    [0, 1, 5, 8],  // FP_SABER_DEFENSE
-    // NOTE: Raven's `bgForcePowerCost` has 17 rows for FP_SABERTHROW's cost
-    // ({0,4,6,8}) too — kept in a second const to avoid an 18-row literal
-    // mismatch with the declared `[NUM_FORCE_POWERS]` size at the call sites
-    // that only ever index rows 0..=17 (FP_SABERTHROW's own use is via the
-    // 18th row below).
+    [0, 2, 4, 6], // FP_HEAL
+    [0, 0, 2, 6], // FP_LEVITATION
+    [0, 2, 4, 6], // FP_SPEED
+    [0, 1, 3, 6], // FP_PUSH
+    [0, 1, 3, 6], // FP_PULL
+    [0, 4, 6, 8], // FP_TELEPATHY
+    [0, 1, 3, 6], // FP_GRIP
+    [0, 2, 5, 8], // FP_LIGHTNING
+    [0, 4, 6, 8], // FP_RAGE
+    [0, 2, 5, 8], // FP_PROTECT
+    [0, 1, 3, 6], // FP_ABSORB
+    [0, 1, 3, 6], // FP_TEAM_HEAL
+    [0, 1, 3, 6], // FP_TEAM_FORCE
+    [0, 2, 4, 6], // FP_DRAIN
+    [0, 2, 5, 8], // FP_SEE
+    [0, 1, 5, 8], // FP_SABER_OFFENSE
+    [0, 1, 5, 8], // FP_SABER_DEFENSE
+                  // NOTE: Raven's `bgForcePowerCost` has 17 rows for FP_SABERTHROW's cost
+                  // ({0,4,6,8}) too — kept in a second const to avoid an 18-row literal
+                  // mismatch with the declared `[NUM_FORCE_POWERS]` size at the call sites
+                  // that only ever index rows 0..=17 (FP_SABERTHROW's own use is via the
+                  // 18th row below).
 ];
 /// Raven `bgForcePowerCost[FP_SABERTHROW]` (`{0,4,6,8}`), row 17 — appended
 /// separately; see note on `bgForcePowerCost` above.
@@ -287,7 +287,9 @@ pub fn BG_ParseField(
                     fieldtype_t::F_VECTOR => {
                         // sscanf(value, "%f %f %f", &vec[0], &vec[1], &vec[2])
                         let text = std::ffi::CStr::from_ptr(value).to_string_lossy();
-                        let mut nums = text.split_whitespace().filter_map(|t| t.parse::<f32>().ok());
+                        let mut nums = text
+                            .split_whitespace()
+                            .filter_map(|t| t.parse::<f32>().ok());
                         let vec: vec3_t = [
                             nums.next().unwrap_or(0.0),
                             nums.next().unwrap_or(0.0),
@@ -364,7 +366,9 @@ pub fn BG_LegalizedForcePowers(
     fpDisabled: c_int,
 ) -> qboolean {
     unsafe {
-        let orig = std::ffi::CStr::from_ptr(powerOut).to_string_lossy().into_owned();
+        let orig = std::ffi::CStr::from_ptr(powerOut)
+            .to_string_lossy()
+            .into_owned();
         let mut maintains_validity = qtrue;
 
         let power_buf: String;
@@ -398,7 +402,11 @@ pub fn BG_LegalizedForcePowers(
 
         const NUM_FORCE_POWERS_USIZE: usize = 18;
         let mut final_powers: [c_int; NUM_FORCE_POWERS_USIZE] = [0; NUM_FORCE_POWERS_USIZE];
-        for (c, ch) in powers_field.chars().take(NUM_FORCE_POWERS_USIZE).enumerate() {
+        for (c, ch) in powers_field
+            .chars()
+            .take(NUM_FORCE_POWERS_USIZE)
+            .enumerate()
+        {
             final_powers[c] = ch.to_digit(10).unwrap_or(0) as c_int;
         }
 
@@ -459,10 +467,13 @@ pub fn BG_LegalizedForcePowers(
                             while final_powers[which_one] > 0 && used_points > allowed_points {
                                 if final_powers[which_one] > 1
                                     || ((which_one != FP_SABER_OFFENSE as usize || freeSaber == 0)
-                                        && (which_one != FP_SABER_DEFENSE as usize || freeSaber == 0))
+                                        && (which_one != FP_SABER_DEFENSE as usize
+                                            || freeSaber == 0))
                                 {
-                                    used_points -=
-                                        force_power_cost(which_one as c_int, final_powers[which_one]);
+                                    used_points -= force_power_cost(
+                                        which_one as c_int,
+                                        final_powers[which_one],
+                                    );
                                     final_powers[which_one] -= 1;
                                 } else {
                                     break;
@@ -566,9 +577,7 @@ pub fn BG_LegalizedForcePowers(
 /// Raven `vectoyaw`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1773-1792`
-pub fn vectoyaw(
-    vec: vec3_t,
-) -> f32 {
+pub fn vectoyaw(vec: vec3_t) -> f32 {
     let mut yaw: f32;
 
     if vec[YAW] == 0.0 && vec[PITCH] == 0.0 {
@@ -592,13 +601,11 @@ pub fn vectoyaw(
 /// Raven `BG_HasYsalamiri`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1794-1808`
-pub fn BG_HasYsalamiri(
-    gametype: c_int,
-    ps: *mut playerState_t,
-) -> qboolean {
+pub fn BG_HasYsalamiri(gametype: c_int, ps: *mut playerState_t) -> qboolean {
     unsafe {
         if gametype == GT_CTY
-            && ((*ps).powerups[PW_REDFLAG as usize] != 0 || (*ps).powerups[PW_BLUEFLAG as usize] != 0)
+            && ((*ps).powerups[PW_REDFLAG as usize] != 0
+                || (*ps).powerups[PW_BLUEFLAG as usize] != 0)
         {
             return qtrue;
         }
@@ -680,7 +687,8 @@ pub fn BG_CanUseFPNow(
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1881-1893`
 pub fn BG_FindItemForPowerup(pw: powerup_t) -> *mut gitem_t {
     for i in 0..bg_numItems {
-        if (bg_itemlist[i as usize].giType == IT_POWERUP || bg_itemlist[i as usize].giType == IT_TEAM)
+        if (bg_itemlist[i as usize].giType == IT_POWERUP
+            || bg_itemlist[i as usize].giType == IT_TEAM)
             && bg_itemlist[i as usize].giTag == pw
         {
             return &bg_itemlist[i as usize] as *const gitem_t as *mut gitem_t;
@@ -785,9 +793,7 @@ pub fn BG_PlayerTouchesItem(
 /// Raven `BG_ProperForceIndex`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:1997-2012`
-pub fn BG_ProperForceIndex(
-    power: c_int,
-) -> c_int {
+pub fn BG_ProperForceIndex(power: c_int) -> c_int {
     for i in 0..forcePowerSorted.len() {
         if forcePowerSorted[i] == power {
             return i as c_int;
@@ -799,10 +805,7 @@ pub fn BG_ProperForceIndex(
 /// Raven `BG_CycleForce`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2014-2090`
-pub fn BG_CycleForce(
-    ps: *mut playerState_t,
-    direction: c_int,
-) {
+pub fn BG_CycleForce(ps: *mut playerState_t, direction: c_int) {
     unsafe {
         let mut i = (*ps).fd.forcePowerSelected;
         let mut x = i;
@@ -891,10 +894,7 @@ pub fn BG_GetItemIndexByTag(tag: c_int, r#type: c_int) -> c_int {
 /// Raven `BG_IsItemSelectable`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2111-2119`
-pub fn BG_IsItemSelectable(
-    ps: *mut playerState_t,
-    item: c_int,
-) -> qboolean {
+pub fn BG_IsItemSelectable(ps: *mut playerState_t, item: c_int) -> qboolean {
     if item == HI_HEALTHDISP || item == HI_AMMODISP || item == HI_JETPACK {
         return qfalse;
     }
@@ -906,7 +906,8 @@ pub fn BG_IsItemSelectable(
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2121-2182`
 pub fn BG_CycleInven(ps: *mut playerState_t, direction: c_int) {
     unsafe {
-        let mut i = bg_itemlist[(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize].giTag;
+        let mut i =
+            bg_itemlist[(*ps).stats[statIndex_t::STAT_HOLDABLE_ITEM as usize] as usize].giTag;
         let original = i;
         if direction == 1 {
             i += 1;
@@ -1002,7 +1003,10 @@ pub fn BG_CanItemBeGrabbed(
                 {
                     return qfalse;
                 }
-                if item.giTag == WP_THERMAL || item.giTag == WP_TRIP_MINE || item.giTag == WP_DET_PACK {
+                if item.giTag == WP_THERMAL
+                    || item.giTag == WP_TRIP_MINE
+                    || item.giTag == WP_DET_PACK
+                {
                     let ammoIndex = weaponData[item.giTag as usize].ammoIndex;
                     if (*ps).ammo[ammoIndex as usize] >= ammoData[ammoIndex as usize].max {
                         return qfalse;
@@ -1059,14 +1063,16 @@ pub fn BG_CanItemBeGrabbed(
                     if (*ps).persistant[persEnum_t::PERS_TEAM as usize] == TEAM_RED {
                         if item.giTag == PW_BLUEFLAG
                             || (item.giTag == PW_REDFLAG && (*ent).modelindex2 != 0)
-                            || (item.giTag == PW_REDFLAG && (*ps).powerups[PW_BLUEFLAG as usize] != 0)
+                            || (item.giTag == PW_REDFLAG
+                                && (*ps).powerups[PW_BLUEFLAG as usize] != 0)
                         {
                             return qtrue;
                         }
                     } else if (*ps).persistant[persEnum_t::PERS_TEAM as usize] == TEAM_BLUE {
                         if item.giTag == PW_REDFLAG
                             || (item.giTag == PW_BLUEFLAG && (*ent).modelindex2 != 0)
-                            || (item.giTag == PW_BLUEFLAG && (*ps).powerups[PW_REDFLAG as usize] != 0)
+                            || (item.giTag == PW_BLUEFLAG
+                                && (*ps).powerups[PW_REDFLAG as usize] != 0)
                         {
                             return qtrue;
                         }
@@ -1075,7 +1081,8 @@ pub fn BG_CanItemBeGrabbed(
                 qfalse
             }
             IT_HOLDABLE => {
-                if ((*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << item.giTag)) != 0 {
+                if ((*ps).stats[statIndex_t::STAT_HOLDABLE_ITEMS as usize] & (1 << item.giTag)) != 0
+                {
                     return qfalse;
                 }
                 qtrue
@@ -1088,15 +1095,12 @@ pub fn BG_CanItemBeGrabbed(
 /// Raven `BG_EvaluateTrajectory`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2353-2410`
-pub fn BG_EvaluateTrajectory(
-    tr: *const trajectory_t,
-    atTime: c_int,
-    result: &mut [f32; 3],
-) {
+pub fn BG_EvaluateTrajectory(tr: *const trajectory_t, atTime: c_int, result: &mut [f32; 3]) {
     unsafe {
         let tr_ref = &*tr;
         match tr_ref.trType {
-            crate::trajectory::trType_t::TR_STATIONARY | crate::trajectory::trType_t::TR_INTERPOLATE => {
+            crate::trajectory::trType_t::TR_STATIONARY
+            | crate::trajectory::trType_t::TR_INTERPOLATE => {
                 result[0] = tr_ref.trBase[0];
                 result[1] = tr_ref.trBase[1];
                 result[2] = tr_ref.trBase[2];
@@ -1135,7 +1139,8 @@ pub fn BG_EvaluateTrajectory(
                 let deltaTime = if t - tr_ref.trTime > tr_ref.trDuration || t - tr_ref.trTime <= 0 {
                     0.0
                 } else {
-                    let angle = 90.0 - (90.0 * ((t - tr_ref.trTime) as f32) / tr_ref.trDuration as f32);
+                    let angle =
+                        90.0 - (90.0 * ((t - tr_ref.trTime) as f32) / tr_ref.trDuration as f32);
                     tr_ref.trDuration as f32 * 0.001 * angle.to_radians().cos()
                 };
                 result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
@@ -1146,10 +1151,14 @@ pub fn BG_EvaluateTrajectory(
                 let deltaTime = (atTime - tr_ref.trTime) as f32 * 0.001;
                 result[0] = tr_ref.trBase[0] + deltaTime * tr_ref.trDelta[0];
                 result[1] = tr_ref.trBase[1] + deltaTime * tr_ref.trDelta[1];
-                result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2] - 0.5 * 800.0 * deltaTime * deltaTime;
+                result[2] = tr_ref.trBase[2] + deltaTime * tr_ref.trDelta[2]
+                    - 0.5 * 800.0 * deltaTime * deltaTime;
             }
             _ => {
-                panic!("BG_EvaluateTrajectory: unknown trType: {}", tr_ref.trType as c_int);
+                panic!(
+                    "BG_EvaluateTrajectory: unknown trType: {}",
+                    tr_ref.trType as c_int
+                );
             }
         }
     }
@@ -1159,15 +1168,12 @@ pub fn BG_EvaluateTrajectory(
 /// time.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2419-2462`
-pub fn BG_EvaluateTrajectoryDelta(
-    tr: *const trajectory_t,
-    atTime: c_int,
-    result: &mut [f32; 3],
-) {
+pub fn BG_EvaluateTrajectoryDelta(tr: *const trajectory_t, atTime: c_int, result: &mut [f32; 3]) {
     unsafe {
         let tr_ref = &*tr;
         match tr_ref.trType {
-            crate::trajectory::trType_t::TR_STATIONARY | crate::trajectory::trType_t::TR_INTERPOLATE => {
+            crate::trajectory::trType_t::TR_STATIONARY
+            | crate::trajectory::trType_t::TR_INTERPOLATE => {
                 result[0] = 0.0;
                 result[1] = 0.0;
                 result[2] = 0.0;
@@ -1202,7 +1208,12 @@ pub fn BG_EvaluateTrajectoryDelta(
                     result[2] = 0.0;
                     return;
                 }
-                let deltaTime = tr_ref.trDuration as f32 * 0.001 * ((90.0 - (90.0 * ((atTime - tr_ref.trTime) as f32) / tr_ref.trDuration as f32)).to_radians().cos());
+                let deltaTime = tr_ref.trDuration as f32
+                    * 0.001
+                    * ((90.0
+                        - (90.0 * ((atTime - tr_ref.trTime) as f32) / tr_ref.trDuration as f32))
+                        .to_radians()
+                        .cos());
                 result[0] = deltaTime * tr_ref.trDelta[0];
                 result[1] = deltaTime * tr_ref.trDelta[1];
                 result[2] = deltaTime * tr_ref.trDelta[2];
@@ -1214,7 +1225,10 @@ pub fn BG_EvaluateTrajectoryDelta(
                 result[2] = tr_ref.trDelta[2] - 800.0 * deltaTime;
             }
             _ => {
-                panic!("BG_EvaluateTrajectoryDelta: unknown trType: {}", tr_ref.trType as c_int);
+                panic!(
+                    "BG_EvaluateTrajectoryDelta: unknown trType: {}",
+                    tr_ref.trType as c_int
+                );
             }
         }
     }
@@ -1244,10 +1258,7 @@ pub fn BG_AddPredictableEventToPlayerstate(
 /// Raven `BG_TouchJumpPad`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2667-2694`
-pub fn BG_TouchJumpPad(
-    ps: *mut playerState_t,
-    jumppad: *mut entityState_t,
-) {
+pub fn BG_TouchJumpPad(ps: *mut playerState_t, jumppad: *mut entityState_t) {
     unsafe {
         let ps_ref = &mut *ps;
         let jumppad_ref = &*jumppad;
@@ -1327,10 +1338,7 @@ pub fn BG_EmplacedView(
 /// the best way to go.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2744-2766`
-pub fn BG_IsValidCharacterModel(
-    modelName: *const c_char,
-    skinName: *const c_char,
-) -> qboolean {
+pub fn BG_IsValidCharacterModel(modelName: *const c_char, skinName: *const c_char) -> qboolean {
     unsafe {
         if Q_stricmp(skinName, c"menu".as_ptr()) == 0 {
             return qfalse;
@@ -1479,11 +1487,7 @@ fn snap_vector(v: &mut vec3_t) {
 /// `usercmd_t` on the server, and after local prediction on the client.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_misc.c:2887-3027`
-pub fn BG_PlayerStateToEntityState(
-    ps: *mut playerState_t,
-    s: *mut entityState_t,
-    snap: qboolean,
-) {
+pub fn BG_PlayerStateToEntityState(ps: *mut playerState_t, s: *mut entityState_t, snap: qboolean) {
     unsafe {
         if (*ps).pm_type == PM_INTERMISSION as c_int || (*ps).pm_type == PM_SPECTATOR as c_int {
             (*s).eType = ET_INVISIBLE as c_int;
@@ -1795,7 +1799,11 @@ pub fn BG_Alloc(size: c_int, bg: &mut BgState) -> *mut c_void {
         );
     }
     bg.bg_poolSize += size;
-    unsafe { bg.bg_pool.as_mut_ptr().add((bg.bg_poolSize - size) as usize) as *mut c_void }
+    unsafe {
+        bg.bg_pool
+            .as_mut_ptr()
+            .add((bg.bg_poolSize - size) as usize) as *mut c_void
+    }
 }
 
 /// Raven `BG_AllocUnaligned`.
@@ -1810,7 +1818,11 @@ pub fn BG_AllocUnaligned(size: c_int, bg: &mut BgState) -> *mut c_void {
         );
     }
     bg.bg_poolSize += size;
-    unsafe { bg.bg_pool.as_mut_ptr().add((bg.bg_poolSize - size) as usize) as *mut c_void }
+    unsafe {
+        bg.bg_pool
+            .as_mut_ptr()
+            .add((bg.bg_poolSize - size) as usize) as *mut c_void
+    }
 }
 
 /// Raven `BG_TempAlloc`.

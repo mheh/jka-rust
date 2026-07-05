@@ -244,8 +244,12 @@ pub fn COM_DefaultExtension(path: *mut c_char, maxSize: c_int, extension: *const
             src = src.offset(-1);
         }
 
-        let old_path = std::ffi::CStr::from_ptr(path).to_string_lossy().into_owned();
-        let ext = std::ffi::CStr::from_ptr(extension).to_string_lossy().into_owned();
+        let old_path = std::ffi::CStr::from_ptr(path)
+            .to_string_lossy()
+            .into_owned();
+        let ext = std::ffi::CStr::from_ptr(extension)
+            .to_string_lossy()
+            .into_owned();
         let combined = format!("{old_path}{ext}");
         let cstr = std::ffi::CString::new(combined).unwrap();
         // Q_strncpyz semantics: truncate to maxSize-1 + NUL.
@@ -366,10 +370,9 @@ pub fn COM_Parse(data_p: *mut *const c_char) -> *mut c_char {
 /// Source: `oracle/oracle/codemp/game/q_shared.c:300-310`
 pub fn COM_ParseError(format: *mut c_char) {
     unsafe {
-        let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char)
-            .to_string_lossy();
-        let parsename_str = std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char)
-            .to_string_lossy();
+        let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
+        let parsename_str =
+            std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char).to_string_lossy();
         let msg = format!("ERROR: {}, line {}: {}", parsename_str, COM_LINES, fmt_str);
         let c_msg = std::ffi::CString::new(msg).unwrap();
         crate::g_main::Com_Printf(c_msg.as_ptr());
@@ -384,11 +387,13 @@ pub fn COM_ParseError(format: *mut c_char) {
 /// Source: `oracle/oracle/codemp/game/q_shared.c:312-322`
 pub fn COM_ParseWarning(format: *mut c_char) {
     unsafe {
-        let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char)
-            .to_string_lossy();
-        let parsename_str = std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char)
-            .to_string_lossy();
-        let msg = format!("WARNING: {}, line {}: {}", parsename_str, COM_LINES, fmt_str);
+        let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
+        let parsename_str =
+            std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char).to_string_lossy();
+        let msg = format!(
+            "WARNING: {}, line {}: {}",
+            parsename_str, COM_LINES, fmt_str
+        );
         let c_msg = std::ffi::CString::new(msg).unwrap();
         crate::g_main::Com_Printf(c_msg.as_ptr());
     }
@@ -444,7 +449,8 @@ pub fn COM_Compress(data_p: *mut c_char) -> c_int {
                     r#in = r#in.offset(1);
                 }
             } else if c == b'/' as c_char && *r#in.offset(1) == b'*' as c_char {
-                while *r#in != 0 && !(*r#in == b'*' as c_char && *r#in.offset(1) == b'/' as c_char) {
+                while *r#in != 0 && !(*r#in == b'*' as c_char && *r#in.offset(1) == b'/' as c_char)
+                {
                     r#in = r#in.offset(1);
                 }
                 if *r#in != 0 {
@@ -541,7 +547,8 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
                 }
             } else if c == b'/' as c_int && *data.offset(1) == b'*' as c_char {
                 data = data.offset(2);
-                while *data != 0 && !(*data == b'*' as c_char && *data.offset(1) == b'/' as c_char) {
+                while *data != 0 && !(*data == b'*' as c_char && *data.offset(1) == b'/' as c_char)
+                {
                     data = data.offset(1);
                 }
                 if *data != 0 {
@@ -1146,8 +1153,7 @@ pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char) {
             return;
         }
         // Without access to varargs, use the format string as the message.
-        let fmt_str = std::ffi::CStr::from_ptr(fmt)
-            .to_string_lossy();
+        let fmt_str = std::ffi::CStr::from_ptr(fmt).to_string_lossy();
         let bigbuffer = format!("{}", fmt_str);
         let c_bigbuffer = std::ffi::CString::new(bigbuffer).unwrap();
         crate::q_shared::Q_strncpyz(dest, c_bigbuffer.as_ptr(), size);
@@ -1168,8 +1174,7 @@ pub fn va(format: *const c_char) -> *mut c_char {
         let buf = VA_STRING[VA_INDEX & 1].as_mut_ptr();
         VA_INDEX += 1;
 
-        let fmt_str = std::ffi::CStr::from_ptr(format)
-            .to_string_lossy();
+        let fmt_str = std::ffi::CStr::from_ptr(format).to_string_lossy();
         let formatted = format!("{}", fmt_str);
         let bytes = formatted.as_bytes();
         let max_len = 32000_usize;
@@ -1440,7 +1445,8 @@ pub fn Info_SetValueForKey(s: *mut c_char, key: *const c_char, value: *const c_c
         //TODO: Port MAX_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_SetValueForKey: oversize infostring")) once the const is ported.
         // Source: oracle/oracle/codemp/game/q_shared.c:1283-1285
 
-        if !c_strchr(key, b'\\' as c_char).is_null() || !c_strchr(value, b'\\' as c_char).is_null() {
+        if !c_strchr(key, b'\\' as c_char).is_null() || !c_strchr(value, b'\\' as c_char).is_null()
+        {
             com_printf_lit("Can't use keys or values with a \\\n");
             return;
         }
@@ -1490,7 +1496,8 @@ pub fn Info_SetValueForKey_Big(s: *mut c_char, key: *const c_char, value: *const
         //TODO: Port BIG_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_SetValueForKey: oversize infostring")) once the const is ported.
         // Source: oracle/oracle/codemp/game/q_shared.c:1331-1333
 
-        if !c_strchr(key, b'\\' as c_char).is_null() || !c_strchr(value, b'\\' as c_char).is_null() {
+        if !c_strchr(key, b'\\' as c_char).is_null() || !c_strchr(value, b'\\' as c_char).is_null()
+        {
             com_printf_lit("Can't use keys or values with a \\\n");
             return;
         }

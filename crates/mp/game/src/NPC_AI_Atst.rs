@@ -8,12 +8,12 @@
 //! RULES TABLE in fnskel.py.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
-use crate::NPC_AI_Default::NPC_BSIdle;
-use crate::NPC_reactions::NPC_Pain;
 use crate::bg_misc::BG_FindItemForWeapon;
 use crate::g_items::RegisterItem;
 use crate::g_utils::{G_EffectIndex, G_SoundIndex, G_SoundOnEnt};
+use crate::prelude::*;
+use crate::NPC_AI_Default::NPC_BSIdle;
+use crate::NPC_reactions::NPC_Pain;
 
 /// Min melee attack range.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:3`
@@ -75,9 +75,19 @@ pub fn G_ATSTCheckPain(
     unsafe {
         // SAFETY: self_ accessed through game context, rand() via bg_state.rng.
         if (*ctx.world).bg_state.rng.rand() & 1 != 0 {
-            G_SoundOnEnt(ctx, self_, CHAN_LESS_ATTEN, b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char);
+            G_SoundOnEnt(
+                ctx,
+                self_,
+                CHAN_LESS_ATTEN,
+                b"sound/chars/atst/atst_damaged1\0".as_ptr() as *const c_char,
+            );
         } else {
-            G_SoundOnEnt(ctx, self_, CHAN_LESS_ATTEN, b"sound/chars/atst/atst_damaged2\0".as_ptr() as *const c_char);
+            G_SoundOnEnt(
+                ctx,
+                self_,
+                CHAN_LESS_ATTEN,
+                b"sound/chars/atst/atst_damaged2\0".as_ptr() as *const c_char,
+            );
         }
     }
 }
@@ -103,11 +113,7 @@ pub fn NPC_ATST_Pain(
 ///
 /// Hunt down the enemy. Set goal to enemy and move toward it.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Atst.c:130-142`
-pub fn ATST_Hunt(
-    ctx: GameContext<'_>,
-    visible: qboolean,
-    advance: qboolean,
-) {
+pub fn ATST_Hunt(ctx: GameContext<'_>, visible: qboolean, advance: qboolean) {
     unsafe {
         // PORT-NOTE(ai-context): NPC/NPCInfo accessed via (*ctx.world).globals
         let npc = (*ctx.world).globals.NPC;
@@ -140,10 +146,16 @@ pub fn ATST_Ranged(
         let npc_info = (*ctx.world).globals.NPCInfo;
         let ucmd = &mut (*ctx.world).globals.ucmd;
 
-        if TIMER_Done(ctx, npc, b"atkDelay\0".as_ptr() as *const c_char) != qfalse && visible != qfalse {
+        if TIMER_Done(ctx, npc, b"atkDelay\0".as_ptr() as *const c_char) != qfalse
+            && visible != qfalse
+        {
             // Attack?
-            TIMER_Set(ctx, npc, b"atkDelay\0".as_ptr() as *const c_char,
-                (*ctx.world).bg_state.rng.Q_irand(500, 3000));
+            TIMER_Set(
+                ctx,
+                npc,
+                b"atkDelay\0".as_ptr() as *const c_char,
+                (*ctx.world).bg_state.rng.Q_irand(500, 3000),
+            );
 
             if altAttack != qfalse {
                 (*ucmd).buttons |= BUTTON_ATTACK | BUTTON_ALT_ATTACK;
@@ -188,10 +200,19 @@ pub fn ATST_Attack(ctx: GameContext<'_>) {
         // Rate our distance to the target, and our visibility
         let enemy_id = (*npc).enemy.unwrap();
         let enemy = &(*ctx.world).g_entities[enemy_id.0 as usize];
-        distance = DistanceHorizontalSquared((*npc).r.currentOrigin, (*enemy).r.currentOrigin) as c_int;
-        dist_rate = if distance > MIN_MELEE_RANGE_SQR { DIST_LONG } else { DIST_MELEE };
+        distance =
+            DistanceHorizontalSquared((*npc).r.currentOrigin, (*enemy).r.currentOrigin) as c_int;
+        dist_rate = if distance > MIN_MELEE_RANGE_SQR {
+            DIST_LONG
+        } else {
+            DIST_MELEE
+        };
         visible = NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
-        advance = if distance > MIN_DISTANCE_SQR { qtrue } else { qfalse };
+        advance = if distance > MIN_DISTANCE_SQR {
+            qtrue
+        } else {
+            qfalse
+        };
 
         // If we cannot see our target, move to see it
         if visible == qfalse {
@@ -301,7 +322,13 @@ pub fn ATST_Idle(ctx: GameContext<'_>) {
 
         NPC_BSIdle(ctx);
 
-        NPC_SetAnim(ctx, npc, SETANIM_BOTH, BOTH_STAND1 as c_int, SETANIM_FLAG_NORMAL);
+        NPC_SetAnim(
+            ctx,
+            npc,
+            SETANIM_BOTH,
+            BOTH_STAND1 as c_int,
+            SETANIM_FLAG_NORMAL,
+        );
     }
 }
 

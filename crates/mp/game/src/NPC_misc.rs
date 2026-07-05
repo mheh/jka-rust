@@ -6,8 +6,8 @@
 //! as the first parameter and access level.time from the game world.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::g_main::Com_Printf;
+use crate::prelude::*;
 
 // Raven DEBUG_LEVEL_* constants from b_local.h
 // Source: oracle/oracle/codemp/game/b_local.h:23-26
@@ -40,21 +40,17 @@ pub fn Debug_Printf(
         }
 
         let color: &'static str = match debugLevel {
-            DEBUG_LEVEL_DETAIL => "^7",     // S_COLOR_WHITE
-            DEBUG_LEVEL_INFO => "^2",       // S_COLOR_GREEN
-            DEBUG_LEVEL_WARNING => "^3",    // S_COLOR_YELLOW
-            DEBUG_LEVEL_ERROR => "^1",      // S_COLOR_RED
-            _ => "^1",                       // Default to S_COLOR_RED
+            DEBUG_LEVEL_DETAIL => "^7",  // S_COLOR_WHITE
+            DEBUG_LEVEL_INFO => "^2",    // S_COLOR_GREEN
+            DEBUG_LEVEL_WARNING => "^3", // S_COLOR_YELLOW
+            DEBUG_LEVEL_ERROR => "^1",   // S_COLOR_RED
+            _ => "^1",                   // Default to S_COLOR_RED
         };
 
         let time = (*ctx.world).level.time;
         let msg: String = cstr_to_str(fmt);
 
-        let output = format!("{}{:5}:{}",
-            color,
-            time,
-            msg
-        );
+        let output = format!("{}{:5}:{}", color, time, msg);
         let output_cstr = cstr(&output);
 
         Com_Printf(output_cstr.as_ptr());
@@ -88,11 +84,11 @@ pub fn Debug_NPCPrintf(
         // Map debug level to color code. Raven's COLOR_* are the ASCII digit
         // chars '7'/'2'/'3'/'1', emitted as literal bytes (not control codes).
         let color: char = match debugLevel {
-            DEBUG_LEVEL_DETAIL => '7',   // COLOR_WHITE
-            DEBUG_LEVEL_INFO => '2',     // COLOR_GREEN
-            DEBUG_LEVEL_WARNING => '3',  // COLOR_YELLOW
-            DEBUG_LEVEL_ERROR => '1',    // COLOR_RED
-            _ => '1',                    // Default to COLOR_RED
+            DEBUG_LEVEL_DETAIL => '7',  // COLOR_WHITE
+            DEBUG_LEVEL_INFO => '2',    // COLOR_GREEN
+            DEBUG_LEVEL_WARNING => '3', // COLOR_YELLOW
+            DEBUG_LEVEL_ERROR => '1',   // COLOR_RED
+            _ => '1',                   // Default to COLOR_RED
         };
 
         let time = (*ctx.world).level.time;
@@ -100,12 +96,7 @@ pub fn Debug_NPCPrintf(
         let npc_targetname: String = cstr_to_str((*printNPC).targetname);
 
         // Format: Q_COLOR_ESCAPE ('^') + color char + time + NPC name + message
-        let output = format!("^{}{:5} ({}) {}",
-            color,
-            time,
-            npc_targetname,
-            msg
-        );
+        let output = format!("^{}{:5} ({}) {}", color, time, npc_targetname, msg);
         let output_cstr = cstr(&output);
 
         Com_Printf(output_cstr.as_ptr());

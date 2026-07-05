@@ -2,7 +2,10 @@ use core::ffi::{c_float, c_int};
 
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{
+    word_to_c_int, word_to_const_ptr, DecodeVmMain, EncodeVmMainReturn, InboundVmCall,
+    VmMainTransport,
+};
 
 /// `GAME_NAV_CLEARPATHBETWEENPOINTS` MP game exports vmMain ABI token.
 ///
@@ -72,4 +75,26 @@ impl InboundVmCall for GameNavClearpathbetweenpoints {
     type Output = c_int;
 
     const COMMAND: MpGameExport = MpGameExport::GAME_NAV_CLEARPATHBETWEENPOINTS;
+}
+
+impl DecodeVmMain for GameNavClearpathbetweenpoints {
+    fn decode_vm_main(t: VmMainTransport) -> Self::Args {
+        // `NAVNEW_ClearPathBetweenPoints((float *)arg0, (float *)arg1,
+        //  (float *)arg2, (float *)arg3, arg4, arg5)` — g_main.c:677.
+        GameNavClearpathbetweenpointsArgs::new(
+            word_to_const_ptr(t.arg(0)),
+            word_to_const_ptr(t.arg(1)),
+            word_to_const_ptr(t.arg(2)),
+            word_to_const_ptr(t.arg(3)),
+            word_to_c_int(t.arg(4)),
+            word_to_c_int(t.arg(5)),
+        )
+    }
+}
+
+impl EncodeVmMainReturn for GameNavClearpathbetweenpoints {
+    fn encode_return(output: Self::Output) -> isize {
+        // `return NAVNEW_ClearPathBetweenPoints(...);` — g_main.c:677.
+        output as isize
+    }
 }

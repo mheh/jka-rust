@@ -1,6 +1,6 @@
 use super::super::MpGameExport;
 
-use abi_transport::generic::InboundVmCall;
+use abi_transport::generic::{DecodeVmMain, EncodeVmMainReturn, InboundVmCall, VmMainTransport};
 
 /// `GAME_SPAWN_RMG_ENTITY` MP game exports vmMain ABI token.
 ///
@@ -18,4 +18,16 @@ impl InboundVmCall for GameSpawnRmgEntity {
     type Output = ();
 
     const COMMAND: MpGameExport = MpGameExport::GAME_SPAWN_RMG_ENTITY;
+}
+
+impl DecodeVmMain for GameSpawnRmgEntity {
+    // `GAME_SPAWN_RMG_ENTITY` takes no vmMain arg words — g_main.c:550-554.
+    fn decode_vm_main(_t: VmMainTransport) -> Self::Args {}
+}
+
+impl EncodeVmMainReturn for GameSpawnRmgEntity {
+    fn encode_return(_output: Self::Output) -> isize {
+        // `... return 0;` — g_main.c:555.
+        0
+    }
 }

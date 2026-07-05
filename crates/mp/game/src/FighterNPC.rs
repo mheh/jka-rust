@@ -27,9 +27,13 @@ use crate::bg_vehicleLoad::BG_VehicleGetIndex;
 use crate::g_combat::G_DamageFromKiller;
 use crate::g_main::Com_Error;
 use crate::g_utils::G_AllocateVehicleObject;
+use crate::g_vehicles::{
+    SHIPSURF_BROKEN_C, SHIPSURF_BROKEN_D, SHIPSURF_BROKEN_E, SHIPSURF_BROKEN_F,
+};
+use crate::q_math::{
+    _DotProduct, _VectorMA, _VectorScale, AngleVectors, VectorClear, VectorLength,
+};
 use crate::q_math::{AngleNormalize180, AngleNormalize360, AngleSubtract};
-use crate::q_math::{AngleVectors, VectorClear, VectorLength, _DotProduct, _VectorMA, _VectorScale};
-use crate::g_vehicles::{SHIPSURF_BROKEN_C, SHIPSURF_BROKEN_D, SHIPSURF_BROKEN_E, SHIPSURF_BROKEN_F};
 
 // Constants used by the vehicle move/orient/animate bodies below. Values from the
 // oracle; defined locally (mirroring `SpeederNPC.rs`) so the flight bodies don't
@@ -46,18 +50,14 @@ const EF2_HYPERSPACE: c_int = 1 << 5;
 const EF_JETPACK_ACTIVE: c_int = 1 << 11;
 const EF_DEAD: c_int = 1 << 1; // bg_public.h:561
 const CHAN_AUTO: c_int = 0; // soundChannel_t CHAN_AUTO
-// `vehFlags_t` masks as `u64` for `Vehicle_t::m_ulFlags`. Source: `bg_vehicles.h:417`.
+                            // `vehFlags_t` masks as `u64` for `Vehicle_t::m_ulFlags`. Source: `bg_vehicles.h:417`.
 const VEH_WINGSOPEN: u64 = 0x0000_0020;
 const VEH_GEARSOPEN: u64 = 0x0000_0040;
 
 /// Raven `Board`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:212-221`
-pub fn Board(
-    ctx: GameContext<'_>,
-    pVeh: *mut Vehicle_t,
-    pEnt: *mut bgEntity_t,
-) -> qboolean {
+pub fn Board(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pEnt: *mut bgEntity_t) -> qboolean {
     unsafe {
         // `g_vehicleInfo[VEHICLE_BASE].Board` is the generic base body.
         if crate::g_vehicles::Board(ctx, pVeh, pEnt) == qfalse {
@@ -109,9 +109,13 @@ pub fn BG_FighterUpdate(
         let mut isDead: qboolean = qfalse;
 
         // In QAGAME, ghost the riders.
-        #[cfg(target_os = "windows")]  // placeholder for QAGAME
+        #[cfg(target_os = "windows")] // placeholder for QAGAME
         {
-            let i_max = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.maxPassengers).unwrap_or(0);
+            let i_max = (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.maxPassengers)
+                .unwrap_or(0);
             for i in 0..i_max {
                 // Ghost passengers - calling through vtable/function pointers
                 // This is a simplification; actual ghosts of riders would be done here
@@ -142,7 +146,11 @@ pub fn BG_FighterUpdate(
         }
 
         // Check if dead
-        isDead = if (*parentPS).eFlags & EF_DEAD != 0 { qtrue } else { qfalse };
+        isDead = if (*parentPS).eFlags & EF_DEAD != 0 {
+            qtrue
+        } else {
+            qfalse
+        };
 
         // Check landing surface. `vec3_t` (`[f32;3]`) is `Copy`, so `VectorCopy`
         // transcribes as plain array assignment per the bless-the-rule appendix
@@ -153,16 +161,28 @@ pub fn BG_FighterUpdate(
         }
 
         // Call trace function
-        let trace_fn: extern "C" fn(*mut trace_t, *const f32, *const f32, *const f32, *const f32, c_int, c_int) =
-            std::mem::transmute(traceFunc);
+        let trace_fn: extern "C" fn(
+            *mut trace_t,
+            *const f32,
+            *const f32,
+            *const f32,
+            *const f32,
+            c_int,
+            c_int,
+        ) = std::mem::transmute(traceFunc);
         trace_fn(
             &mut (*pVeh).m_LandTrace,
             &(*parentPS).origin[0],
             &trMins[0],
             &trMaxs[0],
             &bottom[0],
-            (*pVeh).m_pParentEntity.cast::<gentity_t>().as_ref().map(|e| e.s.number).unwrap_or(0),
-            3 | 4,  // MASK_NPCSOLID & ~CONTENTS_BODY
+            (*pVeh)
+                .m_pParentEntity
+                .cast::<gentity_t>()
+                .as_ref()
+                .map(|e| e.s.number)
+                .unwrap_or(0),
+            3 | 4, // MASK_NPCSOLID & ~CONTENTS_BODY
         );
 
         qtrue
@@ -172,11 +192,7 @@ pub fn BG_FighterUpdate(
 /// Raven `PredictedAngularDecrement`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:237-273`
-pub fn PredictedAngularDecrement(
-    scale: f32,
-    timeMod: f32,
-    originalAngle: f32,
-) -> f32 {
+pub fn PredictedAngularDecrement(scale: f32, timeMod: f32, originalAngle: f32) -> f32 {
     let mut fixedBaseDec = originalAngle * 0.05f32;
     let mut r = 0.0f32;
 
@@ -212,15 +228,14 @@ pub fn PredictedAngularDecrement(
 /// Raven `FighterIsInSpace`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:276-286`
-pub fn FighterIsInSpace(
-    gParent: *mut gentity_t,
-) -> qboolean {
+pub fn FighterIsInSpace(gParent: *mut gentity_t) -> qboolean {
     unsafe {
         if !gParent.is_null() {
             let ent = &*gParent;
             if !ent.client.is_null() {
                 let client = &*(ent.client as *mut gclient_t);
-                if client.inSpaceIndex != 0 && client.inSpaceIndex < 2047 {  // ENTITYNUM_WORLD
+                if client.inSpaceIndex != 0 && client.inSpaceIndex < 2047 {
+                    // ENTITYNUM_WORLD
                     return qtrue;
                 }
             }
@@ -232,9 +247,7 @@ pub fn FighterIsInSpace(
 /// Raven `FighterOverValidLandingSurface`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:289-298`
-pub fn FighterOverValidLandingSurface(
-    pVeh: *mut Vehicle_t,
-) -> qboolean {
+pub fn FighterOverValidLandingSurface(pVeh: *mut Vehicle_t) -> qboolean {
     unsafe {
         if (*pVeh).m_LandTrace.fraction < 1.0f32 && (*pVeh).m_LandTrace.plane.normal[2] >= 0.7f32 {
             qtrue
@@ -247,10 +260,7 @@ pub fn FighterOverValidLandingSurface(
 /// Raven `FighterIsLanded`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:300-308`
-pub fn FighterIsLanded(
-    pVeh: *mut Vehicle_t,
-    parentPS: *mut playerState_t,
-) -> qboolean {
+pub fn FighterIsLanded(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) -> qboolean {
     unsafe {
         if FighterOverValidLandingSurface(pVeh) == qtrue && (*parentPS).speed == 0.0f32 {
             qtrue
@@ -263,10 +273,7 @@ pub fn FighterIsLanded(
 /// Raven `FighterIsLanding`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:310-323`
-pub fn FighterIsLanding(
-    pVeh: *mut Vehicle_t,
-    parentPS: *mut playerState_t,
-) -> qboolean {
+pub fn FighterIsLanding(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) -> qboolean {
     unsafe {
         if FighterOverValidLandingSurface(pVeh) == qtrue
             && ((*pVeh).m_ucmd.forwardmove < 0 || (*pVeh).m_ucmd.upmove < 0)
@@ -282,10 +289,7 @@ pub fn FighterIsLanding(
 /// Raven `FighterIsLaunching`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:325-338`
-pub fn FighterIsLaunching(
-    pVeh: *mut Vehicle_t,
-    parentPS: *mut playerState_t,
-) -> qboolean {
+pub fn FighterIsLaunching(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) -> qboolean {
     unsafe {
         if FighterOverValidLandingSurface(pVeh) == qtrue
             && (*pVeh).m_ucmd.upmove > 0
@@ -301,12 +305,9 @@ pub fn FighterIsLaunching(
 /// Raven `FighterSuspended`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:340-355`
-pub fn FighterSuspended(
-    pVeh: *mut Vehicle_t,
-    parentPS: *mut playerState_t,
-) -> qboolean {
+pub fn FighterSuspended(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) -> qboolean {
     unsafe {
-        #[cfg(target_os = "windows")]  // placeholder for QAGAME
+        #[cfg(target_os = "windows")] // placeholder for QAGAME
         {
             if (*pVeh).m_pPilot.is_null()
                 && (*parentPS).speed == 0.0f32
@@ -326,10 +327,7 @@ pub fn FighterSuspended(
 /// Raven `FighterWingMalfunctionCheck`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:890-915`
-pub fn FighterWingMalfunctionCheck(
-    pVeh: *mut Vehicle_t,
-    parentPS: *mut playerState_t,
-) {
+pub fn FighterWingMalfunctionCheck(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) {
     unsafe {
         let mut mPitchOverride = 1.0f32;
         let mut mYawOverride = 1.0f32;
@@ -343,35 +341,35 @@ pub fn FighterWingMalfunctionCheck(
         // Check right wing damage
         if ((*parentPS).brokenLimbs & (1 << 6)) != 0 {
             // SHIPSURF_DAMAGE_RIGHT_HEAVY
-            *(*pVeh).m_vOrientation.add(2) +=
-                (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
-                    * (*pVeh).m_fTimeModifier
-                    * mYawOverride
-                    * 50.0f32;
+            *(*pVeh).m_vOrientation.add(2) += (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
+                + 1.0f32)
+                * (*pVeh).m_fTimeModifier
+                * mYawOverride
+                * 50.0f32;
         } else if ((*parentPS).brokenLimbs & (1 << 2)) != 0 {
             // SHIPSURF_DAMAGE_RIGHT_LIGHT
-            *(*pVeh).m_vOrientation.add(2) +=
-                (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
-                    * (*pVeh).m_fTimeModifier
-                    * mYawOverride
-                    * 12.5f32;
+            *(*pVeh).m_vOrientation.add(2) += (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
+                + 1.0f32)
+                * (*pVeh).m_fTimeModifier
+                * mYawOverride
+                * 12.5f32;
         }
 
         // Check left wing damage
         if ((*parentPS).brokenLimbs & (1 << 7)) != 0 {
             // SHIPSURF_DAMAGE_LEFT_HEAVY
-            *(*pVeh).m_vOrientation.add(2) -=
-                (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
-                    * (*pVeh).m_fTimeModifier
-                    * mYawOverride
-                    * 50.0f32;
+            *(*pVeh).m_vOrientation.add(2) -= (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
+                + 1.0f32)
+                * (*pVeh).m_fTimeModifier
+                * mYawOverride
+                * 50.0f32;
         } else if ((*parentPS).brokenLimbs & (1 << 3)) != 0 {
             // SHIPSURF_DAMAGE_LEFT_LIGHT
-            *(*pVeh).m_vOrientation.add(2) -=
-                (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin() + 1.0f32)
-                    * (*pVeh).m_fTimeModifier
-                    * mYawOverride
-                    * 12.5f32;
+            *(*pVeh).m_vOrientation.add(2) -= (((*pVeh).m_ucmd.serverTime as f32 * 0.001).sin()
+                + 1.0f32)
+                * (*pVeh).m_fTimeModifier
+                * mYawOverride
+                * 12.5f32;
         }
     }
 }
@@ -379,10 +377,7 @@ pub fn FighterWingMalfunctionCheck(
 /// Raven `FighterNoseMalfunctionCheck`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:917-933`
-pub fn FighterNoseMalfunctionCheck(
-    pVeh: *mut Vehicle_t,
-    parentPS: *mut playerState_t,
-) {
+pub fn FighterNoseMalfunctionCheck(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) {
     unsafe {
         let mut mPitchOverride = 1.0f32;
         let mut mYawOverride = 1.0f32;
@@ -487,10 +482,10 @@ pub fn FighterDamageRoutine(
         }
 
         // Wing damage effects
-        let c = 0x01;  // SHIPSURF_BROKEN_C
-        let d = 0x02;  // SHIPSURF_BROKEN_D
-        let e = 0x04;  // SHIPSURF_BROKEN_E
-        let f = 0x08;  // SHIPSURF_BROKEN_F
+        let c = 0x01; // SHIPSURF_BROKEN_C
+        let d = 0x02; // SHIPSURF_BROKEN_D
+        let e = 0x04; // SHIPSURF_BROKEN_E
+        let f = 0x08; // SHIPSURF_BROKEN_F
 
         if (((*pVeh).m_iRemovedSurfaces & c) != 0 || ((*pVeh).m_iRemovedSurfaces & d) != 0)
             && (((*pVeh).m_iRemovedSurfaces & e) != 0 || ((*pVeh).m_iRemovedSurfaces & f) != 0)
@@ -502,7 +497,7 @@ pub fn FighterDamageRoutine(
                 && ((*pVeh).m_iRemovedSurfaces & c) != 0
                 && ((*pVeh).m_iRemovedSurfaces & d) != 0
             {
-                factor *= 2.0f32;  // All wings broken
+                factor *= 2.0f32; // All wings broken
             }
 
             let parent_ent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
@@ -512,9 +507,7 @@ pub fn FighterDamageRoutine(
             }
 
             *(*pVeh).m_vOrientation.add(2) += (*pVeh).m_fTimeModifier * factor;
-        } else if ((*pVeh).m_iRemovedSurfaces & c) != 0
-            || ((*pVeh).m_iRemovedSurfaces & d) != 0
-        {
+        } else if ((*pVeh).m_iRemovedSurfaces & c) != 0 || ((*pVeh).m_iRemovedSurfaces & d) != 0 {
             // Left wing broken
             let mut factor = 2.0f32;
             if ((*pVeh).m_iRemovedSurfaces & c) != 0 && ((*pVeh).m_iRemovedSurfaces & d) != 0 {
@@ -528,9 +521,7 @@ pub fn FighterDamageRoutine(
             }
 
             *(*pVeh).m_vOrientation.add(2) += factor * (*pVeh).m_fTimeModifier;
-        } else if ((*pVeh).m_iRemovedSurfaces & e) != 0
-            || ((*pVeh).m_iRemovedSurfaces & f) != 0
-        {
+        } else if ((*pVeh).m_iRemovedSurfaces & e) != 0 || ((*pVeh).m_iRemovedSurfaces & f) != 0 {
             // Right wing broken
             let mut factor = 2.0f32;
             if ((*pVeh).m_iRemovedSurfaces & e) != 0 && ((*pVeh).m_iRemovedSurfaces & f) != 0 {
@@ -557,26 +548,34 @@ pub fn FighterYawAdjust(
     parentPS: *mut playerState_t,
 ) {
     unsafe {
-        let angDif = AngleSubtract(
-            *(*pVeh).m_vOrientation.add(1),
-            (*riderPS).viewangles[1],
-        );
+        let angDif = AngleSubtract(*(*pVeh).m_vOrientation.add(1), (*riderPS).viewangles[1]);
 
         if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
             let mut s = (*parentPS).speed;
-            let maxDif = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turningSpeed).unwrap_or(1.0) * 0.8f32;
+            let maxDif = (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.turningSpeed)
+                .unwrap_or(1.0)
+                * 0.8f32;
 
             if s < 0.0f32 {
                 s = -s;
             }
-            let mut scaled = angDif * s / (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(1.0);
+            let mut scaled = angDif * s
+                / (*pVeh)
+                    .m_pVehicleInfo
+                    .as_ref()
+                    .map(|vi| vi.speedMax)
+                    .unwrap_or(1.0);
             if scaled > maxDif {
                 scaled = maxDif;
             } else if scaled < -maxDif {
                 scaled = -maxDif;
             }
-            *(*pVeh).m_vOrientation.add(1) =
-                AngleNormalize180(*(*pVeh).m_vOrientation.add(1) - scaled * ((*pVeh).m_fTimeModifier * 0.2f32));
+            *(*pVeh).m_vOrientation.add(1) = AngleNormalize180(
+                *(*pVeh).m_vOrientation.add(1) - scaled * ((*pVeh).m_fTimeModifier * 0.2f32),
+            );
         }
     }
 }
@@ -590,26 +589,34 @@ pub fn FighterPitchAdjust(
     parentPS: *mut playerState_t,
 ) {
     unsafe {
-        let angDif = AngleSubtract(
-            *(*pVeh).m_vOrientation.add(0),
-            (*riderPS).viewangles[0],
-        );
+        let angDif = AngleSubtract(*(*pVeh).m_vOrientation.add(0), (*riderPS).viewangles[0]);
 
         if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
             let mut s = (*parentPS).speed;
-            let maxDif = (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.turningSpeed).unwrap_or(1.0) * 0.8f32;
+            let maxDif = (*pVeh)
+                .m_pVehicleInfo
+                .as_ref()
+                .map(|vi| vi.turningSpeed)
+                .unwrap_or(1.0)
+                * 0.8f32;
 
             if s < 0.0f32 {
                 s = -s;
             }
-            let mut scaled = angDif * s / (*pVeh).m_pVehicleInfo.as_ref().map(|vi| vi.speedMax).unwrap_or(1.0);
+            let mut scaled = angDif * s
+                / (*pVeh)
+                    .m_pVehicleInfo
+                    .as_ref()
+                    .map(|vi| vi.speedMax)
+                    .unwrap_or(1.0);
             if scaled > maxDif {
                 scaled = maxDif;
             } else if scaled < -maxDif {
                 scaled = -maxDif;
             }
-            *(*pVeh).m_vOrientation.add(0) =
-                AngleNormalize360(*(*pVeh).m_vOrientation.add(0) - scaled * ((*pVeh).m_fTimeModifier * 0.2f32));
+            *(*pVeh).m_vOrientation.add(0) = AngleNormalize360(
+                *(*pVeh).m_vOrientation.add(0) - scaled * ((*pVeh).m_fTimeModifier * 0.2f32),
+            );
         }
     }
 }
@@ -660,11 +667,9 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         let vi = (*pVeh).m_pVehicleInfo;
 
         // Going to Hyperspace: totally override movement.
-        if (*parentPS).hyperSpaceTime != 0
-            && curTime - (*parentPS).hyperSpaceTime < HYPERSPACE_TIME
+        if (*parentPS).hyperSpaceTime != 0 && curTime - (*parentPS).hyperSpaceTime < HYPERSPACE_TIME
         {
-            let timeFrac =
-                (curTime - (*parentPS).hyperSpaceTime) as f32 / HYPERSPACE_TIME as f32;
+            let timeFrac = (curTime - (*parentPS).hyperSpaceTime) as f32 / HYPERSPACE_TIME as f32;
             if timeFrac < HYPERSPACE_TELEPORT_FRAC {
                 // for the first half, instantly jump to top speed
                 if (*parentPS).eFlags2 & EF2_HYPERSPACE == 0 {
@@ -681,7 +686,11 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                         * (1.0 / HYPERSPACE_TELEPORT_FRAC)
                         * (HYPERSPACE_SPEED - 200.0));
                 if VectorLength((*parentPS).velocity) < (*parentPS).speed {
-                    _VectorScale((*parentPS).moveDir, (*parentPS).speed, &mut (*parentPS).velocity);
+                    _VectorScale(
+                        (*parentPS).moveDir,
+                        (*parentPS).speed,
+                        &mut (*parentPS).velocity,
+                    );
                 }
             }
             return;
@@ -913,9 +922,8 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                             &mut (*parentPS).velocity,
                         );
                     }
-                    (*parentPS).hackingTime = ((*parentPS).hackingTime as f32
-                        - 50.0 * (*pVeh).m_fTimeModifier)
-                        as c_int;
+                    (*parentPS).hackingTime =
+                        ((*parentPS).hackingTime as f32 - 50.0 * (*pVeh).m_fTimeModifier) as c_int;
                 }
             } else if ((*parentPS).hackingTime as f32) < MAX_STRAFE_TIME {
                 // strafe left (can for 2 seconds)
@@ -931,8 +939,8 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                         &mut (*parentPS).velocity,
                     );
                 }
-                (*parentPS).hackingTime = ((*parentPS).hackingTime as f32
-                    + 50.0 * (*pVeh).m_fTimeModifier) as c_int;
+                (*parentPS).hackingTime =
+                    ((*parentPS).hackingTime as f32 + 50.0 * (*pVeh).m_fTimeModifier) as c_int;
             }
         } else if (*parentPS).hackingTime > 0 {
             (*parentPS).hackingTime =
@@ -1074,7 +1082,14 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 && (*pVeh).m_iRemovedSurfaces & SHIPSURF_BROKEN_F != 0)
         {
             // all wings torn off
-            FighterDamageRoutine(ctx, pVeh, parent as *mut gentity_t, parentPS, riderPS, isDead);
+            FighterDamageRoutine(
+                ctx,
+                pVeh,
+                parent as *mut gentity_t,
+                parentPS,
+                riderPS,
+                isDead,
+            );
             *(*pVeh).m_vOrientation.add(2) = AngleNormalize180(*(*pVeh).m_vOrientation.add(2));
             return;
         }
@@ -1208,8 +1223,11 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             && ((*vi).surfDestruction == 0 || (*pVeh).m_iRemovedSurfaces == 0)
         {
             if *(*pVeh).m_vOrientation.add(0) > 0.0 {
-                *(*pVeh).m_vOrientation.add(0) =
-                    PredictedAngularDecrement(0.2, angleTimeMod * 10.0, *(*pVeh).m_vOrientation.add(0));
+                *(*pVeh).m_vOrientation.add(0) = PredictedAngularDecrement(
+                    0.2,
+                    angleTimeMod * 10.0,
+                    *(*pVeh).m_vOrientation.add(0),
+                );
             } else {
                 *(*pVeh).m_vOrientation.add(0) = PredictedAngularDecrement(
                     0.75,
@@ -1243,7 +1261,8 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     && ((*parent).s.number % 2 == 0 || (*parent).s.number % 6 == 0)
                 {
                     // spiralling out of control: leave YAW alone
-                } else if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse {
+                } else if BG_UnrestrainedPitchRoll(riderPS, pVeh, &(*ctx.world).bg_state) == qfalse
+                {
                     *(*pVeh).m_vOrientation.add(1) -=
                         (*(*pVeh).m_vOrientation.add(2) * 0.05) * (*pVeh).m_fTimeModifier;
                 }
@@ -1267,7 +1286,14 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         }
 
         if (*vi).surfDestruction != 0 {
-            FighterDamageRoutine(ctx, pVeh, parent as *mut gentity_t, parentPS, riderPS, isDead);
+            FighterDamageRoutine(
+                ctx,
+                pVeh,
+                parent as *mut gentity_t,
+                parentPS,
+                riderPS,
+                isDead,
+            );
         }
         *(*pVeh).m_vOrientation.add(2) = AngleNormalize180(*(*pVeh).m_vOrientation.add(2));
     }
@@ -1288,8 +1314,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         let curTime: c_int = (*ctx.world).level.time;
         let vi = (*pVeh).m_pVehicleInfo;
 
-        if (*parentPS).hyperSpaceTime != 0
-            && curTime - (*parentPS).hyperSpaceTime < HYPERSPACE_TIME
+        if (*parentPS).hyperSpaceTime != 0 && curTime - (*parentPS).hyperSpaceTime < HYPERSPACE_TIME
         {
             // Going to Hyperspace: close the wings.
             if (*pVeh).m_ulFlags & VEH_WINGSOPEN != 0 {
@@ -1358,11 +1383,7 @@ pub fn AnimateRiders(_ctx: GameContext<'_>, _pVeh: *mut Vehicle_t) {}
 /// Raven `G_CreateFighterNPC`.
 ///
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:1994-2014`
-pub fn G_CreateFighterNPC(
-    ctx: GameContext<'_>,
-    pVeh: *mut *mut Vehicle_t,
-    strType: *const c_char,
-) {
+pub fn G_CreateFighterNPC(ctx: GameContext<'_>, pVeh: *mut *mut Vehicle_t, strType: *const c_char) {
     unsafe {
         // Allocate the Vehicle (MP QAGAME path).
         G_AllocateVehicleObject(ctx, pVeh);
@@ -1376,7 +1397,7 @@ pub fn G_CreateFighterNPC(
             &mut (*ctx.world).bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         );
-        (*(*pVeh)).m_pVehicleInfo = &(*ctx.world).bg_state.g_vehicleInfo[veh_index as usize] as *const _ as *mut vehicleInfo_t;
+        (*(*pVeh)).m_pVehicleInfo = &(*ctx.world).bg_state.g_vehicleInfo[veh_index as usize]
+            as *const _ as *mut vehicleInfo_t;
     }
 }
-

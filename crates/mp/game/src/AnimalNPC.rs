@@ -78,7 +78,8 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 
         if !(*pVeh).m_pPilot.is_null()
             && ((*pVeh).m_ucmd.buttons & BUTTON_ALT_ATTACK) != 0
-            && (*(*pVeh).m_pVehicleInfo).turboSpeed > 0.0f32 {
+            && (*(*pVeh).m_pVehicleInfo).turboSpeed > 0.0f32
+        {
             if (curTime - (*pVeh).m_iTurboTime) > (*(*pVeh).m_pVehicleInfo).turboRecharge {
                 (*pVeh).m_iTurboTime = curTime + (*(*pVeh).m_pVehicleInfo).turboDuration;
                 (*parentPS).speed = (*(*pVeh).m_pVehicleInfo).turboSpeed;
@@ -99,8 +100,11 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             speedInc = (*(*pVeh).m_pVehicleInfo).acceleration * (*pVeh).m_fTimeModifier;
         }
 
-        if (*parentPS).speed != 0.0f32 || (*parentPS).groundEntityNum == ENTITYNUM_NONE
-            || (*pVeh).m_ucmd.forwardmove != 0 || (*pVeh).m_ucmd.upmove > 0 {
+        if (*parentPS).speed != 0.0f32
+            || (*parentPS).groundEntityNum == ENTITYNUM_NONE
+            || (*pVeh).m_ucmd.forwardmove != 0
+            || (*pVeh).m_ucmd.upmove > 0
+        {
             if (*pVeh).m_ucmd.forwardmove > 0 && speedInc != 0.0f32 {
                 (*parentPS).speed += speedInc;
             } else if (*pVeh).m_ucmd.forwardmove < 0 {
@@ -130,7 +134,10 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         }
 
         fWalkSpeedMax = speedMax * 0.275f32;
-        if curTime > (*pVeh).m_iTurboTime && ((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0 && (*parentPS).speed > fWalkSpeedMax {
+        if curTime > (*pVeh).m_iTurboTime
+            && ((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0
+            && (*parentPS).speed > fWalkSpeedMax
+        {
             (*parentPS).speed = fWalkSpeedMax;
         } else if (*parentPS).speed > speedMax {
             (*parentPS).speed = speedMax;
@@ -170,10 +177,10 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             // Oracle: `if (!rider) rider = parent;` then `if (rider)` — always
             // true here, so key the yaw block off the reassigned rider (parent).
             if !rider_ent.is_null() {
-                let mut angDif =
-                    crate::q_math::AngleSubtract(                        *(*pVeh).m_vOrientation.add(YAW),
-                        (*riderPS).viewangles[YAW],
-                    );
+                let mut angDif = crate::q_math::AngleSubtract(
+                    *(*pVeh).m_vOrientation.add(YAW),
+                    (*riderPS).viewangles[YAW],
+                );
                 if !parentPS.is_null() && (*parentPS).speed > 0.0f32 {
                     let mut s = (*parentPS).speed;
                     let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
@@ -186,17 +193,19 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     } else if angDif < -maxDif {
                         angDif = -maxDif;
                     }
-                    *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(                        *(*pVeh).m_vOrientation.add(YAW) - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
+                    *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(
+                        *(*pVeh).m_vOrientation.add(YAW)
+                            - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
                     );
                 }
             }
         } else {
             let riderPS = (*rider).playerState;
             if !rider.is_null() {
-                let mut angDif =
-                    crate::q_math::AngleSubtract(                        *(*pVeh).m_vOrientation.add(YAW),
-                        (*riderPS).viewangles[YAW],
-                    );
+                let mut angDif = crate::q_math::AngleSubtract(
+                    *(*pVeh).m_vOrientation.add(YAW),
+                    (*riderPS).viewangles[YAW],
+                );
                 if !parentPS.is_null() && (*parentPS).speed > 0.0f32 {
                     let mut s = (*parentPS).speed;
                     let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
@@ -209,7 +218,9 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     } else if angDif < -maxDif {
                         angDif = -maxDif;
                     }
-                    *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(                        *(*pVeh).m_vOrientation.add(YAW) - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
+                    *(*pVeh).m_vOrientation.add(YAW) = crate::q_math::AngleNormalize180(
+                        *(*pVeh).m_vOrientation.add(YAW)
+                            - angDif * ((*pVeh).m_fTimeModifier * 0.2f32),
                     );
                 }
             }
@@ -221,8 +232,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
 /// (`_JK2MP` only).
 ///
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:467-470`
-pub fn AnimalProcessOri(
-    ctx: GameContext<'_>,pVeh: *mut Vehicle_t) {
+pub fn AnimalProcessOri(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     ProcessOrientCommands(ctx, pVeh);
 }
 
@@ -244,7 +254,9 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         }
 
         // If they're bucking, play the animation and leave...
-        if (*parent).client.is_null() == false && (*((*parent).client as *mut gclient_t)).ps.legsAnim == BOTH_VT_BUCK as c_int {
+        if (*parent).client.is_null() == false
+            && (*((*parent).client as *mut gclient_t)).ps.legsAnim == BOTH_VT_BUCK as c_int
+        {
             if (*((*parent).client as *mut gclient_t)).ps.legsTimer <= 0 {
                 (*pVeh).m_ulFlags &= !(VEH_BUCKING as u64);
             } else {
@@ -275,7 +287,8 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     &(*ctx.world).bg_state,
                     (*parent).localAnimIndex,
                     anim as c_int,
-                ) as f32 * 0.7f32) as c_int;
+                ) as f32
+                    * 0.7f32) as c_int;
                 (*pVeh).m_iBoarding = level_time + iAnimLen;
 
                 iFlags = SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD;
@@ -302,7 +315,8 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             let turbo = fSpeedPercToMax > 0.0f32 && level_time < (*pVeh).m_iTurboTime;
             let walking = if !(*parent).client.is_null() {
                 fSpeedPercToMax > 0.0f32
-                    && (((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0 || fSpeedPercToMax <= 0.275f32)
+                    && (((*pVeh).m_ucmd.buttons & BUTTON_WALKING) != 0
+                        || fSpeedPercToMax <= 0.275f32)
             } else {
                 false
             };
@@ -370,7 +384,8 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             let attacking = hasWeapon
                 && !pilotPS.is_none()
                 && !pilotPS.unwrap().is_null()
-                && ((*pilotPS.unwrap()).weaponTime > 0 || ((*pVeh).m_ucmd.buttons & BUTTON_ATTACK) != 0);
+                && ((*pilotPS.unwrap()).weaponTime > 0
+                    || ((*pVeh).m_ucmd.buttons & BUTTON_ATTACK) != 0);
             let right = (*pVeh).m_ucmd.rightmove > 0;
             let left = (*pVeh).m_ucmd.rightmove < 0;
             let turbo = fSpeedPercToMax > 0.0f32 && level_time < (*pVeh).m_iTurboTime;
@@ -445,7 +460,11 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                         );
                         actor_right_dot = crate::q_math::_DotProduct(to_enemy, actor_right);
 
-                        if actor_right_dot.abs() > 0.5f32 || !pilotPS.is_none() && !pilotPS.unwrap().is_null() && (*pilotPS.unwrap()).weapon == WP_SABER {
+                        if actor_right_dot.abs() > 0.5f32
+                            || !pilotPS.is_none()
+                                && !pilotPS.unwrap().is_null()
+                                && (*pilotPS.unwrap()).weapon == WP_SABER
+                        {
                             left_mut = actor_right_dot > 0.0f32;
                             right_mut = !left_mut;
                         } else {
@@ -536,7 +555,6 @@ pub fn G_CreateAnimalNPC(
             &mut (*ctx.world).bg_state,
             &crate::bg_channel::GameBgTraps::new(ctx.engine),
         ) as usize;
-        (*(*pVeh)).m_pVehicleInfo =
-            &mut (*ctx.world).bg_state.g_vehicleInfo[veh_index];
+        (*(*pVeh)).m_pVehicleInfo = &mut (*ctx.world).bg_state.g_vehicleInfo[veh_index];
     }
 }

@@ -18,13 +18,13 @@
 //!   surface beyond this packet's scope; parked rather than guessed.
 #![allow(non_snake_case, unused, clippy::all)]
 
-use crate::prelude::*;
 use crate::entity::flags::{FL_NO_KNOCKBACK, FL_SHIELDED};
+use crate::prelude::*;
 use crate::trap;
+use mp_bg::public::anim_number::animNumber_t;
 use mp_bg::public::entity_event::entity_event_t;
 use mp_bg::public::means_of_death::meansOfDeath_t;
 use mp_bg::public::stat_index::statIndex_t;
-use mp_bg::public::anim_number::animNumber_t;
 use mp_qshared::common::mp::qcommon::usercmd_button::BUTTON_WALKING;
 
 // Raven's file-scope `#define`s (`NPC_AI_GalakMech.c:24-26`) — not central
@@ -82,7 +82,11 @@ const ARMOR_EFFECT_TIME: c_int = 3000;
 /// same name — the call-surface table's "ported: NPC_AI_Mark2.rs" copy is
 /// `fn`-private to that file).
 #[inline]
-pub(crate) fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, vec: &mut vec3_t) {
+pub(crate) fn BG_GiveMeVectorFromMatrix(
+    boltMatrix: *const mdxaBone_t,
+    flags: c_int,
+    vec: &mut vec3_t,
+) {
     pub const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
     pub const NEGATIVE_Y: c_int = Eorientations::NEGATIVE_Y as c_int;
     unsafe {
@@ -134,9 +138,9 @@ pub fn NPC_GalakMech_Init(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*npc).investigateCount = 0;
             (*npc).investigateDebounceTime = 0;
             (*ent).flags |= FL_SHIELDED; // reflect normal shots
-            // rwwFIXMEFIXME: Support PW_GALAK_SHIELD
-            // ent->client->ps.powerups[PW_GALAK_SHIELD] = Q3_INFINITE; // temp, for effect
-            // ent->fx_time = level.time;
+                                         // rwwFIXMEFIXME: Support PW_GALAK_SHIELD
+                                         // ent->client->ps.powerups[PW_GALAK_SHIELD] = Q3_INFINITE; // temp, for effect
+                                         // ent->fx_time = level.time;
             (*ent).r.mins = [-60.0, -60.0, -24.0];
             (*ent).r.maxs = [60.0, 60.0, 80.0];
             (*ent).flags |= FL_NO_KNOCKBACK; // don't get pushed
@@ -196,11 +200,7 @@ pub fn GM_CreateExplosion(
                 ),
             );
 
-            BG_GiveMeVectorFromMatrix(
-                &boltMatrix as *const mdxaBone_t,
-                ORIGIN as c_int,
-                &mut org,
-            );
+            BG_GiveMeVectorFromMatrix(&boltMatrix as *const mdxaBone_t, ORIGIN as c_int, &mut org);
             BG_GiveMeVectorFromMatrix(
                 &boltMatrix as *const mdxaBone_t,
                 NEGATIVE_Y as c_int,
@@ -493,9 +493,7 @@ pub fn NPC_GM_Pain(
 
         let npc = (*self_).NPC as *mut gNPC_t;
 
-        if (*self_).lockCount == 0
-            && (*(*self_).client.cast::<gclient_t>()).ps.torsoTimer <= 0
-        {
+        if (*self_).lockCount == 0 && (*(*self_).client.cast::<gclient_t>()).ps.torsoTimer <= 0 {
             // don't interrupt laser sweep attack or other special attacks/moves
             if (*self_).count < 4 && (*self_).health > 100 && hitLoc != HL_GENERIC1 {
                 if (*self_).delay < level_time {
@@ -533,7 +531,9 @@ pub fn NPC_GM_Pain(
         {
             // He force-pushed my own lobfires back at me
             let npc = (*self_).NPC as *mut gNPC_t;
-            if r#mod == meansOfDeath_t::MOD_REPEATER_ALT as c_int && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0 {
+            if r#mod == meansOfDeath_t::MOD_REPEATER_ALT as c_int
+                && (*ctx.world).bg_state.rng.Q_irand(0, 2) == 0
+            {
                 if crate::g_timer::TIMER_Done(ctx, self_, c"noRapid".as_ptr()) != 0 {
                     if !npc.is_null() {
                         (*npc).scriptFlags &= !SCF_ALT_FIRE;
@@ -554,7 +554,9 @@ pub fn NPC_GM_Pain(
                         (*ctx.world).bg_state.rng.Q_irand(1000, 2000),
                     );
                 }
-            } else if r#mod == meansOfDeath_t::MOD_REPEATER as c_int && (*ctx.world).bg_state.rng.Q_irand(0, 5) == 0 {
+            } else if r#mod == meansOfDeath_t::MOD_REPEATER as c_int
+                && (*ctx.world).bg_state.rng.Q_irand(0, 5) == 0
+            {
                 if crate::g_timer::TIMER_Done(ctx, self_, c"noLob".as_ptr()) != 0 {
                     if !npc.is_null() {
                         (*npc).scriptFlags |= SCF_ALT_FIRE;
@@ -695,7 +697,9 @@ pub fn GM_CheckMoveState(ctx: GameContext<'_>) {
                 (*npc_ent).r.currentOrigin,
                 (*npc_ent).r.mins,
                 (*npc_ent).r.maxs,
-                (*ctx.world).g_entities[(*npc_info).goalEntity.unwrap().index()].r.currentOrigin,
+                (*ctx.world).g_entities[(*npc_info).goalEntity.unwrap().index()]
+                    .r
+                    .currentOrigin,
                 16,
                 0,
             );
@@ -897,7 +901,8 @@ pub fn GM_StartGloat(ctx: GameContext<'_>) {
         crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_collar".as_ptr(), TURN_ON);
         crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_galaktorso".as_ptr(), TURN_ON);
 
-        crate::npc_c::NPC_SetAnim(ctx,
+        crate::npc_c::NPC_SetAnim(
+            ctx,
             npc_ent,
             SETANIM_BOTH,
             animNumber_t::BOTH_STAND2TO1 as c_int,
@@ -930,7 +935,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         // Victory animation section disabled with #if 0 in oracle
 
         // If we don't have an enemy, just idle
-        if crate::NPC_utils::NPC_CheckEnemyExt(ctx, qfalse) == qfalse || (*npc_ent).enemy.is_none() {
+        if crate::NPC_utils::NPC_CheckEnemyExt(ctx, qfalse) == qfalse || (*npc_ent).enemy.is_none()
+        {
             (*npc_ent).enemy = None;
             NPC_BSGM_Patrol(ctx);
             return;
@@ -960,7 +966,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 if crate::g_timer::TIMER_Done(ctx, npc_ent, c"beamDelay".as_ptr()) != 0 {
                     // time to start the beam
                     let laserAnim: c_int = BOTH_ATTACK2 as c_int;
-                    crate::npc_c::NPC_SetAnim(ctx,
+                    crate::npc_c::NPC_SetAnim(
+                        ctx,
                         npc_ent,
                         SETANIM_BOTH,
                         laserAnim,
@@ -979,16 +986,22 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         (*npc_ent).r.currentOrigin,
                         vec3_origin,
                     );
-                    (*npc_ent).s.loopSound = crate::g_utils::G_SoundIndex(c"sound/weapons/galak/lasercutting.wav".as_ptr());
+                    (*npc_ent).s.loopSound = crate::g_utils::G_SoundIndex(
+                        c"sound/weapons/galak/lasercutting.wav".as_ptr(),
+                    );
                     if (*npc_info).coverTarg.is_none() {
                         // for moving looping sound at end of trace
                         let cover_ent = crate::g_utils::G_Spawn(ctx);
                         if !cover_ent.is_null() {
                             (*npc_info).coverTarg = Some(ent_id(g_entities_base, cover_ent));
-                            crate::g_utils::G_SetOrigin(cover_ent, (*client).renderInfo.muzzlePoint);
+                            crate::g_utils::G_SetOrigin(
+                                cover_ent,
+                                (*client).renderInfo.muzzlePoint,
+                            );
                             (*cover_ent).r.svFlags |= SVF_BROADCAST;
-                            (*cover_ent).s.loopSound =
-                                crate::g_utils::G_SoundIndex(c"sound/weapons/galak/lasercutting.wav".as_ptr());
+                            (*cover_ent).s.loopSound = crate::g_utils::G_SoundIndex(
+                                c"sound/weapons/galak/lasercutting.wav".as_ptr(),
+                            );
                         }
                     }
                 }
@@ -1002,7 +1015,12 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         crate::g_utils::G_FreeEntity(ctx, cover_ent_ptr);
                     }
                     (*npc_ent).s.loopSound = 0;
-                    crate::g_timer::TIMER_Set(ctx, npc_ent, c"attackDelay".as_ptr(), (*client).ps.torsoTimer);
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        npc_ent,
+                        c"attackDelay".as_ptr(),
+                        (*client).ps.torsoTimer,
+                    );
                 } else {
                     // attack still going
                     // do the trace and damage
@@ -1010,7 +1028,12 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     let mut end: vec3_t = [0.0; 3];
                     let mins: vec3_t = [-3.0, -3.0, -3.0];
                     let maxs: vec3_t = [3.0, 3.0, 3.0];
-                    _VectorMA((*client).renderInfo.muzzlePoint, 1024.0, (*client).renderInfo.muzzleDir, &mut end);
+                    _VectorMA(
+                        (*client).renderInfo.muzzlePoint,
+                        1024.0,
+                        (*client).renderInfo.muzzleDir,
+                        &mut end,
+                    );
                     trap::Trace(
                         ctx.engine,
                         mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(
@@ -1027,7 +1050,10 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                         // oops, in a wall
                         if let Some(cover_id) = (*npc_info).coverTarg {
                             let cover_ent_ptr = g_entities_base.add(cover_id.0 as usize);
-                            crate::g_utils::G_SetOrigin(cover_ent_ptr, (*client).renderInfo.muzzlePoint);
+                            crate::g_utils::G_SetOrigin(
+                                cover_ent_ptr,
+                                (*client).renderInfo.muzzlePoint,
+                            );
                         }
                     } else {
                         // clear
@@ -1040,7 +1066,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                                     ctx,
                                     trace.endpos,
                                     CHAN_AUTO,
-                                    crate::g_utils::G_SoundIndex(c"sound/weapons/galak/laserdamage.wav".as_ptr()),
+                                    crate::g_utils::G_SoundIndex(
+                                        c"sound/weapons/galak/laserdamage.wav".as_ptr(),
+                                    ),
                                 );
                                 crate::g_combat::G_Damage(
                                     ctx,
@@ -1064,7 +1092,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                                 ctx,
                                 trace.endpos,
                                 CHAN_AUTO,
-                                crate::g_utils::G_SoundIndex(c"sound/weapons/galak/laserdamage.wav".as_ptr()),
+                                crate::g_utils::G_SoundIndex(
+                                    c"sound/weapons/galak/laserdamage.wav".as_ptr(),
+                                ),
                             );
                         }
                     }
@@ -1089,7 +1119,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 if crate::g_timer::TIMER_Done(ctx, npc_ent, c"attackDelay".as_ptr()) != 0 {
                     // animate me
                     let swingAnim: c_int = BOTH_ATTACK1 as c_int;
-                    crate::npc_c::NPC_SetAnim(ctx,
+                    crate::npc_c::NPC_SetAnim(
+                        ctx,
                         npc_ent,
                         SETANIM_BOTH,
                         swingAnim,
@@ -1114,7 +1145,11 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     (*client).ps.viewangles,
                     0.3,
                 ) != 0
-                && ((*ctx.world).bg_state.rng.Q_irand(0, 10 * (2 - (*ctx.world).cvars.g_spskill.integer)) == 0
+                && ((*ctx.world)
+                    .bg_state
+                    .rng
+                    .Q_irand(0, 10 * (2 - (*ctx.world).cvars.g_spskill.integer))
+                    == 0
                     && (*ctx.world).globals.enemyDist4 > MIN_LOB_DIST_SQUARED
                     && (*ctx.world).globals.enemyDist4 < MAX_LOB_DIST_SQUARED
                     || crate::g_timer::TIMER_Done(ctx, npc_ent, c"noLob".as_ptr()) == 0
@@ -1130,7 +1165,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noRapid".as_ptr()) != 0
             {
                 // enemy within 256
-                if (*client).ps.weapon == WP_REPEATER as c_int && ((*npc_info).scriptFlags & SCF_ALT_FIRE as i32) as c_int != 0 {
+                if (*client).ps.weapon == WP_REPEATER as c_int
+                    && ((*npc_info).scriptFlags & SCF_ALT_FIRE as i32) as c_int != 0
+                {
                     // shooting an explosive, but enemy too close, switch to primary fire
                     (*npc_info).scriptFlags &= !(SCF_ALT_FIRE as i32);
                     (*npc_ent).alt_fire = qfalse;
@@ -1142,7 +1179,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 && crate::g_timer::TIMER_Done(ctx, npc_ent, c"noLob".as_ptr()) != 0
             {
                 // enemy more than 448 away and we are ready to try lob fire again
-                if (*client).ps.weapon == WP_REPEATER as c_int && ((*npc_info).scriptFlags & SCF_ALT_FIRE as i32) as c_int == 0 {
+                if (*client).ps.weapon == WP_REPEATER as c_int
+                    && ((*npc_info).scriptFlags & SCF_ALT_FIRE as i32) as c_int == 0
+                {
                     // enemy far enough away to use lobby explosives
                     (*npc_info).scriptFlags |= SCF_ALT_FIRE as i32;
                     (*npc_ent).alt_fire = qtrue;
@@ -1173,19 +1212,24 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     if hit == (*enemy_ent).s.number as c_int
                         || (!hit_ent.is_null()
                             && (*hit_ent).client != core::ptr::null_mut()
-                            && (*((*hit_ent).client as *mut gclient_t)).playerTeam == (*client).enemyTeam)
+                            && (*((*hit_ent).client as *mut gclient_t)).playerTeam
+                                == (*client).enemyTeam)
                         || (!hit_ent.is_null() && (*hit_ent).takedamage != 0)
                     {
                         // can hit enemy or will hit glass or other breakable, so shoot anyway
                         (*ctx.world).globals.enemyCS4 = qtrue;
                         crate::NPC_combat::NPC_AimAdjust(ctx, 2); // adjust aim better longer we have clear shot at enemy
-                        _VectorCopy((*enemy_ent).r.currentOrigin, &mut (*npc_info).enemyLastSeenLocation);
+                        _VectorCopy(
+                            (*enemy_ent).r.currentOrigin,
+                            &mut (*npc_info).enemyLastSeenLocation,
+                        );
                     } else {
                         // Hmm, have to get around this bastard
                         crate::NPC_combat::NPC_AimAdjust(ctx, 1); // adjust aim better longer we can see enemy
                         if !hit_ent.is_null()
                             && (*hit_ent).client != core::ptr::null_mut()
-                            && (*((*hit_ent).client as *mut gclient_t)).playerTeam == (*client).playerTeam
+                            && (*((*hit_ent).client as *mut gclient_t)).playerTeam
+                                == (*client).playerTeam
                         {
                             // would hit an ally, don't fire!!!
                             (*ctx.world).globals.hitAlly4 = qtrue;
@@ -1209,15 +1253,33 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             {
                 if (*npc_info).enemyCheckDebounceTime < 8 {
                     let speech: c_int = match (*npc_info).enemyCheckDebounceTime {
-                        0 | 1 | 2 => entity_event_t::EV_CHASE1 as c_int + (*npc_info).enemyCheckDebounceTime,
-                        3 | 4 | 5 => entity_event_t::EV_COVER1 as c_int + ((*npc_info).enemyCheckDebounceTime - 3),
-                        6 | 7 => entity_event_t::EV_ESCAPING1 as c_int + ((*npc_info).enemyCheckDebounceTime - 6),
+                        0 | 1 | 2 => {
+                            entity_event_t::EV_CHASE1 as c_int + (*npc_info).enemyCheckDebounceTime
+                        }
+                        3 | 4 | 5 => {
+                            entity_event_t::EV_COVER1 as c_int
+                                + ((*npc_info).enemyCheckDebounceTime - 3)
+                        }
+                        6 | 7 => {
+                            entity_event_t::EV_ESCAPING1 as c_int
+                                + ((*npc_info).enemyCheckDebounceTime - 6)
+                        }
                         _ => -1,
                     };
                     (*npc_info).enemyCheckDebounceTime += 1;
                     if speech != -1 {
-                        crate::NPC_sounds::G_AddVoiceEvent(ctx, npc_ent, speech, (*ctx.world).bg_state.rng.Q_irand(3000, 5000));
-                        crate::g_timer::TIMER_Set(ctx, npc_ent, c"talkDebounce".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(5000, 7000));
+                        crate::NPC_sounds::G_AddVoiceEvent(
+                            ctx,
+                            npc_ent,
+                            speech,
+                            (*ctx.world).bg_state.rng.Q_irand(3000, 5000),
+                        );
+                        crate::g_timer::TIMER_Set(
+                            ctx,
+                            npc_ent,
+                            c"talkDebounce".as_ptr(),
+                            (*ctx.world).bg_state.rng.Q_irand(5000, 7000),
+                        );
                     }
                 }
             }
@@ -1278,11 +1340,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             let mut angles: vec3_t = [0.0; 3];
             let mut target: vec3_t = [0.0; 3];
             let mut velocity: vec3_t = [0.0; 3];
-            let mins = [
-                -REPEATER_ALT_SIZE,
-                -REPEATER_ALT_SIZE,
-                -REPEATER_ALT_SIZE,
-            ];
+            let mins = [-REPEATER_ALT_SIZE, -REPEATER_ALT_SIZE, -REPEATER_ALT_SIZE];
             let maxs = [REPEATER_ALT_SIZE, REPEATER_ALT_SIZE, REPEATER_ALT_SIZE];
 
             crate::NPC_utils::CalcEntitySpot(ctx, npc_ent, SPOT_WEAPON, &mut muzzle);
@@ -1314,7 +1372,11 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                 1500.0,
                 qtrue,
             );
-            if VectorCompare(vec3_origin, velocity) != 0 || (clearshot == 0 && (*ctx.world).globals.enemyLOS4 != 0 && (*ctx.world).globals.enemyCS4 != 0) {
+            if VectorCompare(vec3_origin, velocity) != 0
+                || (clearshot == 0
+                    && (*ctx.world).globals.enemyLOS4 != 0
+                    && (*ctx.world).globals.enemyCS4 != 0)
+            {
                 // no clear lob shot and no lob shot that will hit something breakable
                 if (*ctx.world).globals.enemyLOS4 != 0
                     && (*ctx.world).globals.enemyCS4 != 0
@@ -1325,7 +1387,12 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     (*npc_ent).alt_fire = qfalse;
                     crate::NPC_combat::NPC_ChangeWeapon(WP_REPEATER);
                     // keep this weap for a bit
-                    crate::g_timer::TIMER_Set(ctx, npc_ent, c"noLob".as_ptr(), (*ctx.world).bg_state.rng.Q_irand(500, 1000));
+                    crate::g_timer::TIMER_Set(
+                        ctx,
+                        npc_ent,
+                        c"noLob".as_ptr(),
+                        (*ctx.world).bg_state.rng.Q_irand(500, 1000),
+                    );
                 } else {
                     (*ctx.world).globals.shoot4 = qfalse;
                 }
@@ -1392,7 +1459,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             // The enemy's own enemy — a second EntityId hop off `enemy_ent`, resolved
             // only inside this guard (guaranteed `Some` by the check above).
             let enemy_of_enemy_ent = g_entities_base.add((*enemy_ent).enemy.unwrap().index());
-            if (*enemy_ent).s.weapon == WP_SABER as c_int && (*enemy_of_enemy_ent).s.weapon == WP_SABER as c_int {
+            if (*enemy_ent).s.weapon == WP_SABER as c_int
+                && (*enemy_of_enemy_ent).s.weapon == WP_SABER as c_int
+            {
                 // don't shoot at an enemy jedi who is fighting another jedi, for fear of injuring one or causing rogue blaster deflections (a la Obi Wan/Vader duel at end of ANH)
                 (*ctx.world).globals.shoot4 = qfalse;
             }
@@ -1409,7 +1478,9 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
         }
 
         // also:
-        if (*enemy_ent).s.weapon == WP_TURRET as c_int && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname) == 0 {
+        if (*enemy_ent).s.weapon == WP_TURRET as c_int
+            && crate::q_shared::Q_stricmp(c"PAS".as_ptr(), (*enemy_ent).classname) == 0
+        {
             // crush turrets
             if crate::NPC_goal::G_BoundsOverlap(
                 (*npc_ent).r.absmin,
@@ -1420,8 +1491,7 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             {
                 // have to do this test because placed turrets are not solid to NPCs (so they don't obstruct navigation)
                 if false {
-                    (*client).ps.powerups[PW_BATTLESUIT as usize] =
-                        level_time + ARMOR_EFFECT_TIME;
+                    (*client).ps.powerups[PW_BATTLESUIT as usize] = level_time + ARMOR_EFFECT_TIME;
                     crate::g_combat::G_Damage(
                         ctx,
                         enemy_ent,
@@ -1447,17 +1517,33 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     );
                 }
             }
-        } else if (*npc_info).touchedByPlayer.is_some() && (*npc_info).touchedByPlayer == (*npc_ent).enemy {
+        } else if (*npc_info).touchedByPlayer.is_some()
+            && (*npc_info).touchedByPlayer == (*npc_ent).enemy
+        {
             // touched enemy
             if false {
                 // zap him!
                 let mut smackDir: vec3_t = [0.0; 3];
-                crate::g_timer::TIMER_Set(ctx, npc_ent, c"attackDelay".as_ptr(), (*client).ps.torsoTimer);
-                crate::g_timer::TIMER_Set(ctx, npc_ent, c"standTime".as_ptr(), (*client).ps.legsTimer);
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    npc_ent,
+                    c"attackDelay".as_ptr(),
+                    (*client).ps.torsoTimer,
+                );
+                crate::g_timer::TIMER_Set(
+                    ctx,
+                    npc_ent,
+                    c"standTime".as_ptr(),
+                    (*client).ps.legsTimer,
+                );
                 (*npc_info).touchedByPlayer = None;
                 (*client).ps.powerups[PW_BATTLESUIT as usize] = level_time + ARMOR_EFFECT_TIME;
 
-                _VectorSubtract((*enemy_ent).r.currentOrigin, (*npc_ent).r.currentOrigin, &mut smackDir);
+                _VectorSubtract(
+                    (*enemy_ent).r.currentOrigin,
+                    (*npc_ent).r.currentOrigin,
+                    &mut smackDir,
+                );
                 smackDir[2] += 30.0;
                 VectorNormalize(&mut smackDir);
                 crate::g_combat::G_Damage(
@@ -1467,7 +1553,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     npc_ent,
                     Some(&mut smackDir),
                     (*npc_ent).r.currentOrigin,
-                    ((*ctx.world).cvars.g_spskill.integer + 1) * (*ctx.world).bg_state.rng.Q_irand(5, 10),
+                    ((*ctx.world).cvars.g_spskill.integer + 1)
+                        * (*ctx.world).bg_state.rng.Q_irand(5, 10),
                     DAMAGE_NO_KNOCKBACK,
                     meansOfDeath_t::MOD_UNKNOWN as c_int,
                 );
@@ -1532,7 +1619,12 @@ pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
             // if ( !NPCInfo->investigateDebounceTime )
             if false {
                 // start regenerating the armor
-                crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_shield".as_ptr(), TURN_OFF);
+                crate::NPC_utils::NPC_SetSurfaceOnOff(
+                    ctx,
+                    npc_ent,
+                    c"torso_shield".as_ptr(),
+                    TURN_OFF,
+                );
                 (*npc_ent).flags &= !FL_SHIELDED; // no more reflections
                 (*npc_ent).r.mins = [-20.0, -20.0, -24.0];
                 (*npc_ent).r.maxs = [20.0, 20.0, 64.0];
@@ -1543,8 +1635,8 @@ pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
                     if (*npc_info).investigateCount < 12 {
                         (*npc_info).investigateCount += 1;
                     }
-                    (*npc_info).investigateDebounceTime =
-                        (*ctx.world).level.time + ((*npc_info).investigateCount as c_int as i32 * 5000) as i32;
+                    (*npc_info).investigateDebounceTime = (*ctx.world).level.time
+                        + ((*npc_info).investigateCount as c_int as i32 * 5000) as i32;
                 }
             } else if (*npc_info).investigateDebounceTime < (*ctx.world).level.time {
                 // armor regenerated, turn shield back on
@@ -1572,8 +1664,13 @@ pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
                     (*client).ps.stats[statIndex_t::STAT_ARMOR as usize] = GALAK_SHIELD_HEALTH;
                     (*npc_info).investigateDebounceTime = 0;
                     (*npc_ent).flags |= FL_SHIELDED; // reflect normal shots
-                    // NPC->fx_time = level.time;
-                    crate::NPC_utils::NPC_SetSurfaceOnOff(ctx, npc_ent, c"torso_shield".as_ptr(), TURN_ON);
+                                                     // NPC->fx_time = level.time;
+                    crate::NPC_utils::NPC_SetSurfaceOnOff(
+                        ctx,
+                        npc_ent,
+                        c"torso_shield".as_ptr(),
+                        TURN_ON,
+                    );
                 }
             }
         }

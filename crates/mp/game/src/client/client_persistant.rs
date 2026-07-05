@@ -29,19 +29,19 @@ pub const MAX_VOTE_COUNT: c_int = 3;
 #[derive(Clone, Copy)]
 pub struct clientPersistant_t {
     pub connected: clientConnected_t,
-    pub cmd: usercmd_t, // we would lose angles if not persistant
-    pub localClient: qboolean, // true if "ip" info key is "localhost"
-    pub initialSpawn: qboolean, // the first spawn should be at a cool location
+    pub cmd: usercmd_t,              // we would lose angles if not persistant
+    pub localClient: qboolean,       // true if "ip" info key is "localhost"
+    pub initialSpawn: qboolean,      // the first spawn should be at a cool location
     pub predictItemPickup: qboolean, // based on cg_predictItems userinfo
     pub pmoveFixed: qboolean,
     pub netname: [c_char; MAX_NETNAME],
-    pub netnameTime: c_int, // Last time the name was changed
-    pub maxHealth: c_int,   // for handicapping
-    pub enterTime: c_int,   // level.time the client entered the game
+    pub netnameTime: c_int,           // Last time the name was changed
+    pub maxHealth: c_int,             // for handicapping
+    pub enterTime: c_int,             // level.time the client entered the game
     pub teamState: playerTeamState_t, // status in teamplay games
-    pub voteCount: c_int,   // to prevent people from constantly calling votes
-    pub teamVoteCount: c_int, // to prevent people from constantly calling votes
-    pub teamInfo: qboolean, // send team overlay updates?
+    pub voteCount: c_int,             // to prevent people from constantly calling votes
+    pub teamVoteCount: c_int,         // to prevent people from constantly calling votes
+    pub teamInfo: qboolean,           // send team overlay updates?
 }
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<clientPersistant_t>() == 156);

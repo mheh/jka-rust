@@ -215,7 +215,11 @@ fn vec_sub(a: vec3_t, b: vec3_t) -> vec3_t {
 }
 #[inline]
 fn vec_ma(a: vec3_t, scale: f32, b: vec3_t) -> vec3_t {
-    [a[0] + scale * b[0], a[1] + scale * b[1], a[2] + scale * b[2]]
+    [
+        a[0] + scale * b[0],
+        a[1] + scale * b[1],
+        a[2] + scale * b[2],
+    ]
 }
 #[inline]
 fn vec_length_sq(v: vec3_t) -> f32 {
@@ -573,7 +577,12 @@ pub fn AnglesToAxis(angles: vec3_t, axis: *mut vec3_t) {
         // angle vectors returns "right" instead of "y axis"
         let (first, rest) = axis.split_at_mut(1);
         let (_, third) = rest.split_at_mut(1);
-        AngleVectors(angles, Some(&mut first[0]), Some(&mut right), Some(&mut third[0]));
+        AngleVectors(
+            angles,
+            Some(&mut first[0]),
+            Some(&mut right),
+            Some(&mut third[0]),
+        );
     }
     axis[1] = vec_sub(VEC3_ORIGIN, right);
 }
