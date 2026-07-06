@@ -338,6 +338,10 @@ pub fn sv_game_system_calls(engine: &mut ServerGame, args: &[isize]) -> isize;
 // unimplemented arms: todo!("Port <trap>")   (porting-rules marker).
 ```
 
+*Amendment (2026-07-05, user ruling): the forward-declared `ServerGame` shape is
+pinned in state-ownership.md § Seam definition — `pub type ServerGame = Server;`
+(plain alias; STATE-Q7 residual CLOSED).*
+
 `args[0]` arrives as a raw wire word, so — as in the inbound dual below — the
 exhaustive `match` is preceded by a fallible conversion: the engine-side decode
 direction `isize → i32 → MpGameImport::try_from` using the agent-written
