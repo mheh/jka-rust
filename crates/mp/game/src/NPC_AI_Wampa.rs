@@ -313,12 +313,16 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
 
             if DistanceSquared((*radiusEnt).r.currentOrigin, boltOrg) <= radiusSquared {
                 // smack
+                // Raven passes the global `vec3_origin` as `dir`; G_Damage
+                // normalizes `dir` in place (a no-op on the zero vector), so a
+                // fresh local copy is behaviorally identical.
+                let mut origin = vec3_origin;
                 crate::g_combat::G_Damage(
                     ctx,
                     radiusEnt,
                     npc,
                     npc,
-                    Some(&mut crate::prelude::vec3_origin),
+                    Some(&mut origin),
                     (*radiusEnt).r.currentOrigin,
                     if backhand != 0 {
                         (*ctx.world).bg_state.rng.Q_irand(10, 15)

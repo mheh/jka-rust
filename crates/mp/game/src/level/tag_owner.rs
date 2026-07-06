@@ -13,6 +13,13 @@ use crate::level::reference_tag::{reference_tag_t, MAX_REFNAME};
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2868`
 pub const TAG_GENERIC_NAME: &str = "__WORLD__";
 
+/// `TAG_GENERIC_NAME` as a C string literal (static storage), for sites that
+/// store the pointer past the enclosing statement — mirrors Raven passing the
+/// string literal directly.
+///
+/// Source: `oracle/oracle/codemp/game/g_misc.c:2868`
+pub const TAG_GENERIC_NAME_C: &core::ffi::CStr = c"__WORLD__";
+
 /// Raven `MAX_TAGS` — each tag owner has preallocated space for tags up to
 /// this many.
 ///

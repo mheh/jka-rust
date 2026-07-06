@@ -151,13 +151,13 @@ pub fn BuildShaderStateConfig(ctx: GameContext<'_>) -> *const c_char {
             let formatted = format!("{}={}:{:5.2}@", old_shader_str, new_shader_str, time_offset);
             let out_cstr = CString::new(formatted).unwrap_or_else(|_| CString::new("").unwrap());
             Q_strcat(
-                buff.as_mut_ptr(),
+                (&raw mut buff).cast::<c_char>(),
                 (MAX_STRING_CHARS * 4) as c_int,
                 out_cstr.as_ptr(),
             );
         }
 
-        buff.as_ptr()
+        (&raw const buff).cast::<c_char>()
     }
 }
 

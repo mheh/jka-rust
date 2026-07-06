@@ -9,6 +9,8 @@ pub const MAX_QUED_EVENTS: usize = 256;
 /// the 1024-entry `com_pushedEvents` ring (`Common.event_queue`).
 ///
 /// Source: `oracle/oracle/codemp/win32/win_main.cpp:1162-1166`
+// Ported engine-boot state; read once the `Sys_QueEvent`/`Sys_GetEvent` slice is wired.
+#[allow(dead_code)]
 pub struct SysEventQueue {
     /// `eventQue[MAX_QUED_EVENTS]`.
     que: [sysEvent_t; MAX_QUED_EVENTS],

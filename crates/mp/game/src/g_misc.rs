@@ -26,7 +26,7 @@ use crate::g_utils::{
     G_SoundIndex, G_SoundSetIndex, G_Spawn, G_TempEntity, G_UseTargets, G_UseTargets2,
 };
 use crate::level::reference_tag::MAX_REFNAME;
-use crate::level::tag_owner::{MAX_TAGS, MAX_TAG_OWNERS, TAG_GENERIC_NAME};
+use crate::level::tag_owner::{MAX_TAGS, MAX_TAG_OWNERS, TAG_GENERIC_NAME, TAG_GENERIC_NAME_C};
 use crate::q_math::vec3_origin;
 use crate::q_math::{DirToByte, PerpendicularVector, VectorNormalize};
 use crate::q_shared::{Info_SetValueForKey, Q_strlwr};
@@ -3211,7 +3211,7 @@ pub fn TAG_Add(
         // Attempt to add this to the owner's list
         if owner.is_null() || *owner == 0 {
             // If the owner isn't found, use the generic world name
-            owner = cstr(TAG_GENERIC_NAME).as_ptr();
+            owner = TAG_GENERIC_NAME_C.as_ptr();
         }
 
         let mut tag_owner = TAG_FindOwner(ctx, owner);

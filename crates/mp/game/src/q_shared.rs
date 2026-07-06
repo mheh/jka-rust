@@ -343,7 +343,11 @@ pub fn FloatNoSwap(f: *const f32) -> f32 {
 pub fn COM_BeginParseSession(name: *const c_char) {
     unsafe {
         COM_LINES = 0;
-        crate::q_shared::Q_strncpyz(COM_PARSENAME.as_mut_ptr(), name, MAX_QPATH as c_int);
+        crate::q_shared::Q_strncpyz(
+            (&raw mut COM_PARSENAME).cast::<c_char>(),
+            name,
+            MAX_QPATH as c_int,
+        );
     }
 }
 
@@ -372,8 +376,9 @@ pub fn COM_ParseError(format: *mut c_char) {
     unsafe {
         let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
         let parsename_str =
-            std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char).to_string_lossy();
-        let msg = format!("ERROR: {}, line {}: {}", parsename_str, COM_LINES, fmt_str);
+            std::ffi::CStr::from_ptr((&raw const COM_PARSENAME).cast::<c_char>()).to_string_lossy();
+        let com_lines = COM_LINES;
+        let msg = format!("ERROR: {}, line {}: {}", parsename_str, com_lines, fmt_str);
         let c_msg = std::ffi::CString::new(msg).unwrap();
         crate::g_main::Com_Printf(c_msg.as_ptr());
     }
@@ -389,10 +394,11 @@ pub fn COM_ParseWarning(format: *mut c_char) {
     unsafe {
         let fmt_str = std::ffi::CStr::from_ptr(format as *const c_char).to_string_lossy();
         let parsename_str =
-            std::ffi::CStr::from_ptr(COM_PARSENAME.as_ptr() as *const c_char).to_string_lossy();
+            std::ffi::CStr::from_ptr((&raw const COM_PARSENAME).cast::<c_char>()).to_string_lossy();
+        let com_lines = COM_LINES;
         let msg = format!(
             "WARNING: {}, line {}: {}",
-            parsename_str, COM_LINES, fmt_str
+            parsename_str, com_lines, fmt_str
         );
         let c_msg = std::ffi::CString::new(msg).unwrap();
         crate::g_main::Com_Printf(c_msg.as_ptr());
@@ -522,7 +528,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
         // make sure incoming data is valid
         if data.is_null() {
             *data_p = std::ptr::null();
-            return COM_TOKEN.as_mut_ptr();
+            return (&raw mut COM_TOKEN).cast::<c_char>();
         }
 
         loop {
@@ -530,11 +536,11 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
             data = crate::q_shared::SkipWhitespace(data, &mut hasNewLines);
             if data.is_null() {
                 *data_p = std::ptr::null();
-                return COM_TOKEN.as_mut_ptr();
+                return (&raw mut COM_TOKEN).cast::<c_char>();
             }
             if hasNewLines == QTRUE && allowLineBreaks == QFALSE {
                 *data_p = data;
-                return COM_TOKEN.as_mut_ptr();
+                return (&raw mut COM_TOKEN).cast::<c_char>();
             }
 
             c = *data as c_int;
@@ -568,7 +574,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
                 if c == b'"' as c_int || c == 0 {
                     COM_TOKEN[len as usize] = 0;
                     *data_p = data as *const c_char;
-                    return COM_TOKEN.as_mut_ptr();
+                    return (&raw mut COM_TOKEN).cast::<c_char>();
                 }
                 if len < MAX_TOKEN_CHARS as c_int {
                     COM_TOKEN[len as usize] = c as c_char;
@@ -599,7 +605,7 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
         COM_TOKEN[len as usize] = 0;
 
         *data_p = data as *const c_char;
-        COM_TOKEN.as_mut_ptr()
+        (&raw mut COM_TOKEN).cast::<c_char>()
     }
 }
 

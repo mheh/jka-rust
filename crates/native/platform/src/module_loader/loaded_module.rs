@@ -12,6 +12,9 @@ use crate::entrypoints::RawVmMain;
 /// Source: `oracle/oracle/codemp/qcommon/vm_local.h:111-146`
 pub struct LoadedModule {
     /// `vm->dllHandle` (`win_main.cpp:855-863`); `pub(crate)` per LOAD-D12f.
+    // Held only to keep the OS-mapped dylib alive (RAII); its `entry` fn ptr is
+    // the sole read path, so the field itself is never read.
+    #[allow(dead_code)]
     pub(crate) lib: libloading::Library,
     /// `"vmMain"` (`win_main.cpp:880`); `RawVmMain` defined in this crate
     /// (LOAD-D6), re-exported by `abi-transport`.
