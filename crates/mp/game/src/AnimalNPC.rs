@@ -16,6 +16,7 @@
 //!   (`*mut vehicleInfo_t`) to read the base vehicle-type stats table.
 #![allow(non_snake_case, unused, clippy::all)]
 
+use crate::g_main::level_time;
 use crate::prelude::*;
 
 // Raven angle-vector index (`q_shared.h`): YAW=1.
@@ -26,7 +27,7 @@ const YAW: usize = 1;
 /// Source: `oracle/oracle/codemp/game/AnimalNPC.c:97-148`
 pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     unsafe {
-        let level_time = crate::g_main::level_time();
+        let level_time = level_time(ctx);
         if level_time >= (*pVeh).m_iDieTime {
             // If the vehicle is not empty. (`Inhabited`/`EjectAll` have
             // no Animal override, so dispatch resolves to the generic base.)
@@ -64,7 +65,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         let speedMin: f32;
         let mut speedMax: f32;
         let fWalkSpeedMax: f32;
-        let curTime: c_int = crate::g_main::level_time();
+        let curTime: c_int = level_time(ctx);
 
         let parent = (*pVeh).m_pParentEntity;
         let parentPS = (*parent).playerState;
@@ -245,7 +246,7 @@ pub fn AnimateVehicle(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         let mut iBlend: c_int = 300;
         let pilot = (*pVeh).m_pPilot as *mut gentity_t;
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
-        let level_time = crate::g_main::level_time();
+        let level_time = level_time(ctx);
 
         // We're dead.
         if (*parent).health <= 0 {
@@ -359,7 +360,7 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
         let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
         let pilotPS = (*pVeh).m_pPilot.as_ref().map(|p| (*p).playerState);
         let parentPS = (*parent).playerState;
-        let level_time = crate::g_main::level_time();
+        let level_time = level_time(ctx);
 
         // Boarding animation.
         if (*pVeh).m_iBoarding != 0 {

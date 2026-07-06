@@ -1582,6 +1582,7 @@ pub fn AttachRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             pVeh,
             &(*ctx.world).bg_state,
             &GameBgTraps::new(ctx.engine),
+            (*ctx.world).level.time,
         );
 
         if !(*pVeh).m_pPilot.is_null() {
