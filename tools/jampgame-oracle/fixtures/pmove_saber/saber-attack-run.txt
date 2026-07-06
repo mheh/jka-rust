@@ -1,0 +1,17 @@
+# Saber scenario 4: saber-attack-run. Run forward (forwardmove=127) for 5
+# commands to build the run gait, then keep running forward while holding
+# BUTTON_ATTACK (1) for 12. Exercises a DIFFERENT arc than the standing swing:
+# with forwardmove>0 the attack path (bg_saber.c:3698) calls
+# PM_SaberAttackForMovement, which for a grounded SS_MEDIUM single saber
+# (velocity[2]<=100, NULL saber, zero force power) skips the flip/special branch
+# and falls to PM_CheckStabDown (one extra forward pm->trace against the world,
+# returns LS_NONE) -> LS_A_T2B, the forward overhead slash. Distinct saberMove /
+# torso anim / weaponTime progression vs scenario 3, and ntr rises by the extra
+# stab-down probe on the swing step. rng holds 89abcdef.
+# origin z 24.25 = 0x41c20000.
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+
+ps origin 0x00000000 0x00000000 0x41c20000
+start
+cmd 50 127 0 0 0 0 0 0 x5
+cmd 50 127 0 0 1 0 0 0 x12

@@ -1,0 +1,14 @@
+# Saber scenario 1: saber-idle. Spawn 0.25 above a flat floor (top z=0) wielding
+# WP_SABER at SS_MEDIUM, saber lit (saberHolstered=0, saberEntityNum baseline 1),
+# and feed 20 empty 50ms commands. Exercises the saber READY settle:
+# PM_WeaponLightsaber's not-attacking branch drops saberMove to LS_READY and
+# PM_SetSaberMove(LS_READY) -> BG_InSaberStandAnim -> PM_GetSaberStance() settles
+# the torso to the MEDIUM saber stance (BOTH_STAND2), weaponstate to WEAPON_IDLE,
+# and the ground snap parks groundEntityNum at ENTITYNUM_WORLD (1022). The rng
+# tripwire must hold at 89abcdef (no holdrand draw on the saber-idle path).
+# origin z 24.25 = 0x41c20000 (box bottom 0.25 above the floor top at z=0).
+brush -4096 -4096 -4096 4096 4096 0 surf=0x2000
+
+ps origin 0x00000000 0x00000000 0x41c20000
+start
+cmd 50 0 0 0 0 0 0 0 x20
