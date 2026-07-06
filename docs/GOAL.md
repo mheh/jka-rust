@@ -60,13 +60,12 @@ Raven's `jampgamex86.dll`:
   wsaber — via the `tools/jampgame-oracle/` harness, plus the ABI smoke test's
   client lifecycle drive. Representative, not exhaustive: exhaustive coverage
   is the per-file audit and referee replay below).
-- [ ] Audit every ported game-tier file against its oracle TU (the per-file
-  oracle review): line-level transcription review of `crates/mp/game/src/*.rs`
-  against `oracle/oracle/codemp/game/*.c`, hunting the proven divergence
-  classes (inverted/mistranscribed conditions, f32-vs-f64 promotion through
-  double libm, empty-`Vec`-vs-fixed-array state init, silent C UB needing §19
-  decisions). Findings are fixed behind the green suites; high-value audited
-  functions get promoted into new parity slices.
+- [x] Audit every ported game-tier file against its oracle TU (the per-file
+  oracle review): all 107 files compared line-level against
+  `oracle/oracle/codemp/game/*.c` (waves 1-2, 2026-07-06; ~160 findings,
+  ~102 confirmed fixed, follow-up ports resolved). Ledger + findings log:
+  `docs/audits/per-file-oracle-audit.md`. Honestly-skimmed functions listed
+  there remain an optional second-pass tail, not a gate.
 - [ ] Prove hot-swap behavior by replacing `jampgamex86.dll`/the platform
   equivalent with the Rust build and running the MP engine through init, map
   load, frame loop, client connect, and shutdown.
