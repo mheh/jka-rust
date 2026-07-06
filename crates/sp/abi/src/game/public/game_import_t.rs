@@ -5,6 +5,7 @@ use core::ffi::{c_char, c_int, c_ulong, c_void};
 use sp_qshared::common::sp::gentity::gentity_t;
 use sp_qshared::common::sp::ghoul2::crag_doll_params::CRagDollParams;
 use sp_qshared::common::sp::ghoul2::eg2_collision::EG2_Collision;
+use sp_qshared::common::sp::ghoul2::sskin_gore_data::SSkinGoreData;
 use sp_qshared::common::sp::qcommon::collision_record::CCollisionRecord;
 use sp_qshared::common::sp::qcommon::shared_set_bone_ik_state_params::sharedSetBoneIKStateParams_t;
 use sp_qshared::common::sp::qcommon::tags::memtag_t;
@@ -555,10 +556,8 @@ pub struct game_import_t {
         ) -> qboolean,
     >,
 
-    //TODO: Port SSkinGoreData
-    // Source: oracle/oracle/code/game/q_shared.h:2530
     pub G2API_AddSkinGore:
-        Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, gore: *mut c_void)>,
+        Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v, gore: *mut SSkinGoreData)>,
     pub G2API_ClearSkinGore: Option<unsafe extern "C" fn(ghoul2: *mut CGhoul2Info_v)>,
 
     pub RMG_Init: Option<unsafe extern "C" fn(terrainID: c_int)>,
