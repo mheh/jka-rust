@@ -181,7 +181,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     *(*pVeh).m_vOrientation.add(YAW),
                     (*riderPS).viewangles[YAW],
                 );
-                if !parentPS.is_null() && (*parentPS).speed > 0.0f32 {
+                if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
                     let mut s = (*parentPS).speed;
                     let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
                     if s < 0.0f32 {
@@ -206,7 +206,7 @@ pub fn ProcessOrientCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                     *(*pVeh).m_vOrientation.add(YAW),
                     (*riderPS).viewangles[YAW],
                 );
-                if !parentPS.is_null() && (*parentPS).speed > 0.0f32 {
+                if !parentPS.is_null() && (*parentPS).speed != 0.0f32 {
                     let mut s = (*parentPS).speed;
                     let maxDif = (*(*pVeh).m_pVehicleInfo).turningSpeed * 4.0f32;
                     if s < 0.0f32 {
@@ -373,7 +373,9 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             0.0f32
         };
 
-        if fSpeedPercToMax < -0.01f32 {
+        // MP `#ifdef _JK2MP` guards the reverse-anim branch as `if (0)` (reverse
+        // is handled in pmove in MP), so the else block always runs here.
+        if false {
             anim = BOTH_VT_WALK_REV;
             iBlend = 600;
         } else {
@@ -381,11 +383,7 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 && !pilotPS.unwrap().is_null()
                 && (*pilotPS.unwrap()).weapon != WP_NONE
                 && (*pilotPS.unwrap()).weapon != WP_MELEE;
-            let attacking = hasWeapon
-                && !pilotPS.is_none()
-                && !pilotPS.unwrap().is_null()
-                && ((*pilotPS.unwrap()).weaponTime > 0
-                    || ((*pVeh).m_ucmd.buttons & BUTTON_ATTACK) != 0);
+            let attacking = hasWeapon && ((*pVeh).m_ucmd.buttons & BUTTON_ATTACK) != 0;
             let right = (*pVeh).m_ucmd.rightmove > 0;
             let left = (*pVeh).m_ucmd.rightmove < 0;
             let turbo = fSpeedPercToMax > 0.0f32 && level_time < (*pVeh).m_iTurboTime;
@@ -395,6 +393,14 @@ pub fn AnimateRiders(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             let mut weapon_pose: EWeaponPose = WPOSE_NONE;
 
             (*pVeh).m_ulFlags &= !(VEH_CRASHING as u64);
+
+            // MP `#ifdef _JK2MP`: don't interrupt attack anims — if a shot is
+            // mid-fire the current anim is left untouched (skips pose + SetAnim).
+            if let Some(pps) = pilotPS {
+                if !pps.is_null() && (*pps).weaponTime > 0 {
+                    return;
+                }
+            }
 
             // Compute The Weapon Pose
             if !pilotPS.is_none() && !pilotPS.unwrap().is_null() {

@@ -357,6 +357,7 @@ pub fn multi_trigger(ctx: GameContext<'_>, ent: *mut gentity_t, activator: *mut 
                 return;
             }
 
+            // §19: Raven derefs activator->client unguarded; guard the null activator too.
             if activator.is_null()
                 || (*activator).client.is_null()
                 || ((*((*activator).client as *mut gclient_t)).sess.sessionTeam != SIEGETEAM_TEAM1
@@ -623,7 +624,7 @@ pub fn Touch_Multi(
                 {
                     return;
                 } else if (*other_client).isHacking != (*self_).s.number
-                    && (*self_).s.number < MAX_CLIENTS as c_int
+                    && (*other).s.number < MAX_CLIENTS as c_int
                 {
                     // start the hack
                     (*other_client).isHacking = (*self_).s.number;
@@ -1070,7 +1071,9 @@ pub fn trigger_push_touch(
         }
 
         // linear
-        if (*ctx.world).level.time < (*self_).painDebounceTime + (*self_).wait as c_int {
+        // Raven compares in float: `level.time < painDebounceTime + self->wait`, with
+        // wait a float, so both sides promote to float rather than truncating wait.
+        if ((*ctx.world).level.time as f32) < (*self_).painDebounceTime as f32 + (*self_).wait {
             // normal 'wait' check
             if (*self_).spawnflags & PUSH_MULTIPLE != 0 {
                 // MULTIPLE - allow multiple entities to touch this trigger in one frame
@@ -1208,7 +1211,9 @@ pub fn AimAtTarget(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
         let height = (*ent).s.origin[2] - origin[2];
         let gravity = (*ctx.world).cvars.g_gravity.value;
-        let time = (height / (0.5 * gravity)).sqrt();
+        // Raven: `sqrt( height / ( .5 * gravity ) )`. `.5` is double, so the divide
+        // promotes to double and sqrt is the double libm call; the result narrows to float.
+        let time = ((height as f64) / (0.5 * gravity as f64)).sqrt() as f32;
         if time == 0.0 {
             G_FreeEntity(ctx, self_);
             return;
@@ -1351,6 +1356,12 @@ pub fn trigger_teleporter_touch(
             return;
         }
         if (*((*other).client as *mut gclient_t)).ps.pm_type == pmtype_t::PM_DEAD as c_int {
+            return;
+        }
+        // Spectators only?
+        if (*self_).spawnflags & 1 != 0
+            && (*((*other).client as *mut gclient_t)).sess.sessionTeam != TEAM_SPECTATOR
+        {
             return;
         }
 
@@ -1647,6 +1658,7 @@ pub fn space_touch(
 
             if (*veh).inuse != 0 && !(*veh).client.is_null() && !(*veh).m_pVehicle.is_null() {
                 let p_veh = (*veh).m_pVehicle as *mut Vehicle_t;
+                // §19: Raven derefs m_pVehicleInfo unguarded; guard the null it would crash on.
                 if !(*p_veh).m_pVehicleInfo.is_null() && (*(*p_veh).m_pVehicleInfo).hideRider != 0 {
                     // if they are "inside" a vehicle, then let that protect
                     // them from THE HORRORS OF SPACE.
@@ -1800,6 +1812,7 @@ pub fn shipboundary_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     && (*listed_ent).s.NPC_class == CLASS_VEHICLE as c_int
                 {
                     let p_veh = (*listed_ent).m_pVehicle as *mut Vehicle_t;
+                    // §19: Raven derefs m_pVehicleInfo unguarded; guard the null it would crash on.
                     if !p_veh.is_null()
                         && !(*p_veh).m_pVehicleInfo.is_null()
                         && (*(*p_veh).m_pVehicleInfo).r#type == VH_FIGHTER

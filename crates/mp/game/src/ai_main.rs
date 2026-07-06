@@ -538,7 +538,8 @@ pub fn BotChangeViewAngles(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime
             }
             bs.viewangles[i] += anglespeed;
             bs.viewangles[i] = crate::q_math::AngleMod(bs.viewangles[i]);
-            bs.viewanglespeed[i] *= 0.45 * (1.0 - factor);
+            bs.viewanglespeed[i] =
+                (bs.viewanglespeed[i] as f64 * (0.45 * (1.0 - factor) as f64)) as f32;
         }
         if bs.viewangles[PITCH] > 180.0 {
             bs.viewangles[PITCH] -= 360.0;
@@ -7518,8 +7519,8 @@ pub fn StandardBotAI(ctx: GameContext<'_>, bs: *mut bot_state_t, thinktime: f32)
 
         if (*bs).timeToReact < lt as f32
             && (*bs).currentEnemy.is_some()
-            && (*bs).enemySeenTime
-                > lt as f32 + (ENEMY_FORGET_MS as f32 - (ENEMY_FORGET_MS as f32 * 0.2))
+            && ((*bs).enemySeenTime as f64)
+                > (lt as f64 + (ENEMY_FORGET_MS as f64 - (ENEMY_FORGET_MS as f64 * 0.2)))
         {
             let currentEnemy = resolve((*bs).currentEnemy);
             if (*bs).frame_Enemy_Vis != 0 {

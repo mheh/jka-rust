@@ -401,6 +401,10 @@ pub fn BG_LegalizedForcePowers(
         }
 
         const NUM_FORCE_POWERS_USIZE: usize = 18;
+        // Raven's loop also stops at an embedded '\n' and leaves the unwritten
+        // `final_Powers` tail as uninitialized stack garbage (read later); the
+        // zero-fill here is the defined choice for that UB, and normal machine-
+        // generated power strings carry no embedded '\n' to diverge on.
         let mut final_powers: [c_int; NUM_FORCE_POWERS_USIZE] = [0; NUM_FORCE_POWERS_USIZE];
         for (c, ch) in powers_field
             .chars()

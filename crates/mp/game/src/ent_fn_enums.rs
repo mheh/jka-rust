@@ -794,7 +794,7 @@ pub enum EntSpawn {
     misc_turretG2,
 }
 
-/// The `spawns[]` classname->`EntSpawn` table (190 rows, oracle order).
+/// The `spawns[]` classname->`EntSpawn` table (178 rows, oracle order).
 /// Raven `G_CallSpawn` walks this with a case-sensitive strcmp on
 /// `ent->classname`; `spawn_for_classname` is that lookup.
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:435-673`

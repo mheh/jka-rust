@@ -16,7 +16,9 @@
 use crate::prelude::*;
 
 pub const USE_EPSILON_TEST: bool = true;
-pub const EPSILON: f32 = 0.000001;
+// C's `fabs(du0) < EPSILON` promotes the f32 to double and compares against the
+// unsuffixed double literal, so the clamp-to-zero threshold is evaluated in f64.
+pub const EPSILON: f64 = 0.000001;
 
 /// Raven `coplanar_tri_tri`.
 ///
@@ -380,13 +382,13 @@ pub fn tri_tri_intersect(
 
     // Coplanarity robustness check
     if USE_EPSILON_TEST {
-        if du0.abs() < EPSILON {
+        if (du0 as f64).abs() < EPSILON {
             du0 = 0.0;
         }
-        if du1.abs() < EPSILON {
+        if (du1 as f64).abs() < EPSILON {
             du1 = 0.0;
         }
-        if du2.abs() < EPSILON {
+        if (du2 as f64).abs() < EPSILON {
             du2 = 0.0;
         }
     }
@@ -423,13 +425,13 @@ pub fn tri_tri_intersect(
     let mut dv2 = N2[0] * V2[0] + N2[1] * V2[1] + N2[2] * V2[2] + d2;
 
     if USE_EPSILON_TEST {
-        if dv0.abs() < EPSILON {
+        if (dv0 as f64).abs() < EPSILON {
             dv0 = 0.0;
         }
-        if dv1.abs() < EPSILON {
+        if (dv1 as f64).abs() < EPSILON {
             dv1 = 0.0;
         }
-        if dv2.abs() < EPSILON {
+        if (dv2 as f64).abs() < EPSILON {
             dv2 = 0.0;
         }
     }
@@ -530,8 +532,9 @@ pub fn tri_tri_intersect(
             isect2[0] = up2 + (up0 - up2) * du2 / (du2 - du0);
             isect2[1] = up2 + (up1 - up2) * du2 / (du2 - du1);
         } else {
-            // Triangles are coplanar
-            return coplanar_tri_tri(N2, V0, V1, V2, U0, U1, U2);
+            // Triangles are coplanar. The COMPUTE_INTERVALS macro hardcodes N1 in
+            // both expansions, so this branch passes N1, not N2.
+            return coplanar_tri_tri(N1, V0, V1, V2, U0, U1, U2);
         }
     }
 

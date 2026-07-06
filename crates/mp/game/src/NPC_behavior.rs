@@ -62,11 +62,12 @@ const CP_AVOID: c_int = 0x0000_0100;
 const CP_HAS_ROUTE: c_int = 0x0000_1000;
 const CP_NO_PVS: c_int = 0x0001_0000;
 
-// Raven `MIN_ANGLE_ERROR`/`APEX_HEIGHT` (`NPC_behavior.c` file-scope consts
-// used by `NPC_BSAdvanceFight`/`NPC_BSJump`).
-// Source: `oracle/oracle/codemp/game/NPC_behavior.c` (top-of-file consts)
-pub const MIN_ANGLE_ERROR: f32 = 4.0;
-pub const APEX_HEIGHT: f32 = 30.0;
+// Raven `MIN_ANGLE_ERROR` (`b_local.h`, the facing gate in `NPC_BSJump`).
+// Source: `oracle/oracle/codemp/game/b_local.h:29`
+pub const MIN_ANGLE_ERROR: f32 = 0.01;
+// Raven `APEX_HEIGHT` (`NPC_behavior.c` #define, the jump-parabola apex).
+// Source: `oracle/oracle/codemp/game/NPC_behavior.c:730`
+pub const APEX_HEIGHT: f32 = 200.0;
 
 /// Raven `NPC_BSAdvanceFight`.
 ///
@@ -672,8 +673,11 @@ pub fn NPC_BSFollowLeader(ctx: GameContext<'_>) {
                 followDist = (*NPCInfo).followDist;
             }
             let backupdist = followDist / 2.0;
-            let walkdist = followDist * 0.83;
-            let minrundist = followDist * 1.33;
+            // C's `0.83`/`1.33` are double literals, so each product is formed in
+            // double and narrowed to the f32 local; match that width so the
+            // `walkdist`/`minrundist` boundary comparisons agree.
+            let walkdist = (followDist as f64 * 0.83) as f32;
+            let minrundist = (followDist as f64 * 1.33) as f32;
 
             let mut vec = [0.0f32; 3];
             _VectorSubtract((*leader).r.currentOrigin, (*NPC).r.currentOrigin, &mut vec);
@@ -789,7 +793,10 @@ pub fn NPC_BSJump(ctx: GameContext<'_>) {
 
                 let apexHeight: f32 = APEX_HEIGHT / 2.0;
 
-                z = (apexHeight + z).sqrt() - apexHeight.sqrt();
+                // C's `sqrt` is the libm double routine: the f32 `apexHeight + z`
+                // is promoted to double for each sqrt and the result narrowed back
+                // to the f32 local; evaluate through f64 to match.
+                z = (((apexHeight + z) as f64).sqrt() - (apexHeight as f64).sqrt()) as f32;
                 debug_assert!(z >= 0.0);
 
                 xy -= z;
@@ -803,7 +810,10 @@ pub fn NPC_BSJump(ctx: GameContext<'_>) {
                 _VectorCopy(apex, &mut (*NPC).pos1);
 
                 let height = apex[2] - (*NPC).r.currentOrigin[2];
-                let time = (height / (0.5 * (*npc_client).ps.gravity as f32)).sqrt();
+                // C evaluates `.5 * gravity` and the `height / …` divide in double
+                // (libm `sqrt`), narrowing only into the f32 `time`; match that width.
+                let time =
+                    ((height as f64) / (0.5 * (*npc_client).ps.gravity as f64)).sqrt() as f32;
                 if time == 0.0 {
                     return;
                 }
@@ -1541,7 +1551,8 @@ pub fn NPC_StartFlee(
 
         if dangerLevel > AEL_DANGER as c_int
             || (*NPC).s.weapon == WP_NONE as c_int
-            || ((*NPCInfo).group.is_null() && (*NPC).health <= 10)
+            || (((*NPCInfo).group.is_null() || (*(*NPCInfo).group).numGroup <= 1)
+                && (*NPC).health <= 10)
         {
             cp = NPC_FindCombatPoint(
                 ctx,
@@ -1708,7 +1719,7 @@ pub fn NPC_BSEmplaced(ctx: GameContext<'_>) {
             if NPC_ClearLOS4(ctx, enemy) != QFALSE {
                 enemyLOS = QTRUE;
 
-                let hit = NPC_ShotEntity(ctx, enemy, impactPos);
+                let hit = NPC_ShotEntity(ctx, enemy, Some(&mut impactPos));
                 let hitEnt = &mut world.g_entities[hit as usize] as *mut gentity_t;
 
                 if hit == (*enemy).s.number || (!hitEnt.is_null() && (*hitEnt).takedamage != 0) {

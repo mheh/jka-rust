@@ -1100,7 +1100,9 @@ pub fn Mark1_AttackDecision(ctx: GameContext<'_>) {
                 if let Some(die_fn) = (*npc).die {
                     crate::ent_fn_enums::dispatch_die(ctx, die_fn, npc, npc, npc, 100, MOD_UNKNOWN as c_int);
                 }
-                return;
+                // C does not return here: it falls through to NPC_FaceEnemy and the
+                // attack dispatch with the unchanged distRate from the distance check.
+                distRate
             };
 
         // We can see enemy so shoot him if timers let you.

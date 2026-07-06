@@ -79,14 +79,16 @@ pub fn NPC_StandTrackAndShoot(
         if !duck_ok {
             if let Some(enemy_id) = npc.enemy {
                 let enemy = unsafe { &*(*world).g_entities.as_ptr().add(enemy_id.0 as usize) };
-                if let Some(enemy_enemy) = unsafe { &*enemy }.enemy {
-                    if enemy_enemy.0 == npc.s.number as u32 {
-                        if (unsafe { &*(enemy.client as *mut gclient_t) }.buttons
-                            & BUTTON_ATTACK as i32)
-                            != 0
-                        {
-                            if NPC_CheckDefend(ctx, 1.0) != 0 {
-                                duck_ok = true;
+                if !enemy.client.is_null() {
+                    if let Some(enemy_enemy) = unsafe { &*enemy }.enemy {
+                        if enemy_enemy.0 == npc.s.number as u32 {
+                            if (unsafe { &*(enemy.client as *mut gclient_t) }.buttons
+                                & BUTTON_ATTACK as i32)
+                                != 0
+                            {
+                                if NPC_CheckDefend(ctx, 1.0) != 0 {
+                                    duck_ok = true;
+                                }
                             }
                         }
                     }
@@ -222,8 +224,11 @@ pub fn NPC_BSHuntAndKill(ctx: GameContext<'_>) {
             );
             enemy_dist = crate::q_math::VectorLength(vec);
 
+            // `1.5` is a double literal, so the scaled square is computed in f64
+            // (the float weapon range promotes) before the comparison.
             if enemy_dist > 48.0
-                && ((enemy_dist * 1.5) * (enemy_dist * 1.5) >= NPC_MaxDistSquaredForWeapon(ctx)
+                && ((enemy_dist as f64 * 1.5) * (enemy_dist as f64 * 1.5)
+                    >= NPC_MaxDistSquaredForWeapon(ctx) as f64
                     || o_evis != VIS_SHOOT
                     || enemy_dist > IdealDistance(ctx, (*world).globals.NPC) * 3.0)
             {
@@ -408,6 +413,9 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
                 TID_BSTATE as c_int,
             ),
         );
+        npc_info.desiredYaw = client.ps.viewangles[YAW];
+        npc_info.desiredPitch = client.ps.viewangles[PITCH];
+        npc_info.aimTime = 0;
         return;
     }
 
@@ -423,6 +431,9 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
                     TID_BSTATE as c_int,
                 ),
             );
+            npc_info.desiredYaw = client.ps.viewangles[YAW];
+            npc_info.desiredPitch = client.ps.viewangles[PITCH];
+            npc_info.aimTime = 0;
             return;
         }
     }
@@ -467,6 +478,9 @@ pub fn NPC_BSPointShoot(ctx: GameContext<'_>, shoot: qboolean) {
                 TID_BSTATE as c_int,
             ),
         );
+        npc_info.desiredYaw = client.ps.viewangles[YAW];
+        npc_info.desiredPitch = client.ps.viewangles[PITCH];
+        npc_info.aimTime = 0;
     }
 }
 

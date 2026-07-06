@@ -138,6 +138,9 @@ pub fn G_ReadSessionData(ctx: GameContext<'_>, client: *mut gclient_t) {
         let parts: Vec<&str> = s_str.split_whitespace().collect();
 
         let mut idx = 0;
+        // §19: C's sscanf leaves these uninitialized when the session string has
+        // fewer than the expected tokens and then assigns that garbage (UB); a
+        // short string reads as 0 here instead.
         let mut session_team: i32 = 0;
         let mut spectator_state: i32 = 0;
         let mut team_leader: i32 = 0;

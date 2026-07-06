@@ -150,7 +150,7 @@ pub static StanceTable: [stringID_table_t; 9] = [
 /// Raven `WPTable` — weapon name/id table (also used by NPC parsing).
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:72-97`
-pub static WPTable: [stringID_table_t; 21] = [
+pub static WPTable: [stringID_table_t; 22] = [
     stringID_table_t {
         name: c"NULL".as_ptr() as *mut c_char,
         id: WP_NONE,
@@ -230,6 +230,10 @@ pub static WPTable: [stringID_table_t; 21] = [
     stringID_table_t {
         name: c"WP_EMPLACED_GUN".as_ptr() as *mut c_char,
         id: WP_EMPLACED_GUN,
+    },
+    stringID_table_t {
+        name: c"WP_TURRET".as_ptr() as *mut c_char,
+        id: WP_TURRET,
     },
     stringID_table_t {
         name: c"".as_ptr() as *mut c_char,

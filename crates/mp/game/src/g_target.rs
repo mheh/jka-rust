@@ -445,8 +445,8 @@ pub fn SP_target_speaker(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).spawnflags |= 8;
         }
 
-        let mut buffer: [c_char; 256] = [0; 256]; // MAX_QPATH is typically 64 or 256
-        Q_strncpyz(buffer.as_mut_ptr(), s, 256);
+        let mut buffer: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
+        Q_strncpyz(buffer.as_mut_ptr(), s, MAX_QPATH as c_int);
 
         (*ent).noise_index = G_SoundIndex(buffer.as_ptr());
 

@@ -595,8 +595,8 @@ pub fn ST_Move(ctx: GameContext<'_>) -> qboolean {
         // FIXME: if we bump into another one of our guys and can't get around him,
         // just stop! (Raven comment).
         // If we hit our target, then stop and fire!
-        if (info.flags & 1) != 0 {
-            // NIF_COLLISION = 1
+        if (info.flags & 0x00000004) != 0 {
+            // NIF_COLLISION = 0x00000004 (b_local.h:305); was wrongly 0x1 (NIF_FAILED).
             if ent_id_opt(ent_base(ctx), info.blocker) == (*NPC).enemy {
                 ST_HoldPosition(ctx);
             }
@@ -3162,7 +3162,7 @@ pub fn NPC_BSST_Attack(ctx: GameContext<'_>) {
                 } else if world.globals.enemyInFOV != QFALSE {
                     // if enemy is FOV, go ahead and check for shooting
                     let mut impactPos = world.globals.impactPos;
-                    let hit = NPC_ShotEntity(ctx, enemy, impactPos);
+                    let hit = NPC_ShotEntity(ctx, enemy, Some(&mut impactPos));
                     world.globals.impactPos = impactPos;
                     let hitEnt = &mut world.g_entities[hit as usize] as *mut gentity_t;
                     let hitClient = (*hitEnt).client as *mut gclient_t;

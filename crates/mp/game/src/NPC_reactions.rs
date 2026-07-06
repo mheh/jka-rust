@@ -525,9 +525,10 @@ pub fn NPC_Pain(
                         // Turn on our ally
                         (*npc).blockedSpeechDebounceTime = 0;
                         voice_event = 132; // EV_FFTURN
-                        (*npc).behaviorState = (*npc).tempBehavior;
-                        (*npc).tempBehavior = (*npc).defaultBehavior;
+                        // C chained assignment sets all three to BS_DEFAULT.
                         (*npc).defaultBehavior = bState_t::BS_DEFAULT;
+                        (*npc).tempBehavior = bState_t::BS_DEFAULT;
+                        (*npc).behaviorState = bState_t::BS_DEFAULT;
                         (*other).flags &= !0x00000020; // ~FL_NOTARGET
                         (*self_).r.svFlags &= !0x00008000; // ~SVF_ICARUS_FREEZE
                         G_SetEnemy(ctx, self_, other);

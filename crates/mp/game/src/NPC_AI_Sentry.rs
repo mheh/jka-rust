@@ -628,7 +628,7 @@ pub fn Sentry_AttackDecision(ctx: GameContext<'_>) {
             distance = crate::q_math::DistanceHorizontalSquared(
                 (*NPC).r.currentOrigin,
                 enemy.r.currentOrigin,
-            );
+            ) as c_int as f32;
             visible =
                 crate::NPC_utils::NPC_ClearLOS4(ctx, enemy as *const gentity_t as *mut gentity_t);
             advance = if distance > MIN_DISTANCE_SQR {

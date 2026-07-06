@@ -748,7 +748,9 @@ pub fn G_CheckForDanger(
                 && unsafe { (*self_).client.is_null() } == false
                 && team != unsafe { (*((*self_).client as *mut gclient_t)).playerTeam }
         } else {
-            owner.is_null()
+            // Reaching here means `!owner || !owner->client`, either of which makes
+            // the C `if` condition true.
+            true
         };
 
         if should_flee {
@@ -899,13 +901,10 @@ pub fn ClearPlayerAlertEvents(ctx: GameContext<'_>) {
             if world.level.numAlertEvents > 0 {
                 // still have more in the array
                 if (i + 1) < MAX_ALERT_EVENTS as c_int {
-                    // Move elements down in the array
-                    for j in i as usize..MAX_ALERT_EVENTS {
-                        if j + 1 < MAX_ALERT_EVENTS {
-                            world.level.alertEvents[j] = world.level.alertEvents[j + 1];
-                        } else {
-                            world.level.alertEvents[j] = alertEvent_t::default();
-                        }
+                    // memmove shifts [i+1..MAX) down into [i..MAX-1); the final
+                    // slot MAX-1 is left untouched (stale), not zeroed.
+                    for j in i as usize..(MAX_ALERT_EVENTS - 1) {
+                        world.level.alertEvents[j] = world.level.alertEvents[j + 1];
                     }
                 }
             } else {
@@ -951,13 +950,10 @@ pub fn RemoveOldestAlert(ctx: GameContext<'_>) -> qboolean {
         if world.level.numAlertEvents > 0 {
             // still have more in the array
             if (oldest_event + 1) < MAX_ALERT_EVENTS as c_int {
-                // Move elements down in the array
-                for j in (oldest_event as usize)..MAX_ALERT_EVENTS {
-                    if j + 1 < MAX_ALERT_EVENTS {
-                        world.level.alertEvents[j] = world.level.alertEvents[j + 1];
-                    } else {
-                        world.level.alertEvents[j] = alertEvent_t::default();
-                    }
+                // memmove shifts [oldest+1..MAX) down into [oldest..MAX-1); the
+                // final slot MAX-1 is left untouched (stale), not zeroed.
+                for j in (oldest_event as usize)..(MAX_ALERT_EVENTS - 1) {
+                    world.level.alertEvents[j] = world.level.alertEvents[j + 1];
                 }
             }
         } else {
@@ -1174,8 +1170,12 @@ pub fn G_FindLocalInterestPoint(ctx: GameContext<'_>, self_: *mut gentity_t) -> 
         ) != 0
         {
             _VectorSubtract(world.level.interestPoints[i].origin, eyes, &mut diff_vec);
-            if ((diff_vec[0].abs() + diff_vec[1].abs()) / 2.0) < 48.0
-                && diff_vec[2].abs() > ((diff_vec[0].abs() + diff_vec[1].abs()) / 2.0)
+            // C's `fabs` is the double libm function: the magnitude sum and the
+            // `/2` divide evaluate in f64, so the two boundary comparisons are
+            // f64. f32-throughout would diverge at the `< 48` / up-down cutoff.
+            if ((diff_vec[0].abs() as f64 + diff_vec[1].abs() as f64) / 2.0) < 48.0
+                && (diff_vec[2].abs() as f64)
+                    > ((diff_vec[0].abs() as f64 + diff_vec[1].abs() as f64) / 2.0)
             {
                 // Too close to look so far up or down
                 continue;

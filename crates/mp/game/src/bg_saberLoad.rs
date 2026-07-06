@@ -978,7 +978,6 @@ pub fn WP_SaberParseParms(
                     crate::q_shared::COM_BeginParseSession(c"saberinfo".as_ptr());
                     c_strcpy(useSaber.as_mut_ptr(), DEFAULT_SABER.as_ptr());
                     triedDefault = QTRUE;
-                    continue;
                 } else {
                     return QFALSE;
                 }
@@ -2650,7 +2649,9 @@ pub fn BG_SI_SetLengthGradual(saber: *mut saberInfo_t, time: c_int) {
                 }
             }
 
-            let mut amt = (time - blade.extendDebounce) as f32 * 0.01;
+            // Raven multiplies the int delta by a double literal, so the product
+            // is evaluated in f64 before narrowing to the f32 `amt`.
+            let mut amt = ((time - blade.extendDebounce) as f64 * 0.01) as f32;
 
             if amt < 0.2 {
                 amt = 0.2;

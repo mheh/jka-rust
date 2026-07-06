@@ -24,7 +24,7 @@ use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING, QFALSE, QTRUE};
 // Parse-session state (cross-frame state -> GameWorld fields, pending full threading).
 // These are module-level statics mimicking Raven's file-static globals in q_shared.c.
 static mut COM_LINES: c_int = 0;
-static mut COM_PARSENAME: [c_char; 256] = [0; 256]; // MAX_QPATH
+static mut COM_PARSENAME: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
 static mut COM_TOKEN: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
 
 // va() rotating-buffer statics (2-slot rotating return buffer).
@@ -32,7 +32,7 @@ static mut VA_STRING: [[c_char; 32000]; 2] = [[0; 32000]; 2];
 static mut VA_INDEX: usize = 0;
 
 // Info_ValueForKey rotating-buffer statics (same rotating idiom as va()).
-static mut INFO_VALUE: [[c_char; 4096]; 2] = [[0; 4096]; 2]; // BIG_INFO_VALUE
+static mut INFO_VALUE: [[c_char; 8192]; 2] = [[0; 8192]; 2]; // BIG_INFO_VALUE
 static mut INFO_VALUEINDEX: c_int = 0;
 
 /// Raven `FOFS(targetname)` — `#define FOFS(x) ((int)&(((gentity_t *)0)->x))`,
@@ -245,19 +245,20 @@ pub fn COM_DefaultExtension(path: *mut c_char, maxSize: c_int, extension: *const
             src = src.offset(-1);
         }
 
-        let old_path = std::ffi::CStr::from_ptr(path)
-            .to_string_lossy()
-            .into_owned();
-        let ext = std::ffi::CStr::from_ptr(extension)
-            .to_string_lossy()
-            .into_owned();
-        let combined = format!("{old_path}{ext}");
-        let cstr = std::ffi::CString::new(combined).unwrap();
-        // Q_strncpyz semantics: truncate to maxSize-1 + NUL.
-        let bytes = cstr.as_bytes_with_nul();
+        // Raven copies `path` into `oldPath[MAX_QPATH]` via Q_strncpyz first,
+        // truncating to MAX_QPATH-1 bytes before the "%s%s" concatenation.
+        let path_bytes = std::ffi::CStr::from_ptr(path).to_bytes();
+        let ext_bytes = std::ffi::CStr::from_ptr(extension).to_bytes();
+        let old_len = path_bytes.len().min(MAX_QPATH as usize - 1);
+        let mut combined: Vec<c_char> =
+            Vec::with_capacity(old_len + ext_bytes.len() + 1);
+        combined.extend(path_bytes[..old_len].iter().map(|&b| b as c_char));
+        combined.extend(ext_bytes.iter().map(|&b| b as c_char));
+        combined.push(0);
+        // Com_sprintf(path, maxSize, ...) truncates to maxSize-1 + NUL.
         let cap = maxSize.max(1) as usize;
-        let n = bytes.len().min(cap);
-        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, path, n - 1);
+        let n = combined.len().min(cap);
+        std::ptr::copy_nonoverlapping(combined.as_ptr(), path, n - 1);
         *path.offset(n as isize - 1) = 0;
     }
 }
@@ -347,7 +348,7 @@ pub fn COM_BeginParseSession(name: *const c_char) {
         crate::q_shared::Q_strncpyz(
             (&raw mut COM_PARSENAME).cast::<c_char>(),
             name,
-            MAX_QPATH as c_int,
+            MAX_TOKEN_CHARS as c_int,
         );
     }
 }
@@ -573,7 +574,11 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
                 c = *data as c_int;
                 data = data.offset(1);
                 if c == b'"' as c_int || c == 0 {
-                    COM_TOKEN[len as usize] = 0;
+                    // Raven's quoted path omits the `len == MAX_TOKEN_CHARS`
+                    // reset the word path below applies, so a buffer-filling
+                    // token writes the terminator one past `com_token`. Clamp
+                    // to the last slot rather than reproduce that overrun.
+                    COM_TOKEN[len.min(MAX_TOKEN_CHARS as c_int - 1) as usize] = 0;
                     *data_p = data as *const c_char;
                     return (&raw mut COM_TOKEN).cast::<c_char>();
                 }
@@ -1227,7 +1232,7 @@ pub fn va(format: *const c_char, args: &[FmtArg]) -> *mut c_char {
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1051-1098`
 pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
     unsafe {
-        let mut pkey: [c_char; 1024] = [0; 1024]; // BIG_INFO_KEY
+        let mut pkey: [c_char; 8192] = [0; 8192]; // BIG_INFO_KEY
         let mut o: *mut c_char;
 
         if s.is_null() || key.is_null() {
@@ -1253,7 +1258,7 @@ pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
                 if *p == 0 {
                     return c"".as_ptr() as *mut c_char;
                 }
-                if o.offset_from(pkey.as_ptr()) < 1023 {
+                if o.offset_from(pkey.as_ptr()) < 8191 {
                     *o = *p;
                     o = o.offset(1);
                 }
@@ -1265,7 +1270,7 @@ pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
             o = INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
 
             while *p != b'\\' as c_char && *p != 0 {
-                if o.offset_from(INFO_VALUE[INFO_VALUEINDEX as usize].as_ptr()) < 4095 {
+                if o.offset_from(INFO_VALUE[INFO_VALUEINDEX as usize].as_ptr()) < 8191 {
                     *o = *p;
                     o = o.offset(1);
                 }

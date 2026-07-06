@@ -18,7 +18,7 @@
 
 use crate::g_main::Com_Printf;
 use crate::prelude::*;
-use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorNormalize2};
+use crate::q_math::{AngleNormalize180, AnglesSubtract, VectorLength, VectorNormalize2};
 use mp_bg::vehicles::MIN_LANDING_SLOPE;
 use mp_qshared::shared::trajectory::trType_t;
 
@@ -53,10 +53,7 @@ impl PmoveContext<'_> {
             let pSelfVehInfo = (*pSelfVeh).m_pVehicleInfo;
             let ps = (*self.pm).ps;
             let velocity = (*ps).velocity;
-            let vel_len =
-                (velocity[0] * velocity[0] + velocity[1] * velocity[1] + velocity[2] * velocity[2])
-                    .sqrt();
-            let mut magnitude = vel_len * (*pSelfVehInfo).mass as f32 / 50.0;
+            let mut magnitude = VectorLength(velocity) * (*pSelfVehInfo).mass as f32 / 50.0;
             let mut forceSurfDestruction: qboolean = QFALSE;
 
             let hitEnt: *mut bgEntity_t = if !trace.is_null() {
@@ -630,11 +627,7 @@ impl PmoveContext<'_> {
             }
 
             let ps = &*(*self.pm).ps;
-            let vel_len = (ps.velocity[0] * ps.velocity[0]
-                + ps.velocity[1] * ps.velocity[1]
-                + ps.velocity[2] * ps.velocity[2])
-                .sqrt();
-            if vel_len >= 100.0
+            if VectorLength(ps.velocity) >= 100.0
                 && (*self.pm_entSelf).s.NPC_class != CLASS_VEHICLE as c_int
                 && ps.lastOnGround + 100 < self.callbacks.get_time()
             {
@@ -991,6 +984,9 @@ impl PmoveContext<'_> {
             let mut isGiant: qboolean = QFALSE;
             if (*ps).clientNum >= MAX_CLIENTS as c_int {
                 // apply ground friction, even if on ladder
+                // Raven's `&&`-over-`||` precedence leaves the CLASS_VEHICLE clause
+                // dereferencing pEnt with no null check; the added guard hardens that
+                // deref (pEnt is never null here, so behavior is unchanged).
                 if (!pEnt.is_null() && (*pEnt).s.NPC_class == CLASS_ATST as c_int)
                     || (!pEnt.is_null()
                         && (*pEnt).s.NPC_class == CLASS_VEHICLE as c_int

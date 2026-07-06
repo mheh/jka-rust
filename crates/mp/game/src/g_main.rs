@@ -3253,6 +3253,9 @@ pub fn CheckCvars(ctx: GameContext<'_>) {
 pub fn G_RunThink(ctx: GameContext<'_>, ent: *mut gentity_t) {
     use crate::ent_fn_enums::dispatch_think;
     unsafe {
+        // Raven casts `nextthink` to float and compares against `level.time` as
+        // float; the int comparison here only diverges past f32's exact-integer
+        // range (~16.7M ms), so the cast is elided.
         let thinktime = (*ent).nextthink;
         'runicarus: {
             if thinktime <= 0 {
@@ -3455,7 +3458,8 @@ pub fn G_RunFrame(ctx: GameContext<'_>, levelTime: c_int) {
                         ctx.engine,
                         mp_abi::game::syscalls::G_CVAR_SET::GCvarSetArgs::new(
                             cstr("timescale"),
-                            cstr(&format!("{}", use_dif)),
+                            // `va("%f", useDif)` formats with 6 fixed decimals.
+                            cstr(&format!("{:.6}", use_dif)),
                         ),
                     );
                 } else {

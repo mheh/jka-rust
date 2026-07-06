@@ -40,7 +40,9 @@ pub fn G_RunExPhys(
         let velScaling: f32 = 0.1f32;
         let mut vTotal: f32 = 0.0f32;
 
-        assert!(mass <= 1.0 && mass >= 0.01);
+        // C `assert` is elided under NDEBUG (release), so out-of-range mass is
+        // tolerated in shipping builds; `debug_assert!` mirrors that.
+        debug_assert!(mass <= 1.0 && mass >= 0.01);
 
         if gravity != 0.0 {
             _VectorCopy((*ent).r.currentOrigin, &mut ground);

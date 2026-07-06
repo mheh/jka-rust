@@ -831,6 +831,9 @@ pub fn NAVNEW_TestNodeConnectionBlocked(
             crate::q_math::_VectorCopy((*ignoreEnt).r.maxs, &mut maxs);
             ignoreEntNum = (*ignoreEnt).s.number;
         } else {
+            // §19: Raven copies playerMaxs into `mins` here (its own bug, preserved),
+            // leaving `maxs` uninitialized before the reads below; the zeroed `maxs`
+            // declared above is the defined-behavior choice for that C UB.
             crate::q_math::_VectorCopy(localPlayerMins, &mut mins);
             crate::q_math::_VectorCopy(localPlayerMaxs, &mut mins);
             ignoreEntNum = ENTITYNUM_NONE;

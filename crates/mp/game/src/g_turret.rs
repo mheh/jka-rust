@@ -423,6 +423,9 @@ pub fn turret_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 && !(*enemy).m_pVehicle.is_null()
             {
                 let enemy_veh = (*enemy).m_pVehicle as *mut Vehicle_t;
+                // C dereferences `m_pVehicleInfo` unconditionally here; the added
+                // null guard is a defined-behavior choice for the (always-holding)
+                // `m_pVehicle` non-null => `m_pVehicleInfo` non-null invariant.
                 if (*enemy_veh).m_pVehicleInfo as *const vehicleInfo_t != std::ptr::null() {
                     if (*(*enemy_veh).m_pVehicleInfo).r#type == VH_WALKER {
                         org[2] += 32.0;
@@ -452,8 +455,11 @@ pub fn turret_aim(ctx: GameContext<'_>, self_: *mut gentity_t) {
             diffPitch = AngleSubtract(desiredAngles[PITCH], top.r.currentAngles[PITCH]);
         } else {
             // No enemy — pan back and forth
+            // C: `sin( level.time * 0.0001f + top->count )` — the sum is float
+            // (the `0.0001f` literal and int operands stay float), then promotes
+            // to double for the libm `sin`, and the result truncates to float.
             desiredAngles[YAW] =
-                (((*ctx.world).level.time as f32) * 0.0001 + top.count as f32).sin();
+                (((*ctx.world).level.time as f32 * 0.0001 + top.count as f32) as f64).sin() as f32;
             desiredAngles[YAW] *= 60.0;
             desiredAngles[YAW] += (*self_).s.angles[YAW];
             desiredAngles[YAW] = AngleNormalize180(desiredAngles[YAW]);
@@ -608,13 +614,13 @@ pub fn turret_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
                 continue;
             }
             if (*self_).alliedTeam != 0 {
-                if !(*target).client.is_null()
-                    && (*((*target).client as *mut gclient_t)).sess.sessionTeam
+                if !(*target).client.is_null() {
+                    if (*((*target).client as *mut gclient_t)).sess.sessionTeam
                         == (*self_).alliedTeam
-                {
-                    continue;
-                }
-                if (*target).teamnodmg == (*self_).alliedTeam {
+                    {
+                        continue;
+                    }
+                } else if (*target).teamnodmg == (*self_).alliedTeam {
                     continue;
                 }
             }
@@ -661,10 +667,11 @@ pub fn turret_find_enemies(ctx: GameContext<'_>, self_: *mut gentity_t) -> qbool
 
                 let atst_name = c"atst_vehicle".as_ptr();
                 let target_is_atst = Q_stricmp((*target).NPC_type, atst_name) == 0;
+                let has_best = !bestTarget.is_null();
                 let best_is_atst =
-                    !bestTarget.is_null() && Q_stricmp((*bestTarget).NPC_type, atst_name) == 0;
+                    has_best && Q_stricmp((*bestTarget).NPC_type, atst_name) == 0;
 
-                if enemyDist < bestDist || (target_is_atst && !best_is_atst) {
+                if enemyDist < bestDist || (target_is_atst && has_best && !best_is_atst) {
                     if (*self_).attackDebounceTime < (*ctx.world).level.time {
                         (*self_).attackDebounceTime = (*ctx.world).level.time + 1400;
                     }

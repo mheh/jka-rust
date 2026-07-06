@@ -49,7 +49,7 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             .as_ref()
             .map(|v| v.decelIdle * pVeh.m_fTimeModifier)
             .unwrap_or(0.0);
-        let speed_max = pVeh
+        let mut speed_max = pVeh
             .m_pVehicleInfo
             .as_ref()
             .map(|v| v.speedMax)
@@ -122,15 +122,12 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             pVeh.m_ucmd.rightmove = 0;
         }
 
-        // PORT-NOTE(pm-global): electrifyTime check requires access to global pm;
-        // accessing through bg_pmove module (bgEntity_t overlay-cast to gentity_t).
-        if parent_ps.electrifyTime > 0 {
-            // Electrify check: reduce speed by half
-            // Note: oracle accesses pm->cmd.serverTime; we check electrifyTime > 0 as proxy
-            let mut reduced_max = speed_max * 0.5;
-            if parent_ps.speed > reduced_max {
-                parent_ps.speed = reduced_max;
-            }
+        // `pm->cmd.serverTime` equals `pVeh->m_ucmd.serverTime` here (the vehicle ucmd is a
+        // full copy of pm->cmd; see g_vehicles.c:2106), so use it as the serverTime source —
+        // matching the FighterNPC/SpeederNPC `curTime` precedent. Halving speedMax (not the
+        // final speed) so the reduced cap also feeds fWalkSpeedMax below.
+        if parent_ps.electrifyTime > pVeh.m_ucmd.serverTime {
+            speed_max *= 0.5;
         }
 
         let f_walk_speed_max = speed_max * 0.275;

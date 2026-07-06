@@ -73,8 +73,8 @@ static mut IMPACT_POS_4: vec3_t = [0.0; 3];
 const MELEE_DIST_SQUARED: f32 = 6400.0; // 80*80
 const MIN_LOB_DIST_SQUARED: f32 = 65536.0; // 256*256
 const MAX_LOB_DIST_SQUARED: f32 = 200704.0; // 448*448
-const REPEATER_ALT_SIZE: f32 = 24.0;
-const GENERATOR_HEALTH: c_int = 100; // Shield generator health threshold
+const REPEATER_ALT_SIZE: f32 = 3.0; // half of bbox size
+const GENERATOR_HEALTH: c_int = 25; // Shield generator health threshold
 const ARMOR_EFFECT_TIME: c_int = 3000;
 
 /// Inline helper from `oracle/oracle/codemp/game/bg_public.h:1524-1564`
@@ -1207,7 +1207,13 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
                     (*ctx.world).globals.enemyCS4 = qfalse; // not true, but should stop us from firing
                     (*ctx.world).globals.hitAlly4 = qtrue; // us!
                 } else {
-                    let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, IMPACT_POS_4);
+                    // `impactPos4` is a file static shared with GM_CheckFireState; copy it
+                    // out, let NPC_ShotEntity write through the local, then store back so the
+                    // later reads see the same value C's file-static vec3_t would hold.
+                    let mut impactPos4 = IMPACT_POS_4;
+                    let hit =
+                        crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, Some(&mut impactPos4));
+                    *(&raw mut IMPACT_POS_4) = impactPos4;
                     let hit_ent = g_entities_base.add(hit as usize);
                     if hit == (*enemy_ent).s.number as c_int
                         || (!hit_ent.is_null()
@@ -1245,9 +1251,8 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
             ),
         ) != 0
         {
-            let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, IMPACT_POS_4);
-            let hit_ent = g_entities_base.add(hit as usize);
-
+            // C only declares hit/hitEnt here; the single NPC_ShotEntity call is below,
+            // after enemyLastSeenTime is set.
             if crate::g_timer::TIMER_Done(ctx, npc_ent, c"talkDebounce".as_ptr()) != 0
                 && (*ctx.world).bg_state.rng.Q_irand(0, 10) == 0
             {
@@ -1286,7 +1291,11 @@ pub fn NPC_BSGM_Attack(ctx: GameContext<'_>) {
 
             (*npc_info).enemyLastSeenTime = level_time;
 
-            let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, IMPACT_POS_4);
+            // `impactPos4` is a file static shared with GM_CheckFireState; copy it out, let
+            // NPC_ShotEntity write through the local, then store back (matches C's file-static).
+            let mut impactPos4 = IMPACT_POS_4;
+            let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy_ent, Some(&mut impactPos4));
+            *(&raw mut IMPACT_POS_4) = impactPos4;
             let hit_ent = g_entities_base.add(hit as usize);
             if hit == (*enemy_ent).s.number as c_int
                 || (!hit_ent.is_null()
@@ -1642,8 +1651,9 @@ pub fn NPC_BSGM_Default(ctx: GameContext<'_>) {
                 // armor regenerated, turn shield back on
                 // do a trace and make sure we can turn this back on?
                 let mut tr: trace_t = core::mem::zeroed();
-                let shield_mins = [-20.0, -20.0, -24.0];
-                let shield_maxs = [20.0, 20.0, 64.0];
+                // file-static shieldMins/shieldMaxs, not the dead if(0) block's -20/20/64 box.
+                let shield_mins = [-60.0, -60.0, -24.0];
+                let shield_maxs = [60.0, 60.0, 80.0];
                 trap::Trace(
                     ctx.engine,
                     mp_abi::game::syscalls::G_TRACE::GTraceArgs::new(

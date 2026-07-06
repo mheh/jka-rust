@@ -89,9 +89,10 @@ const WORLD_SIZE: f32 = 131072.0;
 const MASK_PLAYERSOLID: c_int =
     CONTENTS_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_BODY | CONTENTS_TERRAIN;
 
-// Raven `#define MAX_RADIUS_ENTS 128` (per-file local const, same idiom as
-// `NPC_AI_Utils.rs`).
-const MAX_RADIUS_ENTS: usize = 128;
+// Raven `#define MAX_RADIUS_ENTS 256` (per-file local const, scopes
+// `NPC_FindNearestEnemy`; distinct from the 128 value in `NPC_AI_Utils.rs`).
+// Source: `oracle/oracle/codemp/game/NPC_utils.c:1243`
+const MAX_RADIUS_ENTS: usize = 256;
 
 // Raven `SCF_DONT_FIRE` (`gNPC_t::scriptFlags` bit), per-file local const,
 // same idiom as `NPC_combat.rs`.
@@ -459,16 +460,20 @@ pub fn NPC_AimWiggle(ctx: GameContext<'_>, enemy_org: &mut vec3_t) {
             // by the caller).
             let enemy =
                 &mut (*ctx.world).g_entities[(*npc).enemy.unwrap().index()] as *mut gentity_t;
-            (*npc_info).aimOfs[0] = 0.3
+            // C's `0.3` is a double literal: `0.3*flrand(...)` evaluates in f64,
+            // narrowing to the float `aimOfs` only at the assignment.
+            (*npc_info).aimOfs[0] = (0.3
                 * (*ctx.world)
                     .bg_state
                     .rng
-                    .flrand((*enemy).r.mins[0], (*enemy).r.maxs[0]);
-            (*npc_info).aimOfs[1] = 0.3
+                    .flrand((*enemy).r.mins[0], (*enemy).r.maxs[0]) as f64)
+                as f32;
+            (*npc_info).aimOfs[1] = (0.3
                 * (*ctx.world)
                     .bg_state
                     .rng
-                    .flrand((*enemy).r.mins[1], (*enemy).r.maxs[1]);
+                    .flrand((*enemy).r.mins[1], (*enemy).r.maxs[1]) as f64)
+                as f32;
             if (*enemy).r.maxs[2] > 0.0 {
                 (*npc_info).aimOfs[2] =
                     (*enemy).r.maxs[2] * (*ctx.world).bg_state.rng.flrand(0.0, -1.0);
@@ -951,7 +956,7 @@ pub fn NPC_SomeoneLookingAtMe(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboo
                     ),
                 ) != 0
                 //I'm in a 30 fov or so cone from this player.. that's enough I guess.
-                && InFOV(ctx, pEnt, ent, 30, 30) != 0
+                && InFOV(ctx, ent, pEnt, 30, 30) != 0
             {
                 return QTRUE;
             }
@@ -1411,8 +1416,12 @@ pub fn NPC_FacePosition(ctx: GameContext<'_>, position: vec3_t, doPitch: qboolea
                 let enemy_client = (*enemy).client as *mut gclient_t;
                 if (*enemy_client).NPC_class == CLASS_ATST {
                     // FIXME: this is kind of dumb, but it was the easiest way to get it to look sort of ok
-                    (*npc_info).desiredYaw += (*ctx.world).bg_state.rng.flrand(-5.0, 5.0)
-                        + (((*ctx.world).level.time as f32) * 0.004).sin() * 7.0;
+                    // C's `sin` is the double libm function: the float `time*0.004f`
+                    // argument widens to f64, `sin(...)*7` and the `flrand` sum
+                    // evaluate in f64, narrowing to the float `desiredYaw` on assign.
+                    (*npc_info).desiredYaw += ((*ctx.world).bg_state.rng.flrand(-5.0, 5.0) as f64
+                        + ((((*ctx.world).level.time as f32) * 0.004) as f64).sin() * 7.0)
+                        as f32;
                     (*npc_info).desiredPitch += (*ctx.world).bg_state.rng.flrand(-2.0, 2.0);
                 }
             }

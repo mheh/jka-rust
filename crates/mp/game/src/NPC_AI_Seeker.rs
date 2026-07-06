@@ -685,21 +685,28 @@ pub fn Seeker_FollowOwner(ctx: GameContext<'_>) {
 
         if dis < minDistSqr {
             // generally circle the player closely till we take an enemy..this is our target point
+            // `cos`/`sin` are the double libm: the f32 argument is promoted, the
+            // transcendental and its scaling evaluate in f64, and the sum with the
+            // float origin narrows to f32 only on store.
             if (*((*NPC).client as *mut gclient_t)).NPC_class == CLASS_BOBAFETT {
-                pt[0] = (*owner).r.currentOrigin[0]
-                    + (world.level.time as f32 * 0.001f32 + (*NPC).random).cos() * 250.0f32;
-                pt[1] = (*owner).r.currentOrigin[1]
-                    + (world.level.time as f32 * 0.001f32 + (*NPC).random).sin() * 250.0f32;
+                pt[0] = ((*owner).r.currentOrigin[0] as f64
+                    + ((world.level.time as f32 * 0.001f32 + (*NPC).random) as f64).cos() * 250.0)
+                    as f32;
+                pt[1] = ((*owner).r.currentOrigin[1] as f64
+                    + ((world.level.time as f32 * 0.001f32 + (*NPC).random) as f64).sin() * 250.0)
+                    as f32;
                 if (*((*NPC).client as *mut gclient_t)).jetPackTime < world.level.time {
                     pt[2] = (*NPC).r.currentOrigin[2] - 64.0f32;
                 } else {
                     pt[2] = (*owner).r.currentOrigin[2] + 200.0f32;
                 }
             } else {
-                pt[0] = (*owner).r.currentOrigin[0]
-                    + (world.level.time as f32 * 0.001f32 + (*NPC).random).cos() * 56.0f32;
-                pt[1] = (*owner).r.currentOrigin[1]
-                    + (world.level.time as f32 * 0.001f32 + (*NPC).random).sin() * 56.0f32;
+                pt[0] = ((*owner).r.currentOrigin[0] as f64
+                    + ((world.level.time as f32 * 0.001f32 + (*NPC).random) as f64).cos() * 56.0)
+                    as f32;
+                pt[1] = ((*owner).r.currentOrigin[1] as f64
+                    + ((world.level.time as f32 * 0.001f32 + (*NPC).random) as f64).sin() * 56.0)
+                    as f32;
                 pt[2] = (*owner).r.currentOrigin[2] + 40.0f32;
             }
 

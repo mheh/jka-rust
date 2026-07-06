@@ -183,11 +183,26 @@ pub fn process_orient_commands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     }
 }
 
-/// `Update` — generic base only (the shared setter is the sole assigner; no
-/// per-class override). Distinct from `AnimateVehicle`/`AnimateRiders`.
-/// Source: `oracle/oracle/codemp/game/g_vehicles.c:3306`.
+/// `Update` — per-class where the class setter overrides the base slot.
+///
+/// Oracle wiring: Fighter/Speeder/Animal each assign `pVehInfo->Update` to their
+/// own `Update`; Walker's assignment is commented out, so Walker (and any other
+/// type) keeps the base `Update` set by the shared setter.
+///
+/// VH_FIGHTER is intentionally routed to the base for now: oracle's
+/// `FighterNPC::Update` runs `BG_FighterUpdate` with `G_VehicleTrace` passed as a
+/// bare `void(*)(trace_t*,...)` fn-ptr (same shape as `pmove_t::trace`). The Rust
+/// `G_VehicleTrace` takes `ctx` and cannot be coerced to that ctx-free fn-ptr;
+/// threading `ctx` through the bg/game trace seam is an unsettled design decision,
+/// so the Fighter override stays deferred rather than being invented here.
+/// Source: `oracle/oracle/codemp/game/{Fighter,Speeder,Animal,Walker}NPC.c`
+/// (per-class `Update` wiring), `g_vehicles.c:3306` (base).
 pub fn update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
-    crate::g_vehicles::Update(ctx, pVeh, pUcmd)
+    match unsafe { veh_type(pVeh) } {
+        vehicleType_t::VH_SPEEDER => crate::SpeederNPC::Update(ctx, pVeh, pUcmd),
+        vehicleType_t::VH_ANIMAL => crate::AnimalNPC::Update(ctx, pVeh, pUcmd),
+        _ => crate::g_vehicles::Update(ctx, pVeh, pUcmd),
+    }
 }
 
 /// `Animate` — generic base only (the `vehicleInfo_t.Animate` slot, distinct

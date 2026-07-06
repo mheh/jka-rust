@@ -11,111 +11,111 @@ C UB needing §19 decisions. Status: `pending` / `in-review` / `audited`
 |---|---|---|
 | w_saber.rs | 11149 | audited (wave 1) — 3 confirmed + 1 type-fidelity + 2 §19 notes |
 | bg_pmove.rs | 10342 | audited (wave 1) — 4 confirmed (f64-sqrt), 2 shared-convention parked |
-| ai_main.rs | 8401 | pending |
-| NPC_AI_Jedi.rs | 6988 | pending |
-| anim_table.rs | 6202 | pending |
+| ai_main.rs | 8401 | audited (wave 2) — batch ai_main: 1 confirmed / 2 findings, 2 fixes |
+| NPC_AI_Jedi.rs | 6988 | audited (wave 2) — batch npc_jedi: 1 confirmed / 3 findings, 5 fixes |
+| anim_table.rs | 6202 | audited (wave 2) — batch data_tables: 0 confirmed / 1 findings, 1 fixes |
 | w_force.rs | 6096 | audited (wave 1) — 2 confirmed + 2 FP suspects fixed + 1 dead-code |
 | g_combat.rs | 6072 | audited (wave 1) — 2 confirmed + 1 §19 note |
 | g_weapon.rs | 6035 | audited (wave 1) — 1 confirmed + 3 FP suspects fixed + 1 §19 note |
-| g_ICARUScb.rs | 5281 | pending |
-| g_cmds.rs | 5088 | pending |
-| g_client.rs | 4679 | pending |
-| g_items.rs | 4197 | pending |
+| g_ICARUScb.rs | 5281 | audited (wave 2) — batch icarus: 2 confirmed / 4 findings, 4 fixes |
+| g_cmds.rs | 5088 | audited (wave 2) — batch g_cmds: 2 confirmed / 3 findings, 3 fixes |
+| g_client.rs | 4679 | no-oracle (port-native, sanity-skimmed wave 2) |
+| g_items.rs | 4197 | audited (wave 2) — batch items_utils: 7 confirmed / 8 findings, 8 fixes |
 | g_active.rs | 3968 | audited (wave 1) — 1 confirmed (turndelta f64) |
-| g_main.rs | 3939 | pending |
-| g_mover.rs | 3668 | pending |
-| ai_wpnav.rs | 3658 | pending |
-| g_misc.rs | 3624 | pending |
-| NPC_AI_Stormtrooper.rs | 3372 | pending |
-| NPC_spawn.rs | 3193 | pending |
-| NPC_combat.rs | 3104 | pending |
-| bg_saber.rs | 2962 | pending |
-| g_vehicles.rs | 2802 | pending |
-| bg_saberLoad.rs | 2743 | pending |
-| g_saga.rs | 2690 | pending |
-| bg_panimate.rs | 2688 | pending |
-| g_utils.rs | 2441 | pending |
-| g_trigger.rs | 2394 | pending |
-| g_nav.rs | 2360 | pending |
-| NPC_stats.rs | 2201 | pending |
-| trap.rs | 1963 | pending |
-| bg_saga.rs | 1911 | pending |
-| bg_misc.rs | 1907 | pending |
-| npc_c.rs | 1885 | pending |
-| NPC_utils.rs | 1772 | pending |
-| NPC_behavior.rs | 1759 | pending |
-| NPC_AI_GalakMech.rs | 1686 | pending |
-| g_spawn.rs | 1605 | pending |
-| g_team.rs | 1595 | pending |
-| q_shared.rs | 1575 | pending |
-| game_cvars.rs | 1490 | pending |
-| NPC_AI_Rancor.rs | 1471 | pending |
-| g_turret_G2.rs | 1462 | pending |
-| g_bot.rs | 1409 | pending |
-| FighterNPC.rs | 1405 | pending |
-| g_icarus_set_type.rs | 1330 | pending |
-| g_target.rs | 1315 | pending |
-| q_math.rs | 1308 | pending |
-| g_missile.rs | 1300 | pending |
-| NPC_senses.rs | 1251 | pending |
-| NPC_AI_Utils.rs | 1232 | pending |
-| g_navnew.rs | 1225 | pending |
-| ent_fn_enums.rs | 1209 | pending |
-| game_globals.rs | 1187 | pending |
-| NPC_AI_Mark1.rs | 1175 | pending |
-| NPC_reactions.rs | 1146 | pending |
-| NPC_AI_Sniper.rs | 1138 | pending |
-| bg_slidemove.rs | 1130 | pending |
-| bg_vehicleLoad_tables.rs | 1111 | pending |
-| ai_util.rs | 1045 | pending |
-| g_turret.rs | 1028 | pending |
-| NPC_AI_Wampa.rs | 1025 | pending |
-| bg_vehicleLoad.rs | 1019 | pending |
-| NPC_AI_Grenadier.rs | 869 | pending |
-| NPC_AI_Seeker.rs | 812 | pending |
-| NPC_AI_ImperialProbe.rs | 744 | pending |
-| g_log.rs | 729 | pending |
-| NPC_AI_Sentry.rs | 723 | pending |
-| g_vehicleTurret.rs | 682 | pending |
-| NPC_AI_Default.rs | 680 | pending |
-| NPC_AI_Droid.rs | 657 | pending |
-| g_svcmds.rs | 648 | pending |
-| NPC_AI_Interrogator.rs | 623 | pending |
-| AnimalNPC.rs | 560 | pending |
-| NPC_AI_Mark2.rs | 560 | pending |
-| c_format.rs | 557 | pending |
-| tri_coll_test.rs | 556 | pending |
-| NPC_move.rs | 546 | pending |
-| NPC_AI_Remote.rs | 508 | pending |
-| bg_lib.rs | 507 | pending |
-| SpeederNPC.rs | 492 | pending |
-| prelude.rs | 458 | pending |
-| WalkerNPC.rs | 436 | pending |
-| NPC_AI_MineMonster.rs | 392 | pending |
-| g_init_game.rs | 375 | pending |
-| g_timer.rs | 374 | pending |
-| g_session.rs | 366 | pending |
-| NPC_AI_Atst.rs | 357 | pending |
-| g_object.rs | 345 | pending |
-| NPC_AI_Howler.rs | 325 | pending |
-| g_strap.rs | 316 | pending |
-| g_exphysics.rs | 284 | pending |
-| veh_dispatch.rs | 215 | pending |
-| NPC_goal.rs | 206 | pending |
+| g_main.rs | 3939 | audited (wave 2) — batch g_main: 4 confirmed / 10 findings, 10 fixes |
+| g_mover.rs | 3668 | audited (wave 2) — batch mover_trigger: 5 confirmed / 10 findings, 11 fixes |
+| ai_wpnav.rs | 3658 | audited (wave 2) — batch nav: 1 confirmed / 2 findings, 2 fixes |
+| g_misc.rs | 3624 | audited (wave 2) — batch misc_target: 4 confirmed / 7 findings, 7 fixes |
+| NPC_AI_Stormtrooper.rs | 3372 | audited (wave 2) — batch npc_troopers: 13 confirmed / 13 findings, 11 fixes |
+| NPC_spawn.rs | 3193 | in-review (wave 2 — audit agent failed, re-run pending) |
+| NPC_combat.rs | 3104 | audited (wave 2) — batch npc_combat: 4 confirmed / 10 findings, 9 fixes |
+| bg_saber.rs | 2962 | audited (wave 2) — batch bg_saber_anim: 4 confirmed / 4 findings, 4 fixes |
+| g_vehicles.rs | 2802 | audited (wave 2) — batch vehicles: 6 confirmed / 9 findings, 8 fixes |
+| bg_saberLoad.rs | 2743 | audited (wave 2) — batch loaders: 2 confirmed / 3 findings, 3 fixes |
+| g_saga.rs | 2690 | audited (wave 2) — batch siege: 2 confirmed / 3 findings, 3 fixes |
+| bg_panimate.rs | 2688 | audited (wave 2) — batch bg_saber_anim: 4 confirmed / 4 findings, 4 fixes |
+| g_utils.rs | 2441 | audited (wave 2) — batch items_utils: 7 confirmed / 8 findings, 8 fixes |
+| g_trigger.rs | 2394 | audited (wave 2) — batch mover_trigger: 5 confirmed / 10 findings, 11 fixes |
+| g_nav.rs | 2360 | audited (wave 2) — batch nav: 1 confirmed / 2 findings, 2 fixes |
+| NPC_stats.rs | 2201 | in-review (wave 2 — audit agent failed, re-run pending) |
+| trap.rs | 1963 | audited (wave 2) — batch trap_infra: 0 confirmed / 0 findings, 0 fixes |
+| bg_saga.rs | 1911 | audited (wave 2) — batch siege: 2 confirmed / 3 findings, 3 fixes |
+| bg_misc.rs | 1907 | audited (wave 2) — batch qshared_bg: 5 confirmed / 8 findings, 8 fixes |
+| npc_c.rs | 1885 | in-review (wave 2 — audit agent failed, re-run pending) |
+| NPC_utils.rs | 1772 | audited (wave 2) — batch npc_combat: 4 confirmed / 10 findings, 9 fixes |
+| NPC_behavior.rs | 1759 | audited (wave 2) — batch npc_behavior: 5 confirmed / 6 findings, 7 fixes |
+| NPC_AI_GalakMech.rs | 1686 | audited (wave 2) — batch npc_creatures: 6 confirmed / 7 findings, 8 fixes |
+| g_spawn.rs | 1605 | audited (wave 2) — batch g_main: 4 confirmed / 10 findings, 10 fixes |
+| g_team.rs | 1595 | audited (wave 2) — batch team_bot: 2 confirmed / 4 findings, 17 fixes |
+| q_shared.rs | 1575 | audited (wave 2) — batch qshared_bg: 5 confirmed / 8 findings, 8 fixes |
+| game_cvars.rs | 1490 | audited (wave 2) — batch infra_consts: 0 confirmed / 0 findings, 0 fixes |
+| NPC_AI_Rancor.rs | 1471 | audited (wave 2) — batch npc_creatures: 6 confirmed / 7 findings, 8 fixes |
+| g_turret_G2.rs | 1462 | audited (wave 2) — batch turrets: 5 confirmed / 7 findings, 7 fixes |
+| g_bot.rs | 1409 | audited (wave 2) — batch team_bot: 2 confirmed / 4 findings, 17 fixes |
+| FighterNPC.rs | 1405 | audited (wave 2) — batch vehicles: 6 confirmed / 9 findings, 8 fixes |
+| g_icarus_set_type.rs | 1330 | audited (wave 2) — batch icarus: 2 confirmed / 4 findings, 4 fixes |
+| g_target.rs | 1315 | audited (wave 2) — batch misc_target: 4 confirmed / 7 findings, 7 fixes |
+| q_math.rs | 1308 | audited (wave 2) — batch qshared_bg: 5 confirmed / 8 findings, 8 fixes |
+| g_missile.rs | 1300 | audited (wave 2) — batch missiles: 2 confirmed / 4 findings, 7 fixes |
+| NPC_senses.rs | 1251 | audited (wave 2) — batch npc_combat: 4 confirmed / 10 findings, 9 fixes |
+| NPC_AI_Utils.rs | 1232 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| g_navnew.rs | 1225 | audited (wave 2) — batch nav: 1 confirmed / 2 findings, 2 fixes |
+| ent_fn_enums.rs | 1209 | audited (wave 2) — batch data_tables: 0 confirmed / 1 findings, 1 fixes |
+| game_globals.rs | 1187 | audited (wave 2) — batch infra_consts: 0 confirmed / 0 findings, 0 fixes |
+| NPC_AI_Mark1.rs | 1175 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| NPC_reactions.rs | 1146 | audited (wave 2) — batch npc_behavior: 5 confirmed / 6 findings, 7 fixes |
+| NPC_AI_Sniper.rs | 1138 | audited (wave 2) — batch npc_troopers: 13 confirmed / 13 findings, 11 fixes |
+| bg_slidemove.rs | 1130 | audited (wave 2) — batch slide_coll: 2 confirmed / 5 findings, 6 fixes |
+| bg_vehicleLoad_tables.rs | 1111 | audited (wave 2) — batch loaders: 2 confirmed / 3 findings, 3 fixes |
+| ai_util.rs | 1045 | audited (wave 2) — batch ai_util: 0 confirmed / 3 findings, 4 fixes |
+| g_turret.rs | 1028 | audited (wave 2) — batch turrets: 5 confirmed / 7 findings, 7 fixes |
+| NPC_AI_Wampa.rs | 1025 | audited (wave 2) — batch npc_creatures: 6 confirmed / 7 findings, 8 fixes |
+| bg_vehicleLoad.rs | 1019 | audited (wave 2) — batch loaders: 2 confirmed / 3 findings, 3 fixes |
+| NPC_AI_Grenadier.rs | 869 | audited (wave 2) — batch npc_troopers: 13 confirmed / 13 findings, 11 fixes |
+| NPC_AI_Seeker.rs | 812 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| NPC_AI_ImperialProbe.rs | 744 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| g_log.rs | 729 | audited (wave 2) — batch g_cmds: 2 confirmed / 3 findings, 3 fixes |
+| NPC_AI_Sentry.rs | 723 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| g_vehicleTurret.rs | 682 | audited (wave 2) — batch turrets: 5 confirmed / 7 findings, 7 fixes |
+| NPC_AI_Default.rs | 680 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| NPC_AI_Droid.rs | 657 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| g_svcmds.rs | 648 | audited (wave 2) — batch g_main: 4 confirmed / 10 findings, 10 fixes |
+| NPC_AI_Interrogator.rs | 623 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| AnimalNPC.rs | 560 | audited (wave 2) — batch vehicles: 6 confirmed / 9 findings, 8 fixes |
+| NPC_AI_Mark2.rs | 560 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| c_format.rs | 557 | no-oracle (port-native, sanity-skimmed wave 2) |
+| tri_coll_test.rs | 556 | audited (wave 2) — batch slide_coll: 2 confirmed / 5 findings, 6 fixes |
+| NPC_move.rs | 546 | audited (wave 2) — batch npc_behavior: 5 confirmed / 6 findings, 7 fixes |
+| NPC_AI_Remote.rs | 508 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| bg_lib.rs | 507 | audited (wave 2) — batch qshared_bg: 5 confirmed / 8 findings, 8 fixes |
+| SpeederNPC.rs | 492 | audited (wave 2) — batch vehicles: 6 confirmed / 9 findings, 8 fixes |
+| prelude.rs | 458 | no-oracle (port-native, sanity-skimmed wave 2) |
+| WalkerNPC.rs | 436 | audited (wave 2) — batch vehicles: 6 confirmed / 9 findings, 8 fixes |
+| NPC_AI_MineMonster.rs | 392 | audited (wave 2) — batch npc_creatures: 6 confirmed / 7 findings, 8 fixes |
+| g_init_game.rs | 375 | audited (wave 2) — batch trap_infra: 0 confirmed / 0 findings, 0 fixes |
+| g_timer.rs | 374 | audited (wave 2) — batch missiles: 2 confirmed / 4 findings, 7 fixes |
+| g_session.rs | 366 | audited (wave 2) — batch g_client: 6 confirmed / 9 findings, 11 fixes |
+| NPC_AI_Atst.rs | 357 | audited (wave 2) — batch npc_droids: 4 confirmed / 8 findings, 8 fixes |
+| g_object.rs | 345 | audited (wave 2) — batch misc_target: 4 confirmed / 7 findings, 7 fixes |
+| NPC_AI_Howler.rs | 325 | audited (wave 2) — batch npc_creatures: 6 confirmed / 7 findings, 8 fixes |
+| g_strap.rs | 316 | audited (wave 2) — batch missiles: 2 confirmed / 4 findings, 7 fixes |
+| g_exphysics.rs | 284 | audited (wave 2) — batch slide_coll: 2 confirmed / 5 findings, 6 fixes |
+| veh_dispatch.rs | 215 | no-oracle (port-native, sanity-skimmed wave 2) |
+| NPC_goal.rs | 206 | audited (wave 2) — batch npc_behavior: 5 confirmed / 6 findings, 7 fixes |
 | bg_g2_utils.rs | 195 | pending |
-| ai_main_consts.rs | 194 | pending |
-| g_arenas.rs | 191 | pending |
-| lib.rs | 177 | pending |
-| g_shutdown_game.rs | 146 | pending |
-| NPC_sounds.rs | 115 | pending |
-| NPC_misc.rs | 104 | pending |
-| g_nav_consts.rs | 96 | pending |
-| g_mem.rs | 77 | pending |
-| q_shared_cvar_flags.rs | 67 | pending |
-| cstr_util.rs | 55 | pending |
-| g_local_consts.rs | 51 | pending |
-| g_public_consts.rs | 40 | pending |
-| ent_id.rs | 29 | pending |
+| ai_main_consts.rs | 194 | audited (wave 2) — batch ai_util: 0 confirmed / 3 findings, 4 fixes |
+| g_arenas.rs | 191 | audited (wave 2) — batch team_bot: 2 confirmed / 4 findings, 17 fixes |
+| lib.rs | 177 | no-oracle (port-native, sanity-skimmed wave 2) |
+| g_shutdown_game.rs | 146 | audited (wave 2) — batch trap_infra: 0 confirmed / 0 findings, 0 fixes |
+| NPC_sounds.rs | 115 | audited (wave 2) — batch npc_behavior: 5 confirmed / 6 findings, 7 fixes |
+| NPC_misc.rs | 104 | audited (wave 2) — batch npc_behavior: 5 confirmed / 6 findings, 7 fixes |
+| g_nav_consts.rs | 96 | audited (wave 2) — batch nav: 1 confirmed / 2 findings, 2 fixes |
+| g_mem.rs | 77 | audited (wave 2) — batch trap_infra: 0 confirmed / 0 findings, 0 fixes |
+| q_shared_cvar_flags.rs | 67 | audited (wave 2) — batch infra_consts: 0 confirmed / 0 findings, 0 fixes |
+| cstr_util.rs | 55 | no-oracle (port-native, sanity-skimmed wave 2) |
+| g_local_consts.rs | 51 | audited (wave 2) — batch infra_consts: 0 confirmed / 0 findings, 0 fixes |
+| g_public_consts.rs | 40 | audited (wave 2) — batch infra_consts: 0 confirmed / 0 findings, 0 fixes |
+| ent_id.rs | 29 | no-oracle (port-native, sanity-skimmed wave 2) |
 
 ## Wave 1 findings log (2026-07-06)
 
@@ -194,3 +194,39 @@ Refuted candidates are recorded so later waves don't re-litigate them.
 - Cleanup: stale WP_MuzzlePoint PORT-NOTE (g_weapon rs:~4211).
 - Latent, parked (from slice round): `G_GetHitLocation` threshold compares
   f32-vs-f32 where C promotes to f64 — ~1e-8 window, no fixture hits it.
+
+## Wave 2 findings log (2026-07-06, workflow run wf_c53e0d39-bb0)
+
+All 101 remaining files audited in one 57-agent workflow (28 of 29 batches
+complete; the npc_spawn batch — NPC_spawn.rs, NPC_stats.rs, npc_c.rs — died on
+an API error and is re-run separately). **153 findings (95 CONFIRMED), 174
+fixes applied, 3 rejected on verification, 3 cross-file fixes applied by the
+serial finisher.** Full per-finding detail (quotes, cites, impact):
+`docs/audits/audit-findings-wave2-2026-07-06.json`. Workspace green after:
+54/54 tests, verified in-workflow and independently.
+
+Headline confirmed findings (see JSON for the rest):
+- `g_items.rs` JETPACK_TOGGLE_TIME was 500 vs Raven's 1000 (double-rate
+  jetpack toggling).
+- `g_cmds.rs` Cmd_CallTeamVote_f numeric-vs-name client-id parse logic
+  mistranscribed.
+- `NPC_AI_Jedi.rs` health thresholds `< maxHealth*0.75f` truncated to int
+  before compare — flips rage/heal triggers at exact boundaries (3 sites).
+- `vehicles`: FighterNPC.c's static per-class `Update` (c:188) is MISSING —
+  G_SetFighterVehicleFunctions never wires it, so BG_FighterUpdate is
+  unreachable in the live update path. **Port follow-up required.**
+- `bg_panimate.c` BG_ParseAnimationEvtFile + 2 static helpers are not ported
+  anywhere in crates/ (animevents parser). **Port follow-up required.**
+- `NPC_ShotEntity` out-param was `[f32;3]` by-value where C writes through a
+  nullable pointer — signature now `Option<&mut vec3_t>`, 6 call sites across
+  5 files (finisher).
+- `bg_lib.rs` `_atoi` and `q_math.rs` `VectorNormalizeFast` absent but dead in
+  game-module scope (documented, not ported).
+- `bg_misc.rs` `BG_GiveMeVectorFromMatrix` lives in NPC_AI_Mark2.rs — file
+  placement inconsistency; transcription unverified there.
+
+Skimmed/parked items worth a follow-up pass (auditors flagged honestly; full
+list in the JSON): ai_wpnav.rs bulk (16 functions read Rust-side only),
+g_vehicles.rs (~42 functions lightly compared), g_main.rs G_RunFrame middle
+section, g_client.rs SetupGameGhoul2Model/G_UpdateClientAnims, bg_misc.rs
+table-heavy functions, NPC_AI_Default.rs NPC_BSDefault.

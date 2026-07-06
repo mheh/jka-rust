@@ -117,8 +117,8 @@ pub fn BG_FighterUpdate(
         let parentPS: *mut playerState_t;
         let mut isDead: qboolean = qfalse;
 
-        // In QAGAME, ghost the riders.
-        #[cfg(target_os = "windows")] // placeholder for QAGAME
+        // In QAGAME, ghost the riders. jampgame always defines QAGAME, so this
+        // runs unconditionally on the game side.
         {
             let i_max = (*pVeh)
                 .m_pVehicleInfo
@@ -309,17 +309,16 @@ pub fn FighterIsLaunching(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) ->
 /// Source: `oracle/oracle/codemp/game/FighterNPC.c:340-355`
 pub fn FighterSuspended(pVeh: *mut Vehicle_t, parentPS: *mut playerState_t) -> qboolean {
     unsafe {
-        #[cfg(target_os = "windows")] // placeholder for QAGAME
+        // QAGAME-only check; jampgame always defines QAGAME, so this is
+        // unconditional on the game side (the CGAME branch just returns qfalse).
+        if (*pVeh).m_pPilot.is_null()
+            && (*parentPS).speed == 0.0f32
+            && (*pVeh).m_ucmd.forwardmove <= 0
+            && !(*pVeh).m_pParentEntity.is_null()
         {
-            if (*pVeh).m_pPilot.is_null()
-                && (*parentPS).speed == 0.0f32
-                && (*pVeh).m_ucmd.forwardmove <= 0
-                && !(*pVeh).m_pParentEntity.is_null()
-            {
-                let parent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
-                if !parent.is_null() && ((*parent).spawnflags & 2) != 0 {
-                    return qtrue;
-                }
+            let parent = (*pVeh).m_pParentEntity.cast::<gentity_t>();
+            if !parent.is_null() && ((*parent).spawnflags & 2) != 0 {
+                return qtrue;
             }
         }
         qfalse

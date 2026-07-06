@@ -651,8 +651,19 @@ pub fn VEH_LoadVehicle(vehicleName: *const c_char, bg: &mut BgState, traps: &dyn
             }
         }
 
-        // NOTE: this crate is MP (`_JK2MP`), so the SP `#ifndef _JK2MP` default
-        // health-from-armor fallback block does not apply; skipped.
+        // let's give these guys some defaults
+        if (*vehicle).health_front == 0 {
+            (*vehicle).health_front = (*vehicle).armor / 4;
+        }
+        if (*vehicle).health_back == 0 {
+            (*vehicle).health_back = (*vehicle).armor / 4;
+        }
+        if (*vehicle).health_right == 0 {
+            (*vehicle).health_right = (*vehicle).armor / 4;
+        }
+        if (*vehicle).health_left == 0 {
+            (*vehicle).health_left = (*vehicle).armor / 4;
+        }
 
         if !(*vehicle).model.is_null() {
             let model = cstr_to_str((*vehicle).model);

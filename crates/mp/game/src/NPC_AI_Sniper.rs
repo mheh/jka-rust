@@ -203,16 +203,16 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
         // If our move failed, then reset
         if moved == QFALSE {
             // couldn't get to enemy
-            if ((*NPCInfo).scriptFlags & 1) != 0
+            if ((*NPCInfo).scriptFlags & 0x00000400) != 0
                 && (*NPCInfo).goalEntity != None
                 && (*NPCInfo).goalEntity == (*NPC).enemy
             {
-                // SCF_CHASE_ENEMIES = 1, we were running after enemy
+                // SCF_CHASE_ENEMIES = 0x00000400, we were running after enemy
                 // Try to find a combat point that can hit the enemy
                 let mut cpFlags = CP_CLEAR | CP_HAS_ROUTE;
                 let cp;
-                if ((*NPCInfo).scriptFlags & 0x0004) != 0 {
-                    // SCF_USE_CP_NEAREST = 0x0004
+                if ((*NPCInfo).scriptFlags & 0x00100000) != 0 {
+                    // SCF_USE_CP_NEAREST = 0x00100000
                     cpFlags &= !(CP_FLANK | CP_APPROACH_ENEMY | CP_CLOSEST);
                     cpFlags |= CP_NEAREST;
                 }
@@ -225,7 +225,7 @@ pub fn Sniper_Move(ctx: GameContext<'_>) -> qboolean {
                     32.0,
                     -1,
                 );
-                if cp == -1 && ((*NPCInfo).scriptFlags & 0x0004) == 0 {
+                if cp == -1 && ((*NPCInfo).scriptFlags & 0x00100000) == 0 {
                     // okay, try one by the enemy
                     let cp2 = NPC_FindCombatPoint(
                         ctx,
@@ -288,8 +288,8 @@ pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
 
         if (*NPCInfo).confusionTime < world.level.time {
             // Look for any enemies
-            if ((*NPCInfo).scriptFlags & 0x100000) != 0 {
-                // SCF_LOOK_FOR_ENEMIES = 0x100000
+            if ((*NPCInfo).scriptFlags & 0x00000800) != 0 {
+                // SCF_LOOK_FOR_ENEMIES = 0x00000800
                 if NPC_CheckPlayerTeamStealth(ctx) != 0 {
                     // Look for player team members with stealth
                     NPC_UpdateAngles(ctx, QTRUE, QTRUE);
@@ -297,8 +297,8 @@ pub fn NPC_BSSniper_Patrol(ctx: GameContext<'_>) {
                 }
             }
 
-            if ((*NPCInfo).scriptFlags & 0x200000) == 0 {
-                // SCF_IGNORE_ALERTS = 0x200000
+            if ((*NPCInfo).scriptFlags & 0x00002000) == 0 {
+                // SCF_IGNORE_ALERTS = 0x00002000
                 // Is there danger nearby
                 let alertEvent = NPC_CheckAlertEvents(ctx, QTRUE, QTRUE, -1, QFALSE, 1); // AEL_SUSPICIOUS = 1
                 if NPC_CheckForDanger(ctx, alertEvent) != 0 {
@@ -394,8 +394,8 @@ pub fn Sniper_CheckMoveState(ctx: GameContext<'_>) {
         let NPCInfo = world.globals.NPCInfo as *mut gNPC_t;
 
         // See if we're a scout
-        if ((*NPCInfo).scriptFlags & 1) == 0 {
-            // SCF_CHASE_ENEMIES = 1
+        if ((*NPCInfo).scriptFlags & 0x00000400) == 0 {
+            // SCF_CHASE_ENEMIES = 0x00000400
             if (*NPCInfo).goalEntity == (*NPC).enemy {
                 world.globals.move2 = QFALSE;
                 return;
@@ -517,17 +517,17 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
             if TIMER_Done(ctx, NPC, c"roamTime".as_ptr()) != 0 {
                 // not roaming
                 // FIXME: try to find another spot from which to hit the enemy
-                if ((*NPCInfo).scriptFlags & 1) != 0
+                if ((*NPCInfo).scriptFlags & 0x00000400) != 0
                     && ((*NPCInfo).goalEntity == None || (*NPCInfo).goalEntity == (*NPC).enemy)
                 {
-                    // SCF_CHASE_ENEMIES = 1
+                    // SCF_CHASE_ENEMIES = 0x00000400
                     // we were running after enemy
                     // Try to find a combat point that can hit the enemy
                     let mut cpFlags = CP_CLEAR | CP_HAS_ROUTE;
                     let cp;
 
-                    if ((*NPCInfo).scriptFlags & 0x0004) != 0 {
-                        // SCF_USE_CP_NEAREST = 0x0004
+                    if ((*NPCInfo).scriptFlags & 0x00100000) != 0 {
+                        // SCF_USE_CP_NEAREST = 0x00100000
                         cpFlags &= !(CP_FLANK | CP_APPROACH_ENEMY | CP_CLOSEST);
                         cpFlags |= CP_NEAREST;
                     }
@@ -540,7 +540,7 @@ pub fn Sniper_ResolveBlockedShot(ctx: GameContext<'_>) {
                         32.0,
                         -1,
                     );
-                    if cp == -1 && ((*NPCInfo).scriptFlags & 0x0004) == 0 {
+                    if cp == -1 && ((*NPCInfo).scriptFlags & 0x00100000) == 0 {
                         // okay, try one by the enemy
                         let cp2 = NPC_FindCombatPoint(
                             ctx,
@@ -683,10 +683,10 @@ pub fn Sniper_EvaluateShot(ctx: GameContext<'_>, hit: c_int) -> qboolean {
             || (hitEnt.client != core::ptr::null_mut()
                 && (*(hitEnt.client as *mut gclient_t)).playerTeam == (*((*NPC).client as *mut gclient_t)).enemyTeam)
             || (hitEnt.takedamage != 0
-                && ((hitEnt.r.svFlags & 0x00000004) != 0 // SVF_GLASS_BRUSH = 0x00000004
+                && ((hitEnt.r.svFlags & 0x08000000) != 0 // SVF_GLASS_BRUSH = 0x08000000
                     || hitEnt.health < 40
-                    || (*NPC).s.weapon == 18)) // WP_EMPLACED_GUN = 18
-            || (hitEnt.r.svFlags & 0x00000004) != 0
+                    || (*NPC).s.weapon == 17)) // WP_EMPLACED_GUN = 17
+            || (hitEnt.r.svFlags & 0x08000000) != 0
         {
             // can hit enemy or will hit glass, so shoot anyway
             return QTRUE;
@@ -936,20 +936,20 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
 
         if world.globals.enemyDist2 < 16384.0 {
             // 128 squared, too close, so switch to primary fire
-            if (*((*NPC).client as *mut gclient_t)).ps.weapon == 18 {
-                // WP_DISRUPTOR = 18
+            if (*((*NPC).client as *mut gclient_t)).ps.weapon == 6 {
+                // WP_DISRUPTOR = 6
                 // sniping... should be assumed
-                if ((*NPCInfo).scriptFlags & 0x08) != 0 {
-                    // SCF_ALT_FIRE = 0x08
+                if ((*NPCInfo).scriptFlags & 0x00000040) != 0 {
+                    // SCF_ALT_FIRE = 0x00000040
                     // use primary fire
                     let mut trace: trace_t = core::mem::zeroed();
                     // trap_Trace(&trace, (*NPC)->enemy->r.currentOrigin, ...);
                     // if (!trace.allsolid && !trace.startsolid && (trace.fraction == 1.0 || trace.entityNum == NPC->s.number)) {
                     if true {
                         // he can get right to me
-                        (*NPCInfo).scriptFlags &= !0x08; // SCF_ALT_FIRE
+                        (*NPCInfo).scriptFlags &= !0x00000040; // SCF_ALT_FIRE
                                                          // reset fire-timing variables
-                        NPC_ChangeWeapon(18); // WP_DISRUPTOR
+                        NPC_ChangeWeapon(6); // WP_DISRUPTOR
                         NPC_UpdateAngles(ctx, QTRUE, QTRUE);
                         return;
                     }
@@ -958,15 +958,15 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             }
         } else if world.globals.enemyDist2 > 65536.0 {
             // 256 squared
-            if (*((*NPC).client as *mut gclient_t)).ps.weapon == 18 {
-                // WP_DISRUPTOR
+            if (*((*NPC).client as *mut gclient_t)).ps.weapon == 6 {
+                // WP_DISRUPTOR = 6
                 // sniping... should be assumed
-                if ((*NPCInfo).scriptFlags & 0x08) == 0 {
-                    // SCF_ALT_FIRE = 0x08
+                if ((*NPCInfo).scriptFlags & 0x00000040) == 0 {
+                    // SCF_ALT_FIRE = 0x00000040
                     // use alt fire
-                    (*NPCInfo).scriptFlags |= 0x08; // SCF_ALT_FIRE
+                    (*NPCInfo).scriptFlags |= 0x00000040; // SCF_ALT_FIRE
                                                     // reset fire-timing variables
-                    NPC_ChangeWeapon(18); // WP_DISRUPTOR
+                    NPC_ChangeWeapon(6); // WP_DISRUPTOR
                     NPC_UpdateAngles(ctx, QTRUE, QTRUE);
                     return;
                 }
@@ -1064,8 +1064,8 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             && (TIMER_Get(ctx, NPC, c"attackDelay".as_ptr()) - world.level.time) > 1000
             && (*NPC).attackDebounceTime < world.level.time
         {
-            if world.globals.enemyLOS2 != 0 && ((*NPCInfo).scriptFlags & 0x08) != 0 {
-                // SCF_ALT_FIRE = 0x08
+            if world.globals.enemyLOS2 != 0 && ((*NPCInfo).scriptFlags & 0x00000040) != 0 {
+                // SCF_ALT_FIRE = 0x00000040
                 if (*NPC).fly_sound_debounce_time < world.level.time {
                     (*NPC).fly_sound_debounce_time = world.level.time + 2000;
                 }
@@ -1086,8 +1086,8 @@ pub fn NPC_BSSniper_Attack(ctx: GameContext<'_>) {
             Sniper_FaceEnemy(ctx);
         }
 
-        if ((*NPCInfo).scriptFlags & 0x01000) != 0 {
-            // SCF_DONT_FIRE = 0x01000
+        if ((*NPCInfo).scriptFlags & 0x00004000) != 0 {
+            // SCF_DONT_FIRE = 0x00004000
             world.globals.shoot2 = QFALSE;
         }
 

@@ -1967,7 +1967,9 @@ impl PmoveContext<'_> {
         let mut len: c_int;
         let mut i: c_int;
         let mut token: *mut c_char;
-        let mut fps: f64;
+        // Raven's `fps` is a `float`; keeping it single-precision (and dividing
+        // `1000.0f32 / fps`) matches C's float division before floor/ceil.
+        let mut fps: f32;
         let mut skip: c_int;
         let mut usedIndex: c_int = -1;
         let mut nextIndex: c_int = self.bg.bgNumAllAnims;
@@ -2092,17 +2094,17 @@ impl PmoveContext<'_> {
             if token.is_null() {
                 break;
             }
-            fps = atof(token);
+            fps = atof(token) as f32;
             if fps == 0.0 {
                 fps = 1.0;
             }
             if fps < 0.0 {
                 unsafe {
-                    (*animset.offset(animNum as isize)).frameLerp = (1000.0 / fps).floor() as i16;
+                    (*animset.offset(animNum as isize)).frameLerp = (1000.0f32 / fps).floor() as i16;
                 }
             } else {
                 unsafe {
-                    (*animset.offset(animNum as isize)).frameLerp = (1000.0 / fps).ceil() as i16;
+                    (*animset.offset(animNum as isize)).frameLerp = (1000.0f32 / fps).ceil() as i16;
                 }
             }
         }
@@ -2451,7 +2453,8 @@ impl PmoveContext<'_> {
                         }
 
                         if (*ps).fd.forcePowersActive & (1 << FP_RAGE) != 0 {
-                            (*ps).torsoTimer = ((*ps).torsoTimer as f32 / 1.7) as c_int;
+                            // C's `int /= 1.7` promotes to double, divides, then truncates.
+                            (*ps).torsoTimer = ((*ps).torsoTimer as f64 / 1.7) as c_int;
                         }
                     }
                 }
@@ -2497,9 +2500,11 @@ impl PmoveContext<'_> {
                         // these guys are ok, they don't actually reference pm
                         if PM_RunningAnim(anim) != 0 || PM_WalkingAnim(anim) != 0 {
                             if (*ps).fd.forcePowersActive & (1 << FP_RAGE) != 0 {
-                                (*ps).legsTimer = ((*ps).legsTimer as f32 / 1.3) as c_int;
+                                // C's `int /= 1.3` promotes to double, divides, then truncates.
+                                (*ps).legsTimer = ((*ps).legsTimer as f64 / 1.3) as c_int;
                             } else if (*ps).fd.forcePowersActive & (1 << FP_SPEED) != 0 {
-                                (*ps).legsTimer = ((*ps).legsTimer as f32 / 1.7) as c_int;
+                                // C's `int /= 1.7` promotes to double, divides, then truncates.
+                                (*ps).legsTimer = ((*ps).legsTimer as f64 / 1.7) as c_int;
                             }
                         }
                     }
@@ -2625,7 +2630,7 @@ impl PmoveContext<'_> {
         ps: *mut playerState_t,
         mut animations: *mut animation_t,
         setAnimParts: c_int,
-        anim: c_int,
+        mut anim: c_int,
         setAnimFlags: c_int,
         blendTime: c_int,
     ) {
@@ -2637,20 +2642,19 @@ impl PmoveContext<'_> {
             if (*animations.offset(anim as isize)).firstFrame == 0
                 && (*animations.offset(anim as isize)).numFrames == 0
             {
-                let mut fallback_anim = anim;
                 if anim == BOTH_RUNBACK1 as c_int
                     || anim == BOTH_WALKBACK1 as c_int
                     || anim == BOTH_RUN1 as c_int
                 {
-                    fallback_anim = BOTH_WALK2 as c_int;
+                    //hack for droids
+                    anim = BOTH_WALK2 as c_int;
                 }
 
-                if (*animations.offset(fallback_anim as isize)).firstFrame == 0
-                    && (*animations.offset(fallback_anim as isize)).numFrames == 0
+                if (*animations.offset(anim as isize)).firstFrame == 0
+                    && (*animations.offset(anim as isize)).numFrames == 0
                 {
                     return;
                 }
-                animations = animations.offset((fallback_anim - anim) as isize);
             }
 
             if setAnimFlags & SETANIM_FLAG_OVERRIDE != 0 {
