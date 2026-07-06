@@ -11,10 +11,11 @@
 //! statics evolve identically on both sides. Run with `--test-threads=1`.
 //! See `tools/jampgame-oracle/README.md`.
 //!
-//! Scope note: `Com_sprintf`/`va` are exercised with LITERAL formats only — the
-//! port's implementations are documented variadic stubs that echo the format
-//! string without argument substitution, so `%s/%i/%d/%c/%x` conversions cannot
-//! reach parity (reported as a finding, not fixtured).
+//! Scope note: `Com_sprintf`/`va` are exercised here with LITERAL formats only
+//! (the golden fixture predates real `%`-substitution). The `%`-directive
+//! substitution itself now lives in `mp_game::c_format::c_vsprintf` and is
+//! covered byte-exactly by that module's own `#[cfg(test)]` suite; the literal
+//! cases below still validate the rotating-buffer and truncation semantics.
 #![allow(non_snake_case)]
 
 use core::ffi::{c_char, c_int};
@@ -437,9 +438,9 @@ fn dump_strhelpers(o: &mut String) {
 fn dump_va(o: &mut String) {
     o.push_str("== va ==\n");
     let f1 = cstr("first-literal");
-    let p1 = va(f1.as_ptr());
+    let p1 = va(f1.as_ptr(), &[]);
     let f2 = cstr("second-literal");
-    let p2 = va(f2.as_ptr());
+    let p2 = va(f2.as_ptr(), &[]);
     let _ = write!(o, "va1 ");
     qstr_p(o, p1);
     let _ = writeln!(o);
@@ -447,7 +448,7 @@ fn dump_va(o: &mut String) {
     qstr_p(o, p2);
     let _ = writeln!(o);
     let f3 = cstr("third-literal");
-    let p3 = va(f3.as_ptr()); // reuses p1's slot (2-slot rotation)
+    let p3 = va(f3.as_ptr(), &[]); // reuses p1's slot (2-slot rotation)
     let _ = write!(o, "va1b ");
     qstr_p(o, p1);
     let _ = writeln!(o);
@@ -470,7 +471,7 @@ fn dump_sprintf(o: &mut String) {
     for (tag, size, lit) in cases {
         let mut b = vec![0xAAu8 as c_char; 24];
         let f = cbuf(lit);
-        Com_sprintf(b.as_mut_ptr(), size, f.as_ptr());
+        Com_sprintf(b.as_mut_ptr(), size, f.as_ptr(), &[]);
         let _ = write!(o, "{tag} ");
         hex(o, &b);
         let _ = writeln!(o);

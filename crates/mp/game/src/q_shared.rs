@@ -18,6 +18,7 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::c_format::{c_vsprintf, FmtArg};
 use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING, QFALSE, QTRUE};
 
 // Parse-session state (cross-frame state -> GameWorld fields, pending full threading).
@@ -1165,45 +1166,56 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
 
 /// Raven `Com_sprintf`.
 ///
-/// PORT-NOTE(variadic-c-abi): Rust cannot express C varargs without external C FFI or macros.
-/// The Raven implementation uses va_start/va_end/vsprintf to format a bigbuffer, then
-/// copies to dest with Q_strncpyz bounds. This implementation accepts the format string
-/// and attempts basic formatting; true vararg expansion requires a seam decision (vsprintf
-/// FFI, pre-formatted String caller convention, or macro-based variadic wrapper).
+/// PORT-NOTE(variadic-c-abi): Raven's `...` becomes an explicit `&[FmtArg]`
+/// channel formatted by `c_format::c_vsprintf` (native-libc `vsprintf` parity);
+/// see `c_format` for the seam rationale. The 32000-byte `bigbuffer`, the
+/// `ERR_FATAL` on `len >= sizeof(bigbuffer)` (→ panic, frozen Group A), the
+/// `Com_Printf` overflow-of warning on `len >= size`, and the closing
+/// `Q_strncpyz(dest, bigbuffer, size)` are reproduced exactly.
 /// Source: `oracle/oracle/codemp/game/q_shared.c:985-1005`
-pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char) {
+pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char, args: &[FmtArg]) {
     unsafe {
-        if dest.is_null() || size < 1 {
-            return;
+        let fmt_bytes = std::ffi::CStr::from_ptr(fmt).to_bytes();
+        let bigbuffer = c_vsprintf(fmt_bytes, args);
+        let len = bigbuffer.len();
+        if len >= 32000 {
+            // Com_Error(ERR_FATAL, "Com_sprintf: overflowed bigbuffer") -> panic.
+            panic!("Com_sprintf: overflowed bigbuffer");
         }
-        // Without access to varargs, use the format string as the message.
-        let fmt_str = std::ffi::CStr::from_ptr(fmt).to_string_lossy();
-        let bigbuffer = format!("{}", fmt_str);
-        let c_bigbuffer = std::ffi::CString::new(bigbuffer).unwrap();
-        crate::q_shared::Q_strncpyz(dest, c_bigbuffer.as_ptr(), size);
+        if len as c_int >= size {
+            let msg = format!("Com_sprintf: overflow of {} in {}\n", len, size);
+            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+        }
+        // Q_strncpyz needs a NUL-terminated source; `bigbuffer` has no interior
+        // NUL (the formatter never emits one), so append the terminator here.
+        let mut cbig = bigbuffer;
+        cbig.push(0);
+        crate::q_shared::Q_strncpyz(dest, cbig.as_ptr() as *const c_char, size);
     }
 }
 
 /// Raven `va`.
 ///
-/// PORT-NOTE(variadic-c-abi): Rust cannot express C varargs without external C FFI or macros.
-/// The Raven implementation uses va_start/va_end/vsprintf to format into a rotating 2-slot
-/// static buffer. This implementation accesses the static VA_STRING rotating buffer and
-/// formats with the format string available; true vararg expansion requires a seam decision
-/// (vsprintf FFI or macro-based variadic wrapper). va() is consumed
-/// immediately (passed to trap, copied into field) — callers should use format!() + cstr() directly.
+/// PORT-NOTE(variadic-c-abi): Raven's `...` becomes an explicit `&[FmtArg]`
+/// channel formatted by `c_format::c_vsprintf` (native-libc `vsprintf` parity).
+/// The 2-slot rotating `static char string[2][32000]` return buffer and the
+/// `index & 1` alternation are reproduced by the module statics. Raven's own
+/// `// FIXME: make this buffer size safe someday` means a `>= 32000`-byte result
+/// overruns in C; the port instead truncates into the 31999-usable-byte slot.
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1017-1031`
-pub fn va(format: *const c_char) -> *mut c_char {
+pub fn va(format: *const c_char, args: &[FmtArg]) -> *mut c_char {
     unsafe {
         let buf = VA_STRING[VA_INDEX & 1].as_mut_ptr();
         VA_INDEX += 1;
 
-        let fmt_str = std::ffi::CStr::from_ptr(format).to_string_lossy();
-        let formatted = format!("{}", fmt_str);
-        let bytes = formatted.as_bytes();
-        let max_len = 32000_usize;
-        let copy_len = bytes.len().min(max_len - 1);
-        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, buf, copy_len);
+        let fmt_bytes = std::ffi::CStr::from_ptr(format).to_bytes();
+        let formatted = c_vsprintf(fmt_bytes, args);
+        let copy_len = formatted.len().min(32000 - 1);
+        std::ptr::copy_nonoverlapping(
+            formatted.as_ptr() as *const c_char,
+            buf,
+            copy_len,
+        );
         *buf.offset(copy_len as isize) = 0;
 
         buf
