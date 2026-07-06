@@ -4355,12 +4355,12 @@ pub fn WP_CalcVehMuzzle(ctx: GameContext<'_>, ent: *mut gentity_t, muzzleNum: c_
             ),
         );
         use mp_qshared::shared::Eorientations;
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(
+        BG_GiveMeVectorFromMatrix(
             &boltMatrix as *const mdxaBone_t,
             Eorientations::ORIGIN as c_int,
             &mut (*pVeh).m_vMuzzlePos[muzzleNum as usize],
         );
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(
+        BG_GiveMeVectorFromMatrix(
             &boltMatrix as *const mdxaBone_t,
             Eorientations::NEGATIVE_Y as c_int,
             &mut (*pVeh).m_vMuzzleDir[muzzleNum as usize],

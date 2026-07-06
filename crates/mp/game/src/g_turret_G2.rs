@@ -25,7 +25,7 @@ use crate::q_math::{
     VectorNormalize,
 };
 use crate::q_shared::Q_stricmp;
-use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
+use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::NPC_combat::G_SetEnemy;
 use mp_abi::game::syscalls::G_IN_PVS::GInPvsArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;

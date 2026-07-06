@@ -15,6 +15,25 @@
 //! `pmove-working-state` / `raw-ptr-skeleton-no-world-handle` precedent
 //! already established in `bg_saber.rs` / `g_combat.rs` for the file-static
 //! `pmove_t *pm` and the bare `g_entities` global respectively.
+//!
+//! Dropped dead surface (porting-rules §20): the animation-*event* parser —
+//! `CheckAnimFrameForEventType`, `ParseAnimationEvtBlock`,
+//! `BG_ParseAnimationEvtFile`, the `bgAllEvents`/`bgNumAnimEvents`/
+//! `bg_animParseIncluding` file-statics, and the `animEventTypeTable` /
+//! `footstepTypeTable` string tables — is intentionally NOT ported into this
+//! (QAGAME / jampgame) module. In the oracle these all live inside a single
+//! `#ifndef QAGAME` block (`oracle/oracle/codemp/game/bg_panimate.c:1756-2328`,
+//! guard comment: "none of this is actually needed serverside"), so they are
+//! compiled OUT of the server game module and exist only in CGAME/UI. Every
+//! caller of `BG_ParseAnimationEvtFile` is likewise CGAME-only
+//! (`oracle/oracle/codemp/cgame/cg_players.c:544,556,791,6933,7254`), and the
+//! only reads of `bgAllEvents` are CGAME-side
+//! (`cg_players.c:2470,2474`); no `game/` TU parses or reads anim events. The
+//! wave-2 audit flagged these three as unported, but that is a false positive
+//! against the `#ifndef QAGAME` guard — this file is the game module, so the
+//! correct action is the drop, not a port. (`BgState::bgAllEvents` still exists
+//! as a faithful field of the shared state struct but is never populated or
+//! read game-side, mirroring the compiled-out C global.)
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_pmove::{PM_RunningAnim, PM_WalkingAnim};

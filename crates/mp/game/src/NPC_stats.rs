@@ -1462,13 +1462,17 @@ pub fn NPC_ParseParms(
                 if crate::q_shared::COM_ParseInt(&mut p as *mut *const c_char, &mut n0) != 0 {
                     continue;
                 }
-                // PORT-NOTE(vehicle-info-shape): `m_pVehicleInfo->type` requires
-                // the vehicleInfo_t layout; `m_pVehicle` is still `*mut c_void`
-                // here so this branch checks non-null only (never resolves
-                // VH_FIGHTER) — see missing_symbols.
-                if (*client_ptr).NPC_class == CLASS_VEHICLE && !(*NPC).m_pVehicle.is_null() {
-                    (*NPC).r.maxs[2] = n0 as f32 / 2.0f32;
-                    (*client_ptr).ps.standheight = (*NPC).r.maxs[2] as c_int;
+                let vehForHeight = (*NPC).m_pVehicle as *mut Vehicle_t;
+                if (*client_ptr).NPC_class == CLASS_VEHICLE
+                    && !(*NPC).m_pVehicle.is_null()
+                    && !(*vehForHeight).m_pVehicleInfo.is_null()
+                    && (*(*vehForHeight).m_pVehicleInfo).r#type == VH_FIGHTER
+                {
+                    // a flying vehicle's origin must be centered in bbox and it should spawn on the ground
+                    // Raven `maxs[2] = ps.standheight = (n/2.0f)`: the chained assign stores
+                    // through int `standheight` first, so `maxs[2]` gets the truncated `floor(n/2)`.
+                    (*client_ptr).ps.standheight = (n0 as f32 / 2.0f32) as c_int;
+                    (*NPC).r.maxs[2] = (*client_ptr).ps.standheight as f32;
                     (*NPC).r.mins[2] = -(*NPC).r.maxs[2];
                     (*NPC).s.origin[2] += (DEFAULT_MINS_2 - (*NPC).r.mins[2]) + 0.125f32;
                     crate::q_math::_VectorCopy((*NPC).s.origin, &mut (*client_ptr).ps.origin);

@@ -136,8 +136,8 @@ pub fn NPC_Mark1_Part_Explode(ctx: GameContext<'_>, self_: *mut gentity_t, bolt:
                 ),
             );
 
-            crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut org);
-            crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(
+            BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut org);
+            BG_GiveMeVectorFromMatrix(
                 &boltMatrix,
                 NEGATIVE_Y as c_int,
                 &mut dir,
@@ -221,8 +221,8 @@ pub fn Mark1Dead_FireRocket(ctx: GameContext<'_>) {
             ),
         );
 
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(
+        BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
+        BG_GiveMeVectorFromMatrix(
             &boltMatrix,
             NEGATIVE_Y as c_int,
             &mut muzzle_dir,
@@ -315,8 +315,8 @@ pub fn Mark1Dead_FireBlaster(ctx: GameContext<'_>) {
             ),
         );
 
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(
+        BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
+        BG_GiveMeVectorFromMatrix(
             &boltMatrix,
             NEGATIVE_Y as c_int,
             &mut muzzle_dir,
@@ -738,7 +738,7 @@ pub fn Mark1_FireBlaster(ctx: GameContext<'_>) {
             ),
         );
 
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
+        BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
 
         if (*npc).health != 0 {
             crate::NPC_utils::CalcEntitySpot(
@@ -912,7 +912,7 @@ pub fn Mark1_FireRocket(ctx: GameContext<'_>) {
             ),
         );
 
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
+        BG_GiveMeVectorFromMatrix(&boltMatrix, ORIGIN as c_int, &mut muzzle1);
 
         crate::NPC_utils::CalcEntitySpot(
             ctx,
