@@ -1,7 +1,7 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 794 markers — 183 `TODO: Port`,
-554 `PORT-NOTE`, 57 other TODO forms.
+Totals: 785 markers — 177 `TODO: Port`,
+552 `PORT-NOTE`, 56 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
@@ -10,43 +10,24 @@ judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
-  the actionable findings. (22; weaponData/Pickup_Item done in 43d83f4,
-  bg_itemlist/EWebDie done in 2516172)
+  the actionable findings. (16)
 - **STALE-escalated** — mechanical fix known but crosses files; left in place. (3)
 
 PORT-NOTE section is a plain re-grep (not audited).
 
-## TODO: Port — COMPLEX (22)
+## TODO: Port — COMPLEX (16)
 
 ### crates/mp/engine/server/src/server_host.rs
 - L16: Server fields (sv: server_t incl. the SS_DEAD liveness state,
   - server_t and serverStatic_t are already ported (crates/mp/engine/server/src/server/server_t.rs, server_static_t.rs) but the marker also covers bot/master/savegame state that is not ported, and Server has no constructors anywhere yet — wiring this in is a design decision (how sv/svs/bot compose, whether Server stays a plain aggregate) plus multiple unported sub-fields, not a single mechanical retype.
 
-### crates/mp/game/src/ai_main.rs
-- L907: bot_settings_s  (C: `struct bot_settings_s *`)
-  - bot_settings_t IS already ported (crates/mp/game/src/level/bot_settings.rs, re-exported via crates/mp/game/src/botai/bot_settings_s.rs) and even imported/used in this same file (line 89, line 932's cast) — the `settings: *mut c_void` param is a stale overlay cast exactly like the saberFace_t exemplar. However BotAISetupClient is `pub fn` and its one caller in crates/mp/game/src/g_bot.rs:803 also does the matching `&mut settings as *mut bot_settings_t as *mut c_void` overlay cast, so the mechanical fix is not file-local (touches g_bot.rs too) — per the STALE/COMPLEX tie-break, reporting as COMPLEX. Marker text is also malformed (trailing '(C: `struct bot_settings_s *`)' junk, no '// Source:' line) but is moot since the subject is ported, not unported.
-
 ### crates/mp/game/src/g_init_game.rs
 - L38: G_InitGame body (G_RegisterCvars, level wiring, back-pointers,
   - The individual building blocks this marker lists are now ported (G_RegisterCvars at g_main.rs:182, trap::LocateGameData at trap.rs:1400, G_SpawnEntitiesFromString at g_spawn.rs:1459), but g_init_game() is still the live-wired GAME_INIT entrypoint (world/game_context.rs:86) and is explicitly a 'Slice-0 minimal' stub that calls none of them. Assembling the real G_InitGame body (level/back-pointer wiring, trap_SV_RegisterSharedMemory, cvar registration order, entity-spawn sequencing per g_main.c:897-1015) is substantial new orchestration logic, not a mechanical retype/placeholder swap.
 
-### crates/mp/game/src/g_mover.rs
-- L2926: MAT_DRK_STONE, MAT_LT_STONE, MAT_GREY_STONE, MAT_SNOWY_ROCK
-  - All four material_t values are ported (crates/mp/qshared/src/common/mp/gentity.rs) and already used elsewhere in this same file (CacheChunkEffects, line 2614), but the fix is not a small mechanical rename: the entire stone-chunk-spawning branch of funcBBrushPain (g_mover.c:2556-2588, ~20 lines of vector math, Q_irand, and a G_Chunks call) is missing and must be transcribed faithfully — real logic addition, not a retype.
-
-### crates/mp/game/src/g_shutdown_game.rs
-- L17: G_ShutdownGame body (G_SaveBanIP, fake-client + ghoul2 cleanup)
-  - All referenced dependencies now exist (G_SaveBanIP, G_CleanAllFakeClients, BG_ClearAnimsets, trap::G2API_CleanGhoul2Models, trap::G2_HaveWeGhoul2Models), but the fix is a full function-body transcription — a MAX_GENTITIES loop over g_entities checking `ent.ghoul2`/`ent.client`, a nested MAX_SABERS loop over weaponGhoul2 — not a mechanical retype.
-
 ### crates/mp/game/src/game_globals.rs
-- L661: navInfo_t
+- L689: navInfo_t
   - navInfo_t is ported (crates/mp/game/src/npc/nav_info_s.rs:12, with size/offset asserts), but the corresponding oracle global (frameNavInfo) is currently implemented as NPC_move.rs's own `static mut FRAME_NAV_INFO: navInfo_t` rather than threaded through GameWorld, in violation of porting-rules B3. Wiring the () placeholder to a real field requires refactoring NPC_move.rs's static-mut global and its several call sites (NPC_move.rs, g_nav.rs callers) to read/write ctx.world instead — not a file-local mechanical retype.
-- L1027: gtimer_t **
-  - gtimer_t is ported (crates/mp/game/src/g_timer.rs:27), but g_timerFreeList is currently its own `static mut` global in g_timer.rs (line 47) rather than a threaded GameWorld field, violating porting-rules B3/B4. Wiring the () placeholder requires removing that static mut and rethreading every g_timer.rs call site (TIMER_GetNew/TIMER_GetExisting/etc.) through ctx.world — not file-local.
-- L1030: gtimer_t[ MAX_GTIMERS ]
-  - Same situation as g_timerFreeList: gtimer_t is ported but g_timerPool is its own `static mut [gtimer_t; MAX_GTIMERS]` in g_timer.rs (line 40), not threaded via GameWorld. Fixing requires cross-file rework of g_timer.rs's global state, not a local retype.
-- L1033: gtimer_t *[ MAX_GENTITIES ]*
-  - Same situation: g_timers is its own `static mut [*mut gtimer_t; MAX_GENTITIES]` in g_timer.rs (line 45), not a GameWorld field. Wiring the placeholder needs a cross-file refactor of g_timer.rs's static-mut globals into ctx.world, not a file-local fix.
 
 ### crates/mp/qshared/src/common/mp/gentity.rs
 - L94: Vehicle_t
@@ -240,11 +221,11 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L3150: level.time reach-through
 
 ### crates/mp/game/src/g_misc.rs
-- L99: bSet_e
-- L2255: FX_STATE_OFF
-- L2258: FX_STATE_ONE_SHOT
-- L2261: FX_STATE_ONE_SHOT_LIMIT
-- L2264: FX_STATE_CONTINUOUS
+- L94: bSet_e
+- L2250: FX_STATE_OFF
+- L2253: FX_STATE_ONE_SHOT
+- L2256: FX_STATE_ONE_SHOT_LIMIT
+- L2259: FX_STATE_CONTINUOUS
 
 ### crates/mp/game/src/g_trigger.rs
 - L54: bSet_e
@@ -445,7 +426,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L8: ui live entrypoint exports (vmMain match, SEAM-D10)
 
 
-## TODO-other (57)
+## TODO-other (56)
 
 ### crates/mp/engine/core/src/lifecycle.rs
 - L33 [LEGIT]: /// carry `//TODO: Port` markers in step order so the transcript diff (DEC-09.2)
@@ -521,10 +502,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 
 ### crates/mp/game/src/g_misc.rs
-- L3396 [LEGIT]: //TODO: Find the target and set our angles to that direction
-
-### crates/mp/game/src/g_mover.rs
-- L2890 [?]: // `CacheChunkEffects` in this file); left as an explicit `//TODO: Port`
+- L3391 [LEGIT]: //TODO: Find the target and set our angles to that direction
 
 ### crates/mp/game/src/g_nav.rs
 - L950 [LEGIT]: // TODO: Handle all ents
@@ -555,7 +533,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/game_globals.rs
 - L7 [LEGIT]: //! `//TODO: Port <type>` marker — the porter fills the real type when
-- L831 [LEGIT]: // it"); shapes are exactly what the `g_log.md` packet's TODO comments
+- L859 [?]: // it"); shapes are exactly what the `g_log.md` packet's TODO comments
 
 ### crates/mp/game/src/npc_c.rs
 - L1416 [LEGIT]: // TODO: Add vehicle behaviors here.
@@ -609,7 +587,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L15 [LEGIT]: /// TODO: SP transport path does not provide a direct `UI_S_STARTLOCALSOUND` case in `oracle/oracle/code/client/cl_ui.cpp`.
 
 
-## NOTE (554)
+## NOTE (552)
 
 ### crates/mp/game/src/FighterNPC.rs
 - L1309: (untopiced)
@@ -724,24 +702,24 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L564: ACTION_*/ANGLE2SHORT
 - L676: SHORT2ANGLE/ACTION_*
 - L790: botstates/PRT_FATAL/SHORT2ANGLE
-- L911: botstates/PRT_FATAL
-- L1260: bot_pvstype
-- L1410: FORCEJUMP_INSTANTMETHOD
-- L1490: forceJumpStrength/FORCEJUMP_INSTANTMETHOD
-- L1592: FORCEJUMP_INSTANTMETHOD
-- L1688: DEFAULT_MAXS_2/STRAFEAROUND_*
-- L2093: botstates/ENEMY_FORGET_MS
-- L2533: MAX_CHICKENWUSS_TIME/BOT_RUN_HEALTH
-- L2646: ENEMY_FORGET_MS
-- L2785: BASE_GUARD_DISTANCE
-- L2820: BASE_GETENEMYFLAG_DISTANCE
-- L6508: preproc
-- L7350: gWPArray-oob §S19
-- L7402: gWPArray-oob §S19
-- L7546: §S19
-- L7563: mLen-quirk
-- L8114: fn-statics
-- L8235: bot-cvars
+- L910: botstates/PRT_FATAL
+- L1258: bot_pvstype
+- L1408: FORCEJUMP_INSTANTMETHOD
+- L1488: forceJumpStrength/FORCEJUMP_INSTANTMETHOD
+- L1590: FORCEJUMP_INSTANTMETHOD
+- L1686: DEFAULT_MAXS_2/STRAFEAROUND_*
+- L2091: botstates/ENEMY_FORGET_MS
+- L2531: MAX_CHICKENWUSS_TIME/BOT_RUN_HEALTH
+- L2644: ENEMY_FORGET_MS
+- L2783: BASE_GUARD_DISTANCE
+- L2818: BASE_GETENEMYFLAG_DISTANCE
+- L6506: preproc
+- L7348: gWPArray-oob §S19
+- L7400: gWPArray-oob §S19
+- L7544: §S19
+- L7561: mLen-quirk
+- L8112: fn-statics
+- L8233: bot-cvars
 
 ### crates/mp/game/src/ai_wpnav.rs
 - L2: (untopiced)
@@ -946,36 +924,36 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L1810: vec3-outparam-seam
 - L1882: raw-ptr-skeleton-no-world-handle
 - L1913: raw-ptr-skeleton-no-world-handle
-- L1973: raw-ptr-skeleton-no-world-handle
-- L1997: raw-ptr-skeleton-no-world-handle
-- L2097: raw-ptr-skeleton-no-world-handle
-- L2145: raw-ptr-skeleton-no-world-handle
-- L2216: vec3-outparam-seam
-- L2395: raw-ptr-skeleton-no-world-handle
-- L2498: raw-ptr-skeleton-no-world-handle
-- L2700: raw-ptr-skeleton-no-world-handle
-- L2750: vec3-outparam-seam
-- L2855: raw-ptr-skeleton-no-world-handle
-- L2879: missing-const
-- L2882: raw-ptr-skeleton-no-world-handle
-- L2903: raw-ptr-skeleton-no-world-handle
-- L2964: raw-ptr-skeleton-no-world-handle
-- L3035: missing-const
-- L3101: raw-ptr-skeleton-no-world-handle
-- L3182: raw-ptr-skeleton-no-world-handle
-- L3219: raw-ptr-skeleton-no-world-handle
-- L3525: vec3-outparam-seam
-- L3612: missing-const
-- L3616: vec3-outparam-seam
-- L3656: raw-ptr-skeleton-no-world-handle
-- L3821: raw-ptr-skeleton-no-world-handle
-- L3855: raw-ptr-skeleton-no-world-handle
-- L3878: raw-ptr-skeleton-no-world-handle
-- L3894: raw-ptr-skeleton-no-world-handle
-- L3923: raw-ptr-skeleton-no-world-handle
-- L3937: raw-ptr-skeleton-no-world-handle
-- L3998: raw-ptr-skeleton-no-world-handle
-- L4085: raw-ptr-skeleton-no-world-handle
+- L1989: raw-ptr-skeleton-no-world-handle
+- L2013: raw-ptr-skeleton-no-world-handle
+- L2113: raw-ptr-skeleton-no-world-handle
+- L2161: raw-ptr-skeleton-no-world-handle
+- L2232: vec3-outparam-seam
+- L2411: raw-ptr-skeleton-no-world-handle
+- L2514: raw-ptr-skeleton-no-world-handle
+- L2716: raw-ptr-skeleton-no-world-handle
+- L2766: vec3-outparam-seam
+- L2871: raw-ptr-skeleton-no-world-handle
+- L2895: missing-const
+- L2898: raw-ptr-skeleton-no-world-handle
+- L2919: raw-ptr-skeleton-no-world-handle
+- L2980: raw-ptr-skeleton-no-world-handle
+- L3051: missing-const
+- L3117: raw-ptr-skeleton-no-world-handle
+- L3198: raw-ptr-skeleton-no-world-handle
+- L3235: raw-ptr-skeleton-no-world-handle
+- L3555: vec3-outparam-seam
+- L3642: missing-const
+- L3646: vec3-outparam-seam
+- L3686: raw-ptr-skeleton-no-world-handle
+- L3851: raw-ptr-skeleton-no-world-handle
+- L3885: raw-ptr-skeleton-no-world-handle
+- L3908: raw-ptr-skeleton-no-world-handle
+- L3924: raw-ptr-skeleton-no-world-handle
+- L3953: raw-ptr-skeleton-no-world-handle
+- L3967: raw-ptr-skeleton-no-world-handle
+- L4028: raw-ptr-skeleton-no-world-handle
+- L4115: raw-ptr-skeleton-no-world-handle
 
 ### crates/mp/game/src/g_main.rs
 - L11: <topic>
@@ -1025,29 +1003,28 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L33: state-threading-g-alloc
 
 ### crates/mp/game/src/g_misc.rs
-- L4: ...
-- L472: raw-ptr-skeleton-no-world-handle
-- L586: unported-const
-- L790: raw-ptr-skeleton-no-world-handle
-- L935: unported-const
-- L1068: control-flow
-- L1430: raw-ptr-skeleton-no-world-handle
-- L1477: unported-const
-- L2007: seam-threading
-- L2138: seam-threading
-- L2152: raw-ptr-skeleton-no-world-handle
-- L2626: raw-ptr-skeleton-no-world-handle
-- L2658: unported-const
-- L2705: raw-ptr-skeleton-no-world-handle
-- L2762: unported-const
-- L2878: raw-ptr-skeleton-no-world-handle
-- L2910: raw-ptr-skeleton-no-world-handle
-- L3006: raw-ptr-skeleton-no-world-handle
-- L3019: raw-ptr-skeleton-no-world-handle
-- L3361: bg-dep
-- L3375: bg-dep
-- L3440: unported-const
-- L3503: raw-ptr-skeleton-no-world-handle
+- L467: raw-ptr-skeleton-no-world-handle
+- L581: unported-const
+- L785: raw-ptr-skeleton-no-world-handle
+- L930: unported-const
+- L1063: control-flow
+- L1425: raw-ptr-skeleton-no-world-handle
+- L1472: unported-const
+- L2002: seam-threading
+- L2133: seam-threading
+- L2147: raw-ptr-skeleton-no-world-handle
+- L2621: raw-ptr-skeleton-no-world-handle
+- L2653: unported-const
+- L2700: raw-ptr-skeleton-no-world-handle
+- L2757: unported-const
+- L2873: raw-ptr-skeleton-no-world-handle
+- L2905: raw-ptr-skeleton-no-world-handle
+- L3001: raw-ptr-skeleton-no-world-handle
+- L3014: raw-ptr-skeleton-no-world-handle
+- L3356: bg-dep
+- L3370: bg-dep
+- L3435: unported-const
+- L3498: raw-ptr-skeleton-no-world-handle
 
 ### crates/mp/game/src/g_missile.rs
 - L1216: gclient_t
@@ -1055,7 +1032,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/game/src/g_mover.rs
 - L18: (untopiced)
 - L589: bg-boundary
-- L2886: unported-consts
 
 ### crates/mp/game/src/g_nav.rs
 - L127: missing-const
@@ -1116,7 +1092,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L9: (untopiced)
 
 ### crates/mp/game/src/g_timer.rs
-- L49: level-global-access
+- L42: level-global-access
 
 ### crates/mp/game/src/g_trigger.rs
 - L2136: variadic-c-abi
