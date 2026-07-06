@@ -2883,12 +2883,6 @@ pub fn funcBBrushUse(
     }
 }
 
-// PORT-NOTE(unported-consts): the stone-chunk branch compares
-// `material` against `MAT_DRK_STONE`/`MAT_LT_STONE`/`MAT_GREY_STONE`/
-// `MAT_SNOWY_ROCK` (`material_t`'s anonymous enum, `q_shared.h`) — not
-// type-ported anywhere in the crate graph yet (same blocker as
-// `CacheChunkEffects` in this file); left as an explicit `//TODO: Port`
-// no-op, rest of the body faithfully ported.
 /// Raven `funcBBrushPain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_mover.c:2532-2597`
@@ -2923,11 +2917,69 @@ pub fn funcBBrushPain(
 
         G_ActivateBehavior(ctx, self_, bSet_t::BSET_PAIN as c_int);
 
-        //TODO: Port MAT_DRK_STONE, MAT_LT_STONE, MAT_GREY_STONE, MAT_SNOWY_ROCK
-        // Source: oracle/oracle/codemp/game/g_mover.c:2556-2588 — the stone
-        // chunk-spawning branch (`G_Chunks` with a `Q_irand(1,3)`-scaled
-        // count) needs these `material_t` values, not type-ported anywhere
-        // in the crate graph yet.
+        if (*self_).material == MAT_DRK_STONE
+            || (*self_).material == MAT_LT_STONE
+            || (*self_).material == MAT_GREY_STONE
+            || (*self_).material == MAT_SNOWY_ROCK
+        {
+            // size
+            let size = [
+                (*self_).r.absmax[0] - (*self_).r.absmin[0],
+                (*self_).r.absmax[1] - (*self_).r.absmin[1],
+                (*self_).r.absmax[2] - (*self_).r.absmin[2],
+            ];
+            // This formula really has no logical basis other than the fact
+            // that it seemed to be the closest to yielding the results that
+            // I wanted. Volume is length * width * height...then break
+            // that volume down based on how many chunks we have.
+            let scale = VectorLength(size) / 100.0;
+
+            // Raven's dead `VectorMA(absmin, 0.5, size, org)` (result overwritten unread) dropped.
+            let mut org = [
+                (*self_).r.absmin[0] + (*self_).r.absmax[0],
+                (*self_).r.absmin[1] + (*self_).r.absmax[1],
+                (*self_).r.absmin[2] + (*self_).r.absmax[2],
+            ];
+            for c in org.iter_mut() {
+                *c *= 0.5;
+            }
+
+            let dir = if !attacker.is_null() && !(*attacker).client.is_null() {
+                let mut d = [
+                    (*attacker).r.currentOrigin[0] - org[0],
+                    (*attacker).r.currentOrigin[1] - org[1],
+                    (*attacker).r.currentOrigin[2] - org[2],
+                ];
+                VectorNormalize(&mut d);
+                d
+            } else {
+                [0.0, 0.0, 1.0]
+            };
+
+            let mut numChunks = (*ctx.world).bg_state.rng.Q_irand(1, 3);
+            if (*self_).radius > 0.0 {
+                // designer wants to scale number of chunks, helpful because
+                // the above scale code is far from perfect — I do this
+                // after the scale calculation because it seems that the
+                // chunk size generally seems to be very close, it's just
+                // the number of chunks is a bit weak.
+                numChunks = (numChunks as f32 * (*self_).radius).ceil() as c_int;
+            }
+
+            G_Chunks(
+                ctx,
+                (*self_).s.number,
+                org,
+                dir,
+                (*self_).r.absmin,
+                (*self_).r.absmax,
+                300.0,
+                numChunks,
+                (*self_).material,
+                0,
+                scale * (*self_).mass,
+            );
+        }
 
         if (*self_).wait == 0.0 {
             (*self_).pain = None;
