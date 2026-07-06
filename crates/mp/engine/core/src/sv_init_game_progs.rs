@@ -40,7 +40,7 @@ pub fn sv_init_game_progs(engine: &mut Engine, policy: &ModuleSearchPolicy) -> S
     let syscall: RawSyscall =
         game_syscall_trampoline as unsafe extern "C-unwind" fn(isize, ...) -> isize as usize
             as *const c_void;
-    //TODO: Port ServerGame reborrow ctx (ServerGame concrete shape unpinned)
+    //TODO: Port SV_InitGameProgs ctx injection (&mut Engine.sv into the game slot)
     // Source: docs/architecture/engine-seam.md § Engine-side dispatchers
     let ctx: *mut c_void = core::ptr::null_mut();
 

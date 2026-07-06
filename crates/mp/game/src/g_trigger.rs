@@ -75,27 +75,20 @@ const FRAMETIME: c_int = 100;
 // are ported (`mp_qshared::common::mp::qcommon::pm_flags`,
 // `mp_bg::public::configstring`, `mp_bg::saga::siege_team_t`) and reach this
 // file through `crate::prelude::*`.
-//TODO: Port PUSH_CONSTANT
 // Source: oracle/oracle/codemp/game/g_trigger.c:899
 pub const PUSH_CONSTANT: c_int = 2;
-//TODO: Port PUSH_LINEAR
 // Source: oracle/oracle/codemp/game/g_trigger.c:895
 pub const PUSH_LINEAR: c_int = 4;
-//TODO: Port PUSH_RELATIVE
 // Source: oracle/oracle/codemp/game/g_trigger.c:896
 pub const PUSH_RELATIVE: c_int = 16;
-//TODO: Port PUSH_MULTIPLE
 // Source: oracle/oracle/codemp/game/g_trigger.c:897
 pub const PUSH_MULTIPLE: c_int = 2048;
-//TODO: Port HYPERSPACE_TIME
 // Source: oracle/oracle/codemp/game/bg_public.h:1679
 pub const HYPERSPACE_TIME: c_int = 4000;
-//TODO: Port HYPERSPACE_TELEPORT_FRAC
 // Source: oracle/oracle/codemp/game/bg_public.h:1680
 pub const HYPERSPACE_TELEPORT_FRAC: f32 = 0.75;
 // `EF2_HYPERSPACE`/`EF_RAG` are ported (`mp_bg::public::entity_effects`) and
 // reach this file through `crate::prelude::*`.
-//TODO: Port INITIAL_SUFFOCATION_DELAY
 // Source: oracle/oracle/codemp/game/g_trigger.c:1441
 pub const INITIAL_SUFFOCATION_DELAY: c_int = 500;
 

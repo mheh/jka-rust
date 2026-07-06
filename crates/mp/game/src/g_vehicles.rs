@@ -2790,7 +2790,6 @@ pub fn DeathUpdate(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
     }
 }
 
-//TODO: Port RegisterAssets
 // Source: oracle/oracle/codemp/game/g_vehicles.c:1618-1620
 /// Raven `RegisterAssets` — register all the assets used by this vehicle. The
 /// base implementation is an empty function body in Raven (see cite); this

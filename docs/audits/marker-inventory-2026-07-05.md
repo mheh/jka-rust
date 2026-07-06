@@ -1,21 +1,27 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 781 markers — 172 `TODO: Port`,
+Totals: 773 markers — 164 `TODO: Port`,
 553 `PORT-NOTE`, 56 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 
-- **LEGIT** — subject genuinely unported; marker accurate. (157)
+- **LEGIT** — subject genuinely unported; marker accurate. (147)
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
-  the actionable findings. (12)
-- **STALE-escalated** — mechanical fix known but crosses files; left in place. (3)
+  the actionable findings. (15)
+- **STALE-escalated** — mechanical fix known but crosses files; left in place. (2)
 
 PORT-NOTE section is a plain re-grep (not audited).
 
-## TODO: Port — COMPLEX (12)
+## TODO: Port — COMPLEX (15)
+
+### crates/mp/cgame/src/local/client_info_t.rs
+- L57: ghoul2Weapons element type (CGhoul2Info_v*)
+  - CGhoul2Info_v IS ported (crates/mp/engine/ghoul2/src/shared/cghoul2_info_v.rs) but mp_cgame naming engine-side ghoul2 state rides the open STATE-Q2 attachment question (ghoul2 is shared engine<->cgame).
+- L142: ghoul2Model (CGhoul2Info_v*)
+  - Same as ghoul2Weapons above — CGhoul2Info_v ported, blocked on STATE-Q2.
 
 ### crates/mp/qshared/src/common/mp/gentity.rs
 - L94: Vehicle_t
@@ -26,6 +32,10 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/qshared/src/common/mp/qcommon/shared_entity_t.rs
 - L29: Vehicle_t
   - Same tiering blocker as gentity.rs: Vehicle_t is ported at crates/mp/bg/src/vehicles/vehicle_s.rs but sharedEntity_t lives in mp_qshared, which cannot depend on mp_bg. Requires an abi-seam/tier refactor, not a file-local mechanical fix.
+
+### crates/sp/abi/src/game/public/game_import_t.rs
+- L435: CMiniHeap
+  - CMiniHeap IS ported (crates/sp/engine/qcommon/src/miniheap/cmini_heap.rs) but sp_abi cannot depend on the engine tier — same cross-tier-naming class as Vehicle_t/gNPC_t; pointer param stays opaque pending a DEC ruling.
 
 ### crates/sp/cgame/src/media/cgs_t.rs
 - L47: clientInfo_t (cross-crate, sp_game -> sp_cgame not wired)
@@ -52,7 +62,7 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Real struct gNPC_t is ported at crates/sp/game/src/npc/g_npc_t.rs (audited in this same shard), but it lives in sp_game (tier 3) while gentity_t lives in sp_qshared (tier 0); same cross-tier dependency block prevents retyping the NPC field.
 
 
-## TODO: Port — STALE-escalated (3)
+## TODO: Port — STALE-escalated (2)
 
 ### crates/mp/engine/qcommon/src/lib.rs
 - L1: module mp_engine_qcommon
@@ -62,12 +72,8 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L1: module mp_engine_server
   - Validator claim does not match the file. Actual line 1 is `//! `mp_engine_server` crate. //TODO: Port module mp_engine_server` — subject is already `mp_engine_server` (not `server` as claimed), and there is no `// Source:` line to normalize. This exact one-line, no-Source-line form is the established house convention for crate-root module docs, verified identical across all 22 sibling crate lib.rs files (e.g. crates/mp/engine/qcommon/src/lib.rs, crates/mp/engine/client/src/lib.rs, crates/sp/engine/server/src/lib.rs, crates/mp/bg/src/lib.rs). Git history (git log -p --follow on this file) shows the line unchanged since crate creation in 71ec41c7. Fixing/normalizing it as described would actually break consistency with the rest of the codebase, so no edit was made.
 
-### crates/sp/abi/src/game/public/game_import_t.rs
-- L435: CMiniHeap
-  - Validator claim is false: CMiniHeap IS used by a field in this struct — G2API_CollisionDetect's G2VertSpace parameter (line 448, currently `*mut c_void`) is Raven's `CMiniHeap *G2VertSpace` (oracle/oracle/code/game/g_public.h:403-404). The marker correctly documents that placeholder. Retyping it to `*mut CMiniHeap` (ported at crates/sp/engine/qcommon/src/miniheap/cmini_heap.rs) requires adding sp_engine_qcommon as a dependency in crates/sp/abi/Cargo.toml, which is outside my assigned file — so I left the marker and field untouched rather than deleting it.
 
-
-## TODO: Port — LEGIT (157)
+## TODO: Port — LEGIT (147)
 
 ### crates/abi-transport/src/generic/engine.rs
 - L78: RunStatic per-call handler surface
@@ -105,10 +111,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/cgame/src/lib.rs
 - L3: module mp_cgame
 
-### crates/mp/cgame/src/local/client_info_t.rs
-- L57: ghoul2Weapons element type (CGhoul2Info_v*)
-- L142: ghoul2Model (CGhoul2Info_v*)
-
 ### crates/mp/engine-select/src/lib.rs
 - L17: wasm32 outbound backend type (SEAM-Q11 — concrete type/file open)
 
@@ -138,7 +140,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L126: Sys_Error console teardown + IN_Shutdown (client-shell slice)
 
 ### crates/mp/engine/core/src/sv_init_game_progs.rs
-- L43: ServerGame reborrow ctx (ServerGame concrete shape unpinned)
+- L43: SV_InitGameProgs ctx injection (&mut Engine.sv into the game slot)
 
 ### crates/mp/engine/ghoul2/src/lib.rs
 - L1: module mp_engine_ghoul2
@@ -211,19 +213,9 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/g_trigger.rs
 - L54: bSet_e
-- L78: PUSH_CONSTANT
-- L81: PUSH_LINEAR
-- L84: PUSH_RELATIVE
-- L87: PUSH_MULTIPLE
-- L90: HYPERSPACE_TIME
-- L93: HYPERSPACE_TELEPORT_FRAC
-- L98: INITIAL_SUFFOCATION_DELAY
 
 ### crates/mp/game/src/g_turret.rs
 - L44: CLASS_VEHICLE
-
-### crates/mp/game/src/g_vehicles.rs
-- L2793: RegisterAssets
 
 ### crates/mp/game/src/npc/g_npc_t.rs
 - L75: rank_t
@@ -1077,7 +1069,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L42: level-global-access
 
 ### crates/mp/game/src/g_trigger.rs
-- L2136: variadic-c-abi
+- L2129: variadic-c-abi
 
 ### crates/mp/game/src/g_turret_G2.rs
 - L11: (untopiced)
