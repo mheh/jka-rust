@@ -546,7 +546,12 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*cl).ps.fd.forcePowerSelected = (*cl).sess.selectedFP;
         }
 
-        if (*cl).ps.fd.forcePowersKnown & (1 << (*cl).ps.fd.forcePowerSelected) == 0 {
+        // Raven shifts by forcePowerSelected while it can still be -1 (fresh client,
+        // set to -1 above) — shift-by-negative UB; x86/ARM both mask the count (= 1<<31,
+        // never a known power), so the masked shift is the one defined behavior (§19).
+        if (*cl).ps.fd.forcePowersKnown & 1i32.wrapping_shl((*cl).ps.fd.forcePowerSelected as u32)
+            == 0
+        {
             if lastFPKnown != -1 {
                 (*cl).ps.fd.forcePowerSelected = lastFPKnown;
             } else {
