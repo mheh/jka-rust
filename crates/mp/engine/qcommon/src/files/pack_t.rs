@@ -1,7 +1,8 @@
 #![allow(non_camel_case_types, non_snake_case)]
-use core::ffi::{c_char, c_int, c_void};
+use core::ffi::{c_char, c_int};
 
 use super::file_in_pack_s::fileInPack_t;
+use super::unz_file::unzFile;
 
 /// Raven `pack_t` — an open `.pk3` archive tracked by the filesystem.
 ///
@@ -14,10 +15,8 @@ pub struct pack_t {
     pub pakBasename: [c_char; 1024],
     /// base
     pub pakGamename: [c_char; 1024],
-    //TODO: Port unzFile
-    // Source: oracle/oracle/codemp/qcommon/files.h:47
     /// handle to zip file
-    pub handle: *mut c_void,
+    pub handle: unzFile,
     /// regular checksum
     pub checksum: c_int,
     /// checksum for pure
