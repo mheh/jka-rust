@@ -73,6 +73,12 @@ pub struct GameWorld {
     /// Source: `oracle/oracle/codemp/game/g_misc.c:2886`
     pub refTagOwnerMap:
         Box<[crate::level::tag_owner::tagOwner_t; crate::level::tag_owner::MAX_TAG_OWNERS]>,
+
+    /// `char gSharedBuffer[MAX_G_SHARED_BUFFER_SIZE]`, the module's
+    /// engine-registered shared-memory region (`trap_SV_RegisterSharedMemory`).
+    /// Untyped raw bytes, same shape as `memoryPool` above.
+    /// Source: `oracle/oracle/codemp/game/g_main.c:881`
+    pub gSharedBuffer: Box<[u8; crate::g_local_consts::MAX_G_SHARED_BUFFER_SIZE]>,
 }
 
 impl GameWorld {
@@ -94,6 +100,8 @@ impl GameWorld {
         let refTagOwnerMap = native_platform::zeroed_box::<
             [crate::level::tag_owner::tagOwner_t; crate::level::tag_owner::MAX_TAG_OWNERS],
         >();
+        let gSharedBuffer =
+            native_platform::zeroed_box::<[u8; crate::g_local_consts::MAX_G_SHARED_BUFFER_SIZE]>();
         GameWorld {
             level,
             g_entities,
@@ -114,6 +122,7 @@ impl GameWorld {
             // Zeroed session state with the LCG seeded to Raven's `holdrand`.
             bg_state: crate::bg_channel::BgState::new(),
             refTagOwnerMap,
+            gSharedBuffer,
         }
     }
 }

@@ -32,3 +32,20 @@ pub const START_TIME_LINK_ENTS: c_int = crate::g_items::FRAMETIME * 1;
 ///
 /// Source: `oracle/oracle/codemp/game/g_local.h:46`
 pub const START_TIME_FIND_LINKS: c_int = crate::g_items::FRAMETIME * 2;
+
+/// Raven `START_TIME_NAV_CALC` — time-delay after map start to connect
+/// waypoints and calc routes.
+///
+/// Source: `oracle/oracle/codemp/game/g_local.h:49`
+pub const START_TIME_NAV_CALC: c_int = crate::g_items::FRAMETIME * 4;
+
+/// Raven `MAX_G_SHARED_BUFFER_SIZE` — size of `gSharedBuffer`, the module's
+/// engine-registered shared-memory region.
+///
+/// Source: `oracle/oracle/codemp/game/g_local.h:85`
+pub const MAX_G_SHARED_BUFFER_SIZE: usize = 8192;
+
+/// Raven `SP_PODIUM_MODEL`.
+///
+/// Source: `oracle/oracle/codemp/game/g_local.h:96`
+pub const SP_PODIUM_MODEL: &core::ffi::CStr = c"models/mapobjects/podium/podium4.md3";
