@@ -37,6 +37,9 @@ use mp_abi::game::syscalls::G_LINKENTITY::GLinkentityArgs;
 use mp_abi::game::syscalls::G_TRACE::GTraceArgs;
 use mp_bg::public::configstring::{CS_SKYBOXORG, CS_TERRAINS};
 use mp_bg::public::entity_type::entityType_t;
+use mp_bg::public::fx_state::{
+    FX_STATE_CONTINUOUS, FX_STATE_OFF, FX_STATE_ONE_SHOT, FX_STATE_ONE_SHOT_LIMIT,
+};
 use mp_bg::public::means_of_death::meansOfDeath_t::MOD_UNKNOWN;
 use mp_bg::public::viewheight::{DEFAULT_MAXS_2, DEFAULT_MINS_2};
 use mp_qshared::common::mp::qcommon::pm_flags::PMF_FOLLOW;
@@ -87,13 +90,6 @@ impl Default for shooterClient_t {
 // Source: `oracle/oracle/codemp/game/q_shared.h`
 const qtrue: qboolean = 1;
 const qfalse: qboolean = 0;
-
-// Raven `bSet_e` (`g_public.h:641-646`); only `BSET_USE` (index 1) is needed
-// in this file. Not yet ported as an enum (ICARUS/behavior-set territory);
-// cited by value rather than guessed.
-//TODO: Port bSet_e
-// Source: oracle/oracle/codemp/game/g_public.h:641-661
-const BSET_USE: c_int = 1;
 
 /// Raven `SP_info_camp`.
 ///
@@ -222,7 +218,7 @@ pub fn misc_dlight_use(
     activator: *mut gentity_t,
 ) {
     unsafe {
-        G_ActivateBehavior(ctx, ent, BSET_USE);
+        G_ActivateBehavior(ctx, ent, bSet_t::BSET_USE as c_int);
         (*ent).alt_fire = if (*ent).alt_fire != qfalse {
             qfalse
         } else {
@@ -2246,19 +2242,6 @@ pub fn SP_misc_model_health_power_converter(ctx: GameContext<'_>, ent: *mut gent
         }
     }
 }
-
-//TODO: Port FX_STATE_OFF
-// Source: oracle/oracle/codemp/game/bg_public.h:1182
-const FX_STATE_OFF: c_int = 0;
-//TODO: Port FX_STATE_ONE_SHOT
-// Source: oracle/oracle/codemp/game/bg_public.h:1183
-const FX_STATE_ONE_SHOT: c_int = 1;
-//TODO: Port FX_STATE_ONE_SHOT_LIMIT
-// Source: oracle/oracle/codemp/game/bg_public.h:1184
-const FX_STATE_ONE_SHOT_LIMIT: c_int = 10;
-//TODO: Port FX_STATE_CONTINUOUS
-// Source: oracle/oracle/codemp/game/bg_public.h:1185
-const FX_STATE_CONTINUOUS: c_int = 20;
 
 /// Raven `fx_runner_think`.
 ///
