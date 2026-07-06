@@ -48,8 +48,12 @@ Raven's `jampgamex86.dll`:
   and platform conventions expected by the engine (CI packages engine-named
   modules — `jampgamex86_64.dll`/`.so` — on every master push; the 32-bit
   `jampgamex86.dll`/`jampgamei386.so` lanes await the ILP32 assert pass).
-- [ ] Add an ABI smoke test that loads the Rust module through the same
-  `dllEntry`/`vmMain` contract as the engine.
+- [x] Add an ABI smoke test that loads the Rust module through the same
+  `dllEntry`/`vmMain` contract as the engine
+  (`crates/jampgame/tests/abi_smoke.rs`: loads the built cdylib via the ported
+  `native_platform` loader + real inbound syscall trampoline, drives
+  `GAME_INIT` → 10 `GAME_RUN_FRAME`s → `GAME_SHUTDOWN` against a mock engine,
+  asserting survival and structural side effects).
 - [ ] Add differential tests against Raven/oracle behavior for representative
   imports, exports, and frame/client flows.
 - [ ] Prove hot-swap behavior by replacing `jampgamex86.dll`/the platform

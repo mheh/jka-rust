@@ -59,7 +59,11 @@ name = "jampgame"
 version = "0.1.0"
 dependencies = [
  "abi_transport",
+ "mp_abi",
+ "mp_engine_qcommon",
  "mp_game",
+ "mp_qshared",
+ "native_platform",
 ]
 
 [[package]]
