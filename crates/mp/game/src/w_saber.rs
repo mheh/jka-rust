@@ -99,7 +99,7 @@ use crate::saber::saber_flags::{
 use crate::tri_coll_test::tri_tri_intersect;
 use crate::w_force::{ForceThrow, WP_ForcePowerUsable};
 use crate::NPC_AI_Jedi::{Jedi_Ambush, Jedi_SaberBlockGo, Jedi_WaitingAmbush};
-use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
+use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::NPC_senses::InFront;
 use mp_bg::public::set_anim::{SETANIM_BOTH, SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE};
 

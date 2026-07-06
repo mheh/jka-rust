@@ -225,7 +225,7 @@ pub fn Sentry_Fire(ctx: GameContext<'_>) {
             ),
         );
 
-        crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(
+        BG_GiveMeVectorFromMatrix(
             &boltMatrix,
             Eorientations::ORIGIN as c_int,
             &mut muzzle,

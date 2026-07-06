@@ -20,10 +20,6 @@ use crate::trap;
 use crate::NPC_reactions::NPC_Pain;
 use crate::NPC_utils::NPC_SetSurfaceOnOff;
 
-// Matrix flags for BG_GiveMeVectorFromMatrix are Raven `Eorientations`
-// (`q_shared.h:3086-3095`, enumerator order X, Z, Y) — glob-imported via the
-// prelude; this file previously carried its own (incorrectly-ordered) copy.
-
 /// Raven ammo pod health.
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:4-5`
 const AMMO_POD_HEALTH: c_int = 1;
@@ -43,64 +39,6 @@ pub const LSTATE_RISINGUP: c_int = 3;
 /// Source: `oracle/oracle/codemp/game/NPC_AI_Mark2.c:8-12`
 const MIN_DISTANCE: c_int = 24;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
-
-/// Inline helper from `oracle/oracle/codemp/game/bg_public.h:1524-1564`.
-///
-/// Extract a vector from a bolt matrix based on flags.
-/// Source: `oracle/oracle/codemp/game/bg_public.h:1524-1564`
-#[inline]
-pub fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, vec: &mut vec3_t) {
-    // `flags` (the faithful C `int`) is matched against `Eorientations`
-    // (`q_shared.h:3086-3095`); local `c_int`-typed aliases let the match
-    // patterns below compare directly against the scrutinee's type.
-    const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
-    pub const POSITIVE_Y: c_int = Eorientations::POSITIVE_Y as c_int;
-    pub const POSITIVE_X: c_int = Eorientations::POSITIVE_X as c_int;
-    pub const POSITIVE_Z: c_int = Eorientations::POSITIVE_Z as c_int;
-    const NEGATIVE_Y: c_int = Eorientations::NEGATIVE_Y as c_int;
-    pub const NEGATIVE_X: c_int = Eorientations::NEGATIVE_X as c_int;
-    pub const NEGATIVE_Z: c_int = Eorientations::NEGATIVE_Z as c_int;
-    unsafe {
-        match flags {
-            ORIGIN => {
-                vec[0] = (*boltMatrix).matrix[0][3];
-                vec[1] = (*boltMatrix).matrix[1][3];
-                vec[2] = (*boltMatrix).matrix[2][3];
-            }
-            POSITIVE_Y => {
-                vec[0] = (*boltMatrix).matrix[0][1];
-                vec[1] = (*boltMatrix).matrix[1][1];
-                vec[2] = (*boltMatrix).matrix[2][1];
-            }
-            POSITIVE_X => {
-                vec[0] = (*boltMatrix).matrix[0][0];
-                vec[1] = (*boltMatrix).matrix[1][0];
-                vec[2] = (*boltMatrix).matrix[2][0];
-            }
-            POSITIVE_Z => {
-                vec[0] = (*boltMatrix).matrix[0][2];
-                vec[1] = (*boltMatrix).matrix[1][2];
-                vec[2] = (*boltMatrix).matrix[2][2];
-            }
-            NEGATIVE_Y => {
-                vec[0] = -(*boltMatrix).matrix[0][1];
-                vec[1] = -(*boltMatrix).matrix[1][1];
-                vec[2] = -(*boltMatrix).matrix[2][1];
-            }
-            NEGATIVE_X => {
-                vec[0] = -(*boltMatrix).matrix[0][0];
-                vec[1] = -(*boltMatrix).matrix[1][0];
-                vec[2] = -(*boltMatrix).matrix[2][0];
-            }
-            NEGATIVE_Z => {
-                vec[0] = -(*boltMatrix).matrix[0][2];
-                vec[1] = -(*boltMatrix).matrix[1][2];
-                vec[2] = -(*boltMatrix).matrix[2][2];
-            }
-            _ => {}
-        }
-    }
-}
 
 /// Raven `NPC_Mark2_Precache`.
 ///

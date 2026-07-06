@@ -100,12 +100,11 @@ pub use crate::q_shared_cvar_flags::*;
 pub use crate::w_force::mindTrickTime;
 pub use mp_bg::vehicles::{vehFieldType_t, vehFieldType_t::*, vehField_t};
 pub use mp_qshared::shared::q_math_rand::RAND_MAX;
-// `BG_GiveMeVectorFromMatrix` has independent per-NPC-file transcriptions
-// (Raven copy-paste convention, porting-rules §F20); `NPC_AI_Mark2`'s copy is
-// the only one already `pub` and is the canonical export for bare-use sites.
+// `BG_GiveMeVectorFromMatrix` lives in `bg_misc` (its oracle home,
+// `bg_misc.c:736`); the canonical export for bare-use sites.
+pub use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 pub use crate::saber::w_saber_consts::*;
 pub use crate::teams::npcteam::*;
-pub use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
 
 // Enum types transcribed as `#[repr(i32)] enum` per porting-rules'
 // enum-vs-alias fidelity rule; the fnskel packets carry their bare Raven

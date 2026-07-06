@@ -20,7 +20,7 @@ use crate::q_shared::va;
 use crate::trap;
 use crate::world::{ent_id, ent_id_opt};
 use crate::NPC_AI_Default::NPC_BSIdle;
-use crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix;
+use crate::bg_misc::BG_GiveMeVectorFromMatrix;
 use crate::NPC_AI_Stormtrooper::NPC_CheckPlayerTeamStealth;
 use crate::NPC_goal::UpdateGoal;
 use crate::NPC_move::{NPC_GetMoveDirection, NPC_MoveToGoal};

@@ -25,8 +25,10 @@ use crate::g_combat::G_DamageFromKiller;
 use crate::g_main::Com_Error;
 use crate::g_utils::G_AllocateVehicleObject;
 use crate::g_vehicles::{
-    SHIPSURF_BROKEN_C, SHIPSURF_BROKEN_D, SHIPSURF_BROKEN_E, SHIPSURF_BROKEN_F,
+    G_VehicleTrace, Update as vehicle_base_update, SHIPSURF_BROKEN_C, SHIPSURF_BROKEN_D,
+    SHIPSURF_BROKEN_E, SHIPSURF_BROKEN_F,
 };
+use crate::veh_dispatch;
 use crate::q_math::{
     _DotProduct, _VectorMA, _VectorScale, AngleVectors, VectorClear, VectorLength,
 };
@@ -97,37 +99,33 @@ pub fn BG_FighterUpdate(
     trMins: vec3_t,
     trMaxs: vec3_t,
     gravity: f32,
-    // Raven: `void (*traceFunc)(trace_t*, const vec3_t, const vec3_t, const
-    // vec3_t, const vec3_t, int, int)` — same shape as `pmove_t::trace`.
+    // Raven's bare `void (*traceFunc)(trace_t*, ...)` is the ctx-free bg/cgame
+    // trace shape; game-side the caller passes `G_VehicleTrace`, whose port carries
+    // `ctx`. So the port threads the same `ctx`-aware, `vec3_t`-by-value shape as
+    // `G_VehicleTrace` rather than the C fn-ptr.
     // Source: `oracle/oracle/codemp/game/FighterNPC.c:100`
-    traceFunc: Option<
-        unsafe extern "C" fn(
-            results: *mut trace_t,
-            start: *const vec3_t,
-            mins: *const vec3_t,
-            maxs: *const vec3_t,
-            end: *const vec3_t,
-            passEntityNum: c_int,
-            contentMask: c_int,
-        ),
-    >,
+    traceFunc: fn(GameContext<'_>, *mut trace_t, vec3_t, vec3_t, vec3_t, vec3_t, c_int, c_int),
 ) -> qboolean {
     unsafe {
         let mut bottom = [0.0f32; 3];
         let parentPS: *mut playerState_t;
         let mut isDead: qboolean = qfalse;
 
-        // In QAGAME, ghost the riders. jampgame always defines QAGAME, so this
-        // runs unconditionally on the game side.
+        // In QAGAME, make the riders non-visible and non-collidable. jampgame
+        // always defines QAGAME, so this runs unconditionally on the game side.
+        // Raven's `pVeh->m_pVehicleInfo->Ghost(...)` slot dispatches through
+        // `veh_dispatch::ghost` (the base impl null-checks the entity).
+        veh_dispatch::ghost(ctx, pVeh, (*pVeh).m_pPilot.cast::<gentity_t>());
         {
-            let i_max = (*pVeh)
+            let maxPassengers = (*pVeh)
                 .m_pVehicleInfo
                 .as_ref()
                 .map(|vi| vi.maxPassengers)
                 .unwrap_or(0);
-            for i in 0..i_max {
-                // Ghost passengers - calling through vtable/function pointers
-                // This is a simplification; actual ghosts of riders would be done here
+            let mut i: c_int = 0;
+            while i < maxPassengers {
+                veh_dispatch::ghost(ctx, pVeh, (*pVeh).m_ppPassengers[i as usize].cast::<gentity_t>());
+                i += 1;
             }
         }
 
@@ -169,22 +167,57 @@ pub fn BG_FighterUpdate(
             bottom[2] -= vi.landingHeight;
         }
 
-        // Call trace function
-        if let Some(trace_fn) = traceFunc {
-            trace_fn(
-                &mut (*pVeh).m_LandTrace,
-                &(*parentPS).origin,
-                &trMins,
-                &trMaxs,
-                &bottom,
-                (*pVeh)
-                    .m_pParentEntity
-                    .cast::<gentity_t>()
-                    .as_ref()
-                    .map(|e| e.s.number)
-                    .unwrap_or(0),
-                3 | 4, // MASK_NPCSOLID & ~CONTENTS_BODY
-            );
+        // Trace down for the landing surface. Oracle contentmask is
+        // `MASK_NPCSOLID & ~CONTENTS_BODY`.
+        traceFunc(
+            ctx,
+            &mut (*pVeh).m_LandTrace,
+            (*parentPS).origin,
+            trMins,
+            trMaxs,
+            bottom,
+            (*pVeh)
+                .m_pParentEntity
+                .cast::<gentity_t>()
+                .as_ref()
+                .map(|e| e.s.number)
+                .unwrap_or(0),
+            MASK_NPCSOLID & !CONTENTS_BODY,
+        );
+
+        qtrue
+    }
+}
+
+/// Raven `Update` — the fighter's per-frame update slot (QAGAME game-side).
+///
+/// Runs `BG_FighterUpdate` (fighter gravity + landing trace), then chains the
+/// generic base `Update` (`g_vehicleInfo[VEHICLE_BASE].Update`), bailing if either
+/// returns false — the oracle call order. `trMins`/`trMaxs` are the parent
+/// gentity's `r.mins`/`r.maxs` (Raven's `#define mins r.mins`); gravity is the
+/// `g_gravity` cvar.
+/// Source: `oracle/oracle/codemp/game/FighterNPC.c:188-209`
+pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+    unsafe {
+        let parent = (*pVeh).m_pParentEntity as *mut gentity_t;
+        debug_assert!(!parent.is_null());
+
+        if BG_FighterUpdate(
+            ctx,
+            pVeh,
+            pUcmd,
+            (*parent).r.mins,
+            (*parent).r.maxs,
+            (*ctx.world).cvars.g_gravity.value,
+            G_VehicleTrace,
+        ) == qfalse
+        {
+            return qfalse;
+        }
+
+        // `g_vehicleInfo[VEHICLE_BASE].Update` — the generic base body.
+        if vehicle_base_update(ctx, pVeh, pUcmd) == qfalse {
+            return qfalse;
         }
 
         qtrue

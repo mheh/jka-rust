@@ -11,6 +11,7 @@
 use crate::prelude::*;
 // Dedupe SVF_NOCLIENT glob ambiguity (g_items::* / g_public_consts::* both
 // define it): the canonical home is g_public_consts, per house convention.
+use crate::ent_fn_enums::dispatch_die;
 use crate::g_ICARUScb::G_DebugPrint;
 use crate::g_ICARUScb::Q3_SetParm;
 use crate::g_public_consts::SVF_NOCLIENT;
@@ -3022,9 +3023,21 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                     );
                     player.health = 0;
 
-                    if !player.die.is_none() && !player.client.is_null() {
-                        // PORT-NOTE(fn-ptr): die function pointer call with MOD_UNKNOWN
-                        // player.die(player, player, player, unsafe { (*(player.client as *mut gclient_t)).pers.maxHealth }, MOD_UNKNOWN);
+                    if let Some(die_fn) = player.die {
+                        if !player.client.is_null() {
+                            let health =
+                                unsafe { (*(player.client as *mut gclient_t)).pers.maxHealth };
+                            let self_ = player as *mut gentity_t;
+                            dispatch_die(
+                                ctx,
+                                die_fn,
+                                self_,
+                                self_,
+                                self_,
+                                health,
+                                MOD_UNKNOWN as c_int,
+                            );
+                        }
                     }
                 }
             } else if !player.NPC_type.is_null() && !player.classname.is_null() {
@@ -3057,8 +3070,18 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                         .as_ptr(),
                     );
                     player.health = 0;
-                    if !player.die.is_none() {
-                        // PORT-NOTE(fn-ptr): die function pointer call
+                    if let Some(die_fn) = player.die {
+                        let health = unsafe { (*(player.client as *mut gclient_t)).pers.maxHealth };
+                        let self_ = player as *mut gentity_t;
+                        dispatch_die(
+                            ctx,
+                            die_fn,
+                            self_,
+                            self_,
+                            self_,
+                            health,
+                            MOD_UNKNOWN as c_int,
+                        );
                     }
                 }
             } else if (!player.targetname.is_null()
@@ -3080,8 +3103,9 @@ pub fn NPC_Kill_f(ctx: GameContext<'_>) {
                 unsafe {
                     (*(player.client as *mut gclient_t)).ps.stats[STAT_HEALTH as usize] = 0;
                 }
-                if !player.die.is_none() {
-                    // PORT-NOTE(fn-ptr): die function pointer call
+                if let Some(die_fn) = player.die {
+                    let self_ = player as *mut gentity_t;
+                    dispatch_die(ctx, die_fn, self_, self_, self_, 100, MOD_UNKNOWN as c_int);
                 }
             }
         }

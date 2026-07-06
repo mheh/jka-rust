@@ -165,7 +165,7 @@ pub fn G_RunExPhys(
                         &(*ent).modelScale as *const vec3_t,
                     ),
                 );
-                crate::NPC_AI_Mark2::BG_GiveMeVectorFromMatrix(
+                BG_GiveMeVectorFromMatrix(
                     &matrix as *const mdxaBone_t,
                     mp_qshared::shared::Eorientations::ORIGIN as c_int,
                     &mut boneOrg,

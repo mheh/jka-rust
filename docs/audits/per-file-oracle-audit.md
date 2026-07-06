@@ -245,3 +245,25 @@ m_pVehicle resolution). Reported gaps: PORT-NOTE(fn-ptr) player->die calls in
 NPC_Kill_f still commented out (NPCs not killed via that path). Coverage:
 npc_c 43/43, NPC_stats 8/8 live (NPC_ParseParms end-to-end), NPC_spawn all
 substantive fns (the ~55 trivial SP_NPC_* setters spot-verified).
+
+### Audit follow-up round (2026-07-06, post-merge): all five findings resolved
+- **FighterNPC per-class Update — PORTED** (FighterNPC.rs:194-227 + veh_dispatch.rs
+  VH_FIGHTER arm; oracle FighterNPC.c:188-209/1965). BG_FighterUpdate now
+  reachable; its traceFunc retyped to the port's ctx-carrying G_VehicleTrace
+  shape, contentmask placeholder fixed to MASK_NPCSOLID & !CONTENTS_BODY, and
+  the silent Ghost no-op loop wired to veh_dispatch::ghost. Remaining known
+  gap: AnimateVehicle's BG_SetAnim thread (pre-existing documented PORT-NOTE).
+- **BG_ParseAnimationEvtFile — FALSE POSITIVE, §20 drop documented.** All three
+  functions live inside `#ifndef QAGAME` (bg_panimate.c:1756-2328); callers and
+  bgAllEvents reads are CGAME-only. Module-doc note added to bg_panimate.rs;
+  BgState::bgAllEvents stays as a faithful-but-inert mirror.
+- **NPC_Kill_f player->die — WIRED** (stale PORT-NOTE(fn-ptr); the
+  ent_fn_enums::dispatch_die mechanism already existed). Three call sites match
+  oracle NPC_spawn.c:4122-4159; `npc kill` now actually kills NPCs.
+- **NPC_ParseParms vehicle height — PARK STALE, RESOLVED** (NPC_stats.rs:1460-92).
+  Full VH_FIGHTER gate implemented (was missing the vehicleInfo checks — a real
+  mis-branch for non-fighter vehicles) + the deferred standheight chained-assign
+  int truncation (maxs[2] == floor(n/2), oracle NPC_stats.c:1972-1980).
+- **BG_GiveMeVectorFromMatrix — transcription CLEAN** (all matrix indices verified
+  vs bg_misc.c:736-776); relocated to bg_misc.rs:1917 (its oracle home), prelude
+  re-export repointed, 3 explicit imports + 10 inline-path call sites cleaned.

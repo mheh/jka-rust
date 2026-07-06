@@ -1912,3 +1912,64 @@ pub fn BG_OutOfMemory(bg: &BgState) -> qboolean {
         qfalse
     }
 }
+
+/// Raven `BG_GiveMeVectorFromMatrix` — given a bolt matrix, return in `vec` a
+/// vector for the axis requested in `flags`.
+///
+/// The canonical home is `bg_misc.c` (the `#ifdef __LCC__` out-of-line copy);
+/// non-LCC builds compile the identical body as a `static ID_INLINE` in
+/// `bg_public.h:1524-1564`.
+/// Source: `oracle/oracle/codemp/game/bg_misc.c:736-776`
+#[inline]
+pub fn BG_GiveMeVectorFromMatrix(boltMatrix: *const mdxaBone_t, flags: c_int, vec: &mut vec3_t) {
+    // `flags` (the faithful C `int`) is matched against `Eorientations`
+    // (`q_shared.h:3086-3095`); local `c_int`-typed aliases let the match
+    // patterns below compare directly against the scrutinee's type.
+    const ORIGIN: c_int = Eorientations::ORIGIN as c_int;
+    const POSITIVE_Y: c_int = Eorientations::POSITIVE_Y as c_int;
+    const POSITIVE_X: c_int = Eorientations::POSITIVE_X as c_int;
+    const POSITIVE_Z: c_int = Eorientations::POSITIVE_Z as c_int;
+    const NEGATIVE_Y: c_int = Eorientations::NEGATIVE_Y as c_int;
+    const NEGATIVE_X: c_int = Eorientations::NEGATIVE_X as c_int;
+    const NEGATIVE_Z: c_int = Eorientations::NEGATIVE_Z as c_int;
+    unsafe {
+        match flags {
+            ORIGIN => {
+                vec[0] = (*boltMatrix).matrix[0][3];
+                vec[1] = (*boltMatrix).matrix[1][3];
+                vec[2] = (*boltMatrix).matrix[2][3];
+            }
+            POSITIVE_Y => {
+                vec[0] = (*boltMatrix).matrix[0][1];
+                vec[1] = (*boltMatrix).matrix[1][1];
+                vec[2] = (*boltMatrix).matrix[2][1];
+            }
+            POSITIVE_X => {
+                vec[0] = (*boltMatrix).matrix[0][0];
+                vec[1] = (*boltMatrix).matrix[1][0];
+                vec[2] = (*boltMatrix).matrix[2][0];
+            }
+            POSITIVE_Z => {
+                vec[0] = (*boltMatrix).matrix[0][2];
+                vec[1] = (*boltMatrix).matrix[1][2];
+                vec[2] = (*boltMatrix).matrix[2][2];
+            }
+            NEGATIVE_Y => {
+                vec[0] = -(*boltMatrix).matrix[0][1];
+                vec[1] = -(*boltMatrix).matrix[1][1];
+                vec[2] = -(*boltMatrix).matrix[2][1];
+            }
+            NEGATIVE_X => {
+                vec[0] = -(*boltMatrix).matrix[0][0];
+                vec[1] = -(*boltMatrix).matrix[1][0];
+                vec[2] = -(*boltMatrix).matrix[2][0];
+            }
+            NEGATIVE_Z => {
+                vec[0] = -(*boltMatrix).matrix[0][2];
+                vec[1] = -(*boltMatrix).matrix[1][2];
+                vec[2] = -(*boltMatrix).matrix[2][2];
+            }
+            _ => {}
+        }
+    }
+}
