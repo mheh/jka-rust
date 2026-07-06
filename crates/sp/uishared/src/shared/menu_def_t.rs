@@ -1,9 +1,10 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_char, c_float, c_int, c_void};
+use core::ffi::{c_char, c_float, c_int};
 
 use sp_qshared::shared::{qboolean, vec4_t};
 
+use super::item_def_s::itemDef_t;
 use super::window_def_t::windowDef_t;
 
 /// Raven `Window` — alias for `windowDef_t` used by menu/item headers.
@@ -50,10 +51,8 @@ pub struct menuDef_t {
     pub focusColor: vec4_t,
     /// focus color for items
     pub disableColor: vec4_t,
-    //TODO: Port itemDef_s
-    // Source: oracle/oracle/code/ui/ui_shared.h:374-425
     /// items this menu contains
-    pub items: [*mut c_void; MAX_MENUITEMS],
+    pub items: [*mut itemDef_t; MAX_MENUITEMS],
     /// when next item should appear
     pub appearanceTime: c_float,
     /// current item displayed

@@ -1,8 +1,7 @@
 //! `mp_game` — MP server-game module (`g_*`), the game-side of the QVM boundary.
 //!
 //! The core `g_local.h` data model is ported (client/entity/level + AI/teams/npc
-//! types), verified against oracle with size/offset asserts. //TODO: Port the
-//! gameplay logic (g_*.c functions).
+//! types), verified against oracle with size/offset asserts.
 
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 // The pass-3 port reaches world state through raw pointers (`(*ctx.world).…`),

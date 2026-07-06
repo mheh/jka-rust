@@ -1,12 +1,14 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_char, c_int, c_uint, c_void};
+use core::ffi::{c_char, c_int, c_uint};
 
 use mp_qshared::common::mp::cgame::glconfig_t::glconfig_t;
+use mp_qshared::common::mp::cgame::ref_entity_t::refEntity_t;
 use mp_qshared::common::mp::cgame::refdef_t::refdef_t;
 use mp_qshared::shared::{qboolean, qhandle_t, sfxHandle_t, vec3_t, vec4_t};
 
 use super::cached_assets_t::cachedAssets_t;
+use super::item_def_s::itemDef_t;
 
 /// Raven `displayContextDef_t` — the UI module's function-pointer table into
 /// the engine plus the display/frame state the engine keeps refreshed for it.
@@ -60,9 +62,7 @@ pub struct displayContextDef_t {
     pub drawSides: Option<unsafe extern "C" fn(x: f32, y: f32, w: f32, h: f32, size: f32)>,
     pub drawTopBottom: Option<unsafe extern "C" fn(x: f32, y: f32, w: f32, h: f32, size: f32)>,
     pub clearScene: Option<unsafe extern "C" fn()>,
-    //TODO: Port refEntity_t
-    // Source: oracle/oracle/codemp/cgame/tr_types.h:133-251
-    pub addRefEntityToScene: Option<unsafe extern "C" fn(re: *const c_void)>,
+    pub addRefEntityToScene: Option<unsafe extern "C" fn(re: *const refEntity_t)>,
     pub renderScene: Option<unsafe extern "C" fn(fd: *const refdef_t)>,
 
     pub RegisterFont: Option<unsafe extern "C" fn(fontName: *const c_char) -> qhandle_t>,
@@ -151,10 +151,8 @@ pub struct displayContextDef_t {
         ) -> *const c_char,
     >,
     pub feederItemImage: Option<unsafe extern "C" fn(feederID: f32, index: c_int) -> qhandle_t>,
-    //TODO: Port itemDef_t
-    // Source: oracle/oracle/codemp/ui/ui_shared.h:258-305
     pub feederSelection:
-        Option<unsafe extern "C" fn(feederID: f32, index: c_int, item: *mut c_void) -> qboolean>,
+        Option<unsafe extern "C" fn(feederID: f32, index: c_int, item: *mut itemDef_t) -> qboolean>,
     pub keynumToStringBuf:
         Option<unsafe extern "C" fn(keynum: c_int, buf: *mut c_char, buflen: c_int)>,
     pub getBindingBuf: Option<unsafe extern "C" fn(keynum: c_int, buf: *mut c_char, buflen: c_int)>,

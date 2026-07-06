@@ -100,7 +100,8 @@ pub fn BG_FighterUpdate(
     trMins: vec3_t,
     trMaxs: vec3_t,
     gravity: f32,
-    //TODO: Port void ()(trace_t , vec_t , vec_t , vec_t , vec_t , int, int)  (C: `void (*)(trace_t *, const vec_t *, const vec_t *, const vec_t *, const vec_t *, int, int)`)
+    //TODO: Port BG_FighterUpdate traceFunc callback signature
+    // Source: oracle/oracle/codemp/game/FighterNPC.c:100
     traceFunc: *mut c_void,
 ) -> qboolean {
     unsafe {

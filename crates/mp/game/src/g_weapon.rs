@@ -763,13 +763,7 @@ pub fn G_CanDisruptify(ent: *mut gentity_t) -> qboolean {
             return qtrue;
         }
 
-        // PORT-NOTE(bg-dep): `Vehicle_t::m_pVehicleInfo` is still an unported
-        // `*mut c_void` (`vehicleInfo_t` not ported yet — same open item as
-        // `bg_pmove.rs`/`AnimalNPC.rs`); `.type` can't be read through it yet.
-        // Referenced exactly as the oracle cites it; flagged as a missing symbol.
         let veh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
-        //TODO: Port vehicleInfo_t (Vehicle_t::m_pVehicleInfo is still *mut c_void)
-        // Source: oracle/oracle/codemp/game/g_weapon.c:632
         if (*(*veh).m_pVehicleInfo).r#type == mp_bg::vehicles::vehicleType_t::VH_ANIMAL {
             // animal is only type that can be disintigeiteigerated
             return qtrue;
@@ -4009,8 +4003,6 @@ pub fn WP_FireStunBaton(ctx: GameContext<'_>, ent: *mut gentity_t, alt_fire: qbo
                 if (*((*tr_ent).client as *mut gclient_t)).NPC_class == CLASS_VEHICLE {
                     // not on vehicles
                     let pVeh = (*tr_ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
-                    //TODO: Port vehicleInfo_t (Vehicle_t::m_pVehicleInfo is still *mut c_void)
-                    // Source: oracle/oracle/codemp/game/g_weapon.c:3345-3346
                     if pVeh.is_null()
                         || (*(*pVeh).m_pVehicleInfo).r#type
                             == mp_bg::vehicles::vehicleType_t::VH_ANIMAL
@@ -4313,8 +4305,6 @@ pub fn WP_TouchVehMissile(
 pub fn WP_CalcVehMuzzle(ctx: GameContext<'_>, ent: *mut gentity_t, muzzleNum: c_int) {
     unsafe {
         let pVeh = (*ent).m_pVehicle as *mut mp_bg::vehicles::Vehicle_t;
-        //TODO: Port vehicleInfo_t (Vehicle_t::m_pVehicleInfo is still *mut c_void)
-        // Source: oracle/oracle/codemp/game/g_weapon.c:3582
         let mut boltMatrix: mdxaBone_t = std::mem::zeroed();
         let mut vehAngles: vec3_t;
 

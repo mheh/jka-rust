@@ -110,23 +110,6 @@ const PITCH: usize = 0;
 const YAW: usize = 1;
 const ROLL: usize = 2;
 
-// w_force.c-local `#define`s referenced below by their faithful Raven names and
-// resolved at integration (same convention as the module-doc note above; their
-// numeric values live in the un-ported `oracle/oracle/codemp/game/w_force.c`
-// header block and `g_local.h`, not in this packet):
-//TODO: Port FORCE_LIGHTNING_RADIUS   // Source: oracle/oracle/codemp/game/w_force.c
-//TODO: Port MAX_DRAIN_DISTANCE       // Source: oracle/oracle/codemp/game/w_force.c
-//TODO: Port MAX_TRICK_DISTANCE       // Source: oracle/oracle/codemp/game/w_force.c
-//TODO: Port MASK_SHOT                // Source: oracle/oracle/codemp/game/q_shared.h
-//TODO: Port MASK_PLAYERSOLID         // Source: oracle/oracle/codemp/game/q_shared.h
-//TODO: Port GRIP_DRAIN_AMOUNT        // Source: oracle/oracle/codemp/game/g_local.h
-//TODO: Port SVF_BOT                   // Source: oracle/oracle/codemp/game/q_shared.h
-//TODO: Port FJ_FORWARD               // Source: oracle/oracle/codemp/game/w_force.c
-//TODO: Port FJ_BACKWARD              // Source: oracle/oracle/codemp/game/w_force.c
-//TODO: Port FJ_RIGHT                 // Source: oracle/oracle/codemp/game/w_force.c
-//TODO: Port FJ_LEFT                  // Source: oracle/oracle/codemp/game/w_force.c
-//TODO: Port FJ_UP                    // Source: oracle/oracle/codemp/game/w_force.c
-
 /// Raven `PMF_FOLLOW`/`PMF_STUCK_TO_WALL` (`playerState_t::pm_flags` bits).
 /// Source: `oracle/oracle/codemp/game/bg_public.h:415,417`
 const PMF_FOLLOW: c_int = 4096;

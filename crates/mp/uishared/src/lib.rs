@@ -1,3 +1,3 @@
-//! `mp_uishared` crate. //TODO: Port module mp_uishared
+//! `mp_uishared` crate.
 
 pub mod shared;

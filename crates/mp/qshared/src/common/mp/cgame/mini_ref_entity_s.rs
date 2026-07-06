@@ -6,6 +6,7 @@ use core::ffi::c_int;
 
 use native_types::{byte, qhandle_t};
 
+use super::ref_entity_type_t::refEntityType_t;
 use crate::shared::{qboolean, vec2_t, vec3_t};
 
 /// Raven `miniRefEntity_t`.
@@ -16,9 +17,7 @@ use crate::shared::{qboolean, vec2_t, vec3_t};
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct miniRefEntity_t {
-    //TODO: Port refEntityType_t
-    // Source: oracle/oracle/codemp/cgame/tr_types.h:83-98
-    pub reType: c_int,
+    pub reType: refEntityType_t,
     pub renderfx: c_int,
 
     /// opaque type outside refresh

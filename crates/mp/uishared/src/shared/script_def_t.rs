@@ -2,8 +2,8 @@
 
 use core::ffi::c_char;
 
-//TODO: Port MAX_SCRIPT_ARGS
-// Source: oracle/oracle/codemp/ui/ui_shared.h:76
+// Raven `#define MAX_SCRIPT_ARGS 12`.
+// Source: `oracle/oracle/codemp/ui/ui_shared.h:76`
 const MAX_SCRIPT_ARGS: usize = 12;
 
 /// Raven `scriptDef_t` — a UI script command plus its argument list.

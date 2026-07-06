@@ -3054,20 +3054,15 @@ pub fn SP_misc_faller(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(bg-dep): `tagOwner_t`/`refTagOwnerMap` are unported (no
-// GameWorld field to host the pool in); referenced verbatim per the
-// zero-park policy — a fixer ports both and wires the storage.
-//TODO: Port tagOwner_t (unported return type; C: `tagOwner_t *`)
-// Source: oracle/oracle/codemp/game/g_local.h
 /// Raven `FirstFreeTagOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2888-2903`
-pub fn FirstFreeTagOwner(ctx: GameContext<'_>) -> *mut c_void {
+pub fn FirstFreeTagOwner(ctx: GameContext<'_>) -> *mut crate::level::tag_owner::tagOwner_t {
     unsafe {
         let mut i: c_int = 0;
         while i < MAX_TAG_OWNERS as c_int {
             if (*ctx.world).refTagOwnerMap[i as usize].inuse == 0 {
-                return &mut (*ctx.world).refTagOwnerMap[i as usize] as *mut _ as *mut c_void;
+                return &mut (*ctx.world).refTagOwnerMap[i as usize] as *mut _;
             }
             i += 1;
         }
@@ -3083,19 +3078,16 @@ pub fn FirstFreeTagOwner(ctx: GameContext<'_>) -> *mut c_void {
     }
 }
 
-// PORT-NOTE(bg-dep): `tagOwner_t` param is unported; treated as an opaque
-// `*mut c_void` cast to the (also unported) shape at the field access below.
 /// Raven `FirstFreeRefTag`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2905-2922`
 pub fn FirstFreeRefTag(
     ctx: GameContext<'_>,
-    //TODO: Port tagOwner_t  (C: `tagOwner_t *`)
-    tagOwner: *mut c_void,
+    tagOwner: *mut crate::level::tag_owner::tagOwner_t,
 ) -> *mut reference_tag_t {
     unsafe {
         assert!(!tagOwner.is_null());
-        let owner = tagOwner as *mut crate::level::tag_owner::tagOwner_t;
+        let owner = tagOwner;
         let mut i: c_int = 0;
 
         while i < MAX_TAGS as c_int {
@@ -3134,19 +3126,20 @@ pub fn TAG_Init(ctx: GameContext<'_>) {
     }
 }
 
-//TODO: Port tagOwner_t (unported return type; C: `tagOwner_t *`)
-// Source: oracle/oracle/codemp/game/g_local.h
 /// Raven `TAG_FindOwner`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:2953-2967`
-pub fn TAG_FindOwner(ctx: GameContext<'_>, owner: *const c_char) -> *mut c_void {
+pub fn TAG_FindOwner(
+    ctx: GameContext<'_>,
+    owner: *const c_char,
+) -> *mut crate::level::tag_owner::tagOwner_t {
     unsafe {
         let mut i: c_int = 0;
         while i < MAX_TAG_OWNERS as c_int {
             if (*ctx.world).refTagOwnerMap[i as usize].inuse != 0
                 && Q_stricmp((*ctx.world).refTagOwnerMap[i as usize].name.as_ptr(), owner) == 0
             {
-                return &mut (*ctx.world).refTagOwnerMap[i as usize] as *mut _ as *mut c_void;
+                return &mut (*ctx.world).refTagOwnerMap[i as usize] as *mut _;
             }
             i += 1;
         }
@@ -3164,7 +3157,7 @@ pub fn TAG_Find(
     name: *const c_char,
 ) -> *mut reference_tag_t {
     unsafe {
-        let mut tag_owner: *mut c_void = core::ptr::null_mut();
+        let mut tag_owner: *mut crate::level::tag_owner::tagOwner_t = core::ptr::null_mut();
         let mut i: c_int = 0;
 
         if !owner.is_null() && *owner != 0 {

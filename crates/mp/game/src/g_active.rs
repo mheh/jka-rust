@@ -79,8 +79,6 @@ pub const TAUNT_MEDITATE: c_int = 2;
 pub const TAUNT_FLOURISH: c_int = 3;
 pub const TAUNT_GLOAT: c_int = 4;
 
-//TODO: Port VectorCompare           // Source: oracle/oracle/codemp/game/q_shared.h
-
 // Resolved cross-module fns (verbatim post-retrofit signatures — call surface).
 use crate::ai_main::InFieldOfVision;
 use crate::bg_g2_utils::BG_AttachToRancor;
@@ -114,7 +112,7 @@ use crate::g_utils::{
 use crate::g_weapon::FireWeapon;
 use crate::npc_c::NPC_SetAnim;
 use crate::q_math::{
-    vectoangles, AngleVectors, VectorLength, VectorLengthSquared, VectorNormalize,
+    vectoangles, AngleVectors, VectorCompare, VectorLength, VectorLengthSquared, VectorNormalize,
 };
 use crate::w_force::G_PreDefSound;
 use crate::w_force::{

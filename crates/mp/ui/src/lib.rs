@@ -1,4 +1,4 @@
-//! `mp_ui` crate. //TODO: Port module mp_ui
+//! `mp_ui` crate.
 
 pub mod keycodes;
 pub mod local;

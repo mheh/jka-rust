@@ -12,9 +12,8 @@
 //!   (rulings item 1: `level` lives on the world).
 //! - `ambient-global (g_vehicleInfo)`: reads the file-static `g_vehicleInfo`
 //!   table to dispatch the base vehicle-type vtable.
-//! - `bg-dep (vehicleInfo_t)`: dereferences `Vehicle_t::m_pVehicleInfo`, which
-//!   is still a `*mut c_void` placeholder (`//TODO: Port vehicleInfo_t`,
-//!   `bg_vehicles.h:586`) pending that type's pointer-field port.
+//! - `bg-dep (vehicleInfo_t)`: dereferences `Vehicle_t::m_pVehicleInfo`
+//!   (`*mut vehicleInfo_t`) to read the base vehicle-type stats table.
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;

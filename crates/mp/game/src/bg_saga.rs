@@ -896,9 +896,6 @@ pub fn BG_SiegeGetPairedValue(buf: *mut c_char, key: *mut c_char, outbuf: *mut c
     }
 }
 
-//TODO: Port FPTable
-// Source: oracle/oracle/codemp/game/bg_saga.c:100-121
-
 /// Raven `BG_SiegeTranslateForcePowers`.
 ///
 /// Source: `oracle/oracle/codemp/game/bg_saga.c:571-682`

@@ -1,8 +1,10 @@
 #![allow(non_camel_case_types, non_snake_case)]
 
-use core::ffi::{c_char, c_void};
+use core::ffi::c_char;
 
 use mp_qshared::shared::qboolean;
+
+use super::item_def_s::itemDef_t;
 
 /// Raven `commandDef_t` — a named script command with its handler.
 ///
@@ -11,9 +13,7 @@ use mp_qshared::shared::qboolean;
 #[derive(Debug, Clone, Copy)]
 pub struct commandDef_t {
     pub name: *const c_char,
-    //TODO: Port itemDef_t
-    // Source: oracle/oracle/codemp/ui/ui_shared.h:258-305
-    pub handler: Option<unsafe extern "C" fn(item: *mut c_void, args: *mut *mut c_char) -> qboolean>,
+    pub handler: Option<unsafe extern "C" fn(item: *mut itemDef_t, args: *mut *mut c_char) -> qboolean>,
 }
 
 const _: () = assert!(core::mem::size_of::<commandDef_t>() == 16);

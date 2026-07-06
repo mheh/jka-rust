@@ -1012,16 +1012,14 @@ pub fn AI_RefreshGroup(ctx: GameContext<'_>, group: *mut AIGroupInfo_t) -> qbool
             } else {
                 (*group).morale += (*npc).rank;
             }
-            // PORT-NOTE(unported-consts): the debug draw
-            // `G_TestLine(ctx, ..., FRAMETIME)` needs `FRAMETIME`, not yet ported
-            // anywhere in the crate graph (precedent: `g_nav.rs` parks the
-            // same const). This is a debug-visualization side effect only —
-            // it does not affect `group->morale`/membership, so the call is
-            // skipped here rather than parking the whole function.
-            // Source: `oracle/oracle/codemp/game/NPC_AI_Utils.c:880-884`
             if !(*group).commander.is_null() && (*ctx.world).cvars.debugNPCAI.integer != 0 {
-                //TODO: Port FRAMETIME
-                // Source: oracle/oracle/codemp/game/q_shared.h (not yet ported)
+                G_TestLine(
+                    ctx,
+                    (*(*group).commander).r.currentOrigin,
+                    (*member).r.currentOrigin,
+                    0x0000ff,
+                    FRAMETIME,
+                );
             }
         }
         if !(*group).enemy.is_null() {

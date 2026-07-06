@@ -29,6 +29,8 @@ use crate::trap;
 use crate::NPC_combat::G_SetEnemy;
 use mp_bg::public::effect_types::effectTypes_t::{EFFECT_EXPLOSION_TURRET, EFFECT_SPARKS};
 use mp_bg::public::means_of_death::meansOfDeath_t::{MOD_TARGET_LASER, MOD_UNKNOWN};
+use mp_qshared::common::mp::gentity::MAT_METAL;
+use mp_qshared::shared::surface_flags::{CONTENTS_LIGHTSABER, MASK_SHOT};
 use mp_qshared::shared::trajectory::trType_t::{TR_LINEAR, TR_LINEAR_STOP, TR_STATIONARY};
 use std::ffi::c_char;
 
@@ -39,18 +41,6 @@ unsafe fn VALIDSTRING(a: *const c_char) -> bool {
 }
 
 // Unported constants with TODO markers
-//TODO: Port MASK_SHOT
-// Source: oracle/oracle/codemp/game/surfaceflags.h:1177
-const MASK_SHOT: c_int = 0x00000001 | 0x00000100 | 0x00000200 | 0x00040000; // CONTENTS_SOLID|CONTENTS_BODY|CONTENTS_CORPSE|CONTENTS_TERRAIN
-
-//TODO: Port CONTENTS_LIGHTSABER
-// Source: oracle/oracle/codemp/game/surfaceflags.h:31
-const CONTENTS_LIGHTSABER: c_int = 0x00040000;
-
-//TODO: Port MAT_METAL
-// Source: oracle/oracle/codemp/game/g_local.h (material enum)
-const MAT_METAL: c_int = 5;
-
 //TODO: Port CLASS_VEHICLE
 // Source: oracle/oracle/codemp/game/teams.h
 const CLASS_VEHICLE: c_int = 10;

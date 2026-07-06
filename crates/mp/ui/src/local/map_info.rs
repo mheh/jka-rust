@@ -4,8 +4,9 @@ use core::ffi::c_char;
 
 use mp_qshared::shared::{qboolean, qhandle_t};
 
-//TODO: Port MAX_GAMETYPES
-// Source: oracle/oracle/codemp/ui/ui_local.h:566
+/// `MAX_GAMETYPES`.
+///
+/// Source: `oracle/oracle/codemp/ui/ui_local.h:566`
 const MAX_GAMETYPES: usize = 16;
 
 /// Raven `mapInfo`.
