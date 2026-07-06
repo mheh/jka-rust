@@ -1,12 +1,12 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 753 markers — 144 `TODO: Port`,
+Totals: 751 markers — 142 `TODO: Port`,
 553 `PORT-NOTE`, 56 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 
-- **LEGIT** — subject genuinely unported; marker accurate. (127)
+- **LEGIT** — subject genuinely unported; marker accurate. (125)
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
@@ -73,7 +73,7 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Validator claim does not match the file. Actual line 1 is `//! `mp_engine_server` crate. //TODO: Port module mp_engine_server` — subject is already `mp_engine_server` (not `server` as claimed), and there is no `// Source:` line to normalize. This exact one-line, no-Source-line form is the established house convention for crate-root module docs, verified identical across all 22 sibling crate lib.rs files (e.g. crates/mp/engine/qcommon/src/lib.rs, crates/mp/engine/client/src/lib.rs, crates/sp/engine/server/src/lib.rs, crates/mp/bg/src/lib.rs). Git history (git log -p --follow on this file) shows the line unchanged since crate creation in 71ec41c7. Fixing/normalizing it as described would actually break consistency with the rest of the codebase, so no edit was made.
 
 
-## TODO: Port — LEGIT (127)
+## TODO: Port — LEGIT (125)
 
 ### crates/abi-transport/src/generic/engine.rs
 - L78: RunStatic per-call handler surface
@@ -192,9 +192,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/mp/game/src/NPC_AI_Sniper.rs
 - L744: Sniper_FireDecide miss loop body (VectorMA flrand(1.5,4)
 
-### crates/mp/game/src/NPC_stats.rs
-- L361: rank_t (unported return enum; C int-width)
-
 ### crates/mp/game/src/bg_vehicleLoad.rs
 - L300: BG_SetSharedVehicleFunctions
 
@@ -216,9 +213,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/g_turret.rs
 - L44: CLASS_VEHICLE
-
-### crates/mp/game/src/npc/g_npc_t.rs
-- L75: rank_t
 
 ### crates/mp/game/src/q_shared.rs
 - L1306: MAX_INFO_STRING oversize guard (Com_Error(ERR_DROP, "Info_RemoveKey: oversize infostring")) once the const is ported.
@@ -391,8 +385,8 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
 
 ### crates/mp/game/src/NPC_AI_Stormtrooper.rs
-- L668 [LEGIT]: // TODO: Play sleeping shuffle animation (Raven comment).
-- L969 [LEGIT]: // TODO: Play a sound along the lines of, "Huh? What was that?" (Raven comment).
+- L662 [LEGIT]: // TODO: Play sleeping shuffle animation (Raven comment).
+- L963 [LEGIT]: // TODO: Play a sound along the lines of, "Huh? What was that?" (Raven comment).
 
 ### crates/mp/game/src/NPC_combat.rs
 - L7 [LEGIT]: //! ones carry `//TODO: Port <type>` markers. Re-run after editing the
@@ -550,11 +544,11 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/NPC_AI_Jedi.rs
 - L6: (untopiced)
-- L1211: jediSpeechDebounceTime
-- L1948: jediSpeechDebounceTime
-- L2345: BG_AnimLength
-- L4639: jediSpeechDebounceTime
-- L5733: jediSpeechDebounceTime
+- L1199: jediSpeechDebounceTime
+- L1936: jediSpeechDebounceTime
+- L2333: BG_AnimLength
+- L4627: jediSpeechDebounceTime
+- L5721: jediSpeechDebounceTime
 
 ### crates/mp/game/src/NPC_AI_Mark1.rs
 - L6: (untopiced)
@@ -585,7 +579,7 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L6: (untopiced)
 
 ### crates/mp/game/src/NPC_AI_Stormtrooper.rs
-- L1296: vec3-out-param
+- L1290: vec3-out-param
 
 ### crates/mp/game/src/NPC_AI_Wampa.rs
 - L13: (untopiced)
@@ -594,9 +588,9 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L1128: goal-invariant
 
 ### crates/mp/game/src/NPC_combat.rs
-- L1407: varargs-seam
-- L1779: SVF_IGNORE_ENEMIES
-- L2039: vec3-out-param-reshape
+- L1395: varargs-seam
+- L1767: SVF_IGNORE_ENEMIES
+- L2027: vec3-out-param-reshape
 
 ### crates/mp/game/src/NPC_misc.rs
 - L32: varargs
@@ -604,9 +598,9 @@ PORT-NOTE section is a plain re-grep (not audited).
 
 ### crates/mp/game/src/NPC_reactions.rs
 - L20: (untopiced)
-- L394: bgAllAnims-access
-- L955: va-formatting
-- L1088: vehicle-vtable
+- L393: bgAllAnims-access
+- L954: va-formatting
+- L1087: vehicle-vtable
 
 ### crates/mp/game/src/NPC_spawn.rs
 - L50: packet-contract
@@ -618,9 +612,9 @@ PORT-NOTE section is a plain re-grep (not audited).
 - L3084: fn-ptr
 
 ### crates/mp/game/src/NPC_stats.rs
-- L1470: vehicle-info-shape
-- L2075: unported-fn
-- L2128: unported-global
+- L1465: vehicle-info-shape
+- L2070: unported-fn
+- L2123: unported-global
 
 ### crates/mp/game/src/NPC_utils.rs
 - L31: (untopiced)
