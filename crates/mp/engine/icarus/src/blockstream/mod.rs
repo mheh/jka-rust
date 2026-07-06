@@ -2,4 +2,5 @@
 
 pub mod cblock_member;
 pub mod cblock_stream;
+pub mod file;
 pub mod vector_t;
