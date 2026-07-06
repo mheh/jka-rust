@@ -3,6 +3,7 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
 pub mod anim_event_type;
+pub mod anim_number;
 pub mod animation;
 pub mod animevent;
 pub mod entity_event;
