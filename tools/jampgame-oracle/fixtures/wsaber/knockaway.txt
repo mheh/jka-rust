@@ -1,0 +1,6 @@
+# Integer sweep for G_KnockawayForParry (dumper and Rust test expand the same
+# loop). Inclusive bounds: sweep <moveLo> <moveHi>. The switch handles the five
+# LS_PARRY_* moves and returns LS_K1_TR for every other move (default), so a
+# sweep over the whole saberMoveName_t range (LS_MOVE_MAX is ~200) plus a margin
+# exercises both the specific cases and the default.
+sweep 0 240

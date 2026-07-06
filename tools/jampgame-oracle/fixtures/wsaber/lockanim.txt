@@ -1,0 +1,8 @@
+# Exhaustive integer sweep for G_SaberLockAnim (both dumper and Rust test expand
+# the same nested loops). Inclusive bounds:
+#   sweep <styleLo> <styleHi> <topLo> <topHi> <lobLo> <lobHi> <winLo> <winHi>
+# saber_styles_t spans 0..7 (SS_NONE..SS_STAFF); topOrSide is SABERLOCK_TOP=0 /
+# SIDE=1; lockOrBreakOrSuperBreak is LOCK=2 / BREAK=3 / SUPERBREAK=4; winOrLose
+# is WIN=5 / LOSE=6. 8*8*2*3*2 = 768 combinations covering every branch,
+# including the same-style-lose special case.
+sweep 0 7  0 1  2 4  5 6

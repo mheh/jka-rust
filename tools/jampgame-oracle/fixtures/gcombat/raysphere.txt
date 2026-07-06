@@ -1,0 +1,30 @@
+# RaySphereIntersections fixtures.
+# ray <origin xyz> <radius> <point xyz> <dir xyz>
+# Floats are plain ints parsed as (float)atol, or 0xXXXXXXXX f32 bit patterns.
+# `dir` is normalized in place by the function; the dump echoes it plus both
+# intersection slots (unwritten slots read as the pre-zeroed 0).
+
+# two intersections, sqrt(d) a perfect square (d=100 -> 10)
+ray 0 0 0  5  10 0 0  -1 0 0
+# non-normalized dir (-2,0,0) -> same geometry, exercises VectorNormalize
+ray 0 0 0  5  10 0 0  -2 0 0
+# tangent: distance from center to the line == radius, so d==0 -> 1 hit
+ray 0 0 0  5  10 5 0  -1 0 0
+# clean miss: d<0 -> 0 hits
+ray 0 0 0  5  10 20 0  -1 0 0
+# irrational sqrt(d): d=84
+ray 0 0 0  5  7 2 0  -1 0 0
+# irrational sqrt(d): d=200
+ray 0 0 0  10  5 5 0  -1 0 0
+# offset sphere center, irrational sqrt
+ray 5 5 5  10  50 8 5  -1 0 0
+# straight down z through center
+ray 0 0 0  3  0 0 10  0 0 -1
+# diagonal non-normalized dir (1,1,0)
+ray 0 0 0  5  -10 -10 0  1 1 0
+# fully 3D non-normalized dir (2,3,6) |dir|=7
+ray 0 0 0  8  -20 -30 -60  2 3 6
+# negative coords, irrational
+ray -5 -5 0  6  -20 -3 0  1 0 0
+# radius 0 sphere: hits only if line passes through the point-ish; d = b^2-4c
+ray 0 0 0  0  10 0 0  -1 0 0

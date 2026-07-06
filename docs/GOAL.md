@@ -54,11 +54,25 @@ Raven's `jampgamex86.dll`:
   `native_platform` loader + real inbound syscall trampoline, drives
   `GAME_INIT` → 10 `GAME_RUN_FRAME`s → `GAME_SHUTDOWN` against a mock engine,
   asserting survival and structural side effects).
-- [ ] Add differential tests against Raven/oracle behavior for representative
-  imports, exports, and frame/client flows.
+- [x] Add differential tests against Raven/oracle behavior for representative
+  imports, exports, and frame/client flows (9 committed-golden parity suites —
+  pmove, pmove-saber, qmath, bglib, saberload, qshared, bgmisc, gcombat,
+  wsaber — via the `tools/jampgame-oracle/` harness, plus the ABI smoke test's
+  client lifecycle drive. Representative, not exhaustive: exhaustive coverage
+  is the per-file audit and referee replay below).
+- [ ] Audit every ported game-tier file against its oracle TU (the per-file
+  oracle review): line-level transcription review of `crates/mp/game/src/*.rs`
+  against `oracle/oracle/codemp/game/*.c`, hunting the proven divergence
+  classes (inverted/mistranscribed conditions, f32-vs-f64 promotion through
+  double libm, empty-`Vec`-vs-fixed-array state init, silent C UB needing §19
+  decisions). Findings are fixed behind the green suites; high-value audited
+  functions get promoted into new parity slices.
 - [ ] Prove hot-swap behavior by replacing `jampgamex86.dll`/the platform
   equivalent with the Rust build and running the MP engine through init, map
   load, frame loop, client connect, and shutdown.
+- [ ] Referee replay gate (Stage R, `docs/roadmap-final-stages.md`): recorded
+  usercmd streams replayed through oracle DLL and Rust DLL under the same
+  harness, byte-diffing every playerState/entityState per frame.
 
 So the ABI target is:
 
@@ -71,9 +85,11 @@ no longer just the scaffold: the full jampgame logic port is transcribed and
 integrated (`mp_game` compiles green, merged 2026-07-05; `todo!()` stubs and
 open `TODO: Port` markers both at zero, all `vmMain` arms wired, CI publishing
 engine-named modules), without losing the original ABI numbers or mixing MP
-game, MP cgame, MP UI, and SP surfaces into one global enum. What remains
-before hot-swap is oracle differential verification (the referee swap) and a
-live-engine smoke test — compiling green is not verified parity.
+game, MP cgame, MP UI, and SP surfaces into one global enum. Representative
+oracle differential suites are green (including the first game-tier slices)
+and the ABI smoke test drives the full client lifecycle. What remains before
+hot-swap is the per-file oracle audit, the live-engine run, and ultimately the
+referee replay gate — compiling green is not verified parity.
 
 ## Related ABI Track: SP `GetGameAPI`
 

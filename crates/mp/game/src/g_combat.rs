@@ -2940,12 +2940,18 @@ pub fn RaySphereIntersections(
             ]
         };
         if d > 0.0 {
-            let t = (-b + d.sqrt()) / 2.0;
+            // Raven: `t = (- b + sqrt(d)) / 2`. `sqrt` is libm's `double sqrt`,
+            // so `d` promotes to double and the whole root is evaluated in f64
+            // before narrowing to the f32 `t` — evaluating in f32 here diverges
+            // by a last bit on irrational `sqrt(d)`.
+            let t = ((-(b as f64) + (d as f64).sqrt()) / 2.0) as f32;
             *intersections.add(0) = ma(t);
-            let t = (-b - d.sqrt()) / 2.0;
+            let t = ((-(b as f64) - (d as f64).sqrt()) / 2.0) as f32;
             *intersections.add(1) = ma(t);
             2
         } else if d == 0.0 {
+            // Raven: `t = (- b) / 2` — no `sqrt`, so this stays f32 (`2` is an
+            // int divisor, promoting only to float).
             let t = -b / 2.0;
             *intersections.add(0) = ma(t);
             1

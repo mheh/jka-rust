@@ -1,0 +1,34 @@
+# G_GetHitLocation fixtures. The target always has a (non-NULL) client, so only
+# YAW is used from its angles (a NULL client would leave `tangles` uninitialized
+# in Raven -- UB, excluded per porting-rules §19).
+# h <yaw> <absmin xyz> <absmax xyz> <mins xy> <maxs xy> <ppoint xyz>
+# Standard humanoid box centered at (0,0,32): absmin (-15,-15,0), absmax (15,15,64).
+
+# ppoint == vec3_origin -> early HL_NONE return
+h 0   -15 -15 0   15 15 64   -15 -15   15 15    0 0 0
+# high above center, facing +x (yaw 0): head zone
+h 0   -15 -15 0   15 15 64   -15 -15   15 15    0 0 60
+# low, at the feet
+h 0   -15 -15 0   15 15 64   -15 -15   15 15    0 0 2
+# front (in +x forward direction), chest height
+h 0   -15 -15 0   15 15 64   -15 -15   15 15    20 0 34
+# directly behind (-x), chest height -> back zone
+h 0   -15 -15 0   15 15 64   -15 -15   15 15    -20 0 34
+# right side (+y is right for yaw 0), mid height
+h 0   -15 -15 0   15 15 64   -15 -15   15 15    0 20 34
+# left side (-y)
+h 0   -15 -15 0   15 15 64   -15 -15   15 15    0 -20 34
+# yaw 90: forward now points +y
+h 90  -15 -15 0   15 15 64   -15 -15   15 15    0 20 34
+# yaw 45 diagonal, upper front
+h 45  -15 -15 0   15 15 64   -15 -15   15 15    20 20 50
+# yaw 180: forward points -x
+h 180 -15 -15 0   15 15 64   -15 -15   15 15    -20 0 34
+# yaw 270, right-ish low
+h 270 -15 -15 0   15 15 64   -15 -15   15 15    15 -10 12
+# negative yaw, high back-left
+h -60 -15 -15 0   15 15 64   -15 -15   15 15    -18 -8 55
+# leg height, off to right
+h 0   -15 -15 0   15 15 64   -15 -15   15 15    5 12 14
+# arm height front-right
+h 0   -15 -15 0   15 15 64   -15 -15   15 15    14 14 44
