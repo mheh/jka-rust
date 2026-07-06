@@ -9,14 +9,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+// NaN sign/payload is platform-defined (ARM default qNaN = 0x7fc00000, x86 SSE
+// = 0xffc00000), so any NaN is canonicalized to the positive quiet NaN — §19
+// normalization; the Rust parity tests apply the identical rule.
 static unsigned f2b(float f) {
 	union { float f; unsigned u; } u;
 	u.f = f;
+	if ((u.u & 0x7f800000u) == 0x7f800000u && (u.u & 0x007fffffu) != 0)
+		return 0x7fc00000u;
 	return u.u;
 }
 static unsigned long long d2b(double d) {
 	union { double d; unsigned long long u; } u;
 	u.d = d;
+	if ((u.u & 0x7ff0000000000000ull) == 0x7ff0000000000000ull &&
+	    (u.u & 0x000fffffffffffffull) != 0)
+		return 0x7ff8000000000000ull;
 	return u.u;
 }
 

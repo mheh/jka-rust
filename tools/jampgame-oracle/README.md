@@ -177,6 +177,13 @@ these; the linker demands them):
 
 ## Normalizations (qmath/bglib)
 
+- **NaN bit patterns are canonicalized to the positive quiet NaN** (`7fc00000`
+  f32 / `7ff8000000000000` f64) by `dumpcommon.h`'s `f2b`/`d2b` and the Rust
+  tests' `cbits()` mirror. NaN sign/payload is platform-defined — ARM's default
+  qNaN is positive, x86 SSE's is negative — so the raw bits diverge across
+  hosts even when both sides agree per-platform (first seen as CI-on-Linux vs
+  goldens-from-macOS on `ProjectPointOnPlane` degenerate cases). Value
+  computation is untouched; only the dump encoding is canonical.
 - **`ColorBytes3`** writes only bytes `[0..2]` of an uninitialized `unsigned i`;
   byte `[3]` is indeterminate stack garbage. The dumper masks it (`& 0x00ffffff`)
   so the golden is deterministic and matches the port (which zeroes byte 3).
