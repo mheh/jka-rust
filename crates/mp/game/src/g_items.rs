@@ -3373,11 +3373,25 @@ pub fn Touch_Item(
                     || (*(*ent).item).giTag == AMMO_TRIPMINE as c_int
                     || (*(*ent).item).giTag == AMMO_DETPACK as c_int
                 {
-                    //TODO: Port weaponData
-                    // Source: oracle/oracle/codemp/game/g_items.c:2511-2514 — the
-                    // `weaponData[weapForAmmo].ammoIndex` ammo check needs the
-                    // bg-owned `weaponData` table (unported anywhere in the
-                    // crate graph; see `bg_misc.rs`).
+                    let mut weapForAmmo: c_int = 0;
+
+                    if (*(*ent).item).giTag == AMMO_THERMAL as c_int {
+                        weapForAmmo = WP_THERMAL as c_int;
+                    } else if (*(*ent).item).giTag == AMMO_TRIPMINE as c_int {
+                        weapForAmmo = WP_TRIP_MINE as c_int;
+                    } else {
+                        weapForAmmo = WP_DET_PACK as c_int;
+                    }
+
+                    if !other.is_null()
+                        && !(*other).client.is_null()
+                        && (*((*other).client as *mut gclient_t)).ps.ammo
+                            [weaponData[weapForAmmo as usize].ammoIndex as usize]
+                            > 0
+                    {
+                        (*((*other).client as *mut gclient_t)).ps.stats[STAT_WEAPONS as usize] |=
+                            1 << weapForAmmo;
+                    }
                 }
                 predict = qtrue;
             }
