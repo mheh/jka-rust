@@ -1,12 +1,12 @@
 # Marker inventory — PORT-NOTE / TODO (regenerated 2026-07-05, post-audit)
 
-Totals: 773 markers — 164 `TODO: Port`,
+Totals: 753 markers — 144 `TODO: Port`,
 553 `PORT-NOTE`, 56 other TODO forms.
 
 Every TODO comment was audited by the 2026-07-05 validation run (342 markers
 judged; 102 stale/malformed fixed in commit ac144a74). Verdicts:
 
-- **LEGIT** — subject genuinely unported; marker accurate. (147)
+- **LEGIT** — subject genuinely unported; marker accurate. (127)
 - **COMPLEX** — subject (or its blockers) now ported, but resolving the marker
   needs non-mechanical work: authoring missing logic, threading `static mut`
   globals through `GameWorld`, or cross-tier naming. Listed first — these are
@@ -38,13 +38,13 @@ PORT-NOTE section is a plain re-grep (not audited).
   - CMiniHeap IS ported (crates/sp/engine/qcommon/src/miniheap/cmini_heap.rs) but sp_abi cannot depend on the engine tier — same cross-tier-naming class as Vehicle_t/gNPC_t; pointer param stays opaque pending a DEC ruling.
 
 ### crates/sp/cgame/src/media/cgs_t.rs
-- L47: clientInfo_t (cross-crate, sp_game -> sp_cgame not wired)
+- L48: clientInfo_t (cross-crate, sp_game -> sp_cgame not wired)
   - clientInfo_t is fully ported at sp_game::shared::client_info_t::clientInfo_t (confirmed: `pub struct clientInfo_t` at that path), exactly as the marker itself states. But resolving this in cgs_t.rs would mean replacing `OpaqueClientInfo_t = [u64; 62]` (a #[repr(C)] field inside cgs_t, size/offset-asserted at line 259+) with the real cross-crate type, which requires adding a new sp_cgame -> sp_game dependency edge (confirmed absent in crates/sp/cgame/Cargo.toml) — an architecture-layering change with effects beyond this file, not a mechanical local fix.
 
 ### crates/sp/game/src/shared/weapon_info_s.rs
-- L40: centity_t
+- L41: centity_t
   - centity_t IS ported (crates/sp/cgame/src/local/centity_s.rs, pub struct centity_t). But sp_game and sp_cgame are sibling tier-3 module crates with no dependency edge between them (docs/workspace-architecture.md); retyping this callback param to the real type would require adding an sp_game -> sp_cgame crate dependency, which the architecture forbids. The comment already documents this as a deliberate cross-tier opaque-pointer design, not an oversight.
-- L46: centity_t
+- L47: centity_t
   - Same as line 40 — centity_t exists in sp_cgame but sp_game cannot depend on sp_cgame (same tier, no edge), so the opaque *mut c_void callback param is architecturally required, not a stale mechanical leftover.
 
 ### crates/sp/qshared/src/common/sp/gentity.rs
@@ -73,7 +73,7 @@ PORT-NOTE section is a plain re-grep (not audited).
   - Validator claim does not match the file. Actual line 1 is `//! `mp_engine_server` crate. //TODO: Port module mp_engine_server` — subject is already `mp_engine_server` (not `server` as claimed), and there is no `// Source:` line to normalize. This exact one-line, no-Source-line form is the established house convention for crate-root module docs, verified identical across all 22 sibling crate lib.rs files (e.g. crates/mp/engine/qcommon/src/lib.rs, crates/mp/engine/client/src/lib.rs, crates/sp/engine/server/src/lib.rs, crates/mp/bg/src/lib.rs). Git history (git log -p --follow on this file) shows the line unchanged since crate creation in 71ec41c7. Fixing/normalizing it as described would actually break consistency with the rest of the codebase, so no edit was made.
 
 
-## TODO: Port — LEGIT (147)
+## TODO: Port — LEGIT (127)
 
 ### crates/abi-transport/src/generic/engine.rs
 - L78: RunStatic per-call handler surface
@@ -280,25 +280,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/sp/cgame/src/lib.rs
 - L1: module sp_cgame
 
-### crates/sp/cgame/src/media/cg_media_t.rs
-- L209: ffHandle_t
-- L212: ffHandle_t
-- L216: ffHandle_t
-- L220: ffHandle_t
-- L224: ffHandle_t
-- L228: ffHandle_t
-- L231: ffHandle_t
-- L235: ffHandle_t
-- L238: ffHandle_t
-- L241: ffHandle_t
-- L245: ffHandle_t
-- L248: ffHandle_t
-- L251: ffHandle_t
-- L254: ffHandle_t
-
-### crates/sp/cgame/src/media/cgs_t.rs
-- L85: ffHandle_t
-
 ### crates/sp/engine/client/src/lib.rs
 - L1: module sp_engine_client
 
@@ -342,9 +323,6 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/sp/game/src/npc/g_npc_t.rs
 - L75: rank_t
 
-### crates/sp/game/src/shared/weapon_info_s.rs
-- L64: ffHandle_t
-
 ### crates/sp/game/src/world/game_context.rs
 - L37: SP export logic fns taking GameContext (per-export, logic-port)
 
@@ -379,19 +357,11 @@ PORT-NOTE section is a plain re-grep (not audited).
 ### crates/sp/uishared/src/lib.rs
 - L1: module sp_uishared
 
-### crates/sp/uishared/src/shared/cached_assets_t.rs
-- L52: ffHandle_t
-
 ### crates/sp/uishared/src/shared/display_context_def_t.rs
-- L137: CGhoul2Info
-- L146: CGhoul2Info
-- L176: CGhoul2Info
-- L198: CGhoul2Info
-- L211: ffHandle_t
-- L214: ffHandle_t
-
-### crates/sp/uishared/src/shared/item_def_s.rs
-- L86: ffHandle_t
+- L138: CGhoul2Info
+- L147: CGhoul2Info
+- L177: CGhoul2Info
+- L199: CGhoul2Info
 
 ### crates/ui/src/lib.rs
 - L8: ui live entrypoint exports (vmMain match, SEAM-D10)
