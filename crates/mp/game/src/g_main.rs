@@ -10,13 +10,10 @@
 //! Pass-3 status: every previously-parked fn now has a real body. Remaining
 //! open items are called out inline as `// PORT-NOTE(<topic>): …` (never
 //! `PORT-NOTE`/`todo!()`) — notably: the `GAME_CVAR_TABLE` per-row
-//! register/update loops (`G_RegisterCvars`/`G_UpdateCvars`) are transcribed
-//! (mechanical `field_mut` dispatch + `resolve_cvar_flags` string-to-int
-//! folding stand in for the field reflection Rust has none of), but the
-//! per-row `modificationCount` cache feeding `trackChange`/`teamShader` has
-//! no settled `GameCvars`/`GameGlobals` storage yet — see the
-//! `PORT-NOTE(cvar-mod-count-cache)` above `G_RegisterCvars`;
-//! `CalculateRanks`' `qsort(..., SortRanks)`
+//! register/update loops (`G_RegisterCvars`/`G_UpdateCvars`) use a mechanical
+//! `field_mut` dispatch + `resolve_cvar_flags` string-to-int folding standing
+//! in for the field reflection Rust has none of; `CalculateRanks`'
+//! `qsort(..., SortRanks)`
 //! registration is a real ctx/no-ctx ABI shape mismatch (see
 //! shape_mismatches); a handful of ctx-free fn-ptr boundary fns
 //! (`Com_Error`/`Com_Printf`/`BG_GetTime`) approximate their missing
@@ -171,15 +168,6 @@ pub fn G_FindTeams(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/g_main.c:783-795`
 pub fn G_RemapTeamShaders() {}
 
-// PORT-NOTE(cvar-mod-count-cache): `gameCvarTable`'s per-row
-// `modificationCount`/`trackChange`/`teamShader` diff (g_main.c:811-812,
-// 858-869) needs a persistent per-row "last seen modificationCount" cache
-// spanning calls (set in `G_RegisterCvars`, read+updated every
-// `G_UpdateCvars`). `GameCvars`/`GameGlobals` (this crate's settled state
-// homes for file-scope statics) have no field for it yet, and adding one is
-// out of scope for this file under the concurrent-edit boundary — left
-// unported below; the register/update trap calls themselves (the actual
-// `TODO: Port` subject) are transcribed in full.
 /// Maps one `GAME_CVAR_TABLE` row's `field` name to its `vmCvar_t` storage in
 /// `GameCvars` — mechanical field dispatch standing in for the `cv->vmCvar`
 /// pointer Raven's `cvarTable_t` carries directly (Rust has no runtime field
@@ -367,15 +355,16 @@ fn resolve_cvar_flags(expr: &str) -> c_int {
 /// Source: `oracle/oracle/codemp/game/g_main.c:803-845`
 pub fn G_RegisterCvars(ctx: GameContext<'_>) {
     unsafe {
-        let remapped = qfalse;
+        let mut remapped = qfalse;
 
-        // `for (i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++)
+        // `for (i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++) {
         // trap_Cvar_Register(cv->vmCvar, cv->cvarName, cv->defaultString,
-        // cv->cvarFlags);` (g_main.c:808-810). `cv->modificationCount =
-        // cv->vmCvar->modificationCount` (g_main.c:811-812) and the
-        // `cv->teamShader` accumulation into `remapped` (g_main.c:814-816)
-        // are the unported per-row cache piece — see the PORT-NOTE above.
-        for entry in GAME_CVAR_TABLE.iter() {
+        // cv->cvarFlags); if (cv->vmCvar) cv->modificationCount =
+        // cv->vmCvar->modificationCount; if (cv->teamShader) remapped = qtrue;
+        // }` (g_main.c:808-816). `cv->modificationCount` lives in
+        // `GameGlobals::gameCvarModCounts`, indexed the same as
+        // `GAME_CVAR_TABLE` (Raven stores it inline on the row).
+        for (i, entry) in GAME_CVAR_TABLE.iter().enumerate() {
             let cvar_ptr: *mut vmCvar_t = match entry.field {
                 Some(name) => (*ctx.world).cvars.field_mut(name) as *mut vmCvar_t,
                 None => std::ptr::null_mut(),
@@ -389,6 +378,14 @@ pub fn G_RegisterCvars(ctx: GameContext<'_>) {
                     resolve_cvar_flags(entry.flags),
                 ),
             );
+
+            if !cvar_ptr.is_null() {
+                (*ctx.world).globals.gameCvarModCounts.0[i] = (*cvar_ptr).modificationCount;
+            }
+
+            if entry.team_shader {
+                remapped = qtrue;
+            }
         }
 
         // bg-tier cvar mirror: bg code reads this from BgState (Raven read the
@@ -449,21 +446,46 @@ pub fn G_RegisterCvars(ctx: GameContext<'_>) {
 /// Source: `oracle/oracle/codemp/game/g_main.c:852-879`
 pub fn G_UpdateCvars(ctx: GameContext<'_>) {
     unsafe {
-        let remapped = qfalse;
+        let mut remapped = qfalse;
 
-        // `for (i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++)
-        // if (cv->vmCvar) trap_Cvar_Update(cv->vmCvar);` (g_main.c:857-859).
-        // The `modificationCount` diff -> `trackChange` server-print /
-        // `teamShader` -> `remapped` branches (g_main.c:861-869) are the
-        // unported per-row cache piece — see the `field_mut`/
-        // `resolve_cvar_flags` PORT-NOTE above `G_RegisterCvars`.
-        for entry in GAME_CVAR_TABLE.iter() {
+        // `for (i = 0, cv = gameCvarTable; i < gameCvarTableSize; i++, cv++) {
+        // if (cv->vmCvar) { trap_Cvar_Update(cv->vmCvar); if
+        // (cv->modificationCount != cv->vmCvar->modificationCount) {
+        // cv->modificationCount = cv->vmCvar->modificationCount; if
+        // (cv->trackChange) trap_SendServerCommand(-1, va("print \"Server: %s
+        // changed to %s\n\"", cv->cvarName, cv->vmCvar->string)); if
+        // (cv->teamShader) remapped = qtrue; } } }` (g_main.c:857-872).
+        for (i, entry) in GAME_CVAR_TABLE.iter().enumerate() {
             if let Some(name) = entry.field {
                 let cvar_ptr: *mut vmCvar_t = (*ctx.world).cvars.field_mut(name) as *mut vmCvar_t;
                 trap::Cvar_Update(
                     ctx.engine,
                     mp_abi::game::syscalls::G_CVAR_UPDATE::GCvarUpdateArgs::new(cvar_ptr),
                 );
+
+                let new_mod_count = (*cvar_ptr).modificationCount;
+                let cached = &mut (*ctx.world).globals.gameCvarModCounts.0[i];
+                if *cached != new_mod_count {
+                    *cached = new_mod_count;
+
+                    if entry.track_change {
+                        let value = cstr_to_str((*cvar_ptr).string.as_ptr());
+                        trap::SendServerCommand(
+                            ctx.engine,
+                            mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(
+                                -1,
+                                cstr(&format!(
+                                    "print \"Server: {} changed to {}\n\"",
+                                    entry.name, value
+                                )),
+                            ),
+                        );
+                    }
+
+                    if entry.team_shader {
+                        remapped = qtrue;
+                    }
+                }
             }
         }
 

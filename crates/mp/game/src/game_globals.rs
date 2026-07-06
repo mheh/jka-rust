@@ -11,6 +11,7 @@
 
 use crate::botai::nodeobject_s::nodeobject_t;
 use crate::g_svcmds::ipFilter_t;
+use crate::game_cvars::GAME_CVAR_TABLE_LEN;
 use crate::prelude::*;
 
 /// `ipFilter_t ipFilters[MAX_IPFILTERS]` (`g_svcmds.c:54`). Newtype because a
@@ -585,6 +586,21 @@ impl Default for FrameNavInfo {
     }
 }
 
+/// Per-row `cvarTable_t.modificationCount` cache (`g_main.c:22`). Raven
+/// stores this inline on each `gameCvarTable` row; this crate's
+/// `GAME_CVAR_TABLE` is a `const`, so the per-call-spanning cache lives here
+/// instead, indexed identically to `GAME_CVAR_TABLE`.
+pub struct GameCvarModCounts(pub [c_int; GAME_CVAR_TABLE_LEN]);
+
+impl Default for GameCvarModCounts {
+    fn default() -> Self {
+        // Matches the oracle's static zero-initialization of `gameCvarTable`
+        // rows (`modificationCount` is never explicitly initialized in the
+        // table literal, so it starts at 0 — g_main.c:230-475).
+        GameCvarModCounts([0; GAME_CVAR_TABLE_LEN])
+    }
+}
+
 /// `teamgame_t` — CTF flag-state file global (`g_team.c:18`).
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:18`
@@ -906,6 +922,9 @@ pub struct GameGlobals {
     /// Source: `oracle/oracle/codemp/game/g_log.c:25`
     pub G_WeaponLogTime: [[c_int; WP_NUM_WEAPONS as usize]; MAX_CLIENTS],
     // --- `g_main.c` file-scope globals ---
+    /// `cvarTable_t.modificationCount` per-row cache (see `GameCvarModCounts`).
+    /// Source: `oracle/oracle/codemp/game/g_main.c:17-25`
+    pub gameCvarModCounts: GameCvarModCounts,
     /// `eventClearTime`. Source: `oracle/oracle/codemp/game/g_main.c:11`
     pub eventClearTime: c_int,
     /// `gDidDuelStuff`. Source: `oracle/oracle/codemp/game/g_main.c:2305`

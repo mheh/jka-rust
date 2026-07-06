@@ -1483,3 +1483,8 @@ pub const GAME_CVAR_TABLE: [CvarTableEntry; 139] = [
         team_shader: false,
     },
 ];
+
+/// Row count of `GAME_CVAR_TABLE`, shared with `GameGlobals`' per-row
+/// `modificationCount` cache (`cvarTable_t.modificationCount`,
+/// `g_main.c:22`) so the cache array is always sized to match.
+pub const GAME_CVAR_TABLE_LEN: usize = GAME_CVAR_TABLE.len();
