@@ -164,7 +164,11 @@ pub fn Droid_Patrol(ctx: GameContext<'_>) {
                 && (*((*npc).client as *mut gclient_t)).NPC_class == class_t::CLASS_MOUSE
             {
                 // CLASS_MOUSE
-                (*npc_info).desiredYaw += ((*ctx.world).level.time as f32 * 0.5).sin() * 25.0;
+                // `.5` is a double literal and `sin` is the double libm: the whole
+                // term is evaluated in f64 and narrowed only on store to the float.
+                (*npc_info).desiredYaw = ((*npc_info).desiredYaw as f64
+                    + ((*ctx.world).level.time as f64 * 0.5).sin() * 25.0)
+                    as f32;
 
                 if TIMER_Done(ctx, npc, b"patrolNoise\0".as_ptr() as *const c_char) != 0 {
                     let idx = (*ctx.world).bg_state.rng.Q_irand(1, 3);
@@ -258,7 +262,11 @@ pub fn Droid_Run(ctx: GameContext<'_>) {
             if !UpdateGoal(ctx).is_null() {
                 if NPC_MoveToGoal(ctx, 0 as qboolean) != 0 {
                     // qfalse
-                    (*npc_info).desiredYaw += ((*ctx.world).level.time as f32 * 0.5).sin() * 5.0;
+                    // `.5` is a double literal and `sin` is the double libm: the whole
+                    // term is evaluated in f64 and narrowed only on store to the float.
+                    (*npc_info).desiredYaw = ((*npc_info).desiredYaw as f64
+                        + ((*ctx.world).level.time as f64 * 0.5).sin() * 5.0)
+                        as f32;
                 }
             }
         }

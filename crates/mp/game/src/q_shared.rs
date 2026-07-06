@@ -18,12 +18,13 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::prelude::*;
+use crate::c_format::{c_vsprintf, FmtArg};
 use mp_qshared::shared::{BIG_INFO_STRING, MAX_INFO_STRING, QFALSE, QTRUE};
 
 // Parse-session state (cross-frame state -> GameWorld fields, pending full threading).
 // These are module-level statics mimicking Raven's file-static globals in q_shared.c.
 static mut COM_LINES: c_int = 0;
-static mut COM_PARSENAME: [c_char; 256] = [0; 256]; // MAX_QPATH
+static mut COM_PARSENAME: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
 static mut COM_TOKEN: [c_char; 1024] = [0; 1024]; // MAX_TOKEN_CHARS
 
 // va() rotating-buffer statics (2-slot rotating return buffer).
@@ -31,7 +32,7 @@ static mut VA_STRING: [[c_char; 32000]; 2] = [[0; 32000]; 2];
 static mut VA_INDEX: usize = 0;
 
 // Info_ValueForKey rotating-buffer statics (same rotating idiom as va()).
-static mut INFO_VALUE: [[c_char; 4096]; 2] = [[0; 4096]; 2]; // BIG_INFO_VALUE
+static mut INFO_VALUE: [[c_char; 8192]; 2] = [[0; 8192]; 2]; // BIG_INFO_VALUE
 static mut INFO_VALUEINDEX: c_int = 0;
 
 /// Raven `FOFS(targetname)` — `#define FOFS(x) ((int)&(((gentity_t *)0)->x))`,
@@ -244,19 +245,20 @@ pub fn COM_DefaultExtension(path: *mut c_char, maxSize: c_int, extension: *const
             src = src.offset(-1);
         }
 
-        let old_path = std::ffi::CStr::from_ptr(path)
-            .to_string_lossy()
-            .into_owned();
-        let ext = std::ffi::CStr::from_ptr(extension)
-            .to_string_lossy()
-            .into_owned();
-        let combined = format!("{old_path}{ext}");
-        let cstr = std::ffi::CString::new(combined).unwrap();
-        // Q_strncpyz semantics: truncate to maxSize-1 + NUL.
-        let bytes = cstr.as_bytes_with_nul();
+        // Raven copies `path` into `oldPath[MAX_QPATH]` via Q_strncpyz first,
+        // truncating to MAX_QPATH-1 bytes before the "%s%s" concatenation.
+        let path_bytes = std::ffi::CStr::from_ptr(path).to_bytes();
+        let ext_bytes = std::ffi::CStr::from_ptr(extension).to_bytes();
+        let old_len = path_bytes.len().min(MAX_QPATH as usize - 1);
+        let mut combined: Vec<c_char> =
+            Vec::with_capacity(old_len + ext_bytes.len() + 1);
+        combined.extend(path_bytes[..old_len].iter().map(|&b| b as c_char));
+        combined.extend(ext_bytes.iter().map(|&b| b as c_char));
+        combined.push(0);
+        // Com_sprintf(path, maxSize, ...) truncates to maxSize-1 + NUL.
         let cap = maxSize.max(1) as usize;
-        let n = bytes.len().min(cap);
-        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, path, n - 1);
+        let n = combined.len().min(cap);
+        std::ptr::copy_nonoverlapping(combined.as_ptr(), path, n - 1);
         *path.offset(n as isize - 1) = 0;
     }
 }
@@ -346,7 +348,7 @@ pub fn COM_BeginParseSession(name: *const c_char) {
         crate::q_shared::Q_strncpyz(
             (&raw mut COM_PARSENAME).cast::<c_char>(),
             name,
-            MAX_QPATH as c_int,
+            MAX_TOKEN_CHARS as c_int,
         );
     }
 }
@@ -572,7 +574,11 @@ pub fn COM_ParseExt(data_p: *mut *const c_char, allowLineBreaks: qboolean) -> *m
                 c = *data as c_int;
                 data = data.offset(1);
                 if c == b'"' as c_int || c == 0 {
-                    COM_TOKEN[len as usize] = 0;
+                    // Raven's quoted path omits the `len == MAX_TOKEN_CHARS`
+                    // reset the word path below applies, so a buffer-filling
+                    // token writes the terminator one past `com_token`. Clamp
+                    // to the last slot rather than reproduce that overrun.
+                    COM_TOKEN[len.min(MAX_TOKEN_CHARS as c_int - 1) as usize] = 0;
                     *data_p = data as *const c_char;
                     return (&raw mut COM_TOKEN).cast::<c_char>();
                 }
@@ -1165,45 +1171,56 @@ pub fn Q_CleanStr(string: *mut c_char) -> *mut c_char {
 
 /// Raven `Com_sprintf`.
 ///
-/// PORT-NOTE(variadic-c-abi): Rust cannot express C varargs without external C FFI or macros.
-/// The Raven implementation uses va_start/va_end/vsprintf to format a bigbuffer, then
-/// copies to dest with Q_strncpyz bounds. This implementation accepts the format string
-/// and attempts basic formatting; true vararg expansion requires a seam decision (vsprintf
-/// FFI, pre-formatted String caller convention, or macro-based variadic wrapper).
+/// PORT-NOTE(variadic-c-abi): Raven's `...` becomes an explicit `&[FmtArg]`
+/// channel formatted by `c_format::c_vsprintf` (native-libc `vsprintf` parity);
+/// see `c_format` for the seam rationale. The 32000-byte `bigbuffer`, the
+/// `ERR_FATAL` on `len >= sizeof(bigbuffer)` (→ panic, frozen Group A), the
+/// `Com_Printf` overflow-of warning on `len >= size`, and the closing
+/// `Q_strncpyz(dest, bigbuffer, size)` are reproduced exactly.
 /// Source: `oracle/oracle/codemp/game/q_shared.c:985-1005`
-pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char) {
+pub fn Com_sprintf(dest: *mut c_char, size: c_int, fmt: *const c_char, args: &[FmtArg]) {
     unsafe {
-        if dest.is_null() || size < 1 {
-            return;
+        let fmt_bytes = std::ffi::CStr::from_ptr(fmt).to_bytes();
+        let bigbuffer = c_vsprintf(fmt_bytes, args);
+        let len = bigbuffer.len();
+        if len >= 32000 {
+            // Com_Error(ERR_FATAL, "Com_sprintf: overflowed bigbuffer") -> panic.
+            panic!("Com_sprintf: overflowed bigbuffer");
         }
-        // Without access to varargs, use the format string as the message.
-        let fmt_str = std::ffi::CStr::from_ptr(fmt).to_string_lossy();
-        let bigbuffer = format!("{}", fmt_str);
-        let c_bigbuffer = std::ffi::CString::new(bigbuffer).unwrap();
-        crate::q_shared::Q_strncpyz(dest, c_bigbuffer.as_ptr(), size);
+        if len as c_int >= size {
+            let msg = format!("Com_sprintf: overflow of {} in {}\n", len, size);
+            crate::g_main::Com_Printf(cstr(&msg).as_ptr());
+        }
+        // Q_strncpyz needs a NUL-terminated source; `bigbuffer` has no interior
+        // NUL (the formatter never emits one), so append the terminator here.
+        let mut cbig = bigbuffer;
+        cbig.push(0);
+        crate::q_shared::Q_strncpyz(dest, cbig.as_ptr() as *const c_char, size);
     }
 }
 
 /// Raven `va`.
 ///
-/// PORT-NOTE(variadic-c-abi): Rust cannot express C varargs without external C FFI or macros.
-/// The Raven implementation uses va_start/va_end/vsprintf to format into a rotating 2-slot
-/// static buffer. This implementation accesses the static VA_STRING rotating buffer and
-/// formats with the format string available; true vararg expansion requires a seam decision
-/// (vsprintf FFI or macro-based variadic wrapper). va() is consumed
-/// immediately (passed to trap, copied into field) — callers should use format!() + cstr() directly.
+/// PORT-NOTE(variadic-c-abi): Raven's `...` becomes an explicit `&[FmtArg]`
+/// channel formatted by `c_format::c_vsprintf` (native-libc `vsprintf` parity).
+/// The 2-slot rotating `static char string[2][32000]` return buffer and the
+/// `index & 1` alternation are reproduced by the module statics. Raven's own
+/// `// FIXME: make this buffer size safe someday` means a `>= 32000`-byte result
+/// overruns in C; the port instead truncates into the 31999-usable-byte slot.
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1017-1031`
-pub fn va(format: *const c_char) -> *mut c_char {
+pub fn va(format: *const c_char, args: &[FmtArg]) -> *mut c_char {
     unsafe {
         let buf = VA_STRING[VA_INDEX & 1].as_mut_ptr();
         VA_INDEX += 1;
 
-        let fmt_str = std::ffi::CStr::from_ptr(format).to_string_lossy();
-        let formatted = format!("{}", fmt_str);
-        let bytes = formatted.as_bytes();
-        let max_len = 32000_usize;
-        let copy_len = bytes.len().min(max_len - 1);
-        std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, buf, copy_len);
+        let fmt_bytes = std::ffi::CStr::from_ptr(format).to_bytes();
+        let formatted = c_vsprintf(fmt_bytes, args);
+        let copy_len = formatted.len().min(32000 - 1);
+        std::ptr::copy_nonoverlapping(
+            formatted.as_ptr() as *const c_char,
+            buf,
+            copy_len,
+        );
         *buf.offset(copy_len as isize) = 0;
 
         buf
@@ -1215,7 +1232,7 @@ pub fn va(format: *const c_char) -> *mut c_char {
 /// Source: `oracle/oracle/codemp/game/q_shared.c:1051-1098`
 pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
     unsafe {
-        let mut pkey: [c_char; 1024] = [0; 1024]; // BIG_INFO_KEY
+        let mut pkey: [c_char; 8192] = [0; 8192]; // BIG_INFO_KEY
         let mut o: *mut c_char;
 
         if s.is_null() || key.is_null() {
@@ -1241,7 +1258,7 @@ pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
                 if *p == 0 {
                     return c"".as_ptr() as *mut c_char;
                 }
-                if o.offset_from(pkey.as_ptr()) < 1023 {
+                if o.offset_from(pkey.as_ptr()) < 8191 {
                     *o = *p;
                     o = o.offset(1);
                 }
@@ -1253,7 +1270,7 @@ pub fn Info_ValueForKey(s: *const c_char, key: *const c_char) -> *mut c_char {
             o = INFO_VALUE[INFO_VALUEINDEX as usize].as_mut_ptr();
 
             while *p != b'\\' as c_char && *p != 0 {
-                if o.offset_from(INFO_VALUE[INFO_VALUEINDEX as usize].as_ptr()) < 4095 {
+                if o.offset_from(INFO_VALUE[INFO_VALUEINDEX as usize].as_ptr()) < 8191 {
                     *o = *p;
                     o = o.offset(1);
                 }

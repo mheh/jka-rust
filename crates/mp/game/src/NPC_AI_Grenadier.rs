@@ -45,9 +45,9 @@ pub const NIF_COLLISION: i32 = 0x00000004;
 // Source: `oracle/oracle/codemp/game/b_public.h`
 const SCF_CHASE_ENEMIES: i32 = 0x00000400;
 const SCF_USE_CP_NEAREST: i32 = 0x00100000;
-const SCF_DONT_FIRE: i32 = 0x00000010;
-const SCF_FIRE_WEAPON: i32 = 0x00000008;
-const SCF_IGNORE_ALERTS: i32 = 0x00000001;
+const SCF_DONT_FIRE: i32 = 0x00004000;
+const SCF_FIRE_WEAPON: i32 = 0x00040000;
+const SCF_IGNORE_ALERTS: i32 = 0x00002000;
 // Oracle `b_public.h:38`: SCF_LOOK_FOR_ENEMIES = 0x00000800.
 const SCF_LOOK_FOR_ENEMIES: i32 = 0x00000800;
 
@@ -731,7 +731,7 @@ pub fn NPC_BSGrenadier_Attack(ctx: GameContext<'_>) {
             {
                 // in front of me
                 // can we shoot our target?
-                let hit = NPC_ShotEntity(ctx, enemy_ent, vec3_origin);
+                let hit = NPC_ShotEntity(ctx, enemy_ent, None);
                 let hit_ent = &world.g_entities[hit as usize];
                 if hit == (*enemy_ent).s.number
                     || (!hit_ent.client.is_null()

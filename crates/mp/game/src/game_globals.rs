@@ -1173,11 +1173,11 @@ pub struct GameGlobals {
     /// `saberSpinSound`. Source: `oracle/oracle/codemp/game/w_saber.c:18`
     pub saberSpinSound: c_int,
     /// `static float totalDmg[MAX_SABER_VICTIMS]` — per-victim accumulated damage.
-    /// Stored as `c_int` (matches the ported bodies, which accumulate integer
-    /// `trDmg` and feed `G_Damage`'s `int damage`); the wall-scale multiply
-    /// widens to `f32` at the site, as in the oracle.
+    /// `f32` to match the oracle: accumulation, the wall-scale multiply, and the
+    /// magnitude comparisons all run in float; only the `G_Damage` `int damage`
+    /// argument truncates, at that call site.
     /// Source: oracle/oracle/codemp/game/w_saber.c:3506
-    pub totalDmg: [c_int; MAX_SABER_VICTIMS],
+    pub totalDmg: [f32; MAX_SABER_VICTIMS],
     /// `static int victimEntityNum[MAX_SABER_VICTIMS]` — per-victim entity number.
     /// Source: oracle/oracle/codemp/game/w_saber.c:3504
     pub victimEntityNum: [c_int; MAX_SABER_VICTIMS],

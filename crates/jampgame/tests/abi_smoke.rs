@@ -65,6 +65,15 @@ const G_SET_CONFIGSTRING: isize = MpGameImport::G_SET_CONFIGSTRING as isize;
 const G_GET_CONFIGSTRING: isize = MpGameImport::G_GET_CONFIGSTRING as isize;
 const G_GET_ENTITY_TOKEN: isize = MpGameImport::G_GET_ENTITY_TOKEN as isize;
 const G_LOCATE_GAME_DATA: isize = MpGameImport::G_LOCATE_GAME_DATA as isize;
+const G_SET_USERINFO: isize = MpGameImport::G_SET_USERINFO as isize;
+
+/// Realistic userinfo string for client 0, exercising the keys
+/// `ClientUserinfoChanged` reads (g_client.c:1888). A drop-in of what a real
+/// client submits: name, rate/snaps, model + team_model, colors, handicap, sex,
+/// item prediction, teamtask and an empty password.
+const CLIENT0_USERINFO: &str = "\\name\\Padawan\\rate\\25000\\snaps\\20\\model\\kyle/default\
+\\team_model\\kyle/default\\color1\\4\\color2\\4\\handicap\\100\\sex\\male\
+\\cg_predictItems\\1\\teamtask\\0\\password\\";
 
 // ---------------------------------------------------------------------------
 // Mock engine state
@@ -93,9 +102,15 @@ struct MockEngine {
     next_handle: c_int,
     /// Configstrings the game set (`G_SET_CONFIGSTRING`), recorded by index.
     configstrings: BTreeMap<c_int, String>,
+    /// Per-client userinfo strings served by `G_GET_USERINFO` and mutated by
+    /// `G_SET_USERINFO` (the game rewrites userinfo on illegal name changes).
+    userinfos: BTreeMap<c_int, String>,
     /// Minimal BSP entity token stream served by `G_GET_ENTITY_TOKEN`.
     tokens: Vec<CString>,
     token_idx: usize,
+    /// Current command tokens served by `G_ARGC`/`G_ARGV` (the engine's parsed
+    /// `Cmd_Argv` view) while a `GAME_CLIENT_COMMAND`/`GAME_CONSOLE_COMMAND` runs.
+    cmd_args: Vec<CString>,
     /// Captured `G_LOCATE_GAME_DATA` payload (None until INIT calls it).
     locate: Option<LocateData>,
     /// `G_PRINT` capture.
@@ -125,16 +140,27 @@ impl MockEngine {
             cvars.insert(k.to_string(), v.to_string());
         }
 
-        // A minimal one-entity map: a single `worldspawn`. G_ParseSpawnVars
-        // expects `{`, then key/value pairs, then `}`; the first entity must be
-        // `worldspawn` (SP_worldspawn errors otherwise). After these four tokens
+        // A minimal playable map: a `worldspawn` followed by one FFA spawn point.
+        // G_ParseSpawnVars expects `{`, then key/value pairs, then `}`; the first
+        // entity must be `worldspawn` (SP_worldspawn errors otherwise). The
+        // `info_player_deathmatch` is required so ClientSpawn's SelectSpawnPoint
+        // finds a spot — with none, Raven's `G_Error("Couldn't find a spawn
+        // point")` drops the game (g_client.c SelectSpawnPoint). After the stream
         // `G_GET_ENTITY_TOKEN` returns qfalse (end of entity string).
         // Contract: `qboolean trap_GetEntityToken( char *buffer, int bufferSize )`
         // — Source: oracle/oracle/codemp/game/g_public.h:221.
-        let tokens = ["{", "classname", "worldspawn", "}"]
-            .into_iter()
-            .map(|s| CString::new(s).unwrap())
-            .collect();
+        let tokens = [
+            "{", "classname", "worldspawn", "}", //
+            "{", "classname", "info_player_deathmatch", "origin", "0 0 100", "angle", "0", "}",
+        ]
+        .into_iter()
+        .map(|s| CString::new(s).unwrap())
+        .collect();
+
+        // Client 0 arrives with a realistic userinfo; other slots are empty
+        // until a (hypothetical) connect populates them.
+        let mut userinfos = BTreeMap::new();
+        userinfos.insert(0, CLIENT0_USERINFO.to_string());
 
         MockEngine {
             millis: 0,
@@ -142,14 +168,27 @@ impl MockEngine {
             handle_names: BTreeMap::new(),
             next_handle: 1,
             configstrings: BTreeMap::new(),
+            userinfos,
             tokens,
             token_idx: 0,
+            cmd_args: Vec::new(),
             locate: None,
             prints: Vec::new(),
             g_error: None,
             counts: BTreeMap::new(),
             logged_only: BTreeMap::new(),
         }
+    }
+
+    /// Install the tokenized command the engine's `Cmd_Argc`/`Cmd_Argv` view
+    /// serves for the duration of one `ClientCommand`/`ConsoleCommand` dispatch.
+    fn set_cmd(&mut self, tokens: &[&str]) {
+        self.cmd_args = tokens.iter().map(|t| CString::new(*t).unwrap()).collect();
+    }
+
+    /// Clear the command view once the dispatch returns.
+    fn clear_cmd(&mut self) {
+        self.cmd_args.clear();
     }
 }
 
@@ -282,9 +321,18 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
                 0
             }
             // ---- command args ----------------------------------------------
-            G_ARGC => 0,
+            // `int trap_Argc( void )` / `void trap_Argv( int n, char *buffer,
+            // int bufferSize )` — the module's tokenized view of the current
+            // command. Source: oracle/oracle/codemp/game/g_public.h (trap_Argc/Argv).
+            G_ARGC => m.cmd_args.len() as isize,
             G_ARGV => {
-                unsafe { write_c_buffer(word(args, 2), word(args, 3), "") };
+                let idx = unsafe { word(args, 1) } as usize;
+                let s = m
+                    .cmd_args
+                    .get(idx)
+                    .map(|c| c.to_str().unwrap())
+                    .unwrap_or("");
+                unsafe { write_c_buffer(word(args, 2), word(args, 3), s) };
                 0
             }
             // ---- filesystem: everything missing ----------------------------
@@ -312,7 +360,22 @@ extern "C-unwind" fn mock_syscall(_ctx: *mut c_void, args: *const isize) -> isiz
                 0
             }
             G_GET_USERINFO => {
-                unsafe { write_c_buffer(word(args, 2), word(args, 3), "\\name\\smoke") };
+                // `void trap_GetUserinfo( int num, char *buffer, int bufferSize )`.
+                // A realistic client userinfo drives ClientUserinfoChanged's key
+                // reads (name/model/color/sex/handicap/cg_predictItems/team_model
+                // /snaps/rate) faithfully; unknown clients get an empty string.
+                // Source: oracle/oracle/codemp/game/g_client.c:1912,2269 (trap_GetUserinfo).
+                let num = unsafe { word(args, 1) } as c_int;
+                let s = m.userinfos.get(&num).cloned().unwrap_or_default();
+                unsafe { write_c_buffer(word(args, 2), word(args, 3), &s) };
+                0
+            }
+            G_SET_USERINFO => {
+                // `void trap_SetUserinfo( int num, const char *buffer )`.
+                // Source: oracle/oracle/codemp/game/g_public.h (trap_SetUserinfo).
+                let num = unsafe { word(args, 1) } as c_int;
+                let s = unsafe { c_str(word(args, 2)) };
+                m.userinfos.insert(num, s);
                 0
             }
             G_SET_CONFIGSTRING => {
@@ -516,19 +579,11 @@ fn run_lifecycle() {
         );
     });
 
-    // STRETCH (client lifecycle) NOT landed: GAME_CLIENT_CONNECT(0, qtrue,
-    // qfalse) itself succeeds (returns NULL = allowed), but GAME_CLIENT_BEGIN →
-    // ClientSpawn → WP_InitForcePowers hits a Raven latent UB the port copies
-    // faithfully — `1 << ps.fd.forcePowerSelected` with `forcePowerSelected == -1`
-    // on a fresh client (w_force.rs:549), a shift-by-negative that is UB in C but
-    // panics in Rust. Masking that (and the further client-spawn UB it guards) is
-    // out of scope for a survival smoke test; left as a reported finding. See the
-    // task report.
-
-    // ---- GAME_RUN_FRAME x10, +50ms steps ---------------------------------
+    // ---- warm-up frames before the client connects -----------------------
+    // The engine runs a few game frames before wiring up a client (g_main.c:2949
+    // "we run 3 game frames before calling Connect"). +50ms steps.
     let mut t = 600;
-    for _ in 0..10 {
-        t += 50;
+    let run_frame = |t: AbiWord| {
         let ret = call_vm(vm_main, MpGameExport::GAME_RUN_FRAME, &[t]);
         assert_eq!(ret, 0, "GAME_RUN_FRAME(t={t}) returned {ret}, expected 0");
         MOCK.with(|m| {
@@ -537,8 +592,100 @@ fn run_lifecycle() {
                 "GAME_RUN_FRAME raised G_ERROR"
             );
         });
+    };
+    for _ in 0..3 {
+        t += 50;
+        run_frame(t);
     }
-    eprintln!("[smoke] 10 frames survived (level time now {t})");
+    eprintln!("[smoke] 3 warm-up frames survived (level time now {t})");
+
+    // ---- GAME_CLIENT_CONNECT(0, firstTime=qtrue, isBot=qfalse) ------------
+    // Contract (g_client.c ClientConnect): returns NULL (0) to admit the client,
+    // or a pointer to a rejection string on failure. Source: g_client.c:2258.
+    let connect_ret = call_vm(
+        vm_main,
+        MpGameExport::GAME_CLIENT_CONNECT,
+        &[0, 1 /*qtrue*/, 0 /*qfalse*/],
+    );
+    if connect_ret != 0 {
+        let reason = unsafe { c_str(connect_ret) };
+        panic!("GAME_CLIENT_CONNECT(0) rejected the client: {reason:?}");
+    }
+    MOCK.with(|m| {
+        let m = m.borrow();
+        assert!(m.g_error.is_none(), "GAME_CLIENT_CONNECT raised G_ERROR");
+        // ClientConnect → ClientUserinfoChanged reads the client's userinfo
+        // (g_client.c:2269,2347). Prove the substantive G_GET_USERINFO path ran.
+        assert!(
+            *m.counts.get(&G_GET_USERINFO).unwrap_or(&0) > 0,
+            "GAME_CLIENT_CONNECT never read client userinfo (G_GET_USERINFO)"
+        );
+    });
+    eprintln!("[smoke] GAME_CLIENT_CONNECT(0) admitted (returned NULL)");
+
+    // GAME_CLIENT_USERINFO_CHANGED is NOT driven here: the engine only issues it
+    // on an actual userinfo change; the connect/begin flow calls it internally
+    // (ClientConnect g_client.c:2347, ClientBegin g_client.c:2437). We drive only
+    // what the engine drives.
+
+    // ---- GAME_CLIENT_BEGIN(0) --------------------------------------------
+    // vmMain calls ClientBegin(arg0, qtrue) — spawns the client into the level
+    // (ClientSpawn → WP_InitForcePowers etc.). Source: g_main.c:534, g_client.c:2393.
+    let begin_ret = call_vm(vm_main, MpGameExport::GAME_CLIENT_BEGIN, &[0]);
+    assert_eq!(begin_ret, 0, "GAME_CLIENT_BEGIN returned {begin_ret}");
+    MOCK.with(|m| {
+        assert!(
+            m.borrow().g_error.is_none(),
+            "GAME_CLIENT_BEGIN raised G_ERROR"
+        );
+    });
+    eprintln!("[smoke] GAME_CLIENT_BEGIN(0) spawned the client");
+
+    // ---- GAME_RUN_FRAME x10 with the client connected --------------------
+    for _ in 0..10 {
+        t += 50;
+        run_frame(t);
+    }
+    eprintln!("[smoke] 10 connected frames survived (level time now {t})");
+
+    // ---- GAME_CLIENT_COMMAND(0, "say hello") -----------------------------
+    // vmMain calls ClientCommand(arg0), which reads the command via trap_Argc/
+    // trap_Argv (g_main.c:537, g_cmds.c ClientCommand). The mock serves the
+    // command tokens through G_ARGC/G_ARGV below.
+    MOCK.with(|m| m.borrow_mut().set_cmd(&["say", "hello"]));
+    let cmd_ret = call_vm(vm_main, MpGameExport::GAME_CLIENT_COMMAND, &[0]);
+    assert_eq!(cmd_ret, 0, "GAME_CLIENT_COMMAND returned {cmd_ret}");
+    MOCK.with(|m| {
+        let mut m = m.borrow_mut();
+        assert!(m.g_error.is_none(), "GAME_CLIENT_COMMAND raised G_ERROR");
+        m.clear_cmd();
+    });
+    eprintln!("[smoke] GAME_CLIENT_COMMAND(0, \"say hello\") survived");
+
+    // A couple more frames with the client still in.
+    for _ in 0..2 {
+        t += 50;
+        run_frame(t);
+    }
+
+    // ---- GAME_CLIENT_DISCONNECT(0) ---------------------------------------
+    // Source: g_main.c:531, g_client.c:3816.
+    let disc_ret = call_vm(vm_main, MpGameExport::GAME_CLIENT_DISCONNECT, &[0]);
+    assert_eq!(disc_ret, 0, "GAME_CLIENT_DISCONNECT returned {disc_ret}");
+    MOCK.with(|m| {
+        assert!(
+            m.borrow().g_error.is_none(),
+            "GAME_CLIENT_DISCONNECT raised G_ERROR"
+        );
+    });
+    eprintln!("[smoke] GAME_CLIENT_DISCONNECT(0) clean");
+
+    // A frame or two after the disconnect.
+    for _ in 0..2 {
+        t += 50;
+        run_frame(t);
+    }
+    eprintln!("[smoke] post-disconnect frames survived (level time now {t})");
 
     // ---- GAME_SHUTDOWN (restart qfalse) ----------------------------------
     let sd_ret = call_vm(vm_main, MpGameExport::GAME_SHUTDOWN, &[0]);

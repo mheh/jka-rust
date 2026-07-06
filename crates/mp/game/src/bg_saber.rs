@@ -532,7 +532,7 @@ impl PmoveContext<'_> {
                 // the oracle lists (attacks..knockaways are numerically
                 // contiguous in bg_public.h's saberMoveName_t enum).
                 if (curmove >= LS_A_TL2BR && curmove <= LS_A_T2B)
-                    || (curmove >= LS_D1_BR && curmove <= LS_D1_BL)
+                    || (curmove >= LS_D1_BR && curmove <= LS_D1_B_)
                     || (curmove >= LS_R_TL2BR && curmove <= LS_R_T2B)
                     || (curmove >= LS_PARRY_UP && curmove <= LS_PARRY_LL)
                     || (curmove >= LS_REFLECT_UP && curmove <= LS_REFLECT_LL)

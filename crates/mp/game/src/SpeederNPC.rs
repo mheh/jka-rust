@@ -26,19 +26,19 @@ const VEH_OUTOFCONTROL: u64 = 0x0000_0100;
 
 // Button flags (from oracle/oracle/codemp/game/q_shared.h / usercmd_t)
 const BUTTON_ATTACK: c_int = 1;
-const BUTTON_USE: c_int = 2;
+const BUTTON_USE: c_int = 32;
 const BUTTON_ALT_ATTACK: c_int = 128;
 
-// Weapon constants
-const WP_MELEE: c_int = 0;
-const WP_SABER: c_int = 1;
-const WP_BLASTER: c_int = 2;
-const WP_NONE: c_int = -1;
+// Weapon constants (weapon_t, oracle/oracle/codemp/game/bg_weapons.h)
+const WP_NONE: c_int = 0;
+const WP_MELEE: c_int = 2;
+const WP_SABER: c_int = 3;
+const WP_BLASTER: c_int = 5;
 
-// Entity and effect flag constants
+// Entity and effect flag constants (bg_public.h)
 const ENTITYNUM_NONE: c_int = -1;
-const EF_JETPACK_ACTIVE: c_int = 0x0000_0200;
-const EF_DEAD: c_int = 1 << 7;
+const EF_JETPACK_ACTIVE: c_int = 1 << 11;
+const EF_DEAD: c_int = 1 << 1;
 
 // Animation flag constants
 const SETANIM_FLAG_NORMAL: c_int = 0;
@@ -81,24 +81,22 @@ pub fn VEH_StartStrafeRam(pVeh: *mut Vehicle_t, Right: qboolean, Duration: c_int
 /// exhaust, and armor-effects code (lines 163-264) is guarded by `#ifndef _JK2MP`
 /// and is SP-only dead code, dropped per porting-rules §10.
 /// Source: `oracle/oracle/codemp/game/SpeederNPC.c:149-268`
-pub extern "C" fn Update(pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
+pub fn Update(ctx: GameContext<'_>, pVeh: *mut Vehicle_t, pUcmd: *const usercmd_t) -> qboolean {
     unsafe {
-        // Call base vehicle Update; if it returns false, propagate that
-        // PORT-NOTE(vtable-access): g_vehicleInfo[VEHICLE_BASE].Update(pVeh, pUcmd)
-        // requires ctx to access g_vehicleInfo; vtable fn-ptr dispatch needs game-tier state threading
-        // For now, assume base update succeeds (placeholder until vtable dispatch retrofit)
-        // if !g_vehicleInfo[VEHICLE_BASE].Update(pVeh, pUcmd) {
-        //     return qfalse;
-        // }
+        // `g_vehicleInfo[VEHICLE_BASE].Update` — the generic base body.
+        if crate::g_vehicles::Update(ctx, pVeh, pUcmd) == qfalse {
+            return qfalse;
+        }
 
-        // Check if vehicle is dying and call DeathUpdate if so
+        // See whether this vehicle should be exploding.
         if (*pVeh).m_iDieTime != 0 {
-            // PORT-NOTE(vtable-access): (*pVeh).m_pVehicleInfo.DeathUpdate(pVeh)
-            // requires g_vehicleInfo or vtable fn-ptr in m_pVehicleInfo
+            // `pVeh->m_pVehicleInfo->DeathUpdate(pVeh)` — Speeder's DeathUpdate slot is
+            // commented in oracle setup, so this resolves to the base DeathUpdate.
+            crate::veh_dispatch::death_update(ctx, pVeh);
         }
 
         // The rest of the function (movement direction, strafe ram, exhaust, armor effects)
-        // is guarded by #ifndef _JK2MP and is SP-only code, dead in the MP build
+        // is guarded by #ifndef _JK2MP and is SP-only code, dead in the MP build.
 
         qtrue
     }
@@ -136,8 +134,9 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
                 .unwrap_or(0.0)
                 * (*pVeh).m_fTimeModifier
                 * 0.4f32;
-        } else if crate::veh_dispatch::inhabited(ctx, pVeh) as c_int == 0 {
-            // Drifts to a stop
+        } else if (*parentPS).m_iVehicleNum == 0 {
+            // Drifts to a stop. MP `#ifdef _JK2MP` branch is `!parentPS->m_iVehicleNum`
+            // (the SP `#else` branch is `!Inhabited()`); these are not the same test.
             speedInc = 0.0f32;
         } else {
             speedInc = (*pVeh)
@@ -155,9 +154,8 @@ pub fn ProcessMoveCommands(ctx: GameContext<'_>, pVeh: *mut Vehicle_t) {
             .unwrap_or(0.0)
             * (*pVeh).m_fTimeModifier;
 
-        // PORT-NOTE(vtable-access): level.time needed; curTime assignment requires world state
-        // Placeholder: curTime = 0; // Would be level.time or pm->cmd.serverTime
-        curTime = 0;
+        // QAGAME MP branch: `curTime = level.time`, reachable through `ctx`.
+        curTime = (*ctx.world).level.time;
 
         // Handle turbo/acceleration
         if !(*pVeh).m_pPilot.is_null()

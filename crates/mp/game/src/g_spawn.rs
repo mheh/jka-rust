@@ -219,7 +219,33 @@ unsafe fn c_str_to_f64(s: *const c_char) -> f64 {
 }
 
 unsafe fn c_str_to_i32(s: *const c_char) -> c_int {
-    c_str_to_f64(s) as c_int
+    // `atoi`: skip leading whitespace, an optional sign, then consecutive ASCII
+    // digits only (stops at the first non-digit) — not the float parser.
+    if s.is_null() {
+        return 0;
+    }
+    let bytes = CStr::from_ptr(s).to_bytes();
+    let mut i = 0;
+    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    let mut neg = false;
+    if i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
+        neg = bytes[i] == b'-';
+        i += 1;
+    }
+    let mut val: c_int = 0;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        val = val
+            .wrapping_mul(10)
+            .wrapping_add((bytes[i] - b'0') as c_int);
+        i += 1;
+    }
+    if neg {
+        -val
+    } else {
+        val
+    }
 }
 
 unsafe fn sscanf_3f(s: *const c_char) -> (f32, f32, f32) {
@@ -320,7 +346,8 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
         // check item spawn functions
         let mut item = (bg_itemlist.as_ptr() as *mut gitem_t).add(1);
         while !(*item).classname.is_null() {
-            if Q_stricmp((*item).classname, (*ent).classname) == 0 {
+            // Raven matches items with case-sensitive `strcmp`, not `Q_stricmp`.
+            if CStr::from_ptr((*item).classname) == CStr::from_ptr((*ent).classname) {
                 G_SpawnItem(ctx, ent, item);
                 return QTRUE;
             }
@@ -354,7 +381,7 @@ pub fn G_CallSpawn(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 /// real linefeeds so message texts can be multi-line.
 ///
 /// Source: `oracle/oracle/codemp/game/g_spawn.c:724-749`
-pub fn G_NewString(string: *const c_char) -> *mut c_char {
+pub fn G_NewString(ctx: GameContext<'_>, string: *const c_char) -> *mut c_char {
     unsafe {
         let mut l = 0isize;
         while *string.offset(l) != 0 {
@@ -362,7 +389,7 @@ pub fn G_NewString(string: *const c_char) -> *mut c_char {
         }
         l += 1; // + 1 for the NUL, matching `strlen(string) + 1`
 
-        let newb = G_Alloc(l as c_int) as *mut c_char;
+        let newb = G_Alloc(ctx, l as c_int) as *mut c_char;
         let mut new_p = newb;
 
         let mut i: isize = 0;
@@ -753,7 +780,15 @@ pub static FIELDS: &[BG_field_t] = &[
     field(c"parm14", 0, fieldtype_t::F_PARM14),
     field(c"parm15", 0, fieldtype_t::F_PARM15),
     field(c"parm16", 0, fieldtype_t::F_PARM16),
-    field(c"", 0, fieldtype_t::F_IGNORE), // {NULL} sentinel — name left null below
+    // {NULL} terminator: BG_ParseField scans `for (f=l_fields; f->name; f++)`,
+    // so the sentinel's `name` must be a genuine null pointer, not a pointer to
+    // an empty string, or the scan runs off the end of the table.
+    BG_field_t {
+        name: std::ptr::null_mut(),
+        ofs: 0,
+        r#type: fieldtype_t::F_IGNORE,
+        flags: 0,
+    },
 ];
 
 // `behaviorSet[i]` is a `[*mut c_char; NUM_BSETS]` array of pointer-sized (8
@@ -945,9 +980,15 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
             origin = [0.0, 0.0, 0.0];
         }
 
-        let rotation = (*ctx.world).level.mRotationAdjust.to_radians();
-        new_origin[0] = origin[0] * rotation.cos() - origin[1] * rotation.sin();
-        new_origin[1] = origin[0] * rotation.sin() + origin[1] * rotation.cos();
+        // `DEG2RAD(a)` is `(a * M_PI) / 180.0F` in f32; `cos`/`sin` are the double
+        // libm functions and each `origin[k]*cos(...)` term evaluates in f64
+        // before narrowing to the f32 result.
+        let rotation =
+            ((*ctx.world).level.mRotationAdjust * std::f32::consts::PI) / 180.0;
+        let cos_r = (rotation as f64).cos();
+        let sin_r = (rotation as f64).sin();
+        new_origin[0] = (origin[0] as f64 * cos_r - origin[1] as f64 * sin_r) as f32;
+        new_origin[1] = (origin[0] as f64 * sin_r + origin[1] as f64 * cos_r) as f32;
         new_origin[2] = origin[2];
         let origin_adjust = (*ctx.world).level.mOriginAdjust;
         new_origin[0] += origin_adjust[0];
@@ -974,7 +1015,11 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
             let (a, b, c) = sscanf_3f(value);
             angles = [a, b, c];
 
-            angles[1] = (angles[1] + (*ctx.world).level.mRotationAdjust).rem_euclid(360.0);
+            // `fmod` is a double-precision truncated remainder whose sign follows
+            // the dividend; `rem_euclid` (least non-negative) differs by 360 for a
+            // negative sum.
+            angles[1] =
+                ((angles[1] + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
             let temp = format!("{:.0} {:.0} {:.0}", angles[0], angles[1], angles[2]);
             let temp_c = CString::new(temp).unwrap();
             AddSpawnField(
@@ -989,7 +1034,7 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
             } else {
                 0.0
             };
-            angle1 = (angle1 + (*ctx.world).level.mRotationAdjust).rem_euclid(360.0);
+            angle1 = ((angle1 + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
             let temp = format!("{:.0}", angle1);
             let temp_c = CString::new(temp).unwrap();
             AddSpawnField(
@@ -1008,7 +1053,8 @@ fn HandleEntityAdjustment(ctx: GameContext<'_>) {
         } else {
             [0.0, 0.0, 0.0]
         };
-        direction[1] = (direction[1] + (*ctx.world).level.mRotationAdjust).rem_euclid(360.0);
+        direction[1] =
+            ((direction[1] + (*ctx.world).level.mRotationAdjust) as f64 % 360.0) as f32;
         let temp = format!(
             "{:.0} {:.0} {:.0}",
             direction[0], direction[1], direction[2]
@@ -1266,7 +1312,8 @@ pub fn SP_worldspawn(ctx: GameContext<'_>) {
         // make some data visible to connecting client
         trap::SetConfigstring(
             ctx.engine,
-            GSetConfigstringArgs::new(CS_GAME_VERSION, c"GAME_VERSION".to_owned()),
+            // `#define GAME_VERSION "basejka-1"`.
+            GSetConfigstringArgs::new(CS_GAME_VERSION, c"basejka-1".to_owned()),
         );
 
         let level_start_time_str = format!("{}", (*ctx.world).level.startTime);

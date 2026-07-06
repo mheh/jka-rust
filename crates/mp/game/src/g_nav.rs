@@ -2072,7 +2072,9 @@ pub fn NAV_WaypointsTooFar(
             };
 
             let len = temp.len();
-            if (*ctx.world).globals.fatalErrors as usize + len >= 4096 {
+            // C guards on the running byte offset (`fatalErrorPointer - fatalErrorString`),
+            // not the error count; `fatalErrorPointer` is that write offset.
+            if (*ctx.world).globals.fatalErrorPointer + len >= 4096 {
                 let s = format!("{}TOO MANY FATAL NAV ERRORS!!!\n", temp);
                 Com_Error(3 /* ERR_DROP */, cstr(&s).as_ptr());
                 return qtrue;

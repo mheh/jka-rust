@@ -1170,9 +1170,10 @@ pub fn NPC_Rancor_Pain(
                                 (*((*self_).client as *mut gclient_t)).ps.legsTimer
                                     + (*ctx.world).bg_state.rng.Q_irand(0, 500),
                             );
-                        }
-                        if (*self_).count == 1 {
-                            (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_WAITING;
+
+                            if !(*self_).NPC.is_null() {
+                                (*((*self_).NPC as *mut gNPC_t)).localState = LSTATE_WAITING;
+                            }
                         }
                     }
                 }

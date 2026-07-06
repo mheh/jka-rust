@@ -1420,7 +1420,9 @@ pub fn DEMP2_AltRadiusDamage(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         radius = frac * 200.0; // 200 is max radius...the model is aprox. 100 units tall...the fx draw code mults. this by 2.
 
-        fact = (*ent).count as f32 * 0.6;
+        // C's `0.6` is a double literal, so `count*0.6` runs in f64 and narrows
+        // to float at the store.
+        fact = ((*ent).count as f64 * 0.6) as f32;
 
         if fact < 1.0 {
             fact = 1.0;
@@ -1614,7 +1616,9 @@ pub fn WP_DEMP2_AltFire(ctx: GameContext<'_>, ent: *mut gentity_t) {
             count = 3;
         }
 
-        fact = count as f32 * 0.8;
+        // C's `0.8` is a double literal, so `count*0.8` runs in f64 and narrows
+        // to float at the store.
+        fact = (count as f64 * 0.8) as f32;
         if fact < 1.0 {
             fact = 1.0;
         }
@@ -2511,7 +2515,10 @@ pub fn WP_LobFire(
 
             crate::q_math::_VectorScale(targetDir, shotSpeed, &mut shotVel);
             let mut travelTime = targetDist / shotSpeed;
-            shotVel[2] += travelTime * 0.5 * (*ctx.world).cvars.g_gravity.value;
+            // C's `0.5` is a double literal, so the whole `travelTime * 0.5 *
+            // g_gravity.value` product runs in f64 and narrows at the `+=`.
+            shotVel[2] +=
+                (travelTime as f64 * 0.5 * (*ctx.world).cvars.g_gravity.value as f64) as f32;
 
             if hitCount == 0 {
                 // save the first (ideal) one as the failCase (fallback value)
@@ -3296,6 +3303,8 @@ pub fn DetPackBlow(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 target,
                 self_,
                 owner,
+                // §19: C passes an UNINITIALIZED `vec3_t v` as G_Damage's dir here;
+                // that read is UB — we pass a defined zero vector instead.
                 Some(&mut [0.0_f32, 0.0, 0.0]),
                 (*self_).r.currentOrigin,
                 (*self_).damage,
@@ -3696,6 +3705,11 @@ pub fn WP_FireConcussionAlt(ctx: GameContext<'_>, ent: *mut gentity_t) {
                 start = tr.endpos;
                 skip = tr.entityNum as c_int;
                 continue;
+            }
+
+            if tr.fraction >= 1.0 {
+                // draw the beam but don't do anything else
+                break;
             }
 
             if (*traceEnt).s.weapon == WP_SABER {
@@ -4208,7 +4222,6 @@ pub fn LogAccuracyHit(
     }
 }
 
-// PORT-NOTE(weapon-muzzle-table): `WP_MuzzlePoint[]` (per-weapon muzzle offset table) is referenced but not in the resolved call surface — where does this table live / what's its ported shape?
 /// Raven `CalcMuzzlePoint`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_weapon.c:3530-3551`
@@ -4224,9 +4237,6 @@ pub fn CalcMuzzlePoint(
         let weapontype: c_int = (*ent).s.weapon;
         *muzzlePoint = (*ent).s.pos.trBase;
 
-        // PORT-NOTE(weapon-muzzle-table): `WP_MuzzlePoint[]` — the per-weapon
-        // muzzle offset table — is not yet ported anywhere in the crate graph;
-        // referenced bare, reported as a missing symbol.
         let muzzleOffPoint: vec3_t = WP_MuzzlePoint[weapontype as usize];
 
         if weapontype > WP_NONE && weapontype < WP_NUM_WEAPONS {

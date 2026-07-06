@@ -221,8 +221,12 @@ pub fn G_BounceMissile(ctx: GameContext<'_>, ent: *mut gentity_t, trace: *mut tr
             }
         } else if ((*ent).flags & FL_BOUNCE_HALF) != 0 {
             crate::q_math::_VectorScale((*ent).s.pos.trDelta, 0.65, &mut (*ent).s.pos.trDelta);
-            // Check for stop
-            if tr.plane.normal[2] > 0.2 && crate::q_math::VectorLength((*ent).s.pos.trDelta) < 40.0
+            // Check for stop.
+            // `normal[2]` (float) and `VectorLength` (float) promote to double
+            // against the unsuffixed `0.2`/`40` in C; the f32-nearest 0.2 exceeds
+            // double 0.2, so evaluate in f64 to keep the branch decision.
+            if (tr.plane.normal[2] as f64) > 0.2
+                && (crate::q_math::VectorLength((*ent).s.pos.trDelta) as f64) < 40.0
             {
                 G_SetOrigin(ent, tr.endpos);
                 return;

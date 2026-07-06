@@ -187,7 +187,7 @@ pub fn G_FindConfigstringIndex(
             if s[0] == 0 {
                 break;
             }
-            if Q_stricmp(s.as_ptr(), name) == 0 {
+            if Q_strcmp(s.as_ptr(), name) == 0 {
                 return i;
             }
             i += 1;
@@ -426,10 +426,13 @@ pub fn G_Throw(ctx: GameContext<'_>, targ: *mut gentity_t, newDir: vec3_t, push:
 
         let mut kvel = [0.0f32; 3];
         if g_gravity > 0.0 {
+            // C's trailing `* 0.8` / `* 1.5` are unsuffixed double literals, so the
+            // scale is formed in f64 and VectorScale's `newDir[i] * scale` multiply
+            // is in f64, narrowed once to the f32 kvel.
             for i in 0..3 {
-                kvel[i] = newDir[i] * (g_knockback * push / mass * 0.8);
+                kvel[i] = (newDir[i] as f64 * ((g_knockback * push / mass) as f64 * 0.8)) as f32;
             }
-            kvel[2] = newDir[2] * g_knockback * push / mass * 1.5;
+            kvel[2] = (newDir[2] as f64 * ((g_knockback * push / mass) as f64 * 1.5)) as f32;
         } else {
             for i in 0..3 {
                 kvel[i] = newDir[i] * (g_knockback * push / mass);
@@ -610,7 +613,7 @@ pub fn G_SetAnim(
 ///
 /// Source: `oracle/oracle/codemp/game/g_utils.c:521-550`
 pub fn G_PickTarget(ctx: GameContext<'_>, targetname: *mut c_char) -> *mut gentity_t {
-    const MAXCHOICES: usize = 8;
+    const MAXCHOICES: usize = 32;
     let mut choice: [*mut gentity_t; MAXCHOICES] = [core::ptr::null_mut(); MAXCHOICES];
     let mut num_choices: usize = 0;
 
@@ -1578,11 +1581,14 @@ pub fn G_CanUseDispOn(ctx: GameContext<'_>, ent: *mut gentity_t, dispType: c_int
         const WP_NONE: c_int = 0;
         const LAST_USEABLE_WEAPON: c_int = 16; // placeholder
 
-        if ent.is_null() || (*ent).client.is_null() || (*ent).inuse == qfalse || (*ent).health < 1 {
-            let client = (*ent).client as *mut gclient_t;
-            if !client.is_null() && (*client).ps.stats[STAT_HEALTH] < 1 {
-                return 0;
-            }
+        //dead or invalid
+        if ent.is_null()
+            || (*ent).client.is_null()
+            || (*ent).inuse == qfalse
+            || (*ent).health < 1
+            || (*((*ent).client as *mut gclient_t)).ps.stats[STAT_HEALTH] < 1
+        {
+            return 0;
         }
 
         if dispType == HI_HEALTHDISP {

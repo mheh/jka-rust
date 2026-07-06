@@ -152,7 +152,7 @@ pub fn G_ParseInfos(
             // NOTE: extra space for arena number.
             let info_s = cstr_to_str(info.as_ptr());
             let alloc_size = info_s.len() + "\\num\\".len() + format!("{}", MAX_ARENAS).len() + 1;
-            let dest = G_Alloc(alloc_size as c_int) as *mut c_char;
+            let dest = G_Alloc(ctx, alloc_size as c_int) as *mut c_char;
             if !dest.is_null() {
                 let bytes = info_s.as_bytes();
                 for i in 0..bytes.len() {
@@ -355,7 +355,13 @@ pub fn G_RefreshNextMap(ctx: GameContext<'_>, gametype: c_int, forced: qboolean)
         let mut n = thisLevel + 1;
         let mut loopingUp = qfalse;
         while n != thisLevel {
-            if world.globals.g_arenaInfos[n as usize].is_null() || n >= world.globals.g_numArenas {
+            // Oracle indexes one past the array (real, silent UB reading adjacent static
+            // storage) when n reaches MAX_ARENAS on entry; we choose the defined behavior
+            // of treating out-of-range n as null/wrap immediately (porting-rules §19).
+            if n >= MAX_ARENAS
+                || world.globals.g_arenaInfos[n as usize].is_null()
+                || n >= world.globals.g_numArenas
+            {
                 if loopingUp != 0 {
                     break;
                 }

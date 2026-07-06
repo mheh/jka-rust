@@ -722,7 +722,7 @@ pub fn Boba_FireDecide(ctx: GameContext<'_>) {
                         hitAlly = qtrue; //us!
                     } else if enemyInFOV != qfalse {
                         //if enemy is FOV, go ahead and check for shooting
-                        let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy, impactPos);
+                        let hit = crate::NPC_combat::NPC_ShotEntity(ctx, enemy, Some(&mut impactPos));
                         let hitEnt = ge.add(hit as usize);
                         let hitEnt_client = (*hitEnt).client as *mut gclient_t;
 
@@ -1903,7 +1903,8 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
             //we're way out of range
             let mut usedForce: qboolean = qfalse;
             if (*npc_info).stats.aggression < (*world).bg_state.rng.Q_irand(0, 20)
-                && (*npc).health < ((*client).pers.maxHealth as f32 * 0.75f32) as c_int
+                // C compares in float: health widens to float, `*0.75f` RHS stays float.
+                && ((*npc).health as f32) < (*client).pers.maxHealth as f32 * 0.75f32
                 && (*world).bg_state.rng.Q_irand(0, 2) == 0
             {
                 if ((*client).ps.fd.forcePowersKnown & (1 << FP_HEAL)) != 0
@@ -2189,7 +2190,8 @@ pub fn Jedi_CombatDistance(ctx: GameContext<'_>, enemy_dist: c_int) {
         }
         //if really really mad, rage!
         if (*npc_info).stats.aggression > (*world).bg_state.rng.Q_irand(5, 15)
-            && (*npc).health < ((*client).pers.maxHealth as f32 * 0.75f32) as c_int
+            // C compares in float: health widens to float, `*0.75f` RHS stays float.
+            && ((*npc).health as f32) < (*client).pers.maxHealth as f32 * 0.75f32
             && (*world).bg_state.rng.Q_irand(0, 2) == 0
         {
             if ((*client).ps.fd.forcePowersKnown & (1 << FP_RAGE)) != 0
@@ -4202,16 +4204,23 @@ pub fn Jedi_SetEnemyInfo(
             *enemy_movespeed = crate::q_math::VectorNormalize(enemy_movedir);
             //figure out where he'll be, say, 3 frames from now
             let mvd = *enemy_movedir;
+            // C's `0.001` is a double literal, so `movespeed * 0.001 * prediction`
+            // runs in f64 and narrows to the float VectorMA scale.
             crate::q_math::_VectorMA(
                 (*enemy).r.currentOrigin,
-                *enemy_movespeed * 0.001 * prediction as f32,
+                (*enemy_movespeed as f64 * 0.001 * prediction as f64) as f32,
                 mvd,
                 enemy_dest,
             );
             let dest = *enemy_dest;
             crate::q_math::_VectorSubtract(dest, (*npc).r.currentOrigin, enemy_dir);
-            *enemy_dist = crate::q_math::VectorNormalize(enemy_dir)
-                - ((*npc_client).saber[0].blade[0].lengthMax + (*npc).r.maxs[0] * 1.5 + 16.0);
+            // C's `1.5` is a double literal, so the `lengthMax + maxs*1.5 + 16`
+            // offset and the `VectorNormalize() - ...` subtraction run in f64 and
+            // narrow at the store to the float enemy_dist.
+            *enemy_dist = (crate::q_math::VectorNormalize(enemy_dir) as f64
+                - ((*npc_client).saber[0].blade[0].lengthMax as f64
+                    + (*npc).r.maxs[0] as f64 * 1.5
+                    + 16.0)) as f32;
         }
     }
 }
@@ -4263,7 +4272,8 @@ pub fn Jedi_FaceEnemy(ctx: GameContext<'_>, doPitch: qboolean) {
             && (*npc).s.weapon != WP_STUN_BATON as c_int
         {
             //boba leads his enemy
-            if (*npc).health < ((*client).pers.maxHealth as f32 * 0.5f32) as c_int {
+            // C compares in float: health widens to float, `*0.5f` RHS stays float.
+            if ((*npc).health as f32) < (*client).pers.maxHealth as f32 * 0.5f32 {
                 //lead
                 let missileSpeed = crate::g_weapon::WP_SpeedOfMissileForWeapon(
                     (*npc).s.weapon,
@@ -4938,7 +4948,9 @@ pub fn Jedi_Jump(ctx: GameContext<'_>, dest: vec3_t, goalEntNum: c_int) -> qbool
 
                 crate::q_math::_VectorScale(targetDir, shotSpeed, &mut shotVel);
                 travelTime = targetDist / shotSpeed;
-                shotVel[2] += travelTime * 0.5 * (*client).ps.gravity as f32;
+                // C's `0.5` is a double literal, so the `travelTime * 0.5 *
+                // gravity` product runs in f64 and narrows at the `+=`.
+                shotVel[2] += (travelTime as f64 * 0.5 * (*client).ps.gravity as f64) as f32;
 
                 if hitCount == 0 {
                     //save the first one as the worst case scenario

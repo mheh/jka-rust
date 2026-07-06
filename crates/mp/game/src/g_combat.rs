@@ -60,8 +60,12 @@ const ARMOR_REDUCTION_FACTOR: f32 = 0.50;
 
 /// Raven `modNames` — obituary name table indexed by `meansOfDeath_t`.
 ///
+/// Raven declares `char *modNames[MOD_MAX]` (MOD_MAX = 45) with only 42
+/// initializers, so the last 3 slots (MOD_TARGET_LASER, MOD_TRIGGER_HURT,
+/// MOD_TEAM_CHANGE) are NULL — the bounds check and the null-print site below
+/// preserve that.
 /// Source: `oracle/oracle/codemp/game/g_combat.c:755-797`
-const modNames: [*const c_char; 42] = [
+const modNames: [*const c_char; meansOfDeath_t::MOD_MAX as usize] = [
     c"MOD_UNKNOWN".as_ptr(),
     c"MOD_STUN_BATON".as_ptr(),
     c"MOD_MELEE".as_ptr(),
@@ -104,6 +108,12 @@ const modNames: [*const c_char; 42] = [
     c"MOD_SUICIDE".as_ptr(),
     c"MOD_TARGET_LASER".as_ptr(),
     c"MOD_TRIGGER_HURT".as_ptr(),
+    // Raven leaves indices 42-44 (MOD_TARGET_LASER, MOD_TRIGGER_HURT,
+    // MOD_TEAM_CHANGE) uninitialized in a `[MOD_MAX]` array; C zero-inits file
+    // scope arrays, so these three read as NULL.
+    core::ptr::null(),
+    core::ptr::null(),
+    core::ptr::null(),
 ];
 
 /// Raven `hitLocName` — hit-location display-name table indexed by `hitLoc`.
@@ -189,6 +199,8 @@ pub fn G_GetHitLocation(ctx: GameContext<'_>, target: *mut gentity_t, ppoint: ve
         let mut forward: vec3_t = [0.0; 3];
         let mut right: vec3_t = [0.0; 3];
         let mut up: vec3_t = [0.0; 3];
+        // §19: when `target->client` is NULL, C leaves `tangles` UNINITIALIZED
+        // and feeds that garbage to AngleVectors below — UB; we zero-init it.
         let mut tangles: vec3_t = [0.0; 3];
         let mut tcenter: vec3_t = [0.0; 3];
 
@@ -2280,6 +2292,10 @@ pub fn player_die(
         let obit: String;
         if meansOfDeath < 0 || meansOfDeath as usize >= modNames.len() {
             obit = "<bad obituary>".to_string();
+        } else if modNames[meansOfDeath as usize].is_null() {
+            // §19: C's `G_LogPrintf("%s", NULL)` for the three trailing NULL
+            // modNames slots (42-44) is UB; glibc renders NULL as "(null)".
+            obit = "(null)".to_string();
         } else {
             obit = cstr_to_str(modNames[meansOfDeath as usize]);
         }
@@ -2940,12 +2956,18 @@ pub fn RaySphereIntersections(
             ]
         };
         if d > 0.0 {
-            let t = (-b + d.sqrt()) / 2.0;
+            // Raven: `t = (- b + sqrt(d)) / 2`. `sqrt` is libm's `double sqrt`,
+            // so `d` promotes to double and the whole root is evaluated in f64
+            // before narrowing to the f32 `t` — evaluating in f32 here diverges
+            // by a last bit on irrational `sqrt(d)`.
+            let t = ((-(b as f64) + (d as f64).sqrt()) / 2.0) as f32;
             *intersections.add(0) = ma(t);
-            let t = (-b - d.sqrt()) / 2.0;
+            let t = ((-(b as f64) - (d as f64).sqrt()) / 2.0) as f32;
             *intersections.add(1) = ma(t);
             2
         } else if d == 0.0 {
+            // Raven: `t = (- b) / 2` — no `sqrt`, so this stays f32 (`2` is an
+            // int divisor, promoting only to float).
             let t = -b / 2.0;
             *intersections.add(0) = ma(t);
             1
@@ -5981,7 +6003,9 @@ pub fn G_RadiusDamage(
                 continue;
             }
 
-            let points = damage * (1.0 - dist / radius);
+            // C's `1.0` is a double literal, so the subtract and multiply run in
+            // f64 (narrowed at the store); `dist / radius` is still an f32 divide.
+            let points = (damage as f64 * (1.0 - (dist / radius) as f64)) as f32;
 
             if CanDamage(ctx, ent, origin) != qfalse {
                 if crate::g_weapon::LogAccuracyHit(ctx, ent, attacker) != qfalse {

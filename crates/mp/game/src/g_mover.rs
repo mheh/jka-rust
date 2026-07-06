@@ -992,12 +992,14 @@ pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     (*ent).r.currentOrigin[1] - (*ent).pos1[1],
                     (*ent).r.currentOrigin[2] - (*ent).pos1[2],
                 ];
-                let len = |v: vec3_t| (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-                let mut f_partial = len(cur_delta) / len((*ent).s.pos.trDelta);
+                // Raven runs fPartial through double libm: VectorLength narrows a double
+                // sqrt to float, acos is the double call, and RAD2DEG is `(a*180.0f)/M_PI`
+                // with double M_PI. fPartial narrows back to float after each assignment.
+                let mut f_partial = VectorLength(cur_delta) / VectorLength((*ent).s.pos.trDelta);
                 f_partial /= (*ent).s.pos.trDuration as f32;
                 f_partial /= 0.001f32;
-                f_partial = f_partial.acos();
-                f_partial = f_partial.to_degrees();
+                f_partial = (f_partial as f64).acos() as f32;
+                f_partial = ((f_partial * 180.0f32) as f64 / core::f64::consts::PI) as f32;
                 f_partial = (90.0 - f_partial) / 90.0 * (*ent).s.pos.trDuration as f32;
                 total = cur_total;
                 partial = total - f_partial.floor() as c_int;
@@ -1025,12 +1027,14 @@ pub fn Use_BinaryMover_Go(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     (*ent).r.currentOrigin[1] - (*ent).pos2[1],
                     (*ent).r.currentOrigin[2] - (*ent).pos2[2],
                 ];
-                let len = |v: vec3_t| (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-                let mut f_partial = len(cur_delta) / len((*ent).s.pos.trDelta);
+                // Raven runs fPartial through double libm: VectorLength narrows a double
+                // sqrt to float, acos is the double call, and RAD2DEG is `(a*180.0f)/M_PI`
+                // with double M_PI. fPartial narrows back to float after each assignment.
+                let mut f_partial = VectorLength(cur_delta) / VectorLength((*ent).s.pos.trDelta);
                 f_partial /= (*ent).s.pos.trDuration as f32;
                 f_partial /= 0.001f32;
-                f_partial = f_partial.acos();
-                f_partial = f_partial.to_degrees();
+                f_partial = (f_partial as f64).acos() as f32;
+                f_partial = ((f_partial * 180.0f32) as f64 / core::f64::consts::PI) as f32;
                 f_partial = (90.0 - f_partial) / 90.0 * (*ent).s.pos.trDuration as f32;
                 total = cur_total;
                 partial = total - f_partial.floor() as c_int;
@@ -1160,8 +1164,9 @@ pub fn InitMoverTrData(ent: *mut gentity_t) {
         let pos1 = (*ent).pos1;
         let pos2 = (*ent).pos2;
         let r#move = [pos2[0] - pos1[0], pos2[1] - pos1[1], pos2[2] - pos1[2]];
-        let distance =
-            (r#move[0] * r#move[0] + r#move[1] * r#move[1] + r#move[2] * r#move[2]).sqrt();
+        // Raven uses VectorLength, whose sqrt is the double libm call narrowed to float;
+        // an inline f32 sqrt double-rounds and diverges from the oracle.
+        let distance = VectorLength(r#move);
         if (*ent).speed == 0.0 {
             (*ent).speed = 100.0;
         }
@@ -2095,7 +2100,9 @@ pub fn Reached_Train(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*ent).pos2[1] - (*ent).pos1[1],
             (*ent).pos2[2] - (*ent).pos1[2],
         ];
-        let length = (r#move[0] * r#move[0] + r#move[1] * r#move[1] + r#move[2] * r#move[2]).sqrt();
+        // Raven uses VectorLength (double sqrt narrowed to float); an inline f32 sqrt
+        // double-rounds and diverges from the oracle.
+        let length = VectorLength(r#move);
 
         (*ent).s.pos.trDuration = (length * 1000.0 / speed) as c_int;
 
@@ -2562,8 +2569,11 @@ pub fn SP_func_pendulum(ctx: GameContext<'_>, ent: *mut gentity_t) {
             length = 8.0;
         }
 
-        let freq = 1.0 / (core::f32::consts::PI * 2.0)
-            * ((*ctx.world).cvars.g_gravity.value / (3.0 * length)).sqrt();
+        // Raven: `1 / ( M_PI * 2 ) * sqrt( g_gravity.value / ( 3 * length ) )`. The ratio
+        // is a float divide, but sqrt is the double libm call and 1/(M_PI*2) is double;
+        // the product narrows to float.
+        let ratio = (*ctx.world).cvars.g_gravity.value / (3.0 * length);
+        let freq = (1.0f64 / (core::f64::consts::PI * 2.0) * (ratio as f64).sqrt()) as f32;
 
         (*ent).s.pos.trDuration = (1000.0 / freq) as c_int;
 
@@ -2732,7 +2742,10 @@ pub fn funcBBrushDieGo(ctx: GameContext<'_>, self_: *mut gentity_t) {
         // that it seemed to be the closest to yielding the results that I
         // wanted. Volume is length * width * height...then break that
         // volume down based on how many chunks we have.
-        let mut scale = (org_size[0] * org_size[1] * org_size[2]).sqrt().sqrt() * 1.75;
+        // Raven: `sqrt( sqrt( org[0]*org[1]*org[2] )) * 1.75f`. Both sqrts are the double
+        // libm call and the whole product stays double until it narrows to float on assign.
+        let mut scale =
+            (((org_size[0] * org_size[1] * org_size[2]) as f64).sqrt().sqrt() * 1.75) as f32;
 
         let size = if scale > 48.0 {
             2
@@ -3313,14 +3326,14 @@ pub fn GlassUse(
         ];
         (*self_).pos1 = temp1;
 
-        let len = ((*self_).pos2[0] * (*self_).pos2[0]
-            + (*self_).pos2[1] * (*self_).pos2[1]
-            + (*self_).pos2[2] * (*self_).pos2[2])
-            .sqrt();
+        // Raven uses VectorNormalize, whose sqrt is the double libm call and which leaves
+        // the vector untouched at zero length (so the scale yields (0,0,0)); an inline f32
+        // sqrt double-rounds and turns the coincident-center case into NaN.
+        VectorNormalize(&mut (*self_).pos2);
         (*self_).pos2 = [
-            (*self_).pos2[0] / len * 390.0,
-            (*self_).pos2[1] / len * 390.0,
-            (*self_).pos2[2] / len * 390.0,
+            (*self_).pos2[0] * 390.0,
+            (*self_).pos2[1] * 390.0,
+            (*self_).pos2[2] * 390.0,
         ];
 
         GlassDie(

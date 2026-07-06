@@ -281,7 +281,7 @@ pub fn BG_ParseField(
                 match (*f).r#type {
                     fieldtype_t::F_LSTRING => {
                         // QAGAME (jampgame) branch: G_NewString.
-                        let s = G_NewString(value);
+                        let s = G_NewString(ctx, value);
                         *(b.offset((*f).ofs as isize) as *mut *mut c_char) = s;
                     }
                     fieldtype_t::F_VECTOR => {
@@ -401,6 +401,10 @@ pub fn BG_LegalizedForcePowers(
         }
 
         const NUM_FORCE_POWERS_USIZE: usize = 18;
+        // Raven's loop also stops at an embedded '\n' and leaves the unwritten
+        // `final_Powers` tail as uninitialized stack garbage (read later); the
+        // zero-fill here is the defined choice for that UB, and normal machine-
+        // generated power strings carry no embedded '\n' to diverge on.
         let mut final_powers: [c_int; NUM_FORCE_POWERS_USIZE] = [0; NUM_FORCE_POWERS_USIZE];
         for (c, ch) in powers_field
             .chars()
@@ -584,7 +588,10 @@ pub fn vectoyaw(vec: vec3_t) -> f32 {
         yaw = 0.0;
     } else {
         if vec[PITCH] != 0.0 {
-            yaw = vec[YAW].atan2(vec[PITCH]) * 180.0 / std::f32::consts::PI;
+            // Raven's atan2 is the double libm call and M_PI is math.h's double;
+            // the `*180/M_PI` chain evaluates in f64 then rounds to the float result.
+            yaw = ((vec[YAW] as f64).atan2(vec[PITCH] as f64) * 180.0 / std::f64::consts::PI)
+                as f32;
         } else if vec[YAW] > 0.0 {
             yaw = 90.0;
         } else {

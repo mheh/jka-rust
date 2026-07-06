@@ -573,6 +573,9 @@ pub fn SetSaberBoxSize(ctx: GameContext<'_>, saberent: *mut gentity_t) {
             }
         }
 
+        // Raven reads saber[j].blade[k] with j left over from the broken-parry+forceBlock
+        // loops (terminal MAX_BLADES/numBlades) — an OOB read; the loops here use fresh
+        // i/jj, so j and k stay 0 and we read saber[0].blade[0] as the defined behavior (§19).
         if (level_time - (*oc).lastSaberStorageTime) > 200
             || (level_time - (*oc).saber[j as usize].blade[k as usize].storageTime) > 100
         {
@@ -3849,7 +3852,7 @@ pub fn WP_SaberClearDamage(ctx: GameContext<'_>) {
         for ven in 0..MAX_SABER_VICTIMS as usize {
             g.victimEntityNum[ven] = ENTITYNUM_NONE;
             g.victimHitEffectDone[ven] = qfalse;
-            g.totalDmg[ven] = 0;
+            g.totalDmg[ven] = 0.0;
             g.dmgDir[ven] = [0.0; 3];
             g.dmgSpot[ven] = [0.0; 3];
             g.dismemberDmg[ven] = qfalse;
@@ -3903,7 +3906,7 @@ pub fn WP_SaberDamageAdd(
             }
 
             let cv = curVictim as usize;
-            g.totalDmg[cv] += trDmg;
+            g.totalDmg[cv] += trDmg as f32;
             if VectorCompare(g.dmgDir[cv], vec3_origin) != 0 {
                 crate::q_math::_VectorCopy(trDmgDir, &mut g.dmgDir[cv]);
             }
@@ -3937,9 +3940,8 @@ pub fn WP_SaberApplyDamage(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             // nmckenzie: SABER_DAMAGE_WALLS
             if (*victim).client.is_null() {
-                (*ctx.world).globals.totalDmg[iu] = ((*ctx.world).globals.totalDmg[iu] as f32
-                    * (*ctx.world).cvars.g_saberWallDamageScale.value)
-                    as c_int;
+                (*ctx.world).globals.totalDmg[iu] *=
+                    (*ctx.world).cvars.g_saberWallDamageScale.value;
             }
 
             if (*ctx.world).globals.dismemberDmg[iu] == 0 {
@@ -3955,7 +3957,7 @@ pub fn WP_SaberApplyDamage(ctx: GameContext<'_>, self_: *mut gentity_t) {
                 self_,
                 Some(&mut (*ctx.world).globals.dmgDir[iu]),
                 (*ctx.world).globals.dmgSpot[iu],
-                (*ctx.world).globals.totalDmg[iu],
+                (*ctx.world).globals.totalDmg[iu] as c_int,
                 dflags,
                 MOD_SABER as c_int,
             );
@@ -4042,9 +4044,9 @@ pub fn WP_SaberDoHit(
                         || (*victim).s.eType == ET_NPC as c_int
                         || (*victim).s.eType == ET_BODY as c_int)
                 {
-                    if (*ctx.world).globals.totalDmg[iu] < 5 {
+                    if (*ctx.world).globals.totalDmg[iu] < 5.0 {
                         (*te).s.eventParm = 3;
-                    } else if (*ctx.world).globals.totalDmg[iu] < 20 {
+                    } else if (*ctx.world).globals.totalDmg[iu] < 20.0 {
                         (*te).s.eventParm = 2;
                     } else {
                         (*te).s.eventParm = 1;
@@ -4060,7 +4062,7 @@ pub fn WP_SaberDoHit(
                     {
                         // don't do clash flare
                     } else {
-                        if (*ctx.world).globals.totalDmg[iu] > SABER_NONATTACK_DAMAGE {
+                        if (*ctx.world).globals.totalDmg[iu] > SABER_NONATTACK_DAMAGE as f32 {
                             let teS =
                                 G_TempEntity(ctx, (*te).s.origin, EV_SABER_CLASHFLARE as c_int);
                             (*teS).s.origin = (*te).s.origin;
@@ -5508,8 +5510,8 @@ pub fn CheckSaberDamage(
             } else if (selfSaberLevel > FORCE_LEVEL_2 || unblockable != 0)
                 && ((*ooc).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] < selfSaberLevel
                     || ((*ooc).ps.fd.forcePowerLevel[FP_SABER_DEFENSE as usize] == selfSaberLevel
-                        && ((*ctx.world).bg_state.rng.Q_irand(1, 10)
-                            >= (otherSaberLevel as f32 * 1.5) as c_int
+                        && ((*ctx.world).bg_state.rng.Q_irand(1, 10) as f64
+                            >= otherSaberLevel as f64 * 1.5
                             || unblockable != 0)))
                 && PM_SaberInParry((*ooc).ps.saberMove) != 0
                 && PM_SaberInBrokenParry((*ooc).ps.saberMove) == 0
@@ -10240,19 +10242,23 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                         while rBladeNum < (*client).saber[rSaberNum as usize].numBlades {
                             // Don't bother updating the bolt for each blade for this, it's just a
                             // very rough fallback method for during saberlocks
+                            // Raven indexes `saber[saberNum]` where saberNum is a saber ENTITY
+                            // number (>= MAX_CLIENTS) — an OOB write past saber[MAX_SABERS]; the
+                            // loop bound (rSaberNum < MAX_SABERS) and adjacent blade[rBladeNum]
+                            // show the intent, so index saber[rSaberNum] (§19).
                             crate::q_math::_VectorCopy(
                                 boltOrigin,
-                                &mut (*client).saber[saberNum as usize].blade[rBladeNum as usize]
+                                &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .trail
                                     .base,
                             );
                             crate::q_math::_VectorCopy(
                                 end,
-                                &mut (*client).saber[saberNum as usize].blade[rBladeNum as usize]
+                                &mut (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                     .trail
                                     .tip,
                             );
-                            (*client).saber[saberNum as usize].blade[rBladeNum as usize]
+                            (*client).saber[rSaberNum as usize].blade[rBladeNum as usize]
                                 .trail
                                 .lastTime = (*ctx.world).level.time;
 
@@ -10496,6 +10502,9 @@ pub fn WP_SaberPositionUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd:
                                 let mut trMask: c_int = CONTENTS_LIGHTSABER | CONTENTS_BODY;
                                 let mut sN: c_int = 0;
                                 let mut gotHit: qboolean = qfalse;
+                                // Raven leaves clientUnlinked[MAX_CLIENTS] uninitialized and can
+                                // read an entry the trace loop never wrote — UB; zero-init makes
+                                // the unwritten entries read as qfalse, the defined behavior (§19).
                                 let mut clientUnlinked: [qboolean; MAX_CLIENTS as usize] =
                                     [qfalse; MAX_CLIENTS as usize];
                                 let mut skipSaberTrace: qboolean = qfalse;

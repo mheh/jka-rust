@@ -1228,7 +1228,11 @@ pub fn pas_think(ctx: GameContext<'_>, ent: *mut gentity_t) {
             diffPitch = AngleSubtract((*ent).random, desiredAngles[PITCH]);
         } else {
             // no enemy, so make us slowly sweep back and forth as if searching for a new one
-            diffYaw = (((*ctx.world).level.time as f32 * 0.0001 + (*ent).count as f32).sin()) * 2.0;
+            // `sin` is the double libm function: the float argument is widened to f64,
+            // evaluated in f64, then narrowed back to the f32 result.
+            diffYaw =
+                ((((*ctx.world).level.time as f32 * 0.0001 + (*ent).count as f32) as f64).sin()
+                    * 2.0) as f32;
         }
 
         if diffYaw.abs() > 0.25 {
@@ -1623,7 +1627,7 @@ pub fn Jetpack_On(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_items.c:1201-1234`
 pub fn ItemUse_Jetpack(ctx: GameContext<'_>, ent: *mut gentity_t) {
     // Raven `#define JETPACK_TOGGLE_TIME` (`g_items.c`).
-    pub const JETPACK_TOGGLE_TIME: c_int = 500;
+    pub const JETPACK_TOGGLE_TIME: c_int = 1000;
 
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
@@ -1666,7 +1670,7 @@ pub fn ItemUse_Jetpack(ctx: GameContext<'_>, ent: *mut gentity_t) {
 /// Source: `oracle/oracle/codemp/game/g_items.c:1239-1272`
 pub fn ItemUse_UseCloak(ctx: GameContext<'_>, ent: *mut gentity_t) {
     // Raven `#define CLOAK_TOGGLE_TIME` (`g_items.c`).
-    pub const CLOAK_TOGGLE_TIME: c_int = 500;
+    pub const CLOAK_TOGGLE_TIME: c_int = 1000;
 
     unsafe {
         debug_assert!(!ent.is_null() && !(*ent).client.is_null());
@@ -3505,7 +3509,10 @@ pub fn Touch_Item(
 
         // random can be used to vary the respawn time
         if (*ent).random != 0.0 {
-            respawn += ((*ctx.world).bg_state.rng.crandom() * (*ent).random) as c_int;
+            // C `respawn += crandom() * ent->random` truncates the f32 sum once:
+            // `respawn = (int)((float)respawn + delta)`.
+            respawn =
+                ((respawn as f32) + (*ctx.world).bg_state.rng.crandom() * (*ent).random) as c_int;
             if respawn < 1 {
                 respawn = 1;
             }

@@ -233,7 +233,7 @@ pub fn misc_dlight_use(
 /// Source: `oracle/oracle/codemp/game/g_misc.c:142-166`
 pub fn SP_light(ctx: GameContext<'_>, self_: *mut gentity_t) {
     unsafe {
-        if (*self_).targetname.is_null() || *(*self_).targetname == 0 {
+        if (*self_).targetname.is_null() {
             // if i don't have a light style switch, then i go away
             G_FreeEntity(ctx, self_);
             return;
@@ -473,7 +473,9 @@ pub fn SP_misc_portal_camera(ctx: GameContext<'_>, ent: *mut gentity_t) {
         let mut roll: f32 = 0.0;
         G_SpawnFloat(ctx, c"roll".as_ptr(), c"0".as_ptr(), &mut roll as *mut f32);
 
-        (*ent).s.clientNum = (roll / 360.0 * 256.0) as c_int;
+        // C evaluates `roll/360.0 * 256` in double (360.0 is a double literal),
+        // then truncates to int.
+        (*ent).s.clientNum = (roll as f64 / 360.0 * 256.0) as c_int;
     }
 }
 
@@ -574,9 +576,8 @@ pub fn SP_misc_bsp(ctx: GameContext<'_>, ent: *mut gentity_t) {
     }
 }
 
-// PORT-NOTE(unported-const): `MAX_INFO_STRING`/`MAX_INSTANCE_TYPES` have no
-// ported home; the 1024/8 literals below are the oracle's usual values,
-// used only for local scratch-buffer sizing.
+// PORT-NOTE(unported-const): `MAX_INFO_STRING` has no ported home; the 1024
+// literal below is the oracle's value, used only for local scratch-buffer sizing.
 /// Raven `SP_terrain`.
 ///
 /// Source: `oracle/oracle/codemp/game/g_misc.c:484-631`
@@ -649,32 +650,32 @@ pub fn SP_terrain(ctx: GameContext<'_>, ent: *mut gentity_t) {
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"minx".as_ptr(),
-            cstr(&format!("{}", (*ent).r.mins[0])).as_ptr(),
+            cstr(&format!("{:.6}", (*ent).r.mins[0])).as_ptr(),
         );
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"miny".as_ptr(),
-            cstr(&format!("{}", (*ent).r.mins[1])).as_ptr(),
+            cstr(&format!("{:.6}", (*ent).r.mins[1])).as_ptr(),
         );
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"minz".as_ptr(),
-            cstr(&format!("{}", (*ent).r.mins[2])).as_ptr(),
+            cstr(&format!("{:.6}", (*ent).r.mins[2])).as_ptr(),
         );
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"maxx".as_ptr(),
-            cstr(&format!("{}", (*ent).r.maxs[0])).as_ptr(),
+            cstr(&format!("{:.6}", (*ent).r.maxs[0])).as_ptr(),
         );
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"maxy".as_ptr(),
-            cstr(&format!("{}", (*ent).r.maxs[1])).as_ptr(),
+            cstr(&format!("{:.6}", (*ent).r.maxs[1])).as_ptr(),
         );
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"maxz".as_ptr(),
-            cstr(&format!("{}", (*ent).r.maxs[2])).as_ptr(),
+            cstr(&format!("{:.6}", (*ent).r.maxs[2])).as_ptr(),
         );
 
         Info_SetValueForKey(
@@ -703,7 +704,8 @@ pub fn SP_terrain(ctx: GameContext<'_>, ent: *mut gentity_t) {
             mission_type.as_ptr(),
         );
 
-        const MAX_INSTANCE_TYPES: c_int = 8;
+        // `#define MAX_INSTANCE_TYPES 16` at g_misc.c:483.
+        const MAX_INSTANCE_TYPES: c_int = 16;
         let mut i: c_int = 0;
         while i < MAX_INSTANCE_TYPES {
             let mut final_: [c_char; MAX_QPATH as usize] = [0; MAX_QPATH as usize];
@@ -738,7 +740,7 @@ pub fn SP_terrain(ctx: GameContext<'_>, ent: *mut gentity_t) {
         Info_SetValueForKey(
             temp.as_mut_ptr(),
             c"texturescale".as_ptr(),
-            cstr(&format!("{}", crate::bg_lib::atof(value))).as_ptr(),
+            cstr(&format!("{:.6}", crate::bg_lib::atof(value))).as_ptr(),
         );
 
         // Initialise the common aspects of the terrain
@@ -1401,7 +1403,9 @@ pub fn InitShooter(ctx: GameContext<'_>, ent: *mut gentity_t, weapon: c_int) {
         if (*ent).random == 0.0 {
             (*ent).random = 1.0;
         }
-        (*ent).random = (std::f32::consts::PI * (*ent).random / 180.0).sin();
+        // C evaluates `sin( M_PI * ent->random / 180 )` in double (M_PI and the
+        // libm sin are double); narrow only on store.
+        (*ent).random = (std::f64::consts::PI * (*ent).random as f64 / 180.0).sin() as f32;
         // target might be a moving object, so we can't set movedir for it
         if !(*ent).target.is_null() {
             (*ent).think = Some(EntThink::InitShooter_Finish);

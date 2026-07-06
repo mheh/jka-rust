@@ -221,10 +221,25 @@ pub fn G_ProcessIPBans(ctx: GameContext<'_>) {
     let world = unsafe { &*ctx.world };
     let ban_ips_str = unsafe { cstr_to_str(world.cvars.g_banIPs.string.as_ptr()) };
 
-    // Parse space-separated tokens from the string
-    for token in ban_ips_str.split_whitespace() {
-        let token_cstr = cstr(token);
-        AddIP(ctx, token_cstr.as_ptr() as *mut c_char);
+    // Raven scans the string with `strchr(s, ' ')`: only ' ' separates tokens
+    // (tab/newline do not), and the loop breaks at the first token with no
+    // trailing space, so a final non-space-terminated token is never added.
+    let bytes = ban_ips_str.as_bytes();
+    let mut t = 0usize;
+    while t < bytes.len() {
+        let sp = match bytes[t..].iter().position(|&c| c == b' ') {
+            Some(p) => t + p,
+            None => break,
+        };
+        if t < sp {
+            let token_cstr = cstr(&ban_ips_str[t..sp]);
+            AddIP(ctx, token_cstr.as_ptr() as *mut c_char);
+        }
+        let mut ns = sp;
+        while ns < bytes.len() && bytes[ns] == b' ' {
+            ns += 1;
+        }
+        t = ns;
     }
 }
 
@@ -460,14 +475,16 @@ pub fn Svcmd_EntityList_f(ctx: GameContext<'_>) {
             1 => "ET_PLAYER           ",
             2 => "ET_ITEM             ",
             3 => "ET_MISSILE          ",
-            4 => "ET_MOVER            ",
-            5 => "ET_BEAM             ",
-            6 => "ET_PORTAL           ",
-            7 => "ET_SPEAKER          ",
-            8 => "ET_PUSH_TRIGGER     ",
-            9 => "ET_TELEPORT_TRIGGER ",
-            10 => "ET_INVISIBLE        ",
-            11 => "ET_NPC              ",
+            // eType 4 (ET_SPECIAL) and 5 (ET_HOLOCRON) have no C case and fall
+            // through to the default numeric label.
+            6 => "ET_MOVER            ",
+            7 => "ET_BEAM             ",
+            8 => "ET_PORTAL           ",
+            9 => "ET_SPEAKER          ",
+            10 => "ET_PUSH_TRIGGER     ",
+            11 => "ET_TELEPORT_TRIGGER ",
+            12 => "ET_INVISIBLE        ",
+            13 => "ET_NPC              ",
             _ => {
                 G_Printf(
                     ctx,

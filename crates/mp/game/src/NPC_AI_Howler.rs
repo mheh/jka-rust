@@ -35,16 +35,12 @@ const MIN_DISTANCE: c_int = 54;
 const MIN_DISTANCE_SQR: c_int = MIN_DISTANCE * MIN_DISTANCE;
 const MAX_DISTANCE: c_int = 128;
 
-// Animation constants (bg_public.h) — Howler pain response anim.
-// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:187`
-const SETANIM_BOTH: c_int = 2;
-const BOTH_PAIN1: c_int = 4;
+// SETANIM_BOTH (= SETANIM_TORSO|SETANIM_LEGS), BOTH_PAIN1, and BOTH_ATTACK1 come
+// from the prelude (set_anim / anim_number); no local copies here so the enum
+// values stay authoritative.
+// Source: `oracle/oracle/codemp/game/bg_public.h:500`, `anims.h`
 const SETANIM_FLAG_OVERRIDE: c_int = 1;
 const SETANIM_FLAG_HOLD: c_int = 2;
-
-// Attack animation constants
-// Source: `oracle/oracle/codemp/game/NPC_AI_Howler.c:118`
-const BOTH_ATTACK1: c_int = 5;
 
 /// Raven `NPC_Howler_Precache`.
 ///
@@ -198,7 +194,7 @@ pub fn Howler_Attack(ctx: GameContext<'_>) {
                 ctx,
                 npc,
                 SETANIM_BOTH,
-                BOTH_ATTACK1,
+                BOTH_ATTACK1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
 
@@ -290,7 +286,7 @@ pub fn NPC_Howler_Pain(
                 ctx,
                 self_,
                 SETANIM_BOTH,
-                BOTH_PAIN1,
+                BOTH_PAIN1 as c_int,
                 SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD,
             );
 

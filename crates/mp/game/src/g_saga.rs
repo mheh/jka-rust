@@ -734,10 +734,10 @@ pub fn UseSiegeTarget(
 ) {
     unsafe {
         // Raven: "looks like we don't have access to a player, so just use
-        // the activating entity" — `ent` is computed but Raven's own body
-        // never reads it (only `en`/`other` below); kept for parity with the
-        // oracle's dead local.
-        let _ent: *mut gentity_t = if en.is_null() || (*en).client.is_null() {
+        // the activating entity" — when `en` has no client, all three uses
+        // below (self-use test, GlobalUse activator/owner, inuse guard) target
+        // `other` instead.
+        let ent: *mut gentity_t = if en.is_null() || (*en).client.is_null() {
             other
         } else {
             en
@@ -758,16 +758,16 @@ pub fn UseSiegeTarget(
             if t.is_null() {
                 break;
             }
-            if t == en {
+            if t == ent {
                 // G_Printf("WARNING: Entity used itself.\n") — no format args.
                 crate::g_main::G_Printf(
                     ctx,
                     b"WARNING: Entity used itself.\n\0".as_ptr() as *const c_char,
                 );
             } else if !(*t).use_.is_none() {
-                GlobalUse(t, en, en);
+                GlobalUse(t, ent, ent);
             }
-            if (*en).inuse == 0 {
+            if (*ent).inuse == 0 {
                 crate::g_main::G_Printf(
                     ctx,
                     b"entity was removed while using targets\n\0".as_ptr() as *const c_char,
@@ -2485,6 +2485,9 @@ pub fn SP_misc_siege_item(ctx: GameContext<'_>, ent: *mut gentity_t) {
         (*ent).s.modelindex = G_ModelIndex((*ent).model as *const c_char);
 
         // Is the model a ghoul2 model?
+        // Raven indexes `model[strlen(model) - 4]`, which underflows for names
+        // shorter than 4 chars; the `>= 4` guard defines that case as leaving
+        // modelGhoul2 unset.
         let model_str = core::ffi::CStr::from_ptr((*ent).model).to_bytes();
         if model_str.len() >= 4
             && Q_stricmp(

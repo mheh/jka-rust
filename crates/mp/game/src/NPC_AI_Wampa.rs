@@ -282,6 +282,12 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
         let radius = 88.0f32;
         let radiusSquared = radius * radius;
         let mut boltOrg: [f32; 3] = [0.0; 3];
+        // damage is rolled once, before the loop, and applied to every entity hit.
+        let damage = if backhand != 0 {
+            (*ctx.world).bg_state.rng.Q_irand(10, 15)
+        } else {
+            (*ctx.world).bg_state.rng.Q_irand(20, 30)
+        };
 
         let numEnts = crate::NPC_utils::NPC_GetEntsNearBolt(
             ctx,
@@ -324,11 +330,7 @@ pub fn Wampa_Slash(ctx: GameContext<'_>, boltIndex: c_int, backhand: qboolean) {
                     npc,
                     Some(&mut origin),
                     (*radiusEnt).r.currentOrigin,
-                    if backhand != 0 {
-                        (*ctx.world).bg_state.rng.Q_irand(10, 15)
-                    } else {
-                        (*ctx.world).bg_state.rng.Q_irand(20, 30)
-                    },
+                    damage,
                     if backhand != 0 {
                         crate::prelude::DAMAGE_NO_ARMOR
                     } else {

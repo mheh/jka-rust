@@ -247,6 +247,10 @@ pub fn AI_SortGroupByPathCostToEnemy(ctx: GameContext<'_>, group: *mut AIGroupIn
                         {
                             // this guy has a shorter path than the one currently in this spot,
                             // bump him and put myself in here
+                            // Raven's shift loop is `for (k = numGroup; k > j; k++)`, a
+                            // non-terminating buffer overrun (UB); the port takes the
+                            // intended downward shift (`k -= 1`), in bounds since
+                            // numGroup <= MAX_GROUP_MEMBERS - 1.
                             let mut k = (*group).numGroup;
                             while k > j {
                                 bestMembers[k as usize] = bestMembers[(k - 1) as usize];

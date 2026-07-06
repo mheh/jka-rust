@@ -258,7 +258,7 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
 
         if (*ent).s.eType == ET_NPC as c_int && (*ent).s.number >= MAX_CLIENTS as c_int {
             //rwwFIXMEFIXME: Temp
-            write_cstr_field(&mut forcePowers, "forcepowers\\7-1-333003000313003120");
+            write_cstr_field(&mut userinfo, "forcepowers\\7-1-333003000313003120");
         } else {
             trap::GetUserinfo(
                 ctx.engine,
@@ -268,11 +268,12 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
                     userinfo.len() as c_int,
                 ),
             );
-            let userinfo_str = cstr_to_str(userinfo.as_ptr());
-            let key = cstr("forcepowers");
-            let val = Info_ValueForKey(cstr(&userinfo_str).as_ptr(), key.as_ptr());
-            write_cstr_field(&mut forcePowers, &cstr_to_str(val));
         }
+
+        let userinfo_str = cstr_to_str(userinfo.as_ptr());
+        let key = cstr("forcepowers");
+        let val = Info_ValueForKey(cstr(&userinfo_str).as_ptr(), key.as_ptr());
+        write_cstr_field(&mut forcePowers, &cstr_to_str(val));
 
         // PORT-NOTE(bot-forcepowers): `(*ent).r.svFlags & SVF_BOT` + `botstates`
         // branch overwrites `forcePowers` from the bot's personality file.
@@ -546,7 +547,12 @@ pub fn WP_InitForcePowers(ctx: GameContext<'_>, ent: *mut gentity_t) {
             (*cl).ps.fd.forcePowerSelected = (*cl).sess.selectedFP;
         }
 
-        if (*cl).ps.fd.forcePowersKnown & (1 << (*cl).ps.fd.forcePowerSelected) == 0 {
+        // Raven shifts by forcePowerSelected while it can still be -1 (fresh client,
+        // set to -1 above) — shift-by-negative UB; x86/ARM both mask the count (= 1<<31,
+        // never a known power), so the masked shift is the one defined behavior (§19).
+        if (*cl).ps.fd.forcePowersKnown & 1i32.wrapping_shl((*cl).ps.fd.forcePowerSelected as u32)
+            == 0
+        {
             if lastFPKnown != -1 {
                 (*cl).ps.fd.forcePowerSelected = lastFPKnown;
             } else {
@@ -3759,7 +3765,9 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                     let knockback: f32 = if pull != 0 { 0.0 } else { 200.0 };
                     let _ = knockback;
 
-                    let mut pushPowerMod: f32 = pushPower as f32;
+                    // Raven `int pushPowerMod`: each compound step evaluates in
+                    // double then truncates back to int before the next use.
+                    let mut pushPowerMod: c_int = pushPower;
 
                     if (*pcl).pers.cmd.forwardmove != 0 || (*pcl).pers.cmd.rightmove != 0 {
                         //if you are moving, you get one less level of defense
@@ -3795,21 +3803,24 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                         //Make a counter-throw effect
 
                         if otherPushPower >= modPowerLevel {
-                            pushPowerMod = 0.0;
+                            pushPowerMod = 0;
                             canPullWeapon = qfalse;
                         } else {
                             let powerDif = modPowerLevel - otherPushPower;
 
                             if powerDif >= 3 {
-                                pushPowerMod -= pushPowerMod * 0.2;
+                                pushPowerMod =
+                                    (pushPowerMod as f64 - pushPowerMod as f64 * 0.2) as c_int;
                             } else if powerDif == 2 {
-                                pushPowerMod -= pushPowerMod * 0.4;
+                                pushPowerMod =
+                                    (pushPowerMod as f64 - pushPowerMod as f64 * 0.4) as c_int;
                             } else if powerDif == 1 {
-                                pushPowerMod -= pushPowerMod * 0.8;
+                                pushPowerMod =
+                                    (pushPowerMod as f64 - pushPowerMod as f64 * 0.8) as c_int;
                             }
 
-                            if pushPowerMod < 0.0 {
-                                pushPowerMod = 0.0;
+                            if pushPowerMod < 0 {
+                                pushPowerMod = 0;
                             }
                         }
                     }
@@ -3916,26 +3927,26 @@ pub fn ForceThrow(ctx: GameContext<'_>, self_: *mut gentity_t, pull: qboolean) {
                     (*pcl).otherKillerVehWeapon = 0;
                     (*pcl).otherKillerWeaponType = WP_NONE as c_int;
 
-                    pushPowerMod -= dirLen * 0.7;
-                    if pushPowerMod < 16.0 {
-                        pushPowerMod = 16.0;
+                    pushPowerMod = (pushPowerMod as f64 - dirLen as f64 * 0.7) as c_int;
+                    if pushPowerMod < 16 {
+                        pushPowerMod = 16;
                     }
 
                     //fullbody push effect
                     (*pcl).pushEffectTime = level_time + 600;
 
-                    (*pcl).ps.velocity[0] = pushDir[0] * pushPowerMod;
-                    (*pcl).ps.velocity[1] = pushDir[1] * pushPowerMod;
+                    (*pcl).ps.velocity[0] = pushDir[0] * pushPowerMod as f32;
+                    (*pcl).ps.velocity[1] = pushDir[1] * pushPowerMod as f32;
 
                     if (*pcl).ps.velocity[2] as c_int == 0 {
                         //if not going anywhere vertically, boost them up a bit
-                        (*pcl).ps.velocity[2] = pushDir[2] * pushPowerMod;
+                        (*pcl).ps.velocity[2] = pushDir[2] * pushPowerMod as f32;
 
                         if (*pcl).ps.velocity[2] < 128.0 {
                             (*pcl).ps.velocity[2] = 128.0;
                         }
                     } else {
-                        (*pcl).ps.velocity[2] = pushDir[2] * pushPowerMod;
+                        (*pcl).ps.velocity[2] = pushDir[2] * pushPowerMod as f32;
                     }
                 } else if (*push_list[x]).s.eType == ET_MISSILE as c_int
                     && (*push_list[x]).s.pos.trType != TR_STATIONARY
@@ -5060,11 +5071,13 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
             let mut elevated: vec3_t = (*cl).ps.origin;
             elevated[2] += 40.0;
 
-            let angle = ((level_time / 12) & 255) as f64 * (M_PI * 2.0) / 255.0;
+            // Raven `float angle`: the orbit angle narrows to f32, then re-widens
+            // for libm's `double cos`/`sin`.
+            let angle = (((level_time / 12) & 255) as f64 * (M_PI * 2.0) / 255.0) as f32;
             let dir: vec3_t = [
-                (angle.cos() * 20.0) as f32,
-                (angle.sin() * 20.0) as f32,
-                (angle.cos() * 5.0) as f32,
+                ((angle as f64).cos() * 20.0) as f32,
+                ((angle as f64).sin() * 20.0) as f32,
+                ((angle as f64).cos() * 5.0) as f32,
             ];
             let org: vec3_t = [
                 elevated[0] + dir[0],
@@ -5109,11 +5122,13 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
 
             elevated[2] -= 55.0 - prefig;
 
-            let angle = ((level_time / 12) & 255) as f64 * (M_PI * 2.0) / 255.0;
+            // Raven `float angle`: the orbit angle narrows to f32, then re-widens
+            // for libm's `double cos`/`sin`.
+            let angle = (((level_time / 12) & 255) as f64 * (M_PI * 2.0) / 255.0) as f32;
             let dir: vec3_t = [
-                (angle.cos() * 20.0) as f32,
-                (angle.sin() * 20.0) as f32,
-                (angle.cos() * 5.0) as f32,
+                ((angle as f64).cos() * 20.0) as f32,
+                ((angle as f64).sin() * 20.0) as f32,
+                ((angle as f64).cos() * 5.0) as f32,
             ];
             let org: vec3_t = [
                 elevated[0] + dir[0],
@@ -5172,11 +5187,13 @@ pub fn SeekerDroneUpdate(ctx: GameContext<'_>, self_: *mut gentity_t) {
             let mut elevated: vec3_t = (*cl).ps.origin;
             elevated[2] += 40.0;
 
-            let angle = ((level_time / 12) & 255) as f64 * (M_PI * 2.0) / 255.0;
+            // Raven `float angle`: the orbit angle narrows to f32, then re-widens
+            // for libm's `double cos`/`sin`.
+            let angle = (((level_time / 12) & 255) as f64 * (M_PI * 2.0) / 255.0) as f32;
             let dir: vec3_t = [
-                (angle.cos() * 20.0) as f32,
-                (angle.sin() * 20.0) as f32,
-                (angle.cos() * 5.0) as f32,
+                ((angle as f64).cos() * 20.0) as f32,
+                ((angle as f64).sin() * 20.0) as f32,
+                ((angle as f64).cos() * 5.0) as f32,
             ];
             let org: vec3_t = [
                 elevated[0] + dir[0],
@@ -5941,8 +5958,9 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                             && (*ctx.world).bg_state.bgSiegeClasses[(*cl).siegeClass as usize].classflags & (1 << CFL_FASTFORCEREGEN as c_int) != 0
                         {
                             //if this is siege and our player class has the fast force regen ability, then recharge with 1/5th the usual delay
+                            // Raven's `0.2` is a double literal, so the multiply runs in f64.
                             (*cl).ps.fd.forcePowerRegenDebounceTime = level_time
-                                + ((*ctx.world).cvars.g_forceRegenTime.integer as f32 * 0.2)
+                                + ((*ctx.world).cvars.g_forceRegenTime.integer as f64 * 0.2)
                                     as c_int;
                         } else {
                             (*cl).ps.fd.forcePowerRegenDebounceTime =
@@ -5953,16 +5971,21 @@ pub fn WP_ForcePowersUpdate(ctx: GameContext<'_>, self_: *mut gentity_t, ucmd: *
                             && (*cl).sess.duelTeam == DUELTEAM_LONE as c_int
                         {
                             if (*ctx.world).cvars.g_duel_fraglimit.integer != 0 {
+                                // Raven's `0.6`/`.3` are double literals, so the whole
+                                // multiply runs in f64; `(float)wins`/`(float)fraglimit`
+                                // narrow to f32 before promoting into that f64 divide.
                                 (*cl).ps.fd.forcePowerRegenDebounceTime = level_time
-                                    + ((*ctx.world).cvars.g_forceRegenTime.integer as f32
+                                    + ((*ctx.world).cvars.g_forceRegenTime.integer as f64
                                         * (0.6
-                                            + (0.3 * (*cl).sess.wins as f32
+                                            + (0.3 * (*cl).sess.wins as f32 as f64
                                                 / (*ctx.world).cvars.g_duel_fraglimit.integer
-                                                    as f32)))
+                                                    as f32
+                                                    as f64)))
                                         as c_int;
                             } else {
+                                // Raven's `0.7` is a double literal, so the multiply runs in f64.
                                 (*cl).ps.fd.forcePowerRegenDebounceTime = level_time
-                                    + ((*ctx.world).cvars.g_forceRegenTime.integer as f32 * 0.7)
+                                    + ((*ctx.world).cvars.g_forceRegenTime.integer as f64 * 0.7)
                                         as c_int;
                             }
                         } else {

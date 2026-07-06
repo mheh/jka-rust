@@ -2318,10 +2318,12 @@ pub fn G_Say(
                 let mut location = [0 as c_char; 64];
                 if crate::g_team::Team_GetLocationMsg(ctx, ent, location.as_mut_ptr(), 64) != qfalse
                 {
-                    name = format!("^7({}^7)^7: ", netname);
+                    // Raven's EC macro is the literal byte 0x19, distinct from
+                    // the ^7 color escape (Q_COLOR_ESCAPE + COLOR_WHITE).
+                    name = format!("\u{19}({}^7\u{19})\u{19}: ", netname);
                     locMsg = Some(cstr_to_str(location.as_ptr()));
                 } else {
-                    name = format!("^7({}^7)^7: ", netname);
+                    name = format!("\u{19}({}^7\u{19})\u{19}: ", netname);
                 }
                 color = COLOR_CYAN;
             }
@@ -2340,13 +2342,15 @@ pub fn G_Say(
                     if crate::g_team::Team_GetLocationMsg(ctx, ent, location.as_mut_ptr(), 64)
                         != qfalse
                     {
-                        name = format!("^7[{}^7]^7: ", netname);
+                        // EC is the literal byte 0x19, distinct from the ^7
+                        // color escape (Q_COLOR_ESCAPE + COLOR_WHITE).
+                        name = format!("\u{19}[{}^7\u{19}]\u{19}: ", netname);
                         locMsg = Some(cstr_to_str(location.as_ptr()));
                     } else {
-                        name = format!("^7[{}^7]^7: ", netname);
+                        name = format!("\u{19}[{}^7\u{19}]\u{19}: ", netname);
                     }
                 } else {
-                    name = format!("^7[{}^7]^7: ", netname);
+                    name = format!("\u{19}[{}^7\u{19}]\u{19}: ", netname);
                 }
                 color = COLOR_MAGENTA;
             }
@@ -2354,7 +2358,9 @@ pub fn G_Say(
                 // SAY_ALL and default
                 let logmsg = format!("say: {}: {}\n", netname, chat);
                 crate::g_main::G_LogPrintf(ctx, cstr(&logmsg).as_ptr());
-                name = format!("{}^7: ", netname);
+                // Trailing EC is the literal byte 0x19, distinct from the ^7
+                // color escape (Q_COLOR_ESCAPE + COLOR_WHITE).
+                name = format!("{}^7\u{19}: ", netname);
                 color = COLOR_GREEN;
             }
         }
@@ -2617,7 +2623,10 @@ pub fn Cmd_GameCommand_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
         if player < 0 || player >= MAX_CLIENTS as c_int {
             return;
         }
-        if order < 0 || order as usize > gc_orders.len() {
+        // C's guard `order > sizeof(gc_orders)/sizeof(char*)` is off by one and
+        // lets order == 7 index a 7-element array (UB read). Bound at `>=` so the
+        // out-of-range case is a deterministic no-op instead of a panic.
+        if order < 0 || order as usize >= gc_orders.len() {
             return;
         }
         let target = &mut (*world).g_entities[player as usize] as *mut gentity_t;
@@ -3397,9 +3406,23 @@ pub fn Cmd_CallTeamVote_f(ctx: GameContext<'_>, ent: *mut gentity_t) {
             if arg2_s.is_empty() {
                 targetClientNum = (*client).ps.clientNum;
             } else {
-                let numeric = arg2_s.len() <= 3 && arg2_s.chars().all(|c| c.is_ascii_digit());
+                // C scans only the first up-to-3 chars: numeric slot iff those
+                // are all digits (i reaches 3) or the string ends inside them.
+                let bytes = arg2_s.as_bytes();
+                let mut i = 0usize;
+                while i < 3 {
+                    let c = if i < bytes.len() { bytes[i] } else { 0 };
+                    if c == 0 || !c.is_ascii_digit() {
+                        break;
+                    }
+                    i += 1;
+                }
+                let numeric = i >= 3 || i >= bytes.len();
                 if numeric {
-                    targetClientNum = arg2_s.parse().unwrap_or(-1);
+                    // atoi: value of the leading digit run.
+                    let run: String =
+                        arg2_s.chars().take_while(|c| c.is_ascii_digit()).collect();
+                    targetClientNum = run.parse().unwrap_or(0);
                     if targetClientNum < 0 || targetClientNum >= (*world).level.maxclients {
                         let msg = format!("print \"Bad client slot: {}\n\"", targetClientNum);
                         trap::SendServerCommand(ctx.engine, mp_abi::game::syscalls::G_SEND_SERVER_COMMAND::GSendServerCommandArgs::new(ent_index(ctx, ent), cstr(&msg)));

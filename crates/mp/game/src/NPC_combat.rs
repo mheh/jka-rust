@@ -1200,8 +1200,11 @@ pub fn NPC_MaxDistSquaredForWeapon(ctx: GameContext<'_>) -> f32 {
                 let npc_client = (*npc).client as *mut gclient_t;
                 if !npc_client.is_null() && (*npc_client).saber[0].blade[0].lengthMax != 0.0 {
                     //FIXME: account for whether enemy and I are heading towards each other!
-                    let reach = (*npc_client).saber[0].blade[0].lengthMax + (*npc).r.maxs[0] * 1.5;
-                    reach * reach
+                    // C's `1.5` is a double literal: the `*1.5`, the sum, and the
+                    // square evaluate in f64, narrowing to float only on return.
+                    let reach = (*npc_client).saber[0].blade[0].lengthMax as f64
+                        + (*npc).r.maxs[0] as f64 * 1.5;
+                    (reach * reach) as f32
                 } else {
                     48.0 * 48.0
                 }
@@ -1316,6 +1319,8 @@ pub fn NPC_PickEnemy(
         let base = ent_base(ctx);
 
         let mut num_choices: usize = 0;
+        // §19: a >128th valid candidate silently overruns the stack array in C
+        // (UB); here the index panics — unreachable with realistic enemy counts.
         let mut choice: [c_int; 128] = [0; 128];
         let mut closestEnemy: *mut gentity_t = core::ptr::null_mut();
         let mut bestDist: f32 = crate::g_public_consts::Q3_INFINITE as f32;
@@ -1952,7 +1957,11 @@ pub fn NPC_ClearShot(ctx: GameContext<'_>, ent: *mut gentity_t) -> qboolean {
 /// Raven `NPC_ShotEntity`.
 ///
 /// Source: `oracle/oracle/codemp/game/NPC_combat.c:2152-2206`
-pub fn NPC_ShotEntity(ctx: GameContext<'_>, ent: *mut gentity_t, impactPos: vec3_t) -> c_int {
+pub fn NPC_ShotEntity(
+    ctx: GameContext<'_>,
+    ent: *mut gentity_t,
+    impactPos: Option<&mut vec3_t>,
+) -> c_int {
     unsafe {
         let npc = (*ctx.world).globals.NPC;
         let mut muzzle: vec3_t = [0.0; 3];
@@ -2024,12 +2033,10 @@ pub fn NPC_ShotEntity(ctx: GameContext<'_>, ent: *mut gentity_t, impactPos: vec3
             );
         }
         //FIXME: if using a bouncing weapon like the bowcaster, should we check the reflection of the wall, too?
-        // PORT-NOTE(vec3-out-param-reshape): `impactPos` here is caller-owned
-        // storage kept by-value; Raven's `if (impactPos)` null-check is
-        // unreachable for a by-value array, so this always writes through.
-        let mut impactPos = impactPos;
-        impactPos = tr.endpos;
-        let _ = impactPos; // write-only out per Raven contract; caller owns the array
+        if let Some(p) = impactPos {
+            //they want to know *where* the hit would be, too
+            *p = tr.endpos;
+        }
         tr.entityNum as c_int
     }
 }

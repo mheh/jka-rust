@@ -319,7 +319,7 @@ pub fn Q3_Play(
             let file = CString::new(std::ffi::CStr::from_ptr(name).to_bytes()).unwrap();
             (*ent).roffid = trap::ROFF_Cache(ctx.engine, GRoffCacheArgs::new(file));
             if (*ent).roffid != 0 {
-                (*ent).roffname = G_NewString(name);
+                (*ent).roffname = G_NewString(ctx, name);
 
                 // Save this off for later
                 trap::ICARUS_TaskIDSet(
@@ -1763,7 +1763,11 @@ pub fn Q3_SetOriginOffset(ctx: GameContext<'_>, entID: c_int, axis: c_int, offse
         origin[axis as usize] += offset;
         let mut duration = 0.0f32;
         if (*ent).speed != 0.0 {
-            duration = (offset.abs() / (*ent).speed.abs()) * 1000.0;
+            // C's `fabs` is the double libm function: the divide and `*1000.0f`
+            // evaluate in f64, narrowing to the float `duration` only at the
+            // assignment. f32-throughout would diverge at Q3_Lerp2Origin's
+            // `trDuration` truncation boundaries.
+            duration = ((offset as f64).abs() / ((*ent).speed as f64).abs() * 1000.0) as f32;
         }
         Q3_Lerp2Origin(ctx, -1, entID, origin, duration);
     }
@@ -1949,8 +1953,11 @@ pub fn Q3_SetNavGoal(ctx: GameContext<'_>, entID: c_int, name: *const c_char) ->
                 return qfalse;
             }
             (*npc).goalEntity = Some(ent_id((*ctx.world).g_entities.as_mut_ptr(), targ));
-            (*npc).goalRadius = (((*ent).r.maxs[0] + (*ent).r.maxs[0]).sqrt()
-                + ((*targ).r.maxs[0] + (*targ).r.maxs[0]).sqrt())
+            // C's `sqrt` is the double libm function: the float sums promote to
+            // f64, are rooted and summed in f64, then truncated to the int
+            // `goalRadius`. f32-throughout would diverge at truncation boundaries.
+            (*npc).goalRadius = (((*ent).r.maxs[0] as f64 + (*ent).r.maxs[0] as f64).sqrt()
+                + ((*targ).r.maxs[0] as f64 + (*targ).r.maxs[0] as f64).sqrt())
                 as c_int;
             (*npc).aiFlags &= !NPCAI_TOUCHED_GOAL;
             qfalse
@@ -2861,7 +2868,7 @@ pub fn Q3_SetTargetName(ctx: GameContext<'_>, entID: c_int, targetname: *const c
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, targetname) == 0 {
             (*self_).targetname = std::ptr::null_mut();
         } else {
-            (*self_).targetname = G_NewString(targetname);
+            (*self_).targetname = G_NewString(ctx, targetname);
         }
     }
 }
@@ -2876,7 +2883,7 @@ pub fn Q3_SetTarget(ctx: GameContext<'_>, entID: c_int, target: *const c_char) {
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, target) == 0 {
             (*self_).target = std::ptr::null_mut();
         } else {
-            (*self_).target = G_NewString(target);
+            (*self_).target = G_NewString(ctx, target);
         }
     }
 }
@@ -2924,7 +2931,7 @@ pub fn Q3_SetFullName(ctx: GameContext<'_>, entID: c_int, fullName: *const c_cha
         if Q_stricmp(b"NULL\0".as_ptr() as *const c_char, fullName) == 0 {
             (*self_).fullName = std::ptr::null_mut();
         } else {
-            (*self_).fullName = G_NewString(fullName);
+            (*self_).fullName = G_NewString(ctx, fullName);
         }
     }
 }
@@ -2973,7 +2980,10 @@ pub fn Q3_SetParm(ctx: GameContext<'_>, entID: c_int, parmNum: c_int, parmValue:
         }
 
         if (*ent).parms.is_null() {
-            (*ent).parms = G_Alloc(core::mem::size_of::<parms_t>() as c_int) as *mut parms_t;
+            (*ent).parms = G_Alloc(ctx, core::mem::size_of::<parms_t>() as c_int) as *mut parms_t;
+            // G_Alloc is a bump allocator whose pool is not re-zeroed on map
+            // restart; C memsets the fresh parms_t so reused regions read empty.
+            core::ptr::write_bytes((*ent).parms as *mut u8, 0, core::mem::size_of::<parms_t>());
         }
 
         let val = Q3_GameSideCheckStringCounterIncrement(parmValue);
@@ -3821,7 +3831,7 @@ pub fn Q3_SetBehaviorSet(
             if !(*ent).behaviorSet[bSet as usize].is_null() {
                 //				gi.TagFree( ent->behaviorSet[bSet] );
             }
-            (*ent).behaviorSet[bSet as usize] = G_NewString(scriptname); //FIXME: This really isn't good...
+            (*ent).behaviorSet[bSet as usize] = G_NewString(ctx, scriptname); //FIXME: This really isn't good...
         }
         qtrue
     }
@@ -4103,6 +4113,11 @@ pub fn Q3_Set(
         // helper in a different module) — inlined the same whitespace-split
         // float-parse literally at each of the two call sites below rather
         // than defining a new shared shim.
+        // §19: C leaves any component sscanf fails to parse UNINITIALIZED
+        // (garbage-float UB on `vector_data`); the fill below defaults missing
+        // components to 0.0. C's `%f` also stops at the first unparseable token
+        // whereas `filter_map(..ok())` skips non-numeric ones — divergent only
+        // on malformed data; real ICARUS scripts always pass three clean floats.
         match toSet {
             _ if toSet == SET_ORIGIN as i32 => {
                 {

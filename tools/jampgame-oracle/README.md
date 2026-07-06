@@ -41,6 +41,37 @@ model and rules below apply unchanged. Current set:
   `BG_PlayerStateToEntityState(ExtraPolate)`. Fixed the port's f32-vs-f64
   trajectory evaluation. `snap=1` excluded (§19 — the `-D__linux__` macro
   truncates where retail x87 rounds; platform-ifdef not arbitrable here).
+- **gcombat** (`run_gcombat.sh`) — the first *game-tier* slice. Drives three
+  pure-ish leaf functions of the UNMODIFIED `g_combat.c` (full-TU compile, not
+  extracted): `RaySphereIntersections` (ray/sphere hit count + normalized dir +
+  both intersection points), `G_GetHitLocation` (locational hit-zone from an
+  impact point + target box/angles; the NULL-client branch is excluded — it
+  leaves `tangles` uninitialized in Raven, UB per §19), and `CheckArmor`
+  (shield absorption: return value + the mutated `STAT_ARMOR`, over every
+  dflag/clamp/vehicle-shield branch). `g_combat.c` extern-references ~120
+  game/engine symbols across functions the dumper never calls: `main_gcombat.c`
+  defines the zeroed data globals it reads (only `level.time` is on a tested
+  path), and `stubs_gcombat.c` — compiled **without** the game headers, so its
+  argless K&R abort() stubs never clash with the real prototypes (the C linker
+  binds by name alone) — satisfies every unreachable function. **Fixed one port
+  bug**: `RaySphereIntersections` evaluated its roots `(-b ± sqrt(d)) / 2` in
+  f32, but Raven's `sqrt` is libm's *double*, so the root is an f64 computation
+  narrowed to f32 — a last-bit divergence on irrational `sqrt(d)` (caught on
+  `ray 5`). The Rust side (`crates/mp/game/tests/gcombat_parity.rs`) builds a
+  live owned `GameWorld` + a never-invoked `Engine` (none of the three functions
+  crosses the syscall seam) and runs on a roomy stack (the by-value `GameWorld`
+  temporary overflows the small test-harness worker stack).
+- **wsaber** (`run_wsaber.sh`) — a game-tier slice over two pure *integer* leaf
+  functions of the UNMODIFIED `w_saber.c` (full-TU compile): `G_SaberLockAnim`
+  (saber-lock/break anim selection, an exhaustive `8×8×2×3×2 = 768`-combo sweep
+  over `saber_styles_t` × `SABERLOCK_*` axes, covering the same-style-lose
+  special case and every general-path branch) and `G_KnockawayForParry` (the
+  parry→knockaway-anim switch over a `0..240` move sweep). Same stub model as
+  gcombat: `main_wsaber.c` defines ~35 zeroed data globals, `stubs_wsaber.c`
+  abort()-stubs 89 unreachable functions. The sweep bounds are the committed
+  fixtures (`fixtures/wsaber/{lockanim,knockaway}.txt`); both the dumper and
+  `crates/mp/game/tests/wsaber_parity.rs` expand the identical nested loops.
+  Reproduced the golden byte-for-byte on first reconciliation — no port bug.
 - **pmove_saber** (`run_pmove_saber.sh`) — the pmove single-step model
   (spec/world/RNG tripwire unchanged) re-based on `WP_SABER`: stance/gait
   anims, standing/running/strafing attack arcs (`saberMove` chains), jump.
