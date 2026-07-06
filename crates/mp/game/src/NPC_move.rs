@@ -9,39 +9,12 @@
 #![allow(non_snake_case, unused, clippy::all)]
 
 use crate::bg_panimate::PM_InKnockDown;
-use crate::g_nav::NAV_AvoidCollision;
+use crate::g_nav::{NAV_AvoidCollision, NAV_MoveToGoal};
 use crate::g_navnew::{NAVNEW_AvoidCollision, NAVNEW_MoveToGoal};
 use crate::prelude::*;
-use crate::q_math::{AngleVectors, VectorNormalize};
+use crate::q_math::{AngleNormalize360, AngleVectors, VectorNormalize, _VectorCopy, vectoangles};
 use crate::trap;
 use std::ffi::c_int;
-
-/// File-scope static for `NPC_move.c` navigation state (oracle/oracle/codemp/game/NPC_move.c:14).
-/// Zeroed initially, written by NPC_GetMoveDirection and similar functions (all parked).
-/// Read by NAV_GetLastMove.
-static mut FRAME_NAV_INFO: navInfo_t = navInfo_t {
-    blocker: std::ptr::null_mut(),
-    direction: [0.0; 3],
-    pathDirection: [0.0; 3],
-    distance: 0.0,
-    trace: trace_t {
-        allsolid: 0,
-        startsolid: 0,
-        entityNum: 0,
-        fraction: 0.0,
-        endpos: [0.0; 3],
-        plane: cplane_t {
-            normal: [0.0; 3],
-            dist: 0.0,
-            r#type: 0,
-            signbits: 0,
-            pad: [0; 2],
-        },
-        surfaceFlags: 0,
-        contents: 0,
-    },
-    flags: 0,
-};
 
 /// Raven `NPC_ClearPathToGoal`.
 ///
@@ -193,7 +166,8 @@ pub fn NPC_GetMoveInformation(
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:149-152`
 pub fn NAV_GetLastMove(ctx: GameContext<'_>, info: *mut navInfo_t) {
     unsafe {
-        *info = FRAME_NAV_INFO;
+        let world = &mut *ctx.world;
+        *info = world.globals.frameNavInfo.0;
     }
 }
 
@@ -202,81 +176,86 @@ pub fn NAV_GetLastMove(ctx: GameContext<'_>, info: *mut navInfo_t) {
 /// Source: `oracle/oracle/codemp/game/NPC_move.c:160-230`
 pub fn NPC_GetMoveDirection(ctx: GameContext<'_>, mut out: vec3_t, distance: *mut f32) -> qboolean {
     unsafe {
+        let world = &mut *ctx.world;
         let npc = (*ctx.world).globals.NPC;
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
         let mut angles = [0.0f32; 3];
 
         // Clear the struct
-        FRAME_NAV_INFO = unsafe { std::mem::zeroed() };
+        world.globals.frameNavInfo.0 = std::mem::zeroed();
 
         // Get our movement, if any
         if NPC_GetMoveInformation(
             ctx,
-            &mut FRAME_NAV_INFO.direction,
-            &mut FRAME_NAV_INFO.distance,
+            &mut world.globals.frameNavInfo.0.direction,
+            &mut world.globals.frameNavInfo.0.distance,
         ) == qfalse
         {
             return qfalse;
         }
 
         // Setup the return value
-        *distance = FRAME_NAV_INFO.distance;
+        *distance = world.globals.frameNavInfo.0.distance;
 
         // For starters
-        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.pathDirection);
+        _VectorCopy(
+            world.globals.frameNavInfo.0.direction,
+            &mut world.globals.frameNavInfo.0.pathDirection,
+        );
 
         // If on a ladder, move appropriately
         if ((*npc).watertype & CONTENTS_LADDER) != 0 {
-            NPC_LadderMove(ctx, FRAME_NAV_INFO.direction);
+            NPC_LadderMove(ctx, world.globals.frameNavInfo.0.direction);
             return qtrue;
         }
 
         // Attempt a straight move to goal
         if let Some(goal_id) = npc_info.goalEntity {
             let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
-            if NPC_ClearPathToGoal(ctx, FRAME_NAV_INFO.direction, goal_ptr) == qfalse {
+            if NPC_ClearPathToGoal(ctx, world.globals.frameNavInfo.0.direction, goal_ptr) == qfalse
+            {
                 // See if we're just stuck
-                if crate::g_nav::NAV_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO as *mut navInfo_t)
+                if NAV_MoveToGoal(ctx, npc, &mut world.globals.frameNavInfo.0 as *mut navInfo_t)
                     == WAYPOINT_NONE
                 {
                     // Can't reach goal, just face
-                    crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
-                    npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
-                    crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
-                    *distance = FRAME_NAV_INFO.distance;
+                    vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
+                    npc_info.desiredYaw = AngleNormalize360(angles[1]);
+                    _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+                    *distance = world.globals.frameNavInfo.0.distance;
                     return qfalse;
                 }
 
-                FRAME_NAV_INFO.flags |= NIF_MACRO_NAV;
+                world.globals.frameNavInfo.0.flags |= NIF_MACRO_NAV;
             }
         }
 
         // Avoid any collisions on the way
         if let Some(goal_id) = npc_info.goalEntity {
             let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
-            if NAV_AvoidCollision(ctx, npc, goal_ptr, &mut FRAME_NAV_INFO) == qfalse {
-                if (FRAME_NAV_INFO.flags & NIF_MACRO_NAV) == 0 {
+            if NAV_AvoidCollision(ctx, npc, goal_ptr, &mut world.globals.frameNavInfo.0) == qfalse {
+                if (world.globals.frameNavInfo.0.flags & NIF_MACRO_NAV) == 0 {
                     // we had a clear path to goal and didn't try macro nav, but can't avoid collision so try macro nav here
                     // See if we're just stuck
-                    if crate::g_nav::NAV_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO as *mut navInfo_t)
+                    if NAV_MoveToGoal(ctx, npc, &mut world.globals.frameNavInfo.0 as *mut navInfo_t)
                         == WAYPOINT_NONE
                     {
                         // Can't reach goal, just face
-                        crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
-                        npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
-                        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
-                        *distance = FRAME_NAV_INFO.distance;
+                        vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
+                        npc_info.desiredYaw = AngleNormalize360(angles[1]);
+                        _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+                        *distance = world.globals.frameNavInfo.0.distance;
                         return qfalse;
                     }
 
-                    FRAME_NAV_INFO.flags |= NIF_MACRO_NAV;
+                    world.globals.frameNavInfo.0.flags |= NIF_MACRO_NAV;
                 }
             }
         }
 
         // Setup the return values
-        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
-        *distance = FRAME_NAV_INFO.distance;
+        _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+        *distance = world.globals.frameNavInfo.0.distance;
 
         return qtrue;
     }
@@ -292,6 +271,7 @@ pub fn NPC_GetMoveDirectionAltRoute(
     tryStraight: qboolean,
 ) -> qboolean {
     unsafe {
+        let world = &mut *ctx.world;
         let npc = (*ctx.world).globals.NPC;
         let npc_info = &mut *(*ctx.world).globals.NPCInfo;
         let mut angles = [0.0f32; 3];
@@ -299,27 +279,30 @@ pub fn NPC_GetMoveDirectionAltRoute(
         npc_info.aiFlags &= !NPCAI_BLOCKED;
 
         // Clear the struct
-        FRAME_NAV_INFO = unsafe { std::mem::zeroed() };
+        world.globals.frameNavInfo.0 = std::mem::zeroed();
 
         // Get our movement, if any
         if NPC_GetMoveInformation(
             ctx,
-            &mut FRAME_NAV_INFO.direction,
-            &mut FRAME_NAV_INFO.distance,
+            &mut world.globals.frameNavInfo.0.direction,
+            &mut world.globals.frameNavInfo.0.distance,
         ) == qfalse
         {
             return qfalse;
         }
 
         // Setup the return value
-        *distance = FRAME_NAV_INFO.distance;
+        *distance = world.globals.frameNavInfo.0.distance;
 
         // For starters
-        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut FRAME_NAV_INFO.pathDirection);
+        _VectorCopy(
+            world.globals.frameNavInfo.0.direction,
+            &mut world.globals.frameNavInfo.0.pathDirection,
+        );
 
         // If on a ladder, move appropriately
         if ((*npc).watertype & CONTENTS_LADDER) != 0 {
-            NPC_LadderMove(ctx, FRAME_NAV_INFO.direction);
+            NPC_LadderMove(ctx, world.globals.frameNavInfo.0.direction);
             return qtrue;
         }
 
@@ -327,46 +310,55 @@ pub fn NPC_GetMoveDirectionAltRoute(
         if let Some(goal_id) = npc_info.goalEntity {
             let goal_ptr = &mut (*ctx.world).g_entities[goal_id.index()] as *mut gentity_t;
             if tryStraight == qfalse
-                || NPC_ClearPathToGoal(ctx, FRAME_NAV_INFO.direction, goal_ptr) == qfalse
+                || NPC_ClearPathToGoal(ctx, world.globals.frameNavInfo.0.direction, goal_ptr)
+                    == qfalse
             {
                 // blocked — Can't get straight to goal, use macro nav
-                if NAVNEW_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO) == WAYPOINT_NONE {
+                if NAVNEW_MoveToGoal(ctx, npc, &mut world.globals.frameNavInfo.0) == WAYPOINT_NONE {
                     // Can't reach goal, just face
-                    crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
-                    npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
-                    crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
-                    *distance = FRAME_NAV_INFO.distance;
+                    vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
+                    npc_info.desiredYaw = AngleNormalize360(angles[1]);
+                    _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+                    *distance = world.globals.frameNavInfo.0.distance;
                     return qfalse;
                 }
                 // else we are on our way
-                FRAME_NAV_INFO.flags |= NIF_MACRO_NAV;
+                world.globals.frameNavInfo.0.flags |= NIF_MACRO_NAV;
             } else {
                 // we have no architectural problems, see if there are ents inthe way and try to go around them
                 // not blocked
                 if (*ctx.world).cvars.d_altRoutes.integer != 0 {
                     // try macro nav
-                    let mut temp_info = FRAME_NAV_INFO;
+                    let mut temp_info = world.globals.frameNavInfo.0;
                     if NAVNEW_AvoidCollision(ctx, npc, goal_ptr, &mut temp_info, qtrue, 5) == qfalse
                     {
                         // revert to macro nav — Can't get straight to goal, dump tempInfo and use macro nav
-                        if NAVNEW_MoveToGoal(ctx, npc, &mut FRAME_NAV_INFO) == WAYPOINT_NONE {
+                        if NAVNEW_MoveToGoal(ctx, npc, &mut world.globals.frameNavInfo.0)
+                            == WAYPOINT_NONE
+                        {
                             // Can't reach goal, just face
-                            crate::q_math::vectoangles(FRAME_NAV_INFO.direction, &mut angles);
-                            npc_info.desiredYaw = crate::q_math::AngleNormalize360(angles[1]);
-                            crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
-                            *distance = FRAME_NAV_INFO.distance;
+                            vectoangles(world.globals.frameNavInfo.0.direction, &mut angles);
+                            npc_info.desiredYaw = AngleNormalize360(angles[1]);
+                            _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+                            *distance = world.globals.frameNavInfo.0.distance;
                             return qfalse;
                         }
                         // else we are on our way
-                        FRAME_NAV_INFO.flags |= NIF_MACRO_NAV;
+                        world.globals.frameNavInfo.0.flags |= NIF_MACRO_NAV;
                     } else {
                         // otherwise, either clear or can avoid
-                        FRAME_NAV_INFO = temp_info;
+                        world.globals.frameNavInfo.0 = temp_info;
                     }
                 } else {
                     // OR: just give up
-                    if NAVNEW_AvoidCollision(ctx, npc, goal_ptr, &mut FRAME_NAV_INFO, qtrue, 30)
-                        == qfalse
+                    if NAVNEW_AvoidCollision(
+                        ctx,
+                        npc,
+                        goal_ptr,
+                        &mut world.globals.frameNavInfo.0,
+                        qtrue,
+                        30,
+                    ) == qfalse
                     {
                         // give up
                         return qfalse;
@@ -376,8 +368,8 @@ pub fn NPC_GetMoveDirectionAltRoute(
         }
 
         // Setup the return values
-        crate::q_math::_VectorCopy(FRAME_NAV_INFO.direction, &mut out);
-        *distance = FRAME_NAV_INFO.distance;
+        _VectorCopy(world.globals.frameNavInfo.0.direction, &mut out);
+        *distance = world.globals.frameNavInfo.0.distance;
 
         return qtrue;
     }

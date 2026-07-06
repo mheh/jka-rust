@@ -572,6 +572,19 @@ impl Default for GTimers {
     }
 }
 
+/// `navInfo_t frameNavInfo` (`NPC_move.c:14`) — per-frame NPC nav-move
+/// scratch state. Newtype because `navInfo_t` embeds `trace_t`/raw pointers
+/// with no library `Default` impl.
+pub struct FrameNavInfo(pub navInfo_t);
+
+impl Default for FrameNavInfo {
+    fn default() -> Self {
+        // Matches the oracle's static zero-initialization of `frameNavInfo`
+        // and every runtime `memset(&frameNavInfo, 0, sizeof(frameNavInfo))`.
+        FrameNavInfo(unsafe { core::mem::zeroed() })
+    }
+}
+
 /// `teamgame_t` — CTF flag-state file global (`g_team.c:18`).
 ///
 /// Source: `oracle/oracle/codemp/game/g_team.c:18`
@@ -686,9 +699,10 @@ pub struct GameGlobals {
     /// Source: `oracle/oracle/codemp/game/NPC_AI_Stormtrooper.c:48`
     pub impactPos: vec3_t,
     // --- `NPC_move.c` file-scope globals ---
-    //TODO: Port navInfo_t
-    // Source: oracle/oracle/codemp/game/NPC_move.c:14
-    pub frameNavInfo: (),
+    /// `navInfo_t frameNavInfo` — per-frame NPC nav-move scratch state,
+    /// reused across calls within a frame.
+    /// Source: `oracle/oracle/codemp/game/NPC_move.c:14`
+    pub frameNavInfo: FrameNavInfo,
     // --- `NPC_spawn.c` file-scope globals ---
     /// `gNPCPtrs` (`gNPC_t *[MAX_GENTITIES]`; null-init raw pointers).
     /// Source: `oracle/oracle/codemp/game/NPC_spawn.c:1276`
